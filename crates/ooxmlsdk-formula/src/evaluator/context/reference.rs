@@ -75,16 +75,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     )
   }
 
-  pub(crate) fn evaluate_intersection_ast(
-    &self,
-    left: &FormulaAst<'doc>,
-    right: &FormulaAst<'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    let left_ranges = self.reference_ranges_from_ast(left);
-    let right_ranges = self.reference_ranges_from_ast(right);
-    self.evaluate_intersection_ranges(left_ranges, right_ranges)
-  }
-
   pub(crate) fn evaluate_intersection_ranges(
     &self,
     left_ranges: Vec<QualifiedRange<'doc>>,
@@ -106,15 +96,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       1 => Some(FormulaValue::Reference(intersections.pop()?)),
       _ => Some(FormulaValue::RefList(intersections)),
     }
-  }
-
-  pub(crate) fn evaluate_range_ast(
-    &self,
-    left: &FormulaAst<'doc>,
-    right: &FormulaAst<'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    let ranges = self.range_reference_ranges_from_ast(left, right);
-    self.evaluate_range_ranges(ranges)
   }
 
   pub(crate) fn evaluate_range_ranges(
@@ -140,16 +121,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     left_ranges.extend(right_ranges);
     Some(FormulaValue::RefList(left_ranges))
-  }
-
-  pub(crate) fn range_reference_ranges_from_ast(
-    &self,
-    left: &FormulaAst<'doc>,
-    right: &FormulaAst<'doc>,
-  ) -> Vec<QualifiedRange<'doc>> {
-    let left_ranges = self.reference_ranges_from_ast(left);
-    let right_ranges = self.reference_ranges_from_ast(right);
-    self.range_reference_ranges_from_ranges(left_ranges, right_ranges)
   }
 
   pub(crate) fn range_reference_ranges_from_ranges(
@@ -181,174 +152,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       FormulaValue::RefList(ranges) if ranges.len() == 1 => ranges.first().cloned(),
       _ => None,
     }
-  }
-
-  pub(crate) fn reference_ranges_from_ast(
-    &self,
-    ast: &FormulaAst<'doc>,
-  ) -> Vec<QualifiedRange<'doc>> {
-    match ast {
-      FormulaAst::Reference(range) => vec![range.clone()],
-      FormulaAst::Binary {
-        op: FormulaOperator::Union,
-        left,
-        right,
-      } => {
-        let mut ranges = self.reference_ranges_from_ast(left);
-        ranges.extend(self.reference_ranges_from_ast(right));
-        ranges
-      }
-      FormulaAst::Binary {
-        op: FormulaOperator::Range,
-        left,
-        right,
-      } => self.range_reference_ranges_from_ast(left, right),
-      FormulaAst::Binary {
-        op: FormulaOperator::Intersection,
-        left,
-        right,
-      } => {
-        let left_ranges = self.reference_ranges_from_ast(left);
-        let right_ranges = self.reference_ranges_from_ast(right);
-        let mut intersections = Vec::new();
-        for left_range in &left_ranges {
-          for right_range in &right_ranges {
-            if let Some(range) = intersect_qualified_ranges(left_range, right_range) {
-              intersections.push(range);
-            }
-          }
-        }
-        intersections
-      }
-      FormulaAst::Function { name, args, .. }
-        if canonical_function_name(name).as_ref() == "XLOOKUP" =>
-      {
-        self.xlookup_reference_ranges(args).unwrap_or_default()
-      }
-      FormulaAst::Name(_) | FormulaAst::ExternalReference(_) | FormulaAst::Function { .. } => self
-        .evaluate(ast)
-        .map(|value| self.reference_ranges_from_value(&value))
-        .unwrap_or_default(),
-      _ => Vec::new(),
-    }
-  }
-
-  pub(crate) fn xlookup_reference_ranges(
-    &self,
-    args: &[FormulaAst<'doc>],
-  ) -> Option<Vec<QualifiedRange<'doc>>> {
-    if args.len() < 3 {
-      return None;
-    }
-    let lookup = self.scalar_value(self.evaluate(args.first()?)?);
-    let lookup_reference = self.reference_ranges_from_ast(args.get(1)?).pop()?;
-    let return_reference = self.reference_ranges_from_ast(args.get(2)?).pop()?;
-    let lookup_matrix = self.matrix_values(&FormulaValue::Reference(lookup_reference.clone()));
-    let lookup_rows = lookup_matrix.len();
-    let lookup_columns = lookup_matrix.first().map_or(0, Vec::len);
-    if lookup_rows > 1 && lookup_columns > 1 {
-      return None;
-    }
-    let (lookup_vector, lookup_vertical) = lookup_vector(&lookup_matrix)?;
-    let return_rows = return_reference
-      .range
-      .start
-      .row
-      .abs_diff(return_reference.range.end.row)
-      + 1;
-    let return_columns = return_reference
-      .range
-      .start
-      .column
-      .abs_diff(return_reference.range.end.column)
-      + 1;
-    if (lookup_vertical && return_rows as usize != lookup_vector.len())
-      || (!lookup_vertical && return_columns as usize != lookup_vector.len())
-    {
-      return None;
-    }
-    let match_mode = args
-      .get(4)
-      .and_then(|arg| self.optional_number_value(arg))
-      .unwrap_or(0.0) as i32;
-    let search_mode = args
-      .get(5)
-      .and_then(|arg| self.optional_number_value(arg))
-      .unwrap_or(1.0) as i32;
-    let search = LookupSearchMode::from_excel(search_mode)?;
-    let index = match match_mode {
-      0 => search_vector_with_type(
-        self,
-        &lookup,
-        &lookup_vector,
-        QueryOp::Equal,
-        search,
-        QuerySearchType::Normal,
-        SearchVectorFlags::new(true, false).with_first_exact(),
-      ),
-      -1 => search_vector_with_type(
-        self,
-        &lookup,
-        &lookup_vector,
-        QueryOp::Equal,
-        search,
-        QuerySearchType::Normal,
-        SearchVectorFlags::new(true, false).with_first_exact(),
-      )
-      .or_else(|| {
-        search_vector_with_type(
-          self,
-          &lookup,
-          &lookup_vector,
-          QueryOp::LessOrEqual,
-          search,
-          QuerySearchType::Normal,
-          SearchVectorFlags::new(false, true),
-        )
-      }),
-      1 => search_vector_with_type(
-        self,
-        &lookup,
-        &lookup_vector,
-        QueryOp::Equal,
-        search,
-        QuerySearchType::Normal,
-        SearchVectorFlags::new(true, false).with_first_exact(),
-      )
-      .or_else(|| {
-        search_vector_with_type(
-          self,
-          &lookup,
-          &lookup_vector,
-          QueryOp::GreaterOrEqual,
-          search,
-          QuerySearchType::Normal,
-          SearchVectorFlags::new(false, true),
-        )
-      }),
-      _ => return None,
-    }?;
-    let address = if lookup_vertical {
-      CellAddress {
-        column: return_reference.range.start.column,
-        row: return_reference.range.start.row + index as u32,
-      }
-    } else {
-      CellAddress {
-        column: return_reference.range.start.column + index as u32,
-        row: return_reference.range.start.row,
-      }
-    };
-    Some(vec![QualifiedRange {
-      sheet: return_reference.sheet,
-      sheet_name: return_reference.sheet_name,
-      range: CellRange {
-        start: address,
-        end: address,
-      },
-      start_flags: return_reference.start_flags,
-      end_flags: return_reference.end_flags,
-    }])
   }
 
   pub(crate) fn reference_ranges_from_value(

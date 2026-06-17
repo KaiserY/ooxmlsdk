@@ -72,11 +72,10 @@ pub(crate) fn evaluate_code_with_context<'doc>(
   code: &FormulaCode<'doc>,
   evaluator: &FormulaEvaluator<'_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  if let DirectEvaluation::Value(value) = evaluate_code_direct(code, evaluator) {
-    return Some(value);
+  match evaluate_code_direct(code, evaluator) {
+    DirectEvaluation::Value(value) => Some(value),
+    DirectEvaluation::Unsupported => None,
   }
-  let ast = ast_from_code(code)?;
-  evaluator.evaluate(&ast)
 }
 
 fn evaluate_code_direct<'doc>(
@@ -510,76 +509,4 @@ fn reference_ranges_from_operand<'doc>(
       Some(evaluator.reference_ranges_from_value(&value))
     }
   }
-}
-
-pub(crate) fn ast_from_code<'doc>(code: &FormulaCode<'doc>) -> Option<FormulaAst<'doc>> {
-  let mut stack = Vec::with_capacity(code.ops.len());
-  for op in &code.ops {
-    match op {
-      FormulaOp::PushBlank => stack.push(FormulaAst::Literal(FormulaValue::Blank)),
-      FormulaOp::PushText(value) => {
-        stack.push(FormulaAst::Literal(FormulaValue::String(value.clone())));
-      }
-      FormulaOp::PushNumber(value) => {
-        stack.push(FormulaAst::Literal(FormulaValue::Number(*value)));
-      }
-      FormulaOp::PushBoolean(value) => {
-        stack.push(FormulaAst::Literal(FormulaValue::Boolean(*value)));
-      }
-      FormulaOp::PushError(value) => {
-        stack.push(FormulaAst::Literal(FormulaValue::Error(*value)));
-      }
-      FormulaOp::PushReference(value) => stack.push(FormulaAst::Reference(value.clone())),
-      FormulaOp::PushExternal(value) => stack.push(FormulaAst::ExternalReference(value.clone())),
-      FormulaOp::PushName(value) => stack.push(FormulaAst::Name(value.clone())),
-      FormulaOp::Unary(value) => {
-        let expr = stack.pop()?;
-        stack.push(FormulaAst::Unary {
-          op: *value,
-          expr: Box::new(expr),
-        });
-      }
-      FormulaOp::Binary(value) => {
-        let right = stack.pop()?;
-        let left = stack.pop()?;
-        stack.push(FormulaAst::Binary {
-          op: *value,
-          left: Box::new(left),
-          right: Box::new(right),
-        });
-      }
-      FormulaOp::Call {
-        name,
-        function,
-        argc,
-        control,
-        ..
-      } => {
-        let _ = control;
-        if stack.len() < *argc {
-          return None;
-        }
-        let args = stack.split_off(stack.len() - *argc);
-        stack.push(FormulaAst::Function {
-          name: name.clone(),
-          function: *function,
-          args,
-        });
-      }
-      FormulaOp::Array { row_lengths } => {
-        let count = row_lengths.iter().sum::<usize>();
-        if stack.len() < count {
-          return None;
-        }
-        let values = stack.split_off(stack.len() - count);
-        let mut values = values.into_iter();
-        let mut rows = Vec::with_capacity(row_lengths.len());
-        for row_len in row_lengths {
-          rows.push(values.by_ref().take(*row_len).collect());
-        }
-        stack.push(FormulaAst::Array(rows));
-      }
-    }
-  }
-  if stack.len() == 1 { stack.pop() } else { None }
 }

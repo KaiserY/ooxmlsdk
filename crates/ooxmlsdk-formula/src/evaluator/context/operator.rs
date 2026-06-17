@@ -1,15 +1,6 @@
 use super::*;
 
 impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
-  pub(crate) fn evaluate_unary(
-    &self,
-    op: FormulaOperator,
-    expr: &FormulaAst<'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    let value = self.evaluate(expr)?;
-    self.evaluate_unary_value(op, value)
-  }
-
   pub(crate) fn evaluate_unary_value(
     &self,
     op: FormulaOperator,
@@ -21,32 +12,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       FormulaOperator::Percent => Some(FormulaValue::Number(self.number(&value)? / 100.0)),
       _ => None,
     }
-  }
-
-  pub(crate) fn evaluate_binary(
-    &self,
-    op: FormulaOperator,
-    left: &FormulaAst<'doc>,
-    right: &FormulaAst<'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    if op == FormulaOperator::Intersection {
-      return self.evaluate_intersection_ast(left, right);
-    }
-    if op == FormulaOperator::Range {
-      return self.evaluate_range_ast(left, right);
-    }
-    if op == FormulaOperator::Union {
-      let left_ranges = self.reference_ranges_from_ast(left);
-      let right_ranges = self.reference_ranges_from_ast(right);
-      if !left_ranges.is_empty() && !right_ranges.is_empty() {
-        let mut ranges = left_ranges;
-        ranges.extend(right_ranges);
-        return Some(FormulaValue::RefList(ranges));
-      }
-    }
-    let left = self.evaluate(left)?;
-    let right = self.with_current_value(left.clone()).evaluate(right)?;
-    self.evaluate_binary_values(op, left, right)
   }
 
   pub(crate) fn evaluate_binary_values(

@@ -81,6 +81,7 @@ fn qualified_range_from_address<'doc>(
   QualifiedRange {
     sheet,
     sheet_name: address.sheet_name,
+    end_sheet_name: None,
     range: CellRange {
       start: address.cell,
       end: address.cell,
@@ -94,7 +95,7 @@ fn extend_qualified_range<'doc>(
   left: &QualifiedRange<'doc>,
   right: &QualifiedRange<'doc>,
 ) -> Option<QualifiedRange<'doc>> {
-  let sheet_name = compatible_range_sheet_name(left, right)?;
+  let (sheet_name, end_sheet_name) = compatible_range_sheet_name(left, right)?;
   if left.sheet != right.sheet {
     return None;
   }
@@ -110,6 +111,7 @@ fn extend_qualified_range<'doc>(
   Some(QualifiedRange {
     sheet: left.sheet,
     sheet_name,
+    end_sheet_name,
     range: CellRange::new(
       CellAddress {
         column: left_start_column.min(right_start_column),
@@ -128,12 +130,12 @@ fn extend_qualified_range<'doc>(
 fn compatible_range_sheet_name<'doc>(
   left: &QualifiedRange<'doc>,
   right: &QualifiedRange<'doc>,
-) -> Option<Option<SheetName<'doc>>> {
+) -> Option<(Option<SheetName<'doc>>, Option<SheetName<'doc>>)> {
   match (&left.sheet_name, &right.sheet_name) {
-    (Some(left), Some(right)) if left != right => None,
-    (Some(left), _) => Some(Some(left.clone())),
-    (_, Some(right)) => Some(Some(right.clone())),
-    (None, None) => Some(None),
+    (Some(left), Some(right)) if left != right => Some((Some(left.clone()), Some(right.clone()))),
+    (Some(left), _) => Some((Some(left.clone()), None)),
+    (_, Some(right)) => Some((Some(right.clone()), None)),
+    (None, None) => Some((None, None)),
   }
 }
 

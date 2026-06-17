@@ -81,6 +81,7 @@ impl<'a> QualifiedAddress<'a> {
 pub struct QualifiedRange<'a> {
   pub sheet: SheetId,
   pub sheet_name: Option<SheetName<'a>>,
+  pub end_sheet_name: Option<SheetName<'a>>,
   pub range: CellRange,
   pub start_flags: AddressFlags,
   pub end_flags: AddressFlags,
@@ -91,6 +92,7 @@ impl<'a> QualifiedRange<'a> {
     QualifiedRange {
       sheet: self.sheet,
       sheet_name: self.sheet_name.map(SheetName::into_owned),
+      end_sheet_name: self.end_sheet_name.map(SheetName::into_owned),
       range: self.range,
       start_flags: self.start_flags,
       end_flags: self.end_flags,
@@ -109,6 +111,7 @@ impl<'a> QualifiedRange<'a> {
     Ok(Self {
       sheet,
       sheet_name: sheet_name.map(|name| SheetName(Cow::Owned(unquote_sheet_name(name)))),
+      end_sheet_name: None,
       range: CellRange { start, end },
       start_flags,
       end_flags,

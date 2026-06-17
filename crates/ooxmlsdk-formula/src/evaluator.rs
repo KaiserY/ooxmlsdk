@@ -88,13 +88,11 @@ use crate::{
   QualifiedRange, SheetId, SheetName,
 };
 
-mod ast;
 mod context;
 mod engine;
 mod query;
 mod stack;
 
-pub(crate) use ast::{FormulaAst, has_missing_required_argument, is_missing_argument};
 pub(crate) use context::{
   CouponFunction, DatabaseFunction, DatePart, FormulaEvaluator, TimePart, column_index_to_name,
   datevalue, display_text_from_value, display_text_from_value_with_number_format, error_text,

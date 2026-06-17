@@ -1,5 +1,6 @@
 use super::FunctionArgs;
-use crate::evaluator::{FormulaEvaluator, QueryValueSource, evaluate_arg_direct};
+use crate::code::FormulaOp;
+use crate::evaluator::{EvalArg, FormulaEvaluator, QueryValueSource, evaluate_arg_direct};
 use crate::{FormulaErrorValue, FormulaValue, QualifiedRange};
 
 #[derive(Clone, Copy)]
@@ -17,21 +18,44 @@ impl<'args, 'eval, 'doc> FunctionArgReader<'args, 'eval, 'doc> {
   }
 
   pub(crate) fn len(self) -> usize {
-    match self.args {
-      FunctionArgs::Ast(args) => args.len(),
-      FunctionArgs::Lazy(args) => args.len(),
-    }
+    self.args.len()
   }
 
   pub(crate) fn is_empty(self) -> bool {
     self.len() == 0
   }
 
+  pub(crate) fn raw_arg(self, index: usize) -> Option<EvalArg<'args, 'doc>> {
+    self.args.get(index)
+  }
+
+  pub(crate) fn is_missing(self, index: usize) -> bool {
+    let Some(arg) = self.raw_arg(index) else {
+      return false;
+    };
+    let range = arg.range;
+    range.end == range.start + 1 && matches!(arg.ops.get(range.start), Some(FormulaOp::PushBlank))
+  }
+
+  pub(crate) fn is_array_literal(self, index: usize) -> bool {
+    let Some(arg) = self.raw_arg(index) else {
+      return false;
+    };
+    arg
+      .range
+      .end
+      .checked_sub(1)
+      .and_then(|index| arg.ops.get(index))
+      .is_some_and(|op| matches!(op, FormulaOp::Array { .. }))
+  }
+
   pub(crate) fn value(self, index: usize) -> Option<FormulaValue<'doc>> {
-    match self.args {
-      FunctionArgs::Ast(args) => self.evaluator.evaluate(args.get(index)?),
-      FunctionArgs::Lazy(args) => evaluate_arg_direct(args.get(index)?, self.evaluator),
-    }
+    evaluate_arg_direct(self.args.get(index)?, self.evaluator)
+  }
+
+  pub(crate) fn array_value(self, index: usize) -> Option<FormulaValue<'doc>> {
+    let evaluator = self.evaluator.with_array_context();
+    evaluate_arg_direct(self.args.get(index)?, &evaluator)
   }
 
   pub(crate) fn first_value(self) -> Option<FormulaValue<'doc>> {
@@ -39,30 +63,17 @@ impl<'args, 'eval, 'doc> FunctionArgReader<'args, 'eval, 'doc> {
   }
 
   pub(crate) fn reference_ranges(self, index: usize) -> Option<Vec<QualifiedRange<'doc>>> {
-    match self.args {
-      FunctionArgs::Ast(args) => Some(self.evaluator.reference_ranges_from_ast(args.get(index)?)),
-      FunctionArgs::Lazy(_) => {
-        let value = self.value(index)?;
-        Some(self.evaluator.reference_ranges_from_value(&value))
-      }
-    }
+    let value = self.value(index)?;
+    Some(self.evaluator.reference_ranges_from_value(&value))
   }
 
   pub(crate) fn query_source(self, index: usize) -> Option<QueryValueSource<'doc>> {
-    match self.args {
-      FunctionArgs::Ast(args) => self.evaluator.query_source_from_ast(args.get(index)?),
-      FunctionArgs::Lazy(_) => self.evaluator.query_source_from_value(self.value(index)?),
-    }
+    self.evaluator.query_source_from_value(self.value(index)?)
   }
 
   pub(crate) fn value_numbers(self, index: usize) -> Option<Vec<f64>> {
-    match self.args {
-      FunctionArgs::Ast(args) => Some(self.evaluator.value_numbers_from_ast(args.get(index)?)),
-      FunctionArgs::Lazy(_) => {
-        let value = self.value(index)?;
-        Some(self.evaluator.value_numbers(&value))
-      }
-    }
+    let value = self.value(index)?;
+    Some(self.evaluator.value_numbers(&value))
   }
 
   pub(crate) fn scalar_value(self, index: usize) -> Option<FormulaValue<'doc>> {

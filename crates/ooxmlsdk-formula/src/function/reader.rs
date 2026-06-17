@@ -1,6 +1,6 @@
 use super::FunctionArgs;
-use crate::evaluator::{FormulaEvaluator, evaluate_arg_direct};
-use crate::{FormulaErrorValue, FormulaValue};
+use crate::evaluator::{FormulaEvaluator, QueryGrid, evaluate_arg_direct};
+use crate::{FormulaErrorValue, FormulaValue, QualifiedRange};
 
 #[derive(Clone, Copy)]
 pub(crate) struct FunctionArgReader<'args, 'eval, 'doc> {
@@ -36,6 +36,33 @@ impl<'args, 'eval, 'doc> FunctionArgReader<'args, 'eval, 'doc> {
 
   pub(crate) fn first_value(self) -> Option<FormulaValue<'doc>> {
     self.value(0)
+  }
+
+  pub(crate) fn reference_ranges(self, index: usize) -> Option<Vec<QualifiedRange<'doc>>> {
+    match self.args {
+      FunctionArgs::Ast(args) => Some(self.evaluator.reference_ranges_from_ast(args.get(index)?)),
+      FunctionArgs::Lazy(_) => {
+        let value = self.value(index)?;
+        Some(self.evaluator.reference_ranges_from_value(&value))
+      }
+    }
+  }
+
+  pub(crate) fn query_grid(self, index: usize) -> Option<QueryGrid<'doc>> {
+    match self.args {
+      FunctionArgs::Ast(args) => self.evaluator.query_grid_from_ast(args.get(index)?),
+      FunctionArgs::Lazy(_) => self.evaluator.query_grid_from_value(self.value(index)?),
+    }
+  }
+
+  pub(crate) fn value_numbers(self, index: usize) -> Option<Vec<f64>> {
+    match self.args {
+      FunctionArgs::Ast(args) => Some(self.evaluator.value_numbers_from_ast(args.get(index)?)),
+      FunctionArgs::Lazy(_) => {
+        let value = self.value(index)?;
+        Some(self.evaluator.value_numbers(&value))
+      }
+    }
   }
 
   pub(crate) fn scalar_value(self, index: usize) -> Option<FormulaValue<'doc>> {

@@ -10,13 +10,13 @@ use crate::calc::numeric::{
 };
 use crate::calc::regression::EtsKind;
 use crate::calc::special::{BesselKind, erf, erfc, lo_gauss, lo_phi, log_gamma};
-use crate::calc::statistics::{PercentileKind, percentile_sorted, variance_slice};
+use crate::calc::statistics::{PercentileKind, mode_slice, percentile_sorted, variance_slice};
 use crate::calc::text::{
   legacy_char_text, legacy_text_code, proper_formula_text, rot13_formula_text, text_byte_len,
 };
 use crate::evaluator::{
-  CouponFunction, DatabaseFunction, DatePart, TimePart, datevalue, rtl_cos, rtl_sin, rtl_tan,
-  timevalue,
+  CouponFunction, DatabaseFunction, DatePart, IfsAggregate, TimePart, datevalue, rtl_cos, rtl_sin,
+  rtl_tan, timevalue,
 };
 use crate::{FormulaErrorValue, FormulaValue};
 
@@ -958,6 +958,39 @@ fn evaluate_function_reader<'doc>(
     ),
     FormulaFunctionId::Count => Some(FormulaValue::Number(args.count_numbers()? as f64)),
     FormulaFunctionId::Counta => Some(FormulaValue::Number(args.count_all_values()? as f64)),
+    FormulaFunctionId::Mode => evaluate_mode_reader(args),
+    FormulaFunctionId::Sumif if (2..=3).contains(&args.len()) => evaluator.evaluate_ifs_reader(
+      args,
+      Some(if args.len() == 3 { 2 } else { 0 }),
+      0,
+      2,
+      IfsAggregate::Sum,
+    ),
+    FormulaFunctionId::Countif if args.len() == 2 => {
+      evaluator.evaluate_ifs_reader(args, None, 0, 2, IfsAggregate::Count)
+    }
+    FormulaFunctionId::Averageif if (2..=3).contains(&args.len()) => evaluator.evaluate_ifs_reader(
+      args,
+      Some(if args.len() == 3 { 2 } else { 0 }),
+      0,
+      2,
+      IfsAggregate::Average,
+    ),
+    FormulaFunctionId::Sumifs if args.len() >= 3 && !args.len().is_multiple_of(2) => {
+      evaluator.evaluate_ifs_reader(args, Some(0), 1, args.len() - 1, IfsAggregate::Sum)
+    }
+    FormulaFunctionId::Countifs if args.len() >= 2 && args.len().is_multiple_of(2) => {
+      evaluator.evaluate_ifs_reader(args, None, 0, args.len(), IfsAggregate::Count)
+    }
+    FormulaFunctionId::Averageifs if args.len() >= 3 && !args.len().is_multiple_of(2) => {
+      evaluator.evaluate_ifs_reader(args, Some(0), 1, args.len() - 1, IfsAggregate::Average)
+    }
+    FormulaFunctionId::Maxifs if args.len() >= 3 && !args.len().is_multiple_of(2) => {
+      evaluator.evaluate_ifs_reader(args, Some(0), 1, args.len() - 1, IfsAggregate::Max)
+    }
+    FormulaFunctionId::Minifs if args.len() >= 3 && !args.len().is_multiple_of(2) => {
+      evaluator.evaluate_ifs_reader(args, Some(0), 1, args.len() - 1, IfsAggregate::Min)
+    }
     FormulaFunctionId::Iserror if args.len() == 1 => {
       evaluate_information_error_value(evaluator, &args.first_value()?, |_| true)
     }
@@ -999,6 +1032,11 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Type if args.len() == 1 => {
       evaluate_type_value(evaluator, &args.first_value()?)
     }
+    FormulaFunctionId::Areas => evaluate_areas_reader(evaluator, args),
+    FormulaFunctionId::Row => evaluate_row_column_reader(evaluator, args, false),
+    FormulaFunctionId::Column => evaluate_row_column_reader(evaluator, args, true),
+    FormulaFunctionId::Rows => evaluate_rows_columns_reader(args, false),
+    FormulaFunctionId::Columns => evaluate_rows_columns_reader(args, true),
     FormulaFunctionId::N if args.len() == 1 => evaluate_n_value(evaluator, &args.first_value()?),
     FormulaFunctionId::Len if args.len() == 1 => {
       evaluate_len_value(evaluator, &args.first_value()?, false)
@@ -1334,6 +1372,107 @@ fn evaluate_n_value<'doc>(
     FormulaValue::Error(error) => return Some(FormulaValue::Error(error)),
     _ => 0.0,
   }))
+}
+
+fn evaluate_mode_reader<'doc>(args: FunctionArgReader<'_, '_, 'doc>) -> Option<FormulaValue<'doc>> {
+  let mut values = Vec::new();
+  for index in 0..args.len() {
+    values.extend(args.value_numbers(index)?);
+  }
+  mode_slice(&values)
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
+}
+
+fn evaluate_areas_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if args.len() != 1 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+  }
+  let ranges = args.reference_ranges(0)?;
+  if !ranges.is_empty() {
+    return Some(FormulaValue::Number(ranges.len() as f64));
+  }
+  Some(match args.first_value()? {
+    FormulaValue::Matrix(_) => FormulaValue::Number(1.0),
+    value if !evaluator.reference_ranges_from_value(&value).is_empty() => {
+      FormulaValue::Number(evaluator.reference_ranges_from_value(&value).len() as f64)
+    }
+    _ => FormulaValue::Error(FormulaErrorValue::Value),
+  })
+}
+
+fn evaluate_row_column_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  column: bool,
+) -> Option<FormulaValue<'doc>> {
+  let reference = if args.is_empty() {
+    None
+  } else {
+    let value = args.first_value()?;
+    let Some(reference) = evaluator.as_reference(&value) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+    };
+    Some(reference)
+  };
+  let address = reference
+    .as_ref()
+    .map(|reference| reference.range.start)
+    .unwrap_or_else(|| evaluator.current_cell.unwrap_or_default());
+  if let Some(reference) = reference {
+    let range = reference.range;
+    let start_column = range.start.column.min(range.end.column);
+    let end_column = range.start.column.max(range.end.column);
+    let start_row = range.start.row.min(range.end.row);
+    let end_row = range.start.row.max(range.end.row);
+    if column && end_column > start_column {
+      return Some(FormulaValue::Matrix(vec![
+        (start_column..=end_column)
+          .map(|column| FormulaValue::Number(column as f64 + 1.0))
+          .collect(),
+      ]));
+    }
+    if !column && end_row > start_row {
+      return Some(FormulaValue::Matrix(
+        (start_row..=end_row)
+          .map(|row| vec![FormulaValue::Number(row as f64 + 1.0)])
+          .collect(),
+      ));
+    }
+  }
+  Some(FormulaValue::Number(if column {
+    address.column as f64 + 1.0
+  } else {
+    address.row as f64 + 1.0
+  }))
+}
+
+fn evaluate_rows_columns_reader<'doc>(
+  args: FunctionArgReader<'_, '_, 'doc>,
+  columns: bool,
+) -> Option<FormulaValue<'doc>> {
+  if args.is_empty() {
+    return Some(FormulaValue::Number(0.0));
+  }
+  Some(match args.first_value()? {
+    FormulaValue::Reference(reference) => {
+      let range = reference.range;
+      FormulaValue::Number(if columns {
+        range.start.column.abs_diff(range.end.column) as f64 + 1.0
+      } else {
+        range.start.row.abs_diff(range.end.row) as f64 + 1.0
+      })
+    }
+    FormulaValue::Matrix(rows) => FormulaValue::Number(if columns {
+      rows.first().map_or(0, Vec::len) as f64
+    } else {
+      rows.len() as f64
+    }),
+    _ => FormulaValue::Number(1.0),
+  })
 }
 
 fn evaluate_len_value<'doc>(

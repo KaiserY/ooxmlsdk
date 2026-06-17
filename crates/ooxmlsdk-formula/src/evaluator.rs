@@ -95,10 +95,11 @@ mod stack;
 
 pub(crate) use ast::{FormulaAst, has_missing_required_argument, is_missing_argument};
 pub(crate) use context::{
-  CouponFunction, DatabaseFunction, DatePart, FormulaEvaluator, TimePart, column_index_to_name,
-  datevalue, display_text_from_value, display_text_from_value_with_number_format, error_text,
-  error_text_value, error_value, qualified_range, range_intersection_value, rtl_cos, rtl_sin,
-  rtl_tan, split_indirect_intersection, timevalue,
+  CouponFunction, DatabaseFunction, DatePart, FormulaEvaluator, IfsAggregate, QueryGrid, TimePart,
+  column_index_to_name, datevalue, display_text_from_value,
+  display_text_from_value_with_number_format, error_text, error_text_value, error_value,
+  qualified_range, range_intersection_value, rtl_cos, rtl_sin, rtl_tan,
+  split_indirect_intersection, timevalue,
 };
 #[cfg(test)]
 pub(crate) use context::{format_complex_result, valid_date_serial_with_system};

@@ -6470,6 +6470,136 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     Some(FormulaValue::Matrix(rows))
   }
 
+  pub(crate) fn evaluate_ifs_reader(
+    &self,
+    args: crate::function::FunctionArgReader<'_, '_, 'doc>,
+    main_range: Option<usize>,
+    criteria_start: usize,
+    criteria_len: usize,
+    aggregate: IfsAggregate,
+  ) -> Option<FormulaValue<'doc>> {
+    let mut criteria_ranges = Vec::with_capacity(criteria_len / 2);
+    let mut criteria_sets = Vec::with_capacity(criteria_len / 2);
+    let mut result_shape = (1usize, 1usize);
+    let mut result_len = 1usize;
+    let criteria_end = criteria_start.checked_add(criteria_len)?;
+    for range_index in (criteria_start..criteria_end).step_by(2) {
+      let range = args.query_grid(range_index)?;
+      let rows = range.values.len();
+      let columns = range.values.first().map_or(0, Vec::len);
+      if rows == 0
+        || columns == 0
+        || range.values.iter().any(|row| row.len() != columns)
+        || range.query_empty.iter().any(|row| row.len() != columns)
+      {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      }
+      let criteria_matrix = self.matrix_values(&args.value(range_index + 1)?);
+      let criteria_rows = criteria_matrix.len();
+      let criteria_columns = criteria_matrix.first().map_or(0, Vec::len);
+      if criteria_rows == 0 || criteria_columns == 0 {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      }
+      if criteria_rows * criteria_columns > 1 {
+        if result_len == 1 {
+          result_shape = (criteria_rows, criteria_columns);
+          result_len = criteria_rows * criteria_columns;
+        } else if result_shape != (criteria_rows, criteria_columns) {
+          return Some(FormulaValue::Error(FormulaErrorValue::Value));
+        }
+      }
+      criteria_ranges.push(range);
+      criteria_sets.push(
+        criteria_matrix
+          .into_iter()
+          .flatten()
+          .map(|value| QueryParam::from_criterion(self, &value, 0))
+          .collect::<Vec<_>>(),
+      );
+    }
+
+    if criteria_ranges
+      .windows(2)
+      .any(|window| window[0].dimensions() != window[1].dimensions())
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    let dimensions = criteria_ranges.first()?.dimensions();
+    let main_values = if let Some(main_range) = main_range {
+      let values = args.query_grid(main_range)?;
+      if values.dimensions() != dimensions {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      }
+      Some(values)
+    } else {
+      None
+    };
+
+    let mut outputs = Vec::with_capacity(result_len);
+    for criteria_index in 0..result_len {
+      let mut count = 0.0;
+      let mut sum = KahanSum::default();
+      let mut minmax = None::<f64>;
+      for row in 0..dimensions.0 {
+        for column in 0..dimensions.1 {
+          let matches_all =
+            criteria_ranges
+              .iter()
+              .zip(criteria_sets.iter())
+              .all(|(range, criteria)| {
+                let criteria = if criteria.len() == 1 {
+                  &criteria[0]
+                } else {
+                  &criteria[criteria_index]
+                };
+                criteria.matches_value(
+                  self,
+                  &range.values[row][column],
+                  range.query_empty[row][column],
+                )
+              });
+          if !matches_all {
+            continue;
+          }
+          match aggregate {
+            IfsAggregate::Count => count += 1.0,
+            IfsAggregate::Sum | IfsAggregate::Average | IfsAggregate::Min | IfsAggregate::Max => {
+              if let Some(number) = main_values
+                .as_ref()
+                .and_then(|values| formula_cell_numeric_value(&values.values[row][column]))
+              {
+                count += 1.0;
+                sum.add(number);
+                minmax = Some(match (aggregate, minmax) {
+                  (IfsAggregate::Min, Some(value)) => value.min(number),
+                  (IfsAggregate::Max, Some(value)) => value.max(number),
+                  _ => number,
+                });
+              }
+            }
+          }
+        }
+      }
+      outputs.push(match aggregate {
+        IfsAggregate::Count => FormulaValue::Number(count),
+        IfsAggregate::Sum => FormulaValue::Number(sum.finish()),
+        IfsAggregate::Average if count == 0.0 => FormulaValue::Error(FormulaErrorValue::Div0),
+        IfsAggregate::Average => FormulaValue::Number(sum.finish() / count),
+        IfsAggregate::Min | IfsAggregate::Max => FormulaValue::Number(minmax.unwrap_or(0.0)),
+      });
+    }
+
+    if result_len == 1 {
+      return outputs.into_iter().next();
+    }
+    let mut rows = Vec::with_capacity(result_shape.0);
+    let mut iter = outputs.into_iter();
+    for _ in 0..result_shape.0 {
+      rows.push(iter.by_ref().take(result_shape.1).collect());
+    }
+    Some(FormulaValue::Matrix(rows))
+  }
+
   pub(crate) fn evaluate_ceiling(
     &self,
     args: &[FormulaAst<'doc>],
@@ -10273,6 +10403,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   pub(crate) fn query_grid_from_ast(&self, ast: &FormulaAst<'doc>) -> Option<QueryGrid<'doc>> {
     let value = self.evaluate(ast)?;
+    self.query_grid_from_value(value)
+  }
+
+  pub(crate) fn query_grid_from_value(&self, value: FormulaValue<'doc>) -> Option<QueryGrid<'doc>> {
     Some(match value {
       FormulaValue::Reference(reference) => self.query_grid_from_reference(&reference),
       FormulaValue::RefList(ranges) if ranges.len() == 1 => {

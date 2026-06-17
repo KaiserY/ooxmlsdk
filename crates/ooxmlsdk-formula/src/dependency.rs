@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use crate::code::{FormulaCode, FormulaOp};
 use crate::{CellAddress, QualifiedRange, SheetId};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -124,15 +125,26 @@ impl<'doc> DependencyGraphBuilder<'doc> {
   }
 }
 
-pub(crate) fn dependencies_from_ast<'doc>(
+pub(crate) fn dependencies_from_code<'doc>(
   sheet: SheetId,
-  source: &str,
-  borrowed_source: Option<&'doc str>,
-  ast: Option<&crate::parser::FormulaAst>,
+  code: Option<&FormulaCode<'doc>>,
 ) -> Vec<FormulaDependency<'doc>> {
   let mut dependencies = Vec::new();
-  if let Some(ast) = ast {
-    collect_dependencies(sheet, source, borrowed_source, ast, &mut dependencies);
+  let Some(code) = code else {
+    return dependencies;
+  };
+  for op in &code.ops {
+    match op {
+      FormulaOp::PushReference(range) => dependencies.push(dependency_from_range(sheet, range)),
+      FormulaOp::PushName(name) => dependencies.push(FormulaDependency::Name(name.clone())),
+      FormulaOp::PushExternal(external) => {
+        dependencies.push(FormulaDependency::External(external.clone()));
+      }
+      FormulaOp::Call { volatile, .. } if *volatile => {
+        dependencies.push(FormulaDependency::Volatile);
+      }
+      _ => {}
+    }
   }
   dependencies
 }
@@ -185,96 +197,4 @@ pub(crate) fn cow_span_text<'doc>(
     .and_then(|source| source.get(span.start..span.end))
     .map(Cow::Borrowed)
     .unwrap_or_else(|| Cow::Owned(span_text(source, span).to_string()))
-}
-
-fn collect_dependencies<'doc>(
-  sheet: SheetId,
-  source: &str,
-  borrowed_source: Option<&'doc str>,
-  ast: &crate::parser::FormulaAst,
-  dependencies: &mut Vec<FormulaDependency<'doc>>,
-) {
-  match ast {
-    crate::parser::FormulaAst::Blank
-    | crate::parser::FormulaAst::Text(_)
-    | crate::parser::FormulaAst::Number(_)
-    | crate::parser::FormulaAst::Error(_) => {}
-    crate::parser::FormulaAst::Word { span, kind } => {
-      collect_word_dependency(sheet, source, borrowed_source, *span, *kind, dependencies);
-    }
-    crate::parser::FormulaAst::Unary { expr, .. } => {
-      collect_dependencies(sheet, source, borrowed_source, expr, dependencies);
-    }
-    crate::parser::FormulaAst::Binary { left, right, .. } => {
-      collect_dependencies(sheet, source, borrowed_source, left, dependencies);
-      collect_dependencies(sheet, source, borrowed_source, right, dependencies);
-    }
-    crate::parser::FormulaAst::Function { volatile, args, .. } => {
-      if *volatile {
-        dependencies.push(FormulaDependency::Volatile);
-      }
-      collect_arg_dependencies(sheet, source, borrowed_source, args, dependencies);
-    }
-    crate::parser::FormulaAst::LogicalFunction { args, .. } => {
-      collect_arg_dependencies(sheet, source, borrowed_source, args, dependencies);
-    }
-    crate::parser::FormulaAst::Array(rows) => {
-      for row in rows {
-        collect_arg_dependencies(sheet, source, borrowed_source, row, dependencies);
-      }
-    }
-  }
-}
-
-fn collect_arg_dependencies<'doc>(
-  sheet: SheetId,
-  source: &str,
-  borrowed_source: Option<&'doc str>,
-  args: &[crate::parser::FormulaAst],
-  dependencies: &mut Vec<FormulaDependency<'doc>>,
-) {
-  for arg in args {
-    collect_dependencies(sheet, source, borrowed_source, arg, dependencies);
-  }
-}
-
-fn collect_word_dependency<'doc>(
-  sheet: SheetId,
-  source: &str,
-  borrowed_source: Option<&'doc str>,
-  span: crate::parser::SemanticSpan,
-  kind: crate::parser::SemanticWordKind,
-  dependencies: &mut Vec<FormulaDependency<'doc>>,
-) {
-  let word = span_text(source, span);
-  match kind {
-    crate::parser::SemanticWordKind::Boolean(_) => {}
-    crate::parser::SemanticWordKind::ExternalReference(reference) => {
-      dependencies.push(FormulaDependency::External(
-        external_reference_id_from_spans(
-          word,
-          borrowed_source.and_then(|source| source.get(span.start..span.end)),
-          reference,
-        ),
-      ));
-    }
-    crate::parser::SemanticWordKind::ReferenceCandidate => {
-      if let Some(range) = crate::parser::parse_formula_range(sheet, word) {
-        dependencies.push(dependency_from_range(sheet, &range));
-      } else {
-        dependencies.push(FormulaDependency::Name(cow_span_text(
-          source,
-          borrowed_source,
-          span,
-        )));
-      }
-    }
-    crate::parser::SemanticWordKind::Name => {
-      dependencies.push(FormulaDependency::Name(cow_span_text(
-        source,
-        borrowed_source,
-        span,
-      )));
-    }
-  }
 }

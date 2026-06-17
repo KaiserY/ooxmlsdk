@@ -14,6 +14,7 @@ pub(crate) struct SyntaxParse {
   pub issues: Vec<SyntaxIssue>,
 }
 
+#[cfg(test)]
 pub(crate) fn parse_syntax_ast(source: &str) -> SyntaxParse {
   let mut parser = SyntaxParser::new(source);
   let ast = parser.parse_expression();
@@ -44,6 +45,7 @@ struct SyntaxParser<'a> {
 }
 
 impl<'a> SyntaxParser<'a> {
+  #[cfg(test)]
   fn new(source: &'a str) -> Self {
     Self {
       source,
@@ -345,6 +347,7 @@ struct SyntaxTokens<'a> {
 }
 
 impl<'a> SyntaxTokens<'a> {
+  #[cfg(test)]
   fn new(source: &'a str) -> Self {
     Self {
       source,

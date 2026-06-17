@@ -3,7 +3,7 @@ use super::lex::{LexToken, formula_body_start, lex_tokens};
 use super::semantic::{
   ExternalReferenceSpans, SemanticSpan, SemanticToken, SemanticTokenKind, semantic_token_from_lex,
 };
-use super::syntax::{SyntaxIssue, SyntaxParse, parse_syntax_ast, parse_syntax_ast_from_tokens};
+use super::syntax::{SyntaxIssue, SyntaxParse, parse_syntax_ast_from_tokens};
 use super::{LexErrorValue, LexOperator};
 use crate::CellAddress;
 
@@ -25,12 +25,6 @@ pub(crate) struct FormulaSourceParse<'a> {
 pub(crate) struct FormulaSyntaxParse {
   pub ast: Option<FormulaAst>,
   pub issues: Vec<FormulaParseIssue>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct FormulaSourceSyntaxParse<'a> {
-  pub body: &'a str,
-  pub syntax_parse: FormulaSyntaxParse,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -86,19 +80,6 @@ impl<'a> FormulaParser<'a> {
       body_parse: parse_formula_body(body),
     }
   }
-
-  pub(crate) fn parse_syntax(self) -> FormulaSourceSyntaxParse<'a> {
-    let body_start = formula_body_start(self.source);
-    self.parse_syntax_at_body(body_start)
-  }
-
-  pub(crate) fn parse_syntax_at_body(self, body_start: usize) -> FormulaSourceSyntaxParse<'a> {
-    let body = self.source.get(body_start..).unwrap_or(self.source);
-    FormulaSourceSyntaxParse {
-      body,
-      syntax_parse: parse_formula_syntax(body),
-    }
-  }
 }
 
 fn parse_formula_body(source: &str) -> FormulaBodyParse {
@@ -124,10 +105,6 @@ fn parse_formula_body_from_tokens<'a>(source: &'a str, lexed: &'a [LexToken]) ->
     ast: syntax.ast,
     issues,
   }
-}
-
-fn parse_formula_syntax(source: &str) -> FormulaSyntaxParse {
-  formula_syntax_from_syntax(parse_syntax_ast(source))
 }
 
 fn parse_formula_syntax_from_tokens<'a>(

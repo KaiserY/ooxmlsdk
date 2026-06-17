@@ -1,5 +1,6 @@
 mod address;
 pub mod calc;
+mod code;
 mod dependency;
 mod error;
 mod model;

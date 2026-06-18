@@ -16,11 +16,11 @@ use crate::calc::complex::{
   parse_complex_number,
 };
 use crate::calc::datetime::{
-  date_from_serial_with_system, date_serial, date_serial_with_system, date_to_days,
-  days360_with_system as date_days360, is_leap_year, is_valid_libreoffice_gregorian_date,
-  iso_weeknum_from_serial_with_system, last_day_of_month, normalized_date_components,
-  weekday_index_from_serial, weeks_in_year_from_serial_with_system, weeks_mode_one_index,
-  yearfrac as date_yearfrac,
+  basis_o_datetime_text, date_from_serial_with_system, date_serial, date_serial_with_system,
+  date_to_days, days360_with_system as date_days360, is_leap_year,
+  is_valid_libreoffice_gregorian_date, iso_weeknum_from_serial_with_system, last_day_of_month,
+  normalized_date_components, weekday_index_from_serial, weeks_in_year_from_serial_with_system,
+  weeks_mode_one_index, yearfrac as date_yearfrac,
 };
 use crate::calc::financial::{
   finance_coupdaybs, finance_coupdays, finance_coupdaysnc, finance_coupncd, finance_coupnum,
@@ -40,9 +40,12 @@ use crate::calc::radix::{
 };
 use crate::calc::regression::{EtsKind, scalar_state as regression_scalar_state};
 use crate::calc::special::{
-  BesselKind, SpecialError, bessel, erf, erfc, lo_chi_dist, lo_chisq_dist_cdf,
-  lo_f_dist_right_tail, lo_gauss, lo_integral_phi, lo_iterate_inverse, lo_phi, lo_poisson_dist,
-  log_gamma, norm_s_inv,
+  BesselKind, SpecialError, bessel, erf, erfc, lo_chi_dist, lo_chisq_dist_cdf, lo_chisq_dist_pdf,
+  lo_f_dist_pdf, lo_f_dist_right_tail, lo_gamma_dist, lo_gamma_dist_pdf, lo_gauss, lo_integral_phi,
+  lo_iterate_inverse, lo_phi, lo_poisson_dist, lo_t_dist, log_gamma, norm_s_inv,
+};
+use crate::calc::special::{
+  gamma as lo_gamma, lo_beta_dist, lo_beta_dist_pdf, lo_binom_dist_pmf, lo_binom_dist_range,
 };
 use crate::calc::statistics::{
   PercentileKind, StatisticsError, correlation, covariance, deviation_sum_squares,
@@ -494,6 +497,10 @@ fn evaluate_function_reader<'doc>(
         approx_floor(value.abs()) as i64 % 2 != 0,
       ))
     }
+    FormulaFunctionId::Rawsubtract if args.len() >= 2 => {
+      evaluate_rawsubtract_reader(evaluator, args)
+    }
+    FormulaFunctionId::Rawsubtract => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Sqrtpi if args.len() == 1 => {
       let Some(value) = args.scalar_number(0) else {
         return Some(FormulaValue::Error(FormulaErrorValue::Value));
@@ -802,6 +809,124 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::Geomean => evaluate_geomean_harmean_reader(evaluator, args, true),
     FormulaFunctionId::Harmean => evaluate_geomean_harmean_reader(evaluator, args, false),
+    FormulaFunctionId::Phi if args.len() == 1 => {
+      evaluate_simple_stat_unary_reader(evaluator, args, lo_phi)
+    }
+    FormulaFunctionId::Gauss if args.len() == 1 => {
+      evaluate_simple_stat_unary_reader(evaluator, args, lo_gauss)
+    }
+    FormulaFunctionId::Fisher if args.len() == 1 => evaluate_fisher_reader(evaluator, args),
+    FormulaFunctionId::Fisherinv if args.len() == 1 => {
+      evaluate_simple_stat_unary_reader(evaluator, args, f64::tanh)
+    }
+    FormulaFunctionId::Standardize if args.len() == 3 => {
+      evaluate_standardize_reader(evaluator, args)
+    }
+    FormulaFunctionId::GammalnDotPrecise if args.len() == 1 => {
+      evaluate_gammaln_reader(evaluator, args)
+    }
+    FormulaFunctionId::Gamma if args.len() == 1 => evaluate_gamma_reader(evaluator, args),
+    FormulaFunctionId::B if (3..=4).contains(&args.len()) => {
+      evaluate_b_function_reader(evaluator, args)
+    }
+    FormulaFunctionId::BetaDotDist if (4..=6).contains(&args.len()) => {
+      evaluate_beta_dist_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Betadist if (3..=6).contains(&args.len()) => {
+      evaluate_beta_dist_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::BetaDotInv if (3..=5).contains(&args.len()) => {
+      evaluate_beta_inv_reader(evaluator, args)
+    }
+    FormulaFunctionId::BinomDotDist if args.len() == 4 => {
+      evaluate_binom_dist_reader(evaluator, args)
+    }
+    FormulaFunctionId::BinomDotDistDotRange if (3..=4).contains(&args.len()) => {
+      evaluate_binom_dist_range_reader(evaluator, args)
+    }
+    FormulaFunctionId::BinomDotInv if args.len() == 3 => evaluate_binom_inv_reader(evaluator, args),
+    FormulaFunctionId::ChisqDotDist if args.len() == 3 => {
+      evaluate_chisq_dist_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Chisqdist if (2..=3).contains(&args.len()) => {
+      evaluate_chisq_dist_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::ChisqDotDistDotRt if args.len() == 2 => {
+      evaluate_chisq_dist_rt_reader(evaluator, args)
+    }
+    FormulaFunctionId::ChisqDotInv | FormulaFunctionId::Chisqinv if args.len() == 2 => {
+      evaluate_chisq_inv_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::ExponDotDist if args.len() == 3 => {
+      evaluate_expon_dist_reader(evaluator, args)
+    }
+    FormulaFunctionId::FDotDist if (3..=4).contains(&args.len()) => {
+      evaluate_f_dist_reader(evaluator, args)
+    }
+    FormulaFunctionId::FDotDistDotRt if args.len() == 4 => evaluate_f_dist_reader(evaluator, args),
+    FormulaFunctionId::FDotDistDotRt if args.len() == 3 => {
+      evaluate_f_dist_rt_reader(evaluator, args)
+    }
+    FormulaFunctionId::FDotInv if args.len() == 3 => evaluate_f_inv_reader(evaluator, args, false),
+    FormulaFunctionId::FDotInvDotRt if args.len() == 3 => {
+      evaluate_f_inv_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::GammaDotDist if args.len() == 4 => {
+      evaluate_gamma_dist_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Gammadist if (3..=4).contains(&args.len()) => {
+      evaluate_gamma_dist_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::GammaDotInv if args.len() == 3 => evaluate_gamma_inv_reader(evaluator, args),
+    FormulaFunctionId::Negbinomdist if args.len() == 3 => {
+      evaluate_negbinom_dist_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::NegbinomDotDist if args.len() == 4 => {
+      evaluate_negbinom_dist_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::TDotDist if args.len() == 3 => evaluate_t_dist_reader(evaluator, args),
+    FormulaFunctionId::TDotDistDot2t if args.len() == 2 => {
+      evaluate_t_dist_tail_reader(evaluator, args, 2)
+    }
+    FormulaFunctionId::TDotDistDotRt if args.len() == 2 => {
+      evaluate_t_dist_tail_reader(evaluator, args, 1)
+    }
+    FormulaFunctionId::Tdist if args.len() == 3 => evaluate_tdist_reader(evaluator, args),
+    FormulaFunctionId::TDotInv if args.len() == 2 => evaluate_t_inv_reader(evaluator, args, 4),
+    FormulaFunctionId::TDotInvDot2t if args.len() == 2 => evaluate_t_inv_reader(evaluator, args, 2),
+    FormulaFunctionId::WeibullDotDist if args.len() == 4 => {
+      evaluate_weibull_dist_reader(evaluator, args)
+    }
+    FormulaFunctionId::B
+    | FormulaFunctionId::BetaDotDist
+    | FormulaFunctionId::Betadist
+    | FormulaFunctionId::BetaDotInv
+    | FormulaFunctionId::BinomDotDist
+    | FormulaFunctionId::BinomDotDistDotRange
+    | FormulaFunctionId::BinomDotInv
+    | FormulaFunctionId::ChisqDotDist
+    | FormulaFunctionId::ChisqDotDistDotRt
+    | FormulaFunctionId::Chisqdist
+    | FormulaFunctionId::ChisqDotInv
+    | FormulaFunctionId::Chisqinv
+    | FormulaFunctionId::ExponDotDist
+    | FormulaFunctionId::FDotDist
+    | FormulaFunctionId::FDotDistDotRt
+    | FormulaFunctionId::FDotInv
+    | FormulaFunctionId::FDotInvDotRt
+    | FormulaFunctionId::Gamma
+    | FormulaFunctionId::GammaDotDist
+    | FormulaFunctionId::Gammadist
+    | FormulaFunctionId::GammaDotInv
+    | FormulaFunctionId::Negbinomdist
+    | FormulaFunctionId::NegbinomDotDist
+    | FormulaFunctionId::TDotDist
+    | FormulaFunctionId::TDotDistDot2t
+    | FormulaFunctionId::TDotDistDotRt
+    | FormulaFunctionId::Tdist
+    | FormulaFunctionId::TDotInv
+    | FormulaFunctionId::TDotInvDot2t
+    | FormulaFunctionId::WeibullDotDist => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Mmult if args.len() == 2 => evaluate_mmult_reader(evaluator, args),
     FormulaFunctionId::Mdeterm if args.len() == 1 => evaluate_mdeterm_reader(evaluator, args),
     FormulaFunctionId::Minverse if args.len() == 1 => evaluate_minverse_reader(evaluator, args),
@@ -905,6 +1030,9 @@ fn evaluate_function_reader<'doc>(
       } else {
         Some(timevalue(&text))
       }
+    }
+    FormulaFunctionId::Basisodatetime if args.len() == 1 => {
+      evaluate_basis_o_datetime_reader(evaluator, args)
     }
     FormulaFunctionId::Time if args.len() == 3 => evaluate_time_reader(evaluator, args),
     FormulaFunctionId::Weekday if (1..=2).contains(&args.len()) => {
@@ -1061,6 +1189,10 @@ fn evaluate_function_reader<'doc>(
     | FormulaFunctionId::Bitxor
     | FormulaFunctionId::Bitlshift
     | FormulaFunctionId::Bitrshift => Some(FormulaValue::Error(FormulaErrorValue::Value)),
+    FormulaFunctionId::Color if (3..=4).contains(&args.len()) => {
+      evaluate_color_reader(evaluator, args)
+    }
+    FormulaFunctionId::Color => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Left if (1..=2).contains(&args.len()) => {
       evaluate_left_reader(evaluator, args, false)
     }
@@ -1161,6 +1293,9 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::LognormDotInv if args.len() == 3 => {
       evaluate_lognorm_inv_reader(evaluator, args)
+    }
+    FormulaFunctionId::LognormDotDist if (1..=4).contains(&args.len()) => {
+      evaluate_lognorm_dist_reader(evaluator, args)
     }
     FormulaFunctionId::NormDotInv if args.len() == 3 => {
       evaluate_norm_inv_reader(evaluator, args, false)
@@ -1478,6 +1613,24 @@ fn scalar_number_arg_or_value<'doc>(
       None => Err(FormulaErrorValue::Value),
     },
   })
+}
+
+fn evaluate_rawsubtract_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let mut result = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  for index in 1..args.len() {
+    let value = match scalar_number_arg_or_value(evaluator, args, index)? {
+      Ok(value) => value,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    };
+    result -= value;
+  }
+  Some(FormulaValue::Number(result))
 }
 
 fn strict_text_arg<'doc>(
@@ -4211,6 +4364,19 @@ fn evaluate_time_reader<'doc>(
   }
 }
 
+fn evaluate_basis_o_datetime_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let serial = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  basis_o_datetime_text(serial)
+    .map(|value| FormulaValue::String(Cow::Owned(value)))
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+}
+
 fn evaluate_weekday_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -5986,6 +6152,50 @@ fn bit_function_arg<'doc>(
   Some(Ok(value as u64))
 }
 
+fn evaluate_color_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let red = match color_component_arg(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let green = match color_component_arg(evaluator, args, 1)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let blue = match color_component_arg(evaluator, args, 2)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let alpha = if args.len() == 4 {
+    match color_component_arg(evaluator, args, 3)? {
+      Ok(value) => value,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  } else {
+    0.0
+  };
+  Some(FormulaValue::Number(
+    256.0 * 256.0 * 256.0 * alpha + 256.0 * 256.0 * red + 256.0 * green + blue,
+  ))
+}
+
+fn color_component_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+) -> Option<std::result::Result<f64, FormulaErrorValue>> {
+  let value = match scalar_number_arg_or_value(evaluator, args, index)? {
+    Ok(value) => approx_floor(value),
+    Err(error) => return Some(Err(error)),
+  };
+  if !(0.0..=255.0).contains(&value) {
+    return Some(Err(FormulaErrorValue::IllegalArgument));
+  }
+  Some(Ok(value))
+}
+
 fn evaluate_base_to_decimal_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -6779,6 +6989,122 @@ fn student_t_probability(t: f64, degrees_freedom: f64, tails: i32) -> Option<f64
   })
 }
 
+fn evaluate_simple_stat_unary_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  op: impl Fn(f64) -> f64 + Copy,
+) -> Option<FormulaValue<'doc>> {
+  let value = args.value(0)?;
+  if evaluator.array_context && is_matrix_argument(&value) {
+    return map_numeric_array_values(evaluator, &[value], FormulaErrorValue::Value, |values| {
+      let result = op(values[0]);
+      if result.is_finite() {
+        FormulaValue::Number(result)
+      } else {
+        FormulaValue::Error(FormulaErrorValue::Num)
+      }
+    });
+  }
+  match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => {
+      let result = op(value);
+      Some(if result.is_finite() {
+        FormulaValue::Number(result)
+      } else {
+        FormulaValue::Error(FormulaErrorValue::Num)
+      })
+    }
+    Err(error) => Some(FormulaValue::Error(error)),
+  }
+}
+
+fn evaluate_fisher_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let value = args.value(0)?;
+  if evaluator.array_context && is_matrix_argument(&value) {
+    return map_numeric_array_values(evaluator, &[value], FormulaErrorValue::Value, |values| {
+      fisher_value(values[0])
+    });
+  }
+  let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  Some(fisher_value(value))
+}
+
+fn fisher_value<'doc>(value: f64) -> FormulaValue<'doc> {
+  if value.abs() >= 1.0 {
+    FormulaValue::Error(FormulaErrorValue::IllegalArgument)
+  } else {
+    FormulaValue::Number(value.atanh())
+  }
+}
+
+fn evaluate_standardize_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let arg_values = (0..3)
+    .map(|index| args.value(index))
+    .collect::<Option<Vec<_>>>()?;
+  if evaluator.array_context && arg_values.iter().any(is_matrix_argument) {
+    return map_numeric_array_values(evaluator, &arg_values, FormulaErrorValue::Value, |values| {
+      standardize_value(values[0], values[1], values[2])
+    });
+  }
+  let x = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let mean = match scalar_number_arg_or_value(evaluator, args, 1)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let sigma = match scalar_number_arg_or_value(evaluator, args, 2)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  Some(standardize_value(x, mean, sigma))
+}
+
+fn standardize_value<'doc>(x: f64, mean: f64, sigma: f64) -> FormulaValue<'doc> {
+  if sigma < 0.0 {
+    FormulaValue::Error(FormulaErrorValue::IllegalArgument)
+  } else if sigma == 0.0 {
+    FormulaValue::Error(FormulaErrorValue::Div0)
+  } else {
+    FormulaValue::Number((x - mean) / sigma)
+  }
+}
+
+fn evaluate_gammaln_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let value = args.value(0)?;
+  if evaluator.array_context && is_matrix_argument(&value) {
+    return map_numeric_array_values(evaluator, &[value], FormulaErrorValue::Value, |values| {
+      gammaln_value(values[0])
+    });
+  }
+  let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  Some(gammaln_value(value))
+}
+
+fn gammaln_value<'doc>(value: f64) -> FormulaValue<'doc> {
+  if value > 0.0 {
+    FormulaValue::Number(log_gamma(value))
+  } else {
+    FormulaValue::Error(FormulaErrorValue::IllegalArgument)
+  }
+}
+
 fn evaluate_z_test_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -7027,6 +7353,636 @@ fn evaluate_lognorm_inv_values<'doc>(p: f64, mean: f64, sigma: f64) -> FormulaVa
     return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
   };
   FormulaValue::Number(dist.inverse_cdf(p))
+}
+
+fn evaluate_lognorm_dist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let arg_values = (0..args.len())
+    .map(|index| args.value(index))
+    .collect::<Option<Vec<_>>>()?;
+  if evaluator.array_context && arg_values.iter().any(is_matrix_argument) {
+    return map_numeric_array_values(evaluator, &arg_values, FormulaErrorValue::Value, |values| {
+      evaluate_lognorm_dist_values(
+        values[0],
+        values.get(1).copied().unwrap_or(0.0),
+        values.get(2).copied().unwrap_or(1.0),
+        values.get(3).copied().unwrap_or(1.0) != 0.0,
+      )
+    });
+  }
+  let x = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let mean = if args.len() >= 2 {
+    match scalar_number_arg_or_value(evaluator, args, 1)? {
+      Ok(value) => value,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  } else {
+    0.0
+  };
+  let sigma = if args.len() >= 3 {
+    match scalar_number_arg_or_value(evaluator, args, 2)? {
+      Ok(value) => value,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  } else {
+    1.0
+  };
+  let cumulative = if args.len() == 4 {
+    evaluator.truthy(&args.value(3)?)
+  } else {
+    true
+  };
+  Some(evaluate_lognorm_dist_values(x, mean, sigma, cumulative))
+}
+
+fn evaluate_lognorm_dist_values<'doc>(
+  x: f64,
+  mean: f64,
+  sigma: f64,
+  cumulative: bool,
+) -> FormulaValue<'doc> {
+  if sigma <= 0.0 {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  if x <= 0.0 {
+    return if cumulative {
+      FormulaValue::Number(0.0)
+    } else {
+      FormulaValue::Error(FormulaErrorValue::IllegalArgument)
+    };
+  }
+  let z = (x.ln() - mean) / sigma;
+  FormulaValue::Number(if cumulative {
+    lo_integral_phi(z)
+  } else {
+    lo_phi(z) / sigma / x
+  })
+}
+
+fn evaluate_numeric_args_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  invalid_error: FormulaErrorValue,
+  op: impl Fn(&[f64]) -> FormulaValue<'doc> + Copy,
+) -> Option<FormulaValue<'doc>> {
+  let arg_values = (0..args.len())
+    .map(|index| args.value(index))
+    .collect::<Option<Vec<_>>>()?;
+  if evaluator.array_context && arg_values.iter().any(is_matrix_argument) {
+    return map_numeric_array_values(evaluator, &arg_values, invalid_error, op);
+  }
+  let mut values = Vec::with_capacity(args.len());
+  for index in 0..args.len() {
+    match scalar_number_arg_or_value(evaluator, args, index)? {
+      Ok(value) => values.push(value),
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  }
+  Some(op(&values))
+}
+
+fn finite_number_or_num<'doc>(value: f64) -> FormulaValue<'doc> {
+  if value.is_finite() {
+    FormulaValue::Number(value)
+  } else {
+    FormulaValue::Error(FormulaErrorValue::Num)
+  }
+}
+
+fn evaluate_gamma_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    let x = values[0];
+    if x <= 0.0 && x == approx_floor(x) {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    finite_number_or_num(lo_gamma(x))
+  })
+}
+
+fn evaluate_b_function_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    if values.len() == 3 {
+      binom_dist_value(values[2], values[0], values[1], false)
+    } else {
+      binom_dist_range_value(values[0], values[1], values[2], Some(values[3]))
+    }
+  })
+}
+
+fn evaluate_beta_dist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  microsoft: bool,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, move |values| {
+    beta_dist_value(values, microsoft)
+  })
+}
+
+fn beta_dist_value<'doc>(values: &[f64], microsoft: bool) -> FormulaValue<'doc> {
+  let x = values[0];
+  let alpha = values[1];
+  let beta = values[2];
+  let (lower, upper, cumulative) = if microsoft {
+    (
+      values.get(4).copied().unwrap_or(0.0),
+      values.get(5).copied().unwrap_or(1.0),
+      values[3] != 0.0,
+    )
+  } else {
+    (
+      values.get(3).copied().unwrap_or(0.0),
+      values.get(4).copied().unwrap_or(1.0),
+      values.get(5).copied().unwrap_or(1.0) != 0.0,
+    )
+  };
+  let scale = upper - lower;
+  if alpha <= 0.0 || beta <= 0.0 || scale <= 0.0 {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  if microsoft && (x < lower || x > upper) {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  if cumulative {
+    if x < lower {
+      return FormulaValue::Number(0.0);
+    }
+    if x > upper {
+      return FormulaValue::Number(1.0);
+    }
+    FormulaValue::Number(lo_beta_dist((x - lower) / scale, alpha, beta))
+  } else {
+    if x < lower || x > upper {
+      return FormulaValue::Number(0.0);
+    }
+    let mut standard_x = (x - lower) / scale;
+    if !microsoft && alpha != 1.0 && standard_x == 1.0 && beta < 1.0 {
+      standard_x = 1.0 - f64::EPSILON / 2.0;
+    }
+    match lo_beta_dist_pdf(standard_x, alpha, beta) {
+      Ok(value) => finite_number_or_num(value / scale),
+      Err(error) => FormulaValue::Error(special_error_value(error)),
+    }
+  }
+}
+
+fn evaluate_beta_inv_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    let p = values[0];
+    let alpha = values[1];
+    let beta = values[2];
+    let lower = values.get(3).copied().unwrap_or(0.0);
+    let upper = values.get(4).copied().unwrap_or(1.0);
+    if !(0.0..=1.0).contains(&p) || lower >= upper || alpha <= 0.0 || beta <= 0.0 {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    match lo_iterate_inverse(|x| p - lo_beta_dist(x, alpha, beta), 0.0, 1.0) {
+      Ok(value) => FormulaValue::Number(lower + value * (upper - lower)),
+      Err(error) => FormulaValue::Error(special_error_value(error)),
+    }
+  })
+}
+
+fn evaluate_binom_dist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    binom_dist_value(values[0], values[1], values[2], values[3] != 0.0)
+  })
+}
+
+fn evaluate_binom_dist_range_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    binom_dist_range_value(values[0], values[1], values[2], values.get(3).copied())
+  })
+}
+
+fn binom_dist_value<'doc>(x: f64, n: f64, p: f64, cumulative: bool) -> FormulaValue<'doc> {
+  let x = approx_floor(x);
+  let n = approx_floor(n);
+  if n < 0.0 || x < 0.0 || x > n || !(0.0..=1.0).contains(&p) {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  if p == 0.0 {
+    return FormulaValue::Number(if x == 0.0 || cumulative { 1.0 } else { 0.0 });
+  }
+  if p == 1.0 {
+    return FormulaValue::Number(if x == n { 1.0 } else { 0.0 });
+  }
+  if !cumulative {
+    return finite_number_or_num(lo_binom_dist_pmf(x, n, p));
+  }
+  if x == n {
+    return FormulaValue::Number(1.0);
+  }
+  let q = (0.5 - p) + 0.5;
+  let mut factor = q.powf(n);
+  if x == 0.0 {
+    return finite_number_or_num(factor);
+  }
+  if factor <= f64::MIN_POSITIVE {
+    factor = p.powf(n);
+    if factor <= f64::MIN_POSITIVE {
+      finite_number_or_num(lo_beta_dist(q, n - x, x + 1.0))
+    } else if factor > f64::EPSILON {
+      let mut sum = 1.0 - factor;
+      for i in 0..((n - x) as u32).saturating_sub(1) {
+        factor *= (n - f64::from(i)) / f64::from(i + 1) * q / p;
+        sum -= factor;
+      }
+      FormulaValue::Number(sum.max(0.0))
+    } else {
+      finite_number_or_num(lo_binom_dist_range(n, n - x, n, factor, q, p))
+    }
+  } else {
+    finite_number_or_num(lo_binom_dist_range(n, 0.0, x, factor, p, q))
+  }
+}
+
+fn binom_dist_range_value<'doc>(n: f64, p: f64, xs: f64, xe: Option<f64>) -> FormulaValue<'doc> {
+  let n = approx_floor(n);
+  let xs = approx_floor(xs);
+  let xe = approx_floor(xe.unwrap_or(xs));
+  let valid_x = 0.0 <= xs && xs <= xe && xe <= n;
+  if !valid_x {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  if !(0.0..=1.0).contains(&p) {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  if p == 0.0 {
+    return FormulaValue::Number(if xs == 0.0 { 1.0 } else { 0.0 });
+  }
+  if p == 1.0 {
+    return FormulaValue::Number(if xe == n { 1.0 } else { 0.0 });
+  }
+  let q = (0.5 - p) + 0.5;
+  if xs == xe {
+    return finite_number_or_num(lo_binom_dist_pmf(xs, n, p));
+  }
+  let mut factor = q.powf(n);
+  if factor > f64::MIN_POSITIVE {
+    finite_number_or_num(lo_binom_dist_range(n, xs, xe, factor, p, q))
+  } else {
+    factor = p.powf(n);
+    if factor > f64::MIN_POSITIVE {
+      finite_number_or_num(lo_binom_dist_range(n, n - xe, n - xs, factor, q, p))
+    } else {
+      finite_number_or_num(lo_beta_dist(q, n - xe, xe + 1.0) - lo_beta_dist(q, n - xs + 1.0, xs))
+    }
+  }
+}
+
+fn evaluate_binom_inv_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    binom_inv_value(values[0], values[1], values[2])
+  })
+}
+
+fn binom_inv_value<'doc>(n: f64, p: f64, alpha: f64) -> FormulaValue<'doc> {
+  let n = approx_floor(n);
+  if n < 0.0 || !(0.0..=1.0).contains(&alpha) || !(0.0..=1.0).contains(&p) {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  if alpha == 0.0 {
+    return FormulaValue::Number(0.0);
+  }
+  if alpha == 1.0 {
+    return FormulaValue::Number(if p == 0.0 { 0.0 } else { n });
+  }
+  let q = (0.5 - p) + 0.5;
+  if q > p {
+    let mut factor = q.powf(n);
+    let mut sum = factor;
+    for i in 0..n as u32 {
+      if sum >= alpha {
+        return FormulaValue::Number(f64::from(i));
+      }
+      factor *= (n - f64::from(i)) / f64::from(i + 1) * p / q;
+      sum += factor;
+    }
+    FormulaValue::Number(n)
+  } else {
+    let mut factor = p.powf(n);
+    let mut sum = 1.0 - factor;
+    for i in 0..n as u32 {
+      if sum < alpha {
+        return FormulaValue::Number(n - f64::from(i));
+      }
+      factor *= (n - f64::from(i)) / f64::from(i + 1) * q / p;
+      sum -= factor;
+    }
+    FormulaValue::Number(0.0)
+  }
+}
+
+fn evaluate_chisq_dist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  microsoft: bool,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, move |values| {
+    let x = values[0];
+    let df = approx_floor(values[1]);
+    let cumulative = values.get(2).copied().unwrap_or(1.0) != 0.0;
+    if df < 1.0 || (microsoft && (x < 0.0 || df > 1.0e10)) {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    FormulaValue::Number(if cumulative {
+      lo_chisq_dist_cdf(x, df)
+    } else {
+      lo_chisq_dist_pdf(x, df)
+    })
+  })
+}
+
+fn evaluate_chisq_dist_rt_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    let x = values[0];
+    let df = approx_floor(values[1]);
+    if x < 0.0 || df < 1.0 {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    FormulaValue::Number(lo_chi_dist(x, df))
+  })
+}
+
+fn evaluate_expon_dist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    let x = values[0];
+    let lambda = values[1];
+    if lambda <= 0.0 {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    FormulaValue::Number(if values[2] == 0.0 {
+      if x >= 0.0 {
+        lambda * (-lambda * x).exp()
+      } else {
+        0.0
+      }
+    } else if x > 0.0 {
+      1.0 - (-lambda * x).exp()
+    } else {
+      0.0
+    })
+  })
+}
+
+fn evaluate_f_dist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    let x = values[0];
+    let df1 = approx_floor(values[1]);
+    let df2 = approx_floor(values[2]);
+    if x < 0.0 || df1 < 1.0 || df2 < 1.0 || df1 >= 1.0e10 || df2 >= 1.0e10 {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    if values.get(3).copied().unwrap_or(1.0) != 0.0 {
+      FormulaValue::Number(1.0 - lo_f_dist_right_tail(x, df1, df2))
+    } else {
+      finite_number_or_num(lo_f_dist_pdf(x, df1, df2))
+    }
+  })
+}
+
+fn evaluate_f_dist_rt_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    let x = values[0];
+    let df1 = approx_floor(values[1]);
+    let df2 = approx_floor(values[2]);
+    if x < 0.0 || df1 < 1.0 || df2 < 1.0 || df1 >= 1.0e10 || df2 >= 1.0e10 {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    FormulaValue::Number(lo_f_dist_right_tail(x, df1, df2))
+  })
+}
+
+fn evaluate_f_inv_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  right_tail: bool,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, move |values| {
+    let p = values[0];
+    let df1 = approx_floor(values[1]);
+    let df2 = approx_floor(values[2]);
+    if p <= 0.0 || p > 1.0 || df1 < 1.0 || df2 < 1.0 || df1 >= 1.0e10 || df2 >= 1.0e10 {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    let target = if right_tail { p } else { 1.0 - p };
+    match lo_iterate_inverse(
+      |x| target - lo_f_dist_right_tail(x, df1, df2),
+      df1 * 0.5,
+      df1,
+    ) {
+      Ok(value) => FormulaValue::Number(value),
+      Err(error) => FormulaValue::Error(special_error_value(error)),
+    }
+  })
+}
+
+fn evaluate_gamma_dist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  microsoft: bool,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, move |values| {
+    let x = values[0];
+    let alpha = values[1];
+    let beta = values[2];
+    if (microsoft && x < 0.0) || alpha <= 0.0 || beta <= 0.0 {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    if values.get(3).copied().unwrap_or(1.0) != 0.0 {
+      FormulaValue::Number(lo_gamma_dist(x, alpha, beta))
+    } else {
+      match lo_gamma_dist_pdf(x, alpha, beta) {
+        Ok(value) => finite_number_or_num(value),
+        Err(error) => FormulaValue::Error(special_error_value(error)),
+      }
+    }
+  })
+}
+
+fn evaluate_gamma_inv_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    let p = values[0];
+    let alpha = values[1];
+    let beta = values[2];
+    if alpha <= 0.0 || beta <= 0.0 || p < 0.0 || p >= 1.0 {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    if p == 0.0 {
+      return FormulaValue::Number(0.0);
+    }
+    let start = alpha * beta;
+    match lo_iterate_inverse(|x| p - lo_gamma_dist(x, alpha, beta), start * 0.5, start) {
+      Ok(value) => FormulaValue::Number(value),
+      Err(error) => FormulaValue::Error(special_error_value(error)),
+    }
+  })
+}
+
+fn evaluate_negbinom_dist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  microsoft: bool,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, move |values| {
+    let failures = approx_floor(values[0]);
+    let successes = approx_floor(values[1]);
+    let p = values[2];
+    if if microsoft {
+      successes < 1.0 || failures < 0.0 || !(0.0..=1.0).contains(&p)
+    } else {
+      failures + successes <= 1.0 || !(0.0..=1.0).contains(&p)
+    } {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    let q = 1.0 - p;
+    if microsoft && values[3] != 0.0 {
+      return FormulaValue::Number(1.0 - lo_beta_dist(q, failures + 1.0, successes));
+    }
+    let mut factor = p.powf(successes);
+    for i in 0..failures as u32 {
+      factor *= (f64::from(i) + successes) / (f64::from(i) + 1.0) * q;
+    }
+    finite_number_or_num(factor)
+  })
+}
+
+fn evaluate_t_dist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    let df = approx_floor(values[1]);
+    if df < 1.0 {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    FormulaValue::Number(lo_t_dist(
+      values[0],
+      df,
+      if values[2] != 0.0 { 4 } else { 3 },
+    ))
+  })
+}
+
+fn evaluate_t_dist_tail_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  tails: i32,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, move |values| {
+    let t = values[0];
+    let df = approx_floor(values[1]);
+    if df < 1.0 || (tails == 2 && t < 0.0) {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    let result = lo_t_dist(t, df, tails);
+    FormulaValue::Number(if tails == 1 && t < 0.0 {
+      1.0 - result
+    } else {
+      result
+    })
+  })
+}
+
+fn evaluate_tdist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    let t = values[0];
+    let df = approx_floor(values[1]);
+    let tails = approx_floor(values[2]) as i32;
+    if df < 1.0 || t < 0.0 || !(tails == 1 || tails == 2) {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    FormulaValue::Number(lo_t_dist(t, df, tails))
+  })
+}
+
+fn evaluate_t_inv_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  kind: i32,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, move |values| {
+    let p = values[0];
+    let df = approx_floor(values[1]);
+    if df < 1.0 || p <= 0.0 || p > 1.0 || (kind == 4 && p == 1.0) {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    if kind == 4 && p < 0.5 {
+      return match t_inv_value(1.0 - p, df, kind) {
+        FormulaValue::Number(value) => FormulaValue::Number(-value),
+        value => value,
+      };
+    }
+    t_inv_value(p, df, kind)
+  })
+}
+
+fn t_inv_value<'doc>(p: f64, df: f64, kind: i32) -> FormulaValue<'doc> {
+  match lo_iterate_inverse(|x| p - lo_t_dist(x, df, kind), df * 0.5, df) {
+    Ok(value) => FormulaValue::Number(value),
+    Err(error) => FormulaValue::Error(special_error_value(error)),
+  }
+}
+
+fn evaluate_weibull_dist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  evaluate_numeric_args_reader(evaluator, args, FormulaErrorValue::Value, |values| {
+    let x = values[0];
+    let alpha = values[1];
+    let beta = values[2];
+    if alpha <= 0.0 || beta <= 0.0 || x < 0.0 {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    finite_number_or_num(if values[3] == 0.0 {
+      alpha / beta.powf(alpha) * x.powf(alpha - 1.0) * (-(x / beta).powf(alpha)).exp()
+    } else {
+      1.0 - (-(x / beta).powf(alpha)).exp()
+    })
+  })
 }
 
 fn evaluate_norm_inv_reader<'doc>(

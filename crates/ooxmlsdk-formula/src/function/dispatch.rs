@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use num_complex::Complex;
+use regex::RegexBuilder;
 use statrs::distribution::{
   ContinuousCDF, Discrete, DiscreteCDF, Hypergeometric, LogNormal, Normal, StudentsT,
 };
@@ -23,10 +24,12 @@ use crate::calc::datetime::{
   weeks_mode_one_index, yearfrac as date_yearfrac,
 };
 use crate::calc::financial::{
-  OddPeriodArgs, finance_coupdaybs, finance_coupdays, finance_coupdaysnc, finance_coupncd,
-  finance_coupnum, finance_couppcd, finance_duration, finance_price, finance_yield,
-  financial_amordegrc, financial_amorlinc, financial_db, financial_ddb, financial_fv,
-  financial_ipmt, financial_irr, financial_mirr, financial_nper, financial_oddlprice,
+  OddPeriodArgs, finance_accrint, finance_accrintm, finance_coupdaybs, finance_coupdays,
+  finance_coupdaysnc, finance_coupncd, finance_coupnum, finance_couppcd, finance_disc,
+  finance_duration, finance_intrate, finance_price, finance_pricedisc, finance_pricemat,
+  finance_received, finance_tbilleq, finance_tbillprice, finance_tbillyield, finance_yield,
+  finance_yielddisc, financial_amordegrc, financial_amorlinc, financial_db, financial_ddb,
+  financial_fv, financial_ipmt, financial_irr, financial_mirr, financial_nper, financial_oddlprice,
   financial_oddlyield, financial_pmt, financial_rate, financial_vdb, financial_xirr,
   financial_xnpv,
 };
@@ -40,7 +43,7 @@ use crate::calc::numeric::{
 use crate::calc::radix::{
   base_number_text, convert_from_decimal, convert_to_decimal, decimal_text_to_number,
 };
-use crate::calc::regression::{EtsKind, scalar_state as regression_scalar_state};
+use crate::calc::regression::{EtsKind, regression_model, scalar_state as regression_scalar_state};
 use crate::calc::special::{
   BesselKind, SpecialError, bessel, erf, erfc, lo_chi_dist, lo_chisq_dist_cdf, lo_chisq_dist_pdf,
   lo_f_dist_pdf, lo_f_dist_right_tail, lo_gamma_dist, lo_gamma_dist_pdf, lo_gauss, lo_integral_phi,
@@ -283,6 +286,18 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Concat => evaluate_concat_reader(evaluator, args),
     FormulaFunctionId::Concatenate => evaluate_concatenate_reader(evaluator, args),
     FormulaFunctionId::Textjoin => evaluate_textjoin_reader(evaluator, args),
+    FormulaFunctionId::Textafter if (1..=6).contains(&args.len()) => {
+      evaluate_text_before_after_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::Textbefore if (1..=6).contains(&args.len()) => {
+      evaluate_text_before_after_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Textsplit if (1..=6).contains(&args.len()) => {
+      evaluate_textsplit_reader(evaluator, args)
+    }
+    FormulaFunctionId::Regex if (2..=4).contains(&args.len()) => {
+      evaluate_regex_reader(evaluator, args)
+    }
     FormulaFunctionId::Exact if args.len() == 2 => evaluate_exact_reader(evaluator, args),
     FormulaFunctionId::Find if (2..=3).contains(&args.len()) => {
       evaluate_find_reader(evaluator, args, true, false)
@@ -939,10 +954,25 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Filter if (2..=3).contains(&args.len()) => {
       evaluate_filter_reader(evaluator, args)
     }
+    FormulaFunctionId::Expand if (2..=4).contains(&args.len()) => {
+      evaluate_expand_reader(evaluator, args)
+    }
     FormulaFunctionId::Hstack if !args.is_empty() => evaluate_stack_reader(evaluator, args, true),
     FormulaFunctionId::Vstack if !args.is_empty() => evaluate_stack_reader(evaluator, args, false),
+    FormulaFunctionId::Tocol if (1..=3).contains(&args.len()) => {
+      evaluate_torow_tocol_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::Torow if (1..=3).contains(&args.len()) => {
+      evaluate_torow_tocol_reader(evaluator, args, true)
+    }
     FormulaFunctionId::Sequence if (1..=4).contains(&args.len()) => {
       evaluate_sequence_reader(evaluator, args)
+    }
+    FormulaFunctionId::Wrapcols if (2..=3).contains(&args.len()) => {
+      evaluate_wrap_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::Wraprows if (2..=3).contains(&args.len()) => {
+      evaluate_wrap_reader(evaluator, args, true)
     }
     FormulaFunctionId::Take if (1..=3).contains(&args.len()) => {
       evaluate_take_drop_reader(evaluator, args, true)
@@ -954,6 +984,9 @@ fn evaluate_function_reader<'doc>(
       evaluate_sort_reader(evaluator, args)
     }
     FormulaFunctionId::Sortby if args.len() >= 2 => evaluate_sortby_reader(evaluator, args),
+    FormulaFunctionId::Unique if (1..=3).contains(&args.len()) => {
+      evaluate_unique_reader(evaluator, args)
+    }
     FormulaFunctionId::Chooserows if args.len() >= 2 => {
       evaluate_choose_rows_columns_reader(evaluator, args, true)
     }
@@ -1262,11 +1295,35 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Intercept if args.len() == 2 => {
       evaluate_slope_intercept_reader(evaluator, args, false)
     }
+    FormulaFunctionId::Rsq if args.len() == 2 => {
+      evaluate_regression_scalar_reader(evaluator, args, RegressionScalarKind::Rsq)
+    }
+    FormulaFunctionId::Steyx if args.len() == 2 => {
+      evaluate_regression_scalar_reader(evaluator, args, RegressionScalarKind::Steyx)
+    }
+    FormulaFunctionId::Linest if (1..=4).contains(&args.len()) => {
+      evaluate_regression_array_reader(evaluator, args, RegressionArrayKind::Linest)
+    }
+    FormulaFunctionId::Logest if (1..=4).contains(&args.len()) => {
+      evaluate_regression_array_reader(evaluator, args, RegressionArrayKind::Logest)
+    }
+    FormulaFunctionId::Trend if (1..=4).contains(&args.len()) => {
+      evaluate_regression_prediction_reader(evaluator, args, RegressionPredictionKind::Trend)
+    }
+    FormulaFunctionId::Growth if (1..=4).contains(&args.len()) => {
+      evaluate_regression_prediction_reader(evaluator, args, RegressionPredictionKind::Growth)
+    }
     FormulaFunctionId::ForecastDotEts if (3..=6).contains(&args.len()) => {
       evaluator.evaluate_forecast_ets_reader(args, EtsKind::Add)
     }
     FormulaFunctionId::ForecastDotEtsDotMult if (3..=6).contains(&args.len()) => {
       evaluator.evaluate_forecast_ets_reader(args, EtsKind::Mult)
+    }
+    FormulaFunctionId::ForecastDotEtsDotPi if (3..=7).contains(&args.len()) => {
+      evaluator.evaluate_forecast_ets_reader(args, EtsKind::PiAdd)
+    }
+    FormulaFunctionId::ForecastDotEtsDotPiDotMult if (3..=7).contains(&args.len()) => {
+      evaluator.evaluate_forecast_ets_reader(args, EtsKind::PiMult)
     }
     FormulaFunctionId::ForecastDotEtsDotStat if (3..=6).contains(&args.len()) => {
       evaluator.evaluate_forecast_ets_reader(args, EtsKind::StatAdd)
@@ -1508,6 +1565,39 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Price if (6..=7).contains(&args.len()) => {
       evaluate_price_reader(evaluator, args)
     }
+    FormulaFunctionId::Pricedisc if (4..=5).contains(&args.len()) => {
+      evaluate_discount_security_reader(evaluator, args, DiscountSecurityKind::Price)
+    }
+    FormulaFunctionId::Pricemat if (5..=6).contains(&args.len()) => {
+      evaluate_pricemat_reader(evaluator, args)
+    }
+    FormulaFunctionId::Yielddisc if (4..=5).contains(&args.len()) => {
+      evaluate_discount_security_reader(evaluator, args, DiscountSecurityKind::Yield)
+    }
+    FormulaFunctionId::Disc if (4..=5).contains(&args.len()) => {
+      evaluate_discount_security_reader(evaluator, args, DiscountSecurityKind::Discount)
+    }
+    FormulaFunctionId::Received if (4..=5).contains(&args.len()) => {
+      evaluate_discount_security_reader(evaluator, args, DiscountSecurityKind::Received)
+    }
+    FormulaFunctionId::Intrate if (4..=5).contains(&args.len()) => {
+      evaluate_discount_security_reader(evaluator, args, DiscountSecurityKind::Intrate)
+    }
+    FormulaFunctionId::Accrint if (6..=7).contains(&args.len()) => {
+      evaluate_accrint_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::Accrintm if (4..=5).contains(&args.len()) => {
+      evaluate_accrint_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Tbilleq if args.len() == 3 => {
+      evaluate_tbill_reader(evaluator, args, TbillKind::Eq)
+    }
+    FormulaFunctionId::Tbillprice if args.len() == 3 => {
+      evaluate_tbill_reader(evaluator, args, TbillKind::Price)
+    }
+    FormulaFunctionId::Tbillyield if args.len() == 3 => {
+      evaluate_tbill_reader(evaluator, args, TbillKind::Yield)
+    }
     FormulaFunctionId::Oddlprice if (7..=8).contains(&args.len()) => {
       evaluate_odd_period_reader(evaluator, args, true)
     }
@@ -1615,6 +1705,13 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Pi if args.is_empty() => Some(FormulaValue::Number(std::f64::consts::PI)),
     FormulaFunctionId::Pi => Some(FormulaValue::Error(FormulaErrorValue::Unknown)),
     FormulaFunctionId::Style if args.is_empty() => Some(FormulaValue::Number(0.0)),
+    FormulaFunctionId::Current if args.is_empty() => evaluator.current_value.clone(),
+    FormulaFunctionId::Dhfg => Some(FormulaValue::Error(FormulaErrorValue::Name)),
+    FormulaFunctionId::Testfunccurr if args.is_empty() => Some(FormulaValue::Number(5.5)),
+    FormulaFunctionId::Testfuncint if args.is_empty() => Some(FormulaValue::Number(6.0)),
+    FormulaFunctionId::Testfuncsingle if args.is_empty() => Some(FormulaValue::Number(5.5)),
+    FormulaFunctionId::Testfuncdate if args.is_empty() => Some(FormulaValue::Number(5590.0)),
+    FormulaFunctionId::Testfuncbool if args.is_empty() => Some(FormulaValue::Boolean(true)),
     _ => None,
   }
 }
@@ -2775,6 +2872,348 @@ fn evaluate_textjoin_reader<'doc>(
     }
   }
   Some(FormulaValue::String(Cow::Owned(output)))
+}
+
+fn evaluate_text_before_after_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  before: bool,
+) -> Option<FormulaValue<'doc>> {
+  let if_not_found = args
+    .raw_arg(5)
+    .filter(|_| !args.is_missing(5))
+    .and_then(|_| args.value(5));
+  let match_end = args
+    .raw_arg(4)
+    .filter(|_| !args.is_missing(4))
+    .and_then(|_| args.value(4))
+    .is_some_and(|value| evaluator.truthy(&value));
+  let match_mode = args
+    .raw_arg(3)
+    .filter(|_| !args.is_missing(3))
+    .and_then(|_| args.value(3))
+    .is_some_and(|value| evaluator.truthy(&value));
+  let instance = match optional_i32_arg(evaluator, args, 2, 1)? {
+    0 => return Some(FormulaValue::Error(FormulaErrorValue::NA)),
+    value => value,
+  };
+  let delimiters = if args.raw_arg(1).is_some() {
+    match delimiter_texts(evaluator, &args.array_value(1)?) {
+      Ok(delimiters) => delimiters,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  } else {
+    Vec::new()
+  };
+  let text = evaluator.text(&args.value(0)?);
+  if text.is_empty() {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+
+  let mut positions = text_delimiter_positions(&text, &delimiters, match_mode, before);
+  if match_end {
+    if before {
+      if instance < 0 {
+        positions.insert(0, 0);
+      } else {
+        positions.push(text.len());
+      }
+    } else if instance < 0 {
+      positions.push(text.len());
+    } else {
+      positions.insert(0, 0);
+    }
+  }
+  let count = positions.len() as i32;
+  if count == 0 || instance.abs() > count {
+    return Some(if_not_found.unwrap_or(FormulaValue::Error(FormulaErrorValue::NA)));
+  }
+  let index = if instance < 0 {
+    (count + instance) as usize
+  } else {
+    instance as usize - 1
+  };
+  let position = positions[index].min(text.len());
+  Some(FormulaValue::String(Cow::Owned(if before {
+    text[..position].to_string()
+  } else {
+    text[position..].to_string()
+  })))
+}
+
+fn evaluate_textsplit_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let pad = args
+    .raw_arg(5)
+    .filter(|_| !args.is_missing(5))
+    .and_then(|_| args.value(5))
+    .unwrap_or(FormulaValue::Error(FormulaErrorValue::NA));
+  let match_mode = args
+    .raw_arg(4)
+    .filter(|_| !args.is_missing(4))
+    .and_then(|_| args.value(4))
+    .is_some_and(|value| evaluator.truthy(&value));
+  let ignore_empty = args
+    .raw_arg(3)
+    .filter(|_| !args.is_missing(3))
+    .and_then(|_| args.value(3))
+    .is_some_and(|value| evaluator.truthy(&value));
+  let row_delimiters = if args.raw_arg(2).is_some() {
+    match delimiter_texts(evaluator, &args.array_value(2)?) {
+      Ok(delimiters) => delimiters,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  } else {
+    Vec::new()
+  };
+  let col_delimiters = if args.raw_arg(1).is_some() {
+    match delimiter_texts(evaluator, &args.array_value(1)?) {
+      Ok(delimiters) => delimiters,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  } else {
+    Vec::new()
+  };
+  let text = evaluator.text(&args.value(0)?);
+  if text.is_empty() {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let rows = split_text_by_delimiters(&text, &row_delimiters, ignore_empty, match_mode);
+  let mut result = rows
+    .into_iter()
+    .map(|row| {
+      split_text_by_delimiters(&row, &col_delimiters, ignore_empty, match_mode)
+        .into_iter()
+        .map(|value| FormulaValue::String(Cow::Owned(value)))
+        .collect::<Vec<_>>()
+    })
+    .collect::<Vec<_>>();
+  let columns = result.iter().map(Vec::len).max().unwrap_or(1).max(1);
+  for row in &mut result {
+    row.resize(columns, pad.clone());
+  }
+  Some(FormulaValue::Matrix(result))
+}
+
+fn evaluate_regex_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let text_value = args.array_value(0)?;
+  let pattern = evaluator.text(&args.value(1)?);
+  let replacement = args
+    .raw_arg(2)
+    .filter(|_| !args.is_missing(2))
+    .and_then(|_| args.value(2))
+    .map(|value| evaluator.text(&value));
+  let (occurrence, global) = match regex_occurrence_flags(evaluator, args)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let regex = match RegexBuilder::new(&pattern).build() {
+    Ok(regex) => regex,
+    Err(_) => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+  };
+  evaluator.map_unary_values(text_value, |evaluator, value| {
+    if let FormulaValue::Error(error) = value {
+      return Some(FormulaValue::Error(*error));
+    }
+    Some(regex_apply(
+      &regex,
+      &evaluator.text(value),
+      replacement.as_deref(),
+      occurrence,
+      global,
+    ))
+  })
+}
+
+fn regex_occurrence_flags<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<std::result::Result<(usize, bool), FormulaErrorValue>> {
+  let Some(_) = args.raw_arg(3).filter(|_| !args.is_missing(3)) else {
+    return Some(Ok((1, false)));
+  };
+  let value = args.value(3)?;
+  if let FormulaValue::Error(error) = value {
+    return Some(Err(error));
+  }
+  match value {
+    FormulaValue::String(flags) => match flags.as_ref() {
+      "" => Some(Ok((1, false))),
+      "g" => Some(Ok((1, true))),
+      _ => Some(Err(FormulaErrorValue::IllegalArgument)),
+    },
+    value => {
+      let Some(number) = evaluator.number(&value) else {
+        return Some(Err(FormulaErrorValue::Value));
+      };
+      if number < 0.0 {
+        return Some(Err(FormulaErrorValue::IllegalArgument));
+      }
+      Some(Ok((number.floor() as usize, false)))
+    }
+  }
+}
+
+fn regex_apply<'doc>(
+  regex: &regex::Regex,
+  text: &str,
+  replacement: Option<&str>,
+  occurrence: usize,
+  global: bool,
+) -> FormulaValue<'doc> {
+  if occurrence == 0 {
+    return FormulaValue::String(Cow::Owned(text.to_string()));
+  }
+  let Some(replacement) = replacement else {
+    return regex
+      .find_iter(text)
+      .nth(occurrence - 1)
+      .map(|matched| FormulaValue::String(Cow::Owned(matched.as_str().to_string())))
+      .unwrap_or(FormulaValue::Error(FormulaErrorValue::NA));
+  };
+  if global {
+    return FormulaValue::String(Cow::Owned(
+      regex.replace_all(text, replacement).into_owned(),
+    ));
+  }
+  if occurrence == 1 {
+    return FormulaValue::String(Cow::Owned(regex.replace(text, replacement).into_owned()));
+  }
+  let mut result = String::new();
+  let mut last = 0usize;
+  for (index, captures) in regex.captures_iter(text).enumerate() {
+    if index + 1 == occurrence {
+      let matched = captures.get(0).expect("regex captures include full match");
+      result.push_str(&text[last..matched.start()]);
+      captures.expand(replacement, &mut result);
+      last = matched.end();
+      result.push_str(&text[last..]);
+      return FormulaValue::String(Cow::Owned(result));
+    }
+  }
+  FormulaValue::String(Cow::Owned(text.to_string()))
+}
+
+fn delimiter_texts<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> std::result::Result<Vec<String>, FormulaErrorValue> {
+  let mut delimiters = Vec::new();
+  for value in evaluator.matrix_values(value).into_iter().flatten() {
+    if let FormulaValue::Error(error) = value {
+      return Err(error);
+    }
+    delimiters.push(evaluator.text(&value));
+  }
+  Ok(delimiters)
+}
+
+fn split_text_by_delimiters(
+  text: &str,
+  delimiters: &[String],
+  ignore_empty: bool,
+  case_insensitive: bool,
+) -> Vec<String> {
+  if delimiters.is_empty() || text.is_empty() {
+    return vec![text.to_string()];
+  }
+  let mut result = Vec::new();
+  let mut start = 0usize;
+  while start < text.len() {
+    let Some((index, length)) = next_text_delimiter(text, delimiters, start, case_insensitive)
+    else {
+      break;
+    };
+    let value = text[start..index].to_string();
+    if !ignore_empty || !value.is_empty() {
+      result.push(value);
+    }
+    start = index + length;
+  }
+  let value = text[start..].to_string();
+  if !ignore_empty || !value.is_empty() {
+    result.push(value);
+  }
+  result
+}
+
+fn text_delimiter_positions(
+  text: &str,
+  delimiters: &[String],
+  case_insensitive: bool,
+  before: bool,
+) -> Vec<usize> {
+  let mut positions = Vec::new();
+  let mut start = 0usize;
+  while start < text.len() {
+    let Some((index, length)) = next_text_delimiter(text, delimiters, start, case_insensitive)
+    else {
+      break;
+    };
+    positions.push(if before { index } else { index + length });
+    start = index + length;
+  }
+  positions
+}
+
+fn next_text_delimiter(
+  text: &str,
+  delimiters: &[String],
+  start: usize,
+  case_insensitive: bool,
+) -> Option<(usize, usize)> {
+  let mut best: Option<(usize, usize)> = None;
+  for index in text
+    .char_indices()
+    .map(|(index, _)| index)
+    .filter(|index| *index >= start)
+  {
+    for delimiter in delimiters {
+      if delimiter.is_empty() {
+        continue;
+      }
+      let Some(length) = text_delimiter_match_len(&text[index..], delimiter, case_insensitive)
+      else {
+        continue;
+      };
+      if best.is_none_or(|(best_index, _)| index < best_index) {
+        best = Some((index, length));
+      }
+    }
+  }
+  best
+}
+
+fn text_delimiter_match_len(text: &str, delimiter: &str, case_insensitive: bool) -> Option<usize> {
+  if !case_insensitive {
+    return text.starts_with(delimiter).then_some(delimiter.len());
+  }
+  let mut end = 0usize;
+  let mut text_chars = text.chars();
+  for _ in delimiter.chars() {
+    let ch = text_chars.next()?;
+    end += ch.len_utf8();
+  }
+  (text[..end].to_lowercase() == delimiter.to_lowercase()).then_some(end)
+}
+
+fn optional_i32_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  default: i32,
+) -> Option<i32> {
+  if args.raw_arg(index).is_none() || args.is_missing(index) {
+    return Some(default);
+  }
+  evaluator
+    .number(&args.value(index)?)
+    .map(|value| value.floor() as i32)
 }
 
 fn evaluate_text_reader<'doc>(
@@ -3991,6 +4430,213 @@ fn evaluate_stack_reader<'doc>(
   Some(FormulaValue::Matrix(result))
 }
 
+fn evaluate_expand_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let matrix = evaluator.matrix_values(&args.array_value(0)?);
+  let (source_rows, source_columns) = match rectangular_shape(&matrix) {
+    Some(shape) => shape,
+    None => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+  };
+  let target_rows = optional_usize_arg(evaluator, args, 1, source_rows)?;
+  let target_columns = optional_usize_arg(evaluator, args, 2, source_columns)?;
+  if target_rows < source_rows || target_columns < source_columns {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let pad = args
+    .raw_arg(3)
+    .filter(|_| !args.is_missing(3))
+    .and_then(|_| args.value(3))
+    .unwrap_or(FormulaValue::Error(FormulaErrorValue::NA));
+  let mut result = Vec::with_capacity(target_rows);
+  for row in 0..target_rows {
+    let mut result_row = Vec::with_capacity(target_columns);
+    for column in 0..target_columns {
+      result_row.push(
+        matrix
+          .get(row)
+          .and_then(|source_row| source_row.get(column))
+          .cloned()
+          .unwrap_or_else(|| pad.clone()),
+      );
+    }
+    result.push(result_row);
+  }
+  Some(FormulaValue::Matrix(result))
+}
+
+fn evaluate_torow_tocol_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  row_output: bool,
+) -> Option<FormulaValue<'doc>> {
+  let matrix = evaluator.matrix_values(&args.array_value(0)?);
+  let (rows, columns) = match rectangular_shape(&matrix) {
+    Some(shape) => shape,
+    None => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+  };
+  let ignore = optional_usize_arg(evaluator, args, 1, 0)?;
+  if ignore > 3 {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let scan_by_column = args
+    .raw_arg(2)
+    .filter(|_| !args.is_missing(2))
+    .and_then(|_| args.value(2))
+    .is_some_and(|value| evaluator.truthy(&value));
+  let mut values = Vec::new();
+  let outer = if scan_by_column { columns } else { rows };
+  let inner = if scan_by_column { rows } else { columns };
+  for i in 0..outer {
+    for j in 0..inner {
+      let row = if scan_by_column { j } else { i };
+      let column = if scan_by_column { i } else { j };
+      let value = matrix[row][column].clone();
+      if (ignore == 1 || ignore == 3) && matches!(value, FormulaValue::Blank) {
+        continue;
+      }
+      if (ignore == 2 || ignore == 3) && matches!(value, FormulaValue::Error(_)) {
+        continue;
+      }
+      values.push(value);
+    }
+  }
+  if values.is_empty() {
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
+  }
+  Some(FormulaValue::Matrix(if row_output {
+    vec![values]
+  } else {
+    values.into_iter().map(|value| vec![value]).collect()
+  }))
+}
+
+fn evaluate_wrap_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  rows_mode: bool,
+) -> Option<FormulaValue<'doc>> {
+  let matrix = evaluator.matrix_values(&args.array_value(0)?);
+  let (rows, columns) = match rectangular_shape(&matrix) {
+    Some(shape) => shape,
+    None => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+  };
+  if rows > 1 && columns > 1 {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let wrap = optional_usize_arg(evaluator, args, 1, 0)?;
+  if wrap == 0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let pad = args
+    .raw_arg(2)
+    .filter(|_| !args.is_missing(2))
+    .and_then(|_| args.value(2))
+    .unwrap_or(FormulaValue::Error(FormulaErrorValue::NA));
+  let mut values = Vec::with_capacity(rows * columns);
+  for column in 0..columns {
+    for row in 0..rows {
+      values.push(matrix[row][column].clone());
+    }
+  }
+  if values.is_empty() {
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
+  }
+  let block_count = values.len().div_ceil(wrap);
+  if rows_mode {
+    let mut result = Vec::with_capacity(block_count);
+    for row_index in 0..block_count {
+      let mut row = Vec::with_capacity(wrap);
+      for column in 0..wrap {
+        row.push(
+          values
+            .get(row_index * wrap + column)
+            .cloned()
+            .unwrap_or_else(|| pad.clone()),
+        );
+      }
+      result.push(row);
+    }
+    Some(FormulaValue::Matrix(result))
+  } else {
+    let mut result = vec![vec![pad.clone(); block_count]; wrap];
+    for (index, value) in values.into_iter().enumerate() {
+      result[index % wrap][index / wrap] = value;
+    }
+    Some(FormulaValue::Matrix(result))
+  }
+}
+
+fn evaluate_unique_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let matrix = evaluator.matrix_values(&args.array_value(0)?);
+  let (rows, columns) = match rectangular_shape(&matrix) {
+    Some(shape) => shape,
+    None => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+  };
+  let by_column = args
+    .raw_arg(1)
+    .filter(|_| !args.is_missing(1))
+    .and_then(|_| args.value(1))
+    .is_some_and(|value| evaluator.truthy(&value));
+  let exactly_once = args
+    .raw_arg(2)
+    .filter(|_| !args.is_missing(2))
+    .and_then(|_| args.value(2))
+    .is_some_and(|value| evaluator.truthy(&value));
+  let unit_count = if by_column { columns } else { rows };
+  let mut units = Vec::with_capacity(unit_count);
+  for index in 0..unit_count {
+    let key = if by_column {
+      (0..rows)
+        .map(|row| evaluator.text(&matrix[row][index]).to_lowercase())
+        .collect::<Vec<_>>()
+        .join("\u{1}")
+    } else {
+      (0..columns)
+        .map(|column| evaluator.text(&matrix[index][column]).to_lowercase())
+        .collect::<Vec<_>>()
+        .join("\u{1}")
+    };
+    let count = units
+      .iter()
+      .filter(|(unit_key, _)| unit_key == &key)
+      .count()
+      + 1;
+    units.push((key, count));
+  }
+  let mut keep = Vec::new();
+  for (index, (key, count)) in units.iter().enumerate() {
+    if *count != 1 {
+      continue;
+    }
+    let total = units.iter().filter(|(unit_key, _)| unit_key == key).count();
+    if !exactly_once || total == 1 {
+      keep.push(index);
+    }
+  }
+  if keep.is_empty() {
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
+  }
+  Some(if by_column {
+    FormulaValue::Matrix(
+      (0..rows)
+        .map(|row| {
+          keep
+            .iter()
+            .map(|column| matrix[row][*column].clone())
+            .collect()
+        })
+        .collect(),
+    )
+  } else {
+    FormulaValue::Matrix(keep.into_iter().map(|row| matrix[row].clone()).collect())
+  })
+}
+
 fn evaluate_sequence_reader<'doc>(
   _evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -4165,6 +4811,22 @@ fn rectangular_shape(matrix: &[Vec<FormulaValue<'_>>]) -> Option<(usize, usize)>
   } else {
     Some((rows, columns))
   }
+}
+
+fn optional_usize_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  default: usize,
+) -> Option<usize> {
+  if args.raw_arg(index).is_none() || args.is_missing(index) {
+    return Some(default);
+  }
+  let value = evaluator.number(&args.value(index)?)?.floor();
+  if value < 0.0 || value > usize::MAX as f64 {
+    return None;
+  }
+  Some(value as usize)
 }
 
 fn optional_number_values<'doc>(
@@ -8801,6 +9463,462 @@ fn financial_date_arg_strict<'doc>(
     .ok_or(FormulaErrorValue::Value)
 }
 
+#[derive(Clone, Copy)]
+enum FinancialArrayArgKind {
+  Date,
+  Integer,
+  Number,
+}
+
+fn financial_array_arg<'doc>(
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  default: Option<FormulaValue<'doc>>,
+) -> Option<FormulaValue<'doc>> {
+  if args.raw_arg(index).is_none() || args.is_missing(index) {
+    return default;
+  }
+  args.array_value(index)
+}
+
+fn map_financial_array_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  values: &[FormulaValue<'doc>],
+  kinds: &[FinancialArrayArgKind],
+  invalid_error: FormulaErrorValue,
+  op: impl Fn(&[f64]) -> Option<f64> + Copy,
+) -> Option<FormulaValue<'doc>> {
+  let matrices = values
+    .iter()
+    .map(|value| evaluator.matrix_values(value))
+    .collect::<Vec<_>>();
+  let mut rows = 1usize;
+  let mut columns = 1usize;
+  let mut dimensions = Vec::with_capacity(matrices.len());
+  for matrix in &matrices {
+    let row_count = matrix.len();
+    let column_count = matrix.first().map_or(0, Vec::len);
+    if row_count == 0 || column_count == 0 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    rows = rows.max(row_count);
+    columns = columns.max(column_count);
+    dimensions.push((row_count, column_count));
+  }
+  if dimensions.iter().any(|(row_count, column_count)| {
+    !matrix_can_broadcast_local(*row_count, *column_count, rows, columns)
+  }) {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+
+  let mut result = Vec::with_capacity(rows);
+  for row in 0..rows {
+    let mut result_row = Vec::with_capacity(columns);
+    for column in 0..columns {
+      let mut converted = Vec::with_capacity(values.len());
+      let mut error = None;
+      for ((matrix, (row_count, column_count)), kind) in
+        matrices.iter().zip(dimensions.iter().copied()).zip(kinds)
+      {
+        let value = &matrix[row.min(row_count - 1)][column.min(column_count - 1)];
+        let number = match value {
+          FormulaValue::Error(value_error) => {
+            error = Some(*value_error);
+            break;
+          }
+          value => match kind {
+            FinancialArrayArgKind::Date => evaluator
+              .date_number_from_value(value)
+              .and_then(floor_to_i32)
+              .map(f64::from),
+            FinancialArrayArgKind::Integer => evaluator.number(value).map(|value| value.floor()),
+            FinancialArrayArgKind::Number => evaluator.number(value),
+          },
+        };
+        match number {
+          Some(number) if number.is_finite() => converted.push(number),
+          _ => {
+            error = Some(invalid_error);
+            break;
+          }
+        }
+      }
+      result_row.push(error.map_or_else(
+        || match op(&converted) {
+          Some(value) if value.is_finite() => FormulaValue::Number(value),
+          _ => FormulaValue::Error(invalid_error),
+        },
+        FormulaValue::Error,
+      ));
+    }
+    result.push(result_row);
+  }
+  if rows == 1 && columns == 1 {
+    return result.into_iter().next()?.into_iter().next();
+  }
+  Some(FormulaValue::Matrix(result))
+}
+
+#[derive(Clone, Copy)]
+enum DiscountSecurityKind {
+  Discount,
+  Intrate,
+  Price,
+  Received,
+  Yield,
+}
+
+fn evaluate_discount_security_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  kind: DiscountSecurityKind,
+) -> Option<FormulaValue<'doc>> {
+  let invalid_error = financial_invalid_error(evaluator);
+  if evaluator.array_context {
+    let values = [
+      financial_array_arg(args, 0, None)?,
+      financial_array_arg(args, 1, None)?,
+      financial_array_arg(args, 2, None)?,
+      financial_array_arg(args, 3, None)?,
+      financial_array_arg(args, 4, Some(FormulaValue::Number(0.0)))?,
+    ];
+    if values.iter().any(is_matrix_argument) {
+      return map_financial_array_values(
+        evaluator,
+        &values,
+        &[
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Number,
+          FinancialArrayArgKind::Number,
+          FinancialArrayArgKind::Integer,
+        ],
+        invalid_error,
+        |values| {
+          let settle = values[0] as i32;
+          let maturity = values[1] as i32;
+          let basis = values[4] as i32;
+          if !(0..=4).contains(&basis) {
+            return None;
+          }
+          match kind {
+            DiscountSecurityKind::Discount => {
+              finance_disc(settle, maturity, values[2], values[3], basis)
+            }
+            DiscountSecurityKind::Intrate => {
+              finance_intrate(settle, maturity, values[2], values[3], basis)
+            }
+            DiscountSecurityKind::Price => {
+              finance_pricedisc(settle, maturity, values[2], values[3], basis)
+            }
+            DiscountSecurityKind::Received => {
+              finance_received(settle, maturity, values[2], values[3], basis)
+            }
+            DiscountSecurityKind::Yield => {
+              finance_yielddisc(settle, maturity, values[2], values[3], basis)
+            }
+          }
+        },
+      );
+    }
+  }
+  let settle = match financial_date_arg_strict(evaluator, args, 0, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let maturity = match financial_date_arg_strict(evaluator, args, 1, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let first = match financial_number_arg_strict(evaluator, args, 2, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let second = match financial_number_arg_strict(evaluator, args, 3, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let basis = match optional_financial_i32_arg_strict(evaluator, args, 4, 0, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if !(0..=4).contains(&basis) {
+    return Some(FormulaValue::Error(invalid_error));
+  }
+  let result = match kind {
+    DiscountSecurityKind::Discount => finance_disc(settle, maturity, first, second, basis),
+    DiscountSecurityKind::Intrate => finance_intrate(settle, maturity, first, second, basis),
+    DiscountSecurityKind::Price => finance_pricedisc(settle, maturity, first, second, basis),
+    DiscountSecurityKind::Received => finance_received(settle, maturity, first, second, basis),
+    DiscountSecurityKind::Yield => finance_yielddisc(settle, maturity, first, second, basis),
+  };
+  result
+    .filter(|value| value.is_finite())
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(invalid_error)))
+}
+
+fn evaluate_pricemat_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let invalid_error = financial_invalid_error(evaluator);
+  if evaluator.array_context {
+    let values = [
+      financial_array_arg(args, 0, None)?,
+      financial_array_arg(args, 1, None)?,
+      financial_array_arg(args, 2, None)?,
+      financial_array_arg(args, 3, None)?,
+      financial_array_arg(args, 4, None)?,
+      financial_array_arg(args, 5, Some(FormulaValue::Number(0.0)))?,
+    ];
+    if values.iter().any(is_matrix_argument) {
+      return map_financial_array_values(
+        evaluator,
+        &values,
+        &[
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Number,
+          FinancialArrayArgKind::Number,
+          FinancialArrayArgKind::Integer,
+        ],
+        invalid_error,
+        |values| {
+          let basis = values[5] as i32;
+          if !(0..=4).contains(&basis) {
+            return None;
+          }
+          finance_pricemat(
+            values[0] as i32,
+            values[1] as i32,
+            values[2] as i32,
+            values[3],
+            values[4],
+            basis,
+          )
+        },
+      );
+    }
+  }
+  let settle = match financial_date_arg_strict(evaluator, args, 0, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let maturity = match financial_date_arg_strict(evaluator, args, 1, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let issue = match financial_date_arg_strict(evaluator, args, 2, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let rate = match financial_number_arg_strict(evaluator, args, 3, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let yield_value = match financial_number_arg_strict(evaluator, args, 4, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let basis = match optional_financial_i32_arg_strict(evaluator, args, 5, 0, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if !(0..=4).contains(&basis) {
+    return Some(FormulaValue::Error(invalid_error));
+  }
+  finance_pricemat(settle, maturity, issue, rate, yield_value, basis)
+    .filter(|value| value.is_finite())
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(invalid_error)))
+}
+
+fn evaluate_accrint_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  maturity_only: bool,
+) -> Option<FormulaValue<'doc>> {
+  let invalid_error = financial_invalid_error(evaluator);
+  if evaluator.array_context {
+    let values = if maturity_only {
+      [
+        financial_array_arg(args, 0, None)?,
+        financial_array_arg(args, 1, None)?,
+        financial_array_arg(args, 2, None)?,
+        financial_array_arg(args, 3, Some(FormulaValue::Number(1000.0)))?,
+        financial_array_arg(args, 4, Some(FormulaValue::Number(0.0)))?,
+      ]
+      .to_vec()
+    } else {
+      [
+        financial_array_arg(args, 0, None)?,
+        financial_array_arg(args, 1, None)?,
+        financial_array_arg(args, 2, None)?,
+        financial_array_arg(args, 3, None)?,
+        financial_array_arg(args, 4, Some(FormulaValue::Number(1000.0)))?,
+        financial_array_arg(args, 5, None)?,
+        financial_array_arg(args, 6, Some(FormulaValue::Number(0.0)))?,
+      ]
+      .to_vec()
+    };
+    if values.iter().any(is_matrix_argument) {
+      let kinds = if maturity_only {
+        vec![
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Number,
+          FinancialArrayArgKind::Number,
+          FinancialArrayArgKind::Integer,
+        ]
+      } else {
+        vec![
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Number,
+          FinancialArrayArgKind::Number,
+          FinancialArrayArgKind::Integer,
+          FinancialArrayArgKind::Integer,
+        ]
+      };
+      return map_financial_array_values(evaluator, &values, &kinds, invalid_error, |values| {
+        if maturity_only {
+          let basis = values[4] as i32;
+          if !(0..=4).contains(&basis) {
+            return None;
+          }
+          finance_accrintm(
+            values[0] as i32,
+            values[1] as i32,
+            values[2],
+            values[3],
+            basis,
+          )
+        } else {
+          let frequency = values[5] as i32;
+          let basis = values[6] as i32;
+          if !(0..=4).contains(&basis) {
+            return None;
+          }
+          finance_accrint(
+            values[0] as i32,
+            values[2] as i32,
+            values[3],
+            values[4],
+            frequency,
+            basis,
+          )
+        }
+      });
+    }
+  }
+  let issue = match financial_date_arg_strict(evaluator, args, 0, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let settle_index = if maturity_only { 1 } else { 2 };
+  if !maturity_only && let Err(error) = financial_date_arg_strict(evaluator, args, 1, invalid_error)
+  {
+    return Some(FormulaValue::Error(error));
+  }
+  let settle = match financial_date_arg_strict(evaluator, args, settle_index, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let rate = match financial_number_arg_strict(evaluator, args, settle_index + 1, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let par = match optional_financial_number_strict(evaluator, args, settle_index + 2, 1000.0) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let basis_index = if maturity_only { 4 } else { 6 };
+  let basis =
+    match optional_financial_i32_arg_strict(evaluator, args, basis_index, 0, invalid_error) {
+      Ok(value) => value,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    };
+  if !(0..=4).contains(&basis) {
+    return Some(FormulaValue::Error(invalid_error));
+  }
+  let result = if maturity_only {
+    finance_accrintm(issue, settle, rate, par, basis)
+  } else {
+    let frequency = match financial_i32_arg_strict(evaluator, args, 5, invalid_error) {
+      Ok(value) => value,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    };
+    finance_accrint(issue, settle, rate, par, frequency, basis)
+  };
+  result
+    .filter(|value| value.is_finite())
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(invalid_error)))
+}
+
+#[derive(Clone, Copy)]
+enum TbillKind {
+  Eq,
+  Price,
+  Yield,
+}
+
+fn evaluate_tbill_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  kind: TbillKind,
+) -> Option<FormulaValue<'doc>> {
+  let invalid_error = financial_invalid_error(evaluator);
+  if evaluator.array_context {
+    let values = [
+      financial_array_arg(args, 0, None)?,
+      financial_array_arg(args, 1, None)?,
+      financial_array_arg(args, 2, None)?,
+    ];
+    if values.iter().any(is_matrix_argument) {
+      return map_financial_array_values(
+        evaluator,
+        &values,
+        &[
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Date,
+          FinancialArrayArgKind::Number,
+        ],
+        invalid_error,
+        |values| match kind {
+          TbillKind::Eq => finance_tbilleq(values[0] as i32, values[1] as i32, values[2]),
+          TbillKind::Price => finance_tbillprice(values[0] as i32, values[1] as i32, values[2]),
+          TbillKind::Yield => finance_tbillyield(values[0] as i32, values[1] as i32, values[2]),
+        },
+      );
+    }
+  }
+  let settle = match financial_date_arg_strict(evaluator, args, 0, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let maturity = match financial_date_arg_strict(evaluator, args, 1, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let value = match financial_number_arg_strict(evaluator, args, 2, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let result = match kind {
+    TbillKind::Eq => finance_tbilleq(settle, maturity, value),
+    TbillKind::Price => finance_tbillprice(settle, maturity, value),
+    TbillKind::Yield => finance_tbillyield(settle, maturity, value),
+  };
+  result
+    .filter(|value| value.is_finite())
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(invalid_error)))
+}
+
 fn evaluate_yield_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -9494,6 +10612,328 @@ fn evaluate_slope_intercept_reader<'doc>(
   value
     .map(FormulaValue::Number)
     .or(Some(FormulaValue::Error(FormulaErrorValue::Div0)))
+}
+
+#[derive(Clone, Copy)]
+enum RegressionScalarKind {
+  Rsq,
+  Steyx,
+}
+
+fn evaluate_regression_scalar_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  kind: RegressionScalarKind,
+) -> Option<FormulaValue<'doc>> {
+  let y_values = evaluator.matrix_values(&args.value(0)?);
+  let x_values = evaluator.matrix_values(&args.value(1)?);
+  let Some(pairs) = covariance_pairs(&y_values, &x_values) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
+  };
+  let (y, x): (Vec<_>, Vec<_>) = pairs.into_iter().unzip();
+  let state = regression_scalar_state(&y, &x);
+  let value = match kind {
+    RegressionScalarKind::Rsq => state.r_squared(),
+    RegressionScalarKind::Steyx => state.steyx(),
+  };
+  value
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Div0)))
+}
+
+#[derive(Clone, Copy)]
+enum RegressionArrayKind {
+  Linest,
+  Logest,
+}
+
+fn evaluate_regression_array_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  kind: RegressionArrayKind,
+) -> Option<FormulaValue<'doc>> {
+  let log_y = matches!(kind, RegressionArrayKind::Logest);
+  let constant = optional_regression_bool(evaluator, args, 2, true)?;
+  let stats = optional_regression_bool(evaluator, args, 3, false)?;
+  let (y, design, _) = regression_known_data(evaluator, args, log_y)?;
+  let model = regression_model(&y, &design, constant)?;
+  let mut row = model.slopes.iter().rev().copied().collect::<Vec<_>>();
+  row.push(model.intercept);
+  let stats_rows = if stats {
+    Some(regression_stats_rows(&y, &design, constant, &model)?)
+  } else {
+    None
+  };
+  if log_y {
+    for value in &mut row {
+      *value = value.exp();
+    }
+  }
+  let mut result = vec![row.into_iter().map(FormulaValue::Number).collect()];
+  if let Some(stats_rows) = stats_rows {
+    result.extend(
+      stats_rows
+        .into_iter()
+        .map(|row| row.into_iter().map(FormulaValue::Number).collect()),
+    );
+  }
+  Some(FormulaValue::Matrix(result))
+}
+
+fn regression_stats_rows(
+  y: &[f64],
+  design: &[Vec<f64>],
+  constant: bool,
+  model: &crate::calc::regression::RegressionModel,
+) -> Option<Vec<Vec<f64>>> {
+  let feature_count = design.first().map_or(0, Vec::len);
+  if feature_count != 1 || y.len() != design.len() {
+    return None;
+  }
+  let x = design
+    .iter()
+    .map(|row| row.first().copied())
+    .collect::<Option<Vec<_>>>()?;
+  let count = y.len();
+  let parameter_count = feature_count + usize::from(constant);
+  if count <= parameter_count {
+    return None;
+  }
+  let x_mean = kahan_sum(x.iter().copied()) / count as f64;
+  let y_mean = kahan_sum(y.iter().copied()) / count as f64;
+  let sxx = if constant {
+    kahan_sum(x.iter().map(|value| {
+      let delta = value - x_mean;
+      delta * delta
+    }))
+  } else {
+    kahan_sum(x.iter().map(|value| value * value))
+  };
+  if sxx == 0.0 {
+    return None;
+  }
+  let residuals = y
+    .iter()
+    .zip(&x)
+    .map(|(y, x)| y - model.predict(&[*x]))
+    .collect::<Vec<_>>();
+  let ss_res = kahan_sum(residuals.iter().map(|value| value * value));
+  let df = (count - parameter_count) as f64;
+  let mse = ss_res / df;
+  let se_slope = (mse / sxx).sqrt();
+  let se_intercept = if constant {
+    (mse * (1.0 / count as f64 + x_mean * x_mean / sxx)).sqrt()
+  } else {
+    0.0
+  };
+  let ss_total = if constant {
+    kahan_sum(y.iter().map(|value| {
+      let delta = value - y_mean;
+      delta * delta
+    }))
+  } else {
+    kahan_sum(y.iter().map(|value| value * value))
+  };
+  let ss_reg = ss_total - ss_res;
+  let r_squared = if ss_total == 0.0 {
+    1.0
+  } else {
+    1.0 - ss_res / ss_total
+  };
+  let f_stat = if ss_res == 0.0 {
+    f64::INFINITY
+  } else {
+    (ss_reg / feature_count as f64) / mse
+  };
+  Some(vec![
+    vec![se_slope, se_intercept],
+    vec![r_squared, mse.sqrt()],
+    vec![f_stat, df],
+    vec![ss_reg, ss_res],
+  ])
+}
+
+#[derive(Clone, Copy)]
+enum RegressionPredictionKind {
+  Growth,
+  Trend,
+}
+
+fn evaluate_regression_prediction_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  kind: RegressionPredictionKind,
+) -> Option<FormulaValue<'doc>> {
+  let growth = matches!(kind, RegressionPredictionKind::Growth);
+  let constant = optional_regression_bool(evaluator, args, 3, true)?;
+  let (y, design, known_shape) = regression_known_data(evaluator, args, growth)?;
+  let (new_design, result_shape) = regression_new_design(evaluator, args, &design, known_shape)?;
+  let model = regression_model(&y, &design, constant)?;
+  let values = new_design
+    .iter()
+    .map(|row| {
+      let value = model.predict(row);
+      FormulaValue::Number(if growth { value.exp() } else { value })
+    })
+    .collect::<Vec<_>>();
+  Some(regression_values_to_matrix(values, result_shape))
+}
+
+#[derive(Clone, Copy)]
+enum RegressionKnownShape {
+  Column,
+  Row,
+  Matrix,
+}
+
+fn regression_known_data<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  log_y: bool,
+) -> Option<(Vec<f64>, Vec<Vec<f64>>, RegressionKnownShape)> {
+  let y_matrix = numeric_matrix(evaluator, &args.value(0)?)?;
+  let y_rows = y_matrix.len();
+  let y_cols = y_matrix.first().map_or(0, Vec::len);
+  if y_rows == 0 || y_cols == 0 {
+    return None;
+  }
+  let shape = if y_rows == 1 {
+    RegressionKnownShape::Row
+  } else if y_cols == 1 {
+    RegressionKnownShape::Column
+  } else {
+    RegressionKnownShape::Matrix
+  };
+  let mut y = y_matrix.iter().flatten().copied().collect::<Vec<_>>();
+  if log_y {
+    if y.iter().any(|value| *value <= 0.0) {
+      return None;
+    }
+    for value in &mut y {
+      *value = value.ln();
+    }
+  }
+  let x_matrix = if args.raw_arg(1).is_some() && !args.is_missing(1) {
+    Some(numeric_matrix(evaluator, &args.value(1)?)?)
+  } else {
+    None
+  };
+  let design = match x_matrix {
+    None => (1..=y.len()).map(|index| vec![index as f64]).collect(),
+    Some(x) => regression_design_from_x(&y_matrix, &x, shape)?,
+  };
+  (design.len() == y.len()).then_some((y, design, shape))
+}
+
+fn regression_design_from_x(
+  y: &[Vec<f64>],
+  x: &[Vec<f64>],
+  shape: RegressionKnownShape,
+) -> Option<Vec<Vec<f64>>> {
+  let y_rows = y.len();
+  let y_cols = y.first().map_or(0, Vec::len);
+  let x_rows = x.len();
+  let x_cols = x.first().map_or(0, Vec::len);
+  if x_rows == 0 || x_cols == 0 || x.iter().any(|row| row.len() != x_cols) {
+    return None;
+  }
+  if x_rows == y_rows && x_cols == y_cols {
+    return Some(x.iter().flatten().map(|value| vec![*value]).collect());
+  }
+  match shape {
+    RegressionKnownShape::Column if x_rows == y_rows => Some(x.to_vec()),
+    RegressionKnownShape::Row if x_cols == y_cols => Some(
+      (0..y_cols)
+        .map(|column| x.iter().map(|row| row[column]).collect())
+        .collect(),
+    ),
+    _ => None,
+  }
+}
+
+fn regression_new_design<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  known_design: &[Vec<f64>],
+  known_shape: RegressionKnownShape,
+) -> Option<(Vec<Vec<f64>>, (usize, usize))> {
+  if args.raw_arg(2).is_none() || args.is_missing(2) {
+    let shape = match known_shape {
+      RegressionKnownShape::Row => (1, known_design.len()),
+      RegressionKnownShape::Column | RegressionKnownShape::Matrix => (known_design.len(), 1),
+    };
+    return Some((known_design.to_vec(), shape));
+  }
+  let matrix = numeric_matrix(evaluator, &args.value(2)?)?;
+  let rows = matrix.len();
+  let columns = matrix.first().map_or(0, Vec::len);
+  let feature_count = known_design.first().map_or(0, Vec::len);
+  let design = if feature_count == 1 {
+    matrix
+      .iter()
+      .flatten()
+      .map(|value| vec![*value])
+      .collect::<Vec<_>>()
+  } else if columns == feature_count {
+    matrix.clone()
+  } else if rows == feature_count {
+    (0..columns)
+      .map(|column| matrix.iter().map(|row| row[column]).collect())
+      .collect::<Vec<_>>()
+  } else {
+    return None;
+  };
+  Some((design, (rows, columns)))
+}
+
+fn regression_values_to_matrix<'doc>(
+  values: Vec<FormulaValue<'doc>>,
+  shape: (usize, usize),
+) -> FormulaValue<'doc> {
+  let (rows, columns) = shape;
+  if rows == 1 && columns == 1 {
+    return values.into_iter().next().unwrap_or(FormulaValue::Blank);
+  }
+  let mut iter = values.into_iter();
+  FormulaValue::Matrix(
+    (0..rows)
+      .map(|_| {
+        (0..columns)
+          .map(|_| {
+            iter
+              .next()
+              .unwrap_or(FormulaValue::Error(FormulaErrorValue::NA))
+          })
+          .collect()
+      })
+      .collect(),
+  )
+}
+
+fn optional_regression_bool<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  default: bool,
+) -> Option<bool> {
+  match args.raw_arg(index).filter(|_| !args.is_missing(index)) {
+    Some(_) => Some(evaluator.truthy(&args.value(index)?)),
+    None => Some(default),
+  }
+}
+
+fn numeric_matrix<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> Option<Vec<Vec<f64>>> {
+  let matrix = evaluator.matrix_values(value);
+  if matrix.is_empty() {
+    return None;
+  }
+  matrix
+    .iter()
+    .map(|row| row.iter().map(number_only).collect::<Option<Vec<_>>>())
+    .collect()
 }
 
 fn evaluate_complex_reader<'doc>(

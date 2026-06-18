@@ -1957,6 +1957,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       EtsKind::Add | EtsKind::Mult | EtsKind::StatAdd | EtsKind::StatMult => {
         (3..=6).contains(&args.len())
       }
+      EtsKind::PiAdd | EtsKind::PiMult => (3..=7).contains(&args.len()),
       EtsKind::Season => (2..=4).contains(&args.len()),
     };
     if !valid_count {
@@ -1964,13 +1965,18 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let aggregation_index = match kind {
       EtsKind::Season => 3,
+      EtsKind::PiAdd | EtsKind::PiMult => 6,
       _ => 5,
     };
     let data_completion_index = match kind {
       EtsKind::Season => 2,
+      EtsKind::PiAdd | EtsKind::PiMult => 5,
       _ => 4,
     };
-    let seasonality_index = 3;
+    let seasonality_index = match kind {
+      EtsKind::PiAdd | EtsKind::PiMult => 4,
+      _ => 3,
+    };
     let aggregation = args
       .value(aggregation_index)
       .and_then(|value| self.number(&value))
@@ -2016,7 +2022,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let (target_arg, values_index, timeline_index) = match kind {
       EtsKind::Season => (None, 0, 1),
       EtsKind::StatAdd | EtsKind::StatMult => (None, 0, 1),
-      EtsKind::Add | EtsKind::Mult => (Some(0), 1, 2),
+      EtsKind::Add | EtsKind::Mult | EtsKind::PiAdd | EtsKind::PiMult => (Some(0), 1, 2),
     };
     let values = self.value_numbers(&args.value(values_index)?);
     let timeline = self.value_numbers(&args.value(timeline_index)?);
@@ -2055,6 +2061,38 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
               .map(|value| {
                 let index = self.number(&value).unwrap_or(0.0).floor() as i32;
                 FormulaValue::Number(calc.statistic(index))
+              })
+              .collect::<Vec<_>>()
+          })
+          .collect::<Vec<_>>();
+        if result.len() == 1 && result.first().is_some_and(|row| row.len() == 1) {
+          result.into_iter().next()?.into_iter().next()
+        } else {
+          Some(FormulaValue::Matrix(result))
+        }
+      }
+      EtsKind::PiAdd | EtsKind::PiMult => {
+        let level = args
+          .value(3)
+          .and_then(|value| self.number(&value))
+          .unwrap_or(0.95);
+        if !(0.0..=1.0).contains(&level) {
+          return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+        }
+        let matrix = target_matrix?;
+        let result = matrix
+          .iter()
+          .map(|row| {
+            row
+              .iter()
+              .map(|value| {
+                let Some(target) = self.number(value) else {
+                  return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+                };
+                match calc.prediction_interval(target, level) {
+                  Ok(interval) => FormulaValue::Number(interval),
+                  Err(error) => FormulaValue::Error(ets_error_value(error)),
+                }
               })
               .collect::<Vec<_>>()
           })

@@ -257,6 +257,141 @@ pub fn finance_yield(
   }
 }
 
+pub fn finance_accrint(
+  issue: i32,
+  settle: i32,
+  rate: f64,
+  par: f64,
+  frequency: i32,
+  basis: i32,
+) -> Option<f64> {
+  if rate <= 0.0 || par <= 0.0 || !is_coupon_frequency(frequency) || issue >= settle {
+    return None;
+  }
+  Some(par * rate * finance_year_diff(issue, settle, basis)?)
+}
+
+pub fn finance_accrintm(issue: i32, settle: i32, rate: f64, par: f64, basis: i32) -> Option<f64> {
+  if rate <= 0.0 || par <= 0.0 || issue >= settle {
+    return None;
+  }
+  Some(par * rate * finance_year_diff(issue, settle, basis)?)
+}
+
+pub fn finance_received(
+  settle: i32,
+  maturity: i32,
+  investment: f64,
+  discount: f64,
+  basis: i32,
+) -> Option<f64> {
+  if investment <= 0.0 || discount <= 0.0 || settle >= maturity {
+    return None;
+  }
+  Some(investment / (1.0 - discount * finance_year_diff(settle, maturity, basis)?))
+}
+
+pub fn finance_disc(
+  settle: i32,
+  maturity: i32,
+  price: f64,
+  redemption: f64,
+  basis: i32,
+) -> Option<f64> {
+  if price <= 0.0 || redemption <= 0.0 || settle >= maturity {
+    return None;
+  }
+  Some((1.0 - price / redemption) / yearfrac(settle, maturity, basis)?)
+}
+
+pub fn finance_pricedisc(
+  settle: i32,
+  maturity: i32,
+  discount: f64,
+  redemption: f64,
+  basis: i32,
+) -> Option<f64> {
+  if discount <= 0.0 || redemption <= 0.0 || settle >= maturity {
+    return None;
+  }
+  Some(redemption * (1.0 - discount * finance_year_diff(settle, maturity, basis)?))
+}
+
+pub fn finance_pricemat(
+  settle: i32,
+  maturity: i32,
+  issue: i32,
+  rate: f64,
+  yield_value: f64,
+  basis: i32,
+) -> Option<f64> {
+  if rate < 0.0 || yield_value < 0.0 || settle >= maturity {
+    return None;
+  }
+  let issue_maturity = yearfrac(issue, maturity, basis)?;
+  let issue_settle = yearfrac(issue, settle, basis)?;
+  let settle_maturity = yearfrac(settle, maturity, basis)?;
+  Some(
+    ((1.0 + issue_maturity * rate) / (1.0 + settle_maturity * yield_value) - issue_settle * rate)
+      * 100.0,
+  )
+}
+
+pub fn finance_yielddisc(
+  settle: i32,
+  maturity: i32,
+  price: f64,
+  redemption: f64,
+  basis: i32,
+) -> Option<f64> {
+  if price <= 0.0 || redemption <= 0.0 || settle >= maturity {
+    return None;
+  }
+  Some(((redemption / price) - 1.0) / yearfrac(settle, maturity, basis)?)
+}
+
+pub fn finance_intrate(
+  settle: i32,
+  maturity: i32,
+  investment: f64,
+  redemption: f64,
+  basis: i32,
+) -> Option<f64> {
+  if investment <= 0.0 || redemption <= 0.0 || settle >= maturity {
+    return None;
+  }
+  Some(((redemption / investment) - 1.0) / finance_year_diff(settle, maturity, basis)?)
+}
+
+pub fn finance_tbilleq(settle: i32, maturity: i32, discount: f64) -> Option<f64> {
+  let maturity = maturity.checked_add(1)?;
+  let days = finance_days360_us(settle, maturity)?;
+  if discount <= 0.0 || settle >= maturity || days > 360 {
+    return None;
+  }
+  Some((365.0 * discount) / (360.0 - discount * f64::from(days)))
+}
+
+pub fn finance_tbillprice(settle: i32, maturity: i32, discount: f64) -> Option<f64> {
+  if discount <= 0.0 || settle > maturity {
+    return None;
+  }
+  let maturity = maturity.checked_add(1)?;
+  let fraction = yearfrac(settle, maturity, 0)?;
+  if fraction.fract() == 0.0 {
+    return None;
+  }
+  Some(100.0 * (1.0 - discount * fraction))
+}
+
+pub fn finance_tbillyield(settle: i32, maturity: i32, price: f64) -> Option<f64> {
+  let days = finance_days360_us(settle, maturity)?.checked_add(1)?;
+  if price <= 0.0 || settle >= maturity || days > 360 {
+    return None;
+  }
+  Some(((100.0 / price) - 1.0) / f64::from(days) * 360.0)
+}
+
 pub fn financial_oddlyield(args: OddPeriodArgs) -> Option<f64> {
   let frequency = f64::from(args.frequency);
   let dci = yearfrac(args.last_coupon, args.maturity, args.basis)? * frequency;
@@ -638,6 +773,32 @@ fn finance_days_in_year(basis: i32) -> Option<i32> {
     3 => Some(365),
     _ => None,
   }
+}
+
+fn finance_days360_us(start: i32, end: i32) -> Option<i32> {
+  let (year1, month1, mut day1) = date_from_serial(start)?;
+  let (mut year2, mut month2, mut day2) = date_from_serial(end)?;
+  if day1 == 31 {
+    day1 = 30;
+  } else if month1 == 2 && (day1 == 29 || (day1 == 28 && !is_leap_year(year1))) {
+    day1 = 30;
+  }
+  if day2 == 31 {
+    if day1 != 30 {
+      day2 = 1;
+      if month2 == 12 {
+        year2 += 1;
+        month2 = 1;
+      } else {
+        month2 += 1;
+      }
+    } else {
+      day2 = 30;
+    }
+  }
+  Some(
+    day2 as i32 + month2 as i32 * 30 + year2 * 360 - day1 as i32 - month1 as i32 * 30 - year1 * 360,
+  )
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

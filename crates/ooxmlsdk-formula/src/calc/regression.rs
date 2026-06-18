@@ -2,6 +2,8 @@ use crate::DateSystem;
 use crate::calc::datetime::date_from_serial_with_system;
 use crate::calc::matrix::{apply_householder, qr_decompose, solve_upper};
 use crate::calc::numeric::{KahanSum, approx_sub, kahan_sum};
+use crate::calc::special::norm_s_inv;
+use crate::calc::statistics::{PercentileKind, percentile_sorted};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RegressionModel {
@@ -219,6 +221,8 @@ pub fn regression_state(y: &[f64], design: &[Vec<f64>], constant: bool) -> Optio
 pub enum EtsKind {
   Add,
   Mult,
+  PiAdd,
+  PiMult,
   Season,
   StatAdd,
   StatMult,
@@ -264,6 +268,7 @@ pub struct EtsCalculation {
 
 impl EtsCalculation {
   const MIN_RESOLUTION: f64 = 0.001;
+  const PI_SCENARIOS: usize = 1000;
 
   pub fn new(
     timeline: &[f64],
@@ -281,10 +286,15 @@ impl EtsCalculation {
       .map(|(x, y)| EtsDataPoint { x: *x, y: *y })
       .collect::<Vec<_>>();
     data.sort_by(|left, right| left.x.total_cmp(&right.x));
-    if let Some(target) = target
-      && target < data.first().map_or(0.0, |point| point.x)
-    {
-      return Err(EtsError::Num);
+    if let Some(target) = target {
+      let minimum_target = if matches!(kind, EtsKind::PiAdd | EtsKind::PiMult) {
+        data.last().map_or(0.0, |point| point.x)
+      } else {
+        data.first().map_or(0.0, |point| point.x)
+      };
+      if target < minimum_target {
+        return Err(EtsError::Num);
+      }
     }
 
     let month_interval_day = ets_month_interval_day(&data, date_system);
@@ -328,16 +338,16 @@ impl EtsCalculation {
       fill_ets_gaps(&mut data, step_size, data_completion)?;
     }
 
-    let mut samples_in_period = if samples_in_period != 1 {
+    let samples_in_period = if samples_in_period != 1 {
       samples_in_period
     } else {
       ets_period_len(&data)
     };
     let double_smoothing = samples_in_period == 0 || samples_in_period == 1;
-    if double_smoothing {
-      samples_in_period = 0;
-    }
-    let additive = matches!(kind, EtsKind::Add | EtsKind::Season | EtsKind::StatAdd);
+    let additive = matches!(
+      kind,
+      EtsKind::Add | EtsKind::PiAdd | EtsKind::Season | EtsKind::StatAdd
+    );
     let mut calculation = Self {
       base: vec![0.0; data.len()],
       trend: vec![0.0; data.len()],
@@ -732,6 +742,166 @@ impl EtsCalculation {
       9 => self.samples_in_period as f64,
       _ => f64::NAN,
     }
+  }
+
+  pub fn prediction_interval(&mut self, target: f64, level: f64) -> Result<f64, EtsError> {
+    self.initialize();
+    let target = self
+      .month_interval_day
+      .and_then(|day| ets_month_axis_value(target, Some(day), self.date_system))
+      .unwrap_or(target);
+    let last = self.data.len() - 1;
+    let target_offset = target - self.data[last].x;
+    let size = (target_offset / self.step_size).ceil() as usize;
+    if size == 0 {
+      return Err(EtsError::IllegalArgument);
+    }
+    if !self.double_smoothing {
+      return self.ets_prediction_interval(target, level, size);
+    }
+    let z = norm_s_inv((1.0 + level) / 2.0);
+    let one_minus_level = 1.0 - level;
+    let c = (0..size)
+      .map(|index| {
+        let index = index as f64;
+        (1.0
+          + (level / (1.0 + one_minus_level).powi(3))
+            * ((1.0 + 4.0 * one_minus_level + 5.0 * one_minus_level * one_minus_level)
+              + 2.0 * index * level * (1.0 + 3.0 * one_minus_level)
+              + 2.0 * index * index * level * level))
+          .sqrt()
+      })
+      .collect::<Vec<_>>();
+    let step_number = target_offset / self.step_size;
+    if step_number < 1.0 {
+      return Err(EtsError::IllegalArgument);
+    }
+    let step_index = step_number as usize - 1;
+    let interpolate = target_offset % self.step_size;
+    let mut result = z * self.rmse * c[step_index] / c[0];
+    if interpolate != 0.0 {
+      let next = c.get(step_index + 1).ok_or(EtsError::IllegalArgument)?;
+      let next_result = z * self.rmse * next / c[0];
+      result += interpolate * (next_result - result);
+    }
+    Ok(result)
+  }
+
+  fn ets_prediction_interval(&self, target: f64, level: f64, size: usize) -> Result<f64, EtsError> {
+    let last = self.data.len() - 1;
+    let mut predictions = vec![vec![0.0; Self::PI_SCENARIOS]; size];
+
+    for scenario in 0..Self::PI_SCENARIOS {
+      let mut scenario_range = vec![0.0; size];
+      let mut scenario_base = vec![0.0; size];
+      let mut scenario_trend = vec![0.0; size];
+      let mut scenario_period_index = vec![0.0; size];
+      let mut draw_index = 0usize;
+
+      if self.additive {
+        let first_period_index = self.period_index[self.data.len() - self.samples_in_period];
+        scenario_range[0] = self.base[last]
+          + self.trend[last]
+          + first_period_index
+          + self.pi_scenario_deviation(scenario, draw_index);
+        draw_index += 1;
+        predictions[0][scenario] = scenario_range[0];
+        scenario_base[0] = self.alpha * (scenario_range[0] - first_period_index)
+          + (1.0 - self.alpha) * (self.base[last] + self.trend[last]);
+        scenario_trend[0] =
+          self.gamma * (scenario_base[0] - self.base[last]) + (1.0 - self.gamma) * self.trend[last];
+        scenario_period_index[0] = self.beta * (scenario_range[0] - scenario_base[0])
+          + (1.0 - self.beta) * first_period_index;
+
+        for index in 1..size {
+          let period_index = if index < self.samples_in_period {
+            self.period_index[self.data.len() + index - self.samples_in_period]
+          } else {
+            scenario_period_index[index - self.samples_in_period]
+          };
+          scenario_range[index] = scenario_base[index - 1]
+            + scenario_trend[index - 1]
+            + period_index
+            + self.pi_scenario_deviation(scenario, draw_index);
+          draw_index += 1;
+          predictions[index][scenario] = scenario_range[index];
+          scenario_base[index] = self.alpha * (scenario_range[index] - period_index)
+            + (1.0 - self.alpha) * (scenario_base[index - 1] + scenario_trend[index - 1]);
+          scenario_trend[index] = self.gamma * (scenario_base[index] - scenario_base[index - 1])
+            + (1.0 - self.gamma) * scenario_trend[index - 1];
+          scenario_period_index[index] = self.beta * (scenario_range[index] - scenario_base[index])
+            + (1.0 - self.beta) * period_index;
+        }
+      } else {
+        let first_period_index = self.period_index[self.data.len() - self.samples_in_period];
+        scenario_range[0] = (self.base[last] + self.trend[last]) * first_period_index
+          + self.pi_scenario_deviation(scenario, draw_index);
+        draw_index += 1;
+        predictions[0][scenario] = scenario_range[0];
+        scenario_base[0] = self.alpha * (scenario_range[0] / first_period_index)
+          + (1.0 - self.alpha) * (self.base[last] + self.trend[last]);
+        scenario_trend[0] =
+          self.gamma * (scenario_base[0] - self.base[last]) + (1.0 - self.gamma) * self.trend[last];
+        scenario_period_index[0] = self.beta * (scenario_range[0] / scenario_base[0])
+          + (1.0 - self.beta) * first_period_index;
+
+        for index in 1..size {
+          let period_index = if index < self.samples_in_period {
+            self.period_index[self.data.len() + index - self.samples_in_period]
+          } else {
+            scenario_period_index[index - self.samples_in_period]
+          };
+          scenario_range[index] = (scenario_base[index - 1] + scenario_trend[index - 1])
+            * period_index
+            + self.pi_scenario_deviation(scenario, draw_index);
+          draw_index += 1;
+          predictions[index][scenario] = scenario_range[index];
+          scenario_base[index] = self.alpha * (scenario_range[index] / period_index)
+            + (1.0 - self.alpha) * (scenario_base[index - 1] + scenario_trend[index - 1]);
+          scenario_trend[index] = self.gamma * (scenario_base[index] - scenario_base[index - 1])
+            + (1.0 - self.gamma) * scenario_trend[index - 1];
+          scenario_period_index[index] = self.beta * (scenario_range[index] / scenario_base[index])
+            + (1.0 - self.beta) * period_index;
+        }
+      }
+    }
+
+    let percentile = (1.0 + level) / 2.0;
+    let intervals = predictions
+      .into_iter()
+      .map(|mut values| {
+        let upper = percentile_sorted(&mut values.clone(), percentile, PercentileKind::Inc)
+          .ok_or(EtsError::Value)?;
+        let median =
+          percentile_sorted(&mut values, 0.5, PercentileKind::Inc).ok_or(EtsError::Value)?;
+        Ok(upper - median)
+      })
+      .collect::<Result<Vec<_>, EtsError>>()?;
+
+    let target_offset = target - self.data[last].x;
+    let step_number = target_offset / self.step_size;
+    if step_number < 1.0 {
+      return Err(EtsError::IllegalArgument);
+    }
+    let step_index = step_number as usize - 1;
+    let interpolate = target_offset % self.step_size;
+    let mut result = intervals[step_index];
+    if interpolate != 0.0 {
+      let next = intervals
+        .get(step_index + 1)
+        .ok_or(EtsError::IllegalArgument)?;
+      result += interpolate * (next - result);
+    }
+    Ok(result)
+  }
+
+  fn pi_scenario_deviation(&self, scenario: usize, draw: usize) -> f64 {
+    // LibreOffice samples uniform(0.5, 1.0) per scenario before gaussinv().
+    // Use a deterministic stratified sequence over the same half-normal
+    // distribution so formula-test results remain reproducible.
+    let sample = (scenario.wrapping_mul(37) + draw.wrapping_mul(101)) % Self::PI_SCENARIOS;
+    let probability = 0.5 + (sample as f64 + 0.5) / (2.0 * Self::PI_SCENARIOS as f64);
+    self.rmse * norm_s_inv(probability)
   }
 }
 

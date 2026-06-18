@@ -355,8 +355,9 @@ pub fn percent_rank(
     if value == 0.0 {
       value
     } else {
-      let exp = value.abs().log10().floor() + 1.0 - significance;
-      (value * 10f64.powf(-exp)).round() / 10f64.powf(-exp)
+      let digits = value.abs().log10().floor() + 1.0;
+      let factor = 10f64.powf(significance - digits);
+      (value * factor).round() / factor
     }
   };
 

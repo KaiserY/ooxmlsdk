@@ -31,6 +31,7 @@ use crate::error::{LayoutError, Result};
 pub(crate) struct WorkbookCatalog {
   pub(crate) external_links: Vec<ExternalLinkModel>,
   pub(crate) external_cached_cells: Vec<ExternalCachedCell>,
+  pub(crate) external_defined_names: Vec<ExternalDefinedName>,
   pub(crate) xml_maps: Option<XmlMapsModel>,
   pub(crate) persons: Vec<PersonModel>,
   pub(crate) revisions: Option<RevisionHeadersModel>,
@@ -43,6 +44,14 @@ pub(crate) struct ExternalCachedCell {
   pub(crate) sheet_name: String,
   pub(crate) reference: String,
   pub(crate) value: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ExternalDefinedName {
+  pub(crate) link_index: usize,
+  pub(crate) sheet_name: Option<String>,
+  pub(crate) name: String,
+  pub(crate) formula: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -335,10 +344,19 @@ impl WorkbookCatalog {
       .into_iter()
       .flatten()
       .collect();
+    let external_defined_names = external_parts
+      .iter()
+      .enumerate()
+      .map(|(index, part)| external_defined_names_from_part(package, part, index + 1))
+      .collect::<Result<Vec<_>>>()?
+      .into_iter()
+      .flatten()
+      .collect();
 
     Ok(Self {
       external_links,
       external_cached_cells,
+      external_defined_names,
       xml_maps: xml_maps_part
         .as_ref()
         .map(|part| XmlMapsModel::from_part(package, part))
@@ -432,6 +450,63 @@ fn external_cached_cells_from_part(
     }
   }
   Ok(cells)
+}
+
+fn external_defined_names_from_part(
+  package: &mut SpreadsheetDocument,
+  part: &ExternalWorkbookPart,
+  link_index: usize,
+) -> Result<Vec<ExternalDefinedName>> {
+  let link = part.root_element(package)?;
+  let Some(x::ExternalLinkChoice::ExternalBook(book)) = &link.external_link_choice else {
+    return Ok(Vec::new());
+  };
+  let sheet_names = book
+    .sheet_names
+    .as_ref()
+    .map(|names| {
+      names
+        .sheet_name
+        .iter()
+        .map(|name| name.val.clone().unwrap_or_default())
+        .collect::<Vec<_>>()
+    })
+    .unwrap_or_default();
+  let Some(defined_names) = &book.external_defined_names else {
+    return Ok(Vec::new());
+  };
+  Ok(
+    defined_names
+      .external_defined_name
+      .iter()
+      .map(|name| {
+        let sheet_name = name
+          .sheet_id
+          .and_then(|sheet| sheet_names.get(sheet as usize).cloned());
+        ExternalDefinedName {
+          link_index,
+          sheet_name,
+          name: name.name.clone(),
+          formula: normalize_external_defined_name_formula(
+            link_index,
+            name.refers_to.as_deref().unwrap_or_default(),
+          ),
+        }
+      })
+      .collect(),
+  )
+}
+
+fn normalize_external_defined_name_formula(link_index: usize, formula: &str) -> String {
+  let formula = formula.trim().strip_prefix('=').unwrap_or(formula.trim());
+  if formula.starts_with('[') {
+    return formula.to_string();
+  }
+  let Some((sheet, reference)) = formula.split_once('!') else {
+    return formula.to_string();
+  };
+  let sheet = sheet.trim_matches('\'');
+  format!("[{link_index}]{sheet}!{reference}")
 }
 
 impl ExternalLinkModel {

@@ -68,23 +68,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .unwrap_or_default()
   }
 
-  pub(crate) fn information_scalar_value(
-    &self,
-    value: FormulaValue<'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    match value {
-      FormulaValue::Reference(reference) if reference.range.cell_count_hint() == 1 => {
-        self.range_values(&reference).into_iter().next()
-      }
-      FormulaValue::Reference(_) | FormulaValue::RefList(_) => None,
-      FormulaValue::Matrix(rows) => rows
-        .into_iter()
-        .next()
-        .and_then(|row| row.into_iter().next()),
-      value => Some(value),
-    }
-  }
-
   pub(crate) fn scalar_binary_operand(&self, value: FormulaValue<'doc>) -> FormulaValue<'doc> {
     match value {
       FormulaValue::Reference(reference) => self
@@ -144,7 +127,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     match self.first_value(value) {
       FormulaValue::Number(value) => Some(value),
       FormulaValue::Boolean(value) => Some(if value { 1.0 } else { 0.0 }),
-      FormulaValue::String(value) => value.trim().parse::<f64>().ok(),
+      FormulaValue::String(value) => formula_number_from_text(&value, self.book.date_system),
       FormulaValue::Blank => Some(0.0),
       FormulaValue::Error(_) => None,
       FormulaValue::Matrix(_) | FormulaValue::Reference(_) | FormulaValue::RefList(_) => None,
@@ -166,7 +149,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   pub(crate) fn text(&self, value: &FormulaValue<'doc>) -> String {
-    display_text_from_value(&self.first_value(value))
+    display_text_from_value(&self.scalar_value(value.clone()))
   }
 
   pub(crate) fn truthy(&self, value: &FormulaValue<'doc>) -> bool {
@@ -185,15 +168,60 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     right: &FormulaValue<'doc>,
     op: FormulaOperator,
   ) -> bool {
-    let ordering = if let Some((left, right)) = self.number(left).zip(self.number(right)) {
-      match compare_numbers(left, right) {
-        -1 => Some(std::cmp::Ordering::Less),
-        0 => Some(std::cmp::Ordering::Equal),
-        1 => Some(std::cmp::Ordering::Greater),
-        _ => None,
+    let left = self.first_value(left);
+    let right = self.first_value(right);
+    let ordering = match (&left, &right) {
+      (FormulaValue::Number(_), FormulaValue::Number(_))
+      | (FormulaValue::Number(_), FormulaValue::Blank)
+      | (FormulaValue::Blank, FormulaValue::Number(_))
+      | (FormulaValue::Blank, FormulaValue::Blank)
+      | (FormulaValue::Boolean(_), FormulaValue::Boolean(_))
+      | (FormulaValue::Boolean(_), FormulaValue::Blank)
+      | (FormulaValue::Blank, FormulaValue::Boolean(_)) => self
+        .number(&left)
+        .zip(self.number(&right))
+        .and_then(|(left, right)| match compare_numbers(left, right) {
+          -1 => Some(std::cmp::Ordering::Less),
+          0 => Some(std::cmp::Ordering::Equal),
+          1 => Some(std::cmp::Ordering::Greater),
+          _ => None,
+        }),
+      (FormulaValue::Blank, FormulaValue::String(text))
+      | (FormulaValue::String(text), FormulaValue::Blank)
+        if text.is_empty() =>
+      {
+        Some(std::cmp::Ordering::Equal)
       }
-    } else {
-      Some(self.text(left).cmp(&self.text(right)))
+      (FormulaValue::Boolean(_), FormulaValue::Number(_))
+      | (FormulaValue::Number(_), FormulaValue::Boolean(_))
+        if matches!(
+          self.grammar,
+          FormulaGrammar::CalcA1 | FormulaGrammar::OpenFormula
+        ) =>
+      {
+        self
+          .number(&left)
+          .zip(self.number(&right))
+          .and_then(|(left, right)| match compare_numbers(left, right) {
+            -1 => Some(std::cmp::Ordering::Less),
+            0 => Some(std::cmp::Ordering::Equal),
+            1 => Some(std::cmp::Ordering::Greater),
+            _ => None,
+          })
+      }
+      (FormulaValue::Boolean(_), FormulaValue::Number(_)) => Some(std::cmp::Ordering::Greater),
+      (FormulaValue::Number(_), FormulaValue::Boolean(_)) => Some(std::cmp::Ordering::Less),
+      (FormulaValue::Boolean(_), FormulaValue::String(_)) => Some(std::cmp::Ordering::Greater),
+      (FormulaValue::String(_), FormulaValue::Boolean(_)) => Some(std::cmp::Ordering::Less),
+      (FormulaValue::String(_), FormulaValue::Number(_)) => Some(std::cmp::Ordering::Greater),
+      (FormulaValue::Number(_), FormulaValue::String(_)) => Some(std::cmp::Ordering::Less),
+      (FormulaValue::String(left), FormulaValue::String(right)) => {
+        Some(left.to_ascii_lowercase().cmp(&right.to_ascii_lowercase()))
+      }
+      _ => match self.text(&left).cmp(&self.text(&right)) {
+        std::cmp::Ordering::Equal => Some(std::cmp::Ordering::Greater),
+        ordering => Some(ordering),
+      },
     };
     match op {
       FormulaOperator::Equal => ordering == Some(std::cmp::Ordering::Equal),

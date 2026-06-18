@@ -157,6 +157,7 @@ pub(crate) enum FormulaFunctionId {
   Clean,
   Choose,
   Concat,
+  Concatenate,
   Exact,
   Find,
   Findb,
@@ -484,6 +485,7 @@ pub(crate) enum FormulaFunctionId {
   Testfuncbool,
   Testfunccurr,
   Testfuncdate,
+  Randbetween,
   Randarray,
   Testfuncint,
   Testfuncsingle,
@@ -493,7 +495,7 @@ impl FormulaFunctionId {
   pub(crate) fn is_volatile(self) -> bool {
     matches!(
       self,
-      Self::Indirect | Self::Offset | Self::Randarray | Self::Today
+      Self::Indirect | Self::Offset | Self::Randarray | Self::Randbetween | Self::Today
     )
   }
 }
@@ -676,7 +678,8 @@ fn resolve_canonical_function_name(name: &str) -> Option<FormulaFunctionId> {
     "UNICHAR" => Some(FormulaFunctionId::Unichar),
     "CLEAN" => Some(FormulaFunctionId::Clean),
     "CHOOSE" => Some(FormulaFunctionId::Choose),
-    "CONCAT" | "CONCATENATE" => Some(FormulaFunctionId::Concat),
+    "CONCAT" => Some(FormulaFunctionId::Concat),
+    "CONCATENATE" => Some(FormulaFunctionId::Concatenate),
     "EXACT" => Some(FormulaFunctionId::Exact),
     "FIND" => Some(FormulaFunctionId::Find),
     "FINDB" => Some(FormulaFunctionId::Findb),
@@ -870,7 +873,7 @@ fn resolve_canonical_function_name(name: &str) -> Option<FormulaFunctionId> {
     "NORM.DIST" | "NORMDIST" => Some(FormulaFunctionId::NormDotDist),
     "NORM.INV" | "NORMINV" => Some(FormulaFunctionId::NormDotInv),
     "NORM.S.DIST" | "NORMSDIST" | "LEGACY.NORMSDIST" => Some(FormulaFunctionId::NormDotSDotDist),
-    "NORM.S.INV" | "LEGACY.NORMSINV" => Some(FormulaFunctionId::NormDotSDotInv),
+    "NORM.S.INV" | "NORMSINV" | "LEGACY.NORMSINV" => Some(FormulaFunctionId::NormDotSDotInv),
     "PERCENTILE.EXC" => Some(FormulaFunctionId::PercentileDotExc),
     "PERCENTILE.INC" | "PERCENTILE" => Some(FormulaFunctionId::PercentileDotInc),
     "PERCENTRANK" | "PERCENTRANK.INC" => Some(FormulaFunctionId::Percentrank),
@@ -926,7 +929,7 @@ fn resolve_canonical_function_name(name: &str) -> Option<FormulaFunctionId> {
     "GESTEP" => Some(FormulaFunctionId::Gestep),
     "SLOPE" => Some(FormulaFunctionId::Slope),
     "INTERCEPT" => Some(FormulaFunctionId::Intercept),
-    "FORECAST" => Some(FormulaFunctionId::Forecast),
+    "FORECAST" | "FORECAST.LINEAR" => Some(FormulaFunctionId::Forecast),
     "FORECAST.ETS" | "FORECAST.ETS.ADD" => Some(FormulaFunctionId::ForecastDotEts),
     "FORECAST.ETS.MULT" => Some(FormulaFunctionId::ForecastDotEtsDotMult),
     "FORECAST.ETS.STAT" | "FORECAST.ETS.STAT.ADD" => Some(FormulaFunctionId::ForecastDotEtsDotStat),
@@ -1004,6 +1007,7 @@ fn resolve_canonical_function_name(name: &str) -> Option<FormulaFunctionId> {
     "TESTFUNCBOOL" => Some(FormulaFunctionId::Testfuncbool),
     "TESTFUNCCURR" => Some(FormulaFunctionId::Testfunccurr),
     "TESTFUNCDATE" => Some(FormulaFunctionId::Testfuncdate),
+    "RANDBETWEEN" => Some(FormulaFunctionId::Randbetween),
     "RANDARRAY" => Some(FormulaFunctionId::Randarray),
     "TESTFUNCINT" | "TESTFUNCLONG" => Some(FormulaFunctionId::Testfuncint),
     "TESTFUNCSINGLE" | "TESTFUNCDOUBLE" => Some(FormulaFunctionId::Testfuncsingle),

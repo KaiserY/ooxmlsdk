@@ -268,10 +268,7 @@ fn evaluate_if_control<'doc>(
     let Some(arg) = arg else {
       return Some(default);
     };
-    Some(match evaluate_arg_direct(arg, evaluator)? {
-      FormulaValue::Blank => FormulaValue::Number(0.0),
-      value => value,
-    })
+    evaluate_arg_direct(arg, evaluator)
   };
   if evaluator.array_context
     && matches!(
@@ -328,13 +325,27 @@ fn evaluate_choose_control<'doc>(
   args: EvalArgs<'_, 'doc>,
   evaluator: &FormulaEvaluator<'_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let index = evaluator
-    .number(&evaluate_arg_direct(args.get(0)?, evaluator)?)?
-    .floor() as usize;
+  let index_value = evaluator.scalar_binary_operand(evaluate_arg_direct(args.get(0)?, evaluator)?);
+  if let FormulaValue::Error(error) = index_value {
+    return Some(FormulaValue::Error(error));
+  }
+  let Some(index_value) = evaluator.number(&index_value) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let index_value = index_value.floor();
+  if !index_value.is_finite() || index_value < 1.0 || index_value > usize::MAX as f64 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+  let index = index_value as usize;
   if index == 0 || index >= args.len() {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
   }
-  evaluate_arg_direct(args.get(index)?, evaluator)
+  let selected = args.get(index)?;
+  if is_missing_arg(selected) {
+    Some(FormulaValue::Blank)
+  } else {
+    evaluate_arg_direct(selected, evaluator)
+  }
 }
 
 fn evaluate_ifs_control<'doc>(
@@ -382,6 +393,11 @@ fn evaluate_switch_control<'doc>(
     }
     let matches = match (&selector, &candidate) {
       (FormulaValue::String(left), FormulaValue::String(right)) => left.eq_ignore_ascii_case(right),
+      (FormulaValue::Boolean(_), FormulaValue::Number(_))
+      | (FormulaValue::Number(_), FormulaValue::Boolean(_)) => evaluator
+        .number(&selector)
+        .zip(evaluator.number(&candidate))
+        .is_some_and(|(left, right)| left == right),
       _ => evaluator.compare(&selector, &candidate, FormulaOperator::Equal),
     };
     if matches {

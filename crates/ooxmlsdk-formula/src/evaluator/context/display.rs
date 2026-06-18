@@ -29,8 +29,12 @@ pub(crate) fn display_text_from_value_with_number_format(
     return None;
   };
   let format = context?.format_code.as_deref()?;
-  let format = select_number_format_section(format, *number);
-  format_simple_number_pattern(*number, &format)
+  format_number_with_format_code(*number, format)
+}
+
+pub(crate) fn format_number_with_format_code(number: f64, format: &str) -> Option<String> {
+  let format = select_number_format_section(format, number);
+  format_simple_number_pattern(number, &format)
 }
 
 fn format_simple_number_pattern(number: f64, format: &str) -> Option<String> {
@@ -41,7 +45,7 @@ fn format_simple_number_pattern(number: f64, format: &str) -> Option<String> {
   if numeric.starts_with('"') && numeric.ends_with('"') {
     return Some(numeric.trim_matches('"').to_string());
   }
-  if numeric.contains('?') && numeric.contains('/') {
+  if numeric.contains('/') && (numeric.contains('?') || numeric.contains('#')) {
     return format_fraction_pattern(number, &numeric);
   }
   if numeric.to_ascii_uppercase().contains('E') {
@@ -288,11 +292,23 @@ fn format_fraction_pattern(number: f64, format: &str) -> Option<String> {
   if !format.contains('/') {
     return None;
   }
+  let mixed_fraction = format.split_once('/')?.0.contains(' ');
+  let max_denominator = format
+    .split_once('/')?
+    .1
+    .chars()
+    .filter(|ch| matches!(ch, '#' | '?' | '0'))
+    .fold(0i64, |value, _| value * 10 + 9)
+    .max(1);
   let sign = if number < 0.0 { "-" } else { "" };
   let absolute = number.abs();
+  if !mixed_fraction {
+    let (numerator, denominator) = best_fraction(absolute, max_denominator)?;
+    return Some(format!("{sign}{numerator}/{denominator}"));
+  }
   let whole = absolute.floor() as i64;
   let fraction = absolute - whole as f64;
-  let (numerator, denominator) = best_fraction(fraction, 9)?;
+  let (numerator, denominator) = best_fraction(fraction, max_denominator)?;
   if numerator == 0 {
     return Some(format!("{sign}{whole}"));
   }

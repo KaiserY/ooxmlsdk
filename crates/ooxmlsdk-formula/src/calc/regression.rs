@@ -1,3 +1,5 @@
+use crate::DateSystem;
+use crate::calc::datetime::date_from_serial_with_system;
 use crate::calc::matrix::{apply_householder, qr_decompose, solve_upper};
 use crate::calc::numeric::{KahanSum, approx_sub, kahan_sum};
 
@@ -253,6 +255,8 @@ pub struct EtsCalculation {
   mse: f64,
   rmse: f64,
   smape: f64,
+  month_interval_day: Option<u32>,
+  date_system: DateSystem,
   additive: bool,
   double_smoothing: bool,
   initialized: bool,
@@ -269,6 +273,7 @@ impl EtsCalculation {
     aggregation: i32,
     target: Option<f64>,
     kind: EtsKind,
+    date_system: DateSystem,
   ) -> Result<Self, EtsError> {
     let mut data = timeline
       .iter()
@@ -280,6 +285,13 @@ impl EtsCalculation {
       && target < data.first().map_or(0.0, |point| point.x)
     {
       return Err(EtsError::Num);
+    }
+
+    let month_interval_day = ets_month_interval_day(&data, date_system);
+    if month_interval_day.is_some() {
+      for point in &mut data {
+        point.x = ets_month_axis_value(point.x, month_interval_day, date_system).unwrap_or(point.x);
+      }
     }
 
     let mut index = 1usize;
@@ -341,6 +353,8 @@ impl EtsCalculation {
       mse: 0.0,
       rmse: 0.0,
       smape: 0.0,
+      month_interval_day,
+      date_system,
       additive,
       double_smoothing,
       initialized: false,
@@ -665,6 +679,10 @@ impl EtsCalculation {
 
   pub fn forecast(&mut self, target: f64) -> f64 {
     self.initialize();
+    let target = self
+      .month_interval_day
+      .and_then(|day| ets_month_axis_value(target, Some(day), self.date_system))
+      .unwrap_or(target);
     let last = self.data.len() - 1;
     if target <= self.data[last].x {
       let index = ((target - self.data[0].x) / self.step_size) as usize;
@@ -715,6 +733,52 @@ impl EtsCalculation {
       _ => f64::NAN,
     }
   }
+}
+
+fn ets_month_interval_day(data: &[EtsDataPoint], date_system: DateSystem) -> Option<u32> {
+  let first_day = data
+    .first()
+    .and_then(|point| ets_serial_date(point.x, date_system))
+    .map(|(_, _, day)| day)?;
+  for point in data.iter().skip(1) {
+    let (_, _, day) = ets_serial_date(point.x, date_system)?;
+    if day != first_day {
+      return None;
+    }
+  }
+  Some(first_day)
+}
+
+fn ets_month_axis_value(
+  serial: f64,
+  interval_day: Option<u32>,
+  date_system: DateSystem,
+) -> Option<f64> {
+  let (year, month, day) = ets_serial_date(serial, date_system)?;
+  let interval_day = f64::from(interval_day?);
+  let month_len = f64::from(days_in_month(year, month)?);
+  Some(12.0 * f64::from(year) + f64::from(month) + (f64::from(day) - interval_day) / month_len)
+}
+
+fn ets_serial_date(serial: f64, date_system: DateSystem) -> Option<(i32, u32, u32)> {
+  if !serial.is_finite() {
+    return None;
+  }
+  date_from_serial_with_system(serial as i32, date_system)
+}
+
+fn days_in_month(year: i32, month: u32) -> Option<u32> {
+  Some(match month {
+    1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+    2 if is_leap_year(year) => 29,
+    2 => 28,
+    4 | 6 | 9 | 11 => 30,
+    _ => return None,
+  })
+}
+
+fn is_leap_year(year: i32) -> bool {
+  (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
 fn aggregate_duplicate_ets_points(
@@ -830,10 +894,45 @@ mod tests {
   fn ets_calculation_forecasts_additive_series() {
     let timeline = [1.0, 2.0, 3.0, 4.0, 5.0];
     let values = [2.0, 4.0, 7.0, 8.0, 11.0];
-    let mut calculation =
-      EtsCalculation::new(&timeline, &values, 1, true, 1, Some(6.0), EtsKind::Add).unwrap();
+    let mut calculation = EtsCalculation::new(
+      &timeline,
+      &values,
+      1,
+      true,
+      1,
+      Some(6.0),
+      EtsKind::Add,
+      DateSystem::Date1900,
+    )
+    .unwrap();
 
     assert!((calculation.forecast(6.0) - 12.5).abs() < 1.0e-12);
     assert_eq!(calculation.statistic(8), 1.0);
+  }
+
+  #[test]
+  fn ets_calculation_uses_month_axis_for_same_day_dates() {
+    let timeline = [
+      36892.0, 36982.0, 37073.0, 37165.0, 37257.0, 37347.0, 37438.0, 37530.0, 37622.0, 37712.0,
+      37803.0, 37895.0, 37987.0, 38078.0, 38169.0, 38261.0, 38353.0, 38443.0, 38534.0, 38626.0,
+      38718.0, 38808.0, 38899.0, 38991.0,
+    ];
+    let values = [
+      41.7, 24.0, 32.3, 37.3, 46.2, 29.3, 36.5, 43.0, 48.9, 31.2, 37.7, 40.4, 51.2, 31.9, 41.0,
+      43.8, 55.6, 33.9, 42.1, 45.6, 59.8, 35.2, 44.3, 47.9,
+    ];
+    let mut calculation = EtsCalculation::new(
+      &timeline,
+      &values,
+      4,
+      true,
+      1,
+      Some(38991.0),
+      EtsKind::Mult,
+      DateSystem::LibreOffice,
+    )
+    .unwrap();
+
+    assert!((calculation.forecast(38991.0) - 47.9).abs() < 1.0e-12);
   }
 }

@@ -44,10 +44,9 @@ pub fn financial_nper(rate: f64, pmt: f64, pv: f64, fv: f64, pay_in_advance: boo
 pub fn financial_fv(rate: f64, nper: f64, pmt: f64, pv: f64, pay_in_advance: bool) -> f64 {
   let fv = if rate == 0.0 {
     pv + pmt * nper
-  } else if pay_in_advance {
-    pv * (nper * rate.ln_1p()).exp() + pmt * (1.0 + rate) * (nper * rate.ln_1p()).exp_m1() / rate
   } else {
-    pv * (nper * rate.ln_1p()).exp() + pmt * (nper * rate.ln_1p()).exp_m1() / rate
+    let factor = (1.0 + rate).powf(nper);
+    pv * factor + pmt * (1.0 + if pay_in_advance { rate } else { 0.0 }) * (factor - 1.0) / rate
   };
   -fv
 }

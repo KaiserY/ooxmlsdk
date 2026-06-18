@@ -6,9 +6,76 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     op: FormulaOperator,
     value: FormulaValue<'doc>,
   ) -> Option<FormulaValue<'doc>> {
+    if self.array_context
+      && matches!(
+        value,
+        FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+      )
+    {
+      return self.map_unary_values(value, |evaluator, value| {
+        evaluator.evaluate_unary_value(op, value.clone())
+      });
+    }
+    if let FormulaValue::Error(error) = value {
+      return Some(FormulaValue::Error(error));
+    }
+    if matches!(value, FormulaValue::Reference(_) | FormulaValue::RefList(_)) {
+      return self.evaluate_unary_reference_value(op, value);
+    }
     match op {
       FormulaOperator::UnaryPlus => Some(FormulaValue::Number(self.number(&value)?)),
-      FormulaOperator::UnaryMinus => Some(FormulaValue::Number(-self.number(&value)?)),
+      FormulaOperator::UnaryMinus => match value {
+        FormulaValue::String(_) => self
+          .number(&value)
+          .map(|number| FormulaValue::Number(-number))
+          .or(Some(FormulaValue::Error(FormulaErrorValue::Value))),
+        value => Some(FormulaValue::Number(-self.number(&value)?)),
+      },
+      FormulaOperator::Percent => Some(FormulaValue::Number(self.number(&value)? / 100.0)),
+      _ => None,
+    }
+  }
+
+  fn evaluate_unary_reference_value(
+    &self,
+    op: FormulaOperator,
+    value: FormulaValue<'doc>,
+  ) -> Option<FormulaValue<'doc>> {
+    let value = match value {
+      FormulaValue::Reference(reference) => match self.implicit_intersection_value(&reference) {
+        Some(value) => value,
+        None if matches!(op, FormulaOperator::UnaryPlus) => FormulaValue::Reference(reference),
+        None => FormulaValue::Error(FormulaErrorValue::Value),
+      },
+      FormulaValue::RefList(ranges) if ranges.len() == 1 => self
+        .implicit_intersection_value(&ranges[0])
+        .unwrap_or_else(|| {
+          if matches!(op, FormulaOperator::UnaryPlus) {
+            FormulaValue::RefList(ranges)
+          } else {
+            FormulaValue::Error(FormulaErrorValue::Value)
+          }
+        }),
+      FormulaValue::RefList(_) => FormulaValue::Error(FormulaErrorValue::Value),
+      value => value,
+    };
+    match op {
+      FormulaOperator::UnaryPlus => match value {
+        FormulaValue::Error(error) => Some(FormulaValue::Error(error)),
+        FormulaValue::Reference(_) | FormulaValue::RefList(_) => Some(value),
+        FormulaValue::Blank => Some(FormulaValue::Number(0.0)),
+        FormulaValue::Number(_) | FormulaValue::String(_) => Some(value),
+        FormulaValue::Boolean(_) => Some(FormulaValue::Number(self.number(&value)?)),
+        _ => None,
+      },
+      FormulaOperator::UnaryMinus => match value {
+        FormulaValue::Error(error) => Some(FormulaValue::Error(error)),
+        FormulaValue::String(_) => self
+          .number(&value)
+          .map(|number| FormulaValue::Number(-number))
+          .or(Some(FormulaValue::Error(FormulaErrorValue::Value))),
+        value => Some(FormulaValue::Number(-self.number(&value)?)),
+      },
       FormulaOperator::Percent => Some(FormulaValue::Number(self.number(&value)? / 100.0)),
       _ => None,
     }
@@ -22,6 +89,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   ) -> Option<FormulaValue<'doc>> {
     if let Some(error) = propagate_binary_error(&left, &right) {
       return Some(FormulaValue::Error(error));
+    }
+    if op == FormulaOperator::Union {
+      let left_ranges = self.reference_ranges_from_value(&left);
+      let right_ranges = self.reference_ranges_from_value(&right);
+      if let Some(value) = self.evaluate_union_ranges(left_ranges, right_ranges) {
+        return Some(value);
+      }
     }
     let (left, right) = if self.array_context {
       (left, right)
@@ -43,22 +117,30 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           || matches!(right, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
         {
           return self.map_binary_values(left, right, |evaluator, left, right| {
-            let denominator = evaluator.number(right)?;
+            let Some(denominator) = evaluator.number(right) else {
+              return Some(FormulaValue::Error(FormulaErrorValue::Value));
+            };
             if denominator == 0.0 {
               Some(FormulaValue::Error(FormulaErrorValue::Div0))
+            } else if let Some(numerator) = evaluator.number(left) {
+              Some(FormulaValue::Number(numerator / denominator))
             } else {
-              Some(FormulaValue::Number(evaluator.number(left)? / denominator))
+              Some(FormulaValue::Error(FormulaErrorValue::Value))
             }
           });
         }
-        let denominator = self.number(&right)?;
+        let Some(denominator) = self.number(&right) else {
+          return Some(FormulaValue::Error(FormulaErrorValue::Value));
+        };
         if denominator == 0.0 {
           Some(FormulaValue::Error(FormulaErrorValue::Div0))
+        } else if let Some(numerator) = self.number(&left) {
+          Some(FormulaValue::Number(numerator / denominator))
         } else {
-          Some(FormulaValue::Number(self.number(&left)? / denominator))
+          Some(FormulaValue::Error(FormulaErrorValue::Value))
         }
       }
-      FormulaOperator::Power => self.numeric_binary(left, right, f64::powf),
+      FormulaOperator::Power => self.numeric_binary(left, right, formula_power),
       FormulaOperator::Concat => {
         if self.array_context && (is_matrix_argument(&left) || is_matrix_argument(&right)) {
           return self.map_binary_values(left, right, |evaluator, left, right| {
@@ -117,4 +199,9 @@ fn is_matrix_argument(value: &FormulaValue<'_>) -> bool {
     value,
     FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
   )
+}
+
+fn formula_power(left: f64, right: f64) -> f64 {
+  let result = left.powf(right);
+  if result.is_finite() { result } else { f64::NAN }
 }

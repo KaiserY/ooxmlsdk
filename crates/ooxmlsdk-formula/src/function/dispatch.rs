@@ -7,34 +7,39 @@ use statrs::distribution::{
 use super::{
   EvalContext, FormulaFunctionId, FunctionArgReader, FunctionArgs, resolve_function_name,
 };
-use crate::calc::combinatorics::{gcd_number, lcm_number};
+use crate::calc::combinatorics::{combination_count, gcd_number, lcm_number};
 use crate::calc::complex::{
   FormulaComplex, binary_suffix, format_complex_number as format_formula_complex_number,
   parse_complex_number,
 };
 use crate::calc::datetime::{
-  date_from_serial_with_system, date_serial, date_serial_with_system, is_leap_year,
-  is_valid_libreoffice_gregorian_date, iso_weeknum_from_serial_with_system, last_day_of_month,
-  normalized_date_components, weeks_mode_one_index, yearfrac as date_yearfrac,
+  date_from_serial_with_system, date_serial, date_serial_with_system,
+  days360_with_system as date_days360, is_leap_year, is_valid_libreoffice_gregorian_date,
+  iso_weeknum_from_serial_with_system, last_day_of_month, normalized_date_components,
+  weekday_index_from_serial, weeks_mode_one_index, yearfrac as date_yearfrac,
 };
-use crate::calc::financial::{finance_duration, finance_price, financial_pmt};
-use crate::calc::matrix::{determinant, matrix_multiply};
+use crate::calc::financial::{
+  finance_duration, finance_price, finance_yield, financial_fv, financial_irr, financial_mirr,
+  financial_nper, financial_pmt, financial_rate,
+};
+use crate::calc::matrix::{determinant, lup_decompose, lup_solve, matrix_multiply};
 use crate::calc::numeric::{
   CeilingFloorKind, KahanSum, NumericError, approx_ceil, approx_floor, ceiling_excel_legacy,
   even_odd, floor_excel_legacy, floor_to_i32, floor_to_u32, floor_to_usize, kahan_sum, mround,
-  round_direction, round_to_decimal_places, round_to_significant_digits, sign_number,
+  quotient, round_direction, round_to_decimal_places, round_to_significant_digits, sign_number,
 };
 use crate::calc::radix::{
   base_number_text, convert_from_decimal, convert_to_decimal, decimal_text_to_number,
 };
-use crate::calc::regression::EtsKind;
+use crate::calc::regression::{EtsKind, scalar_state as regression_scalar_state};
 use crate::calc::special::{
-  SpecialError, lo_chi_dist, lo_chisq_dist_cdf, lo_f_dist_right_tail, lo_gauss, lo_iterate_inverse,
-  norm_s_inv,
+  BesselKind, SpecialError, bessel, lo_chi_dist, lo_chisq_dist_cdf, lo_f_dist_right_tail, lo_gauss,
+  lo_integral_phi, lo_iterate_inverse, lo_phi, lo_poisson_dist, log_gamma, norm_s_inv,
 };
 use crate::calc::statistics::{
-  PercentileKind, StatisticsError, covariance, deviation_sum_squares, frequency_counts, kurtosis,
-  mode_slice, percent_rank, percentile_sorted, rank_value, skewness, trim_mean, variance_slice,
+  PercentileKind, StatisticsError, correlation, covariance, deviation_sum_squares,
+  frequency_counts, kurtosis, mode_slice, percent_rank, percentile_sorted, rank_value, skewness,
+  trim_mean, variance_slice,
 };
 use crate::calc::text::{
   clean_formula_text, leftb, legacy_char_text, legacy_text_code, proper_formula_text, rightb,
@@ -44,12 +49,14 @@ use crate::calc::units::convert_unit;
 use crate::code::FormulaOp;
 use crate::evaluator::{
   DatabaseFunction, DatePart, IfsAggregate, TimePart, column_index_to_name, compare_text,
-  datevalue, display_text_from_value, error_text_value, rtl_cos, rtl_sin, rtl_tan, timevalue,
+  datevalue, display_text_from_value, error_text_value, format_number_with_format_code, rtl_cos,
+  rtl_sin, rtl_tan, timevalue,
 };
 use crate::model::{XLSX_MAX_COLUMN_ZERO_BASED, XLSX_MAX_ROW_ZERO_BASED};
 use crate::{
-  CellAddress, CellRange, DateSystem, FormulaErrorValue, FormulaGrammar, FormulaValue,
-  PivotDataRequest, PivotFieldFilter, QualifiedRange,
+  CellAddress, CellRange, DateSystem, FormulaErrorValue, FormulaGrammar, FormulaOperator,
+  FormulaValue, MAX_EXPANDED_RANGE_CELLS, PivotDataRequest, PivotFieldFilter, QualifiedRange,
+  SheetId,
 };
 
 pub(crate) fn evaluate_function<'doc>(
@@ -95,8 +102,15 @@ fn evaluate_function_reader<'doc>(
         Ok(values) => values,
         Err(error) => return Some(FormulaValue::Error(error)),
       };
-      (!values.is_empty())
-        .then(|| FormulaValue::Number(kahan_sum(values.iter().copied()) / values.len() as f64))
+      if values.is_empty() {
+        Some(FormulaValue::Error(FormulaErrorValue::Div0))
+      } else {
+        let sum = match evaluator.grammar {
+          FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1 => values.iter().sum::<f64>(),
+          FormulaGrammar::CalcA1 | FormulaGrammar::OpenFormula => kahan_sum(values.iter().copied()),
+        };
+        Some(FormulaValue::Number(sum / values.len() as f64))
+      }
     }
     FormulaFunctionId::Min => Some(
       args
@@ -132,38 +146,46 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Countblank if args.len() == 1 => Some(FormulaValue::Number(
       evaluator.count_blank(&args.first_value()?) as f64,
     )),
-    FormulaFunctionId::Mode => evaluate_mode_reader(args),
+    FormulaFunctionId::Mode => evaluate_mode_reader(evaluator, args),
     FormulaFunctionId::Sumif if (2..=3).contains(&args.len()) => evaluator.evaluate_ifs_reader(
       args,
       Some(if args.len() == 3 { 2 } else { 0 }),
+      args.len() == 3,
       0,
       2,
       IfsAggregate::Sum,
     ),
     FormulaFunctionId::Countif if args.len() == 2 => {
-      evaluator.evaluate_ifs_reader(args, None, 0, 2, IfsAggregate::Count)
+      evaluator.evaluate_ifs_reader(args, None, false, 0, 2, IfsAggregate::Count)
     }
     FormulaFunctionId::Averageif if (2..=3).contains(&args.len()) => evaluator.evaluate_ifs_reader(
       args,
       Some(if args.len() == 3 { 2 } else { 0 }),
+      args.len() == 3,
       0,
       2,
       IfsAggregate::Average,
     ),
     FormulaFunctionId::Sumifs if args.len() >= 3 && !args.len().is_multiple_of(2) => {
-      evaluator.evaluate_ifs_reader(args, Some(0), 1, args.len() - 1, IfsAggregate::Sum)
+      evaluator.evaluate_ifs_reader(args, Some(0), false, 1, args.len() - 1, IfsAggregate::Sum)
     }
     FormulaFunctionId::Countifs if args.len() >= 2 && args.len().is_multiple_of(2) => {
-      evaluator.evaluate_ifs_reader(args, None, 0, args.len(), IfsAggregate::Count)
+      evaluator.evaluate_ifs_reader(args, None, false, 0, args.len(), IfsAggregate::Count)
     }
-    FormulaFunctionId::Averageifs if args.len() >= 3 && !args.len().is_multiple_of(2) => {
-      evaluator.evaluate_ifs_reader(args, Some(0), 1, args.len() - 1, IfsAggregate::Average)
-    }
+    FormulaFunctionId::Averageifs if args.len() >= 3 && !args.len().is_multiple_of(2) => evaluator
+      .evaluate_ifs_reader(
+        args,
+        Some(0),
+        false,
+        1,
+        args.len() - 1,
+        IfsAggregate::Average,
+      ),
     FormulaFunctionId::Maxifs if args.len() >= 3 && !args.len().is_multiple_of(2) => {
-      evaluator.evaluate_ifs_reader(args, Some(0), 1, args.len() - 1, IfsAggregate::Max)
+      evaluator.evaluate_ifs_reader(args, Some(0), false, 1, args.len() - 1, IfsAggregate::Max)
     }
     FormulaFunctionId::Minifs if args.len() >= 3 && !args.len().is_multiple_of(2) => {
-      evaluator.evaluate_ifs_reader(args, Some(0), 1, args.len() - 1, IfsAggregate::Min)
+      evaluator.evaluate_ifs_reader(args, Some(0), false, 1, args.len() - 1, IfsAggregate::Min)
     }
     FormulaFunctionId::Iserror if args.len() == 1 => {
       evaluate_information_error_value(evaluator, &args.first_value()?, |_| true)
@@ -182,15 +204,15 @@ fn evaluate_function_reader<'doc>(
       evaluate_isblank_value(evaluator, &args.first_value()?)
     }
     FormulaFunctionId::Istext if args.len() == 1 => Some(FormulaValue::Boolean(matches!(
-      evaluator.information_scalar_value(args.first_value()?),
+      information_logical_value(evaluator, args.first_value()?),
       Some(FormulaValue::String(_))
     ))),
     FormulaFunctionId::Isnontext if args.len() == 1 => Some(FormulaValue::Boolean(!matches!(
-      evaluator.information_scalar_value(args.first_value()?),
+      information_logical_value(evaluator, args.first_value()?),
       Some(FormulaValue::String(_))
     ))),
     FormulaFunctionId::Islogical if args.len() == 1 => Some(FormulaValue::Boolean(matches!(
-      evaluator.information_scalar_value(args.first_value()?),
+      information_logical_value(evaluator, args.first_value()?),
       Some(FormulaValue::Boolean(_))
     ))),
     FormulaFunctionId::Isnumber if args.len() == 1 => {
@@ -241,7 +263,9 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Fixed if (1..=3).contains(&args.len()) => {
       evaluate_fixed_reader(evaluator, args)
     }
+    FormulaFunctionId::Text if args.len() == 2 => evaluate_text_reader(evaluator, args),
     FormulaFunctionId::Concat => evaluate_concat_reader(evaluator, args),
+    FormulaFunctionId::Concatenate => evaluate_concatenate_reader(evaluator, args),
     FormulaFunctionId::Textjoin => evaluate_textjoin_reader(evaluator, args),
     FormulaFunctionId::Exact if args.len() == 2 => evaluate_exact_reader(evaluator, args),
     FormulaFunctionId::Find if (2..=3).contains(&args.len()) => {
@@ -260,34 +284,71 @@ fn evaluate_function_reader<'doc>(
       evaluate_substitute_reader(evaluator, args)
     }
     FormulaFunctionId::Trim if args.len() == 1 => evaluate_trim_reader(evaluator, args),
-    FormulaFunctionId::Proper if args.len() == 1 => Some(FormulaValue::String(Cow::Owned(
-      proper_formula_text(&evaluator.text(&args.scalar_value(0)?)),
-    ))),
-    FormulaFunctionId::Rot13 if args.len() == 1 => Some(FormulaValue::String(Cow::Owned(
-      rot13_formula_text(&evaluator.text(&args.scalar_value(0)?)),
-    ))),
-    FormulaFunctionId::Upper if args.len() == 1 => Some(FormulaValue::String(Cow::Owned(
-      evaluator.text(&args.scalar_value(0)?).to_ascii_uppercase(),
-    ))),
-    FormulaFunctionId::Lower if args.len() == 1 => Some(FormulaValue::String(Cow::Owned(
-      evaluator.text(&args.scalar_value(0)?).to_ascii_lowercase(),
-    ))),
-    FormulaFunctionId::Code if args.len() == 1 => Some(FormulaValue::Number(
-      evaluator
-        .text(&args.scalar_value(0)?)
-        .chars()
-        .next()
-        .map(legacy_text_code)
-        .unwrap_or(0) as f64,
-    )),
-    FormulaFunctionId::Unicode if args.len() == 1 => Some(FormulaValue::Number(
-      evaluator
-        .text(&args.scalar_value(0)?)
-        .chars()
-        .next()
-        .map(|ch| ch as u32)
-        .unwrap_or(0) as f64,
-    )),
+    FormulaFunctionId::Proper if args.len() == 1 => {
+      let text = match strict_text_arg(evaluator, args.value(0)?) {
+        Ok(text) => text,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      Some(FormulaValue::String(Cow::Owned(proper_formula_text(&text))))
+    }
+    FormulaFunctionId::Rot13 if args.len() == 1 => {
+      let text = match strict_text_arg(evaluator, args.value(0)?) {
+        Ok(text) => text,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      Some(FormulaValue::String(Cow::Owned(rot13_formula_text(&text))))
+    }
+    FormulaFunctionId::Upper if args.len() == 1 => {
+      let value = args.value(0)?;
+      if evaluator.array_context && is_matrix_argument(&value) {
+        return map_text_unary_value(evaluator, value, |text| {
+          FormulaValue::String(Cow::Owned(text.to_ascii_uppercase()))
+        });
+      }
+      let text = match strict_text_arg(evaluator, args.value(0)?) {
+        Ok(text) => text,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      Some(FormulaValue::String(Cow::Owned(text.to_ascii_uppercase())))
+    }
+    FormulaFunctionId::Lower if args.len() == 1 => {
+      let value = args.value(0)?;
+      if evaluator.array_context && is_matrix_argument(&value) {
+        return map_text_unary_value(evaluator, value, |text| {
+          FormulaValue::String(Cow::Owned(text.to_ascii_lowercase()))
+        });
+      }
+      let text = match strict_text_arg(evaluator, args.value(0)?) {
+        Ok(text) => text,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      Some(FormulaValue::String(Cow::Owned(text.to_ascii_lowercase())))
+    }
+    FormulaFunctionId::Code if args.len() == 1 => {
+      let text = match strict_text_arg(evaluator, args.value(0)?) {
+        Ok(text) => text,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      let Some(code) = text.chars().next().map(legacy_text_code) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      };
+      Some(FormulaValue::Number(code as f64))
+    }
+    FormulaFunctionId::Unicode if args.len() == 1 => {
+      let value = args.value(0)?;
+      if evaluator.array_context && is_matrix_argument(&value) {
+        return map_text_unary_value(evaluator, value, |text| {
+          FormulaValue::Number(text.chars().next().map(|ch| ch as u32).unwrap_or(0) as f64)
+        });
+      }
+      let text = match strict_text_arg(evaluator, args.value(0)?) {
+        Ok(text) => text,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      Some(FormulaValue::Number(
+        text.chars().next().map(|ch| ch as u32).unwrap_or(0) as f64,
+      ))
+    }
     FormulaFunctionId::Char if args.len() == 1 => {
       let code = evaluator.number(&args.scalar_value(0)?)?;
       legacy_char_text(code)
@@ -303,7 +364,29 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::Clean if args.len() == 1 => evaluate_clean_reader(evaluator, args),
     FormulaFunctionId::Abs if args.len() == 1 => {
-      scalar_numeric_unary_arg(evaluator, args, f64::abs)
+      let value = args.value(0)?;
+      if matches!(value, FormulaValue::Matrix(_))
+        || (evaluator.array_context && is_matrix_argument(&value))
+      {
+        evaluator.map_unary_values(value, |evaluator, value| {
+          evaluator
+            .number(value)
+            .map(|value| FormulaValue::Number(value.abs()))
+        })
+      } else {
+        let value = if evaluator.current_cell.is_some() {
+          evaluator.scalar_binary_operand(value)
+        } else {
+          evaluator.first_value(&value)
+        };
+        if let FormulaValue::Error(error) = value {
+          return Some(FormulaValue::Error(error));
+        }
+        evaluator
+          .number(&value)
+          .map(|value| FormulaValue::Number(value.abs()))
+          .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+      }
     }
     FormulaFunctionId::Sign if args.len() == 1 => {
       scalar_numeric_unary_arg(evaluator, args, sign_number)
@@ -312,7 +395,10 @@ fn evaluate_function_reader<'doc>(
       scalar_numeric_unary_arg(evaluator, args, approx_floor)
     }
     FormulaFunctionId::Sqrt if args.len() == 1 => {
-      let value = scalar_number_arg(evaluator, args, 0)?;
+      let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+        Ok(value) => value,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
       if value < 0.0 {
         Some(FormulaValue::Error(FormulaErrorValue::Num))
       } else {
@@ -320,8 +406,14 @@ fn evaluate_function_reader<'doc>(
       }
     }
     FormulaFunctionId::Power if args.len() == 2 => {
-      let value = scalar_number_arg(evaluator, args, 0)?;
-      let power = scalar_number_arg(evaluator, args, 1)?;
+      let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+        Ok(value) => value,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      let power = match scalar_number_arg_or_value(evaluator, args, 1)? {
+        Ok(value) => value,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
       let result = value.powf(power);
       if result.is_finite() {
         Some(FormulaValue::Number(result))
@@ -335,26 +427,78 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Odd if args.len() == 1 => {
       scalar_numeric_unary_arg(evaluator, args, |value| even_odd(value, false))
     }
-    FormulaFunctionId::Iseven if args.len() == 1 => Some(FormulaValue::Boolean(
-      approx_floor(scalar_number_arg(evaluator, args, 0)?.abs()) as i64 % 2 == 0,
-    )),
-    FormulaFunctionId::Isodd if args.len() == 1 => Some(FormulaValue::Boolean(
-      approx_floor(scalar_number_arg(evaluator, args, 0)?.abs()) as i64 % 2 != 0,
-    )),
+    FormulaFunctionId::Iseven if args.len() == 1 => {
+      let value = args.value(0)?;
+      if evaluator.array_context && is_matrix_argument(&value) {
+        return evaluator.map_unary_values(value, |evaluator, value| {
+          if let FormulaValue::Error(error) = value {
+            return Some(FormulaValue::Error(*error));
+          }
+          let Some(value) = evaluator.number(value) else {
+            return Some(FormulaValue::Error(FormulaErrorValue::Value));
+          };
+          Some(FormulaValue::Boolean(
+            approx_floor(value.abs()) as i64 % 2 == 0,
+          ))
+        });
+      }
+      let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+        Ok(value) => value,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      Some(FormulaValue::Boolean(
+        approx_floor(value.abs()) as i64 % 2 == 0,
+      ))
+    }
+    FormulaFunctionId::Isodd if args.len() == 1 => {
+      let value = args.value(0)?;
+      if evaluator.array_context && is_matrix_argument(&value) {
+        return evaluator.map_unary_values(value, |evaluator, value| {
+          if let FormulaValue::Error(error) = value {
+            return Some(FormulaValue::Error(*error));
+          }
+          let Some(value) = evaluator.number(value) else {
+            return Some(FormulaValue::Error(FormulaErrorValue::Value));
+          };
+          Some(FormulaValue::Boolean(
+            approx_floor(value.abs()) as i64 % 2 != 0,
+          ))
+        });
+      }
+      let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+        Ok(value) => value,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      Some(FormulaValue::Boolean(
+        approx_floor(value.abs()) as i64 % 2 != 0,
+      ))
+    }
     FormulaFunctionId::Sqrtpi if args.len() == 1 => {
-      let value = scalar_number_arg(evaluator, args, 0)?;
+      let Some(value) = args.scalar_number(0) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      };
       if value < 0.0 {
         Some(FormulaValue::Error(FormulaErrorValue::Num))
       } else {
         Some(FormulaValue::Number((value * std::f64::consts::PI).sqrt()))
       }
     }
-    FormulaFunctionId::Radians if args.len() == 1 => Some(FormulaValue::Number(
-      scalar_number_arg(evaluator, args, 0)?.to_radians(),
-    )),
-    FormulaFunctionId::Degrees if args.len() == 1 => Some(FormulaValue::Number(
-      scalar_number_arg(evaluator, args, 0)?.to_degrees(),
-    )),
+    FormulaFunctionId::Sqrtpi => Some(FormulaValue::Error(FormulaErrorValue::Value)),
+    FormulaFunctionId::Fact if args.len() == 1 => evaluate_factorial_reader(evaluator, args, false),
+    FormulaFunctionId::Factdouble if args.len() == 1 => {
+      evaluate_factorial_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Fact | FormulaFunctionId::Factdouble => {
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    }
+    FormulaFunctionId::Radians if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, f64::to_radians)
+    }
+    FormulaFunctionId::Radians => Some(FormulaValue::Error(FormulaErrorValue::Value)),
+    FormulaFunctionId::Degrees if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, f64::to_degrees)
+    }
+    FormulaFunctionId::Degrees => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Sin if args.len() == 1 => scalar_numeric_unary_arg(evaluator, args, rtl_sin),
     FormulaFunctionId::Csc if args.len() == 1 => {
       scalar_numeric_unary_arg(evaluator, args, |value| 1.0 / rtl_sin(value))
@@ -420,9 +564,54 @@ fn evaluate_function_reader<'doc>(
       |value| (value.abs() > 1.0).then(|| (1.0 / value).atanh()),
       FormulaErrorValue::IllegalArgument,
     ),
-    FormulaFunctionId::Atan2 if args.len() == 2 => Some(FormulaValue::Number(
-      scalar_number_arg(evaluator, args, 1)?.atan2(scalar_number_arg(evaluator, args, 0)?),
-    )),
+    FormulaFunctionId::Atan2 if args.len() == 2 => {
+      let atan2_arg = |value: FormulaValue<'doc>| match value {
+        FormulaValue::Reference(reference) => evaluator
+          .implicit_intersection_value(&reference)
+          .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value)),
+        FormulaValue::RefList(ranges) if ranges.len() == 1 => evaluator
+          .implicit_intersection_value(&ranges[0])
+          .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value)),
+        FormulaValue::RefList(_) => FormulaValue::Error(FormulaErrorValue::Value),
+        FormulaValue::Matrix(rows) => {
+          if rows.len() == 1 && rows.first().is_some_and(|row| row.len() == 1) {
+            rows
+              .into_iter()
+              .next()
+              .and_then(|row| row.into_iter().next())
+              .unwrap_or_default()
+          } else {
+            FormulaValue::Error(FormulaErrorValue::Value)
+          }
+        }
+        value => value,
+      };
+      let x_value = atan2_arg(args.value(0)?);
+      if let FormulaValue::Error(error) = x_value {
+        return Some(FormulaValue::Error(error));
+      }
+      let y_value = atan2_arg(args.value(1)?);
+      if let FormulaValue::Error(error) = y_value {
+        return Some(FormulaValue::Error(error));
+      }
+      let Some(x) = evaluator.number(&x_value) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      };
+      let Some(y) = evaluator.number(&y_value) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      };
+      if x == 0.0
+        && y == 0.0
+        && matches!(
+          evaluator.grammar,
+          FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+        )
+      {
+        Some(FormulaValue::Error(FormulaErrorValue::Div0))
+      } else {
+        Some(FormulaValue::Number(y.atan2(x)))
+      }
+    }
     FormulaFunctionId::Exp if args.len() == 1 => {
       scalar_numeric_unary_arg(evaluator, args, f64::exp)
     }
@@ -439,17 +628,33 @@ fn evaluate_function_reader<'doc>(
       FormulaErrorValue::IllegalArgument,
     ),
     FormulaFunctionId::Log if (1..=2).contains(&args.len()) => {
-      let value = scalar_number_arg(evaluator, args, 0)?;
+      let arg_values = (0..args.len())
+        .map(|index| args.value(index))
+        .collect::<Option<Vec<_>>>()?;
+      if evaluator.array_context && arg_values.iter().any(is_matrix_argument) {
+        return if args.len() == 1 {
+          map_numeric_array_values(evaluator, &arg_values, FormulaErrorValue::Value, |values| {
+            evaluate_log_values(values[0], 10.0)
+          })
+        } else {
+          map_numeric_array_values(evaluator, &arg_values, FormulaErrorValue::Value, |values| {
+            evaluate_log_values(values[0], values[1])
+          })
+        };
+      }
+      let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+        Ok(value) => value,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
       let base = if args.len() == 2 {
-        scalar_number_arg(evaluator, args, 1)?
+        match scalar_number_arg_or_value(evaluator, args, 1)? {
+          Ok(value) => value,
+          Err(error) => return Some(FormulaValue::Error(error)),
+        }
       } else {
         10.0
       };
-      if value > 0.0 && base > 0.0 && base != 1.0 {
-        Some(FormulaValue::Number(value.log(base)))
-      } else {
-        Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
-      }
+      Some(evaluate_log_values(value, base))
     }
     FormulaFunctionId::Sumsq => evaluate_sumsq_reader(args),
     FormulaFunctionId::Sumx2my2 if args.len() == 2 => evaluate_sumx2_reader(evaluator, args, false),
@@ -474,9 +679,17 @@ fn evaluate_function_reader<'doc>(
       evaluate_sumproduct_reader(evaluator, args)
     }
     FormulaFunctionId::Round if args.len() == 2 => {
+      let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+        Ok(value) => value,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      let places = match scalar_number_arg_or_value(evaluator, args, 1)? {
+        Ok(value) => value,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
       Some(FormulaValue::Number(round_to_decimal_places(
-        scalar_number_arg(evaluator, args, 0)?,
-        scalar_number_arg(evaluator, args, 1)? as i32,
+        value,
+        places as i32,
       )))
     }
     FormulaFunctionId::Roundup if (1..=2).contains(&args.len()) => {
@@ -494,8 +707,28 @@ fn evaluate_function_reader<'doc>(
           Some(evaluator.mod_value(number, divisor))
         })
       } else {
+        let number = evaluator.scalar_binary_operand(number);
+        if let FormulaValue::Error(error) = number {
+          return Some(FormulaValue::Error(error));
+        }
+        let divisor = evaluator.scalar_binary_operand(divisor);
+        if let FormulaValue::Error(error) = divisor {
+          return Some(FormulaValue::Error(error));
+        }
         Some(evaluator.mod_value(&number, &divisor))
       }
+    }
+    FormulaFunctionId::Quotient if args.len() == 2 => {
+      let Some(numerator) = evaluator.number(&args.value(0)?) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      };
+      let Some(denominator) = evaluator.number(&args.value(1)?) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      };
+      Some(match quotient(numerator, denominator) {
+        Ok(value) => FormulaValue::Number(value),
+        Err(error) => FormulaValue::Error(numeric_error_value(error)),
+      })
     }
     FormulaFunctionId::Trunc if (1..=2).contains(&args.len()) => {
       evaluate_trunc_reader(evaluator, args)
@@ -503,6 +736,8 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Mround if args.len() == 2 => evaluate_mround_reader(evaluator, args),
     FormulaFunctionId::Gcd => evaluate_gcd_lcm_reader(args, true),
     FormulaFunctionId::Lcm => evaluate_gcd_lcm_reader(args, false),
+    FormulaFunctionId::Combin if args.len() == 2 => evaluate_combin_reader(evaluator, args, false),
+    FormulaFunctionId::Combina if args.len() == 2 => evaluate_combin_reader(evaluator, args, true),
     FormulaFunctionId::Median => evaluate_median_reader(evaluator, args),
     FormulaFunctionId::Large if args.len() == 2 => {
       evaluate_large_small_reader(evaluator, args, true)
@@ -535,11 +770,13 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::RankDotAvg if (2..=3).contains(&args.len()) => {
       evaluate_rank_reader(evaluator, args, true)
     }
-    FormulaFunctionId::Geomean => evaluate_geomean_harmean_reader(args, true),
-    FormulaFunctionId::Harmean => evaluate_geomean_harmean_reader(args, false),
+    FormulaFunctionId::Geomean => evaluate_geomean_harmean_reader(evaluator, args, true),
+    FormulaFunctionId::Harmean => evaluate_geomean_harmean_reader(evaluator, args, false),
     FormulaFunctionId::Mmult if args.len() == 2 => evaluate_mmult_reader(evaluator, args),
     FormulaFunctionId::Mdeterm if args.len() == 1 => evaluate_mdeterm_reader(evaluator, args),
+    FormulaFunctionId::Minverse if args.len() == 1 => evaluate_minverse_reader(evaluator, args),
     FormulaFunctionId::Munit if args.len() == 1 => evaluate_munit_reader(evaluator, args),
+    FormulaFunctionId::Transpose if args.len() == 1 => evaluate_transpose_reader(evaluator, args),
     FormulaFunctionId::Filter if (2..=3).contains(&args.len()) => {
       evaluate_filter_reader(evaluator, args)
     }
@@ -565,6 +802,14 @@ fn evaluate_function_reader<'doc>(
       evaluate_choose_rows_columns_reader(evaluator, args, false)
     }
     FormulaFunctionId::Ceiling if (1..=3).contains(&args.len()) => {
+      if matches!(
+        evaluator.grammar,
+        FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+      ) && args.len() == 2
+        && !(evaluator.array_context && ceiling_floor_has_array_argument(args))
+      {
+        return evaluate_ceiling_floor_legacy_reader(evaluator, args, true);
+      }
       evaluate_ceiling_floor_reader(evaluator, args, true, CeilingFloorKind::Odff)
     }
     FormulaFunctionId::ComDotMicrosoftDotCeiling if args.len() == 2 => {
@@ -574,6 +819,14 @@ fn evaluate_function_reader<'doc>(
       Some(FormulaValue::Error(FormulaErrorValue::Unknown))
     }
     FormulaFunctionId::Floor if (1..=3).contains(&args.len()) => {
+      if matches!(
+        evaluator.grammar,
+        FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+      ) && args.len() == 2
+        && !(evaluator.array_context && ceiling_floor_has_array_argument(args))
+      {
+        return evaluate_ceiling_floor_legacy_reader(evaluator, args, false);
+      }
       evaluate_ceiling_floor_reader(evaluator, args, false, CeilingFloorKind::Odff)
     }
     FormulaFunctionId::ComDotMicrosoftDotFloor if args.len() == 2 => {
@@ -594,15 +847,40 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::FloorDotPrecise if (1..=2).contains(&args.len()) => {
       evaluate_ceiling_floor_reader(evaluator, args, false, CeilingFloorKind::Precise)
     }
+    FormulaFunctionId::Ceiling
+    | FormulaFunctionId::Floor
+    | FormulaFunctionId::CeilingDotMath
+    | FormulaFunctionId::FloorDotMath
+    | FormulaFunctionId::CeilingDotPrecise
+    | FormulaFunctionId::FloorDotPrecise => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Date if args.len() == 3 => evaluate_date_reader(evaluator, args),
-    FormulaFunctionId::Datevalue if args.len() == 1 => Some(datevalue(
-      &evaluator.text(&args.first_value()?),
-      evaluator.book.date_system,
-    )),
+    FormulaFunctionId::Datevalue if args.len() == 1 => {
+      let value = datevalue(
+        &evaluator.text(&args.first_value()?),
+        evaluator.book.date_system,
+      );
+      Some(match value {
+        FormulaValue::Error(FormulaErrorValue::IllegalArgument) => {
+          FormulaValue::Error(FormulaErrorValue::Value)
+        }
+        value => value,
+      })
+    }
     FormulaFunctionId::Timevalue if args.len() == 1 => {
-      Some(timevalue(&evaluator.text(&args.first_value()?)))
+      let text = evaluator.text(&args.first_value()?);
+      if !text.contains(':')
+        && crate::evaluator::parse_date_input(&text, evaluator.book.date_system).is_some()
+      {
+        Some(FormulaValue::Number(0.0))
+      } else {
+        Some(timevalue(&text))
+      }
     }
     FormulaFunctionId::Time if args.len() == 3 => evaluate_time_reader(evaluator, args),
+    FormulaFunctionId::Weekday if (1..=2).contains(&args.len()) => {
+      evaluate_weekday_reader(evaluator, args)
+    }
+    FormulaFunctionId::Weekday => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Year if args.len() == 1 => {
       evaluate_date_part_reader(evaluator, args, DatePart::Year)
     }
@@ -621,11 +899,12 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Second if args.len() == 1 => {
       evaluate_time_part_reader(evaluator, args, TimePart::Second)
     }
-    FormulaFunctionId::Days if args.len() == 2 => {
-      let end = evaluator.date_number_from_value(&args.value(0)?)?;
-      let start = evaluator.date_number_from_value(&args.value(1)?)?;
-      Some(FormulaValue::Number(end.floor() - start.floor()))
+    FormulaFunctionId::Days if args.len() == 2 => evaluate_days_reader(evaluator, args),
+    FormulaFunctionId::Days => Some(FormulaValue::Error(FormulaErrorValue::Value)),
+    FormulaFunctionId::Days360 if (2..=3).contains(&args.len()) => {
+      evaluate_days360_reader(evaluator, args)
     }
+    FormulaFunctionId::Days360 => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Weeks if args.len() == 3 => evaluate_weeks_reader(evaluator, args),
     FormulaFunctionId::Daysinmonth if args.len() == 1 => {
       evaluate_days_in_month_year_reader(evaluator, args, false)
@@ -639,6 +918,9 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::Eomonth if args.len() == 2 => evaluate_eomonth_reader(evaluator, args),
     FormulaFunctionId::Edate if args.len() == 2 => evaluate_edate_reader(evaluator, args),
+    FormulaFunctionId::Eomonth | FormulaFunctionId::Edate => {
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    }
     FormulaFunctionId::Eastersunday if args.len() == 1 => {
       evaluate_eastersunday_reader(evaluator, args)
     }
@@ -649,7 +931,7 @@ fn evaluate_function_reader<'doc>(
       evaluate_iso_weeknum_reader(evaluator, args)
     }
     FormulaFunctionId::Today if args.is_empty() => evaluator.evaluate_today(),
-    FormulaFunctionId::Networkdays if (2..=3).contains(&args.len()) => {
+    FormulaFunctionId::Networkdays if (2..=4).contains(&args.len()) => {
       evaluator.evaluate_networkdays_reader(args, false)
     }
     FormulaFunctionId::NetworkdaysDotIntl if (2..=4).contains(&args.len()) => {
@@ -663,6 +945,9 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::WorkdayDotIntl if (2..=4).contains(&args.len()) => {
       evaluator.evaluate_workday_reader(args, true)
+    }
+    FormulaFunctionId::Workday | FormulaFunctionId::WorkdayDotIntl => {
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
     }
     FormulaFunctionId::Dollar if (1..=2).contains(&args.len()) => {
       evaluate_dollar_reader(evaluator, args)
@@ -707,6 +992,18 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Dec2hex if (1..=2).contains(&args.len()) => {
       evaluate_decimal_to_base_reader(evaluator, args, 16, -549_755_813_888.0, 549_755_813_887.0)
     }
+    FormulaFunctionId::Bin2dec
+    | FormulaFunctionId::Oct2dec
+    | FormulaFunctionId::Hex2dec
+    | FormulaFunctionId::Bin2oct
+    | FormulaFunctionId::Bin2hex
+    | FormulaFunctionId::Oct2bin
+    | FormulaFunctionId::Oct2hex
+    | FormulaFunctionId::Hex2bin
+    | FormulaFunctionId::Hex2oct
+    | FormulaFunctionId::Dec2bin
+    | FormulaFunctionId::Dec2oct
+    | FormulaFunctionId::Dec2hex => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Left if (1..=2).contains(&args.len()) => {
       evaluate_left_reader(evaluator, args, false)
     }
@@ -721,6 +1018,7 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::Mid if args.len() == 3 => evaluate_mid_reader(evaluator, args, false),
     FormulaFunctionId::Midb if args.len() == 3 => evaluate_mid_reader(evaluator, args, true),
+    FormulaFunctionId::Replace if args.len() == 4 => evaluate_replace_reader(evaluator, args),
     FormulaFunctionId::Replaceb if args.len() == 4 => evaluate_replaceb_reader(evaluator, args),
     FormulaFunctionId::Cell if (1..=2).contains(&args.len()) => {
       evaluate_cell_reader(evaluator, args)
@@ -765,6 +1063,12 @@ fn evaluate_function_reader<'doc>(
       evaluate_chisq_inv_reader(evaluator, args, true)
     }
     FormulaFunctionId::Forecast if args.len() == 3 => evaluator.evaluate_forecast_reader(args),
+    FormulaFunctionId::Slope if args.len() == 2 => {
+      evaluate_slope_intercept_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Intercept if args.len() == 2 => {
+      evaluate_slope_intercept_reader(evaluator, args, false)
+    }
     FormulaFunctionId::ForecastDotEts if (3..=6).contains(&args.len()) => {
       evaluator.evaluate_forecast_ets_reader(args, EtsKind::Add)
     }
@@ -807,6 +1111,21 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::NormDotSDotInv if args.len() == 1 => {
       evaluate_norm_inv_reader(evaluator, args, true)
     }
+    FormulaFunctionId::NormDotDist if args.len() == 4 => {
+      evaluate_norm_dist_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::NormDotSDotDist if args.len() == 2 => {
+      evaluate_norm_dist_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::NormDotSDotDist if args.len() == 1 => {
+      evaluate_norm_s_dist_legacy_reader(evaluator, args)
+    }
+    FormulaFunctionId::Poisson | FormulaFunctionId::PoissonDotDist if args.len() == 3 => {
+      evaluate_poisson_reader(evaluator, args)
+    }
+    FormulaFunctionId::Poisson | FormulaFunctionId::PoissonDotDist => {
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    }
     FormulaFunctionId::Fourier if (2..=5).contains(&args.len()) => {
       evaluator.evaluate_fourier_reader(args)
     }
@@ -816,9 +1135,15 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::CovarianceDotS if args.len() == 2 => {
       evaluate_covariance_reader(evaluator, args, true)
     }
+    FormulaFunctionId::Correl | FormulaFunctionId::Pearson if args.len() == 2 => {
+      evaluate_correlation_reader(evaluator, args)
+    }
     FormulaFunctionId::Covar
     | FormulaFunctionId::CovarianceDotP
     | FormulaFunctionId::CovarianceDotS => Some(FormulaValue::Error(FormulaErrorValue::Unknown)),
+    FormulaFunctionId::Complex if (2..=3).contains(&args.len()) => {
+      evaluate_complex_reader(evaluator, args)
+    }
     FormulaFunctionId::Imdiv if args.len() == 2 => evaluate_complex_div_reader(evaluator, args),
     FormulaFunctionId::Cumipmt if args.len() == 6 => {
       evaluator.evaluate_cum_interest_principal_reader(args, true)
@@ -827,6 +1152,18 @@ fn evaluate_function_reader<'doc>(
       evaluator.evaluate_cum_interest_principal_reader(args, false)
     }
     FormulaFunctionId::Fvschedule if args.len() == 2 => evaluate_fvschedule_reader(evaluator, args),
+    FormulaFunctionId::Besseli if args.len() == 2 => {
+      evaluate_bessel_reader(evaluator, args, BesselKind::I)
+    }
+    FormulaFunctionId::Besselj if args.len() == 2 => {
+      evaluate_bessel_reader(evaluator, args, BesselKind::J)
+    }
+    FormulaFunctionId::Besselk if args.len() == 2 => {
+      evaluate_bessel_reader(evaluator, args, BesselKind::K)
+    }
+    FormulaFunctionId::Bessely if args.len() == 2 => {
+      evaluate_bessel_reader(evaluator, args, BesselKind::Y)
+    }
     FormulaFunctionId::Dollarde if args.len() == 2 => {
       evaluate_dollar_decimal_reader(evaluator, args, true)
     }
@@ -842,6 +1179,15 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::Pmt if (3..=5).contains(&args.len()) => evaluate_pmt_reader(evaluator, args),
     FormulaFunctionId::Pv if (3..=5).contains(&args.len()) => evaluate_pv_reader(evaluator, args),
+    FormulaFunctionId::Fv if (3..=5).contains(&args.len()) => evaluate_fv_reader(evaluator, args),
+    FormulaFunctionId::Nper if (3..=5).contains(&args.len()) => {
+      evaluate_nper_reader(evaluator, args)
+    }
+    FormulaFunctionId::Rate if (3..=6).contains(&args.len()) => {
+      evaluate_rate_reader(evaluator, args)
+    }
+    FormulaFunctionId::Irr if (1..=2).contains(&args.len()) => evaluate_irr_reader(evaluator, args),
+    FormulaFunctionId::Mirr if args.len() == 3 => evaluate_mirr_reader(evaluator, args),
     FormulaFunctionId::Npv if args.len() >= 2 => evaluate_npv_reader(evaluator, args),
     FormulaFunctionId::Ispmt if args.len() == 4 => evaluate_ispmt_reader(evaluator, args),
     FormulaFunctionId::Rri if args.len() == 3 => evaluate_rri_reader(evaluator, args),
@@ -851,11 +1197,17 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Mduration if (5..=6).contains(&args.len()) => {
       evaluate_mduration_reader(evaluator, args)
     }
-    FormulaFunctionId::Yield if (0..args.len()).any(|index| args.is_missing(index)) => {
-      Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+    FormulaFunctionId::Yield if (6..=7).contains(&args.len()) => {
+      evaluate_yield_reader(evaluator, args)
     }
+    FormulaFunctionId::Yield => Some(FormulaValue::Error(FormulaErrorValue::Value)),
+    FormulaFunctionId::Randbetween if args.len() == 2 => {
+      evaluate_randbetween_reader(evaluator, args)
+    }
+    FormulaFunctionId::Randbetween => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Randarray if args.len() <= 5 => evaluate_randarray_reader(evaluator, args),
     FormulaFunctionId::Subtotal if args.len() >= 2 => evaluator.evaluate_subtotal_reader(args),
+    FormulaFunctionId::Subtotal => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Aggregate if args.len() >= 3 => evaluator.evaluate_aggregate_reader(args),
     FormulaFunctionId::Dsum => {
       evaluator.evaluate_database_function_reader(args, DatabaseFunction::Sum)
@@ -902,14 +1254,16 @@ fn evaluate_function_reader<'doc>(
         )
       {
         return evaluator.map_unary_values(value, |evaluator, value| {
-          Some(FormulaValue::Boolean(!evaluator.truthy(value)))
+          Some(match logical_scalar_boolean(evaluator, value.clone()) {
+            Ok(value) => FormulaValue::Boolean(!value.unwrap_or(false)),
+            Err(error) => FormulaValue::Error(error),
+          })
         });
       }
-      let value = evaluator.scalar_value(value);
-      match value {
-        FormulaValue::Error(error) => Some(FormulaValue::Error(error)),
-        value => Some(FormulaValue::Boolean(!evaluator.truthy(&value))),
-      }
+      Some(match logical_scalar_boolean(evaluator, value) {
+        Ok(value) => FormulaValue::Boolean(!value.unwrap_or(false)),
+        Err(error) => FormulaValue::Error(error),
+      })
     }
     FormulaFunctionId::And if args.is_empty() => {
       Some(FormulaValue::Error(FormulaErrorValue::Parameter))
@@ -939,12 +1293,44 @@ fn evaluate_function_reader<'doc>(
   }
 }
 
-fn scalar_number_arg<'doc>(
-  _evaluator: &EvalContext<'_, 'doc>,
+fn scalar_number_arg_or_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
   index: usize,
-) -> Option<f64> {
-  args.scalar_number(index)
+) -> Option<std::result::Result<f64, FormulaErrorValue>> {
+  let value = evaluator.scalar_binary_operand(args.value(index)?);
+  Some(match value {
+    FormulaValue::Error(error) => Err(error),
+    value => match evaluator.number(&value) {
+      Some(value) if value.is_finite() => Ok(value),
+      Some(_) => Err(FormulaErrorValue::Num),
+      None => Err(FormulaErrorValue::Value),
+    },
+  })
+}
+
+fn strict_text_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: FormulaValue<'doc>,
+) -> std::result::Result<String, FormulaErrorValue> {
+  let value = evaluator.scalar_binary_operand(value);
+  if let FormulaValue::Error(error) = value {
+    return Err(error);
+  }
+  Ok(evaluator.text(&value))
+}
+
+fn map_text_unary_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: FormulaValue<'doc>,
+  op: impl Fn(&str) -> FormulaValue<'doc> + Copy,
+) -> Option<FormulaValue<'doc>> {
+  evaluator.map_unary_values(value, |evaluator, value| {
+    if let FormulaValue::Error(error) = value {
+      return Some(FormulaValue::Error(*error));
+    }
+    Some(op(&evaluator.text(value)))
+  })
 }
 
 fn evaluate_information_error_value<'doc>(
@@ -965,10 +1351,49 @@ fn evaluate_information_error_value<'doc>(
       )))
     });
   }
+  if let Some(value) = information_logical_value(evaluator, value.clone())
+    && matches!(value, FormulaValue::Error(_))
+  {
+    return Some(FormulaValue::Boolean(matches!(
+      value,
+      FormulaValue::Error(error) if matches_error(error)
+    )));
+  }
   Some(FormulaValue::Boolean(matches!(
     evaluator.first_value(value),
     FormulaValue::Error(error) if matches_error(error)
   )))
+}
+
+fn information_logical_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: FormulaValue<'doc>,
+) -> Option<FormulaValue<'doc>> {
+  match value {
+    FormulaValue::Reference(reference) => Some(
+      evaluator
+        .implicit_intersection_value(&reference)
+        .map(|value| evaluator.first_value(&value))
+        .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value)),
+    ),
+    FormulaValue::RefList(ranges) => {
+      if ranges.len() == 1 {
+        Some(
+          evaluator
+            .implicit_intersection_value(&ranges[0])
+            .map(|value| evaluator.first_value(&value))
+            .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value)),
+        )
+      } else {
+        Some(FormulaValue::Error(FormulaErrorValue::Value))
+      }
+    }
+    FormulaValue::Matrix(rows) => rows
+      .into_iter()
+      .next()
+      .and_then(|row| row.into_iter().next()),
+    value => Some(value),
+  }
 }
 
 fn evaluate_isblank_value<'doc>(
@@ -1019,17 +1444,38 @@ fn evaluate_isblank_value<'doc>(
         .collect(),
     ));
   }
-  if let FormulaValue::Reference(reference) = value
-    && reference.range.cell_count_hint() == 1
-  {
+  if let FormulaValue::Reference(reference) = value {
     let sheet = evaluator.range_sheet(reference);
-    if evaluator
-      .book
-      .formulas
-      .contains_key(&(sheet, reference.range.start))
-    {
+    if reference.range.cell_count_hint() == 1 {
+      if evaluator
+        .book
+        .formulas
+        .contains_key(&(sheet, reference.range.start))
+      {
+        return Some(FormulaValue::Boolean(false));
+      }
+    } else if let Some(value) = evaluator.implicit_intersection_value(reference) {
+      if let FormulaValue::Reference(intersection) = &value {
+        if evaluator
+          .book
+          .formulas
+          .contains_key(&(sheet, intersection.range.start))
+        {
+          return Some(FormulaValue::Boolean(false));
+        }
+      }
+      return Some(FormulaValue::Boolean(matches!(
+        evaluator.first_value(&value),
+        FormulaValue::Blank
+      )));
+    } else {
       return Some(FormulaValue::Boolean(false));
     }
+  }
+  if matches!(value, FormulaValue::RefList(_))
+    || matches!(value, FormulaValue::Reference(reference) if reference.range.cell_count_hint() != 1)
+  {
+    return Some(FormulaValue::Boolean(false));
   }
   Some(FormulaValue::Boolean(matches!(
     evaluator.first_value(value),
@@ -1067,17 +1513,30 @@ fn evaluate_isnumber_value<'doc>(
       FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
     )
   {
-    return evaluator.map_unary_values(value.clone(), |_, value| {
-      Some(FormulaValue::Boolean(matches!(
-        value,
-        FormulaValue::Number(_) | FormulaValue::Boolean(_)
-      )))
+    return evaluator.map_unary_values(value.clone(), |evaluator, value| {
+      Some(FormulaValue::Boolean(
+        matches!(value, FormulaValue::Number(_))
+          || matches!(
+            (evaluator.grammar, value),
+            (
+              FormulaGrammar::CalcA1 | FormulaGrammar::OpenFormula,
+              FormulaValue::Boolean(_)
+            )
+          ),
+      ))
     });
   }
-  Some(FormulaValue::Boolean(matches!(
-    evaluator.information_scalar_value(value.clone()),
-    Some(FormulaValue::Number(_) | FormulaValue::Boolean(_))
-  )))
+  let value = information_logical_value(evaluator, value.clone());
+  Some(FormulaValue::Boolean(
+    matches!(value, Some(FormulaValue::Number(_)))
+      || matches!(
+        (evaluator.grammar, value),
+        (
+          FormulaGrammar::CalcA1 | FormulaGrammar::OpenFormula,
+          Some(FormulaValue::Boolean(_))
+        )
+      ),
+  ))
 }
 
 fn evaluate_error_type_value<'doc>(
@@ -1176,12 +1635,7 @@ fn evaluate_hyperlink_reader<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
   let url = match evaluator.scalar_value(args.first_value()?) {
-    FormulaValue::Error(error) => {
-      return Some(FormulaValue::Matrix(vec![
-        vec![FormulaValue::Error(error)],
-        vec![FormulaValue::Error(error)],
-      ]));
-    }
+    FormulaValue::Error(error) => return Some(FormulaValue::Error(error)),
     value => evaluator.text(&value),
   };
   let display = if args.len() == 2 {
@@ -1196,16 +1650,7 @@ fn evaluate_hyperlink_reader<'doc>(
   } else {
     FormulaValue::String(Cow::Owned(url.clone()))
   };
-  if let FormulaValue::Error(error) = display {
-    return Some(FormulaValue::Matrix(vec![
-      vec![FormulaValue::Error(error)],
-      vec![FormulaValue::String(Cow::Owned(url))],
-    ]));
-  }
-  Some(FormulaValue::Matrix(vec![
-    vec![display],
-    vec![FormulaValue::String(Cow::Owned(url))],
-  ]))
+  Some(display)
 }
 
 fn evaluate_fixed_reader<'doc>(
@@ -1325,27 +1770,63 @@ fn evaluate_n_value<'doc>(
   }))
 }
 
-fn evaluate_mode_reader<'doc>(args: FunctionArgReader<'_, '_, 'doc>) -> Option<FormulaValue<'doc>> {
+fn evaluate_mode_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
   let mut values = Vec::new();
   for index in 0..args.len() {
-    values.extend(args.value_numbers(index)?);
+    if let Err(error) = collect_mode_numbers(evaluator, args.value(index)?, &mut values) {
+      return Some(FormulaValue::Error(error));
+    }
   }
   mode_slice(&values)
     .map(FormulaValue::Number)
     .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
 }
 
+fn collect_mode_numbers<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: FormulaValue<'doc>,
+  values: &mut Vec<f64>,
+) -> std::result::Result<(), FormulaErrorValue> {
+  match value {
+    FormulaValue::Reference(reference) if reference.range.cell_count_hint() == 1 => {
+      match evaluator.first_value(&FormulaValue::Reference(reference)) {
+        FormulaValue::Number(value) => values.push(value),
+        FormulaValue::Error(error) => return Err(error),
+        _ => return Err(FormulaErrorValue::Value),
+      }
+    }
+    FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_) => {
+      for value in evaluator.matrix_values(&value).into_iter().flatten() {
+        match value {
+          FormulaValue::Number(value) => values.push(value),
+          FormulaValue::Error(error) => return Err(error),
+          _ => {}
+        }
+      }
+    }
+    FormulaValue::Number(value) => values.push(value),
+    FormulaValue::Error(error) => return Err(error),
+    FormulaValue::Blank | FormulaValue::Boolean(_) | FormulaValue::String(_) => {
+      return Err(FormulaErrorValue::Value);
+    }
+  }
+  Ok(())
+}
+
 fn evaluate_areas_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  if args.is_empty() {
+  if args.len() != 1 {
     return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
   }
-  let mut ranges = Vec::new();
-  for index in 0..args.len() {
-    ranges.extend(args.reference_ranges(index)?);
+  if let Some(count) = raw_reference_area_count(args, 0) {
+    return Some(FormulaValue::Number(count as f64));
   }
+  let ranges = args.reference_ranges(0)?;
   if !ranges.is_empty() {
     return Some(FormulaValue::Number(ranges.len() as f64));
   }
@@ -1385,18 +1866,28 @@ fn evaluate_row_column_reader<'doc>(
     let start_row = range.start.row.min(range.end.row);
     let end_row = range.start.row.max(range.end.row);
     if column && end_column > start_column {
-      return Some(FormulaValue::Matrix(vec![
+      let value = FormulaValue::Matrix(vec![
         (start_column..=end_column)
           .map(|column| FormulaValue::Number(column as f64 + 1.0))
           .collect(),
-      ]));
+      ]);
+      return Some(if evaluator.array_context {
+        value
+      } else {
+        evaluator.scalar_value(value)
+      });
     }
     if !column && end_row > start_row {
-      return Some(FormulaValue::Matrix(
+      let value = FormulaValue::Matrix(
         (start_row..=end_row)
           .map(|row| vec![FormulaValue::Number(row as f64 + 1.0)])
           .collect(),
-      ));
+      );
+      return Some(if evaluator.array_context {
+        value
+      } else {
+        evaluator.scalar_value(value)
+      });
     }
   }
   Some(FormulaValue::Number(if column {
@@ -1442,9 +1933,23 @@ fn evaluate_len_value<'doc>(
       FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
     )
   {
-    return None;
+    return evaluator.map_unary_values(value.clone(), |evaluator, value| {
+      if let FormulaValue::Error(error) = value {
+        return Some(FormulaValue::Error(*error));
+      }
+      let text = evaluator.text(value);
+      Some(FormulaValue::Number(if bytes {
+        text_byte_len(&text) as f64
+      } else {
+        text.chars().count() as f64
+      }))
+    });
   }
-  let text = evaluator.text(value);
+  let value = evaluator.scalar_binary_operand(value.clone());
+  if let FormulaValue::Error(error) = value {
+    return Some(FormulaValue::Error(error));
+  }
+  let text = evaluator.text(&value);
   Some(FormulaValue::Number(if bytes {
     text_byte_len(&text) as f64
   } else {
@@ -1474,15 +1979,7 @@ fn evaluate_t_reader<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
   let value = args.first_value()?;
-  let value = match value {
-    FormulaValue::Reference(reference) => evaluator.scalar_reference_value(&reference),
-    FormulaValue::Matrix(rows) => rows
-      .into_iter()
-      .next()
-      .and_then(|row| row.into_iter().next())
-      .unwrap_or_default(),
-    value => value,
-  };
+  let value = evaluator.first_value(&value);
   match value {
     FormulaValue::String(text) => Some(FormulaValue::String(text)),
     FormulaValue::Error(error) => Some(FormulaValue::Error(error)),
@@ -1540,7 +2037,10 @@ fn evaluate_numbervalue_reader<'doc>(
       }
     }
   } else {
-    String::new()
+    match evaluator.grammar {
+      FormulaGrammar::OpenFormula | FormulaGrammar::CalcA1 => String::new(),
+      FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1 => ".".to_string(),
+    }
   };
   let group = if args.len() >= 3 {
     evaluator.text(&args.value(2)?)
@@ -1666,6 +2166,21 @@ fn evaluate_concat_reader<'doc>(
   Some(FormulaValue::String(Cow::Owned(output)))
 }
 
+fn evaluate_concatenate_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let mut output = String::new();
+  for index in 0..args.len() {
+    let value = evaluator.scalar_binary_operand(args.value(index)?);
+    if let FormulaValue::Error(error) = value {
+      return Some(FormulaValue::Error(error));
+    }
+    output.push_str(&evaluator.text(&value));
+  }
+  Some(FormulaValue::String(Cow::Owned(output)))
+}
+
 fn evaluate_textjoin_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -1673,7 +2188,7 @@ fn evaluate_textjoin_reader<'doc>(
   if args.len() < 3 {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
   }
-  let delimiters = match textjoin_delimiters(evaluator, &args.value(0)?) {
+  let delimiters = match textjoin_delimiters(evaluator, &args.array_value(0)?) {
     Ok(delimiters) => delimiters,
     Err(error) => return Some(FormulaValue::Error(error)),
   };
@@ -1685,7 +2200,7 @@ fn evaluate_textjoin_reader<'doc>(
   let mut output = String::new();
   let mut value_count = 0usize;
   for index in 2..args.len() {
-    let value = args.value(index)?;
+    let value = args.array_value(index)?;
     if let Err(error) = textjoin_value_text(
       evaluator,
       &value,
@@ -1700,12 +2215,208 @@ fn evaluate_textjoin_reader<'doc>(
   Some(FormulaValue::String(Cow::Owned(output)))
 }
 
+fn evaluate_text_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let value = evaluator.scalar_value(args.value(0)?);
+  let format_value = args.value(1)?;
+  match format_value {
+    FormulaValue::Boolean(_) | FormulaValue::Blank => {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    FormulaValue::Error(error) => return Some(FormulaValue::Error(error)),
+    _ => {}
+  }
+  let format = evaluator.text(&format_value);
+  match value {
+    FormulaValue::Error(error) => Some(FormulaValue::Error(error)),
+    FormulaValue::Boolean(_) => Some(FormulaValue::String(Cow::Owned(display_text_from_value(
+      &value,
+    )))),
+    FormulaValue::String(ref text) if text.is_empty() => {
+      Some(FormulaValue::String(Cow::Borrowed("")))
+    }
+    FormulaValue::String(ref text) => {
+      if let Some(number) = evaluator.date_number_from_scalar(&value)
+        && let Some(text) = format_text_date(number, &format, evaluator.book.date_system)
+      {
+        return Some(FormulaValue::String(Cow::Owned(text)));
+      }
+      Some(FormulaValue::String(Cow::Owned(text.to_string())))
+    }
+    FormulaValue::Blank => format_text_number(0.0, &format, evaluator.book.date_system),
+    value => {
+      let Some(number) = evaluator.number(&value) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      };
+      format_text_number(number, &format, evaluator.book.date_system)
+    }
+  }
+}
+
+fn format_text_number<'doc>(
+  number: f64,
+  format: &str,
+  date_system: DateSystem,
+) -> Option<FormulaValue<'doc>> {
+  if let Some(text) = format_text_date(number, format, date_system) {
+    return Some(FormulaValue::String(Cow::Owned(text)));
+  }
+  Some(FormulaValue::String(Cow::Owned(
+    format_number_with_format_code(number, format)
+      .unwrap_or_else(|| display_text_from_value(&FormulaValue::Number(number))),
+  )))
+}
+
+fn format_text_date(number: f64, format: &str, date_system: DateSystem) -> Option<String> {
+  let lower = format.to_ascii_lowercase();
+  if !(lower.contains('y')
+    || lower.contains('d')
+    || lower.contains('h')
+    || lower.contains('s')
+    || lower.contains('m'))
+  {
+    return None;
+  }
+  let day = number.floor();
+  if !day.is_finite() {
+    return None;
+  }
+  let mut milliseconds = ((number - day) * 86_400_000.0).round() as i64;
+  let day_adjust = milliseconds.div_euclid(86_400_000);
+  milliseconds = milliseconds.rem_euclid(86_400_000);
+  let (year, month, date) =
+    date_from_serial_with_system(day as i32 + day_adjust as i32, date_system)?;
+  let hour = milliseconds / 3_600_000;
+  let minute = (milliseconds % 3_600_000) / 60_000;
+  let second = (milliseconds % 60_000) / 1_000;
+  let millisecond = milliseconds % 1_000;
+  let mut output = String::new();
+  let chars = format.chars().collect::<Vec<_>>();
+  let mut index = 0usize;
+  while index < chars.len() {
+    let ch = chars[index];
+    if ch == '"' {
+      let quote_width = if chars.get(index + 1).is_some_and(|next| *next == '"') {
+        2
+      } else {
+        1
+      };
+      index += quote_width;
+      while index < chars.len() {
+        if chars[index] == '"'
+          && (quote_width == 1 || chars.get(index + 1).is_some_and(|next| *next == '"'))
+        {
+          index += quote_width;
+          break;
+        }
+        output.push(chars[index]);
+        index += 1;
+      }
+      continue;
+    }
+    if ch == '.'
+      && chars
+        .get(index + 1..index + 4)
+        .is_some_and(|tail| tail == ['0', '0', '0'])
+    {
+      output.push_str(&format!(".{millisecond:03}"));
+      index += 4;
+      continue;
+    }
+    let upper = ch.to_ascii_uppercase();
+    if matches!(upper, 'Y' | 'M' | 'D' | 'H' | 'S') {
+      let start = index;
+      while index < chars.len() && chars[index].to_ascii_uppercase() == upper {
+        index += 1;
+      }
+      let len = index - start;
+      match upper {
+        'Y' => output.push_str(&format!("{year:0len$}")),
+        'M' if len >= 3 => output.push_str(month_abbrev(month)),
+        'M' if month_token_is_minute(&chars, start, index) => {
+          output.push_str(&format!("{minute:0len$}"))
+        }
+        'M' => output.push_str(&format!("{month:0len$}")),
+        'D' => output.push_str(&format!("{date:0len$}")),
+        'H' => output.push_str(&format!("{hour:0len$}")),
+        'S' => output.push_str(&format!("{second:0len$}")),
+        _ => {}
+      }
+      continue;
+    }
+    output.push(ch);
+    index += 1;
+  }
+  Some(output)
+}
+
+fn month_token_is_minute(chars: &[char], start: usize, end: usize) -> bool {
+  if chars
+    .get(start.wrapping_sub(1))
+    .is_some_and(|ch| *ch == ':')
+    || chars.get(end).is_some_and(|ch| *ch == ':')
+  {
+    return true;
+  }
+  chars[..start]
+    .iter()
+    .rev()
+    .find_map(|ch| match ch.to_ascii_uppercase() {
+      'H' | 'S' => Some(true),
+      'Y' | 'D' => Some(false),
+      _ => None,
+    })
+    .unwrap_or(false)
+}
+
+fn month_abbrev(month: u32) -> &'static str {
+  match month {
+    1 => "Jan",
+    2 => "Feb",
+    3 => "Mar",
+    4 => "Apr",
+    5 => "May",
+    6 => "Jun",
+    7 => "Jul",
+    8 => "Aug",
+    9 => "Sep",
+    10 => "Oct",
+    11 => "Nov",
+    12 => "Dec",
+    _ => "",
+  }
+}
+
 fn textjoin_delimiters<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   value: &FormulaValue<'doc>,
 ) -> Result<Vec<String>, FormulaErrorValue> {
   let mut delimiters = Vec::new();
-  for value in evaluator.matrix_values(value).into_iter().flatten() {
+  let values = match value {
+    FormulaValue::Reference(reference)
+      if matches!(
+        evaluator.grammar,
+        FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+      ) =>
+    {
+      textjoin_delimiter_reference_values(evaluator, reference)
+    }
+    FormulaValue::RefList(ranges)
+      if matches!(
+        evaluator.grammar,
+        FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+      ) =>
+    {
+      ranges
+        .iter()
+        .flat_map(|range| textjoin_delimiter_reference_values(evaluator, range))
+        .collect()
+    }
+    value => evaluator.matrix_values(value),
+  };
+  for value in values.into_iter().flatten() {
     match value {
       FormulaValue::Error(error) => return Err(error),
       value => delimiters.push(evaluator.text(&value)),
@@ -1717,6 +2428,21 @@ fn textjoin_delimiters<'doc>(
   Ok(delimiters)
 }
 
+fn textjoin_delimiter_reference_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  reference: &QualifiedRange<'doc>,
+) -> Vec<Vec<FormulaValue<'doc>>> {
+  let sheet = evaluator.range_sheet(reference);
+  let row = reference.range.start.row.max(reference.range.end.row);
+  let start_column = reference.range.start.column.min(reference.range.end.column);
+  let end_column = reference.range.start.column.max(reference.range.end.column);
+  vec![
+    (start_column..=end_column)
+      .map(|column| textjoin_cell_value(evaluator, sheet, CellAddress { column, row }))
+      .collect(),
+  ]
+}
+
 fn textjoin_value_text<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   value: &FormulaValue<'doc>,
@@ -1725,7 +2451,10 @@ fn textjoin_value_text<'doc>(
   output: &mut String,
   value_count: &mut usize,
 ) -> Result<(), FormulaErrorValue> {
-  for value in evaluator.matrix_values(value).into_iter().flatten() {
+  for value in textjoin_matrix_values(evaluator, value, ignore_empty)
+    .into_iter()
+    .flatten()
+  {
     match value {
       FormulaValue::Error(error) => return Err(error),
       FormulaValue::Blank => {
@@ -1742,6 +2471,106 @@ fn textjoin_value_text<'doc>(
     }
   }
   Ok(())
+}
+
+fn textjoin_matrix_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+  ignore_empty: bool,
+) -> Vec<Vec<FormulaValue<'doc>>> {
+  match value {
+    FormulaValue::Reference(reference) => {
+      textjoin_reference_values(evaluator, reference, ignore_empty)
+    }
+    FormulaValue::RefList(ranges) => ranges
+      .iter()
+      .flat_map(|range| {
+        textjoin_matrix_values(
+          evaluator,
+          &FormulaValue::Reference(range.clone()),
+          ignore_empty,
+        )
+      })
+      .collect(),
+    value => evaluator.matrix_values(value),
+  }
+}
+
+fn textjoin_reference_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  reference: &QualifiedRange<'doc>,
+  ignore_empty: bool,
+) -> Vec<Vec<FormulaValue<'doc>>> {
+  let sheet = evaluator.range_sheet(reference);
+  let range = if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
+    let Some(range) = evaluator.book.data_area_subrange(sheet, reference.range) else {
+      return Vec::new();
+    };
+    if ignore_empty && range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
+      return sparse_textjoin_reference_values(evaluator, sheet, range);
+    }
+    range
+  } else {
+    reference.range
+  };
+  let start_row = range.start.row.min(range.end.row);
+  let end_row = range.start.row.max(range.end.row);
+  let start_column = range.start.column.min(range.end.column);
+  let end_column = range.start.column.max(range.end.column);
+  (start_row..=end_row)
+    .map(|row| {
+      (start_column..=end_column)
+        .map(|column| textjoin_cell_value(evaluator, sheet, CellAddress { column, row }))
+        .collect()
+    })
+    .collect()
+}
+
+fn textjoin_cell_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  sheet: SheetId,
+  address: CellAddress,
+) -> FormulaValue<'doc> {
+  if evaluator.book.is_query_empty_cell(sheet, address) {
+    FormulaValue::Blank
+  } else {
+    evaluator.book.cell_value(sheet, address)
+  }
+}
+
+fn sparse_textjoin_reference_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  sheet: SheetId,
+  range: CellRange,
+) -> Vec<Vec<FormulaValue<'doc>>> {
+  let start_row = range.start.row.min(range.end.row);
+  let end_row = range.start.row.max(range.end.row);
+  let start_column = range.start.column.min(range.end.column);
+  let end_column = range.start.column.max(range.end.column);
+  let mut cells = evaluator
+    .book
+    .cells
+    .iter()
+    .filter_map(|((cell_sheet, address), value)| {
+      (*cell_sheet == sheet
+        && address.row >= start_row
+        && address.row <= end_row
+        && address.column >= start_column
+        && address.column <= end_column)
+        .then(|| {
+          (
+            *address,
+            if evaluator.book.is_query_empty_cell(sheet, *address) {
+              FormulaValue::Blank
+            } else {
+              value.clone()
+            },
+          )
+        })
+    })
+    .collect::<Vec<_>>();
+  cells.sort_by_key(|(address, _)| (address.row, address.column));
+  cells.into_iter().map(|(_, value)| vec![value]).collect()
 }
 
 fn textjoin_push_value(
@@ -1801,6 +2630,14 @@ fn evaluate_exact_reader<'doc>(
       )))
     });
   }
+  let left = evaluator.scalar_binary_operand(left);
+  let right = evaluator.scalar_binary_operand(right);
+  if let FormulaValue::Error(error) = left {
+    return Some(FormulaValue::Error(error));
+  }
+  if let FormulaValue::Error(error) = right {
+    return Some(FormulaValue::Error(error));
+  }
   Some(FormulaValue::Boolean(exact_text_match(
     &evaluator.text(&left),
     &evaluator.text(&right),
@@ -1819,12 +2656,25 @@ fn evaluate_find_reader<'doc>(
   bytes: bool,
 ) -> Option<FormulaValue<'doc>> {
   let needle_value = args.array_value(0)?;
+  if let FormulaValue::Error(error) = needle_value {
+    return Some(FormulaValue::Error(error));
+  }
   let haystack_value = args.array_value(1)?;
-  let start = args
-    .raw_arg(2)
-    .and_then(|_| args.value(2))
-    .and_then(|value| evaluator.number(&value))
-    .unwrap_or(1.0) as usize;
+  if let FormulaValue::Error(error) = haystack_value {
+    return Some(FormulaValue::Error(error));
+  }
+  let start = if args.raw_arg(2).is_some() {
+    let value = args.value(2)?;
+    if let FormulaValue::Error(error) = value {
+      return Some(FormulaValue::Error(error));
+    }
+    let Some(start) = evaluator.number(&value) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    };
+    start
+  } else {
+    1.0
+  } as usize;
   evaluator.map_find_values(needle_value, haystack_value, start, case_sensitive, bytes)
 }
 
@@ -1865,6 +2715,43 @@ fn evaluate_substitute_reader<'doc>(
   } else {
     Some(FormulaValue::String(Cow::Owned(text.replace(&old, &new))))
   }
+}
+
+fn evaluate_replace_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let old = match strict_text_arg(evaluator, args.value(0)?) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let start = match offset_integer_value(evaluator, args.value(1)?) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let count = match offset_integer_value(evaluator, args.value(2)?) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let new = match strict_text_arg(evaluator, args.value(3)?) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if start < 1 || count < 0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+
+  let mut chars = old.chars().collect::<Vec<_>>();
+  if start > chars.len() as i64 {
+    chars.extend(new.chars());
+  } else {
+    let start_index = (start - 1) as usize;
+    let end_index = start_index.saturating_add(count as usize).min(chars.len());
+    chars.splice(start_index..end_index, new.chars());
+  }
+  Some(FormulaValue::String(Cow::Owned(
+    chars.into_iter().collect(),
+  )))
 }
 
 fn evaluate_sumsq_reader<'doc>(
@@ -1934,7 +2821,10 @@ fn collect_a_numbers<'doc>(
     }
     FormulaValue::Number(value) => values.push(value),
     FormulaValue::Boolean(value) => values.push(if value { 1.0 } else { 0.0 }),
-    FormulaValue::String(_) | FormulaValue::Blank => values.push(0.0),
+    FormulaValue::String(text) => {
+      values.push(evaluator.number(&FormulaValue::String(text)).unwrap_or(0.0))
+    }
+    FormulaValue::Blank => values.push(0.0),
   }
   Some(())
 }
@@ -1971,36 +2861,48 @@ fn evaluate_xy_matrix_reader<'doc>(
 ) -> Option<FormulaValue<'doc>> {
   let left_value = args.array_value(0)?;
   let right_value = args.array_value(1)?;
-  let left = evaluator.matrix_values(&left_value);
-  let right = evaluator.matrix_values(&right_value);
-  if left.len() != right.len()
-    || left
-      .iter()
-      .zip(&right)
-      .any(|(left_row, right_row)| left_row.len() != right_row.len())
-  {
-    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  let left = evaluator
+    .matrix_values(&left_value)
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+  let right = evaluator
+    .matrix_values(&right_value)
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+  if left.is_empty() || left.len() != right.len() {
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
   }
   let mut sum = KahanSum::default();
-  for (left_row, right_row) in left.iter().zip(&right) {
-    for (left, right) in left_row.iter().zip(right_row) {
-      match (left, right) {
-        (FormulaValue::Error(error), _) | (_, FormulaValue::Error(error)) => {
-          return Some(FormulaValue::Error(*error));
-        }
-        (FormulaValue::Blank | FormulaValue::String(_), _)
-        | (_, FormulaValue::Blank | FormulaValue::String(_)) => {}
-        _ => {
-          let Some(left) = evaluator.number(left) else {
-            return Some(FormulaValue::Error(FormulaErrorValue::Value));
-          };
-          let Some(right) = evaluator.number(right) else {
-            return Some(FormulaValue::Error(FormulaErrorValue::Value));
-          };
-          accumulate(&mut sum, left, right);
-        }
+  let mut accumulated = false;
+  let mut first_left_error = None;
+  let mut first_right_error = None;
+  for (left, right) in left.iter().zip(&right) {
+    match (left, right) {
+      (FormulaValue::Error(error), _) => {
+        first_left_error.get_or_insert(*error);
       }
+      (_, FormulaValue::Error(error)) => {
+        first_right_error.get_or_insert(*error);
+      }
+      (FormulaValue::Blank | FormulaValue::String(_), _)
+      | (_, FormulaValue::Blank | FormulaValue::String(_)) => {}
+      (FormulaValue::Number(left), FormulaValue::Number(right)) => {
+        accumulate(&mut sum, *left, *right);
+        accumulated = true;
+      }
+      _ => {}
     }
+  }
+  if let Some(error) = first_left_error {
+    return Some(FormulaValue::Error(error));
+  }
+  if let Some(error) = first_right_error {
+    return Some(FormulaValue::Error(error));
+  }
+  if !accumulated {
+    return Some(FormulaValue::Error(FormulaErrorValue::Div0));
   }
   Some(FormulaValue::Number(sum.finish()))
 }
@@ -2009,7 +2911,9 @@ fn evaluate_devsq_reader<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
   match args.numeric_aggregate(true)? {
-    Ok(values) => deviation_sum_squares(&values).map(FormulaValue::Number),
+    Ok(values) => deviation_sum_squares(&values)
+      .map(FormulaValue::Number)
+      .or(Some(FormulaValue::Error(FormulaErrorValue::Num))),
     Err(error) => Some(FormulaValue::Error(error)),
   }
 }
@@ -2108,7 +3012,7 @@ fn evaluate_large_small_reader<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
   large: bool,
 ) -> Option<FormulaValue<'doc>> {
-  let mut values = evaluator.value_numbers(&args.array_value(0)?);
+  let mut values = large_small_values(evaluator, &args.array_value(0)?);
   if values.is_empty() {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
   }
@@ -2152,6 +3056,39 @@ fn evaluate_large_small_reader<'doc>(
   ))
 }
 
+fn large_small_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> Vec<f64> {
+  match value {
+    FormulaValue::Reference(reference) => evaluator
+      .range_values(reference)
+      .into_iter()
+      .filter_map(|value| match value {
+        FormulaValue::Number(value) => Some(value),
+        _ => None,
+      })
+      .collect(),
+    FormulaValue::RefList(ranges) => ranges
+      .iter()
+      .flat_map(|range| evaluator.range_values(range))
+      .filter_map(|value| match value {
+        FormulaValue::Number(value) => Some(value),
+        _ => None,
+      })
+      .collect(),
+    FormulaValue::Matrix(rows) => rows
+      .iter()
+      .flatten()
+      .filter_map(|value| match value {
+        FormulaValue::Number(value) => Some(*value),
+        _ => None,
+      })
+      .collect(),
+    value => evaluator.number(value).into_iter().collect(),
+  }
+}
+
 fn evaluate_trimmean_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -2168,8 +3105,14 @@ fn evaluate_percentile_reader<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
   kind: PercentileKind,
 ) -> Option<FormulaValue<'doc>> {
-  let mut values = evaluator.value_numbers(&args.value(0)?);
+  let mut values = match percentile_numbers(evaluator, &args.value(0)?) {
+    Ok(values) => values,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
   let k = evaluator.number(&args.value(1)?)?;
+  if !(0.0..=1.0).contains(&k) {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  }
   percentile_sorted(&mut values, k, kind)
     .map(FormulaValue::Number)
     .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
@@ -2180,11 +3123,59 @@ fn evaluate_quartile_reader<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
   kind: PercentileKind,
 ) -> Option<FormulaValue<'doc>> {
-  let mut values = evaluator.value_numbers(&args.value(0)?);
+  let mut values = match percentile_numbers(evaluator, &args.value(0)?) {
+    Ok(values) => values,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
   let k = evaluator.number(&args.value(1)?)?.floor();
   percentile_sorted(&mut values, k / 4.0, kind)
     .map(FormulaValue::Number)
     .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+}
+
+fn percentile_numbers<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> std::result::Result<Vec<f64>, FormulaErrorValue> {
+  match value {
+    FormulaValue::Reference(reference) => {
+      percentile_values_from_iter(evaluator.range_values(reference))
+    }
+    FormulaValue::RefList(ranges) => {
+      let mut values = Vec::new();
+      for range in ranges {
+        values.extend(percentile_values_from_iter(evaluator.range_values(range))?);
+      }
+      Ok(values)
+    }
+    FormulaValue::Matrix(rows) => percentile_values_from_iter(rows.iter().flatten().cloned()),
+    value => Ok(evaluator.number(value).into_iter().collect()),
+  }
+}
+
+fn percentile_values_from_iter<'doc>(
+  values: impl IntoIterator<Item = FormulaValue<'doc>>,
+) -> std::result::Result<Vec<f64>, FormulaErrorValue> {
+  let mut numbers = Vec::new();
+  for value in values {
+    match value {
+      FormulaValue::Error(error) => return Err(error),
+      value => {
+        if let Some(number) = percentile_value_number(&value) {
+          numbers.push(number);
+        }
+      }
+    }
+  }
+  Ok(numbers)
+}
+
+fn percentile_value_number(value: &FormulaValue<'_>) -> Option<f64> {
+  match value {
+    FormulaValue::Number(value) => Some(*value),
+    FormulaValue::String(text) => text.trim().parse::<f64>().ok(),
+    _ => None,
+  }
 }
 
 fn evaluate_percentrank_reader<'doc>(
@@ -2201,7 +3192,15 @@ fn evaluate_percentrank_reader<'doc>(
     .map(approx_floor)
     .unwrap_or(3.0);
   if significance < 1.0 {
-    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  }
+  if values.is_empty() {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  }
+  let min = values.iter().copied().reduce(f64::min)?;
+  let max = values.iter().copied().reduce(f64::max)?;
+  if x < min || x > max {
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
   }
   percent_rank(values, x, significance, kind)
     .map(FormulaValue::Number)
@@ -2231,7 +3230,7 @@ fn evaluate_sumproduct_reader<'doc>(
 ) -> Option<FormulaValue<'doc>> {
   let matrices = (0..args.len())
     .map(|index| {
-      let value = args.array_value(index)?;
+      let value = args.array_value(index).unwrap_or(FormulaValue::Number(0.0));
       Some(evaluator.matrix_values(&value))
     })
     .collect::<Option<Vec<_>>>()?;
@@ -2247,6 +3246,7 @@ fn evaluate_sumproduct_reader<'doc>(
   {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
   }
+  let scalar_product = rows == 1 && columns == 1;
   let mut total = 0.0;
   let mut compensation = 0.0;
   for row in 0..rows {
@@ -2259,6 +3259,9 @@ fn evaluate_sumproduct_reader<'doc>(
             product = product.map(|current| current * if *value { 1.0 } else { 0.0 });
           }
           FormulaValue::Error(error) => return Some(FormulaValue::Error(*error)),
+          FormulaValue::String(value) if scalar_product && !value.is_empty() => {
+            return Some(FormulaValue::Error(FormulaErrorValue::Value));
+          }
           FormulaValue::Blank | FormulaValue::String(_) => product = None,
           FormulaValue::Matrix(_) | FormulaValue::Reference(_) | FormulaValue::RefList(_) => {}
         }
@@ -2275,17 +3278,33 @@ fn evaluate_sumproduct_reader<'doc>(
 }
 
 fn evaluate_geomean_harmean_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
   geometric: bool,
 ) -> Option<FormulaValue<'doc>> {
-  let values = match args.numeric_aggregate(true)? {
+  let mut values = match args.numeric_aggregate(true)? {
     Ok(values) => values,
     Err(error) => return Some(FormulaValue::Error(error)),
   };
-  if values.is_empty() || values.iter().any(|value| *value <= 0.0) {
+  values.extend(
+    (0..args.len())
+      .filter(|index| args.is_missing(*index))
+      .map(|_| 0.0),
+  );
+  let calc_grammar = matches!(
+    evaluator.grammar,
+    FormulaGrammar::CalcA1 | FormulaGrammar::OpenFormula
+  );
+  if values.is_empty()
+    || values.iter().any(|value| *value < 0.0)
+    || (!geometric || !calc_grammar) && values.iter().any(|value| *value == 0.0)
+  {
     return Some(FormulaValue::Error(FormulaErrorValue::Num));
   }
   if geometric {
+    if values.iter().any(|value| *value == 0.0) {
+      return Some(FormulaValue::Number(0.0));
+    }
     Some(FormulaValue::Number(
       (values.iter().map(|value| value.ln()).sum::<f64>() / values.len() as f64).exp(),
     ))
@@ -2719,9 +3738,15 @@ fn evaluate_round_direction_reader<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
   away_from_zero: bool,
 ) -> Option<FormulaValue<'doc>> {
-  let value = evaluator.number(&args.value(0)?)?;
+  let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
   let digits = if args.len() == 2 {
-    evaluator.number(&args.value(1)?)?
+    match scalar_number_arg_or_value(evaluator, args, 1)? {
+      Ok(value) => value,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
   } else {
     0.0
   } as i32;
@@ -2757,7 +3782,9 @@ fn evaluate_trunc_reader<'doc>(
     return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
   }
   let digits = if args.len() == 2 && !args.is_missing(1) {
-    let value = evaluator.number(&args.value(1)?)?;
+    let Some(value) = evaluator.number(&args.value(1)?) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    };
     if value < 0.0 {
       approx_ceil(value)
     } else {
@@ -2766,7 +3793,9 @@ fn evaluate_trunc_reader<'doc>(
   } else {
     0.0
   };
-  let value = evaluator.number(&args.value(0)?)?;
+  let Some(value) = evaluator.number(&args.value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
   Some(FormulaValue::Number(round_direction(
     value,
     digits.clamp(f64::from(i16::MIN), f64::from(i16::MAX)) as i32,
@@ -2781,9 +3810,30 @@ fn evaluate_date_reader<'doc>(
   if args.is_missing(0) {
     return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
   }
-  let mut year = evaluator.number(&args.value(0)?)? as i32;
-  let month = evaluator.number(&args.value(1)?)? as i32;
-  let day = evaluator.number(&args.value(2)?)? as i32;
+  let date_arg = |index| {
+    let value = evaluator.scalar_binary_operand(args.value(index)?);
+    if let FormulaValue::Error(error) = value {
+      return Some(Err(error));
+    }
+    Some(
+      evaluator
+        .number(&value)
+        .map(|value| value as i32)
+        .ok_or(FormulaErrorValue::Value),
+    )
+  };
+  let mut year = match date_arg(0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let month = match date_arg(1)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let day = match date_arg(2)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
   if year < 0 {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
   }
@@ -2833,6 +3883,47 @@ fn evaluate_time_reader<'doc>(
   }
 }
 
+fn evaluate_weekday_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let Some(serial) = evaluator.date_number_from_scalar(&args.value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  if serial < 0.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+  let return_type = if args.len() == 1 {
+    1
+  } else if args.is_missing(1) {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  } else {
+    let value = args.value(1)?;
+    match value {
+      FormulaValue::Reference(reference) if reference.range.cell_count_hint() != 1 => {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      }
+      FormulaValue::RefList(_) => return Some(FormulaValue::Error(FormulaErrorValue::Value)),
+      FormulaValue::Matrix(ref rows)
+        if rows.len() != 1 || rows.first().is_none_or(|row| row.len() != 1) =>
+      {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      }
+      FormulaValue::Blank => return Some(FormulaValue::Error(FormulaErrorValue::Num)),
+      _ => evaluator.number(&value)? as i32,
+    }
+  };
+  let index = weekday_index_from_serial(serial.floor() as i64) as i32;
+  let value = match return_type {
+    1 => ((index + 1) % 7) + 1,
+    2 | 11 => index + 1,
+    3 => index,
+    12..=17 => (index - (return_type - 11)).rem_euclid(7) + 1,
+    _ => return Some(FormulaValue::Error(FormulaErrorValue::Num)),
+  };
+  Some(FormulaValue::Number(value as f64))
+}
+
 fn evaluate_date_part_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -2869,6 +3960,16 @@ fn date_part_value<'doc>(
   else {
     return FormulaValue::Error(FormulaErrorValue::Value);
   };
+  if serial < 0 && evaluator.book.date_system != DateSystem::LibreOffice {
+    return FormulaValue::Error(FormulaErrorValue::Num);
+  }
+  if serial == 0 && evaluator.book.date_system == DateSystem::Date1900 {
+    return FormulaValue::Number(match part {
+      DatePart::Year => 1900.0,
+      DatePart::Month => 1.0,
+      DatePart::Day => 0.0,
+    });
+  }
   let Some((year, month, day)) = date_from_serial_with_system(serial, evaluator.book.date_system)
   else {
     return FormulaValue::Error(FormulaErrorValue::Value);
@@ -2900,6 +4001,60 @@ fn evaluate_weeks_reader<'doc>(
   }
 }
 
+fn evaluate_days_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let Some(end) = evaluator.date_number_from_value(&args.value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(start) = evaluator.date_number_from_value(&args.value(1)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  Some(FormulaValue::Number(end.floor() - start.floor()))
+}
+
+fn evaluate_days360_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let Some(start) = evaluator.date_number_from_value(&args.value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(end) = evaluator.date_number_from_value(&args.value(1)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let european = match args.raw_arg(2).and_then(|_| args.value(2)) {
+    Some(value) => match boolean_method_argument(evaluator, &value) {
+      Some(value) => value,
+      None => return Some(FormulaValue::Error(FormulaErrorValue::Value)),
+    },
+    None => false,
+  };
+  date_days360(
+    start.floor() as i32,
+    end.floor() as i32,
+    european,
+    evaluator.book.date_system,
+  )
+  .map(|value| FormulaValue::Number(value as f64))
+  .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+}
+
+fn boolean_method_argument<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> Option<bool> {
+  match evaluator.scalar_value(value.clone()) {
+    FormulaValue::Boolean(value) => Some(value),
+    FormulaValue::Number(value) => Some(value != 0.0),
+    FormulaValue::String(value) if value.eq_ignore_ascii_case("TRUE") => Some(true),
+    FormulaValue::String(value) if value.eq_ignore_ascii_case("FALSE") => Some(false),
+    FormulaValue::Blank => Some(false),
+    _ => None,
+  }
+}
+
 fn evaluate_days_in_month_year_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -2922,6 +4077,60 @@ fn evaluate_days_in_month_year_reader<'doc>(
       last_day_of_month(year_value, month) as f64
     ))
   }
+}
+
+fn evaluate_factorial_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  double_factorial: bool,
+) -> Option<FormulaValue<'doc>> {
+  let value = evaluator.scalar_binary_operand(args.value(0)?);
+  if let FormulaValue::Error(error) = value {
+    return Some(FormulaValue::Error(error));
+  }
+  let Some(number) = evaluator.number(&value) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let invalid_error = match evaluator.grammar {
+    FormulaGrammar::CalcA1 | FormulaGrammar::OpenFormula => FormulaErrorValue::IllegalArgument,
+    FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1 => FormulaErrorValue::Num,
+  };
+  if !number.is_finite() {
+    return Some(FormulaValue::Error(invalid_error));
+  }
+  let n = number.trunc();
+  if n < 0.0 {
+    return Some(FormulaValue::Error(invalid_error));
+  }
+  let limit = if double_factorial { 300.0 } else { 170.0 };
+  if n > limit {
+    return Some(FormulaValue::Error(invalid_error));
+  }
+  let n = n as u32;
+  let value = if double_factorial {
+    double_factorial_value(n)
+  } else {
+    factorial_value(n)
+  };
+  if value.is_finite() {
+    Some(FormulaValue::Number(value))
+  } else {
+    Some(FormulaValue::Error(invalid_error))
+  }
+}
+
+fn factorial_value(n: u32) -> f64 {
+  (1..=n).fold(1.0, |acc, item| acc * f64::from(item))
+}
+
+fn double_factorial_value(n: u32) -> f64 {
+  if n <= 1 {
+    return 1.0;
+  }
+  (1..=n)
+    .rev()
+    .step_by(2)
+    .fold(1.0, |acc, item| acc * f64::from(item))
 }
 
 fn evaluate_datedif_reader<'doc>(
@@ -3027,9 +4236,7 @@ fn evaluate_yearfrac_reader<'doc>(
     .unwrap_or(0);
   date_yearfrac(start, end, basis)
     .map(FormulaValue::Number)
-    .or(Some(FormulaValue::Error(
-      FormulaErrorValue::IllegalArgument,
-    )))
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Num)))
 }
 
 fn datedif_months(
@@ -3071,7 +4278,15 @@ fn evaluate_time_part_reader<'doc>(
   part: TimePart,
 ) -> Option<FormulaValue<'doc>> {
   let value = args.first_value()?;
-  let value = evaluator.time_number_from_value(&value).unwrap_or_default();
+  if let FormulaValue::Error(error) = value {
+    return Some(FormulaValue::Error(error));
+  }
+  let Some(value) = evaluator.time_number_from_value(&value) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  if value < 0.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  }
   let total_seconds = (value.fract() * 86_400.0).floor() as i64;
   Some(FormulaValue::Number(match part {
     TimePart::Hour => total_seconds.rem_euclid(86_400) / 3600,
@@ -3085,41 +4300,67 @@ fn evaluate_eomonth_reader<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
   let Some(start) = evaluator.date_number_from_value(&args.value(0)?) else {
-    return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
   };
   let Some(months) = evaluator.number(&args.value(1)?) else {
-    return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
   };
-  let start = start.floor() as i32;
+  let start = if (0.0..1.0).contains(&start) {
+    1
+  } else {
+    start.floor() as i32
+  };
   let months = months.floor() as i32;
-  let (year, month, _) = date_from_serial_with_system(start, evaluator.book.date_system)?;
-  date_serial_with_system(
+  let Some((year, month, _)) = date_from_serial_with_system(start, evaluator.book.date_system)
+  else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(serial) = date_serial_with_system(
     year,
     month as i32 + months + 1,
     0,
     evaluator.book.date_system,
-  )
-  .map(FormulaValue::Number)
-  .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+  ) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  Some(FormulaValue::Number(if serial < 0.0 {
+    -1.0
+  } else {
+    serial
+  }))
 }
 
 fn evaluate_edate_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let start = evaluator.date_number_from_value(&args.value(0)?)?.floor() as i32;
-  let months = evaluator.number(&args.value(1)?)?.floor() as i32;
-  let (year, month, day) = date_from_serial_with_system(start, evaluator.book.date_system)?;
+  let Some(start) = evaluator.date_number_from_value(&args.value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(months) = evaluator.number(&args.value(1)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let start = start.floor() as i32;
+  let months = months.floor() as i32;
+  let Some((year, month, day)) = date_from_serial_with_system(start, evaluator.book.date_system)
+  else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
   let (target_year, target_month, _) = normalized_date_components(year, month as i32 + months, 1)?;
   let target_day = day.min(last_day_of_month(target_year, target_month));
-  date_serial_with_system(
+  let Some(serial) = date_serial_with_system(
     target_year,
     target_month as i32,
     target_day as i32,
     evaluator.book.date_system,
-  )
-  .map(FormulaValue::Number)
-  .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+  ) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  Some(FormulaValue::Number(if serial < 0.0 {
+    -1.0
+  } else {
+    serial
+  }))
 }
 
 fn evaluate_eastersunday_reader<'doc>(
@@ -3231,6 +4472,14 @@ fn evaluate_left_reader<'doc>(
       }
     });
   }
+  let value = evaluator.scalar_binary_operand(value);
+  if let FormulaValue::Error(error) = value {
+    return Some(FormulaValue::Error(error));
+  }
+  let len = evaluator.scalar_binary_operand(len);
+  if let FormulaValue::Error(error) = len {
+    return Some(FormulaValue::Error(error));
+  }
   if bytes {
     evaluator.leftb_value(&value, &len)
   } else {
@@ -3258,6 +4507,14 @@ fn evaluate_right_reader<'doc>(
       }
     });
   }
+  let value = evaluator.scalar_binary_operand(value);
+  if let FormulaValue::Error(error) = value {
+    return Some(FormulaValue::Error(error));
+  }
+  let len = evaluator.scalar_binary_operand(len);
+  if let FormulaValue::Error(error) = len {
+    return Some(FormulaValue::Error(error));
+  }
   if bytes {
     evaluator.rightb_value(&value, &len)
   } else {
@@ -3270,11 +4527,23 @@ fn evaluate_mid_reader<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
   bytes: bool,
 ) -> Option<FormulaValue<'doc>> {
-  let text = evaluator.text(&args.value(0)?);
-  let start = evaluator.number(&args.value(1)?)?;
-  let len = evaluator.number(&args.value(2)?)?;
+  let text_value = evaluator.scalar_binary_operand(args.value(0)?);
+  if let FormulaValue::Error(error) = text_value {
+    return Some(FormulaValue::Error(error));
+  }
+  let start_value = evaluator.scalar_binary_operand(args.value(1)?);
+  if let FormulaValue::Error(error) = start_value {
+    return Some(FormulaValue::Error(error));
+  }
+  let len_value = evaluator.scalar_binary_operand(args.value(2)?);
+  if let FormulaValue::Error(error) = len_value {
+    return Some(FormulaValue::Error(error));
+  }
+  let text = evaluator.text(&text_value);
+  let start = evaluator.number(&start_value)?;
+  let len = evaluator.number(&len_value)?;
   if start < 1.0 || len < 0.0 {
-    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
   }
   if bytes {
     let prefix = leftb(&text, start as usize - 1);
@@ -3453,9 +4722,20 @@ fn evaluate_indirect_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let text = evaluator.text(&args.value(0)?);
+  let value = args.value(0)?;
+  if let FormulaValue::Error(error) = value {
+    return Some(FormulaValue::Error(error));
+  }
+  let text = evaluator.text(&value);
   let use_a1 = if args.len() == 2 {
-    evaluator.truthy(&args.value(1)?)
+    let value = args.value(1)?;
+    if let FormulaValue::Error(error) = value {
+      return Some(FormulaValue::Error(error));
+    }
+    let Some(use_a1) = indirect_a1_flag(&value) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    };
+    use_a1
   } else {
     true
   };
@@ -3472,6 +4752,9 @@ fn evaluate_indirect_reader<'doc>(
     reference_text.as_str()
   };
   if use_a1 && !indirect_reference_matches_grammar(text, evaluator.grammar) {
+    return Some(FormulaValue::Error(FormulaErrorValue::Ref));
+  }
+  if use_a1 && indirect_has_invalid_sheet_spacing(text) {
     return Some(FormulaValue::Error(FormulaErrorValue::Ref));
   }
   if use_a1 && evaluator.calc_a1_indirect_bang_reference {
@@ -3501,11 +4784,31 @@ fn evaluate_indirect_reader<'doc>(
   } else {
     text
   };
+  if let Some(reference) = evaluator.resolve_reference(text) {
+    if reference
+      .sheet_name
+      .as_ref()
+      .is_some_and(|name| evaluator.book.sheet_id_by_name(name.0.as_ref()).is_none())
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::Ref));
+    }
+    if !indirect_is_bare_whole_axis_reference(text, &reference) {
+      return Some(FormulaValue::Reference(reference));
+    }
+  }
   evaluator
-    .resolve_reference(text)
-    .map(FormulaValue::Reference)
-    .or_else(|| evaluator.evaluate_defined_name(&Cow::Owned(text.to_string())))
+    .evaluate_defined_name(&Cow::Owned(text.to_string()))
     .or(Some(FormulaValue::Error(FormulaErrorValue::Ref)))
+}
+
+fn indirect_a1_flag(value: &FormulaValue<'_>) -> Option<bool> {
+  match value {
+    FormulaValue::Boolean(value) => Some(*value),
+    FormulaValue::Number(value) => Some(*value != 0.0),
+    FormulaValue::String(value) if value.eq_ignore_ascii_case("TRUE") => Some(true),
+    FormulaValue::String(value) if value.eq_ignore_ascii_case("FALSE") => Some(false),
+    _ => None,
+  }
 }
 
 fn indirect_reference_matches_grammar(reference: &str, grammar: FormulaGrammar) -> bool {
@@ -3517,6 +4820,62 @@ fn indirect_reference_matches_grammar(reference: &str, grammar: FormulaGrammar) 
       reference.contains('!') || !looks_like_calc_sheet_reference(reference)
     }
   }
+}
+
+fn indirect_is_bare_whole_axis_reference(reference: &str, range: &QualifiedRange<'_>) -> bool {
+  (range.start_flags.whole_column
+    || range.start_flags.whole_row
+    || range.end_flags.whole_column
+    || range.end_flags.whole_row)
+    && !contains_unquoted_char(reference, ':')
+}
+
+fn contains_unquoted_char(value: &str, target: char) -> bool {
+  let mut quoted = false;
+  let mut chars = value.chars().peekable();
+  while let Some(ch) = chars.next() {
+    match ch {
+      '\'' => {
+        if quoted && chars.peek().is_some_and(|next| *next == '\'') {
+          chars.next();
+        } else {
+          quoted = !quoted;
+        }
+      }
+      ch if !quoted && ch == target => return true,
+      _ => {}
+    }
+  }
+  false
+}
+
+fn indirect_has_invalid_sheet_spacing(reference: &str) -> bool {
+  let mut quoted = false;
+  let mut chars = reference.char_indices().peekable();
+  while let Some((index, ch)) = chars.next() {
+    match ch {
+      '\'' => {
+        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
+          chars.next();
+        } else {
+          quoted = !quoted;
+        }
+      }
+      '!' if !quoted => {
+        let sheet = &reference[..index];
+        if sheet.trim() != sheet {
+          return true;
+        }
+        if sheet.starts_with('\'') && sheet.ends_with('\'') && sheet.len() >= 2 {
+          let inner = &sheet[1..sheet.len() - 1];
+          return inner.trim() != inner;
+        }
+        return false;
+      }
+      _ => {}
+    }
+  }
+  false
 }
 
 fn looks_like_calc_sheet_reference(reference: &str) -> bool {
@@ -3578,7 +4937,12 @@ fn evaluate_index_reader<'doc>(
     .value(0)
     .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value));
   if let FormulaValue::Matrix(rows) = value {
-    return Some(index_matrix(rows, row, column, args.len()));
+    let value = index_matrix(rows, row, column, args.len());
+    return Some(if evaluator.array_context {
+      value
+    } else {
+      evaluator.scalar_value(value)
+    });
   }
   let Some(reference) = evaluator.as_reference(&value) else {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
@@ -3594,19 +4958,30 @@ fn evaluate_offset_reader<'doc>(
     let value = args.value(0)?;
     evaluator.as_reference(&value)
   })?;
-  let row_offset_value = raw_row_column_function_value(args, 1, false).or_else(|| args.value(1))?;
+  let row_offset_value =
+    raw_row_column_function_value(args, 1, false).or_else(|| offset_argument_value(args, 1))?;
   let column_offset_value =
-    raw_row_column_function_value(args, 2, true).or_else(|| args.value(2))?;
-  let height = args
-    .value(3)
-    .and_then(|value| evaluator.number(&value))
-    .map(|value| value as i64)
-    .unwrap_or_else(|| i64::from(reference.range.end.row - reference.range.start.row + 1));
-  let width = args
-    .value(4)
-    .and_then(|value| evaluator.number(&value))
-    .map(|value| value as i64)
-    .unwrap_or_else(|| i64::from(reference.range.end.column - reference.range.start.column + 1));
+    raw_row_column_function_value(args, 2, true).or_else(|| offset_argument_value(args, 2))?;
+  let row_offset_value = offset_scalar_argument(evaluator, row_offset_value);
+  let column_offset_value = offset_scalar_argument(evaluator, column_offset_value);
+  let height = match offset_optional_integer_argument(
+    evaluator,
+    args,
+    3,
+    i64::from(reference.range.end.row - reference.range.start.row + 1),
+  ) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let width = match offset_optional_integer_argument(
+    evaluator,
+    args,
+    4,
+    i64::from(reference.range.end.column - reference.range.start.column + 1),
+  ) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
   if is_matrix_argument(&row_offset_value) || is_matrix_argument(&column_offset_value) {
     return evaluate_offset_matrix(
       evaluator,
@@ -3617,8 +4992,14 @@ fn evaluate_offset_reader<'doc>(
       width,
     );
   }
-  let row_offset = evaluator.number(&row_offset_value)? as i64;
-  let column_offset = evaluator.number(&column_offset_value)? as i64;
+  let row_offset = match offset_integer_value(evaluator, row_offset_value) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let column_offset = match offset_integer_value(evaluator, column_offset_value) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
   offset_reference(&reference, row_offset, column_offset, height, width)
 }
 
@@ -3661,6 +5042,57 @@ fn evaluate_offset_matrix<'doc>(
     }
   }
   Some(FormulaValue::RefList(ranges))
+}
+
+fn offset_argument_value<'doc>(
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+) -> Option<FormulaValue<'doc>> {
+  if args.is_missing(index) {
+    Some(FormulaValue::Number(0.0))
+  } else {
+    args.value(index)
+  }
+}
+
+fn offset_scalar_argument<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: FormulaValue<'doc>,
+) -> FormulaValue<'doc> {
+  match value {
+    FormulaValue::Reference(_) | FormulaValue::RefList(_) => evaluator.scalar_binary_operand(value),
+    value => value,
+  }
+}
+
+fn offset_optional_integer_argument<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  default: i64,
+) -> Result<i64, FormulaErrorValue> {
+  match args.raw_arg(index).filter(|_| !args.is_missing(index)) {
+    Some(_) => offset_integer_value(
+      evaluator,
+      args.value(index).ok_or(FormulaErrorValue::Value)?,
+    ),
+    None => Ok(default),
+  }
+}
+
+fn offset_integer_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: FormulaValue<'doc>,
+) -> Result<i64, FormulaErrorValue> {
+  let value = evaluator.scalar_binary_operand(value);
+  match value {
+    FormulaValue::Error(error) => Err(error),
+    value => evaluator
+      .number(&value)
+      .filter(|value| value.is_finite())
+      .map(|value| value.floor() as i64)
+      .ok_or(FormulaErrorValue::Value),
+  }
 }
 
 fn offset_reference<'doc>(
@@ -3867,7 +5299,11 @@ fn evaluate_mround_reader<'doc>(
   }
   let value = evaluator.number(&args.value(0)?)?;
   let multiple = evaluator.number(&args.value(1)?)?;
-  if value * multiple < 0.0 {
+  if matches!(
+    evaluator.grammar,
+    FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+  ) && value * multiple < 0.0
+  {
     return Some(FormulaValue::Error(FormulaErrorValue::Num));
   }
   Some(FormulaValue::Number(mround(value, multiple)))
@@ -3880,18 +5316,43 @@ fn evaluate_decimal_to_base_reader<'doc>(
   min: f64,
   max: f64,
 ) -> Option<FormulaValue<'doc>> {
-  let value = evaluator.number(&args.value(0)?)?;
+  let value_arg = args.value(0)?;
+  if let FormulaValue::Error(error) = value_arg {
+    return Some(FormulaValue::Error(error));
+  }
+  let Some(value) = evaluator.number(&value_arg) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
   let places = args
     .raw_arg(1)
     .filter(|_| !args.is_missing(1))
     .and_then(|_| args.value(1))
-    .and_then(|value| evaluator.number(&value))
-    .map(|value| value as i32);
+    .map(|value| {
+      if let FormulaValue::Error(error) = value {
+        return Err(error);
+      }
+      evaluator
+        .number(&value)
+        .map(|value| value as i32)
+        .ok_or(FormulaErrorValue::Value)
+    })
+    .transpose();
+  let places = match places {
+    Ok(places) => places,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if value.fract() != 0.0
+    && let Some(places) = places
+    && let Some(output) = convert_from_decimal(value, min, max, base, None, 10)
+  {
+    if places <= 0 || output.len() > places as usize {
+      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    }
+    return Some(FormulaValue::String(Cow::Owned(output)));
+  }
   convert_from_decimal(value, min, max, base, places, 10)
     .map(|value| FormulaValue::String(Cow::Owned(value)))
-    .or(Some(FormulaValue::Error(
-      FormulaErrorValue::IllegalArgument,
-    )))
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Num)))
 }
 
 fn evaluate_base_reader<'doc>(
@@ -3947,9 +5408,7 @@ fn evaluate_base_to_decimal_reader<'doc>(
 ) -> Option<FormulaValue<'doc>> {
   convert_to_decimal(&base_digits_text(evaluator, &args.value(0)?), base, 10)
     .map(FormulaValue::Number)
-    .or(Some(FormulaValue::Error(
-      FormulaErrorValue::IllegalArgument,
-    )))
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Num)))
 }
 
 fn evaluate_base_to_base_reader<'doc>(
@@ -3972,6 +5431,29 @@ fn evaluate_base_to_base_reader<'doc>(
     .or(Some(FormulaValue::Error(
       FormulaErrorValue::IllegalArgument,
     )))
+}
+
+fn evaluate_bessel_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  kind: BesselKind,
+) -> Option<FormulaValue<'doc>> {
+  let Some(x) = evaluator.number(&args.value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(order) = evaluator.number(&args.value(1)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let order = approx_floor(order);
+  if order < 0.0 || order > i32::MAX as f64 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  }
+  let value = bessel(kind, x, order as i32);
+  Some(if value.is_finite() {
+    FormulaValue::Number(value)
+  } else {
+    FormulaValue::Error(FormulaErrorValue::Num)
+  })
 }
 
 fn base_digits_text<'doc>(evaluator: &EvalContext<'_, 'doc>, value: &FormulaValue<'doc>) -> String {
@@ -4013,6 +5495,34 @@ fn evaluate_gcd_lcm_reader<'doc>(
   Some(FormulaValue::Number(result))
 }
 
+fn evaluate_combin_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  repetition: bool,
+) -> Option<FormulaValue<'doc>> {
+  let count_arg = evaluator.scalar_binary_operand(args.value(0)?);
+  if let FormulaValue::Error(error) = count_arg {
+    return Some(FormulaValue::Error(error));
+  }
+  let chosen_arg = evaluator.scalar_binary_operand(args.value(1)?);
+  if let FormulaValue::Error(error) = chosen_arg {
+    return Some(FormulaValue::Error(error));
+  }
+  let Some(count) = evaluator.number(&count_arg).map(approx_floor) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(chosen) = evaluator.number(&chosen_arg).map(approx_floor) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let invalid_error = match evaluator.grammar {
+    FormulaGrammar::CalcA1 | FormulaGrammar::OpenFormula => FormulaErrorValue::IllegalArgument,
+    FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1 => FormulaErrorValue::Num,
+  };
+  combination_count(count, chosen, repetition, log_gamma)
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(invalid_error)))
+}
+
 fn evaluate_median_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -4037,8 +5547,12 @@ fn evaluate_mmult_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let left = matrix_number_values(evaluator, &args.array_value(0)?)?;
-  let right = matrix_number_values(evaluator, &args.array_value(1)?)?;
+  let Some(left) = matrix_number_values_strict(evaluator, &args.array_value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(right) = matrix_number_values_strict(evaluator, &args.array_value(1)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
   let Some(result) = matrix_multiply(&left, &right) else {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
   };
@@ -4061,12 +5575,42 @@ fn evaluate_mdeterm_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let matrix = matrix_number_values_strict(evaluator, &args.array_value(0)?)?;
+  let Some(matrix) = matrix_number_values_strict(evaluator, &args.array_value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
   let size = matrix.len();
   if size == 0 || matrix.iter().any(|row| row.len() != size) {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
   }
   Some(FormulaValue::Number(determinant(matrix)))
+}
+
+fn evaluate_minverse_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let Some(mut matrix) = matrix_number_values_strict(evaluator, &args.array_value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let size = matrix.len();
+  if size == 0 || matrix.iter().any(|row| row.len() != size) {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+  let Some(decomposition) = lup_decompose(&mut matrix) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  };
+  let mut inverse = vec![vec![FormulaValue::Blank; size]; size];
+  for column in 0..size {
+    let mut rhs = vec![0.0; size];
+    rhs[column] = 1.0;
+    let Some(solution) = lup_solve(&matrix, &decomposition, &rhs) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    };
+    for row in 0..size {
+      inverse[row][column] = FormulaValue::Number(solution[row]);
+    }
+  }
+  Some(FormulaValue::Matrix(inverse))
 }
 
 fn evaluate_munit_reader<'doc>(
@@ -4089,6 +5633,33 @@ fn evaluate_munit_reader<'doc>(
     matrix.push(values);
   }
   Some(FormulaValue::Matrix(matrix))
+}
+
+fn evaluate_transpose_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let matrix = evaluator.matrix_values(&args.array_value(0)?);
+  let rows = matrix.len();
+  let columns = matrix.first().map_or(0, Vec::len);
+  if rows == 0 || columns == 0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+  let mut result = vec![Vec::with_capacity(rows); columns];
+  for column in 0..columns {
+    for row in &matrix {
+      let value = row
+        .get(column)
+        .cloned()
+        .unwrap_or(FormulaValue::Error(FormulaErrorValue::NA));
+      result[column].push(if matches!(value, FormulaValue::Blank) {
+        FormulaValue::Number(0.0)
+      } else {
+        value
+      });
+    }
+  }
+  Some(FormulaValue::Matrix(result))
 }
 
 fn evaluate_choose_rows_columns_reader<'doc>(
@@ -4199,13 +5770,33 @@ fn evaluate_ceiling_floor_reader<'doc>(
   })
 }
 
+fn ceiling_floor_has_array_argument<'doc>(args: FunctionArgReader<'_, '_, 'doc>) -> bool {
+  (0..2).any(|index| {
+    args
+      .value(index)
+      .is_some_and(|value| is_matrix_argument(&value))
+  })
+}
+
 fn evaluate_ceiling_floor_legacy_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
   ceiling: bool,
 ) -> Option<FormulaValue<'doc>> {
-  let value = evaluator.number(&args.value(0)?)?;
-  let significance = evaluator.number(&args.value(1)?)?;
+  let value_arg = evaluator.scalar_binary_operand(args.value(0)?);
+  if let FormulaValue::Error(error) = value_arg {
+    return Some(FormulaValue::Error(error));
+  }
+  let Some(value) = evaluator.number(&value_arg) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let significance_arg = evaluator.scalar_binary_operand(args.value(1)?);
+  if let FormulaValue::Error(error) = significance_arg {
+    return Some(FormulaValue::Error(error));
+  }
+  let Some(significance) = evaluator.number(&significance_arg) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
   let result = if ceiling {
     ceiling_excel_legacy(value, significance)
   } else {
@@ -4213,6 +5804,7 @@ fn evaluate_ceiling_floor_legacy_reader<'doc>(
   };
   match result {
     Ok(value) => Some(FormulaValue::Number(value)),
+    Err(NumericError::IllegalArgument) => Some(FormulaValue::Error(FormulaErrorValue::Num)),
     Err(error) => Some(FormulaValue::Error(numeric_error_value(error))),
   }
 }
@@ -4539,10 +6131,98 @@ fn evaluate_frequency_reader<'doc>(
     .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
 }
 
+fn map_numeric_array_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  values: &[FormulaValue<'doc>],
+  invalid_error: FormulaErrorValue,
+  op: impl Fn(&[f64]) -> FormulaValue<'doc> + Copy,
+) -> Option<FormulaValue<'doc>> {
+  let matrices = values
+    .iter()
+    .map(|value| evaluator.matrix_values(value))
+    .collect::<Vec<_>>();
+  let mut rows = 1usize;
+  let mut columns = 1usize;
+  let mut dimensions = Vec::with_capacity(matrices.len());
+  for matrix in &matrices {
+    let row_count = matrix.len();
+    let column_count = matrix.first().map_or(0, Vec::len);
+    if row_count == 0 || column_count == 0 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    rows = rows.max(row_count);
+    columns = columns.max(column_count);
+    dimensions.push((row_count, column_count));
+  }
+  if dimensions.iter().any(|(row_count, column_count)| {
+    !matrix_can_broadcast_local(*row_count, *column_count, rows, columns)
+  }) {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+
+  let mut result = Vec::with_capacity(rows);
+  for row in 0..rows {
+    let mut result_row = Vec::with_capacity(columns);
+    for column in 0..columns {
+      let mut args = Vec::with_capacity(matrices.len());
+      let mut error = None;
+      for (matrix, (row_count, column_count)) in matrices.iter().zip(dimensions.iter().copied()) {
+        let value = &matrix[row.min(row_count - 1)][column.min(column_count - 1)];
+        match value {
+          FormulaValue::Error(value_error) => {
+            error = Some(*value_error);
+            break;
+          }
+          _ => match evaluator.number(value) {
+            Some(number) => args.push(number),
+            None => {
+              error = Some(invalid_error);
+              break;
+            }
+          },
+        }
+      }
+      result_row.push(error.map_or_else(|| op(&args), FormulaValue::Error));
+    }
+    result.push(result_row);
+  }
+  if rows == 1 && columns == 1 {
+    return result.into_iter().next()?.into_iter().next();
+  }
+  Some(FormulaValue::Matrix(result))
+}
+
+fn evaluate_log_values<'doc>(value: f64, base: f64) -> FormulaValue<'doc> {
+  if value > 0.0 && base > 0.0 && base != 1.0 {
+    FormulaValue::Number(value.log(base))
+  } else {
+    FormulaValue::Error(FormulaErrorValue::IllegalArgument)
+  }
+}
+
 fn evaluate_hypgeom_dist_reader<'doc>(
-  _evaluator: &EvalContext<'_, 'doc>,
+  evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
+  let arg_values = (0..args.len())
+    .map(|index| args.value(index))
+    .collect::<Option<Vec<_>>>()?;
+  if evaluator.array_context && arg_values.iter().any(is_matrix_argument) {
+    return map_numeric_array_values(
+      evaluator,
+      &arg_values,
+      FormulaErrorValue::Unknown,
+      |values| {
+        evaluate_hypgeom_dist_values(
+          values[0],
+          values[1],
+          values[2],
+          values[3],
+          values.get(4).copied().unwrap_or(0.0) != 0.0,
+        )
+      },
+    );
+  }
   let Some(sample_success) = args.scalar_number(0) else {
     return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
   };
@@ -4560,13 +6240,33 @@ fn evaluate_hypgeom_dist_reader<'doc>(
     .and_then(|_| args.value(4))
     .map(|value| match value {
       FormulaValue::Boolean(value) => Some(value),
-      FormulaValue::Number(value) if value == 0.0 || value == 1.0 => Some(value != 0.0),
+      FormulaValue::Number(value) => Some(value != 0.0),
       _ => None,
     })
     .unwrap_or(Some(false));
   let Some(cumulative) = cumulative else {
     return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
   };
+  let sample_success = sample_success.floor();
+  let sample_size = sample_size.floor();
+  let population_success = population_success.floor();
+  let population_size = population_size.floor();
+  Some(evaluate_hypgeom_dist_values(
+    sample_success,
+    sample_size,
+    population_success,
+    population_size,
+    cumulative,
+  ))
+}
+
+fn evaluate_hypgeom_dist_values<'doc>(
+  sample_success: f64,
+  sample_size: f64,
+  population_success: f64,
+  population_size: f64,
+  cumulative: bool,
+) -> FormulaValue<'doc> {
   let sample_success = sample_success.floor();
   let sample_size = sample_size.floor();
   let population_success = population_success.floor();
@@ -4579,25 +6279,38 @@ fn evaluate_hypgeom_dist_reader<'doc>(
     || sample_size > population_size
     || population_success > population_size
   {
-    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
   }
-  let dist = Hypergeometric::new(
+  let Some(dist) = Hypergeometric::new(
     population_size as u64,
     population_success as u64,
     sample_size as u64,
   )
-  .ok()?;
-  Some(FormulaValue::Number(if cumulative {
+  .ok() else {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  };
+  FormulaValue::Number(if cumulative {
     dist.cdf(sample_success as u64)
   } else {
     dist.pmf(sample_success as u64)
-  }))
+  })
 }
 
 fn evaluate_lognorm_inv_reader<'doc>(
-  _evaluator: &EvalContext<'_, 'doc>,
+  evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
+  let arg_values = (0..args.len())
+    .map(|index| args.value(index))
+    .collect::<Option<Vec<_>>>()?;
+  if evaluator.array_context && arg_values.iter().any(is_matrix_argument) {
+    return map_numeric_array_values(
+      evaluator,
+      &arg_values,
+      FormulaErrorValue::Unknown,
+      |values| evaluate_lognorm_inv_values(values[0], values[1], values[2]),
+    );
+  }
   let Some(p) = args.scalar_number(0) else {
     return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
   };
@@ -4607,46 +6320,198 @@ fn evaluate_lognorm_inv_reader<'doc>(
   let Some(sigma) = args.scalar_number(2) else {
     return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
   };
+  Some(evaluate_lognorm_inv_values(p, mean, sigma))
+}
+
+fn evaluate_lognorm_inv_values<'doc>(p: f64, mean: f64, sigma: f64) -> FormulaValue<'doc> {
   if p <= 0.0 || p >= 1.0 || sigma <= 0.0 {
-    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
   }
-  Some(FormulaValue::Number(
-    LogNormal::new(mean, sigma).ok()?.inverse_cdf(p),
-  ))
+  let Some(dist) = LogNormal::new(mean, sigma).ok() else {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  };
+  FormulaValue::Number(dist.inverse_cdf(p))
 }
 
 fn evaluate_norm_inv_reader<'doc>(
-  _evaluator: &EvalContext<'_, 'doc>,
+  evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
   standard: bool,
 ) -> Option<FormulaValue<'doc>> {
+  let arg_values = (0..args.len())
+    .map(|index| args.value(index))
+    .collect::<Option<Vec<_>>>()?;
+  if evaluator.array_context && arg_values.iter().any(is_matrix_argument) {
+    return map_numeric_array_values(evaluator, &arg_values, FormulaErrorValue::Value, |values| {
+      let (mean, sigma) = if standard {
+        (0.0, 1.0)
+      } else {
+        (values[1], values[2])
+      };
+      evaluate_norm_inv_values(values[0], mean, sigma, standard)
+    });
+  }
   let Some(p) = args.scalar_number(0) else {
-    return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
   };
   let (mean, sigma) = if standard {
     (0.0, 1.0)
   } else {
     let Some(mean) = args.scalar_number(1) else {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
     };
     let Some(sigma) = args.scalar_number(2) else {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
     };
     (mean, sigma)
   };
+  Some(evaluate_norm_inv_values(p, mean, sigma, standard))
+}
+
+fn evaluate_norm_inv_values<'doc>(
+  p: f64,
+  mean: f64,
+  sigma: f64,
+  standard: bool,
+) -> FormulaValue<'doc> {
   if sigma <= 0.0 || !(0.0..=1.0).contains(&p) {
-    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    return FormulaValue::Error(FormulaErrorValue::Num);
   }
   if p == 0.0 || p == 1.0 {
-    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    return FormulaValue::Error(FormulaErrorValue::Num);
   }
   if standard {
-    Some(FormulaValue::Number(norm_s_inv(p)))
+    FormulaValue::Number(norm_s_inv(p))
   } else {
-    Some(FormulaValue::Number(
-      Normal::new(mean, sigma).ok()?.inverse_cdf(p),
-    ))
+    let Some(dist) = Normal::new(mean, sigma).ok() else {
+      return FormulaValue::Error(FormulaErrorValue::Num);
+    };
+    FormulaValue::Number(dist.inverse_cdf(p))
   }
+}
+
+fn evaluate_norm_dist_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  standard: bool,
+) -> Option<FormulaValue<'doc>> {
+  let arg_values = (0..args.len())
+    .map(|index| args.value(index))
+    .collect::<Option<Vec<_>>>()?;
+  if evaluator.array_context && arg_values.iter().any(is_matrix_argument) {
+    return map_numeric_array_values(evaluator, &arg_values, FormulaErrorValue::Value, |values| {
+      let (mean, sigma, cumulative) = if standard {
+        (0.0, 1.0, values[1] != 0.0)
+      } else {
+        (values[1], values[2], values[3] != 0.0)
+      };
+      evaluate_norm_dist_values(values[0], mean, sigma, cumulative)
+    });
+  }
+  let Some(x) = args.scalar_number(0) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let (mean, sigma, cumulative_index) = if standard {
+    (0.0, 1.0, 1)
+  } else {
+    let Some(mean) = args.scalar_number(1) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    };
+    let Some(sigma) = args.scalar_number(2) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    };
+    (mean, sigma, 3)
+  };
+  if sigma <= 0.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  }
+  let cumulative = evaluator.truthy(&args.value(cumulative_index)?);
+  Some(evaluate_norm_dist_values(x, mean, sigma, cumulative))
+}
+
+fn evaluate_norm_dist_values<'doc>(
+  x: f64,
+  mean: f64,
+  sigma: f64,
+  cumulative: bool,
+) -> FormulaValue<'doc> {
+  if sigma <= 0.0 {
+    return FormulaValue::Error(FormulaErrorValue::Num);
+  }
+  let z = (x - mean) / sigma;
+  FormulaValue::Number(if cumulative {
+    lo_integral_phi(z)
+  } else {
+    lo_phi(z) / sigma
+  })
+}
+
+fn evaluate_norm_s_dist_legacy_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let value = args.value(0)?;
+  if evaluator.array_context && is_matrix_argument(&value) {
+    return map_numeric_array_values(evaluator, &[value], FormulaErrorValue::Value, |values| {
+      FormulaValue::Number(lo_integral_phi(values[0]))
+    });
+  }
+  if let FormulaValue::Error(error) = value {
+    return Some(FormulaValue::Error(error));
+  }
+  let Some(x) = args.scalar_number(0) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  Some(FormulaValue::Number(lo_integral_phi(x)))
+}
+
+fn evaluate_poisson_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let arg_values = (0..args.len())
+    .map(|index| args.value(index))
+    .collect::<Option<Vec<_>>>()?;
+  if evaluator.array_context && arg_values.iter().any(is_matrix_argument) {
+    return map_numeric_array_values(evaluator, &arg_values, FormulaErrorValue::Value, |values| {
+      evaluate_poisson_values(values[0], values[1], values[2] != 0.0, evaluator.grammar)
+    });
+  }
+  let Some(x) = args.scalar_number(0) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(lambda) = args.scalar_number(1) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let cumulative = evaluator.truthy(&args.value(2)?);
+  Some(evaluate_poisson_values(
+    x,
+    lambda,
+    cumulative,
+    evaluator.grammar,
+  ))
+}
+
+fn evaluate_poisson_values<'doc>(
+  x: f64,
+  lambda: f64,
+  cumulative: bool,
+  grammar: FormulaGrammar,
+) -> FormulaValue<'doc> {
+  if matches!(
+    grammar,
+    FormulaGrammar::OpenFormula | FormulaGrammar::CalcA1
+  ) && (x < 0.0 || lambda <= 0.0)
+  {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  if x == 0.0 && lambda == 0.0 {
+    return FormulaValue::Number(1.0);
+  }
+  if x < 0.0 || lambda <= 0.0 {
+    return FormulaValue::Error(FormulaErrorValue::Num);
+  }
+  FormulaValue::Number(lo_poisson_dist(x.floor(), lambda, cumulative))
 }
 
 fn evaluate_confidence_reader<'doc>(
@@ -4726,6 +6591,24 @@ fn evaluate_npv_reader<'doc>(
   Some(FormulaValue::Number(total.finish()))
 }
 
+fn evaluate_randbetween_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let Some(min) = evaluator.number(&args.value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(max) = evaluator.number(&args.value(1)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let min = min.ceil();
+  let max = max.ceil();
+  if min > max {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  }
+  Some(FormulaValue::Number(min))
+}
+
 fn evaluate_randarray_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -4783,6 +6666,44 @@ fn optional_number<'doc>(
     return Some(default);
   }
   evaluator.number(&args.value(index)?)
+}
+
+fn evaluate_yield_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if (0..6).any(|index| args.is_missing(index)) {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let settle = evaluator.date_number_from_value(&args.value(0)?)?.floor() as i32;
+  let maturity = evaluator.date_number_from_value(&args.value(1)?)?.floor() as i32;
+  let coupon = evaluator.number(&args.value(2)?)?;
+  let price = evaluator.number(&args.value(3)?)?;
+  let redemption = evaluator.number(&args.value(4)?)?;
+  let frequency = evaluator.number(&args.value(5)?)?.floor() as i32;
+  let basis = args
+    .raw_arg(6)
+    .filter(|_| !args.is_missing(6))
+    .and_then(|_| args.value(6))
+    .and_then(|value| evaluator.number(&value))
+    .map(|value| value.floor() as i32)
+    .unwrap_or(0);
+  if settle >= maturity
+    || coupon < 0.0
+    || price <= 0.0
+    || redemption <= 0.0
+    || !matches!(frequency, 1 | 2 | 4)
+    || !(0..=4).contains(&basis)
+  {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  finance_yield(
+    settle, maturity, coupon, price, redemption, frequency, basis,
+  )
+  .map(FormulaValue::Number)
+  .or(Some(FormulaValue::Error(
+    FormulaErrorValue::IllegalArgument,
+  )))
 }
 
 fn evaluate_price_reader<'doc>(
@@ -4885,18 +6806,26 @@ fn evaluate_pmt_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let rate = evaluator.number(&args.value(0)?)?;
-  let nper = evaluator.number(&args.value(1)?)?;
-  let pv = evaluator.number(&args.value(2)?)?;
-  let fv = args
-    .raw_arg(3)
-    .and_then(|_| args.value(3))
-    .and_then(|value| evaluator.number(&value))
-    .unwrap_or(0.0);
-  let pay_in_advance = args
-    .raw_arg(4)
-    .and_then(|_| args.value(4))
-    .is_some_and(|value| evaluator.truthy(&value));
+  let rate = match financial_number_arg(evaluator, args, 0) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let nper = match financial_number_arg(evaluator, args, 1) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pv = match financial_number_arg(evaluator, args, 2) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let fv = match optional_financial_number_strict(evaluator, args, 3, 0.0) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pay_in_advance = match optional_financial_type_strict(evaluator, args, 4) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
   let result = financial_pmt(rate, nper, pv, fv, pay_in_advance);
   if result.is_finite() {
     Some(FormulaValue::Number(result))
@@ -4909,18 +6838,26 @@ fn evaluate_pv_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let rate = evaluator.number(&args.value(0)?)?;
-  let nper = evaluator.number(&args.value(1)?)?;
-  let pmt = evaluator.number(&args.value(2)?)?;
-  let fv = args
-    .raw_arg(3)
-    .and_then(|_| args.value(3))
-    .and_then(|value| evaluator.number(&value))
-    .unwrap_or(0.0);
-  let pay_in_advance = args
-    .raw_arg(4)
-    .and_then(|_| args.value(4))
-    .is_some_and(|value| evaluator.truthy(&value));
+  let rate = match financial_number_arg(evaluator, args, 0) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let nper = match financial_number_arg(evaluator, args, 1) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pmt = match financial_number_arg(evaluator, args, 2) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let fv = match optional_financial_number_strict(evaluator, args, 3, 0.0) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pay_in_advance = match optional_financial_type_strict(evaluator, args, 4) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
   let result = if rate == 0.0 {
     -((nper * pmt) + fv)
   } else {
@@ -4932,6 +6869,192 @@ fn evaluate_pv_reader<'doc>(
     Some(FormulaValue::Number(result))
   } else {
     Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+  }
+}
+
+fn evaluate_fv_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let rate = match financial_number_arg(evaluator, args, 0) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let nper = match financial_number_arg(evaluator, args, 1) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pmt = match financial_number_arg(evaluator, args, 2) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pv = match optional_financial_number_strict(evaluator, args, 3, 0.0) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pay_in_advance = match optional_financial_type_strict(evaluator, args, 4) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let result = financial_fv(rate, nper, pmt, pv, pay_in_advance);
+  if result.is_finite() {
+    Some(FormulaValue::Number(result))
+  } else {
+    Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+  }
+}
+
+fn evaluate_nper_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let rate = match financial_number_arg(evaluator, args, 0) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pmt = match financial_number_arg(evaluator, args, 1) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pv = match financial_number_arg(evaluator, args, 2) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let fv = match optional_financial_number_strict(evaluator, args, 3, 0.0) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pay_in_advance = match optional_financial_type_strict(evaluator, args, 4) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  financial_nper(rate, pmt, pv, fv, pay_in_advance)
+    .filter(|value| value.is_finite())
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Num)))
+}
+
+fn evaluate_rate_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let nper = match financial_number_arg(evaluator, args, 0) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if nper <= 0.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  }
+  let pmt = match financial_number_arg(evaluator, args, 1) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pv = match financial_number_arg(evaluator, args, 2) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let fv = match optional_financial_number_strict(evaluator, args, 3, 0.0) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let pay_in_advance = match optional_financial_type_strict(evaluator, args, 4) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let (guess, default_guess) = match args.raw_arg(5).filter(|_| !args.is_missing(5)) {
+    Some(_) => match financial_number_arg(evaluator, args, 5) {
+      Ok(value) => (value, false),
+      Err(error) => return Some(FormulaValue::Error(error)),
+    },
+    None => (0.1, true),
+  };
+  financial_rate(nper, pmt, pv, fv, pay_in_advance, guess, default_guess)
+    .filter(|value| value.is_finite() && value.abs() <= 1.0e10)
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Num)))
+}
+
+fn evaluate_irr_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let values = evaluator.value_numbers(&args.value(0)?);
+  let guess = optional_financial_number(evaluator, args, 1, 0.1)?;
+  financial_irr(&values, guess)
+    .filter(|value| value.is_finite())
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Num)))
+}
+
+fn evaluate_mirr_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let values = evaluator.value_numbers(&args.value(0)?);
+  let finance_rate = evaluator.number(&args.value(1)?)?;
+  let reinvest_rate = evaluator.number(&args.value(2)?)?;
+  financial_mirr(&values, finance_rate, reinvest_rate)
+    .filter(|value| value.is_finite())
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Div0)))
+}
+
+fn optional_financial_number<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  default: f64,
+) -> Option<f64> {
+  match args.raw_arg(index).filter(|_| !args.is_missing(index)) {
+    Some(_) => evaluator.number(&args.value(index)?),
+    None => Some(default),
+  }
+}
+
+fn financial_number_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+) -> Result<f64, FormulaErrorValue> {
+  let value = args.value(index).ok_or(FormulaErrorValue::Value)?;
+  financial_number_operand(evaluator, value)
+}
+
+fn optional_financial_number_strict<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  default: f64,
+) -> Result<f64, FormulaErrorValue> {
+  match args.raw_arg(index).filter(|_| !args.is_missing(index)) {
+    Some(_) => financial_number_arg(evaluator, args, index),
+    None => Ok(default),
+  }
+}
+
+fn optional_financial_type_strict<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+) -> Result<bool, FormulaErrorValue> {
+  match args.raw_arg(index).filter(|_| !args.is_missing(index)) {
+    Some(_) => financial_number_arg(evaluator, args, index).map(|value| value != 0.0),
+    None => Ok(false),
+  }
+}
+
+fn financial_number_operand<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: FormulaValue<'doc>,
+) -> Result<f64, FormulaErrorValue> {
+  let value = evaluator.scalar_binary_operand(value);
+  match value {
+    FormulaValue::Error(error) => Err(error),
+    value => match evaluator.number(&value) {
+      Some(value) if value.is_finite() => Ok(value),
+      Some(_) => Err(FormulaErrorValue::Num),
+      None => Err(FormulaErrorValue::Value),
+    },
   }
 }
 
@@ -4991,9 +7114,22 @@ fn evaluate_delta_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let left = evaluator.number(&args.value(0)?)?;
+  let left_value = args.value(0)?;
+  if let FormulaValue::Error(error) = left_value {
+    return Some(FormulaValue::Error(error));
+  }
+  let Some(left) = evaluator.number(&left_value) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
   let right = if args.len() == 2 {
-    evaluator.number(&args.value(1)?)?
+    let right_value = args.value(1)?;
+    if let FormulaValue::Error(error) = right_value {
+      return Some(FormulaValue::Error(error));
+    }
+    let Some(right) = evaluator.number(&right_value) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    };
+    right
   } else {
     0.0
   };
@@ -5008,11 +7144,72 @@ fn evaluate_covariance_reader<'doc>(
   let left = evaluator.matrix_values(&args.value(0)?);
   let right = evaluator.matrix_values(&args.value(1)?);
   let Some(pairs) = covariance_pairs(&left, &right) else {
-    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
   };
   covariance(&pairs, sample)
     .map(FormulaValue::Number)
     .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+}
+
+fn evaluate_correlation_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let left_values = evaluator.matrix_values(&args.value(0)?);
+  let right_values = evaluator.matrix_values(&args.value(1)?);
+  let Some(pairs) = covariance_pairs(&left_values, &right_values) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
+  };
+  let (left, right): (Vec<_>, Vec<_>) = pairs.into_iter().unzip();
+  correlation(&left, &right)
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Div0)))
+}
+
+fn evaluate_slope_intercept_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  slope: bool,
+) -> Option<FormulaValue<'doc>> {
+  let y_values = evaluator.matrix_values(&args.value(0)?);
+  let x_values = evaluator.matrix_values(&args.value(1)?);
+  let Some(pairs) = covariance_pairs(&y_values, &x_values) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
+  };
+  let (y, x): (Vec<_>, Vec<_>) = pairs.into_iter().unzip();
+  let state = regression_scalar_state(&y, &x);
+  let value = if slope {
+    state.slope()
+  } else {
+    state.intercept()
+  };
+  value
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Div0)))
+}
+
+fn evaluate_complex_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let Some(real) = evaluator.number(&args.value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(imaginary) = evaluator.number(&args.value(1)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let suffix = if args.len() == 3 && !args.is_missing(2) {
+    match evaluator.text(&args.value(2)?).as_str() {
+      "" | "i" => 'i',
+      "j" => 'j',
+      _ => return Some(FormulaValue::Error(FormulaErrorValue::Value)),
+    }
+  } else {
+    'i'
+  };
+  Some(FormulaValue::String(Cow::Owned(format_complex_result(
+    FormulaComplex::new(real, imaginary, suffix),
+  ))))
 }
 
 fn evaluate_complex_div_reader<'doc>(
@@ -5028,23 +7225,6 @@ fn evaluate_complex_div_reader<'doc>(
   Some(FormulaValue::String(Cow::Owned(format_complex_result(
     result,
   ))))
-}
-
-fn matrix_number_values<'doc>(
-  evaluator: &EvalContext<'_, 'doc>,
-  value: &FormulaValue<'doc>,
-) -> Option<Vec<Vec<f64>>> {
-  evaluator
-    .matrix_values(value)
-    .into_iter()
-    .map(|row| {
-      row
-        .into_iter()
-        .map(|value| evaluator.number(&value).ok_or(()))
-        .collect::<Result<Vec<_>, _>>()
-        .ok()
-    })
-    .collect()
 }
 
 fn matrix_number_values_strict<'doc>(
@@ -5205,6 +7385,10 @@ fn evaluate_logical_aggregate_reader<'doc>(
   let mut true_count = 0usize;
   for index in 0..args.len() {
     let arg = args.value(index)?;
+    let direct_scalar = !matches!(
+      arg,
+      FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+    );
     let values = match arg {
       FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_) => evaluator
         .matrix_values(&arg)
@@ -5233,6 +7417,9 @@ fn evaluate_logical_aggregate_reader<'doc>(
             LogicalAggregate::Xor => true_count += usize::from(item),
           }
         }
+        FormulaValue::String(_) if direct_scalar => {
+          return Some(FormulaValue::Error(FormulaErrorValue::Value));
+        }
         FormulaValue::Blank | FormulaValue::String(_) => {}
         FormulaValue::Matrix(_) | FormulaValue::Reference(_) | FormulaValue::RefList(_) => {}
       }
@@ -5245,6 +7432,30 @@ fn evaluate_logical_aggregate_reader<'doc>(
     LogicalAggregate::And | LogicalAggregate::Or => value,
     LogicalAggregate::Xor => true_count % 2 == 1,
   }))
+}
+
+fn logical_scalar_boolean<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: FormulaValue<'doc>,
+) -> Result<Option<bool>, FormulaErrorValue> {
+  let value = evaluator.scalar_binary_operand(value);
+  let value = match value {
+    FormulaValue::Matrix(_) => evaluator.first_value(&value),
+    value => value,
+  };
+  match value {
+    FormulaValue::Blank => Ok(None),
+    FormulaValue::Boolean(value) => Ok(Some(value)),
+    FormulaValue::Number(value) if value.is_nan() => Err(FormulaErrorValue::Value),
+    FormulaValue::Number(value) => Ok(Some(value != 0.0)),
+    FormulaValue::String(value) if value.eq_ignore_ascii_case("TRUE") => Ok(Some(true)),
+    FormulaValue::String(value) if value.eq_ignore_ascii_case("FALSE") => Ok(Some(false)),
+    FormulaValue::String(_) => Err(FormulaErrorValue::Value),
+    FormulaValue::Error(error) => Err(error),
+    FormulaValue::Matrix(_) | FormulaValue::Reference(_) | FormulaValue::RefList(_) => {
+      Err(FormulaErrorValue::Value)
+    }
+  }
 }
 
 fn numeric_error_value(error: NumericError) -> FormulaErrorValue {
@@ -5301,7 +7512,10 @@ fn scalar_numeric_unary_checked_arg<'doc>(
       if let FormulaValue::Error(error) = value {
         return Some(FormulaValue::Error(*error));
       }
-      evaluator.number(value).map(|value| match op(value) {
+      let Some(value) = evaluator.number(value) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      };
+      Some(match op(value) {
         Some(result) if result.is_finite() => FormulaValue::Number(result),
         Some(_) => FormulaValue::Error(FormulaErrorValue::Value),
         None => FormulaValue::Error(error),
@@ -5312,7 +7526,9 @@ fn scalar_numeric_unary_checked_arg<'doc>(
   if let FormulaValue::Error(error) = value {
     return Some(FormulaValue::Error(error));
   }
-  let value = evaluator.number(&value)?;
+  let Some(value) = evaluator.number(&value) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
   Some(match op(value) {
     Some(result) if result.is_finite() => FormulaValue::Number(result),
     Some(_) => FormulaValue::Error(FormulaErrorValue::Value),
@@ -5335,6 +7551,32 @@ fn single_raw_reference<'doc>(
   let ops = &arg.ops[arg.range.start..arg.range.end];
   match ops {
     [FormulaOp::PushReference(reference)] => Some(reference.clone()),
+    _ => None,
+  }
+}
+
+fn raw_reference_area_count(args: FunctionArgReader<'_, '_, '_>, index: usize) -> Option<usize> {
+  let arg = args.raw_arg(index)?;
+  let ops = &arg.ops[arg.range.start..arg.range.end];
+  let mut stack = Vec::new();
+  for op in ops {
+    match op {
+      FormulaOp::PushReference(_) => stack.push(1usize),
+      FormulaOp::Binary(FormulaOperator::Range | FormulaOperator::Intersection) => {
+        stack.pop()?;
+        stack.pop()?;
+        stack.push(1);
+      }
+      FormulaOp::Binary(FormulaOperator::Union) => {
+        let right = stack.pop()?;
+        let left = stack.pop()?;
+        stack.push(left + right);
+      }
+      _ => return None,
+    }
+  }
+  match stack.as_slice() {
+    [count] => Some(*count),
     _ => None,
   }
 }

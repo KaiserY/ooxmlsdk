@@ -3522,7 +3522,7 @@ mod tests {
     // testTdf100709XLSX asserts that B52 and A75 stay plain "218".
     let settings = OpenSettings {
       markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
-        process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+        process_mode: MarkupCompatibilityProcessMode::NoProcess,
         target_file_format_version: FileFormatVersion::Microsoft365,
       },
       ..Default::default()

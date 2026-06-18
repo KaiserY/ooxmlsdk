@@ -69,6 +69,9 @@ pub(crate) fn parse_table_reference_selection(text: &str) -> Option<TableReferen
 fn table_reference_specifiers(selector_tail: &str) -> Option<Vec<TableReferenceColumn<'_>>> {
   let selector = selector_tail.trim();
   let selector = selector.strip_suffix(']')?;
+  if selector.is_empty() {
+    return Some(Vec::new());
+  }
   if !selector.starts_with('[') {
     return Some(vec![table_reference_column(selector)]);
   }

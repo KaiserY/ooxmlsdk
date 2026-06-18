@@ -150,8 +150,51 @@ impl<'doc> QueryValueSource<'doc> {
     (self.rows, self.columns)
   }
 
+  pub(crate) fn is_ref_list(&self) -> bool {
+    matches!(self.kind, QueryValueSourceKind::RefList(_))
+  }
+
   pub(crate) fn is_rectangular(&self) -> bool {
     self.rectangular
+  }
+
+  pub(crate) fn resized_from_top_left(&self, rows: usize, columns: usize) -> Option<Self> {
+    if rows == 0 || columns == 0 {
+      return None;
+    }
+    match &self.kind {
+      QueryValueSourceKind::Reference(reference) => {
+        let start_row = reference.range.start.row.min(reference.range.end.row);
+        let start_column = reference.range.start.column.min(reference.range.end.column);
+        let row_count = u32::try_from(rows).ok()?;
+        let column_count = u32::try_from(columns).ok()?;
+        let end_row = start_row.checked_add(row_count)?.checked_sub(1)?;
+        let end_column = start_column.checked_add(column_count)?.checked_sub(1)?;
+        Some(Self {
+          kind: QueryValueSourceKind::Reference(QualifiedRange {
+            sheet: reference.sheet,
+            sheet_name: reference.sheet_name.clone(),
+            end_sheet_name: reference.end_sheet_name.clone(),
+            range: CellRange {
+              start: CellAddress {
+                column: start_column,
+                row: start_row,
+              },
+              end: CellAddress {
+                column: end_column,
+                row: end_row,
+              },
+            },
+            start_flags: reference.start_flags,
+            end_flags: reference.end_flags,
+          }),
+          rows,
+          columns,
+          rectangular: true,
+        })
+      }
+      _ => None,
+    }
   }
 
   pub(crate) fn value_at(
@@ -249,6 +292,8 @@ impl<'doc> CriteriaPlan<'doc> {
           value: number,
           source_text: Some(Cow::Owned(operand.to_string())),
         }
+      } else if let Some(error) = criteria_error_value(trimmed) {
+        CriteriaOperand::Error(error)
       } else if !database && is_empty_criterion && matches!(op, QueryOp::Equal | QueryOp::NotEqual)
       {
         if op == QueryOp::Equal {
@@ -319,6 +364,19 @@ impl<'doc> CriteriaPlan<'doc> {
     candidate: &FormulaValue<'doc>,
     candidate_query_empty: bool,
   ) -> bool {
+    if let CriteriaOperand::Error(query) = self.operand {
+      let ordering = match candidate {
+        FormulaValue::Error(candidate) => {
+          formula_error_criteria_code(*candidate).cmp(&formula_error_criteria_code(query))
+        }
+        _ => return matches!(self.op, QueryOp::NotEqual),
+      };
+      return self.compare_ordering(Some(match ordering {
+        std::cmp::Ordering::Less => -1,
+        std::cmp::Ordering::Equal => 0,
+        std::cmp::Ordering::Greater => 1,
+      }));
+    }
     if matches!(candidate, FormulaValue::Error(_)) {
       return false;
     }
@@ -358,7 +416,7 @@ impl<'doc> CriteriaPlan<'doc> {
         }),
         _ => None,
       }),
-      CriteriaOperand::Error(_) => matches!(self.op, QueryOp::NotEqual),
+      CriteriaOperand::Error(_) => unreachable!(),
       CriteriaOperand::Empty | CriteriaOperand::NonEmpty => unreachable!(),
     }
   }
@@ -370,6 +428,20 @@ impl<'doc> CriteriaPlan<'doc> {
     query: f64,
     source_text: &Option<Cow<'doc, str>>,
   ) -> bool {
+    if let Some(source_text) = source_text
+      && !self.match_whole_cell
+      && self.op == QueryOp::Equal
+      && let FormulaValue::String(candidate_text) = candidate
+    {
+      let matched = if self.case_sensitive {
+        candidate_text.contains(source_text.as_ref())
+      } else {
+        lookup_text_contains(candidate_text, source_text)
+      };
+      if matched {
+        return true;
+      }
+    }
     let Some(candidate_number) =
       criteria_candidate_number(candidate, matches!(self.op, QueryOp::Equal))
     else {
@@ -856,6 +928,40 @@ fn criteria_candidate_number(value: &FormulaValue<'_>, parse_text: bool) -> Opti
     FormulaValue::Number(value) => Some(*value),
     FormulaValue::String(_) if parse_text => criteria_candidate_text_number(value),
     _ => None,
+  }
+}
+
+fn criteria_error_value(value: &str) -> Option<FormulaErrorValue> {
+  match value.trim().to_ascii_uppercase().as_str() {
+    "#NULL!" => Some(FormulaErrorValue::Null),
+    "#DIV/0!" => Some(FormulaErrorValue::Div0),
+    "#VALUE!" => Some(FormulaErrorValue::Value),
+    "#REF!" => Some(FormulaErrorValue::Ref),
+    "#NAME?" => Some(FormulaErrorValue::Name),
+    "#NUM!" => Some(FormulaErrorValue::Num),
+    "#N/A" => Some(FormulaErrorValue::NA),
+    "#GETTING_DATA" => Some(FormulaErrorValue::GettingData),
+    "#SPILL!" => Some(FormulaErrorValue::Spill),
+    "#CALC!" => Some(FormulaErrorValue::Calc),
+    _ => None,
+  }
+}
+
+fn formula_error_criteria_code(value: FormulaErrorValue) -> i32 {
+  match value {
+    FormulaErrorValue::Null => 0,
+    FormulaErrorValue::Div0 => 7,
+    FormulaErrorValue::Value => 15,
+    FormulaErrorValue::Ref => 23,
+    FormulaErrorValue::Name => 29,
+    FormulaErrorValue::Num => 36,
+    FormulaErrorValue::NA => 42,
+    FormulaErrorValue::GettingData => 43,
+    FormulaErrorValue::Spill => 44,
+    FormulaErrorValue::Calc => 45,
+    FormulaErrorValue::IllegalArgument => 502,
+    FormulaErrorValue::Parameter => 511,
+    FormulaErrorValue::Unknown => i32::MAX,
   }
 }
 

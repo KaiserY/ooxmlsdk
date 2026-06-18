@@ -169,8 +169,23 @@ fn iso_weeks_in_year(year: i32) -> Option<i32> {
 }
 
 pub fn days360(start: i32, end: i32, european: bool) -> Option<i32> {
-  let (year1, month1, day1) = date_from_serial(start)?;
-  let (year2, month2, day2) = date_from_serial(end)?;
+  days360_with_system(start, end, european, DateSystem::Date1900)
+}
+
+pub fn days360_with_system(
+  mut start: i32,
+  mut end: i32,
+  european: bool,
+  date_system: DateSystem,
+) -> Option<i32> {
+  let sign = if european && end < start {
+    std::mem::swap(&mut start, &mut end);
+    -1
+  } else {
+    1
+  };
+  let (year1, month1, day1) = date_from_serial_with_system(start, date_system)?;
+  let (year2, month2, day2) = date_from_serial_with_system(end, date_system)?;
   let mut day1 = day1 as i32;
   let mut day2 = day2 as i32;
   if day1 == 31 {
@@ -184,7 +199,7 @@ pub fn days360(start: i32, end: i32, european: bool) -> Option<i32> {
   if day2 == 31 && (european || day1 == 30) {
     day2 = 30;
   }
-  Some((year2 - year1) * 360 + (month2 as i32 - month1 as i32) * 30 + (day2 - day1))
+  Some(sign * ((year2 - year1) * 360 + (month2 as i32 - month1 as i32) * 30 + (day2 - day1)))
 }
 
 pub fn yearfrac(start: i32, end: i32, basis: i32) -> Option<f64> {

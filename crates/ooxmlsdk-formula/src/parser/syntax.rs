@@ -148,7 +148,7 @@ impl<'a> SyntaxParser<'a> {
       .consume_token_kind(LexTokenKind::ParenOpen)
       .is_some()
     {
-      let expr = self.parse_expression()?;
+      let expr = self.parse_parenthesized_expression()?;
       if self
         .tokens
         .consume_token_kind(LexTokenKind::ParenClose)
@@ -182,6 +182,23 @@ impl<'a> SyntaxParser<'a> {
       }
     }
     self.parse_word_or_function()
+  }
+
+  fn parse_parenthesized_expression(&mut self) -> Option<FormulaAst> {
+    let mut left = self.parse_expression()?;
+    while self
+      .tokens
+      .consume_token_kind(LexTokenKind::ArgumentSeparator)
+      .is_some()
+    {
+      let right = self.parse_expression_bp(infix_binding_power(LexOperator::Union)?.1)?;
+      left = FormulaAst::Binary {
+        op: LexOperator::Union,
+        left: Box::new(left),
+        right: Box::new(right),
+      };
+    }
+    Some(left)
   }
 
   fn parse_array(&mut self) -> Option<FormulaAst> {
@@ -300,6 +317,13 @@ impl<'a> SyntaxParser<'a> {
         .is_some()
       {
         args.push(FormulaAst::Blank);
+        if self
+          .tokens
+          .peek()
+          .is_some_and(|token| token.kind == LexTokenKind::ParenClose)
+        {
+          args.push(FormulaAst::Blank);
+        }
         continue;
       }
       args.push(self.parse_expression()?);
@@ -549,7 +573,11 @@ fn split_word_before_intersection(source: &str, token: LexToken) -> Option<Seman
           quoted = !quoted;
         }
       }
-      '!' if !quoted && word[..index].contains(':') => {
+      '!'
+        if !quoted
+          && word[..index].contains(':')
+          && !bang_belongs_to_range_endpoint_sheet_name(&word[..index]) =>
+      {
         return Some(SemanticSpan {
           start: token.start,
           end: token.start + index,
@@ -559,6 +587,31 @@ fn split_word_before_intersection(source: &str, token: LexToken) -> Option<Seman
     }
   }
   None
+}
+
+fn bang_belongs_to_range_endpoint_sheet_name(prefix: &str) -> bool {
+  let mut quoted = false;
+  let mut chars = prefix.char_indices().peekable();
+  let mut last_colon = None;
+  while let Some((index, ch)) = chars.next() {
+    match ch {
+      '\'' => {
+        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
+          chars.next();
+        } else {
+          quoted = !quoted;
+        }
+      }
+      ':' if !quoted => last_colon = Some(index),
+      _ => {}
+    }
+  }
+  let Some(colon) = last_colon else {
+    return false;
+  };
+  let endpoint_prefix = prefix[colon + ':'.len_utf8()..].trim();
+  !endpoint_prefix.is_empty()
+    && crate::CellAddress::parse_a1(endpoint_prefix.trim_start_matches('$')).is_err()
 }
 
 fn is_intersection_rhs_start(token: Option<LexToken>) -> bool {

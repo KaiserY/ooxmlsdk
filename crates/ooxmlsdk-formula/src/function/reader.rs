@@ -98,6 +98,9 @@ impl<'args, 'eval, 'doc> FunctionArgReader<'args, 'eval, 'doc> {
   ) -> Option<std::result::Result<Vec<f64>, FormulaErrorValue>> {
     let mut values = Vec::new();
     for index in 0..self.len() {
+      if self.is_missing(index) {
+        continue;
+      }
       let arg = self.value(index)?;
       match arg {
         FormulaValue::Reference(ref reference) => {

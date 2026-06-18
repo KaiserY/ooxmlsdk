@@ -51,8 +51,8 @@ pub(crate) use context::valid_date_serial_with_system;
 pub(crate) use context::{
   DatabaseFunction, DatePart, FormulaEvaluator, TimePart, column_index_to_name, datevalue,
   display_text_from_value, display_text_from_value_with_number_format, error_text,
-  error_text_value, error_value, parse_date_input, qualified_range, range_intersection_value,
-  rtl_cos, rtl_sin, rtl_tan, split_indirect_intersection, timevalue,
+  error_text_value, error_value, format_number_with_format_code, parse_date_input, qualified_range,
+  range_intersection_value, rtl_cos, rtl_sin, rtl_tan, split_indirect_intersection, timevalue,
 };
 pub(crate) use engine::{
   FormulaEvaluatorEngine, evaluate_arg_direct, evaluate_code_with_context,

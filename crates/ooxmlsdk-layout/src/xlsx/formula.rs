@@ -24,16 +24,18 @@ pub(crate) fn recalculate_formula_cells(
     while sheet_index < sheets.len() {
       let formulas = formula_cells(&sheets[sheet_index]);
       for formula_cell in formulas {
-        let Some(value) = formula_book
-          .evaluate_formula_text(
-            formula_book_sheet_id(&book, sheet_index),
-            Some(formula_address(formula_cell.address)),
-            &formula_cell.formula,
-          )
-          .map(|value| calc_value_from_formula_value(&book, value))
+        if formula_contains_smart_quote(&formula_cell.formula) {
+          continue;
+        }
+        let current_sheet = formula_book_sheet_id(&book, sheet_index);
+        let current_cell = formula_address(formula_cell.address);
+        let Some(value) =
+          evaluate_formula_cell(&formula_book, current_sheet, current_cell, &formula_cell)
+            .map(|value| calc_value_from_formula_value(&book, value))
         else {
           continue;
         };
+        let value = lo_pdf_formula_value(&formula_cell.formula, value);
         if let Some(range) = formula_cell
           .reference
           .as_deref()
@@ -59,6 +61,22 @@ pub(crate) fn recalculate_formula_cells(
       break;
     }
   }
+}
+
+fn evaluate_formula_cell<'doc>(
+  book: &ooxmlsdk_formula::FormulaEvaluationBook<'doc>,
+  current_sheet: ooxmlsdk_formula::SheetId,
+  current_cell: ooxmlsdk_formula::CellAddress,
+  formula_cell: &'doc FormulaCell,
+) -> Option<ooxmlsdk_formula::FormulaValue<'doc>> {
+  if formula_cell.is_array {
+    let parsed = ooxmlsdk_formula::parse_formula_text(
+      current_sheet,
+      Cow::Borrowed(formula_cell.formula.as_str()),
+    );
+    return book.evaluate_parsed_formula_raw(current_sheet, Some(current_cell), &parsed, true);
+  }
+  book.evaluate_formula_text(current_sheet, Some(current_cell), &formula_cell.formula)
 }
 
 pub(crate) fn evaluate_relative_formula_as_condition(
@@ -321,6 +339,36 @@ fn should_replace_formula_result(old_text: &str, value: &Value) -> bool {
   }
 }
 
+fn formula_contains_smart_quote(formula: &str) -> bool {
+  formula
+    .chars()
+    .any(|ch| matches!(ch, '\u{2018}' | '\u{2019}' | '\u{201c}' | '\u{201d}'))
+}
+
+fn lo_pdf_formula_value(formula: &str, value: Value) -> Value {
+  if matches!(value, Value::Error(ref error) if error == "#NUM!")
+    && is_legacy_ceiling_floor_formula(formula)
+  {
+    return Value::Error("Err:502".to_string());
+  }
+  value
+}
+
+fn is_legacy_ceiling_floor_formula(formula: &str) -> bool {
+  let trimmed = formula.trim().trim_start_matches('=').trim_start();
+  formula_starts_with_function(trimmed, "CEILING") || formula_starts_with_function(trimmed, "FLOOR")
+}
+
+fn formula_starts_with_function(formula: &str, name: &str) -> bool {
+  let Some(prefix) = formula.get(..name.len()) else {
+    return false;
+  };
+  prefix.eq_ignore_ascii_case(name)
+    && formula
+      .get(name.len()..)
+      .is_some_and(|rest| rest.trim_start().starts_with('('))
+}
+
 #[derive(Clone, Debug)]
 struct FormulaBook {
   sheet_names: Vec<String>,
@@ -330,6 +378,7 @@ struct FormulaBook {
   hidden_rows: HashSet<(usize, u32)>,
   filtered_rows: HashSet<(usize, u32)>,
   external_cells: HashMap<(usize, String, CellAddress), Value>,
+  external_defined_names: HashMap<(usize, Option<String>, String), String>,
   tables: HashMap<String, TableModel>,
   defined: DefinedNames,
 }
@@ -477,6 +526,23 @@ impl FormulaBook {
           ))
         })
         .collect(),
+      external_defined_names: workbook_catalog
+        .external_defined_names
+        .iter()
+        .map(|name| {
+          (
+            (
+              name.link_index,
+              name
+                .sheet_name
+                .as_ref()
+                .map(|sheet| sheet.to_ascii_uppercase()),
+              name.name.to_ascii_uppercase(),
+            ),
+            name.formula.clone(),
+          )
+        })
+        .collect(),
       tables,
       defined: defined.clone(),
     }
@@ -597,6 +663,16 @@ fn formula_evaluation_book_from_calc_book(
         )
       })
       .collect(),
+    external_defined_names: book
+      .external_defined_names
+      .iter()
+      .map(|((link_index, sheet_name, name), formula)| {
+        (
+          (*link_index, sheet_name.clone(), name.clone()),
+          Cow::Owned(formula.clone()),
+        )
+      })
+      .collect(),
     row_states: formula_row_states(book),
     tables: book
       .tables
@@ -704,6 +780,7 @@ fn formula_value_from_calc_value(value: &Value) -> ooxmlsdk_formula::FormulaValu
           .map(formula_sheet_id)
           .unwrap_or_default(),
         sheet_name: None,
+        end_sheet_name: None,
         range: formula_range(reference.range),
         start_flags: ooxmlsdk_formula::AddressFlags::default(),
         end_flags: ooxmlsdk_formula::AddressFlags::default(),
@@ -1006,11 +1083,27 @@ mod tests {
   }
 
   #[test]
+  fn lo_pdf_formula_value_maps_legacy_ceiling_floor_num_to_illegal_argument() {
+    assert_eq!(
+      lo_pdf_formula_value("CEILING(C$1,$A5)", Value::Error("#NUM!".to_string())),
+      Value::Error("Err:502".to_string())
+    );
+    assert_eq!(
+      lo_pdf_formula_value("FLOOR(C$1,$A5)", Value::Error("#NUM!".to_string())),
+      Value::Error("Err:502".to_string())
+    );
+    assert_eq!(
+      lo_pdf_formula_value("FLOOR.MATH(C$1,$A5)", Value::Error("#NUM!".to_string())),
+      Value::Error("#NUM!".to_string())
+    );
+  }
+
+  #[test]
   fn imported_functions_excel_2010_recalculates_equal_column_like_libreoffice() {
     // Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testFunctionsExcel2010XLSX
     let settings = OpenSettings {
       markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
-        process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+        process_mode: MarkupCompatibilityProcessMode::NoProcess,
         target_file_format_version: FileFormatVersion::Microsoft365,
       },
       ..Default::default()

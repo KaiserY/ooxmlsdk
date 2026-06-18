@@ -11,7 +11,57 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     self
       .evaluate_defined_name(name)
+      .or_else(|| self.evaluate_auto_row_label_name(name.as_ref()))
       .or(Some(FormulaValue::Error(FormulaErrorValue::Name)))
+  }
+
+  fn evaluate_auto_row_label_name(&self, name: &str) -> Option<FormulaValue<'doc>> {
+    if !matches!(
+      self.grammar,
+      FormulaGrammar::OpenFormula | FormulaGrammar::CalcA1
+    ) {
+      return None;
+    }
+    let current = self.current_cell?;
+    let sheet = self.current_sheet;
+    let label_column = self
+      .book
+      .cells
+      .iter()
+      .filter_map(|((cell_sheet, address), value)| {
+        if *cell_sheet == sheet
+          && address.row == current.row
+          && address.column > current.column
+          && let FormulaValue::String(text) = value
+          && text.eq_ignore_ascii_case(name)
+        {
+          Some(address.column)
+        } else {
+          None
+        }
+      })
+      .min()?;
+    let start_column = current.column.checked_add(1)?;
+    if start_column >= label_column {
+      return None;
+    }
+    Some(FormulaValue::Reference(QualifiedRange {
+      sheet,
+      sheet_name: None,
+      end_sheet_name: None,
+      range: CellRange::new(
+        CellAddress {
+          column: start_column,
+          row: current.row,
+        },
+        CellAddress {
+          column: label_column - 1,
+          row: current.row,
+        },
+      ),
+      start_flags: AddressFlags::default(),
+      end_flags: AddressFlags::default(),
+    }))
   }
 
   pub(crate) fn evaluate_defined_name(&self, name: &Cow<'doc, str>) -> Option<FormulaValue<'doc>> {
@@ -45,8 +95,17 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     reference: &ExternalReferenceId<'doc>,
   ) -> Option<FormulaValue<'doc>> {
     let link_index = reference.book.as_deref()?.parse::<usize>().ok()?;
-    let sheet_name = reference.sheet.as_deref()?;
     let name = reference.name.as_deref()?;
+    let sheet_name = reference.sheet.as_deref();
+    if sheet_name.is_none() {
+      let formula = self
+        .book
+        .external_defined_name_formula(link_index, None, name)?;
+      return self
+        .book
+        .evaluate_formula_text(self.current_sheet, self.current_cell, formula);
+    }
+    let sheet_name = sheet_name?;
     if name.contains(':') {
       let range = QualifiedRange::parse_a1(self.current_sheet, name).ok()?;
       let start_row = range.range.start.row.min(range.range.end.row);
@@ -67,12 +126,19 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       }
       return Some(FormulaValue::Matrix(rows));
     }
-    let address = CellAddress::parse_a1(name).ok()?;
-    Some(
-      self
-        .book
-        .external_cell_value(link_index, sheet_name, address),
-    )
+    if let Ok(address) = CellAddress::parse_a1(name) {
+      return Some(
+        self
+          .book
+          .external_cell_value(link_index, sheet_name, address),
+      );
+    }
+    let formula = self
+      .book
+      .external_defined_name_formula(link_index, Some(sheet_name), name)?;
+    self
+      .book
+      .evaluate_formula_text(self.current_sheet, self.current_cell, formula)
   }
 
   pub(crate) fn evaluate_intersection_ranges(
@@ -194,30 +260,35 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     &self,
     range: &QualifiedRange<'doc>,
   ) -> Vec<(CellAddress, FormulaValue<'doc>)> {
-    let sheet = self.range_sheet(range);
+    let sheets = self.range_sheet_ids(range);
     if range.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
-      let mut addresses = self
-        .book
-        .cells
-        .range(
-          (sheet, CellAddress { column: 0, row: 0 })
-            ..=(
-              sheet,
-              CellAddress {
-                column: u32::MAX,
-                row: u32::MAX,
-              },
-            ),
-        )
-        .filter_map(|((cell_sheet, address), _)| {
-          (*cell_sheet == sheet && cell_in_range(*address, &range.range)).then_some(*address)
-        })
-        .collect::<Vec<_>>();
-      addresses.sort_by_key(|address| (address.row, address.column));
-      return addresses
-        .into_iter()
-        .map(|address| (address, self.book.cell_value(sheet, address)))
-        .collect();
+      let mut cells = Vec::new();
+      for sheet in sheets {
+        let mut addresses = self
+          .book
+          .cells
+          .range(
+            (sheet, CellAddress { column: 0, row: 0 })
+              ..=(
+                sheet,
+                CellAddress {
+                  column: u32::MAX,
+                  row: u32::MAX,
+                },
+              ),
+          )
+          .filter_map(|((cell_sheet, address), _)| {
+            (*cell_sheet == sheet && cell_in_range(*address, &range.range)).then_some(*address)
+          })
+          .collect::<Vec<_>>();
+        addresses.sort_by_key(|address| (address.row, address.column));
+        cells.extend(
+          addresses
+            .into_iter()
+            .map(|address| (address, self.book.cell_value(sheet, address))),
+        );
+      }
+      return cells;
     }
 
     let start_row = range.range.start.row.min(range.range.end.row);
@@ -225,10 +296,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let start_column = range.range.start.column.min(range.range.end.column);
     let end_column = range.range.start.column.max(range.range.end.column);
     let mut values = Vec::new();
-    for row in start_row..=end_row {
-      for column in start_column..=end_column {
-        let address = CellAddress { column, row };
-        values.push((address, self.book.cell_value(sheet, address)));
+    for sheet in sheets {
+      for row in start_row..=end_row {
+        for column in start_column..=end_column {
+          let address = CellAddress { column, row };
+          values.push((address, self.book.cell_value(sheet, address)));
+        }
       }
     }
     values
@@ -338,5 +411,40 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .as_ref()
       .and_then(|name| self.book.sheet_id_by_name(name.0.as_ref()))
       .unwrap_or(range.sheet)
+  }
+
+  fn range_sheet_ids(&self, range: &QualifiedRange<'doc>) -> Vec<SheetId> {
+    let start = self.range_sheet(range);
+    let Some(end_name) = range.end_sheet_name.as_ref() else {
+      return vec![start];
+    };
+    let Some(end) = self.book.sheet_id_by_name(end_name.0.as_ref()) else {
+      return vec![start];
+    };
+    let Some(start_index) = self
+      .book
+      .sheet_names
+      .iter()
+      .position(|sheet| sheet.id == start)
+    else {
+      return vec![start];
+    };
+    let Some(end_index) = self
+      .book
+      .sheet_names
+      .iter()
+      .position(|sheet| sheet.id == end)
+    else {
+      return vec![start];
+    };
+    let (start_index, end_index) = if start_index <= end_index {
+      (start_index, end_index)
+    } else {
+      (end_index, start_index)
+    };
+    self.book.sheet_names[start_index..=end_index]
+      .iter()
+      .map(|sheet| sheet.id)
+      .collect()
   }
 }

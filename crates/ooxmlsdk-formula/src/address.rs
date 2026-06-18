@@ -102,7 +102,19 @@ impl<'a> QualifiedRange<'a> {
 
 impl<'a> QualifiedRange<'a> {
   pub fn parse_a1(sheet: SheetId, value: &str) -> Result<Self> {
-    let (sheet_name, range_text) = split_sheet_name(value.trim());
+    let value = value.trim();
+    if has_multiple_sheet_markers(value) {
+      return parse_dual_qualified_range(sheet, value);
+    }
+    let (sheet_name, range_text) = split_sheet_name(value);
+    let (sheet_name, end_sheet_name) = sheet_name
+      .map(|name| {
+        split_unquoted_range_bounds(name)
+          .map(|(start, end)| (unquote_sheet_name(start), Some(unquote_sheet_name(end))))
+          .unwrap_or_else(|| (unquote_sheet_name(name), None))
+      })
+      .map(|(start, end)| (Some(start), end))
+      .unwrap_or((None, None));
     let (start_text, end_text) = range_text
       .split_once(':')
       .unwrap_or((range_text, range_text));
@@ -110,13 +122,78 @@ impl<'a> QualifiedRange<'a> {
       parse_range_bounds(start_text.trim(), end_text.trim())?;
     Ok(Self {
       sheet,
-      sheet_name: sheet_name.map(|name| SheetName(Cow::Owned(unquote_sheet_name(name)))),
-      end_sheet_name: None,
+      sheet_name: sheet_name.map(|name| SheetName(Cow::Owned(name))),
+      end_sheet_name: end_sheet_name.map(|name| SheetName(Cow::Owned(name))),
       range: CellRange { start, end },
       start_flags,
       end_flags,
     })
   }
+}
+
+fn parse_dual_qualified_range<'a>(sheet: SheetId, value: &str) -> Result<QualifiedRange<'a>> {
+  let Some((start_source, end_source)) = split_unquoted_range_bounds(value) else {
+    return Err(FormulaError::InvalidAddress(value.to_string()));
+  };
+  let (start_sheet_name, start_text) = split_sheet_name(start_source);
+  let (end_sheet_name, end_text) = split_sheet_name(end_source);
+  let (start, start_flags, end, end_flags) =
+    parse_range_bounds(start_text.trim(), end_text.trim())?;
+  let sheet_name = start_sheet_name.map(unquote_sheet_name);
+  let end_sheet_name = end_sheet_name.map(unquote_sheet_name);
+  let end_sheet_name = match (&sheet_name, &end_sheet_name) {
+    (Some(start), Some(end)) if start == end => None,
+    _ => end_sheet_name,
+  };
+  Ok(QualifiedRange {
+    sheet,
+    sheet_name: sheet_name.map(|name| SheetName(Cow::Owned(name))),
+    end_sheet_name: end_sheet_name.map(|name| SheetName(Cow::Owned(name))),
+    range: CellRange { start, end },
+    start_flags,
+    end_flags,
+  })
+}
+
+fn has_multiple_sheet_markers(value: &str) -> bool {
+  let mut quoted = false;
+  let mut count = 0usize;
+  let mut chars = value.char_indices().peekable();
+  while let Some((_, ch)) = chars.next() {
+    match ch {
+      '\'' => {
+        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
+          chars.next();
+        } else {
+          quoted = !quoted;
+        }
+      }
+      '!' | '.' if !quoted => count += 1,
+      _ => {}
+    }
+  }
+  count > 1
+}
+
+fn split_unquoted_range_bounds(value: &str) -> Option<(&str, &str)> {
+  let mut quoted = false;
+  let mut chars = value.char_indices().peekable();
+  while let Some((index, ch)) = chars.next() {
+    match ch {
+      '\'' => {
+        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
+          chars.next();
+        } else {
+          quoted = !quoted;
+        }
+      }
+      ':' if !quoted && index > 0 && index + ch.len_utf8() < value.len() => {
+        return Some((&value[..index], &value[index + ch.len_utf8()..]));
+      }
+      _ => {}
+    }
+  }
+  None
 }
 
 const EXCEL_MAX_COLUMN_ZERO_BASED: u32 = 16_383;
@@ -339,6 +416,12 @@ mod tests {
     assert_eq!(range.range.end.column, 2);
     assert!(range.start_flags.absolute_column);
     assert!(range.start_flags.whole_column);
+
+    let sheet_range = QualifiedRange::parse_a1(SheetId(7), "Sheet1:Sheet3!A1:B2").unwrap();
+    assert_eq!(sheet_range.sheet_name.unwrap().0, "Sheet1");
+    assert_eq!(sheet_range.end_sheet_name.unwrap().0, "Sheet3");
+    assert_eq!(sheet_range.range.start, CellAddress { column: 0, row: 0 });
+    assert_eq!(sheet_range.range.end, CellAddress { column: 1, row: 1 });
 
     let rows = QualifiedRange::parse_a1(SheetId(1), "$2:$4").unwrap();
     assert_eq!(rows.range.start.row, 1);

@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::workbook_part::WorkbookPart;
+use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::x;
 use ooxmlsdk::sdk::SdkPart;
 
@@ -37,6 +38,7 @@ pub struct WorkbookValueModel<'doc> {
   pub shared_formula_groups: Vec<SharedFormulaGroup<'doc>>,
   pub array_formula_groups: Vec<ArrayFormulaGroup<'doc>>,
   pub data_tables: Vec<DataTableFormula<'doc>>,
+  pub tables: Vec<FormulaTable<'doc>>,
   pub calc_chain: Vec<CalcChainEntry>,
   pub dependency_graph: DependencyGraph<'doc>,
   pub external_references: Vec<ExternalReference<'doc>>,
@@ -94,6 +96,10 @@ impl<'doc> WorkbookValueModel<'doc> {
     let shared_formula_groups = shared_formula_groups(&sheets);
     let array_formula_groups = array_formula_groups(&sheets);
     let data_tables = data_tables(&sheets);
+    let tables = workbook_tables(document, &worksheet_parts, &identity)?
+      .into_iter()
+      .map(FormulaTable::into_owned)
+      .collect();
     let dependency_graph = dependency_graph(&sheets, &defined_names);
 
     Ok(Self {
@@ -108,6 +114,7 @@ impl<'doc> WorkbookValueModel<'doc> {
       shared_formula_groups,
       array_formula_groups,
       data_tables,
+      tables,
       dependency_graph,
       identity,
       sheets,
@@ -364,14 +371,16 @@ impl<'doc> WorkbookValueModel<'doc> {
           };
           match context.evaluate_code(code) {
             Some(value) => {
-              let value = if formula.reference.is_some() {
+              let is_array_formula = formula.formula_kind == FormulaKind::Array;
+              let value = if is_array_formula && formula.reference.is_some() {
                 value.into_owned()
               } else {
                 book
                   .final_formula_value(sheet_id, Some(address), value)
                   .into_owned()
               };
-              if let Some(range) = formula.reference
+              if is_array_formula
+                && let Some(range) = formula.reference
                 && let Some(items) =
                   array_formula_result_items(&context.compat_evaluator(), sheet_id, range, &value)
               {
@@ -379,7 +388,7 @@ impl<'doc> WorkbookValueModel<'doc> {
               } else {
                 candidates.push(EvaluatedFormula {
                   sheet: sheet_id,
-                  cell: formula.address,
+                  cell: address,
                   value,
                 });
               }
@@ -413,24 +422,27 @@ impl<'doc> WorkbookValueModel<'doc> {
   }
 
   fn evaluation_targets(&self) -> Vec<(SheetId, CellAddress)> {
+    let mut targets = Vec::new();
     if !self.calc_chain.is_empty() {
-      return self
-        .calc_chain
-        .iter()
-        .filter_map(|entry| entry.sheet.map(|sheet| (sheet, entry.cell)))
-        .collect();
-    }
-    self
-      .sheets
-      .iter()
-      .flat_map(|sheet| {
-        sheet
-          .cells
+      targets.extend(
+        self
+          .calc_chain
           .iter()
-          .filter(|(_, record)| record.formula.is_some())
-          .map(move |(address, _)| (sheet.id, *address))
-      })
-      .collect()
+          .filter_map(|entry| entry.sheet.map(|sheet| (sheet, entry.cell))),
+      );
+    }
+    for target in self.sheets.iter().flat_map(|sheet| {
+      sheet
+        .cells
+        .iter()
+        .filter(|(_, record)| record.formula.is_some())
+        .map(move |(address, _)| (sheet.id, *address))
+    }) {
+      if !targets.contains(&target) {
+        targets.push(target);
+      }
+    }
+    targets
   }
 
   fn formula_at(
@@ -456,12 +468,18 @@ impl<'doc> WorkbookValueModel<'doc> {
     else {
       return false;
     };
+    let existing_evaluated_value = record
+      .formula
+      .as_ref()
+      .and_then(|formula| formula.evaluated_value.clone());
     let old_value = record
       .formula
       .as_ref()
       .and_then(|formula| formula.evaluated_value.clone())
       .unwrap_or_else(|| record.raw_value.clone());
-    if old_value == value {
+    if existing_evaluated_value.as_ref() == Some(&value)
+      || (record.formula.is_none() && old_value == value)
+    {
       return false;
     }
     let number_format_id = record
@@ -948,6 +966,7 @@ pub struct FormulaEvaluationBook<'doc> {
   pub defined_names: BTreeMap<DefinedNameKey, Cow<'doc, str>>,
   pub defined_arrays: BTreeMap<DefinedNameKey, Vec<Vec<FormulaValue<'doc>>>>,
   pub external_cached_cells: BTreeMap<(usize, String, CellAddress), FormulaValue<'doc>>,
+  pub external_defined_names: BTreeMap<(usize, Option<String>, String), Cow<'doc, str>>,
   pub row_states: BTreeMap<(SheetId, u32), FormulaRowState>,
   pub tables: BTreeMap<String, FormulaTable<'doc>>,
   pub pivot_tables: Vec<FormulaPivotTable<'doc>>,
@@ -970,6 +989,7 @@ impl<'doc> Default for FormulaEvaluationBook<'doc> {
       defined_names: BTreeMap::new(),
       defined_arrays: BTreeMap::new(),
       external_cached_cells: BTreeMap::new(),
+      external_defined_names: BTreeMap::new(),
       row_states: BTreeMap::new(),
       tables: BTreeMap::new(),
       pivot_tables: Vec::new(),
@@ -1229,6 +1249,38 @@ pub struct FormulaTable<'doc> {
   pub columns: Vec<Cow<'doc, str>>,
 }
 
+impl<'doc> FormulaTable<'doc> {
+  fn borrowed(&'doc self) -> FormulaTable<'doc> {
+    FormulaTable {
+      sheet: self.sheet,
+      name: Cow::Borrowed(self.name.as_ref()),
+      range: self.range,
+      header_rows: self.header_rows,
+      totals_rows: self.totals_rows,
+      columns: self
+        .columns
+        .iter()
+        .map(|column| Cow::Borrowed(column.as_ref()))
+        .collect(),
+    }
+  }
+
+  fn into_owned(self) -> FormulaTable<'static> {
+    FormulaTable {
+      sheet: self.sheet,
+      name: Cow::Owned(self.name.into_owned()),
+      range: self.range,
+      header_rows: self.header_rows,
+      totals_rows: self.totals_rows,
+      columns: self
+        .columns
+        .into_iter()
+        .map(|column| Cow::Owned(column.into_owned()))
+        .collect(),
+    }
+  }
+}
+
 impl<'doc> FormulaEvaluationBook<'doc> {
   pub fn from_workbook_value_model(model: &'doc WorkbookValueModel<'doc>) -> Self {
     let sheet_names = model
@@ -1286,6 +1338,26 @@ impl<'doc> FormulaEvaluationBook<'doc> {
         ))
       })
       .collect();
+    let mut external_defined_names = BTreeMap::new();
+    for (external_index, external) in model.external_references.iter().enumerate() {
+      let link_index = external_index + 1;
+      for defined_name in &external.defined_names {
+        let sheet_name = defined_name.sheet.and_then(|sheet| {
+          external
+            .sheet_names
+            .get(sheet.0 as usize)
+            .map(|name| name.to_ascii_uppercase())
+        });
+        external_defined_names.insert(
+          (
+            link_index,
+            sheet_name,
+            defined_name.name.to_ascii_uppercase(),
+          ),
+          Cow::Borrowed(defined_name.formula_text.as_ref()),
+        );
+      }
+    }
     Self {
       source_file_name: model
         .identity
@@ -1298,13 +1370,19 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       defined_names,
       defined_arrays,
       external_cached_cells,
+      external_defined_names,
+      tables: model
+        .tables
+        .iter()
+        .map(|table| (table.name.to_ascii_uppercase(), table.borrowed()))
+        .collect(),
       date_system: model.identity.date_system,
       ..Self::default()
     }
   }
 
   pub fn sheet_id_by_name(&self, name: &str) -> Option<SheetId> {
-    let clean = name.trim_matches('\'').trim();
+    let clean = name.trim_start_matches('$').trim_matches('\'');
     self
       .sheet_names
       .iter()
@@ -1348,6 +1426,24 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       .get(&(link_index, sheet_name.to_ascii_uppercase(), address))
       .cloned()
       .unwrap_or_default()
+  }
+
+  pub fn external_defined_name_formula(
+    &self,
+    link_index: usize,
+    sheet_name: Option<&str>,
+    name: &str,
+  ) -> Option<&Cow<'doc, str>> {
+    let name = name.to_ascii_uppercase();
+    sheet_name
+      .and_then(|sheet_name| {
+        self.external_defined_names.get(&(
+          link_index,
+          Some(sheet_name.to_ascii_uppercase()),
+          name.clone(),
+        ))
+      })
+      .or_else(|| self.external_defined_names.get(&(link_index, None, name)))
   }
 
   pub fn evaluate_formula_text(
@@ -1879,9 +1975,9 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     if matches!(value, FormulaValue::RefList(_)) {
       return FormulaValue::Error(FormulaErrorValue::Value);
     }
-    if matches!(value, FormulaValue::Reference(_)) {
+    if let FormulaValue::Reference(reference) = value {
       let engine = CalcEngine::new();
-      FormulaEvaluator {
+      match (FormulaEvaluator {
         book: self,
         engine: &engine,
         current_sheet,
@@ -1892,7 +1988,12 @@ impl<'doc> FormulaEvaluationBook<'doc> {
         current_value: None,
         calc_a1_indirect_bang_reference: false,
       }
-      .first_value(&value)
+      .implicit_intersection_value(&reference)
+      .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value)))
+      {
+        FormulaValue::Blank => FormulaValue::Number(0.0),
+        value => value,
+      }
     } else {
       value
     }
@@ -2342,9 +2443,20 @@ fn cell_value_record<'doc>(
       .as_deref()
       .map(Cow::Borrowed)
       .unwrap_or(Cow::Borrowed(""));
-    let formula_text =
-      normalize_imported_formula_text(raw_formula_text, workbook_identity, external_references);
-    let parsed_formula = parse_formula(sheet, formula_text.clone(), FormulaGrammar::ExcelA1);
+    let formula_text = normalize_imported_formula_text(
+      raw_formula_text.clone(),
+      workbook_identity,
+      external_references,
+    );
+    let parsed_formula_text = if raw_formula_text.as_ref().contains('[')
+      && normalize_external_formula_references(raw_formula_text.as_ref(), external_references)
+        .is_some()
+    {
+      raw_formula_text.clone()
+    } else {
+      formula_text.clone()
+    };
+    let parsed_formula = parse_formula(sheet, parsed_formula_text, FormulaGrammar::ExcelA1);
     let volatile = parsed_formula
       .dependencies
       .iter()
@@ -2658,9 +2770,7 @@ fn cell_value<'doc>(cell: &'doc x::Cell, shared_strings: &[String]) -> FormulaVa
       .map(inline_string_text)
       .map(|value| FormulaValue::String(Cow::Owned(value)))
       .unwrap_or_default(),
-    x::CellValues::String => value
-      .map(|value| FormulaValue::String(Cow::Borrowed(value)))
-      .unwrap_or_default(),
+    x::CellValues::String => FormulaValue::String(Cow::Borrowed(value.unwrap_or(""))),
   }
 }
 
@@ -2860,7 +2970,7 @@ fn resolve_shared_formula_dependents<'doc>(sheets: &mut [WorksheetValueModel<'do
   }
 
   for sheet in sheets {
-    for record in sheet.cells.values_mut() {
+    for (address, record) in &mut sheet.cells {
       let Some(formula) = record.formula.as_mut() else {
         continue;
       };
@@ -2870,7 +2980,8 @@ fn resolve_shared_formula_dependents<'doc>(sheets: &mut [WorksheetValueModel<'do
       let Some((origin, source)) = definitions.get(&(sheet.id, group_index)) else {
         continue;
       };
-      let translated = translate_shared_formula_text(source, *origin, formula.address);
+      formula.address = *address;
+      let translated = translate_shared_formula_text(source, *origin, *address);
       formula.formula_text = Cow::Owned(translated);
       formula.parsed_formula = Some(parse_formula(
         sheet.id,
@@ -3111,6 +3222,56 @@ fn data_tables<'doc>(sheets: &[WorksheetValueModel<'doc>]) -> Vec<DataTableFormu
     }
   }
   tables
+}
+
+fn workbook_tables<'doc>(
+  document: &mut SpreadsheetDocument,
+  worksheet_parts: &[WorksheetPart],
+  identity: &WorkbookIdentity<'_>,
+) -> Result<Vec<FormulaTable<'doc>>> {
+  let mut tables = Vec::new();
+  for sheet in &identity.sheets {
+    let Some(worksheet_part) = worksheet_parts
+      .iter()
+      .find(|part| part.relationship_id() == sheet.relationship_id.as_deref())
+    else {
+      continue;
+    };
+    let table_parts = worksheet_part
+      .table_definition_parts(document)
+      .collect::<Vec<_>>();
+    for table_part in table_parts {
+      let table = table_part
+        .root_element(document)
+        .map_err(|error| FormulaError::Package(error.to_string()))?;
+      let range = QualifiedRange::parse_a1(sheet.id, table.reference.as_ref())?.range;
+      let totals_rows = table.totals_row_count.unwrap_or_else(|| {
+        if table
+          .totals_row_shown
+          .as_ref()
+          .is_some_and(|shown| shown.as_bool())
+        {
+          1
+        } else {
+          0
+        }
+      });
+      tables.push(FormulaTable {
+        sheet: sheet.id,
+        name: Cow::Owned(table.display_name.clone()),
+        range,
+        header_rows: table.header_row_count.unwrap_or(1),
+        totals_rows,
+        columns: table
+          .table_columns
+          .table_column
+          .iter()
+          .map(|column| Cow::Owned(column.name.clone()))
+          .collect(),
+      });
+    }
+  }
+  Ok(tables)
 }
 
 fn dependency_graph<'doc>(
@@ -3914,6 +4075,14 @@ mod tests {
       ),
       "'Input Sheet'!$A4+D$2"
     );
+    assert_eq!(
+      translate_shared_formula_text(
+        "A2",
+        CellAddress { column: 0, row: 2 },
+        CellAddress { column: 0, row: 4 }
+      ),
+      "A4"
+    );
   }
 
   #[test]
@@ -4021,32 +4190,70 @@ mod tests {
     };
     let worksheet = x::Worksheet {
       sheet_data: Box::new(x::SheetData {
-        row: vec![x::Row {
-          row_index: Some(1),
-          cell: vec![
-            x::Cell {
-              cell_reference: Some("A1".to_string()),
-              cell_formula: Some(x::CellFormula {
-                formula_type: Some(x::CellFormulaValues::Shared),
-                shared_index: Some(7),
-                reference: Some("A1:A2".to_string()),
-                xml_content: Some("B1".to_string()),
-                ..x::CellFormula::default()
-              }),
-              ..x::Cell::default()
-            },
-            x::Cell {
-              cell_reference: Some("A2".to_string()),
-              cell_formula: Some(x::CellFormula {
-                formula_type: Some(x::CellFormulaValues::Shared),
-                shared_index: Some(7),
-                ..x::CellFormula::default()
-              }),
-              ..x::Cell::default()
-            },
-          ],
-          ..x::Row::default()
-        }],
+        row: vec![
+          x::Row {
+            row_index: Some(1),
+            cell: vec![
+              x::Cell {
+                cell_reference: Some("A1".to_string()),
+                cell_formula: Some(x::CellFormula {
+                  formula_type: Some(x::CellFormulaValues::Shared),
+                  shared_index: Some(7),
+                  reference: Some("A1:A2".to_string()),
+                  xml_content: Some("B1".to_string()),
+                  ..x::CellFormula::default()
+                }),
+                ..x::Cell::default()
+              },
+              x::Cell {
+                cell_reference: Some("A2".to_string()),
+                cell_formula: Some(x::CellFormula {
+                  formula_type: Some(x::CellFormulaValues::Shared),
+                  shared_index: Some(7),
+                  ..x::CellFormula::default()
+                }),
+                ..x::Cell::default()
+              },
+            ],
+            ..x::Row::default()
+          },
+          x::Row {
+            row_index: Some(3),
+            cell: vec![
+              x::Cell {
+                cell_reference: Some("A3".to_string()),
+                cell_formula: Some(x::CellFormula {
+                  formula_type: Some(x::CellFormulaValues::Shared),
+                  shared_index: Some(8),
+                  reference: Some("A3:A5".to_string()),
+                  xml_content: Some("A2".to_string()),
+                  ..x::CellFormula::default()
+                }),
+                ..x::Cell::default()
+              },
+              x::Cell {
+                cell_reference: Some("A4".to_string()),
+                data_type: Some(x::CellValues::SharedString),
+                cell_value: Some(x::CellValue {
+                  xml_content: Some("1".to_string()),
+                  space: None,
+                  xml_other_attrs: Vec::new(),
+                }),
+                ..x::Cell::default()
+              },
+              x::Cell {
+                cell_reference: Some("A5".to_string()),
+                cell_formula: Some(x::CellFormula {
+                  formula_type: Some(x::CellFormulaValues::Shared),
+                  shared_index: Some(8),
+                  ..x::CellFormula::default()
+                }),
+                ..x::Cell::default()
+              },
+            ],
+            ..x::Row::default()
+          },
+        ],
       }),
       ..x::Worksheet::default()
     };
@@ -4054,7 +4261,7 @@ mod tests {
       worksheet_value_model(
         &identity,
         Some(&worksheet),
-        &[],
+        &["a value".to_string(), "another value".to_string()],
         &WorkbookMetadata::default(),
         &WorkbookStyles::default(),
         &WorkbookIdentity::default(),
@@ -4064,20 +4271,17 @@ mod tests {
     ];
     resolve_shared_formula_dependents(&mut sheets);
     let groups = shared_formula_groups(&sheets);
+    let group = groups.iter().find(|group| group.index == 7).unwrap();
 
-    assert_eq!(groups.len(), 1);
-    assert_eq!(groups[0].index, 7);
+    assert_eq!(groups.len(), 2);
     assert_eq!(
-      groups[0].range,
+      group.range,
       Some(CellRange {
         start: CellAddress { column: 0, row: 0 },
         end: CellAddress { column: 0, row: 1 }
       })
     );
-    assert_eq!(
-      groups[0].dependents,
-      vec![CellAddress { column: 0, row: 1 }]
-    );
+    assert_eq!(group.dependents, vec![CellAddress { column: 0, row: 1 }]);
     let dependent = sheets[0]
       .cells
       .get(&CellAddress { column: 0, row: 1 })
@@ -4089,6 +4293,23 @@ mod tests {
       FormulaDependency::Cell {
         sheet: SheetId(1),
         address: CellAddress { column: 1, row: 1 }
+      }
+    ));
+    let sparse_dependent = sheets[0]
+      .cells
+      .get(&CellAddress { column: 0, row: 4 })
+      .and_then(|record| record.formula.as_ref())
+      .unwrap();
+    assert_eq!(sparse_dependent.formula_text, Cow::Borrowed("A4"));
+    assert!(matches!(
+      &sparse_dependent
+        .parsed_formula
+        .as_ref()
+        .unwrap()
+        .dependencies[0],
+      FormulaDependency::Cell {
+        sheet: SheetId(1),
+        address: CellAddress { column: 0, row: 3 }
       }
     ));
   }
@@ -5216,6 +5437,52 @@ mod tests {
       ]))
     );
 
+    let excel_book = FormulaEvaluationBook {
+      cells: BTreeMap::from([
+        (
+          (SheetId(1), CellAddress { column: 8, row: 8 }),
+          FormulaValue::Number(5.6789),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 9, row: 8 }),
+          FormulaValue::Number(6.789),
+        ),
+        (
+          (
+            SheetId(1),
+            CellAddress {
+              column: 7,
+              row: 211,
+            },
+          ),
+          FormulaValue::Number(3.0),
+        ),
+      ]),
+      ..FormulaEvaluationBook::default()
+    };
+    assert_eq!(
+      excel_book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress {
+          column: 9,
+          row: 211
+        }),
+        "CEILING(I9:J9,H210:H213)"
+      ),
+      Some(FormulaValue::Number(9.0))
+    );
+    assert_eq!(
+      excel_book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress {
+          column: 10,
+          row: 211
+        }),
+        "CEILING(I9:J10,1)"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+
     let book = FormulaEvaluationBook {
       cells: BTreeMap::from([
         (
@@ -5276,6 +5543,41 @@ mod tests {
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "ROUND(1.1267819797945,12)"),
       Some(FormulaValue::Number(1.126781979795))
+    );
+  }
+
+  #[test]
+  fn evaluator_concatenate_uses_scalar_arguments_like_excel() {
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_sheet(SheetId(1), "Formula")
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 0 },
+        FormulaValue::String(Cow::Borrowed("x")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 2, row: 0 },
+        FormulaValue::String(Cow::Borrowed("y")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 1 },
+        FormulaValue::String(Cow::Borrowed("z")),
+      )
+      .build();
+
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 2, row: 1 }),
+        "CONCATENATE(B1:C1,B1:B2)"
+      ),
+      Some(FormulaValue::String(Cow::Borrowed("yz")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "CONCAT(B1:C1)"),
+      Some(FormulaValue::String(Cow::Borrowed("xy")))
     );
   }
 
@@ -5342,6 +5644,49 @@ mod tests {
         "ROUND(FORECAST.ETS.MULT(6,N1:N5,M1:M5),12)"
       ),
       Some(FormulaValue::Number(11.908196123559))
+    );
+  }
+
+  #[test]
+  fn evaluator_forecast_ets_stat_uses_excel_argument_order() {
+    let mut builder = FormulaEvaluationBookBuilder::new().with_sheet(SheetId(1), "Sheet1");
+    let timeline = [
+      1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0,
+      18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0,
+    ];
+    let values = [
+      362.0, 385.0, 432.0, 341.0, 382.0, 409.0, 498.0, 387.0, 473.0, 513.0, 582.0, 474.0, 544.0,
+      582.0, 681.0, 557.0, 628.0, 707.0, 773.0, 592.0, 627.0, 725.0, 854.0, 661.0,
+    ];
+    for (row, (x, y)) in timeline.into_iter().zip(values).enumerate() {
+      builder = builder
+        .with_cell(
+          SheetId(1),
+          CellAddress {
+            column: 0,
+            row: row as u32,
+          },
+          FormulaValue::Number(x),
+        )
+        .with_cell(
+          SheetId(1),
+          CellAddress {
+            column: 1,
+            row: row as u32,
+          },
+          FormulaValue::Number(y),
+        );
+    }
+    let book = builder.build();
+
+    // Source: LibreOffice sc/qa/unit/data/functions/statistical/fods/forecast.ets.mult.fods.
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        None,
+        "FORECAST.ETS.STAT.MULT(B1:B24,A1:A24,1,4,1,1)"
+      ),
+      Some(FormulaValue::Number(0.75))
     );
   }
 
@@ -5525,6 +5870,176 @@ mod tests {
       book.evaluate_formula_text(SheetId(1), None, "VLOOKUP(\"k\",B1:C1,2)"),
       Some(FormulaValue::Number(9.0))
     );
+    let hlookup_text_table = FormulaEvaluationBook {
+      cells: BTreeMap::from([
+        (
+          (SheetId(1), CellAddress { column: 1, row: 0 }),
+          FormulaValue::String(Cow::Borrowed("INTEGRAL")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 2, row: 0 }),
+          FormulaValue::String(Cow::Borrowed("DOUBLE")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 3, row: 0 }),
+          FormulaValue::String(Cow::Borrowed("BLANK")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 4, row: 0 }),
+          FormulaValue::String(Cow::Borrowed("STRING")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 5, row: 0 }),
+          FormulaValue::String(Cow::Borrowed("REF")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 6, row: 0 }),
+          FormulaValue::String(Cow::Borrowed("AREA (rows)")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 4, row: 5 }),
+          FormulaValue::String(Cow::Borrowed(" beginsWithSpace")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 5, row: 5 }),
+          FormulaValue::Number(0.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 6, row: 5 }),
+          FormulaValue::String(Cow::Borrowed("blanksIncl")),
+        ),
+      ]),
+      ..FormulaEvaluationBook::default()
+    };
+    assert_eq!(
+      hlookup_text_table.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "HLOOKUP(\"STRING\",B1:H6,6,TRUE)",
+        FormulaGrammar::ExcelA1
+      ),
+      Some(FormulaValue::String(Cow::Borrowed(" beginsWithSpace")))
+    );
+    let hlookup_import_shape = FormulaEvaluationBook {
+      cells: BTreeMap::from([
+        (
+          (SheetId(1), CellAddress { column: 1, row: 5 }),
+          FormulaValue::String(Cow::Borrowed("INTEGRAL")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 2, row: 5 }),
+          FormulaValue::String(Cow::Borrowed("DOUBLE")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 3, row: 5 }),
+          FormulaValue::String(Cow::Borrowed("BLANK")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 4, row: 5 }),
+          FormulaValue::String(Cow::Borrowed("STRING")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 5, row: 5 }),
+          FormulaValue::String(Cow::Borrowed("REF")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 6, row: 5 }),
+          FormulaValue::String(Cow::Borrowed("AREA (rows)")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 4, row: 10 }),
+          FormulaValue::String(Cow::Borrowed(" beginsWithSpace")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 5, row: 10 }),
+          FormulaValue::Number(0.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 6, row: 10 }),
+          FormulaValue::String(Cow::Borrowed("blanksIncl")),
+        ),
+      ]),
+      ..FormulaEvaluationBook::default()
+    };
+    assert_eq!(
+      hlookup_import_shape.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress {
+          column: 6,
+          row: 715
+        }),
+        "HLOOKUP(\"STRING\",$B$6:$H$12,6, TRUE)"
+      ),
+      Some(FormulaValue::String(Cow::Borrowed(" beginsWithSpace")))
+    );
+    let vlookup_import_shape = FormulaEvaluationBook {
+      cells: BTreeMap::from([
+        (
+          (SheetId(1), CellAddress { column: 1, row: 5 }),
+          FormulaValue::String(Cow::Borrowed("DOUBLE")),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 1, row: 6 }),
+          FormulaValue::Number(0.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 1, row: 7 }),
+          FormulaValue::Number(1.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 1, row: 11 }),
+          FormulaValue::Number(-9_999_999_999.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 4, row: 11 }),
+          FormulaValue::String(Cow::Borrowed("non-numeric")),
+        ),
+      ]),
+      ..FormulaEvaluationBook::default()
+    };
+    assert_eq!(
+      vlookup_import_shape.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress {
+          column: 6,
+          row: 1471
+        }),
+        "VLOOKUP(-1,$B$6:$H$12,4,TRUE)"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::NA))
+    );
+    let quoted_sheet_lookup = FormulaEvaluationBook {
+      sheet_names: vec![
+        SheetBinding {
+          id: SheetId(1),
+          name: Cow::Borrowed("Formula"),
+        },
+        SheetBinding {
+          id: SheetId(2),
+          name: Cow::Borrowed("DATA TABLE"),
+        },
+      ],
+      cells: BTreeMap::from([
+        (
+          (SheetId(2), CellAddress { column: 0, row: 7 }),
+          FormulaValue::Number(1.0),
+        ),
+        (
+          (SheetId(2), CellAddress { column: 1, row: 7 }),
+          FormulaValue::Number(3.0),
+        ),
+      ]),
+      ..FormulaEvaluationBook::default()
+    };
+    assert_eq!(
+      quoted_sheet_lookup.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "VLOOKUP(1,'DATA TABLE'!$A$8:'DATA TABLE'!$B$10,2)",
+        FormulaGrammar::ExcelA1
+      ),
+      Some(FormulaValue::Number(3.0))
+    );
     assert_eq!(
       book.evaluate_formula_text_with_grammar(
         SheetId(1),
@@ -5606,6 +6121,66 @@ mod tests {
     assert_eq!(
       blank_countif_book.evaluate_formula_text(SheetId(1), None, "COUNTIF(A1:A2,0)"),
       Some(FormulaValue::Number(1.0))
+    );
+    let error_countif_book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Error(FormulaErrorValue::Div0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 1 },
+        FormulaValue::Error(FormulaErrorValue::Ref),
+      )
+      .build();
+    assert_eq!(
+      error_countif_book.evaluate_formula_text(SheetId(1), None, "COUNTIF(A1:A2,1/0)"),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      error_countif_book.evaluate_formula_text(SheetId(1), None, "COUNTIF(A1:A2,\"<>#DIV/0!\")"),
+      Some(FormulaValue::Number(1.0))
+    );
+    let range_criteria_countif_book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Number(1.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 0 },
+        FormulaValue::Number(2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 2, row: 0 },
+        FormulaValue::Number(2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 1 },
+        FormulaValue::Number(9.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 1 },
+        FormulaValue::Number(2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 2, row: 1 },
+        FormulaValue::Number(3.0),
+      )
+      .build();
+    assert_eq!(
+      range_criteria_countif_book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 1, row: 9 }),
+        "COUNTIF(A1:C1,A2:C2)"
+      ),
+      Some(FormulaValue::Number(2.0))
     );
     let empty_text_countif_book = FormulaEvaluationBookBuilder::new()
       .with_cell(
@@ -5709,10 +6284,84 @@ mod tests {
       array_text_book.evaluate_parsed_formula_raw(SheetId(1), None, &formula, true),
       Some(FormulaValue::Number(120.0))
     );
+    let formula = parse_formula_text(SheetId(1), Cow::Borrowed("LOWER({\"AB\";\"ABC\"})"));
+    assert_eq!(
+      book.evaluate_parsed_formula_raw(SheetId(1), None, &formula, true),
+      Some(FormulaValue::Matrix(vec![
+        vec![FormulaValue::String(Cow::Borrowed("ab"))],
+        vec![FormulaValue::String(Cow::Borrowed("abc"))],
+      ]))
+    );
+    let formula = parse_formula_text(SheetId(1), Cow::Borrowed("UPPER({\"test\";36526})"));
+    assert_eq!(
+      book.evaluate_parsed_formula_raw(SheetId(1), None, &formula, true),
+      Some(FormulaValue::Matrix(vec![
+        vec![FormulaValue::String(Cow::Borrowed("TEST"))],
+        vec![FormulaValue::String(Cow::Borrowed("36526"))],
+      ]))
+    );
+    let formula = parse_formula_text(SheetId(1), Cow::Borrowed("UNICODE({\"D\";\"J\"})"));
+    assert_eq!(
+      book.evaluate_parsed_formula_raw(SheetId(1), None, &formula, true),
+      Some(FormulaValue::Matrix(vec![
+        vec![FormulaValue::Number(68.0)],
+        vec![FormulaValue::Number(74.0)],
+      ]))
+    );
     assert!(matches!(
       book.evaluate_formula_text(SheetId(1), None, "DEVSQ({1,-2,3,1/0,5})"),
       Some(FormulaValue::Error(_))
     ));
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DEVSQ(E15:E17)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DEVSQ(1)"),
+      Some(FormulaValue::Number(0.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "FACT(1)"),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "FACT(4)"),
+      Some(FormulaValue::Number(24.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "FACT(1.9)"),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "FACT(-1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
+    );
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=FACT(-1)",
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "FACTDOUBLE(6)"),
+      Some(FormulaValue::Number(48.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "FACTDOUBLE(5)"),
+      Some(FormulaValue::Number(15.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=FACTDOUBLE(-0.9)",
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::Number(1.0))
+    );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "MEDIAN(A1:B2)"),
       Some(FormulaValue::Number(2.5))
@@ -5753,6 +6402,14 @@ mod tests {
       book.evaluate_formula_text(SheetId(1), None, "LCM()"),
       Some(FormulaValue::Error(_))
     ));
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "COMBIN(2,1)"),
+      Some(FormulaValue::Number(2.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "COMBINA(5,2)"),
+      Some(FormulaValue::Number(15.0))
+    );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "ROUND(2.675,2)"),
       Some(FormulaValue::Number(2.68))
@@ -5923,6 +6580,18 @@ mod tests {
       Some(FormulaValue::Number(11.0))
     );
     assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "HOUR(\"nospaces\")"),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "HOUR(\"0.75\")"),
+      Some(FormulaValue::Number(18.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "HOUR(-1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
+    );
+    assert_eq!(
       book.evaluate_formula_text(
         SheetId(1),
         None,
@@ -6021,6 +6690,225 @@ mod tests {
       Some(FormulaValue::Number(1.5))
     );
     assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "MROUND(5,-2)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
+    );
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=MROUND(5;-2)",
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::Number(6.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "POWER(1.1,\"\")"),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "REPLACE(\"ABCDEFG\",2.3,3.9,\"xx\")"),
+      Some(FormulaValue::String(Cow::Borrowed("AxxEFG")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("M1184").unwrap()),
+        "ROUNDDOWN(G7:I7,3)"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    let sumif_book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("AA7").unwrap(),
+        FormulaValue::Error(FormulaErrorValue::Null),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("AA8").unwrap(),
+        FormulaValue::Error(FormulaErrorValue::Div0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("AA9").unwrap(),
+        FormulaValue::Error(FormulaErrorValue::Value),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("AA10").unwrap(),
+        FormulaValue::Error(FormulaErrorValue::Ref),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("AA11").unwrap(),
+        FormulaValue::Error(FormulaErrorValue::Name),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("AA12").unwrap(),
+        FormulaValue::Error(FormulaErrorValue::Num),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("AA13").unwrap(),
+        FormulaValue::Error(FormulaErrorValue::NA),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C9").unwrap(),
+        FormulaValue::Number(1.1),
+      )
+      .build();
+    assert_eq!(
+      sumif_book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("E1324").unwrap()),
+        "SUMIF(AA7:AA13,C10:D10,C7)"
+      ),
+      Some(FormulaValue::Number(1.1))
+    );
+    assert_eq!(
+      sumif_book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=SUMIF(([.C1:.C5]~[.B1:.B5]~[.D1:.D5]);32;[.B1:.D5])",
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Unknown))
+    );
+    let sumproduct_book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("G1330").unwrap(),
+        FormulaValue::String(Cow::Borrowed("text")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("I1330").unwrap(),
+        FormulaValue::Number(2.0),
+      )
+      .build();
+    assert_eq!(
+      sumproduct_book.evaluate_formula_text(
+        SheetId(1),
+        None,
+        "SUMPRODUCT(G1330:G1330,I1330:I1330)"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    let sumproduct_array_book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("K9").unwrap(),
+        FormulaValue::String(Cow::Borrowed("Lim")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("J10").unwrap(),
+        FormulaValue::Number(9.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("K10").unwrap(),
+        FormulaValue::String(Cow::Borrowed("LimMin")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("L10").unwrap(),
+        FormulaValue::Number(5.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("J11").unwrap(),
+        FormulaValue::Number(9.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("K11").unwrap(),
+        FormulaValue::String(Cow::Borrowed("LimPla")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("L11").unwrap(),
+        FormulaValue::Number(2.0),
+      )
+      .build();
+    assert_eq!(
+      sumproduct_array_book.evaluate_formula_text(
+        SheetId(1),
+        None,
+        "SUMPRODUCT(J10:J11=9,LEFT(K10:K11,LEN(K9))=K9,L10:L11)"
+      ),
+      Some(FormulaValue::Number(7.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "SUMX2MY2(C1:D1,D1:E1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Div0))
+    );
+    let xy_book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("B8").unwrap(),
+        FormulaValue::Number(1.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("B9").unwrap(),
+        FormulaValue::Number(2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("B10").unwrap(),
+        FormulaValue::Number(534.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("G8").unwrap(),
+        FormulaValue::Number(1.001),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("H8").unwrap(),
+        FormulaValue::Number(2.999),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("I8").unwrap(),
+        FormulaValue::Number(3.5),
+      )
+      .build();
+    assert_eq!(
+      xy_book.evaluate_formula_text(SheetId(1), None, "SUMX2MY2(B8:B10,G8:I8)"),
+      Some(FormulaValue::Number(285138.753998))
+    );
+    let xy_bool_book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("B16").unwrap(),
+        FormulaValue::Boolean(true),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C16").unwrap(),
+        FormulaValue::Number(-1.1),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("B17").unwrap(),
+        FormulaValue::Boolean(false),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("B18").unwrap(),
+        FormulaValue::String(Cow::Borrowed("TRUE")),
+      )
+      .build();
+    assert_eq!(
+      xy_bool_book.evaluate_formula_text(SheetId(1), None, "SUMX2PY2(B16:D16,B16:B18)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Div0))
+    );
+    assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "FVSCHEDULE(1000,)"),
       Some(FormulaValue::Error(FormulaErrorValue::Unknown))
     );
@@ -6031,6 +6919,18 @@ mod tests {
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "PMT(0.0199/12,0,25000,0,0)"),
       Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        None,
+        "PMT(\"0.01\",\"12\",\"200\",\"-300\",\"TRUE\")"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "NPER(0.01,#N/A,-200,300)"),
+      Some(FormulaValue::Error(FormulaErrorValue::NA))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "ISPMT(0.05,5,0,15000)"),
@@ -6056,6 +6956,20 @@ mod tests {
       ),
       Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
     );
+    let yield_with_default_basis = book
+      .evaluate_formula_text(
+        SheetId(1),
+        None,
+        "YIELD(DATE(1999,2,15),DATE(2007,11,15),0.0575,95.04287,100,2,)",
+      )
+      .unwrap();
+    let FormulaValue::Number(yield_value) = yield_with_default_basis else {
+      panic!("expected YIELD to return a number");
+    };
+    assert!(
+      (yield_value - 0.0650000068807552).abs() <= 1.0e-12,
+      "unexpected YIELD result: {yield_value}"
+    );
     assert_eq!(
       book.evaluate_formula_text(
         SheetId(1),
@@ -6069,16 +6983,25 @@ mod tests {
       Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
     );
     assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=HYPGEOM.DIST(2;2;90;100;2)",
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "LOGNORM.INV(0,0,1)"),
       Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "NORM.INV(0,63,5)"),
-      Some(FormulaValue::Error(FormulaErrorValue::Value))
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "NORM.S.INV(0)"),
-      Some(FormulaValue::Error(FormulaErrorValue::Value))
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "LN(0)"),
@@ -6092,6 +7015,11 @@ mod tests {
       book.evaluate_formula_text(SheetId(1), None, "LOG(-0.03,3)"),
       Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
     );
+    let formula = parse_formula_text(SheetId(1), Cow::Borrowed("LOG({0.54},{2})"));
+    assert_eq!(
+      book.evaluate_parsed_formula_raw(SheetId(1), None, &formula, true),
+      Some(FormulaValue::Number(-0.8889686876112561))
+    );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "POWER(0,-1)"),
       Some(FormulaValue::Error(FormulaErrorValue::Num))
@@ -6101,12 +7029,59 @@ mod tests {
       Some(FormulaValue::Error(FormulaErrorValue::Num))
     );
     assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=GEOMEAN(0;0.1;0.2;0.3)",
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::Number(0.0))
+    );
+    assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "HARMEAN(C1:C1)"),
       Some(FormulaValue::Error(FormulaErrorValue::Num))
+    );
+    let range_name_book = FormulaEvaluationBookBuilder::new()
+      .with_defined_name(None, "RangeName", "$I$2:$I$4")
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("I2").unwrap(),
+        FormulaValue::Number(4.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("I3").unwrap(),
+        FormulaValue::Number(2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("I4").unwrap(),
+        FormulaValue::Number(3.0),
+      )
+      .build();
+    assert_eq!(
+      range_name_book.evaluate_formula_text(SheetId(1), None, "MAX(1,2,3,+RangeName)"),
+      Some(FormulaValue::Number(4.0))
+    );
+    assert_eq!(
+      range_name_book.evaluate_formula_text(SheetId(1), None, "MIN(1,2,3,+RangeName)"),
+      Some(FormulaValue::Number(1.0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "CHOOSE(2,\"a\",\"b\",\"c\")"),
       Some(FormulaValue::String(Cow::Borrowed("b")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "CHOOSE(#REF!,1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Ref))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "CHOOSE(2,1,)"),
+      Some(FormulaValue::Blank)
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "SWITCH(2>0,1,\"Amy\",2,\"Bob\",\"x\")"),
+      Some(FormulaValue::String(Cow::Borrowed("Amy")))
     );
     assert_eq!(
       book.evaluate_formula_text(
@@ -6115,6 +7090,29 @@ mod tests {
         "CONCAT(\"a\",\"b\")&EXACT(\"x\",\"x\")&FIND(\"b\",\"abc\")"
       ),
       Some(FormulaValue::String(Cow::Owned("abTRUE2".to_string())))
+    );
+    let exact_range_formula = parse_formula_with_context(
+      FormulaParseContext {
+        current_sheet: SheetId(1),
+        current_cell: Some(CellAddress {
+          column: 9,
+          row: 475,
+        }),
+        grammar: FormulaGrammar::ExcelA1,
+      },
+      Cow::Borrowed("EXACT(F12:G12,F12:G12)"),
+    );
+    assert_eq!(
+      book.evaluate_parsed_formula_raw(
+        SheetId(1),
+        Some(CellAddress {
+          column: 9,
+          row: 475,
+        }),
+        &exact_range_formula,
+        false,
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "SUBSTITUTE(\"a-b-a\",\"a\",\"x\",2)"),
@@ -6130,6 +7128,28 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "ISNUMBER(TRUE())"),
+      Some(FormulaValue::Boolean(false))
+    );
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=ISNUMBER(TRUE())",
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::Boolean(true))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "TRUE()=1"),
+      Some(FormulaValue::Boolean(false))
+    );
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=TRUE()=1",
+        FormulaGrammar::OpenFormula,
+      ),
       Some(FormulaValue::Boolean(true))
     );
     assert_eq!(
@@ -6166,17 +7186,11 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "HYPERLINK(\"url\",\"label\")"),
-      Some(FormulaValue::Matrix(vec![
-        vec![FormulaValue::String(Cow::Borrowed("label"))],
-        vec![FormulaValue::String(Cow::Borrowed("url"))],
-      ]))
+      Some(FormulaValue::String(Cow::Borrowed("label")))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "HYPERLINK(\"url\",1/0)"),
-      Some(FormulaValue::Matrix(vec![
-        vec![FormulaValue::Error(FormulaErrorValue::Div0)],
-        vec![FormulaValue::String(Cow::Borrowed("url"))],
-      ]))
+      Some(FormulaValue::Error(FormulaErrorValue::Div0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "FIXED(\"1,234,567.890\",-1)"),
@@ -6215,6 +7229,133 @@ mod tests {
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "OR()"),
       Some(FormulaValue::Error(FormulaErrorValue::Parameter))
+    );
+  }
+
+  #[test]
+  fn evaluation_book_textjoin_expands_odf_absolute_sheet_whole_column() {
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_sheet(SheetId(1), "data")
+      .with_sheet(SheetId(2), "Sheet2")
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("H1").unwrap(),
+        FormulaValue::String(Cow::Borrowed("a")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("H2").unwrap(),
+        FormulaValue::String(Cow::Borrowed("b")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("H1048575").unwrap(),
+        FormulaValue::String(Cow::Borrowed("last_row_but_one")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("H1048576").unwrap(),
+        FormulaValue::String(Cow::Borrowed("last_row")),
+      )
+      .build();
+
+    // Source: LibreOffice sc/qa/unit/data/functions/fods/Functions_Excel_2016.fods.
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(2),
+        Some(CellAddress::parse_a1("A20").unwrap()),
+        r#"=TEXTJOIN(".";1;$data.H:H)"#,
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::String(Cow::Borrowed(
+        "a.b.last_row_but_one.last_row"
+      )))
+    );
+  }
+
+  #[test]
+  fn evaluation_book_textjoin_skips_query_empty_references_only() {
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_sheet(SheetId(1), "Sheet1")
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("A1").unwrap(),
+        FormulaValue::String(Cow::Borrowed("A")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("B1").unwrap(),
+        FormulaValue::Number(0.0),
+      )
+      .with_query_empty_cell(SheetId(1), CellAddress::parse_a1("B1").unwrap())
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C1").unwrap(),
+        FormulaValue::String(Cow::Borrowed("C")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("D1").unwrap(),
+        FormulaValue::Number(0.0),
+      )
+      .build();
+
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, r#"TEXTJOIN("-",1,A1:C1)"#),
+      Some(FormulaValue::String(Cow::Borrowed("A-C")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, r#"TEXTJOIN("-",1,A1:D1)"#),
+      Some(FormulaValue::String(Cow::Borrowed("A-C-0")))
+    );
+  }
+
+  #[test]
+  fn evaluation_book_textjoin_reference_delimiter_uses_last_row() {
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_sheet(SheetId(1), "Sheet1")
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("A1").unwrap(),
+        FormulaValue::String(Cow::Borrowed("x")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("B1").unwrap(),
+        FormulaValue::String(Cow::Borrowed("y")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("A2").unwrap(),
+        FormulaValue::String(Cow::Borrowed(",")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("B2").unwrap(),
+        FormulaValue::String(Cow::Borrowed(";")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C1").unwrap(),
+        FormulaValue::String(Cow::Borrowed("a")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C2").unwrap(),
+        FormulaValue::String(Cow::Borrowed("b")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C3").unwrap(),
+        FormulaValue::String(Cow::Borrowed("c")),
+      )
+      .build();
+
+    // Source: Apache POI TextJoinFunction follows Excel's documented multi-cell
+    // delimiter examples by using only the last row of an area delimiter.
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, r#"TEXTJOIN(A1:B2,TRUE,C1:C3)"#),
+      Some(FormulaValue::String(Cow::Borrowed("a,b;c")))
     );
   }
 
@@ -6281,6 +7422,26 @@ mod tests {
         SheetId(1),
         CellAddress::parse_a1("D4").unwrap(),
         FormulaValue::Number(-2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("B14").unwrap(),
+        FormulaValue::Number(-2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C14").unwrap(),
+        FormulaValue::Number(-2.99999),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("B15").unwrap(),
+        FormulaValue::Number(-1.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C15").unwrap(),
+        FormulaValue::Number(-1.00001),
       )
       .build();
 
@@ -6402,8 +7563,24 @@ mod tests {
       Some(FormulaValue::Boolean(true))
     );
     assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "D2"),
+      Some(FormulaValue::Number(0.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("E736").unwrap()),
+        "INDEX(B14:C15,D7,2)"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "COUNTBLANK(D1)"),
       Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "AVERAGE(C1:D1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Div0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "SUMPRODUCT(ABS(E1:E2),E1:E2+E1:E2)"),
@@ -6446,6 +7623,14 @@ mod tests {
       Some(FormulaValue::Number(0.0))
     );
     assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 0, row: 2 }),
+        "SUMPRODUCT(--(B5:B20))"
+      ),
+      Some(FormulaValue::Number(0.0))
+    );
+    assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "SUMPRODUCT(A1:A1*D1:D1)"),
       Some(FormulaValue::Error(FormulaErrorValue::Value))
     );
@@ -6471,12 +7656,38 @@ mod tests {
       Some(FormulaValue::Number(4.0_f64.atan2(-3.0)))
     );
     assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ATAN2(0,0)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Div0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=ATAN2(0;0)",
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::Number(0.0))
+    );
+    assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "AGGREGATE(3,4,F1:H1)"),
       Some(FormulaValue::Number(3.0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "AGGREGATE(3,6,F1:H1)"),
       Some(FormulaValue::Number(2.0))
+    );
+    let formula = parse_formula_text(SheetId(1), Cow::Borrowed("ISODD({1;2})"));
+    assert_eq!(
+      book.evaluate_parsed_formula_raw(SheetId(1), None, &formula, true),
+      Some(FormulaValue::Matrix(vec![
+        vec![FormulaValue::Boolean(true)],
+        vec![FormulaValue::Boolean(false)],
+      ]))
+    );
+    let formula = parse_formula_text(SheetId(1), Cow::Borrowed("POISSON.DIST({140},{120},{0})"));
+    assert_eq!(
+      book.evaluate_parsed_formula_raw(SheetId(1), None, &formula, true),
+      Some(FormulaValue::Number(0.006933086674227154))
     );
     let formula = parse_formula_text(SheetId(1), Cow::Borrowed("ISNUMBER(A1:D1)"));
     assert_eq!(
@@ -6546,6 +7757,212 @@ mod tests {
         CellAddress { column: 0, row: 3 },
         FormulaValue::String(Cow::Borrowed("")),
       )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 2, row: 9 },
+        FormulaValue::Error(FormulaErrorValue::Div0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 2, row: 10 },
+        FormulaValue::Number(42.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 9, row: 13 },
+        FormulaValue::Blank,
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress {
+          column: 10,
+          row: 13,
+        },
+        FormulaValue::String(Cow::Borrowed("text")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress {
+          column: 5,
+          row: 795,
+        },
+        FormulaValue::Boolean(true),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 8 },
+        FormulaValue::Number(2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 9 },
+        FormulaValue::Number(534.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 10 },
+        FormulaValue::Number(9_999_999_999.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 11 },
+        FormulaValue::Number(-9_999_999_999.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 12 },
+        FormulaValue::Number(-534.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 13 },
+        FormulaValue::Number(-2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 14 },
+        FormulaValue::Number(-1.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 15 },
+        FormulaValue::Boolean(true),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 2, row: 5 },
+        FormulaValue::String(Cow::Borrowed("DOUBLE")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 3, row: 5 },
+        FormulaValue::String(Cow::Borrowed("BLANK")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 4, row: 5 },
+        FormulaValue::String(Cow::Borrowed("STRING")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 5, row: 5 },
+        FormulaValue::String(Cow::Borrowed("REF")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 6, row: 5 },
+        FormulaValue::String(Cow::Borrowed("AREA (rows)")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 2, row: 8 },
+        FormulaValue::Number(1.1),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 9, row: 6 },
+        FormulaValue::Number(4.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 6, row: 6 },
+        FormulaValue::Number(1.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 7, row: 6 },
+        FormulaValue::Number(2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 6, row: 7 },
+        FormulaValue::Number(3.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 7, row: 7 },
+        FormulaValue::Number(4.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 6, row: 8 },
+        FormulaValue::Number(5.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 7, row: 8 },
+        FormulaValue::Number(6.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 7, row: 9 },
+        FormulaValue::Number(3.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 4, row: 10 },
+        FormulaValue::String(Cow::Borrowed(" BEGINSWITHSPACE")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 4, row: 7 },
+        FormulaValue::String(Cow::Borrowed("nospaces")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 5, row: 10 },
+        FormulaValue::Number(0.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 6, row: 10 },
+        FormulaValue::String(Cow::Borrowed("Alpha")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 8, row: 10 },
+        FormulaValue::Number(345.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 9, row: 10 },
+        FormulaValue::Number(0.00001),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 10, row: 7 },
+        FormulaValue::Number(2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 11, row: 7 },
+        FormulaValue::String(Cow::Borrowed("aa")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 12, row: 6 },
+        FormulaValue::String(Cow::Borrowed("alphanum")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 10, row: 8 },
+        FormulaValue::String(Cow::Borrowed("b")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 11, row: 8 },
+        FormulaValue::Number(4.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 10, row: 9 },
+        FormulaValue::Number(5.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 11, row: 9 },
+        FormulaValue::Number(6.0),
+      )
       .build();
 
     assert_eq!(
@@ -6560,6 +7977,150 @@ mod tests {
       book.evaluate_formula_text(SheetId(1), None, "ISBLANK(A3)"),
       Some(FormulaValue::Boolean(false))
     );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ISBLANK(A1:A4)"),
+      Some(FormulaValue::Boolean(false))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("A10").unwrap()),
+        "ISBLANK(A1:B1)"
+      ),
+      Some(FormulaValue::Boolean(true))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("G780").unwrap()),
+        "ISERROR(C10:C13)"
+      ),
+      Some(FormulaValue::Boolean(true))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("G780").unwrap()),
+        "ISERR(C10:C13)"
+      ),
+      Some(FormulaValue::Boolean(true))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("J780").unwrap()),
+        "ISTEXT(J14:K14)"
+      ),
+      Some(FormulaValue::Boolean(false))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("K780").unwrap()),
+        "ISTEXT(J14:K14)"
+      ),
+      Some(FormulaValue::Boolean(true))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ISNUMBER(TRUE)"),
+      Some(FormulaValue::Boolean(false))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ISNUMBER(F796)"),
+      Some(FormulaValue::Boolean(false))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "LARGE(B9:B16,4)"),
+      Some(FormulaValue::Number(-1.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "LARGE(TRUE,1)"),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("J824").unwrap()),
+        "LEFT(G7:H9,H10)"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("K832").unwrap()),
+        "LEN(K8:L10)"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("E872").unwrap()),
+        "LOOKUP(\"DOUBLE\",C6:G6,C9:G9)"
+      ),
+      Some(FormulaValue::Number(1.1))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("K876").unwrap()),
+        "LOWER(E11:G11)"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "MINA(\"-23\",0,4)"),
+      Some(FormulaValue::Number(-23.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "MODE(B8:B16)"),
+      Some(FormulaValue::Error(FormulaErrorValue::NA))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "MODE(B9,2,D7)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("K932").unwrap()),
+        "MOD(I11:L11,J7)"
+      ),
+      Some(FormulaValue::Number(0.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("H980").unwrap()),
+        "NOT(E8)"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "NOT(\"TRUE\")"),
+      Some(FormulaValue::Boolean(false))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "NOT(\"nospaces\")"),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("N1352").unwrap()),
+        "T(L7:N7)"
+      ),
+      Some(FormulaValue::String(Cow::Borrowed("")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("M1352").unwrap()),
+        "T(M7:N7)"
+      ),
+      Some(FormulaValue::String(Cow::Borrowed("alphanum")))
+    );
     let formula = parse_formula_text(SheetId(1), Cow::Borrowed("ISBLANK(A1:A4)"));
     assert_eq!(
       book.evaluate_parsed_formula_raw(SheetId(1), None, &formula, true),
@@ -6569,6 +8130,31 @@ mod tests {
         vec![FormulaValue::Boolean(false)],
         vec![FormulaValue::Boolean(false)],
       ]))
+    );
+  }
+
+  #[test]
+  fn evaluation_book_offset_scalarizes_reference_arguments_like_excel() {
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("G7").unwrap(),
+        FormulaValue::Number(1.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("G8").unwrap(),
+        FormulaValue::Number(1.001),
+      )
+      .build();
+
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("G1008").unwrap()),
+        "OFFSET(F7,E7:I7,E7:I7)"
+      ),
+      Some(FormulaValue::Number(1.001))
     );
   }
 
@@ -6674,7 +8260,7 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "COVAR(A1:A2,B1:B3)"),
-      Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+      Some(FormulaValue::Error(FormulaErrorValue::NA))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "COVAR(A1:A2,B1:B2,B1:B2)"),
@@ -6886,6 +8472,10 @@ mod tests {
       Some(FormulaValue::Number(30316.0))
     );
     assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DATE(\"x\",1,1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
       lo_book.evaluate_formula_text(SheetId(1), None, "DATE(0,12,31)"),
       Some(FormulaValue::Number(36891.0))
     );
@@ -6910,12 +8500,72 @@ mod tests {
       Some(FormulaValue::Number(37987.0))
     );
     assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "YEAR(0)+MONTH(0)+DAY(0)"),
+      Some(FormulaValue::Number(1901.0))
+    );
+    assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "DAY(\"1899-12-29T15:26:14\")"),
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DAY(-1.1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
+    );
+    assert_eq!(
+      lo_book.evaluate_formula_text(SheetId(1), None, "DAY(\"1899-12-29T15:26:14\")"),
       Some(FormulaValue::Number(29.0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "DAYS(\"1990-01-01\",\"1980-10-10\")"),
       Some(FormulaValue::Number(3370.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DAYS360(534,1.00001)"),
+      Some(FormulaValue::Number(-526.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DAYS360(\"1-FEB-2021\",\"15-MAR-2021\")"),
+      Some(FormulaValue::Number(44.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        None,
+        "DAYS360(\"2/28/1993\",\"3/1/1993\",FALSE)"
+      ),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DAYS360(\"2/28/1993\",\"3/1/1993\",TRUE)"),
+      Some(FormulaValue::Number(3.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        None,
+        "DAYS360(\"2/28/1993\",\"3/1/1993\",\"FALSE\")"
+      ),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        None,
+        "DAYS360(\"2/28/1993\",\"3/1/1993\",\"x\")"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DEGREES(PI())"),
+      Some(FormulaValue::Number(180.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "RADIANS(180)"),
+      Some(FormulaValue::Number(std::f64::consts::PI))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DEGREES(\"\")"),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "EDATE(\"2001-03-31\",-1)"),

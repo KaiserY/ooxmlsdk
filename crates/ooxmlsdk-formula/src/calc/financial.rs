@@ -1,5 +1,5 @@
 use super::datetime::{date_from_serial, date_serial, is_leap_year, last_day_of_month, yearfrac};
-use super::numeric::{approx_ceil, approx_equal, approx_floor};
+use super::numeric::{KahanSum, approx_ceil, approx_equal, approx_floor};
 
 pub fn financial_pmt(rate: f64, nper: f64, pv: f64, fv: f64, pay_in_advance: bool) -> f64 {
   let payment = if rate == 0.0 {
@@ -838,7 +838,7 @@ fn financial_inter_vdb(
 ) -> f64 {
   let int_end = approx_ceil(period);
   let loop_end = int_end as u64;
-  let mut vdb = 0.0;
+  let mut vdb = KahanSum::default();
   let mut sln = 0.0;
   let mut salvage_value = cost - salvage;
   let mut now_sln = false;
@@ -860,9 +860,9 @@ fn financial_inter_vdb(
     if i == loop_end {
       term *= period + 1.0 - int_end;
     }
-    vdb += term;
+    vdb.add(term);
   }
-  vdb
+  vdb.finish()
 }
 
 pub fn financial_vdb(
@@ -878,7 +878,7 @@ pub fn financial_vdb(
   let int_end = approx_ceil(end);
   let loop_start = int_start as u64;
   let loop_end = int_end as u64;
-  let mut vdb = 0.0;
+  let mut vdb = KahanSum::default();
   if no_switch {
     for i in loop_start + 1..=loop_end {
       let mut term = financial_ddb(cost, salvage, life, i as f64, factor);
@@ -887,8 +887,9 @@ pub fn financial_vdb(
       } else if i == loop_end {
         term *= end + 1.0 - int_end;
       }
-      vdb += term;
+      vdb.add(term);
     }
+    vdb.finish()
   } else {
     let mut part = 0.0;
     if !approx_equal(start, int_start) || !approx_equal(end, int_end) {
@@ -921,16 +922,15 @@ pub fn financial_vdb(
       }
     }
     let adjusted_cost = cost - financial_inter_vdb(cost, salvage, life, life, int_start, factor);
-    vdb = financial_inter_vdb(
+    financial_inter_vdb(
       adjusted_cost,
       salvage,
       life,
       life - int_start,
       int_end - int_start,
       factor,
-    ) - part;
+    ) - part
   }
-  vdb
 }
 
 pub fn financial_rate(

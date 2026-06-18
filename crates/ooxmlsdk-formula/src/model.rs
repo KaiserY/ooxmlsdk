@@ -3955,6 +3955,7 @@ fn built_in_name(name: &str) -> Option<BuiltInName> {
 mod tests {
   use super::*;
   use crate::calc::complex::FormulaComplex;
+  use crate::calc::text::baht_text;
   use crate::code::FormulaOp;
   use crate::evaluator::valid_date_serial_with_system;
   use crate::function::format_complex_result;
@@ -7637,6 +7638,148 @@ mod tests {
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "IMDIV(\"-238+240i\",\"10+24i\")"),
       Some(FormulaValue::String(Cow::Borrowed("5+12i")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMREAL(\"3+4i\")"),
+      Some(FormulaValue::Number(3.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMAGINARY(\"3+4i\")"),
+      Some(FormulaValue::Number(4.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMABS(\"3+4i\")"),
+      Some(FormulaValue::Number(5.0))
+    );
+    match book.evaluate_formula_text(SheetId(1), None, "IMARGUMENT(\"1+i\")") {
+      Some(FormulaValue::Number(value)) => {
+        assert!((value - std::f64::consts::FRAC_PI_4).abs() <= 1.0e-15)
+      }
+      actual => panic!("unexpected IMARGUMENT result: {actual:?}"),
+    }
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMARGUMENT(\"0\")"),
+      Some(FormulaValue::Error(FormulaErrorValue::Div0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMCONJUGATE(\"3+4i\")"),
+      Some(FormulaValue::String(Cow::Borrowed("3-4i")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMPOWER(\"1+i\",2)"),
+      Some(FormulaValue::String(Cow::Borrowed("2i")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMPOWER(\"0\",0)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMPRODUCT(\"1+i\",\"1-i\")"),
+      Some(FormulaValue::String(Cow::Borrowed("2")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMSUB(\"5+6i\",\"1+2i\")"),
+      Some(FormulaValue::String(Cow::Borrowed("4+4i")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMSUM(\"1+i\",\"2+3i\")"),
+      Some(FormulaValue::String(Cow::Borrowed("3+4i")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMEXP(\"0\")"),
+      Some(FormulaValue::String(Cow::Borrowed("1")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMLN(\"1\")"),
+      Some(FormulaValue::String(Cow::Borrowed("0")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMLOG10(\"100\")"),
+      Some(FormulaValue::String(Cow::Borrowed("2")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMLOG2(\"8\")"),
+      Some(FormulaValue::String(Cow::Borrowed("3")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMSQRT(\"-1\")"),
+      Some(FormulaValue::String(Cow::Borrowed("i")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMSIN(\"0\")"),
+      Some(FormulaValue::String(Cow::Borrowed("0")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMCOS(\"0\")"),
+      Some(FormulaValue::String(Cow::Borrowed("1")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMTAN(\"0\")"),
+      Some(FormulaValue::String(Cow::Borrowed("0")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMSEC(\"0\")"),
+      Some(FormulaValue::String(Cow::Borrowed("1")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMCSC(\"0\")"),
+      Some(FormulaValue::Error(FormulaErrorValue::Div0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMCOT(\"0\")"),
+      Some(FormulaValue::Error(FormulaErrorValue::Div0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMSINH(\"0\")"),
+      Some(FormulaValue::String(Cow::Borrowed("0")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMCOSH(\"0\")"),
+      Some(FormulaValue::String(Cow::Borrowed("1")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMSECH(\"0\")"),
+      Some(FormulaValue::String(Cow::Borrowed("1")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IMCSCH(\"0\")"),
+      Some(FormulaValue::Error(FormulaErrorValue::Div0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "REPT(\"ab\",3)"),
+      Some(FormulaValue::String(Cow::Borrowed("ababab")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "REPT(\"x\",-1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ASC(\"ＡＢＣ￥。ガパ\")"),
+      Some(FormulaValue::String(Cow::Borrowed("ABC\\｡ｶﾞﾊﾟ")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "JIS(\"ABC\\｡ｶﾞﾊﾟ\")"),
+      Some(FormulaValue::String(Cow::Borrowed("ＡＢＣ￥。ガパ")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "BAHTTEXT(21.25)"),
+      Some(FormulaValue::String(Cow::Owned(baht_text(21.25))))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ROMAN(499,4)"),
+      Some(FormulaValue::String(Cow::Borrowed("ID")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ARABIC(\"MCMXCIX\")"),
+      Some(FormulaValue::Number(1999.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ARABIC(\"IIV\")"),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ORG.OPENOFFICE.ROT13(\"Abc-Mno-Zz\")"),
+      Some(FormulaValue::String(Cow::Borrowed("Nop-Zab-Mm")))
     );
     assert_eq!(
       format_complex_result(FormulaComplex::new(

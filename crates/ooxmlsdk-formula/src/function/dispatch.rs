@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use num_complex::Complex;
 use statrs::distribution::{
   ContinuousCDF, Discrete, DiscreteCDF, Hypergeometric, LogNormal, Normal, StudentsT,
 };
@@ -19,14 +20,17 @@ use crate::calc::datetime::{
   weekday_index_from_serial, weeks_mode_one_index, yearfrac as date_yearfrac,
 };
 use crate::calc::financial::{
-  finance_duration, finance_price, finance_yield, financial_fv, financial_irr, financial_mirr,
-  financial_nper, financial_pmt, financial_rate,
+  finance_coupdaybs, finance_coupdays, finance_coupdaysnc, finance_coupncd, finance_coupnum,
+  finance_couppcd, finance_duration, finance_price, finance_yield, financial_db, financial_ddb,
+  financial_fv, financial_ipmt, financial_irr, financial_mirr, financial_nper, financial_pmt,
+  financial_rate, financial_vdb, financial_xirr, financial_xnpv,
 };
 use crate::calc::matrix::{determinant, lup_decompose, lup_solve, matrix_multiply};
 use crate::calc::numeric::{
   CeilingFloorKind, KahanSum, NumericError, approx_ceil, approx_floor, ceiling_excel_legacy,
-  even_odd, floor_excel_legacy, floor_to_i32, floor_to_u32, floor_to_usize, kahan_sum, mround,
-  quotient, round_direction, round_to_decimal_places, round_to_significant_digits, sign_number,
+  even_odd, floor_excel_legacy, floor_to_i32, floor_to_u16, floor_to_u32, floor_to_usize,
+  kahan_sum, mround, quotient, round_direction, round_to_decimal_places,
+  round_to_significant_digits, sign_number,
 };
 use crate::calc::radix::{
   base_number_text, convert_from_decimal, convert_to_decimal, decimal_text_to_number,
@@ -42,8 +46,9 @@ use crate::calc::statistics::{
   trim_mean, variance_slice,
 };
 use crate::calc::text::{
-  clean_formula_text, leftb, legacy_char_text, legacy_text_code, proper_formula_text, rightb,
-  rot13_formula_text, text_byte_len, trim_formula_text,
+  baht_text, clean_formula_text, full_width_like_jis, half_width_like_asc, leftb, legacy_char_text,
+  legacy_text_code, proper_formula_text, rightb, roman_text_libreoffice, rot13_formula_text,
+  text_byte_len, trim_formula_text,
 };
 use crate::calc::units::convert_unit;
 use crate::code::FormulaOp;
@@ -291,7 +296,7 @@ fn evaluate_function_reader<'doc>(
       };
       Some(FormulaValue::String(Cow::Owned(proper_formula_text(&text))))
     }
-    FormulaFunctionId::Rot13 if args.len() == 1 => {
+    FormulaFunctionId::Rot13 | FormulaFunctionId::OrgDotOpenofficeDotRot13 if args.len() == 1 => {
       let text = match strict_text_arg(evaluator, args.value(0)?) {
         Ok(text) => text,
         Err(error) => return Some(FormulaValue::Error(error)),
@@ -363,6 +368,18 @@ fn evaluate_function_reader<'doc>(
         .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
     }
     FormulaFunctionId::Clean if args.len() == 1 => evaluate_clean_reader(evaluator, args),
+    FormulaFunctionId::Rept if args.len() == 2 => evaluate_rept_reader(evaluator, args),
+    FormulaFunctionId::Asc if args.len() == 1 => {
+      evaluate_text_transform_reader(evaluator, args, half_width_like_asc)
+    }
+    FormulaFunctionId::Jis if args.len() == 1 => {
+      evaluate_text_transform_reader(evaluator, args, full_width_like_jis)
+    }
+    FormulaFunctionId::Bahttext if args.len() == 1 => evaluate_bahttext_reader(evaluator, args),
+    FormulaFunctionId::Roman if (1..=2).contains(&args.len()) => {
+      evaluate_roman_reader(evaluator, args)
+    }
+    FormulaFunctionId::Arabic if args.len() == 1 => evaluate_arabic_reader(evaluator, args),
     FormulaFunctionId::Abs if args.len() == 1 => {
       let value = args.value(0)?;
       if matches!(value, FormulaValue::Matrix(_))
@@ -1144,7 +1161,75 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Complex if (2..=3).contains(&args.len()) => {
       evaluate_complex_reader(evaluator, args)
     }
+    FormulaFunctionId::Imabs if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Abs)
+    }
+    FormulaFunctionId::Imaginary if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Imaginary)
+    }
+    FormulaFunctionId::Imargument if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Argument)
+    }
+    FormulaFunctionId::Imconjugate if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Conjugate)
+    }
+    FormulaFunctionId::Imcos if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Cos)
+    }
+    FormulaFunctionId::Imcosh if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Cosh)
+    }
+    FormulaFunctionId::Imcot if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Cot)
+    }
+    FormulaFunctionId::Imcsc if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Csc)
+    }
+    FormulaFunctionId::Imcsch if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Csch)
+    }
     FormulaFunctionId::Imdiv if args.len() == 2 => evaluate_complex_div_reader(evaluator, args),
+    FormulaFunctionId::Imexp if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Exp)
+    }
+    FormulaFunctionId::Imln if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Ln)
+    }
+    FormulaFunctionId::Imlog10 if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Log10)
+    }
+    FormulaFunctionId::Imlog2 if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Log2)
+    }
+    FormulaFunctionId::Impower if args.len() == 2 => evaluate_complex_power_reader(evaluator, args),
+    FormulaFunctionId::Improduct if args.len() >= 1 => {
+      evaluate_complex_aggregate_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Imreal if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Real)
+    }
+    FormulaFunctionId::Imsec if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Sec)
+    }
+    FormulaFunctionId::Imsech if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Sech)
+    }
+    FormulaFunctionId::Imsin if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Sin)
+    }
+    FormulaFunctionId::Imsinh if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Sinh)
+    }
+    FormulaFunctionId::Imsqrt if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Sqrt)
+    }
+    FormulaFunctionId::Imsub if args.len() == 2 => evaluate_complex_sub_reader(evaluator, args),
+    FormulaFunctionId::Imsum if args.len() >= 1 => {
+      evaluate_complex_aggregate_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::Imtan if args.len() == 1 => {
+      evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Tan)
+    }
     FormulaFunctionId::Cumipmt if args.len() == 6 => {
       evaluator.evaluate_cum_interest_principal_reader(args, true)
     }
@@ -1180,6 +1265,12 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Pmt if (3..=5).contains(&args.len()) => evaluate_pmt_reader(evaluator, args),
     FormulaFunctionId::Pv if (3..=5).contains(&args.len()) => evaluate_pv_reader(evaluator, args),
     FormulaFunctionId::Fv if (3..=5).contains(&args.len()) => evaluate_fv_reader(evaluator, args),
+    FormulaFunctionId::Ipmt if (4..=6).contains(&args.len()) => {
+      evaluate_ipmt_ppmt_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Ppmt if (4..=6).contains(&args.len()) => {
+      evaluate_ipmt_ppmt_reader(evaluator, args, false)
+    }
     FormulaFunctionId::Nper if (3..=5).contains(&args.len()) => {
       evaluate_nper_reader(evaluator, args)
     }
@@ -1191,6 +1282,39 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Npv if args.len() >= 2 => evaluate_npv_reader(evaluator, args),
     FormulaFunctionId::Ispmt if args.len() == 4 => evaluate_ispmt_reader(evaluator, args),
     FormulaFunctionId::Rri if args.len() == 3 => evaluate_rri_reader(evaluator, args),
+    FormulaFunctionId::Effect if args.len() == 2 => {
+      evaluate_effect_nominal_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Nominal if args.len() == 2 => {
+      evaluate_effect_nominal_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::Sln if args.len() == 3 => evaluate_sln_reader(evaluator, args),
+    FormulaFunctionId::Syd if args.len() == 4 => evaluate_syd_reader(evaluator, args),
+    FormulaFunctionId::Db if (4..=5).contains(&args.len()) => evaluate_db_reader(evaluator, args),
+    FormulaFunctionId::Ddb if (4..=5).contains(&args.len()) => evaluate_ddb_reader(evaluator, args),
+    FormulaFunctionId::Vdb if (5..=7).contains(&args.len()) => evaluate_vdb_reader(evaluator, args),
+    FormulaFunctionId::Xnpv if args.len() == 3 => evaluate_xnpv_reader(evaluator, args),
+    FormulaFunctionId::Xirr if (2..=3).contains(&args.len()) => {
+      evaluate_xirr_reader(evaluator, args)
+    }
+    FormulaFunctionId::Coupdaybs if (4..=5).contains(&args.len()) => {
+      evaluate_coupon_reader(evaluator, args, CouponKind::Daybs)
+    }
+    FormulaFunctionId::Coupdays if (4..=5).contains(&args.len()) => {
+      evaluate_coupon_reader(evaluator, args, CouponKind::Days)
+    }
+    FormulaFunctionId::Coupdaysnc if (4..=5).contains(&args.len()) => {
+      evaluate_coupon_reader(evaluator, args, CouponKind::Daysnc)
+    }
+    FormulaFunctionId::Coupncd if (4..=5).contains(&args.len()) => {
+      evaluate_coupon_reader(evaluator, args, CouponKind::Ncd)
+    }
+    FormulaFunctionId::Coupnum if (4..=5).contains(&args.len()) => {
+      evaluate_coupon_reader(evaluator, args, CouponKind::Num)
+    }
+    FormulaFunctionId::Couppcd if (4..=5).contains(&args.len()) => {
+      evaluate_coupon_reader(evaluator, args, CouponKind::Pcd)
+    }
     FormulaFunctionId::Price if (6..=7).contains(&args.len()) => {
       evaluate_price_reader(evaluator, args)
     }
@@ -2151,6 +2275,163 @@ fn evaluate_clean_reader<'doc>(
   Some(FormulaValue::String(Cow::Owned(clean_formula_text(
     &evaluator.text(&value),
   ))))
+}
+
+fn evaluate_text_transform_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  transform: fn(&str) -> String,
+) -> Option<FormulaValue<'doc>> {
+  let value = args.value(0)?;
+  if evaluator.array_context && is_matrix_argument(&value) {
+    return map_text_unary_value(evaluator, value, |text| {
+      FormulaValue::String(Cow::Owned(transform(text)))
+    });
+  }
+  let text = match strict_text_arg(evaluator, value) {
+    Ok(text) => text,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  Some(FormulaValue::String(Cow::Owned(transform(&text))))
+}
+
+fn evaluate_rept_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let text = match strict_text_arg(evaluator, args.value(0)?) {
+    Ok(text) => text,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let count = match scalar_number_arg_or_value(evaluator, args, 1)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if count < 0.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+  let count = floor_to_usize(count)?;
+  if count == 0 {
+    return Some(FormulaValue::String(Cow::Borrowed("")));
+  }
+  if text.chars().count().saturating_mul(count) > 32_767 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+  Some(FormulaValue::String(Cow::Owned(text.repeat(count))))
+}
+
+fn evaluate_bahttext_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let arg = args.value(0)?;
+  if evaluator.array_context && is_matrix_argument(&arg) {
+    return evaluator.map_unary_values(arg, |evaluator, value| {
+      evaluator
+        .number(value)
+        .filter(|value| value.is_finite())
+        .map(|value| FormulaValue::String(Cow::Owned(baht_text(value))))
+        .or(Some(FormulaValue::Error(FormulaErrorValue::Num)))
+    });
+  }
+  let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if !value.is_finite() {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  }
+  Some(FormulaValue::String(Cow::Owned(baht_text(value))))
+}
+
+fn evaluate_roman_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let mode = if args.len() == 2 && !args.is_missing(1) {
+    match scalar_number_arg_or_value(evaluator, args, 1)? {
+      Ok(value) => value,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  } else {
+    0.0
+  };
+  if !(0.0..4000.0).contains(&value) || !(0.0..5.0).contains(&mode) {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+  let Some(value) = floor_to_u16(value) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(mode) = floor_to_u16(mode) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  Some(FormulaValue::String(Cow::Owned(roman_text_libreoffice(
+    value, mode,
+  ))))
+}
+
+fn evaluate_arabic_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let text = match strict_text_arg(evaluator, args.value(0)?) {
+    Ok(text) => text,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  arabic_from_roman(&text.to_ascii_uppercase())
+    .map(|value| FormulaValue::Number(value as f64))
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+}
+
+fn arabic_from_roman(text: &str) -> Option<u16> {
+  let chars = text.as_bytes();
+  let mut value = 0u16;
+  let mut valid_rest = 3999u16;
+  let mut index = 0usize;
+  while index < chars.len() {
+    let (digit1, is_decimal1) = roman_digit_value(chars[index])?;
+    let digit2 = chars
+      .get(index + 1)
+      .and_then(|value| roman_digit_value(*value).map(|(digit, _)| digit))
+      .unwrap_or(0);
+    if digit1 >= digit2 {
+      value = value.checked_add(digit1)?;
+      valid_rest %= digit1 * if is_decimal1 { 5 } else { 2 };
+      if valid_rest < digit1 {
+        return None;
+      }
+      valid_rest -= digit1;
+      index += 1;
+    } else if digit1 * 2 != digit2 {
+      let difference = digit2 - digit1;
+      value = value.checked_add(difference)?;
+      if valid_rest < difference {
+        return None;
+      }
+      valid_rest = digit1 - 1;
+      index += 2;
+    } else {
+      return None;
+    }
+  }
+  Some(value)
+}
+
+fn roman_digit_value(value: u8) -> Option<(u16, bool)> {
+  match value {
+    b'M' => Some((1000, true)),
+    b'D' => Some((500, false)),
+    b'C' => Some((100, true)),
+    b'L' => Some((50, false)),
+    b'X' => Some((10, true)),
+    b'V' => Some((5, false)),
+    b'I' => Some((1, true)),
+    _ => None,
+  }
 }
 
 fn evaluate_concat_reader<'doc>(
@@ -6668,6 +6949,271 @@ fn optional_number<'doc>(
   evaluator.number(&args.value(index)?)
 }
 
+fn evaluate_ipmt_ppmt_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  interest: bool,
+) -> Option<FormulaValue<'doc>> {
+  let rate = finance_number_arg(evaluator, args, 0)?;
+  let period = finance_number_arg(evaluator, args, 1)?;
+  let nper = finance_number_arg(evaluator, args, 2)?;
+  let pv = finance_number_arg(evaluator, args, 3)?;
+  let fv = optional_number(evaluator, args, 4, 0.0)?;
+  let pay_in_advance = optional_number(evaluator, args, 5, 0.0)? != 0.0;
+  if period < 1.0 || period > nper || nper <= 0.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let (ipmt, pmt) = financial_ipmt(rate, period.floor(), nper, pv, fv, pay_in_advance);
+  Some(FormulaValue::Number(if interest {
+    ipmt
+  } else {
+    pmt - ipmt
+  }))
+}
+
+fn evaluate_effect_nominal_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  effect: bool,
+) -> Option<FormulaValue<'doc>> {
+  let rate_arg = args.value(0)?;
+  let periods_arg = args.value(1)?;
+  if evaluator.array_context && (is_matrix_argument(&rate_arg) || is_matrix_argument(&periods_arg))
+  {
+    return evaluator.map_binary_values(rate_arg, periods_arg, |evaluator, rate, periods| {
+      let Some(rate) = evaluator.number(rate) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      };
+      let Some(periods) = evaluator.number(periods) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      };
+      Some(effect_nominal_value(rate, periods, effect))
+    });
+  }
+  let rate = finance_number_arg(evaluator, args, 0)?;
+  let periods = finance_number_arg(evaluator, args, 1)?.floor();
+  Some(effect_nominal_value(rate, periods, effect))
+}
+
+fn effect_nominal_value<'doc>(rate: f64, periods: f64, effect: bool) -> FormulaValue<'doc> {
+  let periods = periods.floor();
+  if rate <= 0.0 || periods < 1.0 {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  FormulaValue::Number(if effect {
+    (1.0 + rate / periods).powf(periods) - 1.0
+  } else {
+    ((1.0 + rate).powf(1.0 / periods) - 1.0) * periods
+  })
+}
+
+fn evaluate_sln_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let cost = finance_number_arg(evaluator, args, 0)?;
+  let salvage = finance_number_arg(evaluator, args, 1)?;
+  let life = finance_number_arg(evaluator, args, 2)?;
+  if life == 0.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Div0));
+  }
+  Some(FormulaValue::Number((cost - salvage) / life))
+}
+
+fn evaluate_syd_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let cost = finance_number_arg(evaluator, args, 0)?;
+  let salvage = finance_number_arg(evaluator, args, 1)?;
+  let life = finance_number_arg(evaluator, args, 2)?;
+  let period = finance_number_arg(evaluator, args, 3)?;
+  if life <= 0.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  Some(FormulaValue::Number(
+    (cost - salvage) * (life - period + 1.0) * 2.0 / (life * (life + 1.0)),
+  ))
+}
+
+fn evaluate_ddb_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let cost = finance_number_arg(evaluator, args, 0)?;
+  let salvage = finance_number_arg(evaluator, args, 1)?;
+  let life = finance_number_arg(evaluator, args, 2)?;
+  let period = finance_number_arg(evaluator, args, 3)?;
+  if args.raw_arg(4).is_some() && args.is_missing(4) {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let factor = optional_number(evaluator, args, 4, 2.0)?;
+  if cost <= salvage
+    || cost < 0.0
+    || salvage < 0.0
+    || life <= 0.0
+    || period <= 0.0
+    || period > life
+    || factor <= 0.0
+  {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  Some(FormulaValue::Number(financial_ddb(
+    cost, salvage, life, period, factor,
+  )))
+}
+
+fn evaluate_db_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let cost = finance_number_arg(evaluator, args, 0)?;
+  let salvage = finance_number_arg(evaluator, args, 1)?;
+  let life = finance_number_arg(evaluator, args, 2)?;
+  let period = finance_number_arg(evaluator, args, 3)?;
+  let months = optional_number(evaluator, args, 4, 12.0)?;
+  if cost <= 0.0 || salvage < 0.0 || life <= 0.0 || period <= 0.0 || months <= 0.0 || months > 12.0
+  {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  Some(FormulaValue::Number(financial_db(
+    cost, salvage, life, period, months,
+  )))
+}
+
+fn evaluate_vdb_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if args.is_missing(0) {
+    return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+  }
+  let cost = finance_number_arg(evaluator, args, 0)?;
+  let salvage = finance_number_arg(evaluator, args, 1)?;
+  let life = finance_number_arg(evaluator, args, 2)?;
+  let start = finance_number_arg(evaluator, args, 3)?;
+  let end = finance_number_arg(evaluator, args, 4)?;
+  if args.raw_arg(5).is_some() && args.is_missing(5) {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let factor = optional_number(evaluator, args, 5, 2.0)?;
+  let no_switch = args
+    .raw_arg(6)
+    .filter(|_| !args.is_missing(6))
+    .and_then(|_| args.value(6))
+    .is_some_and(|value| evaluator.truthy(&value));
+  if cost < 0.0
+    || salvage < 0.0
+    || cost <= salvage
+    || life <= 0.0
+    || start < 0.0
+    || end < start
+    || end > life
+    || factor <= 0.0
+  {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  Some(FormulaValue::Number(financial_vdb(
+    cost, salvage, life, start, end, factor, no_switch,
+  )))
+}
+
+fn evaluate_xnpv_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let rate = finance_number_arg(evaluator, args, 0)?;
+  let values = evaluator.value_numbers(&args.value(1)?);
+  let dates = evaluator.value_numbers(&args.value(2)?);
+  if values.len() < 2 || values.len() != dates.len() {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  financial_xnpv(rate, &values, &dates)
+    .filter(|value| value.is_finite())
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(
+      FormulaErrorValue::IllegalArgument,
+    )))
+}
+
+fn evaluate_xirr_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let values = evaluator.value_numbers(&args.value(0)?);
+  let dates = evaluator.value_numbers(&args.value(1)?);
+  let guess = optional_number(evaluator, args, 2, 0.1)?;
+  if values.len() < 2 || values.len() != dates.len() || guess <= -1.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  financial_xirr(&values, &dates, guess)
+    .filter(|value| value.is_finite())
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(
+      FormulaErrorValue::IllegalArgument,
+    )))
+}
+
+#[derive(Clone, Copy)]
+enum CouponKind {
+  Daybs,
+  Days,
+  Daysnc,
+  Ncd,
+  Num,
+  Pcd,
+}
+
+fn evaluate_coupon_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  kind: CouponKind,
+) -> Option<FormulaValue<'doc>> {
+  let settle = finance_date_arg(evaluator, args, 0)?;
+  let maturity = finance_date_arg(evaluator, args, 1)?;
+  let frequency = finance_i32_arg(evaluator, args, 2)?;
+  let basis = optional_number(evaluator, args, 3, 0.0)?.floor() as i32;
+  if settle >= maturity || !matches!(frequency, 1 | 2 | 4) || !(0..=4).contains(&basis) {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let value = match kind {
+    CouponKind::Daybs => finance_coupdaybs(settle, maturity, frequency, basis)?,
+    CouponKind::Days => finance_coupdays(settle, maturity, frequency, basis)?,
+    CouponKind::Daysnc => finance_coupdaysnc(settle, maturity, frequency, basis)?,
+    CouponKind::Ncd => f64::from(finance_coupncd(settle, maturity, frequency, basis)?),
+    CouponKind::Num => finance_coupnum(settle, maturity, frequency, basis)?,
+    CouponKind::Pcd => f64::from(finance_couppcd(settle, maturity, frequency, basis)?),
+  };
+  Some(FormulaValue::Number(value))
+}
+
+fn finance_number_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+) -> Option<f64> {
+  match scalar_number_arg_or_value(evaluator, args, index)? {
+    Ok(value) => Some(value),
+    Err(_) => None,
+  }
+}
+
+fn finance_i32_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+) -> Option<i32> {
+  floor_to_i32(finance_number_arg(evaluator, args, index)?)
+}
+
+fn finance_date_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+) -> Option<i32> {
+  floor_to_i32(evaluator.date_number_from_value(&args.value(index)?)?)
+}
+
 fn evaluate_yield_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -7212,19 +7758,306 @@ fn evaluate_complex_reader<'doc>(
   ))))
 }
 
+#[derive(Clone, Copy)]
+enum ComplexUnaryKind {
+  Abs,
+  Argument,
+  Conjugate,
+  Cos,
+  Cosh,
+  Cot,
+  Csc,
+  Csch,
+  Exp,
+  Imaginary,
+  Ln,
+  Log10,
+  Log2,
+  Real,
+  Sec,
+  Sech,
+  Sin,
+  Sinh,
+  Sqrt,
+  Tan,
+}
+
+fn evaluate_complex_unary_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  kind: ComplexUnaryKind,
+) -> Option<FormulaValue<'doc>> {
+  let value = args.value(0)?;
+  if evaluator.array_context && is_matrix_argument(&value) {
+    return evaluator.map_unary_values(value, |evaluator, value| {
+      Some(evaluate_complex_unary_value(evaluator, value, kind))
+    });
+  }
+  Some(evaluate_complex_unary_value(evaluator, &value, kind))
+}
+
+fn evaluate_complex_unary_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+  kind: ComplexUnaryKind,
+) -> FormulaValue<'doc> {
+  if let FormulaValue::Error(error) = value {
+    return FormulaValue::Error(*error);
+  }
+  let Some(complex) = parse_complex_number(&evaluator.text(value)) else {
+    return FormulaValue::Error(FormulaErrorValue::Value);
+  };
+  let value = complex.value();
+  match kind {
+    ComplexUnaryKind::Abs => finite_complex_number(value.norm()),
+    ComplexUnaryKind::Argument => {
+      if value.re == 0.0 && value.im == 0.0 {
+        FormulaValue::Error(FormulaErrorValue::Div0)
+      } else {
+        finite_complex_number(value.arg())
+      }
+    }
+    ComplexUnaryKind::Imaginary => finite_complex_number(value.im),
+    ComplexUnaryKind::Real => finite_complex_number(value.re),
+    ComplexUnaryKind::Conjugate => {
+      complex_result_value(FormulaComplex::from_value(value.conj(), complex.suffix()))
+    }
+    ComplexUnaryKind::Cos => {
+      complex_result_value(FormulaComplex::from_value(value.cos(), complex.suffix()))
+    }
+    ComplexUnaryKind::Cosh => {
+      complex_result_value(FormulaComplex::from_value(value.cosh(), complex.suffix()))
+    }
+    ComplexUnaryKind::Cot => complex_inverse_result(value.tan(), complex.suffix()),
+    ComplexUnaryKind::Csc => complex_inverse_result(value.sin(), complex.suffix()),
+    ComplexUnaryKind::Csch => complex_inverse_result(value.sinh(), complex.suffix()),
+    ComplexUnaryKind::Exp => {
+      complex_result_value(FormulaComplex::from_value(value.exp(), complex.suffix()))
+    }
+    ComplexUnaryKind::Ln => {
+      complex_result_value(FormulaComplex::from_value(value.ln(), complex.suffix()))
+    }
+    ComplexUnaryKind::Log10 => complex_result_value(FormulaComplex::from_value(
+      value.ln() / 10.0_f64.ln(),
+      complex.suffix(),
+    )),
+    ComplexUnaryKind::Log2 => complex_result_value(FormulaComplex::from_value(
+      value.ln() / 2.0_f64.ln(),
+      complex.suffix(),
+    )),
+    ComplexUnaryKind::Sec => complex_inverse_result(value.cos(), complex.suffix()),
+    ComplexUnaryKind::Sech => complex_inverse_result(value.cosh(), complex.suffix()),
+    ComplexUnaryKind::Sin => {
+      complex_result_value(FormulaComplex::from_value(value.sin(), complex.suffix()))
+    }
+    ComplexUnaryKind::Sinh => {
+      complex_result_value(FormulaComplex::from_value(value.sinh(), complex.suffix()))
+    }
+    ComplexUnaryKind::Sqrt => {
+      complex_result_value(FormulaComplex::from_value(value.sqrt(), complex.suffix()))
+    }
+    ComplexUnaryKind::Tan => {
+      complex_result_value(FormulaComplex::from_value(value.tan(), complex.suffix()))
+    }
+  }
+}
+
 fn evaluate_complex_div_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let left = parse_complex_number(&evaluator.text(&args.value(0)?))?;
-  let right = parse_complex_number(&evaluator.text(&args.value(1)?))?;
+  let left = match strict_complex_arg(evaluator, args.value(0)?) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let right = match strict_complex_arg(evaluator, args.value(1)?) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
   if right.value().norm_sqr() == 0.0 {
     return Some(FormulaValue::Error(FormulaErrorValue::Div0));
   }
   let result = FormulaComplex::from_value(left.value() / right.value(), binary_suffix(left, right));
-  Some(FormulaValue::String(Cow::Owned(format_complex_result(
-    result,
-  ))))
+  Some(complex_result_value(result))
+}
+
+fn evaluate_complex_sub_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let left = match strict_complex_arg(evaluator, args.value(0)?) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let right = match strict_complex_arg(evaluator, args.value(1)?) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  Some(complex_result_value(FormulaComplex::from_value(
+    left.value() - right.value(),
+    binary_suffix(left, right),
+  )))
+}
+
+fn evaluate_complex_power_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let complex_arg = args.value(0)?;
+  let power_arg = args.value(1)?;
+  if evaluator.array_context && (is_matrix_argument(&complex_arg) || is_matrix_argument(&power_arg))
+  {
+    return evaluator.map_binary_values(complex_arg, power_arg, |evaluator, complex, power| {
+      Some(evaluate_complex_power_values(evaluator, complex, power))
+    });
+  }
+  let complex = match strict_complex_arg(evaluator, args.value(0)?) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let power = match scalar_number_arg_or_value(evaluator, args, 1)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if complex.value().norm_sqr() == 0.0 && power <= 0.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  }
+  Some(complex_power_result(complex, power))
+}
+
+fn evaluate_complex_power_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  complex: &FormulaValue<'doc>,
+  power: &FormulaValue<'doc>,
+) -> FormulaValue<'doc> {
+  let complex = match strict_complex_arg(evaluator, complex.clone()) {
+    Ok(value) => value,
+    Err(error) => return FormulaValue::Error(error),
+  };
+  let Some(power) = evaluator.number(power) else {
+    return FormulaValue::Error(FormulaErrorValue::Value);
+  };
+  if complex.value().norm_sqr() == 0.0 && power <= 0.0 {
+    return FormulaValue::Error(FormulaErrorValue::Num);
+  }
+  complex_power_result(complex, power)
+}
+
+fn complex_power_result<'doc>(complex: FormulaComplex, power: f64) -> FormulaValue<'doc> {
+  let value =
+    if power.fract() == 0.0 && power >= f64::from(i32::MIN) && power <= f64::from(i32::MAX) {
+      complex.value().powi(power as i32)
+    } else {
+      complex.value().powf(power)
+    };
+  complex_result_value(FormulaComplex::from_value(value, complex.suffix()))
+}
+
+fn evaluate_complex_aggregate_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  product: bool,
+) -> Option<FormulaValue<'doc>> {
+  let mut values = Vec::new();
+  for index in 0..args.len() {
+    if args.is_missing(index) {
+      continue;
+    }
+    if let Err(error) = collect_complex_values(evaluator, args.value(index)?, &mut values) {
+      return Some(FormulaValue::Error(error));
+    }
+  }
+  if values.is_empty() {
+    return Some(complex_result_value(FormulaComplex::new(0.0, 0.0, 'i')));
+  }
+  let mut suffix = values[0].suffix();
+  let mut result = if product {
+    Complex::new(1.0, 0.0)
+  } else {
+    Complex::new(0.0, 0.0)
+  };
+  for value in values {
+    if suffix != 'j' && value.suffix() == 'j' {
+      suffix = 'j';
+    }
+    result = if product {
+      result * value.value()
+    } else {
+      result + value.value()
+    };
+  }
+  Some(complex_result_value(FormulaComplex::from_value(
+    result, suffix,
+  )))
+}
+
+fn collect_complex_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: FormulaValue<'doc>,
+  values: &mut Vec<FormulaComplex>,
+) -> std::result::Result<(), FormulaErrorValue> {
+  match value {
+    FormulaValue::Error(error) => Err(error),
+    FormulaValue::Blank => Ok(()),
+    FormulaValue::String(ref text) if text.is_empty() => Ok(()),
+    FormulaValue::Matrix(_) | FormulaValue::Reference(_) | FormulaValue::RefList(_) => {
+      for value in evaluator.matrix_values(&value).into_iter().flatten() {
+        collect_complex_values(evaluator, value, values)?;
+      }
+      Ok(())
+    }
+    value => {
+      values.push(strict_complex_arg(evaluator, value)?);
+      Ok(())
+    }
+  }
+}
+
+fn strict_complex_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: FormulaValue<'doc>,
+) -> std::result::Result<FormulaComplex, FormulaErrorValue> {
+  let text = strict_text_arg(evaluator, value)?;
+  parse_complex_number(&text).ok_or(FormulaErrorValue::Value)
+}
+
+fn complex_inverse_result<'doc>(value: Complex<f64>, suffix: char) -> FormulaValue<'doc> {
+  if value.norm_sqr() == 0.0 {
+    return FormulaValue::Error(FormulaErrorValue::Div0);
+  }
+  complex_result_value(FormulaComplex::from_value(
+    Complex::new(1.0, 0.0) / value,
+    suffix,
+  ))
+}
+
+fn finite_complex_number<'doc>(value: f64) -> FormulaValue<'doc> {
+  if value.is_finite() {
+    FormulaValue::Number(value)
+  } else {
+    FormulaValue::Error(FormulaErrorValue::Num)
+  }
+}
+
+fn complex_result_value<'doc>(value: FormulaComplex) -> FormulaValue<'doc> {
+  let complex = value.value();
+  if !complex.re.is_finite() || !complex.im.is_finite() {
+    return FormulaValue::Error(FormulaErrorValue::Num);
+  }
+  let normalized = FormulaComplex::new(
+    if complex.re.abs() <= 1.0e-14 {
+      0.0
+    } else {
+      complex.re
+    },
+    if complex.im.abs() <= 1.0e-14 {
+      0.0
+    } else {
+      complex.im
+    },
+    value.suffix(),
+  );
+  FormulaValue::String(Cow::Owned(format_complex_result(normalized)))
 }
 
 fn matrix_number_values_strict<'doc>(
@@ -7322,6 +8155,11 @@ fn format_complex_component(value: f64, leading_sign: bool) -> String {
   if !value.is_finite() {
     return "#VALUE!".to_string();
   }
+  let value = if value > 0.9 && value < 1.0 {
+    value + 5.0e-16
+  } else {
+    value
+  };
   let mut output = format_general_significant(value, 15);
   if leading_sign && value > 0.0 && !output.starts_with('+') {
     output.insert(0, '+');
@@ -7345,7 +8183,11 @@ fn format_general_significant(value: f64, precision: i32) -> String {
   };
   let mantissa = trim_float_text(mantissa);
   let exponent_value = exponent.parse::<i32>().unwrap_or(0);
-  format!("{mantissa}e{exponent_value:+}")
+  if exponent_value < 0 {
+    format!("{mantissa}e-{abs:02}", abs = exponent_value.abs())
+  } else {
+    format!("{mantissa}e+{exponent_value:02}")
+  }
 }
 
 fn trim_float_text(value: &str) -> String {

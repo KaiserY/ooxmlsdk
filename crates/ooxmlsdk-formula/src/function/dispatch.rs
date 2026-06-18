@@ -8,16 +8,19 @@ use statrs::distribution::{
 use super::{
   EvalContext, FormulaFunctionId, FunctionArgReader, FunctionArgs, resolve_function_name,
 };
-use crate::calc::combinatorics::{combination_count, gcd_number, lcm_number};
+use crate::calc::combinatorics::{
+  combination_count, gcd_number, lcm_number, permutation_count, permutation_with_repetition_count,
+};
 use crate::calc::complex::{
   FormulaComplex, binary_suffix, format_complex_number as format_formula_complex_number,
   parse_complex_number,
 };
 use crate::calc::datetime::{
-  date_from_serial_with_system, date_serial, date_serial_with_system,
+  date_from_serial_with_system, date_serial, date_serial_with_system, date_to_days,
   days360_with_system as date_days360, is_leap_year, is_valid_libreoffice_gregorian_date,
   iso_weeknum_from_serial_with_system, last_day_of_month, normalized_date_components,
-  weekday_index_from_serial, weeks_mode_one_index, yearfrac as date_yearfrac,
+  weekday_index_from_serial, weeks_in_year_from_serial_with_system, weeks_mode_one_index,
+  yearfrac as date_yearfrac,
 };
 use crate::calc::financial::{
   finance_coupdaybs, finance_coupdays, finance_coupdaysnc, finance_coupncd, finance_coupnum,
@@ -37,8 +40,9 @@ use crate::calc::radix::{
 };
 use crate::calc::regression::{EtsKind, scalar_state as regression_scalar_state};
 use crate::calc::special::{
-  BesselKind, SpecialError, bessel, lo_chi_dist, lo_chisq_dist_cdf, lo_f_dist_right_tail, lo_gauss,
-  lo_integral_phi, lo_iterate_inverse, lo_phi, lo_poisson_dist, log_gamma, norm_s_inv,
+  BesselKind, SpecialError, bessel, erf, erfc, lo_chi_dist, lo_chisq_dist_cdf,
+  lo_f_dist_right_tail, lo_gauss, lo_integral_phi, lo_iterate_inverse, lo_phi, lo_poisson_dist,
+  log_gamma, norm_s_inv,
 };
 use crate::calc::statistics::{
   PercentileKind, StatisticsError, correlation, covariance, deviation_sum_squares,
@@ -508,6 +512,9 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Fact | FormulaFunctionId::Factdouble => {
       Some(FormulaValue::Error(FormulaErrorValue::Value))
     }
+    FormulaFunctionId::Multinomial => evaluate_multinomial_reader(args),
+    FormulaFunctionId::Seriessum if args.len() == 4 => evaluate_seriessum_reader(evaluator, args),
+    FormulaFunctionId::Seriessum => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Radians if args.len() == 1 => {
       scalar_numeric_unary_arg(evaluator, args, f64::to_radians)
     }
@@ -755,6 +762,12 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Lcm => evaluate_gcd_lcm_reader(args, false),
     FormulaFunctionId::Combin if args.len() == 2 => evaluate_combin_reader(evaluator, args, false),
     FormulaFunctionId::Combina if args.len() == 2 => evaluate_combin_reader(evaluator, args, true),
+    FormulaFunctionId::Permut if args.len() == 2 => {
+      evaluate_permutation_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::Permutationa if args.len() == 2 => {
+      evaluate_permutation_reader(evaluator, args, true)
+    }
     FormulaFunctionId::Median => evaluate_median_reader(evaluator, args),
     FormulaFunctionId::Large if args.len() == 2 => {
       evaluate_large_small_reader(evaluator, args, true)
@@ -923,6 +936,16 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::Days360 => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Weeks if args.len() == 3 => evaluate_weeks_reader(evaluator, args),
+    FormulaFunctionId::Weeknum if args.len() == 2 => evaluate_weeknum_reader(evaluator, args),
+    FormulaFunctionId::Months if args.len() == 3 => {
+      evaluate_months_years_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::Years if args.len() == 3 => {
+      evaluate_months_years_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Weeksinyear if args.len() == 1 => {
+      evaluate_weeks_in_year_reader(evaluator, args)
+    }
     FormulaFunctionId::Daysinmonth if args.len() == 1 => {
       evaluate_days_in_month_year_reader(evaluator, args, false)
     }
@@ -1009,6 +1032,18 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Dec2hex if (1..=2).contains(&args.len()) => {
       evaluate_decimal_to_base_reader(evaluator, args, 16, -549_755_813_888.0, 549_755_813_887.0)
     }
+    FormulaFunctionId::Bitand | FormulaFunctionId::Bitor | FormulaFunctionId::Bitxor
+      if args.len() == 2 =>
+    {
+      evaluate_bitwise_reader(evaluator, args, function)
+    }
+    FormulaFunctionId::Bitlshift | FormulaFunctionId::Bitrshift if args.len() == 2 => {
+      evaluate_bitshift_reader(
+        evaluator,
+        args,
+        matches!(function, FormulaFunctionId::Bitlshift),
+      )
+    }
     FormulaFunctionId::Bin2dec
     | FormulaFunctionId::Oct2dec
     | FormulaFunctionId::Hex2dec
@@ -1020,7 +1055,12 @@ fn evaluate_function_reader<'doc>(
     | FormulaFunctionId::Hex2oct
     | FormulaFunctionId::Dec2bin
     | FormulaFunctionId::Dec2oct
-    | FormulaFunctionId::Dec2hex => Some(FormulaValue::Error(FormulaErrorValue::Value)),
+    | FormulaFunctionId::Dec2hex
+    | FormulaFunctionId::Bitand
+    | FormulaFunctionId::Bitor
+    | FormulaFunctionId::Bitxor
+    | FormulaFunctionId::Bitlshift
+    | FormulaFunctionId::Bitrshift => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Left if (1..=2).contains(&args.len()) => {
       evaluate_left_reader(evaluator, args, false)
     }
@@ -1248,6 +1288,13 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::Bessely if args.len() == 2 => {
       evaluate_bessel_reader(evaluator, args, BesselKind::Y)
+    }
+    FormulaFunctionId::Erf | FormulaFunctionId::ErfDotPrecise if (1..=2).contains(&args.len()) => {
+      evaluate_erf_reader(evaluator, args)
+    }
+    FormulaFunctionId::ErfcDotPrecise if args.len() == 1 => evaluate_erfc_reader(evaluator, args),
+    FormulaFunctionId::Gestep if (1..=2).contains(&args.len()) => {
+      evaluate_gestep_reader(evaluator, args)
     }
     FormulaFunctionId::Dollarde if args.len() == 2 => {
       evaluate_dollar_decimal_reader(evaluator, args, true)
@@ -4282,6 +4329,117 @@ fn evaluate_weeks_reader<'doc>(
   }
 }
 
+fn evaluate_months_years_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  years: bool,
+) -> Option<FormulaValue<'doc>> {
+  if args.is_missing(2) {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let Some(start) = evaluator.date_number_from_value(&args.value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let Some(end) = evaluator.date_number_from_value(&args.value(1)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let mode = match scalar_number_arg_or_value(evaluator, args, 2)? {
+    Ok(value) => approx_floor(value) as i32,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if mode != 0 && mode != 1 {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  let start = start.floor() as i32;
+  let end = end.floor() as i32;
+  let Some(months) = date_diff_months_with_system(start, end, mode, evaluator.book.date_system)
+  else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  Some(FormulaValue::Number(if years {
+    if mode == 1 {
+      let (start_year, _, _) = date_from_serial_with_system(start, evaluator.book.date_system)?;
+      let (end_year, _, _) = date_from_serial_with_system(end, evaluator.book.date_system)?;
+      (end_year - start_year) as f64
+    } else {
+      (months / 12) as f64
+    }
+  } else {
+    months as f64
+  }))
+}
+
+fn date_diff_months_with_system(
+  start: i32,
+  end: i32,
+  mode: i32,
+  date_system: DateSystem,
+) -> Option<i32> {
+  let (start_year, start_month, start_day) = date_from_serial_with_system(start, date_system)?;
+  let (end_year, end_month, end_day) = date_from_serial_with_system(end, date_system)?;
+  let mut result = end_month as i32 - start_month as i32 + (end_year - start_year) * 12;
+  if mode == 1 || start == end {
+    return Some(result);
+  }
+  if start < end {
+    if start_day > end_day {
+      result -= 1;
+    }
+  } else if start_day < end_day {
+    result += 1;
+  }
+  Some(result)
+}
+
+fn evaluate_weeks_in_year_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let Some(serial) = evaluator.date_number_from_value(&args.value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  weeks_in_year_from_serial_with_system(serial.floor() as i32, evaluator.book.date_system)
+    .map(|value| FormulaValue::Number(value as f64))
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+}
+
+fn evaluate_weeknum_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let Some(serial) = evaluator.date_number_from_value(&args.value(0)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  };
+  let mode = if args.is_missing(1) {
+    1
+  } else {
+    match scalar_number_arg_or_value(evaluator, args, 1)? {
+      Ok(value) => approx_floor(value) as i32,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  };
+  if mode == 21 || mode == 150 {
+    return iso_weeknum_from_serial_with_system(serial.floor() as i32, evaluator.book.date_system)
+      .map(|value| FormulaValue::Number(value as f64))
+      .or(Some(FormulaValue::Error(FormulaErrorValue::Value)));
+  }
+  let first_day = match mode {
+    1 => 6,
+    2 => 0,
+    11..=17 => mode - 11,
+    _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+  };
+  let (year, _, _) =
+    date_from_serial_with_system(serial.floor() as i32, evaluator.book.date_system)?;
+  let year_start_serial = date_serial_with_system(year, 1, 1, evaluator.book.date_system)? as i32;
+  let year_start_days = date_to_days(year, 1, 1)?;
+  let first_day_in_year = (year_start_days - 1).rem_euclid(7) as i32;
+  let offset = (first_day_in_year - first_day).rem_euclid(7);
+  Some(FormulaValue::Number(
+    ((serial.floor() as i32 - year_start_serial + offset) / 7 + 1) as f64,
+  ))
+}
+
 fn evaluate_days_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -4412,6 +4570,85 @@ fn double_factorial_value(n: u32) -> f64 {
     .rev()
     .step_by(2)
     .fold(1.0, |acc, item| acc * f64::from(item))
+}
+
+fn libreoffice_binomial_coefficient(mut n: f64, mut k: f64) -> f64 {
+  k = approx_floor(k);
+  if n < k {
+    0.0
+  } else if k == 0.0 {
+    1.0
+  } else {
+    let mut value = n / k;
+    n -= 1.0;
+    k -= 1.0;
+    while k > 0.0 {
+      value *= n / k;
+      n -= 1.0;
+      k -= 1.0;
+    }
+    value
+  }
+}
+
+fn evaluate_multinomial_reader<'doc>(
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let mut sum = 0.0;
+  let mut result = 1.0;
+  let mut seen = false;
+  for index in 0..args.len() {
+    for value in args.value_numbers(index)? {
+      seen = true;
+      let n = if value >= 0.0 {
+        approx_floor(value)
+      } else {
+        approx_ceil(value)
+      };
+      if n < 0.0 {
+        return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+      }
+      if n > 0.0 {
+        sum += n;
+        let coefficient = libreoffice_binomial_coefficient(sum, n);
+        result *= coefficient;
+      }
+    }
+  }
+  Some(FormulaValue::Number(if seen { result } else { 0.0 }))
+}
+
+fn evaluate_seriessum_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let x = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let mut power = match scalar_number_arg_or_value(evaluator, args, 1)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let step = match scalar_number_arg_or_value(evaluator, args, 2)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if x == 0.0 && power == 0.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Num));
+  }
+  let mut result = 0.0;
+  if x != 0.0 {
+    for coefficient in args.value_numbers(3)? {
+      result += coefficient * x.powf(power);
+      power += step;
+    }
+  }
+  Some(if result.is_finite() {
+    FormulaValue::Number(result)
+  } else {
+    FormulaValue::Error(FormulaErrorValue::Num)
+  })
 }
 
 fn evaluate_datedif_reader<'doc>(
@@ -5682,6 +5919,73 @@ fn evaluate_decimal_reader<'doc>(
     )))
 }
 
+const BIT_FUNCTION_LIMIT: f64 = 281_474_976_710_656.0;
+
+fn evaluate_bitwise_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  function: FormulaFunctionId,
+) -> Option<FormulaValue<'doc>> {
+  let left = match bit_function_arg(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let right = match bit_function_arg(evaluator, args, 1)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  Some(FormulaValue::Number(match function {
+    FormulaFunctionId::Bitand => (left & right) as f64,
+    FormulaFunctionId::Bitor => (left | right) as f64,
+    FormulaFunctionId::Bitxor => (left ^ right) as f64,
+    _ => unreachable!(),
+  }))
+}
+
+fn evaluate_bitshift_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  left_shift: bool,
+) -> Option<FormulaValue<'doc>> {
+  let num = match bit_function_arg(evaluator, args, 0)? {
+    Ok(value) => value as f64,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let shift = match scalar_number_arg_or_value(evaluator, args, 1)? {
+    Ok(value) => approx_floor(value),
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let result = if shift < 0.0 {
+    if left_shift {
+      approx_floor(num / 2.0_f64.powf(-shift))
+    } else {
+      num * 2.0_f64.powf(-shift)
+    }
+  } else if shift == 0.0 {
+    num
+  } else if left_shift {
+    num * 2.0_f64.powf(shift)
+  } else {
+    approx_floor(num / 2.0_f64.powf(shift))
+  };
+  Some(FormulaValue::Number(result))
+}
+
+fn bit_function_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+) -> Option<std::result::Result<u64, FormulaErrorValue>> {
+  let value = match scalar_number_arg_or_value(evaluator, args, index)? {
+    Ok(value) => approx_floor(value),
+    Err(error) => return Some(Err(error)),
+  };
+  if !(0.0..BIT_FUNCTION_LIMIT).contains(&value) {
+    return Some(Err(FormulaErrorValue::IllegalArgument));
+  }
+  Some(Ok(value as u64))
+}
+
 fn evaluate_base_to_decimal_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -5735,6 +6039,64 @@ fn evaluate_bessel_reader<'doc>(
   } else {
     FormulaValue::Error(FormulaErrorValue::Num)
   })
+}
+
+fn evaluate_erf_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let lower = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let value = if args.len() == 2 {
+    let upper = match scalar_number_arg_or_value(evaluator, args, 1)? {
+      Ok(value) => value,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    };
+    erf(upper) - erf(lower)
+  } else {
+    erf(lower)
+  };
+  Some(if value.is_finite() {
+    FormulaValue::Number(value)
+  } else {
+    FormulaValue::Error(FormulaErrorValue::Num)
+  })
+}
+
+fn evaluate_erfc_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let value = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => erfc(value),
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  Some(if value.is_finite() {
+    FormulaValue::Number(value)
+  } else {
+    FormulaValue::Error(FormulaErrorValue::Num)
+  })
+}
+
+fn evaluate_gestep_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let number = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let step = if args.len() == 2 {
+    match scalar_number_arg_or_value(evaluator, args, 1)? {
+      Ok(value) => value,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  } else {
+    0.0
+  };
+  Some(FormulaValue::Number(if number >= step { 1.0 } else { 0.0 }))
 }
 
 fn base_digits_text<'doc>(evaluator: &EvalContext<'_, 'doc>, value: &FormulaValue<'doc>) -> String {
@@ -5802,6 +6164,59 @@ fn evaluate_combin_reader<'doc>(
   combination_count(count, chosen, repetition, log_gamma)
     .map(FormulaValue::Number)
     .or(Some(FormulaValue::Error(invalid_error)))
+}
+
+fn evaluate_permutation_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  repetition: bool,
+) -> Option<FormulaValue<'doc>> {
+  let count_arg = args.value(0)?;
+  let chosen_arg = args.value(1)?;
+  if evaluator.array_context && (is_matrix_argument(&count_arg) || is_matrix_argument(&chosen_arg))
+  {
+    return evaluator.map_binary_values(count_arg, chosen_arg, |evaluator, count, chosen| {
+      Some(evaluate_permutation_value(
+        evaluator,
+        count.clone(),
+        chosen.clone(),
+        repetition,
+      ))
+    });
+  }
+  Some(evaluate_permutation_value(
+    evaluator, count_arg, chosen_arg, repetition,
+  ))
+}
+
+fn evaluate_permutation_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  count_arg: FormulaValue<'doc>,
+  chosen_arg: FormulaValue<'doc>,
+  repetition: bool,
+) -> FormulaValue<'doc> {
+  let count_arg = evaluator.scalar_binary_operand(count_arg);
+  if let FormulaValue::Error(error) = count_arg {
+    return FormulaValue::Error(error);
+  }
+  let chosen_arg = evaluator.scalar_binary_operand(chosen_arg);
+  if let FormulaValue::Error(error) = chosen_arg {
+    return FormulaValue::Error(error);
+  }
+  let Some(count) = evaluator.number(&count_arg).map(approx_floor) else {
+    return FormulaValue::Error(FormulaErrorValue::Value);
+  };
+  let Some(chosen) = evaluator.number(&chosen_arg).map(approx_floor) else {
+    return FormulaValue::Error(FormulaErrorValue::Value);
+  };
+  let value = if repetition {
+    permutation_with_repetition_count(count, chosen)
+  } else {
+    permutation_count(count, chosen, log_gamma)
+  };
+  value
+    .map(FormulaValue::Number)
+    .unwrap_or(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
 }
 
 fn evaluate_median_reader<'doc>(

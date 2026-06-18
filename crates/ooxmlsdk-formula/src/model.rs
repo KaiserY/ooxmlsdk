@@ -20,6 +20,10 @@ use crate::evaluator::{
   display_text_from_value_with_number_format, error_text, error_text_value, error_value,
   qualified_range, range_intersection_value, split_indirect_intersection,
 };
+use crate::program::FormulaProgram;
+use crate::source::{
+  FormulaCompileContext, FormulaSource, FormulaSourceKind, FormulaSourcePosition,
+};
 use crate::{
   CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue, FormulaValue,
   QualifiedAddress, QualifiedRange, Result, SheetId,
@@ -651,6 +655,7 @@ pub struct ParsedFormula<'doc> {
   pub grammar: FormulaGrammar,
   pub tokens: Vec<FormulaToken<'doc>>,
   pub(crate) body_start: usize,
+  pub(crate) program: Option<FormulaProgram>,
   pub(crate) code: Option<FormulaCode<'doc>>,
   pub dependencies: Vec<FormulaDependency<'doc>>,
   pub unsupported: Vec<UnsupportedFormulaFeature<'doc>>,
@@ -667,6 +672,7 @@ impl<'doc> ParsedFormula<'doc> {
         .map(FormulaToken::into_owned)
         .collect(),
       body_start: self.body_start,
+      program: self.program,
       code: self.code.map(FormulaCode::into_owned),
       dependencies: self
         .dependencies
@@ -3356,16 +3362,30 @@ fn lower_formula_parser_formula<'doc>(
   let body_start = parsed.body_start;
   let text = parsed.body;
   let borrowed_text = match &source {
-    Cow::Borrowed(value) => Some(value.get(body_start..).unwrap_or(value)),
+    Cow::Borrowed(value) => Some((*value).get(body_start..).unwrap_or(*value)),
     Cow::Owned(_) => None,
   };
-  let lowered = lower_formula_parser_body(sheet, text, borrowed_text, parsed.body_parse);
+  let borrowed_source = match &source {
+    Cow::Borrowed(value) => Some(*value),
+    Cow::Owned(_) => None,
+  };
+  let lowered = lower_formula_parser_body(
+    sheet,
+    source.as_ref(),
+    borrowed_source,
+    grammar,
+    body_start,
+    text,
+    borrowed_text,
+    parsed.body_parse,
+  );
 
   ParsedFormula {
     source,
     grammar,
     tokens: lowered.tokens,
     body_start,
+    program: lowered.program,
     code: lowered.code,
     dependencies: lowered.dependencies,
     unsupported: lowered.unsupported,
@@ -3389,6 +3409,7 @@ fn parse_array_constant_formula<'doc>(formula: &str) -> Option<Vec<Vec<FormulaVa
 
 struct LoweredFormula<'doc> {
   tokens: Vec<FormulaToken<'doc>>,
+  program: Option<FormulaProgram>,
   code: Option<FormulaCode<'doc>>,
   dependencies: Vec<FormulaDependency<'doc>>,
   unsupported: Vec<UnsupportedFormulaFeature<'doc>>,
@@ -3396,6 +3417,10 @@ struct LoweredFormula<'doc> {
 
 fn lower_formula_parser_body<'doc>(
   sheet: SheetId,
+  full_source: &str,
+  borrowed_source: Option<&'doc str>,
+  grammar: FormulaGrammar,
+  body_start: usize,
   text: &str,
   borrowed_text: Option<&'doc str>,
   parsed: crate::parser::FormulaBodyParse,
@@ -3408,7 +3433,7 @@ fn lower_formula_parser_body<'doc>(
   let mut tokens = Vec::with_capacity(parsed_tokens.len());
   let mut unsupported = Vec::new();
 
-  for token in parsed_tokens {
+  for token in &parsed_tokens {
     match token.kind {
       crate::parser::FormulaBodyTokenKind::Text => {
         tokens.push(FormulaToken::Literal(formula_text_value(
@@ -3476,11 +3501,25 @@ fn lower_formula_parser_body<'doc>(
   unsupported.extend(formula_parse_issues_to_unsupported(
     text,
     borrowed_text,
-    issues,
+    issues.clone(),
   ));
-  let code = FormulaCode::from_parser_ast(sheet, text, borrowed_text, parser_ast.as_ref());
+  let program = FormulaProgram::from_parser_parts(
+    FormulaSource {
+      text: full_source,
+      context: FormulaCompileContext {
+        grammar,
+        position: FormulaSourcePosition::Sheet(sheet),
+        kind: FormulaSourceKind::Cell,
+      },
+    },
+    body_start,
+    parsed_tokens.len(),
+    parser_ast.as_ref(),
+    &issues,
+  );
+  let code = FormulaCode::from_program(sheet, borrowed_source, &program);
   if code.is_none()
-    && parser_ast.is_some()
+    && program.root.is_some()
     && !unsupported
       .iter()
       .any(|issue| issue.reason.as_ref() == "formula expression is not fully parsed")
@@ -3496,6 +3535,7 @@ fn lower_formula_parser_body<'doc>(
 
   LoweredFormula {
     tokens,
+    program: Some(program),
     code,
     dependencies,
     unsupported,

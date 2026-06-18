@@ -1,8 +1,18 @@
 use std::borrow::Cow;
 
-use crate::dependency::{ExternalReferenceId, cow_span_text, external_reference_id_from_spans};
+use crate::dependency::ExternalReferenceId;
 use crate::function::{FormulaFunctionId, resolve_function_name};
-use crate::{FormulaErrorValue, FormulaOperator, FormulaValue, QualifiedRange, SheetId, parser};
+use crate::program::{
+  FormulaAddressFlags, FormulaArraySpan, FormulaExprId, FormulaFunctionName, FormulaNameScope,
+  FormulaNodeKind, FormulaProgram, FormulaReference, FormulaReferenceFlags, FormulaReferencePoint,
+  FormulaSheetName, FormulaSheetRange, FormulaSheetReference, FormulaStructuredReference,
+  FormulaStructuredReferenceItem, FormulaStructuredReferencePart,
+  FormulaStructuredReferenceSpecifier,
+};
+use crate::{
+  AddressFlags, CellAddress, CellRange, FormulaErrorValue, FormulaOperator, FormulaValue,
+  QualifiedRange, SheetId, SheetName, parser,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct FormulaCode<'doc> {
@@ -10,14 +20,19 @@ pub(crate) struct FormulaCode<'doc> {
 }
 
 impl<'doc> FormulaCode<'doc> {
-  pub(crate) fn from_parser_ast(
-    sheet: SheetId,
-    source: &str,
+  pub(crate) fn from_program(
+    current_sheet: SheetId,
     borrowed_source: Option<&'doc str>,
-    ast: Option<&parser::FormulaAst>,
+    program: &FormulaProgram,
   ) -> Option<Self> {
-    let mut ops = Vec::new();
-    lower_node(sheet, source, borrowed_source, ast?, &mut ops)?;
+    let mut ops = Vec::with_capacity(program.nodes.len());
+    lower_program_node(
+      current_sheet,
+      borrowed_source,
+      program,
+      program.root?,
+      &mut ops,
+    )?;
     Some(Self { ops })
   }
 
@@ -25,6 +40,522 @@ impl<'doc> FormulaCode<'doc> {
     FormulaCode {
       ops: self.ops.into_iter().map(FormulaOp::into_owned).collect(),
     }
+  }
+}
+
+fn lower_program_node<'doc>(
+  current_sheet: SheetId,
+  borrowed_source: Option<&'doc str>,
+  program: &FormulaProgram,
+  id: FormulaExprId,
+  ops: &mut Vec<FormulaOp<'doc>>,
+) -> Option<()> {
+  let node = program.node(id)?;
+  match &node.kind {
+    FormulaNodeKind::Blank | FormulaNodeKind::MissingArgument => ops.push(FormulaOp::PushBlank),
+    FormulaNodeKind::Text(value) => {
+      ops.push(FormulaOp::PushText(program_text_cow(
+        program,
+        borrowed_source,
+        node.span,
+        *value,
+      )?));
+    }
+    FormulaNodeKind::Number(value) => {
+      ops.push(FormulaOp::PushNumber(match value {
+        crate::program::FormulaNumberLiteral::Integer(value) => *value as f64,
+        crate::program::FormulaNumberLiteral::Number(value) => *value,
+      }));
+    }
+    FormulaNodeKind::Boolean(value) => ops.push(FormulaOp::PushBoolean(*value)),
+    FormulaNodeKind::Error(value) => ops.push(FormulaOp::PushError(*value)),
+    FormulaNodeKind::Reference(reference) => {
+      ops.push(formula_op_from_program_reference(
+        current_sheet,
+        borrowed_source,
+        program,
+        node.span,
+        reference,
+      )?);
+    }
+    FormulaNodeKind::Unary { op, expr } => {
+      lower_program_node(current_sheet, borrowed_source, program, *expr, ops)?;
+      ops.push(FormulaOp::Unary(*op));
+    }
+    FormulaNodeKind::Binary { op, left, right } => {
+      lower_program_node(current_sheet, borrowed_source, program, *left, ops)?;
+      lower_program_node(current_sheet, borrowed_source, program, *right, ops)?;
+      ops.push(FormulaOp::Binary(*op));
+    }
+    FormulaNodeKind::Function { name, args } => {
+      let args = program.args(*args)?;
+      let mut arg_ranges = Vec::with_capacity(args.len());
+      for arg in args {
+        let start = ops.len();
+        lower_program_node(current_sheet, borrowed_source, program, *arg, ops)?;
+        arg_ranges.push(FormulaArgRange {
+          start,
+          end: ops.len(),
+        });
+      }
+      let name = function_name_cow(program, borrowed_source, node.span, *name)?;
+      let function = resolve_function_name(name.as_ref());
+      let volatile = node
+        .metadata
+        .labels
+        .contains(crate::program::FormulaNodeLabels::VOLATILE);
+      ops.push(FormulaOp::Call {
+        name,
+        function,
+        argc: args.len(),
+        arg_ranges,
+        volatile,
+        control: control_for_function(function),
+      });
+    }
+    FormulaNodeKind::Array(span) => {
+      lower_program_array(current_sheet, borrowed_source, program, *span, ops)?
+    }
+    FormulaNodeKind::Call { .. } | FormulaNodeKind::Unsupported(_) => return None,
+  }
+  Some(())
+}
+
+fn lower_program_array<'doc>(
+  current_sheet: SheetId,
+  borrowed_source: Option<&'doc str>,
+  program: &FormulaProgram,
+  span: FormulaArraySpan,
+  ops: &mut Vec<FormulaOp<'doc>>,
+) -> Option<()> {
+  let elements = program.array_elements(span)?;
+  for element in elements {
+    lower_program_node(current_sheet, borrowed_source, program, *element, ops)?;
+  }
+  ops.push(FormulaOp::Array {
+    row_lengths: vec![usize::from(span.cols); usize::from(span.rows)],
+  });
+  Some(())
+}
+
+fn function_name_cow<'doc>(
+  program: &FormulaProgram,
+  borrowed_source: Option<&'doc str>,
+  span: Option<crate::program::SourceSpan>,
+  name: FormulaFunctionName,
+) -> Option<Cow<'doc, str>> {
+  match name {
+    FormulaFunctionName::Builtin(id) => Some(Cow::Owned(format!("BUILTIN{}", id.0))),
+    FormulaFunctionName::External(id) | FormulaFunctionName::Unknown(id) => {
+      program_symbol_cow(program, borrowed_source, span, id)
+    }
+  }
+}
+
+fn formula_op_from_program_reference<'doc>(
+  current_sheet: SheetId,
+  borrowed_source: Option<&'doc str>,
+  program: &FormulaProgram,
+  span: Option<crate::program::SourceSpan>,
+  reference: &FormulaReference,
+) -> Option<FormulaOp<'doc>> {
+  match reference {
+    FormulaReference::Cell(reference) => {
+      if let FormulaSheetReference::External { book, sheet } = reference.target.sheet {
+        return Some(FormulaOp::PushExternal(external_reference_from_cell(
+          program,
+          book,
+          sheet,
+          reference.target,
+          reference.flags,
+        )?));
+      }
+      Some(FormulaOp::PushReference(qualified_range_from_points(
+        current_sheet,
+        program,
+        reference.target,
+        reference.target,
+        reference.flags,
+      )?))
+    }
+    FormulaReference::Range(reference) => {
+      if let FormulaSheetReference::External { book, sheet } = reference.start.sheet {
+        return Some(FormulaOp::PushExternal(external_reference_from_range(
+          program,
+          book,
+          sheet,
+          reference.start,
+          reference.end,
+          reference.flags,
+        )?));
+      }
+      Some(FormulaOp::PushReference(qualified_range_from_points(
+        current_sheet,
+        program,
+        reference.start,
+        reference.end,
+        reference.flags,
+      )?))
+    }
+    FormulaReference::Named(reference) => Some(FormulaOp::PushName(scoped_name_cow(
+      program,
+      borrowed_source,
+      span,
+      &reference.scope,
+      reference.name,
+    )?)),
+    FormulaReference::Structured(reference) => Some(FormulaOp::PushName(Cow::Owned(
+      structured_reference_text(program, reference)?,
+    ))),
+    FormulaReference::ExternalName(reference) => {
+      Some(FormulaOp::PushExternal(ExternalReferenceId {
+        book: Some(Cow::Owned(program.symbols.get(reference.book)?.to_string())),
+        sheet: match reference.sheet {
+          Some(sheet) => Some(Cow::Owned(sheet_name_text(program, sheet)?)),
+          None => None,
+        },
+        name: Some(Cow::Owned(program.symbols.get(reference.name)?.to_string())),
+      }))
+    }
+    FormulaReference::Deleted(_) => Some(FormulaOp::PushError(FormulaErrorValue::Ref)),
+  }
+}
+
+fn qualified_range_from_points<'doc>(
+  current_sheet: SheetId,
+  program: &FormulaProgram,
+  start: FormulaReferencePoint,
+  end: FormulaReferencePoint,
+  reference_flags: FormulaReferenceFlags,
+) -> Option<QualifiedRange<'doc>> {
+  let (sheet, sheet_name, end_sheet_name) =
+    qualified_sheet_parts(current_sheet, program, start.sheet, end.sheet)?;
+  Some(QualifiedRange {
+    sheet,
+    sheet_name: sheet_name.map(|name| SheetName(Cow::Owned(name))),
+    end_sheet_name: end_sheet_name.map(|name| SheetName(Cow::Owned(name))),
+    range: CellRange {
+      start: start.address,
+      end: end.address,
+    },
+    start_flags: address_flags(start.flags, reference_flags),
+    end_flags: address_flags(end.flags, reference_flags),
+  })
+}
+
+fn qualified_sheet_parts(
+  current_sheet: SheetId,
+  program: &FormulaProgram,
+  start: FormulaSheetReference,
+  end: FormulaSheetReference,
+) -> Option<(SheetId, Option<String>, Option<String>)> {
+  match (start, end) {
+    (FormulaSheetReference::Current, FormulaSheetReference::Current) => {
+      Some((current_sheet, None, None))
+    }
+    (
+      FormulaSheetReference::Local(FormulaSheetRange::Sheet(start)),
+      FormulaSheetReference::Local(FormulaSheetRange::Sheet(end)),
+    ) if start == end => {
+      let (sheet, name) = qualified_sheet_name(program, start)?;
+      Some((sheet, name, None))
+    }
+    (
+      FormulaSheetReference::Local(FormulaSheetRange::Range { start, end }),
+      FormulaSheetReference::Local(_),
+    )
+    | (
+      FormulaSheetReference::Local(_),
+      FormulaSheetReference::Local(FormulaSheetRange::Range { start, end }),
+    ) => {
+      let (sheet, start) = qualified_sheet_name(program, start)?;
+      let (_, end) = qualified_sheet_name(program, end)?;
+      Some((sheet, start, end))
+    }
+    (
+      FormulaSheetReference::Local(FormulaSheetRange::Sheet(start)),
+      FormulaSheetReference::Local(FormulaSheetRange::Sheet(end)),
+    ) => {
+      let (sheet, start) = qualified_sheet_name(program, start)?;
+      let (_, end) = qualified_sheet_name(program, end)?;
+      Some((sheet, start, end))
+    }
+    (
+      FormulaSheetReference::Local(FormulaSheetRange::Sheet(start)),
+      FormulaSheetReference::Current,
+    )
+    | (
+      FormulaSheetReference::Current,
+      FormulaSheetReference::Local(FormulaSheetRange::Sheet(start)),
+    ) => {
+      let (sheet, name) = qualified_sheet_name(program, start)?;
+      Some((sheet, name, None))
+    }
+    _ => None,
+  }
+}
+
+fn qualified_sheet_name(
+  program: &FormulaProgram,
+  sheet: FormulaSheetName,
+) -> Option<(SheetId, Option<String>)> {
+  match sheet {
+    FormulaSheetName::Id(sheet) => Some((sheet, None)),
+    FormulaSheetName::Name(name) => Some((
+      SheetId::default(),
+      Some(program.symbols.get(name)?.to_string()),
+    )),
+  }
+}
+
+fn address_flags(
+  flags: FormulaAddressFlags,
+  reference_flags: FormulaReferenceFlags,
+) -> AddressFlags {
+  AddressFlags {
+    absolute_column: flags.contains(FormulaAddressFlags::COL_ABS),
+    absolute_row: flags.contains(FormulaAddressFlags::ROW_ABS),
+    whole_column: reference_flags.contains(FormulaReferenceFlags::WHOLE_COLUMN),
+    whole_row: reference_flags.contains(FormulaReferenceFlags::WHOLE_ROW),
+  }
+}
+
+fn external_reference_from_cell<'doc>(
+  program: &FormulaProgram,
+  book: crate::symbol::FormulaSymbolId,
+  sheet: Option<FormulaSheetRange>,
+  point: FormulaReferencePoint,
+  flags: FormulaReferenceFlags,
+) -> Option<ExternalReferenceId<'doc>> {
+  let mut name = String::new();
+  push_cell_reference_text(point.address, point.flags, flags, &mut name);
+  Some(ExternalReferenceId {
+    book: Some(Cow::Owned(program.symbols.get(book)?.to_string())),
+    sheet: match sheet {
+      Some(sheet) => Some(Cow::Owned(sheet_range_text(program, sheet)?)),
+      None => None,
+    },
+    name: Some(Cow::Owned(name)),
+  })
+}
+
+fn external_reference_from_range<'doc>(
+  program: &FormulaProgram,
+  book: crate::symbol::FormulaSymbolId,
+  sheet: Option<FormulaSheetRange>,
+  start: FormulaReferencePoint,
+  end: FormulaReferencePoint,
+  flags: FormulaReferenceFlags,
+) -> Option<ExternalReferenceId<'doc>> {
+  let mut name = String::new();
+  push_cell_reference_text(start.address, start.flags, flags, &mut name);
+  name.push(':');
+  push_cell_reference_text(end.address, end.flags, flags, &mut name);
+  Some(ExternalReferenceId {
+    book: Some(Cow::Owned(program.symbols.get(book)?.to_string())),
+    sheet: match sheet {
+      Some(sheet) => Some(Cow::Owned(sheet_range_text(program, sheet)?)),
+      None => None,
+    },
+    name: Some(Cow::Owned(name)),
+  })
+}
+
+fn scoped_name_cow<'doc>(
+  program: &FormulaProgram,
+  borrowed_source: Option<&'doc str>,
+  span: Option<crate::program::SourceSpan>,
+  scope: &FormulaNameScope,
+  name: crate::symbol::FormulaSymbolId,
+) -> Option<Cow<'doc, str>> {
+  match scope {
+    FormulaNameScope::Workbook => program_symbol_cow(program, borrowed_source, span, name),
+    FormulaNameScope::Sheet(sheet) => {
+      let mut text = sheet_name_text(program, *sheet)?;
+      text.push('!');
+      text.push_str(program.symbols.get(name)?);
+      Some(Cow::Owned(text))
+    }
+  }
+}
+
+fn program_text_cow<'doc>(
+  program: &FormulaProgram,
+  borrowed_source: Option<&'doc str>,
+  span: Option<crate::program::SourceSpan>,
+  symbol: crate::symbol::FormulaSymbolId,
+) -> Option<Cow<'doc, str>> {
+  if let (Some(source), Some(span)) = (borrowed_source, span)
+    && let Some(value) = parser::formula_text_literal(source, span.start)
+  {
+    return Some(match value {
+      parser::TextLiteral::Borrowed(value) => Cow::Borrowed(value),
+      parser::TextLiteral::Owned(value) => Cow::Owned(value),
+    });
+  }
+  Some(Cow::Owned(program.symbols.get(symbol)?.to_string()))
+}
+
+fn program_symbol_cow<'doc>(
+  program: &FormulaProgram,
+  borrowed_source: Option<&'doc str>,
+  span: Option<crate::program::SourceSpan>,
+  symbol: crate::symbol::FormulaSymbolId,
+) -> Option<Cow<'doc, str>> {
+  let text = program.symbols.get(symbol)?;
+  if let (Some(source), Some(span)) = (borrowed_source, span)
+    && source.get(span.start..span.end) == Some(text)
+  {
+    return Some(Cow::Borrowed(source.get(span.start..span.end)?));
+  }
+  Some(Cow::Owned(text.to_string()))
+}
+
+fn sheet_range_text(program: &FormulaProgram, range: FormulaSheetRange) -> Option<String> {
+  let mut text = String::new();
+  match range {
+    FormulaSheetRange::Sheet(sheet) => text.push_str(&sheet_name_text(program, sheet)?),
+    FormulaSheetRange::Range { start, end } => {
+      text.push_str(&sheet_name_text(program, start)?);
+      text.push(':');
+      text.push_str(&sheet_name_text(program, end)?);
+    }
+  }
+  Some(text)
+}
+
+fn sheet_name_text(program: &FormulaProgram, sheet: FormulaSheetName) -> Option<String> {
+  match sheet {
+    FormulaSheetName::Id(sheet) => Some(format!("Sheet{}", sheet.0)),
+    FormulaSheetName::Name(name) => Some(program.symbols.get(name)?.to_string()),
+  }
+}
+
+fn structured_reference_text(
+  program: &FormulaProgram,
+  reference: &FormulaStructuredReference,
+) -> Option<String> {
+  let mut text = String::new();
+  if let Some(table) = reference.table {
+    text.push_str(program.symbols.get(table)?);
+  }
+  push_structured_reference_specifier(program, &reference.specifier, &mut text)?;
+  Some(text)
+}
+
+fn push_structured_reference_specifier(
+  program: &FormulaProgram,
+  specifier: &FormulaStructuredReferenceSpecifier,
+  text: &mut String,
+) -> Option<()> {
+  match specifier {
+    FormulaStructuredReferenceSpecifier::Table => {}
+    FormulaStructuredReferenceSpecifier::Item(item) => {
+      text.push('[');
+      text.push_str(structured_reference_item_text(*item));
+      text.push(']');
+    }
+    FormulaStructuredReferenceSpecifier::Column(column) => {
+      text.push('[');
+      push_structured_reference_column(program.symbols.get(*column)?, text);
+      text.push(']');
+    }
+    FormulaStructuredReferenceSpecifier::ColumnRange { start, end } => {
+      text.push_str("[[");
+      push_structured_reference_column(program.symbols.get(*start)?, text);
+      text.push_str("]:[");
+      push_structured_reference_column(program.symbols.get(*end)?, text);
+      text.push_str("]]");
+    }
+    FormulaStructuredReferenceSpecifier::Combination(span) => {
+      text.push('[');
+      for (index, part) in program
+        .structured_reference_parts(*span)?
+        .iter()
+        .enumerate()
+      {
+        if index > 0 {
+          text.push(',');
+        }
+        match part {
+          FormulaStructuredReferencePart::Item(item) => {
+            text.push_str(structured_reference_item_text(*item));
+          }
+          FormulaStructuredReferencePart::Column(column) => {
+            text.push('[');
+            push_structured_reference_column(program.symbols.get(*column)?, text);
+            text.push(']');
+          }
+          FormulaStructuredReferencePart::ColumnRange { start, end } => {
+            text.push('[');
+            push_structured_reference_column(program.symbols.get(*start)?, text);
+            text.push_str("]:[");
+            push_structured_reference_column(program.symbols.get(*end)?, text);
+            text.push(']');
+          }
+        }
+      }
+      text.push(']');
+    }
+  }
+  Some(())
+}
+
+fn structured_reference_item_text(item: FormulaStructuredReferenceItem) -> &'static str {
+  match item {
+    FormulaStructuredReferenceItem::All => "#All",
+    FormulaStructuredReferenceItem::Data => "#Data",
+    FormulaStructuredReferenceItem::Headers => "#Headers",
+    FormulaStructuredReferenceItem::Totals => "#Totals",
+    FormulaStructuredReferenceItem::ThisRow => "#This Row",
+  }
+}
+
+fn push_structured_reference_column(value: &str, text: &mut String) {
+  for ch in value.chars() {
+    match ch {
+      '\'' | '#' | '[' | ']' => {
+        text.push('\'');
+        text.push(ch);
+      }
+      _ => text.push(ch),
+    }
+  }
+}
+
+fn push_cell_reference_text(
+  address: CellAddress,
+  address_flags: FormulaAddressFlags,
+  reference_flags: FormulaReferenceFlags,
+  text: &mut String,
+) {
+  if address_flags.contains(FormulaAddressFlags::COL_ABS) {
+    text.push('$');
+  }
+  push_column_name(address.column, text);
+  if address_flags.contains(FormulaAddressFlags::ROW_ABS) {
+    text.push('$');
+  }
+  text.push_str(&(address.row + 1).to_string());
+  if reference_flags.contains(FormulaReferenceFlags::SPILL) {
+    text.push('#');
+  }
+}
+
+fn push_column_name(mut column: u32, text: &mut String) {
+  let mut name = [0u8; 8];
+  let mut len = 0usize;
+  loop {
+    name[len] = b'A' + (column % 26) as u8;
+    len += 1;
+    column /= 26;
+    if column == 0 {
+      break;
+    }
+    column -= 1;
+  }
+  for ch in name[..len].iter().rev() {
+    text.push(*ch as char);
   }
 }
 
@@ -103,101 +634,6 @@ impl<'doc> FormulaOp<'doc> {
   }
 }
 
-fn lower_node<'doc>(
-  sheet: SheetId,
-  source: &str,
-  borrowed_source: Option<&'doc str>,
-  ast: &parser::FormulaAst,
-  ops: &mut Vec<FormulaOp<'doc>>,
-) -> Option<()> {
-  match ast {
-    parser::FormulaAst::Blank => ops.push(FormulaOp::PushBlank),
-    parser::FormulaAst::Text(span) => {
-      ops.push(FormulaOp::PushText(formula_text_cow(
-        source,
-        borrowed_source,
-        span.start,
-      )?));
-    }
-    parser::FormulaAst::Number(value) => ops.push(FormulaOp::PushNumber(*value)),
-    parser::FormulaAst::Error(error) => {
-      ops.push(FormulaOp::PushError(formula_error_from_lex(*error)))
-    }
-    parser::FormulaAst::Word { span, kind } => {
-      lower_word(sheet, source, borrowed_source, *span, *kind, ops)?;
-    }
-    parser::FormulaAst::Unary { op, expr } => {
-      lower_node(sheet, source, borrowed_source, expr, ops)?;
-      ops.push(FormulaOp::Unary(unary_operator_from_lex(*op)?));
-    }
-    parser::FormulaAst::Binary { op, left, right } => {
-      lower_node(sheet, source, borrowed_source, left, ops)?;
-      lower_node(sheet, source, borrowed_source, right, ops)?;
-      ops.push(FormulaOp::Binary(formula_operator_from_lex(*op)));
-    }
-    parser::FormulaAst::Function {
-      name,
-      volatile,
-      args,
-    } => {
-      let mut arg_ranges = Vec::with_capacity(args.len());
-      for arg in args {
-        let start = ops.len();
-        lower_node(sheet, source, borrowed_source, arg, ops)?;
-        arg_ranges.push(FormulaArgRange {
-          start,
-          end: ops.len(),
-        });
-      }
-      let name = cow_span_text(source, borrowed_source, *name);
-      let function = resolve_function_name(name.as_ref());
-      ops.push(FormulaOp::Call {
-        name,
-        function,
-        argc: args.len(),
-        arg_ranges,
-        volatile: *volatile,
-        control: control_for_function(function),
-      });
-    }
-    parser::FormulaAst::LogicalFunction {
-      function: logical_function,
-      args,
-    } => {
-      let mut arg_ranges = Vec::with_capacity(args.len());
-      for arg in args {
-        let start = ops.len();
-        lower_node(sheet, source, borrowed_source, arg, ops)?;
-        arg_ranges.push(FormulaArgRange {
-          start,
-          end: ops.len(),
-        });
-      }
-      let name = Cow::Borrowed(logical_function.name());
-      let function = resolve_function_name(name.as_ref());
-      ops.push(FormulaOp::Call {
-        name,
-        function,
-        argc: args.len(),
-        arg_ranges,
-        volatile: false,
-        control: control_for_function(function),
-      });
-    }
-    parser::FormulaAst::Array(rows) => {
-      let mut row_lengths = Vec::with_capacity(rows.len());
-      for row in rows {
-        row_lengths.push(row.len());
-        for item in row {
-          lower_node(sheet, source, borrowed_source, item, ops)?;
-        }
-      }
-      ops.push(FormulaOp::Array { row_lengths });
-    }
-  }
-  Some(())
-}
-
 fn control_for_function(function: Option<FormulaFunctionId>) -> Option<FormulaControlOp> {
   match function? {
     FormulaFunctionId::If => Some(FormulaControlOp::IfJump),
@@ -209,46 +645,6 @@ fn control_for_function(function: Option<FormulaFunctionId>) -> Option<FormulaCo
     FormulaFunctionId::Let => Some(FormulaControlOp::LetBind),
     _ => None,
   }
-}
-
-fn lower_word<'doc>(
-  sheet: SheetId,
-  source: &str,
-  borrowed_source: Option<&'doc str>,
-  span: parser::SemanticSpan,
-  kind: parser::SemanticWordKind,
-  ops: &mut Vec<FormulaOp<'doc>>,
-) -> Option<()> {
-  let word = source.get(span.start..span.end)?;
-  match kind {
-    parser::SemanticWordKind::Boolean(value) => ops.push(FormulaOp::PushBoolean(value)),
-    parser::SemanticWordKind::ExternalReference(reference) => {
-      ops.push(FormulaOp::PushExternal(external_reference_id_from_spans(
-        word,
-        borrowed_source.and_then(|source| source.get(span.start..span.end)),
-        reference,
-      )));
-    }
-    parser::SemanticWordKind::ReferenceCandidate => {
-      if let Some(range) = parser::parse_formula_range(sheet, word) {
-        ops.push(FormulaOp::PushReference(range));
-      } else {
-        ops.push(FormulaOp::PushName(cow_span_text(
-          source,
-          borrowed_source,
-          span,
-        )));
-      }
-    }
-    parser::SemanticWordKind::Name => {
-      ops.push(FormulaOp::PushName(cow_span_text(
-        source,
-        borrowed_source,
-        span,
-      )));
-    }
-  }
-  Some(())
 }
 
 pub(crate) fn formula_operator_from_lex(operator: parser::LexOperator) -> FormulaOperator {
@@ -310,33 +706,6 @@ pub(crate) fn formula_error_from_lex(error: parser::LexErrorValue) -> FormulaErr
     parser::LexErrorValue::MatrixSize => FormulaErrorValue::MatrixSize,
     parser::LexErrorValue::BadArrayContent => FormulaErrorValue::BadArrayContent,
     parser::LexErrorValue::LinkFormulaNeedingCheck => FormulaErrorValue::LinkFormulaNeedingCheck,
-  }
-}
-
-fn unary_operator_from_lex(operator: parser::LexOperator) -> Option<FormulaOperator> {
-  match operator {
-    parser::LexOperator::Add => Some(FormulaOperator::UnaryPlus),
-    parser::LexOperator::Subtract => Some(FormulaOperator::UnaryMinus),
-    parser::LexOperator::ImplicitIntersection => Some(FormulaOperator::ImplicitIntersection),
-    parser::LexOperator::Percent => Some(FormulaOperator::Percent),
-    _ => None,
-  }
-}
-
-fn formula_text_cow<'doc>(
-  source: &str,
-  borrowed_source: Option<&'doc str>,
-  start: usize,
-) -> Option<Cow<'doc, str>> {
-  if let Some(borrowed_source) = borrowed_source {
-    return match parser::formula_text_literal(borrowed_source, start)? {
-      parser::TextLiteral::Borrowed(value) => Some(Cow::Borrowed(value)),
-      parser::TextLiteral::Owned(value) => Some(Cow::Owned(value)),
-    };
-  }
-  match parser::formula_text_literal(source, start)? {
-    parser::TextLiteral::Borrowed(value) => Some(Cow::Owned(value.to_string())),
-    parser::TextLiteral::Owned(value) => Some(Cow::Owned(value)),
   }
 }
 

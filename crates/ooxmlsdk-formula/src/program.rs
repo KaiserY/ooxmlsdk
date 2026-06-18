@@ -1,7 +1,13 @@
+use std::fmt::Write as _;
+
 use bitflags::bitflags;
 
+use crate::source::{FormulaSource, FormulaSourcePosition};
 use crate::symbol::{FormulaSymbolId, FormulaSymbolPool};
-use crate::{CellAddress, CellRange, FormulaErrorValue, FormulaOperator, SheetId};
+use crate::{
+  AddressFlags, CellAddress, CellRange, FormulaErrorValue, FormulaOperator, QualifiedRange,
+  SheetId, parser,
+};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FormulaProgram {
@@ -168,7 +174,7 @@ pub struct FormulaRangeReference {
   pub flags: FormulaReferenceFlags,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct FormulaReferencePoint {
   pub sheet: FormulaSheetReference,
   pub address: CellAddress,
@@ -403,4 +409,1197 @@ pub enum FormulaPrintGrammar {
   ExcelR1C1,
   OpenFormula,
   CalcA1,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct FormulaProgramBuilder {
+  program: FormulaProgram,
+}
+
+impl FormulaProgram {
+  pub fn builder() -> FormulaProgramBuilder {
+    FormulaProgramBuilder::new()
+  }
+
+  pub fn from_source(source: FormulaSource<'_>) -> Self {
+    let parsed = parser::FormulaParser::new(source.text).parse();
+    let mut builder = FormulaProgramBuilder::with_capacity(parsed.body_parse.tokens.len());
+    for issue in parsed.body_parse.issues {
+      builder.diagnostic(None, diagnostic_from_parse_issue(issue));
+    }
+
+    let root = parsed
+      .body_parse
+      .ast
+      .as_ref()
+      .and_then(|ast| lower_parser_ast(&mut builder, source, parsed.body_start, ast));
+    builder.finish_root(root)
+  }
+
+  pub(crate) fn from_parser_parts(
+    source: FormulaSource<'_>,
+    body_start: usize,
+    token_count: usize,
+    ast: Option<&parser::FormulaAst>,
+    issues: &[parser::FormulaParseIssue],
+  ) -> Self {
+    let mut builder = FormulaProgramBuilder::with_capacity(token_count);
+    for issue in issues {
+      builder.diagnostic(None, diagnostic_from_parse_issue(*issue));
+    }
+
+    let root = ast.and_then(|ast| lower_parser_ast(&mut builder, source, body_start, ast));
+    builder.finish_root(root)
+  }
+
+  pub fn print_formula(&self, options: &FormulaPrintOptions) -> Option<String> {
+    let root = self.root?;
+    let mut output = String::with_capacity(self.nodes.len().saturating_mul(8));
+    if options.include_leading_equals {
+      output.push('=');
+    }
+    FormulaPrinter {
+      program: self,
+      options,
+    }
+    .print_expr(root, 0, FormulaPrintSide::None, &mut output)?;
+    Some(output)
+  }
+
+  pub fn args(&self, span: FormulaArgSpan) -> Option<&[FormulaExprId]> {
+    let start = span.offset as usize;
+    let end = start.checked_add(span.len as usize)?;
+    self.args.get(start..end)
+  }
+
+  pub fn array_elements(&self, span: FormulaArraySpan) -> Option<&[FormulaExprId]> {
+    let start = span.offset as usize;
+    let len = usize::from(span.rows).checked_mul(usize::from(span.cols))?;
+    let end = start.checked_add(len)?;
+    self.array_elements.get(start..end)
+  }
+
+  pub fn structured_reference_parts(
+    &self,
+    span: FormulaStructuredReferenceSpan,
+  ) -> Option<&[FormulaStructuredReferencePart]> {
+    let start = span.offset as usize;
+    let end = start.checked_add(span.len as usize)?;
+    self.structured_reference_parts.get(start..end)
+  }
+
+  pub(crate) fn node(&self, id: FormulaExprId) -> Option<&FormulaNode> {
+    self.nodes.get(id.0 as usize)
+  }
+}
+
+impl FormulaProgramBuilder {
+  pub fn new() -> Self {
+    Self::default()
+  }
+
+  pub fn with_capacity(nodes: usize) -> Self {
+    Self {
+      program: FormulaProgram {
+        nodes: Vec::with_capacity(nodes),
+        args: Vec::with_capacity(nodes),
+        ..FormulaProgram::default()
+      },
+    }
+  }
+
+  pub fn intern(&mut self, text: &str) -> FormulaSymbolId {
+    self.program.symbols.intern(text)
+  }
+
+  pub fn push(
+    &mut self,
+    kind: FormulaNodeKind,
+    span: Option<SourceSpan>,
+    metadata: FormulaNodeMetadata,
+  ) -> FormulaExprId {
+    assert!(self.program.nodes.len() <= u32::MAX as usize);
+    let id = FormulaExprId(self.program.nodes.len() as u32);
+    self.program.nodes.push(FormulaNode {
+      kind,
+      span,
+      metadata,
+    });
+    id
+  }
+
+  pub fn blank(&mut self) -> FormulaExprId {
+    self.push_value(FormulaNodeKind::Blank)
+  }
+
+  pub fn text(&mut self, value: &str) -> FormulaExprId {
+    let symbol = self.intern(value);
+    self.push_value(FormulaNodeKind::Text(symbol))
+  }
+
+  pub fn integer(&mut self, value: i64) -> FormulaExprId {
+    self.push_value(FormulaNodeKind::Number(FormulaNumberLiteral::Integer(
+      value,
+    )))
+  }
+
+  pub fn number(&mut self, value: f64) -> FormulaExprId {
+    self.push_value(FormulaNodeKind::Number(FormulaNumberLiteral::Number(value)))
+  }
+
+  pub fn boolean(&mut self, value: bool) -> FormulaExprId {
+    self.push_value(FormulaNodeKind::Boolean(value))
+  }
+
+  pub fn error(&mut self, value: FormulaErrorValue) -> FormulaExprId {
+    self.push_value(FormulaNodeKind::Error(value))
+  }
+
+  pub fn missing_argument(&mut self) -> FormulaExprId {
+    self.push_value(FormulaNodeKind::MissingArgument)
+  }
+
+  pub fn named_reference(&mut self, name: &str) -> FormulaExprId {
+    let name = self.intern(name);
+    self.push_reference(FormulaReference::Named(FormulaNamedReference {
+      name,
+      scope: FormulaNameScope::Workbook,
+    }))
+  }
+
+  pub fn cell_reference(&mut self, address: CellAddress) -> FormulaExprId {
+    self.push_reference(FormulaReference::Cell(FormulaCellReference {
+      target: FormulaReferencePoint {
+        sheet: FormulaSheetReference::Current,
+        address,
+        flags: valid_address_flags(AddressFlags::default(), false),
+      },
+      flags: FormulaReferenceFlags::empty(),
+    }))
+  }
+
+  pub fn range_reference(&mut self, start: CellAddress, end: CellAddress) -> FormulaExprId {
+    self.push_reference(FormulaReference::Range(FormulaRangeReference {
+      start: FormulaReferencePoint {
+        sheet: FormulaSheetReference::Current,
+        address: start,
+        flags: valid_address_flags(AddressFlags::default(), false),
+      },
+      end: FormulaReferencePoint {
+        sheet: FormulaSheetReference::Current,
+        address: end,
+        flags: valid_address_flags(AddressFlags::default(), false),
+      },
+      flags: FormulaReferenceFlags::empty(),
+    }))
+  }
+
+  pub fn unary(&mut self, op: FormulaOperator, expr: FormulaExprId) -> FormulaExprId {
+    self.push_value(FormulaNodeKind::Unary { op, expr })
+  }
+
+  pub fn binary(
+    &mut self,
+    op: FormulaOperator,
+    left: FormulaExprId,
+    right: FormulaExprId,
+  ) -> FormulaExprId {
+    self.push_value(FormulaNodeKind::Binary { op, left, right })
+  }
+
+  pub fn function(&mut self, name: &str, args: &[FormulaExprId]) -> FormulaExprId {
+    let name = self.intern(name);
+    let args = self.push_arg_span(args);
+    self.push_value(FormulaNodeKind::Function {
+      name: FormulaFunctionName::Unknown(name),
+      args,
+    })
+  }
+
+  pub fn array(&mut self, rows: u16, cols: u16, elements: &[FormulaExprId]) -> FormulaExprId {
+    assert_eq!(usize::from(rows) * usize::from(cols), elements.len());
+    let span = self.push_array_span(rows, cols, elements);
+    self.push_value(FormulaNodeKind::Array(span))
+  }
+
+  pub fn structured_reference(
+    &mut self,
+    table: Option<&str>,
+    specifier: FormulaStructuredReferenceSpecifier,
+  ) -> FormulaExprId {
+    let table = table.map(|table| self.intern(table));
+    self.push_reference(FormulaReference::Structured(FormulaStructuredReference {
+      table,
+      specifier,
+    }))
+  }
+
+  pub fn structured_reference_parts(
+    &mut self,
+    parts: &[FormulaStructuredReferencePart],
+  ) -> FormulaStructuredReferenceSpan {
+    assert!(parts.len() <= u16::MAX as usize);
+    assert!(self.program.structured_reference_parts.len() <= u32::MAX as usize);
+    let span = FormulaStructuredReferenceSpan {
+      offset: self.program.structured_reference_parts.len() as u32,
+      len: parts.len() as u16,
+    };
+    self
+      .program
+      .structured_reference_parts
+      .extend_from_slice(parts);
+    span
+  }
+
+  pub fn diagnostic(&mut self, span: Option<SourceSpan>, kind: FormulaDiagnosticKind) {
+    self
+      .program
+      .diagnostics
+      .push(FormulaDiagnostic { span, kind });
+  }
+
+  pub fn finish(self, root: FormulaExprId) -> FormulaProgram {
+    self.finish_root(Some(root))
+  }
+
+  pub fn finish_root(mut self, root: Option<FormulaExprId>) -> FormulaProgram {
+    self.program.root = root;
+    self.program
+  }
+
+  fn push_value(&mut self, kind: FormulaNodeKind) -> FormulaExprId {
+    self.push(kind, None, FormulaNodeMetadata::default())
+  }
+
+  fn push_reference(&mut self, reference: FormulaReference) -> FormulaExprId {
+    self.push(
+      FormulaNodeKind::Reference(reference),
+      None,
+      FormulaNodeMetadata {
+        labels: FormulaNodeLabels::RETURNS_REFERENCE | FormulaNodeLabels::CONTAINS_REFERENCE,
+        operand_class: FormulaOperandClass::Reference,
+        param_class: FormulaParamClass::Unknown,
+      },
+    )
+  }
+
+  fn push_arg_span(&mut self, args: &[FormulaExprId]) -> FormulaArgSpan {
+    assert!(args.len() <= u16::MAX as usize);
+    assert!(self.program.args.len() <= u32::MAX as usize);
+    let span = FormulaArgSpan {
+      offset: self.program.args.len() as u32,
+      len: args.len() as u16,
+    };
+    self.program.args.extend_from_slice(args);
+    span
+  }
+
+  fn push_array_span(
+    &mut self,
+    rows: u16,
+    cols: u16,
+    elements: &[FormulaExprId],
+  ) -> FormulaArraySpan {
+    assert!(self.program.array_elements.len() <= u32::MAX as usize);
+    let span = FormulaArraySpan {
+      offset: self.program.array_elements.len() as u32,
+      rows,
+      cols,
+    };
+    self.program.array_elements.extend_from_slice(elements);
+    span
+  }
+}
+
+#[derive(Clone, Copy)]
+enum FormulaPrintSide {
+  None,
+  Left,
+  Right,
+}
+
+struct FormulaPrinter<'a> {
+  program: &'a FormulaProgram,
+  options: &'a FormulaPrintOptions,
+}
+
+impl FormulaPrinter<'_> {
+  fn print_expr(
+    &self,
+    id: FormulaExprId,
+    parent_precedence: u8,
+    side: FormulaPrintSide,
+    output: &mut String,
+  ) -> Option<u8> {
+    let node = self.program.node(id)?;
+    let precedence = node_precedence(&node.kind);
+    let parens = needs_parentheses(precedence, parent_precedence, side, &node.kind);
+    if parens {
+      output.push('(');
+    }
+    match &node.kind {
+      FormulaNodeKind::Blank | FormulaNodeKind::MissingArgument => {}
+      FormulaNodeKind::Text(value) => self.print_text(*value, output)?,
+      FormulaNodeKind::Number(value) => print_number(*value, output),
+      FormulaNodeKind::Boolean(value) => output.push_str(if *value { "TRUE" } else { "FALSE" }),
+      FormulaNodeKind::Error(value) => output.push_str(error_text(*value)),
+      FormulaNodeKind::Reference(reference) => self.print_reference(reference, output)?,
+      FormulaNodeKind::Unary { op, expr } => self.print_unary(*op, *expr, output)?,
+      FormulaNodeKind::Binary { op, left, right } => {
+        self.print_binary(*op, *left, *right, output)?
+      }
+      FormulaNodeKind::Function { name, args } => self.print_function(*name, *args, output)?,
+      FormulaNodeKind::Call { callee, args } => self.print_call(*callee, *args, output)?,
+      FormulaNodeKind::Array(span) => self.print_array(*span, output)?,
+      FormulaNodeKind::Unsupported(_) => return None,
+    }
+    if parens {
+      output.push(')');
+    }
+    Some(precedence)
+  }
+
+  fn print_text(&self, id: FormulaSymbolId, output: &mut String) -> Option<()> {
+    output.push('"');
+    for ch in self.program.symbols.get(id)?.chars() {
+      if ch == '"' {
+        output.push('"');
+      }
+      output.push(ch);
+    }
+    output.push('"');
+    Some(())
+  }
+
+  fn print_unary(
+    &self,
+    op: FormulaOperator,
+    expr: FormulaExprId,
+    output: &mut String,
+  ) -> Option<()> {
+    match op {
+      FormulaOperator::UnaryPlus => output.push('+'),
+      FormulaOperator::UnaryMinus => output.push('-'),
+      FormulaOperator::ImplicitIntersection => output.push('@'),
+      FormulaOperator::Percent => {
+        self.print_expr(expr, unary_precedence(op), FormulaPrintSide::Right, output)?;
+        output.push('%');
+        return Some(());
+      }
+      _ => return None,
+    }
+    self.print_expr(expr, unary_precedence(op), FormulaPrintSide::Right, output)?;
+    Some(())
+  }
+
+  fn print_binary(
+    &self,
+    op: FormulaOperator,
+    left: FormulaExprId,
+    right: FormulaExprId,
+    output: &mut String,
+  ) -> Option<()> {
+    let precedence = binary_precedence(op)?;
+    self.print_expr(left, precedence, FormulaPrintSide::Left, output)?;
+    output.push_str(binary_operator_text(op)?);
+    self.print_expr(right, precedence, FormulaPrintSide::Right, output)?;
+    Some(())
+  }
+
+  fn print_function(
+    &self,
+    name: FormulaFunctionName,
+    args: FormulaArgSpan,
+    output: &mut String,
+  ) -> Option<()> {
+    self.print_function_name(name, output)?;
+    output.push('(');
+    self.print_args(args, output)?;
+    output.push(')');
+    Some(())
+  }
+
+  fn print_call(
+    &self,
+    callee: FormulaExprId,
+    args: FormulaArgSpan,
+    output: &mut String,
+  ) -> Option<()> {
+    self.print_expr(callee, 0, FormulaPrintSide::None, output)?;
+    output.push('(');
+    self.print_args(args, output)?;
+    output.push(')');
+    Some(())
+  }
+
+  fn print_function_name(&self, name: FormulaFunctionName, output: &mut String) -> Option<()> {
+    match name {
+      FormulaFunctionName::Builtin(id) => write!(output, "BUILTIN{}", id.0).ok()?,
+      FormulaFunctionName::External(id) | FormulaFunctionName::Unknown(id) => {
+        output.push_str(self.program.symbols.get(id)?);
+      }
+    }
+    Some(())
+  }
+
+  fn print_args(&self, span: FormulaArgSpan, output: &mut String) -> Option<()> {
+    let separator = argument_separator(self.options.grammar);
+    for (index, arg) in self.program.args(span)?.iter().copied().enumerate() {
+      if index > 0 {
+        output.push_str(separator);
+      }
+      self.print_expr(arg, 0, FormulaPrintSide::None, output)?;
+    }
+    Some(())
+  }
+
+  fn print_array(&self, span: FormulaArraySpan, output: &mut String) -> Option<()> {
+    let elements = self.program.array_elements(span)?;
+    let cols = usize::from(span.cols);
+    output.push('{');
+    for row in 0..usize::from(span.rows) {
+      if row > 0 {
+        output.push(';');
+      }
+      for col in 0..cols {
+        if col > 0 {
+          output.push(',');
+        }
+        let index = row.checked_mul(cols)?.checked_add(col)?;
+        self.print_expr(*elements.get(index)?, 0, FormulaPrintSide::None, output)?;
+      }
+    }
+    output.push('}');
+    Some(())
+  }
+
+  fn print_reference(&self, reference: &FormulaReference, output: &mut String) -> Option<()> {
+    match reference {
+      FormulaReference::Cell(reference) => {
+        self.print_sheet_reference(reference.target.sheet, output)?;
+        print_cell_address(reference.target.address, reference.target.flags, output);
+        if reference.flags.contains(FormulaReferenceFlags::SPILL) {
+          output.push('#');
+        }
+      }
+      FormulaReference::Range(reference) => {
+        self.print_sheet_reference(reference.start.sheet, output)?;
+        print_cell_address(reference.start.address, reference.start.flags, output);
+        output.push(':');
+        if reference.end.sheet != reference.start.sheet {
+          self.print_sheet_reference(reference.end.sheet, output)?;
+        }
+        print_cell_address(reference.end.address, reference.end.flags, output);
+        if reference.flags.contains(FormulaReferenceFlags::SPILL) {
+          output.push('#');
+        }
+      }
+      FormulaReference::Named(reference) => {
+        self.print_name_scope(&reference.scope, output)?;
+        output.push_str(self.program.symbols.get(reference.name)?);
+      }
+      FormulaReference::Structured(reference) => {
+        self.print_structured_reference(reference, output)?;
+      }
+      FormulaReference::ExternalName(reference) => {
+        output.push('[');
+        output.push_str(self.program.symbols.get(reference.book)?);
+        output.push(']');
+        if let Some(sheet) = reference.sheet {
+          self.print_sheet_name(sheet, output)?;
+          output.push('!');
+        }
+        output.push_str(self.program.symbols.get(reference.name)?);
+      }
+      FormulaReference::Deleted(reference) => {
+        if let Some(sheet) = reference.sheet {
+          self.print_sheet_reference(sheet, output)?;
+        }
+        output.push_str("#REF!");
+      }
+    }
+    Some(())
+  }
+
+  fn print_name_scope(&self, scope: &FormulaNameScope, output: &mut String) -> Option<()> {
+    match scope {
+      FormulaNameScope::Workbook => {}
+      FormulaNameScope::Sheet(sheet) => {
+        self.print_sheet_name(*sheet, output)?;
+        output.push('!');
+      }
+    }
+    Some(())
+  }
+
+  fn print_sheet_reference(&self, sheet: FormulaSheetReference, output: &mut String) -> Option<()> {
+    match sheet {
+      FormulaSheetReference::Current => {}
+      FormulaSheetReference::Local(range) => {
+        self.print_sheet_range(range, output)?;
+        output.push('!');
+      }
+      FormulaSheetReference::External { book, sheet } => {
+        output.push('[');
+        output.push_str(self.program.symbols.get(book)?);
+        output.push(']');
+        if let Some(sheet) = sheet {
+          self.print_sheet_range(sheet, output)?;
+        }
+        output.push('!');
+      }
+    }
+    Some(())
+  }
+
+  fn print_sheet_range(&self, sheet: FormulaSheetRange, output: &mut String) -> Option<()> {
+    match sheet {
+      FormulaSheetRange::Sheet(sheet) => self.print_sheet_name(sheet, output),
+      FormulaSheetRange::Range { start, end } => {
+        self.print_sheet_name(start, output)?;
+        output.push(':');
+        self.print_sheet_name(end, output)
+      }
+    }
+  }
+
+  fn print_sheet_name(&self, sheet: FormulaSheetName, output: &mut String) -> Option<()> {
+    match sheet {
+      FormulaSheetName::Id(id) => write!(output, "Sheet{}", id.0).ok(),
+      FormulaSheetName::Name(id) => {
+        print_quoted_sheet_name(self.program.symbols.get(id)?, output);
+        Some(())
+      }
+    }
+  }
+
+  fn print_structured_reference(
+    &self,
+    reference: &FormulaStructuredReference,
+    output: &mut String,
+  ) -> Option<()> {
+    if let Some(table) = reference.table {
+      output.push_str(self.program.symbols.get(table)?);
+    }
+    self.print_structured_reference_specifier(&reference.specifier, output)
+  }
+
+  fn print_structured_reference_specifier(
+    &self,
+    specifier: &FormulaStructuredReferenceSpecifier,
+    output: &mut String,
+  ) -> Option<()> {
+    match specifier {
+      FormulaStructuredReferenceSpecifier::Table => {}
+      FormulaStructuredReferenceSpecifier::Item(item) => {
+        output.push('[');
+        output.push_str(structured_reference_item_text(*item));
+        output.push(']');
+      }
+      FormulaStructuredReferenceSpecifier::Column(column) => {
+        output.push('[');
+        print_structured_reference_column(self.program.symbols.get(*column)?, output);
+        output.push(']');
+      }
+      FormulaStructuredReferenceSpecifier::ColumnRange { start, end } => {
+        output.push_str("[[");
+        print_structured_reference_column(self.program.symbols.get(*start)?, output);
+        output.push_str("]:[");
+        print_structured_reference_column(self.program.symbols.get(*end)?, output);
+        output.push_str("]]");
+      }
+      FormulaStructuredReferenceSpecifier::Combination(span) => {
+        output.push('[');
+        for (index, part) in self
+          .program
+          .structured_reference_parts(*span)?
+          .iter()
+          .enumerate()
+        {
+          if index > 0 {
+            output.push(',');
+          }
+          match part {
+            FormulaStructuredReferencePart::Item(item) => {
+              output.push_str(structured_reference_item_text(*item));
+            }
+            FormulaStructuredReferencePart::Column(column) => {
+              output.push('[');
+              print_structured_reference_column(self.program.symbols.get(*column)?, output);
+              output.push(']');
+            }
+            FormulaStructuredReferencePart::ColumnRange { start, end } => {
+              output.push('[');
+              print_structured_reference_column(self.program.symbols.get(*start)?, output);
+              output.push_str("]:[");
+              print_structured_reference_column(self.program.symbols.get(*end)?, output);
+              output.push(']');
+            }
+          }
+        }
+        output.push(']');
+      }
+    }
+    Some(())
+  }
+}
+
+fn lower_parser_ast(
+  builder: &mut FormulaProgramBuilder,
+  source: FormulaSource<'_>,
+  body_start: usize,
+  ast: &parser::FormulaAst,
+) -> Option<FormulaExprId> {
+  match ast {
+    parser::FormulaAst::Blank => Some(builder.blank()),
+    parser::FormulaAst::Text(span) => {
+      let value = match parser::formula_text_literal(source.text, body_start + span.start)? {
+        parser::TextLiteral::Borrowed(value) => value,
+        parser::TextLiteral::Owned(value) => {
+          let symbol = builder.intern(&value);
+          return Some(builder.push(
+            FormulaNodeKind::Text(symbol),
+            Some(source_span(body_start, *span)),
+            FormulaNodeMetadata::default(),
+          ));
+        }
+      };
+      let symbol = builder.intern(value);
+      Some(builder.push(
+        FormulaNodeKind::Text(symbol),
+        Some(source_span(body_start, *span)),
+        FormulaNodeMetadata::default(),
+      ))
+    }
+    parser::FormulaAst::Number(value) => Some(builder.number(*value)),
+    parser::FormulaAst::Error(error) => {
+      Some(builder.error(crate::code::formula_error_from_lex(*error)))
+    }
+    parser::FormulaAst::Word { span, kind } => {
+      lower_parser_word(builder, source, body_start, *span, *kind)
+    }
+    parser::FormulaAst::Unary { op, expr } => {
+      let expr = lower_parser_ast(builder, source, body_start, expr)?;
+      Some(builder.unary(unary_operator_from_lex(*op)?, expr))
+    }
+    parser::FormulaAst::Binary { op, left, right } => {
+      let left = lower_parser_ast(builder, source, body_start, left)?;
+      let right = lower_parser_ast(builder, source, body_start, right)?;
+      Some(builder.binary(crate::code::formula_operator_from_lex(*op), left, right))
+    }
+    parser::FormulaAst::Function {
+      name,
+      volatile,
+      args,
+    } => {
+      let mut lowered = Vec::with_capacity(args.len());
+      for arg in args {
+        lowered.push(lower_parser_ast(builder, source, body_start, arg)?);
+      }
+      let name_text = source
+        .text
+        .get(body_start + name.start..body_start + name.end)?;
+      let name_symbol = builder.intern(name_text);
+      let args = builder.push_arg_span(&lowered);
+      let mut labels = FormulaNodeLabels::empty();
+      if *volatile {
+        labels |= FormulaNodeLabels::VOLATILE;
+      }
+      Some(builder.push(
+        FormulaNodeKind::Function {
+          name: FormulaFunctionName::Unknown(name_symbol),
+          args,
+        },
+        Some(source_span(body_start, *name)),
+        FormulaNodeMetadata {
+          labels,
+          operand_class: FormulaOperandClass::Unknown,
+          param_class: FormulaParamClass::Unknown,
+        },
+      ))
+    }
+    parser::FormulaAst::LogicalFunction { function, args } => {
+      let mut lowered = Vec::with_capacity(args.len());
+      for arg in args {
+        lowered.push(lower_parser_ast(builder, source, body_start, arg)?);
+      }
+      Some(builder.function(function.name(), &lowered))
+    }
+    parser::FormulaAst::Array(rows) => {
+      let row_count = rows.len();
+      let col_count = rows.first().map_or(0, Vec::len);
+      if row_count > u16::MAX as usize || col_count > u16::MAX as usize {
+        return None;
+      }
+      let mut elements = Vec::with_capacity(row_count.saturating_mul(col_count));
+      for row in rows {
+        if row.len() != col_count {
+          return None;
+        }
+        for item in row {
+          elements.push(lower_parser_ast(builder, source, body_start, item)?);
+        }
+      }
+      Some(builder.array(row_count as u16, col_count as u16, &elements))
+    }
+  }
+}
+
+fn lower_parser_word(
+  builder: &mut FormulaProgramBuilder,
+  source: FormulaSource<'_>,
+  body_start: usize,
+  span: parser::SemanticSpan,
+  kind: parser::SemanticWordKind,
+) -> Option<FormulaExprId> {
+  let word = source
+    .text
+    .get(body_start + span.start..body_start + span.end)?;
+  match kind {
+    parser::SemanticWordKind::Boolean(value) => Some(builder.boolean(value)),
+    parser::SemanticWordKind::ReferenceCandidate => {
+      let sheet = match source.context.position {
+        FormulaSourcePosition::Cell(cell) => cell.sheet,
+        FormulaSourcePosition::Sheet(sheet) => sheet,
+      };
+      if let Some(range) = parser::parse_formula_range(sheet, word) {
+        let reference = reference_from_qualified_range(builder, range);
+        return Some(builder.push_reference(reference));
+      }
+      Some(named_reference_with_span(
+        builder,
+        word,
+        Some(source_span(body_start, span)),
+      ))
+    }
+    parser::SemanticWordKind::Name => Some(named_reference_with_span(
+      builder,
+      word,
+      Some(source_span(body_start, span)),
+    )),
+    parser::SemanticWordKind::ExternalReference(reference) => {
+      let reference = external_reference_from_spans(builder, word, reference)?;
+      Some(builder.push_reference(reference))
+    }
+  }
+}
+
+fn named_reference_with_span(
+  builder: &mut FormulaProgramBuilder,
+  name: &str,
+  span: Option<SourceSpan>,
+) -> FormulaExprId {
+  let name = builder.intern(name);
+  builder.push(
+    FormulaNodeKind::Reference(FormulaReference::Named(FormulaNamedReference {
+      name,
+      scope: FormulaNameScope::Workbook,
+    })),
+    span,
+    FormulaNodeMetadata {
+      labels: FormulaNodeLabels::RETURNS_REFERENCE
+        | FormulaNodeLabels::CONTAINS_REFERENCE
+        | FormulaNodeLabels::CONTAINS_NAME,
+      operand_class: FormulaOperandClass::Reference,
+      param_class: FormulaParamClass::Unknown,
+    },
+  )
+}
+
+fn source_span(body_start: usize, span: parser::SemanticSpan) -> SourceSpan {
+  SourceSpan {
+    start: body_start + span.start,
+    end: body_start + span.end,
+  }
+}
+
+fn external_reference_from_spans(
+  builder: &mut FormulaProgramBuilder,
+  source: &str,
+  reference: parser::ExternalReferenceSpans,
+) -> Option<FormulaReference> {
+  let book = builder.intern(span_text(source, reference.book));
+  let sheet = reference
+    .sheet
+    .map(|sheet| FormulaSheetName::Name(builder.intern(&external_sheet_text(source, sheet))));
+  let name = span_text(source, reference.name?);
+
+  if let Some(range) = parser::parse_formula_range(SheetId::default(), name) {
+    let sheet = FormulaSheetReference::External {
+      book,
+      sheet: sheet.map(FormulaSheetRange::Sheet),
+    };
+    let start_flags = valid_address_flags(range.start_flags, true);
+    let end_flags = valid_address_flags(range.end_flags, true);
+    let reference_flags = reference_flags(range.start_flags, range.end_flags);
+    if range.range.start == range.range.end
+      && !range.start_flags.whole_column
+      && !range.start_flags.whole_row
+      && !range.end_flags.whole_column
+      && !range.end_flags.whole_row
+    {
+      return Some(FormulaReference::Cell(FormulaCellReference {
+        target: FormulaReferencePoint {
+          sheet,
+          address: range.range.start,
+          flags: start_flags,
+        },
+        flags: reference_flags,
+      }));
+    }
+    return Some(FormulaReference::Range(FormulaRangeReference {
+      start: FormulaReferencePoint {
+        sheet,
+        address: range.range.start,
+        flags: start_flags,
+      },
+      end: FormulaReferencePoint {
+        sheet,
+        address: range.range.end,
+        flags: end_flags,
+      },
+      flags: reference_flags,
+    }));
+  }
+
+  Some(FormulaReference::ExternalName(
+    FormulaExternalNameReference {
+      book,
+      sheet,
+      name: builder.intern(name),
+    },
+  ))
+}
+
+fn span_text(source: &str, span: parser::SemanticSpan) -> &str {
+  source.get(span.start..span.end).unwrap_or_default()
+}
+
+fn external_sheet_text(source: &str, span: parser::SemanticSpan) -> String {
+  let text = span_text(source, span);
+  if text.contains("''") {
+    text.replace("''", "'")
+  } else {
+    text.to_string()
+  }
+}
+
+fn reference_from_qualified_range(
+  builder: &mut FormulaProgramBuilder,
+  range: QualifiedRange<'_>,
+) -> FormulaReference {
+  let sheet = sheet_reference_from_qualified_range(builder, &range);
+  let start_flags = valid_address_flags(range.start_flags, sheet != FormulaSheetReference::Current);
+  let end_flags = valid_address_flags(range.end_flags, sheet != FormulaSheetReference::Current);
+  let reference_flags = reference_flags(range.start_flags, range.end_flags);
+  if range.range.start == range.range.end
+    && !range.start_flags.whole_column
+    && !range.start_flags.whole_row
+    && !range.end_flags.whole_column
+    && !range.end_flags.whole_row
+  {
+    FormulaReference::Cell(FormulaCellReference {
+      target: FormulaReferencePoint {
+        sheet,
+        address: range.range.start,
+        flags: start_flags,
+      },
+      flags: reference_flags,
+    })
+  } else {
+    FormulaReference::Range(FormulaRangeReference {
+      start: FormulaReferencePoint {
+        sheet,
+        address: range.range.start,
+        flags: start_flags,
+      },
+      end: FormulaReferencePoint {
+        sheet,
+        address: range.range.end,
+        flags: end_flags,
+      },
+      flags: reference_flags,
+    })
+  }
+}
+
+fn sheet_reference_from_qualified_range(
+  builder: &mut FormulaProgramBuilder,
+  range: &QualifiedRange<'_>,
+) -> FormulaSheetReference {
+  let Some(start) = range.sheet_name.as_ref() else {
+    return FormulaSheetReference::Current;
+  };
+  let start = FormulaSheetName::Name(builder.intern(start.0.as_ref()));
+  let sheet = if let Some(end) = range.end_sheet_name.as_ref() {
+    FormulaSheetRange::Range {
+      start,
+      end: FormulaSheetName::Name(builder.intern(end.0.as_ref())),
+    }
+  } else {
+    FormulaSheetRange::Sheet(start)
+  };
+  FormulaSheetReference::Local(sheet)
+}
+
+fn valid_address_flags(flags: AddressFlags, sheet_valid: bool) -> FormulaAddressFlags {
+  let mut result =
+    FormulaAddressFlags::VALID | FormulaAddressFlags::COL_VALID | FormulaAddressFlags::ROW_VALID;
+  if sheet_valid {
+    result |= FormulaAddressFlags::TAB_VALID | FormulaAddressFlags::TAB_3D;
+  }
+  if flags.absolute_column {
+    result |= FormulaAddressFlags::COL_ABS;
+  }
+  if flags.absolute_row {
+    result |= FormulaAddressFlags::ROW_ABS;
+  }
+  result
+}
+
+fn reference_flags(start: AddressFlags, end: AddressFlags) -> FormulaReferenceFlags {
+  let mut flags = FormulaReferenceFlags::empty();
+  if start.whole_column && end.whole_column {
+    flags |= FormulaReferenceFlags::WHOLE_COLUMN;
+  }
+  if start.whole_row && end.whole_row {
+    flags |= FormulaReferenceFlags::WHOLE_ROW;
+  }
+  flags
+}
+
+fn diagnostic_from_parse_issue(issue: parser::FormulaParseIssue) -> FormulaDiagnosticKind {
+  match issue {
+    parser::FormulaParseIssue::UnrecognizedCharacter(_) => {
+      FormulaDiagnosticKind::Unsupported(FormulaUnsupportedKind::Token)
+    }
+    parser::FormulaParseIssue::MissingClosingParenthesis
+    | parser::FormulaParseIssue::IncompleteExpression => FormulaDiagnosticKind::ParseError,
+  }
+}
+
+fn unary_operator_from_lex(operator: parser::LexOperator) -> Option<FormulaOperator> {
+  match operator {
+    parser::LexOperator::Add => Some(FormulaOperator::UnaryPlus),
+    parser::LexOperator::Subtract => Some(FormulaOperator::UnaryMinus),
+    parser::LexOperator::ImplicitIntersection => Some(FormulaOperator::ImplicitIntersection),
+    parser::LexOperator::Percent => Some(FormulaOperator::Percent),
+    _ => None,
+  }
+}
+
+fn node_precedence(kind: &FormulaNodeKind) -> u8 {
+  match kind {
+    FormulaNodeKind::Binary { op, .. } => binary_precedence(*op).unwrap_or(0),
+    FormulaNodeKind::Unary { op, .. } => unary_precedence(*op),
+    FormulaNodeKind::Function { .. } | FormulaNodeKind::Call { .. } => 12,
+    FormulaNodeKind::Array(_) => 12,
+    _ => 13,
+  }
+}
+
+fn needs_parentheses(
+  precedence: u8,
+  parent_precedence: u8,
+  side: FormulaPrintSide,
+  kind: &FormulaNodeKind,
+) -> bool {
+  if parent_precedence == 0 || precedence > parent_precedence {
+    return false;
+  }
+  if precedence < parent_precedence {
+    return true;
+  }
+  matches!(
+    (side, kind),
+    (FormulaPrintSide::Right, FormulaNodeKind::Binary { .. })
+      | (
+        FormulaPrintSide::Left,
+        FormulaNodeKind::Binary {
+          op: FormulaOperator::Power,
+          ..
+        }
+      )
+  )
+}
+
+fn unary_precedence(operator: FormulaOperator) -> u8 {
+  match operator {
+    FormulaOperator::Percent => 11,
+    FormulaOperator::UnaryPlus
+    | FormulaOperator::UnaryMinus
+    | FormulaOperator::ImplicitIntersection => 10,
+    _ => 0,
+  }
+}
+
+fn binary_precedence(operator: FormulaOperator) -> Option<u8> {
+  Some(match operator {
+    FormulaOperator::Union => 1,
+    FormulaOperator::Intersection => 2,
+    FormulaOperator::Range => 3,
+    FormulaOperator::Equal
+    | FormulaOperator::NotEqual
+    | FormulaOperator::Less
+    | FormulaOperator::LessOrEqual
+    | FormulaOperator::Greater
+    | FormulaOperator::GreaterOrEqual => 4,
+    FormulaOperator::Concat => 5,
+    FormulaOperator::Add | FormulaOperator::Subtract => 6,
+    FormulaOperator::Multiply | FormulaOperator::Divide => 7,
+    FormulaOperator::Power => 9,
+    _ => return None,
+  })
+}
+
+fn binary_operator_text(operator: FormulaOperator) -> Option<&'static str> {
+  Some(match operator {
+    FormulaOperator::Add => "+",
+    FormulaOperator::Subtract => "-",
+    FormulaOperator::Multiply => "*",
+    FormulaOperator::Divide => "/",
+    FormulaOperator::Power => "^",
+    FormulaOperator::Concat => "&",
+    FormulaOperator::Equal => "=",
+    FormulaOperator::NotEqual => "<>",
+    FormulaOperator::Less => "<",
+    FormulaOperator::LessOrEqual => "<=",
+    FormulaOperator::Greater => ">",
+    FormulaOperator::GreaterOrEqual => ">=",
+    FormulaOperator::Range => ":",
+    FormulaOperator::Union => ",",
+    FormulaOperator::Intersection => " ",
+    _ => return None,
+  })
+}
+
+fn print_number(value: FormulaNumberLiteral, output: &mut String) {
+  match value {
+    FormulaNumberLiteral::Integer(value) => {
+      let _ = write!(output, "{value}");
+    }
+    FormulaNumberLiteral::Number(value) => {
+      let _ = write!(output, "{value}");
+    }
+  }
+}
+
+fn error_text(value: FormulaErrorValue) -> &'static str {
+  match value {
+    FormulaErrorValue::Null => "#NULL!",
+    FormulaErrorValue::Div0 => "#DIV/0!",
+    FormulaErrorValue::Value => "#VALUE!",
+    FormulaErrorValue::Ref => "#REF!",
+    FormulaErrorValue::Name => "#NAME?",
+    FormulaErrorValue::Num => "#NUM!",
+    FormulaErrorValue::NA => "#N/A",
+    FormulaErrorValue::GettingData => "#GETTING_DATA",
+    FormulaErrorValue::Spill => "#SPILL!",
+    FormulaErrorValue::Calc => "#CALC!",
+    FormulaErrorValue::Error => "#ERROR!",
+    FormulaErrorValue::NotImplemented => "#N/IMPL!",
+    FormulaErrorValue::CircularReference => "#CIRC!",
+    FormulaErrorValue::IllegalChar => "Err:501",
+    FormulaErrorValue::IllegalArgument => "Err:502",
+    FormulaErrorValue::IllegalParameter => "Err:504",
+    FormulaErrorValue::Pair => "Err:507",
+    FormulaErrorValue::PairExpected => "Err:508",
+    FormulaErrorValue::OperatorExpected => "Err:509",
+    FormulaErrorValue::VariableExpected => "Err:510",
+    FormulaErrorValue::Parameter => "Err:511",
+    FormulaErrorValue::CodeOverflow => "Err:512",
+    FormulaErrorValue::StringOverflow => "Err:513",
+    FormulaErrorValue::StackOverflow => "Err:514",
+    FormulaErrorValue::InvalidVariable => "Err:516",
+    FormulaErrorValue::InvalidOpcode => "Err:517",
+    FormulaErrorValue::InvalidStackValue => "Err:518",
+    FormulaErrorValue::InvalidToken => "Err:520",
+    FormulaErrorValue::NoConvergence => "Err:523",
+    FormulaErrorValue::NoAddin => "Err:530",
+    FormulaErrorValue::NoMacro => "Err:531",
+    FormulaErrorValue::NestedArray => "Err:533",
+    FormulaErrorValue::MatrixSize => "Err:538",
+    FormulaErrorValue::BadArrayContent => "Err:539",
+    FormulaErrorValue::LinkFormulaNeedingCheck => "Err:540",
+  }
+}
+
+fn print_cell_address(address: CellAddress, flags: FormulaAddressFlags, output: &mut String) {
+  if flags.contains(FormulaAddressFlags::COL_ABS) {
+    output.push('$');
+  }
+  print_column_name(address.column, output);
+  if flags.contains(FormulaAddressFlags::ROW_ABS) {
+    output.push('$');
+  }
+  let _ = write!(output, "{}", address.row + 1);
+}
+
+fn print_column_name(mut column: u32, output: &mut String) {
+  let mut name = [0u8; 8];
+  let mut len = 0usize;
+  loop {
+    name[len] = b'A' + (column % 26) as u8;
+    len += 1;
+    column /= 26;
+    if column == 0 {
+      break;
+    }
+    column -= 1;
+  }
+  for ch in name[..len].iter().rev() {
+    output.push(*ch as char);
+  }
+}
+
+fn print_quoted_sheet_name(value: &str, output: &mut String) {
+  if is_unquoted_sheet_name(value) {
+    output.push_str(value);
+    return;
+  }
+  output.push('\'');
+  for ch in value.chars() {
+    if ch == '\'' {
+      output.push('\'');
+    }
+    output.push(ch);
+  }
+  output.push('\'');
+}
+
+fn is_unquoted_sheet_name(value: &str) -> bool {
+  !value.is_empty()
+    && value
+      .chars()
+      .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    && !value.chars().next().is_some_and(|ch| ch.is_ascii_digit())
+}
+
+fn print_structured_reference_column(value: &str, output: &mut String) {
+  for ch in value.chars() {
+    match ch {
+      '\'' | '#' | '[' | ']' => {
+        output.push('\'');
+        output.push(ch);
+      }
+      _ => output.push(ch),
+    }
+  }
+}
+
+fn structured_reference_item_text(item: FormulaStructuredReferenceItem) -> &'static str {
+  match item {
+    FormulaStructuredReferenceItem::All => "#All",
+    FormulaStructuredReferenceItem::Data => "#Data",
+    FormulaStructuredReferenceItem::Headers => "#Headers",
+    FormulaStructuredReferenceItem::Totals => "#Totals",
+    FormulaStructuredReferenceItem::ThisRow => "#This Row",
+  }
+}
+
+fn argument_separator(grammar: FormulaPrintGrammar) -> &'static str {
+  match grammar {
+    FormulaPrintGrammar::OpenFormula | FormulaPrintGrammar::CalcA1 => ";",
+    FormulaPrintGrammar::ExcelA1 | FormulaPrintGrammar::ExcelR1C1 => ",",
+  }
 }

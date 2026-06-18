@@ -1,6 +1,7 @@
 use std::fmt::Write as _;
 
 use bitflags::bitflags;
+use smallvec::SmallVec;
 
 use crate::source::{FormulaSource, FormulaSourcePosition};
 use crate::symbol::{FormulaSymbolId, FormulaSymbolPool};
@@ -416,6 +417,16 @@ pub struct FormulaProgramBuilder {
   program: FormulaProgram,
 }
 
+type FormulaArgBuffer = SmallVec<[FormulaExprId; 8]>;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct FormulaProgramCheckpoint {
+  nodes: usize,
+  args: usize,
+  array_elements: usize,
+  structured_reference_parts: usize,
+}
+
 impl FormulaProgram {
   pub fn builder() -> FormulaProgramBuilder {
     FormulaProgramBuilder::new()
@@ -424,31 +435,34 @@ impl FormulaProgram {
   pub fn from_source(source: FormulaSource<'_>) -> Self {
     let parsed = parser::FormulaParser::new(source.text).parse();
     let mut builder = FormulaProgramBuilder::with_capacity(parsed.body_parse.tokens.len());
-    for issue in parsed.body_parse.issues {
+    let mut issues = parsed.body_parse.issues;
+    let root = parse_program_root_from_tokens(
+      &mut builder,
+      source,
+      parsed.body_start,
+      parsed.body,
+      &parsed.body_parse.lexed,
+      &mut issues,
+    );
+    for issue in issues {
       builder.diagnostic(None, diagnostic_from_parse_issue(issue));
     }
-
-    let root = parsed
-      .body_parse
-      .ast
-      .as_ref()
-      .and_then(|ast| lower_parser_ast(&mut builder, source, parsed.body_start, ast));
     builder.finish_root(root)
   }
 
   pub(crate) fn from_parser_parts(
     source: FormulaSource<'_>,
     body_start: usize,
-    token_count: usize,
-    ast: Option<&parser::FormulaAst>,
-    issues: &[parser::FormulaParseIssue],
+    body: &str,
+    lexed: &[parser::LexToken],
+    issues: &mut Vec<parser::FormulaParseIssue>,
   ) -> Self {
-    let mut builder = FormulaProgramBuilder::with_capacity(token_count);
+    let mut builder = FormulaProgramBuilder::with_capacity(lexed.len());
+    let root =
+      parse_program_root_from_tokens(&mut builder, source, body_start, body, lexed, issues);
     for issue in issues {
       builder.diagnostic(None, diagnostic_from_parse_issue(*issue));
     }
-
-    let root = ast.and_then(|ast| lower_parser_ast(&mut builder, source, body_start, ast));
     builder.finish_root(root)
   }
 
@@ -708,6 +722,49 @@ impl FormulaProgramBuilder {
     };
     self.program.array_elements.extend_from_slice(elements);
     span
+  }
+
+  fn checkpoint(&self) -> FormulaProgramCheckpoint {
+    FormulaProgramCheckpoint {
+      nodes: self.program.nodes.len(),
+      args: self.program.args.len(),
+      array_elements: self.program.array_elements.len(),
+      structured_reference_parts: self.program.structured_reference_parts.len(),
+    }
+  }
+
+  fn rollback(&mut self, checkpoint: FormulaProgramCheckpoint) {
+    self.program.nodes.truncate(checkpoint.nodes);
+    self.program.args.truncate(checkpoint.args);
+    self
+      .program
+      .array_elements
+      .truncate(checkpoint.array_elements);
+    self
+      .program
+      .structured_reference_parts
+      .truncate(checkpoint.structured_reference_parts);
+  }
+
+  fn array_mark(&self) -> usize {
+    self.program.array_elements.len()
+  }
+
+  fn push_array_element(&mut self, element: FormulaExprId) {
+    self.program.array_elements.push(element);
+  }
+
+  fn finish_array_span(&self, mark: usize, rows: u16, cols: u16) -> FormulaArraySpan {
+    assert!(mark <= u32::MAX as usize);
+    assert_eq!(
+      self.program.array_elements.len() - mark,
+      usize::from(rows) * usize::from(cols)
+    );
+    FormulaArraySpan {
+      offset: mark as u32,
+      rows,
+      cols,
+    }
   }
 }
 
@@ -1044,104 +1101,704 @@ impl FormulaPrinter<'_> {
   }
 }
 
-fn lower_parser_ast(
+fn parse_program_root_from_tokens(
   builder: &mut FormulaProgramBuilder,
   source: FormulaSource<'_>,
   body_start: usize,
-  ast: &parser::FormulaAst,
+  body: &str,
+  tokens: &[parser::LexToken],
+  issues: &mut Vec<parser::FormulaParseIssue>,
 ) -> Option<FormulaExprId> {
-  match ast {
-    parser::FormulaAst::Blank => Some(builder.blank()),
-    parser::FormulaAst::Text(span) => {
-      let value = match parser::formula_text_literal(source.text, body_start + span.start)? {
-        parser::TextLiteral::Borrowed(value) => value,
-        parser::TextLiteral::Owned(value) => {
-          let symbol = builder.intern(&value);
-          return Some(builder.push(
-            FormulaNodeKind::Text(symbol),
-            Some(source_span(body_start, *span)),
-            FormulaNodeMetadata::default(),
-          ));
+  let mut parser = ProgramSyntaxParser::new(builder, source, body_start, body, tokens);
+  let root = parser.parse_expression();
+  if parser
+    .issues
+    .contains(&ProgramSyntaxIssue::MissingClosingParenthesis)
+  {
+    issues.push(parser::FormulaParseIssue::MissingClosingParenthesis);
+  }
+  if root.is_none() || !parser.tokens.is_end() {
+    issues.push(parser::FormulaParseIssue::IncompleteExpression);
+  }
+  root
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ProgramSyntaxIssue {
+  MissingClosingParenthesis,
+}
+
+struct ProgramSyntaxParser<'a, 'b> {
+  builder: &'a mut FormulaProgramBuilder,
+  source: FormulaSource<'b>,
+  body_start: usize,
+  body: &'b str,
+  tokens: ProgramSyntaxTokens<'b>,
+  issues: Vec<ProgramSyntaxIssue>,
+}
+
+impl<'a, 'b> ProgramSyntaxParser<'a, 'b> {
+  fn new(
+    builder: &'a mut FormulaProgramBuilder,
+    source: FormulaSource<'b>,
+    body_start: usize,
+    body: &'b str,
+    tokens: &'b [parser::LexToken],
+  ) -> Self {
+    Self {
+      builder,
+      source,
+      body_start,
+      body,
+      tokens: ProgramSyntaxTokens::new(body, tokens),
+      issues: Vec::new(),
+    }
+  }
+
+  fn parse_expression(&mut self) -> Option<FormulaExprId> {
+    self.parse_expression_bp(0)
+  }
+
+  fn parse_expression_bp(&mut self, min_bp: u8) -> Option<FormulaExprId> {
+    let mut left = self.parse_prefix()?;
+    loop {
+      let had_ws = self.tokens.ws_before_next();
+
+      let start = self.tokens.position();
+      if let Some(function) = self.tokens.consume_logical_function_call() {
+        let left_bp = logical_binding_power();
+        if left_bp < min_bp {
+          self.tokens.set_position(start);
+          break;
         }
-      };
-      let symbol = builder.intern(value);
-      Some(builder.push(
-        FormulaNodeKind::Text(symbol),
-        Some(source_span(body_start, *span)),
-        FormulaNodeMetadata::default(),
-      ))
-    }
-    parser::FormulaAst::Number(value) => Some(builder.number(*value)),
-    parser::FormulaAst::Error(error) => {
-      Some(builder.error(crate::code::formula_error_from_lex(*error)))
-    }
-    parser::FormulaAst::Word { span, kind } => {
-      lower_parser_word(builder, source, body_start, *span, *kind)
-    }
-    parser::FormulaAst::Unary { op, expr } => {
-      let expr = lower_parser_ast(builder, source, body_start, expr)?;
-      Some(builder.unary(unary_operator_from_lex(*op)?, expr))
-    }
-    parser::FormulaAst::Binary { op, left, right } => {
-      let left = lower_parser_ast(builder, source, body_start, left)?;
-      let right = lower_parser_ast(builder, source, body_start, right)?;
-      Some(builder.binary(crate::code::formula_operator_from_lex(*op), left, right))
-    }
-    parser::FormulaAst::Function {
-      name,
-      volatile,
-      args,
-    } => {
-      let mut lowered = Vec::with_capacity(args.len());
-      for arg in args {
-        lowered.push(lower_parser_ast(builder, source, body_start, arg)?);
+        let args = self.parse_argument_list(Some(left))?;
+        let name = self.builder.intern(function.name());
+        left = self.builder.push_value(FormulaNodeKind::Function {
+          name: FormulaFunctionName::Unknown(name),
+          args,
+        });
+        continue;
       }
-      let name_text = source
-        .text
-        .get(body_start + name.start..body_start + name.end)?;
-      let name_symbol = builder.intern(name_text);
-      let args = builder.push_arg_span(&lowered);
+
+      if let Some(token) = self.tokens.peek()
+        && let parser::LexTokenKind::Operator(op) = token.kind
+      {
+        if let Some(left_bp) = postfix_binding_power(op) {
+          if left_bp < min_bp {
+            break;
+          }
+          self.tokens.advance();
+          left = self.builder.unary(unary_operator_from_lex(op)?, left);
+          continue;
+        }
+
+        if let Some((left_bp, right_bp)) = infix_binding_power(op) {
+          if left_bp < min_bp {
+            break;
+          }
+          self.tokens.advance();
+          let right = self.parse_expression_bp(right_bp)?;
+          left = self
+            .builder
+            .binary(crate::code::formula_operator_from_lex(op), left, right);
+          continue;
+        }
+      }
+
+      if had_ws && is_intersection_rhs_start(self.tokens.peek()) {
+        let (left_bp, right_bp) = infix_binding_power(parser::LexOperator::Intersection)?;
+        if left_bp < min_bp {
+          break;
+        }
+        let before_rhs = self.tokens.position();
+        let checkpoint = self.builder.checkpoint();
+        if let Some(right) = self.parse_expression_bp(right_bp) {
+          left = self.builder.binary(
+            crate::code::formula_operator_from_lex(parser::LexOperator::Intersection),
+            left,
+            right,
+          );
+          continue;
+        }
+        self.builder.rollback(checkpoint);
+        self.tokens.set_position(before_rhs);
+      }
+
+      break;
+    }
+    Some(left)
+  }
+
+  fn parse_prefix(&mut self) -> Option<FormulaExprId> {
+    if let Some(op) = self.tokens.consume_operator_where(prefix_operator) {
+      let expr = self.parse_expression_bp(prefix_binding_power())?;
+      return Some(self.builder.unary(unary_operator_from_lex(op)?, expr));
+    }
+    if self
+      .tokens
+      .consume_token_kind(parser::LexTokenKind::ParenOpen)
+      .is_some()
+    {
+      let expr = self.parse_parenthesized_expression()?;
+      if self
+        .tokens
+        .consume_token_kind(parser::LexTokenKind::ParenClose)
+        .is_none()
+      {
+        self
+          .issues
+          .push(ProgramSyntaxIssue::MissingClosingParenthesis);
+      }
+      return Some(expr);
+    }
+    if let Some(token) = self.tokens.consume_token_kind(parser::LexTokenKind::Text) {
+      return self.push_text_literal(token_span(token));
+    }
+    if self
+      .tokens
+      .consume_token_kind(parser::LexTokenKind::ArrayOpen)
+      .is_some()
+    {
+      return self.parse_array();
+    }
+    if let Some(token) = self.tokens.peek() {
+      match token.kind {
+        parser::LexTokenKind::Number(value) => {
+          self.tokens.advance();
+          return Some(self.builder.number(value));
+        }
+        parser::LexTokenKind::Error(error) => {
+          self.tokens.advance();
+          return Some(
+            self
+              .builder
+              .error(crate::code::formula_error_from_lex(error)),
+          );
+        }
+        _ => {}
+      }
+    }
+    self.parse_word_or_function()
+  }
+
+  fn parse_parenthesized_expression(&mut self) -> Option<FormulaExprId> {
+    let mut left = self.parse_expression()?;
+    while self
+      .tokens
+      .consume_token_kind(parser::LexTokenKind::ArgumentSeparator)
+      .is_some()
+    {
+      let right = self.parse_expression_bp(infix_binding_power(parser::LexOperator::Union)?.1)?;
+      left = self.builder.binary(
+        crate::code::formula_operator_from_lex(parser::LexOperator::Union),
+        left,
+        right,
+      );
+    }
+    Some(left)
+  }
+
+  fn parse_array(&mut self) -> Option<FormulaExprId> {
+    let mark = self.builder.array_mark();
+    let mut rows = 0usize;
+    let mut cols = None::<usize>;
+    let mut row_len = 0usize;
+    loop {
+      if self
+        .tokens
+        .consume_token_kind(parser::LexTokenKind::ArrayClose)
+        .is_some()
+      {
+        if row_len != 0 {
+          rows += 1;
+          cols = finish_array_row(cols, row_len)?;
+        } else if rows != 0 {
+          let blank = self.builder.blank();
+          self.builder.push_array_element(blank);
+          rows += 1;
+          cols = finish_array_row(cols, 1)?;
+        }
+        break;
+      }
+      if self
+        .tokens
+        .consume_token_kind(parser::LexTokenKind::ArgumentSeparator)
+        .is_some()
+      {
+        let blank = self.builder.blank();
+        self.builder.push_array_element(blank);
+        row_len += 1;
+        continue;
+      }
+      if self
+        .tokens
+        .consume_token_kind(parser::LexTokenKind::RowSeparator)
+        .is_some()
+      {
+        if row_len == 0 {
+          let blank = self.builder.blank();
+          self.builder.push_array_element(blank);
+          row_len = 1;
+        }
+        rows += 1;
+        cols = finish_array_row(cols, row_len)?;
+        row_len = 0;
+        continue;
+      }
+
+      let element = self.parse_expression()?;
+      self.builder.push_array_element(element);
+      row_len += 1;
+
+      if self
+        .tokens
+        .consume_token_kind(parser::LexTokenKind::ArgumentSeparator)
+        .is_some()
+      {
+        continue;
+      }
+      if self
+        .tokens
+        .consume_token_kind(parser::LexTokenKind::RowSeparator)
+        .is_some()
+      {
+        rows += 1;
+        cols = finish_array_row(cols, row_len)?;
+        row_len = 0;
+        continue;
+      }
+      if self
+        .tokens
+        .consume_token_kind(parser::LexTokenKind::ArrayClose)
+        .is_some()
+      {
+        rows += 1;
+        cols = finish_array_row(cols, row_len)?;
+        break;
+      }
+      return None;
+    }
+
+    if rows > u16::MAX as usize || cols.unwrap_or_default() > u16::MAX as usize {
+      return None;
+    }
+    let span = self
+      .builder
+      .finish_array_span(mark, rows as u16, cols.unwrap_or_default() as u16);
+    Some(self.builder.push_value(FormulaNodeKind::Array(span)))
+  }
+
+  fn parse_word_or_function(&mut self) -> Option<FormulaExprId> {
+    let token = self.tokens.peek()?;
+    if token.kind != parser::LexTokenKind::Word {
+      return None;
+    }
+    if let Some(split) = split_word_before_intersection(self.body, token) {
+      self.tokens.advance_split_word(split.end);
+      let word = self.body.get(split.start..split.end)?;
+      return self.push_word(split, parser::semantic_word_kind(word));
+    }
+    let name = token_span(token);
+    self.tokens.advance();
+    if self
+      .tokens
+      .peek()
+      .is_some_and(|token| token.kind == parser::LexTokenKind::ParenOpen)
+    {
+      let args = self.parse_argument_list(None)?;
+      let name_text = self.body.get(name.start..name.end)?;
+      let name_symbol = self.builder.intern(name_text);
       let mut labels = FormulaNodeLabels::empty();
-      if *volatile {
+      if parser::is_volatile_function_name(name_text) {
         labels |= FormulaNodeLabels::VOLATILE;
       }
-      Some(builder.push(
+      return Some(self.builder.push(
         FormulaNodeKind::Function {
           name: FormulaFunctionName::Unknown(name_symbol),
           args,
         },
-        Some(source_span(body_start, *name)),
+        Some(source_span(self.body_start, name)),
         FormulaNodeMetadata {
           labels,
           operand_class: FormulaOperandClass::Unknown,
           param_class: FormulaParamClass::Unknown,
         },
-      ))
+      ));
     }
-    parser::FormulaAst::LogicalFunction { function, args } => {
-      let mut lowered = Vec::with_capacity(args.len());
-      for arg in args {
-        lowered.push(lower_parser_ast(builder, source, body_start, arg)?);
-      }
-      Some(builder.function(function.name(), &lowered))
+    let word = self.body.get(name.start..name.end)?;
+    self.push_word(name, parser::semantic_word_kind(word))
+  }
+
+  fn parse_argument_list(&mut self, first: Option<FormulaExprId>) -> Option<FormulaArgSpan> {
+    self
+      .tokens
+      .consume_token_kind(parser::LexTokenKind::ParenOpen)?;
+    let mut args = FormulaArgBuffer::new();
+    if let Some(first) = first {
+      args.push(first);
     }
-    parser::FormulaAst::Array(rows) => {
-      let row_count = rows.len();
-      let col_count = rows.first().map_or(0, Vec::len);
-      if row_count > u16::MAX as usize || col_count > u16::MAX as usize {
-        return None;
+    loop {
+      if self
+        .tokens
+        .consume_token_kind(parser::LexTokenKind::ParenClose)
+        .is_some()
+      {
+        break;
       }
-      let mut elements = Vec::with_capacity(row_count.saturating_mul(col_count));
-      for row in rows {
-        if row.len() != col_count {
-          return None;
+      if self
+        .tokens
+        .consume_token_kind(parser::LexTokenKind::ArgumentSeparator)
+        .is_some()
+      {
+        let blank = self.builder.blank();
+        args.push(blank);
+        if self
+          .tokens
+          .peek()
+          .is_some_and(|token| token.kind == parser::LexTokenKind::ParenClose)
+        {
+          let blank = self.builder.blank();
+          args.push(blank);
         }
-        for item in row {
-          elements.push(lower_parser_ast(builder, source, body_start, item)?);
+        continue;
+      }
+      let arg = self.parse_expression()?;
+      args.push(arg);
+      if self
+        .tokens
+        .consume_token_kind(parser::LexTokenKind::ParenClose)
+        .is_some()
+      {
+        break;
+      }
+      self
+        .tokens
+        .consume_token_kind(parser::LexTokenKind::ArgumentSeparator)?;
+      if self
+        .tokens
+        .peek()
+        .is_some_and(|token| token.kind == parser::LexTokenKind::ParenClose)
+      {
+        let blank = self.builder.blank();
+        args.push(blank);
+      }
+    }
+    Some(self.builder.push_arg_span(&args))
+  }
+
+  fn push_text_literal(&mut self, span: parser::SemanticSpan) -> Option<FormulaExprId> {
+    let value = match parser::formula_text_literal(self.source.text, self.body_start + span.start)?
+    {
+      parser::TextLiteral::Borrowed(value) => value,
+      parser::TextLiteral::Owned(value) => {
+        let symbol = self.builder.intern(&value);
+        return Some(self.builder.push(
+          FormulaNodeKind::Text(symbol),
+          Some(source_span(self.body_start, span)),
+          FormulaNodeMetadata::default(),
+        ));
+      }
+    };
+    let symbol = self.builder.intern(value);
+    Some(self.builder.push(
+      FormulaNodeKind::Text(symbol),
+      Some(source_span(self.body_start, span)),
+      FormulaNodeMetadata::default(),
+    ))
+  }
+
+  fn push_word(
+    &mut self,
+    span: parser::SemanticSpan,
+    kind: parser::SemanticWordKind,
+  ) -> Option<FormulaExprId> {
+    lower_parser_word(self.builder, self.source, self.body_start, span, kind)
+  }
+}
+
+enum ProgramSyntaxTokenInput<'a> {
+  Borrowed(&'a [parser::LexToken]),
+  Owned(Vec<parser::LexToken>),
+}
+
+struct ProgramSyntaxTokens<'a> {
+  source: &'a str,
+  tokens: ProgramSyntaxTokenInput<'a>,
+  index: usize,
+}
+
+impl<'a> ProgramSyntaxTokens<'a> {
+  fn new(source: &'a str, tokens: &'a [parser::LexToken]) -> Self {
+    Self {
+      source,
+      tokens: ProgramSyntaxTokenInput::Borrowed(tokens),
+      index: 0,
+    }
+  }
+
+  fn tokens_from(source: &str, offset: usize) -> Vec<parser::LexToken> {
+    parser::lex_tokens(source.get(offset..).unwrap_or_default())
+      .map(|token| parser::LexToken {
+        kind: token.kind,
+        start: token.start + offset,
+        end: token.end + offset,
+      })
+      .collect()
+  }
+
+  fn is_end(&self) -> bool {
+    self.index >= self.len()
+  }
+
+  fn position(&self) -> usize {
+    self.index
+  }
+
+  fn set_position(&mut self, index: usize) {
+    self.index = index.min(self.len());
+  }
+
+  fn peek(&self) -> Option<parser::LexToken> {
+    self.token_at(self.index)
+  }
+
+  fn advance(&mut self) -> Option<parser::LexToken> {
+    let token = self.peek()?;
+    self.index += 1;
+    Some(token)
+  }
+
+  fn ws_before_next(&self) -> bool {
+    let token = match self.token_at(self.index) {
+      Some(token) => token,
+      None => return false,
+    };
+    let previous_end = if self.index == 0 {
+      0
+    } else {
+      self
+        .token_at(self.index - 1)
+        .map(|token| token.end)
+        .unwrap_or_default()
+    };
+    self
+      .source
+      .get(previous_end..token.start)
+      .is_some_and(|text| !text.is_empty())
+  }
+
+  fn consume_token_kind(&mut self, kind: parser::LexTokenKind) -> Option<parser::LexToken> {
+    let token = self.peek()?;
+    if token.kind != kind {
+      return None;
+    }
+    self.advance()
+  }
+
+  fn consume_operator_where(
+    &mut self,
+    predicate: impl FnOnce(parser::LexOperator) -> bool,
+  ) -> Option<parser::LexOperator> {
+    let token = self.peek()?;
+    let parser::LexTokenKind::Operator(operator) = token.kind else {
+      return None;
+    };
+    if !predicate(operator) {
+      return None;
+    }
+    self.advance();
+    Some(operator)
+  }
+
+  fn consume_logical_function_call(&mut self) -> Option<parser::LexLogicalFunction> {
+    let token = self.peek()?;
+    if token.kind != parser::LexTokenKind::Word {
+      return None;
+    }
+    let word = self.source.get(token.start..token.end)?;
+    let function = logical_function_name(word)?;
+    let next = self.token_at(self.index + 1)?;
+    if next.kind != parser::LexTokenKind::ParenOpen {
+      return None;
+    }
+    self.advance();
+    Some(function)
+  }
+
+  fn advance_split_word(&mut self, end: usize) {
+    if self.token_at(self.index).is_none() {
+      return;
+    }
+    self.materialize();
+    let tail = Self::tokens_from(self.source, end);
+    let ProgramSyntaxTokenInput::Owned(tokens) = &mut self.tokens else {
+      return;
+    };
+    tokens[self.index].end = end;
+    self.index += 1;
+    tokens.splice(self.index.., tail);
+  }
+
+  fn len(&self) -> usize {
+    match &self.tokens {
+      ProgramSyntaxTokenInput::Borrowed(tokens) => tokens.len(),
+      ProgramSyntaxTokenInput::Owned(tokens) => tokens.len(),
+    }
+  }
+
+  fn token_at(&self, index: usize) -> Option<parser::LexToken> {
+    match &self.tokens {
+      ProgramSyntaxTokenInput::Borrowed(tokens) => tokens.get(index).copied(),
+      ProgramSyntaxTokenInput::Owned(tokens) => tokens.get(index).copied(),
+    }
+  }
+
+  fn materialize(&mut self) {
+    let owned = match &self.tokens {
+      ProgramSyntaxTokenInput::Borrowed(tokens) => Some(tokens.to_vec()),
+      ProgramSyntaxTokenInput::Owned(_) => None,
+    };
+    if let Some(tokens) = owned {
+      self.tokens = ProgramSyntaxTokenInput::Owned(tokens);
+    }
+  }
+}
+
+fn logical_function_name(value: &str) -> Option<parser::LexLogicalFunction> {
+  if value.eq_ignore_ascii_case("AND") {
+    Some(parser::LexLogicalFunction::And)
+  } else if value.eq_ignore_ascii_case("OR") {
+    Some(parser::LexLogicalFunction::Or)
+  } else if value.eq_ignore_ascii_case("NOT") {
+    Some(parser::LexLogicalFunction::Not)
+  } else {
+    None
+  }
+}
+
+fn logical_binding_power() -> u8 {
+  1
+}
+
+fn infix_binding_power(operator: parser::LexOperator) -> Option<(u8, u8)> {
+  match operator {
+    parser::LexOperator::Equal
+    | parser::LexOperator::NotEqual
+    | parser::LexOperator::Less
+    | parser::LexOperator::LessOrEqual
+    | parser::LexOperator::Greater
+    | parser::LexOperator::GreaterOrEqual => Some((2, 3)),
+    parser::LexOperator::Union => Some((4, 5)),
+    parser::LexOperator::Intersection => Some((6, 7)),
+    parser::LexOperator::Range => Some((8, 9)),
+    parser::LexOperator::Concat => Some((10, 11)),
+    parser::LexOperator::Add | parser::LexOperator::Subtract => Some((12, 13)),
+    parser::LexOperator::Multiply | parser::LexOperator::Divide => Some((14, 15)),
+    parser::LexOperator::Power => Some((16, 16)),
+    parser::LexOperator::ImplicitIntersection | parser::LexOperator::Percent => None,
+  }
+}
+
+fn postfix_binding_power(operator: parser::LexOperator) -> Option<u8> {
+  (operator == parser::LexOperator::Percent).then_some(18)
+}
+
+fn prefix_binding_power() -> u8 {
+  17
+}
+
+fn prefix_operator(operator: parser::LexOperator) -> bool {
+  matches!(
+    operator,
+    parser::LexOperator::Add
+      | parser::LexOperator::Subtract
+      | parser::LexOperator::ImplicitIntersection
+  )
+}
+
+fn token_span(token: parser::LexToken) -> parser::SemanticSpan {
+  parser::SemanticSpan {
+    start: token.start,
+    end: token.end,
+  }
+}
+
+fn split_word_before_intersection(
+  source: &str,
+  token: parser::LexToken,
+) -> Option<parser::SemanticSpan> {
+  let word = &source[token.start..token.end];
+  let mut quoted = false;
+  let mut chars = word.char_indices().peekable();
+  while let Some((index, ch)) = chars.next() {
+    match ch {
+      '\'' => {
+        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
+          chars.next();
+        } else {
+          quoted = !quoted;
         }
       }
-      Some(builder.array(row_count as u16, col_count as u16, &elements))
+      '!'
+        if !quoted
+          && word[..index].contains(':')
+          && !bang_belongs_to_range_endpoint_sheet_name(&word[..index]) =>
+      {
+        return Some(parser::SemanticSpan {
+          start: token.start,
+          end: token.start + index,
+        });
+      }
+      _ => {}
     }
+  }
+  None
+}
+
+fn bang_belongs_to_range_endpoint_sheet_name(prefix: &str) -> bool {
+  let mut quoted = false;
+  let mut chars = prefix.char_indices().peekable();
+  let mut last_colon = None;
+  while let Some((index, ch)) = chars.next() {
+    match ch {
+      '\'' => {
+        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
+          chars.next();
+        } else {
+          quoted = !quoted;
+        }
+      }
+      ':' if !quoted => last_colon = Some(index),
+      _ => {}
+    }
+  }
+  let Some(colon) = last_colon else {
+    return false;
+  };
+  let endpoint_prefix = prefix[colon + ':'.len_utf8()..].trim();
+  !endpoint_prefix.is_empty()
+    && crate::CellAddress::parse_a1(endpoint_prefix.trim_start_matches('$')).is_err()
+}
+
+fn is_intersection_rhs_start(token: Option<parser::LexToken>) -> bool {
+  token.is_some_and(|token| {
+    matches!(
+      token.kind,
+      parser::LexTokenKind::Text
+        | parser::LexTokenKind::Number(_)
+        | parser::LexTokenKind::Error(_)
+        | parser::LexTokenKind::ArrayOpen
+        | parser::LexTokenKind::ParenOpen
+        | parser::LexTokenKind::Word
+    )
+  })
+}
+
+fn finish_array_row(cols: Option<usize>, row_len: usize) -> Option<Option<usize>> {
+  match cols {
+    Some(cols) if cols != row_len => None,
+    Some(cols) => Some(Some(cols)),
+    None => Some(Some(row_len)),
   }
 }
 

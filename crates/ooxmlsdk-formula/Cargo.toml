@@ -26,6 +26,7 @@ ooxmlsdk = { workspace = true, features = ["parts"] }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 rustfft = { workspace = true }
+smallvec = { workspace = true }
 statrs = { workspace = true }
 thiserror = { workspace = true }
 winnow = { workspace = true }

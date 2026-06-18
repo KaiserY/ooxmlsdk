@@ -1,16 +1,14 @@
-use super::ast::FormulaAst;
 use super::lex::{LexToken, formula_body_start, lex_tokens};
 use super::semantic::{
   ExternalReferenceSpans, SemanticSpan, SemanticToken, SemanticTokenKind, semantic_token_from_lex,
 };
-use super::syntax::{SyntaxIssue, SyntaxParse, parse_syntax_ast_from_tokens};
 use super::{LexErrorValue, LexOperator};
 use crate::CellAddress;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct FormulaBodyParse {
+  pub lexed: Vec<LexToken>,
   pub tokens: Vec<FormulaBodyToken>,
-  pub ast: Option<FormulaAst>,
   pub issues: Vec<FormulaParseIssue>,
 }
 
@@ -19,12 +17,6 @@ pub(crate) struct FormulaSourceParse<'a> {
   pub body_start: usize,
   pub body: &'a str,
   pub body_parse: FormulaBodyParse,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct FormulaSyntaxParse {
-  pub ast: Option<FormulaAst>,
-  pub issues: Vec<FormulaParseIssue>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -84,10 +76,6 @@ impl<'a> FormulaParser<'a> {
 
 fn parse_formula_body(source: &str) -> FormulaBodyParse {
   let lexed = lex_tokens(source).collect::<Vec<_>>();
-  parse_formula_body_from_tokens(source, &lexed)
-}
-
-fn parse_formula_body_from_tokens<'a>(source: &'a str, lexed: &'a [LexToken]) -> FormulaBodyParse {
   let mut issues = Vec::new();
   let tokens = formula_body_tokens(
     lexed
@@ -97,37 +85,9 @@ fn parse_formula_body_from_tokens<'a>(source: &'a str, lexed: &'a [LexToken]) ->
     &mut issues,
   );
 
-  let syntax = parse_formula_syntax_from_tokens(source, lexed);
-  issues.extend(syntax.issues);
-
   FormulaBodyParse {
+    lexed,
     tokens,
-    ast: syntax.ast,
-    issues,
-  }
-}
-
-fn parse_formula_syntax_from_tokens<'a>(
-  source: &'a str,
-  lexed: &'a [LexToken],
-) -> FormulaSyntaxParse {
-  formula_syntax_from_syntax(parse_syntax_ast_from_tokens(source, lexed))
-}
-
-fn formula_syntax_from_syntax(syntax: SyntaxParse) -> FormulaSyntaxParse {
-  let mut issues = Vec::new();
-  for issue in syntax.issues {
-    match issue {
-      SyntaxIssue::MissingClosingParenthesis => {
-        issues.push(FormulaParseIssue::MissingClosingParenthesis);
-      }
-    }
-  }
-  if syntax.ast.is_none() || !syntax.complete {
-    issues.push(FormulaParseIssue::IncompleteExpression);
-  }
-  FormulaSyntaxParse {
-    ast: syntax.ast,
     issues,
   }
 }

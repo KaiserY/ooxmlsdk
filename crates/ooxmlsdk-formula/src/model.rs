@@ -3426,9 +3426,9 @@ fn lower_formula_parser_body<'doc>(
   parsed: crate::parser::FormulaBodyParse,
 ) -> LoweredFormula<'doc> {
   let crate::parser::FormulaBodyParse {
+    lexed,
     tokens: parsed_tokens,
-    ast: parser_ast,
-    issues,
+    mut issues,
   } = parsed;
   let mut tokens = Vec::with_capacity(parsed_tokens.len());
   let mut unsupported = Vec::new();
@@ -3498,11 +3498,6 @@ fn lower_formula_parser_body<'doc>(
     }
   }
 
-  unsupported.extend(formula_parse_issues_to_unsupported(
-    text,
-    borrowed_text,
-    issues.clone(),
-  ));
   let program = FormulaProgram::from_parser_parts(
     FormulaSource {
       text: full_source,
@@ -3513,10 +3508,15 @@ fn lower_formula_parser_body<'doc>(
       },
     },
     body_start,
-    parsed_tokens.len(),
-    parser_ast.as_ref(),
-    &issues,
+    text,
+    &lexed,
+    &mut issues,
   );
+  unsupported.extend(formula_parse_issues_to_unsupported(
+    text,
+    borrowed_text,
+    issues.clone(),
+  ));
   let code = FormulaCode::from_program(sheet, borrowed_source, &program);
   if code.is_none()
     && program.root.is_some()

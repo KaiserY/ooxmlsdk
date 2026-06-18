@@ -23,10 +23,12 @@ use crate::calc::datetime::{
   weeks_mode_one_index, yearfrac as date_yearfrac,
 };
 use crate::calc::financial::{
-  finance_coupdaybs, finance_coupdays, finance_coupdaysnc, finance_coupncd, finance_coupnum,
-  finance_couppcd, finance_duration, finance_price, finance_yield, financial_db, financial_ddb,
-  financial_fv, financial_ipmt, financial_irr, financial_mirr, financial_nper, financial_pmt,
-  financial_rate, financial_vdb, financial_xirr, financial_xnpv,
+  OddPeriodArgs, finance_coupdaybs, finance_coupdays, finance_coupdaysnc, finance_coupncd,
+  finance_coupnum, finance_couppcd, finance_duration, finance_price, finance_yield,
+  financial_amordegrc, financial_amorlinc, financial_db, financial_ddb, financial_fv,
+  financial_ipmt, financial_irr, financial_mirr, financial_nper, financial_oddlprice,
+  financial_oddlyield, financial_pmt, financial_rate, financial_vdb, financial_xirr,
+  financial_xnpv,
 };
 use crate::calc::matrix::{determinant, lup_decompose, lup_solve, matrix_multiply};
 use crate::calc::numeric::{
@@ -49,8 +51,8 @@ use crate::calc::special::{
 };
 use crate::calc::statistics::{
   PercentileKind, StatisticsError, correlation, covariance, deviation_sum_squares,
-  frequency_counts, kurtosis, mode_slice, percent_rank, percentile_sorted, rank_value, skewness,
-  trim_mean, variance_slice,
+  frequency_counts, kurtosis, mode_ms_values, mode_slice, percent_rank, percentile_sorted,
+  rank_value, skewness, trim_mean, variance_slice,
 };
 use crate::calc::text::{
   baht_text, clean_formula_text, full_width_like_jis, half_width_like_asc, leftb, legacy_char_text,
@@ -159,6 +161,8 @@ fn evaluate_function_reader<'doc>(
       evaluator.count_blank(&args.first_value()?) as f64,
     )),
     FormulaFunctionId::Mode => evaluate_mode_reader(evaluator, args),
+    FormulaFunctionId::ModeDotSngl => evaluate_mode_ms_reader(evaluator, args, true),
+    FormulaFunctionId::ModeDotMult => evaluate_mode_ms_reader(evaluator, args, false),
     FormulaFunctionId::Sumif if (2..=3).contains(&args.len()) => evaluator.evaluate_ifs_reader(
       args,
       Some(if args.len() == 3 { 2 } else { 0 }),
@@ -1288,6 +1292,9 @@ fn evaluate_function_reader<'doc>(
       evaluate_z_test_reader(evaluator, args)
     }
     FormulaFunctionId::Frequency if args.len() == 2 => evaluate_frequency_reader(evaluator, args),
+    FormulaFunctionId::Prob if (3..=4).contains(&args.len()) => {
+      evaluate_prob_reader(evaluator, args)
+    }
     FormulaFunctionId::HypgeomDotDist if (4..=5).contains(&args.len()) => {
       evaluate_hypgeom_dist_reader(evaluator, args)
     }
@@ -1464,6 +1471,7 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Npv if args.len() >= 2 => evaluate_npv_reader(evaluator, args),
     FormulaFunctionId::Ispmt if args.len() == 4 => evaluate_ispmt_reader(evaluator, args),
     FormulaFunctionId::Rri if args.len() == 3 => evaluate_rri_reader(evaluator, args),
+    FormulaFunctionId::Pduration if args.len() == 3 => evaluate_pduration_reader(evaluator, args),
     FormulaFunctionId::Effect if args.len() == 2 => {
       evaluate_effect_nominal_reader(evaluator, args, true)
     }
@@ -1499,6 +1507,18 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::Price if (6..=7).contains(&args.len()) => {
       evaluate_price_reader(evaluator, args)
+    }
+    FormulaFunctionId::Oddlprice if (7..=8).contains(&args.len()) => {
+      evaluate_odd_period_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Oddlyield if (7..=8).contains(&args.len()) => {
+      evaluate_odd_period_reader(evaluator, args, false)
+    }
+    FormulaFunctionId::Amordegrc if (6..=7).contains(&args.len()) => {
+      evaluate_amor_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Amorlinc if (6..=7).contains(&args.len()) => {
+      evaluate_amor_reader(evaluator, args, false)
     }
     FormulaFunctionId::Mduration if (5..=6).contains(&args.len()) => {
       evaluate_mduration_reader(evaluator, args)
@@ -2107,6 +2127,67 @@ fn evaluate_mode_reader<'doc>(
   mode_slice(&values)
     .map(FormulaValue::Number)
     .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
+}
+
+fn evaluate_mode_ms_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  single: bool,
+) -> Option<FormulaValue<'doc>> {
+  let mut values = Vec::new();
+  for index in 0..args.len() {
+    if let Err(error) = collect_mode_ms_numbers(evaluator, args.value(index)?, &mut values) {
+      return Some(FormulaValue::Error(error));
+    }
+  }
+  let modes = match mode_ms_values(&values) {
+    Some(modes) => modes,
+    None => return Some(FormulaValue::Error(FormulaErrorValue::NA)),
+  };
+  if single || !evaluator.array_context {
+    return Some(FormulaValue::Number(modes[0]));
+  }
+  Some(FormulaValue::Matrix(
+    modes
+      .into_iter()
+      .map(|value| vec![FormulaValue::Number(value)])
+      .collect(),
+  ))
+}
+
+fn collect_mode_ms_numbers<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: FormulaValue<'doc>,
+  values: &mut Vec<f64>,
+) -> std::result::Result<(), FormulaErrorValue> {
+  match value {
+    FormulaValue::Reference(reference) if reference.range.cell_count_hint() == 1 => {
+      match evaluator.first_value(&FormulaValue::Reference(reference)) {
+        FormulaValue::Number(value) => values.push(value),
+        FormulaValue::Error(error) => return Err(error),
+        _ => return Err(FormulaErrorValue::Value),
+      }
+    }
+    FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_) => {
+      let matrix = evaluator.matrix_values(&value);
+      let columns = matrix.first().map_or(0, Vec::len);
+      for column in 0..columns {
+        for row in &matrix {
+          match row.get(column) {
+            Some(FormulaValue::Number(value)) => values.push(*value),
+            Some(FormulaValue::Error(error)) => return Err(*error),
+            Some(_) | None => {}
+          }
+        }
+      }
+    }
+    FormulaValue::Number(value) => values.push(value),
+    FormulaValue::Error(error) => return Err(error),
+    FormulaValue::Blank | FormulaValue::Boolean(_) | FormulaValue::String(_) => {
+      return Err(FormulaErrorValue::Value);
+    }
+  }
+  Ok(())
 }
 
 fn collect_mode_numbers<'doc>(
@@ -7153,6 +7234,74 @@ fn evaluate_frequency_reader<'doc>(
     .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
 }
 
+fn evaluate_prob_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let x_values = evaluator.matrix_values(&args.array_value(0)?);
+  let probabilities = evaluator.matrix_values(&args.array_value(1)?);
+  let x_rows = x_values.len();
+  let x_columns = x_values.first().map_or(0, Vec::len);
+  let p_rows = probabilities.len();
+  let p_columns = probabilities.first().map_or(0, Vec::len);
+  if x_rows == 0
+    || x_columns == 0
+    || x_rows != p_rows
+    || x_columns != p_columns
+    || x_values.iter().any(|row| row.len() != x_columns)
+    || probabilities.iter().any(|row| row.len() != x_columns)
+  {
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
+  }
+
+  let upper_index = if args.len() == 4 { 3 } else { 2 };
+  let upper = match scalar_number_arg_or_value(evaluator, args, upper_index)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let lower = if args.len() == 4 {
+    match scalar_number_arg_or_value(evaluator, args, 2)? {
+      Ok(value) => value,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  } else {
+    upper
+  };
+  let (lower, upper) = if lower > upper {
+    (upper, lower)
+  } else {
+    (lower, upper)
+  };
+
+  let mut probability_sum = KahanSum::default();
+  let mut result = KahanSum::default();
+  for (x_row, probability_row) in x_values.iter().zip(&probabilities) {
+    for (x_value, probability) in x_row.iter().zip(probability_row) {
+      let x_value = match x_value {
+        FormulaValue::Number(value) => *value,
+        FormulaValue::Error(error) => return Some(FormulaValue::Error(*error)),
+        _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+      };
+      let probability = match probability {
+        FormulaValue::Number(value) => *value,
+        FormulaValue::Error(error) => return Some(FormulaValue::Error(*error)),
+        _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+      };
+      if !(0.0..=1.0).contains(&probability) {
+        return Some(FormulaValue::Error(FormulaErrorValue::NA));
+      }
+      probability_sum.add(probability);
+      if x_value >= lower && x_value <= upper {
+        result.add(probability);
+      }
+    }
+  }
+  if (probability_sum.finish() - 1.0).abs() > 1.0e-7 {
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
+  }
+  Some(FormulaValue::Number(result.finish()))
+}
+
 fn map_numeric_array_values<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   values: &[FormulaValue<'doc>],
@@ -8585,6 +8734,73 @@ fn finance_date_arg<'doc>(
   floor_to_i32(evaluator.date_number_from_value(&args.value(index)?)?)
 }
 
+fn financial_invalid_error(evaluator: &EvalContext<'_, '_>) -> FormulaErrorValue {
+  match evaluator.grammar {
+    FormulaGrammar::CalcA1 | FormulaGrammar::OpenFormula => FormulaErrorValue::IllegalArgument,
+    FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1 => FormulaErrorValue::Num,
+  }
+}
+
+fn financial_number_arg_strict<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  missing_error: FormulaErrorValue,
+) -> Result<f64, FormulaErrorValue> {
+  if args.is_missing(index) {
+    return Err(missing_error);
+  }
+  financial_number_arg(evaluator, args, index).and_then(|value| {
+    if value.is_finite() {
+      Ok(value)
+    } else {
+      Err(missing_error)
+    }
+  })
+}
+
+fn financial_i32_arg_strict<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  missing_error: FormulaErrorValue,
+) -> Result<i32, FormulaErrorValue> {
+  let value = financial_number_arg_strict(evaluator, args, index, missing_error)?;
+  floor_to_i32(value).ok_or(missing_error)
+}
+
+fn optional_financial_i32_arg_strict<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  default: i32,
+  missing_error: FormulaErrorValue,
+) -> Result<i32, FormulaErrorValue> {
+  match args.raw_arg(index).filter(|_| !args.is_missing(index)) {
+    Some(_) => financial_i32_arg_strict(evaluator, args, index, missing_error),
+    None => Ok(default),
+  }
+}
+
+fn financial_date_arg_strict<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  missing_error: FormulaErrorValue,
+) -> Result<i32, FormulaErrorValue> {
+  if args.is_missing(index) {
+    return Err(missing_error);
+  }
+  let value = args.value(index).ok_or(missing_error)?;
+  if let FormulaValue::Error(error) = value {
+    return Err(error);
+  }
+  evaluator
+    .date_number_from_value(&value)
+    .and_then(floor_to_i32)
+    .ok_or(FormulaErrorValue::Value)
+}
+
 fn evaluate_yield_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -8665,6 +8881,144 @@ fn evaluate_price_reader<'doc>(
   .or(Some(FormulaValue::Error(
     FormulaErrorValue::IllegalArgument,
   )))
+}
+
+fn evaluate_odd_period_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  price: bool,
+) -> Option<FormulaValue<'doc>> {
+  let invalid_error = financial_invalid_error(evaluator);
+  if (0..7).any(|index| args.is_missing(index)) {
+    return Some(FormulaValue::Error(invalid_error));
+  }
+  let settle = match financial_date_arg_strict(evaluator, args, 0, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let maturity = match financial_date_arg_strict(evaluator, args, 1, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let last_coupon = match financial_date_arg_strict(evaluator, args, 2, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let rate = match financial_number_arg_strict(evaluator, args, 3, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let value = match financial_number_arg_strict(evaluator, args, 4, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let redemption = match financial_number_arg_strict(evaluator, args, 5, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let frequency = match financial_i32_arg_strict(evaluator, args, 6, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let basis = match optional_financial_i32_arg_strict(evaluator, args, 7, 0, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if rate <= 0.0
+    || value < 0.0
+    || (!price && value <= 0.0)
+    || redemption <= 0.0
+    || !matches!(frequency, 1 | 2 | 4)
+    || maturity <= settle
+    || settle <= last_coupon
+    || !(0..=4).contains(&basis)
+  {
+    return Some(FormulaValue::Error(invalid_error));
+  }
+  let args = OddPeriodArgs {
+    settle,
+    maturity,
+    last_coupon,
+    rate,
+    value,
+    redemption,
+    frequency,
+    basis,
+  };
+  let result = if price {
+    financial_oddlprice(args)
+  } else {
+    financial_oddlyield(args)
+  };
+  result
+    .filter(|value| value.is_finite())
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(invalid_error)))
+}
+
+fn evaluate_amor_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  degressive: bool,
+) -> Option<FormulaValue<'doc>> {
+  let invalid_error = financial_invalid_error(evaluator);
+  if (0..6).any(|index| args.is_missing(index)) {
+    return Some(FormulaValue::Error(invalid_error));
+  }
+  let cost = match financial_number_arg_strict(evaluator, args, 0, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let date = match financial_date_arg_strict(evaluator, args, 1, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let first_period = match financial_date_arg_strict(evaluator, args, 2, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let residual = match financial_number_arg_strict(evaluator, args, 3, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let period = match financial_number_arg_strict(evaluator, args, 4, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let rate = match financial_number_arg_strict(evaluator, args, 5, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let basis = match optional_financial_i32_arg_strict(evaluator, args, 6, 0, invalid_error) {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if matches!(
+    evaluator.grammar,
+    FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+  ) && basis == 2
+  {
+    return Some(FormulaValue::Error(invalid_error));
+  }
+  if date > first_period
+    || rate <= 0.0
+    || residual > cost
+    || cost <= 0.0
+    || residual < 0.0
+    || period < 0.0
+    || !(0..=4).contains(&basis)
+  {
+    return Some(FormulaValue::Error(invalid_error));
+  }
+  let result = if degressive {
+    financial_amordegrc(cost, date, first_period, residual, period, rate, basis)
+  } else {
+    financial_amorlinc(cost, date, first_period, residual, period, rate, basis)
+  };
+  result
+    .filter(|value| value.is_finite())
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(invalid_error)))
 }
 
 fn evaluate_mduration_reader<'doc>(
@@ -9005,6 +9359,43 @@ fn evaluate_rri_reader<'doc>(
   } else {
     Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
   }
+}
+
+fn evaluate_pduration_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let arg_values = (0..args.len())
+    .map(|index| args.array_value(index))
+    .collect::<Option<Vec<_>>>()?;
+  if evaluator.array_context && arg_values.iter().any(is_matrix_argument) {
+    return map_numeric_array_values(evaluator, &arg_values, FormulaErrorValue::Value, |values| {
+      pduration_value(values[0], values[1], values[2])
+    });
+  }
+  let rate = match scalar_number_arg_or_value(evaluator, args, 0)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let present = match scalar_number_arg_or_value(evaluator, args, 1)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let future = match scalar_number_arg_or_value(evaluator, args, 2)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  if rate <= 0.0 || present <= 0.0 || future <= 0.0 {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  Some(pduration_value(rate, present, future))
+}
+
+fn pduration_value<'doc>(rate: f64, present: f64, future: f64) -> FormulaValue<'doc> {
+  if rate <= 0.0 || present <= 0.0 || future <= 0.0 {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  FormulaValue::Number((future / present).ln() / rate.ln_1p())
 }
 
 fn evaluate_dollar_decimal_reader<'doc>(

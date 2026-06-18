@@ -580,7 +580,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       let start_column = reference.range.start.column.min(reference.range.end.column);
       let end_column = reference.range.start.column.max(reference.range.end.column);
       if start_row != end_row && start_column != end_column {
-        return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+        return Some(FormulaValue::Error(FormulaErrorValue::Error));
       }
       let address = if start_row != end_row {
         let row = start_row.saturating_add(index as u32);
@@ -618,7 +618,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           .or(Some(FormulaValue::Error(FormulaErrorValue::NA)));
       }
       if rows > 1 && columns > 1 {
-        return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+        return Some(FormulaValue::Error(FormulaErrorValue::Error));
       }
       let result_vertical = result_matrix.len() >= result_matrix.first().map_or(0, Vec::len);
       let result_vector = lookup_vector_with_orientation(&result_matrix, result_vertical)?;
@@ -1071,7 +1071,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       ));
     }
     if args.len() != 1 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Error));
     }
     if let Some(count) = self.raw_sheets_reference_count(args) {
       return Some(FormulaValue::Number(count as f64));
@@ -1086,7 +1086,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           .map(|range| self.reference_sheet_count(range))
           .sum::<u32>() as f64,
       )),
-      FormulaValue::Matrix(_) => Some(FormulaValue::Error(FormulaErrorValue::Unknown)),
+      FormulaValue::Matrix(_) => Some(FormulaValue::Error(FormulaErrorValue::Error)),
       _ => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     }
   }
@@ -1114,7 +1114,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: FunctionArgReader<'_, '_, 'doc>,
   ) -> Option<FormulaValue<'doc>> {
     if args.len() > 1 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Error));
     }
     let sheet = if args.is_empty() {
       self.current_sheet
@@ -1286,7 +1286,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         FormulaGrammar::CalcA1 | FormulaGrammar::OpenFormula
       )
     {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Error));
     }
     let dimensions = criteria_ranges.first()?.dimensions();
     let main_values = if let Some(main_range) = main_range {
@@ -1491,7 +1491,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .and_then(|value| self.number(&value))
       .map(|value| value as i32)
     else {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Error));
     };
     let function_id = function.rem_euclid(100);
     if !(1..=11).contains(&function_id) {
@@ -1536,21 +1536,21 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: FunctionArgReader<'_, '_, 'doc>,
   ) -> Option<FormulaValue<'doc>> {
     if args.len() < 3 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Error));
     }
     let Some(function) = args
       .value(0)
       .and_then(|value| self.number(&value))
       .map(|value| value as i32)
     else {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Error));
     };
     let Some(options_arg) = args
       .value(1)
       .and_then(|value| self.number(&value))
       .map(|value| value as i32)
     else {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Error));
     };
     if !(1..=19).contains(&function) {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
@@ -1961,7 +1961,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       EtsKind::Season => (2..=4).contains(&args.len()),
     };
     if !valid_count {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Error));
     }
     let aggregation_index = match kind {
       EtsKind::Season => 3,

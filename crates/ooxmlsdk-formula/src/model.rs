@@ -762,6 +762,7 @@ pub enum FormulaOperator {
   Range,
   Union,
   Intersection,
+  ImplicitIntersection,
   Percent,
   UnaryPlus,
   UnaryMinus,
@@ -1676,7 +1677,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
         .get(..4)
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case("err:"))
     {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Error));
     }
     if let Some((left, right)) = split_indirect_intersection(clean) {
       let left = self.evaluate_formula_ast_value(
@@ -2726,7 +2727,7 @@ fn cell_display_text(cell: &x::Cell, shared_strings: &[String]) -> String {
       value.map(str::to_string).unwrap_or_default()
     }
     x::CellValues::Error => value
-      .unwrap_or(error_text_value(FormulaErrorValue::Unknown))
+      .unwrap_or(error_text_value(FormulaErrorValue::Error))
       .to_string(),
     x::CellValues::SharedString => value
       .and_then(|value| value.parse::<usize>().ok())
@@ -2758,7 +2759,7 @@ fn cell_value<'doc>(cell: &'doc x::Cell, shared_strings: &[String]) -> FormulaVa
     x::CellValues::Error => value
       .map(error_value)
       .map(FormulaValue::Error)
-      .unwrap_or(FormulaValue::Error(FormulaErrorValue::Unknown)),
+      .unwrap_or(FormulaValue::Error(FormulaErrorValue::Error)),
     x::CellValues::SharedString => value
       .and_then(|value| value.parse::<usize>().ok())
       .and_then(|index| shared_strings.get(index))
@@ -6672,7 +6673,7 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "PI(A1)"),
-      Some(FormulaValue::Error(FormulaErrorValue::Unknown))
+      Some(FormulaValue::Error(FormulaErrorValue::Error))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "TRUNC(1.234,2)"),
@@ -6684,7 +6685,7 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "MROUND(15.5,)"),
-      Some(FormulaValue::Error(FormulaErrorValue::Unknown))
+      Some(FormulaValue::Error(FormulaErrorValue::Error))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "MROUND(1.45,0.1)"),
@@ -6776,7 +6777,7 @@ mod tests {
         "of:=SUMIF(([.C1:.C5]~[.B1:.B5]~[.D1:.D5]);32;[.B1:.D5])",
         FormulaGrammar::OpenFormula,
       ),
-      Some(FormulaValue::Error(FormulaErrorValue::Unknown))
+      Some(FormulaValue::Error(FormulaErrorValue::Error))
     );
     let sumproduct_book = FormulaEvaluationBookBuilder::new()
       .with_cell(
@@ -6911,7 +6912,7 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "FVSCHEDULE(1000,)"),
-      Some(FormulaValue::Error(FormulaErrorValue::Unknown))
+      Some(FormulaValue::Error(FormulaErrorValue::Error))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "SUM(INDIRECT(\"R1C9\",0))"),
@@ -7171,11 +7172,22 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "ERROR.TYPE(#getting_data)"),
-      Some(FormulaValue::Error(FormulaErrorValue::Unknown))
+      Some(FormulaValue::Error(FormulaErrorValue::NA))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "ERRORTYPE(#getting_data)"),
-      Some(FormulaValue::Error(FormulaErrorValue::Unknown))
+      Some(FormulaValue::Error(FormulaErrorValue::PairExpected))
+    );
+    let open_formula_getting_data = parse_formula_with_context(
+      FormulaParseContext {
+        grammar: FormulaGrammar::OpenFormula,
+        ..Default::default()
+      },
+      "of:=ERROR.TYPE(#getting_data)",
+    );
+    assert_eq!(
+      book.evaluate_parsed_formula(SheetId(1), None, &open_formula_getting_data),
+      Some(FormulaValue::Error(FormulaErrorValue::PairExpected))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "ERRORTYPE(B1)"),
@@ -8407,7 +8419,7 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "COVAR(A1:A2,B1:B2,B1:B2)"),
-      Some(FormulaValue::Error(FormulaErrorValue::Unknown))
+      Some(FormulaValue::Error(FormulaErrorValue::Error))
     );
   }
 
@@ -8461,7 +8473,7 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "CONVERT_OOO(100,\"EUR\",\"SIT\",FALSE())"),
-      Some(FormulaValue::Error(FormulaErrorValue::Unknown))
+      Some(FormulaValue::Error(FormulaErrorValue::Error))
     );
   }
 
@@ -8800,6 +8812,10 @@ mod tests {
     assert_eq!(
       normalize_formula_text("of:=DOLLARDE(1,1;8)", FormulaGrammar::OpenFormula),
       Cow::Borrowed("DOLLARDE(1.1,8)")
+    );
+    assert_eq!(
+      normalize_formula_text("of:=ERROR.TYPE(#getting_data)", FormulaGrammar::OpenFormula),
+      Cow::Borrowed("ERROR.TYPE(#getting_data)")
     );
   }
 

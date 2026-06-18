@@ -439,7 +439,7 @@ pub(crate) fn error_text(value: &FormulaValue<'_>) -> Option<&'static str> {
 pub(crate) fn error_value(value: &str) -> FormulaErrorValue {
   crate::parser::formula_error_value(value)
     .map(formula_error_from_lex)
-    .unwrap_or(FormulaErrorValue::Unknown)
+    .unwrap_or(FormulaErrorValue::Error)
 }
 
 pub(crate) fn error_text_value(value: FormulaErrorValue) -> &'static str {
@@ -454,8 +454,30 @@ pub(crate) fn error_text_value(value: FormulaErrorValue) -> &'static str {
     FormulaErrorValue::GettingData => "#GETTING_DATA",
     FormulaErrorValue::Spill => "#SPILL!",
     FormulaErrorValue::Calc => "#CALC!",
+    FormulaErrorValue::Error => "#ERROR!",
+    FormulaErrorValue::NotImplemented => "#N/IMPL!",
+    FormulaErrorValue::CircularReference => "#CIRC!",
+    FormulaErrorValue::IllegalChar => "Err:501",
     FormulaErrorValue::IllegalArgument => "Err:502",
+    FormulaErrorValue::IllegalParameter => "Err:504",
+    FormulaErrorValue::Pair => "Err:507",
+    FormulaErrorValue::PairExpected => "Err:508",
+    FormulaErrorValue::OperatorExpected => "Err:509",
+    FormulaErrorValue::VariableExpected => "Err:510",
     FormulaErrorValue::Parameter => "Err:511",
-    FormulaErrorValue::Unknown => "#UNKNOWN!",
+    FormulaErrorValue::CodeOverflow => "Err:512",
+    FormulaErrorValue::StringOverflow => "Err:513",
+    FormulaErrorValue::StackOverflow => "Err:514",
+    FormulaErrorValue::InvalidVariable => "Err:516",
+    FormulaErrorValue::InvalidOpcode => "Err:517",
+    FormulaErrorValue::InvalidStackValue => "Err:518",
+    FormulaErrorValue::InvalidToken => "Err:520",
+    FormulaErrorValue::NoConvergence => "Err:523",
+    FormulaErrorValue::NoAddin => "Err:530",
+    FormulaErrorValue::NoMacro => "Err:531",
+    FormulaErrorValue::NestedArray => "Err:533",
+    FormulaErrorValue::MatrixSize => "Err:538",
+    FormulaErrorValue::BadArrayContent => "Err:539",
+    FormulaErrorValue::LinkFormulaNeedingCheck => "Err:540",
   }
 }

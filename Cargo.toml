@@ -36,8 +36,10 @@ ooxmlsdk-pdf = { version = "0.10.3", path = "crates/ooxmlsdk-pdf" }
 ooxmlsdk-pdf-test = { version = "0.10.3", path = "crates/ooxmlsdk-pdf-test" }
 ooxmlsdk-test = { version = "0.10.3", path = "crates/ooxmlsdk-test" }
 base64 = "0.22.1"
+bitflags = "2.13.0"
 quick-xml = "0.40.1"
 regex = "1.12.4"
+rustc-hash = "2.1.2"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_derive = "1.0.228"
 serde_json = "1.0.150"

@@ -268,6 +268,7 @@ pub(crate) fn formula_operator_from_lex(operator: parser::LexOperator) -> Formul
     parser::LexOperator::Range => FormulaOperator::Range,
     parser::LexOperator::Union => FormulaOperator::Union,
     parser::LexOperator::Intersection => FormulaOperator::Intersection,
+    parser::LexOperator::ImplicitIntersection => FormulaOperator::ImplicitIntersection,
     parser::LexOperator::Percent => FormulaOperator::Percent,
   }
 }
@@ -284,9 +285,31 @@ pub(crate) fn formula_error_from_lex(error: parser::LexErrorValue) -> FormulaErr
     parser::LexErrorValue::GettingData => FormulaErrorValue::GettingData,
     parser::LexErrorValue::Spill => FormulaErrorValue::Spill,
     parser::LexErrorValue::Calc => FormulaErrorValue::Calc,
+    parser::LexErrorValue::Error => FormulaErrorValue::Error,
+    parser::LexErrorValue::NotImplemented => FormulaErrorValue::NotImplemented,
+    parser::LexErrorValue::CircularReference => FormulaErrorValue::CircularReference,
+    parser::LexErrorValue::IllegalChar => FormulaErrorValue::IllegalChar,
     parser::LexErrorValue::IllegalArgument => FormulaErrorValue::IllegalArgument,
+    parser::LexErrorValue::IllegalParameter => FormulaErrorValue::IllegalParameter,
+    parser::LexErrorValue::Pair => FormulaErrorValue::Pair,
+    parser::LexErrorValue::PairExpected => FormulaErrorValue::PairExpected,
+    parser::LexErrorValue::OperatorExpected => FormulaErrorValue::OperatorExpected,
+    parser::LexErrorValue::VariableExpected => FormulaErrorValue::VariableExpected,
     parser::LexErrorValue::Parameter => FormulaErrorValue::Parameter,
-    parser::LexErrorValue::Unknown => FormulaErrorValue::Unknown,
+    parser::LexErrorValue::CodeOverflow => FormulaErrorValue::CodeOverflow,
+    parser::LexErrorValue::StringOverflow => FormulaErrorValue::StringOverflow,
+    parser::LexErrorValue::StackOverflow => FormulaErrorValue::StackOverflow,
+    parser::LexErrorValue::InvalidVariable => FormulaErrorValue::InvalidVariable,
+    parser::LexErrorValue::InvalidOpcode => FormulaErrorValue::InvalidOpcode,
+    parser::LexErrorValue::InvalidStackValue => FormulaErrorValue::InvalidStackValue,
+    parser::LexErrorValue::InvalidToken => FormulaErrorValue::InvalidToken,
+    parser::LexErrorValue::NoConvergence => FormulaErrorValue::NoConvergence,
+    parser::LexErrorValue::NoAddin => FormulaErrorValue::NoAddin,
+    parser::LexErrorValue::NoMacro => FormulaErrorValue::NoMacro,
+    parser::LexErrorValue::NestedArray => FormulaErrorValue::NestedArray,
+    parser::LexErrorValue::MatrixSize => FormulaErrorValue::MatrixSize,
+    parser::LexErrorValue::BadArrayContent => FormulaErrorValue::BadArrayContent,
+    parser::LexErrorValue::LinkFormulaNeedingCheck => FormulaErrorValue::LinkFormulaNeedingCheck,
   }
 }
 
@@ -294,6 +317,7 @@ fn unary_operator_from_lex(operator: parser::LexOperator) -> Option<FormulaOpera
   match operator {
     parser::LexOperator::Add => Some(FormulaOperator::UnaryPlus),
     parser::LexOperator::Subtract => Some(FormulaOperator::UnaryMinus),
+    parser::LexOperator::ImplicitIntersection => Some(FormulaOperator::ImplicitIntersection),
     parser::LexOperator::Percent => Some(FormulaOperator::Percent),
     _ => None,
   }

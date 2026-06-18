@@ -7,6 +7,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     value: FormulaValue<'doc>,
   ) -> Option<FormulaValue<'doc>> {
     if self.array_context
+      && op != FormulaOperator::ImplicitIntersection
       && matches!(
         value,
         FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
@@ -23,6 +24,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return self.evaluate_unary_reference_value(op, value);
     }
     match op {
+      FormulaOperator::ImplicitIntersection => Some(self.implicit_intersection_scalar_value(value)),
       FormulaOperator::UnaryPlus => Some(FormulaValue::Number(self.number(&value)?)),
       FormulaOperator::UnaryMinus => match value {
         FormulaValue::String(_) => self
@@ -60,6 +62,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       value => value,
     };
     match op {
+      FormulaOperator::ImplicitIntersection => Some(value),
       FormulaOperator::UnaryPlus => match value {
         FormulaValue::Error(error) => Some(FormulaValue::Error(error)),
         FormulaValue::Reference(_) | FormulaValue::RefList(_) => Some(value),
@@ -78,6 +81,17 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       },
       FormulaOperator::Percent => Some(FormulaValue::Number(self.number(&value)? / 100.0)),
       _ => None,
+    }
+  }
+
+  fn implicit_intersection_scalar_value(&self, value: FormulaValue<'doc>) -> FormulaValue<'doc> {
+    match value {
+      FormulaValue::Matrix(rows) => rows
+        .first()
+        .and_then(|row| row.first())
+        .cloned()
+        .unwrap_or(FormulaValue::Blank),
+      value => value,
     }
   }
 

@@ -537,7 +537,7 @@ fn infix_binding_power(operator: LexOperator) -> Option<(u8, u8)> {
     LexOperator::Add | LexOperator::Subtract => Some((12, 13)),
     LexOperator::Multiply | LexOperator::Divide => Some((14, 15)),
     LexOperator::Power => Some((16, 16)),
-    LexOperator::Percent => None,
+    LexOperator::ImplicitIntersection | LexOperator::Percent => None,
   }
 }
 
@@ -550,7 +550,10 @@ fn prefix_binding_power() -> u8 {
 }
 
 fn prefix_operator(operator: LexOperator) -> bool {
-  matches!(operator, LexOperator::Add | LexOperator::Subtract)
+  matches!(
+    operator,
+    LexOperator::Add | LexOperator::Subtract | LexOperator::ImplicitIntersection
+  )
 }
 
 fn token_span(token: LexToken) -> SemanticSpan {

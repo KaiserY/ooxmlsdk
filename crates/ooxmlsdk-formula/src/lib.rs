@@ -7,7 +7,10 @@ mod evaluator;
 mod function;
 mod model;
 mod parser;
+pub mod program;
 mod provider;
+pub mod source;
+pub mod symbol;
 mod value;
 
 pub use address::*;

@@ -1364,6 +1364,7 @@ dependencies = [
 name = "ooxmlsdk-formula"
 version = "0.10.3"
 dependencies = [
+ "bitflags 2.13.0",
  "encoding_rs",
  "icu_collator",
  "icu_locale",
@@ -1374,6 +1375,7 @@ dependencies = [
  "num-traits",
  "ooxmlsdk",
  "regex",
+ "rustc-hash",
  "rustfft",
  "statrs",
  "thiserror",

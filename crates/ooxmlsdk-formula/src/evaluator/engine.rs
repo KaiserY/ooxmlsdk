@@ -18,12 +18,17 @@ pub(crate) fn evaluate_parsed_formula_raw<'doc>(
   array_context: bool,
 ) -> Option<FormulaValue<'doc>> {
   if !formula.unsupported.is_empty() {
-    return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+    return Some(FormulaValue::Error(FormulaErrorValue::Error));
   }
   if let Some(value) =
     book.evaluate_special_formula_text(current_sheet, current_cell, formula.source.as_ref())
   {
     return Some(value);
+  }
+  if formula.grammar == FormulaGrammar::OpenFormula
+    && formula_contains_unquoted_getting_data(formula.source.as_ref())
+  {
+    return Some(FormulaValue::Error(FormulaErrorValue::PairExpected));
   }
   let engine = CalcEngine::new();
   FormulaEvaluatorEngine {
@@ -41,6 +46,36 @@ pub(crate) fn evaluate_parsed_formula_raw<'doc>(
       && !formula.source.to_ascii_uppercase().contains(",0)"),
   }
   .evaluate_code(formula.code.as_ref()?)
+}
+
+fn formula_contains_unquoted_getting_data(formula: &str) -> bool {
+  let mut quoted = false;
+  let mut index = 0;
+  while index < formula.len() {
+    let rest = &formula[index..];
+    let ch = rest.chars().next().expect("valid formula char");
+    match ch {
+      '"' => {
+        index += ch.len_utf8();
+        if quoted && formula[index..].starts_with('"') {
+          index += '"'.len_utf8();
+        } else {
+          quoted = !quoted;
+        }
+      }
+      _ if !quoted
+        && rest
+          .get(.."#getting_data".len())
+          .is_some_and(|value| value.eq_ignore_ascii_case("#getting_data")) =>
+      {
+        return true;
+      }
+      _ => {
+        index += ch.len_utf8();
+      }
+    }
+  }
+  false
 }
 
 pub(crate) fn evaluate_formula_text_raw<'doc>(
@@ -303,7 +338,7 @@ fn evaluate_if_error_control<'doc>(
     return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
   }
   let value = evaluate_arg_direct(value_arg, evaluator)
-    .unwrap_or(FormulaValue::Error(FormulaErrorValue::Unknown));
+    .unwrap_or(FormulaValue::Error(FormulaErrorValue::Error));
   if evaluator.array_context
     && matches!(
       value,

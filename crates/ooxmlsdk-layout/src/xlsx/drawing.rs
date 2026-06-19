@@ -22,6 +22,8 @@ use crate::compat::RgbColor;
 use crate::error::Result;
 use crate::render::chart as shared_chart;
 
+use super::normalize_hyperlink_target;
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct DrawingResourceCatalog {
   pub(crate) anchors: Vec<DrawingAnchorModel>,
@@ -303,7 +305,7 @@ fn collect_hyperlink_targets(
     .map(|relationship| {
       (
         relationship.id().to_string(),
-        relationship.target().to_string(),
+        normalize_hyperlink_target(relationship.target()),
       )
     })
     .collect()

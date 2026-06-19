@@ -51,3 +51,11 @@ pub fn layout_document(
     document,
   ))
 }
+
+fn normalize_hyperlink_target(target: &str) -> String {
+  if target.starts_with("file:///") {
+    target.replace('\\', "/")
+  } else {
+    target.to_string()
+  }
+}

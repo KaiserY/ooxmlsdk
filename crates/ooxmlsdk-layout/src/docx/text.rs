@@ -144,6 +144,10 @@ pub(super) fn paragraph_model_with_base<'a>(
     list_label_style.color = redline_author_color();
     list_label_style.underline = true;
   }
+  if paragraph_mark_is_deleted(paragraph) && numbering_label.is_some() {
+    list_label_style.color = redline_author_color();
+    list_label_style.strikethrough = !paragraph_contains_drawing(paragraph);
+  }
   let mut inlines = paragraph_inlines(
     paragraph,
     run_style.clone(),

@@ -12,6 +12,8 @@ use ooxmlsdk::sdk::SdkPart;
 
 use crate::error::Result;
 
+use super::normalize_hyperlink_target;
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SheetRelationshipCatalog {
   pub(crate) single_xml_cells: Vec<SingleXmlCellCatalog>,
@@ -128,7 +130,7 @@ impl SheetRelationshipCatalog {
         .map(|relationship| {
           (
             relationship.id().to_string(),
-            relationship.target().to_string(),
+            normalize_hyperlink_target(relationship.target()),
           )
         })
         .collect(),

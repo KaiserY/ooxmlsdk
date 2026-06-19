@@ -248,7 +248,16 @@ pub(crate) fn structured_reference_text(
   if let Some(table) = reference.table {
     text.push_str(program.symbols.get(table)?);
   }
-  push_structured_reference_specifier(program, &reference.specifier, &mut text)?;
+  if reference.table.is_some()
+    && matches!(
+      reference.specifier,
+      FormulaStructuredReferenceSpecifier::Table
+    )
+  {
+    text.push_str("[]");
+  } else {
+    push_structured_reference_specifier(program, &reference.specifier, &mut text)?;
+  }
   Some(text)
 }
 
@@ -288,7 +297,9 @@ fn push_structured_reference_specifier(
         }
         match part {
           FormulaStructuredReferencePart::Item(item) => {
+            text.push('[');
             text.push_str(structured_reference_item_text(*item));
+            text.push(']');
           }
           FormulaStructuredReferencePart::Column(column) => {
             text.push('[');

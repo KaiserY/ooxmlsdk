@@ -23,4 +23,7 @@ pub(crate) use semantic::{
   semantic_word_kind,
 };
 pub(crate) use shared::translate_shared_formula_text;
-pub(crate) use table::{TableReferenceItems, parse_table_reference_selection};
+pub(crate) use table::{
+  TableReferenceColumn, TableReferenceItems, TableReferenceSelection,
+  parse_table_reference_selection,
+};

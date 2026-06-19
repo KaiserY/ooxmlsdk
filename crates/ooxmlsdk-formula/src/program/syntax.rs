@@ -11,8 +11,10 @@ use super::{
   FormulaExternalNameReference, FormulaFunctionName, FormulaNameScope, FormulaNamedReference,
   FormulaNodeKind, FormulaNodeLabels, FormulaNodeMetadata, FormulaOperandClass, FormulaParamClass,
   FormulaProgramBuilder, FormulaRangeReference, FormulaReference, FormulaReferencePoint,
-  FormulaSheetName, FormulaSheetRange, FormulaSheetReference, FormulaUnsupportedKind, SourceSpan,
-  reference_flags, valid_address_flags,
+  FormulaSheetName, FormulaSheetRange, FormulaSheetReference, FormulaStructuredReference,
+  FormulaStructuredReferenceItem, FormulaStructuredReferencePart,
+  FormulaStructuredReferenceSpecifier, FormulaUnsupportedKind, SourceSpan, reference_flags,
+  valid_address_flags,
 };
 use crate::source::{FormulaSource, FormulaSourcePosition};
 use crate::{FormulaOperator, QualifiedRange, SheetId, parser};
@@ -972,6 +974,9 @@ fn lower_parser_word(
   match kind {
     parser::SemanticWordKind::Boolean(value) => Some(builder.boolean(value)),
     parser::SemanticWordKind::ReferenceCandidate => {
+      if let Some(reference) = structured_reference_from_text(builder, word) {
+        return Some(builder.push_reference(reference));
+      }
       let sheet = match source.context.position {
         FormulaSourcePosition::Cell(cell) => cell.sheet,
         FormulaSourcePosition::Sheet(sheet) => sheet,
@@ -996,6 +1001,99 @@ fn lower_parser_word(
       Some(builder.push_reference(reference))
     }
   }
+}
+
+fn structured_reference_from_text(
+  builder: &mut FormulaProgramBuilder,
+  text: &str,
+) -> Option<FormulaReference> {
+  let selection = parser::parse_table_reference_selection(text)?;
+  let table = builder.intern(selection.table_name);
+  let specifier = structured_reference_specifier_from_selection(builder, &selection)?;
+  Some(FormulaReference::Structured(FormulaStructuredReference {
+    table: Some(table),
+    specifier,
+  }))
+}
+
+fn structured_reference_specifier_from_selection(
+  builder: &mut FormulaProgramBuilder,
+  selection: &parser::TableReferenceSelection<'_>,
+) -> Option<FormulaStructuredReferenceSpecifier> {
+  let mut parts = SmallVec::<[FormulaStructuredReferencePart; 4]>::new();
+  push_structured_reference_items(selection.items, &mut parts);
+  match selection.columns.as_slice() {
+    [] if parts.is_empty() => return Some(FormulaStructuredReferenceSpecifier::Table),
+    [] => {
+      if let [FormulaStructuredReferencePart::Item(item)] = parts.as_slice() {
+        return Some(FormulaStructuredReferenceSpecifier::Item(*item));
+      }
+    }
+    [column] if parts.is_empty() => {
+      return Some(FormulaStructuredReferenceSpecifier::Column(
+        intern_table_reference_column(builder, column),
+      ));
+    }
+    [start, end] if parts.is_empty() => {
+      return Some(FormulaStructuredReferenceSpecifier::ColumnRange {
+        start: intern_table_reference_column(builder, start),
+        end: intern_table_reference_column(builder, end),
+      });
+    }
+    [column] => {
+      parts.push(FormulaStructuredReferencePart::Column(
+        intern_table_reference_column(builder, column),
+      ));
+    }
+    [start, end] => {
+      parts.push(FormulaStructuredReferencePart::ColumnRange {
+        start: intern_table_reference_column(builder, start),
+        end: intern_table_reference_column(builder, end),
+      });
+    }
+    _ => return None,
+  }
+  let span = builder.structured_reference_parts(&parts);
+  Some(FormulaStructuredReferenceSpecifier::Combination(span))
+}
+
+fn push_structured_reference_items(
+  items: parser::TableReferenceItems,
+  parts: &mut SmallVec<[FormulaStructuredReferencePart; 4]>,
+) {
+  for (flag, item) in [
+    (
+      parser::TableReferenceItems::ALL,
+      FormulaStructuredReferenceItem::All,
+    ),
+    (
+      parser::TableReferenceItems::HEADERS,
+      FormulaStructuredReferenceItem::Headers,
+    ),
+    (
+      parser::TableReferenceItems::DATA,
+      FormulaStructuredReferenceItem::Data,
+    ),
+    (
+      parser::TableReferenceItems::TOTALS,
+      FormulaStructuredReferenceItem::Totals,
+    ),
+    (
+      parser::TableReferenceItems::THIS_ROW,
+      FormulaStructuredReferenceItem::ThisRow,
+    ),
+  ] {
+    if items.contains(flag) {
+      parts.push(FormulaStructuredReferencePart::Item(item));
+    }
+  }
+}
+
+fn intern_table_reference_column(
+  builder: &mut FormulaProgramBuilder,
+  column: &parser::TableReferenceColumn<'_>,
+) -> super::FormulaSymbolId {
+  builder.intern(column.as_ref())
 }
 
 fn named_reference_with_span(

@@ -382,6 +382,20 @@ pub enum FormulaEditOp {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FormulaEditStatus {
+  Unchanged,
+  Changed,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FormulaEditError {
+  UnsupportedOperation,
+  InvalidExpression,
+}
+
+pub type FormulaEditResult = std::result::Result<FormulaEditStatus, FormulaEditError>;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FormulaEditRange {
   pub sheet: SheetId,
   pub range: CellRange,
@@ -413,6 +427,10 @@ pub enum FormulaPrintGrammar {
 #[derive(Clone, Debug, Default)]
 pub struct FormulaProgramBuilder {
   program: FormulaProgram,
+}
+
+pub struct FormulaProgramEditor<'a> {
+  program: &'a mut FormulaProgram,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -451,6 +469,14 @@ impl FormulaProgram {
     Some(output)
   }
 
+  pub fn edit(&mut self) -> FormulaProgramEditor<'_> {
+    FormulaProgramEditor { program: self }
+  }
+
+  pub fn apply_edit(&mut self, op: FormulaEditOp) -> FormulaEditResult {
+    self.edit().apply(op)
+  }
+
   pub fn args(&self, span: FormulaArgSpan) -> Option<&[FormulaExprId]> {
     let start = span.offset as usize;
     let end = start.checked_add(span.len as usize)?;
@@ -475,6 +501,25 @@ impl FormulaProgram {
 
   pub(crate) fn node(&self, id: FormulaExprId) -> Option<&FormulaNode> {
     self.nodes.get(id.0 as usize)
+  }
+}
+
+impl FormulaProgramEditor<'_> {
+  pub fn apply(&mut self, _op: FormulaEditOp) -> FormulaEditResult {
+    Err(FormulaEditError::UnsupportedOperation)
+  }
+
+  pub fn replace_root(&mut self, root: Option<FormulaExprId>) -> FormulaEditResult {
+    if let Some(root) = root
+      && self.program.node(root).is_none()
+    {
+      return Err(FormulaEditError::InvalidExpression);
+    }
+    if self.program.root == root {
+      return Ok(FormulaEditStatus::Unchanged);
+    }
+    self.program.root = root;
+    Ok(FormulaEditStatus::Changed)
   }
 }
 
@@ -927,7 +972,10 @@ impl FormulaPrinter<'_> {
         output.push_str(self.program.symbols.get(reference.name)?);
       }
       FormulaReference::Structured(reference) => {
-        self.print_structured_reference(reference, output)?;
+        output.push_str(&crate::code::structured_reference_text(
+          self.program,
+          reference,
+        )?);
       }
       FormulaReference::ExternalName(reference) => {
         output.push('[');
@@ -999,76 +1047,6 @@ impl FormulaPrinter<'_> {
         Some(())
       }
     }
-  }
-
-  fn print_structured_reference(
-    &self,
-    reference: &FormulaStructuredReference,
-    output: &mut String,
-  ) -> Option<()> {
-    if let Some(table) = reference.table {
-      output.push_str(self.program.symbols.get(table)?);
-    }
-    self.print_structured_reference_specifier(&reference.specifier, output)
-  }
-
-  fn print_structured_reference_specifier(
-    &self,
-    specifier: &FormulaStructuredReferenceSpecifier,
-    output: &mut String,
-  ) -> Option<()> {
-    match specifier {
-      FormulaStructuredReferenceSpecifier::Table => {}
-      FormulaStructuredReferenceSpecifier::Item(item) => {
-        output.push('[');
-        output.push_str(structured_reference_item_text(*item));
-        output.push(']');
-      }
-      FormulaStructuredReferenceSpecifier::Column(column) => {
-        output.push('[');
-        print_structured_reference_column(self.program.symbols.get(*column)?, output);
-        output.push(']');
-      }
-      FormulaStructuredReferenceSpecifier::ColumnRange { start, end } => {
-        output.push_str("[[");
-        print_structured_reference_column(self.program.symbols.get(*start)?, output);
-        output.push_str("]:[");
-        print_structured_reference_column(self.program.symbols.get(*end)?, output);
-        output.push_str("]]");
-      }
-      FormulaStructuredReferenceSpecifier::Combination(span) => {
-        output.push('[');
-        for (index, part) in self
-          .program
-          .structured_reference_parts(*span)?
-          .iter()
-          .enumerate()
-        {
-          if index > 0 {
-            output.push(',');
-          }
-          match part {
-            FormulaStructuredReferencePart::Item(item) => {
-              output.push_str(structured_reference_item_text(*item));
-            }
-            FormulaStructuredReferencePart::Column(column) => {
-              output.push('[');
-              print_structured_reference_column(self.program.symbols.get(*column)?, output);
-              output.push(']');
-            }
-            FormulaStructuredReferencePart::ColumnRange { start, end } => {
-              output.push('[');
-              print_structured_reference_column(self.program.symbols.get(*start)?, output);
-              output.push_str("]:[");
-              print_structured_reference_column(self.program.symbols.get(*end)?, output);
-              output.push(']');
-            }
-          }
-        }
-        output.push(']');
-      }
-    }
-    Some(())
   }
 }
 
@@ -1283,28 +1261,6 @@ fn is_unquoted_sheet_name(value: &str) -> bool {
       .chars()
       .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
     && !value.chars().next().is_some_and(|ch| ch.is_ascii_digit())
-}
-
-fn print_structured_reference_column(value: &str, output: &mut String) {
-  for ch in value.chars() {
-    match ch {
-      '\'' | '#' | '[' | ']' => {
-        output.push('\'');
-        output.push(ch);
-      }
-      _ => output.push(ch),
-    }
-  }
-}
-
-fn structured_reference_item_text(item: FormulaStructuredReferenceItem) -> &'static str {
-  match item {
-    FormulaStructuredReferenceItem::All => "#All",
-    FormulaStructuredReferenceItem::Data => "#Data",
-    FormulaStructuredReferenceItem::Headers => "#Headers",
-    FormulaStructuredReferenceItem::Totals => "#Totals",
-    FormulaStructuredReferenceItem::ThisRow => "#This Row",
-  }
 }
 
 fn argument_separator(grammar: FormulaPrintGrammar) -> &'static str {

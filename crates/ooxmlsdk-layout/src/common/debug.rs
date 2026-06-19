@@ -55,10 +55,25 @@ pub struct DebugShape<'doc> {
   pub path: Vec<usize>,
   pub kind: Cow<'doc, str>,
   pub bounds: Rect,
+  pub metadata: Vec<DebugProperty<'doc>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DebugUnsupported<'doc> {
   pub owner: Cow<'doc, str>,
   pub feature: Cow<'doc, str>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DebugProperty<'doc> {
+  pub name: Cow<'doc, str>,
+  pub value: DebugValue<'doc>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum DebugValue<'doc> {
+  Bool(bool),
+  Integer(i64),
+  Float(f32),
+  Text(Cow<'doc, str>),
 }

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::sync::Arc;
 
+use crate::common::{DebugProperty, DebugRecord, DebugShape, DebugValue, Point, Rect, Size};
 use crate::compat::RgbColor as LayoutRgbColor;
 use crate::compat::{
   self as layout, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PdfTextSegmentation,
@@ -107,6 +108,196 @@ pub(crate) fn inspect_layout_summary(import: &PowerPointImport) -> PptxLayoutSum
     let _ = lower_slide_items_with_summary(import, slide, page_index, Some(&mut summary));
   }
   summary
+}
+
+pub(crate) fn debug_records(import: &PowerPointImport) -> Vec<DebugRecord<'static>> {
+  let summary = inspect_layout_summary(import);
+  let mut records = Vec::new();
+  if let Some(first_page_name) = summary.first_page_name {
+    records.push(debug_shape(
+      0,
+      Vec::new(),
+      "pptx_first_page",
+      Rect::default(),
+      vec![debug_text("name", first_page_name)],
+    ));
+  }
+  for (page_index, count) in summary.notes_page_shape_counts.into_iter().enumerate() {
+    for shape_index in 0..count {
+      records.push(debug_shape(
+        page_index,
+        vec![shape_index],
+        "pptx_notes_shape",
+        Rect::default(),
+        Vec::new(),
+      ));
+    }
+  }
+  for shape in summary.draw_shapes {
+    records.push(debug_record_from_draw_shape(shape));
+  }
+  for shape in summary.master_text_shapes {
+    records.push(debug_shape(
+      shape.master_page_index,
+      vec![shape.shape_index],
+      "pptx_master_text_shape",
+      Rect::default(),
+      vec![debug_text("text", shape.text)],
+    ));
+  }
+  for shape in summary.smartart_text_shapes {
+    records.push(debug_shape(
+      shape.page_index,
+      Vec::new(),
+      "pptx_smartart_text_shape",
+      rect_100mm(
+        shape.text_anchor_left_100mm,
+        shape.text_anchor_top_100mm,
+        shape.text_anchor_right_100mm,
+        shape.text_anchor_bottom_100mm,
+      ),
+      vec![
+        debug_text("text", shape.text),
+        debug_i32("text_left_distance_100mm", shape.text_left_distance_100mm),
+        debug_i32("text_upper_distance_100mm", shape.text_upper_distance_100mm),
+        debug_i32("text_anchor_left_100mm", shape.text_anchor_left_100mm),
+        debug_i32("text_anchor_top_100mm", shape.text_anchor_top_100mm),
+        debug_i32("text_anchor_right_100mm", shape.text_anchor_right_100mm),
+        debug_i32("text_anchor_bottom_100mm", shape.text_anchor_bottom_100mm),
+      ],
+    ));
+  }
+  for paragraph in summary.bullet_paragraphs {
+    let mut metadata = vec![
+      debug_i32("paragraph_index", paragraph.paragraph_index as i32),
+      debug_text("text", paragraph.text),
+    ];
+    if let Some(character) = paragraph.character {
+      metadata.push(debug_text("character", character));
+    }
+    if let Some(font) = paragraph.font {
+      metadata.push(debug_text("font", font));
+    }
+    if let Some(width) = paragraph.graphic_width_100mm {
+      metadata.push(debug_i32("graphic_width_100mm", width));
+    }
+    if let Some(height) = paragraph.graphic_height_100mm {
+      metadata.push(debug_i32("graphic_height_100mm", height));
+    }
+    records.push(debug_shape(
+      paragraph.page_index,
+      Vec::new(),
+      "pptx_bullet_paragraph",
+      Rect::default(),
+      metadata,
+    ));
+  }
+  records
+}
+
+fn debug_record_from_draw_shape(shape: PptxDrawShapeSummary) -> DebugRecord<'static> {
+  let mut metadata = vec![
+    debug_text("service_name", shape.service_name),
+    debug_text("text", shape.text),
+    debug_i32("left_100mm", shape.left_100mm),
+    debug_i32("top_100mm", shape.top_100mm),
+    debug_i32("right_100mm", shape.right_100mm),
+    debug_i32("bottom_100mm", shape.bottom_100mm),
+    debug_i32("width_100mm", shape.width_100mm),
+    debug_i32("height_100mm", shape.height_100mm),
+    debug_text("fill_style", shape.fill_style),
+    debug_bool(
+      "fill_uses_slide_background",
+      shape.fill_uses_slide_background,
+    ),
+  ];
+  if let Some(geometry) = shape.geometry {
+    metadata.push(debug_text("geometry", geometry));
+  }
+  if let Some(gradient_style) = shape.gradient_style {
+    metadata.push(debug_text("gradient_style", gradient_style));
+  }
+  if let Some(gradient_angle) = shape.gradient_angle {
+    metadata.push(debug_i32("gradient_angle", i32::from(gradient_angle)));
+  }
+  if let Some(value) = shape.text_left_distance_100mm {
+    metadata.push(debug_i32("text_left_distance_100mm", value));
+  }
+  if let Some(value) = shape.text_upper_distance_100mm {
+    metadata.push(debug_i32("text_upper_distance_100mm", value));
+  }
+  if let Some(value) = shape.text_right_distance_100mm {
+    metadata.push(debug_i32("text_right_distance_100mm", value));
+  }
+  if let Some(value) = shape.text_lower_distance_100mm {
+    metadata.push(debug_i32("text_lower_distance_100mm", value));
+  }
+  debug_shape(
+    shape.page_index,
+    shape.shape_path,
+    "pptx_draw_shape",
+    rect_100mm(
+      shape.left_100mm,
+      shape.top_100mm,
+      shape.right_100mm,
+      shape.bottom_100mm,
+    ),
+    metadata,
+  )
+}
+
+fn debug_shape(
+  page_index: usize,
+  path: Vec<usize>,
+  kind: &'static str,
+  bounds: Rect,
+  metadata: Vec<DebugProperty<'static>>,
+) -> DebugRecord<'static> {
+  DebugRecord::Shape(DebugShape {
+    page_index,
+    path,
+    kind: kind.into(),
+    bounds,
+    metadata,
+  })
+}
+
+fn debug_bool(name: &'static str, value: bool) -> DebugProperty<'static> {
+  DebugProperty {
+    name: name.into(),
+    value: DebugValue::Bool(value),
+  }
+}
+
+fn debug_i32(name: &'static str, value: i32) -> DebugProperty<'static> {
+  DebugProperty {
+    name: name.into(),
+    value: DebugValue::Integer(i64::from(value)),
+  }
+}
+
+fn debug_text(name: &'static str, value: String) -> DebugProperty<'static> {
+  DebugProperty {
+    name: name.into(),
+    value: DebugValue::Text(value.into()),
+  }
+}
+
+fn rect_100mm(left: i32, top: i32, right: i32, bottom: i32) -> Rect {
+  Rect {
+    origin: Point {
+      x: crate::common::Pt(points_from_100mm(left)),
+      y: crate::common::Pt(points_from_100mm(top)),
+    },
+    size: Size {
+      width: crate::common::Pt(points_from_100mm(right - left)),
+      height: crate::common::Pt(points_from_100mm(bottom - top)),
+    },
+  }
+}
+
+fn points_from_100mm(value: i32) -> f32 {
+  value as f32 * 72.0 / 2540.0
 }
 
 fn notes_page_shape_count(slide: &SlidePersist) -> usize {

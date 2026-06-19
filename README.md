@@ -96,10 +96,13 @@ The `flat-opc` feature exposes Wordprocessing Flat OPC helpers for loading and w
 - `crates/ooxmlsdk`: runtime library exposed to downstream users
 - `crates/ooxmlsdk-build`: generator that turns checked-in metadata into Rust code
 - `crates/ooxmlsdk-derive`: derive macros used by the generated runtime code
-- `crates/ooxmlsdk-test`: integration tests and benchmarks
 - `sdk_data/`: checked-in intermediate generator data
 - `data/`: upstream-derived metadata snapshots consumed by the generator pipeline
 - `schemas/OpenPackagingConventions-XMLSchema/`: package schema inputs used by the generator
+
+Focused integration tests, package compatibility smoke tests, and runtime
+benchmarks live in the adjacent `../ooxmlsdk-test-suite/crates/ooxmlsdk-test`
+crate.
 
 The generated runtime code under `crates/ooxmlsdk/src/schemas/`, `crates/ooxmlsdk/src/deserializers/`, `crates/ooxmlsdk/src/serializers/`, `crates/ooxmlsdk/src/parts/`, and related module files is intended to be checked in and reviewed as generated artifacts.
 
@@ -115,24 +118,28 @@ cargo test --workspace --no-default-features
 cargo test --workspace --no-default-features --features parts
 cargo test --workspace --no-default-features --features flat-opc
 cargo test --workspace --no-default-features --features mce
-cargo test -p ooxmlsdk-test --features validators
 cargo clippy --workspace --all-targets --no-default-features -- -D warnings
 cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings
 cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings
 cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all
+cd ../ooxmlsdk-test-suite && cargo test -p ooxmlsdk-test --features validators
 ```
 
-For runtime performance work, prefer evaluating `cargo bench -p ooxmlsdk-test` as a whole. The `packages` and `xml` suites have shown a persistent disagreement on `wordprocessing_document/write/parsed`, so treat that one case as an anomaly rather than as the sole performance signal.
+For runtime performance work, prefer evaluating
+`cd ../ooxmlsdk-test-suite && cargo bench -p ooxmlsdk-test --bench perf` as a
+whole. The `packages` and `xml` suites have shown a persistent disagreement on
+`wordprocessing_document/write/parsed`, so treat that one case as an anomaly
+rather than as the sole performance signal.
 
-The in-repository compatibility smoke lane is:
+The package compatibility smoke lane is maintained in the adjacent test suite:
 
 ```bash
-cargo test -p ooxmlsdk-test round_trip -- --nocapture
+cd ../ooxmlsdk-test-suite && cargo test -p ooxmlsdk-test round_trip -- --nocapture
 ```
 
-Corpus-scale package round-trip validation is maintained in the adjacent
+Corpus-scale package round-trip validation is also maintained in the adjacent
 `../ooxmlsdk-test-suite/` checkout. Prefer that local path; the remote is
 `https://github.com/KaiserY/ooxmlsdk-test-suite`.
 

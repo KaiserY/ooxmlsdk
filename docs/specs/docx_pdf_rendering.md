@@ -444,9 +444,9 @@ optional raster comparison, and golden artifacts that should not slow the
 runtime crate's ordinary unit tests.
 
 Scope boundary: this crate does not re-test DOCX/package/schema round-trip
-readiness. `crates/ooxmlsdk-test` owns that layer. `ooxmlsdk-pdf-test` assumes
-the input DOCX is test-ready and only gates the LibreOffice-vs-`ooxmlsdk-pdf`
-PDF export rendering surface.
+readiness. `../ooxmlsdk-test-suite/crates/ooxmlsdk-test` owns that layer.
+`ooxmlsdk-pdf-test` assumes the input DOCX is test-ready and only gates the
+LibreOffice-vs-`ooxmlsdk-pdf` PDF export rendering surface.
 
 LibreOffice QA alignment:
 
@@ -1334,8 +1334,9 @@ Tests should be behavior-oriented and tied to source references.
 
 Each new renderer behavior should include:
 
-- OOXML fixture, preferably generated in `crates/ooxmlsdk-test` or copied from
-  local LibreOffice/Open XML references when licensing allows.
+- OOXML fixture, preferably generated in
+  `../ooxmlsdk-test-suite/crates/ooxmlsdk-test` or copied from local
+  LibreOffice/Open XML references when licensing allows.
 - A comment naming the LibreOffice reference file/function used.
 - Assertions against the internal model or layout model before asserting only
   PDF bytes.

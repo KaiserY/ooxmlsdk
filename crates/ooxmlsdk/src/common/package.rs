@@ -2279,16 +2279,16 @@ fn read_flat_opc_binary_data<R: std::io::BufRead>(
   let mut text = String::new();
   loop {
     match xml_reader.next()? {
-      quick_xml::events::Event::Text(event) => {
+      super::xml::PayloadEvent::Text(event) => {
         text.push_str(event.xml10_content()?.as_ref());
       }
-      quick_xml::events::Event::CData(event) => {
+      super::xml::PayloadEvent::CData(event) => {
         text.push_str(event.xml10_content()?.as_ref());
       }
-      quick_xml::events::Event::End(end) if qname_matches(end.name().as_ref(), b"binaryData") => {
+      super::xml::PayloadEvent::End(end) if qname_matches(end.name().as_ref(), b"binaryData") => {
         break;
       }
-      quick_xml::events::Event::Eof => return Err(unexpected_eof("Flat OPC binaryData")),
+      super::xml::PayloadEvent::Eof => return Err(unexpected_eof("Flat OPC binaryData")),
       _ => {}
     }
   }

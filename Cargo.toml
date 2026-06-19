@@ -9,7 +9,6 @@ members = [
   "crates/ooxmlsdk-layout",
   "crates/ooxmlsdk-pdf",
   "crates/ooxmlsdk-pdf-test",
-  "crates/ooxmlsdk-test",
 ]
 
 [workspace.package]
@@ -34,7 +33,6 @@ ooxmlsdk-formula = { version = "0.10.3", path = "crates/ooxmlsdk-formula" }
 ooxmlsdk-layout = { version = "0.10.3", path = "crates/ooxmlsdk-layout" }
 ooxmlsdk-pdf = { version = "0.10.3", path = "crates/ooxmlsdk-pdf" }
 ooxmlsdk-pdf-test = { version = "0.10.3", path = "crates/ooxmlsdk-pdf-test" }
-ooxmlsdk-test = { version = "0.10.3", path = "crates/ooxmlsdk-test" }
 base64 = "0.22.1"
 bitflags = "2.13.0"
 quick-xml = "0.40.1"

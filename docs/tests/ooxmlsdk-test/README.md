@@ -1,15 +1,20 @@
 # ooxmlsdk-test Fixture Layout
 
-`test-data/ooxmlsdk-test/` is the focused package fixture tree for
-`crates/ooxmlsdk-test`.
+The focused package test crate and its fixtures have moved to the adjacent
+`../ooxmlsdk-test-suite/` checkout:
 
-Buckets:
+- crate: `../ooxmlsdk-test-suite/crates/ooxmlsdk-test`
+- project-owned fixtures: `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test`
+- Open XML SDK package corpus: `../ooxmlsdk-test-suite/corpus/Open-XML-SDK`
+- Open XML SDK raw XML fixtures: `../ooxmlsdk-test-suite/fixtures/Open-XML-SDK`
 
-- `Open-XML-SDK/`: fixtures copied from `../Open-XML-SDK` assets and tests.
-  These are upstream compatibility fixtures used by validator and package
-  behavior tests.
-- `libreoffice/`: fixtures copied from `../core` and kept as supplemental
-  real-world OOXML evidence.
+The remaining `test-data/ooxmlsdk-test/libreoffice/` tree in this repository is
+legacy LibreOffice package fixture staging. Move it into
+`../ooxmlsdk-test-suite/` before adding LibreOffice package round-trip coverage.
+
+Moved buckets:
+
+- `Open-XML-SDK/`: former package fixtures now resolve through the suite corpus.
 - `specs/`: project-owned fixtures for spec-focused coverage and the
   `known_failures.toml` file used by the `round_trip_smoke_test` compatibility
   sweep.
@@ -18,11 +23,12 @@ Buckets:
 
 Round-trip policy:
 
-- Corpus-scale package round-trip coverage lives in the adjacent
-  `../ooxmlsdk-test-suite/` checkout. Prefer the local checkout; its remote is
+- Package round-trip coverage lives in the adjacent `../ooxmlsdk-test-suite/`
+  checkout. Prefer the local checkout; its remote is
   `https://github.com/KaiserY/ooxmlsdk-test-suite`.
-- `crates/ooxmlsdk-test/tests/round_trip.rs::round_trip_smoke_test` walks only
-  `test-data/ooxmlsdk-test/specs/` as a lightweight smoke test, and only that
-  subtree participates in `specs/known_failures.toml`.
+- `../ooxmlsdk-test-suite/crates/ooxmlsdk-test/tests/round_trip.rs::round_trip_smoke_test`
+  walks only `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/specs/` as a
+  lightweight smoke test, and only that subtree participates in
+  `specs/known_failures.toml`.
 - `test-data/ooxmlsdk-pdf-test/` is excluded from package round-trip coverage. Those fixtures
   are for `docx -> pdf` parity only.

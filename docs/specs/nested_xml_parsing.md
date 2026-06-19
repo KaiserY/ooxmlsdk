@@ -673,7 +673,7 @@ Local repository checks for the first implementation should include:
 
 ```text
 cargo test -p ooxmlsdk-derive dump_context_node_expansion -- --ignored --nocapture
-cargo test -p ooxmlsdk-test
+cd ../ooxmlsdk-test-suite && cargo test -p ooxmlsdk-test
 ```
 
 When generator output changes, follow the repository generator loop:
@@ -690,7 +690,7 @@ ordinary acyclic edges still use the direct path.
 Benchmark follow-up:
 
 ```text
-cargo bench -p ooxmlsdk-test --bench perf
+cd ../ooxmlsdk-test-suite && cargo bench -p ooxmlsdk-test --bench perf
 ```
 
 Add or reuse a fixture that has moderate nested tables, not only the 5000-level

@@ -1,5 +1,8 @@
 # misc
 
+This bucket moved to
+`../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/misc`.
+
 Use this bucket only for fixtures that are:
 
 - not copied from `../Open-XML-SDK`, and

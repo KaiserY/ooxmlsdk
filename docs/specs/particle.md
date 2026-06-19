@@ -425,9 +425,9 @@ For each fix:
 3. Run:
    `cargo fmt --all`
 4. Run the focused package lane:
-   `cargo test -p ooxmlsdk-test round_trip_smoke_test -- --nocapture`
+   `cd ../ooxmlsdk-test-suite && cargo test -p ooxmlsdk-test round_trip_smoke_test -- --nocapture`
 5. If the change touches common schema generation, run:
-   `cargo test -p ooxmlsdk-test`
+   `cd ../ooxmlsdk-test-suite && cargo test -p ooxmlsdk-test`
 
 Do not broaden the model or add a new particle verifier unless a concrete
 fixture proves the Rust parse model cannot represent the required shape.

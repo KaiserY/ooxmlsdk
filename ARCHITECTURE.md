@@ -49,14 +49,20 @@ In practice:
 
 ## Workspace Layout
 
-The workspace currently has six crates:
+The workspace currently has eight crates:
 
 - `crates/ooxmlsdk`: runtime crate and primary public API
 - `crates/ooxmlsdk-build`: generator and checked-in input model logic
 - `crates/ooxmlsdk-derive`: procedural macros used by generated/runtime schema types
+- `crates/ooxmlsdk-fonts`: font discovery, fallback, and measurement helpers
+- `crates/ooxmlsdk-formula`: formula parsing/evaluation support
+- `crates/ooxmlsdk-layout`: document layout helpers
 - `crates/ooxmlsdk-pdf`: DOCX -> PDF conversion pipeline
 - `crates/ooxmlsdk-pdf-test`: PDF parity helpers and fixture-based PDF assertions
-- `crates/ooxmlsdk-test`: focused integration tests, validators, smoke round-trip coverage, and benches
+
+Focused integration tests, validators, package smoke coverage, and runtime
+benches live in the adjacent `../ooxmlsdk-test-suite/crates/ooxmlsdk-test`
+crate.
 
 ## Runtime Architecture
 
@@ -178,7 +184,7 @@ The PDF path is separate from the core OOXML runtime:
 
 This split matters:
 
-- `ooxmlsdk-test` owns focused package/schema correctness and smoke round-trip coverage
+- `../ooxmlsdk-test-suite/crates/ooxmlsdk-test` owns focused package/schema correctness and smoke round-trip coverage
 - `ooxmlsdk-pdf-test` owns visible-output and PDF-object parity checks
 - `../ooxmlsdk-test-suite` owns corpus-scale package round-trip coverage
 
@@ -186,23 +192,27 @@ Do not mix PDF rendering fixtures into package round-trip harnesses.
 
 ## Test Architecture
 
-`crates/ooxmlsdk-test` keeps focused fixture-driven lanes in this repository.
-Corpus-scale package round-trip coverage is split out to the adjacent
-`../ooxmlsdk-test-suite/` checkout.
+`../ooxmlsdk-test-suite/crates/ooxmlsdk-test` keeps focused fixture-driven
+package/schema lanes. Corpus-scale package round-trip coverage is maintained in
+the same adjacent `../ooxmlsdk-test-suite/` checkout.
 
-The in-repository package round-trip lane is compatibility smoke coverage in
-`tests/round_trip.rs`.
+The package round-trip smoke lane is compatibility smoke coverage in
+`../ooxmlsdk-test-suite/crates/ooxmlsdk-test/tests/round_trip.rs`.
 
 This lane is intentionally narrower than the external corpus suite.
 
 ### Fixture Buckets
 
-Package fixtures live under `test-data/ooxmlsdk-test/`:
+Package fixtures live under `../ooxmlsdk-test-suite/`:
 
-- `Open-XML-SDK/`: copied from upstream `../Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles`
-- `libreoffice/`: copied from `../core` as supplemental real-world OOXML evidence
-- `specs/`: project-owned fixtures grouped by domain
-- `misc/`: fixtures intentionally outside upstream assets and outside spec buckets
+- `corpus/Open-XML-SDK/`: copied from upstream `../Open-XML-SDK`
+- `fixtures/ooxmlsdk-test/specs/`: project-owned package smoke fixtures grouped by domain
+- `fixtures/ooxmlsdk-test/misc/`: fixtures intentionally outside upstream assets and outside spec buckets
+- `fixtures/Open-XML-SDK/`: raw XML assets copied from upstream tests for focused assertions
+
+The remaining `test-data/ooxmlsdk-test/libreoffice/` directory is legacy
+LibreOffice package fixture staging; move it to `../ooxmlsdk-test-suite/` before
+adding new LibreOffice package round-trip coverage.
 
 PDF fixtures live under `test-data/ooxmlsdk-pdf-test/`:
 
@@ -219,9 +229,9 @@ Corpus round-trip coverage:
 
 Compatibility smoke coverage:
 
-- implemented by `crates/ooxmlsdk-test/tests/round_trip.rs::round_trip_smoke_test`
-- walks only `test-data/ooxmlsdk-test/specs/`
-- uses `test-data/ooxmlsdk-test/specs/known_failures.toml`
+- implemented by `../ooxmlsdk-test-suite/crates/ooxmlsdk-test/tests/round_trip.rs::round_trip_smoke_test`
+- walks only `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/specs/`
+- uses `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/specs/known_failures.toml`
 
 Known-failure policy is intentionally narrow:
 
@@ -236,21 +246,21 @@ Use the repository root for all commands below.
 
 - `cargo build --workspace`: build all crates.
 - `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`: regenerate `sdk_data/` and runtime generated code from checked-in `data/` and package schemas.
-- `cargo test -p ooxmlsdk-test`: fast integration lane for common runtime and package behavior.
 - `cargo test --workspace`: default full test lane.
 - `cargo test --workspace --no-default-features`: no-default-features lane.
 - `cargo test --workspace --no-default-features --features parts`: parts lane without validators or MCE-specific behavior.
 - `cargo test --workspace --no-default-features --features flat-opc`: Flat OPC lane without validators or MCE-specific behavior.
 - `cargo test --workspace --no-default-features --features mce`: MCE lane without validators or Flat OPC-specific behavior.
-- `cargo test -p ooxmlsdk-test --features validators`: validator-focused lane.
 - `cargo fmt --all`: format.
 - `cargo clippy --workspace --all-targets -- -D warnings`: default clippy lane.
 - `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`: no-default-features clippy lane.
 - `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`: Office2007 parts clippy lane.
 - `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`: Flat OPC clippy lane.
 - `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`: MCE clippy lane.
-- `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`: validator clippy lane.
-- `cargo bench -p ooxmlsdk-test --bench perf`: package and XML performance benches.
+- `cd ../ooxmlsdk-test-suite && cargo test -p ooxmlsdk-test`: fast integration lane for common runtime and package behavior.
+- `cd ../ooxmlsdk-test-suite && cargo test -p ooxmlsdk-test --features validators`: validator-focused lane.
+- `cd ../ooxmlsdk-test-suite && cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`: validator clippy lane.
+- `cd ../ooxmlsdk-test-suite && cargo bench -p ooxmlsdk-test --bench perf`: package and XML performance benches.
 
 **Dev Loop**
 
@@ -278,7 +288,12 @@ Full generator/feature validation:
 12. `cargo clippy --workspace --all-targets -- -D warnings`
 13. `cargo fmt --all`
 
-For runtime/doc-sample iteration, start with `cargo test -p ooxmlsdk-test`. If the change touches Flat OPC, also run Flat OPC test. If the change touches MCE behavior, also run MCE tests. Add broader lanes only when the change touches generator code, shared runtime behavior, feature gates, package behavior, or validators.
+For runtime/doc-sample iteration, start with
+`cd ../ooxmlsdk-test-suite && cargo test -p ooxmlsdk-test`. If the change
+touches Flat OPC, also run the test-suite Flat OPC lane. If the change touches
+MCE behavior, also run the test-suite MCE lane. Add broader lanes only when the
+change touches generator code, shared runtime behavior, feature gates, package
+behavior, or validators.
 
 ### Derive Macro Debugging
 

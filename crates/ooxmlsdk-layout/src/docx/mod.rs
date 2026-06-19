@@ -260,16 +260,16 @@ pub(crate) fn extract(
 pub fn layout(
   package: &mut WordprocessingDocument,
   options: &LayoutOptions,
-) -> Result<crate::compat::LayoutDocument> {
-  let document = extract(package, options)?;
-  Ok(layout::layout_document(&document, options))
+) -> Result<crate::common::LayoutDocument<'static>> {
+  layout_document(package, options)
 }
 
 pub fn layout_document(
   package: &mut WordprocessingDocument,
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
-  let document = layout(package, options)?;
+  let document = extract(package, options)?;
+  let document = layout::layout_document(&document, options);
   Ok(layout_document_from_compat(
     LayoutEngineKind::Docx,
     document,

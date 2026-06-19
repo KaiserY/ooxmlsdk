@@ -9,6 +9,7 @@ use ooxmlsdk_fonts::{
   ShapeOptions, ShapedRun, TextScript, script_direction_runs,
 };
 
+use crate::common;
 use crate::docx::TextStyle;
 
 fn font_timing<T>(label: &str, work: impl FnOnce() -> T) -> T {
@@ -43,30 +44,106 @@ impl Hash for FontFaceData {
   }
 }
 
-pub fn load_text_face(style: &TextStyle) -> Option<FontFaceData> {
+pub trait FontStyleRef {
+  fn font_family(&self) -> Option<&str>;
+  fn font_size_pt(&self) -> f32;
+  fn character_spacing_pt(&self) -> f32;
+  fn baseline_shift_pt(&self) -> f32;
+  fn bold(&self) -> bool;
+  fn italic(&self) -> bool;
+  fn small_caps(&self) -> bool;
+}
+
+impl FontStyleRef for TextStyle {
+  fn font_family(&self) -> Option<&str> {
+    self.font_family.as_deref()
+  }
+
+  fn font_size_pt(&self) -> f32 {
+    self.font_size_pt
+  }
+
+  fn character_spacing_pt(&self) -> f32 {
+    self.character_spacing_pt
+  }
+
+  fn baseline_shift_pt(&self) -> f32 {
+    self.baseline_shift_pt
+  }
+
+  fn bold(&self) -> bool {
+    self.bold
+  }
+
+  fn italic(&self) -> bool {
+    self.italic
+  }
+
+  fn small_caps(&self) -> bool {
+    self.small_caps
+  }
+}
+
+impl FontStyleRef for common::TextStyle<'_> {
+  fn font_family(&self) -> Option<&str> {
+    self.font_family.as_deref()
+  }
+
+  fn font_size_pt(&self) -> f32 {
+    self.font_size.0
+  }
+
+  fn character_spacing_pt(&self) -> f32 {
+    self.character_spacing.0
+  }
+
+  fn baseline_shift_pt(&self) -> f32 {
+    self.baseline_shift.0
+  }
+
+  fn bold(&self) -> bool {
+    self.bold
+  }
+
+  fn italic(&self) -> bool {
+    self.italic
+  }
+
+  fn small_caps(&self) -> bool {
+    self.small_caps
+  }
+}
+
+pub fn load_text_face(style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
   let request = font_request(style);
   let registry = style_font_registry(style, None);
   let resolved = registry.resolve(&request).ok()?;
   font_face_data_from_registry(&registry, &resolved.font_id)
 }
 
-pub fn shape_text_runs(text: &str, style: &TextStyle) -> Option<Vec<ShapedRun<'static>>> {
+pub fn shape_text_runs(
+  text: &str,
+  style: &(impl FontStyleRef + ?Sized),
+) -> Option<Vec<ShapedRun<'static>>> {
   font_timing("shape text runs", || shape_text_runs_inner(text, style))
 }
 
-fn shape_text_runs_inner(text: &str, style: &TextStyle) -> Option<Vec<ShapedRun<'static>>> {
+fn shape_text_runs_inner(
+  text: &str,
+  style: &(impl FontStyleRef + ?Sized),
+) -> Option<Vec<ShapedRun<'static>>> {
   let mut output = Vec::new();
   for script_run in script_direction_runs(
     text.to_string(),
-    FontSize(style.font_size_pt),
-    style.small_caps,
+    FontSize(style.font_size_pt()),
+    style.small_caps(),
   ) {
     let registry = style_font_registry(style, Some(script_run.script));
     let mut request = font_request(style);
     request.size_pt = script_run.size_pt;
     request.script = Some(script_run.script);
     let mut options = ShapeOptions::from_request(&request, script_run.direction);
-    options.character_spacing_pt = style.character_spacing_pt;
+    options.character_spacing_pt = style.character_spacing_pt();
     options.small_caps = false;
     options.scan_registered_fallbacks = false;
     let mut runs = registry
@@ -87,50 +164,53 @@ pub fn font_face_data(font_id: &FontId) -> Option<FontFaceData> {
   font_data_cache().lock().ok()?.get(font_id).cloned()
 }
 
-pub fn vertical_metrics(style: &TextStyle) -> Option<ooxmlsdk_fonts::VerticalMetrics> {
+pub fn vertical_metrics(
+  style: &(impl FontStyleRef + ?Sized),
+) -> Option<ooxmlsdk_fonts::VerticalMetrics> {
   let request = font_request(style);
   let registry = style_font_registry(style, None);
   let resolved = registry.resolve(&request).ok()?;
   Some(
     resolved
-      .metrics_at_size(FontSize(style.font_size_pt))
+      .metrics_at_size(FontSize(style.font_size_pt()))
       .vertical,
   )
 }
 
-pub fn decoration_metrics(style: &TextStyle) -> Option<ooxmlsdk_fonts::DecorationMetrics> {
+pub fn decoration_metrics(
+  style: &(impl FontStyleRef + ?Sized),
+) -> Option<ooxmlsdk_fonts::DecorationMetrics> {
   let request = font_request(style);
   let registry = style_font_registry(style, None);
   let resolved = registry.resolve(&request).ok()?;
   Some(
     resolved
-      .metrics_at_size(FontSize(style.font_size_pt))
+      .metrics_at_size(FontSize(style.font_size_pt()))
       .decoration,
   )
 }
 
-fn font_request(style: &TextStyle) -> FontRequest<'static> {
+fn font_request(style: &(impl FontStyleRef + ?Sized)) -> FontRequest<'static> {
   FontRequest {
     family: style
-      .font_family
-      .as_deref()
+      .font_family()
       .filter(|family| !family.trim().is_empty())
       .map(|family| Cow::Owned(family.to_string())),
-    bold: style.bold,
-    italic: style.italic,
-    size_pt: FontSize(style.font_size_pt),
+    bold: style.bold(),
+    italic: style.italic(),
+    size_pt: FontSize(style.font_size_pt()),
     ..FontRequest::default()
   }
 }
 
 fn style_font_registry(
-  style: &TextStyle,
+  style: &(impl FontStyleRef + ?Sized),
   script: Option<TextScript>,
 ) -> Arc<FontRegistry<'static>> {
   let key = FontFaceKey {
-    family: style.font_family.as_deref().map(str::to_string),
-    bold: style.bold,
-    italic: style.italic,
+    family: style.font_family().map(str::to_string),
+    bold: style.bold(),
+    italic: style.italic(),
     script,
   };
   if let Ok(mut cache) = font_registry_cache().lock() {
@@ -146,7 +226,7 @@ fn style_font_registry(
 }
 
 fn build_style_font_registry(
-  style: &TextStyle,
+  style: &(impl FontStyleRef + ?Sized),
   script: Option<TextScript>,
 ) -> FontRegistry<'static> {
   font_timing("build style font registry", || {
@@ -224,11 +304,11 @@ fn font_face_cache() -> &'static Mutex<HashMap<FontFaceKey, FontFaceData>> {
   CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-pub fn cached_text_face(style: &TextStyle) -> Option<FontFaceData> {
+pub fn cached_text_face(style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
   let key = FontFaceKey {
-    family: style.font_family.as_deref().map(str::to_string),
-    bold: style.bold,
-    italic: style.italic,
+    family: style.font_family().map(str::to_string),
+    bold: style.bold(),
+    italic: style.italic(),
     script: None,
   };
   if let Ok(cache) = font_face_cache().lock()

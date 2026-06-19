@@ -6,7 +6,6 @@
 //! 2. This crate converts the layout display list to PDF through `krilla`.
 
 mod error;
-mod layout;
 mod options;
 mod render;
 mod xlsx;
@@ -59,7 +58,6 @@ pub fn convert_wordprocessing_document(
     source_file_name: options.source_file_name.clone(),
   };
   let pages = ooxmlsdk_layout::docx::layout_document(document, &layout_options)?;
-  let pages = layout::from_common_document(pages);
   render::krilla::render(&pages, &options)
 }
 
@@ -157,6 +155,5 @@ pub fn convert_presentation_document(
     source_file_name: options.source_file_name.clone(),
   };
   let pages = ooxmlsdk_layout::pptx::layout_document(document, &layout_options)?;
-  let pages = layout::from_common_document(pages);
   render::krilla::render(&pages, &options)
 }

@@ -4,8 +4,8 @@ use std::sync::{Arc, Mutex};
 use krilla::text::Font;
 
 use crate::error::{PdfError, Result};
-use crate::layout::TextStyle;
-use ooxmlsdk_layout::fonts::{FontFaceData, cached_text_face};
+use ooxmlsdk_layout::common;
+use ooxmlsdk_layout::fonts::{FontFaceData, FontStyleRef, cached_text_face};
 
 pub(super) struct FontSet {
   fallback: Font,
@@ -15,7 +15,7 @@ pub(super) struct FontSet {
 
 impl FontSet {
   pub(super) fn load() -> Result<Self> {
-    let fallback_style = TextStyle::default();
+    let fallback_style = common::TextStyle::default();
     Ok(Self {
       fallback: load_font(&fallback_style)?,
       fonts: Mutex::new(HashMap::new()),
@@ -23,11 +23,11 @@ impl FontSet {
     })
   }
 
-  pub(super) fn select(&self, style: &TextStyle) -> Font {
+  pub(super) fn select(&self, style: &(impl FontStyleRef + ?Sized)) -> Font {
     let key = FontKey {
-      family: style.font_family.as_deref().map(str::to_string),
-      bold: style.bold,
-      italic: style.italic,
+      family: style.font_family().map(str::to_string),
+      bold: style.bold(),
+      italic: style.italic(),
     };
     if let Ok(fonts) = self.fonts.lock()
       && let Some(font) = fonts.get(&key)
@@ -64,7 +64,7 @@ struct FontKey {
   italic: bool,
 }
 
-fn load_font(style: &TextStyle) -> Result<Font> {
+fn load_font(style: &(impl FontStyleRef + ?Sized)) -> Result<Font> {
   if let Some(face) = cached_text_face(style)
     && let Some(font) = font_from_face(&face)
   {
@@ -74,12 +74,11 @@ fn load_font(style: &TextStyle) -> Result<Font> {
   Err(PdfError::Krilla(format!(
     "required PDF font was not found: family={} bold={} italic={}",
     style
-      .font_family
-      .as_deref()
+      .font_family()
       .filter(|family| !family.trim().is_empty())
       .unwrap_or("<document-default>"),
-    style.bold,
-    style.italic
+    style.bold(),
+    style.italic()
   )))
 }
 

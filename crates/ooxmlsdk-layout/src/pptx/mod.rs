@@ -11,7 +11,6 @@ mod slide_fragment;
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 
 use crate::common::{LayoutEngineKind, layout_document_from_compat};
-use crate::compat::LayoutDocument;
 use crate::error::Result;
 use crate::options::LayoutOptions;
 
@@ -89,10 +88,9 @@ pub struct PptxBulletParagraphSummary {
 
 pub fn layout(
   package: &mut PresentationDocument,
-  _options: &LayoutOptions,
-) -> Result<LayoutDocument> {
-  let import = PowerPointImport::import_document(package)?;
-  Ok(display::lower_to_layout_document(&import))
+  options: &LayoutOptions,
+) -> Result<crate::common::LayoutDocument<'static>> {
+  layout_document(package, options)
 }
 
 pub fn layout_document(

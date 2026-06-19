@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use lopdf::{Document as LopdfDocument, Object as LopdfObject, dictionary};
 
 use crate::error::{PdfError, Result};
-use crate::layout::{FormWidget, FormWidgetKind, LayoutDocument, PageItem};
+use ooxmlsdk_layout::common::{self, FormWidget, FormWidgetKind};
 use ooxmlsdk_layout::text_metrics::measure_text;
 // SwContentControlPortion::DescribePDFControl() expands content-control widget
 // bounds by 20 twips before handing them to PDFWriter.
@@ -37,7 +37,7 @@ struct WidgetBounds {
 }
 
 pub(super) fn inject_form_widget_annotations(
-  document: &LayoutDocument,
+  document: &common::LayoutDocument<'static>,
   pdf: Vec<u8>,
 ) -> Result<Vec<u8>> {
   let annotations = collect_form_widget_annotations(document);
@@ -105,12 +105,14 @@ pub(super) fn inject_form_widget_annotations(
   Ok(output)
 }
 
-fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnotationSpec> {
+fn collect_form_widget_annotations(
+  document: &common::LayoutDocument<'static>,
+) -> Vec<WidgetAnnotationSpec> {
   let mut annotations = Vec::new();
   for (page_index, page) in document.pages.iter().enumerate() {
     let mut widgets = HashMap::<u32, WidgetBounds>::new();
     for item in &page.items {
-      let PageItem::Text(text) = item else {
+      let common::DisplayItem::Text(text) = item else {
         continue;
       };
       let Some(widget_id) = text.form_widget_id else {
@@ -123,14 +125,14 @@ fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnot
       {
         continue;
       }
-      let width = measure_text(&text.text, &text.style);
+      let width = measure_text(text.text.as_ref(), &text.style);
       let bounds = WidgetBounds {
-        left: text.x_pt,
-        top: text.y_pt,
-        right: text.x_pt + width,
-        bottom: text.y_pt + text.line_height_pt,
+        left: text.origin.x.0,
+        top: text.origin.y.0,
+        right: text.origin.x.0 + width,
+        bottom: text.origin.y.0 + text.line_height.0,
         paragraph_bidi: text.paragraph_bidi,
-        text: text.text.clone(),
+        text: text.text.to_string(),
       };
       widgets
         .entry(widget_id)
@@ -144,9 +146,9 @@ fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnot
         })
         .or_insert(bounds);
     }
-    let page_height = page.setup.height_pt;
-    let content_left = page.setup.margin_left_pt;
-    let content_right = page.setup.width_pt - page.setup.margin_right_pt;
+    let page_height = page.setup.size.height.0;
+    let content_left = page.setup.margins.left.0;
+    let content_right = page.setup.size.width.0 - page.setup.margins.right.0;
     let mut page_annotations = widgets
       .into_iter()
       .filter_map(|(widget_id, bounds)| {
@@ -210,13 +212,13 @@ fn widget_annotation_field(
     FormWidgetKind::Text => (b"Tx", text.to_string(), None),
     FormWidgetKind::ComboBox => (b"Ch", text.to_string(), Some(LO_PDF_COMBO_BOX_FLAGS)),
     FormWidgetKind::DropDownList => {
-      let value = if widget.entries.iter().any(|entry| entry == text) {
+      let value = if widget.entries.iter().any(|entry| entry.as_ref() == text) {
         text.to_string()
       } else {
         widget
           .entries
           .first()
-          .cloned()
+          .map(|entry| entry.to_string())
           .unwrap_or_else(|| text.to_string())
       };
       (b"Ch", value, Some(LO_PDF_DROPDOWN_LIST_FLAGS))

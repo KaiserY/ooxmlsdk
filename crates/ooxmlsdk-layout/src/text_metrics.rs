@@ -1,6 +1,5 @@
-use crate::docx::TextStyle;
 use crate::fonts::{
-  FontFaceData, decoration_metrics as font_decoration_metrics, font_face_data,
+  FontFaceData, FontStyleRef, decoration_metrics as font_decoration_metrics, font_face_data,
   shape_text_runs as shape_font_text_runs, vertical_metrics as font_vertical_metrics,
 };
 
@@ -66,7 +65,7 @@ pub struct ShapedGlyph {
   pub y_advance_em: f32,
 }
 
-pub fn measure_text(text: &str, style: &TextStyle) -> f32 {
+pub fn measure_text(text: &str, style: &(impl FontStyleRef + ?Sized)) -> f32 {
   if text.is_empty() {
     return 0.0;
   }
@@ -74,7 +73,7 @@ pub fn measure_text(text: &str, style: &TextStyle) -> f32 {
   shape_text(text, style).map_or(0.0, |shaped| shaped.width_pt)
 }
 
-pub fn shape_text(text: &str, style: &TextStyle) -> Option<ShapedText> {
+pub fn shape_text(text: &str, style: &(impl FontStyleRef + ?Sized)) -> Option<ShapedText> {
   if text.is_empty() {
     return Some(ShapedText {
       glyphs: Vec::new(),
@@ -87,7 +86,7 @@ pub fn shape_text(text: &str, style: &TextStyle) -> Option<ShapedText> {
   let mut glyphs = Vec::new();
   let mut font_faces = Vec::new();
   let mut width_pt = 0.0;
-  let em_divisor = style.font_size_pt.max(f32::EPSILON);
+  let em_divisor = style.font_size_pt().max(f32::EPSILON);
 
   for run in runs {
     let font_index = font_faces.len();
@@ -111,17 +110,17 @@ pub fn shape_text(text: &str, style: &TextStyle) -> Option<ShapedText> {
   })
 }
 
-pub fn vertical_metrics(style: &TextStyle) -> TextVerticalMetrics {
+pub fn vertical_metrics(style: &(impl FontStyleRef + ?Sized)) -> TextVerticalMetrics {
   font_vertical_metrics(style)
     .map(|metrics| TextVerticalMetrics {
       ascent_pt: metrics.ascent_pt,
       descent_pt: metrics.descent_pt,
       line_gap_pt: metrics.line_gap_pt,
     })
-    .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt))
+    .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt()))
 }
 
-pub fn text_decoration_metrics(style: &TextStyle) -> TextDecorationMetrics {
+pub fn text_decoration_metrics(style: &(impl FontStyleRef + ?Sized)) -> TextDecorationMetrics {
   font_decoration_metrics(style)
     .and_then(|metrics| {
       (metrics.underline_thickness_pt > f32::EPSILON
@@ -133,18 +132,18 @@ pub fn text_decoration_metrics(style: &TextStyle) -> TextDecorationMetrics {
           strikethrough_width_pt: metrics.strikeout_thickness_pt,
         })
     })
-    .unwrap_or_else(|| approximate_decoration_metrics(style.font_size_pt))
+    .unwrap_or_else(|| approximate_decoration_metrics(style.font_size_pt()))
 }
 
-pub fn inline_text_box_height(style: &TextStyle) -> f32 {
-  vertical_metrics(style).line_height_pt() + style.baseline_shift_pt.abs()
+pub fn inline_text_box_height(style: &(impl FontStyleRef + ?Sized)) -> f32 {
+  vertical_metrics(style).line_height_pt() + style.baseline_shift_pt().abs()
 }
 
-pub fn baseline_offset_in_line(style: &TextStyle, line_height_pt: f32) -> f32 {
+pub fn baseline_offset_in_line(style: &(impl FontStyleRef + ?Sized), line_height_pt: f32) -> f32 {
   let metrics = vertical_metrics(style);
-  let natural_height_pt = metrics.line_height_pt() + style.baseline_shift_pt.abs();
+  let natural_height_pt = metrics.line_height_pt() + style.baseline_shift_pt().abs();
   let extra_leading_pt = (line_height_pt - natural_height_pt).max(0.0) / 2.0;
-  extra_leading_pt + metrics.leading_above_pt() + metrics.ascent_pt - style.baseline_shift_pt
+  extra_leading_pt + metrics.leading_above_pt() + metrics.ascent_pt - style.baseline_shift_pt()
 }
 
 fn approximate_vertical_metrics(font_size: f32) -> TextVerticalMetrics {
@@ -187,11 +186,13 @@ fn approximate_decoration_metrics(font_size: f32) -> TextDecorationMetrics {
 
 #[cfg(test)]
 mod tests {
+  use crate::common::{Pt, TextStyle};
+
   use super::*;
 
   #[test]
   fn shaped_measurement_handles_ligatures_and_cjk() {
-    let style = TextStyle::default();
+    let style = test_style();
 
     assert!(measure_text("office", &style) > 0.0);
     assert!(measure_text("商务文档", &style) > measure_text("abc", &style));
@@ -199,7 +200,7 @@ mod tests {
 
   #[test]
   fn shaped_text_exposes_glyph_advances_for_pdf_paint() {
-    let style = TextStyle::default();
+    let style = test_style();
     let shaped = shape_text("office", &style).expect("shaped text");
 
     assert!(!shaped.glyphs.is_empty());
@@ -210,5 +211,12 @@ mod tests {
         .iter()
         .all(|glyph| glyph.text_range.end <= "office".len())
     );
+  }
+
+  fn test_style() -> TextStyle<'static> {
+    TextStyle {
+      font_size: Pt(11.0),
+      ..TextStyle::default()
+    }
   }
 }

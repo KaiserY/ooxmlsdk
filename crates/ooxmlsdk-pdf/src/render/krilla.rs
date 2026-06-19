@@ -1,4 +1,6 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use krilla::Document;
 use krilla::action::{Action, LinkAction};
@@ -19,20 +21,20 @@ use super::form_widgets::inject_form_widget_annotations;
 use super::image::decode_image;
 use super::settings::serialize_settings;
 use crate::error::{PdfError, Result};
-use crate::layout::{
-  DynamicFieldKind, FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind,
-  LinkAreaItem, OutlineEntry, PageItem, PdfTextSegmentation, PolylineItem, RectItem, RgbColor,
-  TextItem, TextStyle,
-};
 use crate::options::PdfOptions;
-use ooxmlsdk_layout::fonts::FontFaceData;
+use ooxmlsdk_layout::common;
+use ooxmlsdk_layout::fonts::{FontFaceData, FontStyleRef};
 use ooxmlsdk_layout::text_metrics::{
   baseline_offset_in_line, measure_text, shape_text, text_decoration_metrics, vertical_metrics,
 };
 
 const INTERNAL_LINK_DESTINATION_SHIFT_PT: f32 = 10.0;
 const LO_ARIAL_BOLD_11PT_VERTICAL_SCALE: f32 = 1.07;
-pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<Vec<u8>> {
+
+pub(crate) fn render(
+  document: &common::LayoutDocument<'static>,
+  options: &PdfOptions,
+) -> Result<Vec<u8>> {
   debug_assert!(
     document
       .follows
@@ -40,7 +42,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
       .all(|follow| follow.to_page_index < document.pages.len())
   );
   debug_assert!(document.frames.iter().all(|frame| {
-    let _kind = frame.kind;
+    let _kind = &frame.kind;
     let _block_index = frame.block_index;
     let _split_start = frame.split_start;
     let _split_end = frame.split_end;
@@ -48,29 +50,28 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
     frame.page_index < document.pages.len()
       && frame.section_index == document.pages[frame.page_index].section_index
       && frame.section_page_index == document.pages[frame.page_index].section_page_index
-      && frame.item_start < frame.item_end
-      && frame.items.len() == frame.item_end - frame.item_start
+      && frame.item_range.start <= frame.item_range.end
       && frame.column_index < 64
       && frame
         .bounds
-        .is_none_or(|bounds| bounds.width_pt >= 0.0 && bounds.height_pt >= 0.0)
+        .is_none_or(|bounds| bounds.size.width.0 >= 0.0 && bounds.size.height.0 >= 0.0)
       && frame.lines.iter().all(|line| {
-        line.item_start >= frame.item_start
-          && line.item_end <= frame.item_end
-          && line.item_start < line.item_end
-          && line.width_pt >= 0.0
-          && line.height_pt >= 0.0
-          && line.x_pt.is_finite()
-          && line.y_pt.is_finite()
+        line.item_range.start >= frame.item_range.start
+          && line.item_range.end <= frame.item_range.end
+          && line.item_range.start < line.item_range.end
+          && line.bounds.size.width.0 >= 0.0
+          && line.bounds.size.height.0 >= 0.0
+          && line.bounds.origin.x.0.is_finite()
+          && line.bounds.origin.y.0.is_finite()
       })
       && frame.fragments.iter().all(|fragment| {
         let _fragment_kind = fragment.kind;
-        fragment.item_start >= frame.item_start
-          && fragment.item_end <= frame.item_end
-          && fragment.item_start < fragment.item_end
+        fragment.item_range.start >= frame.item_range.start
+          && fragment.item_range.end <= frame.item_range.end
+          && fragment.item_range.start < fragment.item_range.end
           && fragment
             .bounds
-            .is_none_or(|bounds| bounds.width_pt >= 0.0 && bounds.height_pt >= 0.0)
+            .is_none_or(|bounds| bounds.size.width.0 >= 0.0 && bounds.size.height.0 >= 0.0)
       })
       && frame.influences.iter().all(|influence| {
         let _influence_kind = influence.kind;
@@ -78,17 +79,17 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
           && influence.block_index == frame.block_index
           && influence
             .bounds
-            .is_none_or(|bounds| bounds.width_pt >= 0.0 && bounds.height_pt >= 0.0)
+            .is_none_or(|bounds| bounds.size.width.0 >= 0.0 && bounds.size.height.0 >= 0.0)
       })
   }));
-  debug_assert!(document.reflow_requests.iter().all(|request| {
+  debug_assert!(document.reflow.reflow_requests.iter().all(|request| {
     document
       .frames
       .get(request.frame_index)
       .is_some_and(|frame| {
         let _reason = request.reason;
         let _scope = request.scope;
-        frame.kind == request.kind
+        frame_kind_name_from_common(&frame.kind) == frame_kind_from_common(request.kind)
           && frame.page_index == request.page_index
           && frame.section_page_index == request.section_page_index
           && frame.column_index == request.column_index
@@ -96,35 +97,48 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
           && request.influence_count == frame.influences.len()
       })
   }));
-  debug_assert!(document.page_invalidations.iter().all(|invalidation| {
+  debug_assert!(
     document
-      .frames
-      .get(invalidation.first_frame_index)
-      .is_some_and(|frame| {
-        let _reason = invalidation.reason;
-        let _scope = invalidation.scope;
-        frame.page_index == invalidation.page_index
-          && frame.section_page_index == invalidation.section_page_index
+      .reflow
+      .page_invalidations
+      .iter()
+      .all(|invalidation| {
+        document
+          .frames
+          .get(invalidation.first_frame_index)
+          .is_some_and(|frame| {
+            let _reason = invalidation.reason;
+            let _scope = invalidation.scope;
+            frame.page_index == invalidation.page_index
+              && frame.section_page_index == invalidation.section_page_index
+          })
       })
-  }));
-  debug_assert!(document.page_replays.iter().all(|replay| {
+  );
+  debug_assert!(document.reflow.page_replays.iter().all(|replay| {
     let _scope = replay.scope;
     replay.page_index < document.pages.len()
-      && replay.item_start <= replay.item_end
+      && replay.item_range.start <= replay.item_range.end
       && replay.column_index < 64
       && replay.section_page_index == document.pages[replay.page_index].section_page_index
       && !replay.replacement_items.is_empty()
   }));
-  debug_assert!(document.page_replay_applications.iter().all(|application| {
-    let _scope = application.scope;
-    application.page_index < document.pages.len()
-      && application.item_start <= application.item_end
-      && application.column_index < 64
-      && application.section_page_index == document.pages[application.page_index].section_page_index
-      && application.replacement_count > 0
-      && application.applied
-  }));
-  debug_assert!(document.backward_moves.iter().all(|move_back| {
+  debug_assert!(
+    document
+      .reflow
+      .page_replay_applications
+      .iter()
+      .all(|application| {
+        let _scope = application.scope;
+        application.page_index < document.pages.len()
+          && application.item_range.start <= application.item_range.end
+          && application.column_index < 64
+          && application.section_page_index
+            == document.pages[application.page_index].section_page_index
+          && application.replacement_count > 0
+          && application.applied
+      })
+  );
+  debug_assert!(document.reflow.backward_moves.iter().all(|move_back| {
     let _scope = move_back.scope;
     let _reason = move_back.reason;
     move_back.frame_index < document.frames.len()
@@ -134,7 +148,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
       && move_back.to_page_index <= move_back.from_page_index
       && (move_back.suppressed || move_back.replayed_frames > 0)
   }));
-  debug_assert!(document.layout_reruns.iter().all(|rerun| {
+  debug_assert!(document.reflow.layout_reruns.iter().all(|rerun| {
     let _scope = rerun.scope;
     let _reason = rerun.reason;
     rerun.page_index < document.pages.len()
@@ -144,21 +158,21 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
       && rerun.constraints.iter().all(|constraint| {
         let _kind = constraint.kind;
         let _scope = constraint.scope;
-        constraint.content_width >= 0.0
-          && constraint.content_bottom.is_finite()
+        constraint.content_width.0 >= 0.0
+          && constraint.content_bottom.0.is_finite()
           && constraint
             .bounds
-            .is_none_or(|bounds| bounds.width_pt >= 0.0 && bounds.height_pt >= 0.0)
+            .is_none_or(|bounds| bounds.size.width.0 >= 0.0 && bounds.size.height.0 >= 0.0)
       })
   }));
-  debug_assert!(document.reflow_executions.iter().all(|execution| {
+  debug_assert!(document.reflow.reflow_executions.iter().all(|execution| {
     let _action = execution.action;
     let _scope = execution.scope;
     execution.request_count > 0
       && execution.first_page_index < document.pages.len()
-      && execution.backward_moves <= document.backward_moves.len()
+      && execution.backward_moves <= document.reflow.backward_moves.len()
   }));
-  debug_assert!(document.restart_plan.as_ref().is_none_or(|plan| {
+  debug_assert!(document.reflow.restart_plan.as_ref().is_none_or(|plan| {
     document.frames.get(plan.frame_index).is_some_and(|frame| {
       let _reason = plan.reason;
       let _scope = plan.scope;
@@ -218,7 +232,6 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
         PaintItem::Image(_)
         | PaintItem::LinkArea(_)
         | PaintItem::Rect(_)
-        | PaintItem::Fill(_)
         | PaintItem::Line(_)
         | PaintItem::Polyline(_) => true,
       })
@@ -275,6 +288,182 @@ struct PaintPage {
   items: Vec<PaintItem>,
 }
 
+#[derive(Clone, Debug)]
+enum PageItem {
+  Text(TextItem),
+  Image(ImageItem),
+  LinkArea(LinkAreaItem),
+  Rect(RectItem),
+  Line(LineItem),
+  Polyline(PolylineItem),
+}
+
+#[derive(Clone, Debug)]
+struct TextItem {
+  x_pt: f32,
+  y_pt: f32,
+  line_height_pt: f32,
+  text: String,
+  style: TextStyle,
+  rotation_center_pt: Option<(f32, f32)>,
+  hyperlink_url: Option<String>,
+  dynamic_field: Option<common::DynamicField<'static>>,
+  form_widget_id: Option<u32>,
+  paragraph_bidi: bool,
+  preserve_text_portion: bool,
+  decoration_span_start_x_pt: Option<f32>,
+  pdf_text_segmentation: common::PdfTextSegmentation,
+}
+
+#[derive(Clone, Debug)]
+struct ImageItem {
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  crop: ImageCrop,
+  rotation_deg: f32,
+  flip_horizontal: bool,
+  flip_vertical: bool,
+  data: Vec<u8>,
+  content_type: Option<String>,
+  alt_text: Option<String>,
+  hyperlink_url: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct ImageCrop {
+  left: f32,
+  top: f32,
+  right: f32,
+  bottom: f32,
+}
+
+#[derive(Clone, Debug)]
+struct LinkAreaItem {
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  hyperlink_url: String,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RectItem {
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  fill_color: Option<RgbColor>,
+  fill_opacity: f32,
+  stroke: Option<BorderStyle>,
+  stroke_opacity: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LineItem {
+  x1_pt: f32,
+  y1_pt: f32,
+  x2_pt: f32,
+  y2_pt: f32,
+  width_pt: f32,
+  color: RgbColor,
+  kind: LineItemKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LineItemKind {
+  Stroke,
+  FilledRect,
+}
+
+#[derive(Clone, Debug)]
+struct PolylineItem {
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  points: Vec<(f32, f32)>,
+  closed: bool,
+  fill_color: Option<RgbColor>,
+  stroke: Option<BorderStyle>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct BorderStyle {
+  width_pt: f32,
+  color: RgbColor,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct RgbColor {
+  r: u8,
+  g: u8,
+  b: u8,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct TextStyle {
+  font_family: Option<Arc<str>>,
+  symbol_font_family: Option<Arc<str>>,
+  font_size_pt: f32,
+  complex_font_size_pt: Option<f32>,
+  character_spacing_pt: f32,
+  baseline_shift_pt: f32,
+  bold: bool,
+  italic: bool,
+  underline: bool,
+  strikethrough: bool,
+  uppercase: bool,
+  small_caps: bool,
+  hidden: bool,
+  rotation_deg: f32,
+  color: RgbColor,
+  opacity: f32,
+  outline_color: Option<RgbColor>,
+  outline_opacity: f32,
+  outline_width_pt: f32,
+  highlight: Option<RgbColor>,
+  underline_color: Option<RgbColor>,
+}
+
+impl FontStyleRef for TextStyle {
+  fn font_family(&self) -> Option<&str> {
+    self.font_family.as_deref()
+  }
+
+  fn font_size_pt(&self) -> f32 {
+    self.font_size_pt
+  }
+
+  fn character_spacing_pt(&self) -> f32 {
+    self.character_spacing_pt
+  }
+
+  fn baseline_shift_pt(&self) -> f32 {
+    self.baseline_shift_pt
+  }
+
+  fn bold(&self) -> bool {
+    self.bold
+  }
+
+  fn italic(&self) -> bool {
+    self.italic
+  }
+
+  fn small_caps(&self) -> bool {
+    self.small_caps
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FollowFrameKind {
+  Paragraph,
+  Table,
+  Notes,
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 struct DecorationRenderMetadata {
   suppress: bool,
@@ -287,7 +476,6 @@ enum PaintItem {
   Image(ImageItem),
   LinkArea(LinkAreaItem),
   Rect(RectItem),
-  Fill(FillItem),
   Line(LineItem),
   Polyline(PolylineItem),
 }
@@ -321,7 +509,7 @@ struct PaintTextPortion {
 enum PaintTextPortionKind {
   Text,
   Tab,
-  Field(DynamicFieldKind),
+  Field(common::DynamicField<'static>),
   Link,
 }
 
@@ -409,7 +597,6 @@ impl InternalLinkTargets {
           PaintItem::Image(_)
           | PaintItem::LinkArea(_)
           | PaintItem::Rect(_)
-          | PaintItem::Fill(_)
           | PaintItem::Line(_)
           | PaintItem::Polyline(_) => {}
         }
@@ -496,13 +683,19 @@ fn reciprocal_internal_link_url(url: &str) -> Option<String> {
 }
 
 impl PaintDocument {
-  fn from_layout(document: &LayoutDocument) -> Self {
+  fn from_layout(document: &common::LayoutDocument<'static>) -> Self {
     let pages = document
       .pages
       .iter()
       .enumerate()
       .map(|(page_index, page)| {
-        let layout_items = coalesced_writer_text_items(&page.items);
+        let layout_items = coalesced_writer_text_items(
+          &page
+            .items
+            .iter()
+            .filter_map(page_item_from_common)
+            .collect::<Vec<_>>(),
+        );
         let line_owners = paint_line_owners(document, page_index, layout_items.len());
         let decoration_metadata = decoration_render_metadata(&layout_items);
         let items = layout_items
@@ -521,26 +714,245 @@ impl PaintDocument {
               PaintItem::Text(PaintText::from_layout_text(
                 &text,
                 owner,
-                page.setup.width_pt,
+                page.setup.size.width.0,
               ))
             }
             PageItem::Image(image) => PaintItem::Image(image.clone()),
             PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area.clone()),
             PageItem::Rect(rect) => PaintItem::Rect(*rect),
-            PageItem::Fill(fill) => PaintItem::Fill(*fill),
             PageItem::Line(line) => PaintItem::Line(*line),
             PageItem::Polyline(polyline) => PaintItem::Polyline(polyline.clone()),
           })
           .collect();
         PaintPage {
-          width_pt: page.setup.width_pt,
-          height_pt: page.setup.height_pt,
+          width_pt: page.setup.size.width.0,
+          height_pt: page.setup.size.height.0,
           items,
         }
       })
       .collect();
     Self { pages }
   }
+}
+
+fn page_item_from_common(item: &common::DisplayItem<'static>) -> Option<PageItem> {
+  match item {
+    common::DisplayItem::Text(text) => Some(PageItem::Text(text_item_from_common(text))),
+    common::DisplayItem::Image(image) => Some(PageItem::Image(image_item_from_common(image))),
+    common::DisplayItem::Path(path) => Some(PageItem::Polyline(polyline_from_common(path))),
+    common::DisplayItem::Rect(rect) => Some(PageItem::Rect(rect_item_from_common(rect))),
+    common::DisplayItem::Line(line) => Some(PageItem::Line(line_item_from_common(line))),
+    common::DisplayItem::LinkArea(link) => Some(PageItem::LinkArea(link_area_from_common(link))),
+    common::DisplayItem::Glyphs(_)
+    | common::DisplayItem::AnnotationHint(_)
+    | common::DisplayItem::Clip(_)
+    | common::DisplayItem::Transform(_) => None,
+  }
+}
+
+fn text_item_from_common(text: &common::TextRun<'static>) -> TextItem {
+  TextItem {
+    x_pt: text.origin.x.0,
+    y_pt: text.origin.y.0,
+    line_height_pt: text.line_height.0,
+    text: text.text.as_ref().to_string(),
+    style: text_style_from_common(&text.style),
+    rotation_center_pt: text.rotation_center.map(|point| (point.x.0, point.y.0)),
+    hyperlink_url: text.hyperlink_url.as_ref().map(|url| url.to_string()),
+    dynamic_field: text.dynamic_field.as_ref().map(dynamic_field_to_owned),
+    form_widget_id: text.form_widget_id,
+    paragraph_bidi: text.paragraph_bidi,
+    preserve_text_portion: text.preserve_text_portion,
+    decoration_span_start_x_pt: None,
+    pdf_text_segmentation: text.pdf_text_segmentation,
+  }
+}
+
+fn image_item_from_common(image: &common::ImageItem<'static>) -> ImageItem {
+  ImageItem {
+    x_pt: image.bounds.origin.x.0,
+    y_pt: image.bounds.origin.y.0,
+    width_pt: image.bounds.size.width.0,
+    height_pt: image.bounds.size.height.0,
+    crop: image.crop.unwrap_or_default().into(),
+    rotation_deg: image.rotation_degrees,
+    flip_horizontal: image.flip_horizontal,
+    flip_vertical: image.flip_vertical,
+    data: image.bytes.as_ref().to_vec(),
+    content_type: Some(image.content_type.to_string()),
+    alt_text: image.alt_text.as_ref().map(|text| text.to_string()),
+    hyperlink_url: image.hyperlink_url.as_ref().map(|url| url.to_string()),
+  }
+}
+
+fn polyline_from_common(path: &common::PathItem<'static>) -> PolylineItem {
+  let x_pt = path.bounds.origin.x.0;
+  let y_pt = path.bounds.origin.y.0;
+  PolylineItem {
+    x_pt,
+    y_pt,
+    width_pt: path.bounds.size.width.0,
+    height_pt: path.bounds.size.height.0,
+    points: path
+      .points
+      .iter()
+      .map(|point| (point.x.0 - x_pt, point.y.0 - y_pt))
+      .collect(),
+    closed: path.closed,
+    fill_color: solid_rgb(&path.fill),
+    stroke: path.stroke.as_ref().map(stroke_from_common),
+  }
+}
+
+fn rect_item_from_common(rect: &common::RectItem<'static>) -> RectItem {
+  let (fill_color, fill_opacity) = solid_color(&rect.fill)
+    .map(|color| (Some(rgb(color)), opacity(color)))
+    .unwrap_or((None, 1.0));
+  RectItem {
+    x_pt: rect.bounds.origin.x.0,
+    y_pt: rect.bounds.origin.y.0,
+    width_pt: rect.bounds.size.width.0,
+    height_pt: rect.bounds.size.height.0,
+    fill_color,
+    fill_opacity,
+    stroke: rect.stroke.as_ref().map(stroke_from_common),
+    stroke_opacity: rect
+      .stroke
+      .as_ref()
+      .map_or(1.0, |stroke| opacity(stroke.color)),
+  }
+}
+
+fn line_item_from_common(line: &common::LineItem<'static>) -> LineItem {
+  LineItem {
+    x1_pt: line.start.x.0,
+    y1_pt: line.start.y.0,
+    x2_pt: line.end.x.0,
+    y2_pt: line.end.y.0,
+    width_pt: line.stroke.width.0,
+    color: rgb(line.stroke.color),
+    kind: match line.kind {
+      common::LineKind::Stroke => LineItemKind::Stroke,
+      common::LineKind::FilledRect => LineItemKind::FilledRect,
+    },
+  }
+}
+
+fn link_area_from_common(link: &common::LinkArea<'static>) -> LinkAreaItem {
+  LinkAreaItem {
+    x_pt: link.bounds.origin.x.0,
+    y_pt: link.bounds.origin.y.0,
+    width_pt: link.bounds.size.width.0,
+    height_pt: link.bounds.size.height.0,
+    hyperlink_url: link.target.to_string(),
+  }
+}
+
+fn text_style_from_common(style: &common::TextStyle<'static>) -> TextStyle {
+  TextStyle {
+    font_family: style
+      .font_family
+      .as_ref()
+      .map(|value| Arc::<str>::from(value.as_ref())),
+    symbol_font_family: style
+      .symbol_font_family
+      .as_ref()
+      .map(|value| Arc::<str>::from(value.as_ref())),
+    font_size_pt: style.font_size.0,
+    complex_font_size_pt: style.complex_font_size.map(|size| size.0),
+    character_spacing_pt: style.character_spacing.0,
+    baseline_shift_pt: style.baseline_shift.0,
+    bold: style.bold,
+    italic: style.italic,
+    underline: style.underline,
+    strikethrough: style.strikethrough,
+    uppercase: style.uppercase,
+    small_caps: style.small_caps,
+    hidden: style.hidden,
+    rotation_deg: style.rotation_degrees,
+    color: rgb(style.color),
+    opacity: opacity(style.color),
+    outline_color: style.outline_color.map(rgb),
+    outline_opacity: style.outline_color.map_or(1.0, opacity),
+    outline_width_pt: style.outline_width.0,
+    highlight: style.highlight.map(rgb),
+    underline_color: style.underline_color.map(rgb),
+  }
+}
+
+fn dynamic_field_to_owned(field: &common::DynamicField<'static>) -> common::DynamicField<'static> {
+  match field {
+    common::DynamicField::Page => common::DynamicField::Page,
+    common::DynamicField::NumPages => common::DynamicField::NumPages,
+    common::DynamicField::StyleRef {
+      style_name,
+      from_bottom,
+    } => common::DynamicField::StyleRef {
+      style_name: Cow::Owned(style_name.to_string()),
+      from_bottom: *from_bottom,
+    },
+  }
+}
+
+impl From<common::ImageCrop> for ImageCrop {
+  fn from(crop: common::ImageCrop) -> Self {
+    Self {
+      left: crop.left,
+      top: crop.top,
+      right: crop.right,
+      bottom: crop.bottom,
+    }
+  }
+}
+
+fn frame_kind_name_from_common(kind: &str) -> FollowFrameKind {
+  match kind {
+    "table" => FollowFrameKind::Table,
+    "notes" => FollowFrameKind::Notes,
+    _ => FollowFrameKind::Paragraph,
+  }
+}
+
+fn frame_kind_from_common(kind: common::FrameKind) -> FollowFrameKind {
+  match kind {
+    common::FrameKind::Paragraph => FollowFrameKind::Paragraph,
+    common::FrameKind::Table => FollowFrameKind::Table,
+    common::FrameKind::Notes => FollowFrameKind::Notes,
+  }
+}
+
+fn stroke_from_common(stroke: &common::Stroke<'static>) -> BorderStyle {
+  BorderStyle {
+    width_pt: stroke.width.0,
+    color: rgb(stroke.color),
+  }
+}
+
+fn solid_rgb(fill: &common::Fill<'static>) -> Option<RgbColor> {
+  solid_color(fill).map(rgb)
+}
+
+fn solid_color(fill: &common::Fill<'static>) -> Option<common::Color> {
+  match fill {
+    common::Fill::Solid(color) => Some(*color),
+    common::Fill::None
+    | common::Fill::Theme(_)
+    | common::Fill::Gradient(_)
+    | common::Fill::Image { .. }
+    | common::Fill::Pattern { .. } => None,
+  }
+}
+
+fn rgb(color: common::Color) -> RgbColor {
+  RgbColor {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+  }
+}
+
+fn opacity(color: common::Color) -> f32 {
+  f32::from(color.a) / 255.0
 }
 
 fn coalesced_writer_text_items(items: &[PageItem]) -> Vec<PageItem> {
@@ -571,7 +983,7 @@ fn writer_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
   {
     return false;
   }
-  if current.pdf_text_segmentation == PdfTextSegmentation::Portion
+  if current.pdf_text_segmentation == common::PdfTextSegmentation::Portion
     && (current.text.contains('\t') || next.text.contains('\t'))
   {
     return false;
@@ -764,13 +1176,13 @@ fn text_portion_ranges(text: &TextItem) -> Vec<(PaintTextPortionKind, std::ops::
   let split_decorated_portions =
     text.preserve_text_portion && (text.style.underline || text.style.strikethrough);
   if decorated_edge_space
-    && text.pdf_text_segmentation != PdfTextSegmentation::Portion
+    && text.pdf_text_segmentation != common::PdfTextSegmentation::Portion
     && !split_decorated_portions
   {
     return edge_whitespace_text_portion_ranges(text);
   }
   let split_portions =
-    text.pdf_text_segmentation == PdfTextSegmentation::Portion || split_decorated_portions;
+    text.pdf_text_segmentation == common::PdfTextSegmentation::Portion || split_decorated_portions;
   if !split_portions && text.hyperlink_url.is_some() && !text.text.contains('\t') {
     return vec![(PaintTextPortionKind::Link, 0..text.text.len())];
   }
@@ -925,7 +1337,7 @@ struct PaintLineOwner {
 }
 
 fn paint_line_owners(
-  document: &LayoutDocument,
+  document: &common::LayoutDocument<'static>,
   page_index: usize,
   item_count: usize,
 ) -> Vec<Option<PaintLineOwner>> {
@@ -937,19 +1349,19 @@ fn paint_line_owners(
     .filter(|(_, frame)| frame.page_index == page_index)
   {
     for (line_index, line) in frame.lines.iter().enumerate() {
-      let start = line.item_start.min(item_count);
-      let end = line.item_end.min(item_count);
+      let start = line.item_range.start.min(item_count);
+      let end = line.item_range.end.min(item_count);
       for owner in owners.iter_mut().take(end).skip(start) {
         if owner.is_none() {
           *owner = Some(PaintLineOwner {
             frame_index,
             line_index,
-            frame_kind: frame.kind,
+            frame_kind: frame_kind_name_from_common(&frame.kind),
             clip: PaintClipRect {
-              x_pt: line.x_pt,
-              y_pt: line.y_pt,
-              width_pt: line.width_pt,
-              height_pt: line.height_pt,
+              x_pt: line.bounds.origin.x.0,
+              y_pt: line.bounds.origin.y.0,
+              width_pt: line.bounds.size.width.0,
+              height_pt: line.bounds.size.height.0,
             },
           });
         }
@@ -985,7 +1397,6 @@ fn draw_paint_item(
       }
     }
     PaintItem::Rect(rect) => draw_rect_item(surface, rect),
-    PaintItem::Fill(fill_item) => draw_fill_item(surface, fill_item),
     PaintItem::Image(image) => {
       let _alt_text = image.alt_text.as_deref();
       match decode_image(&image.data, image.content_type.as_deref(), options) {
@@ -1058,12 +1469,6 @@ fn paint_item_bounds(item: &PaintItem) -> Option<(f32, f32, f32, f32)> {
       rect.x_pt + rect.width_pt,
       rect.y_pt + rect.height_pt,
     )),
-    PaintItem::Fill(fill) => Some((
-      fill.x_pt,
-      fill.y_pt,
-      fill.x_pt + fill.width_pt,
-      fill.y_pt + fill.height_pt,
-    )),
     PaintItem::Line(line) => {
       let half_width = line.width_pt / 2.0;
       Some((
@@ -1117,7 +1522,7 @@ fn rotate_point(x: f32, y: f32, rotation_x: f32, rotation_y: f32, angle: f32) ->
   )
 }
 
-fn pdf_outline_for_entries(entries: &[OutlineEntry]) -> Option<Outline> {
+fn pdf_outline_for_entries(entries: &[common::OutlineEntry<'static>]) -> Option<Outline> {
   if entries.is_empty() {
     return None;
   }
@@ -1130,12 +1535,19 @@ fn pdf_outline_for_entries(entries: &[OutlineEntry]) -> Option<Outline> {
   Some(outline)
 }
 
-fn pdf_outline_node(entries: &[OutlineEntry], index: &mut usize, level: u8) -> OutlineNode {
+fn pdf_outline_node(
+  entries: &[common::OutlineEntry<'static>],
+  index: &mut usize,
+  level: u8,
+) -> OutlineNode {
   let entry = &entries[*index];
   *index += 1;
   let mut node = OutlineNode::new(
-    entry.text.clone(),
-    XyzDestination::new(entry.page_index, Point::from_xy(entry.x_pt, entry.y_pt)),
+    entry.text.to_string(),
+    XyzDestination::new(
+      entry.page_index,
+      Point::from_xy(entry.target.x.0, entry.target.y.0),
+    ),
   );
   while *index < entries.len() && entries[*index].level > level {
     let child_level = entries[*index].level;
@@ -1329,27 +1741,6 @@ fn draw_paint_stroke_line(surface: &mut Surface<'_>, line: &PaintStrokeLine) {
   let mut path = PathBuilder::new();
   path.move_to(line.x1_pt, line.y1_pt);
   path.line_to(line.x2_pt, line.y2_pt);
-  if let Some(path) = path.finish() {
-    surface.draw_path(&path);
-  }
-}
-
-fn draw_fill_item(surface: &mut Surface<'_>, fill_item: &FillItem) {
-  surface.set_stroke(None);
-  surface.set_fill(Some(Fill {
-    paint: rgb::Color::new(fill_item.color.r, fill_item.color.g, fill_item.color.b).into(),
-    opacity: NormalizedF32::ONE,
-    rule: Default::default(),
-  }));
-  let mut path = PathBuilder::new();
-  path.move_to(fill_item.x_pt, fill_item.y_pt);
-  path.line_to(fill_item.x_pt + fill_item.width_pt, fill_item.y_pt);
-  path.line_to(
-    fill_item.x_pt + fill_item.width_pt,
-    fill_item.y_pt + fill_item.height_pt,
-  );
-  path.line_to(fill_item.x_pt, fill_item.y_pt + fill_item.height_pt);
-  path.close();
   if let Some(path) = path.finish() {
     surface.draw_path(&path);
   }

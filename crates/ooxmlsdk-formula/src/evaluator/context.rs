@@ -2061,11 +2061,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       &timeline,
       &values,
       samples_in_period,
-      data_completion != 0.0,
-      aggregation,
-      target_first,
-      kind,
-      self.book.date_system,
+      EtsCalculationOptions {
+        data_completion: data_completion != 0.0,
+        aggregation,
+        target: target_first,
+        kind,
+        date_system: self.book.date_system,
+      },
     ) {
       Ok(calc) => calc,
       Err(error) => return Some(FormulaValue::Error(ets_error_value(error))),
@@ -4812,9 +4814,7 @@ fn parse_permissive_excel_number(text: &str) -> Option<f64> {
     return None;
   }
   if text.contains(',') {
-    let mantissa_end = text
-      .find(|ch| matches!(ch, 'e' | 'E'))
-      .unwrap_or(text.len());
+    let mantissa_end = text.find(['e', 'E']).unwrap_or(text.len());
     let mantissa = &text[..mantissa_end];
     if mantissa.contains('.') && mantissa.find(',') > mantissa.find('.') {
       return None;

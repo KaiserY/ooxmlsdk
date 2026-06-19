@@ -1449,7 +1449,7 @@ fn evaluate_function_reader<'doc>(
       evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Log2)
     }
     FormulaFunctionId::Impower if args.len() == 2 => evaluate_complex_power_reader(evaluator, args),
-    FormulaFunctionId::Improduct if args.len() >= 1 => {
+    FormulaFunctionId::Improduct if !args.is_empty() => {
       evaluate_complex_aggregate_reader(evaluator, args, true)
     }
     FormulaFunctionId::Imreal if args.len() == 1 => {
@@ -1471,7 +1471,7 @@ fn evaluate_function_reader<'doc>(
       evaluate_complex_unary_reader(evaluator, args, ComplexUnaryKind::Sqrt)
     }
     FormulaFunctionId::Imsub if args.len() == 2 => evaluate_complex_sub_reader(evaluator, args),
-    FormulaFunctionId::Imsum if args.len() >= 1 => {
+    FormulaFunctionId::Imsum if !args.is_empty() => {
       evaluate_complex_aggregate_reader(evaluator, args, false)
     }
     FormulaFunctionId::Imtan if args.len() == 1 => {
@@ -1904,14 +1904,13 @@ fn evaluate_isblank_value<'doc>(
         return Some(FormulaValue::Boolean(false));
       }
     } else if let Some(value) = evaluator.implicit_intersection_value(reference) {
-      if let FormulaValue::Reference(intersection) = &value {
-        if evaluator
+      if let FormulaValue::Reference(intersection) = &value
+        && evaluator
           .book
           .formulas
           .contains_key(&(sheet, intersection.range.start))
-        {
-          return Some(FormulaValue::Boolean(false));
-        }
+      {
+        return Some(FormulaValue::Boolean(false));
       }
       return Some(FormulaValue::Boolean(matches!(
         evaluator.first_value(&value),
@@ -3908,22 +3907,22 @@ fn sparse_textjoin_reference_values<'doc>(
     .book
     .cells
     .iter()
-    .filter_map(|((cell_sheet, address), value)| {
-      (*cell_sheet == sheet
+    .filter(|((cell_sheet, address), _)| {
+      *cell_sheet == sheet
         && address.row >= start_row
         && address.row <= end_row
         && address.column >= start_column
-        && address.column <= end_column)
-        .then(|| {
-          (
-            *address,
-            if evaluator.book.is_query_empty_cell(sheet, *address) {
-              FormulaValue::Blank
-            } else {
-              value.clone()
-            },
-          )
-        })
+        && address.column <= end_column
+    })
+    .map(|((_, address), value)| {
+      (
+        *address,
+        if evaluator.book.is_query_empty_cell(sheet, *address) {
+          FormulaValue::Blank
+        } else {
+          value.clone()
+        },
+      )
     })
     .collect::<Vec<_>>();
   cells.sort_by_key(|(address, _)| (address.row, address.column));
@@ -4654,12 +4653,12 @@ fn evaluate_geomean_harmean_reader<'doc>(
   );
   if values.is_empty()
     || values.iter().any(|value| *value < 0.0)
-    || (!geometric || !calc_grammar) && values.iter().any(|value| *value == 0.0)
+    || (!geometric || !calc_grammar) && values.contains(&0.0)
   {
     return Some(FormulaValue::Error(FormulaErrorValue::Num));
   }
   if geometric {
-    if values.iter().any(|value| *value == 0.0) {
+    if values.contains(&0.0) {
       return Some(FormulaValue::Number(0.0));
     }
     Some(FormulaValue::Number(
@@ -4892,8 +4891,8 @@ fn evaluate_wrap_reader<'doc>(
     .unwrap_or(FormulaValue::Error(FormulaErrorValue::NA));
   let mut values = Vec::with_capacity(rows * columns);
   for column in 0..columns {
-    for row in 0..rows {
-      values.push(matrix[row][column].clone());
+    for row in matrix.iter().take(rows) {
+      values.push(row[column].clone());
     }
   }
   if values.is_empty() {
@@ -4945,24 +4944,36 @@ fn evaluate_unique_reader<'doc>(
     .is_some_and(|value| evaluator.truthy(&value));
   let unit_count = if by_column { columns } else { rows };
   let mut units = Vec::with_capacity(unit_count);
-  for index in 0..unit_count {
-    let key = if by_column {
-      (0..rows)
-        .map(|row| evaluator.text(&matrix[row][index]).to_lowercase())
+  if by_column {
+    for column in 0..unit_count {
+      let key = matrix
+        .iter()
+        .take(rows)
+        .map(|row| evaluator.text(&row[column]).to_lowercase())
         .collect::<Vec<_>>()
-        .join("\u{1}")
-    } else {
-      (0..columns)
-        .map(|column| evaluator.text(&matrix[index][column]).to_lowercase())
+        .join("\u{1}");
+      let count = units
+        .iter()
+        .filter(|(unit_key, _)| unit_key == &key)
+        .count()
+        + 1;
+      units.push((key, count));
+    }
+  } else {
+    for row in matrix.iter().take(unit_count) {
+      let key = row
+        .iter()
+        .take(columns)
+        .map(|value| evaluator.text(value).to_lowercase())
         .collect::<Vec<_>>()
-        .join("\u{1}")
-    };
-    let count = units
-      .iter()
-      .filter(|(unit_key, _)| unit_key == &key)
-      .count()
-      + 1;
-    units.push((key, count));
+        .join("\u{1}");
+      let count = units
+        .iter()
+        .filter(|(unit_key, _)| unit_key == &key)
+        .count()
+        + 1;
+      units.push((key, count));
+    }
   }
   let mut keep = Vec::new();
   for (index, (key, count)) in units.iter().enumerate() {
@@ -7055,7 +7066,7 @@ fn parse_getpivotdata_bracket_item(text: &str) -> Option<(String, &str)> {
     quoted = true;
     chars.next();
   }
-  while let Some((index, ch)) = chars.next() {
+  for (index, ch) in chars {
     if quoted {
       if ch == '\'' {
         let next_index = index + ch.len_utf8();
@@ -7651,13 +7662,13 @@ fn evaluate_transpose_reader<'doc>(
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
   }
   let mut result = vec![Vec::with_capacity(rows); columns];
-  for column in 0..columns {
+  for (column, output) in result.iter_mut().enumerate().take(columns) {
     for row in &matrix {
       let value = row
         .get(column)
         .cloned()
         .unwrap_or(FormulaValue::Error(FormulaErrorValue::NA));
-      result[column].push(if matches!(value, FormulaValue::Blank) {
+      output.push(if matches!(value, FormulaValue::Blank) {
         FormulaValue::Number(0.0)
       } else {
         value
@@ -9003,7 +9014,7 @@ fn evaluate_gamma_inv_reader<'doc>(
     let p = values[0];
     let alpha = values[1];
     let beta = values[2];
-    if alpha <= 0.0 || beta <= 0.0 || p < 0.0 || p >= 1.0 {
+    if alpha <= 0.0 || beta <= 0.0 || !(0.0..1.0).contains(&p) {
       return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
     }
     if p == 0.0 {
@@ -9722,10 +9733,7 @@ fn finance_number_arg<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
   index: usize,
 ) -> Option<f64> {
-  match scalar_number_arg_or_value(evaluator, args, index)? {
-    Ok(value) => Some(value),
-    Err(_) => None,
-  }
+  scalar_number_arg_or_value(evaluator, args, index)?.ok()
 }
 
 fn finance_i32_arg<'doc>(
@@ -11199,12 +11207,14 @@ fn regression_design_from_x(
   }
 }
 
+type RegressionDesignShape = (Vec<Vec<f64>>, (usize, usize));
+
 fn regression_new_design<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
   known_design: &[Vec<f64>],
   known_shape: RegressionKnownShape,
-) -> Option<(Vec<Vec<f64>>, (usize, usize))> {
+) -> Option<RegressionDesignShape> {
   if args.raw_arg(2).is_none() || args.is_missing(2) {
     let shape = match known_shape {
       RegressionKnownShape::Row => (1, known_design.len()),

@@ -778,9 +778,7 @@ fn finance_days_in_year(basis: i32) -> Option<i32> {
 fn finance_days360_us(start: i32, end: i32) -> Option<i32> {
   let (year1, month1, mut day1) = date_from_serial(start)?;
   let (mut year2, mut month2, mut day2) = date_from_serial(end)?;
-  if day1 == 31 {
-    day1 = 30;
-  } else if month1 == 2 && (day1 == 29 || (day1 == 28 && !is_leap_year(year1))) {
+  if day1 == 31 || month1 == 2 && (day1 == 29 || (day1 == 28 && !is_leap_year(year1))) {
     day1 = 30;
   }
   if day2 == 31 {

@@ -237,6 +237,15 @@ pub enum EtsError {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub struct EtsCalculationOptions {
+  pub data_completion: bool,
+  pub aggregation: i32,
+  pub target: Option<f64>,
+  pub kind: EtsKind,
+  pub date_system: DateSystem,
+}
+
+#[derive(Clone, Copy, Debug)]
 struct EtsDataPoint {
   x: f64,
   y: f64,
@@ -274,11 +283,7 @@ impl EtsCalculation {
     timeline: &[f64],
     values: &[f64],
     samples_in_period: usize,
-    data_completion: bool,
-    aggregation: i32,
-    target: Option<f64>,
-    kind: EtsKind,
-    date_system: DateSystem,
+    options: EtsCalculationOptions,
   ) -> Result<Self, EtsError> {
     let mut data = timeline
       .iter()
@@ -286,8 +291,8 @@ impl EtsCalculation {
       .map(|(x, y)| EtsDataPoint { x: *x, y: *y })
       .collect::<Vec<_>>();
     data.sort_by(|left, right| left.x.total_cmp(&right.x));
-    if let Some(target) = target {
-      let minimum_target = if matches!(kind, EtsKind::PiAdd | EtsKind::PiMult) {
+    if let Some(target) = options.target {
+      let minimum_target = if matches!(options.kind, EtsKind::PiAdd | EtsKind::PiMult) {
         data.last().map_or(0.0, |point| point.x)
       } else {
         data.first().map_or(0.0, |point| point.x)
@@ -297,10 +302,11 @@ impl EtsCalculation {
       }
     }
 
-    let month_interval_day = ets_month_interval_day(&data, date_system);
+    let month_interval_day = ets_month_interval_day(&data, options.date_system);
     if month_interval_day.is_some() {
       for point in &mut data {
-        point.x = ets_month_axis_value(point.x, month_interval_day, date_system).unwrap_or(point.x);
+        point.x =
+          ets_month_axis_value(point.x, month_interval_day, options.date_system).unwrap_or(point.x);
       }
     }
 
@@ -309,7 +315,7 @@ impl EtsCalculation {
     while index < data.len() {
       let mut step = data[index].x - data[index - 1].x;
       if step == 0.0 {
-        aggregate_duplicate_ets_points(&mut data, index, aggregation)?;
+        aggregate_duplicate_ets_points(&mut data, index, options.aggregation)?;
         if index < data.len() {
           step = data[index].x - data[index - 1].x;
         } else {
@@ -335,7 +341,7 @@ impl EtsCalculation {
       }
     }
     if has_gap {
-      fill_ets_gaps(&mut data, step_size, data_completion)?;
+      fill_ets_gaps(&mut data, step_size, options.data_completion)?;
     }
 
     let samples_in_period = if samples_in_period != 1 {
@@ -345,7 +351,7 @@ impl EtsCalculation {
     };
     let double_smoothing = samples_in_period == 0 || samples_in_period == 1;
     let additive = matches!(
-      kind,
+      options.kind,
       EtsKind::Add | EtsKind::PiAdd | EtsKind::Season | EtsKind::StatAdd
     );
     let mut calculation = Self {
@@ -364,7 +370,7 @@ impl EtsCalculation {
       rmse: 0.0,
       smape: 0.0,
       month_interval_day,
-      date_system,
+      date_system: options.date_system,
       additive,
       double_smoothing,
       initialized: false,
@@ -789,7 +795,7 @@ impl EtsCalculation {
 
   fn ets_prediction_interval(&self, target: f64, level: f64, size: usize) -> Result<f64, EtsError> {
     let last = self.data.len() - 1;
-    let mut predictions = vec![vec![0.0; Self::PI_SCENARIOS]; size];
+    let mut predictions = vec![Vec::with_capacity(Self::PI_SCENARIOS); size];
 
     for scenario in 0..Self::PI_SCENARIOS {
       let mut scenario_range = vec![0.0; size];
@@ -805,7 +811,7 @@ impl EtsCalculation {
           + first_period_index
           + self.pi_scenario_deviation(scenario, draw_index);
         draw_index += 1;
-        predictions[0][scenario] = scenario_range[0];
+        predictions[0].push(scenario_range[0]);
         scenario_base[0] = self.alpha * (scenario_range[0] - first_period_index)
           + (1.0 - self.alpha) * (self.base[last] + self.trend[last]);
         scenario_trend[0] =
@@ -824,7 +830,7 @@ impl EtsCalculation {
             + period_index
             + self.pi_scenario_deviation(scenario, draw_index);
           draw_index += 1;
-          predictions[index][scenario] = scenario_range[index];
+          predictions[index].push(scenario_range[index]);
           scenario_base[index] = self.alpha * (scenario_range[index] - period_index)
             + (1.0 - self.alpha) * (scenario_base[index - 1] + scenario_trend[index - 1]);
           scenario_trend[index] = self.gamma * (scenario_base[index] - scenario_base[index - 1])
@@ -837,7 +843,7 @@ impl EtsCalculation {
         scenario_range[0] = (self.base[last] + self.trend[last]) * first_period_index
           + self.pi_scenario_deviation(scenario, draw_index);
         draw_index += 1;
-        predictions[0][scenario] = scenario_range[0];
+        predictions[0].push(scenario_range[0]);
         scenario_base[0] = self.alpha * (scenario_range[0] / first_period_index)
           + (1.0 - self.alpha) * (self.base[last] + self.trend[last]);
         scenario_trend[0] =
@@ -855,7 +861,7 @@ impl EtsCalculation {
             * period_index
             + self.pi_scenario_deviation(scenario, draw_index);
           draw_index += 1;
-          predictions[index][scenario] = scenario_range[index];
+          predictions[index].push(scenario_range[index]);
           scenario_base[index] = self.alpha * (scenario_range[index] / period_index)
             + (1.0 - self.alpha) * (scenario_base[index - 1] + scenario_trend[index - 1]);
           scenario_trend[index] = self.gamma * (scenario_base[index] - scenario_base[index - 1])
@@ -1068,11 +1074,13 @@ mod tests {
       &timeline,
       &values,
       1,
-      true,
-      1,
-      Some(6.0),
-      EtsKind::Add,
-      DateSystem::Date1900,
+      EtsCalculationOptions {
+        data_completion: true,
+        aggregation: 1,
+        target: Some(6.0),
+        kind: EtsKind::Add,
+        date_system: DateSystem::Date1900,
+      },
     )
     .unwrap();
 
@@ -1095,11 +1103,13 @@ mod tests {
       &timeline,
       &values,
       4,
-      true,
-      1,
-      Some(38991.0),
-      EtsKind::Mult,
-      DateSystem::LibreOffice,
+      EtsCalculationOptions {
+        data_completion: true,
+        aggregation: 1,
+        target: Some(38991.0),
+        kind: EtsKind::Mult,
+        date_system: DateSystem::LibreOffice,
+      },
     )
     .unwrap();
 

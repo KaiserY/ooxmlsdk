@@ -24,7 +24,7 @@ use crate::calc::query::{
   regex_match, wildcard_match,
 };
 use crate::calc::regression::{
-  EtsCalculation, EtsError, EtsKind, RegressionScalarState,
+  EtsCalculation, EtsCalculationOptions, EtsError, EtsKind, RegressionScalarState,
   scalar_state as regression_scalar_state_from_slices,
 };
 use crate::calc::statistics::{

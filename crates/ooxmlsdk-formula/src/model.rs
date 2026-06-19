@@ -2262,8 +2262,8 @@ fn worksheet_value_model<'doc>(
   shared_strings: &[String],
   metadata: &WorkbookMetadata,
   styles: &WorkbookStyles,
-  workbook_identity: &WorkbookIdentity<'_>,
-  external_references: &[ExternalReference<'_>],
+  workbook_identity: &WorkbookIdentity<'doc>,
+  external_references: &[ExternalReference<'doc>],
 ) -> Result<WorksheetValueModel<'doc>> {
   let mut cells = BTreeMap::new();
   if let Some(worksheet) = worksheet {
@@ -2290,11 +2290,13 @@ fn worksheet_value_model<'doc>(
             identity.id,
             address,
             cell,
-            shared_strings,
-            metadata,
-            styles,
-            workbook_identity,
-            external_references,
+            CellValueRecordContext {
+              shared_strings,
+              metadata,
+              styles,
+              workbook_identity,
+              external_references,
+            },
           )?,
         );
       }
@@ -2416,23 +2418,27 @@ fn address_text(address: CellAddress) -> String {
   )
 }
 
+struct CellValueRecordContext<'a, 'doc> {
+  shared_strings: &'a [String],
+  metadata: &'a WorkbookMetadata,
+  styles: &'a WorkbookStyles,
+  workbook_identity: &'a WorkbookIdentity<'doc>,
+  external_references: &'a [ExternalReference<'doc>],
+}
+
 fn cell_value_record<'doc>(
   sheet: SheetId,
   address: CellAddress,
   cell: &'doc x::Cell,
-  shared_strings: &[String],
-  metadata: &WorkbookMetadata,
-  styles: &WorkbookStyles,
-  workbook_identity: &WorkbookIdentity<'_>,
-  external_references: &[ExternalReference<'_>],
+  context: CellValueRecordContext<'_, 'doc>,
 ) -> Result<CellValueRecord<'doc>> {
-  let mut raw_value = cell_value(cell, shared_strings);
-  if metadata.is_dynamic_array_spill(cell, &raw_value) {
+  let mut raw_value = cell_value(cell, context.shared_strings);
+  if context.metadata.is_dynamic_array_spill(cell, &raw_value) {
     raw_value = FormulaValue::Error(FormulaErrorValue::Spill);
   }
   let number_format_context = cell
     .style_index
-    .and_then(|index| styles.number_format_context(index))
+    .and_then(|index| context.styles.number_format_context(index))
     .or_else(|| {
       cell.style_index.map(|index| NumberFormatContext {
         format_id: Some(index),
@@ -2454,12 +2460,15 @@ fn cell_value_record<'doc>(
       .unwrap_or(Cow::Borrowed(""));
     let formula_text = normalize_imported_formula_text(
       raw_formula_text.clone(),
-      workbook_identity,
-      external_references,
+      context.workbook_identity,
+      context.external_references,
     );
     let parsed_formula_text = if raw_formula_text.as_ref().contains('[')
-      && normalize_external_formula_references(raw_formula_text.as_ref(), external_references)
-        .is_some()
+      && normalize_external_formula_references(
+        raw_formula_text.as_ref(),
+        context.external_references,
+      )
+      .is_some()
     {
       raw_formula_text.clone()
     } else {
@@ -2507,7 +2516,7 @@ fn cell_value_record<'doc>(
   });
   let display_text =
     display_text_from_value_with_number_format(&raw_value, number_format_context.as_ref())
-      .unwrap_or_else(|| cell_display_text(cell, shared_strings));
+      .unwrap_or_else(|| cell_display_text(cell, context.shared_strings));
   let display_value = Some(DisplayValue {
     text: Cow::Owned(display_text),
     source_value: raw_value.clone(),
@@ -2626,11 +2635,7 @@ fn split_external_formula_sheet(formula: &str) -> Option<(&str, &str)> {
 fn normalize_external_formula_target(target: &str) -> String {
   if let Some(path) = target.strip_prefix("file:///") {
     let path = path.trim_start_matches('\\').replace('\\', "/");
-    if path.starts_with('/') {
-      format!("file://{path}")
-    } else {
-      format!("file://{path}")
-    }
+    format!("file://{path}")
   } else {
     target.replace('\\', "/")
   }
@@ -2659,9 +2664,7 @@ struct FormulaTextSpan {
   end: usize,
 }
 
-fn quoted_sheet_range_reference<'a>(
-  formula: &'a str,
-) -> Option<(&'a str, &'a str, &'a str, FormulaTextSpan)> {
+fn quoted_sheet_range_reference(formula: &str) -> Option<(&str, &str, &str, FormulaTextSpan)> {
   let first_quote = formula.find('\'')?;
   let first_end = formula[first_quote + 1..].find('\'')? + first_quote + 1;
   let after_first = first_end + 1;

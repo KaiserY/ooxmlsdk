@@ -49,15 +49,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         None if matches!(op, FormulaOperator::UnaryPlus) => FormulaValue::Reference(reference),
         None => FormulaValue::Error(FormulaErrorValue::Value),
       },
-      FormulaValue::RefList(ranges) if ranges.len() == 1 => self
-        .implicit_intersection_value(&ranges[0])
-        .unwrap_or_else(|| {
-          if matches!(op, FormulaOperator::UnaryPlus) {
-            FormulaValue::RefList(ranges)
-          } else {
-            FormulaValue::Error(FormulaErrorValue::Value)
-          }
-        }),
+      FormulaValue::RefList(ranges) if ranges.len() == 1 => {
+        match self.implicit_intersection_value(&ranges[0]) {
+          Some(value) => value,
+          None if matches!(op, FormulaOperator::UnaryPlus) => FormulaValue::RefList(ranges),
+          None => FormulaValue::Error(FormulaErrorValue::Value),
+        }
+      }
       FormulaValue::RefList(_) => FormulaValue::Error(FormulaErrorValue::Value),
       value => value,
     };

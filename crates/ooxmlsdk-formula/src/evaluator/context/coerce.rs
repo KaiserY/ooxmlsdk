@@ -152,6 +152,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     display_text_from_value(&self.scalar_value(value.clone()))
   }
 
+  pub(crate) fn text_cow(&self, value: &FormulaValue<'doc>) -> Cow<'doc, str> {
+    match self.scalar_value(value.clone()) {
+      FormulaValue::String(value) => value,
+      value => Cow::Owned(display_text_from_value(&value)),
+    }
+  }
+
   pub(crate) fn truthy(&self, value: &FormulaValue<'doc>) -> bool {
     match self.first_value(value) {
       FormulaValue::Boolean(value) => value,

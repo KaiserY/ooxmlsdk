@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use num_complex::Complex;
-use regex::RegexBuilder;
 use statrs::distribution::{
   ContinuousCDF, Discrete, DiscreteCDF, Hypergeometric, LogNormal, Normal, StudentsT,
 };
@@ -297,6 +296,15 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::Regex if (2..=4).contains(&args.len()) => {
       evaluate_regex_reader(evaluator, args)
+    }
+    FormulaFunctionId::Regextest if (2..=3).contains(&args.len()) => {
+      evaluate_regextest_reader(evaluator, args)
+    }
+    FormulaFunctionId::Regexextract if (2..=4).contains(&args.len()) => {
+      evaluate_regexextract_reader(evaluator, args)
+    }
+    FormulaFunctionId::Regexreplace if (3..=5).contains(&args.len()) => {
+      evaluate_regexreplace_reader(evaluator, args)
     }
     FormulaFunctionId::Exact if args.len() == 2 => evaluate_exact_reader(evaluator, args),
     FormulaFunctionId::Find if (2..=3).contains(&args.len()) => {
@@ -3050,17 +3058,17 @@ fn evaluate_regex_reader<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
   let text_value = args.array_value(0)?;
-  let pattern = evaluator.text(&args.value(1)?);
+  let pattern = evaluator.text_cow(&args.value(1)?);
   let replacement = args
     .raw_arg(2)
     .filter(|_| !args.is_missing(2))
     .and_then(|_| args.value(2))
-    .map(|value| evaluator.text(&value));
+    .map(|value| evaluator.text_cow(&value));
   let (occurrence, global) = match regex_occurrence_flags(evaluator, args)? {
     Ok(value) => value,
     Err(error) => return Some(FormulaValue::Error(error)),
   };
-  let regex = match RegexBuilder::new(&pattern).build() {
+  let regex = match evaluator.engine.regex(pattern.as_ref(), false) {
     Ok(regex) => regex,
     Err(_) => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
   };
@@ -3068,9 +3076,10 @@ fn evaluate_regex_reader<'doc>(
     if let FormulaValue::Error(error) = value {
       return Some(FormulaValue::Error(*error));
     }
+    let text = evaluator.text_cow(value);
     Some(regex_apply(
       &regex,
-      &evaluator.text(value),
+      text.as_ref(),
       replacement.as_deref(),
       occurrence,
       global,
@@ -3145,6 +3154,305 @@ fn regex_apply<'doc>(
     }
   }
   FormulaValue::String(Cow::Owned(text.to_string()))
+}
+
+fn evaluate_regextest_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let text_value = args.array_value(0)?;
+  let pattern = evaluator.text_cow(&args.value(1)?);
+  let case_insensitive = match regex_case_insensitive_arg(evaluator, args, 2)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let regex = match evaluator.engine.regex(pattern.as_ref(), case_insensitive) {
+    Ok(regex) => regex,
+    Err(_) => return Some(FormulaValue::Error(FormulaErrorValue::Value)),
+  };
+  evaluator.map_unary_values(text_value, |evaluator, value| {
+    if let FormulaValue::Error(error) = value {
+      return Some(FormulaValue::Error(*error));
+    }
+    Some(FormulaValue::Boolean(
+      regex.is_match(evaluator.text_cow(value).as_ref()),
+    ))
+  })
+}
+
+fn evaluate_regexextract_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let text = evaluator.text_cow(&args.value(0)?);
+  let pattern = evaluator.text_cow(&args.value(1)?);
+  let return_mode = match regexextract_return_mode(evaluator, args)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let case_insensitive = match regex_case_insensitive_arg(evaluator, args, 3)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let regex = match evaluator.engine.regex(pattern.as_ref(), case_insensitive) {
+    Ok(regex) => regex,
+    Err(_) => return Some(FormulaValue::Error(FormulaErrorValue::Value)),
+  };
+  match return_mode {
+    0 => regexextract_first_match(&regex, text),
+    1 => regexextract_all_matches(&regex, text),
+    2 => regexextract_capture_groups(&regex, text),
+    _ => Some(FormulaValue::Error(FormulaErrorValue::Value)),
+  }
+}
+
+fn evaluate_regexreplace_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let text_value = args.array_value(0)?;
+  let pattern = evaluator.text_cow(&args.value(1)?);
+  let replacement = evaluator.text_cow(&args.value(2)?);
+  let occurrence = match regexreplace_occurrence(evaluator, args)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let case_insensitive = match regex_case_insensitive_arg(evaluator, args, 4)? {
+    Ok(value) => value,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let regex = match evaluator.engine.regex(pattern.as_ref(), case_insensitive) {
+    Ok(regex) => regex,
+    Err(_) => return Some(FormulaValue::Error(FormulaErrorValue::Value)),
+  };
+  evaluator.map_unary_values(text_value, |evaluator, value| {
+    if let FormulaValue::Error(error) = value {
+      return Some(FormulaValue::Error(*error));
+    }
+    Some(FormulaValue::String(regexreplace_text(
+      &regex,
+      evaluator.text_cow(value),
+      replacement.as_ref(),
+      occurrence,
+    )))
+  })
+}
+
+fn regexextract_return_mode<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<std::result::Result<i32, FormulaErrorValue>> {
+  let Some(_) = args.raw_arg(2).filter(|_| !args.is_missing(2)) else {
+    return Some(Ok(0));
+  };
+  let value = args.value(2)?;
+  if let FormulaValue::Error(error) = value {
+    return Some(Err(error));
+  }
+  evaluator
+    .number(&value)
+    .and_then(floor_to_i32)
+    .map(Ok)
+    .or(Some(Err(FormulaErrorValue::Value)))
+}
+
+fn regexreplace_occurrence<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<std::result::Result<i32, FormulaErrorValue>> {
+  let Some(_) = args.raw_arg(3).filter(|_| !args.is_missing(3)) else {
+    return Some(Ok(0));
+  };
+  let value = args.value(3)?;
+  if let FormulaValue::Error(error) = value {
+    return Some(Err(error));
+  }
+  evaluator
+    .number(&value)
+    .and_then(floor_to_i32)
+    .map(Ok)
+    .or(Some(Err(FormulaErrorValue::Value)))
+}
+
+fn regex_case_insensitive_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+) -> Option<std::result::Result<bool, FormulaErrorValue>> {
+  let Some(_) = args.raw_arg(index).filter(|_| !args.is_missing(index)) else {
+    return Some(Ok(false));
+  };
+  let value = args.value(index)?;
+  if let FormulaValue::Error(error) = value {
+    return Some(Err(error));
+  }
+  boolean_method_argument(evaluator, &value)
+    .map(Ok)
+    .or(Some(Err(FormulaErrorValue::Value)))
+}
+
+fn regexextract_first_match<'doc>(
+  regex: &regex::Regex,
+  text: Cow<'doc, str>,
+) -> Option<FormulaValue<'doc>> {
+  match text {
+    Cow::Borrowed(text) => regex
+      .find(text)
+      .map(|matched| FormulaValue::String(Cow::Borrowed(matched.as_str())))
+      .or(Some(FormulaValue::Error(FormulaErrorValue::NA))),
+    Cow::Owned(text) => regex
+      .find(&text)
+      .map(|matched| FormulaValue::String(Cow::Owned(matched.as_str().to_string())))
+      .or(Some(FormulaValue::Error(FormulaErrorValue::NA))),
+  }
+}
+
+fn regexextract_all_matches<'doc>(
+  regex: &regex::Regex,
+  text: Cow<'doc, str>,
+) -> Option<FormulaValue<'doc>> {
+  match text {
+    Cow::Borrowed(text) => {
+      let rows = regex
+        .find_iter(text)
+        .map(|matched| vec![FormulaValue::String(Cow::Borrowed(matched.as_str()))])
+        .collect::<Vec<_>>();
+      if rows.is_empty() {
+        Some(FormulaValue::Error(FormulaErrorValue::NA))
+      } else {
+        Some(FormulaValue::Matrix(rows))
+      }
+    }
+    Cow::Owned(text) => {
+      let rows = regex
+        .find_iter(&text)
+        .map(|matched| {
+          vec![FormulaValue::String(Cow::Owned(
+            matched.as_str().to_string(),
+          ))]
+        })
+        .collect::<Vec<_>>();
+      if rows.is_empty() {
+        Some(FormulaValue::Error(FormulaErrorValue::NA))
+      } else {
+        Some(FormulaValue::Matrix(rows))
+      }
+    }
+  }
+}
+
+fn regexextract_capture_groups<'doc>(
+  regex: &regex::Regex,
+  text: Cow<'doc, str>,
+) -> Option<FormulaValue<'doc>> {
+  match text {
+    Cow::Borrowed(text) => {
+      let Some(captures) = regex.captures(text) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::NA));
+      };
+      if captures.len() <= 1 {
+        return Some(FormulaValue::Error(FormulaErrorValue::NA));
+      }
+      Some(FormulaValue::Matrix(vec![
+        (1..captures.len())
+          .map(|index| {
+            captures
+              .get(index)
+              .map(|matched| FormulaValue::String(Cow::Borrowed(matched.as_str())))
+              .unwrap_or(FormulaValue::Blank)
+          })
+          .collect(),
+      ]))
+    }
+    Cow::Owned(text) => {
+      let Some(captures) = regex.captures(&text) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::NA));
+      };
+      if captures.len() <= 1 {
+        return Some(FormulaValue::Error(FormulaErrorValue::NA));
+      }
+      Some(FormulaValue::Matrix(vec![
+        (1..captures.len())
+          .map(|index| {
+            captures
+              .get(index)
+              .map(|matched| FormulaValue::String(Cow::Owned(matched.as_str().to_string())))
+              .unwrap_or(FormulaValue::Blank)
+          })
+          .collect(),
+      ]))
+    }
+  }
+}
+
+fn regexreplace_text<'doc>(
+  regex: &regex::Regex,
+  text: Cow<'doc, str>,
+  replacement: &str,
+  occurrence: i32,
+) -> Cow<'doc, str> {
+  let replacement = regex_replacement_for_rust(replacement);
+  let text_ref = text.as_ref();
+  if occurrence == 0 {
+    if !regex.is_match(text_ref) {
+      return text;
+    }
+    return Cow::Owned(
+      regex
+        .replace_all(text_ref, replacement.as_ref())
+        .into_owned(),
+    );
+  }
+  if occurrence > 0 {
+    let Some(matched) = regex.find_iter(text_ref).nth((occurrence - 1) as usize) else {
+      return text;
+    };
+    return regexreplace_one(text_ref, replacement.as_ref(), regex, matched);
+  }
+  let matches = regex.find_iter(text_ref).collect::<Vec<_>>();
+  let target = usize::try_from(occurrence.unsigned_abs())
+    .ok()
+    .filter(|from_end| *from_end <= matches.len())
+    .map(|from_end| matches.len() - from_end);
+  let Some(target) = target else {
+    return text;
+  };
+  regexreplace_one(text_ref, replacement.as_ref(), regex, matches[target])
+}
+
+fn regexreplace_one<'doc>(
+  text: &str,
+  replacement: &str,
+  regex: &regex::Regex,
+  matched: regex::Match<'_>,
+) -> Cow<'doc, str> {
+  let mut result = String::with_capacity(text.len() + replacement.len());
+  result.push_str(&text[..matched.start()]);
+  let segment = &text[matched.start()..matched.end()];
+  result.push_str(&regex.replace(segment, replacement));
+  result.push_str(&text[matched.end()..]);
+  Cow::Owned(result)
+}
+
+fn regex_replacement_for_rust(replacement: &str) -> Cow<'_, str> {
+  if !replacement
+    .as_bytes()
+    .windows(2)
+    .any(|window| window[0] == b'\\' && window[1].is_ascii_digit())
+  {
+    return Cow::Borrowed(replacement);
+  }
+  let mut result = String::with_capacity(replacement.len());
+  let mut chars = replacement.chars().peekable();
+  while let Some(ch) = chars.next() {
+    if ch == '\\' && chars.peek().is_some_and(|next| next.is_ascii_digit()) {
+      result.push('$');
+      result.push(chars.next().expect("peeked digit"));
+    } else {
+      result.push(ch);
+    }
+  }
+  Cow::Owned(result)
 }
 
 fn delimiter_texts<'doc>(

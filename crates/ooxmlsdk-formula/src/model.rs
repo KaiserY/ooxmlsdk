@@ -20,7 +20,7 @@ use crate::evaluator::{
   display_text_from_value_with_number_format, error_text, error_text_value, error_value,
   qualified_range, range_intersection_value, split_indirect_intersection,
 };
-use crate::program::FormulaProgram;
+use crate::program::{FormulaDiagnosticKind, FormulaProgram};
 use crate::source::{
   FormulaCompileContext, FormulaSource, FormulaSourceKind, FormulaSourcePosition,
 };
@@ -3374,7 +3374,6 @@ fn lower_formula_parser_formula<'doc>(
     source.as_ref(),
     borrowed_source,
     grammar,
-    body_start,
     text,
     borrowed_text,
     parsed.body_parse,
@@ -3420,15 +3419,15 @@ fn lower_formula_parser_body<'doc>(
   full_source: &str,
   borrowed_source: Option<&'doc str>,
   grammar: FormulaGrammar,
-  body_start: usize,
   text: &str,
   borrowed_text: Option<&'doc str>,
   parsed: crate::parser::FormulaBodyParse,
 ) -> LoweredFormula<'doc> {
+  let body_start = full_source.len().saturating_sub(text.len());
   let crate::parser::FormulaBodyParse {
-    lexed,
     tokens: parsed_tokens,
-    mut issues,
+    issues,
+    ..
   } = parsed;
   let mut tokens = Vec::with_capacity(parsed_tokens.len());
   let mut unsupported = Vec::new();
@@ -3498,28 +3497,31 @@ fn lower_formula_parser_body<'doc>(
     }
   }
 
-  let program = FormulaProgram::from_parser_parts(
-    FormulaSource {
-      text: full_source,
-      context: FormulaCompileContext {
-        grammar,
-        position: FormulaSourcePosition::Sheet(sheet),
-        kind: FormulaSourceKind::Cell,
-      },
+  let program_source = formula_program_compat_source(full_source, body_start, grammar);
+  let program_borrowed_source = if matches!(program_source, Cow::Borrowed(_)) {
+    borrowed_source
+  } else {
+    None
+  };
+  let program = FormulaProgram::from_source(FormulaSource {
+    text: program_source.as_ref(),
+    context: FormulaCompileContext {
+      grammar,
+      position: FormulaSourcePosition::Sheet(sheet),
+      kind: FormulaSourceKind::Cell,
     },
-    body_start,
-    text,
-    &lexed,
-    &mut issues,
-  );
+  });
+  let program_parse_error = program
+    .diagnostics
+    .iter()
+    .any(|diagnostic| matches!(diagnostic.kind, FormulaDiagnosticKind::ParseError));
   unsupported.extend(formula_parse_issues_to_unsupported(
     text,
     borrowed_text,
     issues.clone(),
   ));
-  let code = FormulaCode::from_program(sheet, borrowed_source, &program);
-  if code.is_none()
-    && program.root.is_some()
+  let code = FormulaCode::from_program(sheet, program_borrowed_source, &program);
+  if (program_parse_error || (code.is_none() && program.root.is_some()))
     && !unsupported
       .iter()
       .any(|issue| issue.reason.as_ref() == "formula expression is not fully parsed")
@@ -3554,18 +3556,115 @@ fn formula_parse_issues_to_unsupported<'doc>(
         feature: cow_span_text(text, borrowed_text, span),
         reason: Cow::Borrowed("unrecognized formula character"),
       },
-      crate::parser::FormulaParseIssue::MissingClosingParenthesis => UnsupportedFormulaFeature {
-        feature: Cow::Borrowed("parenthesized expression"),
-        reason: Cow::Borrowed("missing closing parenthesis"),
-      },
-      crate::parser::FormulaParseIssue::IncompleteExpression => UnsupportedFormulaFeature {
-        feature: borrowed_text
-          .map(Cow::Borrowed)
-          .unwrap_or_else(|| Cow::Owned(text.to_string())),
-        reason: Cow::Borrowed("formula expression is not fully parsed"),
-      },
     })
     .collect()
+}
+
+fn formula_program_compat_source(
+  source: &str,
+  body_start: usize,
+  grammar: FormulaGrammar,
+) -> Cow<'_, str> {
+  if grammar != FormulaGrammar::OpenFormula {
+    return Cow::Borrowed(source);
+  }
+  let Some(body) = source.get(body_start..) else {
+    return Cow::Borrowed(source);
+  };
+  let Cow::Owned(body) = rewrite_open_formula_embedded_intersection(body) else {
+    return Cow::Borrowed(source);
+  };
+  if body_start == 0 {
+    return Cow::Owned(body);
+  }
+  let mut output = String::with_capacity(body_start + body.len());
+  output.push_str(&source[..body_start]);
+  output.push_str(&body);
+  Cow::Owned(output)
+}
+
+fn rewrite_open_formula_embedded_intersection(body: &str) -> Cow<'_, str> {
+  let mut output = None::<String>;
+  let mut offset = 0usize;
+  let mut copied = 0usize;
+  while let Some(token) = crate::parser::lex_token_at(body, offset) {
+    if token.kind == crate::parser::LexTokenKind::Word {
+      let word = &body[token.start..token.end];
+      let mut word_copied = 0usize;
+      let mut quoted = false;
+      let mut chars = word.char_indices().peekable();
+      while let Some((index, ch)) = chars.next() {
+        match ch {
+          '\'' => {
+            if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
+              chars.next();
+            } else {
+              quoted = !quoted;
+            }
+          }
+          '!'
+            if !quoted
+              && word[..index].contains(':')
+              && !embedded_bang_belongs_to_range_endpoint_sheet_name(&word[..index]) =>
+          {
+            if output.is_none() {
+              let mut new_output = String::with_capacity(body.len() + 4);
+              new_output.push_str(&body[..token.start]);
+              output = Some(new_output);
+              copied = token.start;
+            }
+            let output = output.as_mut().expect("compat output was initialized");
+            if copied < token.start {
+              output.push_str(&body[copied..token.start]);
+            }
+            output.push_str(&word[word_copied..index]);
+            output.push_str(" ! ");
+            copied = token.end;
+            word_copied = index + '!'.len_utf8();
+          }
+          _ => {}
+        }
+      }
+      if let Some(output) = &mut output
+        && word_copied != 0
+      {
+        output.push_str(&word[word_copied..]);
+      }
+    }
+    offset = token.end;
+  }
+  match output {
+    Some(mut output) => {
+      output.push_str(&body[copied..]);
+      Cow::Owned(output)
+    }
+    None => Cow::Borrowed(body),
+  }
+}
+
+fn embedded_bang_belongs_to_range_endpoint_sheet_name(prefix: &str) -> bool {
+  let mut quoted = false;
+  let mut chars = prefix.char_indices().peekable();
+  let mut last_colon = None;
+  while let Some((index, ch)) = chars.next() {
+    match ch {
+      '\'' => {
+        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
+          chars.next();
+        } else {
+          quoted = !quoted;
+        }
+      }
+      ':' if !quoted => last_colon = Some(index),
+      _ => {}
+    }
+  }
+  let Some(colon) = last_colon else {
+    return false;
+  };
+  let endpoint_prefix = prefix[colon + ':'.len_utf8()..].trim();
+  !endpoint_prefix.is_empty()
+    && CellAddress::parse_a1(endpoint_prefix.trim_start_matches('$')).is_err()
 }
 
 fn formula_text_value<'doc>(

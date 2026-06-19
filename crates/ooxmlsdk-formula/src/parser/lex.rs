@@ -150,6 +150,12 @@ pub(crate) fn lex_tokens(source: &str) -> LexTokens<'_> {
   }
 }
 
+pub(crate) fn lex_token_at(source: &str, offset: usize) -> Option<LexToken> {
+  let mut input = source.get(offset..)?;
+  skip_whitespace(&mut input);
+  next_raw_token(source, &mut input)
+}
+
 pub(crate) struct FormulaCursor<'a> {
   source: &'a str,
   index: usize,

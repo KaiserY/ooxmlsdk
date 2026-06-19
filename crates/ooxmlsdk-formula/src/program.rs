@@ -1,7 +1,12 @@
+use std::cell::Cell;
 use std::fmt::Write as _;
 
 use bitflags::bitflags;
 use smallvec::SmallVec;
+use winnow::Parser;
+use winnow::combinator::{Infix, Postfix, Prefix, expression};
+use winnow::error::{ContextError, ParserError};
+use winnow::stream::{Needed, Offset, Stream, StreamIsPartial};
 
 use crate::source::{FormulaSource, FormulaSourcePosition};
 use crate::symbol::{FormulaSymbolId, FormulaSymbolPool};
@@ -418,6 +423,17 @@ pub struct FormulaProgramBuilder {
 }
 
 type FormulaArgBuffer = SmallVec<[FormulaExprId; 8]>;
+type ProgramParseResult<T> = winnow::Result<T, ContextError>;
+type ProgramPrefix<'p> = Prefix<ProgramSyntaxParser<'p>, FormulaExprId, ContextError>;
+type ProgramPostfix<'p> = Postfix<ProgramSyntaxParser<'p>, FormulaExprId, ContextError>;
+type ProgramInfix<'p> = Infix<ProgramSyntaxParser<'p>, FormulaExprId, ContextError>;
+type ProgramUnaryFold<'p> =
+  fn(&mut ProgramSyntaxParser<'p>, FormulaExprId) -> ProgramParseResult<FormulaExprId>;
+type ProgramBinaryFold<'p> = fn(
+  &mut ProgramSyntaxParser<'p>,
+  FormulaExprId,
+  FormulaExprId,
+) -> ProgramParseResult<FormulaExprId>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct FormulaProgramCheckpoint {
@@ -433,36 +449,10 @@ impl FormulaProgram {
   }
 
   pub fn from_source(source: FormulaSource<'_>) -> Self {
-    let parsed = parser::FormulaParser::new(source.text).parse();
-    let mut builder = FormulaProgramBuilder::with_capacity(parsed.body_parse.tokens.len());
-    let mut issues = parsed.body_parse.issues;
-    let root = parse_program_root_from_tokens(
-      &mut builder,
-      source,
-      parsed.body_start,
-      parsed.body,
-      &parsed.body_parse.lexed,
-      &mut issues,
-    );
-    for issue in issues {
-      builder.diagnostic(None, diagnostic_from_parse_issue(issue));
-    }
-    builder.finish_root(root)
-  }
-
-  pub(crate) fn from_parser_parts(
-    source: FormulaSource<'_>,
-    body_start: usize,
-    body: &str,
-    lexed: &[parser::LexToken],
-    issues: &mut Vec<parser::FormulaParseIssue>,
-  ) -> Self {
-    let mut builder = FormulaProgramBuilder::with_capacity(lexed.len());
-    let root =
-      parse_program_root_from_tokens(&mut builder, source, body_start, body, lexed, issues);
-    for issue in issues {
-      builder.diagnostic(None, diagnostic_from_parse_issue(*issue));
-    }
+    let body_start = parser::formula_body_start(source.text);
+    let body = source.text.get(body_start..).unwrap_or(source.text);
+    let mut builder = FormulaProgramBuilder::with_capacity(program_node_capacity_hint(body));
+    let root = parse_program_root(&mut builder, source, body_start, body);
     builder.finish_root(root)
   }
 
@@ -1101,57 +1091,55 @@ impl FormulaPrinter<'_> {
   }
 }
 
-fn parse_program_root_from_tokens(
+fn parse_program_root(
   builder: &mut FormulaProgramBuilder,
   source: FormulaSource<'_>,
   body_start: usize,
   body: &str,
-  tokens: &[parser::LexToken],
-  issues: &mut Vec<parser::FormulaParseIssue>,
 ) -> Option<FormulaExprId> {
-  let mut parser = ProgramSyntaxParser::new(builder, source, body_start, body, tokens);
+  let mut parser = ProgramSyntaxParser::new(builder, source, body_start, body);
   let root = parser.parse_expression();
-  if parser
-    .issues
-    .contains(&ProgramSyntaxIssue::MissingClosingParenthesis)
-  {
-    issues.push(parser::FormulaParseIssue::MissingClosingParenthesis);
+  if parser.missing_closing_parenthesis {
+    parser
+      .builder
+      .diagnostic(None, FormulaDiagnosticKind::ParseError);
   }
+  parser.diagnose_current_unsupported_token();
   if root.is_none() || !parser.tokens.is_end() {
-    issues.push(parser::FormulaParseIssue::IncompleteExpression);
+    parser
+      .builder
+      .diagnostic(None, FormulaDiagnosticKind::ParseError);
   }
   root
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ProgramSyntaxIssue {
-  MissingClosingParenthesis,
+fn program_node_capacity_hint(body: &str) -> usize {
+  (body.len() / 4).clamp(4, 64)
 }
 
-struct ProgramSyntaxParser<'a, 'b> {
-  builder: &'a mut FormulaProgramBuilder,
-  source: FormulaSource<'b>,
+struct ProgramSyntaxParser<'p> {
+  builder: &'p mut FormulaProgramBuilder,
+  source: FormulaSource<'p>,
   body_start: usize,
-  body: &'b str,
-  tokens: ProgramSyntaxTokens<'b>,
-  issues: Vec<ProgramSyntaxIssue>,
+  body: &'p str,
+  tokens: ProgramSyntaxTokens<'p>,
+  missing_closing_parenthesis: bool,
 }
 
-impl<'a, 'b> ProgramSyntaxParser<'a, 'b> {
+impl<'p> ProgramSyntaxParser<'p> {
   fn new(
-    builder: &'a mut FormulaProgramBuilder,
-    source: FormulaSource<'b>,
+    builder: &'p mut FormulaProgramBuilder,
+    source: FormulaSource<'p>,
     body_start: usize,
-    body: &'b str,
-    tokens: &'b [parser::LexToken],
+    body: &'p str,
   ) -> Self {
     Self {
       builder,
       source,
       body_start,
       body,
-      tokens: ProgramSyntaxTokens::new(body, tokens),
-      issues: Vec::new(),
+      tokens: ProgramSyntaxTokens::new(body),
+      missing_closing_parenthesis: false,
     }
   }
 
@@ -1160,68 +1148,25 @@ impl<'a, 'b> ProgramSyntaxParser<'a, 'b> {
   }
 
   fn parse_expression_bp(&mut self, min_bp: u8) -> Option<FormulaExprId> {
-    let mut left = self.parse_prefix()?;
+    let mut left = self.parse_winnow_expression(min_bp)?;
     loop {
       let had_ws = self.tokens.ws_before_next();
-
-      let start = self.tokens.position();
-      if let Some(function) = self.tokens.consume_logical_function_call() {
-        let left_bp = logical_binding_power();
-        if left_bp < min_bp {
-          self.tokens.set_position(start);
-          break;
-        }
-        let args = self.parse_argument_list(Some(left))?;
-        let name = self.builder.intern(function.name());
-        left = self.builder.push_value(FormulaNodeKind::Function {
-          name: FormulaFunctionName::Unknown(name),
-          args,
-        });
-        continue;
-      }
-
-      if let Some(token) = self.tokens.peek()
-        && let parser::LexTokenKind::Operator(op) = token.kind
-      {
-        if let Some(left_bp) = postfix_binding_power(op) {
-          if left_bp < min_bp {
-            break;
-          }
-          self.tokens.advance();
-          left = self.builder.unary(unary_operator_from_lex(op)?, left);
-          continue;
-        }
-
-        if let Some((left_bp, right_bp)) = infix_binding_power(op) {
-          if left_bp < min_bp {
-            break;
-          }
-          self.tokens.advance();
-          let right = self.parse_expression_bp(right_bp)?;
-          left = self
-            .builder
-            .binary(crate::code::formula_operator_from_lex(op), left, right);
-          continue;
-        }
-      }
 
       if had_ws && is_intersection_rhs_start(self.tokens.peek()) {
         let (left_bp, right_bp) = infix_binding_power(parser::LexOperator::Intersection)?;
         if left_bp < min_bp {
           break;
         }
-        let before_rhs = self.tokens.position();
+        let before_rhs = self.tokens.checkpoint();
         let checkpoint = self.builder.checkpoint();
         if let Some(right) = self.parse_expression_bp(right_bp) {
-          left = self.builder.binary(
-            crate::code::formula_operator_from_lex(parser::LexOperator::Intersection),
-            left,
-            right,
-          );
+          left = self
+            .builder
+            .binary(FormulaOperator::Intersection, left, right);
           continue;
         }
         self.builder.rollback(checkpoint);
-        self.tokens.set_position(before_rhs);
+        self.tokens.reset(&before_rhs);
       }
 
       break;
@@ -1229,11 +1174,17 @@ impl<'a, 'b> ProgramSyntaxParser<'a, 'b> {
     Some(left)
   }
 
-  fn parse_prefix(&mut self) -> Option<FormulaExprId> {
-    if let Some(op) = self.tokens.consume_operator_where(prefix_operator) {
-      let expr = self.parse_expression_bp(prefix_binding_power())?;
-      return Some(self.builder.unary(unary_operator_from_lex(op)?, expr));
-    }
+  fn parse_winnow_expression(&mut self, min_bp: u8) -> Option<FormulaExprId> {
+    expression(parse_program_operand)
+      .prefix(parse_program_prefix)
+      .postfix(parse_program_postfix)
+      .infix(parse_program_infix)
+      .current_precedence_level(i64::from(min_bp))
+      .parse_next(self)
+      .ok()
+  }
+
+  fn parse_operand(&mut self) -> Option<FormulaExprId> {
     if self
       .tokens
       .consume_token_kind(parser::LexTokenKind::ParenOpen)
@@ -1245,9 +1196,7 @@ impl<'a, 'b> ProgramSyntaxParser<'a, 'b> {
         .consume_token_kind(parser::LexTokenKind::ParenClose)
         .is_none()
       {
-        self
-          .issues
-          .push(ProgramSyntaxIssue::MissingClosingParenthesis);
+        self.missing_closing_parenthesis = true;
       }
       return Some(expr);
     }
@@ -1289,11 +1238,7 @@ impl<'a, 'b> ProgramSyntaxParser<'a, 'b> {
       .is_some()
     {
       let right = self.parse_expression_bp(infix_binding_power(parser::LexOperator::Union)?.1)?;
-      left = self.builder.binary(
-        crate::code::formula_operator_from_lex(parser::LexOperator::Union),
-        left,
-        right,
-      );
+      left = self.builder.binary(FormulaOperator::Union, left, right);
     }
     Some(left)
   }
@@ -1392,11 +1337,6 @@ impl<'a, 'b> ProgramSyntaxParser<'a, 'b> {
     let token = self.tokens.peek()?;
     if token.kind != parser::LexTokenKind::Word {
       return None;
-    }
-    if let Some(split) = split_word_before_intersection(self.body, token) {
-      self.tokens.advance_split_word(split.end);
-      let word = self.body.get(split.start..split.end)?;
-      return self.push_word(split, parser::semantic_word_kind(word));
     }
     let name = token_span(token);
     self.tokens.advance();
@@ -1514,76 +1454,479 @@ impl<'a, 'b> ProgramSyntaxParser<'a, 'b> {
   ) -> Option<FormulaExprId> {
     lower_parser_word(self.builder, self.source, self.body_start, span, kind)
   }
+
+  fn diagnose_current_unsupported_token(&mut self) {
+    let Some(token) = self.tokens.peek() else {
+      return;
+    };
+    if token.kind == parser::LexTokenKind::Unsupported {
+      self.builder.diagnostic(
+        Some(source_span(self.body_start, token_span(token))),
+        FormulaDiagnosticKind::Unsupported(FormulaUnsupportedKind::Token),
+      );
+    }
+  }
 }
 
-enum ProgramSyntaxTokenInput<'a> {
-  Borrowed(&'a [parser::LexToken]),
-  Owned(Vec<parser::LexToken>),
+fn parse_program_operand<'p>(
+  input: &mut ProgramSyntaxParser<'p>,
+) -> ProgramParseResult<FormulaExprId> {
+  input.parse_operand().ok_or_else(|| program_error(input))
 }
 
-struct ProgramSyntaxTokens<'a> {
-  source: &'a str,
-  tokens: ProgramSyntaxTokenInput<'a>,
-  index: usize,
+fn parse_program_prefix<'p>(
+  input: &mut ProgramSyntaxParser<'p>,
+) -> ProgramParseResult<ProgramPrefix<'p>> {
+  let Some(token) = input.tokens.peek() else {
+    return program_fail(input);
+  };
+  let parser::LexTokenKind::Operator(operator) = token.kind else {
+    return program_fail(input);
+  };
+  let fold: ProgramUnaryFold<'p> = match operator {
+    parser::LexOperator::Add => fold_prefix_plus as ProgramUnaryFold<'p>,
+    parser::LexOperator::Subtract => fold_prefix_minus as ProgramUnaryFold<'p>,
+    parser::LexOperator::ImplicitIntersection => {
+      fold_prefix_implicit_intersection as ProgramUnaryFold<'p>
+    }
+    _ => return program_fail(input),
+  };
+  input.tokens.advance();
+  Ok(Prefix(i64::from(prefix_binding_power()), fold))
 }
 
-impl<'a> ProgramSyntaxTokens<'a> {
-  fn new(source: &'a str, tokens: &'a [parser::LexToken]) -> Self {
+fn parse_program_postfix<'p>(
+  input: &mut ProgramSyntaxParser<'p>,
+) -> ProgramParseResult<ProgramPostfix<'p>> {
+  if let Some(token) = input.tokens.peek()
+    && token.kind == parser::LexTokenKind::Operator(parser::LexOperator::Percent)
+  {
+    input.tokens.advance();
+    return Ok(Postfix(
+      i64::from(percent_postfix_binding_power()),
+      fold_postfix_percent,
+    ));
+  }
+
+  let Some(function) = input.tokens.consume_logical_function_call() else {
+    return program_fail(input);
+  };
+  let fold: ProgramUnaryFold<'p> = match function {
+    parser::LexLogicalFunction::And => fold_postfix_logical_and as ProgramUnaryFold<'p>,
+    parser::LexLogicalFunction::Or => fold_postfix_logical_or as ProgramUnaryFold<'p>,
+    parser::LexLogicalFunction::Not => fold_postfix_logical_not as ProgramUnaryFold<'p>,
+  };
+  Ok(Postfix(i64::from(logical_binding_power()), fold))
+}
+
+fn parse_program_infix<'p>(
+  input: &mut ProgramSyntaxParser<'p>,
+) -> ProgramParseResult<ProgramInfix<'p>> {
+  let Some(token) = input.tokens.peek() else {
+    return program_fail(input);
+  };
+  let parser::LexTokenKind::Operator(operator) = token.kind else {
+    return program_fail(input);
+  };
+  let (left_bp, right_associative, fold): (u8, bool, ProgramBinaryFold<'p>) = match operator {
+    parser::LexOperator::Equal => (2, false, fold_infix_equal),
+    parser::LexOperator::NotEqual => (2, false, fold_infix_not_equal),
+    parser::LexOperator::Less => (2, false, fold_infix_less),
+    parser::LexOperator::LessOrEqual => (2, false, fold_infix_less_or_equal),
+    parser::LexOperator::Greater => (2, false, fold_infix_greater),
+    parser::LexOperator::GreaterOrEqual => (2, false, fold_infix_greater_or_equal),
+    parser::LexOperator::Union => (4, false, fold_infix_union),
+    parser::LexOperator::Intersection => (6, false, fold_infix_intersection),
+    parser::LexOperator::Range => (8, false, fold_infix_range),
+    parser::LexOperator::Concat => (10, false, fold_infix_concat),
+    parser::LexOperator::Add => (12, false, fold_infix_add),
+    parser::LexOperator::Subtract => (12, false, fold_infix_subtract),
+    parser::LexOperator::Multiply => (14, false, fold_infix_multiply),
+    parser::LexOperator::Divide => (14, false, fold_infix_divide),
+    parser::LexOperator::Power => (16, true, fold_infix_power),
+    parser::LexOperator::ImplicitIntersection | parser::LexOperator::Percent => {
+      return program_fail(input);
+    }
+  };
+  input.tokens.advance();
+  if right_associative {
+    Ok(Infix::Right(i64::from(left_bp), fold))
+  } else {
+    Ok(Infix::Left(i64::from(left_bp), fold))
+  }
+}
+
+fn program_fail<T>(input: &ProgramSyntaxParser<'_>) -> ProgramParseResult<T> {
+  Err(program_error(input))
+}
+
+fn program_error(input: &ProgramSyntaxParser<'_>) -> ContextError {
+  ContextError::from_input(input)
+}
+
+fn fold_prefix_plus(
+  input: &mut ProgramSyntaxParser<'_>,
+  expr: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.unary(FormulaOperator::UnaryPlus, expr))
+}
+
+fn fold_prefix_minus(
+  input: &mut ProgramSyntaxParser<'_>,
+  expr: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.unary(FormulaOperator::UnaryMinus, expr))
+}
+
+fn fold_prefix_implicit_intersection(
+  input: &mut ProgramSyntaxParser<'_>,
+  expr: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(
+    input
+      .builder
+      .unary(FormulaOperator::ImplicitIntersection, expr),
+  )
+}
+
+fn fold_postfix_percent(
+  input: &mut ProgramSyntaxParser<'_>,
+  expr: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.unary(FormulaOperator::Percent, expr))
+}
+
+fn fold_postfix_logical_and(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  fold_postfix_logical(input, left, parser::LexLogicalFunction::And)
+}
+
+fn fold_postfix_logical_or(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  fold_postfix_logical(input, left, parser::LexLogicalFunction::Or)
+}
+
+fn fold_postfix_logical_not(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  fold_postfix_logical(input, left, parser::LexLogicalFunction::Not)
+}
+
+fn fold_postfix_logical(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  function: parser::LexLogicalFunction,
+) -> ProgramParseResult<FormulaExprId> {
+  let Some(args) = input.parse_argument_list(Some(left)) else {
+    return program_fail(input);
+  };
+  let name = input.builder.intern(function.name());
+  Ok(input.builder.push_value(FormulaNodeKind::Function {
+    name: FormulaFunctionName::Unknown(name),
+    args,
+  }))
+}
+
+fn fold_infix_equal(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::Equal, left, right))
+}
+
+fn fold_infix_not_equal(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::NotEqual, left, right))
+}
+
+fn fold_infix_less(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::Less, left, right))
+}
+
+fn fold_infix_less_or_equal(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(
+    input
+      .builder
+      .binary(FormulaOperator::LessOrEqual, left, right),
+  )
+}
+
+fn fold_infix_greater(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::Greater, left, right))
+}
+
+fn fold_infix_greater_or_equal(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(
+    input
+      .builder
+      .binary(FormulaOperator::GreaterOrEqual, left, right),
+  )
+}
+
+fn fold_infix_union(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::Union, left, right))
+}
+
+fn fold_infix_intersection(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(
+    input
+      .builder
+      .binary(FormulaOperator::Intersection, left, right),
+  )
+}
+
+fn fold_infix_range(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::Range, left, right))
+}
+
+fn fold_infix_concat(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::Concat, left, right))
+}
+
+fn fold_infix_add(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::Add, left, right))
+}
+
+fn fold_infix_subtract(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::Subtract, left, right))
+}
+
+fn fold_infix_multiply(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::Multiply, left, right))
+}
+
+fn fold_infix_divide(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::Divide, left, right))
+}
+
+fn fold_infix_power(
+  input: &mut ProgramSyntaxParser<'_>,
+  left: FormulaExprId,
+  right: FormulaExprId,
+) -> ProgramParseResult<FormulaExprId> {
+  Ok(input.builder.binary(FormulaOperator::Power, left, right))
+}
+
+#[derive(Clone, Debug)]
+struct ProgramSyntaxCheckpoint {
+  offset: usize,
+  previous_end: usize,
+  peeked: Option<parser::LexToken>,
+}
+
+impl Offset for ProgramSyntaxCheckpoint {
+  fn offset_from(&self, start: &Self) -> usize {
+    self.offset.saturating_sub(start.offset)
+  }
+}
+
+impl Offset<ProgramSyntaxCheckpoint> for ProgramSyntaxParser<'_> {
+  fn offset_from(&self, start: &ProgramSyntaxCheckpoint) -> usize {
+    self.tokens.position().saturating_sub(start.offset)
+  }
+}
+
+impl std::fmt::Debug for ProgramSyntaxParser<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("ProgramSyntaxParser")
+      .field("index", &self.tokens.position())
+      .field("remaining", &self.tokens.eof_offset())
+      .finish()
+  }
+}
+
+impl<'p> Stream for ProgramSyntaxParser<'p> {
+  type Token = parser::LexToken;
+  type Slice = &'p str;
+  type IterOffsets = ProgramSyntaxTokenOffsets<'p>;
+  type Checkpoint = ProgramSyntaxCheckpoint;
+
+  fn iter_offsets(&self) -> Self::IterOffsets {
+    self.tokens.iter_offsets()
+  }
+
+  fn eof_offset(&self) -> usize {
+    self.tokens.eof_offset()
+  }
+
+  fn next_token(&mut self) -> Option<Self::Token> {
+    self.tokens.advance()
+  }
+
+  fn peek_token(&self) -> Option<Self::Token> {
+    self.tokens.peek()
+  }
+
+  fn offset_for<P>(&self, predicate: P) -> Option<usize>
+  where
+    P: Fn(Self::Token) -> bool,
+  {
+    self
+      .tokens
+      .iter_offsets()
+      .find_map(|(offset, token)| predicate(token).then_some(offset))
+  }
+
+  fn offset_at(&self, tokens: usize) -> Result<usize, Needed> {
+    self
+      .tokens
+      .offset_after_tokens(tokens)
+      .map(|offset| offset.saturating_sub(self.tokens.position()))
+      .ok_or_else(|| Needed::new(tokens))
+  }
+
+  fn next_slice(&mut self, offset: usize) -> Self::Slice {
+    self.tokens.next_slice(offset)
+  }
+
+  fn peek_slice(&self, offset: usize) -> Self::Slice {
+    self.tokens.peek_slice(offset)
+  }
+
+  fn checkpoint(&self) -> Self::Checkpoint {
+    self.tokens.checkpoint()
+  }
+
+  fn reset(&mut self, checkpoint: &Self::Checkpoint) {
+    self.tokens.reset(checkpoint);
+  }
+
+  fn trace(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "ProgramSyntaxParser(index={}, remaining={})",
+      self.tokens.position(),
+      self.tokens.eof_offset()
+    )
+  }
+}
+
+impl StreamIsPartial for ProgramSyntaxParser<'_> {
+  type PartialState = ();
+
+  fn complete(&mut self) -> Self::PartialState {}
+
+  fn restore_partial(&mut self, _state: Self::PartialState) {}
+
+  fn is_partial_supported() -> bool {
+    false
+  }
+}
+
+struct ProgramSyntaxTokens<'p> {
+  source: &'p str,
+  offset: usize,
+  previous_end: usize,
+  peeked: Cell<Option<parser::LexToken>>,
+}
+
+impl<'p> ProgramSyntaxTokens<'p> {
+  fn new(source: &'p str) -> Self {
     Self {
       source,
-      tokens: ProgramSyntaxTokenInput::Borrowed(tokens),
-      index: 0,
+      offset: 0,
+      previous_end: 0,
+      peeked: Cell::new(None),
     }
   }
 
-  fn tokens_from(source: &str, offset: usize) -> Vec<parser::LexToken> {
-    parser::lex_tokens(source.get(offset..).unwrap_or_default())
-      .map(|token| parser::LexToken {
-        kind: token.kind,
-        start: token.start + offset,
-        end: token.end + offset,
-      })
-      .collect()
+  fn is_end(&self) -> bool {
+    self.peek().is_none()
   }
 
-  fn is_end(&self) -> bool {
-    self.index >= self.len()
+  fn eof_offset(&self) -> usize {
+    self
+      .peek()
+      .map(|token| self.source.len().saturating_sub(token.start))
+      .unwrap_or_default()
   }
 
   fn position(&self) -> usize {
-    self.index
-  }
-
-  fn set_position(&mut self, index: usize) {
-    self.index = index.min(self.len());
+    self.offset
   }
 
   fn peek(&self) -> Option<parser::LexToken> {
-    self.token_at(self.index)
+    if let Some(token) = self.peeked.get() {
+      return Some(token);
+    }
+    let token = parser::lex_token_at(self.source, self.offset);
+    self.peeked.set(token);
+    token
   }
 
   fn advance(&mut self) -> Option<parser::LexToken> {
     let token = self.peek()?;
-    self.index += 1;
+    self.offset = token.end;
+    self.previous_end = token.end;
+    self.peeked.set(None);
     Some(token)
   }
 
   fn ws_before_next(&self) -> bool {
-    let token = match self.token_at(self.index) {
+    let token = match self.peek() {
       Some(token) => token,
       None => return false,
     };
-    let previous_end = if self.index == 0 {
-      0
-    } else {
-      self
-        .token_at(self.index - 1)
-        .map(|token| token.end)
-        .unwrap_or_default()
-    };
     self
       .source
-      .get(previous_end..token.start)
+      .get(self.previous_end..token.start)
       .is_some_and(|text| !text.is_empty())
   }
 
@@ -1595,21 +1938,6 @@ impl<'a> ProgramSyntaxTokens<'a> {
     self.advance()
   }
 
-  fn consume_operator_where(
-    &mut self,
-    predicate: impl FnOnce(parser::LexOperator) -> bool,
-  ) -> Option<parser::LexOperator> {
-    let token = self.peek()?;
-    let parser::LexTokenKind::Operator(operator) = token.kind else {
-      return None;
-    };
-    if !predicate(operator) {
-      return None;
-    }
-    self.advance();
-    Some(operator)
-  }
-
   fn consume_logical_function_call(&mut self) -> Option<parser::LexLogicalFunction> {
     let token = self.peek()?;
     if token.kind != parser::LexTokenKind::Word {
@@ -1617,7 +1945,7 @@ impl<'a> ProgramSyntaxTokens<'a> {
     }
     let word = self.source.get(token.start..token.end)?;
     let function = logical_function_name(word)?;
-    let next = self.token_at(self.index + 1)?;
+    let next = self.token_after(token.end)?;
     if next.kind != parser::LexTokenKind::ParenOpen {
       return None;
     }
@@ -1625,42 +1953,75 @@ impl<'a> ProgramSyntaxTokens<'a> {
     Some(function)
   }
 
-  fn advance_split_word(&mut self, end: usize) {
-    if self.token_at(self.index).is_none() {
-      return;
-    }
-    self.materialize();
-    let tail = Self::tokens_from(self.source, end);
-    let ProgramSyntaxTokenInput::Owned(tokens) = &mut self.tokens else {
-      return;
-    };
-    tokens[self.index].end = end;
-    self.index += 1;
-    tokens.splice(self.index.., tail);
+  fn token_after(&self, offset: usize) -> Option<parser::LexToken> {
+    parser::lex_token_at(self.source, offset)
   }
 
-  fn len(&self) -> usize {
-    match &self.tokens {
-      ProgramSyntaxTokenInput::Borrowed(tokens) => tokens.len(),
-      ProgramSyntaxTokenInput::Owned(tokens) => tokens.len(),
+  fn checkpoint(&self) -> ProgramSyntaxCheckpoint {
+    ProgramSyntaxCheckpoint {
+      offset: self.offset,
+      previous_end: self.previous_end,
+      peeked: self.peeked.get(),
     }
   }
 
-  fn token_at(&self, index: usize) -> Option<parser::LexToken> {
-    match &self.tokens {
-      ProgramSyntaxTokenInput::Borrowed(tokens) => tokens.get(index).copied(),
-      ProgramSyntaxTokenInput::Owned(tokens) => tokens.get(index).copied(),
+  fn reset(&mut self, checkpoint: &ProgramSyntaxCheckpoint) {
+    self.offset = checkpoint.offset.min(self.source.len());
+    self.previous_end = checkpoint.previous_end.min(self.source.len());
+    self.peeked.set(checkpoint.peeked);
+  }
+
+  fn iter_offsets(&self) -> ProgramSyntaxTokenOffsets<'p> {
+    ProgramSyntaxTokenOffsets {
+      source: self.source,
+      offset: self.offset,
+      token_offset: 0,
     }
   }
 
-  fn materialize(&mut self) {
-    let owned = match &self.tokens {
-      ProgramSyntaxTokenInput::Borrowed(tokens) => Some(tokens.to_vec()),
-      ProgramSyntaxTokenInput::Owned(_) => None,
-    };
-    if let Some(tokens) = owned {
-      self.tokens = ProgramSyntaxTokenInput::Owned(tokens);
+  fn offset_after_tokens(&self, tokens: usize) -> Option<usize> {
+    let mut offset = self.offset;
+    for _ in 0..tokens {
+      offset = parser::lex_token_at(self.source, offset)?.end;
     }
+    Some(offset)
+  }
+
+  fn next_slice(&mut self, tokens: usize) -> &'p str {
+    let start = self.offset;
+    let end = self
+      .offset_after_tokens(tokens)
+      .unwrap_or(self.source.len());
+    self.offset = end;
+    self.previous_end = end;
+    self.peeked.set(None);
+    self.source.get(start..end).unwrap_or_default()
+  }
+
+  fn peek_slice(&self, tokens: usize) -> &'p str {
+    let start = self.offset;
+    let end = self
+      .offset_after_tokens(tokens)
+      .unwrap_or(self.source.len());
+    self.source.get(start..end).unwrap_or_default()
+  }
+}
+
+struct ProgramSyntaxTokenOffsets<'p> {
+  source: &'p str,
+  offset: usize,
+  token_offset: usize,
+}
+
+impl Iterator for ProgramSyntaxTokenOffsets<'_> {
+  type Item = (usize, parser::LexToken);
+
+  fn next(&mut self) -> Option<Self::Item> {
+    let token = parser::lex_token_at(self.source, self.offset)?;
+    let offset = self.token_offset;
+    self.offset = token.end;
+    self.token_offset += 1;
+    Some((offset, token))
   }
 }
 
@@ -1699,21 +2060,12 @@ fn infix_binding_power(operator: parser::LexOperator) -> Option<(u8, u8)> {
   }
 }
 
-fn postfix_binding_power(operator: parser::LexOperator) -> Option<u8> {
-  (operator == parser::LexOperator::Percent).then_some(18)
-}
-
 fn prefix_binding_power() -> u8 {
   17
 }
 
-fn prefix_operator(operator: parser::LexOperator) -> bool {
-  matches!(
-    operator,
-    parser::LexOperator::Add
-      | parser::LexOperator::Subtract
-      | parser::LexOperator::ImplicitIntersection
-  )
+fn percent_postfix_binding_power() -> u8 {
+  18
 }
 
 fn token_span(token: parser::LexToken) -> parser::SemanticSpan {
@@ -1721,63 +2073,6 @@ fn token_span(token: parser::LexToken) -> parser::SemanticSpan {
     start: token.start,
     end: token.end,
   }
-}
-
-fn split_word_before_intersection(
-  source: &str,
-  token: parser::LexToken,
-) -> Option<parser::SemanticSpan> {
-  let word = &source[token.start..token.end];
-  let mut quoted = false;
-  let mut chars = word.char_indices().peekable();
-  while let Some((index, ch)) = chars.next() {
-    match ch {
-      '\'' => {
-        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
-          chars.next();
-        } else {
-          quoted = !quoted;
-        }
-      }
-      '!'
-        if !quoted
-          && word[..index].contains(':')
-          && !bang_belongs_to_range_endpoint_sheet_name(&word[..index]) =>
-      {
-        return Some(parser::SemanticSpan {
-          start: token.start,
-          end: token.start + index,
-        });
-      }
-      _ => {}
-    }
-  }
-  None
-}
-
-fn bang_belongs_to_range_endpoint_sheet_name(prefix: &str) -> bool {
-  let mut quoted = false;
-  let mut chars = prefix.char_indices().peekable();
-  let mut last_colon = None;
-  while let Some((index, ch)) = chars.next() {
-    match ch {
-      '\'' => {
-        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
-          chars.next();
-        } else {
-          quoted = !quoted;
-        }
-      }
-      ':' if !quoted => last_colon = Some(index),
-      _ => {}
-    }
-  }
-  let Some(colon) = last_colon else {
-    return false;
-  };
-  let endpoint_prefix = prefix[colon + ':'.len_utf8()..].trim();
-  !endpoint_prefix.is_empty()
-    && crate::CellAddress::parse_a1(endpoint_prefix.trim_start_matches('$')).is_err()
 }
 
 fn is_intersection_rhs_start(token: Option<parser::LexToken>) -> bool {
@@ -2023,26 +2318,6 @@ fn reference_flags(start: AddressFlags, end: AddressFlags) -> FormulaReferenceFl
     flags |= FormulaReferenceFlags::WHOLE_ROW;
   }
   flags
-}
-
-fn diagnostic_from_parse_issue(issue: parser::FormulaParseIssue) -> FormulaDiagnosticKind {
-  match issue {
-    parser::FormulaParseIssue::UnrecognizedCharacter(_) => {
-      FormulaDiagnosticKind::Unsupported(FormulaUnsupportedKind::Token)
-    }
-    parser::FormulaParseIssue::MissingClosingParenthesis
-    | parser::FormulaParseIssue::IncompleteExpression => FormulaDiagnosticKind::ParseError,
-  }
-}
-
-fn unary_operator_from_lex(operator: parser::LexOperator) -> Option<FormulaOperator> {
-  match operator {
-    parser::LexOperator::Add => Some(FormulaOperator::UnaryPlus),
-    parser::LexOperator::Subtract => Some(FormulaOperator::UnaryMinus),
-    parser::LexOperator::ImplicitIntersection => Some(FormulaOperator::ImplicitIntersection),
-    parser::LexOperator::Percent => Some(FormulaOperator::Percent),
-    _ => None,
-  }
 }
 
 fn node_precedence(kind: &FormulaNodeKind) -> u8 {

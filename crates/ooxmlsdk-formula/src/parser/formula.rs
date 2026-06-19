@@ -46,8 +46,6 @@ pub(crate) enum FormulaBodyTokenKind {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum FormulaParseIssue {
   UnrecognizedCharacter(SemanticSpan),
-  MissingClosingParenthesis,
-  IncompleteExpression,
 }
 
 pub(crate) struct FormulaParser<'a> {

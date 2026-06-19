@@ -14,7 +14,8 @@ pub(crate) use formula::{
 };
 pub(crate) use lex::{
   LexErrorValue, LexLogicalFunction, LexOperator, LexToken, LexTokenKind, TextLiteral,
-  formula_error_value, formula_text_literal, grouped_formula_number, lex_tokens,
+  formula_body_start, formula_error_value, formula_text_literal, grouped_formula_number,
+  lex_token_at,
 };
 pub(crate) use reference::parse_formula_range;
 pub(crate) use semantic::{

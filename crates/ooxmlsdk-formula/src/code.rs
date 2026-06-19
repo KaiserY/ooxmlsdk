@@ -721,8 +721,5 @@ pub(crate) fn formula_value_from_array_constant<'doc>(
       parser::TextLiteral::Borrowed(value) => FormulaValue::String(Cow::Owned(value.into())),
       parser::TextLiteral::Owned(value) => FormulaValue::String(Cow::Owned(value)),
     },
-    parser::ArrayConstantValue::Raw(value) => {
-      FormulaValue::String(Cow::Owned(value.trim_matches('"').to_string()))
-    }
   }
 }

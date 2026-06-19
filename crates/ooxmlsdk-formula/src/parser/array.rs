@@ -15,7 +15,6 @@ pub(crate) enum ArrayConstantValue<'a> {
   Boolean(bool),
   Error(LexErrorValue),
   Text(TextLiteral<'a>),
-  Raw(&'a str),
 }
 
 pub(crate) fn parse_array_constant(source: &str) -> Option<ArrayConstant<'_>> {
@@ -27,6 +26,7 @@ pub(crate) fn parse_array_constant(source: &str) -> Option<ArrayConstant<'_>> {
 
   let mut rows = Vec::new();
   let mut row = Vec::new();
+  let mut column_count = None::<usize>;
   loop {
     row.push(parse_array_constant_value(source, &mut cursor)?);
     cursor.skip_ws();
@@ -40,14 +40,37 @@ pub(crate) fn parse_array_constant(source: &str) -> Option<ArrayConstant<'_>> {
       .consume_token_kind(LexTokenKind::RowSeparator)
       .is_some()
     {
-      rows.push(row);
+      push_array_row(&mut rows, &mut column_count, row)?;
       row = Vec::new();
       continue;
     }
     cursor.consume_token_kind(LexTokenKind::ArrayClose)?;
-    rows.push(row);
+    push_array_row(&mut rows, &mut column_count, row)?;
     cursor.skip_ws();
     return cursor.is_end().then_some(ArrayConstant { rows });
+  }
+}
+
+fn push_array_row<'a>(
+  rows: &mut Vec<Vec<ArrayConstantValue<'a>>>,
+  column_count: &mut Option<usize>,
+  row: Vec<ArrayConstantValue<'a>>,
+) -> Option<()> {
+  let columns = row.len();
+  if columns == 0 {
+    return None;
+  }
+  match *column_count {
+    Some(expected) if expected != columns => None,
+    Some(_) => {
+      rows.push(row);
+      Some(())
+    }
+    None => {
+      *column_count = Some(columns);
+      rows.push(row);
+      Some(())
+    }
   }
 }
 
@@ -86,7 +109,7 @@ fn parse_array_constant_value<'a>(
       if word.eq_ignore_ascii_case("FALSE") {
         return Some(ArrayConstantValue::Boolean(false));
       }
-      return Some(ArrayConstantValue::Raw(word.trim()));
+      return None;
     }
     Some(LexTokenKind::Operator(LexOperator::Add | LexOperator::Subtract)) => {
       if let Some(value) = parse_signed_array_number(cursor) {
@@ -95,7 +118,7 @@ fn parse_array_constant_value<'a>(
     }
     _ => {}
   }
-  parse_raw_array_constant_value(source, cursor)
+  None
 }
 
 fn parse_signed_array_number(cursor: &mut FormulaCursor<'_>) -> Option<f64> {
@@ -120,26 +143,22 @@ fn parse_signed_array_number(cursor: &mut FormulaCursor<'_>) -> Option<f64> {
   Some(sign * value)
 }
 
-fn parse_raw_array_constant_value<'a>(
-  source: &'a str,
-  cursor: &mut FormulaCursor<'a>,
-) -> Option<ArrayConstantValue<'a>> {
-  let start = cursor.index();
-  let mut end = start;
-  let mut quoted = false;
-  while end < source.len() {
-    let ch = source[end..].chars().next()?;
-    if ch == '"' {
-      quoted = !quoted;
-      end += ch.len_utf8();
-      continue;
-    }
-    if !quoted && matches!(ch, ',' | ';' | '|' | '}') {
-      break;
-    }
-    end += ch.len_utf8();
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn array_constants_reject_ragged_rows_and_raw_values() {
+    assert!(parse_array_constant("{1,2;3}").is_none());
+    assert!(parse_array_constant("{1,Name}").is_none());
+    assert!(parse_array_constant("{1,A1+1}").is_none());
   }
-  cursor
-    .set_index(end)
-    .then_some(ArrayConstantValue::Raw(source.get(start..end)?.trim()))
+
+  #[test]
+  fn array_constants_accept_scalar_literals() {
+    let array = parse_array_constant(r#"{1,"a";TRUE,#DIV/0!}"#).expect("array constant");
+    assert_eq!(array.rows.len(), 2);
+    assert_eq!(array.rows[0].len(), 2);
+    assert_eq!(array.rows[1].len(), 2);
+  }
 }

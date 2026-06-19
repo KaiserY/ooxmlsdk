@@ -420,13 +420,15 @@ fn formula_text(input: &mut &str) -> WinnowResult<()> {
 
 fn formula_number(input: &mut &str) -> WinnowResult<f64> {
   let original = *input;
-  let start_len = input.len();
-  scan_formula_number(input);
-  if input.len() == start_len {
-    fail.parse_next(input)
-  } else {
-    let consumed = start_len - input.len();
-    Ok(original[..consumed].parse::<f64>().unwrap_or_default())
+  let Some(consumed) = scan_formula_number_len(original) else {
+    return fail.parse_next(input);
+  };
+  match original[..consumed].parse::<f64>() {
+    Ok(value) => {
+      *input = &input[consumed..];
+      Ok(value)
+    }
+    Err(_) => fail.parse_next(input),
   }
 }
 
@@ -443,25 +445,125 @@ fn formula_error(input: &mut &str) -> WinnowResult<LexErrorValue> {
     *input = &input["#getting_data".len()..];
     return Ok(LexErrorValue::GettingData);
   }
-  for (literal_value, error) in formula_error_literals() {
-    let matches = if literal_value.starts_with("Err:") {
-      input
-        .get(..literal_value.len())
-        .is_some_and(|value| value.eq_ignore_ascii_case(literal_value))
-    } else {
-      input.starts_with(literal_value)
-    };
-    if matches {
-      *input = &input[literal_value.len()..];
-      return Ok(*error);
-    }
+  if input
+    .get(..4)
+    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("Err:"))
+    && let Some((value, consumed)) = formula_err_code_value(&input[4..], false)
+  {
+    *input = &input[4 + consumed..];
+    return Ok(value);
+  }
+  if input.starts_with("#ERR")
+    && let Some((value, consumed)) = formula_err_code_value(&input[4..], true)
+  {
+    *input = &input[4 + consumed..];
+    return Ok(value);
+  }
+  if let Some((literal_value, error)) = formula_hash_error_literal(input) {
+    *input = &input[literal_value.len()..];
+    return Ok(error);
   }
   fail.parse_next(input)
 }
 
+fn formula_hash_error_literal(input: &str) -> Option<(&'static str, LexErrorValue)> {
+  if input.starts_with("#GETTING_DATA") {
+    Some(("#GETTING_DATA", LexErrorValue::GettingData))
+  } else if input.starts_with("#DIV/0!") {
+    Some(("#DIV/0!", LexErrorValue::Div0))
+  } else if input.starts_with("#VALUE!") {
+    Some(("#VALUE!", LexErrorValue::Value))
+  } else if input.starts_with("#NULL!") {
+    Some(("#NULL!", LexErrorValue::Null))
+  } else if input.starts_with("#NULL") {
+    Some(("#NULL", LexErrorValue::Null))
+  } else if input.starts_with("#REF!") {
+    Some(("#REF!", LexErrorValue::Ref))
+  } else if input.starts_with("#NAME?") {
+    Some(("#NAME?", LexErrorValue::Name))
+  } else if input.starts_with("#NUM!") {
+    Some(("#NUM!", LexErrorValue::Num))
+  } else if input.starts_with("#N/A") {
+    Some(("#N/A", LexErrorValue::NA))
+  } else if input.starts_with("#SPILL!") {
+    Some(("#SPILL!", LexErrorValue::Spill))
+  } else if input.starts_with("#CALC!") {
+    Some(("#CALC!", LexErrorValue::Calc))
+  } else if input.starts_with("#ERROR!") {
+    Some(("#ERROR!", LexErrorValue::Error))
+  } else if input.starts_with("#N/IMPL!") {
+    Some(("#N/IMPL!", LexErrorValue::NotImplemented))
+  } else if input.starts_with("#CIRC!") {
+    Some(("#CIRC!", LexErrorValue::CircularReference))
+  } else {
+    None
+  }
+}
+
+fn formula_err_code_value(input: &str, requires_bang: bool) -> Option<(LexErrorValue, usize)> {
+  let bytes = input.as_bytes();
+  let index = if requires_bang {
+    let mut index = 0usize;
+    while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+      index += 1;
+    }
+    index
+  } else {
+    3
+  };
+  if index == 0 || requires_bang && bytes.get(index) != Some(&b'!') {
+    return None;
+  }
+  if !input[..index].bytes().all(|byte| byte.is_ascii_digit()) {
+    return None;
+  }
+  let code = input[..index].parse::<u16>().ok()?;
+  let consumed = if requires_bang { index + 1 } else { index };
+  Some((formula_error_code_value(code)?, consumed))
+}
+
+fn formula_error_code_value(code: u16) -> Option<LexErrorValue> {
+  Some(match code {
+    501 => LexErrorValue::IllegalChar,
+    502 => LexErrorValue::IllegalArgument,
+    503 => LexErrorValue::Num,
+    504 => LexErrorValue::IllegalParameter,
+    507 => LexErrorValue::Pair,
+    508 => LexErrorValue::PairExpected,
+    509 => LexErrorValue::OperatorExpected,
+    510 => LexErrorValue::VariableExpected,
+    511 => LexErrorValue::Parameter,
+    512 => LexErrorValue::CodeOverflow,
+    513 => LexErrorValue::StringOverflow,
+    514 => LexErrorValue::StackOverflow,
+    515 => LexErrorValue::Error,
+    516 => LexErrorValue::InvalidVariable,
+    517 => LexErrorValue::InvalidOpcode,
+    518 => LexErrorValue::InvalidStackValue,
+    519 => LexErrorValue::Value,
+    520 => LexErrorValue::InvalidToken,
+    521 => LexErrorValue::Null,
+    522 => LexErrorValue::CircularReference,
+    523 => LexErrorValue::NoConvergence,
+    524 => LexErrorValue::Ref,
+    525 => LexErrorValue::Name,
+    530 => LexErrorValue::NoAddin,
+    531 => LexErrorValue::NoMacro,
+    532 => LexErrorValue::Div0,
+    533 => LexErrorValue::NestedArray,
+    538 => LexErrorValue::MatrixSize,
+    539 => LexErrorValue::BadArrayContent,
+    540 => LexErrorValue::LinkFormulaNeedingCheck,
+    541 => LexErrorValue::Spill,
+    _ => return None,
+  })
+}
+
 fn formula_error_or_word(input: &mut &str) -> WinnowResult<LexTokenKind> {
   let original = *input;
-  if let Ok(error) = formula_error.parse_next(input) {
+  if could_start_formula_error(original)
+    && let Ok(error) = formula_error.parse_next(input)
+  {
     return Ok(LexTokenKind::Error(error));
   }
   *input = original;
@@ -477,23 +579,52 @@ fn formula_word_or_unknown(input: &mut &str) -> WinnowResult<LexTokenKind> {
   any.value(LexTokenKind::Unsupported).parse_next(input)
 }
 
-fn scan_formula_number(input: &mut &str) {
+fn scan_formula_number_len(input: &str) -> Option<usize> {
   let bytes = input.as_bytes();
   let mut index = 0usize;
-  let mut previous_was_exponent = false;
-  while index < bytes.len() {
-    let byte = bytes[index];
-    if byte.is_ascii_digit() || byte == b'.' || matches!(byte, b'E' | b'e') {
-      previous_was_exponent = matches!(byte, b'E' | b'e');
-      index += 1;
-    } else if matches!(byte, b'+' | b'-') && previous_was_exponent {
-      previous_was_exponent = false;
-      index += 1;
-    } else {
-      break;
-    }
+  let integer_start = index;
+  while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+    index += 1;
   }
-  *input = &input[index..];
+  let integer_digits = index - integer_start;
+
+  let mut decimal_digits = 0usize;
+  if bytes.get(index) == Some(&b'.') {
+    index += 1;
+    let decimal_start = index;
+    while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+      index += 1;
+    }
+    decimal_digits = index - decimal_start;
+  }
+
+  if integer_digits == 0 && decimal_digits == 0 {
+    return None;
+  }
+
+  if matches!(bytes.get(index), Some(b'E' | b'e')) {
+    index += 1;
+    if matches!(bytes.get(index), Some(b'+' | b'-')) {
+      index += 1;
+    }
+    let digits_start = index;
+    while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+      index += 1;
+    }
+    if index == digits_start {
+      return None;
+    }
+    return Some(index);
+  }
+
+  Some(index)
+}
+
+fn could_start_formula_error(input: &str) -> bool {
+  input.starts_with('#')
+    || input
+      .get(..4)
+      .is_some_and(|prefix| prefix.eq_ignore_ascii_case("Err:"))
 }
 
 fn scan_formula_word(input: &mut &str) {
@@ -612,87 +743,6 @@ fn starts_with_ignore_ascii_case(source: &str, prefix: &str) -> bool {
     .is_some_and(|value| value.eq_ignore_ascii_case(prefix))
 }
 
-fn formula_error_literals() -> &'static [(&'static str, LexErrorValue)] {
-  &[
-    ("#GETTING_DATA", LexErrorValue::GettingData),
-    ("#DIV/0!", LexErrorValue::Div0),
-    ("#VALUE!", LexErrorValue::Value),
-    ("#NULL!", LexErrorValue::Null),
-    ("#NULL", LexErrorValue::Null),
-    ("#REF!", LexErrorValue::Ref),
-    ("#NAME?", LexErrorValue::Name),
-    ("#NUM!", LexErrorValue::Num),
-    ("#N/A", LexErrorValue::NA),
-    ("#SPILL!", LexErrorValue::Spill),
-    ("#CALC!", LexErrorValue::Calc),
-    ("#ERROR!", LexErrorValue::Error),
-    ("#N/IMPL!", LexErrorValue::NotImplemented),
-    ("#CIRC!", LexErrorValue::CircularReference),
-    ("Err:501", LexErrorValue::IllegalChar),
-    ("Err:502", LexErrorValue::IllegalArgument),
-    ("Err:503", LexErrorValue::Num),
-    ("Err:504", LexErrorValue::IllegalParameter),
-    ("Err:507", LexErrorValue::Pair),
-    ("Err:508", LexErrorValue::PairExpected),
-    ("Err:509", LexErrorValue::OperatorExpected),
-    ("Err:510", LexErrorValue::VariableExpected),
-    ("Err:511", LexErrorValue::Parameter),
-    ("Err:512", LexErrorValue::CodeOverflow),
-    ("Err:513", LexErrorValue::StringOverflow),
-    ("Err:514", LexErrorValue::StackOverflow),
-    ("Err:515", LexErrorValue::Error),
-    ("Err:516", LexErrorValue::InvalidVariable),
-    ("Err:517", LexErrorValue::InvalidOpcode),
-    ("Err:518", LexErrorValue::InvalidStackValue),
-    ("Err:519", LexErrorValue::Value),
-    ("Err:520", LexErrorValue::InvalidToken),
-    ("Err:521", LexErrorValue::Null),
-    ("Err:522", LexErrorValue::CircularReference),
-    ("Err:523", LexErrorValue::NoConvergence),
-    ("Err:524", LexErrorValue::Ref),
-    ("Err:525", LexErrorValue::Name),
-    ("Err:530", LexErrorValue::NoAddin),
-    ("Err:531", LexErrorValue::NoMacro),
-    ("Err:532", LexErrorValue::Div0),
-    ("Err:533", LexErrorValue::NestedArray),
-    ("Err:538", LexErrorValue::MatrixSize),
-    ("Err:539", LexErrorValue::BadArrayContent),
-    ("Err:540", LexErrorValue::LinkFormulaNeedingCheck),
-    ("Err:541", LexErrorValue::Spill),
-    ("#ERR501!", LexErrorValue::IllegalChar),
-    ("#ERR502!", LexErrorValue::IllegalArgument),
-    ("#ERR503!", LexErrorValue::Num),
-    ("#ERR504!", LexErrorValue::IllegalParameter),
-    ("#ERR507!", LexErrorValue::Pair),
-    ("#ERR508!", LexErrorValue::PairExpected),
-    ("#ERR509!", LexErrorValue::OperatorExpected),
-    ("#ERR510!", LexErrorValue::VariableExpected),
-    ("#ERR511!", LexErrorValue::Parameter),
-    ("#ERR512!", LexErrorValue::CodeOverflow),
-    ("#ERR513!", LexErrorValue::StringOverflow),
-    ("#ERR514!", LexErrorValue::StackOverflow),
-    ("#ERR515!", LexErrorValue::Error),
-    ("#ERR516!", LexErrorValue::InvalidVariable),
-    ("#ERR517!", LexErrorValue::InvalidOpcode),
-    ("#ERR518!", LexErrorValue::InvalidStackValue),
-    ("#ERR519!", LexErrorValue::Value),
-    ("#ERR520!", LexErrorValue::InvalidToken),
-    ("#ERR521!", LexErrorValue::Null),
-    ("#ERR522!", LexErrorValue::CircularReference),
-    ("#ERR523!", LexErrorValue::NoConvergence),
-    ("#ERR524!", LexErrorValue::Ref),
-    ("#ERR525!", LexErrorValue::Name),
-    ("#ERR530!", LexErrorValue::NoAddin),
-    ("#ERR531!", LexErrorValue::NoMacro),
-    ("#ERR532!", LexErrorValue::Div0),
-    ("#ERR533!", LexErrorValue::NestedArray),
-    ("#ERR538!", LexErrorValue::MatrixSize),
-    ("#ERR539!", LexErrorValue::BadArrayContent),
-    ("#ERR540!", LexErrorValue::LinkFormulaNeedingCheck),
-    ("#ERR541!", LexErrorValue::Spill),
-  ]
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -704,5 +754,21 @@ mod tests {
     assert_eq!(formula_body_start("==A1"), 2);
     assert_eq!(formula_body_start("of:=A1"), 4);
     assert_eq!(formula_body_start("OF:A1"), 3);
+  }
+
+  #[test]
+  fn formula_error_values_cover_calc_and_excel_forms() {
+    assert_eq!(formula_error_value("#DIV/0!"), Some(LexErrorValue::Div0));
+    assert_eq!(
+      formula_error_value("#GETTING_DATA"),
+      Some(LexErrorValue::GettingData)
+    );
+    assert_eq!(
+      formula_error_value("#getting_data"),
+      Some(LexErrorValue::GettingData)
+    );
+    assert_eq!(formula_error_value("Err:541"), Some(LexErrorValue::Spill));
+    assert_eq!(formula_error_value("eRr:524"), Some(LexErrorValue::Ref));
+    assert_eq!(formula_error_value("#ERR541!"), Some(LexErrorValue::Spill));
   }
 }

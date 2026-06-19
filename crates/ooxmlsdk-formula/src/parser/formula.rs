@@ -73,15 +73,17 @@ impl<'a> FormulaParser<'a> {
 }
 
 fn parse_formula_body(source: &str) -> FormulaBodyParse {
-  let lexed = lex_tokens(source).collect::<Vec<_>>();
+  let mut lexed = Vec::new();
+  let mut tokens = Vec::new();
   let mut issues = Vec::new();
-  let tokens = formula_body_tokens(
-    lexed
-      .iter()
-      .copied()
-      .map(|token| semantic_token_from_lex(source, token)),
-    &mut issues,
-  );
+
+  for token in lex_tokens(source) {
+    let semantic = semantic_token_from_lex(source, token);
+    if let Some(token) = formula_body_token(semantic, &mut issues) {
+      tokens.push(token);
+    }
+    lexed.push(token);
+  }
 
   FormulaBodyParse {
     lexed,
@@ -90,42 +92,35 @@ fn parse_formula_body(source: &str) -> FormulaBodyParse {
   }
 }
 
-fn formula_body_tokens(
-  tokens: impl IntoIterator<Item = SemanticToken>,
+fn formula_body_token(
+  token: SemanticToken,
   issues: &mut Vec<FormulaParseIssue>,
-) -> Vec<FormulaBodyToken> {
-  tokens
-    .into_iter()
-    .filter_map(|token| {
-      let span = SemanticSpan {
-        start: token.start,
-        end: token.end,
-      };
-      let kind = match token.kind {
-        SemanticTokenKind::Text => FormulaBodyTokenKind::Text,
-        SemanticTokenKind::Number(value) => FormulaBodyTokenKind::Number(value),
-        SemanticTokenKind::Error(value) => FormulaBodyTokenKind::Error(value),
-        SemanticTokenKind::Operator(value) => FormulaBodyTokenKind::Operator(value),
-        SemanticTokenKind::ArrayOpen => FormulaBodyTokenKind::ArrayOpen,
-        SemanticTokenKind::ArrayClose => FormulaBodyTokenKind::ArrayClose,
-        SemanticTokenKind::ArgumentSeparator => FormulaBodyTokenKind::ArgumentSeparator,
-        SemanticTokenKind::RowSeparator => FormulaBodyTokenKind::RowSeparator,
-        SemanticTokenKind::ParenOpen | SemanticTokenKind::ParenClose => return None,
-        SemanticTokenKind::Function { volatile } => FormulaBodyTokenKind::Function { volatile },
-        SemanticTokenKind::Boolean(value) => FormulaBodyTokenKind::Boolean(value),
-        SemanticTokenKind::ExternalReference(value) => {
-          FormulaBodyTokenKind::ExternalReference(value)
-        }
-        SemanticTokenKind::ReferenceCandidate => FormulaBodyTokenKind::ReferenceCandidate,
-        SemanticTokenKind::Name => FormulaBodyTokenKind::Name,
-        SemanticTokenKind::Unsupported => {
-          issues.push(FormulaParseIssue::UnrecognizedCharacter(span));
-          FormulaBodyTokenKind::Unsupported
-        }
-      };
-      Some(FormulaBodyToken { kind, span })
-    })
-    .collect()
+) -> Option<FormulaBodyToken> {
+  let span = SemanticSpan {
+    start: token.start,
+    end: token.end,
+  };
+  let kind = match token.kind {
+    SemanticTokenKind::Text => FormulaBodyTokenKind::Text,
+    SemanticTokenKind::Number(value) => FormulaBodyTokenKind::Number(value),
+    SemanticTokenKind::Error(value) => FormulaBodyTokenKind::Error(value),
+    SemanticTokenKind::Operator(value) => FormulaBodyTokenKind::Operator(value),
+    SemanticTokenKind::ArrayOpen => FormulaBodyTokenKind::ArrayOpen,
+    SemanticTokenKind::ArrayClose => FormulaBodyTokenKind::ArrayClose,
+    SemanticTokenKind::ArgumentSeparator => FormulaBodyTokenKind::ArgumentSeparator,
+    SemanticTokenKind::RowSeparator => FormulaBodyTokenKind::RowSeparator,
+    SemanticTokenKind::ParenOpen | SemanticTokenKind::ParenClose => return None,
+    SemanticTokenKind::Function { volatile } => FormulaBodyTokenKind::Function { volatile },
+    SemanticTokenKind::Boolean(value) => FormulaBodyTokenKind::Boolean(value),
+    SemanticTokenKind::ExternalReference(value) => FormulaBodyTokenKind::ExternalReference(value),
+    SemanticTokenKind::ReferenceCandidate => FormulaBodyTokenKind::ReferenceCandidate,
+    SemanticTokenKind::Name => FormulaBodyTokenKind::Name,
+    SemanticTokenKind::Unsupported => {
+      issues.push(FormulaParseIssue::UnrecognizedCharacter(span));
+      FormulaBodyTokenKind::Unsupported
+    }
+  };
+  Some(FormulaBodyToken { kind, span })
 }
 
 pub(crate) fn normalize_excel_formula_text(formula: &str) -> &str {
@@ -149,12 +144,12 @@ pub(crate) fn r1c1_whole_axis_reference_to_a1(
   base: CellAddress,
 ) -> Option<String> {
   let reference = normalize_excel_formula_text(reference);
-  if let Some(offset) = parse_r1c1_relative(reference, 'C') {
+  if let Some(offset) = parse_r1c1_relative(reference, b'C') {
     let column = base.column.checked_add_signed(offset)?.checked_add(1)?;
     let column = one_based_column_name(column);
     return Some(format!("{column}:{column}"));
   }
-  if let Some(offset) = parse_r1c1_relative(reference, 'R') {
+  if let Some(offset) = parse_r1c1_relative(reference, b'R') {
     let row = base.row.checked_add_signed(offset)?.checked_add(1)?;
     return Some(format!("{row}:{row}"));
   }
@@ -292,8 +287,8 @@ fn normalize_open_formula_reference(reference: &str) -> String {
   reference
 }
 
-fn parse_r1c1_relative(reference: &str, axis: char) -> Option<i32> {
-  let rest = reference.strip_prefix(axis)?;
+fn parse_r1c1_relative(reference: &str, axis: u8) -> Option<i32> {
+  let rest = strip_ascii_axis_prefix(reference, axis)?;
   if rest.is_empty() {
     return Some(0);
   }
@@ -303,14 +298,23 @@ fn parse_r1c1_relative(reference: &str, axis: char) -> Option<i32> {
 
 fn parse_r1c1_cell(reference: &str, base: CellAddress) -> Option<CellAddress> {
   let reference = normalize_excel_formula_text(reference);
-  let upper = reference.to_ascii_uppercase();
-  let rest = upper.strip_prefix('R')?;
-  let column_marker = rest.find('C')?;
+  let rest = strip_ascii_axis_prefix(reference, b'R')?;
+  let column_marker = rest
+    .char_indices()
+    .find_map(|(index, ch)| ch.eq_ignore_ascii_case(&'C').then_some(index))?;
   let (row_text, column_text) = rest.split_at(column_marker);
-  let column_text = column_text.strip_prefix('C')?;
+  let column_text = column_text.get(1..)?;
   let row = parse_r1c1_axis(row_text, base.row)?;
   let column = parse_r1c1_axis(column_text, base.column)?;
   Some(CellAddress { column, row })
+}
+
+fn strip_ascii_axis_prefix(reference: &str, axis: u8) -> Option<&str> {
+  let bytes = reference.as_bytes();
+  bytes
+    .first()
+    .is_some_and(|byte| byte.eq_ignore_ascii_case(&axis))
+    .then(|| &reference[1..])
 }
 
 fn parse_r1c1_axis(text: &str, base: u32) -> Option<u32> {
@@ -327,24 +331,36 @@ fn parse_r1c1_axis(text: &str, base: u32) -> Option<u32> {
 }
 
 fn one_based_column_name(mut column: u32) -> String {
-  let mut chars = Vec::new();
+  let mut chars = [0u8; 8];
+  let mut len = 0usize;
   while column > 0 {
     column -= 1;
-    chars.push(char::from_u32('A' as u32 + column % 26).unwrap_or('A'));
+    chars[len] = b'A' + (column % 26) as u8;
+    len += 1;
     column /= 26;
   }
-  chars.into_iter().rev().collect()
+  reverse_ascii_column_name(&chars[..len])
 }
 
 fn zero_based_column_name(mut column: u32) -> String {
-  let mut name = Vec::new();
+  let mut chars = [0u8; 8];
+  let mut len = 0usize;
   loop {
-    name.push((b'A' + (column % 26) as u8) as char);
+    chars[len] = b'A' + (column % 26) as u8;
+    len += 1;
     column /= 26;
     if column == 0 {
       break;
     }
     column -= 1;
   }
-  name.into_iter().rev().collect()
+  reverse_ascii_column_name(&chars[..len])
+}
+
+fn reverse_ascii_column_name(reversed: &[u8]) -> String {
+  let mut name = String::with_capacity(reversed.len());
+  for byte in reversed.iter().rev() {
+    name.push(*byte as char);
+  }
+  name
 }

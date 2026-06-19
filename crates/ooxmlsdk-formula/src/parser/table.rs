@@ -73,12 +73,19 @@ fn table_reference_specifiers(selector_tail: &str) -> Option<Vec<TableReferenceC
     return Some(Vec::new());
   }
   if !selector.starts_with('[') {
-    return Some(vec![table_reference_column(selector)]);
+    let mut specifiers = Vec::new();
+    push_table_reference_column_or_range(selector, &mut specifiers);
+    return Some(specifiers);
   }
   let mut specifiers = Vec::new();
   let mut depth = 0i32;
   let mut start = None;
-  for (index, ch) in selector.char_indices() {
+  let mut chars = selector.char_indices().peekable();
+  while let Some((index, ch)) = chars.next() {
+    if ch == '\'' {
+      let _ = chars.next();
+      continue;
+    }
     match ch {
       '[' => {
         if depth == 0 {
@@ -90,9 +97,13 @@ fn table_reference_specifiers(selector_tail: &str) -> Option<Vec<TableReferenceC
         depth -= 1;
         if depth == 0 {
           let start = start.take()?;
-          specifiers.push(table_reference_column(&selector[start..index]));
+          push_table_reference_column_or_range(&selector[start..index], &mut specifiers);
+        } else if depth < 0 {
+          return None;
         }
       }
+      ',' | ':' if depth == 0 => {}
+      _ if depth == 0 && !ch.is_whitespace() => return None,
       _ => {}
     }
   }
@@ -104,6 +115,36 @@ fn table_reference_specifiers(selector_tail: &str) -> Option<Vec<TableReferenceC
   } else {
     Some(specifiers)
   }
+}
+
+fn push_table_reference_column_or_range<'a>(
+  value: &'a str,
+  specifiers: &mut Vec<TableReferenceColumn<'a>>,
+) {
+  let value = value.trim();
+  if let Some((start, end)) = split_unescaped_table_reference_range(value) {
+    specifiers.push(table_reference_column(start.trim()));
+    specifiers.push(table_reference_column(end.trim()));
+  } else {
+    specifiers.push(table_reference_column(value));
+  }
+}
+
+fn split_unescaped_table_reference_range(value: &str) -> Option<(&str, &str)> {
+  let mut chars = value.char_indices().peekable();
+  while let Some((index, ch)) = chars.next() {
+    if ch == '\'' {
+      let _ = chars.next();
+    } else if ch == ':' {
+      let start = &value[..index];
+      let end = &value[index + 1..];
+      if !start.trim().is_empty() && !end.trim().is_empty() {
+        return Some((start, end));
+      }
+      return None;
+    }
+  }
+  None
 }
 
 fn table_reference_column(value: &str) -> TableReferenceColumn<'_> {
@@ -123,4 +164,32 @@ fn table_reference_column(value: &str) -> TableReferenceColumn<'_> {
     }
   }
   TableReferenceColumn::Owned(result)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn table_reference_selection_expands_item_and_column_ranges() {
+    let selection = parse_table_reference_selection("Table1[[#Headers]:[#Data],[Col 1]:[Col 2]]")
+      .expect("table reference");
+
+    assert_eq!(selection.table_name, "Table1");
+    assert!(selection.items.contains(TableReferenceItems::HEADERS));
+    assert!(selection.items.contains(TableReferenceItems::DATA));
+    assert_eq!(selection.columns.len(), 2);
+    assert_eq!(selection.columns[0].as_ref(), "Col 1");
+    assert_eq!(selection.columns[1].as_ref(), "Col 2");
+  }
+
+  #[test]
+  fn table_reference_selection_keeps_escaped_column_delimiters() {
+    let selection =
+      parse_table_reference_selection("Table1[[A':B]:[C']D]]").expect("table reference");
+
+    assert_eq!(selection.columns.len(), 2);
+    assert_eq!(selection.columns[0].as_ref(), "A:B");
+    assert_eq!(selection.columns[1].as_ref(), "C]D");
+  }
 }

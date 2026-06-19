@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use krilla::Document;
 use krilla::action::{Action, LinkAction};
@@ -277,37 +276,37 @@ pub(crate) fn render(
 }
 
 #[derive(Clone, Debug)]
-struct PaintDocument {
-  pages: Vec<PaintPage>,
+struct PaintDocument<'doc> {
+  pages: Vec<PaintPage<'doc>>,
 }
 
 #[derive(Clone, Debug)]
-struct PaintPage {
+struct PaintPage<'doc> {
   width_pt: f32,
   height_pt: f32,
-  items: Vec<PaintItem>,
+  items: Vec<PaintItem<'doc>>,
 }
 
 #[derive(Clone, Debug)]
-enum PageItem {
-  Text(TextItem),
-  Image(ImageItem),
-  LinkArea(LinkAreaItem),
+enum PageItem<'doc> {
+  Text(TextItem<'doc>),
+  Image(ImageItem<'doc>),
+  LinkArea(LinkAreaItem<'doc>),
   Rect(RectItem),
   Line(LineItem),
   Polyline(PolylineItem),
 }
 
 #[derive(Clone, Debug)]
-struct TextItem {
+struct TextItem<'doc> {
   x_pt: f32,
   y_pt: f32,
   line_height_pt: f32,
-  text: String,
-  style: TextStyle,
+  text: Cow<'doc, str>,
+  style: TextStyle<'doc>,
   rotation_center_pt: Option<(f32, f32)>,
-  hyperlink_url: Option<String>,
-  dynamic_field: Option<common::DynamicField<'static>>,
+  hyperlink_url: Option<Cow<'doc, str>>,
+  dynamic_field: Option<common::DynamicField<'doc>>,
   form_widget_id: Option<u32>,
   paragraph_bidi: bool,
   preserve_text_portion: bool,
@@ -316,7 +315,7 @@ struct TextItem {
 }
 
 #[derive(Clone, Debug)]
-struct ImageItem {
+struct ImageItem<'doc> {
   x_pt: f32,
   y_pt: f32,
   width_pt: f32,
@@ -325,10 +324,10 @@ struct ImageItem {
   rotation_deg: f32,
   flip_horizontal: bool,
   flip_vertical: bool,
-  data: Vec<u8>,
-  content_type: Option<String>,
-  alt_text: Option<String>,
-  hyperlink_url: Option<String>,
+  data: Cow<'doc, [u8]>,
+  content_type: Option<Cow<'doc, str>>,
+  alt_text: Option<Cow<'doc, str>>,
+  hyperlink_url: Option<Cow<'doc, str>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -340,12 +339,12 @@ struct ImageCrop {
 }
 
 #[derive(Clone, Debug)]
-struct LinkAreaItem {
+struct LinkAreaItem<'doc> {
   x_pt: f32,
   y_pt: f32,
   width_pt: f32,
   height_pt: f32,
-  hyperlink_url: String,
+  hyperlink_url: Cow<'doc, str>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -403,9 +402,9 @@ struct RgbColor {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct TextStyle {
-  font_family: Option<Arc<str>>,
-  symbol_font_family: Option<Arc<str>>,
+struct TextStyle<'doc> {
+  font_family: Option<Cow<'doc, str>>,
+  symbol_font_family: Option<Cow<'doc, str>>,
   font_size_pt: f32,
   complex_font_size_pt: Option<f32>,
   character_spacing_pt: f32,
@@ -427,7 +426,7 @@ struct TextStyle {
   underline_color: Option<RgbColor>,
 }
 
-impl FontStyleRef for TextStyle {
+impl FontStyleRef for TextStyle<'_> {
   fn font_family(&self) -> Option<&str> {
     self.font_family.as_deref()
   }
@@ -471,28 +470,28 @@ struct DecorationRenderMetadata {
 }
 
 #[derive(Clone, Debug)]
-enum PaintItem {
-  Text(PaintText),
-  Image(ImageItem),
-  LinkArea(LinkAreaItem),
+enum PaintItem<'doc> {
+  Text(PaintText<'doc>),
+  Image(ImageItem<'doc>),
+  LinkArea(LinkAreaItem<'doc>),
   Rect(RectItem),
   Line(LineItem),
   Polyline(PolylineItem),
 }
 
 #[derive(Clone, Debug)]
-struct PaintText {
-  item: TextItem,
+struct PaintText<'doc> {
+  item: TextItem<'doc>,
   source_frame_index: Option<usize>,
   source_line_index: Option<usize>,
   baseline_y: f32,
   width_pt: f32,
-  portions: Vec<PaintTextPortion>,
+  portions: Vec<PaintTextPortion<'doc>>,
 }
 
 #[derive(Clone, Debug)]
-struct PaintTextPortion {
-  kind: PaintTextPortionKind,
+struct PaintTextPortion<'doc> {
+  kind: PaintTextPortionKind<'doc>,
   text_range: std::ops::Range<usize>,
   x_pt: f32,
   baseline_y: f32,
@@ -502,14 +501,14 @@ struct PaintTextPortion {
   highlight: Option<PaintRect>,
   underline: Option<PaintStrokeLine>,
   strikethrough: Option<PaintStrokeLine>,
-  link: Option<PaintLink>,
+  link: Option<PaintLink<'doc>>,
 }
 
 #[derive(Clone, Debug)]
-enum PaintTextPortionKind {
+enum PaintTextPortionKind<'doc> {
   Text,
   Tab,
-  Field(common::DynamicField<'static>),
+  Field(common::DynamicField<'doc>),
   Link,
 }
 
@@ -554,12 +553,12 @@ struct PaintStrokeLine {
 }
 
 #[derive(Clone, Debug)]
-struct PaintLink {
+struct PaintLink<'doc> {
   x_pt: f32,
   y_pt: f32,
   width_pt: f32,
   height_pt: f32,
-  url: String,
+  url: Cow<'doc, str>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -575,7 +574,7 @@ struct InternalLinkTargets {
 }
 
 impl InternalLinkTargets {
-  fn from_paint(paint: &PaintDocument) -> Self {
+  fn from_paint(paint: &PaintDocument<'_>) -> Self {
     let mut positions = HashMap::new();
     for (page_index, page) in paint.pages.iter().enumerate() {
       for item in &page.items {
@@ -585,7 +584,7 @@ impl InternalLinkTargets {
               && is_internal_link_url(url)
             {
               positions
-                .entry(url.clone())
+                .entry(url.to_string())
                 .or_insert(InternalLinkPosition {
                   page_index,
                   x_pt: text.item.x_pt,
@@ -615,7 +614,7 @@ impl InternalLinkTargets {
   }
 }
 
-fn decoration_render_metadata(items: &[PageItem]) -> Vec<DecorationRenderMetadata> {
+fn decoration_render_metadata(items: &[PageItem<'_>]) -> Vec<DecorationRenderMetadata> {
   let mut metadata = vec![DecorationRenderMetadata::default(); items.len()];
   let mut index = 0usize;
 
@@ -657,7 +656,7 @@ fn decoration_render_metadata(items: &[PageItem]) -> Vec<DecorationRenderMetadat
   metadata
 }
 
-fn decoration_compatible(current: &TextItem, next: &TextItem) -> bool {
+fn decoration_compatible(current: &TextItem<'_>, next: &TextItem<'_>) -> bool {
   current.style == next.style
     && current.hyperlink_url == next.hyperlink_url
     && current.dynamic_field == next.dynamic_field
@@ -682,8 +681,8 @@ fn reciprocal_internal_link_url(url: &str) -> Option<String> {
   Some(format!("ooxmlsdk-pdf:{target_kind}:{id}"))
 }
 
-impl PaintDocument {
-  fn from_layout(document: &common::LayoutDocument<'static>) -> Self {
+impl<'doc> PaintDocument<'doc> {
+  fn from_layout(document: &'doc common::LayoutDocument<'static>) -> Self {
     let pages = document
       .pages
       .iter()
@@ -735,7 +734,7 @@ impl PaintDocument {
   }
 }
 
-fn page_item_from_common(item: &common::DisplayItem<'static>) -> Option<PageItem> {
+fn page_item_from_common<'doc>(item: &'doc common::DisplayItem<'static>) -> Option<PageItem<'doc>> {
   match item {
     common::DisplayItem::Text(text) => Some(PageItem::Text(text_item_from_common(text))),
     common::DisplayItem::Image(image) => Some(PageItem::Image(image_item_from_common(image))),
@@ -750,16 +749,19 @@ fn page_item_from_common(item: &common::DisplayItem<'static>) -> Option<PageItem
   }
 }
 
-fn text_item_from_common(text: &common::TextRun<'static>) -> TextItem {
+fn text_item_from_common<'doc>(text: &'doc common::TextRun<'static>) -> TextItem<'doc> {
   TextItem {
     x_pt: text.origin.x.0,
     y_pt: text.origin.y.0,
     line_height_pt: text.line_height.0,
-    text: text.text.as_ref().to_string(),
+    text: Cow::Borrowed(text.text.as_ref()),
     style: text_style_from_common(&text.style),
     rotation_center_pt: text.rotation_center.map(|point| (point.x.0, point.y.0)),
-    hyperlink_url: text.hyperlink_url.as_ref().map(|url| url.to_string()),
-    dynamic_field: text.dynamic_field.as_ref().map(dynamic_field_to_owned),
+    hyperlink_url: text
+      .hyperlink_url
+      .as_ref()
+      .map(|url| Cow::Borrowed(url.as_ref())),
+    dynamic_field: text.dynamic_field.as_ref().map(dynamic_field_borrowed),
     form_widget_id: text.form_widget_id,
     paragraph_bidi: text.paragraph_bidi,
     preserve_text_portion: text.preserve_text_portion,
@@ -768,7 +770,7 @@ fn text_item_from_common(text: &common::TextRun<'static>) -> TextItem {
   }
 }
 
-fn image_item_from_common(image: &common::ImageItem<'static>) -> ImageItem {
+fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> ImageItem<'doc> {
   ImageItem {
     x_pt: image.bounds.origin.x.0,
     y_pt: image.bounds.origin.y.0,
@@ -778,10 +780,16 @@ fn image_item_from_common(image: &common::ImageItem<'static>) -> ImageItem {
     rotation_deg: image.rotation_degrees,
     flip_horizontal: image.flip_horizontal,
     flip_vertical: image.flip_vertical,
-    data: image.bytes.as_ref().to_vec(),
-    content_type: Some(image.content_type.to_string()),
-    alt_text: image.alt_text.as_ref().map(|text| text.to_string()),
-    hyperlink_url: image.hyperlink_url.as_ref().map(|url| url.to_string()),
+    data: Cow::Borrowed(image.bytes.as_ref()),
+    content_type: Some(Cow::Borrowed(image.content_type.as_ref())),
+    alt_text: image
+      .alt_text
+      .as_ref()
+      .map(|text| Cow::Borrowed(text.as_ref())),
+    hyperlink_url: image
+      .hyperlink_url
+      .as_ref()
+      .map(|url| Cow::Borrowed(url.as_ref())),
   }
 }
 
@@ -838,26 +846,26 @@ fn line_item_from_common(line: &common::LineItem<'static>) -> LineItem {
   }
 }
 
-fn link_area_from_common(link: &common::LinkArea<'static>) -> LinkAreaItem {
+fn link_area_from_common<'doc>(link: &'doc common::LinkArea<'static>) -> LinkAreaItem<'doc> {
   LinkAreaItem {
     x_pt: link.bounds.origin.x.0,
     y_pt: link.bounds.origin.y.0,
     width_pt: link.bounds.size.width.0,
     height_pt: link.bounds.size.height.0,
-    hyperlink_url: link.target.to_string(),
+    hyperlink_url: Cow::Borrowed(link.target.as_ref()),
   }
 }
 
-fn text_style_from_common(style: &common::TextStyle<'static>) -> TextStyle {
+fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> TextStyle<'doc> {
   TextStyle {
     font_family: style
       .font_family
       .as_ref()
-      .map(|value| Arc::<str>::from(value.as_ref())),
+      .map(|value| Cow::Borrowed(value.as_ref())),
     symbol_font_family: style
       .symbol_font_family
       .as_ref()
-      .map(|value| Arc::<str>::from(value.as_ref())),
+      .map(|value| Cow::Borrowed(value.as_ref())),
     font_size_pt: style.font_size.0,
     complex_font_size_pt: style.complex_font_size.map(|size| size.0),
     character_spacing_pt: style.character_spacing.0,
@@ -880,7 +888,9 @@ fn text_style_from_common(style: &common::TextStyle<'static>) -> TextStyle {
   }
 }
 
-fn dynamic_field_to_owned(field: &common::DynamicField<'static>) -> common::DynamicField<'static> {
+fn dynamic_field_borrowed<'doc>(
+  field: &'doc common::DynamicField<'static>,
+) -> common::DynamicField<'doc> {
   match field {
     common::DynamicField::Page => common::DynamicField::Page,
     common::DynamicField::NumPages => common::DynamicField::NumPages,
@@ -888,7 +898,7 @@ fn dynamic_field_to_owned(field: &common::DynamicField<'static>) -> common::Dyna
       style_name,
       from_bottom,
     } => common::DynamicField::StyleRef {
-      style_name: Cow::Owned(style_name.to_string()),
+      style_name: Cow::Borrowed(style_name.as_ref()),
       from_bottom: *from_bottom,
     },
   }
@@ -955,8 +965,8 @@ fn opacity(color: common::Color) -> f32 {
   f32::from(color.a) / 255.0
 }
 
-fn coalesced_writer_text_items(items: &[PageItem]) -> Vec<PageItem> {
-  let mut output: Vec<PageItem> = Vec::with_capacity(items.len());
+fn coalesced_writer_text_items<'doc>(items: &[PageItem<'doc>]) -> Vec<PageItem<'doc>> {
+  let mut output: Vec<PageItem<'doc>> = Vec::with_capacity(items.len());
   for item in items {
     let PageItem::Text(text) = item else {
       output.push(item.clone());
@@ -965,7 +975,7 @@ fn coalesced_writer_text_items(items: &[PageItem]) -> Vec<PageItem> {
     if let Some(PageItem::Text(previous)) = output.last_mut()
       && writer_text_items_coalesce(previous, text)
     {
-      previous.text.push_str(&text.text);
+      previous.text.to_mut().push_str(&text.text);
       previous.line_height_pt = previous.line_height_pt.max(text.line_height_pt);
       continue;
     }
@@ -974,7 +984,7 @@ fn coalesced_writer_text_items(items: &[PageItem]) -> Vec<PageItem> {
   output
 }
 
-fn writer_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
+fn writer_text_items_coalesce(current: &TextItem<'_>, next: &TextItem<'_>) -> bool {
   if current.pdf_text_segmentation != next.pdf_text_segmentation
     || current.form_widget_id.is_some()
     || next.form_widget_id.is_some()
@@ -1003,8 +1013,12 @@ fn writer_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
   (current_right - next.x_pt).abs() < 0.25
 }
 
-impl PaintText {
-  fn from_layout_text(text: &TextItem, owner: Option<PaintLineOwner>, page_width_pt: f32) -> Self {
+impl<'doc> PaintText<'doc> {
+  fn from_layout_text(
+    text: &TextItem<'doc>,
+    owner: Option<PaintLineOwner>,
+    page_width_pt: f32,
+  ) -> Self {
     let glyphs = if should_shape_pdf_glyphs(text) {
       shaped_pdf_glyphs(&text.text, &text.style)
     } else {
@@ -1081,8 +1095,8 @@ impl PaintText {
   }
 }
 
-struct PaintTextPortionSource<'a> {
-  text: &'a TextItem,
+struct PaintTextPortionSource<'a, 'doc> {
+  text: &'a TextItem<'doc>,
   baseline_y: f32,
   width_pt: f32,
   page_width_pt: f32,
@@ -1091,10 +1105,12 @@ struct PaintTextPortionSource<'a> {
   highlight: Option<PaintRect>,
   underline: Option<PaintStrokeLine>,
   strikethrough: Option<PaintStrokeLine>,
-  link: Option<PaintLink>,
+  link: Option<PaintLink<'doc>>,
 }
 
-fn text_paint_portions(source: PaintTextPortionSource<'_>) -> Vec<PaintTextPortion> {
+fn text_paint_portions<'doc>(
+  source: PaintTextPortionSource<'_, 'doc>,
+) -> Vec<PaintTextPortion<'doc>> {
   let PaintTextPortionSource {
     text,
     baseline_y,
@@ -1161,7 +1177,9 @@ fn text_paint_portions(source: PaintTextPortionSource<'_>) -> Vec<PaintTextPorti
   portions
 }
 
-fn text_portion_ranges(text: &TextItem) -> Vec<(PaintTextPortionKind, std::ops::Range<usize>)> {
+fn text_portion_ranges<'doc>(
+  text: &TextItem<'doc>,
+) -> Vec<(PaintTextPortionKind<'doc>, std::ops::Range<usize>)> {
   if text.text.is_empty() {
     return Vec::new();
   }
@@ -1219,9 +1237,9 @@ fn text_portion_ranges(text: &TextItem) -> Vec<(PaintTextPortionKind, std::ops::
   ranges
 }
 
-fn edge_whitespace_text_portion_ranges(
-  text: &TextItem,
-) -> Vec<(PaintTextPortionKind, std::ops::Range<usize>)> {
+fn edge_whitespace_text_portion_ranges<'doc>(
+  text: &TextItem<'doc>,
+) -> Vec<(PaintTextPortionKind<'doc>, std::ops::Range<usize>)> {
   let kind = if text.hyperlink_url.is_some() {
     PaintTextPortionKind::Link
   } else {
@@ -1307,7 +1325,11 @@ fn paint_line_for_portion(line: &PaintStrokeLine, x_pt: f32, width_pt: f32) -> P
   }
 }
 
-fn paint_link_for_portion(link: &PaintLink, x_pt: f32, width_pt: f32) -> PaintLink {
+fn paint_link_for_portion<'doc>(
+  link: &PaintLink<'doc>,
+  x_pt: f32,
+  width_pt: f32,
+) -> PaintLink<'doc> {
   PaintLink {
     x_pt,
     width_pt,
@@ -1317,7 +1339,7 @@ fn paint_link_for_portion(link: &PaintLink, x_pt: f32, width_pt: f32) -> PaintLi
 
 fn paint_clip_for_portion(
   clip: Option<PaintClipRect>,
-  kind: &PaintTextPortionKind,
+  kind: &PaintTextPortionKind<'_>,
   page_width_pt: f32,
 ) -> Option<PaintClipRect> {
   let mut clip = clip?;
@@ -1373,7 +1395,7 @@ fn paint_line_owners(
 
 fn draw_paint_item(
   surface: &mut Surface<'_>,
-  item: &PaintItem,
+  item: &PaintItem<'_>,
   fonts: &FontSet,
   internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
@@ -1421,7 +1443,11 @@ fn draw_paint_item(
   }
 }
 
-fn paint_item_intersects_page(item: &PaintItem, page_width_pt: f32, page_height_pt: f32) -> bool {
+fn paint_item_intersects_page(
+  item: &PaintItem<'_>,
+  page_width_pt: f32,
+  page_height_pt: f32,
+) -> bool {
   // the page rectangle before SwRootFrame::PaintSwFrame(); drawing layers also
   // receive the page frame in sw/source/core/view/vdraw.cxx.
   let Some((left, top, right, bottom)) = paint_item_bounds(item) else {
@@ -1430,7 +1456,7 @@ fn paint_item_intersects_page(item: &PaintItem, page_width_pt: f32, page_height_
   right > 0.0 && bottom > 0.0 && left < page_width_pt && top < page_height_pt
 }
 
-fn paint_item_bounds(item: &PaintItem) -> Option<(f32, f32, f32, f32)> {
+fn paint_item_bounds(item: &PaintItem<'_>) -> Option<(f32, f32, f32, f32)> {
   match item {
     PaintItem::Text(text) => {
       let item = &text.item;
@@ -1558,7 +1584,7 @@ fn pdf_outline_node(
 
 fn draw_text_item(
   surface: &mut Surface<'_>,
-  text: &PaintText,
+  text: &PaintText<'_>,
   fonts: &FontSet,
   internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
@@ -1746,7 +1772,7 @@ fn draw_paint_stroke_line(surface: &mut Surface<'_>, line: &PaintStrokeLine) {
   }
 }
 
-fn draw_missing_image(surface: &mut Surface<'_>, image: &ImageItem) {
+fn draw_missing_image(surface: &mut Surface<'_>, image: &ImageItem<'_>) {
   surface.set_fill(None);
   surface.set_stroke(Some(Stroke {
     width: 0.5,
@@ -1875,7 +1901,7 @@ fn draw_rect_path(surface: &mut Surface<'_>, rect: &RectItem) {
   }
 }
 
-fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem, pdf_image: Image) {
+fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, pdf_image: Image) {
   if image.width_pt <= f32::EPSILON || image.height_pt <= f32::EPSILON {
     return;
   }
@@ -1930,7 +1956,7 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem, pdf_image: Imag
   }
 }
 
-fn shaped_pdf_glyphs(text: &str, style: &TextStyle) -> Option<PaintGlyphRun> {
+fn shaped_pdf_glyphs(text: &str, style: &TextStyle<'_>) -> Option<PaintGlyphRun> {
   let shaped = shape_text(text, style)?;
   let mut font_runs = Vec::<PaintGlyphFontRun>::new();
   let mut x_offset_pt = 0.0;
@@ -1967,7 +1993,7 @@ fn shaped_pdf_glyphs(text: &str, style: &TextStyle) -> Option<PaintGlyphRun> {
   })
 }
 
-fn should_shape_pdf_glyphs(text: &TextItem) -> bool {
+fn should_shape_pdf_glyphs(text: &TextItem<'_>) -> bool {
   // glyphs. This renderer only has text items at PDF time, so keep ordinary
   // Latin runs on krilla's text path and reserve explicit glyph painting for
   // cases where we need fallback faces or complex ActualText ranges.
@@ -1988,7 +2014,7 @@ fn requires_shaped_pdf_glyph(ch: char) -> bool {
   !ch.is_ascii()
 }
 
-fn text_vertical_scale(style: &TextStyle) -> f32 {
+fn text_vertical_scale(style: &TextStyle<'_>) -> f32 {
   if style.bold
     && (style.font_size_pt - 11.0).abs() < 0.01
     && style
@@ -2012,7 +2038,7 @@ fn rect_path(x: f32, y: f32, width: f32, height: f32) -> Option<krilla::geom::Pa
   path.finish()
 }
 
-fn fill(style: &TextStyle) -> Fill {
+fn fill(style: &TextStyle<'_>) -> Fill {
   Fill {
     paint: rgb::Color::new(style.color.r, style.color.g, style.color.b).into(),
     opacity: NormalizedF32::new(style.opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ZERO),
@@ -2020,7 +2046,7 @@ fn fill(style: &TextStyle) -> Fill {
   }
 }
 
-fn stroke(style: &TextStyle) -> Option<Stroke> {
+fn stroke(style: &TextStyle<'_>) -> Option<Stroke> {
   let color = style.outline_color?;
   if style.outline_width_pt <= f32::EPSILON {
     return None;

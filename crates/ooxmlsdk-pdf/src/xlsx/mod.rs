@@ -11,6 +11,6 @@ pub(crate) fn layout(
   let options = ooxmlsdk_layout::options::LayoutOptions {
     source_file_name: options.source_file_name.clone(),
   };
-  let layout = ooxmlsdk_layout::xlsx::layout(package, &options)?;
-  Ok(crate::layout::from_compat_document(layout))
+  let layout = ooxmlsdk_layout::xlsx::layout_document(package, &options)?;
+  Ok(crate::layout::from_common_document(layout))
 }

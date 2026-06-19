@@ -81,7 +81,15 @@ pub struct TextRun<'doc> {
   pub form_widget_id: Option<u32>,
   pub paragraph_bidi: bool,
   pub preserve_text_portion: bool,
+  pub pdf_text_segmentation: PdfTextSegmentation,
   pub source: Option<DisplaySource<'doc>>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PdfTextSegmentation {
+  #[default]
+  Line,
+  Portion,
 }
 
 #[derive(Clone, Debug, PartialEq)]

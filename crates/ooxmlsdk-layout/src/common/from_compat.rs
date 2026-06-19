@@ -109,6 +109,10 @@ fn text_run_from_compat(item: legacy::TextItem) -> TextRun<'static> {
     form_widget_id: item.form_widget_id,
     paragraph_bidi: item.paragraph_bidi,
     preserve_text_portion: item.preserve_text_portion,
+    pdf_text_segmentation: match item.pdf_text_segmentation {
+      legacy::PdfTextSegmentation::Line => PdfTextSegmentation::Line,
+      legacy::PdfTextSegmentation::Portion => PdfTextSegmentation::Portion,
+    },
     source: None,
   }
 }

@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use lopdf::{Document as LopdfDocument, Object as LopdfObject, dictionary};
 
 use crate::error::{PdfError, Result};
-use crate::layout::{LayoutDocument, PageItem};
-use ooxmlsdk_layout::compat::{FormWidget, FormWidgetKind};
+use crate::layout::{FormWidget, FormWidgetKind, LayoutDocument, PageItem};
 use ooxmlsdk_layout::text_metrics::measure_text;
 // SwContentControlPortion::DescribePDFControl() expands content-control widget
 // bounds by 20 twips before handing them to PDFWriter.

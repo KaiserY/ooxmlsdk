@@ -1,35 +1,31 @@
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
-use std::io::Cursor;
-use std::sync::{Arc, Mutex};
 
-use image::codecs::jpeg::JpegEncoder;
-use image::{GenericImageView, ImageFormat as RasterImageFormat, Rgba};
+use krilla::Document;
 use krilla::action::{Action, LinkAction};
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::color::rgb;
-use krilla::configure::{Configuration, PdfVersion};
 use krilla::destination::{Destination, XyzDestination};
 use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
-use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
+use krilla::image::Image;
 use krilla::num::NormalizedF32;
 use krilla::outline::{Outline, OutlineNode};
 use krilla::page::PageSettings;
 use krilla::paint::{Fill, FillRule, LineJoin, Stroke};
 use krilla::surface::Surface;
-use krilla::text::{Font, GlyphId, KrillaGlyph, TextDirection};
-use krilla::{Document, SerializeSettings};
+use krilla::text::{GlyphId, KrillaGlyph, TextDirection};
 
+use super::fonts::FontSet;
 use super::form_widgets::inject_form_widget_annotations;
+use super::image::decode_image;
+use super::settings::serialize_settings;
 use crate::error::{PdfError, Result};
 use crate::layout::{
-  FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind, LinkAreaItem,
-  OutlineEntry, PageItem, PdfTextSegmentation, PolylineItem, RectItem, TextItem,
+  DynamicFieldKind, FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind,
+  LinkAreaItem, OutlineEntry, PageItem, PdfTextSegmentation, PolylineItem, RectItem, RgbColor,
+  TextItem, TextStyle,
 };
 use crate::options::PdfOptions;
-use ooxmlsdk_layout::compat::{DynamicFieldKind, RgbColor, TextStyle};
-use ooxmlsdk_layout::fonts::{FontFaceData, cached_text_face};
-use ooxmlsdk_layout::render::emf_wmf;
+use ooxmlsdk_layout::fonts::FontFaceData;
 use ooxmlsdk_layout::text_metrics::{
   baseline_offset_in_line, measure_text, shape_text, text_decoration_metrics, vertical_metrics,
 };
@@ -227,7 +223,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
         | PaintItem::Polyline(_) => true,
       })
   }));
-  let mut pdf = Document::new_with(serialize_settings(options));
+  let mut pdf = Document::new_with(serialize_settings(options)?);
   let fonts = FontSet::load()?;
 
   for page in &paint.pages {
@@ -1601,11 +1597,6 @@ fn requires_shaped_pdf_glyph(ch: char) -> bool {
   !ch.is_ascii()
 }
 
-fn font_from_face(face: &FontFaceData) -> Option<Font> {
-  let data: Arc<dyn AsRef<[u8]> + Send + Sync> = face.data.clone();
-  Font::new(data.into(), face.index)
-}
-
 fn text_vertical_scale(style: &TextStyle) -> f32 {
   if style.bold
     && (style.font_size_pt - 11.0).abs() < 0.01
@@ -1628,303 +1619,6 @@ fn rect_path(x: f32, y: f32, width: f32, height: f32) -> Option<krilla::geom::Pa
   path.line_to(x, y + height);
   path.close();
   path.finish()
-}
-
-fn decode_image(data: &[u8], content_type: Option<&str>, options: &PdfOptions) -> Result<Image> {
-  if let Some(raster) = emf_wmf::decode_metafile_as_raster(data, content_type)
-    .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF image: {err}")))?
-  {
-    return match raster.content_type {
-      "image/jpeg" => Image::from_jpeg(raster.data.into(), false).map_err(PdfError::Krilla),
-      "image/png" => {
-        if let Some(quality) = options.jpeg_quality {
-          let raster = image::load_from_memory_with_format(&raster.data, RasterImageFormat::Png)
-            .map_err(|err| {
-              PdfError::Krilla(format!(
-                "failed to decode EMF/WMF PNG for JPEG export: {err}"
-              ))
-            })?;
-          let jpeg = encode_jpeg(raster, quality)?;
-          return Image::from_jpeg(jpeg.into(), false).map_err(PdfError::Krilla);
-        }
-        let image = decode_png_relaxed(&raster.data)
-          .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF PNG: {err}")))?;
-        Image::from_custom(image, false).map_err(PdfError::Krilla)
-      }
-      content_type => Err(PdfError::Krilla(format!(
-        "unsupported EMF/WMF raster content type: {content_type}"
-      ))),
-    };
-  }
-
-  let format = content_type
-    .and_then(image_format_from_content_type)
-    .or_else(|| image::guess_format(data).ok());
-
-  if matches!(format, Some(RasterImageFormat::Jpeg))
-    && let Ok(image) = Image::from_jpeg(data.to_vec().into(), false)
-  {
-    return Ok(image);
-  }
-  if matches!(format, Some(RasterImageFormat::Png))
-    && let Ok(image) = decode_png_relaxed(data)
-  {
-    return Image::from_custom(image, false).map_err(PdfError::Krilla);
-  }
-
-  let raster = match format {
-    Some(format) => image::load_from_memory_with_format(data, format),
-    None => image::load_from_memory(data),
-  };
-
-  let raster =
-    raster.map_err(|err| PdfError::Krilla(format!("failed to decode raster image: {err}")))?;
-  Image::from_custom(PdfRasterImage::from_dynamic(raster), false).map_err(PdfError::Krilla)
-}
-
-fn encode_jpeg(image: image::DynamicImage, quality: u8) -> Result<Vec<u8>> {
-  let rgb = image.to_rgb8();
-  let (width, height) = rgb.dimensions();
-  let mut jpeg = Vec::new();
-  JpegEncoder::new_with_quality(&mut jpeg, quality)
-    .encode(rgb.as_raw(), width, height, image::ExtendedColorType::Rgb8)
-    .map_err(|err| PdfError::Krilla(format!("failed to encode JPEG image: {err}")))?;
-  Ok(jpeg)
-}
-
-fn decode_png_relaxed(data: &[u8]) -> std::result::Result<PdfRasterImage, String> {
-  let mut decoder = png::Decoder::new(Cursor::new(data));
-  decoder.ignore_checksums(true);
-  decoder.set_transformations(png::Transformations::normalize_to_color8());
-  let mut reader = decoder.read_info().map_err(|err| err.to_string())?;
-  let buffer_size = reader
-    .output_buffer_size()
-    .ok_or_else(|| "PNG output buffer size is unavailable".to_string())?;
-  let mut buffer = vec![0; buffer_size];
-  let info = reader
-    .next_frame(&mut buffer)
-    .map_err(|err| err.to_string())?;
-  buffer.truncate(info.buffer_size());
-  Ok(PdfRasterImage::from_png_frame(
-    info.width,
-    info.height,
-    info.color_type,
-    &buffer,
-  ))
-}
-
-fn image_format_from_content_type(content_type: &str) -> Option<RasterImageFormat> {
-  match content_type {
-    "image/png" => Some(RasterImageFormat::Png),
-    "image/jpeg" | "image/jpg" => Some(RasterImageFormat::Jpeg),
-    "image/gif" => Some(RasterImageFormat::Gif),
-    "image/webp" => Some(RasterImageFormat::WebP),
-    _ => None,
-  }
-}
-
-#[derive(Clone, Debug)]
-struct PdfRasterImage {
-  pixels: Arc<PdfRasterPixels>,
-}
-
-#[derive(Debug)]
-struct PdfRasterPixels {
-  width: u32,
-  height: u32,
-  rgb: Vec<u8>,
-  alpha: Option<Vec<u8>>,
-}
-
-impl PdfRasterImage {
-  fn from_dynamic(image: image::DynamicImage) -> Self {
-    let (width, height) = image.dimensions();
-    let rgba = image.to_rgba8();
-    let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
-    let mut alpha = Vec::with_capacity(width as usize * height as usize);
-    let mut opaque = true;
-
-    for Rgba([r, g, b, a]) in rgba.pixels() {
-      rgb.extend_from_slice(&[*r, *g, *b]);
-      alpha.push(*a);
-      opaque &= *a == u8::MAX;
-    }
-
-    Self {
-      pixels: Arc::new(PdfRasterPixels {
-        width,
-        height,
-        rgb,
-        alpha: (!opaque).then_some(alpha),
-      }),
-    }
-  }
-
-  fn from_png_frame(width: u32, height: u32, color_type: png::ColorType, data: &[u8]) -> Self {
-    let pixel_count = width as usize * height as usize;
-    let mut rgb = Vec::with_capacity(pixel_count * 3);
-    let mut alpha = Vec::with_capacity(pixel_count);
-    let mut opaque = true;
-
-    match color_type {
-      png::ColorType::Grayscale => {
-        for value in data {
-          rgb.extend_from_slice(&[*value, *value, *value]);
-        }
-      }
-      png::ColorType::GrayscaleAlpha => {
-        for pixel in data.chunks_exact(2) {
-          rgb.extend_from_slice(&[pixel[0], pixel[0], pixel[0]]);
-          alpha.push(pixel[1]);
-          opaque &= pixel[1] == u8::MAX;
-        }
-      }
-      png::ColorType::Rgb => {
-        rgb.extend_from_slice(data);
-      }
-      png::ColorType::Rgba => {
-        for pixel in data.chunks_exact(4) {
-          rgb.extend_from_slice(&pixel[..3]);
-          alpha.push(pixel[3]);
-          opaque &= pixel[3] == u8::MAX;
-        }
-      }
-      png::ColorType::Indexed => {}
-    }
-
-    Self {
-      pixels: Arc::new(PdfRasterPixels {
-        width,
-        height,
-        rgb,
-        alpha: (!opaque && !alpha.is_empty()).then_some(alpha),
-      }),
-    }
-  }
-}
-
-impl Hash for PdfRasterImage {
-  fn hash<H: Hasher>(&self, state: &mut H) {
-    self.pixels.width.hash(state);
-    self.pixels.height.hash(state);
-    self.pixels.rgb.hash(state);
-    self.pixels.alpha.hash(state);
-  }
-}
-
-impl CustomImage for PdfRasterImage {
-  fn color_channel(&self) -> &[u8] {
-    &self.pixels.rgb
-  }
-
-  fn alpha_channel(&self) -> Option<&[u8]> {
-    self.pixels.alpha.as_deref()
-  }
-
-  fn bits_per_component(&self) -> BitsPerComponent {
-    BitsPerComponent::Eight
-  }
-
-  fn size(&self) -> (u32, u32) {
-    (self.pixels.width, self.pixels.height)
-  }
-
-  fn icc_profile(&self) -> Option<&[u8]> {
-    None
-  }
-
-  fn color_space(&self) -> ImageColorspace {
-    ImageColorspace::Rgb
-  }
-}
-
-fn serialize_settings(options: &PdfOptions) -> SerializeSettings {
-  SerializeSettings {
-    compress_content_streams: options.compress_content_streams,
-    no_device_cs: true,
-    ascii_compatible: false,
-    xmp_metadata: true,
-    cmyk_profile: None,
-    configuration: Configuration::new_with_version(PdfVersion::Pdf17),
-    enable_tagging: false,
-    render_svg_glyph_fn: krilla_svg::render_svg_glyph,
-  }
-}
-
-struct FontSet {
-  fallback: Font,
-  fonts: Mutex<HashMap<FontKey, Font>>,
-  face_fonts: Mutex<HashMap<FontFaceData, Font>>,
-}
-
-impl FontSet {
-  fn load() -> Result<Self> {
-    let fallback_style = TextStyle::default();
-    Ok(Self {
-      fallback: load_font(&fallback_style)?,
-      fonts: Mutex::new(HashMap::new()),
-      face_fonts: Mutex::new(HashMap::new()),
-    })
-  }
-
-  fn select(&self, style: &TextStyle) -> Font {
-    let key = FontKey {
-      family: style.font_family.as_deref().map(str::to_string),
-      bold: style.bold,
-      italic: style.italic,
-    };
-    if let Ok(fonts) = self.fonts.lock()
-      && let Some(font) = fonts.get(&key)
-    {
-      return font.clone();
-    }
-
-    let loaded = load_font(style).unwrap_or_else(|_| self.fallback.clone());
-    let Ok(mut fonts) = self.fonts.lock() else {
-      return loaded;
-    };
-    fonts.entry(key).or_insert(loaded).clone()
-  }
-
-  fn select_face(&self, face: &FontFaceData) -> Font {
-    if let Ok(fonts) = self.face_fonts.lock()
-      && let Some(font) = fonts.get(face)
-    {
-      return font.clone();
-    }
-
-    let loaded = font_from_face(face).unwrap_or_else(|| self.fallback.clone());
-    let Ok(mut fonts) = self.face_fonts.lock() else {
-      return loaded;
-    };
-    fonts.entry(face.clone()).or_insert(loaded).clone()
-  }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct FontKey {
-  family: Option<String>,
-  bold: bool,
-  italic: bool,
-}
-
-fn load_font(style: &TextStyle) -> Result<Font> {
-  if let Some(face) = cached_text_face(style)
-    && let Some(font) = font_from_face(&face)
-  {
-    return Ok(font);
-  }
-
-  Err(PdfError::Krilla(format!(
-    "required PDF font was not found: family={} bold={} italic={}",
-    style
-      .font_family
-      .as_deref()
-      .filter(|family| !family.trim().is_empty())
-      .unwrap_or("<document-default>"),
-    style.bold,
-    style.italic
-  )))
 }
 
 fn fill(style: &TextStyle) -> Fill {

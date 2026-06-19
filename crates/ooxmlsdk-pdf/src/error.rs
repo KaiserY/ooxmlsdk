@@ -13,6 +13,9 @@ pub enum PdfError {
   #[error("krilla failed to produce PDF output: {0}")]
   Krilla(String),
 
+  #[error("invalid PDF options: {0}")]
+  Options(String),
+
   #[error("lopdf failed to patch PDF output: {0}")]
   Lopdf(String),
 }

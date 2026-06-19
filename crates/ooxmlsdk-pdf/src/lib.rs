@@ -28,7 +28,11 @@ pub use ooxmlsdk_layout::pptx::{
   PptxBulletParagraphSummary, PptxDrawShapeSummary, PptxLayoutSummary,
   PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
 };
-pub use options::{PdfOptions, PdfStandard};
+pub use options::{
+  PdfFormOptions, PdfFormSubmitFormat, PdfGeneralOptions, PdfImageOptions, PdfLinkDefaultAction,
+  PdfLinkOptions, PdfMetadataOptions, PdfOptions, PdfPageLayout, PdfSpreadsheetOptions,
+  PdfStandard, PdfViewerMagnification, PdfViewerOptions, PdfViewerPageMode, PdfWatermarkOptions,
+};
 
 /// Convert a DOCX stream into PDF bytes.
 pub fn convert_docx<R>(reader: R, options: PdfOptions) -> Result<Vec<u8>>
@@ -54,8 +58,8 @@ pub fn convert_wordprocessing_document(
   let layout_options = ooxmlsdk_layout::options::LayoutOptions {
     source_file_name: options.source_file_name.clone(),
   };
-  let pages = ooxmlsdk_layout::docx::layout(document, &layout_options)?;
-  let pages = layout::from_compat_document(pages);
+  let pages = ooxmlsdk_layout::docx::layout_document(document, &layout_options)?;
+  let pages = layout::from_common_document(pages);
   render::krilla::render(&pages, &options)
 }
 
@@ -152,7 +156,7 @@ pub fn convert_presentation_document(
   let layout_options = ooxmlsdk_layout::options::LayoutOptions {
     source_file_name: options.source_file_name.clone(),
   };
-  let pages = ooxmlsdk_layout::pptx::layout(document, &layout_options)?;
-  let pages = layout::from_compat_document(pages);
+  let pages = ooxmlsdk_layout::pptx::layout_document(document, &layout_options)?;
+  let pages = layout::from_common_document(pages);
   render::krilla::render(&pages, &options)
 }

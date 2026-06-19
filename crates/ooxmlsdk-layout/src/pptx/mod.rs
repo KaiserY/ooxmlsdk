@@ -10,6 +10,7 @@ mod slide_fragment;
 
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 
+use crate::common::{LayoutEngineKind, layout_document_from_compat};
 use crate::compat::LayoutDocument;
 use crate::error::Result;
 use crate::options::LayoutOptions;
@@ -92,6 +93,17 @@ pub fn layout(
 ) -> Result<LayoutDocument> {
   let import = PowerPointImport::import_document(package)?;
   Ok(display::lower_to_layout_document(&import))
+}
+
+pub fn layout_document(
+  package: &mut PresentationDocument,
+  options: &LayoutOptions,
+) -> Result<crate::common::LayoutDocument<'static>> {
+  let document = layout(package, options)?;
+  Ok(layout_document_from_compat(
+    LayoutEngineKind::Pptx,
+    document,
+  ))
 }
 
 pub fn inspect_layout(package: &mut PresentationDocument) -> Result<PptxLayoutSummary> {

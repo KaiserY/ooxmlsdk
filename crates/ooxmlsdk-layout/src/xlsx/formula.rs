@@ -912,7 +912,7 @@ fn formula_error_value(value: &str) -> ooxmlsdk_formula::FormulaErrorValue {
     "#SPILL!" => ooxmlsdk_formula::FormulaErrorValue::Spill,
     "#CALC!" => ooxmlsdk_formula::FormulaErrorValue::Calc,
     "Err:502" => ooxmlsdk_formula::FormulaErrorValue::IllegalArgument,
-    _ => ooxmlsdk_formula::FormulaErrorValue::Unknown,
+    _ => ooxmlsdk_formula::FormulaErrorValue::Error,
   }
 }
 
@@ -928,9 +928,31 @@ fn calc_error_text(value: ooxmlsdk_formula::FormulaErrorValue) -> &'static str {
     ooxmlsdk_formula::FormulaErrorValue::GettingData => "#GETTING_DATA",
     ooxmlsdk_formula::FormulaErrorValue::Spill => "#SPILL!",
     ooxmlsdk_formula::FormulaErrorValue::Calc => "#CALC!",
+    ooxmlsdk_formula::FormulaErrorValue::Error => "#ERROR!",
+    ooxmlsdk_formula::FormulaErrorValue::NotImplemented => "#N/IMPL!",
+    ooxmlsdk_formula::FormulaErrorValue::CircularReference => "#CIRC!",
+    ooxmlsdk_formula::FormulaErrorValue::IllegalChar => "Err:501",
     ooxmlsdk_formula::FormulaErrorValue::IllegalArgument => "Err:502",
+    ooxmlsdk_formula::FormulaErrorValue::IllegalParameter => "Err:504",
+    ooxmlsdk_formula::FormulaErrorValue::Pair => "Err:507",
+    ooxmlsdk_formula::FormulaErrorValue::PairExpected => "Err:508",
+    ooxmlsdk_formula::FormulaErrorValue::OperatorExpected => "Err:509",
+    ooxmlsdk_formula::FormulaErrorValue::VariableExpected => "Err:510",
     ooxmlsdk_formula::FormulaErrorValue::Parameter => "Err:511",
-    ooxmlsdk_formula::FormulaErrorValue::Unknown => "#UNKNOWN!",
+    ooxmlsdk_formula::FormulaErrorValue::CodeOverflow => "Err:512",
+    ooxmlsdk_formula::FormulaErrorValue::StringOverflow => "Err:513",
+    ooxmlsdk_formula::FormulaErrorValue::StackOverflow => "Err:514",
+    ooxmlsdk_formula::FormulaErrorValue::InvalidVariable => "Err:516",
+    ooxmlsdk_formula::FormulaErrorValue::InvalidOpcode => "Err:517",
+    ooxmlsdk_formula::FormulaErrorValue::InvalidStackValue => "Err:518",
+    ooxmlsdk_formula::FormulaErrorValue::InvalidToken => "Err:520",
+    ooxmlsdk_formula::FormulaErrorValue::NoConvergence => "Err:523",
+    ooxmlsdk_formula::FormulaErrorValue::NoAddin => "Err:530",
+    ooxmlsdk_formula::FormulaErrorValue::NoMacro => "Err:531",
+    ooxmlsdk_formula::FormulaErrorValue::NestedArray => "Err:533",
+    ooxmlsdk_formula::FormulaErrorValue::MatrixSize => "Err:538",
+    ooxmlsdk_formula::FormulaErrorValue::BadArrayContent => "Err:539",
+    ooxmlsdk_formula::FormulaErrorValue::LinkFormulaNeedingCheck => "Err:540",
   }
 }
 

@@ -42,6 +42,7 @@ use quick_xml::Writer;
 use quick_xml::escape::unescape;
 use quick_xml::events::{Event, attributes::Attribute};
 
+use crate::common::{LayoutEngineKind, layout_document_from_compat};
 use crate::error::Result;
 use crate::options::LayoutOptions;
 use crate::render::chart as shared_chart;
@@ -264,6 +265,17 @@ pub fn layout(
 ) -> Result<crate::compat::LayoutDocument> {
   let document = extract(package, options)?;
   Ok(layout::layout_document(&document, options))
+}
+
+pub fn layout_document(
+  package: &mut WordprocessingDocument,
+  options: &LayoutOptions,
+) -> Result<crate::common::LayoutDocument<'static>> {
+  let document = layout(package, options)?;
+  Ok(layout_document_from_compat(
+    LayoutEngineKind::Docx,
+    document,
+  ))
 }
 
 pub fn inspect_layout(

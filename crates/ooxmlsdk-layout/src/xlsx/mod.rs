@@ -24,6 +24,7 @@ mod worksheet;
 
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 
+use crate::common::{LayoutEngineKind, layout_document_from_compat};
 use crate::compat::LayoutDocument;
 use crate::error::Result;
 use crate::options::LayoutOptions;
@@ -38,4 +39,15 @@ pub fn layout(
 ) -> Result<LayoutDocument> {
   let import = ExcelImport::import_document(package, _options)?;
   Ok(display::lower_to_layout_document(&import))
+}
+
+pub fn layout_document(
+  package: &mut SpreadsheetDocument,
+  options: &LayoutOptions,
+) -> Result<crate::common::LayoutDocument<'static>> {
+  let document = layout(package, options)?;
+  Ok(layout_document_from_compat(
+    LayoutEngineKind::Xlsx,
+    document,
+  ))
 }

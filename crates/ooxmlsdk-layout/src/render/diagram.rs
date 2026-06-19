@@ -345,7 +345,6 @@ pub fn layout_shapes(
   bounds: DiagramBounds,
   accent_fill: RgbColor,
 ) -> Vec<DiagramShape> {
-  // Source: LibreOffice oox/source/drawingml/diagram/diagram.cxx
   // SmartArtDiagram::createShapeHierarchyFromModel() creates shapes from the
   // diagram data model, then applies layout atoms. This is the shared entry
   // point for that same model-to-shapes stage.

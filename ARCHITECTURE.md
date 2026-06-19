@@ -208,14 +208,9 @@ Package fixtures live under `../ooxmlsdk-test-suite/`:
 - `fixtures/ooxmlsdk-test/misc/`: fixtures intentionally outside upstream assets and outside spec buckets
 - `fixtures/Open-XML-SDK/`: raw XML assets copied from upstream tests for focused assertions
 
-The remaining `test-data/ooxmlsdk-test/libreoffice/` directory is legacy
-LibreOffice package fixture staging; move it to `../ooxmlsdk-test-suite/` before
-adding new LibreOffice package round-trip coverage.
-
 LibreOffice PDF/layout parity fixtures live under
-`../ooxmlsdk-test-suite/corpus/LibreOffice/`. The remaining
-`test-data/ooxmlsdk-pdf-test/` directory is legacy fixture staging used by a
-small number of local layout unit tests; do not add new coverage there.
+`../ooxmlsdk-test-suite/corpus/LibreOffice/`. Do not add new fixture corpus
+files under this repository.
 
 ### Round-Trip Coverage
 

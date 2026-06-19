@@ -26,7 +26,6 @@ impl GraphicalObjectFrameContext {
     slide_persist: &SlidePersist,
     shape: &mut Shape,
   ) {
-    // Source: LibreOffice oox/source/drawingml/graphicshapecontext.cxx
     // GraphicalObjectFrameContext dispatches graphicData by URI, while the
     // PPT parent handles ext drawings at p:graphicFrame end.
     let uri = graphic_data.uri.as_str();

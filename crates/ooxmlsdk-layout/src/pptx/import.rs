@@ -44,7 +44,6 @@ pub(crate) struct ThemeFragmentRecord {
 
 impl PowerPointImport {
   pub(crate) fn import_document(package: &mut PresentationDocument) -> Result<Self> {
-    // Source: LibreOffice oox/source/ppt/pptimport.cxx
     // PowerPointImport::importDocument resolves the officeDocument part,
     // imports the presentation fragment, then imports presProps when present.
     let presentation_part = package.presentation_part()?;
@@ -293,7 +292,6 @@ impl PowerPointImport {
     package: &mut PresentationDocument,
     presentation_part: &PresentationPart,
   ) -> Result<()> {
-    // Source: LibreOffice PowerPointImport::getTableStyles lazily imports the
     // tableStyles relationship from the office document. The Rust importer
     // materializes it once after the presentation traversal so display/model
     // users can resolve table style IDs without reparsing package state.

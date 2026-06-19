@@ -60,7 +60,6 @@ impl CommentsCatalog {
     comments_part: Option<WorksheetCommentsPart>,
     threaded_parts: Vec<WorksheetThreadedCommentsPart>,
   ) -> Result<Self> {
-    // Source: LibreOffice sc/source/filter/oox/commentsbuffer.cxx and
     // threadedcommentsfragment.cxx. Legacy comments create notes; threaded
     // comments are attached to matching legacy notes by root id/cell later.
     Ok(Self {

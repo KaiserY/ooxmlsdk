@@ -229,4 +229,4 @@ application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-C-01 | `test-data/wml/comments.docx` | comments.xml with two comments (id=1 with date+initials, id=2 with date only); body with commentRangeStart/End as paragraph children; commentReference as run child; annotationRef inside comment content |
+| WML-C-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/comments.docx` | comments.xml with two comments (id=1 with date+initials, id=2 with date only); body with commentRangeStart/End as paragraph children; commentReference as run child; annotationRef inside comment content |

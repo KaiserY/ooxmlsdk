@@ -687,7 +687,7 @@ the `Id` values in the master's `.rels` file.
 
 | ID | File | Properties covered |
 |----|------|-------------------|
-| PML-H-01 | `test-data/pml/hierarchy_basic.pptx` | Single master, two layouts (title + obj), one slide per layout; relationship chain; clrMap; sldLayoutIdLst |
-| PML-H-02 | `test-data/pml/hierarchy_multilevel.pptx` | Body placeholder with lvl 0–2 text; inherited geometry (empty spPr); txStyles titleStyle/bodyStyle |
-| PML-H-03 | `test-data/pml/hierarchy_clrmap_override.pptx` | Slide with overrideClrMapping (dark/inverted palette); contrast with masterClrMapping sibling slide |
-| PML-H-04 | `test-data/pml/hierarchy_preserve.pptx` | Layout with preserve="1" not referenced by any slide; verifies layout is retained on round-trip |
+| PML-H-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/hierarchy_basic.pptx` | Single master, two layouts (title + obj), one slide per layout; relationship chain; clrMap; sldLayoutIdLst |
+| PML-H-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/hierarchy_multilevel.pptx` | Body placeholder with lvl 0–2 text; inherited geometry (empty spPr); txStyles titleStyle/bodyStyle |
+| PML-H-03 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/hierarchy_clrmap_override.pptx` | Slide with overrideClrMapping (dark/inverted palette); contrast with masterClrMapping sibling slide |
+| PML-H-04 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/hierarchy_preserve.pptx` | Layout with preserve="1" not referenced by any slide; verifies layout is retained on round-trip |

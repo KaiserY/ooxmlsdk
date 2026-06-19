@@ -306,7 +306,6 @@ impl Color {
 }
 
 fn best_solid_gradient_color(fill: &a::GradientFill) -> Option<Color> {
-  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
   // FillProperties::getBestSolidColor() uses the first gradient stop, or the
   // second stop when there are more than two stops.
   let stops = &fill.gradient_stop_list.as_ref()?.gradient_stop;
@@ -319,7 +318,6 @@ fn best_solid_gradient_color(fill: &a::GradientFill) -> Option<Color> {
 }
 
 fn best_solid_pattern_color(fill: &a::PatternFill) -> Option<Color> {
-  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
   // prefers used pattern background color, otherwise foreground color.
   fill
     .background_color

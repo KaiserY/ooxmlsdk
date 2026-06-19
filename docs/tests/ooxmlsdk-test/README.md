@@ -8,10 +8,6 @@ The focused package test crate and its fixtures have moved to the adjacent
 - Open XML SDK package corpus: `../ooxmlsdk-test-suite/corpus/Open-XML-SDK`
 - Open XML SDK raw XML fixtures: `../ooxmlsdk-test-suite/fixtures/Open-XML-SDK`
 
-The remaining `test-data/ooxmlsdk-test/libreoffice/` tree in this repository is
-legacy LibreOffice package fixture staging. Move it into
-`../ooxmlsdk-test-suite/` before adding LibreOffice package round-trip coverage.
-
 Moved buckets:
 
 - `Open-XML-SDK/`: former package fixtures now resolve through the suite corpus.
@@ -30,7 +26,6 @@ Round-trip policy:
   walks only `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/specs/` as a
   lightweight smoke test, and only that subtree participates in
   `specs/known_failures.toml`.
-- `test-data/ooxmlsdk-pdf-test/` is legacy local fixture staging and is
-  excluded from package round-trip coverage. PDF/layout parity coverage lives
-  in `../ooxmlsdk-test-suite/crates/ooxmlsdk-pdf-test` and
+- PDF/layout parity coverage lives in
+  `../ooxmlsdk-test-suite/crates/ooxmlsdk-pdf-test` and
   `../ooxmlsdk-test-suite/crates/ooxmlsdk-layout-test`.

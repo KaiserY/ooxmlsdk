@@ -307,7 +307,6 @@ impl WorkbookCatalog {
     package: &mut SpreadsheetDocument,
     workbook_part: &WorkbookPart,
   ) -> Result<Self> {
-    // Source: LibreOffice sc/source/filter/oox/workbookfragment.cxx
     // finalizeImport imports persons, connections, custom XML, xmlMaps,
     // external links, revisions, and VBA through workbook-level relationships.
     let external_reference_ids = workbook_part

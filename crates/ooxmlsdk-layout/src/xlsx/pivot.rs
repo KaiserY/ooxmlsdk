@@ -319,7 +319,6 @@ pub(crate) fn pivot_print_address(sheet: &CalcSheet, address: CellAddress) -> Op
     }
     let mut print_address = address;
     if pivot.first_header_row > 1 {
-      // Source: LibreOffice sc/source/filter/oox/pivottablebuffer.cxx
       // clears the persisted pivot cache range and inserts ScDPOutput at the
       // location start. Cached rows before firstHeaderRow are not emitted; the
       // first cached header row maps to ScDPOutput::mnTabStartRow.
@@ -674,7 +673,6 @@ impl PivotSourceCacheTable {
     record_count: Option<u32>,
     shared_strings: &[SharedStringModel],
   ) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/pivottablebuffer.cxx
     // PivotTable::finalizeImport creates the DataPilot descriptor from the
     // worksheet source range.  The cache records are supplemental import data,
     // but source-backed pivots are recalculated from the sheet cells.
@@ -720,9 +718,8 @@ impl PivotSourceCacheTable {
     records: &x::PivotCacheRecords,
     cache_field_item_values: &[Vec<PivotCacheItemValue>],
   ) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/pivotcachebuffer.cxx
-    // PivotCacheField::writeSourceDataCell.  Indexed record items are resolved
-    // through shared items; missing items do not write a source cell.
+    // Indexed record items are resolved through shared items; missing items do
+    // not write a backing data cell.
     let rows = records
       .pivot_cache_record
       .iter()
@@ -1452,9 +1449,8 @@ fn format_pivot_cache_number(value: f64) -> String {
 }
 
 fn pivot_cache_datetime_serial(text: &str) -> Option<f64> {
-  // Source: LibreOffice sc/source/filter/oox/pivotcachebuffer.cxx
-  // PivotCacheItem::readDate/writeItemToSourceDataCell writes an actual
-  // DateTime cell, and DataPilot stores it as a numeric item.
+  // DateTime cache items are materialized as cells, and DataPilot stores them
+  // as numeric items.
   let (date, time) = text.split_once('T')?;
   let mut date_parts = date.split('-');
   let year = date_parts.next()?.parse::<i64>().ok()?;
@@ -1505,7 +1501,6 @@ fn pivot_table_format_models(definition: &x::PivotTableDefinition) -> Vec<PivotT
     .format
     .iter()
     .map(|format| {
-      // Source: LibreOffice sc/source/filter/oox/PivotTableFormat.cxx
       // PivotTableFormat::importFormat/importPivotArea/finalizeImport.
       let pivot_area = &format.pivot_area;
       let data_only = pivot_area.data_only.is_none_or(|value| value.as_bool());
@@ -2266,7 +2261,6 @@ fn pivot_cache_page_filters(
         field_index,
         kind: PivotSourceFilterKind::Group(items),
       });
-      // Source: LibreOffice sc/source/filter/oox/pivottablebuffer.cxx
       // PivotTableField::convertPageField sets PROP_SelectedPage, which
       // ScDPSaveDimension::SetCurrentPage applies only to already registered
       // save members.  The source cache is filtered later from member
@@ -2556,7 +2550,6 @@ fn printable_location_reference(
   let Some(range) = CellRange::parse_a1_range(reference) else {
     return reference.to_string();
   };
-  // Source: LibreOffice sc/source/core/data/dpoutput.cxx::CalcSizes.
   // Data dimensions expand the generated DataPilot output along the data
   // layout axis. The stale OOXML destination cache is reduced along that same
   // axis when calculated data fields are not part of the generated PDF model.
@@ -2604,7 +2597,6 @@ fn pivot_output_geometry(
   let location = CellRange::parse_a1_range(printable_reference)
     .or_else(|| CellRange::parse_a1_range(&definition.location.reference))
     .unwrap_or_default();
-  // Source: LibreOffice sc/source/core/data/dpoutput.cxx::CalcSizes.
   // OOXML location is the insertion start plus a persisted cached area; Calc
   // recomputes member/data starts and table/result ends from row/column fields
   // and the data result matrix.
@@ -2630,7 +2622,6 @@ fn pivot_output_geometry(
   };
   let row_field_columns = pivot_columns_for_row_fields(definition);
   let column_field_rows = pivot_column_field_count(definition);
-  // Source: LibreOffice sc/source/core/data/dpoutput.cxx
   // ScDPOutput::CalcSizes recomputes mnDataStartCol from the generated row
   // field column count, and mnDataStartRow from header rows plus column field
   // levels.  The OOXML firstDataCol/firstDataRow values describe Excel's stale
@@ -2641,7 +2632,6 @@ fn pivot_output_geometry(
     col: table_start.col + data_start_col_offset,
     row: table_start.row + data_start_row_offset,
   };
-  // Source: LibreOffice sc/source/core/data/dpoutput.cxx::CalcSizes.
   // Calc takes mnRowCount/mnColCount from the generated DataPilot result
   // matrix.  The PDF bridge still prints the imported cached sheetData, so the
   // printable location range is the closest upstream-backed matrix boundary;

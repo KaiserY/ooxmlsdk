@@ -388,5 +388,5 @@ application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-H-01 | `test-data/wml/header_footer.docx` | Default header + footer; pgSz (US Letter); pgMar (1-inch margins); xmlns:r on document |
-| WML-H-02 | `test-data/wml/header_first_page.docx` | Default header + first-page header; default footer; titlePg; three part relationships |
+| WML-H-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/header_footer.docx` | Default header + footer; pgSz (US Letter); pgMar (1-inch margins); xmlns:r on document |
+| WML-H-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/header_first_page.docx` | Default header + first-page header; default footer; titlePg; three part relationships |

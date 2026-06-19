@@ -208,4 +208,4 @@ references and are uncommon in general documents.
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-BM-01 | `test-data/wml/bookmarks.docx` | Inline bookmark wrapping text range; heading-style bookmark wrapping full paragraph; zero-width point bookmark; internal anchor hyperlink targeting the inline bookmark |
+| WML-BM-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/bookmarks.docx` | Inline bookmark wrapping text range; heading-style bookmark wrapping full paragraph; zero-width point bookmark; internal anchor hyperlink targeting the inline bookmark |

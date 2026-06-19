@@ -56,7 +56,6 @@ impl WorkbookFragment {
     package: &mut SpreadsheetDocument,
     mso_document: bool,
   ) -> Result<Vec<CalcSheet>> {
-    // Source: LibreOffice sc/source/filter/oox/workbookfragment.cxx
     // WorkbookFragment::finalizeImport imports theme/styles/shared strings
     // before creating all sheet globals/fragments in workbook sheet order.
     self.styles = StylesCatalog::from_workbook_part(package, &self.workbook_part)?;

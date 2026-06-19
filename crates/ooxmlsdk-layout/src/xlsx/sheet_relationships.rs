@@ -84,7 +84,6 @@ impl SheetRelationshipCatalog {
     package: &mut SpreadsheetDocument,
     part: &WorksheetPart,
   ) -> Result<Self> {
-    // Source: LibreOffice sc/source/filter/oox/worksheetfragment.cxx imports
     // relationship-scoped worksheet helpers before final sheet/layout
     // finalization. Modern extension resources stay worksheet-owned here.
     let single_cell_parts = part

@@ -367,5 +367,5 @@ valid but unusual and creates large `[Content_Types].xml` entries.
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-I-01 | `test-data/wml/image_inline_props.docx` | Inline image with real 1-inch dimensions; non-zero distL/distR; altText on docPr; `cstate="print"` on blip; noChangeAspect lock |
-| WML-I-02 | `test-data/wml/image_floating.docx` | Floating anchor with wrapSquare; column-relative horizontal pos (align=left); paragraph-relative vertical pos (posOffset); explicit distances |
+| WML-I-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/image_inline_props.docx` | Inline image with real 1-inch dimensions; non-zero distL/distR; altText on docPr; `cstate="print"` on blip; noChangeAspect lock |
+| WML-I-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/image_floating.docx` | Floating anchor with wrapSquare; column-relative horizontal pos (align=left); paragraph-relative vertical pos (posOffset); explicit distances |

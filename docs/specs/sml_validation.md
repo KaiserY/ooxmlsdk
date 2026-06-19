@@ -186,4 +186,4 @@ Excel. Use a range reference for large lists.
 
 | ID | File | Coverage |
 |----|------|----------|
-| SML-DV-01 | `test-data/spreadsheet/data_validation.xlsx` | Three `<x:dataValidation>` rules in one block: `type="whole" operator="between"` with `<x:formula1>1</x:formula1><x:formula2>100</x:formula2>` plus `errorTitle/error` and `promptTitle/prompt`; `type="list"` with inline `"red,green,blue"` literal; `type="custom" errorStyle="warning"` with a Boolean formula; `<x:dataValidations count="3">` |
+| SML-DV-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/spreadsheet/data_validation.xlsx` | Three `<x:dataValidation>` rules in one block: `type="whole" operator="between"` with `<x:formula1>1</x:formula1><x:formula2>100</x:formula2>` plus `errorTitle/error` and `promptTitle/prompt`; `type="list"` with inline `"red,green,blue"` literal; `type="custom" errorStyle="warning"` with a Boolean formula; `<x:dataValidations count="3">` |

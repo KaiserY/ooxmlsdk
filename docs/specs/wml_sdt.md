@@ -286,4 +286,4 @@ Run `sdtContent` holds run-level content (same as the interior of `<w:p>`).
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-SDT-01 | `test-data/wml/content_controls.docx` | Block SDT with plain text control (alias, tag, id); inline run SDT with date picker (fullDate, dateFormat); inline run SDT with dropDownList (listItems, lastValue) |
+| WML-SDT-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/content_controls.docx` | Block SDT with plain text control (alias, tag, id); inline run SDT with date picker (fullDate, dateFormat); inline run SDT with dropDownList (listItems, lastValue) |

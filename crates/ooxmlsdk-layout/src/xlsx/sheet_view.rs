@@ -50,7 +50,6 @@ pub(crate) struct SelectionModel {
 
 impl SheetViewCatalog {
   pub(crate) fn from_worksheet(worksheet: &x::Worksheet) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/viewsettings.cxx
     // SheetViewSettings imports sheetView, pane, and selection before final
     // workbook view settings. Keep OOXML values typed; LO defaulting and pane
     // split conversion belong to the view finalizer.

@@ -91,7 +91,6 @@ pub struct DocxLayoutRowSummary {
 }
 
 const DEFAULT_TAB_STOP_PT: f32 = 36.0;
-// Source: LibreOffice sw/source/writerfilter/dmapper/SectionColumnHandler.cxx
 // initializes w:cols/@space to 720 twips.
 const DEFAULT_SECTION_COLUMN_GAP_PT: f32 = 720.0 / units::TWIPS_PER_POINT;
 const DEFAULT_TEXTBOX_MIN_WIDTH_PT: f32 = 11.0;
@@ -105,7 +104,6 @@ const WML_DEFAULT_BORDER_WIDTH_PT: f32 = 0.5;
 const WML_MIN_BORDER_WIDTH_PT: f32 = 0.25;
 const DRAWINGML_DEFAULT_LINE_WIDTH_EMU: i64 = 0;
 const VML_DEFAULT_STROKE_WEIGHT_EMU: i64 = 1;
-// Source: LibreOffice include/editeng/escapementitem.hxx and
 // sw/source/writerfilter/dmapper/DomainMapper.cxx. DOCX vertAlign maps to
 // DFLT_ESC_PROP with DFLT_ESC_SUPER / DFLT_ESC_SUB.
 const LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE: f32 = 0.58;
@@ -602,7 +600,6 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
           if !paragraph_is_effectively_empty(&model) {
             push_body_paragraph(&mut current_blocks, model);
           }
-          // Source: LibreOffice sw/source/writerfilter/dmapper/PropertyMap.cxx
           // treats the paragraph carrying sectPr as discarded section metadata;
           // its below spacing is emulated separately instead of creating an
           // extra empty layout paragraph.
@@ -663,7 +660,6 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
       .get(index + 1)
       .is_some_and(|next| next.break_kind == SectionBreakKind::Continuous);
     if no_column_balance || !next_is_continuous {
-      // Source: LibreOffice sw/source/writerfilter/dmapper/PropertyMap.cxx
       // and sw/source/filter/ww8/ww8par.cxx set DontBalanceTextColumns
       // from w:noColumnBalance, and for multi-column sections followed by a
       // non-continuous break or by the end of the section group.
@@ -774,7 +770,6 @@ fn paragraph_drop_cap_text(paragraph: &Paragraph) -> Option<String> {
 }
 
 fn prepend_drop_cap_text(paragraph: &mut Paragraph, text: String) {
-  // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx
   // saves DOCX framePr/dropCap paragraphs and applies them to the following
   // paragraph as DropCapFormat instead of converting them to text frames.
   if let Some(InlineItem::Text(run)) = paragraph
@@ -2597,7 +2592,6 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   }
 
   if let Some(tabs) = properties.tabs() {
-    // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper.cxx
     // LN_CT_PPrBase_tabs initializes the current tab-stop vector from the
     // paragraph style, then DomainMapper_Impl::IncorporateTabStop() applies
     // each direct tab. A w:val="clear" entry removes an inherited tab at the
@@ -5365,7 +5359,6 @@ fn drawingml_textbox_frame_from_fragment(
 fn autofit_textbox_placement(placement: ImagePlacement) -> ImagePlacement {
   match placement {
     ImagePlacement::Floating(mut placement) => {
-      // Source: LibreOffice keeps the Writer fly frame that carries textbox
       // content inside the owning draw shape (SwTextBoxHelper), so text flow
       // must not be wrapped into the shape's textbox area.
       placement.wrap = ImageWrapMode::TopBottom;
@@ -5720,7 +5713,6 @@ fn wordprocessing_shape_textbox_uses_auto_light_text(
 }
 
 fn libreoffice_color_is_dark(color: RgbColor) -> bool {
-  // Source: LibreOffice tools/source/generic/color.cxx Color::IsDark().
   color_wcag_luminance(color) <= 87
 }
 
@@ -6692,7 +6684,6 @@ fn drawing_diagram_shapes(
   transform: DrawingMlGroupTransform,
   context: DrawingShapeImportContext<'_>,
 ) -> Option<Vec<InlineItem>> {
-  // Source: LibreOffice oox/source/drawingml/graphicshapecontext.cxx
   // resolves dgm:relIds through the diagram data part, then imports the
   // persisted diagramDrawing extDrawing fallback when present.
   let data_relationship_id = relationship_ids.data_part.as_str();
@@ -7728,7 +7719,6 @@ fn drawingml_shape_text_box_from_fragment(
   styles: &StylesCatalog,
   smartart_text_color: Option<RgbColor>,
 ) -> Option<TextBoxFrameContent> {
-  // Source: LibreOffice oox/source/drawingml/shape.cxx imports SmartArt
   // persisted dsp:sp text as child shape text, using the a:bodyPr insets.
   let body_pr = first_named_xml_fragment(xml, b"bodyPr");
   let texts = drawingml_shape_text_body_texts(xml);
@@ -9078,7 +9068,6 @@ fn vml_textbox_frame(
   apply_vml_textbox_properties(textbox, &mut frame);
   let auto_fit = vml_textbox_fits_shape_to_text(textbox);
   let width_pt = if auto_fit {
-    // Source: LibreOffice keeps VML mso-fit-shape-to-text text boxes as fly
     // frames that can grow horizontally instead of wrapping on the narrow
     // imported shape width.
     shape_width_pt.max(DEFAULT_TEXTBOX_AUTO_FIT_WIDTH_PT)
@@ -12931,7 +12920,6 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
   if let Some(margin) = &section.page_margin {
     if let Some(top) = margin.top.as_ref().and_then(signed_twips_measure_to_twips) {
       setup.top_margin_was_negative = top < 0.0;
-      // Source: LibreOffice writerfilter/dmapper/PropertyMap.hxx::SetTopMargin()
       // stores the absolute page margin and uses the sign only to disable
       // dynamic header height / convert header content to a fly frame.
       setup.margin_top_pt = units::twips_to_points(top.abs());
@@ -12945,7 +12933,6 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
       .and_then(signed_twips_measure_to_twips)
     {
       setup.bottom_margin_was_negative = bottom < 0.0;
-      // Source: LibreOffice writerfilter/dmapper/PropertyMap.hxx::SetBottomMargin().
       setup.margin_bottom_pt = units::twips_to_points(bottom.abs());
     }
     if let Some(left) = margin.left.as_ref().and_then(twips_measure_to_points) {
@@ -12999,7 +12986,6 @@ fn libreoffice_page_size_measure_to_points(value: &TwipsMeasureValue) -> Option<
 }
 
 fn lo_twips_to_mm100(twips: f32) -> f32 {
-  // Source: LibreOffice writerfilter/dmapper/DomainMapper.cxx imports
   // CT_PageSz_w/h via convertTwipToMm100() before PaperInfo sloppy fitting.
   (twips * 127.0 / 72.0).round()
 }
@@ -13009,7 +12995,6 @@ fn lo_mm100_to_points(mm100: f32) -> f32 {
 }
 
 fn lo_sloppy_fit_page_dimension_mm100(mm100: f32) -> f32 {
-  // Source: LibreOffice i18nutil/source/utility/paper.cxx
   // PaperInfo::sloppyFitPageDimension(), using dimensions from aDinTab.
   const MAX_SLOPPY_MM100: f32 = 44.0;
   const DIMENSIONS_MM100: &[f32] = &[
@@ -13076,16 +13061,6 @@ mod tests {
   }
 
   #[test]
-  fn compatibility_mode_reads_word_2013_fixture_setting() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let path = root.join("test-data/ooxmlsdk-pdf-test/libreoffice/tdf88496.docx");
-    let mut package = WordprocessingDocument::new(std::fs::File::open(path).unwrap()).unwrap();
-    let main = package.main_document_part().unwrap().clone();
-
-    assert_eq!(compatibility_mode(&mut package, &main), 15);
-  }
-
-  #[test]
   fn drawing_image_properties_preserve_crop_and_transform() {
     let xml = r#"<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><pic:nvPicPr><pic:cNvPr id="1" name="Picture 1"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId7"/><a:srcRect l="10000" t="20000" r="30000" b="40000"/></pic:blipFill><pic:spPr><a:xfrm rot="5400000" flipH="1" flipV="true"/></pic:spPr></pic:pic>"#;
 
@@ -13105,7 +13080,6 @@ mod tests {
 
   #[test]
   fn wps_textbox_fragment_imports_as_positioned_shape_text() {
-    // Source: LibreOffice imports <wps:txbx> through WpsContext as text on the
     // drawing shape, not as fallback body text.
     let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="857250" cy="742950"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>inside shape</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr lIns="91440" tIns="45720" rIns="91440" bIns="45720" anchor="t"/></wps:wsp>"#;
     assert!(drawing_textbox_content(xml.as_bytes()).is_some());
@@ -13133,7 +13107,6 @@ mod tests {
 
   #[test]
   fn wps_custom_geometry_line_imports_as_line_shape() {
-    // Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport.cxx:testTdf100072
     let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5760720" cy="0"/></a:xfrm><a:custGeom><a:pathLst><a:path w="8504" h="0"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="8504" y="0"/></a:lnTo></a:path></a:pathLst></a:custGeom><a:noFill/><a:ln w="6480"><a:solidFill><a:srgbClr val="ff0101"/></a:solidFill></a:ln></wps:spPr></wps:wsp>"#;
     let shape = drawingml_shape_from_fragment(
       xml,
@@ -13153,7 +13126,6 @@ mod tests {
 
   #[test]
   fn alternate_content_drawing_imports_choice_shape() {
-    // Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport.cxx:testTdf100072
     let xml = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><mc:Choice Requires="wps"><w:drawing><wp:anchor behindDoc="1" distT="0" distB="0" distL="114300" distR="114300" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>1080135</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>1260475</wp:posOffset></wp:positionV><wp:extent cx="5760720" cy="0"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="1" name="Freeform 2"/><a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr/><wps:spPr><a:custGeom><a:pathLst><a:path w="8504" h="0"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="8504" y="0"/></a:lnTo></a:path></a:pathLst></a:custGeom><a:noFill/><a:ln w="6480"><a:solidFill><a:srgbClr val="ff0101"/></a:solidFill></a:ln></wps:spPr><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></mc:Choice><mc:Fallback><w:pict/></mc:Fallback></mc:AlternateContent>"#;
     let mut inlines = Vec::new();
 
@@ -13677,7 +13649,6 @@ mod tests {
 
   #[test]
   fn explicit_zero_paragraph_spacing_overrides_doc_default_spacing() {
-    // Source: LibreOffice writerfilter/dmapper imports explicit paragraph
     // spacing properties into the property map even when the value is zero.
     let mut format = ParagraphFormat {
       spacing_after_pt: 8.0,

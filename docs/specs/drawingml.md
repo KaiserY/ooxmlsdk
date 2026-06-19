@@ -12,7 +12,7 @@ guide and test oracle for `ooxmlsdk` and similar Rust OOXML parsers.
 - ISO/IEC 29500-1:2016 — cross-reference for DrawingML semantics
 - `dml-main.xsd` from this repository (`schemas/OfficeOpenXML-XMLSchema-Transitional/`)
 - Microsoft Open Specifications: `[MS-ODRAW]`, `[MS-PPTX]`, `[MS-DOCX]`
-- Existing `ooxmlsdk` test fixtures (`test-data/`)
+- Existing `ooxmlsdk` test fixtures (`../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/`)
 - python-pptx and Apache POI source code (reference implementations)
 
 This document contains **no verbatim text** from any copyrighted source.

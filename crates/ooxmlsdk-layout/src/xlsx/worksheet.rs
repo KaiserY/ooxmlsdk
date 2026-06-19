@@ -117,7 +117,6 @@ impl Default for SheetFormatModel {
     Self {
       base_column_width: None,
       default_column_width: None,
-      // Source: LibreOffice sc/source/core/data/global.cxx
       // ScGlobal::nStdRowHeight = 256 twips.
       default_row_height: 256.0 / units::TWIPS_PER_POINT as f64,
       custom_height: false,
@@ -611,7 +610,6 @@ impl CellRange {
 
 impl SheetMetrics {
   fn from_worksheet(worksheet: &x::Worksheet, styles: &StylesCatalog, mso_document: bool) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/worksheetfragment.cxx
     // WorksheetFragment imports dimensions, sheetFormatPr, cols,
     // mergeCells, hyperlinks, rowBreaks, and colBreaks before page layout.
     Self {
@@ -711,7 +709,6 @@ impl SheetFormatModel {
     if let Some(width) = self.default_column_width {
       return digit_width_to_lo_points(width as f32, digit_width_pt);
     }
-    // Source: LibreOffice sc/source/filter/oox/worksheethelper.cxx
     // setBaseColumnWidth() uses baseColWidth plus 5 screen pixels converted
     // through UnitConverter after UnitConverter::finalizeImport() has replaced
     // Unit::Digit with the default font's maximum digit width.
@@ -862,7 +859,6 @@ fn worksheet_rows(
         .cell
         .iter()
         .map(|cell| {
-          // Source: LibreOffice sc/source/filter/oox/sheetdatacontext.cxx
           // SheetDataContext::importCell falls back to the next column in the
           // current row when XML_r is missing or cannot be converted to an A1
           // address. Malformed producer output still imports as ordered cells.
@@ -901,7 +897,6 @@ fn worksheet_rows(
 
 fn mso_row_height_pt(height: f64) -> f64 {
   if height > 0.0 {
-    // Source: LibreOffice sc/source/filter/oox/sheetdatacontext.cxx and
     // worksheetfragment.cxx round MSO OOXML row heights down to 0.75pt.
     height - height % 0.75
   } else {
@@ -910,7 +905,6 @@ fn mso_row_height_pt(height: f64) -> f64 {
 }
 
 fn digit_width_to_points(value: f32, digit_width_pt: f32) -> f32 {
-  // Source: LibreOffice sc/source/filter/oox/unitconverter.cxx:
   // UnitConverter::scaleValue(value, Unit::Digit, Unit::Twip).
   value * digit_width_pt
 }
@@ -921,7 +915,6 @@ fn digit_width_to_lo_points(value: f32, digit_width_pt: f32) -> f32 {
 }
 
 fn default_digit_width_pt(styles: &StylesCatalog) -> f32 {
-  // Source: LibreOffice sc/source/filter/oox/unitconverter.cxx initializes
   // Unit::Digit to 2mm, then UnitConverter::finalizeImport() replaces it with
   // the default font XFont maximum width across '0'..'9'.
   let style = styles.default_font_text_style();
@@ -936,7 +929,6 @@ fn default_digit_width_pt(styles: &StylesCatalog) -> f32 {
 }
 
 fn screen_pixel_width_pt() -> f32 {
-  // Source: LibreOffice sc/source/filter/oox/unitconverter.cxx initializes
   // Unit::ScreenX from GraphicHelper device pixels. The headless Calc export
   // path used by the upstream fixtures has a 96dpi reference device, i.e. one
   // screen pixel is 0.75pt.
@@ -995,7 +987,6 @@ fn format_cell_address_a1(address: CellAddress) -> String {
 
 impl FormulaModel {
   fn from_formula(formula: &x::CellFormula) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/sheetdatacontext.cxx and
     // sheetdatabuffer.cxx. These fields decide whether the cell is imported
     // as a normal formula, shared formula, array formula, or data-table
     // operation. Token conversion is a later FormulaBuffer responsibility.

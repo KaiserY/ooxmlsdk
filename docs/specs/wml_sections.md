@@ -359,5 +359,5 @@ inheritance chain flows **forward** through sections:
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-S-01 | `test-data/wml/section_columns.docx` | Two equal columns; `w:cols num="2" space="720"`; continuous section break followed by single-column section |
-| WML-S-02 | `test-data/wml/section_props.docx` | `vAlign=center`; `docGrid type="lines" linePitch="360"`; `lnNumType countBy="5"` |
+| WML-S-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/section_columns.docx` | Two equal columns; `w:cols num="2" space="720"`; continuous section break followed by single-column section |
+| WML-S-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/section_props.docx` | `vAlign=center`; `docGrid type="lines" linePitch="360"`; `lnNumType countBy="5"` |

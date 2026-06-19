@@ -10,7 +10,6 @@ use crate::fonts::{
 const FALLBACK_ASCENT_EM: f32 = 0.8;
 const FALLBACK_DESCENT_EM: f32 = 0.2;
 const FALLBACK_LINE_GAP_EM: f32 = 0.05;
-// Source: LibreOffice vcl/source/font/fontmetric.cxx
 // FontMetricData::ImplInitTextLineSize.
 const LO_TEXT_LINE_DESCENT_FALLBACK_DIVISOR: f32 = 10.0;
 const LO_TEXT_LINE_MAX_DESCENT_DIVISOR: f32 = 3.0;
@@ -157,7 +156,6 @@ fn approximate_vertical_metrics(font_size: f32) -> TextVerticalMetrics {
 }
 
 fn approximate_decoration_metrics(font_size: f32) -> TextDecorationMetrics {
-  // Source: LibreOffice vcl/source/font/fontmetric.cxx
   // FontMetricData::ImplInitTextLineSize. This branch is only used when no
   // usable OpenType underline/strikeout metrics can be loaded for the face.
   let metrics = approximate_vertical_metrics(font_size);

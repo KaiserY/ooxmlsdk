@@ -322,4 +322,4 @@ Rust types live under
 
 | ID | File | Coverage |
 |----|------|----------|
-| CHART-01 | `test-data/spreadsheet/chart_bar.xlsx` | Worksheet with a `<x:drawing>` ref; `xl/drawings/drawing1.xml` `twoCellAnchor` graphicFrame referencing `<c:chart r:id>`; `xl/charts/chart1.xml` `<c:chartSpace>` with `<c:barChart barDir="col" grouping="clustered">` containing one `<c:ser>` with `<c:tx>` `strRef`, `<c:cat>` `strRef` (3 categories cached), `<c:val>` `numRef` (3 numerical values cached); `<c:catAx>`/`<c:valAx>` pair sharing `axId` |
+| CHART-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/spreadsheet/chart_bar.xlsx` | Worksheet with a `<x:drawing>` ref; `xl/drawings/drawing1.xml` `twoCellAnchor` graphicFrame referencing `<c:chart r:id>`; `xl/charts/chart1.xml` `<c:chartSpace>` with `<c:barChart barDir="col" grouping="clustered">` containing one `<c:ser>` with `<c:tx>` `strRef`, `<c:cat>` `strRef` (3 categories cached), `<c:val>` `numRef` (3 numerical values cached); `<c:catAx>`/`<c:valAx>` pair sharing `axId` |

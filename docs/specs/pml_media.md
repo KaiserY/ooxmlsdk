@@ -181,5 +181,5 @@ Rust types under
 
 | ID | File | Coverage |
 |----|------|----------|
-| PML-IMG-01 | `test-data/slideshow/minimal_image.pptx` | Basic `<p:pic>` with PNG (already covered) |
-| PML-IMG-02 | `test-data/pml/slide_pic.pptx` | `<p:pic>` with `<a:srcRect l t r b>` 10% crop all sides; `<a:picLocks noChangeAspect>`; `descr` alt-text on `<p:cNvPr>` |
+| PML-IMG-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/slideshow/minimal_image.pptx` | Basic `<p:pic>` with PNG (already covered) |
+| PML-IMG-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/slide_pic.pptx` | `<p:pic>` with `<a:srcRect l t r b>` 10% crop all sides; `<a:picLocks noChangeAspect>`; `descr` alt-text on `<p:cNvPr>` |

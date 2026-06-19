@@ -22,7 +22,6 @@ impl ExcelImport {
     package: &mut SpreadsheetDocument,
     options: &LayoutOptions,
   ) -> Result<Self> {
-    // Source: LibreOffice sc/source/filter/oox/excelfilter.cxx
     // ExcelFilter::importDocument creates workbook-global state and delegates
     // workbook XML/substream order to WorkbookFragment. Document properties,
     // link-update state, and overflow warnings are represented as structured

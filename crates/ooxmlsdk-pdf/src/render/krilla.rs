@@ -405,7 +405,6 @@ impl InternalLinkTargets {
                 .or_insert(InternalLinkPosition {
                   page_index,
                   x_pt: text.item.x_pt,
-                  // Source: Typst typst-pdf/src/link.rs pos_to_xyz shifts
                   // position links upward by 10pt so baseline targets remain visible.
                   y_pt: (text.baseline_y - INTERNAL_LINK_DESTINATION_SHIFT_PT).max(0.0),
                 });
@@ -1016,7 +1015,6 @@ fn draw_paint_item(
 }
 
 fn paint_item_intersects_page(item: &PaintItem, page_width_pt: f32, page_height_pt: f32) -> bool {
-  // Source: LibreOffice sw/source/core/view/vprint.cxx intersects output with
   // the page rectangle before SwRootFrame::PaintSwFrame(); drawing layers also
   // receive the page frame in sw/source/core/view/vdraw.cxx.
   let Some((left, top, right, bottom)) = paint_item_bounds(item) else {
@@ -1275,7 +1273,6 @@ fn link_annotation_for_rect(
 }
 
 fn normalize_external_url(url: &str) -> String {
-  // Source: LibreOffice oox/source/core/filterbase.cxx::FilterBase::getAbsoluteUrl.
   // OOXML relationship targets may contain Windows backslashes even when the
   // value is already a file URI; LO normalizes them before creating links.
   let normalized = url.replace('\\', "/");
@@ -1584,7 +1581,6 @@ fn shaped_pdf_glyphs(text: &str, style: &TextStyle) -> Option<PaintGlyphRun> {
 }
 
 fn should_shape_pdf_glyphs(text: &TextItem) -> bool {
-  // Source: Typst shapes during layout and PDF rendering consumes the shaped
   // glyphs. This renderer only has text items at PDF time, so keep ordinary
   // Latin runs on krilla's text path and reserve explicit glyph painting for
   // cases where we need fallback faces or complex ActualText ranges.

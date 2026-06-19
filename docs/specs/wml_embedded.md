@@ -217,4 +217,4 @@ Rust types:
 
 | ID | File | Coverage |
 |----|------|----------|
-| WML-EO-01 | `test-data/wml/embedded_object.docx` | `<w:object>` with VML shape and `<o:OLEObject>` referencing an `EmbeddedObjectPart` (`oleObject1.bin`, opaque OLE2 placeholder header) and a PNG icon (`media/image1.png`); `<Default Extension="bin">` content-type entry; two relationships (`image`, `oleObject`) on the document part |
+| WML-EO-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/embedded_object.docx` | `<w:object>` with VML shape and `<o:OLEObject>` referencing an `EmbeddedObjectPart` (`oleObject1.bin`, opaque OLE2 placeholder header) and a PNG icon (`media/image1.png`); `<Default Extension="bin">` content-type entry; two relationships (`image`, `oleObject`) on the document part |

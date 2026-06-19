@@ -307,5 +307,5 @@ application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-N-01 | `test-data/wml/footnotes.docx` | footnotes.xml with special separator notes (id=-1, id=0) and two normal footnotes; body with footnoteReference marks inside runs; Override content type entry |
-| WML-N-02 | `test-data/wml/endnotes.docx` | endnotes.xml with special separator notes and one normal endnote; body with endnoteReference mark |
+| WML-N-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/footnotes.docx` | footnotes.xml with special separator notes (id=-1, id=0) and two normal footnotes; body with footnoteReference marks inside runs; Override content type entry |
+| WML-N-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/endnotes.docx` | endnotes.xml with special separator notes and one normal endnote; body with endnoteReference mark |

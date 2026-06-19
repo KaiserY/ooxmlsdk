@@ -37,7 +37,6 @@ impl PPTShapeGroupContext {
     slide_persist: &mut SlidePersist,
     shape_tree: &p::ShapeTree,
   ) {
-    // Source: LibreOffice oox/source/ppt/pptshapegroupcontext.cxx
     // onCreateContext dispatches sp/cxnSp/grpSp/pic/graphicFrame and keeps
     // PPT shape-location state available to child shape contexts.
     self.import_shape_tree_choices(slide_persist, &shape_tree.shape_tree_choice);
@@ -139,7 +138,6 @@ impl PPTShapeGroupContext {
       .use_background_fill
       .is_some_and(|value| value.as_bool())
     {
-      // Source: LibreOffice oox/source/ppt/pptshapegroupcontext.cxx
       // imports p:sp@useBgFill as noFill so the style fill reference does not
       // paint over the slide background.
       shape.shape.fill_properties = Some(FillProperties {
@@ -344,7 +342,6 @@ fn apply_graphic_placeholder(
   slide_persist: &mut SlidePersist,
   placeholder: &p::PlaceholderShape,
 ) {
-  // Source: LibreOffice oox/source/ppt/pptgraphicshapecontext.cxx passes
   // bUseText=false for graphic placeholders so prompt text is not inherited by
   // real charts/tables/pictures/media.
   shape.shape.sub_type = Some(placeholder.r#type.unwrap_or(p::PlaceholderValues::Object));
@@ -417,7 +414,6 @@ fn hyperlink_action_url(action: String) -> Option<String> {
 }
 
 fn resolve_text_body_hyperlinks(slide_persist: &SlidePersist, text_body: &mut TextBody) {
-  // Source: LibreOffice oox/source/drawingml/hyperlinkcontext.cxx resolves
   // a:rPr/a:hlinkClick exactly like shape-level cNvPr/a:hlinkClick.
   for paragraph in &mut text_body.paragraphs {
     for run in &mut paragraph.runs {
@@ -442,7 +438,6 @@ fn apply_application_media(
   slide_persist: &SlidePersist,
   properties: &p::ApplicationNonVisualDrawingProperties,
 ) {
-  // Source: LibreOffice oox/source/drawingml/graphicshapecontext.cxx
   // stores media stream/package URL/mime from a:wavAudioFile, a:audioFile,
   // a:videoFile, and p14:media before Shape::finalizeServiceName chooses a
   // presentation MediaShape.
@@ -522,7 +517,6 @@ fn apply_application_media(
 }
 
 fn apply_shape_properties(shape: &mut Shape, properties: &p::ShapeProperties) {
-  // Source: LibreOffice oox/source/drawingml/shapepropertiescontext.cxx
   // ShapePropertiesContext owns fill/line/effect state before the PPT shape is
   // converted to drawing objects.
   if let Some(geometry) = properties
@@ -555,7 +549,6 @@ fn image_crop_from_source_rectangle(rect: Option<&a::SourceRectangle>) -> ImageC
   let Some(rect) = rect else {
     return ImageCrop::default();
   };
-  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
   // CropQuotientsFromSrcRect clamps negative srcRect edges to zero before
   // deriving crop quotients.
   let left = drawingml_percent_ratio(rect.left.as_ref()).max(0.0);
@@ -578,7 +571,6 @@ fn drawingml_percent_ratio(value: Option<&DrawingmlPercentageValue>) -> f32 {
 }
 
 fn import_custom_shape_geometry(choice: &p::ShapePropertiesChoice) -> CustomShapeGeometry {
-  // Source: LibreOffice oox/source/drawingml/shapepropertiescontext.cxx
   // custGeom/prstGeom populate CustomShapeProperties before createAndInsert;
   // do not lower preset geometry to PDF path data during import.
   match choice {
@@ -733,7 +725,6 @@ fn apply_transform_fields(
   extents: Option<&a::Extents>,
 ) {
   if let Some(rotation) = rotation {
-    // Source: LibreOffice oox/source/drawingml/shapepropertiescontext.cxx
     // keeps DrawingML rotation as shape transform state before rendering.
     shape.rotation = rotation as f32 / 60_000.0;
   }

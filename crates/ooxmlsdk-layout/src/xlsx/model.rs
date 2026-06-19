@@ -8,14 +8,11 @@ use ooxmlsdk_formula::{
 };
 
 use crate::common::{Fill, Insets, LayoutFontRequest, Point, Pt, Rect, Size, Stroke, Twips};
-
-// Source: LibreOffice sc/inc/global.hxx STD_COL_WIDTH = convert(64pt, twip).
 const CALC_STANDARD_COLUMN_WIDTH_TWIPS: i32 = 1280;
 // OOXML sheetFormatPr defaultRowHeight is commonly 15pt; LO may derive this
 // from the standard row height when the attribute is absent.
 const DEFAULT_ROW_HEIGHT_PT: f64 = 15.0;
 const POINTS_PER_INCH: f64 = 72.0;
-// Source: LibreOffice sc/source/ui/view/printfun.cxx uses A4 as print fallback.
 const A4_PORTRAIT_WIDTH_PT: f32 = 595.2756;
 const A4_PORTRAIT_HEIGHT_PT: f32 = 841.8898;
 

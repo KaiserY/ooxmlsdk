@@ -490,9 +490,9 @@ occurs first. The new slide enters from the right side.
 
 | ID | File | Coverage |
 |----|------|---------|
-| PML-TR-01 | `test-data/pml/transition_fade.pptx` | `<p:fade/>` at `spd="med"`, click-advance only |
-| PML-TR-02 | `test-data/pml/transition_push.pptx` | `<p:push dir="r"/>` with `advClick="1"` and `advTm="2000"` |
-| PML-TR-03 | `test-data/pml/transition_none.pptx` | Slide with no `<p:transition>` element |
-| PML-TR-04 | `test-data/pml/transition_kiosk.pptx` | `advClick="0"` and `advTm="5000"` (auto-run) |
-| PML-TR-05 | `test-data/pml/transition_sound.pptx` | Transition with `<a:sndAc>` embedded sound |
-| PML-TR-06 | `test-data/pml/transition_variety.pptx` | Multiple slides using `split`, `wheel`, `checker`, `blinds`, `dissolve` |
+| PML-TR-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/transition_fade.pptx` | `<p:fade/>` at `spd="med"`, click-advance only |
+| PML-TR-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/transition_push.pptx` | `<p:push dir="r"/>` with `advClick="1"` and `advTm="2000"` |
+| PML-TR-03 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/transition_none.pptx` | Slide with no `<p:transition>` element |
+| PML-TR-04 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/transition_kiosk.pptx` | `advClick="0"` and `advTm="5000"` (auto-run) |
+| PML-TR-05 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/transition_sound.pptx` | Transition with `<a:sndAc>` embedded sound |
+| PML-TR-06 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/transition_variety.pptx` | Multiple slides using `split`, `wheel`, `checker`, `blinds`, `dissolve` |

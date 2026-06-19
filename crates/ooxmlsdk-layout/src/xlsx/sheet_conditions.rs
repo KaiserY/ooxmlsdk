@@ -141,7 +141,6 @@ pub(crate) struct IgnoredErrorsModel {
 
 impl SheetConditionCatalog {
   pub(crate) fn from_worksheet(worksheet: &x::Worksheet) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/condformatbuffer.cxx and
     // worksheetfragment.cxx DataValidationsContext. Formula strings stay with
     // the sheet condition catalog; evaluation is delegated to ooxmlsdk-formula.
     let data_validations = worksheet.data_validations.as_ref();

@@ -305,5 +305,5 @@ part, not stored as separate parts.
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-FLD-01 | `test-data/wml/fields_complex.docx` | Complex PAGE field (begin/instrText/separate/result/end); complex NUMPAGES field; `dirty="1"` on a field with no cached result; `xmlns:r` on document |
-| WML-FLD-02 | `test-data/wml/fields_hyperlink.docx` | External hyperlink with `r:id` + `TargetMode=External`; internal anchor hyperlink (`w:anchor`); `w:fldSimple` with DATE instruction |
+| WML-FLD-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/fields_complex.docx` | Complex PAGE field (begin/instrText/separate/result/end); complex NUMPAGES field; `dirty="1"` on a field with no cached result; `xmlns:r` on document |
+| WML-FLD-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/fields_hyperlink.docx` | External hyperlink with `r:id` + `TargetMode=External`; internal anchor hyperlink (`w:anchor`); `w:fldSimple` with DATE instruction |

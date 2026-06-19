@@ -362,5 +362,5 @@ If a document has no Normal style, the parser must fall back to
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-S-01 | `test-data/wml/style_inheritance.docx` | 3-level basedOn chain; paragraph style references; docDefaults |
-| WML-S-02 | `test-data/wml/style_linked.docx` | Linked paragraph+character style pair; next style reference; character rStyle |
+| WML-S-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/style_inheritance.docx` | 3-level basedOn chain; paragraph style references; docDefaults |
+| WML-S-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/style_linked.docx` | Linked paragraph+character style pair; next style reference; character rStyle |

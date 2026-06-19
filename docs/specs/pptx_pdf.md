@@ -860,8 +860,6 @@ Prefer LibreOffice-derived fixtures:
 - `../core/sd/qa/filter/data/pptx/*.pptx`
 - `../core/vcl/qa/cppunit/pdfexport/data/*.pptx`
 
-Use `// Source:` comments in tests that encode upstream behavior.
-
 Avoid broad hand-authored PPTX files unless the behavior is named, upstream
 backed, and no useful LibreOffice fixture exists.
 

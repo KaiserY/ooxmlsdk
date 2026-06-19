@@ -80,7 +80,6 @@ pub(crate) enum TextRunKind {
 
 impl TextBody {
   pub(crate) fn from_dml(source: &a::TextBody) -> Self {
-    // Source: LibreOffice oox/source/drawingml/textbodycontext.cxx
     // TextBodyContext owns bodyPr, lstStyle, and paragraph import for both
     // shape text and DrawingML table cell text.
     Self::from_parts(
@@ -91,7 +90,6 @@ impl TextBody {
   }
 
   pub(crate) fn from_pml(source: &p::TextBody) -> Self {
-    // Source: LibreOffice oox/source/drawingml/textbodycontext.cxx
     // PresentationML p:txBody carries DrawingML bodyPr/lstStyle/a:p
     // children; import it through the same typed DrawingML paragraph path.
     Self::from_parts(
@@ -102,7 +100,6 @@ impl TextBody {
   }
 
   pub(crate) fn from_diagram_drawing(source: &dsp::TextBody) -> Self {
-    // Source: LibreOffice oox/source/drawingml/textbodycontext.cxx
     // Diagram drawing text bodies are regular DrawingML text bodies inside
     // dsp:sp. Import them through the same text body model as p:txBody.
     Self::from_parts(
@@ -158,7 +155,6 @@ impl Default for TextBodyDisplayProperties {
 
 impl TextBodyDisplayProperties {
   pub(crate) fn from_body_properties(properties: &a::BodyProperties) -> Self {
-    // Source: LibreOffice oox/source/drawingml/textbodypropertiescontext.cxx
     // TextBodyPropertiesContext maps CT_TextBodyProperties into a stable text
     // property bag before any shape is created. Keep these as typed PPTX text
     // semantics; display lowering may consume only a subset.
@@ -267,7 +263,6 @@ impl TextBodyDisplayProperties {
   }
 
   pub(crate) fn camera_z_rotation_degrees(&self) -> f32 {
-    // Source: LibreOffice oox/source/drawingml/shape.cxx stores
     // bodyPr/scene3d camera rot@rev as TextCameraZRotateAngle, and
     // svx/source/svdraw/svdotextdecomposition.cxx applies it as
     // 360 - GetCameraZRotation() during text decomposition.

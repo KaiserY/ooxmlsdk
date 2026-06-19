@@ -1277,8 +1277,6 @@ Preferred upstream fixture sources:
 - `../core/sc/qa/filter/`
 - `../core/vcl/qa/cppunit/pdfexport/data/*.xlsx`
 
-Use `// Source:` comments for assertions projected from LibreOffice tests.
-
 Add a mapped fixture lane analogous to PPTX/DOCX:
 
 ```text

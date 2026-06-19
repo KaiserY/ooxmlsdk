@@ -145,7 +145,6 @@ impl Default for TableCellMargins {
 
 impl TableProperties {
   pub(crate) fn from_dml_table(source: &a::Table) -> Self {
-    // Source: LibreOffice oox/source/drawingml/table/tablecontext.cxx
     // TableContext owns tblPr, tblGrid/gridCol, and tr/tc import after
     // GraphicalObjectFrameContext dispatches a table graphicData URI.
     let mut table = Self {
@@ -213,7 +212,6 @@ impl TableStyleList {
 pub(crate) fn predefined_table_style(style_id: Option<&str>) -> Option<TableStyle> {
   let style_id = style_id?;
   let (style_name, accent) = match style_id {
-    // Source: LibreOffice oox/source/drawingml/table/predefined-table-styles.cxx.
     "{9D7B26C5-4107-4FEC-AEDC-1716B250A1EF}" => ("Light-Style-1", a::SchemeColorValues::Text1),
     "{3B4B98B0-60AC-42C2-AFA5-B58CD77FA1E5}" => ("Light-Style-1", a::SchemeColorValues::Accent1),
     "{0E3FDE45-AF77-4B5C-9715-49D594BDF05E}" => ("Light-Style-1", a::SchemeColorValues::Accent2),
@@ -221,7 +219,6 @@ pub(crate) fn predefined_table_style(style_id: Option<&str>) -> Option<TableStyl
     "{D27102A9-8310-4765-A935-A1911B00CA55}" => ("Light-Style-1", a::SchemeColorValues::Accent4),
     "{5FD0F851-EC5A-4D38-B0AD-8093EC10F338}" => ("Light-Style-1", a::SchemeColorValues::Accent5),
     "{68D230F3-CF80-4859-8CE7-A43EE81993B5}" => ("Light-Style-1", a::SchemeColorValues::Accent6),
-    // Source: LibreOffice oox/source/drawingml/table/predefined-table-styles.cxx.
     "{073A0DAA-6AF3-43AB-8588-CEC1D06C72B9}" => ("Medium-Style-2", a::SchemeColorValues::Dark1),
     "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}" => ("Medium-Style-2", a::SchemeColorValues::Accent1),
     "{21E4AEA4-8DFA-4A89-87EB-49C32662AFE0}" => ("Medium-Style-2", a::SchemeColorValues::Accent2),
@@ -1020,7 +1017,6 @@ fn table_cell_text_color(choice: &a::TableCellTextStyleChoice2) -> Option<Color>
 
 impl TableRow {
   fn from_dml(source: &a::TableRow) -> Self {
-    // Source: LibreOffice oox/source/drawingml/table/tablerowcontext.cxx
     // TableRowContext owns ordered table-cell import.
     Self {
       height: source.height.to_emu(),
@@ -1031,7 +1027,6 @@ impl TableRow {
 
 impl TableCell {
   fn from_dml(source: &a::TableCell) -> Self {
-    // Source: LibreOffice oox/source/drawingml/table/tablecellcontext.cxx
     // TableCellContext owns merge flags, margins, and typed TextBody import.
     let mut cell = Self {
       row_span: source.row_span,

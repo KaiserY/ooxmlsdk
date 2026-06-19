@@ -47,7 +47,6 @@ impl PresentationFragmentHandler {
     package: &mut PresentationDocument,
     presentation_part: PresentationPart,
   ) -> Result<Self> {
-    // Source: LibreOffice oox/source/ppt/presentationfragmenthandler.cxx
     // PresentationFragmentHandler records ids and presentation-wide state
     // before finalizeImport imports master and slide fragments.
     let presentation = presentation_part.root_element(package)?;
@@ -142,7 +141,6 @@ impl PresentationFragmentHandler {
     package: &mut PresentationDocument,
     import: &mut PowerPointImport,
   ) -> Result<()> {
-    // Source: LibreOffice PresentationFragmentHandler::importMasterSlides.
     for relationship_id in self.slide_master_vector.clone() {
       let Some(master_part) = self.slide_master_part_by_relationship_id(package, &relationship_id)
       else {
@@ -185,7 +183,6 @@ impl PresentationFragmentHandler {
     slide_ref: SlideRef,
     slide_part: SlidePart,
   ) -> Result<()> {
-    // Source: LibreOffice PresentationFragmentHandler::importSlide.
     let path = slide_part
       .path(package)
       .map(str::to_string)
@@ -270,7 +267,6 @@ impl PresentationFragmentHandler {
     package: &mut PresentationDocument,
     import: &mut PowerPointImport,
   ) -> Result<()> {
-    // Source: LibreOffice PresentationFragmentHandler records notes master ids
     // from presentation.xml and imports them as master persists using notes
     // page size/style state before notes slides are imported.
     for relationship_id in self.notes_master_vector.clone() {
@@ -290,7 +286,6 @@ impl PresentationFragmentHandler {
     import: &mut PowerPointImport,
     layout_part: SlideLayoutPart,
   ) -> Result<Option<usize>> {
-    // Source: LibreOffice PresentationFragmentHandler::importSlide checks the
     // corresponding masterpage+layout pair and reuses an existing persist.
     let layout_path = layout_part.path(package).map(str::to_string);
     let master_path = layout_part
@@ -364,7 +359,6 @@ impl PresentationFragmentHandler {
     slide_index: usize,
     slide_part: &SlidePart,
   ) -> Result<()> {
-    // Source: LibreOffice PresentationFragmentHandler::importSlide imports the
     // corresponding notesSlide after the visible slide and stores it in the
     // notes-pages collection instead of the draw-page collection.
     let Some(notes_part) = slide_part.notes_slide_part(package) else {
@@ -455,7 +449,6 @@ impl PresentationFragmentHandler {
     import: &mut PowerPointImport,
     master_part: &SlideMasterPart,
   ) -> Result<Option<String>> {
-    // Source: LibreOffice PresentationFragmentHandler::importMasterSlides
     // resolves a master theme fragment and stores/reuses it by path before
     // importing master shapes.
     let Some(theme_part) = master_part.theme_part(package) else {
@@ -483,7 +476,6 @@ impl PresentationFragmentHandler {
     import: &mut PowerPointImport,
     notes_master_part: &NotesMasterPart,
   ) -> Result<Option<String>> {
-    // Source: notes masters carry their own theme relationship just like slide
     // masters; keep the theme path on the notes master persist for style/color
     // resolution during notes shape creation.
     let Some(theme_part) = notes_master_part.theme_part(package) else {
@@ -511,7 +503,6 @@ impl PresentationFragmentHandler {
     persist: &mut SlidePersist,
     slide_part: &SlidePart,
   ) -> Result<()> {
-    // Source: LibreOffice oox/source/ppt/presentationfragmenthandler.cxx
     // imports the presentation-wide comment authors before resolving per-slide
     // comments and attaching annotations to the slide persist.
     persist.set_comment_authors(self.comment_authors.clone());
@@ -528,7 +519,6 @@ impl PresentationFragmentHandler {
   }
 
   pub(crate) fn import_slide_names(&self, import: &mut PowerPointImport) {
-    // Source: LibreOffice PresentationFragmentHandler::importSlideNames.
     // Slide names are taken from the first title/centered-title shape text,
     // truncated to the same 63 UTF-16 code-unit limit and disambiguated with
     // " (N)" against already named preceding pages.
@@ -562,7 +552,6 @@ impl PresentationFragmentHandler {
     package: &mut PresentationDocument,
     import: &mut PowerPointImport,
   ) -> Result<()> {
-    // Source: LibreOffice oox/source/ppt/presPropsfragmenthandler.cxx.
     // The presProps fragment maps showPr/@loop, showPr/@useTimings,
     // showPr/custShow and showPr/sldRg to presentation properties.
     let Some(properties_part) = self.presentation_part.presentation_properties_part(package) else {

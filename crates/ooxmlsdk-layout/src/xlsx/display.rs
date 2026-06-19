@@ -20,7 +20,6 @@ use super::print::{CalcPrintDocument, CalcPrintPage};
 use super::worksheet::{CalcSheet, CellAddress, CellRange, CellRect};
 
 const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
-// Source: LibreOffice svx/source/items/algitem.cxx SvxMarginItem default
 // margins are 20 twips on each side.
 const XLSX_CELL_TEXT_INSET_PT: f32 = 20.0 / crate::units::TWIPS_PER_POINT;
 const XLSX_GRID_LINE_WIDTH_PT: f32 = 0.25;
@@ -273,7 +272,6 @@ fn render_cell_area(
       height_pt,
     };
     let mut measurement_style = import.styles.text_style_for_cell(cell.style_index);
-    // Source: LibreOffice sc/source/ui/view/printfun.cxx InitModes() and
     // sc/source/ui/view/output2.cxx ScDrawStringsVars::SetPattern(). Calc's
     // print map mode scales cell geometry and the font used for measurement.
     measurement_style.font_size_pt *= layout.zoom_scale;
@@ -500,7 +498,6 @@ fn calc_cell_visible_text<'a>(
       std::borrow::Cow::Borrowed(&cell.rendered_text)
     };
   }
-  // Source: LibreOffice sc/source/ui/view/output2.cxx draws string cells as
   // strings with a clip region from GetOutputArea/Clip. krilla text extraction
   // exposes full glyph payloads even when clipped, so trim the extracted text
   // to the visible prefix/suffix while keeping the same clip decision.
@@ -700,7 +697,6 @@ fn calc_row_inter_cell_spaces(
   {
     return 0;
   }
-  // Source: LibreOffice sc/source/ui/view/output2.cxx SetTextToWidthOrHash()
   // replaces clipped numeric output with "###", then SetClipMarks() only
   // adjusts the clip region. Keep PDF text extraction joined when the actual
   // glyph positions are closer than a printable word gap.
@@ -2041,7 +2037,6 @@ fn vml_shape_visible_text<'a>(
     return Cow::Borrowed("");
   };
   let address = super::worksheet::CellAddress { col, row };
-  // Source: LibreOffice sc/source/filter/oox/commentsbuffer.cxx finalizes
   // legacy comments against the VML note shape map; visible note captions use
   // the comments part text when the VML textbox itself is empty.
   sheet

@@ -16,9 +16,6 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
   storage internals, or root cache state from this crate.
 - If a behavior matters but only an internal API exposes it, assert it through
   package open/save/reopen, public part accessors, or serialized XML.
-- Keep `// Source:` comments on upstream-derived tests so new coverage can be
-  audited against `../Open-XML-SDK/test`.
-
 ## Status Legend
 
 - `covered`: behavior is covered by current public Rust tests.

@@ -392,6 +392,6 @@ without duplicating the format definition.
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-N-01 | `test-data/wml/numbering_bullets.docx` | Single-level bullet list; bullet numFmt; Unicode bullet char; hanging indent |
-| WML-N-02 | `test-data/wml/numbering_ordered.docx` | Multi-level list: decimal L0, lowerLetter L1, lowerRoman L2; multi-level lvlText |
-| WML-N-03 | `test-data/wml/numbering_restart.docx` | Two independent ordered lists; second restarts via lvlOverride startOverride |
+| WML-N-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/numbering_bullets.docx` | Single-level bullet list; bullet numFmt; Unicode bullet char; hanging indent |
+| WML-N-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/numbering_ordered.docx` | Multi-level list: decimal L0, lowerLetter L1, lowerRoman L2; multi-level lvlText |
+| WML-N-03 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/numbering_restart.docx` | Two independent ordered lists; second restarts via lvlOverride startOverride |

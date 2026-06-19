@@ -15,7 +15,7 @@ OOXML parsers.
 - `wml.xsd` from this repository (`schemas/OfficeOpenXML-XMLSchema-Transitional/`)
 - `shared-commonSimpleTypes.xsd` from the same directory
 - Microsoft Open Specifications: `[MS-DOCX]`, `[MS-OI29500]`
-- Existing `ooxmlsdk` test fixtures (`test-data/document/`)
+- Existing `ooxmlsdk` test fixtures (`../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/document/`)
 - python-docx and Apache POI source code (reference implementations)
 
 This document contains **no verbatim text** from any copyrighted source.
@@ -107,7 +107,7 @@ produces a schema-invalid document.
 ```
 
 A body that contains only `<w:sectPr>` and no paragraphs is valid (see
-`test-data/document/minimal_empty.docx`).
+`../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/document/minimal_empty.docx`).
 
 ---
 
@@ -1631,13 +1631,13 @@ properties, run properties, whitespace handling, and break elements:
 ## 16. Fixture Plan
 
 The following test fixtures should be created to verify correct round-trip
-behaviour. Existing fixtures in `test-data/document/` cover minimal structure
+behaviour. Existing fixtures in `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/document/` cover minimal structure
 (empty body, text, styles, table, image). The fixtures below target run-level
 correctness.
 
 ### Fixture WML-R-01: Character Formatting
 
-**File:** `test-data/wml/char_formatting.docx`
+**File:** `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/char_formatting.docx`
 
 **Content:** A single paragraph with multiple runs, each demonstrating a
 different character formatting property:
@@ -1664,7 +1664,7 @@ different character formatting property:
 
 ### Fixture WML-R-02: Run Fonts
 
-**File:** `test-data/wml/run_fonts.docx`
+**File:** `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/run_fonts.docx`
 
 **Content:** Runs exercising `<w:rFonts>`:
 - `w:ascii="Arial" w:hAnsi="Arial"` (explicit font override)
@@ -1681,7 +1681,7 @@ different character formatting property:
 
 ### Fixture WML-R-03: Whitespace Preservation
 
-**File:** `test-data/wml/whitespace.docx`
+**File:** `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/whitespace.docx`
 
 **Content:** Runs specifically testing `xml:space` behaviour:
 - A run with text starting with a space: `<w:t xml:space="preserve"> leading`
@@ -1700,7 +1700,7 @@ different character formatting property:
 
 ### Fixture WML-R-04: Break Elements
 
-**File:** `test-data/wml/breaks.docx`
+**File:** `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/breaks.docx`
 
 **Content:** Runs demonstrating break elements:
 - Soft return: `<w:br/>` (no `w:type` attribute)

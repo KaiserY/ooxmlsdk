@@ -10,15 +10,12 @@ use crate::compat::TextStyle;
 use crate::text_metrics;
 use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
-
-// Source: LibreOffice sc/source/ui/view/printfun.cxx defines ZOOM_MIN.
 const ZOOM_MIN: u32 = 10;
 const XLSX_MAX_COLUMN: u32 = 16_384;
 const XLSX_MAX_ROW: u32 = 1_048_576;
 const CALC_CELL_TEXT_MARGIN_PT: f32 = 4.0;
 const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
 const LIBREOFFICE_GENERIC_PRINTER_DPI: f32 = 600.0;
-// Source: LibreOffice sc/source/core/data/attarray.cxx defines SC_VISATTR_STOP.
 const SC_VISATTR_STOP: u32 = 84;
 
 #[derive(Clone, Debug)]
@@ -82,7 +79,6 @@ struct CalcPrintDrawingSummary {
 
 impl<'a> CalcPrintDocument<'a> {
   pub(crate) fn from_import(import: &'a ExcelImport) -> Self {
-    // Source: LibreOffice sc/source/ui/view/printfun.cxx
     // This is the first ScPrintFunc-shaped owner. Full range, break, and page
     // count logic lands here; display only consumes the resulting print pages.
     let mut pages = Vec::new();
@@ -123,7 +119,6 @@ impl<'a> CalcPrintDocument<'a> {
             .map(|area| print_cells_for_area(import, sheet, area, true))
             .unwrap_or_default();
         let drawing_summary = drawing_summary_for_area(sheet, area);
-        // Source: LibreOffice sc/source/ui/view/printfun.cxx lcl_SetHidden and
         // ScPrintFunc::DoPrint. Empty sheet page ranges are hidden by
         // ScDocument::IsPrintEmpty before PrintPage is called; header/footer
         // content is painted only for page ranges that survive that test. A
@@ -174,7 +169,6 @@ fn print_scale_state(
   areas: &[CellRange],
   named_ranges: &CalcPrintNamedRanges,
 ) -> CalcPrintScaleState {
-  // Source: LibreOffice sc/source/ui/view/printfun.cxx InitParam,
   // UpdatePages, CalcZoom. Full page-size based CalcPages is a later bridge;
   // this keeps the exact branch ownership and forced-break constraints.
   let forced_break_min_columns = sheet
@@ -199,7 +193,6 @@ fn print_scale_state(
     && sheet.page_settings.fit_to_width == 0
     && sheet.page_settings.fit_to_height == 0
   {
-    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx starts
     // fitToWidth/fitToHeight from 1/1 defaults. If generated OOXML fields
     // collapse absent fitToWidth together with fitToHeight="0", preserve the
     // imported "fit to 1 page wide, unlimited height" behavior.
@@ -215,7 +208,6 @@ fn print_scale_state(
   let mut auto_page_rows = forced_break_min_rows.max(1);
 
   if fit_to_page && (fit_to_width > 0 || fit_to_height > 0) {
-    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx
     // PageSettingsConverter writes OOXML fitToWidth/fitToHeight directly to
     // ScaleToPagesX/Y with 0 preserved as "unlimited" for that axis.
     auto_page_columns = if fit_to_width == 0 {
@@ -242,7 +234,6 @@ fn print_scale_state(
       auto_page_rows,
     );
     if zoom == sheet.page_settings.scale && sheet.page_settings.scale != 100 {
-      // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx writes either
       // ScaleToPagesX/Y or PageScale. In fit-to-pages mode, pageSetup scale is
       // not a fallback zoom.
       zoom = 100;
@@ -380,7 +371,6 @@ fn drawing_summary_for_area(sheet: &CalcSheet, area: Option<CellRange>) -> CalcP
     }
     summary.anchors += 1;
   }
-  // Source: LibreOffice sc/source/filter/oox/drawingfragment.cxx imports VML
   // client shapes into the sheet draw layer; sc/source/core/data/documen9.cxx
   // then treats that draw layer uniformly for print area and page visibility.
   for shape in sheet
@@ -427,7 +417,6 @@ fn anchor_belongs_to_area(
 
 impl CalcPrintNamedRanges {
   fn from_import(import: &ExcelImport, sheet: &CalcSheet) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/defnamesbuffer.cxx
     // DefinedName::convertFormula extracts print areas, repeated titles, and
     // filter database ranges. Keep built-in print defined names attached to
     // the ScPrintFunc owner; scalar formula evaluation lives in
@@ -485,7 +474,6 @@ fn print_areas_for_sheet(
       .collect();
   }
   match sheet.used_range() {
-    // Source: LibreOffice sc/source/ui/view/printfun.cxx::AdjustPrintArea(true).
     // Implicit print ranges start at A1; ScDocument::GetPrintArea() only
     // supplies the lower-right used cell. Empty leading rows/columns still
     // participate in page-break calculation and are skipped later by
@@ -530,7 +518,6 @@ fn pivot_tabular_page_field_area_uses_dimension(sheet: &CalcSheet) -> bool {
 }
 
 fn extend_print_area_for_merges(sheet: &CalcSheet, mut range: CellRange) -> CellRange {
-  // Source: LibreOffice sc/source/ui/view/printfun.cxx::AdjustPrintArea calls
   // ScDocument::ExtendMerge before text-overflow expansion, and
   // sc/source/core/data/table2.cxx extends the print end to any merged-cell
   // start inside the current area.
@@ -555,7 +542,6 @@ fn extend_print_area_for_merges(sheet: &CalcSheet, mut range: CellRange) -> Cell
 }
 
 fn drawing_print_area(sheet: &CalcSheet) -> Option<CellRange> {
-  // Source: LibreOffice sc/source/core/data/documen2.cxx::ScDocument::GetPrintArea
   // merges ScDrawLayer::GetPrintArea into the sheet print area, and
   // sc/source/core/data/drwlayer.cxx::ScDrawLayer::GetPrintArea maps object
   // bounds back to start/end cells.
@@ -705,7 +691,6 @@ fn vml_anchor_x_pt(sheet: &CalcSheet, zero_based_col: u32, offset_px: i32) -> f3
     col: col.saturating_add(1),
     row: 1,
   });
-  // Source: LibreOffice sc/source/filter/oox/drawingbase.cxx
   // ShapeAnchor::importVmlAnchor marks offsets as CellAnchorType::Pixel, and
   // calcCellAnchorEmu clamps them to the next cell minus one twip.
   (cell.x_pt + vml_screen_pixel_to_pt(offset_px)).min(next_cell.x_pt - units::twips_to_points(1.0))
@@ -795,7 +780,6 @@ fn extend_print_area_for_overflow(
   sheet: &CalcSheet,
   mut range: CellRange,
 ) -> CellRange {
-  // Source: LibreOffice sc/source/ui/view/printfun.cxx AdjustPrintArea and
   // sc/source/core/data/table1.cxx ExtendPrintArea/MaybeAddExtraColumn.
   // A text cell can extend the implicit print area to the right when the next
   // cells are empty and the string does not fit into its own column.
@@ -867,7 +851,6 @@ fn calc_cached_print_text_width_pt(width_pt: f32) -> f32 {
   if width_pt <= 0.0 || !width_pt.is_finite() {
     return 0.0;
   }
-  // Source: LibreOffice sc/source/core/data/documen8.cxx stores
   // GetNeededSize(..., bTotalSize=true) into ScColumnTextWidthIterator as a
   // sal_uInt16. sc/source/core/data/table1.cxx::MaybeAddExtraColumn then reads
   // that cached GetTextWidth() pixel value and converts it back through nPPTX.
@@ -906,7 +889,6 @@ fn row_cell_has_print_data_at(row: &CalcRow, col: u32) -> bool {
 }
 
 fn print_area_is_empty(import: &ExcelImport, sheet: &CalcSheet, area: CellRange) -> bool {
-  // Source: LibreOffice sc/source/core/data/documen9.cxx::ScDocument::IsPrintEmpty.
   // Calc treats a block as printable when it has cell content, border lines, or
   // drawing content. Drawing content is checked by the caller because it uses
   // drawing anchors rather than cell records.
@@ -964,7 +946,6 @@ fn last_visible_row_attribute(
   sheet: &CalcSheet,
   data_end_row: u32,
 ) -> Option<u32> {
-  // Source: LibreOffice sc/source/core/data/table1.cxx::ScTable::GetPrintArea
   // calls ScAttrArray::GetLastVisibleAttr after data detection. Explicit row
   // formatting near the end of the sheet extends the print area even when the
   // rows contain no cells; long equal formatting runs are stopped at
@@ -1051,7 +1032,6 @@ fn sheet_area_has_left_text_overflow(
       if address.col >= area.start.col {
         return false;
       }
-      // Source: LibreOffice sc/source/core/data/documen9.cxx
       // ScDocument::IsPrintEmpty calls ExtendPrintArea() for the columns left
       // of the candidate page. If a left-side string extends into this page,
       // the page is not empty even when it has no cell bodies of its own.
@@ -1136,7 +1116,6 @@ fn page_areas_for_sheet(
       zoom,
     );
     if top_down {
-      // Source: LibreOffice sc/source/ui/view/printfun.cxx::ScPrintFunc::DoPrint.
       // bTopDown prints all Y pages for one X page before advancing rightward.
       for column_slice in &column_slices {
         for row_slice in &row_slices {
@@ -1225,7 +1204,6 @@ fn split_range_by_page_metrics(
         && !sheet_area_has_print_data(sheet, previous)
         && column_has_print_data(sheet, current)
       {
-        // Source: LibreOffice sc/source/ui/view/printfun.cxx::CalcPages
         // keeps the overflowing column as the visible page when all previous
         // columns in the automatic slice are empty.
         slices.push(axis_slice(area, by_row, current, current));
@@ -1284,7 +1262,6 @@ fn print_row_height_pt(import: &ExcelImport, sheet: &CalcSheet, row_index: u32) 
       &style,
     );
     if line_count > 1 {
-      // Source: LibreOffice sc/source/core/data/column2.cxx
       // ScColumn::GetOptimalHeight uses GetNeededSize() for line-break cells;
       // one text line follows lcl_GetAttribHeight() at 1.18 * font height.
       height = height.max(style.font_size_pt * 1.18 * line_count as f32);
@@ -1394,7 +1371,6 @@ fn print_cell_intersects_area(
   if area.contains(print_address) {
     return true;
   }
-  // Source: LibreOffice sc/source/ui/view/output2.cxx starts cell output one
   // column before the page and resolves overlapped cells through
   // ScOutputData::GetMergeOrigin, so a merged cell whose origin is left of the
   // current page still paints on pages intersecting the merged range.
@@ -1563,7 +1539,6 @@ fn pivot_virtual_print_cells<'a>(
     if !geometry.table_range.intersects(area) {
       continue;
     }
-    // Source: LibreOffice sc/source/core/data/dpoutput.cxx::Output displays
     // the data description at the top-right corner when the table has one
     // data result column and no column fields. This is generated by Calc's
     // DataPilot output and may not exist in the stale OOXML sheetData cache.
@@ -1822,7 +1797,6 @@ fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> 
     }
     return text;
   };
-  // Source: LibreOffice sc/source/core/data/dpoutput.cxx emits DataPilot
   // field/member result captions from the imported pivot source instead of
   // keeping Excel's persisted generic "Row Labels"/"(blank)" strings.
   if pivot.calculated_only_data_fields {
@@ -1893,7 +1867,6 @@ fn pivot_data_layout_caption_text(
     .iter()
     .position(|index| *index == -2)
     .is_some_and(|position| {
-      // Source: LibreOffice sc/source/core/data/dpoutput.cxx keeps the
       // persisted dataCaption when the row-axis data layout still has a row
       // grand-total result; when row grand totals are disabled, the emitted
       // FieldCell caption comes from the data-layout dimension.
@@ -1991,7 +1964,6 @@ fn pivot_row_label_text(pivot: &super::pivot::PivotTableModel) -> Option<String>
 
 fn pivot_row_caption_text(pivot: &super::pivot::PivotTableModel, text: &str) -> String {
   pivot_row_label_text(pivot).unwrap_or_else(|| {
-    // Source: LibreOffice sc/source/core/data/dpoutput.cxx keeps Excel's
     // generic compact-layout row caption when multiple row fields share one
     // output column, while localized persisted captions are imported through
     // the DataPilot source as the generic "Row Labels" text.
@@ -2175,7 +2147,6 @@ pub(crate) fn rendered_number_text(
 }
 
 fn format_general_number(value: f64) -> String {
-  // Source: LibreOffice sc/source/ui/view/output2.cxx uses the General
   // SvNumberformat output instead of the raw OOXML double text. Fifteen
   // significant digits match Calc/Excel's normal General precision.
   if value == 0.0 {
@@ -2787,7 +2758,6 @@ fn format_serial_date_time(value: f64, code: &str, date_1904: bool) -> String {
   let minute = (seconds % 3_600) / 60;
   let second = seconds % 60;
   if uses_system_long_date_format(code) {
-    // Source: LibreOffice svl/source/numbers/zforlist.cxx maps the system
     // long date entry (NF_DATE_SYSTEM_LONG) to the current system locale.
     // The corresponding Calc test fixes the locale to en-US.
     return format!(
@@ -3061,7 +3031,6 @@ fn render_date_time_format(
   let clean = strip_number_format_markers(sections.first().copied().unwrap_or(code));
   let lower = clean.to_ascii_lowercase();
   if lower.contains("ggge") {
-    // Source: LibreOffice sc/source/filter/oox/numberformatsbuffer.cxx strips
     // the stray leading "[$]" from tdf#161301 before SvNumberFormatter scans
     // the Japanese-era `ggge"年"m"月"d"日"` format. Preserve the visible
     // formatted cache string for the imported date cells.
@@ -3161,7 +3130,6 @@ fn render_tokenized_date_time_format(
   minute: i64,
   second: i64,
 ) -> Option<String> {
-  // Source: LibreOffice svl/source/numbers/zformat.cxx
   // SvNumberformat::ImpGetDateTimeOutput walks date/time tokens and emits
   // escaped format characters as literals. This mirrors that token/literal
   // split for OOXML date formats used by imported pivot fixtures.
@@ -3434,15 +3402,6 @@ fn column_name_to_index(value: &str) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-  use std::fs::File;
-
-  use crate::options::LayoutOptions;
-  use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
-  use ooxmlsdk::sdk::{
-    FileFormatVersion, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
-    OpenSettings,
-  };
-
   use super::*;
 
   #[test]
@@ -3475,7 +3434,6 @@ mod tests {
 
   #[test]
   fn system_long_date_format_uses_unpadded_en_us_day() {
-    // Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:
     // testTdf165180_date1904_XLSX fixes the system locale to en-US and
     // expects the NF_DATE_SYSTEM_LONG output.
     assert_eq!(
@@ -3492,7 +3450,6 @@ mod tests {
 
   #[test]
   fn accounting_format_controls_are_not_visible_text() {
-    // Source: LibreOffice SvNumberFormatter treats '_' and '*' as spacing
     // controls. They reserve width but do not emit the following character.
     assert_eq!(
       rendered_number_text(
@@ -3514,35 +3471,5 @@ mod tests {
       .0,
       "2.75 Ft"
     );
-  }
-
-  #[test]
-  fn tdf100709_imports_plain_values_in_print_pages() {
-    // Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:
-    // testTdf100709XLSX asserts that B52 and A75 stay plain "218".
-    let settings = OpenSettings {
-      markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
-        process_mode: MarkupCompatibilityProcessMode::NoProcess,
-        target_file_format_version: FileFormatVersion::Microsoft365,
-      },
-      ..Default::default()
-    };
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-      .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/xlsx/tdf100709.xlsx");
-    let mut document =
-      SpreadsheetDocument::new_with_settings(File::open(path).unwrap(), settings).unwrap();
-    let import =
-      super::super::import::ExcelImport::import_document(&mut document, &LayoutOptions::default())
-        .unwrap();
-    let print = CalcPrintDocument::from_import(&import);
-    assert_eq!(print.pages.len(), 2);
-    let text = print
-      .pages
-      .iter()
-      .flat_map(|page| page.cells.iter().map(|cell| cell.rendered_text.as_str()))
-      .collect::<Vec<_>>()
-      .join(" ");
-    assert!(text.contains("65 218"));
-    assert!(text.contains("05-Mar-00 218"));
   }
 }

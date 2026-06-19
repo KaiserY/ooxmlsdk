@@ -243,4 +243,4 @@ markup must be preserved intact.
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-TC-01 | `test-data/wml/tracked_changes.docx` | `w:ins` wrapping inserted run; `w:del` wrapping deleted run with `w:delText`; `w:rPrChange` (previous rPr stored); `w:pPrChange` (previous pPr stored) |
+| WML-TC-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/tracked_changes.docx` | `w:ins` wrapping inserted run; `w:del` wrapping deleted run with `w:delText`; `w:rPrChange` (previous rPr stored); `w:pPrChange` (previous pPr stored) |

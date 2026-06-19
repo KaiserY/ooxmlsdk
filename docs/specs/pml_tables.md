@@ -195,5 +195,5 @@ any-payload field (`xml_children: Vec<Box<str>>`).
 
 | ID | File | Coverage |
 |----|------|----------|
-| PML-TBL-01 | `test-data/slideshow/minimal_table.pptx` | Basic 2×2 table (already covered) |
-| PML-TBL-02 | `test-data/pml/slide_table.pptx` | 3-column 3-row table: `firstRow="1"` `bandRow="1"` on `<a:tblPr>`; `<a:tcPr>` bottom-border on header cells; horizontal merge spanning cols 2–3 (`gridSpan="2"` + `hMerge="1"` continuation) |
+| PML-TBL-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/slideshow/minimal_table.pptx` | Basic 2×2 table (already covered) |
+| PML-TBL-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/slide_table.pptx` | 3-column 3-row table: `firstRow="1"` `bandRow="1"` on `<a:tblPr>`; `<a:tcPr>` bottom-border on header cells; horizontal merge spanning cols 2–3 (`gridSpan="2"` + `hMerge="1"` continuation) |

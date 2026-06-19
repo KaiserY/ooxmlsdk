@@ -596,9 +596,9 @@ Shape-level properties (font, size, colour) defined in `<p:spPr>` and
 
 | ID | File | Properties covered |
 |----|------|--------------------|
-| PML-T-01 | `test-data/pml/txbody_basic.pptx` | `<a:txBody>` with `bodyPr`, `lstStyle`, single `<a:p>` with one run |
-| PML-T-02 | `test-data/pml/txbody_vert.pptx` | `vert="vert"`, `anchor="b"`, `<a:normAutofit/>` |
-| PML-T-03 | `test-data/pml/txbody_bullets.pptx` | Multi-level paragraphs with `lvl="0"` through `lvl="2"`; `<a:lstStyle>` with level defaults |
-| PML-T-04 | `test-data/pml/txbody_hyperlink.pptx` | `<a:hlinkClick r:id="rId2"/>` with matching External relationship |
-| PML-T-05 | `test-data/pml/txbody_linebreak.pptx` | `<a:br>` soft return within a paragraph |
-| PML-T-06 | `test-data/pml/txbody_richtext.pptx` | Mixed bold/italic/underline runs; superscript `baseline`; `xml:space="preserve"` |
+| PML-T-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/txbody_basic.pptx` | `<a:txBody>` with `bodyPr`, `lstStyle`, single `<a:p>` with one run |
+| PML-T-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/txbody_vert.pptx` | `vert="vert"`, `anchor="b"`, `<a:normAutofit/>` |
+| PML-T-03 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/txbody_bullets.pptx` | Multi-level paragraphs with `lvl="0"` through `lvl="2"`; `<a:lstStyle>` with level defaults |
+| PML-T-04 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/txbody_hyperlink.pptx` | `<a:hlinkClick r:id="rId2"/>` with matching External relationship |
+| PML-T-05 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/txbody_linebreak.pptx` | `<a:br>` soft return within a paragraph |
+| PML-T-06 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/txbody_richtext.pptx` | Mixed bold/italic/underline runs; superscript `baseline`; `xml:space="preserve"` |

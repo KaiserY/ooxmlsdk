@@ -260,5 +260,5 @@ let dxf = &styles.dxfs.as_ref()?.dxf[rule.dxf_id?? as usize];
 
 | ID | File | Coverage |
 |----|------|----------|
-| SML-CF-01 | `test-data/spreadsheet/conditional_cellis.xlsx` | `cellIs` operator `greaterThan` with `<x:formula>` and `dxfId`; `expression` rule referencing a different `<x:dxf>`; `<x:dxfs count="2">` in styles.xml with font + fill formats |
-| SML-CF-02 | `test-data/spreadsheet/conditional_visual.xlsx` | 3-stop `<x:colorScale>` with min/percentile/max `<x:cfvo>` and three colours; `<x:dataBar>` rule on a separate range; `<x:iconSet iconSet="3TrafficLights1">` with three cfvo entries |
+| SML-CF-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/spreadsheet/conditional_cellis.xlsx` | `cellIs` operator `greaterThan` with `<x:formula>` and `dxfId`; `expression` rule referencing a different `<x:dxf>`; `<x:dxfs count="2">` in styles.xml with font + fill formats |
+| SML-CF-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/spreadsheet/conditional_visual.xlsx` | 3-stop `<x:colorScale>` with min/percentile/max `<x:cfvo>` and three colours; `<x:dataBar>` rule on a separate range; `<x:iconSet iconSet="3TrafficLights1">` with three cfvo entries |

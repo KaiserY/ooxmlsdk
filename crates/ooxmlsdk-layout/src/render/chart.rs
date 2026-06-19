@@ -144,14 +144,12 @@ fn visible_texts_with_default_series_label(
 }
 
 fn uncached_series_label(_series: ChartSeriesRef<'_>, series_index: usize) -> String {
-  // Source: LibreOffice chart2/source/tools/UncachedDataSequence.cxx
   // uses STR_DATA_UNNAMED_SERIES_WITH_INDEX ("Series%NUMBER") for imported
   // OOXML series without a cached label sequence.
   format!("Series{series_index}")
 }
 
 fn default_series_label(series: ChartSeriesRef<'_>, series_index: usize) -> String {
-  // Source: LibreOffice chart2/source/tools/InternalData.cxx
   // uses the localized STR_ROW_LABEL/STR_COLUMN_LABEL defaults when imported
   // chart data has no explicit series label. OOXML bar charts with a horizontal
   // value range map each series to a data row.

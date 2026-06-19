@@ -204,5 +204,5 @@ Rust types under `schemas_openxmlformats_org_drawingml_2006_main`:
 
 | ID | File | Coverage |
 |----|------|----------|
-| PML-TH-01 | `test-data/drawingml/theme.pptx` | Full theme round-trip via slide master (covered in DrawingML spec) |
-| PML-TH-02 | `test-data/pml/theme_colors.pptx` | `<a:overrideClrMapping>`: slide with `accent1`/`dk1`/`lt1` scheme-color fills and `<p:clrMapOvr><a:overrideClrMapping bg1="dk1" tx1="lt1" …>` swapping dark/light for that slide |
+| PML-TH-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/drawingml/theme.pptx` | Full theme round-trip via slide master (covered in DrawingML spec) |
+| PML-TH-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/theme_colors.pptx` | `<a:overrideClrMapping>`: slide with `accent1`/`dk1`/`lt1` scheme-color fills and `<p:clrMapOvr><a:overrideClrMapping bg1="dk1" tx1="lt1" …>` swapping dark/light for that slide |

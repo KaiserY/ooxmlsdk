@@ -603,8 +603,8 @@ Within a `<p:grpSp>`, the same rule applies to the group's children.
 
 | ID | File | Properties covered |
 |----|------|-------------------|
-| PML-S-01 | `test-data/pml/shapes_basic.pptx` | spTree structure; two sp elements with preset geometry; xfrm with off/ext; solidFill; noFill |
-| PML-S-02 | `test-data/pml/shapes_rotation.pptx` | rot at 45°/90°/270°; flipH only; flipV only; flipH+flipV combined; off preserved through round-trip |
-| PML-S-03 | `test-data/pml/shapes_group.pptx` | grpSp with two child shapes; chOff/chExt matching child bounding box; nested group inside a group |
-| PML-S-04 | `test-data/pml/shapes_txbox.pptx` | txBox="1" shapes; multi-paragraph txBody; endParaRPr preservation; bodyPr wrap/anchor attributes |
-| PML-S-05 | `test-data/pml/shapes_graphicframe.pptx` | graphicFrame wrapping a DrawingML table; p:xfrm structure; graphicData uri |
+| PML-S-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/shapes_basic.pptx` | spTree structure; two sp elements with preset geometry; xfrm with off/ext; solidFill; noFill |
+| PML-S-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/shapes_rotation.pptx` | rot at 45°/90°/270°; flipH only; flipV only; flipH+flipV combined; off preserved through round-trip |
+| PML-S-03 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/shapes_group.pptx` | grpSp with two child shapes; chOff/chExt matching child bounding box; nested group inside a group |
+| PML-S-04 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/shapes_txbox.pptx` | txBox="1" shapes; multi-paragraph txBody; endParaRPr preservation; bodyPr wrap/anchor attributes |
+| PML-S-05 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/shapes_graphicframe.pptx` | graphicFrame wrapping a DrawingML table; p:xfrm structure; graphicData uri |

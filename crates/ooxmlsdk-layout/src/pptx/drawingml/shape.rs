@@ -280,7 +280,6 @@ impl Shape {
   }
 
   pub(crate) fn apply_shape_reference_with_text(&mut self, reference: &Shape, use_text: bool) {
-    // Source: LibreOffice oox/source/drawingml/shape.cxx
     // applyShapeReference copies inherited properties while keeping direct
     // shape properties authoritative. LibreOffice inherits getActual*()
     // results from placeholders, not just the placeholder's direct properties.
@@ -410,7 +409,6 @@ impl Shape {
   }
 
   pub(crate) fn finalize_x_shape(&mut self) {
-    // Source: LibreOffice oox/source/drawingml/table/tableproperties.cxx
     // expands undersized rows to the graphical frame height, while still using
     // the DrawingML grid/row dimensions when they exceed the frame.
     if self.service_name == ShapeService::Table
@@ -432,7 +430,6 @@ impl Shape {
     import: &PowerPointImport,
     parent_fill: Option<&FillProperties>,
   ) -> Option<FillProperties> {
-    // Source: LibreOffice oox/source/drawingml/shape.cxx
     // getActualFillProperties applies reference/theme/direct properties, then
     // replaces direct grpFill with the parent group fill when one exists.
     let mut actual = self.shape_ref_fill_properties.clone();

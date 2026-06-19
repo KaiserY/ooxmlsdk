@@ -171,7 +171,6 @@ mod tests {
 
   #[test]
   fn text_math_text_reads_generated_math_fragment() {
-    // Source: test-data/ooxmlsdk-pdf-test/libreoffice/pptx/tdf131553.pptx
     // ppt/diagrams/data1.xml. a14:m preserves selected MCE math as raw XML bytes;
     // the selected MCE dgm:pt already contains the m:oMathPara child.
     let math = [

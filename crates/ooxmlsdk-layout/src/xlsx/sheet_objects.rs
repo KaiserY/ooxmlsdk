@@ -51,7 +51,6 @@ pub(crate) struct ObjectAnchorModel {
 
 impl SheetObjectCatalog {
   pub(crate) fn from_worksheet(worksheet: &x::Worksheet) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/worksheetfragment.cxx
     // importOleObject/importControl collect worksheet XML object records and
     // register them with the VML drawing owner instead of treating only the
     // relationship parts as printable objects.

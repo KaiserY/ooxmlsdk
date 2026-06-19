@@ -241,7 +241,6 @@ impl StylesCatalog {
       return Some(format.code.as_str());
     }
     match id {
-      // Source: LibreOffice sc/source/filter/oox/numberformatsbuffer.cxx
       // maps OOXML numFmtId 0 to NUMBER_STANDARD (General).
       0 => Some("General"),
       1 => Some("0"),
@@ -253,7 +252,6 @@ impl StylesCatalog {
       11 => Some("0.00E+00"),
       12 => Some("# ?/?"),
       13 => Some("# ??/??"),
-      // Source: LibreOffice sc/source/filter/excel/xlstyle.cxx
       // spBuiltInFormats_ENGLISH_US maps Excel builtin 14 to M/D/YYYY.
       14 => Some("M/D/YYYY"),
       15 => Some("d-mmm-yy"),
@@ -268,7 +266,6 @@ impl StylesCatalog {
       38 => Some("#,##0 ;[Red](#,##0)"),
       39 => Some("#,##0.00;(#,##0.00)"),
       40 => Some("#,##0.00;[Red](#,##0.00)"),
-      // Source: LibreOffice sc/source/filter/oox/numberformatsbuffer.cxx
       // maps OOXML builtin ids 41..44 to accounting formats without a
       // currency symbol in the default OOXML table.
       41 => Some("_-* #,##0_-;-* #,##0_-;_-* \"-\"_-;_-@_-"),
@@ -449,7 +446,6 @@ impl StylesCatalog {
     else {
       return Some(format);
     };
-    // Source: LibreOffice sc/source/filter/oox/stylesbuffer.cxx
     // Xf::createPattern enables a cell XF property when it differs from the
     // parent style XF, even if the cell XF apply flag was initially false.
     if !format.apply_font {
@@ -478,7 +474,6 @@ impl StylesCatalog {
 
 impl CellFormatRecord {
   fn from_cell_format(format: &x::CellFormat, style_xf: bool) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/stylesbuffer.cxx
     // Xf::importXf. Office effectively lets explicit xf properties apply by
     // default; cellXf records with xfId are the branch where apply defaults to
     // false unless an id makes the property used.
@@ -634,7 +629,6 @@ impl DifferentialFormatRecord {
 impl AlignmentRecord {
   fn from_alignment(alignment: &x::Alignment) -> Self {
     let horizontal = alignment.horizontal.or_else(|| {
-      // Source: LibreOffice sc/source/filter/oox/stylesbuffer.cxx
       // Alignment::importAlignment. Rotated OOXML cells default to left for
       // rotations below 90 degrees or exactly 180, and to right otherwise.
       alignment.text_rotation.and_then(|rotation| {
@@ -765,7 +759,6 @@ fn border_style(
 }
 
 fn border_width_pt(style: x::BorderStyleValues) -> f32 {
-  // Source: LibreOffice maps OOXML border tokens through Border::convertBorderLine
   // into editeng SvxBorderLine widths. Keep the same thin/medium/thick groups.
   match style {
     x::BorderStyleValues::Hair => 0.25,
@@ -933,7 +926,6 @@ mod tests {
 
   #[test]
   fn rotated_alignment_defaults_match_libreoffice_import() {
-    // Source: LibreOffice sc/source/filter/oox/stylesbuffer.cxx
     // Alignment::importAlignment and
     // sc/qa/unit/subsequent_export_test2.cxx:testTdf120168.
     let left = AlignmentRecord::from_alignment(&x::Alignment {

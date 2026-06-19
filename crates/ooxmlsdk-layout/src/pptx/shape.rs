@@ -133,7 +133,6 @@ impl PptShape {
   }
 
   pub(crate) fn set_text_master_styles(&mut self, slide_persist: &SlidePersist) {
-    // Source: LibreOffice oox/source/ppt/pptshape.cxx
     // PPTShape::addShape merges master text list style, placeholder text body
     // style, and the current shape text body style before shape creation.
     let mut style = TextListStyle::default();
@@ -178,7 +177,6 @@ impl PptShape {
     if !text_body_is_empty(text_body) {
       return;
     }
-    // Source: LibreOffice sd/source/core/sdpage.cxx::GetPresObjText
     // creates localized prompt text for empty presentation objects.
     if text_body.paragraphs.is_empty() {
       text_body.paragraphs.push(TextParagraph::default());

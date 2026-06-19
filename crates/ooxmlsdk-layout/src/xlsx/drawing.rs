@@ -677,7 +677,6 @@ impl DrawingObjectModel {
 }
 
 fn blip_relationship_id(blip: &a::Blip) -> Option<String> {
-  // Source: LibreOffice oox/source/drawingml and export/drawingml.cxx keeps SVG
   // blips as the primary graphic with a bitmap fallback. Preserve that owner
   // choice here instead of always taking the fallback r:embed.
   blip
@@ -865,7 +864,6 @@ fn shape_style_line_color(style: Option<&xdr::ShapeStyle>) -> Option<RgbColor> {
 }
 
 fn scheme_color(color: &a::SchemeColor) -> Option<RgbColor> {
-  // Source: LibreOffice resolves xdr:style scheme colors through the workbook
   // theme/style matrix before SdrObject painting. Until the workbook theme
   // bridge owns these colors, keep the Office default theme mapping used by
   // OOXML's generated style references.

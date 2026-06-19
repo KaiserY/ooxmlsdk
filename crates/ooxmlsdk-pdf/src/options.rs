@@ -13,7 +13,7 @@ pub struct PdfOptions {
   /// JPEG quality used when the PDF filter asks raster graphics to be stored as JPEG.
   pub jpeg_quality: Option<u8>,
 
-  /// Source file name used by spreadsheet formulas such as CELL("filename").
+  /// Input file name used by spreadsheet formulas such as CELL("filename").
   pub source_file_name: Option<String>,
 }
 

@@ -386,7 +386,7 @@ application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml
 
 | ID | File | Coverage |
 |----|------|---------|
-| PML-NO-01 | `test-data/pml/notes_basic.pptx` | Single slide with one-paragraph notes; slide `.rels` notesSlide entry; notes slide back-rels; `<Override>` in Content_Types |
-| PML-NO-02 | `test-data/pml/notes_multipara.pptx` | Notes body placeholder with three paragraphs; one paragraph with a bold run |
-| PML-NO-03 | `test-data/pml/notes_empty.pptx` | Slide with an explicit empty notes slide (single empty `<a:p>`) vs. slide with no notesSlide relationship |
-| PML-NO-04 | `test-data/pml/notes_master.pptx` | Full notes master part with `sldImg` and `body` placeholders; notes slide references master via `rId` |
+| PML-NO-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/notes_basic.pptx` | Single slide with one-paragraph notes; slide `.rels` notesSlide entry; notes slide back-rels; `<Override>` in Content_Types |
+| PML-NO-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/notes_multipara.pptx` | Notes body placeholder with three paragraphs; one paragraph with a bold run |
+| PML-NO-03 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/notes_empty.pptx` | Slide with an explicit empty notes slide (single empty `<a:p>`) vs. slide with no notesSlide relationship |
+| PML-NO-04 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/notes_master.pptx` | Full notes master part with `sldImg` and `body` placeholders; notes slide references master via `rId` |

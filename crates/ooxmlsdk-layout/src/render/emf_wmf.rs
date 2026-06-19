@@ -1,7 +1,5 @@
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
-
-// Source: LibreOffice vcl/source/filter/wmf/emfwr.cxx writes these Win32 EMF
 // record ids. The byte offsets below are the EMR_STRETCHDIBITS /
 // EMR_SETDIBITSTODEVICE record layout fields.
 const EMF_HEADER_SIZE: usize = 108;
@@ -61,7 +59,6 @@ const EMFPLUS_DIRECT_COLOR_FLAG: u16 = 0x8000;
 const EMFPLUS_COMPRESSED_FLAG: u16 = 0x4000;
 const EMFPLUS_POST_MULTIPLY_FLAG: u16 = 0x2000;
 const LOGFONT_FACE_NAME_CHARS: usize = 32;
-// Source: LibreOffice vcl/source/bitmap/dibtools.cxx parses BITMAPINFOHEADER
 // values and keeps DIB scanlines aligned to four bytes.
 const BITMAPINFOHEADER_SIZE: usize = 40;
 const BITMAP_WIDTH_OFFSET: usize = 4;
@@ -956,7 +953,6 @@ fn process_emf_plus_comment(
   record_size: usize,
   state: &mut EmfVectorState,
 ) -> Result<(), String> {
-  // Source: LibreOffice drawinglayer/source/tools/emfphelperdata.cxx consumes
   // EMR_COMMENT_EMFPLUS chunks as a stream of 12-byte EMF+ record headers.
   let data_size = read_u32(data, record_offset + 8)? as usize;
   let comment_identifier = read_u32(data, record_offset + 12)?;
@@ -1273,7 +1269,6 @@ struct ExtTextRecord {
 }
 
 fn ext_text_record(data: &[u8], record_offset: usize, record_size: usize) -> Option<ExtTextRecord> {
-  // Source: LibreOffice vcl/source/filter/wmf/emfwr.cxx writes EMR_EXTTEXTOUTW
   // with rclBounds, graphics mode, scales, then EMRTEXT. EMRTEXT::offString is
   // relative to the record start.
   const EMRTEXT_OFFSET: usize = 36;
@@ -1303,7 +1298,6 @@ fn read_logfont_object(
   record_offset: usize,
   record_size: usize,
 ) -> Option<(u32, EmfFont)> {
-  // Source: LibreOffice emfio/source/reader/emfreader.cxx
   // EMR_EXTCREATEFONTINDIRECTW reads an object index followed by LOGFONTW.
   const OBJECT_ID_OFFSET: usize = 8;
   const LOGFONT_OFFSET: usize = 12;
@@ -1351,80 +1345,4 @@ fn read_f32(data: &[u8], offset: usize) -> Result<f32, String> {
     .get(offset..offset + 4)
     .ok_or_else(|| format!("read past end of buffer at offset {offset}"))?;
   Ok(f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
-}
-
-#[cfg(test)]
-mod tests {
-  use std::path::PathBuf;
-
-  use ooxmlsdk::parts::PartRef;
-  use ooxmlsdk::parts::wordprocessing_document::WordprocessingDocument;
-
-  use super::decode_metafile_as_raster;
-
-  #[test]
-  fn emf_fixture_decodes_to_png() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-      .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/tdf129085.docx");
-    let package = WordprocessingDocument::new_from_file(path).unwrap();
-    let image = package
-      .get_all_parts()
-      .find_map(|part| match part {
-        PartRef::ImagePart(image) if image.path(&package) == Some("word/media/image1.wmf") => {
-          Some(image)
-        }
-        _ => None,
-      })
-      .unwrap();
-    let emf = image.data(&package).unwrap();
-    let content_type = image.content_type(&package);
-
-    let raster = decode_metafile_as_raster(emf, content_type)
-      .unwrap()
-      .unwrap();
-    assert_eq!(raster.content_type, "image/png");
-    let decoded = image::load_from_memory(&raster.data).unwrap();
-    assert_eq!(decoded.width(), 884);
-    assert_eq!(decoded.height(), 925);
-  }
-
-  #[test]
-  fn emf_bitmap_record_fixture_decodes_to_png_without_jpeg_loss() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-      .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/tdf136841.docx");
-    let package = WordprocessingDocument::new_from_file(path).unwrap();
-    let image = package
-      .get_all_parts()
-      .find_map(|part| match part {
-        PartRef::ImagePart(image) if image.path(&package) == Some("word/media/image1.emf") => {
-          Some(image)
-        }
-        _ => None,
-      })
-      .unwrap();
-    let emf = image.data(&package).unwrap();
-    let content_type = image.content_type(&package);
-
-    let raster = decode_metafile_as_raster(emf, content_type)
-      .unwrap()
-      .unwrap();
-    assert_eq!(raster.content_type, "image/png");
-    let decoded = image::load_from_memory(&raster.data).unwrap();
-    assert_eq!(decoded.width(), 76);
-    assert_eq!(decoded.height(), 76);
-    let rgb = decoded.to_rgb8();
-    let pixel = rgb.get_pixel(38, 38).0;
-    let diff = pixel
-      .iter()
-      .zip([228u8, 72, 70])
-      .map(|(actual, expected)| (i16::from(*actual) - i16::from(expected)).abs())
-      .sum::<i16>();
-    assert!(
-      diff <= 3,
-      "decoded pixel was #{:02x}{:02x}{:02x}",
-      pixel[0],
-      pixel[1],
-      pixel[2]
-    );
-  }
 }

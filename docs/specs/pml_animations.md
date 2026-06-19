@@ -253,4 +253,4 @@ Rust types under
 
 | ID | File | Coverage |
 |----|------|----------|
-| PML-ANIM-01 | `test-data/pml/slide_animation.pptx` | Single slide with text box (id=2); full `<p:timing>` hierarchy (tmRoot→mainSeq→click→effect); `<p:set>` visibility + `<p:animEffect filter="fade" transition="in">`; `<p:bldLst><p:bldP>`; `<p:prevCondLst>`/`<p:nextCondLst>` on `<p:seq>` |
+| PML-ANIM-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/pml/slide_animation.pptx` | Single slide with text box (id=2); full `<p:timing>` hierarchy (tmRoot→mainSeq→click→effect); `<p:set>` visibility + `<p:animEffect filter="fade" transition="in">`; `<p:bldLst><p:bldP>`; `<p:prevCondLst>`/`<p:nextCondLst>` on `<p:seq>` |

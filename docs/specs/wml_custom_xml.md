@@ -203,4 +203,4 @@ the application walks the body tree.
 
 | ID | File | Coverage |
 |----|------|----------|
-| WML-CX-01 | `test-data/wml/custom_xml.docx` | Single CustomXmlPart with item1.xml payload, CustomXmlPropertiesPart with `ds:itemID` GUID and `ds:schemaRefs` listing two URIs; document body uses inline `<w:customXml>` block tagging with `<w:customXmlPr>` and `<w:attr>` |
+| WML-CX-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/custom_xml.docx` | Single CustomXmlPart with item1.xml payload, CustomXmlPropertiesPart with `ds:itemID` GUID and `ds:schemaRefs` listing two URIs; document body uses inline `<w:customXml>` block tagging with `<w:customXmlPr>` and `<w:attr>` |

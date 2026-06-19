@@ -24,7 +24,6 @@ const PARAGRAPH_SPACING_AFTER_PT: f32 = 0.0;
 const DEFAULT_TAB_STOP_PT: f32 = 36.0;
 const DEFAULT_FONT_SIZE_PT: f32 = 11.0;
 const DEFAULT_LINE_HEIGHT_PT: f32 = 14.0;
-// Source: LibreOffice sw/inc/swtypes.hxx defines MINLAY as the minimal
 // Writer frame size, including table rows.
 const LO_MIN_FRAME_SIZE_PT: f32 = 23.0 / units::TWIPS_PER_POINT;
 const TABLE_ROW_MIN_HEIGHT_PT: f32 = LO_MIN_FRAME_SIZE_PT;
@@ -35,20 +34,17 @@ const MOVE_BACKWARD_SUPPRESS_THRESHOLD: usize = 20;
 const UNBOUNDED_LAYOUT_EXTENT_PT: f32 = f32::MAX / 4.0;
 const MEASURE_SCRATCH_PAGE_HEIGHT_PT: f32 = UNBOUNDED_LAYOUT_EXTENT_PT;
 const LAYOUT_EPSILON_PT: f32 = 0.1;
-// Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx
 // sets OOXML document defaults to proportional line spacing 115.
 const LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT: f32 = 115.0;
 const PERCENT_SCALE: f32 = 100.0;
 const LO_EMPTY_PARAGRAPH_FIRST_LINE_HEIGHT_PER_FONT_SIZE: f32 = 340.0 / 220.0;
 const LO_DRAWING_ANCHOR_MARGIN_LINE_HEIGHT_PT: f32 = 288.0 / units::TWIPS_PER_POINT;
-// Source: LibreOffice sw/source/core/layout/pagedesc.cxx
 // SwPageFootnoteInfo defaults: line width 10 twips, relative width 25%,
 // top/bottom distance 57 twips.
 const LO_FOOTNOTE_SEPARATOR_WIDTH_FRACTION: f32 = 0.25;
 const LO_FOOTNOTE_SEPARATOR_STROKE_PT: f32 = 10.0 / units::TWIPS_PER_POINT;
 const LO_FOOTNOTE_SEPARATOR_TOP_DIST_PT: f32 = 57.0 / units::TWIPS_PER_POINT;
 const LO_FOOTNOTE_SEPARATOR_BOTTOM_DIST_PT: f32 = 57.0 / units::TWIPS_PER_POINT;
-// Source: LibreOffice sw/qa/core/layout/paintfrm.cxx and ftnfrm.cxx
 // Word-style endnote separators are 2 inches wide, and inline endnotes keep
 // 269 twips of separator area above the endnote text.
 const LO_ENDNOTE_SEPARATOR_WIDTH_PT: f32 = 2880.0 / units::TWIPS_PER_POINT;
@@ -63,7 +59,6 @@ enum NoteSeparatorKind {
 }
 
 fn inline_text_height(style: &TextStyle) -> f32 {
-  // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper.cxx
   // maps w:szCs to CharHeightComplex. Writer line formatting carries the
   // multi-script font heights in the line box, while Western glyph shaping
   // still uses CharHeight for width.
@@ -132,7 +127,6 @@ fn paragraph_line_height_for_setup(
         .line_height_pt
         .map(|multiple| word_auto_line_height(base_line_style) * multiple)
         .unwrap_or_else(|| inline_text_height(base_line_style));
-      // Source: LibreOffice sw/source/core/text/itrform2.cxx
       // SwTextFormatter::CalcRealHeight() uses the imported document grid
       // base height as the auto line real height in grid layout.
       if paragraph.format.snap_to_grid.unwrap_or(false)
@@ -157,7 +151,6 @@ fn snap_line_height_to_doc_grid(line_height: f32, doc_grid_line_pitch_pt: Option
   if grid_height <= LAYOUT_EPSILON_PT || line_height <= grid_height {
     return line_height.max(grid_height);
   }
-  // Source: LibreOffice sw/source/core/text/itrform2.cxx
   // SwTextFormatter::CalcRealHeight() rounds a snapped line up to the next
   // document-grid base-height multiple.
   (line_height / grid_height).ceil() * grid_height
@@ -168,7 +161,6 @@ fn word_auto_line_height(style: &TextStyle) -> f32 {
 }
 
 fn libreoffice_empty_paragraph_first_line_height(style: &TextStyle) -> f32 {
-  // Source: LibreOffice keeps VML/text anchor offsets based on an empty-paragraph
   // first-line box that is taller than the default 115% auto line height.
   style.font_size_pt * LO_EMPTY_PARAGRAPH_FIRST_LINE_HEIGHT_PER_FONT_SIZE
 }
@@ -1696,7 +1688,6 @@ impl<'a> RootFrameLayout<'a> {
         && section_index == 0
         && section_index + 1 < self.document.sections.len()
       {
-        // Source: LibreOffice sw/qa/extras/ooxmlexport/ooxmlexport8.cxx:testN750255
         // keeps an empty section page when a paragraph-level sectPr precedes a
         // following section break; a nextColumn break without columns then acts
         // as a page break, so later content must not reuse the empty page.
@@ -1740,7 +1731,6 @@ impl<'a> RootFrameLayout<'a> {
       && previous_section_is_empty
       && starts_new_page(section.break_kind)
     {
-      // Source: LibreOffice sw/source/core/layout/pagechg.cxx
       // CheckPageDescs() keeps intentionally empty pages for page-style
       // transitions, but a following continuous section does not consume an
       // extra body page before its own content/breaks are laid out.
@@ -1761,7 +1751,6 @@ impl<'a> RootFrameLayout<'a> {
       && blocks_have_footnote_references(&section.blocks)
       && current_page_has_body_progress
     {
-      // Source: LibreOffice sw/source/core/layout/findfrm.cxx:tdf139336
       // moves footnotes in non-balanced column sections to the page frame.
       self.push_current_page(empty_page(section.page, section_index));
       self.y = body_content_limits_for_page(
@@ -1904,7 +1893,6 @@ impl<'a> RootFrameLayout<'a> {
       && flow.text_segmentation == TextSegmentation::Body
       && block_is_page_break_only_paragraph(block)
     {
-      // Source: LibreOffice sw/qa/extras/ooxmlexport/ooxmlexport13.cxx
       // testTdf123636_newlinePageBreak4: with SplitPgBreakAndParaMark, a
       // non-first empty page-break paragraph creates an empty following page
       // but does not move following body text there.
@@ -1985,8 +1973,6 @@ impl<'a> RootFrameLayout<'a> {
     if !has_pending_floating_table_follows(&self.current, &self.pages) {
       return;
     }
-
-    // Source: LibreOffice sw/source/core/layout/flycnt.cxx
     // SwFrame::GetNextFlyLeaf() creates the follow fly during layout and
     // chains it to the split anchor. SwTabFrame::Split() then moves rows into
     // the follow table before frame recording/reflow sees the result. Keep the
@@ -2520,7 +2506,6 @@ impl<'a> RootFrameLayout<'a> {
     if text.is_empty() {
       return;
     }
-    // Source: LibreOffice sw/source/core/text/EnhancedPDFExportHelper.cxx
     // iterates the document outline node list while
     // DocumentOutlineNodesManager::GetExpandTextMerged() consults merged
     // paragraph layout. In tdf131728 this leaves the last style-separator
@@ -3440,7 +3425,6 @@ fn normalize_reflow_executions(
   pages: &[Page],
   backward_moves: &[BackwardMove],
 ) {
-  // Source: LibreOffice layout invalidations are attached to the current frame
   // tree after joins and CheckPageDescs() cleanup. These execution records are
   // diagnostics for that normalized tree, so keep their move counts in sync
   // with backward moves that survived normalization.
@@ -3846,7 +3830,6 @@ fn normalize_layout_frames(frames: &mut Vec<LayoutFrame>, pages: &[Page]) {
 }
 
 fn normalize_reflow_requests(requests: &mut Vec<ReflowRequest>, frames: &[LayoutFrame]) {
-  // Source: LibreOffice layout invalidation follows the current frame tree
   // after joins, page-desc cleanup and reflow. Keep our diagnostic restart
   // requests attached to the normalized layout frames instead of preserving
   // stale pre-normalization cursors.
@@ -4124,7 +4107,6 @@ fn check_page_desc_empty_pages(
   follows: &mut Vec<FrameFollow>,
   outline_entries: &mut Vec<OutlineEntry>,
 ) {
-  // Source: LibreOffice sw/source/core/layout/pagechg.cxx
   // SwFrame::CheckPageDescs() walks the page chain, inserts intentional empty
   // pages for right/left page wishes, and after every change re-evaluates the
   // affected previous/next page instead of doing a one-shot filter.
@@ -4253,7 +4235,6 @@ fn page_frame_empty_for_check_page(page: &CheckPage, follows: &[FrameFollow]) ->
 }
 
 fn is_page_frame_empty(page: &Page) -> bool {
-  // Source: LibreOffice sw/source/core/layout/pagechg.cxx
   // sw::IsPageFrameEmpty() removes only pages without essential body content.
   // Body table frames survive even when they have no rendered text yet; visible
   // body-anchored objects are essential. Page decorations are applied after this
@@ -4280,7 +4261,6 @@ fn page_wants_right_page(
   kept_pages: &[Page],
   physical_page_number: usize,
 ) -> bool {
-  // Source: LibreOffice sw/source/core/layout/trvlfrm.cxx
   // SwFrame::WannaRightPage(): prefer the first body content's page number
   // offset, otherwise use the physical page side while ignoring a previous
   // intentional empty page.
@@ -4329,7 +4309,6 @@ fn page_wants_right_page(
 }
 
 fn page_number_offset_wants_right_page(page_number: i32) -> bool {
-  // Source: LibreOffice sw/source/core/layout/frmtool.cxx
   // IsRightPageByNumber(), for non-initial content where the document's first
   // virtual page has already established the parity base.
   page_number.rem_euclid(2) == 1
@@ -4530,7 +4509,6 @@ fn keep_group_height(block: &Block, next: Option<&Block>, flow: FlowContext) -> 
     && paragraph.format.keep_with_next
     && let Some(Block::Paragraph(next)) = next
   {
-    // Source: LibreOffice sw/source/core/layout/calcmove.cxx
     // CheckMoveFwd()/WouldFit() tests whether the next content can start in
     // the remaining upper, not whether the whole next paragraph fits there.
     height += estimated_paragraph_first_line_height(next, flow);
@@ -4744,7 +4722,6 @@ fn starts_new_page(kind: SectionBreakKind) -> bool {
 }
 
 fn page_has_body_region_items(page: &Page, flow: FlowContext) -> bool {
-  // Source: LibreOffice sw/source/core/layout/flowfrm.cxx
   // Page-break movement is based on body text/frame progress. Header/footer
   // content and page decorations may already be present on the physical page,
   // but they must not make body layout create an extra empty body page.
@@ -4815,7 +4792,6 @@ fn paragraph_spacing_before_after_previous(
   previous: &crate::docx::Paragraph,
   paragraph: &crate::docx::Paragraph,
 ) -> f32 {
-  // Source: LibreOffice sw/source/core/layout/flowfrm.cxx
   // SwFlowFrame::CalcUpperSpace() collapses normal inter-paragraph spacing to
   // max(previous lower, current upper), with contextual-spacing exceptions for
   // identical paragraph styles.
@@ -4862,7 +4838,6 @@ fn segment_affects_line_height(text: &str) -> bool {
 }
 
 fn libreoffice_ignored_line_height_blank(ch: char) -> bool {
-  // Source: LibreOffice sw/source/core/text/porlay.cxx lcl_HasOnlyBlanks().
   matches!(ch, ' ' | '\u{2002}' | '\u{2003}' | '\u{2005}' | '\u{3000}')
 }
 
@@ -4968,7 +4943,6 @@ fn layout_document_block(
 }
 
 fn table_has_indirect_previous_frame(page: &Page, flow: FlowContext, y: f32) -> bool {
-  // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
   // SwTabFrame::MakeAll() uses GetIndPrev() before the table is split. The
   // current table frame itself must not count as the previous frame.
   if flow.text_segmentation == TextSegmentation::Body {
@@ -4978,7 +4952,6 @@ fn table_has_indirect_previous_frame(page: &Page, flow: FlowContext, y: f32) -> 
 }
 
 fn note_body_content_frame(current: &mut Page, flow: FlowContext) {
-  // Source: LibreOffice sw/source/core/layout/pagechg.cxx
   // sw::IsPageFrameEmpty() keeps pages whose body frame ContainsContent().
   // A Writer content frame exists for an empty paragraph as well; PDF painted
   // items are therefore insufficient for deciding if a body page is empty.
@@ -6334,7 +6307,6 @@ fn layout_repeating_block(
   match block {
     Block::Paragraph(paragraph) => {
       let spacing_after_pt = if is_last_repeating_block {
-        // Source: LibreOffice sw/source/core/layout/flowfrm.cxx
         // SwFlowFrame::CalcLowerSpace(), tdf#128195 branch:
         // the text frame already carries its normal paragraph lower spacing,
         // then the header/footer compatibility branch adds the last
@@ -6416,7 +6388,6 @@ fn layout_floating_table(
     && y > flow.content_top_pt + LAYOUT_EPSILON_PT
     && flow.paragraph_spacing_context != ParagraphSpacingContext::SectionStart
   {
-    // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper.cxx
     // HandleFramedParagraphPageBreak() inserts a dummy PAGE_BEFORE paragraph
     // before a framed paragraph so the anchored frame is placed on the next
     // page instead of remaining on the pre-break page.
@@ -6530,7 +6501,6 @@ fn layout_floating_table(
 }
 
 fn join_split_fly_table_follows(pages: &mut Vec<Page>, flow: FlowContext) {
-  // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
   // SwTabFrame::MakeAll(): when a table has a follow directly in a split fly,
   // Writer first asks the split fly if it can grow enough to join follow table
   // frames, then joins only that follow chain. Keep this restricted to pages
@@ -6615,7 +6585,6 @@ fn effective_floating_table_split_allowed(table: &Table, flow: FlowContext) -> b
   if !table.split_allowed {
     return false;
   }
-  // Source: LibreOffice sw/source/core/layout/fly.cxx disables split flys in
   // multi-column sections and for bottom-growing body-relative flys.
   if flow.columns.count > 1 {
     return false;
@@ -7333,7 +7302,6 @@ impl<'a> TableFrameLayout<'a> {
     table_row_keep: bool,
     allow_split_of_keep_row: bool,
   ) -> Option<TableSplitDecision> {
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
     // SwTabFrame::Split(): first identify the row that crosses the cut
     // position and count the rows that remain in the master table, then apply
     // row-split, repeated-headline and keep-with-next rules in that order.
@@ -7457,7 +7425,6 @@ impl<'a> TableFrameLayout<'a> {
     table_row_keep: bool,
     allow_split_of_keep_row: bool,
   ) -> TableMakeAllPlan {
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
     // SwTabFrame::MakeAll(): try splitting with row-split enabled first, then
     // retry the same split with bTryToSplit=false when the first attempt would
     // move the whole table or cannot satisfy the break-line precondition.
@@ -7533,7 +7500,6 @@ impl<'a> TableFrameLayout<'a> {
     start_row_index: usize,
     y: f32,
   ) -> bool {
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx tdf#88496 /
     // tdf#130639 fallback. If repeated headlines leave no room for the first
     // body row, Writer switches off row repetition and reformats the table in
     // place instead of starting a header-only split chain.
@@ -7558,7 +7524,6 @@ impl<'a> TableFrameLayout<'a> {
     table_row_keep: bool,
     allow_split_of_keep_row: bool,
   ) -> bool {
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
     // SwTabFrame::MakeAll() computes nBreakLine from the repeated headlines,
     // the keep-with-next row chain, and the second no-row-split attempt before
     // it calls SwTabFrame::Split(). If that minimum prefix cannot fit and the
@@ -7642,7 +7607,6 @@ impl<'a> TableFrameLayout<'a> {
   }
 
   fn without_repeating_headers(&self) -> Self {
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
     // SwTabFrame::Split(), tdf#88496 fallback: if repeated headlines do not
     // fit at the start of the upper, disable the table's rows-to-repeat and
     // reformat instead of creating an endless follow chain.
@@ -7656,7 +7620,6 @@ impl<'a> TableFrameLayout<'a> {
     if !self.frame.split_allowed {
       return self.frame.total_height;
     }
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
     // SwTabFrame::MakeAll() only needs the repeat/keep break line to fit
     // before trying SwTabFrame::Split(); a split-capable table is not moved
     // forward just because its full height reaches the page bottom.
@@ -7691,7 +7654,6 @@ impl<'a> TableFrameLayout<'a> {
   }
 
   fn should_backward_move_follow_row_group(&self, row_index: usize, y: f32) -> bool {
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
     // SwTabFrame::MakeAll() calls GetFollow()->ShouldBwdMoved() before it
     // keeps the follow split. ShouldBwdMoved() compares the first content
     // line of the follow with the master upper's remaining space; if it fits,
@@ -7710,7 +7672,6 @@ impl<'a> TableFrameLayout<'a> {
   }
 
   fn calc_height_of_first_content_line(&self, row_index: usize, table_row_keep: bool) -> f32 {
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
     // SwTabFrame::CalcHeightOfFirstContentLine(): for follow tables, repeated
     // headlines are ignored, keep-with-next rows are counted as full rows, and
     // the next splittable row contributes only its first content line.
@@ -7798,7 +7759,6 @@ impl<'a> TableFrameLayout<'a> {
     row_index: usize,
     row: &TableRow,
   ) -> Option<f32> {
-    // Source: LibreOffice sw/source/core/text/frmform.cxx formats a
     // SwTextFrame follow from the cursor after a page break. The follow row
     // must therefore reserve the height of the remaining lower content, not
     // only the leftover twips of the original row frame.
@@ -7834,7 +7794,6 @@ impl<'a> TableFrameLayout<'a> {
   }
 
   fn maximum_layout_row_span(&self, row_index: usize) -> usize {
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
     // lcl_GetMaximumLayoutRowSpan(): when moving the first follow row
     // backward, include following covered rows so row-span layout stays
     // structurally valid.
@@ -7893,7 +7852,6 @@ impl<'a> TableFrameLayout<'a> {
     has_ind_prev: bool,
     table_row_keep: bool,
   ) -> bool {
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
     // SwTabFrame::MakeAll() derives bAllowSplitOfRow from the current
     // master/follow table: no indirect previous frame and all rows starting at
     // the current first non-headline row keep with next.
@@ -7961,7 +7919,6 @@ impl<'a> TableFrameLayout<'a> {
   }
 
   fn row_minimum_split_fragment_height(table: &Table, row_index: usize, row: &TableRow) -> f32 {
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
     // lcl_PreprocessRowsInCells() only splits a minimum-height row when the
     // available master fragment is larger than the row's minimum height;
     // otherwise the row is moved to the follow table.
@@ -8020,8 +7977,6 @@ impl<'a> TableFrameLayout<'a> {
     let block_right = block_left + self.frame.block.content_width;
     let left_space = (exclusion.left_pt - block_left).max(0.0);
     let right_space = (block_right - exclusion.right_pt).max(0.0);
-
-    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
     // SwTabFrame::CalcFlyOffsets() shifts the table down for no-wrap flys and
     // only keeps side wrapping when the table print area can fit beside the fly.
     match exclusion.side {
@@ -8791,8 +8746,6 @@ fn table_repeating_header_count(table: &Table) -> usize {
     count
   }
 }
-
-// Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapperTableManager.cxx
 // HEADER_ROW_LIMIT_FOR_MSO_WORKAROUND. DOCX imports that mark more than this
 // many leading rows as headers disable repeating headers to match MS Word.
 const HEADER_ROW_LIMIT_FOR_MSO_WORKAROUND: usize = 10;
@@ -9361,7 +9314,6 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     None
   };
   if split_blocks.is_some() && content_offset > LAYOUT_EPSILON_PT {
-    // Source: LibreOffice writerfilter imports w:lastRenderedPageBreak as a
     // real text break position. A follow fragment that starts after that
     // marker is not a candidate for SwTabFrame::Join() back into its master.
     current.explicit_break_target = true;
@@ -9577,7 +9529,6 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
 }
 
 fn following_text_flow_cell_bottom(current: &Page, text_bottom: f32) -> f32 {
-  // Source: LibreOffice sw/source/core/layout/fly.cxx GetFlyAnchorBottom() and
   // SwFlyFrame::Grow_(): split fly growth is limited by the current body
   // deadline. A cell whose estimated height grows past the page bottom must
   // still split the nested following-text-flow floating table on this page.
@@ -9628,7 +9579,6 @@ fn table_cell_blocks_for_split_fragment(
   cell: &TableCell,
   follow_fragment: bool,
 ) -> Option<Vec<Block>> {
-  // Source: LibreOffice Writer imports w:lastRenderedPageBreak as pagination
   // evidence on the following text portion. When a table row is already split,
   // SwTextFrame follows are laid out from the text cursor after the break, not
   // from the whole paragraph again; split the imported block stream at that
@@ -9712,7 +9662,6 @@ fn table_cell_first_content_line_height(
   setup: PageSetup,
   text_segmentation: TextSegmentation,
 ) -> Option<f32> {
-  // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
   // lcl_CalcHeightOfFirstContentLine(): inspect the first lower frame in the
   // cell. Text contributes FirstLineHeight(), nested tables recurse into
   // CalcHeightOfFirstContentLine().
@@ -9886,7 +9835,6 @@ fn layout_shape_text_box(
   };
 
   let flow = FlowContext {
-    // Source: LibreOffice imports WPS text boxes as drawing shapes
     // (oox/source/shape/WpsContext.cxx + drawingml/shape.cxx). Shape text is
     // formatted inside the Sdr object and clipped/overflowed there; it does
     // not create follow pages in the document body when it reaches the shape
@@ -10117,14 +10065,12 @@ fn table_cell_paragraph_height(
   last_in_cell: bool,
   split_follow_text_frame: bool,
 ) -> f32 {
-  // Source: LibreOffice sw/source/core/layout/flowfrm.cxx CalcUpperSpace()
   // and sw/source/core/layout/tabfrm.cxx table row sizing. A paragraph inside a
   // table cell is measured as a frame in sequence: upper space is collapsed
   // against the previous flow frame, lower space is owned by the current frame,
   // and the final paragraph contributes Word-compatible line-spacing slack at
   // the cell border.
   //
-  // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
   // lcl_CalcHeightOfFirstContentLine(): a split text frame follow that has a
   // master is not measured with its master's upper/lower spacing again.
   let content = estimated_paragraph_content_height(paragraph, flow);
@@ -10154,7 +10100,6 @@ fn paragraph_add_lower_space_as_last_in_table_cell(
   paragraph: &crate::docx::Paragraph,
   flow: FlowContext,
 ) -> f32 {
-  // Source: LibreOffice sw/source/core/layout/flowfrm.cxx
   // SwFlowFrame::CalcAddLowerSpaceAsLastInTableCell(): Writer's Word
   // compatibility setting ADD_PARA_SPACING_TO_TABLE_CELLS adds the paragraph's
   // lower space again for the last flow frame in a table cell. Writer enables
@@ -10176,7 +10121,6 @@ fn paragraph_line_spacing_excess(paragraph: &crate::docx::Paragraph) -> f32 {
   if multiple <= 1.0 {
     return 0.0;
   }
-  // Source: LibreOffice sw/source/core/layout/frmtool.cxx
   // SwBorderAttrs::CalcLineSpacing_ adds 115% of the proportional line spacing
   // excess when Word-compatible layout asks for paragraph line spacing.
   word_auto_line_height(&paragraph_base_line_style(paragraph)) * (multiple - 1.0)
@@ -10285,7 +10229,6 @@ fn floating_anchor_reference_y(
   line_y: f32,
 ) -> f32 {
   match placement.vertical_relative_to {
-    // Source: LibreOffice anchors DrawingML relativeFrom="paragraph" to the
     // paragraph frame, not to the line where the anchor run is encountered.
     crate::docx::VerticalImageReference::Paragraph => paragraph_top,
     _ => line_y,
@@ -10410,7 +10353,6 @@ fn effective_vertical_reference(placement: FloatingImagePlacement) -> VerticalIm
 }
 
 fn effective_layout_in_cell(placement: FloatingImagePlacement, flow: FlowContext) -> bool {
-  // Source: LibreOffice sw/source/filter/ww8/wrtw8esh.cxx notes that Word
   // compat15 ignores layoutInCell="0" and always lays out shapes in the cell.
   flow.text_segmentation == TextSegmentation::TableCell
     && (placement.layout_in_cell || flow.compatibility_mode >= 15)
@@ -10643,7 +10585,6 @@ struct TextFrame {
 impl TextFrame {
   fn new(paragraph: &crate::docx::Paragraph, flow: FlowContext) -> Self {
     let default_line_left = flow.content_left_pt + paragraph.format.indent_left_pt;
-    // Source: LibreOffice sw/source/core/text/itrcrsr.cxx
     // SwTextMargin::CtorInitTextMargin() allows a negative left indent to move
     // mnFirst/mnLeft before the frame print-area left edge without moving
     // mnRight left with it. Keep the existing local width model for
@@ -10826,7 +10767,6 @@ impl TextFrameState {
         return TextSplitDecision::Rejected;
       }
       if after < widow_lines {
-        // Source: LibreOffice sw/source/core/text/widorp.cxx
         // WidowsAndOrphans::FindWidows() asks the master of this follow to
         // give lines to the follow. That is a local master/follow adjustment,
         // not a request to move the whole paragraph from the first page.
@@ -11562,7 +11502,6 @@ impl<'a> TextFrameLayout<'a> {
             && page_has_body_region_items(current, flow)
             && y + line_height > flow.content_bottom - LAYOUT_EPSILON_PT
           {
-            // Source: DOCX imports w:lastRenderedPageBreak as the known text
             // cursor where the previous layout created a page follow. Writer
             // uses that evidence while laying out body text, so keep the
             // following portions on the follow page instead of reflowing the
@@ -11867,7 +11806,6 @@ impl<'a> TextFrameLayout<'a> {
               }));
             }
             if shape_has_invisible_auto_fit_textbox_bounds(shape) {
-              // Source: LibreOffice keeps a Writer fly frame for textbox
               // content even when the owning draw shape has no fill/stroke,
               // but that layout-only frame is not painted as a polypolygon.
               current.items.push(PageItem::Rect(RectItem {
@@ -12419,7 +12357,6 @@ fn emergency_break_segments(text: &str) -> Vec<String> {
 }
 
 fn line_fit_width(text: &str, style: &TextStyle) -> f32 {
-  // Source: LibreOffice sw/source/core/text/guess.cxx
   // Spaces from UAX #14 SP/BA classes are elided at line end for line-break
   // fitting. Keep the original segment width for painting and following text
   // advance; only the fit test ignores trailing collapsible blanks.
@@ -12468,7 +12405,6 @@ fn push_line_segments(text: &str, segments: &mut Vec<String>) {
 }
 
 fn libreoffice_preserves_latin_line_token(text: &str) -> bool {
-  // Source: LibreOffice sw/source/core/text/guess.cxx asks the break iterator
   // for a break around the current cut position. A Latin token made of letters,
   // numbers and inline punctuation has no internal line break opportunity, even
   // when ICU's generic line segmenter reports punctuation-adjacent boundaries.
@@ -12501,13 +12437,11 @@ fn push_text_line_segment(text: &str, segments: &mut Vec<String>) {
 }
 
 fn libreoffice_forbidden_line_end_before_text(ch: char) -> bool {
-  // Source: LibreOffice uses i18npool breakiterator forbidden end-character
   // handling, so opening quotation marks don't remain alone at line end.
   matches!(ch, '“' | '‘')
 }
 
 fn libreoffice_forbidden_line_start_after_text(ch: char) -> bool {
-  // Source: LibreOffice sw/source/core/text/guess.cxx passes forbidden
   // begin-line characters to i18npool getLineBreak(), preventing punctuation
   // portions such as "," from starting their own line.
   matches!(
@@ -12791,8 +12725,6 @@ fn apply_pending_aligned_tab(
   if min_x == f32::MAX || max_x <= tab.stop.x_pt {
     return;
   }
-
-  // Source: LibreOffice sw/source/core/text/txttab.cxx
   // SwTabPortion::PostFormat() sums the widths of every portion after a
   // center/right tab and then stretches the tab portion so the whole following
   // run, not only the first word, is aligned to the tab position.
@@ -12830,7 +12762,6 @@ fn justify_line_items(
   line_left: f32,
   line_right: f32,
 ) {
-  // Source: LibreOffice vcl/source/pdf/pdfwriter_impl.cxx::drawLayout()
   // writes one PDF text object for a laid-out line and carries justification
   // through glyph positioning / text arrays. Splitting a justified Writer line
   // into per-word text objects changes PDFium object counts and does not match
@@ -12922,7 +12853,6 @@ fn force_page_break(
   current: &mut Page,
   pages: &mut Vec<Page>,
 ) -> (FlowContext, f32) {
-  // Source: Writer treats an explicit text page break as a real page
   // transition even when the current page has no painted objects yet; see
   // sw/qa/core/text/itrform2.cxx:testContentControlHeaderPDFExport.
   let mut next_flow = FlowContext {

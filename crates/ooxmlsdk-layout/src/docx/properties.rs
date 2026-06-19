@@ -116,7 +116,6 @@ pub(super) fn merge_run_style(
   if let Some(font_size) = properties.complex_script_font_size()
     && let Ok(size) = font_size.val.as_str().parse::<HpsMeasureValue>()
   {
-    // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper.cxx
     // imports w:szCs as CharHeightComplex. Keep it separate from Western
     // CharHeight so Latin shaping width remains source-backed, while layout
     // line height can still see the complex-script font height.

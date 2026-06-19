@@ -15,7 +15,7 @@ structure. It is intended as an implementation guide and test oracle for
 - `sml.xsd` from this repository
   (`schemas/OfficeOpenXML-XMLSchema-Transitional/`)
 - Microsoft Open Specifications: `[MS-XLSX]`
-- Existing `ooxmlsdk` test fixtures (`test-data/spreadsheet/`)
+- Existing `ooxmlsdk` test fixtures (`../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/spreadsheet/`)
 - Apache POI and openpyxl source code (reference implementations)
 
 This document contains **no verbatim text** from any copyrighted source.

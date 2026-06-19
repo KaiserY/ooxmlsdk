@@ -372,6 +372,6 @@ but may lay out the table differently.
 
 | ID | File | Coverage |
 |----|------|---------|
-| WML-T-01 | `test-data/wml/table_borders.docx` | tblBorders (outer + insideH/V), tcBorders overrides, cell shading, dxa widths |
-| WML-T-02 | `test-data/wml/table_merged.docx` | gridSpan (horizontal merge), vMerge restart/continue (vertical merge) |
-| WML-T-03 | `test-data/wml/table_props.docx` | trHeight exact, tblHeader, cantSplit, vAlign top/center/bottom, noWrap, pct table width |
+| WML-T-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/table_borders.docx` | tblBorders (outer + insideH/V), tcBorders overrides, cell shading, dxa widths |
+| WML-T-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/table_merged.docx` | gridSpan (horizontal merge), vMerge restart/continue (vertical merge) |
+| WML-T-03 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/table_props.docx` | trHeight exact, tblHeader, cantSplit, vAlign top/center/bottom, noWrap, pct table width |

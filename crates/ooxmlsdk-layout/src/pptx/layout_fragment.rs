@@ -12,7 +12,6 @@ impl LayoutFragmentHandler {
   }
 
   pub(crate) fn on_create_context(&mut self, show_master_shapes: bool) {
-    // Source: LibreOffice oox/source/ppt/layoutfragmenthandler.cxx
     // showMasterSp=false hides inherited master shapes.
     if !show_master_shapes {
       // The actual SlidePersist is owned by the slide handler. This hook is

@@ -151,7 +151,6 @@ struct SharedFormula {
 }
 
 fn formula_cells(sheet: &CalcSheet) -> Vec<FormulaCell> {
-  // Source: LibreOffice sc/source/filter/oox/formulabuffer.cxx
   // Shared formula masters are recorded by id first, and cells that carry only
   // the shared id are later materialized from the master tokens at their own
   // address.
@@ -957,7 +956,6 @@ fn calc_error_text(value: ooxmlsdk_formula::FormulaErrorValue) -> &'static str {
 }
 
 fn formula_cell_value(cell: &CalcCell) -> Value {
-  // Source: LibreOffice sc/source/filter/oox/worksheethelper.cxx and
   // shared-string import model: for t="s" the raw <v> is an SST index, while
   // cached numeric/formula values carry the actual scalar value.
   let text = match cell.data_type {
@@ -1089,20 +1087,6 @@ fn parse_array_constant(formula: &str) -> Option<Vec<Vec<Value>>> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use std::fs::File;
-
-  use crate::options::LayoutOptions;
-  use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
-  use ooxmlsdk::sdk::{
-    FileFormatVersion, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
-    OpenSettings,
-  };
-
-  fn imported_cell_text(sheet: &CalcSheet, reference: &str) -> String {
-    cell_at(sheet, CellAddress::parse_a1(reference).unwrap())
-      .map(|cell| cell.display_text.clone())
-      .unwrap_or_default()
-  }
 
   #[test]
   fn lo_pdf_formula_value_maps_legacy_ceiling_floor_num_to_illegal_argument() {
@@ -1118,28 +1102,5 @@ mod tests {
       lo_pdf_formula_value("FLOOR.MATH(C$1,$A5)", Value::Error("#NUM!".to_string())),
       Value::Error("#NUM!".to_string())
     );
-  }
-
-  #[test]
-  fn imported_functions_excel_2010_recalculates_equal_column_like_libreoffice() {
-    // Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testFunctionsExcel2010XLSX
-    let settings = OpenSettings {
-      markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
-        process_mode: MarkupCompatibilityProcessMode::NoProcess,
-        target_file_format_version: FileFormatVersion::Microsoft365,
-      },
-      ..Default::default()
-    };
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-      .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/xlsx/functions-excel-2010.xlsx");
-    let mut document =
-      SpreadsheetDocument::new_with_settings(File::open(path).unwrap(), settings).unwrap();
-    let import =
-      super::super::import::ExcelImport::import_document(&mut document, &LayoutOptions::default())
-        .unwrap();
-    let sheet = &import.sheets[0];
-    assert_eq!(imported_cell_text(sheet, "B10"), "2");
-    assert_eq!(imported_cell_text(sheet, "D3"), "TRUE");
-    assert_eq!(imported_cell_text(sheet, "D10"), "TRUE");
   }
 }

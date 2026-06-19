@@ -590,7 +590,7 @@ what the expected behaviour is.
 
 ### Fixture MCE-01: Ignorable attribute, unknown namespace
 
-**File:** `test-data/mce/ignorable_unknown_ns.docx`
+**File:** `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/mce/ignorable_unknown_ns.docx`
 
 **Expected behaviour (round-trip parser):** Opens without error. Saves without
 error. The saved file re-opens without error. The `mc:Ignorable` attribute and
@@ -600,7 +600,7 @@ the `ext:decoration` element are preserved in the saved output.
 
 ### Fixture MCE-02: ProcessContent, wrapper element
 
-**File:** `test-data/mce/process_content.docx`
+**File:** `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/mce/process_content.docx`
 
 **Expected:** Opens and saves without error. Attributes preserved.
 
@@ -608,7 +608,7 @@ the `ext:decoration` element are preserved in the saved output.
 
 ### Fixture MCE-03: AlternateContent with fallback
 
-**File:** `test-data/mce/alternate_content_fallback.docx`
+**File:** `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/mce/alternate_content_fallback.docx`
 
 **Expected:** Opens and saves without error. All three elements
 (`mc:AlternateContent`, `mc:Choice`, `mc:Fallback`) are preserved in saved
@@ -618,7 +618,7 @@ output.
 
 ### Fixture MCE-04: AlternateContent in PPTX (DrawingML)
 
-**File:** `test-data/mce/alternate_content_pptx.pptx`
+**File:** `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/mce/alternate_content_pptx.pptx`
 
 **Expected:** Opens and saves without error. This is the core of issue #11.
 
@@ -626,7 +626,7 @@ output.
 
 ### Fixture MCE-05: extLst with unknown extension namespace
 
-**File:** `test-data/mce/extlst_unknown_ns.pptx`
+**File:** `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/mce/extlst_unknown_ns.pptx`
 
 Note: `a16` is NOT declared as `mc:Ignorable` anywhere. The MCE processor
 must treat `a:extLst` as an application-defined extension element and pass
@@ -638,7 +638,7 @@ through `a16:creationId` without error.
 
 ### Fixture MCE-06: MustUnderstand with understood namespace
 
-**File:** `test-data/mce/must_understand_ok.docx`
+**File:** `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/mce/must_understand_ok.docx`
 
 `w` is in every OOXML parser's understood set. This MUST succeed.
 
@@ -648,7 +648,7 @@ through `a16:creationId` without error.
 
 ### Fixture MCE-07: Nested AlternateContent
 
-**File:** `test-data/mce/nested_alternate_content.docx`
+**File:** `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/mce/nested_alternate_content.docx`
 
 **Expected:** Opens and saves without error. Nested structure preserved intact.
 

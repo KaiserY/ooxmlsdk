@@ -16,7 +16,6 @@ pub(super) fn compatibility_mode(
           .and_then(|setting| setting.w_val.as_str().parse::<u16>().ok())
       })
     })
-    // Source: LibreOffice sw/source/writerfilter/dmapper/SettingsTable.cxx
     // defaults a missing DOCX compatibilityMode to Word 2007 / mode 12.
     .unwrap_or(12)
 }

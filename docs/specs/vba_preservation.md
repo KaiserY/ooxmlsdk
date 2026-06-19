@@ -214,4 +214,4 @@ application/vnd.ms-powerpoint.template.macroEnabled.main+xml
 
 | ID | File | Coverage |
 |----|------|---------|
-| VBA-01 | `test-data/wml/vba_preserve.docm` | Macro-enabled document (.docm) with a minimal OLE2 placeholder `vbaProject.bin`; correct macro-enabled content type; microsoft.com relationship type; `<Default Extension="bin">` entry |
+| VBA-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/vba_preserve.docm` | Macro-enabled document (.docm) with a minimal OLE2 placeholder `vbaProject.bin`; correct macro-enabled content type; microsoft.com relationship type; `<Default Extension="bin">` entry |

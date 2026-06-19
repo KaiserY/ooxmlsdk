@@ -459,8 +459,8 @@ pBdr → shd → tabs → spacing → ind → contextualSpacing → jc → outli
 
 | ID | File | Properties covered |
 |----|------|-------------------|
-| WML-P-01 | `test-data/wml/para_alignment.docx` | `jc` left/center/right/both/distribute |
-| WML-P-02 | `test-data/wml/para_spacing.docx` | `spacing` before/after twips; lineRule auto/exact/atLeast; `contextualSpacing` |
-| WML-P-03 | `test-data/wml/para_indent.docx` | `ind` left/right; firstLine; hanging |
-| WML-P-04 | `test-data/wml/para_borders_shading.docx` | `pBdr` top/left/bottom/right; `shd` clear fill; `shd` pct fill |
-| WML-P-05 | `test-data/wml/para_keep.docx` | `keepNext`, `keepLines`, `pageBreakBefore`, `widowControl`, `outlineLvl` |
+| WML-P-01 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/para_alignment.docx` | `jc` left/center/right/both/distribute |
+| WML-P-02 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/para_spacing.docx` | `spacing` before/after twips; lineRule auto/exact/atLeast; `contextualSpacing` |
+| WML-P-03 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/para_indent.docx` | `ind` left/right; firstLine; hanging |
+| WML-P-04 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/para_borders_shading.docx` | `pBdr` top/left/bottom/right; `shd` clear fill; `shd` pct fill |
+| WML-P-05 | `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/para_keep.docx` | `keepNext`, `keepLines`, `pageBreakBefore`, `widowControl`, `outlineLvl` |

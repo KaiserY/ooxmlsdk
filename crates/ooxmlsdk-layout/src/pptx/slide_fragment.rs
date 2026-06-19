@@ -36,7 +36,6 @@ impl SlideFragmentHandler {
     package: &mut PresentationDocument,
     slide_part: &SlidePart,
   ) -> Result<()> {
-    // Source: LibreOffice oox/source/ppt/slidefragmenthandler.cxx
     // The constructor imports related vmlDrawing/legacyDrawing before XML
     // contexts create shapes; destruction converts and inserts VML drawing.
     self.slide_persist.import_image_parts(package, slide_part);
@@ -72,7 +71,6 @@ impl SlideFragmentHandler {
     package: &mut PresentationDocument,
     notes_part: &NotesSlidePart,
   ) -> Result<()> {
-    // Source: LibreOffice oox/source/ppt/slidefragmenthandler.cxx imports
     // notes as a slide fragment with its own relationship scope and notes-size
     // page geometry. The notes master is attached by PresentationFragmentHandler
     // before this method, mirroring SlidePersist::setMasterPersist.
@@ -108,7 +106,6 @@ impl SlideFragmentHandler {
     package: &mut PresentationDocument,
     notes_master_part: &NotesMasterPart,
   ) -> Result<()> {
-    // Source: LibreOffice imports notesMaster as a master persist before the
     // notes slide content so placeholder/style lookup uses notes text style.
     self
       .slide_persist
@@ -164,7 +161,6 @@ impl SlideFragmentHandler {
   }
 
   fn import_background(&mut self, background: &p::Background) {
-    // Source: LibreOffice oox/source/ppt/slidefragmenthandler.cxx
     // bgPr/bgRef populate SlidePersist background state; createBackground
     // later applies that state to the page.
     match background.background_choice.as_ref() {

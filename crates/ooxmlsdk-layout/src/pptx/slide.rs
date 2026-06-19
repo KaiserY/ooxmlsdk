@@ -33,8 +33,6 @@ use super::drawingml::fill::FillProperties;
 use super::drawingml::shape::{Shape, ShapeMapEntry};
 use super::drawingml::text_list_style::TextListStyle;
 use super::import::PowerPointImport;
-
-// Source: LibreOffice sd/source/filter/eppt/pptx-epptbase.cxx falls back to
 // a 28000 x 21000 mm100 master page when exporting a presentation with no page
 // property value. Kept here until the full sd import defaults are ported.
 const LO_DEFAULT_SLIDE_WIDTH_MM100: f32 = 28_000.0;
@@ -824,7 +822,6 @@ pub(crate) struct VmlDrawing {
 
 impl VmlDrawing {
   pub(crate) fn convert_and_insert(&mut self) {
-    // Source: LibreOffice oox/source/ppt/slidefragmenthandler.cxx
     // SlideFragmentHandler destruction converts and inserts VML controls.
     // Rust keeps the explicit lifecycle slot until VML drawing import is
     // ported beyond a structured fallback marker.
@@ -965,7 +962,6 @@ impl SlidePersist {
   where
     P: SdkPart,
   {
-    // Source: LibreOffice oox/source/drawingml/blipcontext.cxx resolves blip
     // embed IDs against the current fragment's relationships, so cache image
     // bytes on the owning slide/layout/master persist before display lowering.
     for related_part in part.related_parts_of_type::<_, ImagePart>(package) {
@@ -988,7 +984,6 @@ impl SlidePersist {
   where
     P: SdkPart,
   {
-    // Source: LibreOffice oox/source/drawingml/graphicshapecontext.cxx
     // resolves a:wavAudioFile, a:audioFile, a:videoFile, and p14:media
     // relationship IDs against the current fragment before shape finalization.
     for relationship in part.data_part_reference_relationships(package) {
@@ -1019,7 +1014,6 @@ impl SlidePersist {
   ) where
     P: SdkPart,
   {
-    // Source: LibreOffice oox/source/drawingml/hyperlinkcontext.cxx resolves
     // a:hlinkClick r:id through the current fragment relationships.
     for relationship in part.hyperlink_relationships(package) {
       self.hyperlink_targets.insert(
@@ -1044,7 +1038,6 @@ impl SlidePersist {
   where
     P: SdkPart,
   {
-    // Source: LibreOffice oox/source/drawingml/graphicshapecontext.cxx and
     // oox/source/ppt/slidefragmenthandler.cxx resolve graphicFrame targets
     // against the owning fragment. Cache targets here before inherited
     // master/layout shapes are cloned into another relationship scope.
@@ -1266,12 +1259,10 @@ impl SlidePersist {
   }
 
   pub(crate) fn create_background(&mut self, _import: &PowerPointImport) {
-    // Source: LibreOffice oox/source/ppt/slidepersist.cxx
     // createBackground pushes resolved bg/bgPr/bgRef state to the page.
   }
 
   pub(crate) fn create_x_shapes(&mut self, import: &PowerPointImport) {
-    // Source: LibreOffice oox/source/ppt/slidepersist.cxx
     // createXShapes applies text styles, creates shapes, then resolves
     // connector maps. Rust keeps a drawing model instead of UNO XShapes.
     self.apply_text_styles(import);
@@ -1283,7 +1274,6 @@ impl SlidePersist {
   }
 
   pub(crate) fn apply_text_styles(&mut self, _import: &PowerPointImport) {
-    // Source: LibreOffice oox/source/ppt/slidepersist.cxx
     // applyTextStyles prepares paragraph-level master style state before
     // createAndInsert lowers DrawingML text into drawing objects.
     for shape in &mut self.shapes {
@@ -1292,7 +1282,6 @@ impl SlidePersist {
   }
 
   pub(crate) fn create_connector_shape_connection(&mut self) {
-    // Source: LibreOffice oox/source/ppt/slidepersist.cxx
     // createXShapes builds a connector shape map after shape creation, then
     // applies connector endpoint links against the page shape map.
     self.connector_connections_applied = !self.connector_shape_map.is_empty();

@@ -148,17 +148,12 @@ Use GitHub only when the local checkout is missing or clearly stale.
 
 ## Test Fixture Boundaries
 
-- `test-data/ooxmlsdk-test/Open-XML-SDK/`: upstream Open XML SDK fixture assets
-- `test-data/ooxmlsdk-test/specs/`: project-owned spec fixtures
-- `test-data/ooxmlsdk-test/misc/`: non-upstream, non-spec package fixtures
-- `test-data/ooxmlsdk-pdf-test/libreoffice/`: LibreOffice-derived DOCX -> PDF fixtures
-
 Important:
 
 - full package round-trip corpus coverage belongs in `../ooxmlsdk-test-suite`, not in this repository
-- `crates/ooxmlsdk-test/tests/round_trip.rs::round_trip_smoke_test` is a lightweight smoke test and scans only `test-data/ooxmlsdk-test/specs/`
-- `test-data/ooxmlsdk-test/specs/known_failures.toml` applies only to `specs/`
-- `test-data/ooxmlsdk-pdf-test/` is not part of package round-trip coverage
+- focused package fixtures live in `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test`
+- LibreOffice package/PDF/layout corpora live in `../ooxmlsdk-test-suite/corpus/LibreOffice`
+- do not add new fixture corpus files under this repository
 
 ## Generated Code
 
@@ -186,8 +181,6 @@ Place tests near the behavior they protect:
 - MCE: `packages.rs` or `markup_compatibility_calibration.rs`
 - validators: `validators.rs` and `file_validators.rs`
 - corpus-scale package round trips: `../ooxmlsdk-test-suite`
-
-Prefer upstream-derived assertions and add `// Source:` comments on upstream-based tests.
 
 ## Documentation Guidance
 

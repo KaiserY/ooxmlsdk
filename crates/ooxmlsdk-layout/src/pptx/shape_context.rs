@@ -18,7 +18,6 @@ impl<'a> PPTShapeContext<'a> {
     slide_persist: &mut SlidePersist,
     placeholder: &p::PlaceholderShape,
   ) {
-    // Source: LibreOffice oox/source/ppt/pptshapecontext.cxx
     // Placeholder lookup applies layout/master references before shape
     // properties and text body are finalized.
     let mut sub_type = placeholder.r#type.unwrap_or(p::PlaceholderValues::Object);

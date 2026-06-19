@@ -72,7 +72,6 @@ pub(crate) struct SortStateModel {
 
 impl SheetSettingsCatalog {
   pub(crate) fn from_worksheet(worksheet: &x::Worksheet) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/worksheetsettings.cxx and
     // autofilterbuffer.cxx. These settings are imported before worksheet
     // finalization and table auto-filter application.
     Self {

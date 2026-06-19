@@ -8,8 +8,6 @@ enum PaperMeasure {
   Millimeters(f32, f32),
   Undefined,
 }
-
-// Source: LibreOffice filter/source/msfilter/util.cxx
 // PaperSizeConv::spPaperSizeTable, indices are MS paperSize values.
 const MS_PAPER_SIZE_TABLE: [PaperMeasure; 91] = [
   PaperMeasure::Undefined,
@@ -151,7 +149,6 @@ pub(crate) struct HeaderFooterModel {
 
 impl Default for CalcPageSettings {
   fn default() -> Self {
-    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx
     // PageSettingsModel defaults. Keep these in the PageSettings owner.
     Self {
       has_margins: false,
@@ -262,7 +259,6 @@ impl CalcPageSettings {
   }
 
   pub(crate) fn page_size_pt(&self) -> (f32, f32) {
-    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx keeps
     // PageSettingsModel::mbValidSettings true until pageSetup says otherwise.
     // With valid printer defaults, PageSettingsConverter leaves PROP_Size
     // unchanged, so Calc printing uses the document style default. The LO test
@@ -286,7 +282,6 @@ impl CalcPageSettings {
         units::millimeters_to_points(height),
       ),
       PaperMeasure::Undefined => {
-        // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx
         // PageSettingsConverter leaves PROP_Size unchanged for undefined or
         // invalid paper sizes, and sc/source/ui/view/printfun.cxx InitParam
         // falls back a null page size to PAPER_A4.
@@ -343,7 +338,6 @@ impl HeaderFooterModel {
   }
 
   fn from_header_footer(header_footer: &x::HeaderFooter) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx
     // HeaderFooterParser tokenizes these strings later; page settings owns the
     // six text channels and picture relationship state.
     Self {

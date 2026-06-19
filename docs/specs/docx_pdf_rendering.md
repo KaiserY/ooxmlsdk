@@ -1010,12 +1010,12 @@ Current progress:
   that have already moved so an oversized row is placed once in its destination
   leaf instead of oscillating through empty pages.
 - Real DOCX fixture coverage includes floating DrawingML image anchor import
-  and placement via `test-data/wml/image_floating.docx`.
+  and placement via `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/image_floating.docx`.
 - Real DOCX fixture coverage includes external `w:hyperlink` relationship
   import through the OOXML SDK part relationship model and krilla PDF link
-  annotation emission via `test-data/wml/fields_hyperlink.docx`.
+  annotation emission via `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/fields_hyperlink.docx`.
 - Real DOCX fixture coverage includes complex `w:fldChar`/`w:instrText` PAGE
-  and NUMPAGES fields via `test-data/wml/fields_complex.docx`. The same dynamic
+  and NUMPAGES fields via `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/wml/fields_complex.docx`. The same dynamic
   field path also covers simple PAGE/NUMPAGES fields and legacy `w:pgNum`. The
   import keeps a dynamic field marker and resolves visible text after body flow
   and repeating header/footer layout, following Writer's field-expansion

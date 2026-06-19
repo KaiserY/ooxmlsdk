@@ -804,8 +804,6 @@ fn lower_chart(
     let point_count = paints.len().max(1) as f32;
     let gap = (plot_width * 0.02).min(6.0);
     let item_width = ((plot_width - gap * (point_count - 1.0)) / point_count).max(1.0);
-
-    // Source: LibreOffice sd/qa/unit/import-tests4.cxx:testTdf153012
     // Chart data point fills resolve against c:clrMapOvr, so bg1 maps through
     // the chart color map instead of the slide p:clrMapOvr.
     for (index, paint) in paints.iter().enumerate() {
@@ -1179,7 +1177,6 @@ fn lower_diagram_drawing(
   items: &mut Vec<PageItem>,
   mut summary: Option<&mut PptxLayoutSummary>,
 ) -> bool {
-  // Source: LibreOffice oox/source/drawingml/diagram/diagram.cxx loadDiagram()
   // imports persisted diagramDrawing extDrawing before falling back to layout
   // atom shape generation.
   let transform = DiagramDrawingTransform::root(
@@ -1529,7 +1526,6 @@ fn diagram_text_body(source: &shared_diagram::DiagramTextBody) -> TextBody {
     .as_deref()
     .map(TextBodyDisplayProperties::from_body_properties)
     .unwrap_or_default();
-  // Source: LibreOffice oox/source/drawingml/diagram/diagramlayoutatoms.cxx
   // creates SmartArt text shapes from diagram layout constraints first; text
   // size is then synchronized/autofit inside that fixed layout. Do not apply
   // the generic DrawingML shape word-wrap default here, or persisted SmartArt
@@ -2557,7 +2553,6 @@ fn lower_table(
   table: &TableProperties,
   items: &mut Vec<PageItem>,
 ) {
-  // Source: LibreOffice oox/source/drawingml/shape.cxx uses the DrawingML
   // table grid and row heights as the visible TableShape size.
   let x0 = units::emu_to_points(offset.x_emu + shape.position.x);
   let y0 = units::emu_to_points(offset.y_emu + shape.position.y);
@@ -2714,7 +2709,6 @@ fn table_cell_style_part(
   row: usize,
   max_row: usize,
 ) -> TableStylePart {
-  // Source: LibreOffice tablecell.cxx applies table style parts in a fixed
   // order: whole table, first/last row/column, horizontal banding, corners,
   // then vertical banding. Direct tcPr is merged afterwards by the caller.
   let mut result = TableStylePart::default();
@@ -3039,7 +3033,6 @@ fn table_cell_fill_paint(
 }
 
 fn blend_table_cell_fill(background: DisplayPaint, cell: DisplayPaint) -> DisplayPaint {
-  // Source: LibreOffice tablecell.cxx blends table background and cell fill
   // through basegfx::interpolate(bg, cell, 1 - cellTransparency).
   let cell_weight = cell.opacity.clamp(0.0, 1.0);
   let background_weight = 1.0 - cell_weight;
@@ -3346,8 +3339,6 @@ fn blip_fill_image_items_from_resource(
   if let Some(a::BlipFillChoice::Tile(tile)) = blip_fill.blip_fill_choice.as_ref() {
     return tiled_blip_fill_image_items(&image_data.data, content_type, tile, placement);
   }
-
-  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
   // lclGetBitmapMode() defaults missing bitmap mode to XML_tile for MSO.
   if blip_fill.blip_fill_choice.is_none() {
     return tiled_blip_fill_image_items(
@@ -3619,7 +3610,6 @@ fn image_effects_from_blip(
           .contrast
           .as_ref()
           .map(|value| (value.as_ratio() * 100.0).round() as i32);
-        // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
         // maps MSO washout (bright=70%, contrast=-70%) to
         // GraphicDrawMode::Watermark and clears AdjustLuminance/Contrast.
         if brightness == Some(70) && contrast == Some(-70) {
@@ -3632,7 +3622,6 @@ fn image_effects_from_blip(
         }
       }
       a::BlipChoice::BiLevel(bilevel) => {
-        // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
         // lclApplyBlackWhiteEffect maps DrawingML's 0..100000 threshold to
         // BitmapMonochromeFilter's 0..255 luminance threshold.
         effects.bilevel_threshold = Some(
@@ -3666,7 +3655,6 @@ fn resolve_color_to_choice(
 }
 
 fn color_change_tolerance(content_type: Option<&str>) -> u8 {
-  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
   // lclCheckAndApplyChangeColorTransform uses 9 by default, native JPEG 15,
   // native PNG/TIFF 1, and native BMP 0.
   match content_type {
@@ -3756,8 +3744,6 @@ fn transform_image_data_to_png(
   if width == 0 || height == 0 {
     return None;
   }
-
-  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
   // lclCropGraphic rounds the srcRect-derived quotients against bitmap pixels
   // and creates a cropped bitmap before assigning it as custom-shape fill.
   let left = ((width as f32) * crop.left)
@@ -3784,7 +3770,6 @@ fn transform_image_data_to_png(
     height - top - bottom,
   )
   .to_image();
-  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
   // lclMirrorGraphic mirrors custom-shape fill bitmaps directly instead of
   // relying on a shape-level bitmap flip.
   if flip_horizontal {
@@ -3828,7 +3813,6 @@ fn mso_brightness_contrast_component(value: u8, brightness: i32, contrast: i32) 
 }
 
 fn libreoffice_luminance_contrast_component(value: u8, luminance: f32, contrast: f32) -> u8 {
-  // Source: LibreOffice
   // basegfx/source/color/bcolormodifier.cxx
   // BColorModifier_RGBLuminanceContrast applies contrast as a 0..1 slope and
   // combines luminance with the prepared contrast offset.
@@ -3865,7 +3849,6 @@ fn blip_fill_image_crop(blip_fill: &a::BlipFill) -> ImageCrop {
 }
 
 fn image_crop_from_source_rectangle(rect: &a::SourceRectangle) -> ImageCrop {
-  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
   // CropQuotientsFromSrcRect clamps negative srcRect edges to zero before
   // deriving crop quotients.
   let left = drawingml_percent_ratio(rect.left.as_ref()).max(0.0);
@@ -3884,7 +3867,6 @@ fn image_crop_from_source_rectangle(rect: &a::SourceRectangle) -> ImageCrop {
 }
 
 fn image_crop_from_fill_rectangle(rect: &a::FillRectangle) -> ImageCrop {
-  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
   // CropQuotientsFromFillRect ignores positive fillRect edges and computes
   // crop quotients from the negative growth denominator.
   let left = drawingml_percent_ratio(rect.left.as_ref()).min(0.0);
@@ -4807,7 +4789,6 @@ fn lower_paragraph(
       column_width,
     );
     let alignment = if context.options.anchor_center {
-      // Source: LibreOffice oox/source/drawingml/textbodypropertiescontext.cxx
       // maps horizontal text with anchorCtr=1 to TextHorizontalAdjust_CENTER,
       // so the shape-level adjustment overrides paragraph alignment.
       a::TextAlignmentTypeValues::Center
@@ -5033,7 +5014,6 @@ fn styled_text_run(
 
 fn apply_text_scale(style: &mut TextStyle, options: &TextLoweringOptions) {
   style.font_size_pt = if options.round_font_size_to_pt {
-    // Source: LibreOffice svx/source/svdraw/svdotext.cxx calls
     // setRoundFontSizeToPt(true) for AUTOFIT; editeng then rounds the
     // unscaled font size and the scaled font size to the nearest point.
     (style.font_size_pt.round() * options.font_scale).round()
@@ -5174,7 +5154,6 @@ fn push_text_segment(
 }
 
 fn is_drawingml_symbol_char(ch: char) -> bool {
-  // Source: LibreOffice oox/source/drawingml/textrun.cxx applies a:sym direct
   // formatting only to text portions whose UTF-16 high byte is 0xf0.
   let code = ch as u32;
   (code & 0xff00) == 0xf000
@@ -6060,7 +6039,6 @@ fn level_bullet_label(choice: &impl BulletChoice) -> Option<BulletKind> {
 
 fn apply_run_properties(import: &PowerPointImport, run: &TextRun, style: &mut TextStyle) {
   if run.kind == TextRunKind::Math {
-    // Source: LibreOffice oox/source/drawingml/shape.cxx imports a14:m as a
     // Math OLE object. Use the Office math face for text extraction/rendering
     // of the flattened math text instead of inheriting the surrounding
     // DrawingML paragraph font.
@@ -6199,7 +6177,6 @@ fn apply_text_fill(
 ) {
   match fill {
     a::RunPropertiesChoice::NoFill(_) => {
-      // Source: LibreOffice sd/qa/unit/import-tests2.cxx:testTdf118776
       // imports text noFill as 99% CharTransparence, not as a dropped run.
       style.color = RgbColor { r: 0, g: 0, b: 0 };
       style.opacity = 0.01;
@@ -6232,7 +6209,6 @@ fn apply_default_text_fill(
 ) {
   match fill {
     a::DefaultRunPropertiesChoice::NoFill(_) => {
-      // Source: LibreOffice sd/qa/unit/import-tests2.cxx:testTdf118776
       // imports text noFill as 99% CharTransparence, not as a dropped run.
       style.color = RgbColor { r: 0, g: 0, b: 0 };
       style.opacity = 0.01;
@@ -6263,7 +6239,6 @@ fn apply_best_solid_text_fill(
   color: Option<Color>,
   style: &mut TextStyle,
 ) {
-  // Source: LibreOffice oox/source/drawingml/textcharacterproperties.cxx
   // maps DrawingML character fill to CharColor via getBestSolidColor().
   if let Some(color) = color.and_then(|color| display_paint(import, &color, None)) {
     style.color = color.color;
@@ -6276,7 +6251,6 @@ fn apply_text_highlight(
   highlight: &a::Highlight,
   style: &mut TextStyle,
 ) {
-  // Source: LibreOffice oox/source/drawingml/textcharacterpropertiescontext.cxx
   // imports a:highlight (CT_Color) through ColorContext into CharBackColor.
   if let Some(color) = highlight
     .highlight_choice
@@ -6313,7 +6287,6 @@ fn apply_default_run_underline_fill(
 }
 
 fn apply_underline_fill(import: &PowerPointImport, fill: &a::UnderlineFill, style: &mut TextStyle) {
-  // Source: LibreOffice oox/source/drawingml/textcharacterpropertiescontext.cxx
   // parses a:uFill through SimpleFillPropertiesContext into maUnderlineColor.
   if let Some(color) = fill
     .underline_fill_choice
@@ -6326,7 +6299,6 @@ fn apply_underline_fill(import: &PowerPointImport, fill: &a::UnderlineFill, styl
 }
 
 fn apply_hyperlink_text_fill(import: &PowerPointImport, style: &mut TextStyle) {
-  // Source: LibreOffice oox/source/drawingml/textrun.cxx assigns scheme
   // color hlink when a hyperlink field has no explicit CharColor.
   let color = Color::Scheme(SchemeColor {
     value: a::SchemeColorValues::Hyperlink,

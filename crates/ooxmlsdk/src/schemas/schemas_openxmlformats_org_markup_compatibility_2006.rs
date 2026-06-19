@@ -9,6 +9,7 @@
 #[sdk(qname = "mc:AlternateContent")]
 pub struct AlternateContent {
   pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   #[sdk(
         choice(
             child(variant = Choice, qname = "mc:Choice"),
@@ -22,6 +23,7 @@ pub struct AlternateContent {
 #[sdk(qname = "mc:Choice")]
 pub struct Choice {
   pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   #[sdk(any)]
   pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
@@ -30,6 +32,7 @@ pub struct Choice {
 #[sdk(qname = "mc:Fallback")]
 pub struct Fallback {
   pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   #[sdk(any)]
   pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }

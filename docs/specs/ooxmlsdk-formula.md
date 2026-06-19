@@ -503,7 +503,7 @@ Primary test sources:
 | OOXML formula structure | `docs/specs/sml_formulas.md` |
 | Calc formula import tests | `../core/sc/qa/unit/` |
 | Pivot/formula fixture evidence | `../core/sc/qa/unit/data/xlsx/` |
-| Existing XLSX PDF matrix candidates | `docs/tests/ooxmlsdk-pdf-test/libreoffice/UPSTREAM_TEST_MATRIX.md` |
+| Existing XLSX PDF matrix candidates | `../ooxmlsdk-test-suite/docs/ooxmlsdk-pdf-test/LibreOffice.md` |
 
 Test buckets:
 
@@ -542,7 +542,7 @@ Use a repeated three-pass loop before implementing each formula area:
      evidence, temporary regression coverage, and migration inventory;
      re-implement through the formula crate's current model and LO's Calc owner
      files, not by copying the PDF helper parser/evaluator
-   - keep `crates/ooxmlsdk-pdf-test` green during migration unless a changed
+   - keep `../ooxmlsdk-test-suite/crates/ooxmlsdk-pdf-test` green during migration unless a changed
      expectation is deliberately updated with LO-backed evidence
 
 1. LO pass

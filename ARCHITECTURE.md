@@ -49,7 +49,7 @@ In practice:
 
 ## Workspace Layout
 
-The workspace currently has eight crates:
+The workspace currently has seven crates:
 
 - `crates/ooxmlsdk`: runtime crate and primary public API
 - `crates/ooxmlsdk-build`: generator and checked-in input model logic
@@ -58,7 +58,6 @@ The workspace currently has eight crates:
 - `crates/ooxmlsdk-formula`: formula parsing/evaluation support
 - `crates/ooxmlsdk-layout`: document layout helpers
 - `crates/ooxmlsdk-pdf`: DOCX -> PDF conversion pipeline
-- `crates/ooxmlsdk-pdf-test`: PDF parity helpers and fixture-based PDF assertions
 
 Focused integration tests, validators, package smoke coverage, and runtime
 benches live in the adjacent `../ooxmlsdk-test-suite/crates/ooxmlsdk-test`
@@ -179,13 +178,12 @@ fixture behavior and compatibility coverage.
 The PDF path is separate from the core OOXML runtime:
 
 - `crates/ooxmlsdk-pdf`: renders DOCX content into PDF
-- `crates/ooxmlsdk-pdf-test`: renders committed DOCX fixtures and inspects the
-  resulting PDF with PDFium/Lopdf-based helpers
 
 This split matters:
 
 - `../ooxmlsdk-test-suite/crates/ooxmlsdk-test` owns focused package/schema correctness and smoke round-trip coverage
-- `ooxmlsdk-pdf-test` owns visible-output and PDF-object parity checks
+- `../ooxmlsdk-test-suite/crates/ooxmlsdk-pdf-test` owns visible-output and PDF-object parity checks
+- `../ooxmlsdk-test-suite/crates/ooxmlsdk-layout-test` owns layout parity checks
 - `../ooxmlsdk-test-suite` owns corpus-scale package round-trip coverage
 
 Do not mix PDF rendering fixtures into package round-trip harnesses.
@@ -214,9 +212,10 @@ The remaining `test-data/ooxmlsdk-test/libreoffice/` directory is legacy
 LibreOffice package fixture staging; move it to `../ooxmlsdk-test-suite/` before
 adding new LibreOffice package round-trip coverage.
 
-PDF fixtures live under `test-data/ooxmlsdk-pdf-test/`:
-
-- `libreoffice/`: fixtures copied from `../core`
+LibreOffice PDF/layout parity fixtures live under
+`../ooxmlsdk-test-suite/corpus/LibreOffice/`. The remaining
+`test-data/ooxmlsdk-pdf-test/` directory is legacy fixture staging used by a
+small number of local layout unit tests; do not add new coverage there.
 
 ### Round-Trip Coverage
 
@@ -320,8 +319,6 @@ Test documentation lives under `docs/tests/`:
 - `docs/tests/ooxmlsdk-test/Open-XML-SDK/UPSTREAM_TEST_MATRIX.md`
 - `docs/tests/ooxmlsdk-test/specs/README.md`
 - `docs/tests/ooxmlsdk-test/misc/README.md`
-- `docs/tests/ooxmlsdk-pdf-test/README.md`
-- `docs/tests/ooxmlsdk-pdf-test/libreoffice/UPSTREAM_TEST_MATRIX.md`
 
 Use these files when deciding where a new fixture belongs.
 
@@ -385,7 +382,9 @@ Key paths:
 - `../core/oox/qa/unit/`
 - `../core/sw/qa/writerfilter/dmapper/`
 
-Do not place non-`../core` PDF fixtures into `test-data/ooxmlsdk-pdf-test/libreoffice/`.
+Do not place new PDF parity fixtures in this repository. Add LibreOffice-backed
+PDF fixtures under `../ooxmlsdk-test-suite/corpus/LibreOffice/` and document
+the migration in `../ooxmlsdk-test-suite/docs/ooxmlsdk-pdf-test/`.
 
 ## Documentation Map
 

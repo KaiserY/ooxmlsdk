@@ -312,7 +312,7 @@ decisions.
 
 The DOCX/PDF lane should optimize for real LibreOffice-aligned coverage rather
 than hand-crafted renderer fixtures. New PDF calibration fixtures live only in
-`test-data/ooxmlsdk-pdf-test/libreoffice/` and should be copied from upstream compatibility
+`../ooxmlsdk-test-suite/corpus/LibreOffice/` and should be copied from upstream compatibility
 suites, starting with LibreOffice Writer QA files under `../core/sw/qa/`.
 
 Default fixture policy:
@@ -327,7 +327,7 @@ Default fixture policy:
 - record each copied fixture's upstream source path next to the fixture
 
 Each copied fixture should live under
-`test-data/ooxmlsdk-pdf-test/libreoffice/` and record its upstream source path,
+`../ooxmlsdk-test-suite/corpus/LibreOffice/` and record its upstream source path,
 for example a file copied from `../core/sw/qa/extras/ooxmlexport/data/`.
 
 Implementation work should also happen in feature batches. A batch may import
@@ -374,7 +374,7 @@ is:
 1. **Sections/page styles:** section boundaries, break normalization,
    first/default/even header/footer inheritance, body reservation, columns,
    page backgrounds, and page borders match the selected LibreOffice Writer QA
-   fixtures in `test-data/ooxmlsdk-pdf-test/libreoffice/`.
+   fixtures in `../ooxmlsdk-test-suite/corpus/LibreOffice/`.
 2. **Paragraph/text:** paragraph/run property overlay, numbering, tabs, fields,
    page/column breaks, keep/widow/orphan behavior, shaped text measurement, and
    paint portions match the selected LibreOffice Writer QA fixtures.
@@ -437,7 +437,7 @@ closed:
 
 ### LibreOffice Calibration Crate
 
-`crates/ooxmlsdk-pdf-test` is the separate crate for full parity calibration.
+`../ooxmlsdk-test-suite/crates/ooxmlsdk-pdf-test` is the separate crate for full parity calibration.
 It stays separate from `ooxmlsdk-pdf` because the calibration lane needs
 LibreOffice installed, temporary reference PDFs, PDF text/geometry extraction,
 optional raster comparison, and golden artifacts that should not slow the
@@ -472,7 +472,7 @@ LibreOffice QA alignment:
 
 Implemented crate responsibilities:
 
-- discover Word fixtures from `test-data/ooxmlsdk-pdf-test/libreoffice/` (`.docx`,
+- discover Word fixtures from `../ooxmlsdk-test-suite/corpus/LibreOffice/` (`.docx`,
   `.docm`, `.dotx`, `.dotm`)
 - render each fixture with LibreOffice headless, for example
   `soffice --headless --convert-to pdf --outdir <tmp> <fixture.docx>`
@@ -530,7 +530,7 @@ Final LibreOffice QA audit before using this as the development baseline:
 Implemented layout:
 
 ```text
-crates/ooxmlsdk-pdf-test/
+../ooxmlsdk-test-suite/crates/ooxmlsdk-pdf-test/
   Cargo.toml
   src/
     lib.rs
@@ -540,7 +540,7 @@ crates/ooxmlsdk-pdf-test/
     core_docx_pdf_fixtures.rs
     mapped_docx_pdf_fixtures.rs
     pdfexport_fixtures.rs
-test-data/ooxmlsdk-pdf-test/libreoffice/
+../ooxmlsdk-test-suite/corpus/LibreOffice/
   README.md
   <LibreOffice-derived Word fixtures>
 ```
@@ -550,16 +550,16 @@ This lane currently has these layers:
 - direct PDF/object tests projected from LibreOffice PDF export tests
 - source-backed Writer layout tests projected into PDF-visible assertions
 - mapped visible-output fixture tests over the broad
-  `test-data/ooxmlsdk-pdf-test/libreoffice/` fixture set
+  `../ooxmlsdk-test-suite/corpus/LibreOffice/` fixture set
 - render-summary and PDF extraction helpers that separate open-file/render
   failures from comparison failures
 
 Current repository calibration surface:
 
 - verification command: `cargo test -p ooxmlsdk-pdf-test -- --nocapture`
-- fixture directory: `test-data/ooxmlsdk-pdf-test/libreoffice/`
+- fixture directory: `../ooxmlsdk-test-suite/corpus/LibreOffice/`
 - upstream source map:
-  `docs/tests/ooxmlsdk-pdf-test/libreoffice/UPSTREAM_TEST_MATRIX.md`
+  `../ooxmlsdk-test-suite/docs/ooxmlsdk-pdf-test/LibreOffice.md`
 - matrix status: 306 local covered PDF-rendering fixture rows, 10 direct
   upstream DOCX-to-PDF/object assertion rows, and 8 supplemental source-backed
   PDF-visible assertion rows
@@ -1000,7 +1000,7 @@ Current progress:
   column flow, keep-next pagination, repeated table headers, page background,
   and borders were removed. Future PDF parity coverage for these behaviors
   should come from LibreOffice QA fixtures copied into
-  `test-data/ooxmlsdk-pdf-test/libreoffice/`.
+  `../ooxmlsdk-test-suite/corpus/LibreOffice/`.
 - Layout model coverage checks that a table row following into the next section
   column also moves later body blocks into that destination column, matching the
   Writer `SwTabFrame` follow invariant before full row split/follow-flow-line
@@ -1379,7 +1379,7 @@ behavior batches:
 4. Extend floating frame influence from paragraph-local exclusions to
    page/frame-associated fly influence that can affect following paragraphs and
    table cell content.
-5. Expand `test-data/ooxmlsdk-pdf-test/libreoffice/` with focused LibreOffice QA DOCX files
+5. Expand `../ooxmlsdk-test-suite/corpus/LibreOffice/` with focused LibreOffice QA DOCX files
    only when the next behavior batch is ready to make those fixtures pass
    without known-issue whitelists.
 

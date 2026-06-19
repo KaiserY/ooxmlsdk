@@ -765,7 +765,7 @@ Use LO layout-level tests first:
 - `../core/sw/qa/extras/ooxmlexport/` cases using `parseLayoutDump()`
 
 Many rows currently listed as PDF projections in
-`docs/tests/ooxmlsdk-pdf-test/libreoffice/UPSTREAM_TEST_MATRIX.md` should move
+`../ooxmlsdk-test-suite/docs/ooxmlsdk-pdf-test/LibreOffice.md` should move
 to layout tests when this crate exists.
 
 ### 12.2 XLSX Tests
@@ -800,7 +800,7 @@ Pure export XML round-trip tests stay outside layout.
 ### 12.4 LibreOffice Coverage Gate
 
 During the migration from `ooxmlsdk-pdf` to `ooxmlsdk-layout`, keep
-`crates/ooxmlsdk-pdf-test` as the temporary regression gate. The current PDF
+`../ooxmlsdk-test-suite/crates/ooxmlsdk-pdf-test` as the temporary regression gate. The current PDF
 suite contains many source-backed LO regressions and should catch behavior
 breaks while layout and formula behavior are moved upward:
 
@@ -825,7 +825,7 @@ The temporary acceptance gate for each migrated behavior is:
   `ooxmlsdk-formula`
 - `ooxmlsdk-pdf` consumes the migrated layout/formula state without keeping a
   competing PDF-local parser, document model, or layout algorithm
-- the existing `crates/ooxmlsdk-pdf-test` coverage still passes or the failure
+- the existing `../ooxmlsdk-test-suite/crates/ooxmlsdk-pdf-test` coverage still passes or the failure
   is explained by a deliberate, LO-backed expectation update
 - expected values come from LO assertions, layout dumps, rendered metafile/
   bitmap evidence, or fixture facts; never from current Rust PDF output
@@ -1095,7 +1095,7 @@ typed-source layout/formula owner. For each migrated slice:
 - XLSX values and references come from `ooxmlsdk-formula`
 - layout produces display/debug output for the affected DOCX, XLSX, or PPTX
   fixture path
-- the existing `crates/ooxmlsdk-pdf-test` coverage for that behavior remains
+- the existing `../ooxmlsdk-test-suite/crates/ooxmlsdk-pdf-test` coverage for that behavior remains
   green, or the changed expectation is documented with LO-backed evidence
 - PDF-local duplicate layout/formula code is removed, bypassed, or clearly
   marked as pending migration inventory

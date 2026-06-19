@@ -1282,8 +1282,8 @@ Use `// Source:` comments for assertions projected from LibreOffice tests.
 Add a mapped fixture lane analogous to PPTX/DOCX:
 
 ```text
-crates/ooxmlsdk-pdf-test/tests/mapped_xlsx_pdf_fixtures.rs
-test-data/ooxmlsdk-pdf-test/libreoffice/xlsx/
+../ooxmlsdk-test-suite/crates/ooxmlsdk-pdf-test/tests/mapped_xlsx_pdf_fixtures.rs
+../ooxmlsdk-test-suite/corpus/LibreOffice/xlsx/
 ```
 
 Reference generation should use LibreOffice headless:

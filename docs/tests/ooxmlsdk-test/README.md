@@ -30,5 +30,7 @@ Round-trip policy:
   walks only `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test/specs/` as a
   lightweight smoke test, and only that subtree participates in
   `specs/known_failures.toml`.
-- `test-data/ooxmlsdk-pdf-test/` is excluded from package round-trip coverage. Those fixtures
-  are for `docx -> pdf` parity only.
+- `test-data/ooxmlsdk-pdf-test/` is legacy local fixture staging and is
+  excluded from package round-trip coverage. PDF/layout parity coverage lives
+  in `../ooxmlsdk-test-suite/crates/ooxmlsdk-pdf-test` and
+  `../ooxmlsdk-test-suite/crates/ooxmlsdk-layout-test`.

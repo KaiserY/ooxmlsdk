@@ -934,6 +934,10 @@ impl<'a> FontBook<'a> {
       let registered = registered_faces.iter().find(|registered| {
         registered.face_index == face.face_index && family_overlaps(registered, face)
       });
+      let family_class_mismatch = target_family.is_none()
+        && request
+          .family_class
+          .is_some_and(|class| !font_family_class_matches(class, face));
       let charset_mismatch = request
         .charset
         .is_some_and(|charset| !font_charset_matches(charset, face, registered));
@@ -948,6 +952,10 @@ impl<'a> FontBook<'a> {
         rejected = true;
         reason = Some(FontMatchReason::Charset);
       }
+      if family_class_mismatch {
+        rejected = true;
+        reason = Some(FontMatchReason::FamilyClass);
+      }
       if slant_mismatch && !rejected {
         reason = Some(FontMatchReason::Slant);
       }
@@ -960,6 +968,7 @@ impl<'a> FontBook<'a> {
 
       let rank = FontMatchRank {
         rejected,
+        family_class_mismatch,
         charset_mismatch,
         slant_mismatch,
         stretch_distance,
@@ -1052,6 +1061,7 @@ pub struct FontFaceInfo<'a> {
   pub family_names: Vec<Cow<'a, str>>,
   pub postscript_name: Option<Cow<'a, str>>,
   pub style_name: Option<Cow<'a, str>>,
+  pub family_class: Option<FontFamilyClass>,
   pub weight: FontWeight,
   pub slant: FontSlant,
   pub stretch: FontStretch,
@@ -1074,6 +1084,7 @@ impl<'a> FontFaceInfo<'a> {
       family_names: vec![family.into()],
       postscript_name: None,
       style_name: None,
+      family_class: None,
       weight: FontWeight::Normal,
       slant: FontSlant::Upright,
       stretch: FontStretch::Normal,
@@ -1134,6 +1145,7 @@ impl<'a> FontFaceInfo<'a> {
       family_names,
       postscript_name,
       style_name,
+      family_class: None,
       weight: font_weight_from_ttf(face.weight().to_number()),
       slant: font_slant_from_ttf(face.style()),
       stretch: font_stretch_from_ttf(face.width().to_number()),
@@ -1383,6 +1395,7 @@ impl<'a> ThemeFontMap<'a> {
 pub struct FontRequest<'a> {
   pub family: Option<Cow<'a, str>>,
   pub theme_family: Option<ThemeFontKind>,
+  pub family_class: Option<FontFamilyClass>,
   pub bold: bool,
   pub italic: bool,
   pub weight: Option<FontWeight>,
@@ -1716,16 +1729,46 @@ pub struct FontScriptRun<'a> {
   pub size_pt: FontSize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ScriptScanOptions {
+  pub app_script: TextScript,
+  pub small_caps: bool,
+}
+
+impl Default for ScriptScanOptions {
+  fn default() -> Self {
+    Self {
+      app_script: TextScript::Common,
+      small_caps: false,
+    }
+  }
+}
+
 pub fn script_direction_runs<'a>(
   text: impl Into<Cow<'a, str>>,
   size_pt: FontSize,
   small_caps: bool,
 ) -> Vec<FontScriptRun<'a>> {
+  script_direction_runs_with_options(
+    text,
+    size_pt,
+    ScriptScanOptions {
+      small_caps,
+      ..ScriptScanOptions::default()
+    },
+  )
+}
+
+pub fn script_direction_runs_with_options<'a>(
+  text: impl Into<Cow<'a, str>>,
+  size_pt: FontSize,
+  options: ScriptScanOptions,
+) -> Vec<FontScriptRun<'a>> {
   let text = text.into();
-  if small_caps {
+  if options.small_caps {
     return small_caps_script_direction_runs(text.as_ref(), size_pt);
   }
-  script_direction_runs_for_segment(text.as_ref(), 0, size_pt, false)
+  script_direction_runs_for_segment(text.as_ref(), 0, size_pt, false, options.app_script)
 }
 
 fn small_caps_script_direction_runs<'a>(text: &str, size_pt: FontSize) -> Vec<FontScriptRun<'a>> {
@@ -1792,6 +1835,7 @@ fn push_small_caps_case_run<'a>(
     range.start,
     segment_size,
     false,
+    TextScript::Common,
   ));
 }
 
@@ -1800,33 +1844,66 @@ fn script_direction_runs_for_segment<'a>(
   range_offset: usize,
   size_pt: FontSize,
   small_caps: bool,
+  app_script: TextScript,
 ) -> Vec<FontScriptRun<'a>> {
   let mut runs = Vec::new();
+  if text.is_empty() {
+    return runs;
+  }
+  let leading_script = first_strong_text_script(text).unwrap_or(app_script);
   let mut start = 0usize;
   let mut active = None::<TextScript>;
+  let mut pending_weak_start = None::<usize>;
+  let mut pending_weak_has_inherited = false;
   for (index, ch) in text.char_indices() {
-    let script = text_script_from_unicode(ch.script(), active.unwrap_or(TextScript::Other));
-    if let Some(active_script) = active
-      && script != active_script
-    {
-      push_script_direction_run(
-        text,
-        start..index,
-        active_script,
-        range_offset,
-        size_pt,
-        small_caps,
-        &mut runs,
-      );
-      start = index;
+    let unicode_script = ch.script();
+    if is_nonspacing_mark(ch) {
+      active.get_or_insert(leading_script);
+      pending_weak_start.get_or_insert(index);
+      pending_weak_has_inherited = true;
+      continue;
     }
-    active = Some(script);
+    let Some(script) = strong_text_script_from_unicode(unicode_script) else {
+      active.get_or_insert(leading_script);
+      pending_weak_start.get_or_insert(index);
+      pending_weak_has_inherited |= unicode_script == UnicodeScriptValue::Inherited;
+      continue;
+    };
+
+    match active {
+      None => {
+        active = Some(script);
+      }
+      Some(active_script) if script != active_script => {
+        let split = if pending_weak_has_inherited {
+          pending_weak_start.unwrap_or(index)
+        } else {
+          index
+        };
+        if start < split {
+          push_script_direction_run(
+            text,
+            start..split,
+            active_script,
+            range_offset,
+            size_pt,
+            small_caps,
+            &mut runs,
+          );
+        }
+        start = split;
+        active = Some(script);
+      }
+      Some(_) => {}
+    }
+    pending_weak_start = None;
+    pending_weak_has_inherited = false;
   }
   if start < text.len() {
     push_script_direction_run(
       text,
       start..text.len(),
-      active.unwrap_or(TextScript::Other),
+      active.unwrap_or(leading_script),
       range_offset,
       size_pt,
       small_caps,
@@ -1882,6 +1959,7 @@ pub struct FontMatchCandidate<'a> {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct FontMatchRank {
   rejected: bool,
+  family_class_mismatch: bool,
   charset_mismatch: bool,
   slant_mismatch: bool,
   stretch_distance: i32,
@@ -1892,6 +1970,7 @@ struct FontMatchRank {
 impl FontMatchRank {
   fn distance(self) -> i32 {
     i32::from(self.rejected)
+      + i32::from(self.family_class_mismatch)
       + i32::from(self.charset_mismatch)
       + i32::from(self.slant_mismatch)
       + i32::from(self.stretch_distance != 0)
@@ -1903,6 +1982,7 @@ impl FontMatchRank {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FontMatchReason {
   Family,
+  FamilyClass,
   StyleName,
   Charset,
   Pitch,
@@ -2279,6 +2359,19 @@ pub enum FontPitch {
   Variable,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum FontFamilyClass {
+  Serif,
+  SansSerif,
+  Fixed,
+  Decorative,
+  BrushScript,
+  Titling,
+  Capitals,
+  OldStyle,
+  Schoolbook,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FontCharset {
   Ansi,
@@ -2614,6 +2707,34 @@ fn family_overlaps(registered: &RegisteredFontFace<'_>, face: &FontFaceInfo<'_>)
     .family_names
     .iter()
     .any(|registered| family_matches(face, registered))
+}
+
+fn font_family_class_matches(requested: FontFamilyClass, face: &FontFaceInfo<'_>) -> bool {
+  face.family_class == Some(requested)
+    || (requested == FontFamilyClass::Fixed
+      && (face.pitch == FontPitch::Fixed || face.flags.monospace))
+    || (requested == FontFamilyClass::Serif && face.flags.serif)
+    || face
+      .family_names
+      .iter()
+      .any(|family| font_family_name_matches_class(family, requested))
+}
+
+fn font_family_name_matches_class(family: &str, requested: FontFamilyClass) -> bool {
+  let normalized = normalize_family(family);
+  match requested {
+    FontFamilyClass::Serif => {
+      !normalized.contains("sans") && (normalized.contains("serif") || normalized.contains("roman"))
+    }
+    FontFamilyClass::SansSerif => normalized.contains("sans"),
+    FontFamilyClass::Fixed => false,
+    FontFamilyClass::Decorative => normalized.contains("decorative"),
+    FontFamilyClass::BrushScript => normalized.contains("script"),
+    FontFamilyClass::Titling => normalized.contains("titling"),
+    FontFamilyClass::Capitals => normalized.contains("caps") || normalized.contains("capitals"),
+    FontFamilyClass::OldStyle => normalized.contains("oldstyle"),
+    FontFamilyClass::Schoolbook => normalized.contains("schoolbook"),
+  }
 }
 
 fn family_tokens(value: &str) -> Vec<String> {
@@ -3133,20 +3254,35 @@ fn tag_to_string(tag: Tag) -> String {
 }
 
 fn text_script_from_unicode(script: UnicodeScriptValue, previous: TextScript) -> TextScript {
+  match strong_text_script_from_unicode(script) {
+    Some(script) => script,
+    None => previous,
+  }
+}
+
+fn first_strong_text_script(text: &str) -> Option<TextScript> {
+  text.chars().find_map(|ch| {
+    (!is_nonspacing_mark(ch))
+      .then(|| strong_text_script_from_unicode(ch.script()))
+      .flatten()
+  })
+}
+
+fn strong_text_script_from_unicode(script: UnicodeScriptValue) -> Option<TextScript> {
   match script {
-    UnicodeScriptValue::Latin => TextScript::Latin,
-    UnicodeScriptValue::Cyrillic => TextScript::Cyrillic,
-    UnicodeScriptValue::Greek => TextScript::Greek,
-    UnicodeScriptValue::Han => TextScript::Han,
-    UnicodeScriptValue::Hiragana => TextScript::Hiragana,
-    UnicodeScriptValue::Katakana => TextScript::Katakana,
-    UnicodeScriptValue::Hangul => TextScript::Hangul,
-    UnicodeScriptValue::Arabic => TextScript::Arabic,
-    UnicodeScriptValue::Hebrew => TextScript::Hebrew,
-    UnicodeScriptValue::Devanagari => TextScript::Devanagari,
-    UnicodeScriptValue::Thai => TextScript::Thai,
-    UnicodeScriptValue::Common | UnicodeScriptValue::Inherited => previous,
-    _ => TextScript::Other,
+    UnicodeScriptValue::Latin => Some(TextScript::Latin),
+    UnicodeScriptValue::Cyrillic => Some(TextScript::Cyrillic),
+    UnicodeScriptValue::Greek => Some(TextScript::Greek),
+    UnicodeScriptValue::Han => Some(TextScript::Han),
+    UnicodeScriptValue::Hiragana => Some(TextScript::Hiragana),
+    UnicodeScriptValue::Katakana => Some(TextScript::Katakana),
+    UnicodeScriptValue::Hangul => Some(TextScript::Hangul),
+    UnicodeScriptValue::Arabic => Some(TextScript::Arabic),
+    UnicodeScriptValue::Hebrew => Some(TextScript::Hebrew),
+    UnicodeScriptValue::Devanagari => Some(TextScript::Devanagari),
+    UnicodeScriptValue::Thai => Some(TextScript::Thai),
+    UnicodeScriptValue::Common | UnicodeScriptValue::Inherited => None,
+    _ => Some(TextScript::Other),
   }
 }
 
@@ -3156,6 +3292,41 @@ fn text_direction_from_bidi(direction: BidiDirection) -> TextDirection {
     BidiDirection::Rtl => TextDirection::RightToLeft,
     BidiDirection::Mixed => TextDirection::Mixed,
   }
+}
+
+fn is_nonspacing_mark(ch: char) -> bool {
+  matches!(
+    u32::from(ch),
+    0x0300..=0x036F
+      | 0x0591..=0x05BD
+      | 0x05BF
+      | 0x05C1..=0x05C2
+      | 0x05C4..=0x05C5
+      | 0x05C7
+      | 0x0610..=0x061A
+      | 0x064B..=0x065F
+      | 0x0670
+      | 0x06D6..=0x06DC
+      | 0x06DF..=0x06E4
+      | 0x06E7..=0x06E8
+      | 0x06EA..=0x06ED
+      | 0x0711
+      | 0x0730..=0x074A
+      | 0x07A6..=0x07B0
+      | 0x0816..=0x0819
+      | 0x081B..=0x0823
+      | 0x0825..=0x0827
+      | 0x0829..=0x082D
+      | 0x0859..=0x085B
+      | 0x08D3..=0x08E1
+      | 0x08E3..=0x0902
+      | 0x093A
+      | 0x093C
+      | 0x0941..=0x0948
+      | 0x094D
+      | 0x0951..=0x0957
+      | 0x0962..=0x0963
+  )
 }
 
 fn is_justifiable_char(ch: char) -> bool {

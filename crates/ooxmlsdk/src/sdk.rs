@@ -553,14 +553,14 @@ pub trait SdkMce {
     &mut self,
     settings: &MarkupCompatibilityProcessSettings,
   ) -> Result<(), crate::common::SdkError> {
-    let mut context = MceContext::default();
-    self.process_mce_with_context(settings, &mut context)
+    let context = MceContext::default();
+    self.process_mce_with_context(settings, &context)
   }
 
   fn process_mce_with_context(
     &mut self,
     _settings: &MarkupCompatibilityProcessSettings,
-    _context: &mut MceContext,
+    _context: &MceContext<'_>,
   ) -> Result<(), crate::common::SdkError> {
     Ok(())
   }
@@ -580,69 +580,191 @@ impl<T: SdkMce + ?Sized> SdkMce for Box<T> {
   fn process_mce_with_context(
     &mut self,
     settings: &MarkupCompatibilityProcessSettings,
-    context: &mut MceContext,
+    context: &MceContext<'_>,
   ) -> Result<(), crate::common::SdkError> {
     self.as_mut().process_mce_with_context(settings, context)
   }
 }
 
 #[cfg(feature = "mce")]
+#[derive(Clone, Debug)]
+struct McePrefixList<'a> {
+  value: std::borrow::Cow<'a, [u8]>,
+}
+
+#[cfg(feature = "mce")]
+impl<'a> McePrefixList<'a> {
+  fn new(value: &'a [u8]) -> Result<Self, crate::common::SdkError> {
+    Ok(Self {
+      value: decode_mce_attr_value(value)?,
+    })
+  }
+
+  fn prefixes(&self) -> impl Iterator<Item = &[u8]> {
+    split_xml_whitespace(self.value.as_ref())
+  }
+}
+
+#[cfg(feature = "mce")]
+#[derive(Clone, Debug)]
+struct MceQNameList<'a> {
+  value: std::borrow::Cow<'a, [u8]>,
+  patterns: Vec<MceQNamePattern<'a>>,
+}
+
+#[cfg(feature = "mce")]
+#[derive(Clone, Debug)]
+enum MceQNamePattern<'a> {
+  Any,
+  Qualified {
+    namespace: &'a [u8],
+    local_name: MceQNameLocal,
+  },
+}
+
+#[cfg(feature = "mce")]
+#[derive(Clone, Debug)]
+enum MceQNameLocal {
+  Any,
+  Range(std::ops::Range<usize>),
+}
+
+#[cfg(feature = "mce")]
+impl<'a> MceQNameList<'a> {
+  fn new(
+    context: &'a MceContext<'a>,
+    namespaces: &'a [crate::common::XmlNamespace],
+    value: &'a [u8],
+  ) -> Result<Self, crate::common::SdkError> {
+    let value = decode_mce_attr_value(value)?;
+    let mut patterns = Vec::new();
+    for range in split_xml_whitespace_ranges(value.as_ref()) {
+      let token = &value[range.clone()];
+      if token == b"*" {
+        patterns.push(MceQNamePattern::Any);
+        continue;
+      }
+      let Some(separator) = token.iter().position(|byte| *byte == b':') else {
+        continue;
+      };
+      let prefix = &token[..separator];
+      let Some(namespace) = context.namespace_for_prefix_with_current_bytes(namespaces, prefix)
+      else {
+        continue;
+      };
+      let local_start = range.start + separator + 1;
+      let local_name = if local_start == range.end {
+        continue;
+      } else if &value[local_start..range.end] == b"*" {
+        MceQNameLocal::Any
+      } else {
+        MceQNameLocal::Range(local_start..range.end)
+      };
+      patterns.push(MceQNamePattern::Qualified {
+        namespace,
+        local_name,
+      });
+    }
+
+    Ok(Self { value, patterns })
+  }
+
+  fn contains(&self, namespace: &[u8], local_name: &[u8]) -> bool {
+    self.patterns.iter().any(|pattern| match pattern {
+      MceQNamePattern::Any => true,
+      MceQNamePattern::Qualified {
+        namespace: candidate_namespace,
+        local_name: candidate_local_name,
+      } => {
+        *candidate_namespace == namespace
+          && match candidate_local_name {
+            MceQNameLocal::Any => true,
+            MceQNameLocal::Range(range) => self.value[range.clone()] == *local_name,
+          }
+      }
+    })
+  }
+}
+
+#[cfg(feature = "mce")]
 #[derive(Clone, Debug, Default)]
-pub struct MceContext {
-  namespaces: Vec<crate::common::XmlNamespace>,
-  ignorable_namespaces: Vec<Box<[u8]>>,
-  process_content: Vec<Box<[u8]>>,
-  preserve_attributes: Vec<Box<[u8]>>,
+pub struct MceContext<'a> {
+  parent: Option<&'a MceContext<'a>>,
+  namespaces: &'a [crate::common::XmlNamespace],
+  ignorable_namespaces: Vec<&'a [u8]>,
+  process_content: Option<MceQNameList<'a>>,
+  preserve_attributes: Option<MceQNameList<'a>>,
+  preserve_elements: Option<MceQNameList<'a>>,
 }
 
 #[cfg(feature = "mce")]
-#[derive(Clone, Copy, Debug)]
-pub struct MceContextCheckpoint {
-  namespaces: usize,
-  ignorable_namespaces: usize,
-  process_content: usize,
-  preserve_attributes: usize,
-}
-
-#[cfg(feature = "mce")]
-impl MceContext {
-  pub(crate) fn push(
-    &mut self,
-    namespaces: &[crate::common::XmlNamespace],
-    attrs: &[crate::common::XmlOtherAttr],
+impl<'a> MceContext<'a> {
+  pub(crate) fn child_context(
+    &'a self,
+    namespaces: &'a [crate::common::XmlNamespace],
+    attrs: &'a [crate::common::XmlOtherAttr],
     settings: &MarkupCompatibilityProcessSettings,
-  ) -> Result<MceContextCheckpoint, crate::common::SdkError> {
-    let checkpoint = MceContextCheckpoint {
-      namespaces: self.namespaces.len(),
-      ignorable_namespaces: self.ignorable_namespaces.len(),
-      process_content: self.process_content.len(),
-      preserve_attributes: self.preserve_attributes.len(),
+  ) -> Result<Self, crate::common::SdkError> {
+    let context = Self {
+      parent: Some(self),
+      namespaces,
+      ignorable_namespaces: self.current_ignorable_namespaces(namespaces, attrs)?,
+      process_content: mce_attr(attrs, b"ProcessContent")
+        .map(|value| MceQNameList::new(self, namespaces, value))
+        .transpose()?,
+      preserve_attributes: mce_attr(attrs, b"PreserveAttributes")
+        .map(|value| MceQNameList::new(self, namespaces, value))
+        .transpose()?,
+      preserve_elements: mce_attr(attrs, b"PreserveElements")
+        .map(|value| MceQNameList::new(self, namespaces, value))
+        .transpose()?,
     };
 
-    self.namespaces.extend_from_slice(namespaces);
+    context.validate_must_understand(attrs, settings)?;
+    Ok(context)
+  }
 
-    if let Some(value) = mce_attr(attrs, b"Ignorable") {
-      for prefix in split_ascii_whitespace(value) {
-        if let Some(ns) = self.namespace_for_prefix_bytes(prefix) {
-          self.ignorable_namespaces.push(ns.into());
+  pub(crate) fn process_current_attrs(
+    &self,
+    namespaces: &[crate::common::XmlNamespace],
+    attrs: &mut Vec<crate::common::XmlOtherAttr>,
+  ) -> Result<(), crate::common::SdkError> {
+    let remove_indexes = {
+      let current_ignorable_namespaces = self.current_ignorable_namespaces(namespaces, attrs)?;
+      let current_preserve_attributes = mce_attr(attrs, b"PreserveAttributes")
+        .map(|value| MceQNameList::new(self, namespaces, value))
+        .transpose()?;
+      let current_preserve_attributes = current_preserve_attributes.as_ref();
+      let mut remove_indexes = Vec::new();
+
+      for (index, attr) in attrs.iter().enumerate() {
+        if self.should_remove_ignorable_attribute_with_current_bytes(
+          namespaces,
+          &current_ignorable_namespaces,
+          current_preserve_attributes,
+          attr.name_bytes(),
+        ) {
+          remove_indexes.push(index);
         }
       }
-    }
 
-    if let Some(value) = mce_attr(attrs, b"ProcessContent") {
-      self
-        .process_content
-        .extend(split_ascii_whitespace(value).map(Into::into));
-    }
+      remove_indexes
+    };
 
-    if let Some(value) = mce_attr(attrs, b"PreserveAttributes") {
-      self
-        .preserve_attributes
-        .extend(split_ascii_whitespace(value).map(Into::into));
+    for index in remove_indexes.into_iter().rev() {
+      attrs.remove(index);
     }
+    Ok(())
+  }
 
+  fn validate_must_understand(
+    &self,
+    attrs: &[crate::common::XmlOtherAttr],
+    settings: &MarkupCompatibilityProcessSettings,
+  ) -> Result<(), crate::common::SdkError> {
     if let Some(value) = mce_attr(attrs, b"MustUnderstand") {
-      for prefix in split_ascii_whitespace(value) {
+      let prefixes = McePrefixList::new(value)?;
+      for prefix in prefixes.prefixes() {
         let Some(ns) = self.namespace_for_prefix_bytes(prefix) else {
           let prefix = String::from_utf8_lossy(prefix);
           return Err(crate::common::SdkError::CommonError(format!(
@@ -659,70 +781,137 @@ impl MceContext {
       }
     }
 
-    Ok(checkpoint)
+    Ok(())
   }
 
-  pub(crate) fn pop(&mut self, checkpoint: MceContextCheckpoint) {
-    self.namespaces.truncate(checkpoint.namespaces);
+  pub(crate) fn is_process_content_qname_with_current_bytes(
+    &self,
+    namespaces: &[crate::common::XmlNamespace],
+    qname: &[u8],
+  ) -> bool {
+    let Some((namespace, local_name)) = self.qname_parts_with_current_bytes(namespaces, qname)
+    else {
+      return false;
+    };
     self
-      .ignorable_namespaces
-      .truncate(checkpoint.ignorable_namespaces);
-    self.process_content.truncate(checkpoint.process_content);
+      .process_content
+      .as_ref()
+      .is_some_and(|list| list.contains(namespace, local_name))
+      || self
+        .parent
+        .is_some_and(|parent| parent.is_process_content_qname_with_current_bytes(&[], qname))
+  }
+
+  pub(crate) fn is_preserved_element_qname_with_current_bytes(
+    &self,
+    namespaces: &[crate::common::XmlNamespace],
+    qname: &[u8],
+  ) -> bool {
+    let Some((namespace, local_name)) = self.qname_parts_with_current_bytes(namespaces, qname)
+    else {
+      return false;
+    };
+    self
+      .preserve_elements
+      .as_ref()
+      .is_some_and(|list| list.contains(namespace, local_name))
+      || self
+        .parent
+        .is_some_and(|parent| parent.is_preserved_element_qname_with_current_bytes(&[], qname))
+  }
+
+  fn should_remove_ignorable_attribute_with_current_bytes(
+    &self,
+    namespaces: &[crate::common::XmlNamespace],
+    current_ignorable_namespaces: &[&[u8]],
+    current_preserve_attributes: Option<&MceQNameList<'_>>,
+    qname: &[u8],
+  ) -> bool {
+    let Some((namespace, local_name)) = self.qname_parts_with_current_bytes(namespaces, qname)
+    else {
+      return false;
+    };
+    let ignorable = self.is_ignorable_namespace_bytes(namespace)
+      || current_ignorable_namespaces.contains(&namespace);
+    let preserved = self.is_preserved_attribute_qname_bytes(namespace, local_name)
+      || current_preserve_attributes.is_some_and(|list| list.contains(namespace, local_name));
+    ignorable && !preserved
+  }
+
+  fn is_preserved_attribute_qname_bytes(&self, namespace: &[u8], local_name: &[u8]) -> bool {
     self
       .preserve_attributes
-      .truncate(checkpoint.preserve_attributes);
-  }
-
-  pub(crate) fn is_process_content_qname_bytes(&self, qname: &[u8]) -> bool {
-    self.process_content.iter().any(|candidate| {
-      let candidate = candidate.as_ref();
-      candidate == b"*"
-        || candidate == qname
-        || candidate
-          .strip_suffix(b":*")
-          .zip(qname.iter().position(|byte| *byte == b':'))
-          .is_some_and(|(prefix, qname_prefix_len)| prefix == &qname[..qname_prefix_len])
-    })
-  }
-
-  pub(crate) fn should_remove_ignorable_attribute_bytes(&self, qname: &[u8]) -> bool {
-    let Some(prefix_len) = qname.iter().position(|byte| *byte == b':') else {
-      return false;
-    };
-    let Some(namespace) = self.namespace_for_prefix_bytes(&qname[..prefix_len]) else {
-      return false;
-    };
-    self.is_ignorable_namespace_bytes(namespace) && !self.is_preserved_attribute_qname_bytes(qname)
-  }
-
-  fn is_preserved_attribute_qname_bytes(&self, qname: &[u8]) -> bool {
-    self.preserve_attributes.iter().any(|candidate| {
-      let candidate = candidate.as_ref();
-      candidate == b"*"
-        || candidate == qname
-        || candidate
-          .strip_suffix(b":*")
-          .zip(qname.iter().position(|byte| *byte == b':'))
-          .is_some_and(|(prefix, qname_prefix_len)| prefix == &qname[..qname_prefix_len])
-    })
+      .as_ref()
+      .is_some_and(|list| list.contains(namespace, local_name))
+      || self
+        .parent
+        .is_some_and(|parent| parent.is_preserved_attribute_qname_bytes(namespace, local_name))
   }
 
   pub(crate) fn namespace_for_prefix_bytes(&self, prefix: &[u8]) -> Option<&[u8]> {
-    self.namespaces.iter().rev().find_map(|candidate| {
+    self
+      .namespace_for_prefix_in_frame_bytes(self.namespaces, prefix)
+      .or_else(|| {
+        self
+          .parent
+          .and_then(|parent| parent.namespace_for_prefix_bytes(prefix))
+      })
+  }
+
+  fn namespace_for_prefix_with_current_bytes<'b>(
+    &'b self,
+    namespaces: &'b [crate::common::XmlNamespace],
+    prefix: &[u8],
+  ) -> Option<&'b [u8]> {
+    self
+      .namespace_for_prefix_in_frame_bytes(namespaces, prefix)
+      .or_else(|| self.namespace_for_prefix_bytes(prefix))
+  }
+
+  fn namespace_for_prefix_in_frame_bytes<'b>(
+    &'b self,
+    namespaces: &'b [crate::common::XmlNamespace],
+    prefix: &[u8],
+  ) -> Option<&'b [u8]> {
+    namespaces.iter().rev().find_map(|candidate| {
       let (candidate_prefix, candidate_uri) = candidate.parts();
       (candidate_prefix == prefix).then_some(candidate_uri)
     })
   }
 
-  pub(crate) fn is_ignorable_namespace_bytes(&self, namespace: &[u8]) -> bool {
-    self
-      .ignorable_namespaces
-      .iter()
-      .any(|candidate| candidate.as_ref() == namespace)
+  fn qname_parts_with_current_bytes<'b>(
+    &'b self,
+    namespaces: &'b [crate::common::XmlNamespace],
+    qname: &'b [u8],
+  ) -> Option<(&'b [u8], &'b [u8])> {
+    let prefix_len = qname.iter().position(|byte| *byte == b':')?;
+    let namespace =
+      self.namespace_for_prefix_with_current_bytes(namespaces, &qname[..prefix_len])?;
+    Some((namespace, &qname[prefix_len + 1..]))
   }
 
-  pub(crate) fn namespaces(&self) -> &[crate::common::XmlNamespace] {
-    self.namespaces.as_slice()
+  fn current_ignorable_namespaces<'b>(
+    &'b self,
+    namespaces: &'b [crate::common::XmlNamespace],
+    attrs: &'b [crate::common::XmlOtherAttr],
+  ) -> Result<Vec<&'b [u8]>, crate::common::SdkError> {
+    let mut ignorable_namespaces = Vec::new();
+    if let Some(value) = mce_attr(attrs, b"Ignorable") {
+      let prefixes = McePrefixList::new(value)?;
+      for prefix in prefixes.prefixes() {
+        if let Some(ns) = self.namespace_for_prefix_with_current_bytes(namespaces, prefix) {
+          ignorable_namespaces.push(ns);
+        }
+      }
+    }
+    Ok(ignorable_namespaces)
+  }
+
+  pub(crate) fn is_ignorable_namespace_bytes(&self, namespace: &[u8]) -> bool {
+    self.ignorable_namespaces.contains(&namespace)
+      || self
+        .parent
+        .is_some_and(|parent| parent.is_ignorable_namespace_bytes(namespace))
   }
 }
 
@@ -790,10 +979,65 @@ fn mce_attr<'a>(attrs: &'a [crate::common::XmlOtherAttr], local_name: &[u8]) -> 
 }
 
 #[cfg(feature = "mce")]
-fn split_ascii_whitespace(value: &[u8]) -> impl Iterator<Item = &[u8]> {
+const fn is_xml_whitespace(value: u8) -> bool {
+  matches!(value, b' ' | b'\r' | b'\n' | b'\t')
+}
+
+#[cfg(feature = "mce")]
+fn split_xml_whitespace(value: &[u8]) -> impl Iterator<Item = &[u8]> {
   value
-    .split(u8::is_ascii_whitespace)
+    .split(|byte| is_xml_whitespace(*byte))
     .filter(|part| !part.is_empty())
+}
+
+#[cfg(feature = "mce")]
+fn split_xml_whitespace_ranges(value: &[u8]) -> impl Iterator<Item = std::ops::Range<usize>> + '_ {
+  let mut offset = 0;
+  std::iter::from_fn(move || {
+    while offset < value.len() && is_xml_whitespace(value[offset]) {
+      offset += 1;
+    }
+    if offset == value.len() {
+      return None;
+    }
+    let start = offset;
+    while offset < value.len() && !is_xml_whitespace(value[offset]) {
+      offset += 1;
+    }
+    Some(start..offset)
+  })
+}
+
+#[cfg(feature = "mce")]
+fn decode_mce_attr_value(
+  value: &[u8],
+) -> Result<std::borrow::Cow<'_, [u8]>, crate::common::SdkError> {
+  if !value.contains(&b'&') {
+    return Ok(std::borrow::Cow::Borrowed(value));
+  }
+
+  let value = std::str::from_utf8(value).map_err(|err| {
+    crate::common::SdkError::CommonError(format!("invalid MCE attribute value: {err}"))
+  })?;
+  let decoded = quick_xml::escape::unescape(value).map_err(|err| {
+    crate::common::SdkError::CommonError(format!("invalid MCE attribute value: {err}"))
+  })?;
+  Ok(match decoded {
+    std::borrow::Cow::Borrowed(value) => std::borrow::Cow::Borrowed(value.as_bytes()),
+    std::borrow::Cow::Owned(value) => std::borrow::Cow::Owned(value.into_bytes()),
+  })
+}
+
+#[cfg(feature = "mce")]
+pub(crate) fn for_each_mce_prefix(
+  value: &[u8],
+  mut f: impl FnMut(&[u8]) -> Result<(), crate::common::SdkError>,
+) -> Result<(), crate::common::SdkError> {
+  let prefixes = McePrefixList::new(value)?;
+  for prefix in prefixes.prefixes() {
+    f(prefix)?;
+  }
+  Ok(())
 }
 
 #[cfg(feature = "parts")]
@@ -3937,4 +4181,70 @@ pub trait SdkDataPartReference: Sized {
     zip: &mut zip::ZipWriter<W>,
     entry_set: &mut std::collections::HashSet<String>,
   ) -> Result<(), crate::common::SdkError>;
+}
+
+#[cfg(all(test, feature = "mce"))]
+mod tests {
+  fn split_mce_prefix_list(value: &[u8]) -> Vec<Vec<u8>> {
+    let mut prefixes = Vec::new();
+    super::for_each_mce_prefix(value, |prefix| {
+      prefixes.push(prefix.to_vec());
+      Ok(())
+    })
+    .expect("valid MCE prefix list");
+    prefixes
+  }
+
+  #[test]
+  fn mce_prefix_list_splits_raw_and_entity_whitespace() {
+    assert_eq!(
+      split_mce_prefix_list(b"w14 wp14"),
+      [b"w14".to_vec(), b"wp14".to_vec()]
+    );
+    assert_eq!(
+      split_mce_prefix_list(b"w14\twp14"),
+      [b"w14".to_vec(), b"wp14".to_vec()]
+    );
+    assert_eq!(
+      split_mce_prefix_list(b"w14&#x9;wp14"),
+      [b"w14".to_vec(), b"wp14".to_vec()]
+    );
+    assert_eq!(
+      split_mce_prefix_list(b"w14&#9;wp14&#10;w15&#13;w16"),
+      [
+        b"w14".to_vec(),
+        b"wp14".to_vec(),
+        b"w15".to_vec(),
+        b"w16".to_vec()
+      ]
+    );
+    assert!(split_mce_prefix_list(b"  &#x9;&#xA;&#xD; ").is_empty());
+    assert_eq!(
+      split_mce_prefix_list(b"w14\x0Bwp14"),
+      [b"w14\x0Bwp14".to_vec()]
+    );
+  }
+
+  #[test]
+  fn mce_qname_lists_match_resolved_namespace() {
+    let settings = super::MarkupCompatibilityProcessSettings {
+      process_mode: super::MarkupCompatibilityProcessMode::ProcessAllParts,
+      target_file_format_version: super::FileFormatVersion::Office2007,
+    };
+    let context = super::MceContext::default();
+    let namespaces = [crate::common::XmlNamespace::raw(b"p", b"urn:one")];
+    let attrs = [crate::common::XmlOtherAttr::new_raw(
+      b"mc:ProcessContent",
+      b"p:item",
+    )];
+    let context = context
+      .child_context(&namespaces, &attrs, &settings)
+      .expect("valid MCE context");
+
+    let alias_namespaces = [crate::common::XmlNamespace::raw(b"q", b"urn:one")];
+    assert!(context.is_process_content_qname_with_current_bytes(&alias_namespaces, b"q:item"));
+
+    let shadow_namespaces = [crate::common::XmlNamespace::raw(b"p", b"urn:two")];
+    assert!(!context.is_process_content_qname_with_current_bytes(&shadow_namespaces, b"p:item"));
+  }
 }

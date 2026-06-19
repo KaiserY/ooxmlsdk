@@ -1233,7 +1233,7 @@ const MC_FALLBACK_NAMES: &[&[u8]] = &[b"mc:Fallback", b"Fallback"];
 pub(crate) fn mce_choice_replacement_child_bytes(
   xml: &[u8],
   settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-  context: &crate::sdk::MceContext,
+  context: &crate::sdk::MceContext<'_>,
 ) -> Result<Option<Vec<Box<[u8]>>>, SdkError> {
   let mut reader = Reader::from_reader(xml);
   reader.config_mut().check_end_names = false;
@@ -1242,27 +1242,29 @@ pub(crate) fn mce_choice_replacement_child_bytes(
   loop {
     match reader.read_event()? {
       Event::Start(e) if qname_in(e.name().as_ref(), MC_ALTERNATE_CONTENT_NAMES) => {
-        let namespaces = namespaces_from_context_with(context, &e)?;
+        let namespaces = namespace_decls(&e)?;
         loop {
           match reader.read_event()? {
             Event::Start(e) if qname_in(e.name().as_ref(), MC_CHOICE_NAMES) => {
-              let choice_namespaces = namespaces_with(&namespaces, &e)?;
+              let choice_namespaces = namespace_decls(&e)?;
               let requires = attr_value(&reader, &e, b"Requires")?;
               let children = read_mce_container_children_bytes(&mut reader, MC_CHOICE_NAMES)?;
               if choice_requires_supported(
                 requires.as_deref(),
-                &choice_namespaces,
+                context,
+                &[choice_namespaces.as_slice(), namespaces.as_slice()],
                 settings.target_file_format_version,
               )? {
                 return Ok(Some(children));
               }
             }
             Event::Empty(e) if qname_in(e.name().as_ref(), MC_CHOICE_NAMES) => {
-              let choice_namespaces = namespaces_with(&namespaces, &e)?;
+              let choice_namespaces = namespace_decls(&e)?;
               let requires = attr_value(&reader, &e, b"Requires")?;
               if choice_requires_supported(
                 requires.as_deref(),
-                &choice_namespaces,
+                context,
+                &[choice_namespaces.as_slice(), namespaces.as_slice()],
                 settings.target_file_format_version,
               )? {
                 return Ok(Some(Vec::new()));
@@ -1307,26 +1309,22 @@ pub(crate) fn mce_choice_replacement_child_bytes(
 fn mce_unknown_element_replacement_bytes(
   reader: &mut Reader<&[u8]>,
   start: quick_xml::events::BytesStart<'_>,
-  context: &crate::sdk::MceContext,
+  context: &crate::sdk::MceContext<'_>,
   empty_tag: bool,
 ) -> Result<Option<Vec<Box<[u8]>>>, SdkError> {
   let qname = start.name();
   let qname = qname.as_ref();
-  let namespaces = namespaces_from_context_with(context, &start)?;
-  let is_ignorable = qname_prefix(qname).is_some_and(|prefix| {
-    namespaces
-      .iter()
-      .rev()
-      .find_map(|namespace| {
-        let (namespace_prefix, namespace_uri) = namespace.parts();
-        (namespace_prefix == prefix)
-          .then_some(namespace_uri)
-          .filter(|ns| context.is_ignorable_namespace_bytes(ns))
-      })
-      .is_some()
-  });
+  let namespaces = namespace_decls(&start)?;
+  let namespace_frames = [namespaces.as_slice()];
+  let is_ignorable = qname_prefix(qname)
+    .and_then(|prefix| namespace_for_prefix_with_frames(context, &namespace_frames, prefix))
+    .is_some_and(|ns| context.is_ignorable_namespace_bytes(ns));
 
-  if is_ignorable && context.is_process_content_qname_bytes(qname) {
+  if is_ignorable && context.is_preserved_element_qname_with_current_bytes(&namespaces, qname) {
+    return Ok(None);
+  }
+
+  if is_ignorable && context.is_process_content_qname_with_current_bytes(&namespaces, qname) {
     if empty_tag {
       return Ok(Some(Vec::new()));
     }
@@ -1458,47 +1456,48 @@ fn attr_value(
 #[cfg(feature = "mce")]
 fn choice_requires_supported(
   requires: Option<&[u8]>,
-  namespaces: &[crate::common::XmlNamespace],
+  context: &crate::sdk::MceContext<'_>,
+  namespace_frames: &[&[crate::common::XmlNamespace]],
   target: crate::sdk::FileFormatVersion,
 ) -> Result<bool, SdkError> {
   let Some(requires) = requires else {
     return Ok(false);
   };
-  for prefix in requires
-    .split(u8::is_ascii_whitespace)
-    .filter(|part| !part.is_empty())
-  {
-    let Some(ns) = namespaces.iter().rev().find_map(|namespace| {
-      let (namespace_prefix, namespace_uri) = namespace.parts();
-      (namespace_prefix == prefix).then_some(namespace_uri)
-    }) else {
-      return Ok(false);
+  let mut supported = true;
+  crate::sdk::for_each_mce_prefix(requires, |prefix| {
+    let Some(ns) = namespace_for_prefix_with_frames(context, namespace_frames, prefix) else {
+      supported = false;
+      return Ok(());
     };
     if !namespace_supported(ns, target) {
-      return Ok(false);
+      supported = false;
     }
-  }
-  Ok(true)
+    Ok(())
+  })?;
+  Ok(supported)
 }
 
 #[cfg(feature = "mce")]
-fn namespaces_with(
-  namespaces: &[crate::common::XmlNamespace],
-  start: &quick_xml::events::BytesStart<'_>,
-) -> Result<Vec<crate::common::XmlNamespace>, SdkError> {
-  let mut merged = namespaces.to_vec();
-  merged.extend(namespace_decls(start)?);
-  Ok(merged)
+fn namespace_for_prefix_with_frames<'a>(
+  context: &'a crate::sdk::MceContext<'_>,
+  namespace_frames: &'a [&'a [crate::common::XmlNamespace]],
+  prefix: &[u8],
+) -> Option<&'a [u8]> {
+  namespace_frames
+    .iter()
+    .find_map(|namespaces| namespace_for_prefix_in_frame(namespaces, prefix))
+    .or_else(|| context.namespace_for_prefix_bytes(prefix))
 }
 
 #[cfg(feature = "mce")]
-fn namespaces_from_context_with(
-  context: &crate::sdk::MceContext,
-  start: &quick_xml::events::BytesStart<'_>,
-) -> Result<Vec<crate::common::XmlNamespace>, SdkError> {
-  let mut namespaces = context.namespaces().to_vec();
-  namespaces.extend(namespace_decls(start)?);
-  Ok(namespaces)
+fn namespace_for_prefix_in_frame<'a>(
+  namespaces: &'a [crate::common::XmlNamespace],
+  prefix: &[u8],
+) -> Option<&'a [u8]> {
+  namespaces.iter().rev().find_map(|namespace| {
+    let (namespace_prefix, namespace_uri) = namespace.parts();
+    (namespace_prefix == prefix).then_some(namespace_uri)
+  })
 }
 
 #[cfg(feature = "mce")]

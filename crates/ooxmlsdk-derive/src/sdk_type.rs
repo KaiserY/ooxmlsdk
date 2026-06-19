@@ -2160,7 +2160,7 @@ fn expand_tuple_wrapper(
       fn process_mce_with_context(
         &mut self,
         settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &mut crate::sdk::MceContext,
+        context: &crate::sdk::MceContext<'_>,
       ) -> Result<(), crate::common::SdkError> {
         <#inner_ty as crate::sdk::SdkMce>::process_mce_with_context(&mut self.0, settings, context)
       }
@@ -2459,7 +2459,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
       fn process_mce_choice_with_context(
         &mut self,
         settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &mut crate::sdk::MceContext,
+        context: &crate::sdk::MceContext<'_>,
       ) -> Result<(), crate::common::SdkError> {
         #process_self_choice
         Ok(())
@@ -2468,7 +2468,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
       fn process_mce_choices_with_context(
         values: &mut Vec<Self>,
         settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &mut crate::sdk::MceContext,
+        context: &crate::sdk::MceContext<'_>,
       ) -> Result<(), crate::common::SdkError> {
         #process_repeated_choices
         Ok(())
@@ -2564,21 +2564,18 @@ fn mce_context_scope_tokens(
   } else {
     let process_attrs_tokens = if let Some(ident) = xml_other_attrs_field {
       quote! {
-        self
-          .#ident
-          .retain(|attr| !context.should_remove_ignorable_attribute_bytes(attr.name_bytes()));
+        context.process_current_attrs(#xmlns_expr, &mut self.#ident)?;
       }
     } else {
       quote! {}
     };
     (
-      quote! {
-        let __mce_checkpoint = context.push(#xmlns_expr, #attrs_expr, settings)?;
-      },
       process_attrs_tokens,
       quote! {
-        context.pop(__mce_checkpoint);
+        let __mce_context = context.child_context(#xmlns_expr, #attrs_expr, settings)?;
+        let context = &__mce_context;
       },
+      quote! {},
     )
   }
 }
@@ -4017,7 +4014,7 @@ fn expand_helper_struct(
       fn process_mce_with_context(
         &mut self,
         settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &mut crate::sdk::MceContext,
+        context: &crate::sdk::MceContext<'_>,
       ) -> Result<(), crate::common::SdkError> {
         if matches!(
           settings.process_mode,
@@ -7173,7 +7170,7 @@ fn expand_named_struct(
       fn process_mce_with_context(
         &mut self,
         settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &mut crate::sdk::MceContext,
+        context: &crate::sdk::MceContext<'_>,
       ) -> Result<(), crate::common::SdkError> {
         if matches!(
           settings.process_mode,

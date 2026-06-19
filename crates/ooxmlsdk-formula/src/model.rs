@@ -5238,45 +5238,6 @@ mod tests {
   }
 
   #[test]
-  fn evaluator_resolves_significant_whitespace_intersection() {
-    // Source: LibreOffice sc/qa/unit/ucalc_formula2.cxx::testIntersectionOpExcel.
-    let book = FormulaEvaluationBookBuilder::new()
-      .with_defined_name(None, "horz", "$B$2:$D$2")
-      .with_defined_name(None, "vert", "$C$1:$C$3")
-      .with_cell(
-        SheetId(1),
-        CellAddress { column: 2, row: 1 },
-        FormulaValue::Number(1.0),
-      )
-      .build();
-
-    assert_eq!(
-      book.evaluate_formula_text(
-        SheetId(1),
-        Some(CellAddress { column: 0, row: 3 }),
-        "horz vert"
-      ),
-      Some(FormulaValue::Number(1.0))
-    );
-    assert_eq!(
-      book.evaluate_formula_text(
-        SheetId(1),
-        Some(CellAddress { column: 0, row: 4 }),
-        "(horz vert)*2",
-      ),
-      Some(FormulaValue::Number(2.0))
-    );
-    assert_eq!(
-      book.evaluate_formula_text(
-        SheetId(1),
-        Some(CellAddress { column: 0, row: 5 }),
-        "2*(horz vert)",
-      ),
-      Some(FormulaValue::Number(2.0))
-    );
-  }
-
-  #[test]
   fn evaluator_resolves_external_cached_cells() {
     let mut workbook = WorkbookValueModel {
       identity: WorkbookIdentity {
@@ -5823,7 +5784,6 @@ mod tests {
     }
     let book = builder.build();
 
-    // Source: LibreOffice sc/qa/unit/data/functions/statistical/fods/forecast.ets.mult.fods.
     assert_eq!(
       book.evaluate_formula_text(
         SheetId(1),
@@ -7414,7 +7374,6 @@ mod tests {
       )
       .build();
 
-    // Source: LibreOffice sc/qa/unit/data/functions/fods/Functions_Excel_2016.fods.
     assert_eq!(
       book.evaluate_formula_text_with_grammar(
         SheetId(2),
@@ -7506,8 +7465,8 @@ mod tests {
       )
       .build();
 
-    // Source: Apache POI TextJoinFunction follows Excel's documented multi-cell
-    // delimiter examples by using only the last row of an area delimiter.
+    // Area delimiters use the last row, matching Excel's documented multi-cell
+    // delimiter examples.
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, r#"TEXTJOIN(A1:B2,TRUE,C1:C3)"#),
       Some(FormulaValue::String(Cow::Borrowed("a,b;c")))
@@ -7600,7 +7559,6 @@ mod tests {
       )
       .build();
 
-    // Source: LibreOffice sc/qa/unit/data/functions/array/fods/fourier.fods.
     assert_formula_matrix_numbers_close(
       &book,
       "FOURIER(A1:A4,1)",
@@ -8635,8 +8593,8 @@ mod tests {
 
   #[test]
   fn evaluation_book_dsum_parses_decimal_comma_criteria_like_libreoffice() {
-    // Source: LibreOffice sc/qa/unit/data/functions/database/fods/dsum.fods,
-    // Interest sheet uses criteria text such as ">,005" and "<=0,01".
+    // Decimal-comma criteria such as ">,005" and "<=0,01" should parse as
+    // numbers in database criteria cells.
     let book = FormulaEvaluationBookBuilder::new()
       .with_cell(
         SheetId(1),

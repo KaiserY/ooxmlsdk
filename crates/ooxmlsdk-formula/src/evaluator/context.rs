@@ -3134,7 +3134,6 @@ struct AggregateOptions {
 }
 
 fn aggregate_options(option: i32) -> Option<AggregateOptions> {
-  // Source: LibreOffice sc/source/core/tool/interpr1.cxx ScAggregate.
   Some(match option {
     0 => AggregateOptions {
       ignore_hidden: false,
@@ -4041,7 +4040,6 @@ fn weekend_mask(
   workday_function: bool,
   evaluator: &FormulaEvaluator<'_, '_>,
 ) -> Option<[bool; 7]> {
-  // Source: LibreOffice sc/source/core/tool/interpr2.cxx GetWeekendAndHolidayMasks_MS.
   let mut mask = [false; 7];
   let Some(value) = value else {
     mask[5] = true;
@@ -4146,7 +4144,6 @@ fn old_networkdays_weekend_mask(
   value: Option<&FormulaValue<'_>>,
   evaluator: &FormulaEvaluator<'_, '_>,
 ) -> Option<[bool; 7]> {
-  // Source: LibreOffice sc/source/core/tool/interpr2.cxx GetWeekendAndHolidayMasks.
   let value = value?;
   let values = evaluator
     .matrix_values(value)
@@ -4582,8 +4579,8 @@ fn parse_month_date_input(text: &str, date_system: DateSystem) -> Option<f64> {
     })
     .collect::<Vec<_>>();
   let (year, day) = match (month_index, numbers.as_slice()) {
-    // Source: LibreOffice ImpSvNumberInputScan::GetDateRef, nMonthPos == 1
-    // with two numeric substrings uses MDY in the default English locale.
+    // Month-first long dates with two numeric substrings use MDY in the
+    // default English locale.
     (0, [(day, _), (year, _)]) => (*year, *day),
     // For middle-month long dates, LO accepts both DMY and YMD depending on
     // locale/date order. Treat a four-digit leading number as year, otherwise
@@ -4627,8 +4624,8 @@ fn parse_numeric_date_input(text: &str, date_system: DateSystem) -> Option<f64> 
     if third_number < 100 {
       third_number = expand_two_digit_year(third_number);
     }
-    // Source: LibreOffice's default English number formatter parses slash
-    // dates such as 5/3/2011 as MDY.
+    // The default English number formatter parses slash dates such as
+    // 5/3/2011 as MDY.
     (third_number, first_number, second_number)
   };
   valid_date_serial_with_system(year, month, day, date_system)

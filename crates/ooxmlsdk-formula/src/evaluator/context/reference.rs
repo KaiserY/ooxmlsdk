@@ -87,7 +87,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !parsed.unsupported.is_empty() {
       return None;
     }
-    evaluate_code_with_context(parsed.code.as_ref()?, self).map(FormulaValue::into_owned)
+    let borrowed_source = match &parsed.source {
+      Cow::Borrowed(source) => Some(*source),
+      Cow::Owned(_) => None,
+    };
+    evaluate_program_with_context(parsed.program.as_ref()?, borrowed_source, self)
+      .map(FormulaValue::into_owned)
   }
 
   pub(crate) fn evaluate_external_reference(

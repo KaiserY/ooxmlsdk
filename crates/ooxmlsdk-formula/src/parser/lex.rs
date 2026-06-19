@@ -511,7 +511,7 @@ fn formula_err_code_value(input: &str, requires_bang: bool) -> Option<(LexErrorV
   } else {
     3
   };
-  if index == 0 || requires_bang && bytes.get(index) != Some(&b'!') {
+  if index == 0 || input.len() < index || requires_bang && bytes.get(index) != Some(&b'!') {
     return None;
   }
   if !input[..index].bytes().all(|byte| byte.is_ascii_digit()) {

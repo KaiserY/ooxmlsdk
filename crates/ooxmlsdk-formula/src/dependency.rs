@@ -1,6 +1,10 @@
 use std::borrow::Cow;
 
-use crate::code::{FormulaCode, FormulaOp};
+use crate::function::resolve_function_name;
+use crate::program::{
+  FormulaExprId, FormulaNodeKind, FormulaNodeLabels, FormulaProgram, FormulaReference,
+  FormulaSheetReference,
+};
 use crate::{CellAddress, QualifiedRange, SheetId};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -125,34 +129,151 @@ impl<'doc> DependencyGraphBuilder<'doc> {
   }
 }
 
-pub(crate) fn dependencies_from_code<'doc>(
+pub(crate) fn dependencies_from_program<'doc>(
   sheet: SheetId,
-  code: Option<&FormulaCode<'doc>>,
+  program: Option<&FormulaProgram>,
 ) -> Vec<FormulaDependency<'doc>> {
   let mut dependencies = Vec::new();
-  let Some(code) = code else {
+  let Some(program) = program else {
     return dependencies;
   };
-  for op in &code.ops {
-    match op {
-      FormulaOp::PushReference(range) => dependencies.push(dependency_from_range(sheet, range)),
-      FormulaOp::PushName(name) => dependencies.push(FormulaDependency::Name(name.clone())),
-      FormulaOp::PushExternal(external) => {
-        dependencies.push(FormulaDependency::External(external.clone()));
-      }
-      FormulaOp::Call {
-        function, volatile, ..
-      } if *volatile
-        || function
-          .as_ref()
-          .is_some_and(|function| function.is_volatile()) =>
-      {
-        dependencies.push(FormulaDependency::Volatile);
-      }
-      _ => {}
-    }
+  if let Some(root) = program.root {
+    dependencies_from_program_node(sheet, program, root, &mut dependencies);
   }
   dependencies
+}
+
+fn dependencies_from_program_node<'doc>(
+  sheet: SheetId,
+  program: &FormulaProgram,
+  id: FormulaExprId,
+  dependencies: &mut Vec<FormulaDependency<'doc>>,
+) -> Option<()> {
+  let node = program.node(id)?;
+  match &node.kind {
+    FormulaNodeKind::Reference(reference) => {
+      push_reference_dependency(sheet, program, reference, dependencies)?;
+    }
+    FormulaNodeKind::Unary { expr, .. } => {
+      dependencies_from_program_node(sheet, program, *expr, dependencies)?;
+    }
+    FormulaNodeKind::Binary { left, right, .. } => {
+      dependencies_from_program_node(sheet, program, *left, dependencies)?;
+      dependencies_from_program_node(sheet, program, *right, dependencies)?;
+    }
+    FormulaNodeKind::Function { name, args } => {
+      let volatile = node.metadata.labels.contains(FormulaNodeLabels::VOLATILE)
+        || crate::code::function_name_cow(program, None, node.span, *name)
+          .and_then(|name| resolve_function_name(name.as_ref()))
+          .is_some_and(|function| function.is_volatile());
+      if volatile {
+        dependencies.push(FormulaDependency::Volatile);
+      }
+      for arg in program.args(*args)? {
+        dependencies_from_program_node(sheet, program, *arg, dependencies)?;
+      }
+    }
+    FormulaNodeKind::Call { callee, args } => {
+      dependencies_from_program_node(sheet, program, *callee, dependencies)?;
+      for arg in program.args(*args)? {
+        dependencies_from_program_node(sheet, program, *arg, dependencies)?;
+      }
+    }
+    FormulaNodeKind::Array(span) => {
+      for element in program.array_elements(*span)? {
+        dependencies_from_program_node(sheet, program, *element, dependencies)?;
+      }
+    }
+    FormulaNodeKind::Blank
+    | FormulaNodeKind::Text(_)
+    | FormulaNodeKind::Number(_)
+    | FormulaNodeKind::Boolean(_)
+    | FormulaNodeKind::Error(_)
+    | FormulaNodeKind::MissingArgument
+    | FormulaNodeKind::Unsupported(_) => {}
+  }
+  Some(())
+}
+
+fn push_reference_dependency<'doc>(
+  sheet: SheetId,
+  program: &FormulaProgram,
+  reference: &FormulaReference,
+  dependencies: &mut Vec<FormulaDependency<'doc>>,
+) -> Option<()> {
+  match reference {
+    FormulaReference::Cell(reference) => {
+      if let FormulaSheetReference::External { book, sheet } = reference.target.sheet {
+        dependencies.push(FormulaDependency::External(
+          crate::code::external_reference_from_cell(
+            program,
+            book,
+            sheet,
+            reference.target,
+            reference.flags,
+          )?,
+        ));
+      } else {
+        let range = crate::code::qualified_range_from_points(
+          sheet,
+          program,
+          reference.target,
+          reference.target,
+          reference.flags,
+        )?;
+        dependencies.push(dependency_from_range(sheet, &range));
+      }
+    }
+    FormulaReference::Range(reference) => {
+      if let FormulaSheetReference::External { book, sheet } = reference.start.sheet {
+        dependencies.push(FormulaDependency::External(
+          crate::code::external_reference_from_range(
+            program,
+            book,
+            sheet,
+            reference.start,
+            reference.end,
+            reference.flags,
+          )?,
+        ));
+      } else {
+        let range = crate::code::qualified_range_from_points(
+          sheet,
+          program,
+          reference.start,
+          reference.end,
+          reference.flags,
+        )?;
+        dependencies.push(dependency_from_range(sheet, &range));
+      }
+    }
+    FormulaReference::Named(reference) => {
+      dependencies.push(FormulaDependency::Name(crate::code::scoped_name_cow(
+        program,
+        None,
+        None,
+        &reference.scope,
+        reference.name,
+      )?));
+    }
+    FormulaReference::Structured(reference) => {
+      dependencies.push(FormulaDependency::Name(Cow::Owned(
+        crate::code::structured_reference_text(program, reference)?,
+      )));
+    }
+    FormulaReference::ExternalName(reference) => {
+      dependencies.push(FormulaDependency::External(ExternalReferenceId {
+        book: Some(Cow::Owned(program.symbols.get(reference.book)?.to_string())),
+        sheet: match reference.sheet {
+          Some(sheet) => Some(Cow::Owned(crate::code::sheet_name_text(program, sheet)?)),
+          None => None,
+        },
+        name: Some(Cow::Owned(program.symbols.get(reference.name)?.to_string())),
+      }));
+    }
+    FormulaReference::Deleted(_) => {}
+  }
+  Some(())
 }
 
 pub(crate) fn dependency_from_range<'doc>(

@@ -1,5 +1,5 @@
 use super::*;
-use crate::code::{FormulaArgRange, FormulaOp};
+use crate::program::{FormulaExprId, FormulaProgram};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum EvalOperand<'doc> {
@@ -10,30 +10,41 @@ pub(crate) enum EvalOperand<'doc> {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct EvalArg<'code, 'doc> {
-  pub(crate) ops: &'code [FormulaOp<'doc>],
-  pub(crate) range: FormulaArgRange,
+pub(crate) struct EvalArg<'program, 'doc> {
+  pub(crate) program: &'program FormulaProgram,
+  pub(crate) id: FormulaExprId,
+  pub(crate) borrowed_source: Option<&'doc str>,
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct EvalArgs<'code, 'doc> {
-  ops: &'code [FormulaOp<'doc>],
-  ranges: &'code [FormulaArgRange],
+pub(crate) struct EvalArgs<'program, 'doc> {
+  program: &'program FormulaProgram,
+  args: &'program [FormulaExprId],
+  borrowed_source: Option<&'doc str>,
 }
 
-impl<'code, 'doc> EvalArgs<'code, 'doc> {
-  pub(crate) fn new(ops: &'code [FormulaOp<'doc>], ranges: &'code [FormulaArgRange]) -> Self {
-    Self { ops, ranges }
+impl<'program, 'doc> EvalArgs<'program, 'doc> {
+  pub(crate) fn new(
+    program: &'program FormulaProgram,
+    args: &'program [FormulaExprId],
+    borrowed_source: Option<&'doc str>,
+  ) -> Self {
+    Self {
+      program,
+      args,
+      borrowed_source,
+    }
   }
 
   pub(crate) fn len(self) -> usize {
-    self.ranges.len()
+    self.args.len()
   }
 
-  pub(crate) fn get(self, index: usize) -> Option<EvalArg<'code, 'doc>> {
-    self.ranges.get(index).copied().map(|range| EvalArg {
-      ops: self.ops,
-      range,
+  pub(crate) fn get(self, index: usize) -> Option<EvalArg<'program, 'doc>> {
+    self.args.get(index).copied().map(|id| EvalArg {
+      program: self.program,
+      id,
+      borrowed_source: self.borrowed_source,
     })
   }
 }

@@ -1,144 +1,19 @@
 use std::borrow::Cow;
 
 use crate::dependency::ExternalReferenceId;
-use crate::function::{FormulaFunctionId, resolve_function_name};
+use crate::function::FormulaFunctionId;
 use crate::program::{
-  FormulaAddressFlags, FormulaArraySpan, FormulaExprId, FormulaFunctionName, FormulaNameScope,
-  FormulaNodeKind, FormulaProgram, FormulaReference, FormulaReferenceFlags, FormulaReferencePoint,
-  FormulaSheetName, FormulaSheetRange, FormulaSheetReference, FormulaStructuredReference,
-  FormulaStructuredReferenceItem, FormulaStructuredReferencePart,
-  FormulaStructuredReferenceSpecifier,
+  FormulaAddressFlags, FormulaFunctionName, FormulaNameScope, FormulaProgram,
+  FormulaReferenceFlags, FormulaReferencePoint, FormulaSheetName, FormulaSheetRange,
+  FormulaSheetReference, FormulaStructuredReference, FormulaStructuredReferenceItem,
+  FormulaStructuredReferencePart, FormulaStructuredReferenceSpecifier,
 };
 use crate::{
   AddressFlags, CellAddress, CellRange, FormulaErrorValue, FormulaOperator, FormulaValue,
   QualifiedRange, SheetId, SheetName, parser,
 };
 
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct FormulaCode<'doc> {
-  pub(crate) ops: Vec<FormulaOp<'doc>>,
-}
-
-impl<'doc> FormulaCode<'doc> {
-  pub(crate) fn from_program(
-    current_sheet: SheetId,
-    borrowed_source: Option<&'doc str>,
-    program: &FormulaProgram,
-  ) -> Option<Self> {
-    let mut ops = Vec::with_capacity(program.nodes.len());
-    lower_program_node(
-      current_sheet,
-      borrowed_source,
-      program,
-      program.root?,
-      &mut ops,
-    )?;
-    Some(Self { ops })
-  }
-
-  pub(crate) fn into_owned(self) -> FormulaCode<'static> {
-    FormulaCode {
-      ops: self.ops.into_iter().map(FormulaOp::into_owned).collect(),
-    }
-  }
-}
-
-fn lower_program_node<'doc>(
-  current_sheet: SheetId,
-  borrowed_source: Option<&'doc str>,
-  program: &FormulaProgram,
-  id: FormulaExprId,
-  ops: &mut Vec<FormulaOp<'doc>>,
-) -> Option<()> {
-  let node = program.node(id)?;
-  match &node.kind {
-    FormulaNodeKind::Blank | FormulaNodeKind::MissingArgument => ops.push(FormulaOp::PushBlank),
-    FormulaNodeKind::Text(value) => {
-      ops.push(FormulaOp::PushText(program_text_cow(
-        program,
-        borrowed_source,
-        node.span,
-        *value,
-      )?));
-    }
-    FormulaNodeKind::Number(value) => {
-      ops.push(FormulaOp::PushNumber(match value {
-        crate::program::FormulaNumberLiteral::Integer(value) => *value as f64,
-        crate::program::FormulaNumberLiteral::Number(value) => *value,
-      }));
-    }
-    FormulaNodeKind::Boolean(value) => ops.push(FormulaOp::PushBoolean(*value)),
-    FormulaNodeKind::Error(value) => ops.push(FormulaOp::PushError(*value)),
-    FormulaNodeKind::Reference(reference) => {
-      ops.push(formula_op_from_program_reference(
-        current_sheet,
-        borrowed_source,
-        program,
-        node.span,
-        reference,
-      )?);
-    }
-    FormulaNodeKind::Unary { op, expr } => {
-      lower_program_node(current_sheet, borrowed_source, program, *expr, ops)?;
-      ops.push(FormulaOp::Unary(*op));
-    }
-    FormulaNodeKind::Binary { op, left, right } => {
-      lower_program_node(current_sheet, borrowed_source, program, *left, ops)?;
-      lower_program_node(current_sheet, borrowed_source, program, *right, ops)?;
-      ops.push(FormulaOp::Binary(*op));
-    }
-    FormulaNodeKind::Function { name, args } => {
-      let args = program.args(*args)?;
-      let mut arg_ranges = Vec::with_capacity(args.len());
-      for arg in args {
-        let start = ops.len();
-        lower_program_node(current_sheet, borrowed_source, program, *arg, ops)?;
-        arg_ranges.push(FormulaArgRange {
-          start,
-          end: ops.len(),
-        });
-      }
-      let name = function_name_cow(program, borrowed_source, node.span, *name)?;
-      let function = resolve_function_name(name.as_ref());
-      let volatile = node
-        .metadata
-        .labels
-        .contains(crate::program::FormulaNodeLabels::VOLATILE);
-      ops.push(FormulaOp::Call {
-        name,
-        function,
-        argc: args.len(),
-        arg_ranges,
-        volatile,
-        control: control_for_function(function),
-      });
-    }
-    FormulaNodeKind::Array(span) => {
-      lower_program_array(current_sheet, borrowed_source, program, *span, ops)?
-    }
-    FormulaNodeKind::Call { .. } | FormulaNodeKind::Unsupported(_) => return None,
-  }
-  Some(())
-}
-
-fn lower_program_array<'doc>(
-  current_sheet: SheetId,
-  borrowed_source: Option<&'doc str>,
-  program: &FormulaProgram,
-  span: FormulaArraySpan,
-  ops: &mut Vec<FormulaOp<'doc>>,
-) -> Option<()> {
-  let elements = program.array_elements(span)?;
-  for element in elements {
-    lower_program_node(current_sheet, borrowed_source, program, *element, ops)?;
-  }
-  ops.push(FormulaOp::Array {
-    row_lengths: vec![usize::from(span.cols); usize::from(span.rows)],
-  });
-  Some(())
-}
-
-fn function_name_cow<'doc>(
+pub(crate) fn function_name_cow<'doc>(
   program: &FormulaProgram,
   borrowed_source: Option<&'doc str>,
   span: Option<crate::program::SourceSpan>,
@@ -152,76 +27,7 @@ fn function_name_cow<'doc>(
   }
 }
 
-fn formula_op_from_program_reference<'doc>(
-  current_sheet: SheetId,
-  borrowed_source: Option<&'doc str>,
-  program: &FormulaProgram,
-  span: Option<crate::program::SourceSpan>,
-  reference: &FormulaReference,
-) -> Option<FormulaOp<'doc>> {
-  match reference {
-    FormulaReference::Cell(reference) => {
-      if let FormulaSheetReference::External { book, sheet } = reference.target.sheet {
-        return Some(FormulaOp::PushExternal(external_reference_from_cell(
-          program,
-          book,
-          sheet,
-          reference.target,
-          reference.flags,
-        )?));
-      }
-      Some(FormulaOp::PushReference(qualified_range_from_points(
-        current_sheet,
-        program,
-        reference.target,
-        reference.target,
-        reference.flags,
-      )?))
-    }
-    FormulaReference::Range(reference) => {
-      if let FormulaSheetReference::External { book, sheet } = reference.start.sheet {
-        return Some(FormulaOp::PushExternal(external_reference_from_range(
-          program,
-          book,
-          sheet,
-          reference.start,
-          reference.end,
-          reference.flags,
-        )?));
-      }
-      Some(FormulaOp::PushReference(qualified_range_from_points(
-        current_sheet,
-        program,
-        reference.start,
-        reference.end,
-        reference.flags,
-      )?))
-    }
-    FormulaReference::Named(reference) => Some(FormulaOp::PushName(scoped_name_cow(
-      program,
-      borrowed_source,
-      span,
-      &reference.scope,
-      reference.name,
-    )?)),
-    FormulaReference::Structured(reference) => Some(FormulaOp::PushName(Cow::Owned(
-      structured_reference_text(program, reference)?,
-    ))),
-    FormulaReference::ExternalName(reference) => {
-      Some(FormulaOp::PushExternal(ExternalReferenceId {
-        book: Some(Cow::Owned(program.symbols.get(reference.book)?.to_string())),
-        sheet: match reference.sheet {
-          Some(sheet) => Some(Cow::Owned(sheet_name_text(program, sheet)?)),
-          None => None,
-        },
-        name: Some(Cow::Owned(program.symbols.get(reference.name)?.to_string())),
-      }))
-    }
-    FormulaReference::Deleted(_) => Some(FormulaOp::PushError(FormulaErrorValue::Ref)),
-  }
-}
-
-fn qualified_range_from_points<'doc>(
+pub(crate) fn qualified_range_from_points<'doc>(
   current_sheet: SheetId,
   program: &FormulaProgram,
   start: FormulaReferencePoint,
@@ -243,7 +49,7 @@ fn qualified_range_from_points<'doc>(
   })
 }
 
-fn qualified_sheet_parts(
+pub(crate) fn qualified_sheet_parts(
   current_sheet: SheetId,
   program: &FormulaProgram,
   start: FormulaSheetReference,
@@ -295,7 +101,7 @@ fn qualified_sheet_parts(
   }
 }
 
-fn qualified_sheet_name(
+pub(crate) fn qualified_sheet_name(
   program: &FormulaProgram,
   sheet: FormulaSheetName,
 ) -> Option<(SheetId, Option<String>)> {
@@ -308,7 +114,7 @@ fn qualified_sheet_name(
   }
 }
 
-fn address_flags(
+pub(crate) fn address_flags(
   flags: FormulaAddressFlags,
   reference_flags: FormulaReferenceFlags,
 ) -> AddressFlags {
@@ -320,7 +126,7 @@ fn address_flags(
   }
 }
 
-fn external_reference_from_cell<'doc>(
+pub(crate) fn external_reference_from_cell<'doc>(
   program: &FormulaProgram,
   book: crate::symbol::FormulaSymbolId,
   sheet: Option<FormulaSheetRange>,
@@ -339,7 +145,7 @@ fn external_reference_from_cell<'doc>(
   })
 }
 
-fn external_reference_from_range<'doc>(
+pub(crate) fn external_reference_from_range<'doc>(
   program: &FormulaProgram,
   book: crate::symbol::FormulaSymbolId,
   sheet: Option<FormulaSheetRange>,
@@ -361,7 +167,7 @@ fn external_reference_from_range<'doc>(
   })
 }
 
-fn scoped_name_cow<'doc>(
+pub(crate) fn scoped_name_cow<'doc>(
   program: &FormulaProgram,
   borrowed_source: Option<&'doc str>,
   span: Option<crate::program::SourceSpan>,
@@ -379,7 +185,7 @@ fn scoped_name_cow<'doc>(
   }
 }
 
-fn program_text_cow<'doc>(
+pub(crate) fn program_text_cow<'doc>(
   program: &FormulaProgram,
   borrowed_source: Option<&'doc str>,
   span: Option<crate::program::SourceSpan>,
@@ -396,7 +202,7 @@ fn program_text_cow<'doc>(
   Some(Cow::Owned(program.symbols.get(symbol)?.to_string()))
 }
 
-fn program_symbol_cow<'doc>(
+pub(crate) fn program_symbol_cow<'doc>(
   program: &FormulaProgram,
   borrowed_source: Option<&'doc str>,
   span: Option<crate::program::SourceSpan>,
@@ -411,7 +217,10 @@ fn program_symbol_cow<'doc>(
   Some(Cow::Owned(text.to_string()))
 }
 
-fn sheet_range_text(program: &FormulaProgram, range: FormulaSheetRange) -> Option<String> {
+pub(crate) fn sheet_range_text(
+  program: &FormulaProgram,
+  range: FormulaSheetRange,
+) -> Option<String> {
   let mut text = String::new();
   match range {
     FormulaSheetRange::Sheet(sheet) => text.push_str(&sheet_name_text(program, sheet)?),
@@ -424,14 +233,14 @@ fn sheet_range_text(program: &FormulaProgram, range: FormulaSheetRange) -> Optio
   Some(text)
 }
 
-fn sheet_name_text(program: &FormulaProgram, sheet: FormulaSheetName) -> Option<String> {
+pub(crate) fn sheet_name_text(program: &FormulaProgram, sheet: FormulaSheetName) -> Option<String> {
   match sheet {
     FormulaSheetName::Id(sheet) => Some(format!("Sheet{}", sheet.0)),
     FormulaSheetName::Name(name) => Some(program.symbols.get(name)?.to_string()),
   }
 }
 
-fn structured_reference_text(
+pub(crate) fn structured_reference_text(
   program: &FormulaProgram,
   reference: &FormulaStructuredReference,
 ) -> Option<String> {
@@ -559,37 +368,6 @@ fn push_column_name(mut column: u32, text: &mut String) {
   }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) enum FormulaOp<'doc> {
-  PushBlank,
-  PushText(Cow<'doc, str>),
-  PushNumber(f64),
-  PushBoolean(bool),
-  PushError(FormulaErrorValue),
-  PushReference(QualifiedRange<'doc>),
-  PushExternal(ExternalReferenceId<'doc>),
-  PushName(Cow<'doc, str>),
-  Unary(FormulaOperator),
-  Binary(FormulaOperator),
-  Call {
-    name: Cow<'doc, str>,
-    function: Option<FormulaFunctionId>,
-    argc: usize,
-    arg_ranges: Vec<FormulaArgRange>,
-    volatile: bool,
-    control: Option<FormulaControlOp>,
-  },
-  Array {
-    row_lengths: Vec<usize>,
-  },
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct FormulaArgRange {
-  pub(crate) start: usize,
-  pub(crate) end: usize,
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum FormulaControlOp {
   IfJump,
@@ -601,40 +379,9 @@ pub(crate) enum FormulaControlOp {
   LetBind,
 }
 
-impl<'doc> FormulaOp<'doc> {
-  fn into_owned(self) -> FormulaOp<'static> {
-    match self {
-      FormulaOp::PushBlank => FormulaOp::PushBlank,
-      FormulaOp::PushText(value) => FormulaOp::PushText(Cow::Owned(value.into_owned())),
-      FormulaOp::PushNumber(value) => FormulaOp::PushNumber(value),
-      FormulaOp::PushBoolean(value) => FormulaOp::PushBoolean(value),
-      FormulaOp::PushError(value) => FormulaOp::PushError(value),
-      FormulaOp::PushReference(value) => FormulaOp::PushReference(value.into_owned()),
-      FormulaOp::PushExternal(value) => FormulaOp::PushExternal(value.into_owned()),
-      FormulaOp::PushName(value) => FormulaOp::PushName(Cow::Owned(value.into_owned())),
-      FormulaOp::Unary(value) => FormulaOp::Unary(value),
-      FormulaOp::Binary(value) => FormulaOp::Binary(value),
-      FormulaOp::Call {
-        name,
-        function,
-        argc,
-        arg_ranges,
-        volatile,
-        control,
-      } => FormulaOp::Call {
-        name: Cow::Owned(name.into_owned()),
-        function,
-        argc,
-        arg_ranges,
-        volatile,
-        control,
-      },
-      FormulaOp::Array { row_lengths } => FormulaOp::Array { row_lengths },
-    }
-  }
-}
-
-fn control_for_function(function: Option<FormulaFunctionId>) -> Option<FormulaControlOp> {
+pub(crate) fn control_for_function(
+  function: Option<FormulaFunctionId>,
+) -> Option<FormulaControlOp> {
   match function? {
     FormulaFunctionId::If => Some(FormulaControlOp::IfJump),
     FormulaFunctionId::Iferror => Some(FormulaControlOp::IfErrorJump),

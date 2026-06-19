@@ -63,13 +63,13 @@ use crate::calc::text::{
   text_byte_len, trim_formula_text,
 };
 use crate::calc::units::convert_unit;
-use crate::code::FormulaOp;
 use crate::evaluator::{
-  DatabaseFunction, DatePart, IfsAggregate, TimePart, column_index_to_name, compare_text,
+  DatabaseFunction, DatePart, EvalArg, IfsAggregate, TimePart, column_index_to_name, compare_text,
   datevalue, display_text_from_value, error_text_value, format_number_with_format_code, rtl_cos,
   rtl_sin, rtl_tan, timevalue,
 };
 use crate::model::{XLSX_MAX_COLUMN_ZERO_BASED, XLSX_MAX_ROW_ZERO_BASED};
+use crate::program::{FormulaNodeKind, FormulaReference};
 use crate::{
   CellAddress, CellRange, DateSystem, FormulaErrorValue, FormulaGrammar, FormulaOperator,
   FormulaValue, MAX_EXPANDED_RANGE_CELLS, PivotDataRequest, PivotFieldFilter, QualifiedRange,
@@ -2034,11 +2034,10 @@ fn evaluate_error_type_raw_reader<'doc>(
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
   let direct_error_literal = args.raw_arg(0).is_some_and(|arg| {
-    arg.range.end == arg.range.start + 1
-      && matches!(
-        arg.ops.get(arg.range.start),
-        Some(FormulaOp::PushError(FormulaErrorValue::Error))
-      )
+    matches!(
+      arg.program.node(arg.id).map(|node| &node.kind),
+      Some(FormulaNodeKind::Error(FormulaErrorValue::Error))
+    )
   });
   let value = args.first_value()?;
   if let FormulaValue::Reference(reference) = &value
@@ -2398,7 +2397,7 @@ fn evaluate_row_column_reader<'doc>(
   let reference = if args.is_empty() {
     None
   } else {
-    let Some(reference) = single_raw_reference(args, 0).or_else(|| {
+    let Some(reference) = single_raw_reference(evaluator, args, 0).or_else(|| {
       let value = args.first_value()?;
       evaluator.as_reference(&value)
     }) else {
@@ -6430,14 +6429,14 @@ fn evaluate_offset_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let reference = single_raw_reference(args, 0).or_else(|| {
+  let reference = single_raw_reference(evaluator, args, 0).or_else(|| {
     let value = args.value(0)?;
     evaluator.as_reference(&value)
   })?;
-  let row_offset_value =
-    raw_row_column_function_value(args, 1, false).or_else(|| offset_argument_value(args, 1))?;
-  let column_offset_value =
-    raw_row_column_function_value(args, 2, true).or_else(|| offset_argument_value(args, 2))?;
+  let row_offset_value = raw_row_column_function_value(evaluator, args, 1, false)
+    .or_else(|| offset_argument_value(args, 1))?;
+  let column_offset_value = raw_row_column_function_value(evaluator, args, 2, true)
+    .or_else(|| offset_argument_value(args, 2))?;
   let row_offset_value = offset_scalar_argument(evaluator, row_offset_value);
   let column_offset_value = offset_scalar_argument(evaluator, column_offset_value);
   let height = match offset_optional_integer_argument(
@@ -11629,65 +11628,88 @@ fn is_matrix_argument(value: &FormulaValue<'_>) -> bool {
 }
 
 fn single_raw_reference<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
   index: usize,
 ) -> Option<QualifiedRange<'doc>> {
-  let arg = args.raw_arg(index)?;
-  let ops = &arg.ops[arg.range.start..arg.range.end];
-  match ops {
-    [FormulaOp::PushReference(reference)] => Some(reference.clone()),
-    _ => None,
-  }
+  raw_reference_from_arg(evaluator, args.raw_arg(index)?)
 }
 
 fn raw_reference_area_count(args: FunctionArgReader<'_, '_, '_>, index: usize) -> Option<usize> {
-  let arg = args.raw_arg(index)?;
-  let ops = &arg.ops[arg.range.start..arg.range.end];
-  let mut stack = Vec::new();
-  for op in ops {
-    match op {
-      FormulaOp::PushReference(_) => stack.push(1usize),
-      FormulaOp::Binary(FormulaOperator::Range | FormulaOperator::Intersection) => {
-        stack.pop()?;
-        stack.pop()?;
-        stack.push(1);
-      }
-      FormulaOp::Binary(FormulaOperator::Union) => {
-        let right = stack.pop()?;
-        let left = stack.pop()?;
-        stack.push(left + right);
-      }
-      _ => return None,
+  raw_reference_area_count_arg(args.raw_arg(index)?)
+}
+
+fn raw_reference_area_count_arg(arg: EvalArg<'_, '_>) -> Option<usize> {
+  let node = arg.program.node(arg.id)?;
+  match &node.kind {
+    FormulaNodeKind::Reference(_) => Some(1),
+    FormulaNodeKind::Binary {
+      op: FormulaOperator::Range | FormulaOperator::Intersection,
+      left,
+      right,
+    } => {
+      raw_reference_area_count_arg(EvalArg {
+        program: arg.program,
+        id: *left,
+        borrowed_source: arg.borrowed_source,
+      })?;
+      raw_reference_area_count_arg(EvalArg {
+        program: arg.program,
+        id: *right,
+        borrowed_source: arg.borrowed_source,
+      })?;
+      Some(1)
     }
-  }
-  match stack.as_slice() {
-    [count] => Some(*count),
+    FormulaNodeKind::Binary {
+      op: FormulaOperator::Union,
+      left,
+      right,
+    } => Some(
+      raw_reference_area_count_arg(EvalArg {
+        program: arg.program,
+        id: *left,
+        borrowed_source: arg.borrowed_source,
+      })?
+        + raw_reference_area_count_arg(EvalArg {
+          program: arg.program,
+          id: *right,
+          borrowed_source: arg.borrowed_source,
+        })?,
+    ),
     _ => None,
   }
 }
 
 fn raw_row_column_function_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
   index: usize,
   column: bool,
 ) -> Option<FormulaValue<'doc>> {
   let arg = args.raw_arg(index)?;
-  let ops = &arg.ops[arg.range.start..arg.range.end];
-  let [
-    FormulaOp::PushReference(reference),
-    FormulaOp::Call { function, argc, .. },
-  ] = ops
-  else {
+  let node = arg.program.node(arg.id)?;
+  let FormulaNodeKind::Function { name, args } = &node.kind else {
     return None;
   };
+  let args = arg.program.args(*args)?;
   let expected = if column {
     FormulaFunctionId::Column
   } else {
     FormulaFunctionId::Row
   };
-  if *argc != 1 || *function != Some(expected) {
+  let function_name =
+    crate::code::function_name_cow(arg.program, arg.borrowed_source, node.span, *name)?;
+  if args.len() != 1 || resolve_function_name(function_name.as_ref()) != Some(expected) {
     return None;
   }
+  let reference = raw_reference_from_arg(
+    evaluator,
+    EvalArg {
+      program: arg.program,
+      id: args[0],
+      borrowed_source: arg.borrowed_source,
+    },
+  )?;
   let range = reference.range;
   let start_column = range.start.column.min(range.end.column);
   let end_column = range.start.column.max(range.end.column);
@@ -11712,6 +11734,34 @@ fn raw_row_column_function_value<'doc>(
   } else {
     start_row as f64 + 1.0
   }))
+}
+
+fn raw_reference_from_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  arg: EvalArg<'_, 'doc>,
+) -> Option<QualifiedRange<'doc>> {
+  let node = arg.program.node(arg.id)?;
+  match &node.kind {
+    FormulaNodeKind::Reference(FormulaReference::Cell(reference)) => {
+      crate::code::qualified_range_from_points(
+        evaluator.current_sheet,
+        arg.program,
+        reference.target,
+        reference.target,
+        reference.flags,
+      )
+    }
+    FormulaNodeKind::Reference(FormulaReference::Range(reference)) => {
+      crate::code::qualified_range_from_points(
+        evaluator.current_sheet,
+        arg.program,
+        reference.start,
+        reference.end,
+        reference.flags,
+      )
+    }
+    _ => None,
+  }
 }
 
 fn is_multicell_scalar_argument(value: &FormulaValue<'_>) -> bool {

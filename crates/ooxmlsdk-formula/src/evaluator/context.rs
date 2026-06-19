@@ -1093,16 +1093,37 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   fn raw_sheets_reference_count(&self, args: FunctionArgReader<'_, '_, 'doc>) -> Option<u32> {
     let arg = args.raw_arg(0)?;
-    let ops = &arg.ops[arg.range.start..arg.range.end];
-    match ops {
-      [FormulaOp::PushReference(reference)] => Some(self.reference_sheet_count(reference)),
-      [
-        FormulaOp::PushReference(left),
-        FormulaOp::PushReference(right),
-        FormulaOp::Binary(FormulaOperator::Range),
-      ] => {
-        let left_sheet = self.range_sheet(left).0;
-        let right_sheet = self.range_sheet(right).0;
+    let node = arg.program.node(arg.id)?;
+    match &node.kind {
+      FormulaNodeKind::Reference(FormulaReference::Cell(reference)) => {
+        let reference = crate::code::qualified_range_from_points(
+          self.current_sheet,
+          arg.program,
+          reference.target,
+          reference.target,
+          reference.flags,
+        )?;
+        Some(self.reference_sheet_count(&reference))
+      }
+      FormulaNodeKind::Reference(FormulaReference::Range(reference)) => {
+        let reference = crate::code::qualified_range_from_points(
+          self.current_sheet,
+          arg.program,
+          reference.start,
+          reference.end,
+          reference.flags,
+        )?;
+        Some(self.reference_sheet_count(&reference))
+      }
+      FormulaNodeKind::Binary {
+        op: FormulaOperator::Range,
+        left,
+        right,
+      } => {
+        let left = raw_qualified_reference(self, arg.program, *left)?;
+        let right = raw_qualified_reference(self, arg.program, *right)?;
+        let left_sheet = self.range_sheet(&left).0;
+        let right_sheet = self.range_sheet(&right).0;
         Some(left_sheet.abs_diff(right_sheet) + 1)
       }
       _ => None,
@@ -3165,6 +3186,35 @@ fn aggregate_options(option: i32) -> Option<AggregateOptions> {
     },
     _ => return None,
   })
+}
+
+fn raw_qualified_reference<'doc>(
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+  program: &FormulaProgram,
+  id: FormulaExprId,
+) -> Option<QualifiedRange<'doc>> {
+  let node = program.node(id)?;
+  match &node.kind {
+    FormulaNodeKind::Reference(FormulaReference::Cell(reference)) => {
+      crate::code::qualified_range_from_points(
+        evaluator.current_sheet,
+        program,
+        reference.target,
+        reference.target,
+        reference.flags,
+      )
+    }
+    FormulaNodeKind::Reference(FormulaReference::Range(reference)) => {
+      crate::code::qualified_range_from_points(
+        evaluator.current_sheet,
+        program,
+        reference.start,
+        reference.end,
+        reference.flags,
+      )
+    }
+    _ => None,
+  }
 }
 
 fn matrix_can_broadcast(

@@ -46,7 +46,7 @@ pub(crate) fn parse_table_reference_selection(text: &str) -> Option<TableReferen
   let mut items = TableReferenceItems::TABLE;
   let mut columns = Vec::new();
   for specifier in specifiers {
-    match specifier.as_ref() {
+    match specifier.as_ref().trim() {
       value if value.eq_ignore_ascii_case("#ALL") => items.add(TableReferenceItems::ALL),
       value if value.eq_ignore_ascii_case("#HEADERS") => {
         items.add(TableReferenceItems::HEADERS);
@@ -121,10 +121,9 @@ fn push_table_reference_column_or_range<'a>(
   value: &'a str,
   specifiers: &mut Vec<TableReferenceColumn<'a>>,
 ) {
-  let value = value.trim();
   if let Some((start, end)) = split_unescaped_table_reference_range(value) {
-    specifiers.push(table_reference_column(start.trim()));
-    specifiers.push(table_reference_column(end.trim()));
+    specifiers.push(table_reference_column(start));
+    specifiers.push(table_reference_column(end));
   } else {
     specifiers.push(table_reference_column(value));
   }

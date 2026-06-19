@@ -9,11 +9,11 @@ use ooxmlsdk::sdk::SdkPart;
 
 use crate::calc::CalcEngine;
 use crate::code::{
-  FormulaCode, formula_error_from_lex, formula_operator_from_lex, formula_value_from_array_constant,
+  formula_error_from_lex, formula_operator_from_lex, formula_value_from_array_constant,
 };
 use crate::dependency::{
   DependencyGraph, DependencyGraphBuilder, ExternalReferenceId, FormulaDependency, cow_span_text,
-  dependencies_from_code, external_reference_id_from_spans,
+  dependencies_from_program, external_reference_id_from_spans,
 };
 use crate::evaluator::{
   self, FormulaEvaluator, column_index_to_name, display_text_from_value,
@@ -353,7 +353,7 @@ impl<'doc> WorkbookValueModel<'doc> {
           let Some((formula, parsed)) = self.formula_at(sheet_id, address) else {
             continue;
           };
-          let Some(code) = parsed.code.as_ref() else {
+          let Some(program) = parsed.program.as_ref() else {
             if pass == 0 {
               unsupported.extend(parsed.unsupported.clone());
             }
@@ -373,7 +373,11 @@ impl<'doc> WorkbookValueModel<'doc> {
               && !parsed.source.to_ascii_uppercase().contains(";0)")
               && !parsed.source.to_ascii_uppercase().contains(",0)"),
           };
-          match context.evaluate_code(code) {
+          let borrowed_source = match &parsed.source {
+            Cow::Borrowed(source) => Some(*source),
+            Cow::Owned(_) => None,
+          };
+          match context.evaluate_program(program, borrowed_source) {
             Some(value) => {
               let is_array_formula = formula.formula_kind == FormulaKind::Array;
               let value = if is_array_formula && formula.reference.is_some() {
@@ -656,7 +660,6 @@ pub struct ParsedFormula<'doc> {
   pub tokens: Vec<FormulaToken<'doc>>,
   pub(crate) body_start: usize,
   pub(crate) program: Option<FormulaProgram>,
-  pub(crate) code: Option<FormulaCode<'doc>>,
   pub dependencies: Vec<FormulaDependency<'doc>>,
   pub unsupported: Vec<UnsupportedFormulaFeature<'doc>>,
 }
@@ -673,7 +676,6 @@ impl<'doc> ParsedFormula<'doc> {
         .collect(),
       body_start: self.body_start,
       program: self.program,
-      code: self.code.map(FormulaCode::into_owned),
       dependencies: self
         .dependencies
         .into_iter()
@@ -3365,14 +3367,9 @@ fn lower_formula_parser_formula<'doc>(
     Cow::Borrowed(value) => Some((*value).get(body_start..).unwrap_or(*value)),
     Cow::Owned(_) => None,
   };
-  let borrowed_source = match &source {
-    Cow::Borrowed(value) => Some(*value),
-    Cow::Owned(_) => None,
-  };
   let lowered = lower_formula_parser_body(
     sheet,
     source.as_ref(),
-    borrowed_source,
     grammar,
     text,
     borrowed_text,
@@ -3385,7 +3382,6 @@ fn lower_formula_parser_formula<'doc>(
     tokens: lowered.tokens,
     body_start,
     program: lowered.program,
-    code: lowered.code,
     dependencies: lowered.dependencies,
     unsupported: lowered.unsupported,
   }
@@ -3409,7 +3405,6 @@ fn parse_array_constant_formula<'doc>(formula: &str) -> Option<Vec<Vec<FormulaVa
 struct LoweredFormula<'doc> {
   tokens: Vec<FormulaToken<'doc>>,
   program: Option<FormulaProgram>,
-  code: Option<FormulaCode<'doc>>,
   dependencies: Vec<FormulaDependency<'doc>>,
   unsupported: Vec<UnsupportedFormulaFeature<'doc>>,
 }
@@ -3417,7 +3412,6 @@ struct LoweredFormula<'doc> {
 fn lower_formula_parser_body<'doc>(
   sheet: SheetId,
   full_source: &str,
-  borrowed_source: Option<&'doc str>,
   grammar: FormulaGrammar,
   text: &str,
   borrowed_text: Option<&'doc str>,
@@ -3498,11 +3492,6 @@ fn lower_formula_parser_body<'doc>(
   }
 
   let program_source = formula_program_compat_source(full_source, body_start, grammar);
-  let program_borrowed_source = if matches!(program_source, Cow::Borrowed(_)) {
-    borrowed_source
-  } else {
-    None
-  };
   let program = FormulaProgram::from_source(FormulaSource {
     text: program_source.as_ref(),
     context: FormulaCompileContext {
@@ -3520,8 +3509,7 @@ fn lower_formula_parser_body<'doc>(
     borrowed_text,
     issues.clone(),
   ));
-  let code = FormulaCode::from_program(sheet, program_borrowed_source, &program);
-  if (program_parse_error || (code.is_none() && program.root.is_some()))
+  if (program_parse_error || program.root.is_none())
     && !unsupported
       .iter()
       .any(|issue| issue.reason.as_ref() == "formula expression is not fully parsed")
@@ -3533,12 +3521,11 @@ fn lower_formula_parser_body<'doc>(
       reason: Cow::Borrowed("formula expression is not fully parsed"),
     });
   }
-  let dependencies = dependencies_from_code(sheet, code.as_ref());
+  let dependencies = dependencies_from_program(sheet, Some(&program));
 
   LoweredFormula {
     tokens,
     program: Some(program),
-    code,
     dependencies,
     unsupported,
   }
@@ -4096,9 +4083,9 @@ mod tests {
   use super::*;
   use crate::calc::complex::FormulaComplex;
   use crate::calc::text::baht_text;
-  use crate::code::FormulaOp;
   use crate::evaluator::valid_date_serial_with_system;
   use crate::function::format_complex_result;
+  use crate::program::{FormulaNodeKind, FormulaReference};
 
   #[test]
   fn parses_odf_range_endpoints_with_inherited_sheet_name() {
@@ -4604,8 +4591,15 @@ mod tests {
       }
     ));
     assert!(matches!(
-      parsed.code.as_ref().and_then(|code| code.ops.last()),
-      Some(FormulaOp::Binary(FormulaOperator::Add))
+      parsed
+        .program
+        .as_ref()
+        .and_then(|program| program.root.and_then(|root| program.node(root)))
+        .map(|node| &node.kind),
+      Some(FormulaNodeKind::Binary {
+        op: FormulaOperator::Add,
+        ..
+      })
     ));
   }
 
@@ -4870,17 +4864,26 @@ mod tests {
       )
     }));
 
-    let Some(FormulaOp::Call { name, .. }) = parsed.code.as_ref().and_then(|code| code.ops.last())
-    else {
-      panic!("expected formula call");
+    let Some(program) = parsed.program.as_ref() else {
+      panic!("expected formula program");
     };
-    assert!(matches!(name, Cow::Borrowed("SUM")));
+    let Some(root) = program.root.and_then(|root| program.node(root)) else {
+      panic!("expected formula root");
+    };
     assert!(matches!(
-      parsed.code.as_ref().and_then(|code| code
-        .ops
-        .iter()
-        .find(|op| matches!(op, FormulaOp::PushName(_)))),
-      Some(FormulaOp::PushName(Cow::Borrowed("LocalName")))
+      &root.kind,
+      FormulaNodeKind::Function { name, .. }
+        if crate::code::function_name_cow(program, Some("SUM(Sheet3!A1,LocalName)"), root.span, *name)
+          .as_deref() == Some("SUM")
+    ));
+    assert!(matches!(
+      program.nodes.iter().find_map(|node| match &node.kind {
+        FormulaNodeKind::Reference(FormulaReference::Named(reference)) => {
+          program.symbols.get(reference.name)
+        }
+        _ => None,
+      }),
+      Some("LocalName")
     ));
   }
 
@@ -9407,10 +9410,11 @@ mod tests {
         FormulaParseContext::default(),
         Cow::Borrowed("SUMIFS(B1:B6,A1:A6,\"a\")")
       )
-      .code
+      .program
       .as_ref()
-      .and_then(|code| code.ops.last()),
-      Some(FormulaOp::Call { .. })
+      .and_then(|program| program.root.and_then(|root| program.node(root)))
+      .map(|node| &node.kind),
+      Some(FormulaNodeKind::Function { .. })
     ));
   }
 

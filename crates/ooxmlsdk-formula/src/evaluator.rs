@@ -31,11 +31,13 @@ use crate::calc::statistics::{
   PercentileKind, kth_value, mean, mode_slice, percentile_sorted, variance_slice,
 };
 use crate::calc::text::{leftb, rightb};
-use crate::code::{
-  FormulaArgRange, FormulaCode, FormulaControlOp, FormulaOp, formula_error_from_lex,
-};
+use crate::code::FormulaControlOp;
 use crate::dependency::ExternalReferenceId;
 use crate::model::*;
+use crate::program::{
+  FormulaExprId, FormulaNodeKind, FormulaNumberLiteral, FormulaProgram, FormulaReference,
+  FormulaSheetReference,
+};
 use crate::{
   AddressFlags, CellAddress, CellRange, FormulaErrorValue, FormulaValue, QualifiedRange, SheetId,
   SheetName,
@@ -55,8 +57,8 @@ pub(crate) use context::{
   range_intersection_value, rtl_cos, rtl_sin, rtl_tan, split_indirect_intersection, timevalue,
 };
 pub(crate) use engine::{
-  FormulaEvaluatorEngine, evaluate_arg_direct, evaluate_code_with_context,
-  evaluate_formula_text_raw, evaluate_parsed_formula_raw,
+  FormulaEvaluatorEngine, evaluate_arg_direct, evaluate_formula_text_raw,
+  evaluate_parsed_formula_raw, evaluate_program_with_context,
 };
 pub(crate) use query::{
   CriteriaPlan, DatabaseCriteriaPlan, FieldCriteriaPlan, IfsAggregate, LookupPlan,

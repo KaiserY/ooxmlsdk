@@ -45,7 +45,7 @@ pub(crate) fn evaluate_parsed_formula_raw<'doc>(
       && !formula.source.to_ascii_uppercase().contains(";0)")
       && !formula.source.to_ascii_uppercase().contains(",0)"),
   }
-  .evaluate_code(formula.code.as_ref()?)
+  .evaluate_program(formula.program.as_ref()?, program_borrowed_source(formula))
 }
 
 fn formula_contains_unquoted_getting_data(formula: &str) -> bool {
@@ -91,9 +91,13 @@ pub(crate) fn evaluate_formula_text_raw<'doc>(
 }
 
 impl<'book, 'engine, 'doc> FormulaEvaluatorEngine<'book, 'engine, 'doc> {
-  pub(crate) fn evaluate_code(&self, code: &FormulaCode<'doc>) -> Option<FormulaValue<'doc>> {
+  pub(crate) fn evaluate_program(
+    &self,
+    program: &FormulaProgram,
+    borrowed_source: Option<&'doc str>,
+  ) -> Option<FormulaValue<'doc>> {
     let evaluator = self.compat_evaluator();
-    evaluate_code_with_context(code, &evaluator)
+    evaluate_program_with_context(program, borrowed_source, &evaluator)
   }
 
   pub(crate) fn compat_evaluator(&self) -> FormulaEvaluator<'_, 'doc> {
@@ -111,28 +115,23 @@ impl<'book, 'engine, 'doc> FormulaEvaluatorEngine<'book, 'engine, 'doc> {
   }
 }
 
-pub(crate) fn evaluate_code_with_context<'doc>(
-  code: &FormulaCode<'doc>,
-  evaluator: &FormulaEvaluator<'_, 'doc>,
-) -> Option<FormulaValue<'doc>> {
-  match evaluate_code_direct(code, evaluator) {
-    DirectEvaluation::Value(value) => Some(value),
-    DirectEvaluation::Unsupported => None,
+fn program_borrowed_source<'doc>(formula: &ParsedFormula<'doc>) -> Option<&'doc str> {
+  match &formula.source {
+    Cow::Borrowed(source) => Some(*source),
+    Cow::Owned(_) => None,
   }
 }
 
-fn evaluate_code_direct<'doc>(
-  code: &FormulaCode<'doc>,
+pub(crate) fn evaluate_program_with_context<'doc>(
+  program: &FormulaProgram,
+  borrowed_source: Option<&'doc str>,
   evaluator: &FormulaEvaluator<'_, 'doc>,
-) -> DirectEvaluation<'doc> {
-  evaluate_ops_range(
-    &code.ops,
-    FormulaArgRange {
-      start: 0,
-      end: code.ops.len(),
-    },
-    evaluator,
-  )
+) -> Option<FormulaValue<'doc>> {
+  let root = program.root?;
+  match evaluate_node_value(program, borrowed_source, root, evaluator) {
+    DirectEvaluation::Value(value) => Some(value),
+    DirectEvaluation::Unsupported => None,
+  }
 }
 
 enum DirectEvaluation<'doc> {
@@ -140,141 +139,186 @@ enum DirectEvaluation<'doc> {
   Unsupported,
 }
 
-fn evaluate_ops_range<'doc>(
-  ops: &[FormulaOp<'doc>],
-  range: FormulaArgRange,
+fn evaluate_node_value<'doc>(
+  program: &FormulaProgram,
+  borrowed_source: Option<&'doc str>,
+  id: FormulaExprId,
   evaluator: &FormulaEvaluator<'_, 'doc>,
 ) -> DirectEvaluation<'doc> {
-  if range.start > range.end || range.end > ops.len() {
-    return DirectEvaluation::Unsupported;
-  }
-  let mut stack = Vec::with_capacity(range.end - range.start);
-  let mut index = range.start;
-  while index < range.end {
-    if let Some(call_index) = call_starting_at(ops, index, range.end) {
-      let FormulaOp::Call {
-        name,
-        function,
-        arg_ranges,
-        control,
-        ..
-      } = &ops[call_index]
-      else {
-        return DirectEvaluation::Unsupported;
-      };
-      let args = EvalArgs::new(ops, arg_ranges);
-      let Some(value) = (match control {
-        Some(control) => evaluate_control_call(*control, args, evaluator),
-        None => crate::function::evaluate_function(
-          evaluator,
-          *function,
-          name,
-          crate::function::FunctionArgs::new_lazy(args),
-        ),
-      }) else {
-        return DirectEvaluation::Unsupported;
-      };
-      stack.push(EvalOperand::Value(value));
-      index = call_index + 1;
-      continue;
-    }
-    let op = &ops[index];
-    match op {
-      FormulaOp::PushBlank => stack.push(EvalOperand::Value(FormulaValue::Blank)),
-      FormulaOp::PushText(value) => {
-        stack.push(EvalOperand::Value(FormulaValue::String(value.clone())));
-      }
-      FormulaOp::PushNumber(value) => {
-        stack.push(EvalOperand::Value(FormulaValue::Number(*value)));
-      }
-      FormulaOp::PushBoolean(value) => {
-        stack.push(EvalOperand::Value(FormulaValue::Boolean(*value)));
-      }
-      FormulaOp::PushError(value) => {
-        stack.push(EvalOperand::Value(FormulaValue::Error(*value)));
-      }
-      FormulaOp::PushReference(value) => stack.push(EvalOperand::Reference(value.clone())),
-      FormulaOp::PushExternal(value) => stack.push(EvalOperand::ExternalReference(value.clone())),
-      FormulaOp::PushName(value) => stack.push(EvalOperand::Name(value.clone())),
-      FormulaOp::Unary(op) => {
-        let Some(value) = stack.pop().and_then(|value| value.into_value(evaluator)) else {
-          return DirectEvaluation::Unsupported;
-        };
-        let Some(value) = evaluator.evaluate_unary_value(*op, value) else {
-          return DirectEvaluation::Unsupported;
-        };
-        stack.push(EvalOperand::Value(value));
-      }
-      FormulaOp::Binary(op) => {
-        let Some(right) = stack.pop() else {
-          return DirectEvaluation::Unsupported;
-        };
-        if matches!(
-          op,
-          FormulaOperator::Range | FormulaOperator::Union | FormulaOperator::Intersection
-        ) {
-          let Some(left) = stack.pop() else {
-            return DirectEvaluation::Unsupported;
-          };
-          let Some(value) = evaluate_reference_binary(evaluator, *op, left, right) else {
-            return DirectEvaluation::Unsupported;
-          };
-          stack.push(EvalOperand::Value(value));
-          index += 1;
-          continue;
-        }
-        let Some(left) = stack.pop().and_then(|value| value.into_value(evaluator)) else {
-          return DirectEvaluation::Unsupported;
-        };
-        let right_evaluator = evaluator.with_current_value(left.clone());
-        let Some(right) = right.into_value(&right_evaluator) else {
-          return DirectEvaluation::Unsupported;
-        };
-        let Some(value) = evaluator.evaluate_binary_values(*op, left, right) else {
-          return DirectEvaluation::Unsupported;
-        };
-        stack.push(EvalOperand::Value(value));
-      }
-      FormulaOp::Call { .. } => return DirectEvaluation::Unsupported,
-      FormulaOp::Array { row_lengths } => {
-        let count = row_lengths.iter().sum::<usize>();
-        if stack.len() < count {
-          return DirectEvaluation::Unsupported;
-        }
-        let values = stack.split_off(stack.len() - count);
-        let mut values = values.into_iter();
-        let mut rows = Vec::with_capacity(row_lengths.len());
-        for row_len in row_lengths {
-          let mut row = Vec::with_capacity(*row_len);
-          for value in values.by_ref().take(*row_len) {
-            let Some(value) = value.into_value(evaluator) else {
-              return DirectEvaluation::Unsupported;
-            };
-            row.push(value);
-          }
-          rows.push(row);
-        }
-        stack.push(EvalOperand::Value(FormulaValue::Matrix(rows)));
-      }
-    }
-    index += 1;
-  }
-  match stack.pop() {
-    Some(value) if stack.is_empty() => value
-      .into_value(evaluator)
-      .map(DirectEvaluation::Value)
-      .unwrap_or(DirectEvaluation::Unsupported),
-    _ => DirectEvaluation::Unsupported,
-  }
+  evaluate_node_operand(program, borrowed_source, id, evaluator)
+    .and_then(|value| value.into_value(evaluator))
+    .map(DirectEvaluation::Value)
+    .unwrap_or(DirectEvaluation::Unsupported)
 }
 
 pub(crate) fn evaluate_arg_direct<'doc>(
   arg: EvalArg<'_, 'doc>,
   evaluator: &FormulaEvaluator<'_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  match evaluate_ops_range(arg.ops, arg.range, evaluator) {
+  match evaluate_node_value(arg.program, arg.borrowed_source, arg.id, evaluator) {
     DirectEvaluation::Value(value) => Some(value),
     DirectEvaluation::Unsupported => None,
+  }
+}
+
+fn evaluate_node_operand<'doc>(
+  program: &FormulaProgram,
+  borrowed_source: Option<&'doc str>,
+  id: FormulaExprId,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> Option<EvalOperand<'doc>> {
+  let node = program.node(id)?;
+  match &node.kind {
+    FormulaNodeKind::Blank | FormulaNodeKind::MissingArgument => {
+      Some(EvalOperand::Value(FormulaValue::Blank))
+    }
+    FormulaNodeKind::Text(value) => Some(EvalOperand::Value(FormulaValue::String(
+      crate::code::program_text_cow(program, borrowed_source, node.span, *value)?,
+    ))),
+    FormulaNodeKind::Number(value) => Some(EvalOperand::Value(FormulaValue::Number(match value {
+      FormulaNumberLiteral::Integer(value) => *value as f64,
+      FormulaNumberLiteral::Number(value) => *value,
+    }))),
+    FormulaNodeKind::Boolean(value) => Some(EvalOperand::Value(FormulaValue::Boolean(*value))),
+    FormulaNodeKind::Error(value) => Some(EvalOperand::Value(FormulaValue::Error(*value))),
+    FormulaNodeKind::Reference(reference) => {
+      program_reference_operand(program, borrowed_source, node.span, reference, evaluator)
+    }
+    FormulaNodeKind::Unary { op, expr } => {
+      let value =
+        evaluate_node_operand(program, borrowed_source, *expr, evaluator)?.into_value(evaluator)?;
+      let value = evaluator.evaluate_unary_value(*op, value)?;
+      Some(EvalOperand::Value(value))
+    }
+    FormulaNodeKind::Binary { op, left, right } => {
+      let right = evaluate_node_operand(program, borrowed_source, *right, evaluator)?;
+      if matches!(
+        op,
+        FormulaOperator::Range | FormulaOperator::Union | FormulaOperator::Intersection
+      ) {
+        let left = evaluate_node_operand(program, borrowed_source, *left, evaluator)?;
+        let value = evaluate_reference_binary(evaluator, *op, left, right)?;
+        return Some(EvalOperand::Value(value));
+      }
+      let left =
+        evaluate_node_operand(program, borrowed_source, *left, evaluator)?.into_value(evaluator)?;
+      let right_evaluator = evaluator.with_current_value(left.clone());
+      let right = right.into_value(&right_evaluator)?;
+      let value = evaluator.evaluate_binary_values(*op, left, right)?;
+      Some(EvalOperand::Value(value))
+    }
+    FormulaNodeKind::Function { name, args } => {
+      let args = program.args(*args)?;
+      let name = crate::code::function_name_cow(program, borrowed_source, node.span, *name)?;
+      let function = crate::function::resolve_function_name(name.as_ref());
+      let eval_args = EvalArgs::new(program, args, borrowed_source);
+      let value = match crate::code::control_for_function(function) {
+        Some(control) => evaluate_control_call(control, eval_args, evaluator),
+        None => crate::function::evaluate_function(
+          evaluator,
+          function,
+          &name,
+          crate::function::FunctionArgs::new_lazy(eval_args),
+        ),
+      }?;
+      Some(EvalOperand::Value(value))
+    }
+    FormulaNodeKind::Array(span) => {
+      let elements = program.array_elements(*span)?;
+      let cols = usize::from(span.cols);
+      let rows_len = usize::from(span.rows);
+      let mut rows = Vec::with_capacity(rows_len);
+      for row_elements in elements.chunks(cols) {
+        let mut row = Vec::with_capacity(row_elements.len());
+        for element in row_elements {
+          let value = evaluate_node_operand(program, borrowed_source, *element, evaluator)?
+            .into_value(evaluator)?;
+          row.push(value);
+        }
+        rows.push(row);
+      }
+      Some(EvalOperand::Value(FormulaValue::Matrix(rows)))
+    }
+    FormulaNodeKind::Call { .. } | FormulaNodeKind::Unsupported(_) => None,
+  }
+}
+
+fn program_reference_operand<'doc>(
+  program: &FormulaProgram,
+  borrowed_source: Option<&'doc str>,
+  span: Option<crate::program::SourceSpan>,
+  reference: &FormulaReference,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> Option<EvalOperand<'doc>> {
+  match reference {
+    FormulaReference::Cell(reference) => {
+      if let FormulaSheetReference::External { book, sheet } = reference.target.sheet {
+        return Some(EvalOperand::ExternalReference(
+          crate::code::external_reference_from_cell(
+            program,
+            book,
+            sheet,
+            reference.target,
+            reference.flags,
+          )?,
+        ));
+      }
+      Some(EvalOperand::Reference(
+        crate::code::qualified_range_from_points(
+          evaluator.current_sheet,
+          program,
+          reference.target,
+          reference.target,
+          reference.flags,
+        )?,
+      ))
+    }
+    FormulaReference::Range(reference) => {
+      if let FormulaSheetReference::External { book, sheet } = reference.start.sheet {
+        return Some(EvalOperand::ExternalReference(
+          crate::code::external_reference_from_range(
+            program,
+            book,
+            sheet,
+            reference.start,
+            reference.end,
+            reference.flags,
+          )?,
+        ));
+      }
+      Some(EvalOperand::Reference(
+        crate::code::qualified_range_from_points(
+          evaluator.current_sheet,
+          program,
+          reference.start,
+          reference.end,
+          reference.flags,
+        )?,
+      ))
+    }
+    FormulaReference::Named(reference) => Some(EvalOperand::Name(crate::code::scoped_name_cow(
+      program,
+      borrowed_source,
+      span,
+      &reference.scope,
+      reference.name,
+    )?)),
+    FormulaReference::Structured(reference) => Some(EvalOperand::Name(Cow::Owned(
+      crate::code::structured_reference_text(program, reference)?,
+    ))),
+    FormulaReference::ExternalName(reference) => {
+      Some(EvalOperand::ExternalReference(ExternalReferenceId {
+        book: Some(Cow::Owned(program.symbols.get(reference.book)?.to_string())),
+        sheet: match reference.sheet {
+          Some(sheet) => Some(Cow::Owned(crate::code::sheet_name_text(program, sheet)?)),
+          None => None,
+        },
+        name: Some(Cow::Owned(program.symbols.get(reference.name)?.to_string())),
+      }))
+    }
+    FormulaReference::Deleted(_) => Some(EvalOperand::Value(FormulaValue::Error(
+      FormulaErrorValue::Ref,
+    ))),
   }
 }
 
@@ -479,32 +523,11 @@ fn evaluate_let_control<'doc>(
   evaluate_arg_direct(args.get(args.len() - 1)?, &local_evaluator)
 }
 
-fn call_starting_at<'doc>(ops: &[FormulaOp<'doc>], index: usize, end: usize) -> Option<usize> {
-  let mut selected = None;
-  for (call_index, op) in ops.iter().enumerate().take(end).skip(index) {
-    let FormulaOp::Call {
-      arg_ranges, argc, ..
-    } = op
-    else {
-      continue;
-    };
-    if (*argc == 0 && call_index == index)
-      || (arg_ranges
-        .first()
-        .is_some_and(|range| range.start == index && range.end <= call_index)
-        && arg_ranges
-          .iter()
-          .all(|range| range.start <= range.end && range.end <= call_index))
-    {
-      selected = Some(call_index);
-    }
-  }
-  selected
-}
-
 fn is_missing_arg(arg: EvalArg<'_, '_>) -> bool {
-  let range = arg.range;
-  range.end == range.start + 1 && matches!(arg.ops.get(range.start), Some(FormulaOp::PushBlank))
+  matches!(
+    arg.program.node(arg.id).map(|node| &node.kind),
+    Some(FormulaNodeKind::Blank | FormulaNodeKind::MissingArgument)
+  )
 }
 
 fn value_error_matches(value: &FormulaValue<'_>, na_only: bool) -> bool {
@@ -515,13 +538,11 @@ fn value_error_matches(value: &FormulaValue<'_>, na_only: bool) -> bool {
 }
 
 fn let_binding_name_from_arg(arg: EvalArg<'_, '_>) -> Option<String> {
-  let range = arg.range;
-  if range.end != range.start + 1 {
-    return None;
-  }
-  let Some(FormulaOp::PushName(name)) = arg.ops.get(range.start) else {
+  let node = arg.program.node(arg.id)?;
+  let FormulaNodeKind::Reference(FormulaReference::Named(reference)) = &node.kind else {
     return None;
   };
+  let name = arg.program.symbols.get(reference.name)?;
   Some(name.trim_start_matches("_xlpm.").to_ascii_uppercase())
 }
 

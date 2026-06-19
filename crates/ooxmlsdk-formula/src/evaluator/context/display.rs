@@ -438,7 +438,7 @@ pub(crate) fn error_text(value: &FormulaValue<'_>) -> Option<&'static str> {
 
 pub(crate) fn error_value(value: &str) -> FormulaErrorValue {
   crate::parser::formula_error_value(value)
-    .map(formula_error_from_lex)
+    .map(crate::code::formula_error_from_lex)
     .unwrap_or(FormulaErrorValue::Error)
 }
 

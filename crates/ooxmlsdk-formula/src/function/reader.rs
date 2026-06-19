@@ -1,6 +1,6 @@
 use super::FunctionArgs;
-use crate::code::FormulaOp;
 use crate::evaluator::{EvalArg, FormulaEvaluator, QueryValueSource, evaluate_arg_direct};
+use crate::program::FormulaNodeKind;
 use crate::{FormulaErrorValue, FormulaValue, QualifiedRange};
 
 #[derive(Clone, Copy)]
@@ -33,20 +33,20 @@ impl<'args, 'eval, 'doc> FunctionArgReader<'args, 'eval, 'doc> {
     let Some(arg) = self.raw_arg(index) else {
       return false;
     };
-    let range = arg.range;
-    range.end == range.start + 1 && matches!(arg.ops.get(range.start), Some(FormulaOp::PushBlank))
+    matches!(
+      arg.program.node(arg.id).map(|node| &node.kind),
+      Some(FormulaNodeKind::Blank | FormulaNodeKind::MissingArgument)
+    )
   }
 
   pub(crate) fn is_array_literal(self, index: usize) -> bool {
     let Some(arg) = self.raw_arg(index) else {
       return false;
     };
-    arg
-      .range
-      .end
-      .checked_sub(1)
-      .and_then(|index| arg.ops.get(index))
-      .is_some_and(|op| matches!(op, FormulaOp::Array { .. }))
+    matches!(
+      arg.program.node(arg.id).map(|node| &node.kind),
+      Some(FormulaNodeKind::Array(_))
+    )
   }
 
   pub(crate) fn value(self, index: usize) -> Option<FormulaValue<'doc>> {

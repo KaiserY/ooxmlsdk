@@ -11,6 +11,7 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   let mut as_xml_bytes_arms = Vec::with_capacity(variants.len());
   let mut from_bytes_arms = Vec::with_capacity(variants.len());
+  let mut write_xml_attr_value_other_arm = None;
   let mut other_arm = None;
 
   for variant in variants {
@@ -66,6 +67,10 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
       as_xml_bytes_arms.push(quote! {
         #(#cfg_attrs)*
         Self::#variant_ident(value) => value.as_ref(),
+      });
+      write_xml_attr_value_other_arm = Some(quote! {
+        #(#cfg_attrs)*
+        Self::#variant_ident(value) => crate::common::write_escaped_bytes(writer, value),
       });
       other_arm = Some(quote! {
         #(#cfg_attrs)*
@@ -126,6 +131,19 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
         match b {
           #( #from_bytes_arms )*
           #fallback_arm
+        }
+      }
+    }
+
+    impl #ident {
+      #[inline]
+      pub(crate) fn write_xml_attr_value<W: ::std::io::Write>(
+        &self,
+        writer: &mut W,
+      ) -> ::std::io::Result<()> {
+        match self {
+          #write_xml_attr_value_other_arm
+          _ => writer.write_all(<Self as crate::sdk::SdkEnum>::as_xml_bytes(self)),
         }
       }
     }

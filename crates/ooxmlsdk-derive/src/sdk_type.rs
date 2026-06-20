@@ -4352,12 +4352,14 @@ fn expand_named_struct(
         crate::common::write_attr_value_str(writer, #name_lit, value.as_ref())?;
       }
     } else if is_sdk_enum_effective_type(&value_ty, simple_type) {
+      let attr_prefix_lit = LitByteStr::new(
+        format!(" {}=\"", field.name).as_bytes(),
+        proc_macro2::Span::call_site(),
+      );
       quote! {
-        crate::common::write_attr_value_bytes(
-          writer,
-          #name_bytes_lit,
-          <#value_ty as crate::sdk::SdkEnum>::as_xml_bytes(value),
-        )?;
+        writer.write_all(#attr_prefix_lit)?;
+        value.write_xml_attr_value(writer)?;
+        writer.write_all(b"\"")?;
       }
     } else {
       quote! {

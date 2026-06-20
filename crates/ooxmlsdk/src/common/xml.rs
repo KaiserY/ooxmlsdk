@@ -1767,19 +1767,6 @@ pub(crate) fn write_attr_value_str<W: std::io::Write>(
 }
 
 #[inline]
-pub(crate) fn write_attr_value_bytes<W: std::io::Write>(
-  writer: &mut W,
-  attr_name: &[u8],
-  value: &[u8],
-) -> std::io::Result<()> {
-  writer.write_all(b" ")?;
-  writer.write_all(attr_name)?;
-  writer.write_all(b"=\"")?;
-  write_escaped_bytes(writer, value)?;
-  writer.write_all(b"\"")
-}
-
-#[inline]
 pub(crate) fn write_list_attr_value<W, T>(
   writer: &mut W,
   attr_name: &str,

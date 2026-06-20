@@ -13,6 +13,7 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+emfsdk = { workspace = true }
 hypher = { workspace = true }
 icu_segmenter = { workspace = true }
 image = { workspace = true }

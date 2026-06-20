@@ -233,7 +233,7 @@ pub fn apply_schema_extensions(
       if extension.has_other_variant.unwrap_or(false) {
         schema_enum.other_variant = Some(crate::sdk_data::sdk_data_model::SchemaEnumOtherVariant {
           name: "OtherVariant".to_string(),
-          r#type: "Box<str>".to_string(),
+          r#type: "Box<[u8]>".to_string(),
         });
       }
 
@@ -920,7 +920,7 @@ mod tests {
 
     let other = schemas[0].enums[0].other_variant.as_ref().unwrap();
     assert_eq!(other.name, "OtherVariant");
-    assert_eq!(other.r#type, "Box<str>");
+    assert_eq!(other.r#type, "Box<[u8]>");
   }
 
   #[test]

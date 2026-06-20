@@ -4235,8 +4235,8 @@ fn expand_named_struct(
   for field in &attr_fields {
     let field_ident = &field.ident;
     let name_lit = LitStr::new(&field.name, Span::call_site());
-    let QNameInfo { local_name, .. } = parse_qname_info(&field.name);
     let name_bytes_lit = LitByteStr::new(field.name.as_bytes(), Span::call_site());
+    let QNameInfo { local_name, .. } = parse_qname_info(&field.name);
     let local_name_bytes_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
     let local_name_suffix = format!(":{local_name}");
     let local_name_suffix_bytes_lit =
@@ -4350,6 +4350,14 @@ fn expand_named_struct(
     } else if is_string_like_effective_type(&value_ty, simple_type) {
       quote! {
         crate::common::write_attr_value_str(writer, #name_lit, value.as_ref())?;
+      }
+    } else if is_sdk_enum_effective_type(&value_ty, simple_type) {
+      quote! {
+        crate::common::write_attr_value_bytes(
+          writer,
+          #name_bytes_lit,
+          <#value_ty as crate::sdk::SdkEnum>::as_xml_bytes(value),
+        )?;
       }
     } else {
       quote! {

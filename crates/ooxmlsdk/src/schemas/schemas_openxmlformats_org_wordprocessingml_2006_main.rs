@@ -690,7 +690,7 @@ pub enum FontTypeHintValues {
   #[sdk(rename = "cs")]
   ComplexScript,
   #[sdk(other)]
-  OtherVariant(Box<str>),
+  OtherVariant(Box<[u8]>),
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ThemeFontValues {
@@ -2010,7 +2010,7 @@ pub enum StrictCharacterSet {
   #[sdk(rename = "windows-1250")]
   ChsEastEurope,
   #[sdk(other)]
-  OtherVariant(Box<str>),
+  OtherVariant(Box<[u8]>),
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ObjectDrawAspect {
@@ -2048,7 +2048,7 @@ pub enum CompatSettingNameValues {
   #[sdk(rename = "allowTextAfterFloatingTableBreak")]
   AllowTextAfterFloatingTableBreak,
   #[sdk(other)]
-  OtherVariant(Box<str>),
+  OtherVariant(Box<[u8]>),
 }
 /// Table Cell Insertion.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

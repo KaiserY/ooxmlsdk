@@ -709,7 +709,7 @@ impl RelationshipSet {
     if let Some(bytes) = &self.raw_bytes {
       return Ok(Cow::Borrowed(bytes));
     }
-    Ok(Cow::Owned(crate::sdk::SdkType::to_bytes(
+    Ok(Cow::Owned(crate::sdk::sdk_type_to_bytes(
       &self.to_relationships(),
     )?))
   }
@@ -719,7 +719,7 @@ impl RelationshipSet {
     if let Some(bytes) = &self.raw_bytes {
       writer.write_all(bytes)?;
     } else {
-      writer.write_all(&crate::sdk::SdkType::to_bytes(&self.to_relationships())?)?;
+      crate::sdk::SdkType::write_to(&self.to_relationships(), writer)?;
     }
     Ok(())
   }

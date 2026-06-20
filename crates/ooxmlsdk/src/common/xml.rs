@@ -1667,10 +1667,7 @@ pub(crate) fn write_escaped_str<W: std::io::Write>(
   writer: &mut W,
   value: &str,
 ) -> std::io::Result<()> {
-  match quick_xml::escape::escape(value) {
-    std::borrow::Cow::Borrowed(value) => writer.write_all(value.as_bytes()),
-    std::borrow::Cow::Owned(value) => writer.write_all(value.as_bytes()),
-  }
+  write_escaped_xml_bytes(writer, value.as_bytes(), true)
 }
 
 #[inline]
@@ -1678,9 +1675,52 @@ pub(crate) fn write_escaped_content_str<W: std::io::Write>(
   writer: &mut W,
   value: &str,
 ) -> std::io::Result<()> {
-  match quick_xml::escape::minimal_escape(value) {
-    std::borrow::Cow::Borrowed(value) => writer.write_all(value.as_bytes()),
-    std::borrow::Cow::Owned(value) => writer.write_all(value.as_bytes()),
+  write_escaped_xml_bytes(writer, value.as_bytes(), false)
+}
+
+#[inline]
+pub(crate) fn write_escaped_bytes<W: std::io::Write>(
+  writer: &mut W,
+  value: &[u8],
+) -> std::io::Result<()> {
+  write_escaped_xml_bytes(writer, value, true)
+}
+
+#[inline]
+fn write_escaped_xml_bytes<W: std::io::Write>(
+  writer: &mut W,
+  bytes: &[u8],
+  escape_quotes: bool,
+) -> std::io::Result<()> {
+  let mut copied = 0usize;
+  let mut escaped = false;
+
+  for (index, byte) in bytes.iter().copied().enumerate() {
+    let replacement: Option<&[u8]> = match byte {
+      b'<' => Some(b"&lt;"),
+      b'&' => Some(b"&amp;"),
+      b'>' if escape_quotes => Some(b"&gt;"),
+      b'\'' if escape_quotes => Some(b"&apos;"),
+      b'"' if escape_quotes => Some(b"&quot;"),
+      _ => None,
+    };
+
+    if let Some(replacement) = replacement {
+      escaped = true;
+      if copied < index {
+        writer.write_all(&bytes[copied..index])?;
+      }
+      writer.write_all(replacement)?;
+      copied = index + 1;
+    }
+  }
+
+  if !escaped {
+    writer.write_all(bytes)
+  } else if copied < bytes.len() {
+    writer.write_all(&bytes[copied..])
+  } else {
+    Ok(())
   }
 }
 
@@ -1723,6 +1763,19 @@ pub(crate) fn write_attr_value_str<W: std::io::Write>(
   writer.write_all(attr_name.as_bytes())?;
   writer.write_all(b"=\"")?;
   write_escaped_str(writer, value)?;
+  writer.write_all(b"\"")
+}
+
+#[inline]
+pub(crate) fn write_attr_value_bytes<W: std::io::Write>(
+  writer: &mut W,
+  attr_name: &[u8],
+  value: &[u8],
+) -> std::io::Result<()> {
+  writer.write_all(b" ")?;
+  writer.write_all(attr_name)?;
+  writer.write_all(b"=\"")?;
+  write_escaped_bytes(writer, value)?;
   writer.write_all(b"\"")
 }
 
@@ -1920,7 +1973,7 @@ pub(crate) fn write_xmlns_attr<W: std::io::Write>(
 mod tests {
   use quick_xml::{Reader, events::Event};
 
-  use super::decode_attr_value;
+  use super::{decode_attr_value, write_escaped_content_str, write_escaped_str};
 
   #[test]
   fn attribute_decode_preserves_literal_newlines_for_round_trip() {
@@ -1938,5 +1991,23 @@ mod tests {
     let value = decode_attr_value(&attr, reader.decoder()).expect("decoded attribute");
 
     assert_eq!(value, "one\ntwo & three");
+  }
+
+  #[test]
+  fn xml_writer_escapes_attributes_and_content() {
+    let mut attr = Vec::new();
+    write_escaped_str(&mut attr, r#"<tag attr="one&two">'text'</tag>"#).expect("write attr");
+    assert_eq!(
+      String::from_utf8(attr).expect("utf-8 attr"),
+      "&lt;tag attr=&quot;one&amp;two&quot;&gt;&apos;text&apos;&lt;/tag&gt;"
+    );
+
+    let mut content = Vec::new();
+    write_escaped_content_str(&mut content, r#"<tag attr="one&two">'text'</tag>"#)
+      .expect("write content");
+    assert_eq!(
+      String::from_utf8(content).expect("utf-8 content"),
+      r#"&lt;tag attr="one&amp;two">'text'&lt;/tag>"#
+    );
   }
 }

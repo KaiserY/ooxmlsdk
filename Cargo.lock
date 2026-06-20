@@ -330,6 +330,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91622ff5e7162018101f2fea40d6ebf4a78bbe5a49736a2020649edf9693679e"
 
 [[package]]
+name = "emfsdk"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.13.0",
+ "emfsdk-derive",
+ "encoding_rs",
+ "image",
+ "thiserror",
+]
+
+[[package]]
+name = "emfsdk-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1182,6 +1202,7 @@ dependencies = [
 name = "ooxmlsdk-layout"
 version = "0.10.3"
 dependencies = [
+ "emfsdk",
  "hypher",
  "icu_segmenter",
  "image",

@@ -37,11 +37,11 @@ pub(crate) use xml::{
   parse_i64_attr, parse_list_attr, parse_list_value, parse_measurement_or_percent_attr,
   parse_signed_twips_measure_attr, parse_text_child_value, parse_twips_measure_attr, parse_u8_attr,
   parse_u16_attr, parse_u32_attr, parse_u64_attr, parse_value, read_root_start_borrowed,
-  read_root_start_io, root_element_matches_namespace_local, write_attr_value, write_attr_value_str,
-  write_decimal_number_or_percent_attr, write_escaped_content_str, write_escaped_content_text,
-  write_escaped_text, write_list_attr_value, write_list_text_content_value,
-  write_measurement_or_percent_attr, write_signed_twips_measure_attr, write_twips_measure_attr,
-  write_xmlns_attr,
+  read_root_start_io, root_element_matches_namespace_local, write_attr_value,
+  write_attr_value_bytes, write_attr_value_str, write_decimal_number_or_percent_attr,
+  write_escaped_content_str, write_escaped_content_text, write_escaped_text, write_list_attr_value,
+  write_list_text_content_value, write_measurement_or_percent_attr,
+  write_signed_twips_measure_attr, write_twips_measure_attr, write_xmlns_attr,
 };
 #[cfg(feature = "flat-opc")]
 pub(crate) use xml::{read_outer_xml_borrowed, read_outer_xml_io};

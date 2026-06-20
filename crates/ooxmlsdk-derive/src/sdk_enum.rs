@@ -9,7 +9,7 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
     ));
   };
 
-  let mut as_xml_arms = Vec::with_capacity(variants.len());
+  let mut as_xml_bytes_arms = Vec::with_capacity(variants.len());
   let mut from_bytes_arms = Vec::with_capacity(variants.len());
   let mut other_arm = None;
 
@@ -36,7 +36,7 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
         }
       };
 
-      let is_box_str = matches!(
+      let is_box_bytes = matches!(
         other_field_ty,
         Type::Path(TypePath { path, .. })
           if path.segments.len() == 1
@@ -47,25 +47,29 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
                 if args.args.len() == 1
                   && matches!(
                     &args.args[0],
-                    syn::GenericArgument::Type(Type::Path(TypePath { path, .. }))
-                      if path.segments.len() == 1 && path.segments[0].ident == "str"
+                    syn::GenericArgument::Type(Type::Slice(slice))
+                      if matches!(
+                        slice.elem.as_ref(),
+                        Type::Path(TypePath { path, .. })
+                          if path.segments.len() == 1 && path.segments[0].ident == "u8"
+                      )
                   )
             )
       );
-      if !is_box_str {
+      if !is_box_bytes {
         return Err(syn::Error::new_spanned(
           other_field_ty,
-          "#[sdk(other)] variant must use Box<str>",
+          "#[sdk(other)] variant must use Box<[u8]>",
         ));
       }
 
-      as_xml_arms.push(quote! {
+      as_xml_bytes_arms.push(quote! {
         #(#cfg_attrs)*
         Self::#variant_ident(value) => value.as_ref(),
       });
       other_arm = Some(quote! {
         #(#cfg_attrs)*
-        other => Ok(Self::#variant_ident(String::from_utf8_lossy(other).into_owned().into_boxed_str())),
+        other => Ok(Self::#variant_ident(Box::<[u8]>::from(other))),
       });
       continue;
     }
@@ -78,12 +82,11 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
     }
 
     let xml_value = rename.unwrap_or_else(|| variant_ident.to_string());
-    let xml_value_lit = LitStr::new(&xml_value, Span::call_site());
     let xml_bytes_lit = LitByteStr::new(xml_value.as_bytes(), Span::call_site());
 
-    as_xml_arms.push(quote! {
+    as_xml_bytes_arms.push(quote! {
       #(#cfg_attrs)*
-      Self::#variant_ident => #xml_value_lit,
+      Self::#variant_ident => #xml_bytes_lit,
     });
     from_bytes_arms.push(quote! {
       #(#cfg_attrs)*
@@ -113,9 +116,9 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   Ok(quote! {
     impl crate::sdk::SdkEnum for #ident {
-      fn as_xml_str(&self) -> &str {
+      fn as_xml_bytes(&self) -> &[u8] {
         match self {
-          #( #as_xml_arms )*
+          #( #as_xml_bytes_arms )*
         }
       }
 
@@ -124,20 +127,6 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
           #( #from_bytes_arms )*
           #fallback_arm
         }
-      }
-    }
-
-    impl #ident {
-      pub fn as_xml_str(&self) -> &str {
-        <Self as crate::sdk::SdkEnum>::as_xml_str(self)
-      }
-
-      pub fn to_xml(&self) -> String {
-        self.as_xml_str().to_string()
-      }
-
-      pub fn from_bytes(b: &[u8]) -> Result<Self, crate::common::SdkError> {
-        <Self as crate::sdk::SdkEnum>::from_xml_bytes(b)
       }
     }
 
@@ -151,7 +140,10 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
     impl ::std::fmt::Display for #ident {
       fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        f.write_str(self.as_xml_str())
+        f.write_str(
+          std::str::from_utf8(<Self as crate::sdk::SdkEnum>::as_xml_bytes(self))
+            .map_err(|_| ::std::fmt::Error)?,
+        )
       }
     }
   })

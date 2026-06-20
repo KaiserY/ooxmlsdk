@@ -206,9 +206,10 @@ impl ImageCatalog {
       let Ok(root) = part.root_element(package) else {
         continue;
       };
-      let Ok(bytes) = root.to_bytes() else {
+      let mut bytes = Vec::new();
+      if SdkType::write_to(root, &mut bytes).is_err() {
         continue;
-      };
+      }
       let Ok(xml) = String::from_utf8(bytes) else {
         continue;
       };

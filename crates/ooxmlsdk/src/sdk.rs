@@ -496,13 +496,9 @@ impl PresentationDocumentType {
 }
 
 pub trait SdkEnum: Sized {
-  fn as_xml_str(&self) -> &str;
+  fn as_xml_bytes(&self) -> &[u8];
 
   fn from_xml_bytes(value: &[u8]) -> Result<Self, crate::common::SdkError>;
-
-  fn to_xml(&self) -> String {
-    self.as_xml_str().to_string()
-  }
 }
 
 pub trait SdkType: Sized {
@@ -525,14 +521,8 @@ pub trait SdkType: Sized {
     ))
   }
 
-  fn to_bytes(&self) -> Result<Vec<u8>, std::io::Error> {
-    let mut writer = Vec::with_capacity(32);
-    self.write_to(&mut writer)?;
-    Ok(writer)
-  }
-
   fn to_xml(&self) -> Result<String, crate::common::SdkError> {
-    String::from_utf8(self.to_bytes()?)
+    String::from_utf8(sdk_type_to_bytes(self)?)
       .map_err(|err| crate::common::SdkError::CommonError(format!("invalid utf-8 xml: {err}")))
   }
 
@@ -545,6 +535,13 @@ pub trait SdkType: Sized {
       "SdkType does not support deserialization".to_string(),
     ))
   }
+}
+
+#[inline]
+pub(crate) fn sdk_type_to_bytes<T: SdkType>(value: &T) -> Result<Vec<u8>, std::io::Error> {
+  let mut writer = Vec::with_capacity(32);
+  value.write_to(&mut writer)?;
+  Ok(writer)
 }
 
 #[cfg(feature = "mce")]

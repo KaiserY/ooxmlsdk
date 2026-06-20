@@ -244,7 +244,15 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
     let variant_ident = &variant.ident;
     quote! {
       #( #attrs )*
-      Self::#variant_ident(root) => Ok(crate::sdk::SdkType::to_bytes(root.as_ref())?),
+      Self::#variant_ident(root) => Ok(crate::sdk::sdk_type_to_bytes(root.as_ref())?),
+    }
+  });
+  let root_write_to_arms = root_variants.clone().map(|(variant, _)| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    quote! {
+      #( #attrs )*
+      Self::#variant_ident(root) => Ok(crate::sdk::SdkType::write_to(root.as_ref(), writer)?),
     }
   });
   let root_clear_arms = root_variants.clone().map(|(variant, _)| {
@@ -337,6 +345,15 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       pub fn to_bytes(&self) -> Result<Vec<u8>, crate::common::SdkError> {
         match self {
           #( #root_to_bytes_arms )*
+        }
+      }
+
+      pub fn write_to<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+      ) -> Result<(), crate::common::SdkError> {
+        match self {
+          #( #root_write_to_arms )*
         }
       }
 

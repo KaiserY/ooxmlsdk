@@ -396,7 +396,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       let storage = crate::sdk::SdkPackage::storage(package);
 
       zip.start_file("[Content_Types].xml", options)?;
-      zip.write_all(&crate::sdk::SdkType::to_bytes(storage.content_types())?)?;
+      crate::sdk::SdkType::write_to(storage.content_types(), &mut zip)?;
 
       let package_relationships = storage.package_relationships();
       if !package_relationships.is_empty() {
@@ -432,7 +432,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
 
         zip.start_file(part.path(), options)?;
         if let Some(root_element) = crate::sdk::SdkPackage::root_element(package, part_id) {
-          zip.write_all(&root_element.to_bytes()?)?;
+          root_element.write_to(&mut zip)?;
         } else {
           zip.write_all(part.data().bytes())?;
         }

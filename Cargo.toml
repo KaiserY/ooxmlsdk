@@ -31,6 +31,7 @@ ooxmlsdk-fonts = { version = "0.10.3", path = "crates/ooxmlsdk-fonts" }
 ooxmlsdk-formula = { version = "0.10.3", path = "crates/ooxmlsdk-formula" }
 ooxmlsdk-layout = { version = "0.10.3", path = "crates/ooxmlsdk-layout" }
 ooxmlsdk-pdf = { version = "0.10.3", path = "crates/ooxmlsdk-pdf" }
+emfsdk = { version = "0.1.0", path = "../emfsdk/crates/emfsdk", features = ["render"] }
 base64 = "0.22.1"
 bitflags = "2.13.0"
 quick-xml = "0.40.1"

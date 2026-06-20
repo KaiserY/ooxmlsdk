@@ -384,10 +384,18 @@ impl<'de> SliceReader<'de> {
     }
 
     loop {
-      if let Some(event) = payload_event_from_event(self.reader.read_event()?)
-        && let Some(event) = tag_event_from_payload(event)
-      {
-        return Ok(event);
+      match self.reader.read_event()? {
+        Event::Start(e) => return Ok(TagEvent::Start(e, false)),
+        Event::Empty(e) => return Ok(TagEvent::Start(e, true)),
+        Event::End(e) => return Ok(TagEvent::End(e)),
+        Event::Decl(e) => {
+          return Ok(TagEvent::Decl(matches!(
+            e.standalone(),
+            Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
+          )));
+        }
+        Event::Eof => return Ok(TagEvent::Eof),
+        _ => {}
       }
     }
   }

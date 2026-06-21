@@ -2163,7 +2163,9 @@ fn read_flat_opc_parts<R: std::io::BufRead>(reader: R) -> Result<Vec<FlatOpcPart
 
   loop {
     match xml_reader.next_tag_event()? {
-      super::TagEvent::Start(start, empty_tag) if qname_matches(start.name().as_ref(), b"part") => {
+      super::PayloadEvent::Start(start, empty_tag)
+        if qname_matches(start.name().as_ref(), b"part") =>
+      {
         if empty_tag {
           return Err(SdkError::CommonError(
             "Flat OPC part must contain xmlData or binaryData".to_string(),
@@ -2171,7 +2173,7 @@ fn read_flat_opc_parts<R: std::io::BufRead>(reader: R) -> Result<Vec<FlatOpcPart
         }
         parts.push(read_flat_opc_part(&mut xml_reader, start)?);
       }
-      super::TagEvent::Eof => break,
+      super::PayloadEvent::Eof => break,
       _ => {}
     }
   }
@@ -2206,24 +2208,24 @@ fn read_flat_opc_part<R: std::io::BufRead>(
 
   loop {
     match xml_reader.next_tag_event()? {
-      super::TagEvent::Start(start, empty_tag)
+      super::PayloadEvent::Start(start, empty_tag)
         if qname_matches(start.name().as_ref(), b"xmlData") =>
       {
         bytes = Some(read_flat_opc_xml_data(xml_reader, empty_tag)?);
       }
-      super::TagEvent::Start(start, empty_tag)
+      super::PayloadEvent::Start(start, empty_tag)
         if qname_matches(start.name().as_ref(), b"binaryData") =>
       {
         bytes = Some(read_flat_opc_binary_data(xml_reader, empty_tag)?);
       }
-      super::TagEvent::Start(_, true) => {}
-      super::TagEvent::Start(_, false) => {
+      super::PayloadEvent::Start(_, true) => {}
+      super::PayloadEvent::Start(_, false) => {
         return Err(SdkError::CommonError(
           "unsupported Flat OPC part child element".to_string(),
         ));
       }
-      super::TagEvent::End(end) if qname_matches(end.name().as_ref(), b"part") => break,
-      super::TagEvent::Eof => return Err(unexpected_eof("Flat OPC part")),
+      super::PayloadEvent::End(end) if qname_matches(end.name().as_ref(), b"part") => break,
+      super::PayloadEvent::Eof => return Err(unexpected_eof("Flat OPC part")),
       _ => {}
     }
   }
@@ -2253,11 +2255,11 @@ fn read_flat_opc_xml_data<R: std::io::BufRead>(
   let mut bytes = None;
   loop {
     match xml_reader.next_tag_event()? {
-      super::TagEvent::Start(start, empty_tag) => {
+      super::PayloadEvent::Start(start, empty_tag) => {
         bytes = Some(super::read_outer_xml_io(xml_reader, start, empty_tag)?.into_bytes());
       }
-      super::TagEvent::End(end) if qname_matches(end.name().as_ref(), b"xmlData") => break,
-      super::TagEvent::Eof => return Err(unexpected_eof("Flat OPC xmlData")),
+      super::PayloadEvent::End(end) if qname_matches(end.name().as_ref(), b"xmlData") => break,
+      super::PayloadEvent::Eof => return Err(unexpected_eof("Flat OPC xmlData")),
       _ => {}
     }
   }
@@ -2340,10 +2342,10 @@ fn root_xml_bytes(bytes: &[u8]) -> Result<Vec<u8>, SdkError> {
   let mut xml_reader = super::from_bytes_inner(bytes)?;
   loop {
     match xml_reader.next_tag_event()? {
-      super::TagEvent::Start(start, empty_tag) => {
+      super::PayloadEvent::Start(start, empty_tag) => {
         return Ok(super::read_outer_xml_borrowed(&mut xml_reader, start, empty_tag)?.into_bytes());
       }
-      super::TagEvent::Eof => return Err(unexpected_eof("Flat OPC XML part")),
+      super::PayloadEvent::Eof => return Err(unexpected_eof("Flat OPC XML part")),
       _ => {}
     }
   }

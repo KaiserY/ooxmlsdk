@@ -15,8 +15,7 @@ pub struct IoReader<R: BufRead> {
 
 #[derive(Debug)]
 pub enum PayloadEvent<'xml> {
-  Start(quick_xml::events::BytesStart<'xml>),
-  Empty(quick_xml::events::BytesStart<'xml>),
+  Start(quick_xml::events::BytesStart<'xml>, bool),
   End(quick_xml::events::BytesEnd<'xml>),
   Text(quick_xml::events::BytesText<'xml>),
   CData(quick_xml::events::BytesCData<'xml>),
@@ -29,8 +28,7 @@ impl<'xml> PayloadEvent<'xml> {
   #[inline]
   fn into_owned(self) -> PayloadEvent<'static> {
     match self {
-      Self::Start(e) => PayloadEvent::Start(e.into_owned()),
-      Self::Empty(e) => PayloadEvent::Empty(e.into_owned()),
+      Self::Start(e, empty) => PayloadEvent::Start(e.into_owned(), empty),
       Self::End(e) => PayloadEvent::End(e.into_owned()),
       Self::Text(e) => PayloadEvent::Text(e.into_owned()),
       Self::CData(e) => PayloadEvent::CData(e.into_owned()),
@@ -44,8 +42,8 @@ impl<'xml> PayloadEvent<'xml> {
   #[inline]
   fn into_event(self) -> Option<Event<'xml>> {
     Some(match self {
-      Self::Start(e) => Event::Start(e),
-      Self::Empty(e) => Event::Empty(e),
+      Self::Start(e, false) => Event::Start(e),
+      Self::Start(e, true) => Event::Empty(e),
       Self::End(e) => Event::End(e),
       Self::Text(e) => Event::Text(e),
       Self::CData(e) => Event::CData(e),
@@ -56,18 +54,21 @@ impl<'xml> PayloadEvent<'xml> {
   }
 }
 
-pub enum TagEvent<'xml> {
-  Start(quick_xml::events::BytesStart<'xml>, bool),
-  End(quick_xml::events::BytesEnd<'xml>),
-  Decl(bool),
-  Eof,
+#[inline(always)]
+pub(crate) fn xml_local_name<'a>(name: quick_xml::name::QName<'a>) -> &'a [u8] {
+  let raw_name = name.0;
+  if raw_name.len() > 2 && raw_name[1] == b':' {
+    &raw_name[2..]
+  } else {
+    name.local_name().into_inner()
+  }
 }
 
 #[inline]
 fn payload_event_from_event(event: Event<'_>) -> Option<PayloadEvent<'_>> {
   Some(match event {
-    Event::Start(e) => PayloadEvent::Start(e),
-    Event::Empty(e) => PayloadEvent::Empty(e),
+    Event::Start(e) => PayloadEvent::Start(e, false),
+    Event::Empty(e) => PayloadEvent::Start(e, true),
     Event::End(e) => PayloadEvent::End(e),
     Event::Text(e) => PayloadEvent::Text(e),
     Event::CData(e) => PayloadEvent::CData(e),
@@ -81,22 +82,10 @@ fn payload_event_from_event(event: Event<'_>) -> Option<PayloadEvent<'_>> {
   })
 }
 
-#[inline]
-fn tag_event_from_payload(event: PayloadEvent<'_>) -> Option<TagEvent<'_>> {
-  Some(match event {
-    PayloadEvent::Start(e) => TagEvent::Start(e, false),
-    PayloadEvent::Empty(e) => TagEvent::Start(e, true),
-    PayloadEvent::End(e) => TagEvent::End(e),
-    PayloadEvent::Decl(standalone) => TagEvent::Decl(standalone),
-    PayloadEvent::Eof => TagEvent::Eof,
-    _ => return None,
-  })
-}
-
 pub trait XmlRead<'xml> {
   fn next(&mut self) -> Result<PayloadEvent<'xml>, SdkError>;
 
-  fn next_tag_event(&mut self) -> Result<TagEvent<'xml>, SdkError>;
+  fn next_tag_event(&mut self) -> Result<PayloadEvent<'xml>, SdkError>;
 
   fn unread(&mut self, event: PayloadEvent<'xml>) -> Result<(), SdkError>;
 
@@ -201,26 +190,30 @@ impl<R: BufRead> IoReader<R> {
   }
 
   #[inline]
-  pub fn next_tag_event(&mut self) -> Result<TagEvent<'static>, SdkError> {
-    if let Some(event) = self.pending.take()
-      && let Some(event) = tag_event_from_payload(event)
-    {
-      return Ok(event);
+  pub fn next_tag_event(&mut self) -> Result<PayloadEvent<'static>, SdkError> {
+    if let Some(event) = self.pending.take() {
+      match event {
+        PayloadEvent::Start(_, _)
+        | PayloadEvent::End(_)
+        | PayloadEvent::Decl(_)
+        | PayloadEvent::Eof => return Ok(event),
+        PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {}
+      }
     }
 
     loop {
       self.buf.clear();
       match self.reader.read_event_into(&mut self.buf)? {
-        Event::Start(e) => return Ok(TagEvent::Start(e.into_owned(), false)),
-        Event::Empty(e) => return Ok(TagEvent::Start(e.into_owned(), true)),
-        Event::End(e) => return Ok(TagEvent::End(e.into_owned())),
+        Event::Start(e) => return Ok(PayloadEvent::Start(e.into_owned(), false)),
+        Event::Empty(e) => return Ok(PayloadEvent::Start(e.into_owned(), true)),
+        Event::End(e) => return Ok(PayloadEvent::End(e.into_owned())),
         Event::Decl(e) => {
-          return Ok(TagEvent::Decl(matches!(
+          return Ok(PayloadEvent::Decl(matches!(
             e.standalone(),
             Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
           )));
         }
-        Event::Eof => return Ok(TagEvent::Eof),
+        Event::Eof => return Ok(PayloadEvent::Eof),
         _ => {}
       }
     }
@@ -264,7 +257,7 @@ impl<R: BufRead> XmlRead<'static> for IoReader<R> {
   }
 
   #[inline]
-  fn next_tag_event(&mut self) -> Result<TagEvent<'static>, SdkError> {
+  fn next_tag_event(&mut self) -> Result<PayloadEvent<'static>, SdkError> {
     IoReader::next_tag_event(self)
   }
 
@@ -376,25 +369,29 @@ impl<'de> SliceReader<'de> {
   }
 
   #[inline]
-  pub fn next_tag_event(&mut self) -> Result<TagEvent<'de>, SdkError> {
-    if let Some(event) = self.pending.take()
-      && let Some(event) = tag_event_from_payload(event)
-    {
-      return Ok(event);
+  pub fn next_tag_event(&mut self) -> Result<PayloadEvent<'de>, SdkError> {
+    if let Some(event) = self.pending.take() {
+      match event {
+        PayloadEvent::Start(_, _)
+        | PayloadEvent::End(_)
+        | PayloadEvent::Decl(_)
+        | PayloadEvent::Eof => return Ok(event),
+        PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {}
+      }
     }
 
     loop {
       match self.reader.read_event()? {
-        Event::Start(e) => return Ok(TagEvent::Start(e, false)),
-        Event::Empty(e) => return Ok(TagEvent::Start(e, true)),
-        Event::End(e) => return Ok(TagEvent::End(e)),
+        Event::Start(e) => return Ok(PayloadEvent::Start(e, false)),
+        Event::Empty(e) => return Ok(PayloadEvent::Start(e, true)),
+        Event::End(e) => return Ok(PayloadEvent::End(e)),
         Event::Decl(e) => {
-          return Ok(TagEvent::Decl(matches!(
+          return Ok(PayloadEvent::Decl(matches!(
             e.standalone(),
             Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
           )));
         }
-        Event::Eof => return Ok(TagEvent::Eof),
+        Event::Eof => return Ok(PayloadEvent::Eof),
         _ => {}
       }
     }
@@ -437,7 +434,7 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
   }
 
   #[inline]
-  fn next_tag_event(&mut self) -> Result<TagEvent<'de>, SdkError> {
+  fn next_tag_event(&mut self) -> Result<PayloadEvent<'de>, SdkError> {
     SliceReader::next_tag_event(self)
   }
 
@@ -1006,12 +1003,8 @@ fn read_text_events<'xml, R: XmlRead<'xml>>(
       PayloadEvent::End(e) if e.name() == end => {
         return Ok(value.unwrap_or_default());
       }
-      PayloadEvent::Start(e) | PayloadEvent::Empty(e) => {
-        return Err(unexpected_tag(
-          ty,
-          "text content",
-          e.local_name().into_inner(),
-        ));
+      PayloadEvent::Start(e, _) => {
+        return Err(unexpected_tag(ty, "text content", xml_local_name(e.name())));
       }
       PayloadEvent::Eof => return Err(unexpected_eof(ty)),
       _ => {}
@@ -1564,21 +1557,22 @@ pub(crate) fn read_root_start_borrowed<'de>(
   let mut xml_header = crate::common::XmlHeaderType::None;
   loop {
     match reader.next_tag_event()? {
-      TagEvent::Decl(standalone) => {
+      PayloadEvent::Decl(standalone) => {
         xml_header = if standalone {
           crate::common::XmlHeaderType::Standalone
         } else {
           crate::common::XmlHeaderType::Plain
         };
       }
-      TagEvent::Start(e, empty) => {
-        if e.local_name().into_inner() == local_name {
+      PayloadEvent::Start(e, empty) => {
+        if xml_local_name(e.name()) == local_name {
           return Ok((e, empty, xml_header));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
       }
-      TagEvent::Eof => return Err(unexpected_eof(owner)),
-      TagEvent::End(_) => {}
+      PayloadEvent::Eof => return Err(unexpected_eof(owner)),
+      PayloadEvent::End(_) => {}
+      PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {}
     }
   }
 }
@@ -1599,21 +1593,22 @@ pub(crate) fn read_root_start_io<R: std::io::BufRead>(
   let mut xml_header = crate::common::XmlHeaderType::None;
   loop {
     match reader.next_tag_event()? {
-      TagEvent::Decl(standalone) => {
+      PayloadEvent::Decl(standalone) => {
         xml_header = if standalone {
           crate::common::XmlHeaderType::Standalone
         } else {
           crate::common::XmlHeaderType::Plain
         };
       }
-      TagEvent::Start(e, empty) => {
-        if e.local_name().into_inner() == local_name {
+      PayloadEvent::Start(e, empty) => {
+        if xml_local_name(e.name()) == local_name {
           return Ok((e, empty, xml_header));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
       }
-      TagEvent::Eof => return Err(unexpected_eof(owner)),
-      TagEvent::End(_) => {}
+      PayloadEvent::Eof => return Err(unexpected_eof(owner)),
+      PayloadEvent::End(_) => {}
+      PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {}
     }
   }
 }

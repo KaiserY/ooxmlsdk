@@ -1925,17 +1925,8 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
           let mut child_reader = crate::common::from_bytes_inner(child_xml.as_ref())?;
           loop {
             match child_reader.next()? {
-              crate::common::PayloadEvent::Start(e) => {
-                let next_empty = false;
-                let event_name = e.local_name().into_inner();
-                break match event_name {
-                  #( #parse_replacement_arms )*
-                  _ => None,
-                };
-              }
-              crate::common::PayloadEvent::Empty(e) => {
-                let next_empty = true;
-                let event_name = e.local_name().into_inner();
+              crate::common::PayloadEvent::Start(e, next_empty) => {
+                let event_name = crate::common::xml_local_name(e.name());
                 break match event_name {
                   #( #parse_replacement_arms )*
                   _ => None,
@@ -2853,16 +2844,16 @@ fn build_choice_any_child_parse_tokens(
     if !next_empty {
       loop {
         match (#xml_reader).next()? {
-          crate::common::PayloadEvent::Start(e) => {
-            let xml = crate::common::XmlRead::read_raw_element_xml_string(#xml_reader, e)?;
-            parsed_child.push(xml);
-          }
-          crate::common::PayloadEvent::Empty(e) => {
-            let xml = crate::common::XmlRead::read_raw_empty_xml_string(#xml_reader, e)?;
+          crate::common::PayloadEvent::Start(e, empty) => {
+            let xml = if empty {
+              crate::common::XmlRead::read_raw_empty_xml_string(#xml_reader, e)?
+            } else {
+              crate::common::XmlRead::read_raw_element_xml_string(#xml_reader, e)?
+            };
             parsed_child.push(xml);
           }
           crate::common::PayloadEvent::End(end) => {
-            if end.local_name().into_inner() == #local_name_lit {
+            if crate::common::xml_local_name(end.name()) == #local_name_lit {
               break;
             }
           }
@@ -3320,9 +3311,9 @@ fn expand_helper_struct(
     if __ooxmlsdk_seen_child {
       let _ = event_name;
       xml_reader.unread(if next_empty {
-        crate::common::PayloadEvent::Empty(e)
+        crate::common::PayloadEvent::Start(e, true)
       } else {
-        crate::common::PayloadEvent::Start(e)
+        crate::common::PayloadEvent::Start(e, false)
       })?;
       break;
     }
@@ -3336,9 +3327,9 @@ fn expand_helper_struct(
     if __ooxmlsdk_seen_child {
       let _ = event_name;
       xml_reader.unread(if next_empty {
-        crate::common::PayloadEvent::Empty(e)
+        crate::common::PayloadEvent::Start(e, true)
       } else {
-        crate::common::PayloadEvent::Start(e)
+        crate::common::PayloadEvent::Start(e, false)
       })?;
       break;
     }
@@ -3469,21 +3460,14 @@ fn expand_helper_struct(
 
     loop {
       if let Some((e, next_empty)) = pending_event.take() {
-        let event_name = e.local_name().into_inner();
+        let event_name = crate::common::xml_local_name(e.name());
         #main_dispatch_tokens_borrowed
         #unmatched_child_tokens_borrowed
       }
 
       match xml_reader.next()? {
-        crate::common::PayloadEvent::Start(e) => {
-          let next_empty = false;
-          let event_name = e.local_name().into_inner();
-          #main_dispatch_tokens_borrowed
-          #unmatched_child_tokens_borrowed
-        }
-        crate::common::PayloadEvent::Empty(e) => {
-          let next_empty = true;
-          let event_name = e.local_name().into_inner();
+        crate::common::PayloadEvent::Start(e, next_empty) => {
+          let event_name = crate::common::xml_local_name(e.name());
           #main_dispatch_tokens_borrowed
           #unmatched_child_tokens_borrowed
         }
@@ -4806,7 +4790,7 @@ fn expand_named_struct(
                 } else {
                   quote! { #field_ident = Some(parsed_choice); }
                 };
-                let match_event_name_tokens = quote! { e.local_name().into_inner() };
+                let match_event_name_tokens = quote! { crate::common::xml_local_name(e.name()) };
                 let borrowed_sequence_tokens = quote! {
                   #( #field_decls )*
                   let mut pending_event = Some((e, next_empty));
@@ -4817,26 +4801,27 @@ fn expand_named_struct(
                         #( #borrowed_child_arms )*
                         _ => {
                           xml_reader.unread(if next_empty {
-                            crate::common::PayloadEvent::Empty(e)
+                            crate::common::PayloadEvent::Start(e, true)
                           } else {
-                            crate::common::PayloadEvent::Start(e)
+                            crate::common::PayloadEvent::Start(e, false)
                           })?;
                           break;
                         }
                       }
                     }
                     match xml_reader.next_tag_event()? {
-                      crate::common::TagEvent::Start(e, next_empty) => {
+                      crate::common::PayloadEvent::Start(e, next_empty) => {
                         pending_event = Some((e, next_empty));
                       }
-                      crate::common::TagEvent::End(e) => {
+                      crate::common::PayloadEvent::End(e) => {
                         xml_reader.unread(crate::common::PayloadEvent::End(e))?;
                         break;
                       }
-                      crate::common::TagEvent::Eof => {
+                      crate::common::PayloadEvent::Eof => {
                         return Err(crate::common::unexpected_eof(stringify!(#ident)));
                       }
-                      crate::common::TagEvent::Decl(_) => {}
+                      crate::common::PayloadEvent::Decl(_) => {}
+                      _ => {}
                     }
                   }
                   #( #final_fields )*
@@ -4852,26 +4837,27 @@ fn expand_named_struct(
                         #( #io_child_arms )*
                         _ => {
                           xml_reader.unread(if next_empty {
-                            crate::common::PayloadEvent::Empty(e)
+                            crate::common::PayloadEvent::Start(e, true)
                           } else {
-                            crate::common::PayloadEvent::Start(e)
+                            crate::common::PayloadEvent::Start(e, false)
                           })?;
                           break;
                         }
                       }
                     }
                     match xml_reader.next_tag_event()? {
-                      crate::common::TagEvent::Start(e, next_empty) => {
+                      crate::common::PayloadEvent::Start(e, next_empty) => {
                         pending_event = Some((e, next_empty));
                       }
-                      crate::common::TagEvent::End(e) => {
+                      crate::common::PayloadEvent::End(e) => {
                         xml_reader.unread(crate::common::PayloadEvent::End(e))?;
                         break;
                       }
-                      crate::common::TagEvent::Eof => {
+                      crate::common::PayloadEvent::Eof => {
                         return Err(crate::common::unexpected_eof(stringify!(#ident)));
                       }
-                      crate::common::TagEvent::Decl(_) => {}
+                      crate::common::PayloadEvent::Decl(_) => {}
+                      _ => {}
                     }
                   }
                   #( #final_fields )*
@@ -5229,31 +5215,32 @@ fn expand_named_struct(
                 let mut pending_event = Some((e, next_empty));
                 loop {
                   if let Some((e, next_empty)) = pending_event.take() {
-                    let event_name = e.local_name().into_inner();
+                    let event_name = crate::common::xml_local_name(e.name());
                     match event_name {
                       #( #borrowed_child_arms )*
                       _ => {
                         xml_reader.unread(if next_empty {
-                          crate::common::PayloadEvent::Empty(e)
+                          crate::common::PayloadEvent::Start(e, true)
                         } else {
-                          crate::common::PayloadEvent::Start(e)
+                          crate::common::PayloadEvent::Start(e, false)
                         })?;
                         break;
                       }
                     }
                   }
                   match xml_reader.next_tag_event()? {
-                    crate::common::TagEvent::Start(e, next_empty) => {
+                    crate::common::PayloadEvent::Start(e, next_empty) => {
                       pending_event = Some((e, next_empty));
                     }
-                    crate::common::TagEvent::End(e) => {
+                    crate::common::PayloadEvent::End(e) => {
                       xml_reader.unread(crate::common::PayloadEvent::End(e))?;
                       break;
                     }
-                    crate::common::TagEvent::Eof => {
+                    crate::common::PayloadEvent::Eof => {
                       return Err(crate::common::unexpected_eof(stringify!(#ident)));
                     }
-                    crate::common::TagEvent::Decl(_) => {}
+                    crate::common::PayloadEvent::Decl(_) => {}
+                    _ => {}
                   }
                 }
                 #( #final_fields )*
@@ -5264,31 +5251,32 @@ fn expand_named_struct(
                 let mut pending_event = Some((e, next_empty));
                 loop {
                   if let Some((e, next_empty)) = pending_event.take() {
-                    let event_name = e.local_name().into_inner();
+                    let event_name = crate::common::xml_local_name(e.name());
                     match event_name {
                       #( #io_child_arms )*
                       _ => {
                         xml_reader.unread(if next_empty {
-                          crate::common::PayloadEvent::Empty(e)
+                          crate::common::PayloadEvent::Start(e, true)
                         } else {
-                          crate::common::PayloadEvent::Start(e)
+                          crate::common::PayloadEvent::Start(e, false)
                         })?;
                         break;
                       }
                     }
                   }
                   match xml_reader.next_tag_event()? {
-                    crate::common::TagEvent::Start(e, next_empty) => {
+                    crate::common::PayloadEvent::Start(e, next_empty) => {
                       pending_event = Some((e, next_empty));
                     }
-                    crate::common::TagEvent::End(e) => {
+                    crate::common::PayloadEvent::End(e) => {
                       xml_reader.unread(crate::common::PayloadEvent::End(e))?;
                       break;
                     }
-                    crate::common::TagEvent::Eof => {
+                    crate::common::PayloadEvent::Eof => {
                       return Err(crate::common::unexpected_eof(stringify!(#ident)));
                     }
-                    crate::common::TagEvent::Decl(_) => {}
+                    crate::common::PayloadEvent::Decl(_) => {}
+                    _ => {}
                   }
                 }
                 #( #final_fields )*
@@ -6177,7 +6165,7 @@ fn expand_named_struct(
   };
   let tag_decl_tokens_borrowed = if has_xml_header_field {
     quote! {
-      crate::common::TagEvent::Decl(standalone) => {
+      crate::common::PayloadEvent::Decl(standalone) => {
         xml_header_state = if standalone {
           crate::common::XmlHeaderType::Standalone
         } else {
@@ -6187,12 +6175,12 @@ fn expand_named_struct(
     }
   } else {
     quote! {
-      crate::common::TagEvent::Decl(_) => {},
+      crate::common::PayloadEvent::Decl(_) => {},
     }
   };
   let tag_decl_tokens_io = if has_xml_header_field {
     quote! {
-      crate::common::TagEvent::Decl(standalone) => {
+      crate::common::PayloadEvent::Decl(standalone) => {
         xml_header_state = if standalone {
           crate::common::XmlHeaderType::Standalone
         } else {
@@ -6202,7 +6190,7 @@ fn expand_named_struct(
     }
   } else {
     quote! {
-      crate::common::TagEvent::Decl(_) => {},
+      crate::common::PayloadEvent::Decl(_) => {},
     }
   };
   let raw_xml_other_children_only = has_xml_other_children_field
@@ -6215,7 +6203,7 @@ fn expand_named_struct(
     quote! {}
   } else {
     quote! {
-      let event_name = e.local_name().into_inner();
+      let event_name = crate::common::xml_local_name(e.name());
     }
   };
   let stack_attr_assign_tokens = if wml_table_kind.is_some() {
@@ -6255,9 +6243,15 @@ fn expand_named_struct(
     quote! {}
   };
   let stack_end_name_matches = match wml_table_kind {
-    Some(WmlTableStackKind::Table) => quote! { e.local_name().into_inner() == b"tbl" },
-    Some(WmlTableStackKind::Row) => quote! { e.local_name().into_inner() == b"tr" },
-    Some(WmlTableStackKind::Cell) => quote! { e.local_name().into_inner() == b"tc" },
+    Some(WmlTableStackKind::Table) => {
+      quote! { crate::common::xml_local_name(e.name()) == b"tbl" }
+    }
+    Some(WmlTableStackKind::Row) => {
+      quote! { crate::common::xml_local_name(e.name()) == b"tr" }
+    }
+    Some(WmlTableStackKind::Cell) => {
+      quote! { crate::common::xml_local_name(e.name()) == b"tc" }
+    }
     None => quote! { #end_name_matches },
   };
   #[derive(Clone, Copy, PartialEq, Eq)]
@@ -6443,35 +6437,37 @@ fn expand_named_struct(
           loop {
             match xml_reader.next_tag_event()? {
               #tag_decl_tokens_borrowed
-              crate::common::TagEvent::Start(e, next_empty) => {
+              crate::common::PayloadEvent::Start(e, next_empty) => {
                 #child_event_name_tokens
                 #phase1_dispatch
               }
-              crate::common::TagEvent::End(e) => {
+              crate::common::PayloadEvent::End(e) => {
                 if #end_name_matches {
                   break '__ooxmlsdk_table_read;
                 }
               }
-              crate::common::TagEvent::Eof => {
+              crate::common::PayloadEvent::Eof => {
                 return Err(crate::common::unexpected_eof(stringify!(#ident)));
               }
+              _ => {}
             }
           }
           loop {
             match xml_reader.next_tag_event()? {
               #tag_decl_tokens_borrowed
-              crate::common::TagEvent::Start(e, next_empty) => {
+              crate::common::PayloadEvent::Start(e, next_empty) => {
                 #child_event_name_tokens
                 #phase2_dispatch
               }
-              crate::common::TagEvent::End(e) => {
+              crate::common::PayloadEvent::End(e) => {
                 if #end_name_matches {
                   break;
                 }
               }
-              crate::common::TagEvent::Eof => {
+              crate::common::PayloadEvent::Eof => {
                 return Err(crate::common::unexpected_eof(stringify!(#ident)));
               }
+              _ => {}
             }
           }
         }
@@ -6637,14 +6633,7 @@ fn expand_named_struct(
       loop {
         match xml_reader.next()? {
           #borrowed_decl_event_tokens
-          crate::common::PayloadEvent::Start(e) => {
-            let next_empty = false;
-            #child_event_name_tokens
-            #child_choice_dispatch_tokens_borrowed
-            #unmatched_child_tokens_borrowed
-          }
-          crate::common::PayloadEvent::Empty(e) => {
-            let next_empty = true;
+          crate::common::PayloadEvent::Start(e, next_empty) => {
             #child_event_name_tokens
             #child_choice_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
@@ -6668,19 +6657,20 @@ fn expand_named_struct(
       loop {
         match xml_reader.next_tag_event()? {
           #tag_decl_tokens_borrowed
-          crate::common::TagEvent::Start(e, next_empty) => {
+          crate::common::PayloadEvent::Start(e, next_empty) => {
             #child_event_name_tokens
             #child_choice_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
-          crate::common::TagEvent::End(e) => {
+          crate::common::PayloadEvent::End(e) => {
             if #end_name_matches {
               break;
             }
           }
-          crate::common::TagEvent::Eof => {
+          crate::common::PayloadEvent::Eof => {
             return Err(crate::common::unexpected_eof(stringify!(#ident)));
           }
+          _ => {}
         }
       }
     }
@@ -6696,18 +6686,19 @@ fn expand_named_struct(
     loop {
       match xml_reader.next_tag_event()? {
         #tag_decl_tokens_borrowed
-        crate::common::TagEvent::Start(e, next_empty) => {
+        crate::common::PayloadEvent::Start(e, next_empty) => {
           #child_event_name_tokens
           #stack_child_choice_dispatch_tokens
         }
-        crate::common::TagEvent::End(e) => {
+        crate::common::PayloadEvent::End(e) => {
           if #stack_end_name_matches {
             return Ok(None);
           }
         }
-        crate::common::TagEvent::Eof => {
+        crate::common::PayloadEvent::Eof => {
           return Err(crate::common::unexpected_eof(stringify!(#ident)));
         }
+        _ => {}
       }
     }
   };
@@ -6726,36 +6717,38 @@ fn expand_named_struct(
         loop {
           match xml_reader.next_tag_event()? {
             #tag_decl_tokens_borrowed
-            crate::common::TagEvent::Start(e, next_empty) => {
+            crate::common::PayloadEvent::Start(e, next_empty) => {
               #child_event_name_tokens
               #phase1_dispatch
             }
-            crate::common::TagEvent::End(e) => {
+            crate::common::PayloadEvent::End(e) => {
               if #stack_end_name_matches {
                 return Ok(None);
               }
             }
-            crate::common::TagEvent::Eof => {
+            crate::common::PayloadEvent::Eof => {
               return Err(crate::common::unexpected_eof(stringify!(#ident)));
             }
+            _ => {}
           }
         }
       }
       loop {
         match xml_reader.next_tag_event()? {
           #tag_decl_tokens_borrowed
-          crate::common::TagEvent::Start(e, next_empty) => {
+          crate::common::PayloadEvent::Start(e, next_empty) => {
             #child_event_name_tokens
             #phase2_dispatch
           }
-          crate::common::TagEvent::End(e) => {
+          crate::common::PayloadEvent::End(e) => {
             if #stack_end_name_matches {
               return Ok(None);
             }
           }
-          crate::common::TagEvent::Eof => {
+          crate::common::PayloadEvent::Eof => {
             return Err(crate::common::unexpected_eof(stringify!(#ident)));
           }
+          _ => {}
         }
       }
     }
@@ -6767,14 +6760,7 @@ fn expand_named_struct(
       loop {
         match xml_reader.next()? {
           #borrowed_decl_event_tokens
-          crate::common::PayloadEvent::Start(e) => {
-            let next_empty = false;
-            #child_event_name_tokens
-            #child_choice_dispatch_tokens_io
-            #unmatched_child_tokens_io
-          }
-          crate::common::PayloadEvent::Empty(e) => {
-            let next_empty = true;
+          crate::common::PayloadEvent::Start(e, next_empty) => {
             #child_event_name_tokens
             #child_choice_dispatch_tokens_io
             #unmatched_child_tokens_io
@@ -6798,19 +6784,20 @@ fn expand_named_struct(
       loop {
         match xml_reader.next_tag_event()? {
           #tag_decl_tokens_io
-          crate::common::TagEvent::Start(e, next_empty) => {
+          crate::common::PayloadEvent::Start(e, next_empty) => {
             #child_event_name_tokens
             #child_choice_dispatch_tokens_io
             #unmatched_child_tokens_io
           }
-          crate::common::TagEvent::End(e) => {
+          crate::common::PayloadEvent::End(e) => {
             if #end_name_matches {
               break;
             }
           }
-          crate::common::TagEvent::Eof => {
+          crate::common::PayloadEvent::Eof => {
             return Err(crate::common::unexpected_eof(stringify!(#ident)));
           }
+          _ => {}
         }
       }
     }

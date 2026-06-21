@@ -31,7 +31,7 @@ pub(crate) use xml::mce_choice_replacement_child_bytes;
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
-  PayloadEvent, TagEvent, XmlRead, attr_raw_value, decode_attr_value, decode_utf16_xml_bytes,
+  PayloadEvent, XmlRead, attr_raw_value, decode_attr_value, decode_utf16_xml_bytes,
   from_bytes_inner, from_reader_inner, parse_attr_value, parse_decimal_number_or_percent_attr,
   parse_enum_attr, parse_i8_attr, parse_i16_attr, parse_i32_attr, parse_i32_zero_on_overflow_attr,
   parse_i64_attr, parse_list_attr, parse_list_value, parse_measurement_or_percent_attr,
@@ -41,7 +41,7 @@ pub(crate) use xml::{
   write_decimal_number_or_percent_attr, write_escaped_bytes, write_escaped_content_str,
   write_escaped_content_text, write_escaped_text, write_list_attr_value,
   write_list_text_content_value, write_measurement_or_percent_attr,
-  write_signed_twips_measure_attr, write_twips_measure_attr, write_xmlns_attr,
+  write_signed_twips_measure_attr, write_twips_measure_attr, write_xmlns_attr, xml_local_name,
 };
 #[cfg(feature = "flat-opc")]
 pub(crate) use xml::{read_outer_xml_borrowed, read_outer_xml_io};
@@ -377,7 +377,7 @@ mod tests {
     let mut reader = from_bytes_inner(xml.as_bytes())?;
     let event = reader.next()?;
     let e = match event {
-      PayloadEvent::Start(e) | PayloadEvent::Empty(e) => e,
+      PayloadEvent::Start(e, _) => e,
       other => panic!("expected start or empty tag, got {other:?}"),
     };
     let decoder = reader.decoder();

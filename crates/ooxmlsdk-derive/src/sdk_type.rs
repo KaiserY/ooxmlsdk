@@ -36,6 +36,25 @@ fn extra_xmlns_ident(prefix: &str) -> Ident {
   Ident::new(&ident, Span::call_site())
 }
 
+fn static_xmlns_attr_tokens(prefix: Option<&str>, uri: &str) -> proc_macro2::TokenStream {
+  let mut attr = Vec::with_capacity(uri.len() + prefix.map_or(9, |prefix| prefix.len() + 10));
+  attr.extend_from_slice(b" xmlns");
+  if let Some(prefix) = prefix
+    && !prefix.is_empty()
+  {
+    attr.push(b':');
+    attr.extend_from_slice(prefix.as_bytes());
+  }
+  attr.extend_from_slice(b"=\"");
+  attr.extend_from_slice(uri.as_bytes());
+  attr.push(b'"');
+
+  let attr_lit = LitByteStr::new(&attr, Span::call_site());
+  quote! {
+    writer.write_all(#attr_lit)?;
+  }
+}
+
 fn canonical_namespace_prefix_tokens(
   prefix_pairs: &[String],
 ) -> syn::Result<proc_macro2::TokenStream> {
@@ -90,7 +109,7 @@ fn extra_xmlns_tokens(
     };
     let ident = extra_xmlns_ident(prefix);
     let prefix_lit = LitByteStr::new(prefix.as_bytes(), Span::call_site());
-    let uri_lit = LitByteStr::new(uri.as_bytes(), Span::call_site());
+    let write_xmlns_tokens = static_xmlns_attr_tokens(Some(prefix), uri);
     init_tokens.push(quote! {
       let mut #ident = false;
     });
@@ -101,7 +120,7 @@ fn extra_xmlns_tokens(
     });
     write_tokens.push(quote! {
       if !#ident {
-        crate::common::write_xmlns_attr(writer, Some(#prefix_lit), #uri_lit)?;
+        #write_xmlns_tokens
       }
     });
   }
@@ -2493,22 +2512,27 @@ fn parse_from_bytes_attr_tokens(
 
 fn write_simple_union_attr_tokens(
   kind: SimpleUnionTypeKind,
-  attr_name: &LitStr,
+  attr_prefix_lit: &LitByteStr,
   value_expr: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
-  match kind {
+  let write_value_tokens = match kind {
     SimpleUnionTypeKind::TwipsMeasure => {
-      quote! { crate::common::write_twips_measure_attr(writer, #attr_name, #value_expr)?; }
+      quote! { crate::common::write_twips_measure_value(writer, #value_expr)?; }
     }
     SimpleUnionTypeKind::SignedTwipsMeasure => {
-      quote! { crate::common::write_signed_twips_measure_attr(writer, #attr_name, #value_expr)?; }
+      quote! { crate::common::write_signed_twips_measure_value(writer, #value_expr)?; }
     }
     SimpleUnionTypeKind::DecimalNumberOrPercent => {
-      quote! { crate::common::write_decimal_number_or_percent_attr(writer, #attr_name, #value_expr)?; }
+      quote! { crate::common::write_decimal_number_or_percent_value(writer, #value_expr)?; }
     }
     SimpleUnionTypeKind::MeasurementOrPercent => {
-      quote! { crate::common::write_measurement_or_percent_attr(writer, #attr_name, #value_expr)?; }
+      quote! { crate::common::write_measurement_or_percent_value(writer, #value_expr)?; }
     }
+  };
+  quote! {
+    writer.write_all(#attr_prefix_lit)?;
+    #write_value_tokens
+    writer.write_all(b"\"")?;
   }
 }
 
@@ -3767,8 +3791,13 @@ fn expand_named_struct(
     let from_bytes_attr = is_from_bytes_attr_effective_type(&value_ty, simple_type);
     let integer_kind = integer_effective_type_kind(&value_ty, simple_type);
     let parser = if field.list {
+      let parse_list_fn = if is_string_like_effective_type(&value_ty, simple_type) {
+        quote! { crate::common::parse_list_attr }
+      } else {
+        quote! { crate::common::parse_borrowed_list_attr }
+      };
       quote! {
-        crate::common::parse_list_attr::<#value_ty>(
+        #parse_list_fn::<#value_ty>(
           &attr,
           decoder,
           stringify!(#ident),
@@ -3842,12 +3871,18 @@ fn expand_named_struct(
         ))?
       });
     }
+    let attr_prefix_lit = LitByteStr::new(
+      format!(" {}=\"", field.name).as_bytes(),
+      proc_macro2::Span::call_site(),
+    );
     let attr_write_value_tokens = if field.list {
       quote! {
-        crate::common::write_list_attr_value(writer, #name_lit, value.as_slice())?;
+        writer.write_all(#attr_prefix_lit)?;
+        crate::common::write_list_value(writer, value.as_slice())?;
+        writer.write_all(b"\"")?;
       }
     } else if let Some(kind) = simple_union_kind {
-      write_simple_union_attr_tokens(kind, &name_lit, quote! { value })
+      write_simple_union_attr_tokens(kind, &attr_prefix_lit, quote! { value })
     } else if effective_type_name(&value_ty, simple_type)
       .as_deref()
       .is_some_and(is_xml_schema_float_type_name)
@@ -3855,21 +3890,17 @@ fn expand_named_struct(
       let write_value_tokens =
         write_xml_schema_float_effective_tokens(quote! { value }, &value_ty, simple_type, "");
       quote! {
-        writer.write_all(b" ")?;
-        writer.write_all(#name_lit.as_bytes())?;
-        writer.write_all(b"=\"")?;
+        writer.write_all(#attr_prefix_lit)?;
         #write_value_tokens
         writer.write_all(b"\"")?;
       }
     } else if is_string_like_effective_type(&value_ty, simple_type) {
       quote! {
-        crate::common::write_attr_value_str(writer, #name_lit, value.as_ref())?;
+        writer.write_all(#attr_prefix_lit)?;
+        crate::common::write_escaped_str(writer, value.as_ref())?;
+        writer.write_all(b"\"")?;
       }
     } else if is_sdk_enum_effective_type(&value_ty, simple_type) {
-      let attr_prefix_lit = LitByteStr::new(
-        format!(" {}=\"", field.name).as_bytes(),
-        proc_macro2::Span::call_site(),
-      );
       quote! {
         writer.write_all(#attr_prefix_lit)?;
         value.write_xml_attr_value(writer)?;
@@ -3877,7 +3908,9 @@ fn expand_named_struct(
       }
     } else {
       quote! {
-        crate::common::write_attr_value(writer, #name_lit, value)?;
+        writer.write_all(#attr_prefix_lit)?;
+        crate::common::write_escaped_text(writer, value)?;
+        writer.write_all(b"\"")?;
       }
     };
     if field.optional {
@@ -6814,8 +6847,7 @@ fn expand_named_struct(
       && no_prefix
       && let Some(fixed_namespace_uri) = fixed_namespace_uri
     {
-      let fixed_namespace_uri_lit =
-        LitByteStr::new(fixed_namespace_uri.as_bytes(), Span::call_site());
+      let fixed_xmlns_tokens = static_xmlns_attr_tokens(None, fixed_namespace_uri);
       quote! {
         #extra_xmlns_init_tokens
         let mut has_default_xmlns = false;
@@ -6831,7 +6863,7 @@ fn expand_named_struct(
           }
         }
         if !has_default_xmlns {
-          crate::common::write_xmlns_attr(writer, None, #fixed_namespace_uri_lit)?;
+          #fixed_xmlns_tokens
         }
         #extra_xmlns_write_tokens
       }
@@ -6854,8 +6886,7 @@ fn expand_named_struct(
       && no_prefix
       && let Some(fixed_namespace_uri) = fixed_namespace_uri
     {
-      let fixed_namespace_uri_lit =
-        LitByteStr::new(fixed_namespace_uri.as_bytes(), Span::call_site());
+      let fixed_xmlns_tokens = static_xmlns_attr_tokens(None, fixed_namespace_uri);
       quote! {
         #extra_xmlns_init_tokens
         let mut has_default_xmlns = false;
@@ -6870,7 +6901,7 @@ fn expand_named_struct(
           }
         }
         if !has_default_xmlns {
-          crate::common::write_xmlns_attr(writer, None, #fixed_namespace_uri_lit)?;
+          #fixed_xmlns_tokens
         }
         #extra_xmlns_write_tokens
       }

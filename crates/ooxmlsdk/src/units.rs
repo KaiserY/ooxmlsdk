@@ -1249,6 +1249,28 @@ pub fn format_percent_lexical(value: DrawingmlPercentValue) -> String {
 }
 
 #[inline]
+pub(crate) fn write_percent_lexical<W: std::io::Write>(
+  writer: &mut W,
+  value: DrawingmlPercentValue,
+) -> std::io::Result<()> {
+  write_decimal_ratio_lexical(
+    writer,
+    i64::from(value),
+    i64::from(DRAWINGML_PERCENT_UNITS_PER_PERCENT),
+    "%",
+  )
+}
+
+#[inline]
+pub(crate) fn write_universal_measure_lexical<W: std::io::Write>(
+  writer: &mut W,
+  value: UniversalMeasureValue,
+) -> std::io::Result<()> {
+  let unit = value.unit();
+  write_decimal_ratio_lexical(writer, value.emu(), unit.emus_per_unit(), unit.suffix())
+}
+
+#[inline]
 fn parse_percent_string_bytes_with_options(
   value: &[u8],
   allow_negative: bool,
@@ -1541,6 +1563,64 @@ fn format_decimal_ratio(value: i64, scale: i64, suffix: &str) -> String {
 
   output.push_str(suffix);
   output
+}
+
+fn write_decimal_ratio_lexical<W: std::io::Write>(
+  writer: &mut W,
+  value: i64,
+  scale: i64,
+  suffix: &str,
+) -> std::io::Result<()> {
+  const MAX_FRACTION_DIGITS: usize = 9;
+
+  let negative = value.is_negative();
+  let value = i128::from(value).abs();
+  let scale = i128::from(scale);
+  let rounding_scale = 10_i128.pow(MAX_FRACTION_DIGITS as u32);
+  let rounded = ((value * rounding_scale) + scale / 2) / scale;
+  let integer = rounded / rounding_scale;
+  let fraction = rounded % rounding_scale;
+
+  if negative && rounded != 0 {
+    writer.write_all(b"-")?;
+  }
+  write_unsigned_i128_decimal(writer, integer)?;
+
+  if fraction != 0 {
+    let mut digits = [b'0'; MAX_FRACTION_DIGITS];
+    let mut value = fraction;
+    for digit in digits.iter_mut().rev() {
+      *digit = b'0' + (value % 10) as u8;
+      value /= 10;
+    }
+
+    let mut end = digits.len();
+    while end > 0 && digits[end - 1] == b'0' {
+      end -= 1;
+    }
+    writer.write_all(b".")?;
+    writer.write_all(&digits[..end])?;
+  }
+
+  writer.write_all(suffix.as_bytes())
+}
+
+fn write_unsigned_i128_decimal<W: std::io::Write>(
+  writer: &mut W,
+  mut value: i128,
+) -> std::io::Result<()> {
+  if value == 0 {
+    return writer.write_all(b"0");
+  }
+
+  let mut digits = [0u8; 39];
+  let mut index = digits.len();
+  while value != 0 {
+    index -= 1;
+    digits[index] = b'0' + (value % 10) as u8;
+    value /= 10;
+  }
+  writer.write_all(&digits[index..])
 }
 
 const fn u64_to_i64_saturating(value: u64) -> i64 {

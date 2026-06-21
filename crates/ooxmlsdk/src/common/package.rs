@@ -1037,7 +1037,9 @@ impl SdkPackageStorage {
   {
     writer.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)?;
     writer.write_all(b"\n<pkg:package")?;
-    super::xml::write_xmlns_attr(writer, Some(b"pkg"), FLAT_OPC_PACKAGE_NS.as_bytes())?;
+    writer.write_all(b" xmlns:pkg=\"")?;
+    writer.write_all(FLAT_OPC_PACKAGE_NS.as_bytes())?;
+    writer.write_all(b"\"")?;
     writer.write_all(b">\n")?;
 
     if !self.package_relationships.is_empty() {
@@ -2311,8 +2313,11 @@ fn write_flat_opc_xml_part<W: std::io::Write>(
   bytes: &[u8],
 ) -> Result<(), SdkError> {
   writer.write_all(b"  <pkg:part")?;
-  super::write_attr_value_str(writer, "pkg:name", name)?;
-  super::write_attr_value_str(writer, "pkg:contentType", content_type)?;
+  writer.write_all(b" pkg:name=\"")?;
+  super::write_escaped_str(writer, name)?;
+  writer.write_all(b"\" pkg:contentType=\"")?;
+  super::write_escaped_str(writer, content_type)?;
+  writer.write_all(b"\"")?;
   writer.write_all(b">\n    <pkg:xmlData>")?;
   writer.write_all(root_xml_bytes(bytes)?.as_slice())?;
   writer.write_all(b"</pkg:xmlData>\n  </pkg:part>\n")?;
@@ -2327,9 +2332,11 @@ fn write_flat_opc_binary_part<W: std::io::Write>(
   bytes: &[u8],
 ) -> Result<(), SdkError> {
   writer.write_all(b"  <pkg:part")?;
-  super::write_attr_value_str(writer, "pkg:name", name)?;
-  super::write_attr_value_str(writer, "pkg:contentType", content_type)?;
-  super::write_attr_value_str(writer, "pkg:compression", "store")?;
+  writer.write_all(b" pkg:name=\"")?;
+  super::write_escaped_str(writer, name)?;
+  writer.write_all(b"\" pkg:contentType=\"")?;
+  super::write_escaped_str(writer, content_type)?;
+  writer.write_all(b"\" pkg:compression=\"store\"")?;
   writer.write_all(b">\n    <pkg:binaryData>")?;
   let encoded = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes);
   writer.write_all(encoded.as_bytes())?;

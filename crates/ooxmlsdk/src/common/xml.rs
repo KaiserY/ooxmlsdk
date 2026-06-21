@@ -297,7 +297,7 @@ impl<R: BufRead> XmlRead<'static> for IoReader<R> {
     &mut self,
     start: quick_xml::events::BytesStart<'static>,
   ) -> Result<Box<[u8]>, SdkError> {
-    read_raw_empty_xml_io_bytes(start)
+    Ok(read_raw_empty_xml_start_bytes(start))
   }
 
   #[inline]
@@ -474,7 +474,7 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
     &mut self,
     start: quick_xml::events::BytesStart<'de>,
   ) -> Result<Box<[u8]>, SdkError> {
-    read_raw_empty_xml_borrowed_bytes(self, start)
+    Ok(read_raw_empty_xml_start_bytes(start))
   }
 
   #[inline]
@@ -748,8 +748,9 @@ pub(crate) fn parse_twips_measure_attr(
 
 #[inline]
 pub(crate) fn parse_twips_measure_value(
-  value: String,
+  value: impl AsRef<str>,
 ) -> Result<crate::simple_type::TwipsMeasureValue, SdkError> {
+  let value = value.as_ref();
   crate::simple_type::TwipsMeasureValue::from_bytes(value.as_bytes())
     .map_err(|_| invalid_field_value("TwipsMeasureValue", "value", value))
 }
@@ -770,8 +771,9 @@ pub(crate) fn parse_signed_twips_measure_attr(
 
 #[inline]
 pub(crate) fn parse_signed_twips_measure_value(
-  value: String,
+  value: impl AsRef<str>,
 ) -> Result<crate::simple_type::SignedTwipsMeasureValue, SdkError> {
+  let value = value.as_ref();
   crate::simple_type::SignedTwipsMeasureValue::from_bytes(value.as_bytes())
     .map_err(|_| invalid_field_value("SignedTwipsMeasureValue", "value", value))
 }
@@ -792,8 +794,9 @@ pub(crate) fn parse_decimal_number_or_percent_attr(
 
 #[inline]
 pub(crate) fn parse_decimal_number_or_percent_value(
-  value: String,
+  value: impl AsRef<str>,
 ) -> Result<crate::simple_type::DecimalNumberOrPercentValue, SdkError> {
+  let value = value.as_ref();
   crate::simple_type::DecimalNumberOrPercentValue::from_bytes(value.as_bytes())
     .map_err(|_| invalid_field_value("DecimalNumberOrPercentValue", "value", value))
 }
@@ -814,8 +817,9 @@ pub(crate) fn parse_measurement_or_percent_attr(
 
 #[inline]
 pub(crate) fn parse_measurement_or_percent_value(
-  value: String,
+  value: impl AsRef<str>,
 ) -> Result<crate::simple_type::MeasurementOrPercentValue, SdkError> {
+  let value = value.as_ref();
   crate::simple_type::MeasurementOrPercentValue::from_bytes(value.as_bytes())
     .map_err(|_| invalid_field_value("MeasurementOrPercentValue", "value", value))
 }
@@ -963,6 +967,26 @@ pub(crate) fn parse_list_attr<T>(
 where
   T: std::str::FromStr,
 {
+  let value = decode_attr_value(attr, decoder)?;
+  parse_list_value(value.as_ref(), ty, field)
+}
+
+#[inline]
+pub(crate) fn parse_borrowed_list_attr<T>(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<Vec<T>, SdkError>
+where
+  T: std::str::FromStr,
+{
+  if let Some(value) = attr_raw_value(attr)
+    && let Ok(value) = std::str::from_utf8(value)
+  {
+    return parse_list_value(value, ty, field);
+  }
+
   let value = decode_attr_value(attr, decoder)?;
   parse_list_value(value.as_ref(), ty, field)
 }
@@ -1138,14 +1162,6 @@ fn build_raw_element_xml_bytes(start: &[u8], inner: &[u8], end_name: &[u8]) -> B
 }
 
 #[inline]
-pub(crate) fn read_raw_empty_xml_borrowed_bytes<'de>(
-  _xml_reader: &mut SliceReader<'de>,
-  start: quick_xml::events::BytesStart<'de>,
-) -> Result<Box<[u8]>, SdkError> {
-  Ok(read_raw_empty_xml_start_bytes(start))
-}
-
-#[inline]
 pub(crate) fn read_raw_element_xml_borrowed_bytes<'de>(
   xml_reader: &mut SliceReader<'de>,
   start: quick_xml::events::BytesStart<'de>,
@@ -1197,13 +1213,6 @@ pub(crate) fn read_outer_xml_io<R: BufRead>(
 
   String::from_utf8(writer.into_inner().into_inner())
     .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
-}
-
-#[inline]
-pub(crate) fn read_raw_empty_xml_io_bytes(
-  start: quick_xml::events::BytesStart<'static>,
-) -> Result<Box<[u8]>, SdkError> {
-  Ok(read_raw_empty_xml_start_bytes(start))
 }
 
 #[inline]
@@ -1732,7 +1741,7 @@ pub(crate) fn write_escaped_content_text<W: std::io::Write, T: std::fmt::Display
   writer: &mut W,
   value: &T,
 ) -> std::io::Result<()> {
-  write_escaped_content_str(writer, &value.to_string())
+  write_escaped_display(writer, value, false)
 }
 
 #[inline]
@@ -1740,50 +1749,44 @@ pub(crate) fn write_escaped_text<W: std::io::Write, T: std::fmt::Display + ?Size
   writer: &mut W,
   value: &T,
 ) -> std::io::Result<()> {
-  write_escaped_str(writer, &value.to_string())
+  write_escaped_display(writer, value, true)
 }
 
 #[inline]
-pub(crate) fn write_attr_value<W: std::io::Write, T: std::fmt::Display + ?Sized>(
+fn write_escaped_display<W: std::io::Write, T: std::fmt::Display + ?Sized>(
   writer: &mut W,
-  attr_name: &str,
   value: &T,
+  escape_quotes: bool,
 ) -> std::io::Result<()> {
-  writer.write_all(b" ")?;
-  writer.write_all(attr_name.as_bytes())?;
-  writer.write_all(b"=\"")?;
-  write_escaped_text(writer, value)?;
-  writer.write_all(b"\"")
+  let mut escaped_writer = EscapedDisplayWriter {
+    writer,
+    escape_quotes,
+    error: None,
+  };
+  match std::fmt::write(&mut escaped_writer, format_args!("{value}")) {
+    Ok(()) => Ok(()),
+    Err(_) => Err(
+      escaped_writer
+        .error
+        .unwrap_or_else(|| std::io::Error::other("failed to format escaped XML value")),
+    ),
+  }
 }
 
-#[inline]
-pub(crate) fn write_attr_value_str<W: std::io::Write>(
-  writer: &mut W,
-  attr_name: &str,
-  value: &str,
-) -> std::io::Result<()> {
-  writer.write_all(b" ")?;
-  writer.write_all(attr_name.as_bytes())?;
-  writer.write_all(b"=\"")?;
-  write_escaped_str(writer, value)?;
-  writer.write_all(b"\"")
+struct EscapedDisplayWriter<'a, W: std::io::Write> {
+  writer: &'a mut W,
+  escape_quotes: bool,
+  error: Option<std::io::Error>,
 }
 
-#[inline]
-pub(crate) fn write_list_attr_value<W, T>(
-  writer: &mut W,
-  attr_name: &str,
-  values: &[T],
-) -> std::io::Result<()>
-where
-  W: std::io::Write,
-  T: std::fmt::Display,
-{
-  writer.write_all(b" ")?;
-  writer.write_all(attr_name.as_bytes())?;
-  writer.write_all(b"=\"")?;
-  write_list_value(writer, values)?;
-  writer.write_all(b"\"")
+impl<W: std::io::Write> std::fmt::Write for EscapedDisplayWriter<'_, W> {
+  #[inline]
+  fn write_str(&mut self, value: &str) -> std::fmt::Result {
+    write_escaped_xml_bytes(self.writer, value.as_bytes(), self.escape_quotes).map_err(|err| {
+      self.error = Some(err);
+      std::fmt::Error
+    })
+  }
 }
 
 #[inline]
@@ -1831,7 +1834,7 @@ pub(crate) fn write_twips_measure_value<W: std::io::Write>(
   match value {
     crate::simple_type::TwipsMeasureValue::Twips(value) => write_escaped_text(writer, value),
     crate::simple_type::TwipsMeasureValue::UniversalMeasure(value) => {
-      write_escaped_str(writer, value.to_lexical().as_str())
+      crate::units::write_universal_measure_lexical(writer, *value)
     }
   }
 }
@@ -1844,7 +1847,7 @@ pub(crate) fn write_signed_twips_measure_value<W: std::io::Write>(
   match value {
     crate::simple_type::SignedTwipsMeasureValue::Twips(value) => write_escaped_text(writer, value),
     crate::simple_type::SignedTwipsMeasureValue::UniversalMeasure(value) => {
-      write_escaped_str(writer, value.to_lexical().as_str())
+      crate::units::write_universal_measure_lexical(writer, *value)
     }
   }
 }
@@ -1858,10 +1861,9 @@ pub(crate) fn write_decimal_number_or_percent_value<W: std::io::Write>(
     crate::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value) => {
       write_escaped_text(writer, value)
     }
-    crate::simple_type::DecimalNumberOrPercentValue::Percent(value) => write_escaped_str(
-      writer,
-      crate::units::format_percent_lexical(*value).as_str(),
-    ),
+    crate::simple_type::DecimalNumberOrPercentValue::Percent(value) => {
+      crate::units::write_percent_lexical(writer, *value)
+    }
   }
 }
 
@@ -1875,70 +1877,9 @@ pub(crate) fn write_measurement_or_percent_value<W: std::io::Write>(
       write_decimal_number_or_percent_value(writer, value)
     }
     crate::simple_type::MeasurementOrPercentValue::UniversalMeasure(value) => {
-      write_escaped_str(writer, value.to_lexical().as_str())
+      crate::units::write_universal_measure_lexical(writer, *value)
     }
   }
-}
-
-#[inline]
-pub(crate) fn write_twips_measure_attr<W: std::io::Write>(
-  writer: &mut W,
-  attr_name: &str,
-  value: &crate::simple_type::TwipsMeasureValue,
-) -> std::io::Result<()> {
-  write_simple_union_attr(writer, attr_name, |writer| {
-    write_twips_measure_value(writer, value)
-  })
-}
-
-#[inline]
-pub(crate) fn write_signed_twips_measure_attr<W: std::io::Write>(
-  writer: &mut W,
-  attr_name: &str,
-  value: &crate::simple_type::SignedTwipsMeasureValue,
-) -> std::io::Result<()> {
-  write_simple_union_attr(writer, attr_name, |writer| {
-    write_signed_twips_measure_value(writer, value)
-  })
-}
-
-#[inline]
-pub(crate) fn write_decimal_number_or_percent_attr<W: std::io::Write>(
-  writer: &mut W,
-  attr_name: &str,
-  value: &crate::simple_type::DecimalNumberOrPercentValue,
-) -> std::io::Result<()> {
-  write_simple_union_attr(writer, attr_name, |writer| {
-    write_decimal_number_or_percent_value(writer, value)
-  })
-}
-
-#[inline]
-pub(crate) fn write_measurement_or_percent_attr<W: std::io::Write>(
-  writer: &mut W,
-  attr_name: &str,
-  value: &crate::simple_type::MeasurementOrPercentValue,
-) -> std::io::Result<()> {
-  write_simple_union_attr(writer, attr_name, |writer| {
-    write_measurement_or_percent_value(writer, value)
-  })
-}
-
-#[inline]
-fn write_simple_union_attr<W, F>(
-  writer: &mut W,
-  attr_name: &str,
-  write_value: F,
-) -> std::io::Result<()>
-where
-  W: std::io::Write,
-  F: FnOnce(&mut W) -> std::io::Result<()>,
-{
-  writer.write_all(b" ")?;
-  writer.write_all(attr_name.as_bytes())?;
-  writer.write_all(b"=\"")?;
-  write_value(writer)?;
-  writer.write_all(b"\"")
 }
 
 #[inline]
@@ -1963,7 +1904,32 @@ pub(crate) fn write_xmlns_attr<W: std::io::Write>(
 mod tests {
   use quick_xml::{Reader, events::Event};
 
-  use super::{decode_attr_value, write_escaped_content_str, write_escaped_str};
+  use super::{
+    decode_attr_value, parse_borrowed_list_attr, write_escaped_content_str,
+    write_escaped_content_text, write_escaped_str, write_escaped_text,
+  };
+
+  struct DisplayXml;
+
+  impl std::fmt::Display for DisplayXml {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+      f.write_str(r#"<tag attr="one&two">'text'</tag>"#)
+    }
+  }
+
+  fn parse_u32_list_attr(xml: &str) -> Vec<u32> {
+    let mut reader = Reader::from_str(xml);
+    let Event::Empty(event) = reader.read_event().expect("empty event") else {
+      panic!("expected empty element");
+    };
+    let attr = event
+      .attributes()
+      .with_checks(false)
+      .next()
+      .expect("attribute")
+      .expect("valid attribute");
+    parse_borrowed_list_attr::<u32>(&attr, reader.decoder(), "Test", "a").expect("parsed list")
+  }
 
   #[test]
   fn attribute_decode_preserves_literal_newlines_for_round_trip() {
@@ -1984,6 +1950,12 @@ mod tests {
   }
 
   #[test]
+  fn borrowed_list_attr_parses_raw_and_escaped_values() {
+    assert_eq!(parse_u32_list_attr("<x a=\"1 2 3\"/>"), vec![1, 2, 3]);
+    assert_eq!(parse_u32_list_attr("<x a=\"1&#32;2 3\"/>"), vec![1, 2, 3]);
+  }
+
+  #[test]
   fn xml_writer_escapes_attributes_and_content() {
     let mut attr = Vec::new();
     write_escaped_str(&mut attr, r#"<tag attr="one&two">'text'</tag>"#).expect("write attr");
@@ -1997,6 +1969,20 @@ mod tests {
       .expect("write content");
     assert_eq!(
       String::from_utf8(content).expect("utf-8 content"),
+      r#"&lt;tag attr="one&amp;two">'text'&lt;/tag>"#
+    );
+
+    let mut display_attr = Vec::new();
+    write_escaped_text(&mut display_attr, &DisplayXml).expect("write display attr");
+    assert_eq!(
+      String::from_utf8(display_attr).expect("utf-8 display attr"),
+      "&lt;tag attr=&quot;one&amp;two&quot;&gt;&apos;text&apos;&lt;/tag&gt;"
+    );
+
+    let mut display_content = Vec::new();
+    write_escaped_content_text(&mut display_content, &DisplayXml).expect("write display content");
+    assert_eq!(
+      String::from_utf8(display_content).expect("utf-8 display content"),
       r#"&lt;tag attr="one&amp;two">'text'&lt;/tag>"#
     );
   }

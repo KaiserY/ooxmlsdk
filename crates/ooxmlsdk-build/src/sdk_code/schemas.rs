@@ -338,215 +338,6 @@ impl TypeContainmentGraph {
   }
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct RecursiveSccInfo;
-
-#[derive(Debug, Default)]
-pub(crate) struct RecursiveSccGraph {
-  scc_by_node: HashMap<String, RecursiveSccInfo>,
-}
-
-impl RecursiveSccGraph {
-  pub(crate) fn from_modules(
-    modules: &[&SchemaModuleDecl],
-    type_graph: &TypeContainmentGraph,
-  ) -> Self {
-    let mut edges: HashMap<String, Vec<String>> = HashMap::new();
-    let mut nodes = HashSet::new();
-
-    for module in modules {
-      for type_decl in &module.types {
-        let owner_key = local_type_key(module, &type_decl.rust_name);
-        nodes.insert(owner_key.clone());
-        let owner_edges = edges.entry(owner_key).or_default();
-
-        for member in &type_decl.members {
-          match member {
-            MemberDecl::Field(field) => {
-              let target = match &field.wire {
-                FieldWireDecl::Child { .. } | FieldWireDecl::Choice | FieldWireDecl::Any => {
-                  schema_type_key_from_ref(module, &field.type_ref)
-                }
-                FieldWireDecl::TextChild { .. } => {
-                  if is_value_like_type_ref(module, &field.type_ref, type_graph) {
-                    None
-                  } else {
-                    schema_type_key_from_ref(module, &field.type_ref)
-                  }
-                }
-                FieldWireDecl::Attribute { .. } | FieldWireDecl::Text => None,
-              };
-
-              if let Some(target) = target {
-                owner_edges.push(target);
-              }
-            }
-            MemberDecl::Variant(variant) => {
-              let target = match &variant.wire {
-                VariantWireDecl::Child { .. }
-                | VariantWireDecl::Sequence { .. }
-                | VariantWireDecl::Any { .. }
-                | VariantWireDecl::Text => schema_type_key_from_ref(module, &variant.payload),
-                VariantWireDecl::TextChild { .. } => {
-                  if is_value_like_type_ref(module, &variant.payload, type_graph) {
-                    None
-                  } else {
-                    schema_type_key_from_ref(module, &variant.payload)
-                  }
-                }
-              };
-
-              if let Some(target) = target {
-                owner_edges.push(target);
-              }
-            }
-          }
-        }
-      }
-    }
-
-    for targets in edges.values_mut() {
-      targets.sort();
-      targets.dedup();
-    }
-
-    let sccs = tarjan_scc(&nodes, &edges);
-    let mut recursive_sccs = Vec::new();
-    for mut members in sccs {
-      members.sort();
-      let recursive = if members.len() > 1 {
-        true
-      } else {
-        let node = &members[0];
-        edges
-          .get(node)
-          .is_some_and(|targets| targets.iter().any(|target| target == node))
-      };
-      if recursive {
-        recursive_sccs.push(members);
-      }
-    }
-    recursive_sccs.sort_by(|left, right| left[0].cmp(&right[0]));
-
-    let mut scc_by_node = HashMap::new();
-    for members in recursive_sccs {
-      let info = RecursiveSccInfo;
-      for member in &members {
-        scc_by_node.insert(member.clone(), info.clone());
-      }
-    }
-
-    Self { scc_by_node }
-  }
-
-  pub(crate) fn info_for_key(&self, node: &str) -> Option<&RecursiveSccInfo> {
-    self.scc_by_node.get(node)
-  }
-}
-
-fn wml_recursive_table_stack_parser_attr_tokens(
-  ir: &SchemaModuleDecl,
-  type_decl: &TypeDecl,
-) -> Option<TokenStream> {
-  if ir.module_name != "schemas_openxmlformats_org_wordprocessingml_2006_main" {
-    return None;
-  }
-  if !matches!(
-    type_decl.rust_name.as_str(),
-    "Table" | "TableRow" | "TableCell"
-  ) {
-    return None;
-  }
-
-  let type_stem = escape_snake_case(type_decl.rust_name.to_snake_case());
-  let read_borrowed = format!("__ooxmlsdk_read_recursive_table_as_{type_stem}_borrowed");
-  let write = format!("__ooxmlsdk_write_recursive_table_as_{type_stem}");
-  let child_borrowed = match type_decl.rust_name.as_str() {
-    "Table" => "__ooxmlsdk_read_recursive_table_child_borrowed",
-    "TableRow" => "__ooxmlsdk_read_recursive_table_row_child_borrowed",
-    "TableCell" => "__ooxmlsdk_read_recursive_table_cell_child_borrowed",
-    _ => return None,
-  };
-  Some(quote! {
-    #[sdk(stack_parser(read_borrowed = #read_borrowed, write = #write, child_borrowed = #child_borrowed))]
-  })
-}
-
-fn tarjan_scc(nodes: &HashSet<String>, edges: &HashMap<String, Vec<String>>) -> Vec<Vec<String>> {
-  struct Tarjan<'a> {
-    edges: &'a HashMap<String, Vec<String>>,
-    index: usize,
-    stack: Vec<String>,
-    on_stack: HashSet<String>,
-    indices: HashMap<String, usize>,
-    lowlinks: HashMap<String, usize>,
-    components: Vec<Vec<String>>,
-  }
-
-  impl Tarjan<'_> {
-    fn strong_connect(&mut self, node: &str) {
-      let index = self.index;
-      self.indices.insert(node.to_string(), index);
-      self.lowlinks.insert(node.to_string(), index);
-      self.index += 1;
-      self.stack.push(node.to_string());
-      self.on_stack.insert(node.to_string());
-
-      if let Some(targets) = self.edges.get(node) {
-        for target in targets {
-          if !self.indices.contains_key(target) {
-            self.strong_connect(target);
-            let target_lowlink = self.lowlinks[target];
-            let node_lowlink = self.lowlinks[node];
-            self
-              .lowlinks
-              .insert(node.to_string(), node_lowlink.min(target_lowlink));
-          } else if self.on_stack.contains(target) {
-            let target_index = self.indices[target];
-            let node_lowlink = self.lowlinks[node];
-            self
-              .lowlinks
-              .insert(node.to_string(), node_lowlink.min(target_index));
-          }
-        }
-      }
-
-      if self.lowlinks[node] == self.indices[node] {
-        let mut component = Vec::new();
-        while let Some(member) = self.stack.pop() {
-          self.on_stack.remove(&member);
-          let done = member == node;
-          component.push(member);
-          if done {
-            break;
-          }
-        }
-        self.components.push(component);
-      }
-    }
-  }
-
-  let mut tarjan = Tarjan {
-    edges,
-    index: 0,
-    stack: Vec::new(),
-    on_stack: HashSet::new(),
-    indices: HashMap::new(),
-    lowlinks: HashMap::new(),
-    components: Vec::new(),
-  };
-
-  let mut sorted_nodes = nodes.iter().map(String::as_str).collect::<Vec<_>>();
-  sorted_nodes.sort_unstable();
-  for node in sorted_nodes {
-    if !tarjan.indices.contains_key(node) {
-      tarjan.strong_connect(node);
-    }
-  }
-
-  tarjan.components
-}
-
 fn top_level_content_children(schema_type: &SchemaType) -> &[SchemaTypeChild] {
   if schema_type.children.len() == 1
     && schema_type.children[0].kind == SchemaTypeChildKind::Sequence
@@ -1474,7 +1265,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
   type_graph: &TypeContainmentGraph,
 ) -> Result<TokenStream> {
   let version_cfg = VersionCfgContext::new(suppress_version_cfg_attrs);
-  let recursive_scc_graph = RecursiveSccGraph::from_modules(&[ir], type_graph);
   let mut token_stream_list: Vec<TokenStream> = vec![];
   let mut helper_token_stream_list: Vec<(String, bool, bool, TokenStream)> = vec![];
   let omitted_empty_leaf_marker_type_names = empty_leaf_marker_type_names_to_omit(ir);
@@ -1513,9 +1303,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         || type_graph.is_wrapped_base(&local_type_key(ir, &ty.rust_name))
     })
   {
-    let type_key = local_type_key(ir, &type_decl.rust_name);
-    let recursive_scc_info = recursive_scc_graph.info_for_key(&type_key);
-
     let attr_fields: Vec<&FieldDecl> = type_decl
       .members
       .iter()
@@ -1592,13 +1379,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     } else {
       quote! {}
     };
-    let stack_parser_attrs = if recursive_scc_info.is_some()
-      && let Some(tokens) = wml_recursive_table_stack_parser_attr_tokens(ir, type_decl)
-    {
-      tokens
-    } else {
-      quote! {}
-    };
     let summary_doc = format!(" {}", type_decl.docs);
     let sdk_type_derive = sdk_type_derive_tokens();
 
@@ -1656,7 +1436,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         #[doc = #summary_doc]
         #sdk_type_derive
         #sdk_type_attrs
-        #stack_parser_attrs
         pub struct #struct_name_ident {
           #( #fields )*
         }
@@ -1713,7 +1492,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         #[doc = #summary_doc]
         #sdk_type_derive
         #sdk_type_attrs
-        #stack_parser_attrs
         pub struct #struct_name_ident(pub #base_type_ident);
       });
 
@@ -2259,7 +2037,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       #[doc = #summary_doc]
       #sdk_type_derive
       #sdk_type_attrs
-      #stack_parser_attrs
       pub struct #struct_name_ident {
         #( #fields )*
       }
@@ -7321,114 +7098,5 @@ mod tests {
     assert!(generated.contains("pub text_math : TextMath"));
     assert!(!generated.contains("pub struct TextMath"));
     assert!(!generated.contains("# [sdk (empty_child (qname = \"t:m\"))]"));
-  }
-
-  #[test]
-  fn recursive_scc_graph_detects_choice_cycle() {
-    let ir = SchemaModuleDecl {
-      module_name: "test_module".to_string(),
-      types: vec![
-        TypeDecl {
-          rust_name: "Table".to_string(),
-          members: vec![MemberDecl::Field(FieldDecl {
-            rust_name: "table_choice".to_string(),
-            wire: FieldWireDecl::Choice,
-            type_ref: TypeRefDecl {
-              rust_type: "TableChoice".to_string(),
-              ..Default::default()
-            },
-            ..Default::default()
-          })],
-          ..Default::default()
-        },
-        TypeDecl {
-          rust_name: "TableChoice".to_string(),
-          kind: TypeKind::ChoiceEnum,
-          members: vec![MemberDecl::Variant(VariantDecl {
-            rust_name: "TableRow".to_string(),
-            wire: VariantWireDecl::Child {
-              qnames: vec!["w:tr".to_string()],
-            },
-            payload: TypeRefDecl {
-              rust_type: "TableRow".to_string(),
-              ..Default::default()
-            },
-            ..Default::default()
-          })],
-          ..Default::default()
-        },
-        TypeDecl {
-          rust_name: "TableRow".to_string(),
-          members: vec![MemberDecl::Field(FieldDecl {
-            rust_name: "table_cell".to_string(),
-            wire: FieldWireDecl::Child {
-              qname: "w:tc".to_string(),
-            },
-            type_ref: TypeRefDecl {
-              rust_type: "TableCell".to_string(),
-              ..Default::default()
-            },
-            ..Default::default()
-          })],
-          ..Default::default()
-        },
-        TypeDecl {
-          rust_name: "TableCell".to_string(),
-          members: vec![MemberDecl::Field(FieldDecl {
-            rust_name: "table".to_string(),
-            wire: FieldWireDecl::Child {
-              qname: "w:tbl".to_string(),
-            },
-            type_ref: TypeRefDecl {
-              rust_type: "Table".to_string(),
-              ..Default::default()
-            },
-            ..Default::default()
-          })],
-          ..Default::default()
-        },
-      ],
-      ..Default::default()
-    };
-    let type_graph = TypeContainmentGraph::from_modules(&[&ir]);
-    let recursive_graph = RecursiveSccGraph::from_modules(&[&ir], &type_graph);
-    let table_key = local_type_key(&ir, "Table");
-    let choice_key = local_type_key(&ir, "TableChoice");
-    let row_key = local_type_key(&ir, "TableRow");
-    let cell_key = local_type_key(&ir, "TableCell");
-
-    assert!(recursive_graph.info_for_key(&table_key).is_some());
-    assert!(recursive_graph.info_for_key(&choice_key).is_some());
-    assert!(recursive_graph.info_for_key(&row_key).is_some());
-    assert!(recursive_graph.info_for_key(&cell_key).is_some());
-  }
-
-  #[test]
-  fn recursive_scc_graph_detects_self_cycle() {
-    let ir = SchemaModuleDecl {
-      module_name: "test_module".to_string(),
-      types: vec![TypeDecl {
-        rust_name: "Mapping".to_string(),
-        members: vec![MemberDecl::Field(FieldDecl {
-          rust_name: "mapping".to_string(),
-          wire: FieldWireDecl::Child {
-            qname: "inkml:mapping".to_string(),
-          },
-          type_ref: TypeRefDecl {
-            rust_type: "Mapping".to_string(),
-            ..Default::default()
-          },
-          cardinality: Cardinality::Many,
-          ..Default::default()
-        })],
-        ..Default::default()
-      }],
-      ..Default::default()
-    };
-    let type_graph = TypeContainmentGraph::from_modules(&[&ir]);
-    let recursive_graph = RecursiveSccGraph::from_modules(&[&ir], &type_graph);
-    let mapping_key = local_type_key(&ir, "Mapping");
-
-    assert!(recursive_graph.info_for_key(&mapping_key).is_some());
   }
 }

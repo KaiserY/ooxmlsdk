@@ -292,27 +292,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
     }
   });
-  let root_cache_clear_method = root_elements_ident.map(|root_elements_ident| {
-    quote! {
-      #[doc(hidden)]
-      pub(crate) fn clear_loaded_root_elements_recursive_dom(&mut self) {
-        for root_element in &mut self.#root_elements_ident {
-          if let Some(root_element) = root_element {
-            root_element.clear_recursive_dom();
-          }
-        }
-      }
-    }
-  });
-  let root_cache_drop_impl = root_elements_ident.map(|_| {
-    quote! {
-      impl Drop for #ident {
-        fn drop(&mut self) {
-          self.clear_loaded_root_elements_recursive_dom();
-        }
-      }
-    }
-  });
   let child_field_locals: Vec<_> = child_infos
     .iter()
     .enumerate()
@@ -410,8 +389,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
 
     impl #ident {
       #main_part_relationship_type
-
-      #root_cache_clear_method
 
       pub fn new<R: std::io::Read + std::io::Seek>(
         reader: R,
@@ -1000,8 +977,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         })
       }
     }
-
-    #root_cache_drop_impl
 
   })
 }

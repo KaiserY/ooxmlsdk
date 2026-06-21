@@ -336,8 +336,10 @@ dependencies = [
  "bitflags 2.13.0",
  "emfsdk-derive",
  "encoding_rs",
+ "fontdb",
  "image",
  "thiserror",
+ "ttf-parser",
 ]
 
 [[package]]

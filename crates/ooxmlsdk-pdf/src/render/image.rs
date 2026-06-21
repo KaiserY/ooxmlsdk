@@ -14,8 +14,15 @@ pub(super) fn decode_image(
   data: &[u8],
   content_type: Option<&str>,
   options: &PdfOptions,
+  metafile_render_options: Option<emf_wmf::RenderOptions>,
 ) -> Result<Image> {
-  if let Some(raster) = emf_wmf::decode_metafile_as_raster(data, content_type)
+  let metafile_raster = match metafile_render_options {
+    Some(render_options) => {
+      emf_wmf::decode_metafile_as_raster_with_options(data, content_type, render_options)
+    }
+    None => emf_wmf::decode_metafile_as_raster(data, content_type),
+  };
+  if let Some(raster) = metafile_raster
     .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF image: {err}")))?
   {
     return match raster.content_type {

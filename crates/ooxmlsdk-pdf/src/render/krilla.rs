@@ -1421,7 +1421,12 @@ fn draw_paint_item(
     PaintItem::Rect(rect) => draw_rect_item(surface, rect),
     PaintItem::Image(image) => {
       let _alt_text = image.alt_text.as_deref();
-      match decode_image(&image.data, image.content_type.as_deref(), options) {
+      match decode_image(
+        &image.data,
+        image.content_type.as_deref(),
+        options,
+        Some(metafile_render_options_for_image(image, options)),
+      ) {
         Ok(pdf_image) => draw_image_item(surface, image, pdf_image),
         Err(_) => draw_missing_image(surface, image),
       }
@@ -1440,6 +1445,22 @@ fn draw_paint_item(
     }
     PaintItem::Line(line) => draw_line_item(surface, line),
     PaintItem::Polyline(polyline) => draw_polyline_item(surface, polyline),
+  }
+}
+
+fn metafile_render_options_for_image(
+  _image: &ImageItem<'_>,
+  options: &PdfOptions,
+) -> ooxmlsdk_layout::render::emf_wmf::RenderOptions {
+  let dpi = options
+    .images
+    .max_resolution_dpi
+    .unwrap_or(300)
+    .clamp(72, 600);
+  ooxmlsdk_layout::render::emf_wmf::RenderOptions {
+    target_width_px: None,
+    target_height_px: None,
+    max_pixels: Some(dpi.saturating_mul(dpi).saturating_mul(64)),
   }
 }
 

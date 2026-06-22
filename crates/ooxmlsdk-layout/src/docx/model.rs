@@ -410,6 +410,7 @@ pub(crate) enum InlineItem {
   Text(TextRun),
   Image(InlineImage),
   Shape(InlineShape),
+  BookmarkStart(String),
   FormWidgetStart(u32),
   FormWidgetEnd(u32),
   LastRenderedPageBreak,

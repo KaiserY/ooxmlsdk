@@ -95,14 +95,16 @@ pub fn layout(
 
 pub fn layout_document(
   package: &mut PresentationDocument,
-  _options: &LayoutOptions,
+  options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
   let import = PowerPointImport::import_document(package)?;
   let document = display::lower_to_layout_document(&import);
-  let mut document = layout_document_from_compat(LayoutEngineKind::Pptx, document);
-  document
-    .debug_records
-    .extend(display::debug_records(&import));
+  let mut document = layout_document_from_compat(LayoutEngineKind::Pptx, document, options);
+  if options.diagnostics.collect_debug_records {
+    document
+      .debug_records
+      .extend(display::debug_records(&import));
+  }
   Ok(document)
 }
 

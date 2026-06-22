@@ -2,18 +2,25 @@ use std::borrow::Cow;
 
 use crate::common::*;
 use crate::compat as legacy;
+use crate::options::LayoutOptions as EngineLayoutOptions;
 
 pub fn layout_document_from_compat(
   engine_kind: LayoutEngineKind,
   document: legacy::LayoutDocument,
+  options: &EngineLayoutOptions,
 ) -> LayoutDocument<'static> {
-  let debug_records = debug_records_from_compat(&document);
+  let debug_records = if options.diagnostics.collect_debug_records {
+    debug_records_from_compat(&document)
+  } else {
+    Vec::new()
+  };
   let legacy::LayoutDocument {
     pages,
     form_widgets,
     follows,
     frames,
     outline_entries,
+    anchor_pages,
     page_replays,
     page_replay_applications,
     backward_moves,
@@ -25,6 +32,11 @@ pub fn layout_document_from_compat(
   } = document;
   LayoutDocument {
     engine_kind,
+    options: LayoutOptions {
+      collect_debug: options.diagnostics.collect_debug_records,
+      approximate_unsupported: false,
+      preserve_source_links: options.diagnostics.preserve_source_links,
+    },
     pages: pages.into_iter().map(display_page_from_compat).collect(),
     form_widgets: form_widgets
       .into_iter()
@@ -40,6 +52,10 @@ pub fn layout_document_from_compat(
       .into_iter()
       .map(outline_entry_from_compat)
       .collect(),
+    anchor_pages: anchor_pages
+      .into_iter()
+      .map(anchor_page_from_compat)
+      .collect(),
     reflow: reflow_diagnostics_from_compat(ReflowCompatParts {
       page_replays,
       page_replay_applications,
@@ -52,6 +68,17 @@ pub fn layout_document_from_compat(
     }),
     debug_records,
     ..LayoutDocument::default()
+  }
+}
+
+fn anchor_page_from_compat(anchor: legacy::AnchorPage) -> AnchorPage<'static> {
+  AnchorPage {
+    name: Cow::Owned(anchor.name),
+    page_index: anchor.page_index,
+    section_index: anchor.section_index,
+    section_page_index: anchor.section_page_index,
+    physical_page_number: anchor.physical_page_number,
+    virtual_page_number: anchor.virtual_page_number,
   }
 }
 

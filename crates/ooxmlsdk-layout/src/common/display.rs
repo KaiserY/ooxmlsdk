@@ -13,6 +13,7 @@ pub struct LayoutDocument<'doc> {
   pub frames: Vec<FrameRecord<'doc>>,
   pub follows: Vec<FrameFollow>,
   pub outline_entries: Vec<OutlineEntry<'doc>>,
+  pub anchor_pages: Vec<AnchorPage<'doc>>,
   pub reflow: ReflowDiagnostics<'doc>,
   pub debug_records: Vec<crate::common::DebugRecord<'doc>>,
   pub unsupported: Vec<UnsupportedLayoutFeature<'doc>>,
@@ -31,6 +32,16 @@ pub struct LayoutOptions {
   pub collect_debug: bool,
   pub approximate_unsupported: bool,
   pub preserve_source_links: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AnchorPage<'doc> {
+  pub name: Cow<'doc, str>,
+  pub page_index: usize,
+  pub section_index: usize,
+  pub section_page_index: usize,
+  pub physical_page_number: usize,
+  pub virtual_page_number: usize,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

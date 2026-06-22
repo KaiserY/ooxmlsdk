@@ -48,6 +48,7 @@ pub fn layout_document(
   Ok(layout_document_from_compat(
     LayoutEngineKind::Xlsx,
     document,
+    options,
   ))
 }
 

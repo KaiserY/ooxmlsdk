@@ -273,6 +273,7 @@ pub fn layout_document(
   Ok(layout_document_from_compat(
     LayoutEngineKind::Docx,
     document,
+    options,
   ))
 }
 
@@ -741,6 +742,7 @@ fn paragraph_is_effectively_empty(paragraph: &Paragraph) -> bool {
     && paragraph.inlines.iter().all(|inline| match inline {
       InlineItem::Text(run) => run.text.trim().is_empty(),
       InlineItem::Image(_) | InlineItem::Shape(_) => false,
+      InlineItem::BookmarkStart(_) => true,
       InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
       InlineItem::LastRenderedPageBreak => true,
       InlineItem::PageBreak | InlineItem::ColumnBreak => false,
@@ -759,6 +761,7 @@ fn paragraph_drop_cap_text(paragraph: &Paragraph) -> Option<String> {
       InlineItem::Text(run) => Some(run.text.as_str()),
       InlineItem::Image(_)
       | InlineItem::Shape(_)
+      | InlineItem::BookmarkStart(_)
       | InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
       | InlineItem::LastRenderedPageBreak
@@ -1645,7 +1648,10 @@ pub(super) fn paragraph_starts_after_last_rendered_page_break(inlines: &[InlineI
       }
       InlineItem::Image(_) | InlineItem::Shape(_) => return saw_last_rendered_page_break,
       InlineItem::PageBreak | InlineItem::ColumnBreak => return false,
-      InlineItem::Text(_) | InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => {}
+      InlineItem::Text(_)
+      | InlineItem::BookmarkStart(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_) => {}
     }
   }
   false
@@ -2844,6 +2850,12 @@ fn paragraph_inlines(
           &mut inline_context,
           &mut complex_field,
         );
+      }
+      w::ParagraphChoice::BookmarkStart(bookmark) => {
+        let name = bookmark.name.as_str();
+        if !name.is_empty() {
+          inlines.push(InlineItem::BookmarkStart(name.to_string()));
+        }
       }
       w::ParagraphChoice::InsertedRun(inserted) => {
         push_inserted_run(
@@ -13954,6 +13966,7 @@ mod tests {
         InlineItem::Image(image) => Some(image),
         InlineItem::Text(_)
         | InlineItem::Shape(_)
+        | InlineItem::BookmarkStart(_)
         | InlineItem::FormWidgetStart(_)
         | InlineItem::FormWidgetEnd(_)
         | InlineItem::LastRenderedPageBreak
@@ -14325,6 +14338,7 @@ mod tests {
         InlineItem::Text(run) => Some(run.text.as_str()),
         InlineItem::Image(_)
         | InlineItem::Shape(_)
+        | InlineItem::BookmarkStart(_)
         | InlineItem::FormWidgetStart(_)
         | InlineItem::FormWidgetEnd(_)
         | InlineItem::LastRenderedPageBreak

@@ -9,6 +9,7 @@ pub(crate) fn layout(
 ) -> Result<ooxmlsdk_layout::common::LayoutDocument<'static>> {
   let options = ooxmlsdk_layout::options::LayoutOptions {
     source_file_name: options.source_file_name.clone(),
+    ..Default::default()
   };
   Ok(ooxmlsdk_layout::xlsx::layout_document(package, &options)?)
 }

@@ -186,6 +186,7 @@ pub(super) fn paragraph_model_with_base<'a>(
       super::InlineItem::Text(run) => Some(run.clone()),
       super::InlineItem::Image(_) => None,
       super::InlineItem::Shape(_) => None,
+      super::InlineItem::BookmarkStart(_) => None,
       super::InlineItem::FormWidgetStart(_) | super::InlineItem::FormWidgetEnd(_) => None,
       super::InlineItem::LastRenderedPageBreak => None,
       super::InlineItem::PageBreak | super::InlineItem::ColumnBreak => None,

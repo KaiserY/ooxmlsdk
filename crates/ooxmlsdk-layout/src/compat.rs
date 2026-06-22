@@ -7,6 +7,7 @@ pub struct LayoutDocument {
   pub follows: Vec<FrameFollow>,
   pub frames: Vec<LayoutFrame>,
   pub outline_entries: Vec<OutlineEntry>,
+  pub anchor_pages: Vec<AnchorPage>,
   pub page_replays: Vec<PageReplay>,
   pub page_replay_applications: Vec<PageReplayApplication>,
   pub backward_moves: Vec<BackwardMove>,
@@ -47,6 +48,7 @@ pub(crate) fn fixed_pages_with_items(pages: Vec<(PageSetup, Vec<PageItem>)>) -> 
     follows: Vec::new(),
     frames: Vec::new(),
     outline_entries: Vec::new(),
+    anchor_pages: Vec::new(),
     page_replays: Vec::new(),
     page_replay_applications: Vec::new(),
     backward_moves: Vec::new(),
@@ -66,6 +68,16 @@ pub struct OutlineEntry {
   pub x_pt: f32,
   pub y_pt: f32,
   pub merged_hidden_separator: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AnchorPage {
+  pub name: String,
+  pub page_index: usize,
+  pub section_index: usize,
+  pub section_page_index: usize,
+  pub physical_page_number: usize,
+  pub virtual_page_number: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -14,7 +14,7 @@ use crate::docx::{
   TextStyle, VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
-use crate::options::LayoutOptions;
+use crate::options::{LayoutActionOptions, LayoutOptions};
 use crate::text_metrics::{baseline_offset_in_line, inline_text_box_height, measure_text};
 use crate::units;
 
@@ -77,6 +77,7 @@ fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
     InlineItem::Text(_) => None,
     InlineItem::Image(_)
     | InlineItem::Shape(_)
+    | InlineItem::BookmarkStart(_)
     | InlineItem::FormWidgetStart(_)
     | InlineItem::FormWidgetEnd(_)
     | InlineItem::LastRenderedPageBreak
@@ -268,6 +269,7 @@ pub(crate) struct LayoutDocument {
   pub follows: Vec<FrameFollow>,
   pub frames: Vec<LayoutFrame>,
   pub outline_entries: Vec<OutlineEntry>,
+  pub anchor_pages: Vec<AnchorPage>,
   pub page_replays: Vec<PageReplay>,
   pub page_replay_applications: Vec<PageReplayApplication>,
   pub backward_moves: Vec<BackwardMove>,
@@ -286,6 +288,16 @@ pub(crate) struct OutlineEntry {
   pub x_pt: f32,
   pub y_pt: f32,
   pub merged_hidden_separator: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct AnchorPage {
+  pub name: String,
+  pub page_index: usize,
+  pub section_index: usize,
+  pub section_page_index: usize,
+  pub physical_page_number: usize,
+  pub virtual_page_number: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -325,6 +337,7 @@ pub(crate) struct LayoutFrame {
   pub section_index: usize,
   pub section_page_index: usize,
   pub column_index: usize,
+  pub item_count: usize,
   pub items: Vec<PageItem>,
   pub item_start: usize,
   pub item_end: usize,
@@ -833,8 +846,8 @@ struct BlockArea {
   repeating_slots: RepeatingSlotState,
 }
 
-pub(crate) fn layout(document: &DocxDocument, _options: &LayoutOptions) -> Result<LayoutDocument> {
-  Ok(RootFrameLayout::new(document).format())
+pub(crate) fn layout(document: &DocxDocument, options: &LayoutOptions) -> Result<LayoutDocument> {
+  Ok(RootFrameLayout::new(document, options).format())
 }
 
 pub(crate) fn layout_summary(layout: LayoutDocument) -> super::DocxLayoutSummary {
@@ -887,6 +900,7 @@ pub(crate) fn layout_document(
       follows: Vec::new(),
       frames: Vec::new(),
       outline_entries: Vec::new(),
+      anchor_pages: Vec::new(),
       page_replays: Vec::new(),
       page_replay_applications: Vec::new(),
       backward_moves: Vec::new(),
@@ -921,6 +935,11 @@ fn into_compat_document(document: LayoutDocument) -> crate::compat::LayoutDocume
       .outline_entries
       .into_iter()
       .map(into_compat_outline_entry)
+      .collect(),
+    anchor_pages: document
+      .anchor_pages
+      .into_iter()
+      .map(into_compat_anchor_page)
       .collect(),
     page_replays: document
       .page_replays
@@ -976,32 +995,63 @@ fn into_compat_frame_follow(follow: FrameFollow) -> crate::compat::FrameFollow {
 }
 
 fn into_compat_layout_frame(frame: LayoutFrame) -> crate::compat::LayoutFrame {
+  let item_offset = frame.item_start;
+  let item_count = frame.item_count;
   crate::compat::LayoutFrame {
     kind: into_compat_follow_frame_kind(frame.kind),
     block_index: frame.block_index,
-    split_start: into_compat_frame_cursor(frame.split_start),
-    split_end: into_compat_frame_cursor(frame.split_end),
+    split_start: into_compat_frame_cursor(localize_frame_cursor(frame.split_start, item_offset)),
+    split_end: into_compat_frame_cursor(localize_frame_cursor(frame.split_end, item_offset)),
     page_index: frame.page_index,
     section_index: frame.section_index,
     section_page_index: frame.section_page_index,
     column_index: frame.column_index,
     items: frame.items.into_iter().map(into_compat_page_item).collect(),
-    item_start: frame.item_start,
-    item_end: frame.item_end,
+    item_start: 0,
+    item_end: item_count,
     bounds: frame.bounds.map(into_compat_frame_bounds),
-    lines: frame.lines.into_iter().map(into_compat_line_box).collect(),
+    lines: frame
+      .lines
+      .into_iter()
+      .map(|line| into_compat_line_box(localize_line_box(line, item_offset)))
+      .collect(),
     fragments: frame
       .fragments
       .into_iter()
-      .map(into_compat_frame_fragment)
+      .map(|fragment| into_compat_frame_fragment(localize_frame_fragment(fragment, item_offset)))
       .collect(),
     influences: frame
       .influences
       .into_iter()
-      .map(into_compat_frame_influence)
+      .map(|influence| {
+        into_compat_frame_influence(localize_frame_influence(influence, item_offset))
+      })
       .collect(),
     invalidation: into_compat_frame_invalidation(frame.invalidation),
   }
+}
+
+fn localize_frame_cursor(mut cursor: FrameCursor, item_offset: usize) -> FrameCursor {
+  cursor.inline_index = cursor.inline_index.saturating_sub(item_offset);
+  cursor
+}
+
+fn localize_line_box(mut line: LineBox, item_offset: usize) -> LineBox {
+  line.item_start = line.item_start.saturating_sub(item_offset);
+  line.item_end = line.item_end.saturating_sub(item_offset);
+  line
+}
+
+fn localize_frame_fragment(mut fragment: FrameFragment, item_offset: usize) -> FrameFragment {
+  fragment.item_start = fragment.item_start.saturating_sub(item_offset);
+  fragment.item_end = fragment.item_end.saturating_sub(item_offset);
+  fragment
+}
+
+fn localize_frame_influence(mut influence: FrameInfluence, item_offset: usize) -> FrameInfluence {
+  influence.item_start = influence.item_start.saturating_sub(item_offset);
+  influence.item_end = influence.item_end.saturating_sub(item_offset);
+  influence
 }
 
 fn into_compat_frame_cursor(cursor: FrameCursor) -> crate::compat::FrameCursor {
@@ -1287,6 +1337,17 @@ fn into_compat_outline_entry(entry: OutlineEntry) -> crate::compat::OutlineEntry
   }
 }
 
+fn into_compat_anchor_page(anchor: AnchorPage) -> crate::compat::AnchorPage {
+  crate::compat::AnchorPage {
+    name: anchor.name,
+    page_index: anchor.page_index,
+    section_index: anchor.section_index,
+    section_page_index: anchor.section_page_index,
+    physical_page_number: anchor.physical_page_number,
+    virtual_page_number: anchor.virtual_page_number,
+  }
+}
+
 fn into_compat_form_widget(widget: crate::docx::FormWidget) -> crate::compat::FormWidget {
   crate::compat::FormWidget {
     id: widget.id,
@@ -1511,45 +1572,72 @@ fn into_compat_image_crop(crop: ImageCrop) -> crate::compat::ImageCrop {
 
 struct RootFrameLayout<'a> {
   document: &'a DocxDocument,
+  action: LayoutActionOptions,
+  collect_frame_items: bool,
+  emit_reflow_diagnostics: bool,
   pages: Vec<Page>,
   current: Page,
   y: f32,
   emitted_footnotes: HashSet<i64>,
+  emitted_footnote_order: Vec<i64>,
   follows: Vec<FrameFollow>,
   frames: Vec<LayoutFrame>,
   outline_entries: Vec<OutlineEntry>,
+  anchor_pages: Vec<AnchorPage>,
   checkpoints: Vec<LayoutCheckpoint>,
   next_line_number: i16,
   pending_trailing_page_break: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 struct LayoutCheckpoint {
   section_index: usize,
   block_index: usize,
   page_index: usize,
   y: f32,
   flow: FlowContext,
-  pages: Vec<Page>,
-  current: Page,
-  emitted_footnotes: HashSet<i64>,
-  follows: Vec<FrameFollow>,
-  frames: Vec<LayoutFrame>,
-  outline_entries: Vec<OutlineEntry>,
+  current: PageCheckpoint,
+  emitted_footnotes_len: usize,
+  follows_len: usize,
+  frames_len: usize,
+  outline_entries_len: usize,
+  anchor_pages_len: usize,
   next_line_number: i16,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct PageCheckpoint {
+  setup: PageSetup,
+  section_index: usize,
+  section_page_index: usize,
+  items_len: usize,
+  body_content_frames: usize,
+  explicit_break_target: bool,
+  preserve_empty: bool,
+  delete_forbidden: bool,
+  frame_fragments_len: usize,
+  frame_influences_len: usize,
+  wrap_exclusions_len: usize,
+  repeating_wrap_exclusions_len: usize,
+  pending_floating_table_follows_len: usize,
+}
+
 impl<'a> RootFrameLayout<'a> {
-  fn new(document: &'a DocxDocument) -> Self {
+  fn new(document: &'a DocxDocument, options: &LayoutOptions) -> Self {
     Self {
       document,
+      action: options.action,
+      collect_frame_items: options.diagnostics.collect_debug_records,
+      emit_reflow_diagnostics: options.diagnostics.collect_reflow_records,
       pages: Vec::new(),
       current: empty_page(document.page, 0),
       y: document.page.margin_top_pt,
       emitted_footnotes: HashSet::new(),
+      emitted_footnote_order: Vec::new(),
       follows: Vec::new(),
       frames: Vec::new(),
       outline_entries: Vec::new(),
+      anchor_pages: Vec::new(),
       checkpoints: Vec::new(),
       next_line_number: document
         .page
@@ -1566,18 +1654,20 @@ impl<'a> RootFrameLayout<'a> {
     self.finish_current_page();
     self.finish_pending_trailing_page_break();
     materialize_pending_floating_table_follows(&mut self.pages);
-    check_page_desc_empty_pages(
-      self.document,
-      &mut self.pages,
-      &mut self.frames,
-      &mut self.follows,
-      &mut self.outline_entries,
-    );
+    if self.action.check_pages {
+      check_page_desc_empty_pages(
+        self.document,
+        &mut self.pages,
+        &mut self.frames,
+        &mut self.follows,
+        &mut self.outline_entries,
+      );
+    }
 
     let mut layout_reruns = Vec::new();
     let influence_reflow_requests = reflow_requests_for_frames(&self.frames, true);
     let (mut reflow_requests, mut reflow_executions, mut page_replays, mut backward_moves) =
-      execute_reflow_requests(&mut self.frames, influence_reflow_requests);
+      execute_reflow_requests(&mut self.frames, &self.pages, influence_reflow_requests);
     if let Some(rerun) = self.apply_checkpoint_rerun(&backward_moves) {
       layout_reruns.push(rerun);
       let influence_reflow_requests = reflow_requests_for_frames(&self.frames, true);
@@ -1586,41 +1676,43 @@ impl<'a> RootFrameLayout<'a> {
         reflow_executions,
         page_replays,
         backward_moves,
-      ) = execute_reflow_requests(&mut self.frames, influence_reflow_requests);
+      ) = execute_reflow_requests(&mut self.frames, &self.pages, influence_reflow_requests);
     }
     let mut page_replay_applications = apply_page_replays(&mut self.pages, &page_replays);
 
-    let page_item_counts_before_decoration = self
-      .pages
-      .iter()
-      .map(|page| page.items.len())
-      .collect::<Vec<_>>();
-    apply_page_backgrounds(&mut self.pages);
-    place_floating_images(&mut self.pages);
-    apply_column_separators(self.document, &mut self.pages, &self.frames);
-    apply_headers_and_footers(self.document, &mut self.pages);
-    apply_page_borders(&mut self.pages);
-    resolve_dynamic_fields(&mut self.pages);
-    mark_decorated_frame_invalidations(
-      &mut self.frames,
-      &self.pages,
-      &page_item_counts_before_decoration,
-    );
-    let decoration_reflow_requests = reflow_requests_for_frames(&self.frames, false);
-    let (
-      remaining_decoration_reflow_requests,
-      decoration_reflow_executions,
-      decoration_page_replays,
-      decoration_backward_moves,
-    ) = execute_reflow_requests(&mut self.frames, decoration_reflow_requests);
-    page_replay_applications.extend(apply_page_replays(
-      &mut self.pages,
-      &decoration_page_replays,
-    ));
-    page_replays.extend(decoration_page_replays);
-    backward_moves.extend(decoration_backward_moves);
-    reflow_executions.extend(decoration_reflow_executions);
-    reflow_requests.extend(remaining_decoration_reflow_requests);
+    if self.action.paint {
+      let page_item_counts_before_decoration = self
+        .pages
+        .iter()
+        .map(|page| page.items.len())
+        .collect::<Vec<_>>();
+      apply_page_backgrounds(&mut self.pages);
+      place_floating_images(&mut self.pages);
+      apply_column_separators(self.document, &mut self.pages, &self.frames);
+      apply_headers_and_footers(self.document, &mut self.pages);
+      apply_page_borders(&mut self.pages);
+      resolve_dynamic_fields(&mut self.pages);
+      mark_decorated_frame_invalidations(
+        &mut self.frames,
+        &self.pages,
+        &page_item_counts_before_decoration,
+      );
+      let decoration_reflow_requests = reflow_requests_for_frames(&self.frames, false);
+      let (
+        remaining_decoration_reflow_requests,
+        decoration_reflow_executions,
+        decoration_page_replays,
+        decoration_backward_moves,
+      ) = execute_reflow_requests(&mut self.frames, &self.pages, decoration_reflow_requests);
+      page_replay_applications.extend(apply_page_replays(
+        &mut self.pages,
+        &decoration_page_replays,
+      ));
+      page_replays.extend(decoration_page_replays);
+      backward_moves.extend(decoration_backward_moves);
+      reflow_executions.extend(decoration_reflow_executions);
+      reflow_requests.extend(remaining_decoration_reflow_requests);
+    }
     let page_count = self.pages.len();
     self
       .follows
@@ -1631,8 +1723,18 @@ impl<'a> RootFrameLayout<'a> {
     normalize_page_replay_applications(&mut page_replay_applications, &self.pages);
     normalize_backward_moves(&mut backward_moves, &self.frames, &self.pages);
     normalize_reflow_executions(&mut reflow_executions, &self.pages, &backward_moves);
-    let page_invalidations = page_invalidations_for_reflow_requests(&reflow_requests);
-    let restart_plan = restart_plan_for_page_invalidations(&self.frames, &page_invalidations);
+    let mut page_invalidations = page_invalidations_for_reflow_requests(&reflow_requests);
+    let mut restart_plan = restart_plan_for_page_invalidations(&self.frames, &page_invalidations);
+    if !self.emit_reflow_diagnostics {
+      page_replays.clear();
+      page_replay_applications.clear();
+      backward_moves.clear();
+      layout_reruns.clear();
+      page_invalidations.clear();
+      reflow_executions.clear();
+      reflow_requests.clear();
+      restart_plan = None;
+    }
 
     LayoutDocument {
       pages: self.pages,
@@ -1640,6 +1742,7 @@ impl<'a> RootFrameLayout<'a> {
       follows: self.follows,
       frames: self.frames,
       outline_entries: self.outline_entries,
+      anchor_pages: self.anchor_pages,
       page_replays,
       page_replay_applications,
       backward_moves,
@@ -1653,21 +1756,21 @@ impl<'a> RootFrameLayout<'a> {
 
   fn format_body_frames(&mut self) {
     self.seed_current_repeating_wrap_exclusions();
-    if self.document.sections.is_empty() {
-      let blocks = self.document.blocks.clone();
+    let document = self.document;
+    if document.sections.is_empty() {
       let flow = self.body_flow(document_page_frame(
-        self.document.page,
+        document.page,
         0,
         SectionColumns::default(),
       ));
       self.y = flow.content_top_pt;
-      self.format_block_sequence(&blocks, flow);
+      self.format_block_sequence(&document.blocks, flow);
       return;
     }
 
-    for section_index in 0..self.document.sections.len() {
-      let section = self.document.sections[section_index].clone();
-      self.start_section_frame(section_index, &section);
+    for section_index in 0..document.sections.len() {
+      let section = &document.sections[section_index];
+      self.start_section_frame(section_index, section);
       let flow = self.body_flow(document_page_frame(
         section.page,
         section_index,
@@ -1676,17 +1779,16 @@ impl<'a> RootFrameLayout<'a> {
       self.y = self.y.max(flow.content_top_pt);
       let previous_section_block = section_index
         .checked_sub(1)
-        .and_then(|index| self.document.sections.get(index))
+        .and_then(|index| document.sections.get(index))
         .and_then(|section| section.blocks.last());
-      if !blocks_have_visible_body_content(&section.blocks)
-        && section_has_repeating_blocks(&section)
+      if !blocks_have_visible_body_content(&section.blocks) && section_has_repeating_blocks(section)
       {
         self.current.preserve_empty = true;
         self.current.delete_forbidden = true;
       }
       if section.blocks.is_empty()
         && section_index == 0
-        && section_index + 1 < self.document.sections.len()
+        && section_index + 1 < document.sections.len()
       {
         // keeps an empty section page when a paragraph-level sectPr precedes a
         // following section break; a nextColumn break without columns then acts
@@ -1869,12 +1971,12 @@ impl<'a> RootFrameLayout<'a> {
       page_index: self.pages.len(),
       y: self.y,
       flow,
-      pages: self.pages.clone(),
-      current: self.current.clone(),
-      emitted_footnotes: self.emitted_footnotes.clone(),
-      follows: self.follows.clone(),
-      frames: self.frames.clone(),
-      outline_entries: self.outline_entries.clone(),
+      current: page_checkpoint(&self.current),
+      emitted_footnotes_len: self.emitted_footnote_order.len(),
+      follows_len: self.follows.len(),
+      frames_len: self.frames.len(),
+      outline_entries_len: self.outline_entries.len(),
+      anchor_pages_len: self.anchor_pages.len(),
       next_line_number: self.next_line_number,
     });
   }
@@ -1935,8 +2037,11 @@ impl<'a> RootFrameLayout<'a> {
       block,
       next,
       *flow,
-      &mut self.current,
-      &mut self.pages,
+      LayoutBlockTarget {
+        current: &mut self.current,
+        pages: &mut self.pages,
+        anchor_pages: Some(&mut self.anchor_pages),
+      },
       self.y,
     );
     self.materialize_pending_floating_table_follow_chain(flow);
@@ -1959,7 +2064,10 @@ impl<'a> RootFrameLayout<'a> {
     footnote_boss_format(
       block,
       self.document,
-      &mut self.emitted_footnotes,
+      FootnoteEmission {
+        emitted_footnotes: &mut self.emitted_footnotes,
+        emitted_footnote_order: &mut self.emitted_footnote_order,
+      },
       *flow,
       &mut self.current,
       &mut self.pages,
@@ -2199,8 +2307,11 @@ impl<'a> RootFrameLayout<'a> {
         block,
         next,
         flow,
-        &mut self.current,
-        &mut self.pages,
+        LayoutBlockTarget {
+          current: &mut self.current,
+          pages: &mut self.pages,
+          anchor_pages: None,
+        },
         self.y,
       );
       self.y = y;
@@ -2239,34 +2350,13 @@ impl<'a> RootFrameLayout<'a> {
           checkpoint.section_index == start_frame.section_index
             && checkpoint.block_index <= block_index
         })?;
-    let checkpoint = checkpoint.clone();
+    let checkpoint = *checkpoint;
     let replaced_pages = self.pages.len().saturating_sub(checkpoint.page_index);
-    let mut rerun = RootFrameLayout {
-      document: self.document,
-      pages: checkpoint.pages.clone(),
-      current: checkpoint.current.clone(),
-      y: checkpoint.y,
-      emitted_footnotes: checkpoint.emitted_footnotes.clone(),
-      follows: checkpoint.follows.clone(),
-      frames: checkpoint.frames.clone(),
-      outline_entries: checkpoint.outline_entries.clone(),
-      checkpoints: self.checkpoints[..=checkpoint_index].to_vec(),
-      next_line_number: checkpoint.next_line_number,
-      pending_trailing_page_break: self.pending_trailing_page_break,
-    };
-    rerun.format_body_from_checkpoint(&checkpoint, &constraints);
-    rerun.format_trailing_note_frames();
-    rerun.finish_current_page();
-
-    self.pages = rerun.pages;
-    self.current = rerun.current;
-    self.y = rerun.y;
-    self.emitted_footnotes = rerun.emitted_footnotes;
-    self.follows = rerun.follows;
-    self.frames = rerun.frames;
-    self.outline_entries = rerun.outline_entries;
-    self.checkpoints = rerun.checkpoints;
-    self.next_line_number = rerun.next_line_number;
+    self.restore_layout_checkpoint(&checkpoint)?;
+    self.checkpoints.truncate(checkpoint_index + 1);
+    self.format_body_from_checkpoint(&checkpoint, &constraints);
+    self.format_trailing_note_frames();
+    self.finish_current_page();
 
     Some(LayoutRerun {
       checkpoint_index,
@@ -2278,9 +2368,39 @@ impl<'a> RootFrameLayout<'a> {
       scope: move_back.scope,
       replaced_pages,
       produced_pages: self.pages.len().saturating_sub(checkpoint.page_index),
-      produced_frames: self.frames.len().saturating_sub(checkpoint.frames.len()),
+      produced_frames: self.frames.len().saturating_sub(checkpoint.frames_len),
       constraints,
     })
+  }
+
+  fn restore_layout_checkpoint(&mut self, checkpoint: &LayoutCheckpoint) -> Option<()> {
+    let mut current = if checkpoint.page_index < self.pages.len() {
+      let tail = self.pages.split_off(checkpoint.page_index);
+      tail.into_iter().next()?
+    } else if checkpoint.page_index == self.pages.len() {
+      std::mem::replace(
+        &mut self.current,
+        empty_page(checkpoint.current.setup, checkpoint.current.section_index),
+      )
+    } else {
+      return None;
+    };
+    restore_page_checkpoint(&mut current, checkpoint.current);
+    self.current = current;
+    self.y = checkpoint.y;
+    while self.emitted_footnote_order.len() > checkpoint.emitted_footnotes_len {
+      if let Some(id) = self.emitted_footnote_order.pop() {
+        self.emitted_footnotes.remove(&id);
+      }
+    }
+    self.follows.truncate(checkpoint.follows_len);
+    self.frames.truncate(checkpoint.frames_len);
+    self
+      .outline_entries
+      .truncate(checkpoint.outline_entries_len);
+    self.anchor_pages.truncate(checkpoint.anchor_pages_len);
+    self.next_line_number = checkpoint.next_line_number;
+    Some(())
   }
 
   fn format_body_from_checkpoint(
@@ -2290,18 +2410,18 @@ impl<'a> RootFrameLayout<'a> {
   ) {
     let checkpoint_flow = constrained_rerun_flow(checkpoint.flow, constraints);
     self.y = self.y.min(checkpoint_flow.content_bottom);
-    if self.document.sections.is_empty() {
-      let blocks = self.document.blocks.clone();
-      self.format_block_range(&blocks, checkpoint.block_index, checkpoint_flow);
+    let document = self.document;
+    if document.sections.is_empty() {
+      self.format_block_range(&document.blocks, checkpoint.block_index, checkpoint_flow);
       return;
     }
 
-    for section_index in checkpoint.section_index..self.document.sections.len() {
-      let section = self.document.sections[section_index].clone();
+    for section_index in checkpoint.section_index..document.sections.len() {
+      let section = &document.sections[section_index];
       if section_index == checkpoint.section_index {
         self.format_block_range(&section.blocks, checkpoint.block_index, checkpoint_flow);
       } else {
-        self.start_section_frame(section_index, &section);
+        self.start_section_frame(section_index, section);
         let flow = self.body_flow(document_page_frame(
           section.page,
           section_index,
@@ -2456,13 +2576,18 @@ impl<'a> RootFrameLayout<'a> {
       if item_start >= item_end && fragments.is_empty() {
         continue;
       }
-      let items = page.items[item_start..item_end].to_vec();
-      let bounds = frame_bounds_for_items(&items);
+      let page_items = &page.items[item_start..item_end];
+      let bounds = frame_bounds_for_items(page_items);
       let lines = line_boxes_for_items(&page.items, item_start, item_end);
       if fragments.is_empty() {
         fragments = frame_fragments_for(kind, &lines);
       }
-      let bounds = bounds.or_else(|| frame_bounds_for_items(&items));
+      let item_count = item_end.saturating_sub(item_start);
+      let items = if self.collect_frame_items {
+        page_items.to_vec()
+      } else {
+        Vec::new()
+      };
       let mut frame_influences = frame_influences_for_segment(influences, block_index, bounds);
       frame_influences.extend(page_frame_influences(
         &page.frame_influences,
@@ -2483,6 +2608,7 @@ impl<'a> RootFrameLayout<'a> {
         } else {
           flow.column_index
         },
+        item_count,
         items,
         item_start,
         item_end,
@@ -2547,6 +2673,7 @@ fn paragraph_outline_text(paragraph: &crate::docx::Paragraph) -> String {
         InlineItem::Text(text) => Some(text.text.as_str()),
         InlineItem::Image(_)
         | InlineItem::Shape(_)
+        | InlineItem::BookmarkStart(_)
         | InlineItem::FormWidgetStart(_)
         | InlineItem::FormWidgetEnd(_)
         | InlineItem::LastRenderedPageBreak
@@ -3248,6 +3375,7 @@ fn reflow_scope_for_frame(frame: &LayoutFrame) -> ReflowScope {
 
 fn execute_reflow_requests(
   frames: &mut [LayoutFrame],
+  pages: &[Page],
   requests: Vec<ReflowRequest>,
 ) -> (
   Vec<ReflowRequest>,
@@ -3273,7 +3401,7 @@ fn execute_reflow_requests(
     match request.reason {
       ReflowReason::DecorationChangedItems => {
         if let Some(frame) = frames.get_mut(request.frame_index)
-          && frame.items.len() == frame.item_end.saturating_sub(frame.item_start)
+          && frame.item_count == frame.item_end.saturating_sub(frame.item_start)
         {
           frame.invalidation = FrameInvalidation::Clean;
           stabilized_count += 1;
@@ -3296,14 +3424,16 @@ fn execute_reflow_requests(
           influence_count += 1;
           first_influence_page = first_influence_page.min(request.page_index);
           influence_scope = influence_scope.max(request.scope);
-          if let Some(backward) = execute_backward_move(frames, &request, &mut move_backward_keys) {
+          if let Some(backward) =
+            execute_backward_move(frames, pages, &request, &mut move_backward_keys)
+          {
             suppressed_moves += usize::from(backward.move_back.suppressed);
             influence_replayed_frames += backward.move_back.replayed_frames;
             influence_replayed_items += backward.move_back.replayed_items;
             page_replays.extend(backward.pages);
             backward_moves.push(backward.move_back);
           }
-          let replay = replay_scoped_frames(frames, &request);
+          let replay = replay_scoped_frames(frames, pages, &request);
           influence_replayed_frames += replay.frames;
           influence_replayed_items += replay.items;
           replayed_influence_frames.extend(replay.frame_indices);
@@ -3592,6 +3722,7 @@ fn ensure_section_page_slot(
 
 fn execute_backward_move(
   frames: &mut [LayoutFrame],
+  pages: &[Page],
   request: &ReflowRequest,
   move_backward_keys: &mut HashMap<MoveBackwardKey, usize>,
 ) -> Option<BackwardMoveExecution> {
@@ -3641,7 +3772,7 @@ fn execute_backward_move(
     column_index: start_frame.column_index,
     influence_count: start_frame.influences.len(),
   };
-  let replay = replay_scoped_frames(frames, &replay_request);
+  let replay = replay_scoped_frames(frames, pages, &replay_request);
   move_back.replayed_frames = replay.frames;
   move_back.replayed_items = replay.items;
   Some(BackwardMoveExecution {
@@ -3680,7 +3811,11 @@ struct ReflowReplayStats {
   pages: Vec<PageReplay>,
 }
 
-fn replay_scoped_frames(frames: &mut [LayoutFrame], request: &ReflowRequest) -> ReflowReplayStats {
+fn replay_scoped_frames(
+  frames: &mut [LayoutFrame],
+  pages: &[Page],
+  request: &ReflowRequest,
+) -> ReflowReplayStats {
   let mut stats = ReflowReplayStats::default();
   let Some(start) = frames.get(request.frame_index) else {
     return stats;
@@ -3699,17 +3834,20 @@ fn replay_scoped_frames(frames: &mut [LayoutFrame], request: &ReflowRequest) -> 
     ) {
       break;
     }
-    let replay = page_replay_for_frame(frame, request.scope);
-    replay_layout_frame(frame);
+    let replay = page_replay_for_frame(frame, pages, request.scope);
+    replay_layout_frame(frame, pages);
     stats.frames += 1;
-    stats.items += frame.items.len();
+    stats.items += frame.item_count;
     stats.frame_indices.push(frame_index);
     stats.pages.push(replay);
   }
   stats
 }
 
-fn page_replay_for_frame(frame: &LayoutFrame, scope: ReflowScope) -> PageReplay {
+fn page_replay_for_frame(frame: &LayoutFrame, pages: &[Page], scope: ReflowScope) -> PageReplay {
+  let replacement_items = frame_page_items(frame, pages)
+    .map(|items| items.to_vec())
+    .unwrap_or_else(|| frame.items.clone());
   PageReplay {
     page_index: frame.page_index,
     section_page_index: frame.section_page_index,
@@ -3717,7 +3855,7 @@ fn page_replay_for_frame(frame: &LayoutFrame, scope: ReflowScope) -> PageReplay 
     scope,
     item_start: frame.item_start,
     item_end: frame.item_end,
-    replacement_items: frame.items.clone(),
+    replacement_items,
   }
 }
 
@@ -3739,31 +3877,70 @@ fn frame_in_reflow_scope(
   }
 }
 
-fn replay_layout_frame(frame: &mut LayoutFrame) {
-  frame.item_start = 0;
-  frame.item_end = frame.items.len();
-  frame.bounds = frame_bounds_for_items(&frame.items);
-  frame.lines = line_boxes_for_items(&frame.items, 0, frame.items.len());
+fn replay_layout_frame(frame: &mut LayoutFrame, pages: &[Page]) {
+  if let Some(page) = pages.get(frame.page_index) {
+    if frame.item_start > page.items.len() {
+      frame.item_start = page.items.len();
+    }
+    frame.item_end = frame.item_end.min(page.items.len()).max(frame.item_start);
+    frame.item_count = frame.item_end.saturating_sub(frame.item_start);
+    frame.bounds = frame_bounds_for_items(&page.items[frame.item_start..frame.item_end]);
+    frame.lines = line_boxes_for_items(&page.items, frame.item_start, frame.item_end);
+  } else if !frame.items.is_empty() {
+    frame.item_start = 0;
+    frame.item_end = frame.items.len();
+    frame.item_count = frame.items.len();
+    frame.bounds = frame_bounds_for_items(&frame.items);
+    frame.lines = line_boxes_for_items(&frame.items, 0, frame.items.len());
+  } else {
+    frame.item_end = frame.item_start;
+    frame.item_count = 0;
+    frame.bounds = None;
+    frame.lines.clear();
+  }
   let fallback_fragments = frame_fragments_for(frame.kind, &frame.lines);
   if frame.fragments.is_empty() {
     frame.fragments = fallback_fragments;
   } else {
+    let fragment_item_bound = frame_fragment_item_bound(frame);
     normalize_replayed_fragments(
       &mut frame.fragments,
       &fallback_fragments,
       frame.kind,
-      frame.items.len(),
+      fragment_item_bound,
     );
   }
-  frame.split_start = frame_cursor(frame.block_index, frame.kind, 0, &frame.lines, true);
+  frame.split_start = frame_cursor(
+    frame.block_index,
+    frame.kind,
+    frame.item_start,
+    &frame.lines,
+    true,
+  );
   frame.split_end = frame_cursor(
     frame.block_index,
     frame.kind,
-    frame.items.len(),
+    frame.item_end,
     &frame.lines,
     false,
   );
   frame.invalidation = FrameInvalidation::Clean;
+}
+
+fn frame_page_items<'a>(frame: &LayoutFrame, pages: &'a [Page]) -> Option<&'a [PageItem]> {
+  let page = pages.get(frame.page_index)?;
+  if frame.item_start > frame.item_end || frame.item_end > page.items.len() {
+    return None;
+  }
+  Some(&page.items[frame.item_start..frame.item_end])
+}
+
+fn frame_fragment_item_bound(frame: &LayoutFrame) -> usize {
+  if frame.item_start == 0 {
+    frame.item_count
+  } else {
+    frame.item_end
+  }
 }
 
 fn normalize_replayed_fragments(
@@ -3807,25 +3984,34 @@ fn normalize_layout_frames(frames: &mut Vec<LayoutFrame>, pages: &[Page]) {
     frame.page_index < pages.len()
       && frame.section_index == pages[frame.page_index].section_index
       && frame.section_page_index == pages[frame.page_index].section_page_index
-      && !frame.items.is_empty()
+      && frame.item_count > 0
   });
   for frame in frames {
-    let item_len = frame.items.len();
-    frame.item_start = 0;
-    frame.item_end = item_len;
-    frame.lines = line_boxes_for_items(&frame.items, 0, item_len);
     if frame.fragments.is_empty() {
       frame.fragments = frame_fragments_for(frame.kind, &frame.lines);
     } else {
+      let fragment_item_bound = frame_fragment_item_bound(frame);
       normalize_replayed_fragments(
         &mut frame.fragments,
         &frame_fragments_for(frame.kind, &frame.lines),
         frame.kind,
-        item_len,
+        fragment_item_bound,
       );
     }
-    frame.split_start = frame_cursor(frame.block_index, frame.kind, 0, &frame.lines, true);
-    frame.split_end = frame_cursor(frame.block_index, frame.kind, item_len, &frame.lines, false);
+    frame.split_start = frame_cursor(
+      frame.block_index,
+      frame.kind,
+      frame.item_start,
+      &frame.lines,
+      true,
+    );
+    frame.split_end = frame_cursor(
+      frame.block_index,
+      frame.kind,
+      frame.item_end,
+      &frame.lines,
+      false,
+    );
   }
 }
 
@@ -4029,6 +4215,7 @@ fn block_is_page_break_only_paragraph(block: &Block) -> bool {
       InlineItem::PageBreak => saw_page_break = true,
       InlineItem::LastRenderedPageBreak | InlineItem::ColumnBreak => {}
       InlineItem::Text(run) if run.text.trim().is_empty() => {}
+      InlineItem::BookmarkStart(_) => {}
       InlineItem::Text(_) | InlineItem::Image(_) | InlineItem::Shape(_) => return false,
       InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => return false,
     }
@@ -4043,6 +4230,7 @@ fn block_is_empty_paragraph(block: &Block) -> bool {
   paragraph.inlines.iter().all(|inline| match inline {
     InlineItem::LastRenderedPageBreak => true,
     InlineItem::Text(run) => run.text.trim().is_empty(),
+    InlineItem::BookmarkStart(_) => true,
     InlineItem::PageBreak
     | InlineItem::ColumnBreak
     | InlineItem::Image(_)
@@ -4092,6 +4280,50 @@ fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index
     repeating_wrap_exclusions: Vec::new(),
     pending_floating_table_follows: Vec::new(),
   }
+}
+
+fn page_checkpoint(page: &Page) -> PageCheckpoint {
+  PageCheckpoint {
+    setup: page.setup,
+    section_index: page.section_index,
+    section_page_index: page.section_page_index,
+    items_len: page.items.len(),
+    body_content_frames: page.body_content_frames,
+    explicit_break_target: page.explicit_break_target,
+    preserve_empty: page.preserve_empty,
+    delete_forbidden: page.delete_forbidden,
+    frame_fragments_len: page.frame_fragments.len(),
+    frame_influences_len: page.frame_influences.len(),
+    wrap_exclusions_len: page.wrap_exclusions.len(),
+    repeating_wrap_exclusions_len: page.repeating_wrap_exclusions.len(),
+    pending_floating_table_follows_len: page.pending_floating_table_follows.len(),
+  }
+}
+
+fn restore_page_checkpoint(page: &mut Page, checkpoint: PageCheckpoint) {
+  page.setup = checkpoint.setup;
+  page.section_index = checkpoint.section_index;
+  page.section_page_index = checkpoint.section_page_index;
+  page.items.truncate(checkpoint.items_len);
+  page.body_content_frames = checkpoint.body_content_frames;
+  page.explicit_break_target = checkpoint.explicit_break_target;
+  page.preserve_empty = checkpoint.preserve_empty;
+  page.delete_forbidden = checkpoint.delete_forbidden;
+  page
+    .frame_fragments
+    .truncate(checkpoint.frame_fragments_len);
+  page
+    .frame_influences
+    .truncate(checkpoint.frame_influences_len);
+  page
+    .wrap_exclusions
+    .truncate(checkpoint.wrap_exclusions_len);
+  page
+    .repeating_wrap_exclusions
+    .truncate(checkpoint.repeating_wrap_exclusions_len);
+  page
+    .pending_floating_table_follows
+    .truncate(checkpoint.pending_floating_table_follows_len);
 }
 
 #[derive(Clone)]
@@ -4614,6 +4846,7 @@ fn estimated_paragraph_content_height(
           }
         }
       }
+      InlineItem::BookmarkStart(_) => {}
       InlineItem::Image(image) => {
         if let crate::docx::ImagePlacement::Floating(placement) = image.placement
           && (effective_layout_in_cell(placement, flow)
@@ -4827,7 +5060,9 @@ fn paragraph_starts_with_last_rendered_page_break(paragraph: &crate::docx::Parag
     .find(|inline| {
       !matches!(
         inline,
-        InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_)
+        InlineItem::BookmarkStart(_)
+          | InlineItem::FormWidgetStart(_)
+          | InlineItem::FormWidgetEnd(_)
       )
     })
     .is_some_and(|inline| matches!(inline, InlineItem::LastRenderedPageBreak))
@@ -4867,34 +5102,39 @@ fn paragraph_styles_identical(
   }
 }
 
+struct LayoutBlockTarget<'a> {
+  current: &'a mut Page,
+  pages: &'a mut Vec<Page>,
+  anchor_pages: Option<&'a mut Vec<AnchorPage>>,
+}
+
 fn layout_document_block(
   previous: Option<&Block>,
   block: &Block,
   next: Option<&Block>,
   flow: FlowContext,
-  current: &mut Page,
-  pages: &mut Vec<Page>,
+  target: LayoutBlockTarget<'_>,
   mut y: f32,
 ) -> (FlowContext, f32) {
   match block {
     Block::Paragraph(paragraph) => {
       let mut ignore_top_margin_at_page_start = false;
       if let Some(frame) = paragraph_frame(paragraph) {
-        note_body_content_frame(current, flow);
-        return layout_floating_frame(&frame, flow, current, pages, y);
+        note_body_content_frame(target.current, flow);
+        return layout_floating_frame(&frame, flow, target.current, target.pages, y);
       }
       let mut flow = flow;
       let ignore_top_margin_after_page_break = paragraph.format.page_break_before
-        && page_has_body_region_items(current, flow)
+        && page_has_body_region_items(target.current, flow)
         && flow.text_segmentation == TextSegmentation::Body;
       if paragraph.format.page_break_before
-        && page_has_body_region_items(current, flow)
+        && page_has_body_region_items(target.current, flow)
         && flow.text_segmentation == TextSegmentation::Body
       {
-        (flow, y) = force_page_break(flow, current, pages);
+        (flow, y) = force_page_break(flow, target.current, target.pages);
         ignore_top_margin_at_page_start = true;
       }
-      note_body_content_frame(current, flow);
+      note_body_content_frame(target.current, flow);
 
       if paragraph.starts_after_last_rendered_page_break
         && flow.text_segmentation == TextSegmentation::Body
@@ -4917,8 +5157,9 @@ fn layout_document_block(
       let (paragraph_flow, y) = layout_paragraph(
         paragraph,
         paragraph_flow,
-        current,
-        pages,
+        target.current,
+        target.pages,
+        target.anchor_pages,
         y,
         paragraph_spacing_after(paragraph, next),
       );
@@ -4931,13 +5172,13 @@ fn layout_document_block(
       )
     }
     Block::Table(table) => {
-      let has_ind_prev = table_has_indirect_previous_frame(current, flow, y);
-      note_body_content_frame(current, flow);
-      layout_table(table, flow, current, pages, y, has_ind_prev)
+      let has_ind_prev = table_has_indirect_previous_frame(target.current, flow, y);
+      note_body_content_frame(target.current, flow);
+      layout_table(table, flow, target.current, target.pages, y, has_ind_prev)
     }
     Block::Frame(frame) => {
-      note_body_content_frame(current, flow);
-      layout_floating_frame(frame, flow, current, pages, y)
+      note_body_content_frame(target.current, flow);
+      layout_floating_frame(frame, flow, target.current, target.pages, y)
     }
   }
 }
@@ -5033,8 +5274,11 @@ fn layout_floating_frame(
       block,
       next,
       frame_flow,
-      &mut frame_page,
-      &mut frame_pages,
+      LayoutBlockTarget {
+        current: &mut frame_page,
+        pages: &mut frame_pages,
+        anchor_pages: None,
+      },
       block_y,
     );
     block_y = next_y;
@@ -5300,8 +5544,11 @@ fn measured_note_blocks_height(blocks: &[Block], flow: FlowContext) -> f32 {
       block,
       next,
       note_flow,
-      &mut scratch,
-      &mut discarded_pages,
+      LayoutBlockTarget {
+        current: &mut scratch,
+        pages: &mut discarded_pages,
+        anchor_pages: None,
+      },
       y,
     );
     y = next_y;
@@ -5309,10 +5556,15 @@ fn measured_note_blocks_height(blocks: &[Block], flow: FlowContext) -> f32 {
   y
 }
 
+struct FootnoteEmission<'a> {
+  emitted_footnotes: &'a mut HashSet<i64>,
+  emitted_footnote_order: &'a mut Vec<i64>,
+}
+
 fn footnote_boss_format(
   block: &Block,
   document: &DocxDocument,
-  emitted_footnotes: &mut HashSet<i64>,
+  emission: FootnoteEmission<'_>,
   flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
@@ -5338,9 +5590,10 @@ fn footnote_boss_format(
     ..flow
   };
   for id in &paragraph.footnote_reference_ids {
-    if !emitted_footnotes.insert(*id) {
+    if !emission.emitted_footnotes.insert(*id) {
       continue;
     }
+    emission.emitted_footnote_order.push(*id);
     let Some(blocks) = document.footnotes.get(id) else {
       continue;
     };
@@ -5358,8 +5611,18 @@ fn footnote_boss_format(
     for (index, block) in blocks.iter().enumerate() {
       let previous = index.checked_sub(1).and_then(|index| blocks.get(index));
       let next = blocks.get(index + 1);
-      let (_, next_y) =
-        layout_document_block(previous, block, next, footnote_flow, current, pages, y);
+      let (_, next_y) = layout_document_block(
+        previous,
+        block,
+        next,
+        footnote_flow,
+        LayoutBlockTarget {
+          current,
+          pages,
+          anchor_pages: None,
+        },
+        y,
+      );
       y = next_y;
     }
   }
@@ -5757,6 +6020,7 @@ fn block_has_visible_body_content(block: &Block) -> bool {
     Block::Paragraph(paragraph) => paragraph.inlines.iter().any(|inline| match inline {
       InlineItem::Text(run) => !run.text.trim().is_empty(),
       InlineItem::Image(_) | InlineItem::Shape(_) => true,
+      InlineItem::BookmarkStart(_) => false,
       InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
       | InlineItem::LastRenderedPageBreak
@@ -6327,6 +6591,7 @@ fn layout_repeating_block(
         flow,
         page,
         discarded_pages,
+        None,
         y + paragraph.format.spacing_before_pt,
         spacing_after_pt,
       );
@@ -6875,14 +7140,14 @@ impl<'a> TableFrameLayout<'a> {
   }
 
   fn format(
-    &self,
+    self,
     current: &mut Page,
     pages: &mut Vec<Page>,
     mut y: f32,
     mut has_ind_prev: bool,
   ) -> (FlowContext, f32) {
-    let mut flow = flow_from_block_area(self.frame.block);
-    let mut layout = self.clone();
+    let mut layout = self;
+    let mut flow = flow_from_block_area(layout.frame.block);
     let mut repeating_headers_disabled = false;
     y = layout.dodge_wrap_exclusions(current, y, layout.initial_dodge_height());
     if !layout.frame.split_allowed
@@ -6891,7 +7156,7 @@ impl<'a> TableFrameLayout<'a> {
     {
       (flow, y) = advance_section_flow(flow, current, pages);
       has_ind_prev = false;
-      if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+      if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
         layout = next_layout;
       }
     }
@@ -6900,7 +7165,7 @@ impl<'a> TableFrameLayout<'a> {
     let mut right_border_segment = None;
     let mut follow_state = TableFollowState::default();
     let mut row_index = 0usize;
-    'table_rows: while row_index < self.table.rows.len() {
+    'table_rows: while row_index < layout.table.rows.len() {
       let allow_split_of_keep_row =
         layout.allow_split_of_keep_row(row_index, has_ind_prev, table_row_keep);
       let make_all = layout.make_all_split_plan(
@@ -6915,7 +7180,7 @@ impl<'a> TableFrameLayout<'a> {
         flush_border_segment(current, &mut right_border_segment);
         (flow, y) = advance_section_flow(flow, current, pages);
         has_ind_prev = false;
-        if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+        if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
           layout = next_layout;
         }
         y = layout.format_repeated_header_rows(current, pages, y, 0.0);
@@ -6927,11 +7192,11 @@ impl<'a> TableFrameLayout<'a> {
         continue;
       }
       let split_decision = make_all.split_decision;
-      let format_until = split_decision.map_or(self.table.rows.len(), |decision| {
+      let format_until = split_decision.map_or(layout.table.rows.len(), |decision| {
         decision.master_end_row_index
       });
       while row_index < format_until {
-        let row = &self.table.rows[row_index];
+        let row = &layout.table.rows[row_index];
         y = layout.dodge_wrap_exclusions(
           current,
           y,
@@ -6949,7 +7214,7 @@ impl<'a> TableFrameLayout<'a> {
           has_ind_prev = split_decision
             .and_then(|decision| decision.follow_start_row_index)
             .is_some();
-          if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+          if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
             layout = next_layout;
           }
           y = layout.format_repeated_header_rows(current, pages, y, 0.0);
@@ -6969,11 +7234,11 @@ impl<'a> TableFrameLayout<'a> {
           row_frame.trailing_border_segment(row_top, y),
         );
         row_index += 1;
-        if row_index < self.table.rows.len() {
-          y += row_cell_spacing_pt(self.table, row);
+        if row_index < layout.table.rows.len() {
+          y += row_cell_spacing_pt(layout.table, row);
         }
       }
-      if row_index >= self.table.rows.len() {
+      if row_index >= layout.table.rows.len() {
         break;
       }
 
@@ -6983,7 +7248,7 @@ impl<'a> TableFrameLayout<'a> {
       if let Some(follow_start_row_index) = split_decision.follow_start_row_index {
         debug_assert!(follow_start_row_index >= row_index);
       }
-      let row = &self.table.rows[row_index];
+      let row = &layout.table.rows[row_index];
       y = layout.dodge_wrap_exclusions(
         current,
         y,
@@ -7011,7 +7276,7 @@ impl<'a> TableFrameLayout<'a> {
         flush_border_segment(current, &mut right_border_segment);
         (flow, y) = advance_section_flow(flow, current, pages);
         has_ind_prev = split_decision.follow_start_row_index.is_some();
-        if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+        if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
           layout = next_layout;
         }
         y = layout.format_repeated_header_rows(current, pages, y, 0.0);
@@ -7033,7 +7298,7 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
             has_ind_prev = true;
-            if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+            if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
               layout = next_layout;
             }
             y = layout.format_repeated_header_rows(
@@ -7058,7 +7323,7 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
             has_ind_prev = true;
-            if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+            if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
               layout = next_layout;
             }
             y = layout.format_repeated_header_rows(
@@ -7112,7 +7377,7 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
             has_ind_prev = true;
-            if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+            if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
               layout = next_layout;
             }
             y = layout.format_repeated_header_rows(current, pages, y, remaining_height);
@@ -7120,8 +7385,8 @@ impl<'a> TableFrameLayout<'a> {
         }
         follow_state.clear_follow_flow_line();
         row_index += 1;
-        if row_index < self.table.rows.len() {
-          y += row_cell_spacing_pt(self.table, row);
+        if row_index < layout.table.rows.len() {
+          y += row_cell_spacing_pt(layout.table, row);
         }
         continue;
       }
@@ -7140,8 +7405,8 @@ impl<'a> TableFrameLayout<'a> {
           row_frame.trailing_border_segment(row_top, y),
         );
         row_index += 1;
-        if row_index < self.table.rows.len() {
-          y += row_cell_spacing_pt(self.table, row);
+        if row_index < layout.table.rows.len() {
+          y += row_cell_spacing_pt(layout.table, row);
         }
         continue;
       }
@@ -7151,7 +7416,7 @@ impl<'a> TableFrameLayout<'a> {
           && follow_state.split_row_index == Some(row_index.saturating_sub(1))
         {
           if let Some(split_row_index) = follow_state.split_row_index
-            && let Some(split_row) = self.table.rows.get(split_row_index)
+            && let Some(split_row) = layout.table.rows.get(split_row_index)
             && follow_state.remaining_height_pt > LAYOUT_EPSILON_PT
           {
             let available_height = (layout.frame.block.content_bottom - y).max(0.0);
@@ -7177,7 +7442,8 @@ impl<'a> TableFrameLayout<'a> {
                 flush_border_segment(current, &mut right_border_segment);
                 (flow, y) = advance_section_flow(flow, current, pages);
                 has_ind_prev = true;
-                if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+                if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled)
+                {
                   layout = next_layout;
                 }
                 y = layout.format_repeated_header_rows(
@@ -7197,7 +7463,7 @@ impl<'a> TableFrameLayout<'a> {
         let rows_to_move = layout.maximum_layout_row_span(row_index);
         for moved in 0..rows_to_move {
           let moved_row_index = row_index + moved;
-          let Some(moved_row) = self.table.rows.get(moved_row_index) else {
+          let Some(moved_row) = layout.table.rows.get(moved_row_index) else {
             break;
           };
           let moved_row_top = y;
@@ -7227,7 +7493,7 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
             has_ind_prev = true;
-            if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+            if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
               layout = next_layout;
             }
             y = layout.format_repeated_header_rows(
@@ -7248,8 +7514,8 @@ impl<'a> TableFrameLayout<'a> {
               );
             y += remaining_height;
             row_index += 1;
-            if row_index < self.table.rows.len() {
-              y += row_cell_spacing_pt(self.table, moved_row);
+            if row_index < layout.table.rows.len() {
+              y += row_cell_spacing_pt(layout.table, moved_row);
             }
           } else {
             y = moved_row_frame.format(current, pages);
@@ -7264,8 +7530,8 @@ impl<'a> TableFrameLayout<'a> {
               moved_row_frame.trailing_border_segment(moved_row_top, y),
             );
             row_index += 1;
-            if row_index < self.table.rows.len() {
-              y += row_cell_spacing_pt(self.table, moved_row);
+            if row_index < layout.table.rows.len() {
+              y += row_cell_spacing_pt(layout.table, moved_row);
             }
           }
         }
@@ -7276,7 +7542,7 @@ impl<'a> TableFrameLayout<'a> {
       flush_border_segment(current, &mut right_border_segment);
       (flow, y) = advance_section_flow(flow, current, pages);
       has_ind_prev = split_decision.follow_start_row_index.is_some();
-      if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+      if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
         layout = next_layout;
       }
       y = layout.format_repeated_header_rows(
@@ -7606,14 +7872,13 @@ impl<'a> TableFrameLayout<'a> {
     })
   }
 
-  fn without_repeating_headers(&self) -> Self {
+  fn without_repeating_headers(mut self) -> Self {
     // SwTabFrame::Split(), tdf#88496 fallback: if repeated headlines do not
     // fit at the start of the upper, disable the table's rows-to-repeat and
     // reformat instead of creating an endless follow chain.
-    let mut next = self.clone();
-    next.frame.repeating_header_count = 0;
-    next.frame.repeating_header_height = 0.0;
-    next
+    self.frame.repeating_header_count = 0;
+    self.frame.repeating_header_height = 0.0;
+    self
   }
 
   fn initial_dodge_height(&self) -> f32 {
@@ -9400,8 +9665,18 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
         }
         _ => flow,
       };
-      let (_, next_y) =
-        layout_document_block(previous, block, next, block_flow, current, pages, text_y);
+      let (_, next_y) = layout_document_block(
+        previous,
+        block,
+        next,
+        block_flow,
+        LayoutBlockTarget {
+          current,
+          pages,
+          anchor_pages: None,
+        },
+        text_y,
+      );
       text_y = next_y;
     }
     return;
@@ -9438,8 +9713,11 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
       block,
       next,
       block_flow,
-      &mut nested_page,
-      &mut discarded_pages,
+      LayoutBlockTarget {
+        current: &mut nested_page,
+        pages: &mut discarded_pages,
+        anchor_pages: None,
+      },
       text_y,
     );
     text_y = next_y;
@@ -9647,6 +9925,7 @@ fn paragraph_fragment_around_last_rendered_page_break(
 fn paragraph_inlines_are_layout_empty(inlines: &[InlineItem]) -> bool {
   inlines.iter().all(|inline| match inline {
     InlineItem::Text(run) => run.text.trim().is_empty(),
+    InlineItem::BookmarkStart(_) => true,
     InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
     InlineItem::LastRenderedPageBreak => true,
     InlineItem::Image(_)
@@ -9860,8 +10139,11 @@ fn layout_shape_text_box(
       block,
       next,
       flow,
-      &mut nested_page,
-      &mut discarded_pages,
+      LayoutBlockTarget {
+        current: &mut nested_page,
+        pages: &mut discarded_pages,
+        anchor_pages: None,
+      },
       text_cursor_y,
     );
     text_cursor_y = next_y;
@@ -10565,10 +10847,42 @@ fn layout_paragraph(
   flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
+  anchor_pages: Option<&mut Vec<AnchorPage>>,
   y: f32,
   spacing_after_pt: f32,
 ) -> (FlowContext, f32) {
-  TextFrameLayout::new(paragraph, flow, spacing_after_pt).format(current, pages, y)
+  TextFrameLayout::new(paragraph, flow, spacing_after_pt).format(current, pages, anchor_pages, y)
+}
+
+fn record_anchor_page(
+  anchor_pages: &mut Vec<AnchorPage>,
+  name: &str,
+  current: &Page,
+  page_index: usize,
+) {
+  if name.is_empty() {
+    return;
+  }
+  let anchor = AnchorPage {
+    name: name.to_string(),
+    page_index,
+    section_index: current.section_index,
+    section_page_index: current.section_page_index,
+    physical_page_number: page_index + 1,
+    virtual_page_number: virtual_page_number(current.setup, current.section_page_index, page_index),
+  };
+  if let Some(existing) = anchor_pages.iter_mut().find(|anchor| anchor.name == name) {
+    *existing = anchor;
+  } else {
+    anchor_pages.push(anchor);
+  }
+}
+
+fn virtual_page_number(setup: PageSetup, section_page_index: usize, page_index: usize) -> usize {
+  setup
+    .page_number_start
+    .map(|start| start.saturating_add(section_page_index as i32).max(1) as usize)
+    .unwrap_or(page_index + 1)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -10860,7 +11174,9 @@ fn can_defer_page_break_for_following_floating_anchor(
       }
       InlineItem::LastRenderedPageBreak => None,
       InlineItem::Text(run) if run.text.trim().is_empty() => None,
-      InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => None,
+      InlineItem::BookmarkStart(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_) => None,
       InlineItem::Text(_)
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak
@@ -10881,7 +11197,9 @@ fn can_defer_page_break_for_following_floating_anchor(
       .all(|inline| match inline {
         InlineItem::LastRenderedPageBreak => true,
         InlineItem::Text(run) => run.text.trim().is_empty(),
-        InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
+        InlineItem::BookmarkStart(_)
+        | InlineItem::FormWidgetStart(_)
+        | InlineItem::FormWidgetEnd(_) => true,
         InlineItem::PageBreak
         | InlineItem::ColumnBreak
         | InlineItem::Image(_)
@@ -11017,14 +11335,21 @@ impl<'a> TextFrameLayout<'a> {
     )
   }
 
-  fn format(&self, current: &mut Page, pages: &mut Vec<Page>, y: f32) -> (FlowContext, f32) {
-    self.format_with_reflow(current, pages, y, true)
+  fn format(
+    &self,
+    current: &mut Page,
+    pages: &mut Vec<Page>,
+    anchor_pages: Option<&mut Vec<AnchorPage>>,
+    y: f32,
+  ) -> (FlowContext, f32) {
+    self.format_with_reflow(current, pages, anchor_pages, y, true)
   }
 
   fn format_with_reflow(
     &self,
     current: &mut Page,
     pages: &mut Vec<Page>,
+    mut anchor_pages: Option<&mut Vec<AnchorPage>>,
     mut y: f32,
     allow_reflow: bool,
   ) -> (FlowContext, f32) {
@@ -11033,7 +11358,8 @@ impl<'a> TextFrameLayout<'a> {
     let mut text_frame = self.frame;
     let start_item_index = current.items.len();
     let start_pages_len = pages.len();
-    let start_current = current.clone();
+    let start_current = page_checkpoint(current);
+    let start_anchor_pages_len = anchor_pages.as_ref().map(|anchors| anchors.len());
     let start_flow = flow;
     let paragraph_top = y;
     let default_line_left = text_frame.default_line_left;
@@ -11124,6 +11450,13 @@ impl<'a> TextFrameLayout<'a> {
 
     for (inline_index, item) in paragraph.inlines.iter().enumerate() {
       match item {
+        InlineItem::BookmarkStart(name) => {
+          text_state.set_position(InlineCursor::after_inline(inline_index));
+          pending_tab = None;
+          if let Some(anchors) = anchor_pages.as_deref_mut() {
+            record_anchor_page(anchors, name, current, pages.len());
+          }
+        }
         InlineItem::Text(run) => {
           if pending_text_page_break {
             (flow, text_frame, y, line_left, line_right, line_height) =
@@ -12207,10 +12540,13 @@ impl<'a> TextFrameLayout<'a> {
     );
     if allow_reflow && matches!(split_decision, TextSplitDecision::Rejected) {
       pages.truncate(start_pages_len);
-      *current = start_current;
+      restore_page_checkpoint(current, start_current);
+      if let (Some(anchors), Some(len)) = (anchor_pages.as_deref_mut(), start_anchor_pages_len) {
+        anchors.truncate(len);
+      }
       let (follow_flow, follow_y) = advance_section_flow(start_flow, current, pages);
       return TextFrameLayout::new(paragraph, follow_flow, self.spacing_after_pt)
-        .format_with_reflow(current, pages, follow_y, false);
+        .format_with_reflow(current, pages, anchor_pages, follow_y, false);
     }
 
     if paragraph.list_label.is_none() && start_item_index <= current.items.len() {

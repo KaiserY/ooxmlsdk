@@ -56,6 +56,7 @@ pub fn convert_wordprocessing_document(
 ) -> Result<Vec<u8>> {
   let layout_options = ooxmlsdk_layout::options::LayoutOptions {
     source_file_name: options.source_file_name.clone(),
+    ..Default::default()
   };
   let pages = ooxmlsdk_layout::docx::layout_document(document, &layout_options)?;
   render::krilla::render(&pages, &options)
@@ -79,6 +80,12 @@ where
   let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
   let layout_options = ooxmlsdk_layout::options::LayoutOptions {
     source_file_name: options.source_file_name.clone(),
+    diagnostics: ooxmlsdk_layout::options::LayoutDiagnosticsOptions {
+      collect_debug_records: true,
+      collect_reflow_records: true,
+      preserve_source_links: true,
+    },
+    ..Default::default()
   };
   Ok(ooxmlsdk_layout::docx::inspect_layout(
     &mut document,
@@ -153,6 +160,7 @@ pub fn convert_presentation_document(
 ) -> Result<Vec<u8>> {
   let layout_options = ooxmlsdk_layout::options::LayoutOptions {
     source_file_name: options.source_file_name.clone(),
+    ..Default::default()
   };
   let pages = ooxmlsdk_layout::pptx::layout_document(document, &layout_options)?;
   render::krilla::render(&pages, &options)

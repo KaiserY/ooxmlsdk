@@ -12122,6 +12122,7 @@ fn merge_numbering_properties(
 struct NumberingFormatMergeContext {
   direct_indentation: bool,
   direct_tab_stops: bool,
+  style_numbering: bool,
 }
 
 fn merge_numbering_format_values(
@@ -12129,13 +12130,14 @@ fn merge_numbering_format_values(
   mut values: ParagraphFormat,
   context: NumberingFormatMergeContext,
 ) {
-  if context.direct_indentation && target.indent_left_set {
+  let protect_style_indents = context.style_numbering;
+  if (context.direct_indentation || protect_style_indents) && target.indent_left_set {
     values.indent_left_set = false;
   }
-  if context.direct_indentation && target.indent_right_set {
+  if (context.direct_indentation || protect_style_indents) && target.indent_right_set {
     values.indent_right_set = false;
   }
-  if context.direct_indentation && target.first_line_indent_set {
+  if (context.direct_indentation || protect_style_indents) && target.first_line_indent_set {
     values.first_line_indent_set = false;
   }
   if context.direct_tab_stops && target.tab_stops_set {

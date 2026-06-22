@@ -80,6 +80,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     direct_tab_stops: direct_paragraph_properties
       .as_ref()
       .is_some_and(|properties| properties.tabs().is_some()),
+    style_numbering: false,
   };
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
@@ -95,6 +96,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     .as_deref()
     .and_then(|properties| properties.numbering_properties.as_deref());
   let style_numbering = styles.paragraph_numbering_properties(style_id);
+  let style_numbering_applies = direct_numbering.is_none() && style_numbering.is_some();
   let paragraph_mark_run_properties = paragraph
     .paragraph_properties
     .as_deref()
@@ -124,7 +126,10 @@ pub(super) fn paragraph_model_with_base<'a>(
         styles,
         numbering_base_style.clone(),
         paragraph_mark_run_properties,
-        numbering_format_context,
+        NumberingFormatMergeContext {
+          style_numbering: style_numbering_applies,
+          ..numbering_format_context
+        },
       )
     });
   let mut list_label = numbering_label

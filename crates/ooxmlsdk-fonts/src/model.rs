@@ -1640,10 +1640,8 @@ impl<'book> ResolvedFont<'book> {
     runtime_face: &RuntimeFace,
     options: &ShapeOptions<'_>,
   ) -> Result<ShapedRun<'text, 'book>> {
-    let small_caps = options
-      .script
-      .is_none_or(|script| small_caps_supported_for_script(script))
-      && options.small_caps;
+    let small_caps =
+      options.script.is_none_or(small_caps_supported_for_script) && options.small_caps;
     let has_lowercase = small_caps && text.chars().any(char::is_lowercase);
     let (shaped_text, small_caps_ranges) = if has_lowercase {
       small_caps_shaped_text(text)

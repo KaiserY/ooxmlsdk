@@ -18,7 +18,7 @@ use rustc_hash::FxHashMap as HashMap;
 use smallvec::SmallVec;
 
 use super::fonts::FontSet;
-use super::form_widgets::inject_form_widget_annotations;
+use super::form_widgets::{collect_form_widget_annotations, inject_form_widget_annotations};
 use super::image::decode_image;
 use super::settings::serialize_settings;
 use crate::error::{PdfError, Result};
@@ -185,6 +185,7 @@ pub(crate) fn render(
   }));
   let mut text_metrics = TextMetrics::new();
   let paint = PaintDocument::from_layout(document, &mut text_metrics);
+  let form_widget_annotations = collect_form_widget_annotations(document, &mut text_metrics);
   let internal_links = InternalLinkTargets::from_paint(&paint);
   debug_assert_eq!(paint.pages.len(), document.pages.len());
   debug_assert!(paint.pages.iter().all(|page| {
@@ -276,8 +277,7 @@ pub(crate) fn render(
   let pdf = pdf
     .finish()
     .map_err(|err| PdfError::Krilla(format!("{err:?}")))?;
-  let mut annotation_text_metrics = TextMetrics::new();
-  inject_form_widget_annotations(document, pdf, &mut annotation_text_metrics)
+  inject_form_widget_annotations(pdf, form_widget_annotations)
 }
 
 #[derive(Clone, Debug)]
@@ -1023,6 +1023,8 @@ fn writer_text_items_coalesce(
     || next.form_widget_id.is_some()
     || current.preserve_text_portion
     || next.preserve_text_portion
+    || current.style.small_caps
+    || next.style.small_caps
   {
     return false;
   }
@@ -1169,13 +1171,20 @@ fn text_paint_portions<'doc>(
     link,
   } = source;
   let ranges = text_portion_ranges(text);
+  let can_move_glyphs =
+    glyphs.is_some() && ranges.len() == 1 && ranges[0].1 == (0..text.text.len());
+  let mut glyphs = glyphs;
   let mut portions = Vec::with_capacity(ranges.len().max(1));
   let mut x_pt = text.x_pt;
   for (kind, range) in ranges {
     let portion_clip = paint_clip_for_portion(clip, &kind, page_width_pt);
-    let portion_glyphs = glyphs
-      .as_ref()
-      .map(|glyphs| glyphs_for_text_range(glyphs, range.clone(), text.style.font_size_pt));
+    let portion_glyphs = if can_move_glyphs {
+      glyphs.take()
+    } else {
+      glyphs
+        .as_ref()
+        .map(|glyphs| glyphs_for_text_range(glyphs, range.clone(), text.style.font_size_pt))
+    };
     let portion_width = portion_glyphs
       .as_ref()
       .map(|glyphs| glyph_runs_width_pt(glyphs, text.style.font_size_pt))
@@ -1322,16 +1331,18 @@ fn glyphs_for_text_range(
   font_size_pt: f32,
 ) -> PaintGlyphFontRuns {
   let mut output = PaintGlyphFontRuns::new();
+  let mut range_origin_x_pt = None::<f32>;
   for run in glyphs {
     let mut x_pt = run.x_offset_pt;
     let mut active = None::<PaintGlyphFontRun>;
     for glyph in &run.glyphs {
       let intersects = glyph.text_range.start < range.end && glyph.text_range.end > range.start;
       if intersects {
+        let origin_x_pt = *range_origin_x_pt.get_or_insert(x_pt);
         active
           .get_or_insert_with(|| PaintGlyphFontRun {
             font_face: run.font_face.clone(),
-            x_offset_pt: x_pt,
+            x_offset_pt: x_pt - origin_x_pt,
             glyphs: Vec::with_capacity(run.glyphs.len().min(range.len())),
           })
           .glyphs
@@ -1691,17 +1702,7 @@ fn draw_text_item(
         portion.baseline_y * (1.0 - vertical_scale),
       ));
     }
-    if item.style.small_caps {
-      let font = fonts.select(&item.style);
-      surface.draw_text(
-        Point::from_xy(portion.x_pt, portion.baseline_y),
-        font,
-        item.style.font_size_pt,
-        &item.text[portion.text_range.clone()],
-        false,
-        TextDirection::Auto,
-      );
-    } else if let Some(glyphs) = &portion.glyphs {
+    if let Some(glyphs) = &portion.glyphs {
       for run in glyphs {
         let font = fonts.select_face(&run.font_face);
         surface.draw_glyphs(
@@ -1713,6 +1714,16 @@ fn draw_text_item(
           false,
         );
       }
+    } else if item.style.small_caps {
+      let font = fonts.select(&item.style);
+      surface.draw_text(
+        Point::from_xy(portion.x_pt, portion.baseline_y),
+        font,
+        item.style.font_size_pt,
+        &item.text[portion.text_range.clone()],
+        false,
+        TextDirection::Auto,
+      );
     } else {
       let font = fonts.select(&item.style);
       surface.draw_text(
@@ -1944,7 +1955,9 @@ fn draw_rect_item(surface: &mut Surface<'_>, rect: &RectItem) {
     draw_rect_path(surface, rect);
   }
 
-  if let Some(stroke) = rect.stroke {
+  if let Some(stroke) = rect.stroke
+    && rect.stroke_opacity > f32::EPSILON
+  {
     surface.set_fill(None);
     surface.set_stroke(Some(Stroke {
       width: stroke.width_pt,
@@ -2032,17 +2045,16 @@ fn shaped_pdf_glyphs(
   let shaped = text_metrics.shape_text(text, style)?;
   let mut font_runs = PaintGlyphFontRuns::new();
   let mut x_offset_pt = 0.0;
+  let mut last_font_index = None::<usize>;
   for glyph in shaped.glyphs {
-    let font_face = shaped.font_faces.get(glyph.font_index)?.clone();
-    if !font_runs
-      .last()
-      .is_some_and(|run| run.font_face == font_face)
-    {
+    if last_font_index != Some(glyph.font_index) {
+      let font_face = shaped.font_faces.get(glyph.font_index)?.clone();
       font_runs.push(PaintGlyphFontRun {
         font_face,
         x_offset_pt,
         glyphs: Vec::new(),
       });
+      last_font_index = Some(glyph.font_index);
     }
     font_runs
       .last_mut()

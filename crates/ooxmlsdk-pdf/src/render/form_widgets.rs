@@ -18,7 +18,7 @@ const LO_PDF_WIDGET_ANNOTATION_MARGIN_PT: f32 = 1.0 / 1000.0;
 const LO_PDF_COMBO_BOX_FLAGS: i64 = 0x00060000;
 const LO_PDF_DROPDOWN_LIST_FLAGS: i64 = 0x00020000;
 
-struct WidgetAnnotationSpec {
+pub(super) struct WidgetAnnotationSpec {
   page_index: usize,
   rect: [f32; 4],
   field_type: &'static [u8],
@@ -37,11 +37,9 @@ struct WidgetBounds {
 }
 
 pub(super) fn inject_form_widget_annotations(
-  document: &common::LayoutDocument<'static>,
   pdf: Vec<u8>,
-  text_metrics: &mut TextMetrics,
+  annotations: Vec<WidgetAnnotationSpec>,
 ) -> Result<Vec<u8>> {
-  let annotations = collect_form_widget_annotations(document, text_metrics);
   if annotations.is_empty() {
     return Ok(pdf);
   }
@@ -106,7 +104,7 @@ pub(super) fn inject_form_widget_annotations(
   Ok(output)
 }
 
-fn collect_form_widget_annotations(
+pub(super) fn collect_form_widget_annotations(
   document: &common::LayoutDocument<'static>,
   text_metrics: &mut TextMetrics,
 ) -> Vec<WidgetAnnotationSpec> {

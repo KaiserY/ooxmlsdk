@@ -180,7 +180,7 @@ impl<'a> FontRegistry<'a> {
     Ok(registered)
   }
 
-  pub fn register_system_query_fonts(&mut self, request: &FontRequest<'a>) -> Result<usize> {
+  pub fn register_system_query_fonts(&mut self, request: &FontRequest<'_>) -> Result<usize> {
     let database = font_timing("system font database", system_font_database);
     let mut registered = 0usize;
     let mut queries = SmallVec::<[FontDbQueryFamily; 8]>::new();
@@ -195,13 +195,13 @@ impl<'a> FontRegistry<'a> {
         .filter(|family| !family.is_empty())
       {
         queries.push(FontDbQueryFamily::Name(family.to_string()));
-        let aliased = resolve_family_alias(&self.book, &Cow::Borrowed(family));
+        let aliased = resolve_family_alias(&self.book, Cow::Borrowed(family));
         if aliased.as_ref() != family {
           queries.push(FontDbQueryFamily::Name(aliased.into_owned()));
         }
       }
       for family in self.fallback_families(request) {
-        queries.push(FontDbQueryFamily::Name(family.into_owned()));
+        queries.push(FontDbQueryFamily::Name(family.to_owned()));
       }
       queries.push(FontDbQueryFamily::SansSerif);
       queries.push(FontDbQueryFamily::Serif);
@@ -319,7 +319,7 @@ impl<'a> FontRegistry<'a> {
     Ok(font_id)
   }
 
-  pub fn register_office_fallback_path_fonts(&mut self, request: &FontRequest<'a>) -> usize {
+  pub fn register_office_fallback_path_fonts(&mut self, request: &FontRequest<'_>) -> usize {
     let mut paths: Vec<&'static str> = Vec::new();
     if let Some(family) = request.family.as_deref() {
       paths.extend(office_fallback_font_paths(
@@ -345,7 +345,7 @@ impl<'a> FontRegistry<'a> {
     registered
   }
 
-  pub fn register_office_fallback_path_font(&mut self, request: &FontRequest<'a>) -> usize {
+  pub fn register_office_fallback_path_font(&mut self, request: &FontRequest<'_>) -> usize {
     let mut paths: Vec<&'static str> = Vec::new();
     if let Some(family) = request.family.as_deref() {
       paths.extend(office_fallback_font_paths(
@@ -393,21 +393,37 @@ impl<'a> FontRegistry<'a> {
     Ok(font_id)
   }
 
-  pub fn resolve(&self, request: &FontRequest<'a>) -> Result<ResolvedFont<'a>> {
+  pub fn resolve(&self, request: &FontRequest<'_>) -> Result<ResolvedFont<'a>> {
     match self.book.resolve(request, &self.faces) {
       Ok(resolved) => Ok(resolved),
       Err(FontError::NoMatch) => {
         for family in self.fallback_families(request) {
-          let mut fallback_request = request.clone();
-          fallback_request.family = Some(family);
-          if let Ok(mut resolved) = self.book.resolve(&fallback_request, &self.faces) {
-            if let Some(requested_family) = request.family.clone() {
-              resolved.substitution = Some(FontSubstitution {
-                requested_family,
-                substituted_family: resolved.resolved_family.clone(),
-                reason: FontSubstitutionReason::Alias,
-              });
-            }
+          if let Ok(mut resolved) =
+            self
+              .book
+              .resolve_matching_family(request, &self.faces, family, false)
+          {
+            resolved.match_diagnostics.fallback_level = Some(0);
+            return Ok(resolved);
+          }
+        }
+        Err(FontError::NoMatch)
+      }
+      Err(error) => Err(error),
+    }
+  }
+
+  pub fn resolve_with_diagnostics(&self, request: &FontRequest<'_>) -> Result<ResolvedFont<'a>> {
+    match self.book.resolve_with_diagnostics(request, &self.faces) {
+      Ok(resolved) => Ok(resolved),
+      Err(FontError::NoMatch) => {
+        for family in self.fallback_families(request) {
+          if let Ok(mut resolved) =
+            self
+              .book
+              .resolve_matching_family(request, &self.faces, family, true)
+          {
+            resolved.match_diagnostics.fallback_level = Some(0);
             return Ok(resolved);
           }
         }
@@ -421,7 +437,7 @@ impl<'a> FontRegistry<'a> {
     self.book.faces.iter().find(|face| &face.font_id == font_id)
   }
 
-  pub fn resolved_face_data(&self, resolved: &ResolvedFont<'a>) -> Option<FontFaceData<'_>> {
+  pub fn resolved_face_data(&self, resolved: &ResolvedFont<'_>) -> Option<FontFaceData<'_>> {
     self.font_face_data(&resolved.font_id)
   }
 
@@ -440,63 +456,80 @@ impl<'a> FontRegistry<'a> {
     })
   }
 
-  pub fn shape_text(
-    &self,
-    request: &FontRequest<'a>,
-    text: impl Into<Cow<'a, str>>,
-    direction: TextDirection,
-  ) -> Result<ShapedRun<'a>> {
-    let resolved = self.resolve(request)?;
-    match &resolved.source {
-      FontSource::Memory { data, .. }
-      | FontSource::EmbeddedOoxml { data, .. }
-      | FontSource::TestFixture { data, .. }
-      | FontSource::Path {
-        data: Some(data), ..
-      } => resolved.shape_with_font_bytes(
-        text,
-        data.clone(),
-        &ShapeOptions::from_request(request, direction),
-      ),
-      FontSource::System | FontSource::Path { data: None, .. } => Ok(resolved.shape_approximate(
-        text,
-        request.size_pt,
-        direction,
-        request.script,
-        request.language.clone(),
-      )),
-    }
+  pub fn font_face_binary(&self, font_id: &FontId) -> Option<(FontBytes, u32)> {
+    let registered = self
+      .faces
+      .iter()
+      .find(|registered| registered.font_id().as_ref() == Some(font_id))?;
+    Some((registered.source.data_handle()?, registered.face_index))
   }
 
-  pub fn shape_font_face(
+  pub fn shape_text<'text, 'request>(
+    &self,
+    request: &'request FontRequest<'request>,
+    text: &'text str,
+    direction: TextDirection,
+  ) -> Result<ShapedRun<'text, 'a>>
+  where
+    'a: 'request,
+  {
+    let resolved = self.resolve(request)?;
+    self.shape_resolved_font(
+      &resolved,
+      text,
+      &ShapeOptions::from_request(request, direction),
+    )
+  }
+
+  pub fn shape_font_face<'text, 'request>(
     &self,
     resolved: &ResolvedFont<'a>,
-    text: impl Into<Cow<'a, str>>,
-    options: &ShapeOptions<'a>,
-  ) -> Result<ShapedRun<'a>> {
+    text: &'text str,
+    options: &ShapeOptions<'request>,
+  ) -> Result<ShapedRun<'text, 'a>>
+  where
+    'a: 'request,
+  {
+    self.shape_resolved_font(resolved, text, options)
+  }
+
+  fn shape_resolved_font<'text, 'request>(
+    &self,
+    resolved: &ResolvedFont<'a>,
+    text: &'text str,
+    options: &ShapeOptions<'request>,
+  ) -> Result<ShapedRun<'text, 'a>>
+  where
+    'a: 'request,
+  {
     match &resolved.source {
       FontSource::Memory { data, .. }
       | FontSource::EmbeddedOoxml { data, .. }
       | FontSource::TestFixture { data, .. }
       | FontSource::Path {
         data: Some(data), ..
-      } => resolved.shape_with_font_bytes(text, data.clone(), options),
-      FontSource::System | FontSource::Path { data: None, .. } => Ok(resolved.shape_approximate(
-        text,
-        options.size_pt,
-        options.direction,
-        options.script,
-        options.language.clone(),
-      )),
+      } => {
+        let runtime_face = self
+          .runtime_face_for_font(&resolved.font_id)
+          .or_else(|| runtime_face_for_data(data.clone(), resolved.face_index))
+          .ok_or(FontError::InvalidFace)?;
+        resolved.shape_with_runtime_face(text, &runtime_face, options)
+      }
+      FontSource::System | FontSource::Path { data: None, .. } => {
+        Ok(resolved.shape_approximate(text, options.size_pt, options.direction, options.script))
+      }
     }
   }
 
-  pub fn measure_text(
+  pub fn measure_text<'text, 'request>(
     &self,
-    request: &FontRequest<'a>,
-    text: impl Into<Cow<'a, str>>,
+    request: &'request FontRequest<'request>,
+    text: &'text str,
     direction: TextDirection,
-  ) -> Result<f32> {
+  ) -> Result<f32>
+  where
+    'a: 'request,
+  {
     Ok(
       self
         .shape_text_runs(request, text, direction)?
@@ -506,12 +539,15 @@ impl<'a> FontRegistry<'a> {
     )
   }
 
-  pub fn shape_text_runs(
+  pub fn shape_text_runs<'text, 'request>(
     &self,
-    request: &FontRequest<'a>,
-    text: impl Into<Cow<'a, str>>,
+    request: &'request FontRequest<'request>,
+    text: &'text str,
     direction: TextDirection,
-  ) -> Result<Vec<ShapedRun<'a>>> {
+  ) -> Result<Vec<ShapedRun<'text, 'a>>>
+  where
+    'a: 'request,
+  {
     self.shape_text_runs_with_options(
       request,
       text,
@@ -519,71 +555,56 @@ impl<'a> FontRegistry<'a> {
     )
   }
 
-  pub fn shape_text_runs_with_options(
+  pub fn shape_text_runs_with_options<'text, 'request>(
     &self,
-    request: &FontRequest<'a>,
-    text: impl Into<Cow<'a, str>>,
-    options: &ShapeOptions<'a>,
-  ) -> Result<Vec<ShapedRun<'a>>> {
-    let text = text.into();
-    if options.small_caps {
-      let mut runs = Vec::new();
-      for script_run in script_direction_runs(text.as_ref().to_owned(), options.size_pt, true) {
-        let mut segment_request = request.clone();
-        segment_request.size_pt = script_run.size_pt;
-        segment_request.script = Some(script_run.script);
-        let mut segment_options = options.clone();
-        segment_options.size_pt = script_run.size_pt;
-        segment_options.script = Some(script_run.script);
-        segment_options.direction = script_run.direction;
-        segment_options.small_caps = false;
-        let mut segment_runs =
-          self.shape_text_runs_inner(&segment_request, script_run.text, &segment_options)?;
-        for run in &mut segment_runs {
-          run.offset_text_range(script_run.text_range.start);
-        }
-        runs.extend(segment_runs);
-      }
-      return Ok(runs);
-    }
+    request: &'request FontRequest<'request>,
+    text: &'text str,
+    options: &ShapeOptions<'request>,
+  ) -> Result<Vec<ShapedRun<'text, 'a>>>
+  where
+    'a: 'request,
+  {
     self.shape_text_runs_inner(request, text, options)
   }
 
-  fn shape_text_runs_inner(
+  fn shape_text_runs_inner<'text, 'request>(
     &self,
-    request: &FontRequest<'a>,
-    text: Cow<'a, str>,
-    options: &ShapeOptions<'a>,
-  ) -> Result<Vec<ShapedRun<'a>>> {
+    request: &'request FontRequest<'request>,
+    text: &'text str,
+    options: &ShapeOptions<'request>,
+  ) -> Result<Vec<ShapedRun<'text, 'a>>>
+  where
+    'a: 'request,
+  {
     let fonts = font_timing("resolve fallback fonts", || {
-      self.resolve_fallback_fonts(request, text.as_ref(), options)
+      self.resolve_fallback_fonts(request, text, options)
     })?;
-    let parsed_faces = font_timing("prepare runtime faces", || {
+    let runtime_faces = font_timing("prepare runtime faces", || {
       fonts
         .iter()
-        .map(|font| {
-          self
-            .runtime_face_for_font(&font.resolved.font_id)
-            .map(|face| face.ttf.clone())
-        })
+        .map(|font| self.runtime_face_for_font(&font.resolved.font_id))
         .collect::<Vec<_>>()
     });
 
     let mut runs = Vec::new();
     let mut start = 0usize;
     let mut active = None::<usize>;
-    for cluster in grapheme_clusters(text.as_ref()) {
+    for cluster in grapheme_clusters(text) {
       let font_index = fonts
         .iter()
         .enumerate()
         .position(|(index, font)| {
-          font_supports_text_cluster(font, parsed_faces[index].as_ref(), &text[cluster.clone()])
+          font_supports_text_cluster(
+            font,
+            runtime_faces[index].as_deref().map(|face| &face.ttf),
+            &text[cluster.clone()],
+          )
         })
         .unwrap_or(0);
       if active.is_some_and(|active| active != font_index) {
         runs.push(self.shape_resolved_segment(
           &fonts[active.unwrap_or(0)],
-          text.as_ref(),
+          text,
           start..cluster.start,
           options,
         )?);
@@ -594,7 +615,7 @@ impl<'a> FontRegistry<'a> {
     if start < text.len() || text.is_empty() {
       runs.push(self.shape_resolved_segment(
         &fonts[active.unwrap_or(0)],
-        text.as_ref(),
+        text,
         start..text.len(),
         options,
       )?);
@@ -602,12 +623,15 @@ impl<'a> FontRegistry<'a> {
     Ok(runs)
   }
 
-  fn resolve_fallback_fonts(
+  fn resolve_fallback_fonts<'request>(
     &self,
-    request: &FontRequest<'a>,
+    request: &'request FontRequest<'request>,
     text: &str,
-    options: &ShapeOptions<'a>,
-  ) -> Result<Vec<ResolvedFontWithFace<'a>>> {
+    options: &ShapeOptions<'request>,
+  ) -> Result<Vec<ResolvedFontWithFace<'_, 'a>>>
+  where
+    'a: 'request,
+  {
     let primary = self.resolve(request)?;
     let Some(primary_face) = self
       .book
@@ -617,22 +641,22 @@ impl<'a> FontRegistry<'a> {
     else {
       return Ok(vec![ResolvedFontWithFace {
         resolved: primary,
-        face: FontFaceInfo::synthetic("unknown", "unknown"),
+        face: None,
         fallback_level: None,
       }]);
     };
 
     let mut fonts = vec![ResolvedFontWithFace {
       resolved: primary,
-      face: primary_face.clone(),
+      face: Some(primary_face),
       fallback_level: None,
     }];
 
     if !options.scan_registered_fallbacks {
       for family in self.fallback_families(request) {
-        let mut fallback_request = request.clone();
-        fallback_request.family = Some(family.clone());
-        if let Ok(resolved) = self.resolve(&fallback_request)
+        if let Ok(resolved) = self
+          .book
+          .resolve_matching_family(request, &self.faces, family, false)
           && !fonts
             .iter()
             .any(|font| font.resolved.font_id == resolved.font_id)
@@ -645,7 +669,7 @@ impl<'a> FontRegistry<'a> {
           let fallback_level = fonts.len().try_into().ok();
           fonts.push(ResolvedFontWithFace {
             resolved,
-            face: face.clone(),
+            face: Some(face),
             fallback_level,
           });
         }
@@ -659,9 +683,9 @@ impl<'a> FontRegistry<'a> {
       if missing_chars.is_empty() {
         break;
       }
-      let mut fallback_request = request.clone();
-      fallback_request.family = Some(family.clone());
-      if let Ok(resolved) = self.resolve(&fallback_request)
+      if let Ok(resolved) = self
+        .book
+        .resolve_matching_family(request, &self.faces, family, false)
         && !fonts
           .iter()
           .any(|font| font.resolved.font_id == resolved.font_id)
@@ -674,7 +698,7 @@ impl<'a> FontRegistry<'a> {
         let fallback_level = fonts.len().try_into().ok();
         fonts.push(ResolvedFontWithFace {
           resolved,
-          face: face.clone(),
+          face: Some(face),
           fallback_level,
         });
         missing_chars = self.missing_chars_for_fonts(&fonts, text);
@@ -698,7 +722,7 @@ impl<'a> FontRegistry<'a> {
       let fallback_level = fonts.len().try_into().ok();
       fonts.push(ResolvedFontWithFace {
         resolved: self.resolved_from_face(request, face, fallback_level),
-        face: face.clone(),
+        face: Some(face),
         fallback_level,
       });
       missing_chars = self.missing_chars_for_fonts(&fonts, text);
@@ -712,7 +736,7 @@ impl<'a> FontRegistry<'a> {
 
   fn missing_chars_for_fonts(
     &self,
-    fonts: &[ResolvedFontWithFace<'a>],
+    fonts: &[ResolvedFontWithFace<'_, 'a>],
     text: &str,
   ) -> SmallVec<[char; 8]> {
     let mut missing = SmallVec::<[char; 8]>::new();
@@ -720,18 +744,19 @@ impl<'a> FontRegistry<'a> {
       if is_private_use_char(ch) || missing.contains(&ch) {
         continue;
       }
-      if !fonts
-        .iter()
-        .any(|font| self.face_info_supports_char(&font.face, ch))
-      {
+      if !fonts.iter().any(|font| {
+        font
+          .face
+          .is_some_and(|face| self.face_info_supports_char(face, ch))
+      }) {
         missing.push(ch);
       }
     }
     missing
   }
 
-  fn fallback_families(&self, request: &FontRequest<'a>) -> Vec<Cow<'a, str>> {
-    let mut families: Vec<Cow<'a, str>> = Vec::new();
+  fn fallback_families<'book>(&'book self, request: &FontRequest<'_>) -> Vec<&'book str> {
+    let mut families: Vec<&'book str> = Vec::new();
     let mut normalized_families: Vec<String> = Vec::new();
     let requested_family = request.family.as_deref().map(normalize_family);
     for chain in &self.book.fallback_chains {
@@ -764,20 +789,23 @@ impl<'a> FontRegistry<'a> {
           .any(|existing| existing == &normalized)
         {
           normalized_families.push(normalized);
-          families.push(family.clone());
+          families.push(family.as_ref());
         }
       }
     }
     families
   }
 
-  fn shape_resolved_segment(
+  fn shape_resolved_segment<'text, 'request>(
     &self,
-    font: &ResolvedFontWithFace<'a>,
-    text: &str,
+    font: &ResolvedFontWithFace<'_, 'a>,
+    text: &'text str,
     range: Range<usize>,
-    options: &ShapeOptions<'a>,
-  ) -> Result<ShapedRun<'a>> {
+    options: &ShapeOptions<'request>,
+  ) -> Result<ShapedRun<'text, 'a>>
+  where
+    'a: 'request,
+  {
     let mut run = match &font.resolved.source {
       FontSource::Memory { data, .. }
       | FontSource::EmbeddedOoxml { data, .. }
@@ -789,18 +817,15 @@ impl<'a> FontRegistry<'a> {
           .runtime_face_for_font(&font.resolved.font_id)
           .or_else(|| runtime_face_for_data(data.clone(), font.resolved.face_index))
           .ok_or(FontError::InvalidFace)?;
-        font.resolved.shape_with_runtime_face(
-          Cow::Owned(text[range.clone()].to_owned()),
-          &runtime_face,
-          options,
-        )?
+        font
+          .resolved
+          .shape_with_runtime_face(&text[range.clone()], &runtime_face, options)?
       }
       FontSource::System | FontSource::Path { data: None, .. } => font.resolved.shape_approximate(
-        Cow::Owned(text[range.clone()].to_owned()),
+        &text[range.clone()],
         options.size_pt,
         options.direction,
         options.script,
-        options.language.clone(),
       ),
     };
     run.offset_text_range(range.start);
@@ -836,7 +861,7 @@ impl<'a> FontRegistry<'a> {
 
   fn resolved_from_face(
     &self,
-    request: &FontRequest<'a>,
+    _request: &FontRequest<'_>,
     face: &FontFaceInfo<'a>,
     fallback_level: Option<u8>,
   ) -> ResolvedFont<'a> {
@@ -845,7 +870,6 @@ impl<'a> FontRegistry<'a> {
     });
     ResolvedFont {
       font_id: face.font_id.clone(),
-      requested_family: request.family.clone(),
       resolved_family: primary_family(face),
       source: registered
         .map(|face| face.source.clone())
@@ -853,13 +877,7 @@ impl<'a> FontRegistry<'a> {
       face_index: face.face_index,
       synthetic_bold: false,
       synthetic_italic: false,
-      variation_values: request.variations.clone(),
       metrics: face.metrics.clone(),
-      substitution: Some(FontSubstitution {
-        requested_family: request.family.clone().unwrap_or(Cow::Borrowed("")),
-        substituted_family: primary_family(face),
-        reason: FontSubstitutionReason::MissingGlyph,
-      }),
       match_diagnostics: FontMatchDiagnostics {
         candidates: Vec::new(),
         fallback_level,
@@ -868,11 +886,18 @@ impl<'a> FontRegistry<'a> {
   }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-struct ResolvedFontWithFace<'a> {
-  resolved: ResolvedFont<'a>,
-  face: FontFaceInfo<'a>,
+struct ResolvedFontWithFace<'faces, 'book> {
+  resolved: ResolvedFont<'book>,
+  face: Option<&'faces FontFaceInfo<'book>>,
   fallback_level: Option<u8>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ScoredFontMatch {
+  rank: FontMatchRank,
+  face_index: usize,
+  rejected: bool,
+  reason: Option<FontMatchReason>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -887,122 +912,74 @@ pub struct FontBook<'a> {
 impl<'a> FontBook<'a> {
   pub fn resolve(
     &self,
-    request: &FontRequest<'a>,
+    request: &FontRequest<'_>,
     registered_faces: &[RegisteredFontFace<'a>],
   ) -> Result<ResolvedFont<'a>> {
-    let requested_family = request.family.clone();
-    let aliased_family = request
-      .family
-      .as_ref()
-      .map(|family| Cow::Owned(resolve_family_alias(self, family).into_owned()));
-    let substitution_rule = aliased_family
-      .as_ref()
-      .and_then(|family| find_substitution_rule(self, family));
-    let substitution_reason = substitution_rule.map(|rule| rule.reason);
-    let substituted_family = substitution_rule
-      .as_ref()
-      .map(|rule| Cow::Owned(rule.substitute_family.clone().into_owned()));
-    let target_family = substituted_family
-      .as_deref()
-      .or(aliased_family.as_deref())
-      .or(requested_family.as_deref());
-    let target_family_tokens = target_family.map(family_tokens);
+    self.resolve_impl(request, registered_faces, None, false)
+  }
+
+  pub fn resolve_with_diagnostics(
+    &self,
+    request: &FontRequest<'_>,
+    registered_faces: &[RegisteredFontFace<'a>],
+  ) -> Result<ResolvedFont<'a>> {
+    self.resolve_impl(request, registered_faces, None, true)
+  }
+
+  fn resolve_matching_family(
+    &self,
+    request: &FontRequest<'_>,
+    registered_faces: &[RegisteredFontFace<'a>],
+    family: &str,
+    include_diagnostics: bool,
+  ) -> Result<ResolvedFont<'a>> {
+    self.resolve_impl(request, registered_faces, Some(family), include_diagnostics)
+  }
+
+  fn resolve_impl(
+    &self,
+    request: &FontRequest<'_>,
+    registered_faces: &[RegisteredFontFace<'a>],
+    family_override: Option<&str>,
+    include_diagnostics: bool,
+  ) -> Result<ResolvedFont<'a>> {
+    let target_family_names = family_override.or(request.family.as_deref()).map(|family| {
+      let aliased = resolve_family_alias(self, Cow::Borrowed(family));
+      let substituted =
+        find_substitution_rule(self, aliased.as_ref()).map(|rule| rule.substitute_family.as_ref());
+      normalized_family_names(substituted.unwrap_or_else(|| aliased.as_ref()))
+    });
     let requested_weight = requested_weight(request);
     let requested_slant = requested_slant(request);
     let requested_stretch = request.stretch.unwrap_or(FontStretch::Normal);
 
-    let mut candidates = Vec::new();
-    for face in &self.faces {
-      let family = primary_family(face);
-      let mut rejected = false;
-      let mut reason = None;
-
-      if let Some(target_tokens) = target_family_tokens.as_deref() {
-        if family_matches_tokens(face, target_tokens) {
-          reason = Some(FontMatchReason::Family);
-        } else {
-          rejected = true;
-          reason = Some(FontMatchReason::Family);
-        }
+    let mut winner = None::<ScoredFontMatch>;
+    let mut diagnostics = include_diagnostics.then(Vec::new);
+    for (face_index, face) in self.faces.iter().enumerate() {
+      let scored = score_font_match(
+        face_index,
+        face,
+        registered_faces,
+        request,
+        target_family_names.as_deref(),
+        requested_slant,
+        requested_stretch,
+        requested_weight,
+      );
+      if !scored.rejected
+        && winner.is_none_or(|current| scored_font_match_cmp(scored, current, &self.faces).is_lt())
+      {
+        winner = Some(scored);
       }
-
-      let registered = registered_faces.iter().find(|registered| {
-        registered.face_index == face.face_index && family_overlaps(registered, face)
-      });
-      let family_class_mismatch = target_family_tokens.is_none()
-        && request
-          .family_class
-          .is_some_and(|class| !font_family_class_matches(class, face));
-      let charset_mismatch = request
-        .charset
-        .is_some_and(|charset| !font_charset_matches(charset, face, registered));
-      let slant_mismatch = face.slant != requested_slant;
-      let stretch_distance = stretch_distance(face.stretch, requested_stretch);
-      let weight_distance = weight_distance(face.weight, requested_weight);
-      let pitch_mismatch = request.pitch.is_some_and(|pitch| pitch != face.pitch);
-      if charset_mismatch && !rejected && reason == Some(FontMatchReason::Family) {
-        reason = Some(FontMatchReason::Charset);
+      if let Some(diagnostics) = &mut diagnostics {
+        diagnostics.push(scored);
       }
-      if target_family_tokens.is_none() && charset_mismatch {
-        rejected = true;
-        reason = Some(FontMatchReason::Charset);
-      }
-      if family_class_mismatch {
-        rejected = true;
-        reason = Some(FontMatchReason::FamilyClass);
-      }
-      if slant_mismatch && !rejected {
-        reason = Some(FontMatchReason::Slant);
-      }
-      if stretch_distance != 0 && !rejected && reason == Some(FontMatchReason::Family) {
-        reason = Some(FontMatchReason::Stretch);
-      }
-      if pitch_mismatch && !rejected && reason == Some(FontMatchReason::Family) {
-        reason = Some(FontMatchReason::Pitch);
-      }
-
-      let rank = FontMatchRank {
-        rejected,
-        family_class_mismatch,
-        charset_mismatch,
-        slant_mismatch,
-        stretch_distance,
-        weight_distance,
-        pitch_mismatch,
-      };
-      candidates.push((
-        rank,
-        FontMatchCandidate {
-          font_id: face.font_id.clone(),
-          family: family.into_owned().into(),
-          score: -rank.distance(),
-          rejected,
-          reason,
-        },
-      ));
     }
 
-    candidates.sort_by(|left, right| {
-      left
-        .0
-        .cmp(&right.0)
-        .then_with(|| left.1.family.cmp(&right.1.family))
-    });
-    let candidates = candidates
-      .into_iter()
-      .map(|(_, candidate)| candidate)
-      .collect::<Vec<_>>();
-
-    let Some(winner) = candidates.iter().find(|candidate| !candidate.rejected) else {
+    let Some(winner) = winner else {
       return Err(FontError::NoMatch);
     };
-    let Some(face) = self
-      .faces
-      .iter()
-      .find(|face| face.font_id == winner.font_id)
-    else {
-      return Err(FontError::NoMatch);
-    };
+    let face: &FontFaceInfo<'a> = &self.faces[winner.face_index];
     let registered = registered_faces.iter().find(|registered| {
       registered.face_index == face.face_index && family_overlaps(registered, face)
     });
@@ -1010,28 +987,8 @@ impl<'a> FontBook<'a> {
     let synthetic_bold =
       request.bold && font_weight_number(face.weight) < font_weight_number(FontWeight::Bold);
     let synthetic_italic = request.italic && face.slant == FontSlant::Upright;
-    let diagnostic_substituted_family = substituted_family.as_ref().or(aliased_family.as_ref());
-    let substitution = requested_family
-      .as_ref()
-      .zip(diagnostic_substituted_family)
-      .and_then(|(requested, substituted)| {
-        (requested.as_ref() != substituted.as_ref()).then(|| FontSubstitution {
-          requested_family: requested.clone(),
-          substituted_family: substituted.clone(),
-          reason: if aliased_family
-            .as_ref()
-            .is_some_and(|aliased| requested.as_ref() != aliased.as_ref())
-          {
-            FontSubstitutionReason::Alias
-          } else {
-            substitution_reason.unwrap_or(FontSubstitutionReason::Alias)
-          },
-        })
-      });
-
     Ok(ResolvedFont {
       font_id: face.font_id.clone(),
-      requested_family: request.family.clone(),
       resolved_family: primary_family(face),
       source: registered
         .map(|face| face.source.clone())
@@ -1039,11 +996,26 @@ impl<'a> FontBook<'a> {
       face_index: face.face_index,
       synthetic_bold,
       synthetic_italic,
-      variation_values: request.variations.clone(),
       metrics: face.metrics.clone(),
-      substitution,
       match_diagnostics: FontMatchDiagnostics {
-        candidates,
+        candidates: diagnostics
+          .map(|mut diagnostics| {
+            diagnostics.sort_by(|left, right| scored_font_match_cmp(*left, *right, &self.faces));
+            diagnostics
+              .into_iter()
+              .map(|scored| {
+                let face: &FontFaceInfo<'a> = &self.faces[scored.face_index];
+                FontMatchCandidate {
+                  font_id: face.font_id.clone(),
+                  family: primary_family(face),
+                  score: -scored.rank.distance(),
+                  rejected: scored.rejected,
+                  reason: scored.reason,
+                }
+              })
+              .collect()
+          })
+          .unwrap_or_default(),
         fallback_level: None,
       },
     })
@@ -1473,18 +1445,15 @@ pub struct FontRequest<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ResolvedFont<'a> {
+pub struct ResolvedFont<'book> {
   pub font_id: FontId,
-  pub requested_family: Option<Cow<'a, str>>,
-  pub resolved_family: Cow<'a, str>,
-  pub source: FontSource<'a>,
+  pub resolved_family: Cow<'book, str>,
+  pub source: FontSource<'book>,
   pub face_index: u32,
   pub synthetic_bold: bool,
   pub synthetic_italic: bool,
-  pub variation_values: Vec<VariationValue<'a>>,
   pub metrics: FontMetrics,
-  pub substitution: Option<FontSubstitution<'a>>,
-  pub match_diagnostics: FontMatchDiagnostics<'a>,
+  pub match_diagnostics: FontMatchDiagnostics<'book>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1615,22 +1584,20 @@ impl<'a> ShapeOptions<'a> {
   }
 }
 
-impl<'a> ResolvedFont<'a> {
+impl<'book> ResolvedFont<'book> {
   pub fn metrics_at_size(&self, size: FontSize) -> FontMetrics {
     self.metrics.scaled(size.0)
   }
 
-  pub fn shape_approximate(
+  pub fn shape_approximate<'text>(
     &self,
-    text: impl Into<Cow<'a, str>>,
+    text: &'text str,
     size: FontSize,
     direction: TextDirection,
     script: Option<TextScript>,
-    language: Option<Cow<'a, str>>,
-  ) -> ShapedRun<'a> {
-    let text = text.into();
-    let safe_breaks = text_safe_breaks(text.as_ref());
-    let glyphs = approximate_glyphs(text.as_ref(), size);
+  ) -> ShapedRun<'text, 'book> {
+    let safe_breaks = text_safe_breaks(text);
+    let glyphs = approximate_glyphs(text, size);
     let advance_pt = glyphs.iter().map(|glyph| glyph.x_advance_pt).sum();
     ShapedRun {
       font_id: self.font_id.clone(),
@@ -1640,7 +1607,6 @@ impl<'a> ResolvedFont<'a> {
       advance_pt,
       direction,
       script,
-      language,
       safe_breaks,
       approximate: true,
       decorations: Vec::new(),
@@ -1648,39 +1614,43 @@ impl<'a> ResolvedFont<'a> {
     }
   }
 
-  pub fn shape_with_ttf_bytes(
+  pub fn shape_with_ttf_bytes<'text>(
     &self,
-    text: impl Into<Cow<'a, str>>,
+    text: &'text str,
     data: &[u8],
-    options: &ShapeOptions<'a>,
-  ) -> Result<ShapedRun<'a>> {
+    options: &ShapeOptions<'_>,
+  ) -> Result<ShapedRun<'text, 'book>> {
     self.shape_with_font_bytes(text, FontBytes::from(data.to_vec()), options)
   }
 
-  fn shape_with_font_bytes(
+  fn shape_with_font_bytes<'text>(
     &self,
-    text: impl Into<Cow<'a, str>>,
+    text: &'text str,
     data: impl Into<FontBytes>,
-    options: &ShapeOptions<'a>,
-  ) -> Result<ShapedRun<'a>> {
+    options: &ShapeOptions<'_>,
+  ) -> Result<ShapedRun<'text, 'book>> {
     let runtime_face =
       runtime_face_for_data(data.into(), self.face_index).ok_or(FontError::InvalidFace)?;
     self.shape_with_runtime_face(text, &runtime_face, options)
   }
 
-  fn shape_with_runtime_face(
+  fn shape_with_runtime_face<'text>(
     &self,
-    text: impl Into<Cow<'a, str>>,
+    text: &'text str,
     runtime_face: &RuntimeFace,
-    options: &ShapeOptions<'a>,
-  ) -> Result<ShapedRun<'a>> {
-    let text = text.into();
-    let shaped_text = if options.small_caps {
-      Cow::Owned(text.to_uppercase())
+    options: &ShapeOptions<'_>,
+  ) -> Result<ShapedRun<'text, 'book>> {
+    let small_caps = options
+      .script
+      .is_none_or(|script| small_caps_supported_for_script(script))
+      && options.small_caps;
+    let has_lowercase = small_caps && text.chars().any(char::is_lowercase);
+    let (shaped_text, small_caps_ranges) = if has_lowercase {
+      small_caps_shaped_text(text)
     } else {
-      Cow::Borrowed(text.as_ref())
+      (Cow::Borrowed(text), Vec::new())
     };
-    let shape_size = if options.small_caps && text.chars().any(char::is_lowercase) {
+    let shape_size = if has_lowercase {
       FontSize(options.size_pt.0 * 0.8)
     } else {
       options.size_pt
@@ -1710,24 +1680,29 @@ impl<'a> ResolvedFont<'a> {
     });
     let infos = output.glyph_infos();
     let positions = output.glyph_positions();
-    let safe_breaks = text_safe_breaks(text.as_ref());
+    let safe_breaks = text_safe_breaks(text);
     let tracking = options.character_spacing_pt;
     let glyphs = infos
       .iter()
       .zip(positions.iter())
       .enumerate()
       .map(|(index, (info, position))| {
-        let text_range = glyph_text_range(shaped_text.as_ref(), infos, index);
+        let shaped_text_range = glyph_text_range(shaped_text.as_ref(), infos, index);
         let source_char = shaped_text
-          .get(text_range.clone())
+          .get(shaped_text_range.clone())
           .and_then(|cluster| cluster.chars().next());
+        let text_range = if small_caps_ranges.is_empty() {
+          shaped_text_range
+        } else {
+          source_range_for_shaped_range(&small_caps_ranges, shaped_text_range, text.len())
+        };
         let mut x_advance_pt = position.x_advance as f32 / units_per_em * shape_size.0;
         if tracking.abs() > f32::EPSILON && index + 1 < infos.len() {
           x_advance_pt += tracking;
         }
         ShapedGlyph {
           glyph_id: info.glyph_id,
-          cluster: info.cluster,
+          cluster: text_range.start as u32,
           text_range,
           x_advance_pt,
           y_advance_pt: position.y_advance as f32 / units_per_em * shape_size.0,
@@ -1757,7 +1732,6 @@ impl<'a> ResolvedFont<'a> {
       advance_pt,
       direction: options.direction,
       script: options.script,
-      language: options.language.clone(),
       safe_breaks,
       approximate: false,
       decorations: Vec::new(),
@@ -1782,12 +1756,12 @@ impl<'a> ResolvedFont<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct FontScriptRun<'a> {
-  pub text: Cow<'a, str>,
+pub struct FontScriptRun {
   pub text_range: Range<usize>,
   pub script: TextScript,
   pub direction: TextDirection,
   pub size_pt: FontSize,
+  pub small_caps: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1805,11 +1779,11 @@ impl Default for ScriptScanOptions {
   }
 }
 
-pub fn script_direction_runs<'a>(
-  text: impl Into<Cow<'a, str>>,
+pub fn script_direction_runs(
+  text: &str,
   size_pt: FontSize,
   small_caps: bool,
-) -> Vec<FontScriptRun<'a>> {
+) -> Vec<FontScriptRun> {
   script_direction_runs_with_options(
     text,
     size_pt,
@@ -1820,30 +1794,23 @@ pub fn script_direction_runs<'a>(
   )
 }
 
-pub fn script_direction_runs_with_options<'a>(
-  text: impl Into<Cow<'a, str>>,
+pub fn script_direction_runs_with_options(
+  text: &str,
   size_pt: FontSize,
   options: ScriptScanOptions,
-) -> Vec<FontScriptRun<'a>> {
-  match text.into() {
-    Cow::Borrowed(text) => {
-      if options.small_caps {
-        small_caps_script_direction_runs(text, size_pt)
-      } else {
-        script_direction_runs_for_borrowed_segment(text, 0, size_pt, false, options.app_script)
-      }
-    }
-    Cow::Owned(text) => {
-      if options.small_caps {
-        small_caps_script_direction_runs(&text, size_pt)
-      } else {
-        script_direction_runs_for_segment(&text, 0, size_pt, false, options.app_script)
-      }
-    }
+) -> Vec<FontScriptRun> {
+  if options.small_caps {
+    small_caps_script_direction_runs(text, size_pt, options.app_script)
+  } else {
+    script_direction_runs_for_segment(text, 0, size_pt, false, options.app_script)
   }
 }
 
-fn small_caps_script_direction_runs(text: &str, size_pt: FontSize) -> Vec<FontScriptRun<'static>> {
+fn small_caps_script_direction_runs(
+  text: &str,
+  size_pt: FontSize,
+  app_script: TextScript,
+) -> Vec<FontScriptRun> {
   let mut runs = Vec::new();
   let mut start = 0usize;
   let mut active_upper = None::<bool>;
@@ -1852,7 +1819,7 @@ fn small_caps_script_direction_runs(text: &str, size_pt: FontSize) -> Vec<FontSc
     if let Some(active) = active_upper
       && active != is_upper
     {
-      push_small_caps_case_run(text, start..index, active, size_pt, &mut runs);
+      push_small_caps_case_run(text, start..index, active, size_pt, app_script, &mut runs);
       start = index;
     }
     active_upper = Some(is_upper);
@@ -1863,6 +1830,7 @@ fn small_caps_script_direction_runs(text: &str, size_pt: FontSize) -> Vec<FontSc
       start..text.len(),
       active_upper.unwrap_or(false),
       size_pt,
+      app_script,
       &mut runs,
     );
   }
@@ -1874,41 +1842,17 @@ fn push_small_caps_case_run(
   range: Range<usize>,
   upper_run: bool,
   size_pt: FontSize,
-  runs: &mut Vec<FontScriptRun<'static>>,
+  app_script: TextScript,
+  runs: &mut Vec<FontScriptRun>,
 ) {
-  let value = &source[range.clone()];
-  let mapped = if upper_run {
-    value.to_string()
-  } else {
-    value.to_uppercase()
-  };
-  let segment_size = if upper_run {
-    size_pt
-  } else {
-    FontSize(size_pt.0 * 0.8)
-  };
-  if mapped.len() != value.len() {
-    let script = value
-      .chars()
-      .next()
-      .map(|ch| text_script_from_unicode(ch.script(), TextScript::Other))
-      .unwrap_or(TextScript::Other);
-    runs.push(FontScriptRun {
-      text: Cow::Owned(mapped),
-      text_range: range,
-      script,
-      direction: text_direction_from_bidi(get_base_direction(value)),
-      size_pt: segment_size,
-    });
-    return;
-  }
-  runs.extend(script_direction_runs_for_segment(
-    &mapped,
+  let mut segment_runs = script_direction_runs_for_segment(
+    &source[range.clone()],
     range.start,
-    segment_size,
-    false,
-    TextScript::Common,
-  ));
+    size_pt,
+    !upper_run,
+    app_script,
+  );
+  runs.append(&mut segment_runs);
 }
 
 fn script_direction_runs_for_segment(
@@ -1917,10 +1861,29 @@ fn script_direction_runs_for_segment(
   size_pt: FontSize,
   small_caps: bool,
   app_script: TextScript,
-) -> Vec<FontScriptRun<'static>> {
+) -> Vec<FontScriptRun> {
   let mut runs = Vec::new();
+  script_direction_runs_for_segment_into(
+    text,
+    range_offset,
+    size_pt,
+    small_caps,
+    app_script,
+    &mut runs,
+  );
+  runs
+}
+
+fn script_direction_runs_for_segment_into(
+  text: &str,
+  range_offset: usize,
+  size_pt: FontSize,
+  small_caps: bool,
+  app_script: TextScript,
+  runs: &mut Vec<FontScriptRun>,
+) {
   if text.is_empty() {
-    return runs;
+    return;
   }
   let leading_script = first_strong_text_script(text).unwrap_or(app_script);
   let mut start = 0usize;
@@ -1960,7 +1923,7 @@ fn script_direction_runs_for_segment(
             range_offset,
             size_pt,
             small_caps,
-            &mut runs,
+            runs,
           );
         }
         start = split;
@@ -1979,84 +1942,9 @@ fn script_direction_runs_for_segment(
       range_offset,
       size_pt,
       small_caps,
-      &mut runs,
+      runs,
     );
   }
-  runs
-}
-
-fn script_direction_runs_for_borrowed_segment<'a>(
-  text: &'a str,
-  range_offset: usize,
-  size_pt: FontSize,
-  small_caps: bool,
-  app_script: TextScript,
-) -> Vec<FontScriptRun<'a>> {
-  let mut runs = Vec::new();
-  if text.is_empty() {
-    return runs;
-  }
-  let leading_script = first_strong_text_script(text).unwrap_or(app_script);
-  let mut start = 0usize;
-  let mut active = None::<TextScript>;
-  let mut pending_weak_start = None::<usize>;
-  let mut pending_weak_has_inherited = false;
-  for (index, ch) in text.char_indices() {
-    let unicode_script = ch.script();
-    if is_nonspacing_mark(ch) {
-      active.get_or_insert(leading_script);
-      pending_weak_start.get_or_insert(index);
-      pending_weak_has_inherited = true;
-      continue;
-    }
-    let Some(script) = strong_text_script_from_unicode(unicode_script) else {
-      active.get_or_insert(leading_script);
-      pending_weak_start.get_or_insert(index);
-      pending_weak_has_inherited |= unicode_script == UnicodeScriptValue::Inherited;
-      continue;
-    };
-
-    match active {
-      None => {
-        active = Some(script);
-      }
-      Some(active_script) if script != active_script => {
-        let split = if pending_weak_has_inherited {
-          pending_weak_start.unwrap_or(index)
-        } else {
-          index
-        };
-        if start < split {
-          push_borrowed_script_direction_run(
-            text,
-            start..split,
-            active_script,
-            range_offset,
-            size_pt,
-            small_caps,
-            &mut runs,
-          );
-        }
-        start = split;
-        active = Some(script);
-      }
-      Some(_) => {}
-    }
-    pending_weak_start = None;
-    pending_weak_has_inherited = false;
-  }
-  if start < text.len() {
-    push_borrowed_script_direction_run(
-      text,
-      start..text.len(),
-      active.unwrap_or(leading_script),
-      range_offset,
-      size_pt,
-      small_caps,
-      &mut runs,
-    );
-  }
-  runs
 }
 
 fn push_script_direction_run(
@@ -2066,53 +1954,23 @@ fn push_script_direction_run(
   range_offset: usize,
   size_pt: FontSize,
   small_caps: bool,
-  runs: &mut Vec<FontScriptRun<'static>>,
+  runs: &mut Vec<FontScriptRun>,
 ) {
   let value = &source[range.clone()];
-  let has_lowercase = value.chars().any(char::is_lowercase);
   runs.push(FontScriptRun {
-    text: if small_caps && has_lowercase {
-      Cow::Owned(value.to_uppercase())
-    } else {
-      Cow::Owned(value.to_string())
-    },
     text_range: (range.start + range_offset)..(range.end + range_offset),
     script,
     direction: text_direction_from_bidi(get_base_direction(value)),
-    size_pt: if small_caps && has_lowercase {
-      FontSize(size_pt.0 * 0.8)
-    } else {
-      size_pt
-    },
+    size_pt,
+    small_caps: small_caps && small_caps_supported_for_script(script),
   });
 }
 
-fn push_borrowed_script_direction_run<'a>(
-  source: &'a str,
-  range: Range<usize>,
-  script: TextScript,
-  range_offset: usize,
-  size_pt: FontSize,
-  small_caps: bool,
-  runs: &mut Vec<FontScriptRun<'a>>,
-) {
-  let value = &source[range.clone()];
-  let has_lowercase = value.chars().any(char::is_lowercase);
-  runs.push(FontScriptRun {
-    text: if small_caps && has_lowercase {
-      Cow::Owned(value.to_uppercase())
-    } else {
-      Cow::Borrowed(value)
-    },
-    text_range: (range.start + range_offset)..(range.end + range_offset),
+fn small_caps_supported_for_script(script: TextScript) -> bool {
+  !matches!(
     script,
-    direction: text_direction_from_bidi(get_base_direction(value)),
-    size_pt: if small_caps && has_lowercase {
-      FontSize(size_pt.0 * 0.8)
-    } else {
-      size_pt
-    },
-  });
+    TextScript::Arabic | TextScript::Hebrew | TextScript::Devanagari | TextScript::Thai
+  )
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -2311,22 +2169,21 @@ impl ScriptMetrics {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ShapedRun<'a> {
+pub struct ShapedRun<'text, 'meta> {
   pub font_id: FontId,
-  pub text: Cow<'a, str>,
+  pub text: &'text str,
   pub text_range: Range<usize>,
-  pub glyphs: Cow<'a, [ShapedGlyph]>,
+  pub glyphs: Cow<'text, [ShapedGlyph]>,
   pub advance_pt: f32,
   pub direction: TextDirection,
   pub script: Option<TextScript>,
-  pub language: Option<Cow<'a, str>>,
   pub safe_breaks: Vec<usize>,
   pub approximate: bool,
   pub decorations: Vec<TextDecoration>,
-  pub diagnostics: ShapingDiagnostics<'a>,
+  pub diagnostics: ShapingDiagnostics<'meta>,
 }
 
-impl ShapedRun<'_> {
+impl ShapedRun<'_, '_> {
   pub fn offset_text_range(&mut self, offset: usize) {
     if offset == 0 {
       return;
@@ -2415,11 +2272,11 @@ pub struct FontUsageCollector {
 }
 
 impl FontUsageCollector {
-  pub fn record_run(&mut self, run: &ShapedRun<'_>) {
+  pub fn record_run(&mut self, run: &ShapedRun<'_, '_>) {
     self.record_run_with_policy(run, FontEmbeddingPolicy::default());
   }
 
-  pub fn record_run_with_policy(&mut self, run: &ShapedRun<'_>, policy: FontEmbeddingPolicy) {
+  pub fn record_run_with_policy(&mut self, run: &ShapedRun<'_, '_>, policy: FontEmbeddingPolicy) {
     let usage = match self
       .usages
       .iter_mut()
@@ -2451,17 +2308,26 @@ impl FontUsageCollector {
     }
   }
 
-  pub fn record_runs<'a>(&mut self, runs: impl IntoIterator<Item = &'a ShapedRun<'a>>) {
+  pub fn record_runs<'run, 'text, 'meta>(
+    &mut self,
+    runs: impl IntoIterator<Item = &'run ShapedRun<'text, 'meta>>,
+  ) where
+    'text: 'run,
+    'meta: 'run,
+  {
     for run in runs {
       self.record_run(run);
     }
   }
 
-  pub fn record_runs_with_policy<'a>(
+  pub fn record_runs_with_policy<'run, 'text, 'meta>(
     &mut self,
-    runs: impl IntoIterator<Item = &'a ShapedRun<'a>>,
+    runs: impl IntoIterator<Item = &'run ShapedRun<'text, 'meta>>,
     policy: FontEmbeddingPolicy,
-  ) {
+  ) where
+    'text: 'run,
+    'meta: 'run,
+  {
     for run in runs {
       self.record_run_with_policy(run, policy);
     }
@@ -2858,6 +2724,99 @@ fn primary_family<'a>(face: &FontFaceInfo<'a>) -> Cow<'a, str> {
     .unwrap_or_else(|| Cow::Owned(face.font_id.0.to_string()))
 }
 
+fn primary_family_sort_key<'a>(face: &'a FontFaceInfo<'_>) -> &'a str {
+  face
+    .family_names
+    .first()
+    .map(Cow::as_ref)
+    .unwrap_or(face.font_id.0.as_ref())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn score_font_match(
+  face_index: usize,
+  face: &FontFaceInfo<'_>,
+  registered_faces: &[RegisteredFontFace<'_>],
+  request: &FontRequest<'_>,
+  target_family_names: Option<&[String]>,
+  requested_slant: FontSlant,
+  requested_stretch: FontStretch,
+  requested_weight: FontWeight,
+) -> ScoredFontMatch {
+  let mut rejected = false;
+  let mut reason = None;
+
+  if let Some(target_names) = target_family_names {
+    if family_matches_names(face, target_names) {
+      reason = Some(FontMatchReason::Family);
+    } else {
+      rejected = true;
+      reason = Some(FontMatchReason::Family);
+    }
+  }
+
+  let registered = registered_faces.iter().find(|registered| {
+    registered.face_index == face.face_index && family_overlaps(registered, face)
+  });
+  let family_class_mismatch = target_family_names.is_none()
+    && request
+      .family_class
+      .is_some_and(|class| !font_family_class_matches(class, face));
+  let charset_mismatch = request
+    .charset
+    .is_some_and(|charset| !font_charset_matches(charset, face, registered));
+  let slant_mismatch = face.slant != requested_slant;
+  let stretch_distance = stretch_distance(face.stretch, requested_stretch);
+  let weight_distance = weight_distance(face.weight, requested_weight);
+  let pitch_mismatch = request.pitch.is_some_and(|pitch| pitch != face.pitch);
+  if charset_mismatch && !rejected && reason == Some(FontMatchReason::Family) {
+    reason = Some(FontMatchReason::Charset);
+  }
+  if target_family_names.is_none() && charset_mismatch {
+    rejected = true;
+    reason = Some(FontMatchReason::Charset);
+  }
+  if family_class_mismatch {
+    rejected = true;
+    reason = Some(FontMatchReason::FamilyClass);
+  }
+  if slant_mismatch && !rejected {
+    reason = Some(FontMatchReason::Slant);
+  }
+  if stretch_distance != 0 && !rejected && reason == Some(FontMatchReason::Family) {
+    reason = Some(FontMatchReason::Stretch);
+  }
+  if pitch_mismatch && !rejected && reason == Some(FontMatchReason::Family) {
+    reason = Some(FontMatchReason::Pitch);
+  }
+
+  ScoredFontMatch {
+    rank: FontMatchRank {
+      rejected,
+      family_class_mismatch,
+      charset_mismatch,
+      slant_mismatch,
+      stretch_distance,
+      weight_distance,
+      pitch_mismatch,
+    },
+    face_index,
+    rejected,
+    reason,
+  }
+}
+
+fn scored_font_match_cmp(
+  left: ScoredFontMatch,
+  right: ScoredFontMatch,
+  faces: &[FontFaceInfo<'_>],
+) -> std::cmp::Ordering {
+  left.rank.cmp(&right.rank).then_with(|| {
+    primary_family_sort_key(&faces[left.face_index])
+      .cmp(primary_family_sort_key(&faces[right.face_index]))
+  })
+}
+
 fn normalize_family(value: &str) -> String {
   value
     .chars()
@@ -2867,15 +2826,15 @@ fn normalize_family(value: &str) -> String {
 }
 
 fn family_matches(face: &FontFaceInfo<'_>, family: &str) -> bool {
-  let target_tokens = family_tokens(family);
-  family_matches_tokens(face, &target_tokens)
+  let target_names = normalized_family_names(family);
+  family_matches_names(face, &target_names)
 }
 
-fn family_matches_tokens(face: &FontFaceInfo<'_>, target_tokens: &[String]) -> bool {
+fn family_matches_names(face: &FontFaceInfo<'_>, target_names: &[String]) -> bool {
   face.family_names.iter().any(|candidate| {
-    family_tokens(candidate)
+    normalized_family_names(candidate)
       .iter()
-      .any(|candidate| target_tokens.iter().any(|target| candidate == target))
+      .any(|candidate| target_names.iter().any(|target| candidate == target))
   })
 }
 
@@ -2914,7 +2873,7 @@ fn font_family_name_matches_class(family: &str, requested: FontFamilyClass) -> b
   }
 }
 
-fn family_tokens(value: &str) -> Vec<String> {
+fn normalized_family_names(value: &str) -> Vec<String> {
   value
     .split(';')
     .map(str::trim)
@@ -2984,16 +2943,18 @@ fn runtime_face_for_data(data: FontBytes, face_index: u32) -> Option<Arc<Runtime
 }
 
 fn font_supports_char(
-  font: &ResolvedFontWithFace<'_>,
+  font: &ResolvedFontWithFace<'_, '_>,
   parsed_face: Option<&TtfFace<'_>>,
   ch: char,
 ) -> bool {
-  font.face.coverage.contains_char(ch)
+  font
+    .face
+    .is_some_and(|face| face.coverage.contains_char(ch))
     || parsed_face.and_then(|face| face.glyph_index(ch)).is_some()
 }
 
 fn font_supports_text_cluster(
-  font: &ResolvedFontWithFace<'_>,
+  font: &ResolvedFontWithFace<'_, '_>,
   parsed_face: Option<&TtfFace<'_>>,
   text: &str,
 ) -> bool {
@@ -3131,20 +3092,29 @@ fn format_variation_value(value: f32) -> String {
   }
 }
 
-fn resolve_family_alias<'a>(book: &FontBook<'a>, family: &Cow<'a, str>) -> Cow<'a, str> {
-  let normalized_family = normalize_family(family);
+fn resolve_family_alias<'book, 'request>(
+  book: &FontBook<'book>,
+  family: Cow<'request, str>,
+) -> Cow<'request, str>
+where
+  'book: 'request,
+{
+  let normalized_family = normalize_family(family.as_ref());
   book
     .family_aliases
     .iter()
     .find(|alias| normalize_family(&alias.from) == normalized_family)
-    .map(|alias| alias.to.clone())
-    .unwrap_or_else(|| family.clone())
+    .map(|alias| {
+      let family: Cow<'request, str> = alias.to.clone();
+      family
+    })
+    .unwrap_or(family)
 }
 
-fn find_substitution_rule<'a>(
-  book: &'a FontBook<'a>,
-  family: &Cow<'a, str>,
-) -> Option<&'a FontSubstitutionRule<'a>> {
+fn find_substitution_rule<'a, 'b>(
+  book: &'b FontBook<'a>,
+  family: &str,
+) -> Option<&'b FontSubstitutionRule<'a>> {
   let normalized_family = normalize_family(family);
   book
     .substitutions
@@ -3410,13 +3380,6 @@ fn tag_to_string(tag: Tag) -> String {
   tag.to_string().trim_end().to_string()
 }
 
-fn text_script_from_unicode(script: UnicodeScriptValue, previous: TextScript) -> TextScript {
-  match strong_text_script_from_unicode(script) {
-    Some(script) => script,
-    None => previous,
-  }
-}
-
 fn first_strong_text_script(text: &str) -> Option<TextScript> {
   text.chars().find_map(|ch| {
     (!is_nonspacing_mark(ch))
@@ -3523,6 +3486,43 @@ fn glyph_text_range(text: &str, infos: &[rustybuzz::GlyphInfo], index: usize) ->
     .min()
     .unwrap_or(text.len());
   start.min(text.len())..end.min(text.len())
+}
+
+#[derive(Clone, Debug)]
+struct SourceTextRange {
+  shaped: Range<usize>,
+  source: Range<usize>,
+}
+
+fn small_caps_shaped_text(text: &str) -> (Cow<'_, str>, Vec<SourceTextRange>) {
+  let mut shaped = String::with_capacity(text.len());
+  let mut ranges = Vec::with_capacity(text.chars().count());
+  for (source_start, ch) in text.char_indices() {
+    let source_end = source_start + ch.len_utf8();
+    let shaped_start = shaped.len();
+    shaped.extend(ch.to_uppercase());
+    let shaped_end = shaped.len();
+    ranges.push(SourceTextRange {
+      shaped: shaped_start..shaped_end,
+      source: source_start..source_end,
+    });
+  }
+  (Cow::Owned(shaped), ranges)
+}
+
+fn source_range_for_shaped_range(
+  ranges: &[SourceTextRange],
+  shaped: Range<usize>,
+  source_len: usize,
+) -> Range<usize> {
+  let start_index = ranges.partition_point(|entry| entry.shaped.end <= shaped.start);
+  let end_index = ranges.partition_point(|entry| entry.shaped.start < shaped.end);
+  if start_index >= end_index || end_index == 0 {
+    return shaped.start.min(source_len)..shaped.end.min(source_len);
+  }
+  let source_start = ranges[start_index].source.start;
+  let source_end = ranges[end_index - 1].source.end;
+  source_start.min(source_len)..source_end.min(source_len)
 }
 
 fn missing_glyphs_from_shaped_glyphs(glyphs: &[ShapedGlyph]) -> Vec<MissingGlyph> {
@@ -3705,13 +3705,12 @@ mod tests {
     bold.weight = FontWeight::Bold;
     registry.register_face(FontSource::System, bold);
 
-    let resolved = registry
-      .resolve(&FontRequest {
-        family: Some(Cow::Borrowed("Example")),
-        bold: true,
-        ..FontRequest::default()
-      })
-      .unwrap();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Example")),
+      bold: true,
+      ..FontRequest::default()
+    };
+    let resolved = registry.resolve_with_diagnostics(&request).unwrap();
 
     assert_eq!(resolved.font_id, FontId(Arc::from("bold")));
     assert_eq!(resolved.resolved_family, Cow::Borrowed("Example"));
@@ -3731,18 +3730,36 @@ mod tests {
       to: Cow::Borrowed("Liberation Serif"),
     });
 
-    let resolved = registry
-      .resolve(&FontRequest {
-        family: Some(Cow::Borrowed("Times New Roman")),
-        ..FontRequest::default()
-      })
-      .unwrap();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Times New Roman")),
+      ..FontRequest::default()
+    };
+    let resolved = registry.resolve(&request).unwrap();
 
     assert_eq!(resolved.font_id, FontId(Arc::from("liberation")));
-    assert_eq!(
-      resolved.substitution.unwrap().reason,
-      FontSubstitutionReason::Alias
+    assert_eq!(resolved.resolved_family, Cow::Borrowed("Liberation Serif"));
+  }
+
+  #[test]
+  fn family_matching_does_not_cross_match_shared_tokens() {
+    let mut registry = FontRegistry::new();
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("sans", "Liberation Sans"),
     );
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("serif", "Liberation Serif"),
+    );
+
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Liberation Serif")),
+      ..FontRequest::default()
+    };
+    let resolved = registry.resolve(&request).unwrap();
+
+    assert_eq!(resolved.font_id, FontId(Arc::from("serif")));
+    assert_eq!(resolved.resolved_family, Cow::Borrowed("Liberation Serif"));
   }
 
   #[test]
@@ -3760,12 +3777,11 @@ mod tests {
     };
     registry.register_face(FontSource::System, face);
 
-    let resolved = registry
-      .resolve(&FontRequest {
-        family: Some(Cow::Borrowed("Example")),
-        ..FontRequest::default()
-      })
-      .unwrap();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Example")),
+      ..FontRequest::default()
+    };
+    let resolved = registry.resolve(&request).unwrap();
     let metrics = resolved.metrics_at_size(FontSize(12.0));
 
     assert_eq!(metrics.vertical.ascent_pt, 12.0);
@@ -3776,24 +3792,20 @@ mod tests {
   fn approximate_shaping_preserves_text_ranges_without_fake_advances() {
     let resolved = ResolvedFont {
       font_id: FontId(Arc::from("example")),
-      requested_family: Some(Cow::Borrowed("Example")),
       resolved_family: Cow::Borrowed("Example"),
       source: FontSource::System,
       face_index: 0,
       synthetic_bold: false,
       synthetic_italic: false,
-      variation_values: Vec::new(),
       metrics: FontMetrics::default(),
-      substitution: None,
       match_diagnostics: FontMatchDiagnostics::default(),
     };
 
     let shaped = resolved.shape_approximate(
-      Cow::Borrowed("A B"),
+      "A B",
       FontSize(12.0),
       TextDirection::LeftToRight,
       Some(TextScript::Latin),
-      None,
     );
 
     assert!(shaped.approximate);
@@ -3801,6 +3813,26 @@ mod tests {
     assert_eq!(shaped.glyphs[0].text_range, 0..1);
     assert_eq!(shaped.glyphs[0].x_advance_pt, 0.0);
     assert_eq!(shaped.safe_breaks, vec![2]);
+  }
+
+  #[test]
+  fn small_caps_range_mapping_preserves_original_text_ranges() {
+    let source = "ßa";
+    let (shaped, ranges) = small_caps_shaped_text(source);
+
+    assert_eq!(shaped.as_ref(), "SSA");
+    assert_eq!(
+      source_range_for_shaped_range(&ranges, 0..1, source.len()),
+      0..2
+    );
+    assert_eq!(
+      source_range_for_shaped_range(&ranges, 1..2, source.len()),
+      0..2
+    );
+    assert_eq!(
+      source_range_for_shaped_range(&ranges, 2..3, source.len()),
+      2..3
+    );
   }
 
   #[test]
@@ -3862,7 +3894,7 @@ mod tests {
   fn font_usage_collector_records_shaped_runs_for_embedding() {
     let run = ShapedRun {
       font_id: FontId(Arc::from("example")),
-      text: Cow::Borrowed("AB"),
+      text: "AB",
       text_range: 0..2,
       glyphs: Cow::Owned(vec![
         ShapedGlyph {
@@ -3881,7 +3913,6 @@ mod tests {
       advance_pt: 0.0,
       direction: TextDirection::LeftToRight,
       script: Some(TextScript::Latin),
-      language: None,
       safe_breaks: Vec::new(),
       approximate: false,
       decorations: Vec::new(),
@@ -3935,17 +3966,14 @@ mod tests {
       families: vec![Cow::Borrowed("Fallback")],
     });
 
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Primary")),
+      script: Some(TextScript::Latin),
+      size_pt: FontSize(12.0),
+      ..FontRequest::default()
+    };
     let runs = registry
-      .shape_text_runs(
-        &FontRequest {
-          family: Some(Cow::Borrowed("Primary")),
-          script: Some(TextScript::Latin),
-          size_pt: FontSize(12.0),
-          ..FontRequest::default()
-        },
-        "AB",
-        TextDirection::LeftToRight,
-      )
+      .shape_text_runs(&request, "AB", TextDirection::LeftToRight)
       .unwrap();
 
     assert_eq!(runs.len(), 2);

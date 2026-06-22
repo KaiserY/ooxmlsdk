@@ -115,20 +115,31 @@ const TAB_STOP_DEDUP_EPSILON_PT: f32 = 0.1;
 const COMMENT_REFERENCE_FONT_SCALE: f32 = 0.75;
 const MAX_WORD_TABLE_MARGIN_TWIPS: f32 = 31_680.0;
 
+#[derive(Clone, Copy, Debug, Default)]
+struct ImportSettings {
+  justify_lines_with_shrinking: bool,
+  exchange_left_right: bool,
+  use_literal_direction: bool,
+}
+
 pub(crate) fn extract(
   package: &mut WordprocessingDocument,
   _options: &LayoutOptions,
 ) -> Result<DocxDocument> {
   let main = package.main_document_part()?;
-  let styles = StylesCatalog::load(package, &main)?;
-  let mut numbering = NumberingCatalog::load(package, &main)?;
+  let compatibility_mode = compatibility_mode(package, &main);
+  let import_settings = ImportSettings {
+    justify_lines_with_shrinking: compatibility_mode >= 15,
+    ..Default::default()
+  };
+  let styles = StylesCatalog::load(package, &main, import_settings)?;
+  let mut numbering = NumberingCatalog::load(package, &main, import_settings)?;
   let images = ImageCatalog::load(package, &main);
   let hyperlinks = HyperlinkCatalog::load(package, &main);
   let custom_xml_bindings = CustomXmlBindings::load(package, &main);
   let mut form_widget_ids = FormWidgetIdAllocator::default();
   let default_tab_stop_pt = default_tab_stop_pt(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
-  let compatibility_mode = compatibility_mode(package, &main);
   let no_column_balance = no_column_balance(package, &main);
   let split_page_break_and_paragraph_mark = split_page_break_and_paragraph_mark(package, &main);
   let mirror_margins = mirror_margins(package, &main);
@@ -239,6 +250,7 @@ pub(crate) fn extract(
     page,
     default_tab_stop_pt,
     compatibility_mode,
+    justify_lines_with_shrinking: import_settings.justify_lines_with_shrinking,
     even_and_odd_headers,
     split_page_break_and_paragraph_mark,
     form_widgets,
@@ -2540,7 +2552,11 @@ fn vml_background_pattern_color(background: &v::Background) -> Option<RgbColor> 
     .or_else(|| background.fillcolor.as_deref().and_then(parse_vml_color))
 }
 
-fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<ParagraphProps<'_>>) {
+fn merge_paragraph_format(
+  format: &mut ParagraphFormat,
+  properties: Option<ParagraphProps<'_>>,
+  import_settings: ImportSettings,
+) {
   let Some(properties) = properties else {
     return;
   };
@@ -2637,19 +2653,8 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   }
 
   if let Some(justification) = properties.justification() {
-    format.alignment = match justification.val {
-      w::JustificationValues::Center => ParagraphAlignment::Center,
-      w::JustificationValues::Right | w::JustificationValues::End => ParagraphAlignment::Right,
-      w::JustificationValues::Both
-      | w::JustificationValues::Distribute
-      | w::JustificationValues::MediumKashida
-      | w::JustificationValues::HighKashida
-      | w::JustificationValues::LowKashida
-      | w::JustificationValues::ThaiDistribute => ParagraphAlignment::Justify,
-      w::JustificationValues::Left
-      | w::JustificationValues::Start
-      | w::JustificationValues::NumTab => ParagraphAlignment::Left,
-    };
+    format.justification = paragraph_justification(justification.val, import_settings);
+    format.alignment = format.justification.alignment();
   }
 
   if let Some(bidi) = properties.bidi() {
@@ -2673,6 +2678,82 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   if let Some(frame) = properties.frame_properties() {
     merge_paragraph_frame_properties(format, frame);
   }
+}
+
+fn paragraph_justification(
+  value: w::JustificationValues,
+  import_settings: ImportSettings,
+) -> ParagraphJustification {
+  let mut justification = ParagraphJustification::default();
+  match value {
+    w::JustificationValues::Center => {
+      justification.adjust = ParagraphAdjust::Center;
+    }
+    w::JustificationValues::Right | w::JustificationValues::End => {
+      justification.adjust = if import_settings.use_literal_direction {
+        if import_settings.exchange_left_right {
+          ParagraphAdjust::Left
+        } else {
+          ParagraphAdjust::Right
+        }
+      } else {
+        ParagraphAdjust::End
+      };
+    }
+    w::JustificationValues::Distribute => {
+      justification.last_line_adjust = ParagraphAdjust::Block;
+      justification.adjust = ParagraphAdjust::Block;
+      if import_settings.justify_lines_with_shrinking {
+        justification.word_spacing.minimum_pct = 75;
+        justification.word_spacing.maximum_pct = 133;
+      }
+    }
+    w::JustificationValues::Both | w::JustificationValues::ThaiDistribute => {
+      justification.adjust = ParagraphAdjust::Block;
+      if import_settings.justify_lines_with_shrinking {
+        justification.word_spacing.minimum_pct = 75;
+        justification.word_spacing.maximum_pct = 133;
+      }
+    }
+    w::JustificationValues::LowKashida => {
+      justification.adjust = ParagraphAdjust::Block;
+      justification.word_spacing = JustificationWordSpacing {
+        desired_pct: 133,
+        minimum_pct: 133,
+        maximum_pct: 133,
+      };
+    }
+    w::JustificationValues::MediumKashida => {
+      justification.adjust = ParagraphAdjust::Block;
+      justification.word_spacing = JustificationWordSpacing {
+        desired_pct: 200,
+        minimum_pct: 200,
+        maximum_pct: 200,
+      };
+    }
+    w::JustificationValues::HighKashida => {
+      justification.adjust = ParagraphAdjust::Block;
+      justification.word_spacing = JustificationWordSpacing {
+        desired_pct: 300,
+        minimum_pct: 300,
+        maximum_pct: 300,
+      };
+    }
+    w::JustificationValues::Left
+    | w::JustificationValues::Start
+    | w::JustificationValues::NumTab => {
+      justification.adjust = if import_settings.use_literal_direction {
+        if import_settings.exchange_left_right {
+          ParagraphAdjust::Right
+        } else {
+          ParagraphAdjust::Left
+        }
+      } else {
+        ParagraphAdjust::Start
+      };
+    }
+  }
+  justification
 }
 
 fn merge_paragraph_frame_properties(format: &mut ParagraphFormat, frame: &w::FrameProperties) {
@@ -10683,6 +10764,7 @@ fn qname_ends_with(qname: &[u8], local_name: &[u8]) -> bool {
 
 #[derive(Clone, Debug, Default)]
 struct StylesCatalog {
+  import_settings: ImportSettings,
   doc_default_paragraph: ParagraphFormat,
   doc_default_run: TextStyle,
   default_paragraph_style_id: Option<String>,
@@ -10835,10 +10917,15 @@ struct TableModelEnv<'a> {
 }
 
 impl StylesCatalog {
-  fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Result<Self> {
+  fn load(
+    package: &mut WordprocessingDocument,
+    main: &MainDocumentPart,
+    import_settings: ImportSettings,
+  ) -> Result<Self> {
     let theme = ThemeData::load(package, main);
     let Some(styles_part) = main.style_definitions_part(package) else {
       let mut catalog = Self {
+        import_settings,
         theme_fonts: theme.fonts,
         theme_colors: theme.colors,
         theme_lines: theme.lines,
@@ -10851,6 +10938,7 @@ impl StylesCatalog {
     };
     let styles = styles_part.root_element(package)?;
     let mut catalog = Self {
+      import_settings,
       theme_fonts: theme.fonts,
       theme_colors: theme.colors,
       theme_lines: theme.lines,
@@ -10865,6 +10953,7 @@ impl StylesCatalog {
           .as_deref()
           .and_then(|default| default.paragraph_properties_base_style.as_deref())
           .map(ParagraphProps::BaseStyle),
+        catalog.import_settings,
       );
       properties::merge_run_style(
         &mut catalog.doc_default_run,
@@ -10909,6 +10998,7 @@ impl StylesCatalog {
           .style_paragraph_properties
           .as_deref()
           .map(ParagraphProps::Style),
+        catalog.import_settings,
       );
       entry.paragraph_numbering = style
         .style_paragraph_properties
@@ -10922,7 +11012,12 @@ impl StylesCatalog {
       );
       entry.run_overrides =
         run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
-      entry.table_style = table_style_model(style, &catalog.theme_fonts, &catalog.theme_colors);
+      entry.table_style = table_style_model(
+        style,
+        &catalog.theme_fonts,
+        &catalog.theme_colors,
+        catalog.import_settings,
+      );
       catalog.styles.insert(style_id.to_string(), entry);
     }
 
@@ -10959,8 +11054,11 @@ impl StylesCatalog {
     style_id: Option<&str>,
   ) -> Option<w::NumberingProperties> {
     let mut merged = None;
+    let style_id = style_id
+      .map(str::to_string)
+      .or_else(|| self.default_paragraph_style_id.clone());
     for properties in self
-      .style_chain(style_id)
+      .style_chain(style_id.as_deref())
       .into_iter()
       .filter_map(|entry| entry.paragraph_numbering.as_deref())
     {
@@ -11526,6 +11624,7 @@ fn table_style_model(
   style: &w::Style,
   theme_fonts: &ThemeFonts,
   theme_colors: &ThemeColors,
+  import_settings: ImportSettings,
 ) -> TableStyleModel {
   let mut model = TableStyleModel::default();
   if let Some(properties) = style.style_table_properties.as_deref() {
@@ -11555,6 +11654,7 @@ fn table_style_model(
       .style_paragraph_properties
       .as_deref()
       .map(ParagraphProps::Style),
+    import_settings,
   );
   properties::merge_run_style(
     &mut model.whole_table.run_style,
@@ -11572,6 +11672,7 @@ fn table_style_model(
         .style_paragraph_properties
         .as_deref()
         .map(ParagraphProps::Style),
+      import_settings,
     );
     properties::merge_run_style(
       &mut cell_style.run_style,
@@ -11967,7 +12068,10 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
     target.tab_stops = values.tab_stops;
     target.tab_stops_set = true;
   }
-  if values.alignment != ParagraphAlignment::default() {
+  if values.justification != ParagraphJustification::default() {
+    target.justification = values.justification;
+    target.alignment = values.justification.alignment();
+  } else if values.alignment != ParagraphAlignment::default() {
     target.alignment = values.alignment;
   }
   if values.shading.is_some() {
@@ -12012,6 +12116,32 @@ fn merge_numbering_properties(
   if source.inserted.is_some() {
     target.inserted = source.inserted.clone();
   }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct NumberingFormatMergeContext {
+  direct_indentation: bool,
+  direct_tab_stops: bool,
+}
+
+fn merge_numbering_format_values(
+  target: &mut ParagraphFormat,
+  mut values: ParagraphFormat,
+  context: NumberingFormatMergeContext,
+) {
+  if context.direct_indentation && target.indent_left_set {
+    values.indent_left_set = false;
+  }
+  if context.direct_indentation && target.indent_right_set {
+    values.indent_right_set = false;
+  }
+  if context.direct_indentation && target.first_line_indent_set {
+    values.first_line_indent_set = false;
+  }
+  if context.direct_tab_stops && target.tab_stops_set {
+    values.tab_stops_set = false;
+  }
+  merge_format_values(target, values);
 }
 
 fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
@@ -12114,7 +12244,11 @@ struct NumberingLabel {
 }
 
 impl NumberingCatalog {
-  fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Result<Self> {
+  fn load(
+    package: &mut WordprocessingDocument,
+    main: &MainDocumentPart,
+    import_settings: ImportSettings,
+  ) -> Result<Self> {
     let Some(numbering_part) = main.numbering_definitions_part(package) else {
       return Ok(Self::default());
     };
@@ -12133,9 +12267,10 @@ impl NumberingCatalog {
     for abstract_num in &numbering.abstract_num {
       let mut entry = AbstractNumbering::default();
       for level in &abstract_num.level {
-        entry
-          .levels
-          .insert(level.level_index, numbering_level_model(level));
+        entry.levels.insert(
+          level.level_index,
+          numbering_level_model(level, import_settings),
+        );
       }
       catalog
         .abstract_nums
@@ -12154,7 +12289,10 @@ impl NumberingCatalog {
                 .start_override_numbering_value
                 .as_ref()
                 .map(|value| value.val),
-              level: level.level.as_deref().map(numbering_level_model),
+              level: level
+                .level
+                .as_deref()
+                .map(|level| numbering_level_model(level, import_settings)),
             },
           )
         })
@@ -12178,6 +12316,7 @@ impl NumberingCatalog {
     styles: &StylesCatalog,
     base_style: TextStyle,
     paragraph_mark_run_properties: Option<&w::ParagraphMarkRunProperties>,
+    format_context: NumberingFormatMergeContext,
   ) -> Option<NumberingLabel> {
     let num_id = properties.numbering_id.as_ref()?.val;
     let level_index = properties
@@ -12192,7 +12331,7 @@ impl NumberingCatalog {
       .and_then(|override_| override_.level.as_ref())
       .or_else(|| abstract_num.levels.get(&level_index))?;
 
-    merge_format_values(format, level.format_properties.clone());
+    merge_numbering_format_values(format, level.format_properties.clone(), format_context);
     let start = level_override
       .and_then(|override_| override_.start)
       .unwrap_or(level.start);
@@ -12250,7 +12389,7 @@ impl NumberingCatalog {
   }
 }
 
-fn numbering_level_model(level: &w::Level) -> NumberingLevel {
+fn numbering_level_model(level: &w::Level, import_settings: ImportSettings) -> NumberingLevel {
   let mut format_properties = ParagraphFormat::default();
   merge_paragraph_format(
     &mut format_properties,
@@ -12258,6 +12397,7 @@ fn numbering_level_model(level: &w::Level) -> NumberingLevel {
       .previous_paragraph_properties
       .as_deref()
       .map(ParagraphProps::Previous),
+    import_settings,
   );
 
   NumberingLevel {
@@ -13329,6 +13469,7 @@ mod tests {
       },
       &ThemeFonts::default(),
       &ThemeColors::default(),
+      ImportSettings::default(),
     );
 
     let first_row = table_cell_style_for(
@@ -13626,6 +13767,7 @@ mod tests {
       },
       &ThemeFonts::default(),
       &ThemeColors::default(),
+      ImportSettings::default(),
     );
 
     let mut first_row = table_row_style_for(
@@ -13695,6 +13837,7 @@ mod tests {
       },
       &ThemeFonts::default(),
       &ThemeColors::default(),
+      ImportSettings::default(),
     );
 
     assert_eq!(style.alignment, Some(TableAlignment::Center));

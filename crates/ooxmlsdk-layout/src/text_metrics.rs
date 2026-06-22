@@ -1,8 +1,4 @@
-use crate::fonts::{
-  FontFaceData, FontResolver, FontStyleRef, decoration_metrics as font_decoration_metrics,
-  font_face_data, shape_text_runs as shape_font_text_runs,
-  vertical_metrics as font_vertical_metrics,
-};
+use crate::fonts::{FontFaceData, FontResolver, FontStyleRef};
 
 // Last-resort vertical metrics when no usable font face can be loaded. Keep
 // this out of horizontal measurement: LibreOffice and Typst both shape with
@@ -149,31 +145,22 @@ impl TextMetrics {
     let extra_leading_pt = (line_height_pt - natural_height_pt).max(0.0) / 2.0;
     extra_leading_pt + metrics.leading_above_pt() + metrics.ascent_pt - style.baseline_shift_pt()
   }
+
+  pub fn inline_text_box_height(&mut self, style: &(impl FontStyleRef + ?Sized)) -> f32 {
+    self.vertical_metrics(style).line_height_pt() + style.baseline_shift_pt().abs()
+  }
 }
 
 pub fn measure_text(text: &str, style: &(impl FontStyleRef + ?Sized)) -> f32 {
-  if text.is_empty() {
-    return 0.0;
-  }
-
-  shape_text(text, style).map_or(0.0, |shaped| shaped.width_pt)
+  TextMetrics::new().measure_text(text, style)
 }
 
 pub fn shape_text(text: &str, style: &(impl FontStyleRef + ?Sized)) -> Option<ShapedText> {
-  if text.is_empty() {
-    return Some(ShapedText {
-      glyphs: Vec::new(),
-      font_faces: Vec::new(),
-      width_pt: 0.0,
-    });
-  }
-
-  let runs = shape_font_text_runs(text, style)?;
-  shaped_text_from_runs(runs, style, font_face_data)
+  TextMetrics::new().shape_text(text, style)
 }
 
 fn shaped_text_from_runs(
-  runs: Vec<ooxmlsdk_fonts::ShapedRun<'static>>,
+  runs: Vec<ooxmlsdk_fonts::ShapedRun<'_, '_>>,
   style: &(impl FontStyleRef + ?Sized),
   mut font_face: impl FnMut(&ooxmlsdk_fonts::FontId) -> Option<FontFaceData>,
 ) -> Option<ShapedText> {
@@ -206,28 +193,11 @@ fn shaped_text_from_runs(
 }
 
 pub fn vertical_metrics(style: &(impl FontStyleRef + ?Sized)) -> TextVerticalMetrics {
-  font_vertical_metrics(style)
-    .map(|metrics| TextVerticalMetrics {
-      ascent_pt: metrics.ascent_pt,
-      descent_pt: metrics.descent_pt,
-      line_gap_pt: metrics.line_gap_pt,
-    })
-    .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt()))
+  TextMetrics::new().vertical_metrics(style)
 }
 
 pub fn text_decoration_metrics(style: &(impl FontStyleRef + ?Sized)) -> TextDecorationMetrics {
-  font_decoration_metrics(style)
-    .and_then(|metrics| {
-      (metrics.underline_thickness_pt > f32::EPSILON
-        && metrics.strikeout_thickness_pt > f32::EPSILON)
-        .then_some(TextDecorationMetrics {
-          underline_offset_pt: metrics.underline_offset_pt,
-          underline_width_pt: metrics.underline_thickness_pt,
-          strikethrough_offset_pt: metrics.strikeout_offset_pt,
-          strikethrough_width_pt: metrics.strikeout_thickness_pt,
-        })
-    })
-    .unwrap_or_else(|| approximate_decoration_metrics(style.font_size_pt()))
+  TextMetrics::new().text_decoration_metrics(style)
 }
 
 pub fn inline_text_box_height(style: &(impl FontStyleRef + ?Sized)) -> f32 {

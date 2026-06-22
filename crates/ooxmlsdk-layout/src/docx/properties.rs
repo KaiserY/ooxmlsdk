@@ -15,7 +15,7 @@ pub(super) fn paragraph_format(
   direct_properties: Option<ParagraphProps<'_>>,
 ) -> ParagraphFormat {
   let mut format = styles.paragraph_format_with_base(style_id, base_format);
-  merge_paragraph_format(&mut format, direct_properties);
+  merge_paragraph_format(&mut format, direct_properties, styles.import_settings);
   format
 }
 

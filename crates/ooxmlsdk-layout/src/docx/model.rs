@@ -14,6 +14,7 @@ pub(crate) struct DocxDocument {
   pub page: PageSetup,
   pub default_tab_stop_pt: f32,
   pub compatibility_mode: u16,
+  pub justify_lines_with_shrinking: bool,
   pub even_and_odd_headers: bool,
   pub split_page_break_and_paragraph_mark: bool,
   pub form_widgets: Vec<FormWidget>,
@@ -241,6 +242,7 @@ pub(crate) struct ParagraphFormat {
   pub tab_stops: Vec<TabStop>,
   pub tab_stops_set: bool,
   pub alignment: ParagraphAlignment,
+  pub justification: ParagraphJustification,
   pub bidi: bool,
   pub shading: Option<RgbColor>,
   pub borders: CellBordersModel,
@@ -373,6 +375,82 @@ pub(crate) enum ParagraphAlignment {
   Center,
   Right,
   Justify,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct ParagraphJustification {
+  pub adjust: ParagraphAdjust,
+  pub one_word_adjust: ParagraphAdjust,
+  pub last_line_adjust: ParagraphAdjust,
+  pub word_spacing: JustificationWordSpacing,
+  pub letter_spacing_minimum_pct: i16,
+  pub letter_spacing_maximum_pct: i16,
+  pub scale_width_minimum_pct: i16,
+  pub scale_width_maximum_pct: i16,
+  pub paragraph_composer: bool,
+}
+
+impl Default for ParagraphJustification {
+  fn default() -> Self {
+    Self {
+      adjust: ParagraphAdjust::Left,
+      one_word_adjust: ParagraphAdjust::Left,
+      last_line_adjust: ParagraphAdjust::Left,
+      word_spacing: JustificationWordSpacing::default(),
+      letter_spacing_minimum_pct: 0,
+      letter_spacing_maximum_pct: 0,
+      scale_width_minimum_pct: 100,
+      scale_width_maximum_pct: 100,
+      paragraph_composer: false,
+    }
+  }
+}
+
+impl ParagraphJustification {
+  pub(crate) fn alignment(self) -> ParagraphAlignment {
+    match self.adjust {
+      ParagraphAdjust::Center => ParagraphAlignment::Center,
+      ParagraphAdjust::Right | ParagraphAdjust::End => ParagraphAlignment::Right,
+      ParagraphAdjust::Block => ParagraphAlignment::Justify,
+      ParagraphAdjust::Left | ParagraphAdjust::Start => ParagraphAlignment::Left,
+    }
+  }
+
+  pub(crate) fn is_block(self) -> bool {
+    self.adjust == ParagraphAdjust::Block
+  }
+
+  pub(crate) fn can_shrink_word_spacing(self) -> bool {
+    self.word_spacing.minimum_pct < self.word_spacing.desired_pct
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct JustificationWordSpacing {
+  pub desired_pct: u16,
+  pub minimum_pct: u16,
+  pub maximum_pct: u16,
+}
+
+impl Default for JustificationWordSpacing {
+  fn default() -> Self {
+    Self {
+      desired_pct: 100,
+      minimum_pct: 100,
+      maximum_pct: 100,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum ParagraphAdjust {
+  #[default]
+  Left,
+  Right,
+  Center,
+  Block,
+  Start,
+  End,
 }
 
 #[derive(Clone, Debug)]

@@ -106,7 +106,7 @@ pub enum PdfTextSegmentation {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct GlyphRun<'doc> {
-  pub shaped: ShapedRun<'doc>,
+  pub shaped: ShapedRun<'doc, 'doc>,
   pub origin: Point,
   pub glyphs: Cow<'doc, [ShapedGlyph]>,
   pub color: Color,

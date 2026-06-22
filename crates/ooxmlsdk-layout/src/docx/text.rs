@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use super::{
   CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog,
-  Paragraph, ParagraphFormat, ParagraphProps, RunStyleOverrides, StylesCatalog, TextRun, TextStyle,
-  paragraph_inlines, paragraph_note_reference_ids, properties, redline_author_color,
+  NumberingFormatMergeContext, Paragraph, ParagraphFormat, ParagraphProps, RunStyleOverrides,
+  StylesCatalog, TextRun, TextStyle, paragraph_inlines, paragraph_note_reference_ids, properties,
+  redline_author_color,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -72,6 +73,14 @@ pub(super) fn paragraph_model_with_base<'a>(
   } else {
     paragraph_properties.map(ParagraphProps::Direct)
   };
+  let numbering_format_context = NumberingFormatMergeContext {
+    direct_indentation: direct_paragraph_properties
+      .as_ref()
+      .is_some_and(|properties| properties.indentation().is_some()),
+    direct_tab_stops: direct_paragraph_properties
+      .as_ref()
+      .is_some_and(|properties| properties.tabs().is_some()),
+  };
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
   format.style_id = style_id.map(Arc::<str>::from);
@@ -115,6 +124,7 @@ pub(super) fn paragraph_model_with_base<'a>(
         styles,
         numbering_base_style.clone(),
         paragraph_mark_run_properties,
+        numbering_format_context,
       )
     });
   let mut list_label = numbering_label

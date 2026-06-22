@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
@@ -8,6 +7,7 @@ use ooxmlsdk_fonts::{
   FontBytes, FontFaceData as SharedFontFaceData, FontId, FontRegistry, FontRequest, FontSize,
   ShapeOptions, ShapedRun, TextScript, script_direction_runs,
 };
+use rustc_hash::FxHashMap as HashMap;
 
 use crate::common;
 use crate::docx::TextStyle;
@@ -133,11 +133,8 @@ fn shape_text_runs_inner(
   style: &(impl FontStyleRef + ?Sized),
 ) -> Option<Vec<ShapedRun<'static>>> {
   let mut output = Vec::new();
-  for script_run in script_direction_runs(
-    text.to_string(),
-    FontSize(style.font_size_pt()),
-    style.small_caps(),
-  ) {
+  for script_run in script_direction_runs(text, FontSize(style.font_size_pt()), style.small_caps())
+  {
     let registry = style_font_registry(style, Some(script_run.script));
     let mut request = font_request(style);
     request.size_pt = script_run.size_pt;
@@ -147,7 +144,7 @@ fn shape_text_runs_inner(
     options.small_caps = false;
     options.scan_registered_fallbacks = false;
     let mut runs = registry
-      .shape_text_runs_with_options(&request, script_run.text, &options)
+      .shape_text_runs_with_options(&request, Cow::Owned(script_run.text.into_owned()), &options)
       .ok()?;
     for run in &runs {
       let _ = font_face_data_from_registry(&registry, &run.font_id);
@@ -283,12 +280,12 @@ fn font_face_data_from_shared(
 
 fn font_data_cache() -> &'static Mutex<HashMap<FontId, FontFaceData>> {
   static CACHE: OnceLock<Mutex<HashMap<FontId, FontFaceData>>> = OnceLock::new();
-  CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+  CACHE.get_or_init(|| Mutex::new(HashMap::default()))
 }
 
 fn font_registry_cache() -> &'static Mutex<HashMap<FontFaceKey, Arc<FontRegistry<'static>>>> {
   static CACHE: OnceLock<Mutex<HashMap<FontFaceKey, Arc<FontRegistry<'static>>>>> = OnceLock::new();
-  CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+  CACHE.get_or_init(|| Mutex::new(HashMap::default()))
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -299,18 +296,24 @@ struct FontFaceKey {
   script: Option<TextScript>,
 }
 
+impl FontFaceKey {
+  fn from_style(style: &(impl FontStyleRef + ?Sized), script: Option<TextScript>) -> Self {
+    Self {
+      family: style.font_family().map(str::to_string),
+      bold: style.bold(),
+      italic: style.italic(),
+      script,
+    }
+  }
+}
+
 fn font_face_cache() -> &'static Mutex<HashMap<FontFaceKey, FontFaceData>> {
   static CACHE: OnceLock<Mutex<HashMap<FontFaceKey, FontFaceData>>> = OnceLock::new();
-  CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+  CACHE.get_or_init(|| Mutex::new(HashMap::default()))
 }
 
 pub fn cached_text_face(style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
-  let key = FontFaceKey {
-    family: style.font_family().map(str::to_string),
-    bold: style.bold(),
-    italic: style.italic(),
-    script: None,
-  };
+  let key = FontFaceKey::from_style(style, None);
   if let Ok(cache) = font_face_cache().lock()
     && let Some(face) = cache.get(&key)
   {

@@ -83,8 +83,9 @@ pub fn shape_text(text: &str, style: &(impl FontStyleRef + ?Sized)) -> Option<Sh
   }
 
   let runs = shape_font_text_runs(text, style)?;
-  let mut glyphs = Vec::new();
-  let mut font_faces = Vec::new();
+  let glyph_count = runs.iter().map(|run| run.glyphs.len()).sum();
+  let mut glyphs = Vec::with_capacity(glyph_count);
+  let mut font_faces = Vec::with_capacity(runs.len());
   let mut width_pt = 0.0;
   let em_divisor = style.font_size_pt().max(f32::EPSILON);
 

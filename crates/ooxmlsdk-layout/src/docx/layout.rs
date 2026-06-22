@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 use crate::docx::{
   Block, BorderStyle, CellBordersModel, DocxDocument, DynamicFieldKind, FloatingFrame,
@@ -1658,7 +1658,7 @@ impl<'a> RootFrameLayout<'a> {
       pages: Vec::new(),
       current: empty_page(document.page, 0),
       y: document.page.margin_top_pt,
-      emitted_footnotes: HashSet::new(),
+      emitted_footnotes: HashSet::default(),
       emitted_footnote_order: Vec::new(),
       follows: Vec::new(),
       frames: Vec::new(),
@@ -2273,7 +2273,7 @@ impl<'a> RootFrameLayout<'a> {
         self.y,
         note_flow.content_bottom,
       );
-      let mut emitted_endnotes = HashSet::new();
+      let mut emitted_endnotes = HashSet::default();
       for id in document_referenced_endnote_ids(self.document) {
         if !emitted_endnotes.insert(id) {
           continue;
@@ -3443,8 +3443,8 @@ fn execute_reflow_requests(
   let mut influence_replayed_frames = 0usize;
   let mut influence_replayed_items = 0usize;
   let mut suppressed_moves = 0usize;
-  let mut move_backward_keys = HashMap::<MoveBackwardKey, usize>::new();
-  let mut replayed_influence_frames = HashSet::<usize>::new();
+  let mut move_backward_keys = HashMap::<MoveBackwardKey, usize>::default();
+  let mut replayed_influence_frames = HashSet::<usize>::default();
 
   for request in requests {
     match request.reason {
@@ -4417,11 +4417,11 @@ fn check_page_desc_empty_pages(
   // affected previous/next page instead of doing a one-shot filter.
   let original_pages = std::mem::take(pages);
   let original_len = original_pages.len();
+  let fallback_page = original_pages.first().cloned();
   let mut page_index_map = vec![usize::MAX; original_len];
 
   let mut checked = original_pages
-    .iter()
-    .cloned()
+    .into_iter()
     .enumerate()
     .map(|(original_index, page)| CheckPage {
       page,
@@ -4431,17 +4431,17 @@ fn check_page_desc_empty_pages(
 
   let mut index = 0;
   while index < checked.len() {
-    let previous_pages = checked[..index]
-      .iter()
-      .map(|page| page.page.clone())
-      .collect::<Vec<_>>();
     let is_intentional_empty = checked[index].page.preserve_empty;
     let is_frame_empty =
       !is_intentional_empty && page_frame_empty_for_check_page(&checked[index], follows);
     let is_empty = is_intentional_empty || is_frame_empty;
     let on_right = physical_page_is_right(index + 1);
-    let want_right =
-      page_wants_right_page(document, &checked[index].page, &previous_pages, index + 1);
+    let want_right = page_wants_right_page(
+      document,
+      &checked[index].page,
+      checked[..index].iter().map(|page| &page.page),
+      index + 1,
+    );
 
     if !is_empty
       && on_right != want_right
@@ -4469,9 +4469,12 @@ fn check_page_desc_empty_pages(
 
     if is_empty && !checked[index].page.delete_forbidden {
       let next_want_right = checked.get(index + 1).map(|next| {
-        let mut previous_for_next = previous_pages.clone();
-        previous_for_next.push(checked[index].page.clone());
-        page_wants_right_page(document, &next.page, &previous_for_next, index + 2)
+        page_wants_right_page(
+          document,
+          &next.page,
+          checked[..=index].iter().map(|page| &page.page),
+          index + 2,
+        )
       });
       if is_frame_empty || next_want_right.is_none() || next_want_right == Some(on_right) {
         checked.remove(index);
@@ -4542,9 +4545,9 @@ fn check_page_desc_empty_pages(
     true
   });
   if kept.is_empty()
-    && let Some(first) = original_pages.first()
+    && let Some(first) = fallback_page
   {
-    kept.push(first.clone());
+    kept.push(first);
   }
   *pages = kept;
 }
@@ -4577,46 +4580,44 @@ fn is_page_frame_empty_for_check(page: &Page, follows: &[FrameFollow], page_inde
     })
 }
 
-fn page_wants_right_page(
+fn page_wants_right_page<'a, I>(
   document: &DocxDocument,
   page: &Page,
-  kept_pages: &[Page],
+  kept_pages: I,
   physical_page_number: usize,
-) -> bool {
+) -> bool
+where
+  I: Clone + Iterator<Item = &'a Page>,
+{
   // SwFrame::WannaRightPage(): prefer the first body content's page number
   // offset, otherwise use the physical page side while ignoring a previous
   // intentional empty page.
-  let first_body_content_for_section = !kept_pages.iter().any(|previous| {
+  let first_body_content_for_section = !kept_pages.clone().any(|previous| {
     previous.section_index == page.section_index
       && !previous.preserve_empty
       && !is_page_frame_empty(previous)
   });
   let first_body_content_in_document = !kept_pages
-    .iter()
+    .clone()
     .any(|previous| !previous.preserve_empty && !is_page_frame_empty(previous));
+  let previous_is_intentional_empty = kept_pages
+    .clone()
+    .last()
+    .is_some_and(|previous| previous.preserve_empty);
   let mut wants_right = if first_body_content_for_section {
     if first_body_content_in_document {
-      physical_page_is_right(physical_page_number)
-        ^ kept_pages
-          .last()
-          .is_some_and(|previous| previous.preserve_empty)
+      physical_page_is_right(physical_page_number) ^ previous_is_intentional_empty
     } else {
       page
         .setup
         .page_number_start
         .map(page_number_offset_wants_right_page)
         .unwrap_or_else(|| {
-          physical_page_is_right(physical_page_number)
-            ^ kept_pages
-              .last()
-              .is_some_and(|previous| previous.preserve_empty)
+          physical_page_is_right(physical_page_number) ^ previous_is_intentional_empty
         })
     }
   } else {
-    physical_page_is_right(physical_page_number)
-      ^ kept_pages
-        .last()
-        .is_some_and(|previous| previous.preserve_empty)
+    physical_page_is_right(physical_page_number) ^ previous_is_intentional_empty
   };
 
   if first_body_content_for_section && let Some(section) = document.sections.get(page.section_index)
@@ -6375,7 +6376,7 @@ fn normalized_style_ref_name(name: &str) -> String {
 }
 
 fn apply_column_separators(document: &DocxDocument, pages: &mut [Page], frames: &[LayoutFrame]) {
-  let mut section_bounds = HashMap::<(usize, usize), (f32, f32)>::new();
+  let mut section_bounds = HashMap::<(usize, usize), (f32, f32)>::default();
   for frame in frames
     .iter()
     .filter(|frame| matches!(frame.kind, FollowFrameKind::Paragraph))

@@ -1171,6 +1171,7 @@ dependencies = [
  "icu_segmenter",
  "ooxmlsdk",
  "rustybuzz",
+ "smallvec",
  "thiserror",
  "ttf-parser",
  "unicode-bidi",
@@ -1212,6 +1213,8 @@ dependencies = [
  "ooxmlsdk-fonts",
  "ooxmlsdk-formula",
  "quick-xml",
+ "rustc-hash",
+ "smallvec",
  "thiserror",
 ]
 
@@ -1232,7 +1235,9 @@ dependencies = [
  "ooxmlsdk-layout",
  "png 0.18.1",
  "quick-xml",
+ "rustc-hash",
  "rustybuzz",
+ "smallvec",
  "thiserror",
  "ttf-parser",
  "unicode-bidi",

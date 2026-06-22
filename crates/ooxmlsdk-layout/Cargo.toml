@@ -21,4 +21,6 @@ ooxmlsdk = { workspace = true, features = ["parts"] }
 ooxmlsdk-fonts = { workspace = true }
 ooxmlsdk-formula = { workspace = true }
 quick-xml = { workspace = true }
+rustc-hash = { workspace = true }
+smallvec = { workspace = true }
 thiserror = { workspace = true }

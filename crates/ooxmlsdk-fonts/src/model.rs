@@ -1,10 +1,11 @@
 use std::borrow::Cow;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
+use std::fmt;
 use std::fs;
 use std::ops::{Deref, Range};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use fontdb::{Database as FontDatabase, Source as FontDbSource};
@@ -13,6 +14,7 @@ use rustybuzz::{
   Direction as BuzzDirection, Face as BuzzFace, Feature as BuzzFeature, Language as BuzzLanguage,
   Script as BuzzScript, UnicodeBuffer, script,
 };
+use smallvec::SmallVec;
 use ttf_parser::{Face as TtfFace, GlyphId, Rect as TtfRect, Tag};
 use unicode_bidi::{Direction as BidiDirection, get_base_direction};
 use unicode_script::{Script as UnicodeScriptValue, UnicodeScript};
@@ -70,12 +72,6 @@ impl<'a> From<Cow<'a, [u8]>> for FontBytes {
       Cow::Owned(data) => Self::from(data),
     }
   }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct RuntimeFaceKey {
-  font_id: FontId,
-  face_index: u32,
 }
 
 struct RuntimeFace {
@@ -150,6 +146,7 @@ impl<'a> FontRegistry<'a> {
       charset: None,
       face_index: face.face_index,
       origin_priority: 0,
+      runtime_face: OnceLock::new(),
     });
     self.book.faces.push(face);
   }
@@ -186,7 +183,7 @@ impl<'a> FontRegistry<'a> {
   pub fn register_system_query_fonts(&mut self, request: &FontRequest<'a>) -> Result<usize> {
     let database = font_timing("system font database", system_font_database);
     let mut registered = 0usize;
-    let mut queries = Vec::new();
+    let mut queries = SmallVec::<[FontDbQueryFamily; 8]>::new();
     if let Some(family) = request
       .family
       .as_deref()
@@ -713,8 +710,12 @@ impl<'a> FontRegistry<'a> {
     Ok(fonts)
   }
 
-  fn missing_chars_for_fonts(&self, fonts: &[ResolvedFontWithFace<'a>], text: &str) -> Vec<char> {
-    let mut missing = Vec::new();
+  fn missing_chars_for_fonts(
+    &self,
+    fonts: &[ResolvedFontWithFace<'a>],
+    text: &str,
+  ) -> SmallVec<[char; 8]> {
+    let mut missing = SmallVec::<[char; 8]>::new();
     for ch in text.chars() {
       if is_private_use_char(ch) || missing.contains(&ch) {
         continue;
@@ -731,12 +732,14 @@ impl<'a> FontRegistry<'a> {
 
   fn fallback_families(&self, request: &FontRequest<'a>) -> Vec<Cow<'a, str>> {
     let mut families: Vec<Cow<'a, str>> = Vec::new();
+    let mut normalized_families: Vec<String> = Vec::new();
+    let requested_family = request.family.as_deref().map(normalize_family);
     for chain in &self.book.fallback_chains {
       if chain.requested_family.as_deref().is_some_and(|family| {
-        request
-          .family
-          .as_deref()
-          .is_none_or(|requested| normalize_family(requested) != normalize_family(family))
+        let chain_family = normalize_family(family);
+        requested_family
+          .as_ref()
+          .is_none_or(|requested| requested != &chain_family)
       }) {
         continue;
       }
@@ -755,10 +758,12 @@ impl<'a> FontRegistry<'a> {
         continue;
       }
       for family in &chain.families {
-        if !families
+        let normalized = normalize_family(family.as_ref());
+        if !normalized_families
           .iter()
-          .any(|existing| normalize_family(existing.as_ref()) == normalize_family(family.as_ref()))
+          .any(|existing| existing == &normalized)
         {
+          normalized_families.push(normalized);
           families.push(family.clone());
         }
       }
@@ -782,13 +787,7 @@ impl<'a> FontRegistry<'a> {
       } => {
         let runtime_face = self
           .runtime_face_for_font(&font.resolved.font_id)
-          .or_else(|| {
-            runtime_face_for_data(
-              &font.resolved.font_id,
-              data.clone(),
-              font.resolved.face_index,
-            )
-          })
+          .or_else(|| runtime_face_for_data(data.clone(), font.resolved.face_index))
           .ok_or(FontError::InvalidFace)?;
         font.resolved.shape_with_runtime_face(
           Cow::Owned(text[range.clone()].to_owned()),
@@ -828,16 +827,11 @@ impl<'a> FontRegistry<'a> {
   }
 
   fn runtime_face_for_font(&self, font_id: &FontId) -> Option<Arc<RuntimeFace>> {
-    let (data, face_index) = self.source_data_for_font_id(font_id)?;
-    runtime_face_for_data(font_id, data, face_index)
-  }
-
-  fn source_data_for_font_id(&self, font_id: &FontId) -> Option<(FontBytes, u32)> {
-    let registered = self
+    self
       .faces
       .iter()
-      .find(|registered| registered.font_id().as_ref() == Some(font_id))?;
-    Some((registered.source.data_handle()?, registered.face_index))
+      .find(|registered| registered.font_id().as_ref() == Some(font_id))?
+      .runtime_face()
   }
 
   fn resolved_from_face(
@@ -912,6 +906,10 @@ impl<'a> FontBook<'a> {
       .as_deref()
       .or(aliased_family.as_deref())
       .or(requested_family.as_deref());
+    let target_family_tokens = target_family.map(family_tokens);
+    let requested_weight = requested_weight(request);
+    let requested_slant = requested_slant(request);
+    let requested_stretch = request.stretch.unwrap_or(FontStretch::Normal);
 
     let mut candidates = Vec::new();
     for face in &self.faces {
@@ -919,8 +917,8 @@ impl<'a> FontBook<'a> {
       let mut rejected = false;
       let mut reason = None;
 
-      if let Some(target) = target_family {
-        if family_matches(face, target) {
+      if let Some(target_tokens) = target_family_tokens.as_deref() {
+        if family_matches_tokens(face, target_tokens) {
           reason = Some(FontMatchReason::Family);
         } else {
           rejected = true;
@@ -928,13 +926,10 @@ impl<'a> FontBook<'a> {
         }
       }
 
-      let requested_weight = requested_weight(request);
-      let requested_slant = requested_slant(request);
-      let requested_stretch = request.stretch.unwrap_or(FontStretch::Normal);
       let registered = registered_faces.iter().find(|registered| {
         registered.face_index == face.face_index && family_overlaps(registered, face)
       });
-      let family_class_mismatch = target_family.is_none()
+      let family_class_mismatch = target_family_tokens.is_none()
         && request
           .family_class
           .is_some_and(|class| !font_family_class_matches(class, face));
@@ -948,7 +943,7 @@ impl<'a> FontBook<'a> {
       if charset_mismatch && !rejected && reason == Some(FontMatchReason::Family) {
         reason = Some(FontMatchReason::Charset);
       }
-      if target_family.is_none() && charset_mismatch {
+      if target_family_tokens.is_none() && charset_mismatch {
         rejected = true;
         reason = Some(FontMatchReason::Charset);
       }
@@ -1348,7 +1343,6 @@ impl<'a> FontSource<'a> {
   }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegisteredFontFace<'a> {
   pub source: FontSource<'a>,
   pub family_names: Vec<Cow<'a, str>>,
@@ -1360,13 +1354,80 @@ pub struct RegisteredFontFace<'a> {
   pub charset: Option<FontCharset>,
   pub face_index: u32,
   pub origin_priority: u16,
+  runtime_face: OnceLock<Option<Arc<RuntimeFace>>>,
 }
 
 impl RegisteredFontFace<'_> {
   fn font_id(&self) -> Option<FontId> {
     self.source.id().map(|id| FontId(Arc::from(id)))
   }
+
+  fn runtime_face(&self) -> Option<Arc<RuntimeFace>> {
+    self
+      .runtime_face
+      .get_or_init(|| {
+        self
+          .source
+          .data_handle()
+          .and_then(|data| RuntimeFace::new(data, self.face_index).ok())
+          .map(Arc::new)
+      })
+      .clone()
+  }
 }
+
+impl<'a> Clone for RegisteredFontFace<'a> {
+  fn clone(&self) -> Self {
+    Self {
+      source: self.source.clone(),
+      family_names: self.family_names.clone(),
+      style_name: self.style_name.clone(),
+      weight: self.weight,
+      slant: self.slant,
+      stretch: self.stretch,
+      pitch: self.pitch,
+      charset: self.charset,
+      face_index: self.face_index,
+      origin_priority: self.origin_priority,
+      runtime_face: OnceLock::new(),
+    }
+  }
+}
+
+impl<'a> fmt::Debug for RegisteredFontFace<'a> {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("RegisteredFontFace")
+      .field("source", &self.source)
+      .field("family_names", &self.family_names)
+      .field("style_name", &self.style_name)
+      .field("weight", &self.weight)
+      .field("slant", &self.slant)
+      .field("stretch", &self.stretch)
+      .field("pitch", &self.pitch)
+      .field("charset", &self.charset)
+      .field("face_index", &self.face_index)
+      .field("origin_priority", &self.origin_priority)
+      .finish()
+  }
+}
+
+impl<'a> PartialEq for RegisteredFontFace<'a> {
+  fn eq(&self, other: &Self) -> bool {
+    self.source == other.source
+      && self.family_names == other.family_names
+      && self.style_name == other.style_name
+      && self.weight == other.weight
+      && self.slant == other.slant
+      && self.stretch == other.stretch
+      && self.pitch == other.pitch
+      && self.charset == other.charset
+      && self.face_index == other.face_index
+      && self.origin_priority == other.origin_priority
+  }
+}
+
+impl<'a> Eq for RegisteredFontFace<'a> {}
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ThemeFontMap<'a> {
@@ -1602,8 +1663,8 @@ impl<'a> ResolvedFont<'a> {
     data: impl Into<FontBytes>,
     options: &ShapeOptions<'a>,
   ) -> Result<ShapedRun<'a>> {
-    let runtime_face = runtime_face_for_data(&self.font_id, data.into(), self.face_index)
-      .ok_or(FontError::InvalidFace)?;
+    let runtime_face =
+      runtime_face_for_data(data.into(), self.face_index).ok_or(FontError::InvalidFace)?;
     self.shape_with_runtime_face(text, &runtime_face, options)
   }
 
@@ -1764,14 +1825,25 @@ pub fn script_direction_runs_with_options<'a>(
   size_pt: FontSize,
   options: ScriptScanOptions,
 ) -> Vec<FontScriptRun<'a>> {
-  let text = text.into();
-  if options.small_caps {
-    return small_caps_script_direction_runs(text.as_ref(), size_pt);
+  match text.into() {
+    Cow::Borrowed(text) => {
+      if options.small_caps {
+        small_caps_script_direction_runs(text, size_pt)
+      } else {
+        script_direction_runs_for_borrowed_segment(text, 0, size_pt, false, options.app_script)
+      }
+    }
+    Cow::Owned(text) => {
+      if options.small_caps {
+        small_caps_script_direction_runs(&text, size_pt)
+      } else {
+        script_direction_runs_for_segment(&text, 0, size_pt, false, options.app_script)
+      }
+    }
   }
-  script_direction_runs_for_segment(text.as_ref(), 0, size_pt, false, options.app_script)
 }
 
-fn small_caps_script_direction_runs<'a>(text: &str, size_pt: FontSize) -> Vec<FontScriptRun<'a>> {
+fn small_caps_script_direction_runs(text: &str, size_pt: FontSize) -> Vec<FontScriptRun<'static>> {
   let mut runs = Vec::new();
   let mut start = 0usize;
   let mut active_upper = None::<bool>;
@@ -1797,12 +1869,12 @@ fn small_caps_script_direction_runs<'a>(text: &str, size_pt: FontSize) -> Vec<Fo
   runs
 }
 
-fn push_small_caps_case_run<'a>(
+fn push_small_caps_case_run(
   source: &str,
   range: Range<usize>,
   upper_run: bool,
   size_pt: FontSize,
-  runs: &mut Vec<FontScriptRun<'a>>,
+  runs: &mut Vec<FontScriptRun<'static>>,
 ) {
   let value = &source[range.clone()];
   let mapped = if upper_run {
@@ -1839,13 +1911,13 @@ fn push_small_caps_case_run<'a>(
   ));
 }
 
-fn script_direction_runs_for_segment<'a>(
+fn script_direction_runs_for_segment(
   text: &str,
   range_offset: usize,
   size_pt: FontSize,
   small_caps: bool,
   app_script: TextScript,
-) -> Vec<FontScriptRun<'a>> {
+) -> Vec<FontScriptRun<'static>> {
   let mut runs = Vec::new();
   if text.is_empty() {
     return runs;
@@ -1913,8 +1985,110 @@ fn script_direction_runs_for_segment<'a>(
   runs
 }
 
-fn push_script_direction_run<'a>(
+fn script_direction_runs_for_borrowed_segment<'a>(
+  text: &'a str,
+  range_offset: usize,
+  size_pt: FontSize,
+  small_caps: bool,
+  app_script: TextScript,
+) -> Vec<FontScriptRun<'a>> {
+  let mut runs = Vec::new();
+  if text.is_empty() {
+    return runs;
+  }
+  let leading_script = first_strong_text_script(text).unwrap_or(app_script);
+  let mut start = 0usize;
+  let mut active = None::<TextScript>;
+  let mut pending_weak_start = None::<usize>;
+  let mut pending_weak_has_inherited = false;
+  for (index, ch) in text.char_indices() {
+    let unicode_script = ch.script();
+    if is_nonspacing_mark(ch) {
+      active.get_or_insert(leading_script);
+      pending_weak_start.get_or_insert(index);
+      pending_weak_has_inherited = true;
+      continue;
+    }
+    let Some(script) = strong_text_script_from_unicode(unicode_script) else {
+      active.get_or_insert(leading_script);
+      pending_weak_start.get_or_insert(index);
+      pending_weak_has_inherited |= unicode_script == UnicodeScriptValue::Inherited;
+      continue;
+    };
+
+    match active {
+      None => {
+        active = Some(script);
+      }
+      Some(active_script) if script != active_script => {
+        let split = if pending_weak_has_inherited {
+          pending_weak_start.unwrap_or(index)
+        } else {
+          index
+        };
+        if start < split {
+          push_borrowed_script_direction_run(
+            text,
+            start..split,
+            active_script,
+            range_offset,
+            size_pt,
+            small_caps,
+            &mut runs,
+          );
+        }
+        start = split;
+        active = Some(script);
+      }
+      Some(_) => {}
+    }
+    pending_weak_start = None;
+    pending_weak_has_inherited = false;
+  }
+  if start < text.len() {
+    push_borrowed_script_direction_run(
+      text,
+      start..text.len(),
+      active.unwrap_or(leading_script),
+      range_offset,
+      size_pt,
+      small_caps,
+      &mut runs,
+    );
+  }
+  runs
+}
+
+fn push_script_direction_run(
   source: &str,
+  range: Range<usize>,
+  script: TextScript,
+  range_offset: usize,
+  size_pt: FontSize,
+  small_caps: bool,
+  runs: &mut Vec<FontScriptRun<'static>>,
+) {
+  let value = &source[range.clone()];
+  let has_lowercase = value.chars().any(char::is_lowercase);
+  runs.push(FontScriptRun {
+    text: if small_caps && has_lowercase {
+      Cow::Owned(value.to_uppercase())
+    } else {
+      Cow::Owned(value.to_string())
+    },
+    text_range: (range.start + range_offset)..(range.end + range_offset),
+    script,
+    direction: text_direction_from_bidi(get_base_direction(value)),
+    size_pt: if small_caps && has_lowercase {
+      FontSize(size_pt.0 * 0.8)
+    } else {
+      size_pt
+    },
+  });
+}
+
+fn push_borrowed_script_direction_run<'a>(
+  source: &'a str,
   range: Range<usize>,
   script: TextScript,
   range_offset: usize,
@@ -1928,7 +2102,7 @@ fn push_script_direction_run<'a>(
     text: if small_caps && has_lowercase {
       Cow::Owned(value.to_uppercase())
     } else {
-      Cow::Owned(value.to_string())
+      Cow::Borrowed(value)
     },
     text_range: (range.start + range_offset)..(range.end + range_offset),
     script,
@@ -2693,12 +2867,15 @@ fn normalize_family(value: &str) -> String {
 }
 
 fn family_matches(face: &FontFaceInfo<'_>, family: &str) -> bool {
+  let target_tokens = family_tokens(family);
+  family_matches_tokens(face, &target_tokens)
+}
+
+fn family_matches_tokens(face: &FontFaceInfo<'_>, target_tokens: &[String]) -> bool {
   face.family_names.iter().any(|candidate| {
-    family_tokens(candidate).iter().any(|candidate| {
-      family_tokens(family)
-        .iter()
-        .any(|target| candidate == target)
-    })
+    family_tokens(candidate)
+      .iter()
+      .any(|candidate| target_tokens.iter().any(|target| candidate == target))
   })
 }
 
@@ -2802,30 +2979,8 @@ fn system_font_database() -> &'static FontDatabase {
   })
 }
 
-fn runtime_face_cache() -> &'static Mutex<HashMap<RuntimeFaceKey, Arc<RuntimeFace>>> {
-  static CACHE: OnceLock<Mutex<HashMap<RuntimeFaceKey, Arc<RuntimeFace>>>> = OnceLock::new();
-  CACHE.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-fn runtime_face_for_data(
-  font_id: &FontId,
-  data: FontBytes,
-  face_index: u32,
-) -> Option<Arc<RuntimeFace>> {
-  let key = RuntimeFaceKey {
-    font_id: font_id.clone(),
-    face_index,
-  };
-  if let Ok(cache) = runtime_face_cache().lock()
-    && let Some(face) = cache.get(&key)
-  {
-    return Some(face.clone());
-  }
-  let face = Arc::new(RuntimeFace::new(data, face_index).ok()?);
-  if let Ok(mut cache) = runtime_face_cache().lock() {
-    cache.insert(key, face.clone());
-  }
-  Some(face)
+fn runtime_face_for_data(data: FontBytes, face_index: u32) -> Option<Arc<RuntimeFace>> {
+  RuntimeFace::new(data, face_index).ok().map(Arc::new)
 }
 
 fn font_supports_char(
@@ -2977,10 +3132,11 @@ fn format_variation_value(value: f32) -> String {
 }
 
 fn resolve_family_alias<'a>(book: &FontBook<'a>, family: &Cow<'a, str>) -> Cow<'a, str> {
+  let normalized_family = normalize_family(family);
   book
     .family_aliases
     .iter()
-    .find(|alias| normalize_family(&alias.from) == normalize_family(family))
+    .find(|alias| normalize_family(&alias.from) == normalized_family)
     .map(|alias| alias.to.clone())
     .unwrap_or_else(|| family.clone())
 }
@@ -2989,10 +3145,11 @@ fn find_substitution_rule<'a>(
   book: &'a FontBook<'a>,
   family: &Cow<'a, str>,
 ) -> Option<&'a FontSubstitutionRule<'a>> {
+  let normalized_family = normalize_family(family);
   book
     .substitutions
     .iter()
-    .find(|rule| normalize_family(&rule.requested_family) == normalize_family(family))
+    .find(|rule| normalize_family(&rule.requested_family) == normalized_family)
 }
 
 fn requested_weight(request: &FontRequest<'_>) -> FontWeight {

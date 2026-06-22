@@ -21,6 +21,7 @@ fontdb = { workspace = true }
 icu_segmenter = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"], optional = true }
 rustybuzz = { workspace = true }
+smallvec = { workspace = true }
 thiserror = { workspace = true }
 ttf-parser = { workspace = true }
 unicode-bidi = { workspace = true }

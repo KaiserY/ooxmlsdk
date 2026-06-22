@@ -26,7 +26,9 @@ ooxmlsdk-formula = { workspace = true }
 ooxmlsdk-layout = { workspace = true }
 png = { workspace = true }
 quick-xml = { workspace = true }
+rustc-hash = { workspace = true }
 rustybuzz = { workspace = true }
+smallvec = { workspace = true }
 thiserror = { workspace = true }
 ttf-parser = { workspace = true }
 unicode-bidi = { workspace = true }

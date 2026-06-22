@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::ops::Range;
 
 use krilla::Document;
 use krilla::action::{Action, LinkAction};
@@ -14,6 +14,8 @@ use krilla::page::PageSettings;
 use krilla::paint::{Fill, FillRule, LineJoin, Stroke};
 use krilla::surface::Surface;
 use krilla::text::{GlyphId, KrillaGlyph, TextDirection};
+use rustc_hash::FxHashMap as HashMap;
+use smallvec::SmallVec;
 
 use super::fonts::FontSet;
 use super::form_widgets::inject_form_widget_annotations;
@@ -29,6 +31,9 @@ use ooxmlsdk_layout::text_metrics::{
 
 const INTERNAL_LINK_DESTINATION_SHIFT_PT: f32 = 10.0;
 const LO_ARIAL_BOLD_11PT_VERTICAL_SCALE: f32 = 1.07;
+
+type PaintTextPortionRanges<'doc> = SmallVec<[(PaintTextPortionKind<'doc>, Range<usize>); 2]>;
+type PaintGlyphFontRuns = SmallVec<[PaintGlyphFontRun; 2]>;
 
 pub(crate) fn render(
   document: &common::LayoutDocument<'static>,
@@ -236,7 +241,7 @@ pub(crate) fn render(
       })
   }));
   let mut pdf = Document::new_with(serialize_settings(options)?);
-  let fonts = FontSet::load()?;
+  let mut fonts = FontSet::load()?;
 
   for page in &paint.pages {
     let settings = PageSettings::from_wh(page.width_pt, page.height_pt)
@@ -253,7 +258,7 @@ pub(crate) fn render(
       draw_paint_item(
         &mut surface,
         item,
-        &fonts,
+        &mut fonts,
         &internal_links,
         &mut link_annotations,
         options,
@@ -497,7 +502,7 @@ struct PaintTextPortion<'doc> {
   baseline_y: f32,
   width_pt: f32,
   clip: Option<PaintClipRect>,
-  glyphs: Option<Vec<PaintGlyphFontRun>>,
+  glyphs: Option<PaintGlyphFontRuns>,
   highlight: Option<PaintRect>,
   underline: Option<PaintStrokeLine>,
   strikethrough: Option<PaintStrokeLine>,
@@ -515,7 +520,7 @@ enum PaintTextPortionKind<'doc> {
 #[derive(Clone, Debug)]
 struct PaintGlyphRun {
   width_pt: f32,
-  font_runs: Vec<PaintGlyphFontRun>,
+  font_runs: PaintGlyphFontRuns,
 }
 
 #[derive(Clone, Debug)]
@@ -569,28 +574,26 @@ struct InternalLinkPosition {
 }
 
 #[derive(Clone, Debug, Default)]
-struct InternalLinkTargets<'doc> {
-  positions: HashMap<Cow<'doc, str>, InternalLinkPosition>,
+struct InternalLinkTargets {
+  positions: HashMap<String, InternalLinkPosition>,
 }
 
-impl<'doc> InternalLinkTargets<'doc> {
-  fn from_paint(paint: &'doc PaintDocument<'doc>) -> Self {
-    let mut positions = HashMap::new();
+impl InternalLinkTargets {
+  fn from_paint(paint: &PaintDocument<'_>) -> Self {
+    let mut positions = HashMap::default();
     for (page_index, page) in paint.pages.iter().enumerate() {
       for item in &page.items {
         match item {
           PaintItem::Text(text) => {
             if let Some(url) = &text.item.hyperlink_url
-              && is_internal_link_url(url)
+              && let Some(source_url) = reciprocal_internal_link_url(url)
             {
-              positions
-                .entry(Cow::Borrowed(url.as_ref()))
-                .or_insert(InternalLinkPosition {
-                  page_index,
-                  x_pt: text.item.x_pt,
-                  // position links upward by 10pt so baseline targets remain visible.
-                  y_pt: (text.baseline_y - INTERNAL_LINK_DESTINATION_SHIFT_PT).max(0.0),
-                });
+              positions.entry(source_url).or_insert(InternalLinkPosition {
+                page_index,
+                x_pt: text.item.x_pt,
+                // position links upward by 10pt so baseline targets remain visible.
+                y_pt: (text.baseline_y - INTERNAL_LINK_DESTINATION_SHIFT_PT).max(0.0),
+              });
             }
           }
           PaintItem::Image(_)
@@ -605,8 +608,7 @@ impl<'doc> InternalLinkTargets<'doc> {
   }
 
   fn target_for_url(&self, url: &str) -> Option<Target> {
-    let target_url = reciprocal_internal_link_url(url)?;
-    let position = self.positions.get(target_url.as_str())?;
+    let position = self.positions.get(url)?;
     Some(Target::Destination(Destination::Xyz(XyzDestination::new(
       position.page_index,
       Point::from_xy(position.x_pt, position.y_pt),
@@ -669,16 +671,28 @@ fn is_internal_link_url(url: &str) -> bool {
 }
 
 fn reciprocal_internal_link_url(url: &str) -> Option<String> {
-  let rest = url.strip_prefix("ooxmlsdk-pdf:")?;
-  let (kind, id) = rest.rsplit_once(':')?;
-  let target_kind = if let Some(note_kind) = kind.strip_suffix("-reference") {
-    format!("{note_kind}-backlink")
+  let (kind, id) = internal_link_url_parts(url)?;
+  let (note_kind, target_suffix) = if let Some(note_kind) = kind.strip_suffix("-reference") {
+    (note_kind, "-backlink")
   } else if let Some(note_kind) = kind.strip_suffix("-backlink") {
-    format!("{note_kind}-reference")
+    (note_kind, "-reference")
   } else {
     return None;
   };
-  Some(format!("ooxmlsdk-pdf:{target_kind}:{id}"))
+  let mut target_url = String::with_capacity(
+    "ooxmlsdk-pdf:".len() + note_kind.len() + target_suffix.len() + id.len() + 1,
+  );
+  target_url.push_str("ooxmlsdk-pdf:");
+  target_url.push_str(note_kind);
+  target_url.push_str(target_suffix);
+  target_url.push(':');
+  target_url.push_str(id);
+  Some(target_url)
+}
+
+fn internal_link_url_parts(url: &str) -> Option<(&str, &str)> {
+  let rest = url.strip_prefix("ooxmlsdk-pdf:")?;
+  rest.rsplit_once(':')
 }
 
 impl<'doc> PaintDocument<'doc> {
@@ -689,7 +703,7 @@ impl<'doc> PaintDocument<'doc> {
       .enumerate()
       .map(|(page_index, page)| {
         let layout_items = coalesced_writer_text_items(
-          &page
+          page
             .items
             .iter()
             .filter_map(page_item_from_common)
@@ -967,21 +981,26 @@ fn opacity(color: common::Color) -> f32 {
   f32::from(color.a) / 255.0
 }
 
-fn coalesced_writer_text_items<'doc>(items: &[PageItem<'doc>]) -> Vec<PageItem<'doc>> {
+fn coalesced_writer_text_items<'doc>(items: Vec<PageItem<'doc>>) -> Vec<PageItem<'doc>> {
   let mut output: Vec<PageItem<'doc>> = Vec::with_capacity(items.len());
   for item in items {
-    let PageItem::Text(text) = item else {
-      output.push(item.clone());
-      continue;
-    };
-    if let Some(PageItem::Text(previous)) = output.last_mut()
-      && writer_text_items_coalesce(previous, text)
-    {
-      previous.text.to_mut().push_str(&text.text);
-      previous.line_height_pt = previous.line_height_pt.max(text.line_height_pt);
-      continue;
+    match item {
+      PageItem::Text(text) => {
+        if let Some(PageItem::Text(previous)) = output.last_mut()
+          && writer_text_items_coalesce(previous, &text)
+        {
+          previous.text.to_mut().push_str(&text.text);
+          previous.line_height_pt = previous.line_height_pt.max(text.line_height_pt);
+          continue;
+        }
+        output.push(PageItem::Text(text));
+      }
+      PageItem::Image(image) => output.push(PageItem::Image(image)),
+      PageItem::LinkArea(link_area) => output.push(PageItem::LinkArea(link_area)),
+      PageItem::Rect(rect) => output.push(PageItem::Rect(rect)),
+      PageItem::Line(line) => output.push(PageItem::Line(line)),
+      PageItem::Polyline(polyline) => output.push(PageItem::Polyline(polyline)),
     }
-    output.push(PageItem::Text(text.clone()));
   }
   output
 }
@@ -1109,7 +1128,7 @@ struct PaintTextPortionSource<'a, 'doc> {
   width_pt: f32,
   page_width_pt: f32,
   clip: Option<PaintClipRect>,
-  glyphs: Option<Vec<PaintGlyphFontRun>>,
+  glyphs: Option<PaintGlyphFontRuns>,
   highlight: Option<PaintRect>,
   underline: Option<PaintStrokeLine>,
   strikethrough: Option<PaintStrokeLine>,
@@ -1185,17 +1204,17 @@ fn text_paint_portions<'doc>(
   portions
 }
 
-fn text_portion_ranges<'doc>(
-  text: &TextItem<'doc>,
-) -> Vec<(PaintTextPortionKind<'doc>, std::ops::Range<usize>)> {
+fn text_portion_ranges<'doc>(text: &TextItem<'doc>) -> PaintTextPortionRanges<'doc> {
   if text.text.is_empty() {
-    return Vec::new();
+    return PaintTextPortionRanges::new();
   }
   if let Some(kind) = &text.dynamic_field {
-    return vec![(
+    let mut ranges = PaintTextPortionRanges::new();
+    ranges.push((
       PaintTextPortionKind::Field(kind.clone()),
       0..text.text.len(),
-    )];
+    ));
+    return ranges;
   }
   let decorated_edge_space = (text.style.underline || text.style.strikethrough)
     && (text.text.starts_with(char::is_whitespace) || text.text.ends_with(char::is_whitespace));
@@ -1210,10 +1229,12 @@ fn text_portion_ranges<'doc>(
   let split_portions =
     text.pdf_text_segmentation == common::PdfTextSegmentation::Portion || split_decorated_portions;
   if !split_portions && text.hyperlink_url.is_some() && !text.text.contains('\t') {
-    return vec![(PaintTextPortionKind::Link, 0..text.text.len())];
+    let mut ranges = PaintTextPortionRanges::new();
+    ranges.push((PaintTextPortionKind::Link, 0..text.text.len()));
+    return ranges;
   }
 
-  let mut ranges = Vec::new();
+  let mut ranges = PaintTextPortionRanges::new();
   let mut start = 0usize;
   for (index, ch) in text.text.char_indices() {
     if ch != '\t' && !(split_portions && ch.is_whitespace()) {
@@ -1247,7 +1268,7 @@ fn text_portion_ranges<'doc>(
 
 fn edge_whitespace_text_portion_ranges<'doc>(
   text: &TextItem<'doc>,
-) -> Vec<(PaintTextPortionKind<'doc>, std::ops::Range<usize>)> {
+) -> PaintTextPortionRanges<'doc> {
   let kind = if text.hyperlink_url.is_some() {
     PaintTextPortionKind::Link
   } else {
@@ -1264,7 +1285,7 @@ fn edge_whitespace_text_portion_ranges<'doc>(
     .rev()
     .find_map(|(index, ch)| (!ch.is_whitespace()).then_some(index + ch.len_utf8()))
     .unwrap_or(0);
-  let mut ranges = Vec::new();
+  let mut ranges = PaintTextPortionRanges::new();
   if leading_end > 0 {
     ranges.push((kind.clone(), 0..leading_end));
   }
@@ -1279,10 +1300,10 @@ fn edge_whitespace_text_portion_ranges<'doc>(
 
 fn glyphs_for_text_range(
   glyphs: &[PaintGlyphFontRun],
-  range: std::ops::Range<usize>,
+  range: Range<usize>,
   font_size_pt: f32,
-) -> Vec<PaintGlyphFontRun> {
-  let mut output = Vec::new();
+) -> PaintGlyphFontRuns {
+  let mut output = PaintGlyphFontRuns::new();
   for run in glyphs {
     let mut x_pt = run.x_offset_pt;
     let mut active = None::<PaintGlyphFontRun>;
@@ -1293,7 +1314,7 @@ fn glyphs_for_text_range(
           .get_or_insert_with(|| PaintGlyphFontRun {
             font_face: run.font_face.clone(),
             x_offset_pt: x_pt,
-            glyphs: Vec::new(),
+            glyphs: Vec::with_capacity(run.glyphs.len().min(range.len())),
           })
           .glyphs
           .push(glyph.clone());
@@ -1404,7 +1425,7 @@ fn paint_line_owners(
 fn draw_paint_item(
   surface: &mut Surface<'_>,
   item: &PaintItem<'_>,
-  fonts: &FontSet,
+  fonts: &mut FontSet,
   internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
   options: &PdfOptions,
@@ -1614,7 +1635,7 @@ fn pdf_outline_node(
 fn draw_text_item(
   surface: &mut Surface<'_>,
   text: &PaintText<'_>,
-  fonts: &FontSet,
+  fonts: &mut FontSet,
   internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
 ) {
@@ -1987,7 +2008,7 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, pdf_image: 
 
 fn shaped_pdf_glyphs(text: &str, style: &TextStyle<'_>) -> Option<PaintGlyphRun> {
   let shaped = shape_text(text, style)?;
-  let mut font_runs = Vec::<PaintGlyphFontRun>::new();
+  let mut font_runs = PaintGlyphFontRuns::new();
   let mut x_offset_pt = 0.0;
   for glyph in shaped.glyphs {
     let font_face = shaped.font_faces.get(glyph.font_index)?.clone();

@@ -407,6 +407,8 @@ struct RgbColor {
 #[derive(Clone, Debug, PartialEq)]
 struct TextStyle<'doc> {
   font_family: Option<Cow<'doc, str>>,
+  east_asia_font_family: Option<Cow<'doc, str>>,
+  complex_font_family: Option<Cow<'doc, str>>,
   symbol_font_family: Option<Cow<'doc, str>>,
   font_size_pt: f32,
   complex_font_size_pt: Option<f32>,
@@ -432,6 +434,20 @@ struct TextStyle<'doc> {
 impl FontStyleRef for TextStyle<'_> {
   fn font_family(&self) -> Option<&str> {
     self.font_family.as_deref()
+  }
+
+  fn east_asia_font_family(&self) -> Option<&str> {
+    self
+      .east_asia_font_family
+      .as_deref()
+      .or_else(|| self.font_family())
+  }
+
+  fn complex_font_family(&self) -> Option<&str> {
+    self
+      .complex_font_family
+      .as_deref()
+      .or_else(|| self.font_family())
   }
 
   fn font_size_pt(&self) -> f32 {
@@ -875,6 +891,14 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
   TextStyle {
     font_family: style
       .font_family
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    east_asia_font_family: style
+      .east_asia_font_family
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    complex_font_family: style
+      .complex_font_family
       .as_ref()
       .map(|value| Cow::Borrowed(value.as_ref())),
     symbol_font_family: style

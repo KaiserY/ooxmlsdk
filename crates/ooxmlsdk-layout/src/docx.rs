@@ -2932,7 +2932,7 @@ fn paragraph_inlines(
     custom_xml_bindings,
     form_widget_ids,
   };
-  let mut complex_field = None;
+  let mut complex_fields = Vec::new();
 
   for choice in &paragraph.paragraph_choice {
     match choice {
@@ -2947,7 +2947,7 @@ fn paragraph_inlines(
             hyperlinks,
           },
           None,
-          &mut complex_field,
+          &mut complex_fields,
         );
       }
       w::ParagraphChoice::SimpleField(field) => {
@@ -2960,7 +2960,7 @@ fn paragraph_inlines(
           base_style.clone(),
           None,
           &mut inline_context,
-          &mut complex_field,
+          &mut complex_fields,
         );
       }
       w::ParagraphChoice::BookmarkStart(bookmark) => {
@@ -3034,7 +3034,7 @@ fn paragraph_inlines(
       _ => {}
     }
   }
-  flush_unclosed_complex_field(&mut inlines, &mut complex_field);
+  flush_unclosed_complex_fields(&mut inlines, &mut complex_fields);
 
   inlines
 }
@@ -3069,9 +3069,9 @@ fn push_run_or_complex_field(
   base_style: TextStyle,
   context: RunImportContext<'_>,
   hyperlink_url: Option<&str>,
-  state: &mut Option<ComplexFieldState>,
+  fields: &mut Vec<ComplexFieldState>,
 ) {
-  if state.is_none() && !run_starts_complex_field(run) {
+  if fields.is_empty() && !run_starts_complex_field(run) {
     push_run(
       run,
       inlines,
@@ -3094,7 +3094,7 @@ fn push_run_or_complex_field(
       w::RunChoice::FieldChar(field_char)
         if field_char.field_char_type == w::FieldCharValues::Begin =>
       {
-        *state = Some(ComplexFieldState {
+        fields.push(ComplexFieldState {
           instr: String::new(),
           result: Vec::new(),
           in_result: false,
@@ -3105,30 +3105,30 @@ fn push_run_or_complex_field(
       w::RunChoice::FieldChar(field_char)
         if field_char.field_char_type == w::FieldCharValues::Separate =>
       {
-        if let Some(state) = state {
-          state.in_result = true;
+        if let Some(field) = fields.last_mut() {
+          field.in_result = true;
         }
       }
       w::RunChoice::FieldChar(field_char)
         if field_char.field_char_type == w::FieldCharValues::End =>
       {
-        flush_closed_complex_field(inlines, state);
+        flush_closed_complex_field(inlines, fields);
       }
       w::RunChoice::FieldCode(code) => {
-        if let Some(state) = state
-          && !state.in_result
+        if let Some(field) = fields.last_mut()
+          && !field.in_result
           && let Some(content) = &code.xml_content
         {
-          state.instr.push_str(content);
+          field.instr.push_str(content);
         }
       }
       _ => {
-        if let Some(state) = state
-          && state.in_result
+        if let Some(field) = fields.last_mut()
+          && field.in_result
         {
           push_run(
             run,
-            &mut state.result,
+            &mut field.result,
             base_style.clone(),
             context.styles,
             context.images,
@@ -3152,26 +3152,37 @@ fn run_starts_complex_field(run: &w::Run) -> bool {
   })
 }
 
-fn flush_closed_complex_field(
-  inlines: &mut Vec<InlineItem>,
-  state: &mut Option<ComplexFieldState>,
-) {
-  let Some(state) = state.take() else {
+fn flush_closed_complex_field(inlines: &mut Vec<InlineItem>, fields: &mut Vec<ComplexFieldState>) {
+  let Some(state) = fields.pop() else {
     return;
   };
+  let mut resolved = Vec::new();
   if let Some(kind) = dynamic_field_kind(&state.instr) {
-    push_dynamic_field(inlines, kind, state.style, state.hyperlink_url.as_deref());
+    push_dynamic_field(
+      &mut resolved,
+      kind,
+      state.style,
+      state.hyperlink_url.as_deref(),
+      field_result_text(&state.result),
+    );
   } else {
-    inlines.extend(state.result);
+    resolved = state.result;
+  }
+  if let Some(parent) = fields.last_mut()
+    && parent.in_result
+  {
+    parent.result.extend(resolved);
+  } else {
+    inlines.extend(resolved);
   }
 }
 
-fn flush_unclosed_complex_field(
+fn flush_unclosed_complex_fields(
   inlines: &mut Vec<InlineItem>,
-  state: &mut Option<ComplexFieldState>,
+  fields: &mut Vec<ComplexFieldState>,
 ) {
-  if state.is_some() {
-    flush_closed_complex_field(inlines, state);
+  while !fields.is_empty() {
+    flush_closed_complex_field(inlines, fields);
   }
 }
 
@@ -3259,9 +3270,12 @@ fn push_dynamic_field(
   kind: DynamicFieldKind,
   style: TextStyle,
   hyperlink_url: Option<&str>,
+  result_text: Option<String>,
 ) {
   inlines.push(InlineItem::Text(TextRun {
-    text: "1".to_string(),
+    text: result_text
+      .filter(|text| !text.is_empty())
+      .unwrap_or_else(|| "1".to_string()),
     style,
     hyperlink_url: hyperlink_url.map(ToString::to_string),
     dynamic_field: Some(kind),
@@ -3269,6 +3283,22 @@ fn push_dynamic_field(
     style_ref_text: None,
     preserve_text_portion: false,
   }));
+}
+
+fn field_result_text(result: &[InlineItem]) -> Option<String> {
+  let mut text = String::new();
+  for item in result {
+    match item {
+      InlineItem::Text(run) => text.push_str(&run.text),
+      InlineItem::PageBreak | InlineItem::ColumnBreak | InlineItem::LastRenderedPageBreak => {}
+      InlineItem::Image(_)
+      | InlineItem::Shape(_)
+      | InlineItem::BookmarkStart(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_) => {}
+    }
+  }
+  (!text.is_empty()).then_some(text)
 }
 
 fn hyperlink_url(hyperlink: &w::Hyperlink, hyperlinks: &HyperlinkCatalog) -> Option<String> {
@@ -3285,7 +3315,7 @@ fn push_hyperlink_content(
   base_style: TextStyle,
   inherited_url: Option<&str>,
   context: &mut InlineImportContext<'_>,
-  complex_field: &mut Option<ComplexFieldState>,
+  complex_fields: &mut Vec<ComplexFieldState>,
 ) {
   let hyperlink_url = self::hyperlink_url(hyperlink, context.hyperlinks)
     .or_else(|| inherited_url.map(ToString::to_string));
@@ -3301,7 +3331,7 @@ fn push_hyperlink_content(
           hyperlinks: context.hyperlinks,
         },
         hyperlink_url.as_deref(),
-        complex_field,
+        complex_fields,
       ),
       w::HyperlinkChoice::SimpleField(field) => {
         push_simple_field(field, inlines, base_style.clone(), context)
@@ -3312,7 +3342,7 @@ fn push_hyperlink_content(
         base_style.clone(),
         hyperlink_url.as_deref(),
         context,
-        complex_field,
+        complex_fields,
       ),
       w::HyperlinkChoice::SdtRun(sdt) => push_sdt_run(
         sdt,
@@ -3629,7 +3659,13 @@ fn push_simple_field(
   context: &mut InlineImportContext<'_>,
 ) {
   if let Some(kind) = dynamic_field_kind(&field.instruction) {
-    push_dynamic_field(inlines, kind, base_style, None);
+    push_dynamic_field(
+      inlines,
+      kind,
+      base_style.clone(),
+      None,
+      simple_field_result_text(field, base_style, context),
+    );
     return;
   }
 
@@ -3645,16 +3681,16 @@ fn push_simple_field(
         None,
       ),
       w::SimpleFieldChoice::Hyperlink(hyperlink) => {
-        let mut complex_field = None;
+        let mut complex_fields = Vec::new();
         push_hyperlink_content(
           hyperlink.as_ref(),
           inlines,
           base_style.clone(),
           None,
           context,
-          &mut complex_field,
+          &mut complex_fields,
         );
-        flush_unclosed_complex_field(inlines, &mut complex_field);
+        flush_unclosed_complex_fields(inlines, &mut complex_fields);
       }
       w::SimpleFieldChoice::SimpleField(field) => {
         push_simple_field(field, inlines, base_style.clone(), context);
@@ -3665,6 +3701,47 @@ fn push_simple_field(
       _ => {}
     }
   }
+}
+
+fn simple_field_result_text(
+  field: &w::SimpleField,
+  base_style: TextStyle,
+  context: &mut InlineImportContext<'_>,
+) -> Option<String> {
+  let mut result = Vec::new();
+  for choice in &field.simple_field_choice {
+    match choice {
+      w::SimpleFieldChoice::WRun(run) => push_run(
+        run,
+        &mut result,
+        base_style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+        None,
+      ),
+      w::SimpleFieldChoice::Hyperlink(hyperlink) => {
+        let mut complex_fields = Vec::new();
+        push_hyperlink_content(
+          hyperlink.as_ref(),
+          &mut result,
+          base_style.clone(),
+          None,
+          context,
+          &mut complex_fields,
+        );
+        flush_unclosed_complex_fields(&mut result, &mut complex_fields);
+      }
+      w::SimpleFieldChoice::SimpleField(nested) => {
+        push_simple_field(nested, &mut result, base_style.clone(), context);
+      }
+      w::SimpleFieldChoice::SdtRun(sdt) => {
+        push_sdt_run(sdt, &mut result, base_style.clone(), None, context);
+      }
+      _ => {}
+    }
+  }
+  field_result_text(&result)
 }
 
 fn push_run(
@@ -3755,6 +3832,7 @@ fn push_run(
           DynamicFieldKind::Page,
           style.clone(),
           hyperlink_url,
+          None,
         );
       }
       w::RunChoice::NoBreakHyphen => text.push('\u{2011}'),
@@ -4100,7 +4178,7 @@ fn push_sdt_run(
     return;
   }
 
-  let mut complex_field = None;
+  let mut complex_fields = Vec::new();
   for choice in &content.sdt_content_run_choice {
     match choice {
       w::SdtContentRunChoice::WRun(run) => push_run_or_complex_field(
@@ -4113,22 +4191,20 @@ fn push_sdt_run(
           hyperlinks: context.hyperlinks,
         },
         hyperlink_url,
-        &mut complex_field,
+        &mut complex_fields,
       ),
       w::SdtContentRunChoice::SimpleField(field) => {
         push_simple_field(field.as_ref(), inlines, base_style.clone(), context);
       }
       w::SdtContentRunChoice::Hyperlink(hyperlink) => {
-        let mut complex_field = None;
         push_hyperlink_content(
           hyperlink.as_ref(),
           inlines,
           base_style.clone(),
           hyperlink_url,
           context,
-          &mut complex_field,
+          &mut complex_fields,
         );
-        flush_unclosed_complex_field(inlines, &mut complex_field);
       }
       w::SdtContentRunChoice::SdtRun(sdt) => push_sdt_run(
         sdt.as_ref(),
@@ -4184,7 +4260,7 @@ fn push_sdt_run(
       _ => {}
     }
   }
-  flush_unclosed_complex_field(inlines, &mut complex_field);
+  flush_unclosed_complex_fields(inlines, &mut complex_fields);
   if showing_placeholder {
     for inline in &mut inlines[start..] {
       if let InlineItem::Text(run) = inline {
@@ -14156,6 +14232,171 @@ mod tests {
         bookmark_name: Arc::<str>::from("_Toc123"),
       })
     );
+  }
+
+  #[test]
+  fn complex_pageref_field_uses_cached_result_for_layout_text() {
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let mut inlines = Vec::new();
+    let mut complex_fields = Vec::new();
+    let runs = [
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldChar(Box::new(w::FieldChar {
+          field_char_type: w::FieldCharValues::Begin,
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode {
+          xml_content: Some(r#" PAGEREF "_Toc123" \h "#.into()),
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldChar(Box::new(w::FieldChar {
+          field_char_type: w::FieldCharValues::Separate,
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::Text(text("27"))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldChar(Box::new(w::FieldChar {
+          field_char_type: w::FieldCharValues::End,
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+    ];
+
+    for run in &runs {
+      push_run_or_complex_field(
+        run,
+        &mut inlines,
+        TextStyle::default(),
+        RunImportContext {
+          styles: &styles,
+          images: &images,
+          hyperlinks: &hyperlinks,
+        },
+        None,
+        &mut complex_fields,
+      );
+    }
+
+    let InlineItem::Text(run) = &inlines[0] else {
+      panic!("expected dynamic field text");
+    };
+    assert_eq!(run.text, "27");
+    assert_eq!(
+      run.dynamic_field,
+      Some(DynamicFieldKind::PageRef {
+        bookmark_name: Arc::<str>::from("_Toc123"),
+      })
+    );
+  }
+
+  #[test]
+  fn nested_pageref_inside_unsupported_field_preserves_outer_result_text() {
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let mut inlines = Vec::new();
+    let mut complex_fields = Vec::new();
+    let runs = [
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldChar(Box::new(w::FieldChar {
+          field_char_type: w::FieldCharValues::Begin,
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode {
+          xml_content: Some(r#" HYPERLINK \l md_intro "#.into()),
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldChar(Box::new(w::FieldChar {
+          field_char_type: w::FieldCharValues::Separate,
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::Text(text("前言"))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::TabChar],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldChar(Box::new(w::FieldChar {
+          field_char_type: w::FieldCharValues::Begin,
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode {
+          xml_content: Some(r#" PAGEREF md_intro \h "#.into()),
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldChar(Box::new(w::FieldChar {
+          field_char_type: w::FieldCharValues::Separate,
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::Text(text("4"))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldChar(Box::new(w::FieldChar {
+          field_char_type: w::FieldCharValues::End,
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+      w::Run {
+        run_choice: vec![w::RunChoice::FieldChar(Box::new(w::FieldChar {
+          field_char_type: w::FieldCharValues::End,
+          ..Default::default()
+        }))],
+        ..Default::default()
+      },
+    ];
+
+    for run in &runs {
+      push_run_or_complex_field(
+        run,
+        &mut inlines,
+        TextStyle::default(),
+        RunImportContext {
+          styles: &styles,
+          images: &images,
+          hyperlinks: &hyperlinks,
+        },
+        None,
+        &mut complex_fields,
+      );
+    }
+
+    assert_eq!(field_result_text(&inlines).as_deref(), Some("前言\t4"));
   }
 
   #[test]

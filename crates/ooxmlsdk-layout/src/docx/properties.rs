@@ -85,21 +85,37 @@ pub(super) fn merge_run_style(
     return;
   };
 
-  if let Some(fonts) = properties.run_fonts()
-    && let Some(font_family) = fonts
+  if let Some(fonts) = properties.run_fonts() {
+    // LibreOffice maps DOCX rFonts into separate Writer character properties:
+    // ascii -> CharFontName, eastAsia -> CharFontNameAsian, cs -> CharFontNameComplex.
+    // hAnsi is kept only as interop metadata in writerfilter/dmapper/DomainMapper.cxx.
+    if let Some(font_family) = fonts
       .ascii
       .as_deref()
-      .or(fonts.high_ansi.as_deref())
-      .or(fonts.east_asia.as_deref())
-      .or(fonts.complex_script.as_deref())
       .filter(|value| is_explicit_font_family(value))
       .map(std::sync::Arc::<str>::from)
       .or_else(|| theme_fonts.resolve(fonts.ascii_theme))
-      .or_else(|| theme_fonts.resolve(fonts.high_ansi_theme))
+    {
+      style.font_family = Some(font_family);
+    }
+    if let Some(font_family) = fonts
+      .east_asia
+      .as_deref()
+      .filter(|value| is_explicit_font_family(value))
+      .map(std::sync::Arc::<str>::from)
       .or_else(|| theme_fonts.resolve(fonts.east_asia_theme))
+    {
+      style.east_asia_font_family = Some(font_family);
+    }
+    if let Some(font_family) = fonts
+      .complex_script
+      .as_deref()
+      .filter(|value| is_explicit_font_family(value))
+      .map(std::sync::Arc::<str>::from)
       .or_else(|| theme_fonts.resolve(fonts.complex_script_theme))
-  {
-    style.font_family = Some(font_family);
+    {
+      style.complex_font_family = Some(font_family);
+    }
   }
 
   if let Some(bold) = properties.bold() {

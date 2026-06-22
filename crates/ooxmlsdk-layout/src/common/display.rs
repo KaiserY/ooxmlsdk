@@ -297,6 +297,8 @@ pub struct LineNumbering {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextStyle<'doc> {
   pub font_family: Option<Cow<'doc, str>>,
+  pub east_asia_font_family: Option<Cow<'doc, str>>,
+  pub complex_font_family: Option<Cow<'doc, str>>,
   pub symbol_font_family: Option<Cow<'doc, str>>,
   pub font_size: Pt,
   pub complex_font_size: Option<Pt>,

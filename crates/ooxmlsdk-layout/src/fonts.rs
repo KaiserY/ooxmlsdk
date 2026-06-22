@@ -67,6 +67,12 @@ impl Hash for FontFaceData {
 
 pub trait FontStyleRef {
   fn font_family(&self) -> Option<&str>;
+  fn east_asia_font_family(&self) -> Option<&str> {
+    self.font_family()
+  }
+  fn complex_font_family(&self) -> Option<&str> {
+    self.font_family()
+  }
   fn font_size_pt(&self) -> f32;
   fn character_spacing_pt(&self) -> f32;
   fn baseline_shift_pt(&self) -> f32;
@@ -78,6 +84,20 @@ pub trait FontStyleRef {
 impl FontStyleRef for TextStyle {
   fn font_family(&self) -> Option<&str> {
     self.font_family.as_deref()
+  }
+
+  fn east_asia_font_family(&self) -> Option<&str> {
+    self
+      .east_asia_font_family
+      .as_deref()
+      .or_else(|| self.font_family())
+  }
+
+  fn complex_font_family(&self) -> Option<&str> {
+    self
+      .complex_font_family
+      .as_deref()
+      .or_else(|| self.font_family())
   }
 
   fn font_size_pt(&self) -> f32 {
@@ -108,6 +128,20 @@ impl FontStyleRef for TextStyle {
 impl FontStyleRef for common::TextStyle<'_> {
   fn font_family(&self) -> Option<&str> {
     self.font_family.as_deref()
+  }
+
+  fn east_asia_font_family(&self) -> Option<&str> {
+    self
+      .east_asia_font_family
+      .as_deref()
+      .or_else(|| self.font_family())
+  }
+
+  fn complex_font_family(&self) -> Option<&str> {
+    self
+      .complex_font_family
+      .as_deref()
+      .or_else(|| self.font_family())
   }
 
   fn font_size_pt(&self) -> f32 {
@@ -152,7 +186,7 @@ pub struct FontResolver {
 
 impl FontResolver {
   pub fn load_text_face(&mut self, style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
-    let request = font_request(style);
+    let request = font_request(style, None);
     let registry = self.style_font_registry(style, None);
     let resolved = registry.resolve(&request).ok()?;
     self.font_face_data_from_registry(&registry, &resolved.font_id)
@@ -199,30 +233,38 @@ impl FontResolver {
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
   ) -> Option<ooxmlsdk_fonts::VerticalMetrics> {
-    self.font_metrics(style).map(|metrics| metrics.vertical)
+    self
+      .font_metrics(style, None)
+      .map(|metrics| metrics.vertical)
   }
 
   pub fn decoration_metrics(
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
   ) -> Option<ooxmlsdk_fonts::DecorationMetrics> {
-    self.font_metrics(style).map(|metrics| metrics.decoration)
+    self
+      .font_metrics(style, None)
+      .map(|metrics| metrics.decoration)
   }
 
-  fn font_metrics(&mut self, style: &(impl FontStyleRef + ?Sized)) -> Option<FontMetrics> {
+  fn font_metrics(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+    script: Option<TextScript>,
+  ) -> Option<FontMetrics> {
     if let Some((key, metrics)) = &self.last_font_metrics
-      && key.matches_style(style)
+      && key.matches_style(style, script)
     {
       return Some(*metrics);
     }
-    let key = FontMetricsKey::from_style(style);
+    let key = FontMetricsKey::from_style(style, script);
     if let Some(metrics) = self.font_metrics_cache.get(&key) {
       let metrics = *metrics;
       self.last_font_metrics = Some((key, metrics));
       return Some(metrics);
     }
-    let request = font_request(style);
-    let registry = self.style_font_registry(style, None);
+    let request = font_request(style, script);
+    let registry = self.style_font_registry(style, script);
     let resolved = registry.resolve(&request).ok()?;
     let metrics_at_size = resolved.metrics_at_size(FontSize(style.font_size_pt()));
     let metrics = FontMetrics {
@@ -244,7 +286,7 @@ impl FontResolver {
     let mut output = Vec::with_capacity(script_runs.len());
     for script_run in script_runs {
       let registry = self.style_font_registry(style, Some(script_run.script));
-      let mut request = font_request(style);
+      let mut request = font_request(style, Some(script_run.script));
       request.size_pt = script_run.size_pt;
       request.script = Some(script_run.script);
       let mut options = ShapeOptions::from_request(&request, script_run.direction);
@@ -323,16 +365,34 @@ pub fn decoration_metrics(
   FontResolver::default().decoration_metrics(style)
 }
 
-fn font_request<'a>(style: &'a (impl FontStyleRef + ?Sized)) -> FontRequest<'a> {
+fn font_request<'a>(
+  style: &'a (impl FontStyleRef + ?Sized),
+  script: Option<TextScript>,
+) -> FontRequest<'a> {
   FontRequest {
-    family: style
-      .font_family()
+    family: script_font_family(style, script)
       .filter(|family| !family.trim().is_empty())
       .map(Cow::Borrowed),
     bold: style.bold(),
     italic: style.italic(),
     size_pt: FontSize(style.font_size_pt()),
+    script,
     ..FontRequest::default()
+  }
+}
+
+fn script_font_family(
+  style: &(impl FontStyleRef + ?Sized),
+  script: Option<TextScript>,
+) -> Option<&str> {
+  match script {
+    Some(TextScript::Han | TextScript::Hiragana | TextScript::Katakana | TextScript::Hangul) => {
+      style.east_asia_font_family()
+    }
+    Some(TextScript::Arabic | TextScript::Hebrew | TextScript::Devanagari | TextScript::Thai) => {
+      style.complex_font_family()
+    }
+    _ => style.font_family(),
   }
 }
 
@@ -341,7 +401,7 @@ fn build_style_font_registry(
   script: Option<TextScript>,
 ) -> FontRegistry<'static> {
   font_timing("build style font registry", || {
-    let mut request = font_request(style);
+    let mut request = font_request(style, script);
     request.script = script;
     let mut registry = FontRegistry::with_default_policy();
     let mut registered = registry
@@ -351,7 +411,7 @@ fn build_style_font_registry(
       registered += registry.register_office_fallback_path_font(&request);
     }
     if registered == 0 {
-      let mut fallback_request = font_request(style);
+      let mut fallback_request = font_request(style, script);
       fallback_request.script = script;
       fallback_request.family = None;
       registered += registry
@@ -388,7 +448,7 @@ struct FontFaceKey {
 impl FontFaceKey {
   fn from_style(style: &(impl FontStyleRef + ?Sized), script: Option<TextScript>) -> Self {
     Self {
-      family: style.font_family().map(str::to_string),
+      family: script_font_family(style, script).map(str::to_string),
       bold: style.bold(),
       italic: style.italic(),
       script,
@@ -400,7 +460,7 @@ impl FontFaceKey {
     style: &(impl FontStyleRef + ?Sized),
     script: Option<TextScript>,
   ) -> bool {
-    self.family.as_deref() == style.font_family()
+    self.family.as_deref() == script_font_family(style, script)
       && self.bold == style.bold()
       && self.italic == style.italic()
       && self.script == script
@@ -418,23 +478,30 @@ struct FontMetricsKey {
   family: Option<String>,
   bold: bool,
   italic: bool,
+  script: Option<TextScript>,
   size_pt_bits: u32,
 }
 
 impl FontMetricsKey {
-  fn from_style(style: &(impl FontStyleRef + ?Sized)) -> Self {
+  fn from_style(style: &(impl FontStyleRef + ?Sized), script: Option<TextScript>) -> Self {
     Self {
-      family: style.font_family().map(str::to_string),
+      family: script_font_family(style, script).map(str::to_string),
       bold: style.bold(),
       italic: style.italic(),
+      script,
       size_pt_bits: style.font_size_pt().to_bits(),
     }
   }
 
-  fn matches_style(&self, style: &(impl FontStyleRef + ?Sized)) -> bool {
-    self.family.as_deref() == style.font_family()
+  fn matches_style(
+    &self,
+    style: &(impl FontStyleRef + ?Sized),
+    script: Option<TextScript>,
+  ) -> bool {
+    self.family.as_deref() == script_font_family(style, script)
       && self.bold == style.bold()
       && self.italic == style.italic()
+      && self.script == script
       && self.size_pt_bits == style.font_size_pt().to_bits()
   }
 }

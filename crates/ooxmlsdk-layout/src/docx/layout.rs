@@ -133,11 +133,17 @@ fn paragraph_line_height_for_setup(
         .map(|multiple| word_auto_line_height(base_line_style) * multiple)
         .unwrap_or_else(|| inline_text_height(base_line_style, text_metrics));
       // SwTextFormatter::CalcRealHeight() uses the imported document grid
-      // base height as the auto line real height in grid layout.
+      // base height as the auto line real height in grid layout. In Writer this
+      // grid snap happens before proportional line spacing is applied, and the
+      // first paragraph line keeps the snapped grid height. Applying the
+      // proportional multiplier before the snap would round 135% of one grid
+      // line up to two grid lines.
       if paragraph.format.snap_to_grid.unwrap_or(true)
         && matches!(text_segmentation, TextSegmentation::Body)
+        && setup.doc_grid_line_pitch_pt.is_some()
       {
-        snap_line_height_to_doc_grid(line_height, setup.doc_grid_line_pitch_pt)
+        let grid_line_height = inline_text_height(base_line_style, text_metrics);
+        snap_line_height_to_doc_grid(grid_line_height, setup.doc_grid_line_pitch_pt)
       } else {
         line_height
       }
@@ -1558,6 +1564,8 @@ fn into_compat_line_numbering(numbering: LineNumbering) -> crate::compat::LineNu
 fn into_compat_text_style(style: TextStyle) -> crate::compat::TextStyle {
   crate::compat::TextStyle {
     font_family: style.font_family,
+    east_asia_font_family: style.east_asia_font_family,
+    complex_font_family: style.complex_font_family,
     symbol_font_family: style.symbol_font_family,
     font_size_pt: style.font_size_pt,
     complex_font_size_pt: style.complex_font_size_pt,
@@ -12319,18 +12327,19 @@ impl<'a> TextFrameLayout<'a> {
           }
           let mut chunk = String::new();
           let mut chunk_x = x;
+          let (style_ref_keys, style_ref_text) = if run.style_ref_keys.is_empty() {
+            (
+              paragraph.style_ref_keys.as_slice(),
+              paragraph.style_ref_text.as_ref(),
+            )
+          } else {
+            (run.style_ref_keys.as_slice(), run.style_ref_text.as_ref())
+          };
           let meta = TextChunkMeta {
             hyperlink_url: run.hyperlink_url.as_deref(),
             dynamic_field: run.dynamic_field.as_ref(),
-            style_ref_keys: if run.style_ref_keys.is_empty() {
-              paragraph.style_ref_keys.as_slice()
-            } else {
-              run.style_ref_keys.as_slice()
-            },
-            style_ref_text: run
-              .style_ref_text
-              .as_ref()
-              .or(paragraph.style_ref_text.as_ref()),
+            style_ref_keys,
+            style_ref_text,
             form_widget_id: active_form_widget_ids.last().copied(),
             paragraph_bidi: paragraph.format.bidi,
             preserve_text_portion: run.preserve_text_portion,

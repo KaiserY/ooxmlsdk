@@ -255,6 +255,12 @@ fn page_setup_from_compat(setup: legacy::PageSetup) -> PageSetup {
 fn text_style_from_compat(style: legacy::TextStyle) -> TextStyle<'static> {
   TextStyle {
     font_family: style.font_family.map(|value| Cow::Owned(value.to_string())),
+    east_asia_font_family: style
+      .east_asia_font_family
+      .map(|value| Cow::Owned(value.to_string())),
+    complex_font_family: style
+      .complex_font_family
+      .map(|value| Cow::Owned(value.to_string())),
     symbol_font_family: style
       .symbol_font_family
       .map(|value| Cow::Owned(value.to_string())),

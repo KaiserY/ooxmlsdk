@@ -5,14 +5,15 @@ use rustc_hash::FxHashMap as HashMap;
 
 use crate::error::{PdfError, Result};
 use ooxmlsdk_layout::common;
-use ooxmlsdk_layout::fonts::{FontFaceData, FontResolver, FontStyleRef};
+use ooxmlsdk_layout::fonts::{FontFaceCacheKey, FontFaceData, FontResolver, FontStyleRef};
 
 pub(super) struct FontSet {
   resolver: FontResolver,
   fallback: Font,
   fonts: HashMap<FontKey, Font>,
-  face_fonts: HashMap<FontFaceData, Font>,
+  face_fonts: HashMap<FontFaceCacheKey, Font>,
   last_font: Option<(FontKey, Font)>,
+  last_face_font: Option<(FontFaceCacheKey, Font)>,
 }
 
 impl FontSet {
@@ -25,6 +26,7 @@ impl FontSet {
       fonts: HashMap::default(),
       face_fonts: HashMap::default(),
       last_font: None,
+      last_face_font: None,
     })
   }
 
@@ -49,16 +51,22 @@ impl FontSet {
   }
 
   pub(super) fn select_face(&mut self, face: &FontFaceData) -> Font {
-    if let Some(font) = self.face_fonts.get(face) {
+    if let Some((key, font)) = self.last_face_font.as_ref()
+      && key.matches_face(face)
+    {
       return font.clone();
+    }
+    let key = face.cache_key();
+    if let Some(font) = self.face_fonts.get(&key) {
+      let font = font.clone();
+      self.last_face_font = Some((key, font.clone()));
+      return font;
     }
 
     let loaded = font_from_face(face).unwrap_or_else(|| self.fallback.clone());
-    self
-      .face_fonts
-      .entry(face.clone())
-      .or_insert(loaded)
-      .clone()
+    let font = self.face_fonts.entry(key.clone()).or_insert(loaded).clone();
+    self.last_face_font = Some((key, font.clone()));
+    font
   }
 
   fn store_last_font(&mut self, key: FontKey, font: Font) {
@@ -90,8 +98,9 @@ impl FontKey {
 }
 
 fn load_font(resolver: &mut FontResolver, style: &(impl FontStyleRef + ?Sized)) -> Result<Font> {
-  if let Some(face) = resolver.cached_text_face(style)
-    && let Some(font) = font_from_face(&face)
+  if let Some(font) = resolver
+    .with_cached_text_face(style, font_from_face)
+    .flatten()
   {
     return Ok(font);
   }

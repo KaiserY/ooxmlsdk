@@ -30,7 +30,7 @@ use ooxmlsdk_layout::text_metrics::TextMetrics;
 const INTERNAL_LINK_DESTINATION_SHIFT_PT: f32 = 10.0;
 const LO_ARIAL_BOLD_11PT_VERTICAL_SCALE: f32 = 1.07;
 
-type PaintTextPortionRanges<'doc> = SmallVec<[(PaintTextPortionKind<'doc>, Range<usize>); 2]>;
+type PaintTextPortionRanges = SmallVec<[(PaintTextPortionKind, Range<usize>); 2]>;
 type PaintGlyphFontRuns = SmallVec<[PaintGlyphFontRun; 2]>;
 
 pub(crate) fn render(
@@ -201,10 +201,8 @@ pub(crate) fn render(
             && text.width_pt >= 0.0
             && !text.portions.is_empty()
             && text.portions.iter().all(|portion| {
-              match &portion.kind {
-                PaintTextPortionKind::Field(kind) => {
-                  let _field_kind = kind;
-                }
+              match portion.kind {
+                PaintTextPortionKind::Field => {}
                 PaintTextPortionKind::Text
                 | PaintTextPortionKind::Tab
                 | PaintTextPortionKind::Link => {}
@@ -491,12 +489,12 @@ struct PaintText<'doc> {
   source_line_index: Option<usize>,
   baseline_y: f32,
   width_pt: f32,
-  portions: Vec<PaintTextPortion<'doc>>,
+  portions: Vec<PaintTextPortion>,
 }
 
 #[derive(Clone, Debug)]
-struct PaintTextPortion<'doc> {
-  kind: PaintTextPortionKind<'doc>,
+struct PaintTextPortion {
+  kind: PaintTextPortionKind,
   text_range: std::ops::Range<usize>,
   x_pt: f32,
   baseline_y: f32,
@@ -506,14 +504,14 @@ struct PaintTextPortion<'doc> {
   highlight: Option<PaintRect>,
   underline: Option<PaintStrokeLine>,
   strikethrough: Option<PaintStrokeLine>,
-  link: Option<PaintLink<'doc>>,
+  link: Option<PaintLink>,
 }
 
-#[derive(Clone, Debug)]
-enum PaintTextPortionKind<'doc> {
+#[derive(Clone, Copy, Debug)]
+enum PaintTextPortionKind {
   Text,
   Tab,
-  Field(common::DynamicField<'doc>),
+  Field,
   Link,
 }
 
@@ -530,7 +528,7 @@ struct PaintGlyphFontRun {
   glyphs: Vec<KrillaGlyph>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 struct PaintRect {
   x_pt: f32,
   y_pt: f32,
@@ -547,7 +545,7 @@ struct PaintClipRect {
   height_pt: f32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 struct PaintStrokeLine {
   x1_pt: f32,
   y1_pt: f32,
@@ -557,13 +555,12 @@ struct PaintStrokeLine {
   color: RgbColor,
 }
 
-#[derive(Clone, Debug)]
-struct PaintLink<'doc> {
+#[derive(Clone, Copy, Debug)]
+struct PaintLink {
   x_pt: f32,
   y_pt: f32,
   width_pt: f32,
   height_pt: f32,
-  url: Cow<'doc, str>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1106,12 +1103,11 @@ impl<'doc> PaintText<'doc> {
       width_pt: decoration_metrics.strikethrough_width_pt,
       color: text_ref.style.color,
     });
-    let link = text_ref.hyperlink_url.as_ref().map(|url| PaintLink {
+    let link = text_ref.hyperlink_url.as_ref().map(|_| PaintLink {
       x_pt: text_ref.x_pt,
       y_pt: text_box_y_pt,
       width_pt,
       height_pt: text_box_height_pt,
-      url: url.clone(),
     });
 
     let portions = text_paint_portions(
@@ -1151,13 +1147,13 @@ struct PaintTextPortionSource<'a, 'doc> {
   highlight: Option<PaintRect>,
   underline: Option<PaintStrokeLine>,
   strikethrough: Option<PaintStrokeLine>,
-  link: Option<PaintLink<'doc>>,
+  link: Option<PaintLink>,
 }
 
 fn text_paint_portions<'doc>(
   source: PaintTextPortionSource<'_, 'doc>,
   text_metrics: &mut TextMetrics,
-) -> Vec<PaintTextPortion<'doc>> {
+) -> Vec<PaintTextPortion> {
   let PaintTextPortionSource {
     text,
     baseline_y,
@@ -1183,15 +1179,17 @@ fn text_paint_portions<'doc>(
     } else {
       glyphs
         .as_ref()
-        .map(|glyphs| glyphs_for_text_range(glyphs, range.clone(), text.style.font_size_pt))
+        .map(|glyphs| glyphs_for_text_range(glyphs, &range, text.style.font_size_pt))
     };
     let portion_width = portion_glyphs
       .as_ref()
       .map(|glyphs| glyph_runs_width_pt(glyphs, text.style.font_size_pt))
-      .unwrap_or_else(|| text_metrics.measure_text(&text.text[range.clone()], &text.style));
+      .unwrap_or_else(|| {
+        text_metrics.measure_text(&text.text[range.start..range.end], &text.style)
+      });
     portions.push(PaintTextPortion {
       kind,
-      text_range: range.clone(),
+      text_range: range,
       x_pt,
       baseline_y,
       width_pt: portion_width,
@@ -1231,16 +1229,13 @@ fn text_paint_portions<'doc>(
   portions
 }
 
-fn text_portion_ranges<'doc>(text: &TextItem<'doc>) -> PaintTextPortionRanges<'doc> {
+fn text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionRanges {
   if text.text.is_empty() {
     return PaintTextPortionRanges::new();
   }
-  if let Some(kind) = &text.dynamic_field {
+  if text.dynamic_field.is_some() {
     let mut ranges = PaintTextPortionRanges::new();
-    ranges.push((
-      PaintTextPortionKind::Field(kind.clone()),
-      0..text.text.len(),
-    ));
+    ranges.push((PaintTextPortionKind::Field, 0..text.text.len()));
     return ranges;
   }
   let decorated_edge_space = (text.style.underline || text.style.strikethrough)
@@ -1293,9 +1288,7 @@ fn text_portion_ranges<'doc>(text: &TextItem<'doc>) -> PaintTextPortionRanges<'d
   ranges
 }
 
-fn edge_whitespace_text_portion_ranges<'doc>(
-  text: &TextItem<'doc>,
-) -> PaintTextPortionRanges<'doc> {
+fn edge_whitespace_text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionRanges {
   let kind = if text.hyperlink_url.is_some() {
     PaintTextPortionKind::Link
   } else {
@@ -1314,10 +1307,10 @@ fn edge_whitespace_text_portion_ranges<'doc>(
     .unwrap_or(0);
   let mut ranges = PaintTextPortionRanges::new();
   if leading_end > 0 {
-    ranges.push((kind.clone(), 0..leading_end));
+    ranges.push((kind, 0..leading_end));
   }
   if leading_end < trailing_start {
-    ranges.push((kind.clone(), leading_end..trailing_start));
+    ranges.push((kind, leading_end..trailing_start));
   }
   if trailing_start < text.text.len() {
     ranges.push((kind, trailing_start..text.text.len()));
@@ -1327,7 +1320,7 @@ fn edge_whitespace_text_portion_ranges<'doc>(
 
 fn glyphs_for_text_range(
   glyphs: &[PaintGlyphFontRun],
-  range: Range<usize>,
+  range: &Range<usize>,
   font_size_pt: f32,
 ) -> PaintGlyphFontRuns {
   let mut output = PaintGlyphFontRuns::new();
@@ -1371,7 +1364,7 @@ fn paint_rect_for_portion(rect: &PaintRect, x_pt: f32, width_pt: f32) -> PaintRe
   PaintRect {
     x_pt,
     width_pt,
-    ..rect.clone()
+    ..*rect
   }
 }
 
@@ -1379,25 +1372,21 @@ fn paint_line_for_portion(line: &PaintStrokeLine, x_pt: f32, width_pt: f32) -> P
   PaintStrokeLine {
     x1_pt: x_pt,
     x2_pt: x_pt + width_pt,
-    ..line.clone()
+    ..*line
   }
 }
 
-fn paint_link_for_portion<'doc>(
-  link: &PaintLink<'doc>,
-  x_pt: f32,
-  width_pt: f32,
-) -> PaintLink<'doc> {
+fn paint_link_for_portion(link: &PaintLink, x_pt: f32, width_pt: f32) -> PaintLink {
   PaintLink {
     x_pt,
     width_pt,
-    ..link.clone()
+    ..*link
   }
 }
 
 fn paint_clip_for_portion(
   clip: Option<PaintClipRect>,
-  kind: &PaintTextPortionKind<'_>,
+  kind: &PaintTextPortionKind,
   page_width_pt: f32,
 ) -> Option<PaintClipRect> {
   let mut clip = clip?;
@@ -1714,23 +1703,13 @@ fn draw_text_item(
           false,
         );
       }
-    } else if item.style.small_caps {
-      let font = fonts.select(&item.style);
-      surface.draw_text(
-        Point::from_xy(portion.x_pt, portion.baseline_y),
-        font,
-        item.style.font_size_pt,
-        &item.text[portion.text_range.clone()],
-        false,
-        TextDirection::Auto,
-      );
     } else {
       let font = fonts.select(&item.style);
       surface.draw_text(
         Point::from_xy(portion.x_pt, portion.baseline_y),
         font,
         item.style.font_size_pt,
-        &item.text[portion.text_range.clone()],
+        &item.text[portion.text_range.start..portion.text_range.end],
         false,
         TextDirection::Auto,
       );
@@ -1744,13 +1723,13 @@ fn draw_text_item(
     if let Some(strikethrough) = &portion.strikethrough {
       draw_paint_stroke_line(surface, strikethrough);
     }
-    if let Some(link) = &portion.link
+    if let (Some(link), Some(url)) = (&portion.link, item.hyperlink_url.as_ref())
       && let Some(annotation) = link_annotation_for_rect(
         link.x_pt,
         link.y_pt,
         link.width_pt,
         link.height_pt,
-        &link.url,
+        url,
         internal_links,
       )
     {

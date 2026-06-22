@@ -41,6 +41,7 @@ use quick_xml::Reader;
 use quick_xml::Writer;
 use quick_xml::escape::unescape;
 use quick_xml::events::{Event, attributes::Attribute};
+use smallvec::SmallVec;
 
 use crate::common::{LayoutEngineKind, layout_document_from_compat};
 use crate::error::Result;
@@ -11039,33 +11040,23 @@ impl StylesCatalog {
     base_format: ParagraphFormat,
   ) -> ParagraphFormat {
     let mut format = self.doc_default_paragraph.clone();
-    merge_format_values(&mut format, base_format);
-    let style_id = style_id
-      .map(str::to_string)
-      .or_else(|| self.default_paragraph_style_id.clone());
-    for entry in self.style_chain(style_id.as_deref()) {
-      merge_format_values(&mut format, entry.paragraph_format.clone());
+    merge_format_values(&mut format, &base_format);
+    let style_id = style_id.or(self.default_paragraph_style_id.as_deref());
+    for entry in self.style_chain(style_id) {
+      merge_format_values(&mut format, &entry.paragraph_format);
     }
     format
   }
 
-  fn paragraph_numbering_properties(
-    &self,
-    style_id: Option<&str>,
-  ) -> Option<w::NumberingProperties> {
-    let mut merged = None;
-    let style_id = style_id
-      .map(str::to_string)
-      .or_else(|| self.default_paragraph_style_id.clone());
-    for properties in self
-      .style_chain(style_id.as_deref())
-      .into_iter()
-      .filter_map(|entry| entry.paragraph_numbering.as_deref())
-    {
-      let target = merged.get_or_insert_with(w::NumberingProperties::default);
-      merge_numbering_properties(target, properties);
+  fn paragraph_numbering_reference(&self, style_id: Option<&str>) -> Option<NumberingReference> {
+    let mut reference = NumberingReference::default();
+    let style_id = style_id.or(self.default_paragraph_style_id.as_deref());
+    for entry in self.style_chain(style_id) {
+      if let Some(properties) = entry.paragraph_numbering.as_deref() {
+        reference.merge_properties(properties);
+      }
     }
-    merged
+    reference.resolved()
   }
 
   fn run_style_with_base(
@@ -11075,13 +11066,11 @@ impl StylesCatalog {
     base_overrides: RunStyleOverrides,
   ) -> TextStyle {
     let mut style = self.doc_default_run.clone();
-    merge_style_values(&mut style, base_style);
+    merge_style_values(&mut style, &base_style);
     apply_run_style_overrides(&mut style, base_overrides);
-    let style_id = style_id
-      .map(str::to_string)
-      .or_else(|| self.default_paragraph_style_id.clone());
-    for entry in self.style_chain(style_id.as_deref()) {
-      merge_style_values(&mut style, entry.run_style.clone());
+    let style_id = style_id.or(self.default_paragraph_style_id.as_deref());
+    for entry in self.style_chain(style_id) {
+      merge_style_values(&mut style, &entry.run_style);
       apply_run_style_overrides(&mut style, entry.run_overrides);
     }
     style
@@ -11096,7 +11085,7 @@ impl StylesCatalog {
     for entry in self.style_chain(Some(style_id)) {
       if matches!(entry.style_type, Some(w::StyleValues::Character)) {
         matched = true;
-        merge_style_values(&mut style, entry.run_style.clone());
+        merge_style_values(&mut style, &entry.run_style);
         apply_run_style_overrides(&mut style, entry.run_overrides);
       }
     }
@@ -11133,8 +11122,8 @@ impl StylesCatalog {
     style
   }
 
-  fn style_chain(&self, style_id: Option<&str>) -> Vec<&StyleEntry> {
-    let mut ids = Vec::new();
+  fn style_chain<'a>(&'a self, style_id: Option<&'a str>) -> StyleChain<'a> {
+    let mut ids = SmallVec::new();
     let mut current = style_id;
     while let Some(id) = current {
       if ids.contains(&id) {
@@ -11147,11 +11136,45 @@ impl StylesCatalog {
       current = entry.based_on.as_deref();
     }
 
-    ids
-      .into_iter()
-      .rev()
-      .filter_map(|id| self.styles.get(id))
-      .collect()
+    StyleChain {
+      styles: &self.styles,
+      ids,
+    }
+  }
+}
+
+struct StyleChain<'a> {
+  styles: &'a HashMap<String, StyleEntry>,
+  ids: SmallVec<[&'a str; 4]>,
+}
+
+impl<'a> IntoIterator for StyleChain<'a> {
+  type Item = &'a StyleEntry;
+  type IntoIter = StyleChainIter<'a>;
+
+  fn into_iter(self) -> Self::IntoIter {
+    StyleChainIter {
+      styles: self.styles,
+      ids: self.ids,
+    }
+  }
+}
+
+struct StyleChainIter<'a> {
+  styles: &'a HashMap<String, StyleEntry>,
+  ids: SmallVec<[&'a str; 4]>,
+}
+
+impl<'a> Iterator for StyleChainIter<'a> {
+  type Item = &'a StyleEntry;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    while let Some(id) = self.ids.pop() {
+      if let Some(entry) = self.styles.get(id) {
+        return Some(entry);
+      }
+    }
+    None
   }
 }
 
@@ -11900,11 +11923,8 @@ fn merge_table_cell_style(target: &mut TableCellStyle, source: &TableCellStyle) 
   if source.vertical_alignment.is_some() {
     target.vertical_alignment = source.vertical_alignment;
   }
-  merge_format_values(
-    &mut target.paragraph_format,
-    source.paragraph_format.clone(),
-  );
-  merge_style_values(&mut target.run_style, source.run_style.clone());
+  merge_format_values(&mut target.paragraph_format, &source.paragraph_format);
+  merge_style_values(&mut target.run_style, &source.run_style);
   target.run_overrides = merge_run_style_overrides(target.run_overrides, source.run_overrides);
 }
 
@@ -12036,7 +12056,7 @@ fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides
   }
 }
 
-fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
+fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   if values.spacing_before_set || values.spacing_before_pt != 0.0 {
     target.spacing_before_pt = values.spacing_before_pt;
     target.spacing_before_set = values.spacing_before_set;
@@ -12065,7 +12085,7 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
     target.first_line_indent_set = true;
   }
   if values.tab_stops_set {
-    target.tab_stops = values.tab_stops;
+    target.tab_stops.clone_from(&values.tab_stops);
     target.tab_stops_set = true;
   }
   if values.justification != ParagraphJustification::default() {
@@ -12100,21 +12120,40 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
   }
 }
 
-fn merge_numbering_properties(
-  target: &mut w::NumberingProperties,
-  source: &w::NumberingProperties,
-) {
-  if source.numbering_level_reference.is_some() {
-    target.numbering_level_reference = source.numbering_level_reference.clone();
+#[derive(Clone, Copy, Debug, Default)]
+struct NumberingReference {
+  num_id: Option<i32>,
+  level_index: Option<i32>,
+}
+
+impl NumberingReference {
+  fn from_properties(properties: &w::NumberingProperties) -> Option<Self> {
+    let mut reference = Self::default();
+    reference.merge_properties(properties);
+    reference.resolved()
   }
-  if source.numbering_id.is_some() {
-    target.numbering_id = source.numbering_id.clone();
+
+  fn merge_properties(&mut self, properties: &w::NumberingProperties) {
+    if let Some(numbering_id) = &properties.numbering_id {
+      self.num_id = Some(numbering_id.val);
+    }
+    if let Some(level) = &properties.numbering_level_reference {
+      self.level_index = Some(level.val);
+    }
   }
-  if source.numbering_change.is_some() {
-    target.numbering_change = source.numbering_change.clone();
+
+  fn resolved(self) -> Option<Self> {
+    self.num_id.map(|_| self)
   }
-  if source.inserted.is_some() {
-    target.inserted = source.inserted.clone();
+
+  fn num_id(self) -> i32 {
+    self
+      .num_id
+      .expect("resolved numbering reference has num_id")
+  }
+
+  fn level_index(self) -> i32 {
+    self.level_index.unwrap_or(0)
   }
 }
 
@@ -12127,26 +12166,79 @@ struct NumberingFormatMergeContext {
 
 fn merge_numbering_format_values(
   target: &mut ParagraphFormat,
-  mut values: ParagraphFormat,
+  values: &ParagraphFormat,
   context: NumberingFormatMergeContext,
 ) {
-  let protect_style_indents = context.style_numbering;
-  if (context.direct_indentation || protect_style_indents) && target.indent_left_set {
-    values.indent_left_set = false;
+  if values.spacing_before_set || values.spacing_before_pt != 0.0 {
+    target.spacing_before_pt = values.spacing_before_pt;
+    target.spacing_before_set = values.spacing_before_set;
   }
-  if (context.direct_indentation || protect_style_indents) && target.indent_right_set {
-    values.indent_right_set = false;
+  if values.spacing_after_set || values.spacing_after_pt != 0.0 {
+    target.spacing_after_pt = values.spacing_after_pt;
+    target.spacing_after_set = values.spacing_after_set;
   }
-  if (context.direct_indentation || protect_style_indents) && target.first_line_indent_set {
-    values.first_line_indent_set = false;
+  if values.line_height_pt.is_some() {
+    target.line_height_pt = values.line_height_pt;
+    target.line_height_rule = values.line_height_rule;
   }
-  if context.direct_tab_stops && target.tab_stops_set {
-    values.tab_stops_set = false;
+  if values.snap_to_grid.is_some() {
+    target.snap_to_grid = values.snap_to_grid;
   }
-  merge_format_values(target, values);
+  let protect_indents =
+    (context.direct_indentation || context.style_numbering) && target.indent_left_set;
+  if values.indent_left_set && !protect_indents {
+    target.indent_left_pt = values.indent_left_pt;
+    target.indent_left_set = true;
+  }
+  let protect_indents =
+    (context.direct_indentation || context.style_numbering) && target.indent_right_set;
+  if values.indent_right_set && !protect_indents {
+    target.indent_right_pt = values.indent_right_pt;
+    target.indent_right_set = true;
+  }
+  let protect_indents =
+    (context.direct_indentation || context.style_numbering) && target.first_line_indent_set;
+  if values.first_line_indent_set && !protect_indents {
+    target.first_line_indent_pt = values.first_line_indent_pt;
+    target.first_line_indent_set = true;
+  }
+  if values.tab_stops_set && !(context.direct_tab_stops && target.tab_stops_set) {
+    target.tab_stops.clone_from(&values.tab_stops);
+    target.tab_stops_set = true;
+  }
+  if values.justification != ParagraphJustification::default() {
+    target.justification = values.justification;
+    target.alignment = values.justification.alignment();
+  } else if values.alignment != ParagraphAlignment::default() {
+    target.alignment = values.alignment;
+  }
+  if values.shading.is_some() {
+    target.shading = values.shading;
+  }
+  if values.borders != CellBordersModel::default() {
+    target.borders = values.borders;
+  }
+  if values.page_break_before {
+    target.page_break_before = true;
+  }
+  if values.keep_with_next {
+    target.keep_with_next = true;
+  }
+  if values.keep_lines {
+    target.keep_lines = true;
+  }
+  if values.contextual_spacing {
+    target.contextual_spacing = true;
+  }
+  if values.outline_level.is_some() {
+    target.outline_level = values.outline_level;
+  }
+  if values.frame.is_some() {
+    target.frame = values.frame;
+  }
 }
 
-fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
+fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   if values.font_family.is_some() {
     target.font_family = values.font_family.clone();
   }
@@ -12313,19 +12405,15 @@ impl NumberingCatalog {
 
   fn next_label(
     &mut self,
-    properties: &w::NumberingProperties,
+    reference: NumberingReference,
     format: &mut ParagraphFormat,
     styles: &StylesCatalog,
     base_style: TextStyle,
     paragraph_mark_run_properties: Option<&w::ParagraphMarkRunProperties>,
     format_context: NumberingFormatMergeContext,
   ) -> Option<NumberingLabel> {
-    let num_id = properties.numbering_id.as_ref()?.val;
-    let level_index = properties
-      .numbering_level_reference
-      .as_ref()
-      .map(|level| level.val)
-      .unwrap_or(0);
+    let num_id = reference.num_id();
+    let level_index = reference.level_index();
     let instance = self.nums.get(&num_id)?;
     let abstract_num = self.abstract_nums.get(&instance.abstract_num_id)?;
     let level_override = instance.overrides.get(&level_index);
@@ -12333,7 +12421,7 @@ impl NumberingCatalog {
       .and_then(|override_| override_.level.as_ref())
       .or_else(|| abstract_num.levels.get(&level_index))?;
 
-    merge_numbering_format_values(format, level.format_properties.clone(), format_context);
+    merge_numbering_format_values(format, &level.format_properties, format_context);
     let start = level_override
       .and_then(|override_| override_.start)
       .unwrap_or(level.start);
@@ -12597,6 +12685,7 @@ fn roman_number(mut value: i32) -> String {
   output
 }
 
+#[derive(Clone, Copy)]
 enum ParagraphProps<'a> {
   Direct(&'a w::ParagraphProperties),
   Extended(&'a w::ParagraphPropertiesExtended),
@@ -12683,6 +12772,16 @@ impl<'a> ParagraphProps<'a> {
       Self::Style(properties) => properties.tabs.as_ref(),
       Self::BaseStyle(properties) => properties.tabs.as_ref(),
       Self::Previous(properties) => properties.tabs.as_ref(),
+    }
+  }
+
+  fn numbering_properties(&self) -> Option<&'a w::NumberingProperties> {
+    match self {
+      Self::Direct(properties) => properties.numbering_properties.as_deref(),
+      Self::Extended(properties) => properties.numbering_properties.as_deref(),
+      Self::Style(properties) => properties.numbering_properties.as_deref(),
+      Self::BaseStyle(properties) => properties.numbering_properties.as_deref(),
+      Self::Previous(properties) => properties.numbering_properties.as_deref(),
     }
   }
 
@@ -13858,7 +13957,7 @@ mod tests {
 
     merge_format_values(
       &mut format,
-      ParagraphFormat {
+      &ParagraphFormat {
         spacing_after_pt: 0.0,
         spacing_after_set: true,
         ..Default::default()

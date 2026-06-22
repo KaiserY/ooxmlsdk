@@ -29,6 +29,27 @@ pub struct FontFaceData {
   id: Arc<str>,
 }
 
+impl FontFaceData {
+  pub fn cache_key(&self) -> FontFaceCacheKey {
+    FontFaceCacheKey {
+      id: self.id.clone(),
+      index: self.index,
+    }
+  }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct FontFaceCacheKey {
+  id: Arc<str>,
+  index: u32,
+}
+
+impl FontFaceCacheKey {
+  pub fn matches_face(&self, face: &FontFaceData) -> bool {
+    self.index == face.index && self.id == face.id
+  }
+}
+
 impl PartialEq for FontFaceData {
   fn eq(&self, other: &Self) -> bool {
     self.index == other.index && self.id == other.id
@@ -123,6 +144,10 @@ pub struct FontResolver {
   font_data_cache: HashMap<FontId, FontFaceData>,
   font_registry_cache: HashMap<FontFaceKey, Arc<FontRegistry<'static>>>,
   font_face_cache: HashMap<FontFaceKey, FontFaceData>,
+  font_metrics_cache: HashMap<FontMetricsKey, FontMetrics>,
+  last_font_registry: Option<(FontFaceKey, Arc<FontRegistry<'static>>)>,
+  last_font_face: Option<FontFaceKey>,
+  last_font_metrics: Option<(FontMetricsKey, FontMetrics)>,
 }
 
 impl FontResolver {
@@ -134,13 +159,26 @@ impl FontResolver {
   }
 
   pub fn cached_text_face(&mut self, style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
-    let key = FontFaceKey::from_style(style, None);
-    if let Some(face) = self.font_face_cache.get(&key) {
-      return Some(face.clone());
+    self.with_cached_text_face(style, Clone::clone)
+  }
+
+  pub fn with_cached_text_face<T>(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+    read: impl FnOnce(&FontFaceData) -> T,
+  ) -> Option<T> {
+    if let Some(key) = &self.last_font_face
+      && key.matches_style(style, None)
+    {
+      return self.font_face_cache.get(key).map(read);
     }
-    let face = self.load_text_face(style)?;
-    self.font_face_cache.insert(key, face.clone());
-    Some(face)
+    let key = FontFaceKey::from_style(style, None);
+    if !self.font_face_cache.contains_key(&key) {
+      let face = self.load_text_face(style)?;
+      self.font_face_cache.insert(key.clone(), face);
+    }
+    self.last_font_face = Some(key.clone());
+    self.font_face_cache.get(&key).map(read)
   }
 
   pub fn shape_text_runs<'text>(
@@ -161,28 +199,39 @@ impl FontResolver {
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
   ) -> Option<ooxmlsdk_fonts::VerticalMetrics> {
-    let request = font_request(style);
-    let registry = self.style_font_registry(style, None);
-    let resolved = registry.resolve(&request).ok()?;
-    Some(
-      resolved
-        .metrics_at_size(FontSize(style.font_size_pt()))
-        .vertical,
-    )
+    self.font_metrics(style).map(|metrics| metrics.vertical)
   }
 
   pub fn decoration_metrics(
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
   ) -> Option<ooxmlsdk_fonts::DecorationMetrics> {
+    self.font_metrics(style).map(|metrics| metrics.decoration)
+  }
+
+  fn font_metrics(&mut self, style: &(impl FontStyleRef + ?Sized)) -> Option<FontMetrics> {
+    if let Some((key, metrics)) = &self.last_font_metrics
+      && key.matches_style(style)
+    {
+      return Some(*metrics);
+    }
+    let key = FontMetricsKey::from_style(style);
+    if let Some(metrics) = self.font_metrics_cache.get(&key) {
+      let metrics = *metrics;
+      self.last_font_metrics = Some((key, metrics));
+      return Some(metrics);
+    }
     let request = font_request(style);
     let registry = self.style_font_registry(style, None);
     let resolved = registry.resolve(&request).ok()?;
-    Some(
-      resolved
-        .metrics_at_size(FontSize(style.font_size_pt()))
-        .decoration,
-    )
+    let metrics_at_size = resolved.metrics_at_size(FontSize(style.font_size_pt()));
+    let metrics = FontMetrics {
+      vertical: metrics_at_size.vertical,
+      decoration: metrics_at_size.decoration,
+    };
+    self.font_metrics_cache.insert(key.clone(), metrics);
+    self.last_font_metrics = Some((key, metrics));
+    Some(metrics)
   }
 
   fn shape_text_runs_inner<'text>(
@@ -222,12 +271,22 @@ impl FontResolver {
     style: &(impl FontStyleRef + ?Sized),
     script: Option<TextScript>,
   ) -> Arc<FontRegistry<'static>> {
-    let key = FontFaceKey::from_style(style, script);
-    if let Some(registry) = self.font_registry_cache.get(&key) {
+    if let Some((key, registry)) = &self.last_font_registry
+      && key.matches_style(style, script)
+    {
       return registry.clone();
     }
+    let key = FontFaceKey::from_style(style, script);
+    if let Some(registry) = self.font_registry_cache.get(&key) {
+      let registry = registry.clone();
+      self.last_font_registry = Some((key, registry.clone()));
+      return registry;
+    }
     let registry = Arc::new(build_style_font_registry(style, script));
-    self.font_registry_cache.insert(key, registry.clone());
+    self
+      .font_registry_cache
+      .insert(key.clone(), registry.clone());
+    self.last_font_registry = Some((key, registry.clone()));
     registry
   }
 
@@ -334,6 +393,49 @@ impl FontFaceKey {
       italic: style.italic(),
       script,
     }
+  }
+
+  fn matches_style(
+    &self,
+    style: &(impl FontStyleRef + ?Sized),
+    script: Option<TextScript>,
+  ) -> bool {
+    self.family.as_deref() == style.font_family()
+      && self.bold == style.bold()
+      && self.italic == style.italic()
+      && self.script == script
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FontMetrics {
+  vertical: ooxmlsdk_fonts::VerticalMetrics,
+  decoration: ooxmlsdk_fonts::DecorationMetrics,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct FontMetricsKey {
+  family: Option<String>,
+  bold: bool,
+  italic: bool,
+  size_pt_bits: u32,
+}
+
+impl FontMetricsKey {
+  fn from_style(style: &(impl FontStyleRef + ?Sized)) -> Self {
+    Self {
+      family: style.font_family().map(str::to_string),
+      bold: style.bold(),
+      italic: style.italic(),
+      size_pt_bits: style.font_size_pt().to_bits(),
+    }
+  }
+
+  fn matches_style(&self, style: &(impl FontStyleRef + ?Sized)) -> bool {
+    self.family.as_deref() == style.font_family()
+      && self.bold == style.bold()
+      && self.italic == style.italic()
+      && self.size_pt_bits == style.font_size_pt().to_bits()
   }
 }
 

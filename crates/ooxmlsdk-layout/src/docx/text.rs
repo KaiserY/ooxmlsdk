@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use super::{
   CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog,
-  NumberingFormatMergeContext, Paragraph, ParagraphFormat, ParagraphProps, RunStyleOverrides,
-  StylesCatalog, TextRun, TextStyle, paragraph_inlines, paragraph_note_reference_ids, properties,
-  redline_author_color,
+  NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphFormat, ParagraphProps,
+  RunStyleOverrides, StylesCatalog, TextRun, TextStyle, paragraph_inlines,
+  paragraph_note_reference_ids, properties, redline_author_color,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -91,20 +91,17 @@ pub(super) fn paragraph_model_with_base<'a>(
     run_style.color = redline_author_color();
     run_style.strikethrough = !paragraph_contains_drawing(paragraph);
   }
-  let direct_numbering = paragraph
-    .paragraph_properties
-    .as_deref()
-    .and_then(|properties| properties.numbering_properties.as_deref());
-  let style_numbering = styles.paragraph_numbering_properties(style_id);
+  let direct_numbering = direct_paragraph_properties
+    .as_ref()
+    .and_then(|properties| properties.numbering_properties())
+    .and_then(NumberingReference::from_properties);
+  let style_numbering = styles.paragraph_numbering_reference(style_id);
   let style_numbering_applies = direct_numbering.is_none() && style_numbering.is_some();
   let paragraph_mark_run_properties = paragraph
     .paragraph_properties
     .as_deref()
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref());
-  let has_direct_indentation = paragraph
-    .paragraph_properties
-    .as_deref()
-    .is_some_and(|properties| properties.indentation.is_some());
+  let has_direct_indentation = numbering_format_context.direct_indentation;
   let mut numbering_base_style = styles.doc_default_run.clone();
   numbering_base_style.color = run_style.color;
   numbering_base_style.highlight = run_style.highlight;
@@ -117,49 +114,44 @@ pub(super) fn paragraph_model_with_base<'a>(
     styles,
   );
   let style_tab_stop_pt = format.tab_stops.last().map(|stop| stop.position_pt);
-  let numbering_label = direct_numbering
-    .or(style_numbering.as_ref())
-    .and_then(|properties| {
-      numbering.next_label(
-        properties,
-        &mut format,
-        styles,
-        numbering_base_style.clone(),
-        paragraph_mark_run_properties,
-        NumberingFormatMergeContext {
-          style_numbering: style_numbering_applies,
-          ..numbering_format_context
-        },
-      )
-    });
-  let mut list_label = numbering_label
-    .as_ref()
-    .and_then(|label| label.text.clone());
-  let list_label_tab_stop_pt = numbering_label.as_ref().and_then(|_| {
-    style_tab_stop_pt
-      .or_else(|| {
-        numbering_label
-          .as_ref()
-          .and_then(|label| label.list_tab_stop_pt)
-      })
-      .or_else(|| {
-        (!has_direct_indentation && format.indent_left_pt > 0.0).then_some(
-          format.indent_left_pt + format.first_line_indent_pt.max(format.indent_left_pt) * 4.0,
-        )
-      })
+  let numbering_label = direct_numbering.or(style_numbering).and_then(|reference| {
+    numbering.next_label(
+      reference,
+      &mut format,
+      styles,
+      numbering_base_style,
+      paragraph_mark_run_properties,
+      NumberingFormatMergeContext {
+        style_numbering: style_numbering_applies,
+        ..numbering_format_context
+      },
+    )
   });
+  let (mut list_label, numbering_image, mut list_label_style, numbering_list_tab_stop_pt) =
+    numbering_label.map_or_else(
+      || (None, None, TextStyle::default(), None),
+      |label| (label.text, label.image, label.style, label.list_tab_stop_pt),
+    );
+  let has_numbering_label = list_label.is_some() || numbering_image.is_some();
+  let list_label_tab_stop_pt = has_numbering_label
+    .then(|| {
+      style_tab_stop_pt
+        .or(numbering_list_tab_stop_pt)
+        .or_else(|| {
+          (!has_direct_indentation && format.indent_left_pt > 0.0).then_some(
+            format.indent_left_pt + format.first_line_indent_pt.max(format.indent_left_pt) * 4.0,
+          )
+        })
+    })
+    .flatten();
   if list_label.as_deref() == Some("\t") && style_tab_stop_pt.is_some() && !has_direct_indentation {
     list_label = Some(" \t".to_string());
   }
-  let mut list_label_style = numbering_label
-    .as_ref()
-    .map(|label| label.style.clone())
-    .unwrap_or_default();
-  if paragraph_mark_is_inserted(paragraph) && numbering_label.is_some() {
+  if paragraph_mark_is_inserted(paragraph) && has_numbering_label {
     list_label_style.color = redline_author_color();
     list_label_style.underline = true;
   }
-  if paragraph_mark_is_deleted(paragraph) && numbering_label.is_some() {
+  if paragraph_mark_is_deleted(paragraph) && has_numbering_label {
     list_label_style.color = redline_author_color();
     list_label_style.strikethrough = !paragraph_contains_drawing(paragraph);
   }
@@ -172,7 +164,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     custom_xml_bindings,
     form_widget_ids,
   );
-  if let Some(image) = numbering_label.and_then(|label| label.image) {
+  if let Some(image) = numbering_image {
     inlines.insert(0, super::InlineItem::Image(image));
   }
   fill_character_style_ref_texts(&mut inlines);

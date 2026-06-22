@@ -420,7 +420,7 @@ pub(crate) enum InlineItem {
 
 #[derive(Clone, Debug)]
 pub(crate) struct InlineImage {
-  pub data: Vec<u8>,
+  pub data: Arc<[u8]>,
   pub content_type: Option<String>,
   pub width_pt: f32,
   pub height_pt: f32,
@@ -467,7 +467,7 @@ pub(crate) struct InlineShape {
 
 #[derive(Clone, Debug)]
 pub(crate) struct InlineShapeImageFill {
-  pub data: Vec<u8>,
+  pub data: Arc<[u8]>,
   pub content_type: Option<String>,
   pub crop: ImageCrop,
   pub rotation_deg: f32,

@@ -657,7 +657,7 @@ pub(crate) struct ImageItem {
   pub rotation_deg: f32,
   pub flip_horizontal: bool,
   pub flip_vertical: bool,
-  pub data: Vec<u8>,
+  pub data: Arc<[u8]>,
   pub content_type: Option<String>,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
@@ -1667,7 +1667,12 @@ impl<'a> RootFrameLayout<'a> {
     let mut layout_reruns = Vec::new();
     let influence_reflow_requests = reflow_requests_for_frames(&self.frames, true);
     let (mut reflow_requests, mut reflow_executions, mut page_replays, mut backward_moves) =
-      execute_reflow_requests(&mut self.frames, &self.pages, influence_reflow_requests);
+      execute_reflow_requests(
+        &mut self.frames,
+        &self.pages,
+        influence_reflow_requests,
+        self.emit_reflow_diagnostics,
+      );
     if let Some(rerun) = self.apply_checkpoint_rerun(&backward_moves) {
       layout_reruns.push(rerun);
       let influence_reflow_requests = reflow_requests_for_frames(&self.frames, true);
@@ -1676,9 +1681,18 @@ impl<'a> RootFrameLayout<'a> {
         reflow_executions,
         page_replays,
         backward_moves,
-      ) = execute_reflow_requests(&mut self.frames, &self.pages, influence_reflow_requests);
+      ) = execute_reflow_requests(
+        &mut self.frames,
+        &self.pages,
+        influence_reflow_requests,
+        self.emit_reflow_diagnostics,
+      );
     }
-    let mut page_replay_applications = apply_page_replays(&mut self.pages, &page_replays);
+    let mut page_replay_applications = apply_page_replays(
+      &mut self.pages,
+      &mut page_replays,
+      self.emit_reflow_diagnostics,
+    );
 
     if self.action.paint {
       let page_item_counts_before_decoration = self
@@ -1701,12 +1715,18 @@ impl<'a> RootFrameLayout<'a> {
       let (
         remaining_decoration_reflow_requests,
         decoration_reflow_executions,
-        decoration_page_replays,
+        mut decoration_page_replays,
         decoration_backward_moves,
-      ) = execute_reflow_requests(&mut self.frames, &self.pages, decoration_reflow_requests);
+      ) = execute_reflow_requests(
+        &mut self.frames,
+        &self.pages,
+        decoration_reflow_requests,
+        self.emit_reflow_diagnostics,
+      );
       page_replay_applications.extend(apply_page_replays(
         &mut self.pages,
-        &decoration_page_replays,
+        &mut decoration_page_replays,
+        self.emit_reflow_diagnostics,
       ));
       page_replays.extend(decoration_page_replays);
       backward_moves.extend(decoration_backward_moves);
@@ -1718,23 +1738,24 @@ impl<'a> RootFrameLayout<'a> {
       .follows
       .retain(|follow| follow.from_page_index < page_count && follow.to_page_index < page_count);
     normalize_layout_frames(&mut self.frames, &self.pages);
-    normalize_reflow_requests(&mut reflow_requests, &self.frames);
-    normalize_page_replays(&mut page_replays, &self.pages);
-    normalize_page_replay_applications(&mut page_replay_applications, &self.pages);
-    normalize_backward_moves(&mut backward_moves, &self.frames, &self.pages);
-    normalize_reflow_executions(&mut reflow_executions, &self.pages, &backward_moves);
-    let mut page_invalidations = page_invalidations_for_reflow_requests(&reflow_requests);
-    let mut restart_plan = restart_plan_for_page_invalidations(&self.frames, &page_invalidations);
-    if !self.emit_reflow_diagnostics {
+    let (page_invalidations, restart_plan) = if self.emit_reflow_diagnostics {
+      normalize_reflow_requests(&mut reflow_requests, &self.frames);
+      normalize_page_replays(&mut page_replays, &self.pages);
+      normalize_page_replay_applications(&mut page_replay_applications, &self.pages);
+      normalize_backward_moves(&mut backward_moves, &self.frames, &self.pages);
+      normalize_reflow_executions(&mut reflow_executions, &self.pages, &backward_moves);
+      let page_invalidations = page_invalidations_for_reflow_requests(&reflow_requests);
+      let restart_plan = restart_plan_for_page_invalidations(&self.frames, &page_invalidations);
+      (page_invalidations, restart_plan)
+    } else {
       page_replays.clear();
       page_replay_applications.clear();
       backward_moves.clear();
       layout_reruns.clear();
-      page_invalidations.clear();
       reflow_executions.clear();
       reflow_requests.clear();
-      restart_plan = None;
-    }
+      (Vec::new(), None)
+    };
 
     LayoutDocument {
       pages: self.pages,
@@ -3377,6 +3398,7 @@ fn execute_reflow_requests(
   frames: &mut [LayoutFrame],
   pages: &[Page],
   requests: Vec<ReflowRequest>,
+  collect_page_replays: bool,
 ) -> (
   Vec<ReflowRequest>,
   Vec<ReflowExecution>,
@@ -3424,16 +3446,20 @@ fn execute_reflow_requests(
           influence_count += 1;
           first_influence_page = first_influence_page.min(request.page_index);
           influence_scope = influence_scope.max(request.scope);
-          if let Some(backward) =
-            execute_backward_move(frames, pages, &request, &mut move_backward_keys)
-          {
+          if let Some(backward) = execute_backward_move(
+            frames,
+            pages,
+            &request,
+            &mut move_backward_keys,
+            collect_page_replays,
+          ) {
             suppressed_moves += usize::from(backward.move_back.suppressed);
             influence_replayed_frames += backward.move_back.replayed_frames;
             influence_replayed_items += backward.move_back.replayed_items;
             page_replays.extend(backward.pages);
             backward_moves.push(backward.move_back);
           }
-          let replay = replay_scoped_frames(frames, pages, &request);
+          let replay = replay_scoped_frames(frames, pages, &request, collect_page_replays);
           influence_replayed_frames += replay.frames;
           influence_replayed_items += replay.items;
           replayed_influence_frames.extend(replay.frame_indices);
@@ -3492,12 +3518,17 @@ fn execute_reflow_requests(
   (remaining, executions, page_replays, backward_moves)
 }
 
-fn apply_page_replays(pages: &mut [Page], replays: &[PageReplay]) -> Vec<PageReplayApplication> {
+fn apply_page_replays(
+  pages: &mut [Page],
+  replays: &mut [PageReplay],
+  preserve_replays: bool,
+) -> Vec<PageReplayApplication> {
   let mut applications = Vec::with_capacity(replays.len());
   for replay in replays {
+    let replacement_count = replay.replacement_items.len();
     let applied = pages
       .get_mut(replay.page_index)
-      .is_some_and(|page| apply_page_replay(page, replay));
+      .is_some_and(|page| apply_page_replay(page, replay, preserve_replays));
     applications.push(PageReplayApplication {
       page_index: replay.page_index,
       section_page_index: replay.section_page_index,
@@ -3505,7 +3536,7 @@ fn apply_page_replays(pages: &mut [Page], replays: &[PageReplay]) -> Vec<PageRep
       scope: replay.scope,
       item_start: replay.item_start,
       item_end: replay.item_end,
-      replacement_count: replay.replacement_items.len(),
+      replacement_count,
       applied,
     });
   }
@@ -3567,7 +3598,7 @@ fn normalize_reflow_executions(
   });
 }
 
-fn apply_page_replay(page: &mut Page, replay: &PageReplay) -> bool {
+fn apply_page_replay(page: &mut Page, replay: &mut PageReplay, preserve_replay: bool) -> bool {
   if page.section_page_index != replay.section_page_index
     || replay.item_start > replay.item_end
     || replay.item_end > page.items.len()
@@ -3575,10 +3606,17 @@ fn apply_page_replay(page: &mut Page, replay: &PageReplay) -> bool {
     return false;
   }
 
-  page.items.splice(
-    replay.item_start..replay.item_end,
-    replay.replacement_items.clone(),
-  );
+  if preserve_replay {
+    page.items.splice(
+      replay.item_start..replay.item_end,
+      replay.replacement_items.clone(),
+    );
+  } else {
+    page.items.splice(
+      replay.item_start..replay.item_end,
+      std::mem::take(&mut replay.replacement_items),
+    );
+  }
   true
 }
 
@@ -3725,6 +3763,7 @@ fn execute_backward_move(
   pages: &[Page],
   request: &ReflowRequest,
   move_backward_keys: &mut HashMap<MoveBackwardKey, usize>,
+  collect_page_replays: bool,
 ) -> Option<BackwardMoveExecution> {
   if request.page_index == 0 || matches!(request.scope, ReflowScope::Frame) {
     return None;
@@ -3772,7 +3811,7 @@ fn execute_backward_move(
     column_index: start_frame.column_index,
     influence_count: start_frame.influences.len(),
   };
-  let replay = replay_scoped_frames(frames, pages, &replay_request);
+  let replay = replay_scoped_frames(frames, pages, &replay_request, collect_page_replays);
   move_back.replayed_frames = replay.frames;
   move_back.replayed_items = replay.items;
   Some(BackwardMoveExecution {
@@ -3815,6 +3854,7 @@ fn replay_scoped_frames(
   frames: &mut [LayoutFrame],
   pages: &[Page],
   request: &ReflowRequest,
+  collect_page_replays: bool,
 ) -> ReflowReplayStats {
   let mut stats = ReflowReplayStats::default();
   let Some(start) = frames.get(request.frame_index) else {
@@ -3834,12 +3874,14 @@ fn replay_scoped_frames(
     ) {
       break;
     }
-    let replay = page_replay_for_frame(frame, pages, request.scope);
+    let replay = collect_page_replays.then(|| page_replay_for_frame(frame, pages, request.scope));
     replay_layout_frame(frame, pages);
     stats.frames += 1;
     stats.items += frame.item_count;
     stats.frame_indices.push(frame_index);
-    stats.pages.push(replay);
+    if let Some(replay) = replay {
+      stats.pages.push(replay);
+    }
   }
   stats
 }

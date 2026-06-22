@@ -551,7 +551,7 @@ fn collect_vml_image_resources(
       Some((
         related_part.relationship_id().to_string(),
         ImageResource {
-          data: related_part.part().data_to_vec(package)?,
+          data: related_part.part().data_to_vec(package)?.into(),
           content_type: related_part
             .part()
             .content_type(package)

@@ -398,7 +398,7 @@ pub struct ImageItem {
   pub rotation_deg: f32,
   pub flip_horizontal: bool,
   pub flip_vertical: bool,
-  pub data: Vec<u8>,
+  pub data: Arc<[u8]>,
   pub content_type: Option<String>,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,

@@ -44,7 +44,7 @@ use quick_xml::events::{Event, attributes::Attribute};
 
 use crate::common::{LayoutEngineKind, layout_document_from_compat};
 use crate::error::Result;
-use crate::options::LayoutOptions;
+use crate::options::{LayoutActionOptions, LayoutDiagnosticsOptions, LayoutOptions};
 use crate::render::chart as shared_chart;
 use crate::units;
 
@@ -275,6 +275,36 @@ pub fn layout_document(
     document,
     options,
   ))
+}
+
+pub fn layout_anchor_pages(
+  package: &mut WordprocessingDocument,
+  options: &LayoutOptions,
+) -> Result<Vec<crate::common::AnchorPage<'static>>> {
+  let document = extract(package, options)?;
+  let anchor_options = LayoutOptions {
+    source_file_name: None,
+    action: LayoutActionOptions {
+      paint: false,
+      ..options.action
+    },
+    diagnostics: LayoutDiagnosticsOptions::default(),
+  };
+  let layout = layout::layout(&document, &anchor_options)?;
+  Ok(
+    layout
+      .anchor_pages
+      .into_iter()
+      .map(|anchor| crate::common::AnchorPage {
+        name: std::borrow::Cow::Owned(anchor.name),
+        page_index: anchor.page_index,
+        section_index: anchor.section_index,
+        section_page_index: anchor.section_page_index,
+        physical_page_number: anchor.physical_page_number,
+        virtual_page_number: anchor.virtual_page_number,
+      })
+      .collect(),
+  )
 }
 
 pub fn inspect_layout(
@@ -8348,7 +8378,7 @@ fn opacity_from_drawingml_scheme_transforms(transforms: &[a::SchemeColorChoice])
 }
 
 struct ImportedImageData {
-  data: Vec<u8>,
+  data: Arc<[u8]>,
   content_type: Option<String>,
 }
 
@@ -8371,7 +8401,7 @@ fn image_data_with_effects(
   };
 
   ImportedImageData {
-    data,
+    data: data.into(),
     content_type: Some("image/png".into()),
   }
 }
@@ -13925,7 +13955,7 @@ mod tests {
     catalog.by_relationship_id.insert(
       "rId1".into(),
       package::ImageResource {
-        data: vec![1, 2, 3],
+        data: vec![1, 2, 3].into(),
         content_type: Some("image/png".into()),
       },
     );

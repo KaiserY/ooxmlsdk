@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use ooxmlsdk_fonts::{FontId, ShapedGlyph, ShapedRun};
 
@@ -120,7 +121,7 @@ pub struct ImageItem<'doc> {
   pub flip_horizontal: bool,
   pub flip_vertical: bool,
   pub content_type: Cow<'doc, str>,
-  pub bytes: Cow<'doc, [u8]>,
+  pub bytes: Arc<[u8]>,
   pub relationship_id: Option<Cow<'doc, str>>,
   pub alt_text: Option<Cow<'doc, str>>,
   pub hyperlink_url: Option<Cow<'doc, str>>,

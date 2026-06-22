@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use ooxmlsdk::common::{MediaDataPart, RelationshipRef};
 use ooxmlsdk::parts::{
@@ -138,7 +139,7 @@ pub(crate) struct SlidePersist {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ImageResource {
-  pub(crate) data: Vec<u8>,
+  pub(crate) data: Arc<[u8]>,
   pub(crate) content_type: Option<String>,
 }
 
@@ -436,7 +437,7 @@ where
       Some((
         related_part.relationship_id().to_string(),
         ImageResource {
-          data: related_part.part().data_to_vec(package)?,
+          data: related_part.part().data_to_vec(package)?.into(),
           content_type: related_part
             .part()
             .content_type(package)
@@ -973,7 +974,7 @@ impl SlidePersist {
       self.image_resources.insert(
         relationship_id,
         ImageResource {
-          data,
+          data: data.into(),
           content_type: image_part.content_type(package).map(str::to_string),
         },
       );

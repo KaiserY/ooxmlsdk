@@ -160,7 +160,7 @@ fn image_item_from_compat(item: legacy::ImageItem) -> ImageItem<'static> {
       .content_type
       .map(Cow::Owned)
       .unwrap_or(Cow::Borrowed("application/octet-stream")),
-    bytes: Cow::Owned(item.data),
+    bytes: item.data,
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),

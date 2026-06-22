@@ -54,10 +54,7 @@ pub fn convert_wordprocessing_document(
   document: &mut WordprocessingDocument,
   options: PdfOptions,
 ) -> Result<Vec<u8>> {
-  let layout_options = ooxmlsdk_layout::options::LayoutOptions {
-    source_file_name: options.source_file_name.clone(),
-    ..Default::default()
-  };
+  let layout_options = ooxmlsdk_layout::options::LayoutOptions::default();
   let pages = ooxmlsdk_layout::docx::layout_document(document, &layout_options)?;
   render::krilla::render(&pages, &options)
 }
@@ -66,7 +63,7 @@ pub fn convert_wordprocessing_document(
 ///
 /// This mirrors LibreOffice layout-dump tests that assert `SwLineLayout`
 /// metrics directly instead of going through PDF text extraction.
-pub fn inspect_docx_layout<R>(reader: R, options: PdfOptions) -> Result<DocxLayoutSummary>
+pub fn inspect_docx_layout<R>(reader: R, _options: PdfOptions) -> Result<DocxLayoutSummary>
 where
   R: Read + Seek,
 {
@@ -79,7 +76,6 @@ where
   };
   let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
   let layout_options = ooxmlsdk_layout::options::LayoutOptions {
-    source_file_name: options.source_file_name.clone(),
     diagnostics: ooxmlsdk_layout::options::LayoutDiagnosticsOptions {
       collect_debug_records: true,
       collect_reflow_records: true,
@@ -158,10 +154,7 @@ pub fn convert_presentation_document(
   document: &mut PresentationDocument,
   options: PdfOptions,
 ) -> Result<Vec<u8>> {
-  let layout_options = ooxmlsdk_layout::options::LayoutOptions {
-    source_file_name: options.source_file_name.clone(),
-    ..Default::default()
-  };
+  let layout_options = ooxmlsdk_layout::options::LayoutOptions::default();
   let pages = ooxmlsdk_layout::pptx::layout_document(document, &layout_options)?;
   render::krilla::render(&pages, &options)
 }

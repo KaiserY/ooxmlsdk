@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use ooxmlsdk::common::RelationshipTargetKind;
 use ooxmlsdk::parts::{
@@ -58,7 +59,7 @@ impl HyperlinkCatalog {
 
 #[derive(Clone, Debug)]
 pub(super) struct ImageResource {
-  pub(super) data: Vec<u8>,
+  pub(super) data: Arc<[u8]>,
   pub(super) content_type: Option<String>,
 }
 
@@ -140,7 +141,7 @@ impl ImageCatalog {
       by_relationship_id.insert(
         relationship_id.to_string(),
         ImageResource {
-          data,
+          data: data.into(),
           content_type: image_part.content_type(package).map(str::to_string),
         },
       );

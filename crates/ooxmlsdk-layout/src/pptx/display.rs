@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -2479,7 +2480,7 @@ fn lower_picture(
       transform_image_data_to_png(&image_data.data, picture.crop, shape.flip_h, shape.flip_v)
         .map(|data| {
           (
-            data,
+            data.into(),
             Some("image/png".into()),
             ImageCrop::default(),
             false,
@@ -3337,12 +3338,12 @@ fn blip_fill_image_items_from_resource(
 
   let crop = blip_fill_image_crop(blip_fill);
   if let Some(a::BlipFillChoice::Tile(tile)) = blip_fill.blip_fill_choice.as_ref() {
-    return tiled_blip_fill_image_items(&image_data.data, content_type, tile, placement);
+    return tiled_blip_fill_image_items(image_data.data, content_type, tile, placement);
   }
   // lclGetBitmapMode() defaults missing bitmap mode to XML_tile for MSO.
   if blip_fill.blip_fill_choice.is_none() {
     return tiled_blip_fill_image_items(
-      &image_data.data,
+      image_data.data,
       content_type,
       &a::Tile::default(),
       placement,
@@ -3362,7 +3363,7 @@ fn blip_fill_image_items_from_resource(
     )
     .map(|data| {
       (
-        data,
+        data.into(),
         Some("image/png".into()),
         ImageCrop::default(),
         false,
@@ -3405,13 +3406,13 @@ fn blip_fill_image_items_from_resource(
 }
 
 fn tiled_blip_fill_image_items(
-  data: &[u8],
+  data: Arc<[u8]>,
   content_type: Option<String>,
   tile: &a::Tile,
   placement: ImageFillPlacement,
 ) -> Vec<ImageItem> {
   let (mut tile_width_pt, mut tile_height_pt) =
-    image_tile_size_pt(data).unwrap_or((placement.frame.width_pt, placement.frame.height_pt));
+    image_tile_size_pt(&data).unwrap_or((placement.frame.width_pt, placement.frame.height_pt));
   let scale_x = tile
     .horizontal_ratio
     .as_ref()
@@ -3474,7 +3475,7 @@ fn tiled_blip_fill_image_items(
           rotation_deg: placement.rotation_deg,
           flip_horizontal: placement.flip_horizontal ^ tile_flip_h,
           flip_vertical: placement.flip_vertical ^ tile_flip_v,
-          data: data.to_vec(),
+          data: Arc::clone(&data),
           content_type: content_type.clone(),
           alt_text: placement.alt_text.clone(),
           hyperlink_url: placement.hyperlink_url.clone(),
@@ -3509,7 +3510,7 @@ fn tile_flip(flip: Option<a::TileFlipValues>, row: usize, column: usize) -> (boo
 }
 
 struct ImportedImageData {
-  data: Vec<u8>,
+  data: Arc<[u8]>,
   content_type: Option<String>,
 }
 
@@ -3534,25 +3535,26 @@ struct ColorChangeEffect {
 fn image_data_with_blip_effects(
   import: &PowerPointImport,
   slide: &SlidePersist,
-  data: &[u8],
+  data: &Arc<[u8]>,
   content_type: Option<&str>,
   blip_choices: &[a::BlipChoice],
 ) -> ImportedImageData {
+  let data_ref = data.as_ref();
   let effects = image_effects_from_blip(import, slide, blip_choices, content_type);
   if effects == ImageEffects::default() {
     return ImportedImageData {
-      data: data.to_vec(),
+      data: Arc::clone(data),
       content_type: content_type.map(str::to_string),
     };
   }
-  let Some(data) = apply_image_effects(data, content_type, effects) else {
+  let Some(data) = apply_image_effects(data_ref, content_type, effects) else {
     return ImportedImageData {
-      data: data.to_vec(),
+      data: Arc::clone(data),
       content_type: content_type.map(str::to_string),
     };
   };
   ImportedImageData {
-    data,
+    data: data.into(),
     content_type: Some("image/png".into()),
   }
 }
@@ -3673,9 +3675,11 @@ fn apply_image_effects(
   let raster_data = emf_wmf::decode_metafile_as_raster(data, content_type)
     .ok()
     .flatten()
-    .map(|raster| raster.data)
-    .unwrap_or_else(|| data.to_vec());
-  let mut image = image::load_from_memory(&raster_data).ok()?.to_rgba8();
+    .map(|raster| Cow::Owned(raster.data))
+    .unwrap_or(Cow::Borrowed(data));
+  let mut image = image::load_from_memory(raster_data.as_ref())
+    .ok()?
+    .to_rgba8();
   for pixel in image.pixels_mut() {
     let [mut r, mut g, mut b, mut a] = pixel.0;
     if let Some(effect) = effects.color_change
@@ -5283,13 +5287,13 @@ fn push_math_ole_preview_item(
   }));
 }
 
-fn transparent_png_1x1() -> Option<Vec<u8>> {
+fn transparent_png_1x1() -> Option<Arc<[u8]>> {
   let mut output = Vec::new();
   let encoder = PngEncoder::new(Cursor::new(&mut output));
   encoder
     .write_image(&[0, 0, 0, 0], 1, 1, ColorType::Rgba8.into())
     .ok()?;
-  Some(output)
+  Some(output.into())
 }
 
 #[derive(Clone, Debug)]

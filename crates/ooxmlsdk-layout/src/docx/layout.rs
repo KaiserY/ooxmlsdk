@@ -15,7 +15,7 @@ use crate::docx::{
 };
 use crate::error::Result;
 use crate::options::{LayoutActionOptions, LayoutOptions};
-use crate::text_metrics::{baseline_offset_in_line, inline_text_box_height, measure_text};
+use crate::text_metrics::{TextMetrics, baseline_offset_in_line, inline_text_box_height};
 use crate::units;
 
 // Word document defaults used by LibreOffice import/export are 11pt text,
@@ -1611,6 +1611,7 @@ struct RootFrameLayout<'a> {
   outline_entries: Vec<OutlineEntry>,
   anchor_pages: Vec<AnchorPage>,
   checkpoints: Vec<LayoutCheckpoint>,
+  text_metrics: TextMetrics,
   next_line_number: i16,
   pending_trailing_page_break: bool,
 }
@@ -1665,6 +1666,7 @@ impl<'a> RootFrameLayout<'a> {
       outline_entries: Vec::new(),
       anchor_pages: Vec::new(),
       checkpoints: Vec::new(),
+      text_metrics: TextMetrics::new(),
       next_line_number: document
         .page
         .line_numbering
@@ -1699,6 +1701,7 @@ impl<'a> RootFrameLayout<'a> {
         &self.pages,
         influence_reflow_requests,
         self.emit_reflow_diagnostics,
+        &mut self.text_metrics,
       );
     if let Some(rerun) = self.apply_checkpoint_rerun(&backward_moves) {
       layout_reruns.push(rerun);
@@ -1713,6 +1716,7 @@ impl<'a> RootFrameLayout<'a> {
         &self.pages,
         influence_reflow_requests,
         self.emit_reflow_diagnostics,
+        &mut self.text_metrics,
       );
     }
     let mut page_replay_applications = apply_page_replays(
@@ -1749,6 +1753,7 @@ impl<'a> RootFrameLayout<'a> {
         &self.pages,
         decoration_reflow_requests,
         self.emit_reflow_diagnostics,
+        &mut self.text_metrics,
       );
       page_replay_applications.extend(apply_page_replays(
         &mut self.pages,
@@ -2050,8 +2055,13 @@ impl<'a> RootFrameLayout<'a> {
       return;
     }
     let kind = follow_kind_for_block(block);
-    let (block_flow, footnote_top) =
-      footnote_boss_reserve(block, self.document, &self.emitted_footnotes, *flow);
+    let (block_flow, footnote_top) = footnote_boss_reserve(
+      block,
+      self.document,
+      &self.emitted_footnotes,
+      *flow,
+      &mut self.text_metrics,
+    );
     let transition = self.follow_transition_start(*flow);
     (*flow, self.y) = prepare_block_flow(
       block,
@@ -2059,6 +2069,7 @@ impl<'a> RootFrameLayout<'a> {
       block_flow,
       &mut self.current,
       &mut self.pages,
+      &mut self.text_metrics,
       self.y,
     );
     self.record_follow_transition(
@@ -2079,6 +2090,7 @@ impl<'a> RootFrameLayout<'a> {
       &self.emitted_footnotes,
       *flow,
       Some(block_index),
+      &mut self.text_metrics,
     );
     (*flow, self.y) = layout_document_block(
       previous,
@@ -2089,6 +2101,7 @@ impl<'a> RootFrameLayout<'a> {
         current: &mut self.current,
         pages: &mut self.pages,
         anchor_pages: Some(&mut self.anchor_pages),
+        text_metrics: &mut self.text_metrics,
       },
       self.y,
     );
@@ -2117,8 +2130,11 @@ impl<'a> RootFrameLayout<'a> {
         emitted_footnote_order: &mut self.emitted_footnote_order,
       },
       *flow,
-      &mut self.current,
-      &mut self.pages,
+      FootnoteLayoutTarget {
+        current: &mut self.current,
+        pages: &mut self.pages,
+        text_metrics: &mut self.text_metrics,
+      },
       footnote_top,
     );
     *flow = restore_body_content_bottom(*flow);
@@ -2176,7 +2192,12 @@ impl<'a> RootFrameLayout<'a> {
     let Some(line_numbering) = flow.setup.line_numbering else {
       return;
     };
-    let line_boxes = line_number_boxes_for_block(&self.current, start_index, fragment_start);
+    let line_boxes = line_number_boxes_for_block(
+      &self.current,
+      start_index,
+      fragment_start,
+      &mut self.text_metrics,
+    );
     if line_boxes.is_empty() {
       return;
     }
@@ -2196,7 +2217,7 @@ impl<'a> RootFrameLayout<'a> {
         ..Default::default()
       };
       let text = number.to_string();
-      let width = measure_text(&text, &style);
+      let width = self.text_metrics.measure_text(&text, &style);
       items.push((
         line_box.item_start,
         PageItem::Text(TextItem {
@@ -2349,6 +2370,7 @@ impl<'a> RootFrameLayout<'a> {
         &self.emitted_footnotes,
         flow,
         Some(index),
+        &mut self.text_metrics,
       );
       let (_, y) = layout_document_block(
         previous,
@@ -2359,6 +2381,7 @@ impl<'a> RootFrameLayout<'a> {
           current: &mut self.current,
           pages: &mut self.pages,
           anchor_pages: None,
+          text_metrics: &mut self.text_metrics,
         },
         self.y,
       );
@@ -2529,13 +2552,12 @@ impl<'a> RootFrameLayout<'a> {
     let exclusions = catalog
       .selected(self.current.section_page_index, self.pages.len() + 1)
       .to_vec();
-    let previous = self.current.repeating_wrap_exclusions.clone();
+    let previous = std::mem::replace(&mut self.current.repeating_wrap_exclusions, exclusions);
     self
       .current
       .wrap_exclusions
       .retain(|exclusion| !previous.contains(exclusion));
     self.current.repeating_wrap_exclusion_catalog = catalog;
-    self.current.repeating_wrap_exclusions = exclusions;
     extend_wrap_exclusions_unique(
       &mut self.current.wrap_exclusions,
       &self.current.repeating_wrap_exclusions,
@@ -2625,8 +2647,8 @@ impl<'a> RootFrameLayout<'a> {
         continue;
       }
       let page_items = &page.items[item_start..item_end];
-      let bounds = frame_bounds_for_items(page_items);
-      let lines = line_boxes_for_items(&page.items, item_start, item_end);
+      let bounds = frame_bounds_for_items(page_items, &mut self.text_metrics);
+      let lines = line_boxes_for_items(&page.items, item_start, item_end, &mut self.text_metrics);
       if fragments.is_empty() {
         fragments = frame_fragments_for(kind, &lines);
       }
@@ -2872,10 +2894,13 @@ fn follow_kind_for_block(block: &Block) -> FollowFrameKind {
   }
 }
 
-fn frame_bounds_for_items(items: &[PageItem]) -> Option<FrameBounds> {
+fn frame_bounds_for_items(
+  items: &[PageItem],
+  text_metrics: &mut TextMetrics,
+) -> Option<FrameBounds> {
   let mut bounds: Option<(f32, f32, f32, f32)> = None;
   for item in items {
-    let Some((x1, y1, x2, y2)) = item_bounds(item) else {
+    let Some((x1, y1, x2, y2)) = item_bounds(item, text_metrics) else {
       continue;
     };
     bounds = Some(match bounds {
@@ -2893,7 +2918,12 @@ fn frame_bounds_for_items(items: &[PageItem]) -> Option<FrameBounds> {
   })
 }
 
-fn line_boxes_for_items(items: &[PageItem], item_start: usize, item_end: usize) -> Vec<LineBox> {
+fn line_boxes_for_items(
+  items: &[PageItem],
+  item_start: usize,
+  item_end: usize,
+  text_metrics: &mut TextMetrics,
+) -> Vec<LineBox> {
   let mut lines = Vec::new();
   let mut index = item_start;
   while index < item_end {
@@ -2903,11 +2933,11 @@ fn line_boxes_for_items(items: &[PageItem], item_start: usize, item_end: usize) 
     };
     let line_start = index;
     let mut line_end = index + 1;
-    let mut bounds = item_bounds(&items[index]);
+    let mut bounds = item_bounds(&items[index], text_metrics);
     while line_end < item_end
       && item_line_y(&items[line_end]).is_some_and(|next_y| (next_y - y).abs() < LAYOUT_EPSILON_PT)
     {
-      if let Some((x1, y1, x2, y2)) = item_bounds(&items[line_end]) {
+      if let Some((x1, y1, x2, y2)) = item_bounds(&items[line_end], text_metrics) {
         bounds = Some(match bounds {
           Some((min_x, min_y, max_x, max_y)) => {
             (min_x.min(x1), min_y.min(y1), max_x.max(x2), max_y.max(y2))
@@ -2936,6 +2966,7 @@ fn line_number_boxes_for_block(
   page: &Page,
   item_start: usize,
   fragment_start: usize,
+  text_metrics: &mut TextMetrics,
 ) -> Vec<LineNumberBox> {
   let item_end = page.items.len();
   let mut boxes = page
@@ -2973,7 +3004,7 @@ fn line_number_boxes_for_block(
 
   if boxes.is_empty() {
     boxes.extend(
-      line_boxes_for_items(&page.items, item_start, item_end)
+      line_boxes_for_items(&page.items, item_start, item_end, text_metrics)
         .into_iter()
         .map(|line| LineNumberBox {
           item_start: line.item_start,
@@ -3068,6 +3099,7 @@ fn block_frame_influences(
   emitted_footnotes: &HashSet<i64>,
   flow: FlowContext,
   block_index: Option<usize>,
+  text_metrics: &mut TextMetrics,
 ) -> Vec<FrameInfluence> {
   let mut influences = Vec::new();
   match block {
@@ -3079,7 +3111,8 @@ fn block_frame_influences(
         .count();
       if footnote_count > 0 {
         let height =
-          referenced_footnote_area_height(block, document, emitted_footnotes, flow).max(0.0);
+          referenced_footnote_area_height(block, document, emitted_footnotes, flow, text_metrics)
+            .max(0.0);
         influences.push(FrameInfluence {
           kind: FrameInfluenceKind::FootnoteReservation,
           count: footnote_count,
@@ -3158,7 +3191,14 @@ fn block_frame_influences(
     }
     Block::Frame(frame) => {
       influences.extend(frame.blocks.iter().flat_map(|block| {
-        block_frame_influences(block, document, emitted_footnotes, flow, block_index)
+        block_frame_influences(
+          block,
+          document,
+          emitted_footnotes,
+          flow,
+          block_index,
+          text_metrics,
+        )
       }));
     }
   }
@@ -3236,7 +3276,11 @@ fn page_frame_fragments(
     .collect()
 }
 
-fn push_page_fragment(page: &mut Page, fragment: PageFragmentRecord) {
+fn push_page_fragment(
+  page: &mut Page,
+  fragment: PageFragmentRecord,
+  text_metrics: &mut TextMetrics,
+) {
   let PageFragmentRecord {
     kind,
     split,
@@ -3250,7 +3294,8 @@ fn push_page_fragment(page: &mut Page, fragment: PageFragmentRecord) {
   if item_start >= item_end && bounds.is_none() {
     return;
   }
-  let bounds = bounds.or_else(|| frame_bounds_for_items(&page.items[item_start..item_end]));
+  let bounds =
+    bounds.or_else(|| frame_bounds_for_items(&page.items[item_start..item_end], text_metrics));
   page.frame_fragments.push(FrameFragment {
     kind,
     split,
@@ -3426,6 +3471,7 @@ fn execute_reflow_requests(
   pages: &[Page],
   requests: Vec<ReflowRequest>,
   collect_page_replays: bool,
+  text_metrics: &mut TextMetrics,
 ) -> (
   Vec<ReflowRequest>,
   Vec<ReflowExecution>,
@@ -3479,6 +3525,7 @@ fn execute_reflow_requests(
             &request,
             &mut move_backward_keys,
             collect_page_replays,
+            text_metrics,
           ) {
             suppressed_moves += usize::from(backward.move_back.suppressed);
             influence_replayed_frames += backward.move_back.replayed_frames;
@@ -3486,7 +3533,8 @@ fn execute_reflow_requests(
             page_replays.extend(backward.pages);
             backward_moves.push(backward.move_back);
           }
-          let replay = replay_scoped_frames(frames, pages, &request, collect_page_replays);
+          let replay =
+            replay_scoped_frames(frames, pages, &request, collect_page_replays, text_metrics);
           influence_replayed_frames += replay.frames;
           influence_replayed_items += replay.items;
           replayed_influence_frames.extend(replay.frame_indices);
@@ -3794,6 +3842,7 @@ fn execute_backward_move(
   request: &ReflowRequest,
   move_backward_keys: &mut HashMap<MoveBackwardKey, usize>,
   collect_page_replays: bool,
+  text_metrics: &mut TextMetrics,
 ) -> Option<BackwardMoveExecution> {
   if request.page_index == 0 || matches!(request.scope, ReflowScope::Frame) {
     return None;
@@ -3841,7 +3890,13 @@ fn execute_backward_move(
     column_index: start_frame.column_index,
     influence_count: start_frame.influences.len(),
   };
-  let replay = replay_scoped_frames(frames, pages, &replay_request, collect_page_replays);
+  let replay = replay_scoped_frames(
+    frames,
+    pages,
+    &replay_request,
+    collect_page_replays,
+    text_metrics,
+  );
   move_back.replayed_frames = replay.frames;
   move_back.replayed_items = replay.items;
   Some(BackwardMoveExecution {
@@ -3885,6 +3940,7 @@ fn replay_scoped_frames(
   pages: &[Page],
   request: &ReflowRequest,
   collect_page_replays: bool,
+  text_metrics: &mut TextMetrics,
 ) -> ReflowReplayStats {
   let mut stats = ReflowReplayStats::default();
   let Some(start) = frames.get(request.frame_index) else {
@@ -3905,7 +3961,7 @@ fn replay_scoped_frames(
       break;
     }
     let replay = collect_page_replays.then(|| page_replay_for_frame(frame, pages, request.scope));
-    replay_layout_frame(frame, pages);
+    replay_layout_frame(frame, pages, text_metrics);
     stats.frames += 1;
     stats.items += frame.item_count;
     stats.frame_indices.push(frame_index);
@@ -3949,21 +4005,22 @@ fn frame_in_reflow_scope(
   }
 }
 
-fn replay_layout_frame(frame: &mut LayoutFrame, pages: &[Page]) {
+fn replay_layout_frame(frame: &mut LayoutFrame, pages: &[Page], text_metrics: &mut TextMetrics) {
   if let Some(page) = pages.get(frame.page_index) {
     if frame.item_start > page.items.len() {
       frame.item_start = page.items.len();
     }
     frame.item_end = frame.item_end.min(page.items.len()).max(frame.item_start);
     frame.item_count = frame.item_end.saturating_sub(frame.item_start);
-    frame.bounds = frame_bounds_for_items(&page.items[frame.item_start..frame.item_end]);
-    frame.lines = line_boxes_for_items(&page.items, frame.item_start, frame.item_end);
+    frame.bounds =
+      frame_bounds_for_items(&page.items[frame.item_start..frame.item_end], text_metrics);
+    frame.lines = line_boxes_for_items(&page.items, frame.item_start, frame.item_end, text_metrics);
   } else if !frame.items.is_empty() {
     frame.item_start = 0;
     frame.item_end = frame.items.len();
     frame.item_count = frame.items.len();
-    frame.bounds = frame_bounds_for_items(&frame.items);
-    frame.lines = line_boxes_for_items(&frame.items, 0, frame.items.len());
+    frame.bounds = frame_bounds_for_items(&frame.items, text_metrics);
+    frame.lines = line_boxes_for_items(&frame.items, 0, frame.items.len(), text_metrics);
   } else {
     frame.item_end = frame.item_start;
     frame.item_count = 0;
@@ -4169,10 +4226,10 @@ fn item_line_y(item: &PageItem) -> Option<f32> {
   }
 }
 
-fn item_bounds(item: &PageItem) -> Option<(f32, f32, f32, f32)> {
+fn item_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Option<(f32, f32, f32, f32)> {
   match item {
     PageItem::Text(text) => {
-      let width = measure_text(&text.text, &text.style);
+      let width = text_metrics.measure_text(&text.text, &text.style);
       Some((
         text.x_pt,
         text.y_pt,
@@ -4216,10 +4273,13 @@ fn item_bounds(item: &PageItem) -> Option<(f32, f32, f32, f32)> {
   }
 }
 
-fn page_items_bounds(items: &[PageItem]) -> Option<(f32, f32, f32, f32)> {
+fn page_items_bounds(
+  items: &[PageItem],
+  text_metrics: &mut TextMetrics,
+) -> Option<(f32, f32, f32, f32)> {
   let mut bounds: Option<(f32, f32, f32, f32)> = None;
   for item in items {
-    let Some((x1, y1, x2, y2)) = item_bounds(item) else {
+    let Some((x1, y1, x2, y2)) = item_bounds(item, text_metrics) else {
       continue;
     };
     bounds = Some(match bounds {
@@ -4804,12 +4864,13 @@ fn prepare_block_flow(
   flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
+  text_metrics: &mut TextMetrics,
   y: f32,
 ) -> (FlowContext, f32) {
   if !page_has_body_region_items(current, flow) || !block_should_stay_together(block, next) {
     return (flow, y);
   }
-  let required_height = keep_group_height(block, next, flow);
+  let required_height = keep_group_height(block, next, flow, text_metrics);
   if y + required_height <= flow.content_bottom || y <= flow.content_top_pt + LAYOUT_EPSILON_PT {
     return (flow, y);
   }
@@ -4826,8 +4887,13 @@ fn block_should_stay_together(block: &Block, next: Option<&Block>) -> bool {
   }
 }
 
-fn keep_group_height(block: &Block, next: Option<&Block>, flow: FlowContext) -> f32 {
-  let mut height = estimated_block_height(block, flow);
+fn keep_group_height(
+  block: &Block,
+  next: Option<&Block>,
+  flow: FlowContext,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let mut height = estimated_block_height(block, flow, text_metrics);
   if let Block::Paragraph(paragraph) = block
     && paragraph.format.keep_with_next
     && let Some(Block::Paragraph(next)) = next
@@ -4839,23 +4905,28 @@ fn keep_group_height(block: &Block, next: Option<&Block>, flow: FlowContext) -> 
   height
 }
 
-fn estimated_block_height(block: &Block, flow: FlowContext) -> f32 {
+fn estimated_block_height(block: &Block, flow: FlowContext, text_metrics: &mut TextMetrics) -> f32 {
   match block {
-    Block::Paragraph(paragraph) => estimated_paragraph_height(paragraph, flow),
-    Block::Table(table) => estimated_table_height(table, flow),
-    Block::Frame(frame) => estimated_frame_height(frame, flow),
+    Block::Paragraph(paragraph) => estimated_paragraph_height(paragraph, flow, text_metrics),
+    Block::Table(table) => estimated_table_height(table, flow, text_metrics),
+    Block::Frame(frame) => estimated_frame_height(frame, flow, text_metrics),
   }
 }
 
-fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowContext) -> f32 {
+fn estimated_paragraph_height(
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
   paragraph.format.spacing_before_pt
-    + estimated_paragraph_content_height(paragraph, flow)
+    + estimated_paragraph_content_height(paragraph, flow, text_metrics)
     + paragraph_lower_space(paragraph)
 }
 
 fn estimated_paragraph_content_height(
   paragraph: &crate::docx::Paragraph,
   flow: FlowContext,
+  text_metrics: &mut TextMetrics,
 ) -> f32 {
   let content_width =
     (flow.content_width - paragraph.format.indent_left_pt - paragraph.format.indent_right_pt)
@@ -4896,19 +4967,19 @@ fn estimated_paragraph_content_height(
             continue;
           }
           has_flow_content = true;
-          let width = measure_text(&segment, &run.style);
+          let width = text_metrics.measure_text(&segment, &run.style);
           if x + width > content_width && x > 0.0 {
             finish_line(&mut content_height, &mut line_height);
             x = 0.0;
           }
           if width > content_width && x <= 0.0 && !segment.chars().all(char::is_whitespace) {
             for text in emergency_break_segments(&segment) {
-              let width = measure_text(&text, &run.style);
+              let width = text_metrics.measure_text(&text, &run.style);
               if width > content_width && text.chars().count() > 1 {
                 for ch in text.chars() {
                   let mut encoded = [0; 4];
                   let text = ch.encode_utf8(&mut encoded);
-                  let width = measure_text(text, &run.style);
+                  let width = text_metrics.measure_text(text, &run.style);
                   if x + width > content_width && x > 0.0 {
                     finish_line(&mut content_height, &mut line_height);
                     x = 0.0;
@@ -5197,6 +5268,7 @@ struct LayoutBlockTarget<'a> {
   current: &'a mut Page,
   pages: &'a mut Vec<Page>,
   anchor_pages: Option<&'a mut Vec<AnchorPage>>,
+  text_metrics: &'a mut TextMetrics,
 }
 
 fn layout_document_block(
@@ -5212,7 +5284,14 @@ fn layout_document_block(
       let mut ignore_top_margin_at_page_start = false;
       if let Some(frame) = paragraph_frame(paragraph) {
         note_body_content_frame(target.current, flow);
-        return layout_floating_frame(&frame, flow, target.current, target.pages, y);
+        return layout_floating_frame(
+          &frame,
+          flow,
+          target.current,
+          target.pages,
+          target.text_metrics,
+          y,
+        );
       }
       let mut flow = flow;
       let ignore_top_margin_after_page_break = paragraph.format.page_break_before
@@ -5248,9 +5327,12 @@ fn layout_document_block(
       let (paragraph_flow, y) = layout_paragraph(
         paragraph,
         paragraph_flow,
-        target.current,
-        target.pages,
-        target.anchor_pages,
+        ParagraphLayoutTarget {
+          current: target.current,
+          pages: target.pages,
+          anchor_pages: target.anchor_pages,
+          text_metrics: target.text_metrics,
+        },
         y,
         paragraph_spacing_after(paragraph, next),
       );
@@ -5265,11 +5347,26 @@ fn layout_document_block(
     Block::Table(table) => {
       let has_ind_prev = table_has_indirect_previous_frame(target.current, flow, y);
       note_body_content_frame(target.current, flow);
-      layout_table(table, flow, target.current, target.pages, y, has_ind_prev)
+      layout_table(
+        table,
+        flow,
+        target.current,
+        target.pages,
+        target.text_metrics,
+        y,
+        has_ind_prev,
+      )
     }
     Block::Frame(frame) => {
       note_body_content_frame(target.current, flow);
-      layout_floating_frame(frame, flow, target.current, target.pages, y)
+      layout_floating_frame(
+        frame,
+        flow,
+        target.current,
+        target.pages,
+        target.text_metrics,
+        y,
+      )
     }
   }
 }
@@ -5312,13 +5409,14 @@ fn layout_floating_frame(
   flow: FlowContext,
   current: &mut Page,
   _pages: &mut Vec<Page>,
+  text_metrics: &mut TextMetrics,
   y: f32,
 ) -> (FlowContext, f32) {
   let width = frame
     .width_pt
     .unwrap_or_else(|| default_floating_frame_width(frame.placement, flow))
     .max(DEFAULT_FONT_SIZE_PT);
-  let height = estimated_frame_height(frame, flow);
+  let height = estimated_frame_height(frame, flow, text_metrics);
   let (x, frame_y) = floating_frame_position(frame.placement, flow, y, width, height, true);
   let frame_stroke = frame
     .borders
@@ -5369,6 +5467,7 @@ fn layout_floating_frame(
         current: &mut frame_page,
         pages: &mut frame_pages,
         anchor_pages: None,
+        text_metrics: &mut *text_metrics,
       },
       block_y,
     );
@@ -5400,16 +5499,24 @@ fn default_floating_frame_width(placement: FloatingFramePlacement, flow: FlowCon
   .max(DEFAULT_FONT_SIZE_PT)
 }
 
-fn frame_content_height(frame: &FloatingFrame, flow: FlowContext) -> f32 {
+fn frame_content_height(
+  frame: &FloatingFrame,
+  flow: FlowContext,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
   frame
     .blocks
     .iter()
-    .map(|block| estimated_block_height(block, flow))
+    .map(|block| estimated_block_height(block, flow, text_metrics))
     .sum::<f32>()
     .max(DEFAULT_LINE_HEIGHT_PT)
 }
 
-fn estimated_frame_height(frame: &FloatingFrame, flow: FlowContext) -> f32 {
+fn estimated_frame_height(
+  frame: &FloatingFrame,
+  flow: FlowContext,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
   let width = frame
     .width_pt
     .unwrap_or_else(|| default_floating_frame_width(frame.placement, flow))
@@ -5420,6 +5527,7 @@ fn estimated_frame_height(frame: &FloatingFrame, flow: FlowContext) -> f32 {
       content_width: width,
       ..flow
     },
+    text_metrics,
   );
   match frame.height_rule {
     FrameHeightRule::Auto => frame.height_pt.unwrap_or(measured_height),
@@ -5553,8 +5661,10 @@ fn footnote_boss_reserve(
   document: &DocxDocument,
   emitted_footnotes: &HashSet<i64>,
   flow: FlowContext,
+  text_metrics: &mut TextMetrics,
 ) -> (FlowContext, Option<f32>) {
-  let height = referenced_footnote_area_height(block, document, emitted_footnotes, flow);
+  let height =
+    referenced_footnote_area_height(block, document, emitted_footnotes, flow, text_metrics);
   if height <= 0.0 {
     return (flow, None);
   }
@@ -5576,6 +5686,7 @@ fn referenced_footnote_area_height(
   document: &DocxDocument,
   emitted_footnotes: &HashSet<i64>,
   flow: FlowContext,
+  text_metrics: &mut TextMetrics,
 ) -> f32 {
   let Block::Paragraph(paragraph) = block else {
     return 0.0;
@@ -5594,12 +5705,16 @@ fn referenced_footnote_area_height(
       height += DEFAULT_LINE_HEIGHT_PT;
       has_note = true;
     }
-    height += measured_note_blocks_height(blocks, flow);
+    height += measured_note_blocks_height(blocks, flow, text_metrics);
   }
   height
 }
 
-fn measured_note_blocks_height(blocks: &[Block], flow: FlowContext) -> f32 {
+fn measured_note_blocks_height(
+  blocks: &[Block],
+  flow: FlowContext,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
   let mut scratch = empty_section_page(
     PageSetup {
       width_pt: flow.setup.width_pt,
@@ -5639,6 +5754,7 @@ fn measured_note_blocks_height(blocks: &[Block], flow: FlowContext) -> f32 {
         current: &mut scratch,
         pages: &mut discarded_pages,
         anchor_pages: None,
+        text_metrics: &mut *text_metrics,
       },
       y,
     );
@@ -5652,13 +5768,18 @@ struct FootnoteEmission<'a> {
   emitted_footnote_order: &'a mut Vec<i64>,
 }
 
+struct FootnoteLayoutTarget<'a> {
+  current: &'a mut Page,
+  pages: &'a mut Vec<Page>,
+  text_metrics: &'a mut TextMetrics,
+}
+
 fn footnote_boss_format(
   block: &Block,
   document: &DocxDocument,
   emission: FootnoteEmission<'_>,
   flow: FlowContext,
-  current: &mut Page,
-  pages: &mut Vec<Page>,
+  target: FootnoteLayoutTarget<'_>,
   footnote_top: Option<f32>,
 ) {
   let Block::Paragraph(paragraph) = block else {
@@ -5692,8 +5813,8 @@ fn footnote_boss_format(
       y = layout_note_separator(
         NoteSeparatorKind::Footnote,
         footnote_flow.setup,
-        current,
-        pages,
+        target.current,
+        target.pages,
         y,
         footnote_flow.content_bottom,
       );
@@ -5708,9 +5829,10 @@ fn footnote_boss_format(
         next,
         footnote_flow,
         LayoutBlockTarget {
-          current,
-          pages,
+          current: target.current,
+          pages: target.pages,
           anchor_pages: None,
+          text_metrics: &mut *target.text_metrics,
         },
         y,
       );
@@ -5821,6 +5943,7 @@ fn repeating_slot_wrap_exclusions_for_page(
       .max(DEFAULT_FONT_SIZE_PT);
   let mut adornment = empty_section_page(page.setup, page.section_index, page.section_page_index);
   let mut discarded_pages = Vec::new();
+  let mut text_metrics = TextMetrics::new();
 
   let header_height =
     measured_repeating_blocks_height(header_blocks, page.setup, document.default_tab_stop_pt);
@@ -5829,6 +5952,7 @@ fn repeating_slot_wrap_exclusions_for_page(
     header_blocks,
     &mut adornment,
     &mut discarded_pages,
+    &mut text_metrics,
     header_top,
     FlowContext {
       setup: page.setup,
@@ -5864,6 +5988,7 @@ fn repeating_slot_wrap_exclusions_for_page(
     footer_blocks,
     &mut adornment,
     &mut discarded_pages,
+    &mut text_metrics,
     footer_top,
     FlowContext {
       setup: page.setup,
@@ -5912,6 +6037,7 @@ fn layout_repeating_blocks_into_page(
   blocks: &[Block],
   page: &mut Page,
   discarded_pages: &mut Vec<Page>,
+  text_metrics: &mut TextMetrics,
   mut y: f32,
   flow: FlowContext,
 ) -> f32 {
@@ -5920,6 +6046,7 @@ fn layout_repeating_blocks_into_page(
       block,
       page,
       discarded_pages,
+      text_metrics,
       y,
       flow,
       index + 1 == blocks.len(),
@@ -6000,6 +6127,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
         .max(DEFAULT_FONT_SIZE_PT);
     let mut adornment = empty_section_page(page.setup, page.section_index, page.section_page_index);
     let mut discarded_pages = Vec::new();
+    let mut text_metrics = TextMetrics::new();
     let header_height =
       measured_repeating_blocks_height(header_blocks, page.setup, document.default_tab_stop_pt);
     let header_top = page.setup.header_distance_pt.max(0.0);
@@ -6007,6 +6135,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
       header_blocks,
       &mut adornment,
       &mut discarded_pages,
+      &mut text_metrics,
       header_top,
       FlowContext {
         setup: page.setup,
@@ -6042,6 +6171,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
       footer_blocks,
       &mut adornment,
       &mut discarded_pages,
+      &mut text_metrics,
       footer_top,
       FlowContext {
         setup: page.setup,
@@ -6627,6 +6757,7 @@ fn measured_repeating_blocks_height(
     0,
   );
   let mut discarded_pages = Vec::new();
+  let mut text_metrics = TextMetrics::new();
   let content_width =
     (setup.width_pt - setup.margin_left_pt - setup.margin_right_pt).max(DEFAULT_FONT_SIZE_PT);
   let flow = FlowContext {
@@ -6657,6 +6788,7 @@ fn measured_repeating_blocks_height(
       block,
       &mut scratch,
       &mut discarded_pages,
+      &mut text_metrics,
       y,
       flow,
       index + 1 == blocks.len(),
@@ -6669,6 +6801,7 @@ fn layout_repeating_block(
   block: &Block,
   page: &mut Page,
   discarded_pages: &mut Vec<Page>,
+  text_metrics: &mut TextMetrics,
   y: f32,
   flow: FlowContext,
   is_last_repeating_block: bool,
@@ -6694,9 +6827,12 @@ fn layout_repeating_block(
       let (_, y) = layout_paragraph(
         paragraph,
         flow,
-        page,
-        discarded_pages,
-        None,
+        ParagraphLayoutTarget {
+          current: page,
+          pages: discarded_pages,
+          anchor_pages: None,
+          text_metrics,
+        },
         y + paragraph.format.spacing_before_pt,
         spacing_after_pt,
       );
@@ -6704,11 +6840,19 @@ fn layout_repeating_block(
     }
     Block::Table(table) => {
       let has_ind_prev = table_has_indirect_previous_frame(page, flow, y);
-      let (_, y) = layout_table(table, flow, page, discarded_pages, y, has_ind_prev);
+      let (_, y) = layout_table(
+        table,
+        flow,
+        page,
+        discarded_pages,
+        text_metrics,
+        y,
+        has_ind_prev,
+      );
       y
     }
     Block::Frame(frame) => {
-      let (_, y) = layout_floating_frame(frame, flow, page, discarded_pages, y);
+      let (_, y) = layout_floating_frame(frame, flow, page, discarded_pages, text_metrics, y);
       y
     }
   }
@@ -6719,6 +6863,7 @@ fn layout_table(
   flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
+  text_metrics: &mut TextMetrics,
   y: f32,
   has_ind_prev: bool,
 ) -> (FlowContext, f32) {
@@ -6731,16 +6876,16 @@ fn layout_table(
   {
     let mut inline_table = table.clone();
     inline_table.placement = None;
-    return TableFrameLayout::new(&inline_table, block_area(flow), false)
+    return TableFrameLayout::new(&inline_table, block_area(flow), false, text_metrics)
       .map_or((flow, y), |layout| {
-        layout.format(current, pages, y, has_ind_prev)
+        layout.format(current, pages, text_metrics, y, has_ind_prev)
       });
   }
   if table.placement.is_some() {
-    return layout_floating_table(table, flow, current, pages, y);
+    return layout_floating_table(table, flow, current, pages, text_metrics, y);
   }
-  TableFrameLayout::new(table, block_area(flow), false).map_or((flow, y), |layout| {
-    layout.format(current, pages, y, has_ind_prev)
+  TableFrameLayout::new(table, block_area(flow), false, text_metrics).map_or((flow, y), |layout| {
+    layout.format(current, pages, text_metrics, y, has_ind_prev)
   })
 }
 
@@ -6749,6 +6894,7 @@ fn layout_floating_table(
   mut flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
+  text_metrics: &mut TextMetrics,
   mut y: f32,
 ) -> (FlowContext, f32) {
   let Some(placement) = table.placement else {
@@ -6765,7 +6911,8 @@ fn layout_floating_table(
   }
   let mut effective_table = table.clone();
   effective_table.split_allowed = effective_floating_table_split_allowed(table, flow);
-  let Some(layout) = TableFrameLayout::new(&effective_table, block_area(flow), true) else {
+  let Some(layout) = TableFrameLayout::new(&effective_table, block_area(flow), true, text_metrics)
+  else {
     return (flow, y);
   };
   let table_width = (layout.frame.right_pt - layout.frame.left_pt).max(DEFAULT_FONT_SIZE_PT);
@@ -6790,10 +6937,19 @@ fn layout_floating_table(
   let mut frame_page =
     empty_section_page(flow.setup, current.section_index, flow.section_page_index);
   let mut frame_pages = Vec::new();
-  let (_, bottom_y) = TableFrameLayout::new(&effective_table, block_area(frame_flow), true)
-    .map_or((frame_flow, frame_y), |layout| {
-      layout.format(&mut frame_page, &mut frame_pages, frame_y, false)
-    });
+  let (_, bottom_y) =
+    TableFrameLayout::new(&effective_table, block_area(frame_flow), true, text_metrics).map_or(
+      (frame_flow, frame_y),
+      |layout| {
+        layout.format(
+          &mut frame_page,
+          &mut frame_pages,
+          text_metrics,
+          frame_y,
+          false,
+        )
+      },
+    );
   frame_pages.push(frame_page);
   materialize_pending_floating_table_follows(&mut frame_pages);
   join_split_fly_table_follows(&mut frame_pages, flow);
@@ -6824,7 +6980,7 @@ fn layout_floating_table(
     .first()
     .and_then(|page| page_items_vertical_bounds(&page.items).map(|(_, bottom)| bottom));
   if let Some(first_page) = frame_pages.first_mut() {
-    append_floating_table_wrap_exclusion(first_page, placement);
+    append_floating_table_wrap_exclusion(first_page, placement, text_metrics);
     let item_offset = current.items.len();
     offset_page_frame_records(first_page, item_offset);
     current.items.append(&mut first_page.items);
@@ -6848,7 +7004,7 @@ fn layout_floating_table(
     {
       continue;
     }
-    append_floating_table_wrap_exclusion(&mut follow_page, placement);
+    append_floating_table_wrap_exclusion(&mut follow_page, placement, text_metrics);
     current
       .pending_floating_table_follows
       .push(PendingFloatingTableFollow {
@@ -7007,8 +7163,13 @@ fn decorate_floating_table_page_bounds(
   );
 }
 
-fn append_floating_table_wrap_exclusion(page: &mut Page, placement: FloatingFramePlacement) {
-  let Some((left_pt, top_pt, right_pt, bottom_pt)) = page_items_bounds(&page.items) else {
+fn append_floating_table_wrap_exclusion(
+  page: &mut Page,
+  placement: FloatingFramePlacement,
+  text_metrics: &mut TextMetrics,
+) {
+  let Some((left_pt, top_pt, right_pt, bottom_pt)) = page_items_bounds(&page.items, text_metrics)
+  else {
     return;
   };
   let blocks_flow = frame_wrap_blocks_flow(placement.wrap);
@@ -7149,14 +7310,15 @@ fn flatten_nested_pages(
   items
 }
 
-fn flatten_nested_page_fragments(
+fn flatten_nested_pages_with_fragments(
   first_page: Page,
   discarded_pages: Vec<Page>,
   first_top_pt: f32,
   first_bottom_pt: f32,
-) -> Vec<FrameFragment> {
+) -> (Vec<PageItem>, Vec<FrameFragment>) {
   let mut pages = discarded_pages;
   pages.push(first_page);
+  let mut items = Vec::new();
   let mut fragments = Vec::new();
   let mut item_offset = 0;
   let mut virtual_top_pt = first_top_pt;
@@ -7173,11 +7335,18 @@ fn flatten_nested_page_fragments(
       fragment.item_end += item_offset;
       translate_frame_fragment(fragment, 0.0, dy_pt)
     }));
-    item_offset += page.items.len();
+    let item_count = page.items.len();
+    items.extend(
+      page
+        .items
+        .into_iter()
+        .map(|item| translate_page_item(item, 0.0, dy_pt)),
+    );
+    item_offset += item_count;
     virtual_top_pt += (page_bottom_pt - page_top_pt).max(0.0);
   }
 
-  fragments
+  (items, fragments)
 }
 
 fn ordered_local_pages(first_page: Page, mut discarded_pages: Vec<Page>) -> Vec<Page> {
@@ -7200,7 +7369,12 @@ struct PendingBorderSegment {
 }
 
 impl<'a> TableFrameLayout<'a> {
-  fn new(table: &'a Table, area: BlockArea, allow_width_overflow: bool) -> Option<Self> {
+  fn new(
+    table: &'a Table,
+    area: BlockArea,
+    allow_width_overflow: bool,
+    text_metrics: &mut TextMetrics,
+  ) -> Option<Self> {
     let column_count = table_column_count(table);
     if column_count == 0 {
       return None;
@@ -7220,8 +7394,13 @@ impl<'a> TableFrameLayout<'a> {
     let repeating_header_count = table_repeating_header_count(table);
     let coalesce_row_shading = table.preferred_width_pct.is_some_and(|pct| pct >= 0.999);
     let split_allowed = table_split_allowed(table);
-    let row_heights =
-      table_row_heights_with_widths(table, &column_widths, area.setup, area.compatibility_mode);
+    let row_heights = table_row_heights_with_widths(
+      table,
+      &column_widths,
+      area.setup,
+      area.compatibility_mode,
+      text_metrics,
+    );
     let repeating_header_height =
       table_repeating_header_height_from_row_heights(table, repeating_header_count, &row_heights);
     let total_height = table_total_height_from_row_heights(table, &row_heights);
@@ -7248,6 +7427,7 @@ impl<'a> TableFrameLayout<'a> {
     self,
     current: &mut Page,
     pages: &mut Vec<Page>,
+    text_metrics: &mut TextMetrics,
     mut y: f32,
     mut has_ind_prev: bool,
   ) -> (FlowContext, f32) {
@@ -7261,7 +7441,9 @@ impl<'a> TableFrameLayout<'a> {
     {
       (flow, y) = advance_section_flow(flow, current, pages);
       has_ind_prev = false;
-      if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
+      if let Some(next_layout) =
+        layout.layout_for_flow(flow, repeating_headers_disabled, text_metrics)
+      {
         layout = next_layout;
       }
     }
@@ -7285,10 +7467,12 @@ impl<'a> TableFrameLayout<'a> {
         flush_border_segment(current, &mut right_border_segment);
         (flow, y) = advance_section_flow(flow, current, pages);
         has_ind_prev = false;
-        if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
+        if let Some(next_layout) =
+          layout.layout_for_flow(flow, repeating_headers_disabled, text_metrics)
+        {
           layout = next_layout;
         }
-        y = layout.format_repeated_header_rows(current, pages, y, 0.0);
+        y = layout.format_repeated_header_rows(current, pages, text_metrics, y, 0.0);
         continue;
       }
       if make_all.disable_repeating_headers {
@@ -7319,15 +7503,17 @@ impl<'a> TableFrameLayout<'a> {
           has_ind_prev = split_decision
             .and_then(|decision| decision.follow_start_row_index)
             .is_some();
-          if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
+          if let Some(next_layout) =
+            layout.layout_for_flow(flow, repeating_headers_disabled, text_metrics)
+          {
             layout = next_layout;
           }
-          y = layout.format_repeated_header_rows(current, pages, y, 0.0);
+          y = layout.format_repeated_header_rows(current, pages, text_metrics, y, 0.0);
           continue 'table_rows;
         }
         let row_frame = layout.row_frame(row, row_index, y);
         let row_top = y;
-        y = row_frame.format(current, pages);
+        y = row_frame.format(current, pages, text_metrics);
         extend_border_segment(
           current,
           &mut left_border_segment,
@@ -7364,7 +7550,7 @@ impl<'a> TableFrameLayout<'a> {
           .or_else(|| {
             split_decision
               .split_row_allowed
-              .then(|| layout.row_first_content_line_height(row_index, row))
+              .then(|| layout.row_first_content_line_height(row_index, row, text_metrics))
               .flatten()
           })
           .unwrap_or_else(|| {
@@ -7381,10 +7567,12 @@ impl<'a> TableFrameLayout<'a> {
         flush_border_segment(current, &mut right_border_segment);
         (flow, y) = advance_section_flow(flow, current, pages);
         has_ind_prev = split_decision.follow_start_row_index.is_some();
-        if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
+        if let Some(next_layout) =
+          layout.layout_for_flow(flow, repeating_headers_disabled, text_metrics)
+        {
           layout = next_layout;
         }
-        y = layout.format_repeated_header_rows(current, pages, y, 0.0);
+        y = layout.format_repeated_header_rows(current, pages, text_metrics, y, 0.0);
         continue 'table_rows;
       }
       let row_frame = layout.row_frame(row, row_index, y);
@@ -7403,12 +7591,15 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
             has_ind_prev = true;
-            if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
+            if let Some(next_layout) =
+              layout.layout_for_flow(flow, repeating_headers_disabled, text_metrics)
+            {
               layout = next_layout;
             }
             y = layout.format_repeated_header_rows(
               current,
               pages,
+              text_metrics,
               y,
               if follow_state.has_follow_flow_line {
                 remaining_height
@@ -7428,12 +7619,15 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
             has_ind_prev = true;
-            if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
+            if let Some(next_layout) =
+              layout.layout_for_flow(flow, repeating_headers_disabled, text_metrics)
+            {
               layout = next_layout;
             }
             y = layout.format_repeated_header_rows(
               current,
               pages,
+              text_metrics,
               y,
               if follow_state.has_follow_flow_line {
                 remaining_height
@@ -7448,6 +7642,7 @@ impl<'a> TableFrameLayout<'a> {
           layout.row_frame(row, row_index, y).format_fragment(
             current,
             pages,
+            text_metrics,
             y,
             y + fragment_height,
             content_offset,
@@ -7482,10 +7677,13 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
             has_ind_prev = true;
-            if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
+            if let Some(next_layout) =
+              layout.layout_for_flow(flow, repeating_headers_disabled, text_metrics)
+            {
               layout = next_layout;
             }
-            y = layout.format_repeated_header_rows(current, pages, y, remaining_height);
+            y =
+              layout.format_repeated_header_rows(current, pages, text_metrics, y, remaining_height);
           }
         }
         follow_state.clear_follow_flow_line();
@@ -7498,7 +7696,7 @@ impl<'a> TableFrameLayout<'a> {
 
       if !split_decision.move_rows_to_follow {
         let row_top = y;
-        y = row_frame.format(current, pages);
+        y = row_frame.format(current, pages, text_metrics);
         extend_border_segment(
           current,
           &mut left_border_segment,
@@ -7516,7 +7714,7 @@ impl<'a> TableFrameLayout<'a> {
         continue;
       }
 
-      if layout.should_backward_move_follow_row_group(row_index, y) {
+      if layout.should_backward_move_follow_row_group(row_index, y, text_metrics) {
         if follow_state.has_follow_flow_line
           && follow_state.split_row_index == Some(row_index.saturating_sub(1))
         {
@@ -7532,6 +7730,7 @@ impl<'a> TableFrameLayout<'a> {
                 .format_fragment(
                   current,
                   pages,
+                  text_metrics,
                   y,
                   y + fragment_height,
                   follow_state.content_offset_pt,
@@ -7547,13 +7746,15 @@ impl<'a> TableFrameLayout<'a> {
                 flush_border_segment(current, &mut right_border_segment);
                 (flow, y) = advance_section_flow(flow, current, pages);
                 has_ind_prev = true;
-                if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled)
+                if let Some(next_layout) =
+                  layout.layout_for_flow(flow, repeating_headers_disabled, text_metrics)
                 {
                   layout = next_layout;
                 }
                 y = layout.format_repeated_header_rows(
                   current,
                   pages,
+                  text_metrics,
                   y,
                   follow_state.remaining_height_pt,
                 );
@@ -7583,7 +7784,7 @@ impl<'a> TableFrameLayout<'a> {
             )
           {
             let row_bottom = y + (layout.frame.block.content_bottom - y).max(0.0);
-            moved_row_frame.format_fragment(current, pages, y, row_bottom, 0.0);
+            moved_row_frame.format_fragment(current, pages, text_metrics, y, row_bottom, 0.0);
             extend_border_segment(
               current,
               &mut left_border_segment,
@@ -7598,12 +7799,15 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
             has_ind_prev = true;
-            if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
+            if let Some(next_layout) =
+              layout.layout_for_flow(flow, repeating_headers_disabled, text_metrics)
+            {
               layout = next_layout;
             }
             y = layout.format_repeated_header_rows(
               current,
               pages,
+              text_metrics,
               y,
               moved_row_height - (row_bottom - moved_row_top),
             );
@@ -7613,6 +7817,7 @@ impl<'a> TableFrameLayout<'a> {
               .format_fragment(
                 current,
                 pages,
+                text_metrics,
                 y,
                 y + remaining_height,
                 row_bottom - moved_row_top,
@@ -7623,7 +7828,7 @@ impl<'a> TableFrameLayout<'a> {
               y += row_cell_spacing_pt(layout.table, moved_row);
             }
           } else {
-            y = moved_row_frame.format(current, pages);
+            y = moved_row_frame.format(current, pages, text_metrics);
             extend_border_segment(
               current,
               &mut left_border_segment,
@@ -7647,12 +7852,15 @@ impl<'a> TableFrameLayout<'a> {
       flush_border_segment(current, &mut right_border_segment);
       (flow, y) = advance_section_flow(flow, current, pages);
       has_ind_prev = split_decision.follow_start_row_index.is_some();
-      if let Some(next_layout) = layout.layout_for_flow(flow, repeating_headers_disabled) {
+      if let Some(next_layout) =
+        layout.layout_for_flow(flow, repeating_headers_disabled, text_metrics)
+      {
         layout = next_layout;
       }
       y = layout.format_repeated_header_rows(
         current,
         pages,
+        text_metrics,
         y,
         layout.follow_page_required_height(row_index, y),
       );
@@ -7955,6 +8163,7 @@ impl<'a> TableFrameLayout<'a> {
         .get(row_index)
         .copied()
         .unwrap_or_else(|| {
+          let mut text_metrics = TextMetrics::new();
           table_row_height_with_widths(
             self.table,
             row_index,
@@ -7962,13 +8171,19 @@ impl<'a> TableFrameLayout<'a> {
             &self.frame.column_widths,
             self.frame.block.setup,
             self.frame.block.compatibility_mode,
+            &mut text_metrics,
           )
         }),
     }
   }
 
-  fn layout_for_flow(&self, flow: FlowContext, repeating_headers_disabled: bool) -> Option<Self> {
-    TableFrameLayout::new(self.table, block_area(flow), false).map(|layout| {
+  fn layout_for_flow(
+    &self,
+    flow: FlowContext,
+    repeating_headers_disabled: bool,
+    text_metrics: &mut TextMetrics,
+  ) -> Option<Self> {
+    TableFrameLayout::new(self.table, block_area(flow), false, text_metrics).map(|layout| {
       if repeating_headers_disabled {
         layout.without_repeating_headers()
       } else {
@@ -8023,7 +8238,12 @@ impl<'a> TableFrameLayout<'a> {
     (self.keep_with_next_chain_bottom(row_index, y) - y).max(0.0)
   }
 
-  fn should_backward_move_follow_row_group(&self, row_index: usize, y: f32) -> bool {
+  fn should_backward_move_follow_row_group(
+    &self,
+    row_index: usize,
+    y: f32,
+    text_metrics: &mut TextMetrics,
+  ) -> bool {
     // SwTabFrame::MakeAll() calls GetFollow()->ShouldBwdMoved() before it
     // keeps the follow split. ShouldBwdMoved() compares the first content
     // line of the follow with the master upper's remaining space; if it fits,
@@ -8036,12 +8256,20 @@ impl<'a> TableFrameLayout<'a> {
     if remaining_space <= LAYOUT_EPSILON_PT {
       return false;
     }
-    let first_content_height =
-      self.calc_height_of_first_content_line(row_index, self.table_row_keep_enabled());
+    let first_content_height = self.calc_height_of_first_content_line(
+      row_index,
+      self.table_row_keep_enabled(),
+      text_metrics,
+    );
     first_content_height <= remaining_space + LAYOUT_EPSILON_PT
   }
 
-  fn calc_height_of_first_content_line(&self, row_index: usize, table_row_keep: bool) -> f32 {
+  fn calc_height_of_first_content_line(
+    &self,
+    row_index: usize,
+    table_row_keep: bool,
+    text_metrics: &mut TextMetrics,
+  ) -> f32 {
     // SwTabFrame::CalcHeightOfFirstContentLine(): for follow tables, repeated
     // headlines are ignored, keep-with-next rows are counted as full rows, and
     // the next splittable row contributes only its first content line.
@@ -8070,7 +8298,7 @@ impl<'a> TableFrameLayout<'a> {
     }
 
     let first_line_height = self
-      .row_first_content_line_height(first_content_row_index, row)
+      .row_first_content_line_height(first_content_row_index, row, text_metrics)
       .unwrap_or_else(|| self.row_height(first_content_row_index));
     let minimum_row_height = row.height_pt.unwrap_or(0.0).max(TABLE_ROW_MIN_HEIGHT_PT);
     height + first_line_height.max(minimum_row_height)
@@ -8098,7 +8326,12 @@ impl<'a> TableFrameLayout<'a> {
       && (!table_row_keep || !row.keep_with_next)
   }
 
-  fn row_first_content_line_height(&self, row_index: usize, row: &TableRow) -> Option<f32> {
+  fn row_first_content_line_height(
+    &self,
+    row_index: usize,
+    row: &TableRow,
+    text_metrics: &mut TextMetrics,
+  ) -> Option<f32> {
     let mut grid_index = row.grid_before;
     let mut height: Option<f32> = None;
     for cell in &row.cells {
@@ -8111,6 +8344,7 @@ impl<'a> TableFrameLayout<'a> {
         width,
         self.frame.block.setup,
         TextSegmentation::TableCell,
+        text_metrics,
       ) else {
         continue;
       };
@@ -8252,6 +8486,7 @@ impl<'a> TableFrameLayout<'a> {
     &self,
     current: &mut Page,
     pages: &mut Vec<Page>,
+    text_metrics: &mut TextMetrics,
     mut y: f32,
     row_height: f32,
   ) -> f32 {
@@ -8270,7 +8505,7 @@ impl<'a> TableFrameLayout<'a> {
     {
       y = self
         .row_frame(header, header_index, y)
-        .format(current, pages);
+        .format(current, pages, text_metrics);
       if header_index + 1 < self.frame.repeating_header_count || row_height > 0.0 {
         y += row_cell_spacing_pt(self.table, header);
       }
@@ -8479,10 +8714,15 @@ impl RowFrame<'_, '_> {
     self.height_pt <= self.table_frame.block.content_bottom - self.table_frame.block.content_top_pt
   }
 
-  fn format(&self, current: &mut Page, pages: &mut Vec<Page>) -> f32 {
+  fn format(
+    &self,
+    current: &mut Page,
+    pages: &mut Vec<Page>,
+    text_metrics: &mut TextMetrics,
+  ) -> f32 {
     let row_top = self.y;
     let row_bottom = self.bottom();
-    self.format_fragment(current, pages, row_top, row_bottom, 0.0);
+    self.format_fragment(current, pages, text_metrics, row_top, row_bottom, 0.0);
     row_bottom
   }
 
@@ -8490,6 +8730,7 @@ impl RowFrame<'_, '_> {
     &self,
     current: &mut Page,
     pages: &mut Vec<Page>,
+    text_metrics: &mut TextMetrics,
     row_top: f32,
     row_bottom: f32,
     content_offset: f32,
@@ -8536,7 +8777,14 @@ impl RowFrame<'_, '_> {
         let origin = self.vertical_merge_origin_cell(grid_start);
         cell_frame.format_merged_continue(current, row_top, row_bottom, origin);
       } else {
-        cell_frame.format(current, pages, row_top, row_bottom, content_offset);
+        cell_frame.format(
+          current,
+          pages,
+          text_metrics,
+          row_top,
+          row_bottom,
+          content_offset,
+        );
       }
       push_page_fragment(
         current,
@@ -8550,6 +8798,7 @@ impl RowFrame<'_, '_> {
           item_end: current.items.len(),
           bounds: None,
         },
+        text_metrics,
       );
       cell_left += cell_frame.width_pt + cell_spacing_pt;
     }
@@ -8573,6 +8822,7 @@ impl RowFrame<'_, '_> {
           height_pt: row_bottom - row_top,
         }),
       },
+      text_metrics,
     );
   }
 
@@ -8821,6 +9071,7 @@ impl CellFrame<'_, '_> {
     &self,
     current: &mut Page,
     pages: &mut Vec<Page>,
+    text_metrics: &mut TextMetrics,
     row_top: f32,
     row_bottom: f32,
     content_offset: f32,
@@ -8828,7 +9079,7 @@ impl CellFrame<'_, '_> {
     let fragment_height = (row_bottom - row_top).max(0.0);
     let cell_fragment_height =
       if table_cell_has_vertical_merge_follow(self.table, self.row_index, self.grid_start) {
-        self.content_height().max(fragment_height)
+        self.content_height(text_metrics).max(fragment_height)
       } else {
         fragment_height
       };
@@ -8844,6 +9095,7 @@ impl CellFrame<'_, '_> {
       compatibility_mode: self.table_frame.block.compatibility_mode,
       current,
       pages,
+      text_metrics,
       x: self.left_pt,
       y: row_top,
       width: self.width_pt,
@@ -8959,15 +9211,18 @@ impl CellFrame<'_, '_> {
     }
   }
 
-  fn content_height(&self) -> f32 {
+  fn content_height(&self, text_metrics: &mut TextMetrics) -> f32 {
     vertical_merge_content_height(
       self.table,
       &self.table_frame.column_widths,
-      self.row_index,
-      self.grid_start,
-      self.height_pt,
+      VerticalMergeSpan {
+        row_index: self.row_index,
+        grid_start: self.grid_start,
+        current_row_height: self.height_pt,
+      },
       self.table_frame.block.setup,
       self.table_frame.block.compatibility_mode,
+      text_metrics,
     )
     .unwrap_or(self.height_pt)
   }
@@ -9012,20 +9267,26 @@ fn vertical_merge_origin_cell(
     .find(|cell| !cell.vertical_merge_continue)
 }
 
-fn vertical_merge_content_height(
-  table: &Table,
-  column_widths: &[f32],
+#[derive(Clone, Copy)]
+struct VerticalMergeSpan {
   row_index: usize,
   grid_start: usize,
   current_row_height: f32,
+}
+
+fn vertical_merge_content_height(
+  table: &Table,
+  column_widths: &[f32],
+  span: VerticalMergeSpan,
   setup: PageSetup,
   compatibility_mode: u16,
+  text_metrics: &mut TextMetrics,
 ) -> Option<f32> {
-  let mut height = current_row_height;
-  let mut previous_row = table.rows.get(row_index)?;
+  let mut height = span.current_row_height;
+  let mut previous_row = table.rows.get(span.row_index)?;
   let mut has_continuation = false;
-  for (follow_row_index, row) in table.rows.iter().enumerate().skip(row_index + 1) {
-    let Some(cell) = row_cell_at_grid(row, grid_start) else {
+  for (follow_row_index, row) in table.rows.iter().enumerate().skip(span.row_index + 1) {
+    let Some(cell) = row_cell_at_grid(row, span.grid_start) else {
       break;
     };
     if !cell.vertical_merge_continue {
@@ -9039,6 +9300,7 @@ fn vertical_merge_content_height(
       column_widths,
       setup,
       compatibility_mode,
+      text_metrics,
     );
     previous_row = row;
     has_continuation = true;
@@ -9432,7 +9694,14 @@ fn table_left_position(
 }
 
 fn table_total_height_with_widths(table: &Table, column_widths: &[f32]) -> f32 {
-  let row_heights = table_row_heights_with_widths(table, column_widths, PageSetup::default(), 12);
+  let mut text_metrics = TextMetrics::new();
+  let row_heights = table_row_heights_with_widths(
+    table,
+    column_widths,
+    PageSetup::default(),
+    12,
+    &mut text_metrics,
+  );
   table_total_height_from_row_heights(table, &row_heights)
 }
 
@@ -9441,6 +9710,7 @@ fn table_row_heights_with_widths(
   column_widths: &[f32],
   setup: PageSetup,
   compatibility_mode: u16,
+  text_metrics: &mut TextMetrics,
 ) -> Vec<f32> {
   table
     .rows
@@ -9454,6 +9724,7 @@ fn table_row_heights_with_widths(
         column_widths,
         setup,
         compatibility_mode,
+        text_metrics,
       )
     })
     .collect()
@@ -9473,8 +9744,8 @@ fn table_total_height_from_row_heights(table: &Table, row_heights: &[f32]) -> f3
   height.max(TABLE_ROW_MIN_HEIGHT_PT)
 }
 
-fn estimated_table_height(table: &Table, flow: FlowContext) -> f32 {
-  TableFrameLayout::new(table, block_area(flow), false)
+fn estimated_table_height(table: &Table, flow: FlowContext, text_metrics: &mut TextMetrics) -> f32 {
+  TableFrameLayout::new(table, block_area(flow), false, text_metrics)
     .map(|layout| layout.frame.total_height)
     .unwrap_or_else(|| table_total_height_with_widths(table, &[]))
 }
@@ -9486,6 +9757,7 @@ fn table_row_height_with_widths(
   column_widths: &[f32],
   setup: PageSetup,
   compatibility_mode: u16,
+  text_metrics: &mut TextMetrics,
 ) -> f32 {
   let mut grid_index = row.grid_before;
   let mut content_height = TABLE_ROW_MIN_HEIGHT_PT;
@@ -9500,6 +9772,7 @@ fn table_row_height_with_widths(
         setup,
         table.following_text_flow,
         compatibility_mode,
+        text_metrics,
       ) - cell.margins.top_pt
         - cell.margins.bottom_pt
         + row_top_margin
@@ -9621,6 +9894,7 @@ struct TableCellLayout<'a> {
   compatibility_mode: u16,
   current: &'a mut Page,
   pages: &'a mut Vec<Page>,
+  text_metrics: &'a mut TextMetrics,
   x: f32,
   y: f32,
   width: f32,
@@ -9639,6 +9913,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     compatibility_mode,
     current,
     pages,
+    text_metrics,
     x,
     y,
     width,
@@ -9655,6 +9930,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     setup,
     table_following_text_flow,
     compatibility_mode,
+    text_metrics,
   );
   let first_line_style = table_cell_first_line_style(cell);
   let first_line_height = table_cell_first_inline_text_height(cell, true);
@@ -9779,6 +10055,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
           current,
           pages,
           anchor_pages: None,
+          text_metrics: &mut *text_metrics,
         },
         text_y,
       );
@@ -9822,6 +10099,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
         current: &mut nested_page,
         pages: &mut discarded_pages,
         anchor_pages: None,
+        text_metrics: &mut *text_metrics,
       },
       text_y,
     );
@@ -9884,15 +10162,11 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     return;
   }
 
-  let nested_fragments = flatten_nested_page_fragments(
-    nested_page.clone(),
-    discarded_pages.clone(),
-    content_start_y,
-    text_bottom,
-  );
+  let (nested_items, nested_fragments) =
+    flatten_nested_pages_with_fragments(nested_page, discarded_pages, content_start_y, text_bottom);
   let item_start = current.items.len();
   current.items.extend(
-    flatten_nested_pages(nested_page, discarded_pages, content_start_y, text_bottom)
+    nested_items
       .into_iter()
       .filter(|item| table_cell_item_intersects_vertical_bounds(item, y, text_bottom)),
   );
@@ -10045,6 +10319,7 @@ fn table_cell_first_content_line_height(
   width_pt: f32,
   setup: PageSetup,
   text_segmentation: TextSegmentation,
+  text_metrics: &mut TextMetrics,
 ) -> Option<f32> {
   // lcl_CalcHeightOfFirstContentLine(): inspect the first lower frame in the
   // cell. Text contributes FirstLineHeight(), nested tables recurse into
@@ -10107,8 +10382,13 @@ fn table_cell_first_content_line_height(
           compatibility_mode: 12,
           repeating_slots: RepeatingSlotState::default(),
         };
-        return TableFrameLayout::new(table, area, false).map(|layout| {
-          layout.calc_height_of_first_content_line(0, layout.table_row_keep_enabled())
+        let mut text_metrics = TextMetrics::new();
+        return TableFrameLayout::new(table, area, false, &mut text_metrics).map(|layout| {
+          layout.calc_height_of_first_content_line(
+            0,
+            layout.table_row_keep_enabled(),
+            &mut text_metrics,
+          )
         });
       }
       Block::Frame(frame) => {
@@ -10138,7 +10418,7 @@ fn table_cell_first_content_line_height(
           frame
             .blocks
             .iter()
-            .map(|block| estimated_block_height(block, flow))
+            .map(|block| estimated_block_height(block, flow, text_metrics))
             .sum::<f32>()
             .max(TABLE_ROW_MIN_HEIGHT_PT)
         }));
@@ -10161,24 +10441,30 @@ fn frame_bounds_intersects_vertical_bounds(bounds: FrameBounds, top: f32, bottom
   bounds.y_pt + bounds.height_pt >= top && bounds.y_pt <= bottom
 }
 
-fn layout_shape_text_box(
-  current: &mut Page,
-  parent_flow: FlowContext,
-  shape: &crate::docx::InlineShape,
+#[derive(Clone, Copy)]
+struct ShapeTextBoxRect {
   x: f32,
   y: f32,
   width: f32,
   height: f32,
+}
+
+fn layout_shape_text_box(
+  current: &mut Page,
+  parent_flow: FlowContext,
+  text_metrics: &mut TextMetrics,
+  shape: &crate::docx::InlineShape,
+  rect: ShapeTextBoxRect,
 ) {
   if shape.text_box_blocks.is_empty() {
     return;
   }
 
-  let content_left = x + shape.text_inset_left_pt;
-  let content_top = y + shape.text_inset_top_pt;
+  let content_left = rect.x + shape.text_inset_left_pt;
+  let content_top = rect.y + shape.text_inset_top_pt;
   let content_width =
-    (width - shape.text_inset_left_pt - shape.text_inset_right_pt).max(DEFAULT_FONT_SIZE_PT);
-  let content_bottom = y + height - shape.text_inset_bottom_pt;
+    (rect.width - shape.text_inset_left_pt - shape.text_inset_right_pt).max(DEFAULT_FONT_SIZE_PT);
+  let content_bottom = rect.y + rect.height - shape.text_inset_bottom_pt;
   if content_bottom <= content_top {
     return;
   }
@@ -10208,7 +10494,7 @@ fn layout_shape_text_box(
   let content_height = shape
     .text_box_blocks
     .iter()
-    .map(|block| estimated_block_height(block, measure_flow))
+    .map(|block| estimated_block_height(block, measure_flow, text_metrics))
     .sum::<f32>();
   let text_y = match shape.text_vertical_alignment {
     TextBoxVerticalAlignment::Top => content_top,
@@ -10229,7 +10515,7 @@ fn layout_shape_text_box(
   };
   let mut nested_page = empty_page(parent_flow.setup, current.section_index);
   let mut discarded_pages = Vec::new();
-  let shape_y = y;
+  let shape_y = rect.y;
   let mut text_cursor_y = text_y;
   for (index, block) in shape.text_box_blocks.iter().enumerate() {
     if text_cursor_y > content_bottom {
@@ -10248,6 +10534,7 @@ fn layout_shape_text_box(
         current: &mut nested_page,
         pages: &mut discarded_pages,
         anchor_pages: None,
+        text_metrics: &mut *text_metrics,
       },
       text_cursor_y,
     );
@@ -10263,10 +10550,11 @@ fn layout_shape_text_box(
         let item = if shape.text_box_auto_fit {
           textbox_item_inside_shape_bounds(
             item,
-            x + auto_fit_inset,
+            text_metrics,
+            rect.x + auto_fit_inset,
             shape_y + auto_fit_inset,
-            (width - auto_fit_inset * 2.0).max(DEFAULT_FONT_SIZE_PT),
-            (height - auto_fit_inset * 2.0).max(DEFAULT_LINE_HEIGHT_PT),
+            (rect.width - auto_fit_inset * 2.0).max(DEFAULT_FONT_SIZE_PT),
+            (rect.height - auto_fit_inset * 2.0).max(DEFAULT_LINE_HEIGHT_PT),
           )
         } else {
           item
@@ -10295,6 +10583,7 @@ fn shape_has_invisible_auto_fit_textbox_bounds(shape: &crate::docx::InlineShape)
 
 fn textbox_item_inside_shape_bounds(
   mut item: PageItem,
+  text_metrics: &mut TextMetrics,
   left: f32,
   top: f32,
   width: f32,
@@ -10302,7 +10591,8 @@ fn textbox_item_inside_shape_bounds(
 ) -> PageItem {
   let right = left + width;
   let bottom = top + height;
-  let Some((item_left, item_top, item_right, item_bottom)) = item_bounds(&item) else {
+  let Some((item_left, item_top, item_right, item_bottom)) = item_bounds(&item, text_metrics)
+  else {
     return item;
   };
   let dx = if item_left < left {
@@ -10331,6 +10621,7 @@ fn table_cell_content_height_for_table(
   setup: PageSetup,
   script_sensitive_line_height: bool,
   compatibility_mode: u16,
+  text_metrics: &mut TextMetrics,
 ) -> f32 {
   table_cell_content_height_with_mode(
     cell,
@@ -10339,6 +10630,7 @@ fn table_cell_content_height_for_table(
     TableCellMeasureMode::WholeCell,
     script_sensitive_line_height,
     compatibility_mode,
+    text_metrics,
   )
 }
 
@@ -10347,6 +10639,7 @@ fn table_cell_split_follow_content_height(
   cell_width: f32,
   setup: PageSetup,
 ) -> f32 {
+  let mut text_metrics = TextMetrics::new();
   table_cell_content_height_with_mode(
     cell,
     cell_width,
@@ -10354,6 +10647,7 @@ fn table_cell_split_follow_content_height(
     TableCellMeasureMode::LastRenderedFollow,
     true,
     12,
+    &mut text_metrics,
   )
 }
 
@@ -10364,6 +10658,7 @@ fn table_cell_content_height_with_mode(
   mode: TableCellMeasureMode,
   script_sensitive_line_height: bool,
   compatibility_mode: u16,
+  text_metrics: &mut TextMetrics,
 ) -> f32 {
   let content_width =
     (cell_width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT);
@@ -10403,7 +10698,7 @@ fn table_cell_content_height_with_mode(
     script_sensitive_line_height: true,
     ..flow
   };
-  let content = table_cell_blocks_content_height(&cell.blocks, flow, mode).max(
+  let content = table_cell_blocks_content_height(&cell.blocks, flow, mode, text_metrics).max(
     table_cell_first_inline_text_height(cell, script_sensitive_line_height),
   );
   cell.margins.top_pt + content + cell.margins.bottom_pt
@@ -10419,6 +10714,7 @@ fn table_cell_blocks_content_height(
   blocks: &[Block],
   flow: FlowContext,
   mode: TableCellMeasureMode,
+  text_metrics: &mut TextMetrics,
 ) -> f32 {
   blocks
     .iter()
@@ -10434,11 +10730,12 @@ fn table_cell_blocks_content_height(
           paragraph,
           next,
           flow,
+          text_metrics,
           index + 1 == blocks.len(),
           mode == TableCellMeasureMode::LastRenderedFollow && index == 0,
         ),
-        Block::Table(table) => estimated_table_height(table, flow),
-        Block::Frame(frame) => estimated_frame_height(frame, flow),
+        Block::Table(table) => estimated_table_height(table, flow, text_metrics),
+        Block::Frame(frame) => estimated_frame_height(frame, flow, text_metrics),
       }
     })
     .sum()
@@ -10449,6 +10746,7 @@ fn table_cell_paragraph_height(
   paragraph: &crate::docx::Paragraph,
   next: Option<&Block>,
   flow: FlowContext,
+  text_metrics: &mut TextMetrics,
   last_in_cell: bool,
   split_follow_text_frame: bool,
 ) -> f32 {
@@ -10460,7 +10758,7 @@ fn table_cell_paragraph_height(
   //
   // lcl_CalcHeightOfFirstContentLine(): a split text frame follow that has a
   // master is not measured with its master's upper/lower spacing again.
-  let content = estimated_paragraph_content_height(paragraph, flow);
+  let content = estimated_paragraph_content_height(paragraph, flow, text_metrics);
   let min_height = paragraph_line_height_for_setup(
     paragraph,
     &paragraph_base_line_style(paragraph),
@@ -10947,16 +11245,27 @@ fn aligned_vertical_offset(
   }
 }
 
+struct ParagraphLayoutTarget<'a> {
+  current: &'a mut Page,
+  pages: &'a mut Vec<Page>,
+  anchor_pages: Option<&'a mut Vec<AnchorPage>>,
+  text_metrics: &'a mut TextMetrics,
+}
+
 fn layout_paragraph(
   paragraph: &crate::docx::Paragraph,
   flow: FlowContext,
-  current: &mut Page,
-  pages: &mut Vec<Page>,
-  anchor_pages: Option<&mut Vec<AnchorPage>>,
+  target: ParagraphLayoutTarget<'_>,
   y: f32,
   spacing_after_pt: f32,
 ) -> (FlowContext, f32) {
-  TextFrameLayout::new(paragraph, flow, spacing_after_pt).format(current, pages, anchor_pages, y)
+  TextFrameLayout::new(paragraph, flow, spacing_after_pt).format(
+    target.current,
+    target.pages,
+    target.anchor_pages,
+    target.text_metrics,
+    y,
+  )
 }
 
 fn record_anchor_page(
@@ -11235,6 +11544,7 @@ struct ActiveTextFrame {
 struct TextLineAdvance<'a> {
   current: &'a mut Page,
   pages: &'a mut Vec<Page>,
+  text_metrics: &'a mut TextMetrics,
   wrap_exclusions: &'a mut Vec<WrapExclusion>,
   state: &'a mut TextFrameState,
   active: ActiveTextFrame,
@@ -11372,6 +11682,7 @@ impl<'a> TextFrameLayout<'a> {
           },
         ),
       },
+      advance.text_metrics,
     );
     let real_height = line_real_height(self.paragraph, *line_height, *advance.line_has_form_widget);
     advance.state.finish_line(y, real_height);
@@ -11445,9 +11756,10 @@ impl<'a> TextFrameLayout<'a> {
     current: &mut Page,
     pages: &mut Vec<Page>,
     anchor_pages: Option<&mut Vec<AnchorPage>>,
+    text_metrics: &mut TextMetrics,
     y: f32,
   ) -> (FlowContext, f32) {
-    self.format_with_reflow(current, pages, anchor_pages, y, true)
+    self.format_with_reflow(current, pages, anchor_pages, text_metrics, y, true)
   }
 
   fn format_with_reflow(
@@ -11455,6 +11767,7 @@ impl<'a> TextFrameLayout<'a> {
     current: &mut Page,
     pages: &mut Vec<Page>,
     mut anchor_pages: Option<&mut Vec<AnchorPage>>,
+    text_metrics: &mut TextMetrics,
     mut y: f32,
     allow_reflow: bool,
   ) -> (FlowContext, f32) {
@@ -11578,16 +11891,16 @@ impl<'a> TextFrameLayout<'a> {
           let mut chunk_x = x;
           let meta = TextChunkMeta {
             hyperlink_url: run.hyperlink_url.as_deref(),
-            dynamic_field: run.dynamic_field.clone(),
+            dynamic_field: run.dynamic_field.as_ref(),
             style_ref_keys: if run.style_ref_keys.is_empty() {
-              paragraph.style_ref_keys.clone()
+              paragraph.style_ref_keys.as_slice()
             } else {
-              run.style_ref_keys.clone()
+              run.style_ref_keys.as_slice()
             },
             style_ref_text: run
               .style_ref_text
-              .clone()
-              .or_else(|| paragraph.style_ref_text.clone()),
+              .as_ref()
+              .or(paragraph.style_ref_text.as_ref()),
             form_widget_id: active_form_widget_ids.last().copied(),
             paragraph_bidi: paragraph.format.bidi,
             preserve_text_portion: run.preserve_text_portion,
@@ -11614,13 +11927,21 @@ impl<'a> TextFrameLayout<'a> {
                 },
                 &mut chunk,
                 &run.style,
-                meta.clone(),
+                &meta,
               );
-              apply_pending_aligned_tab(current, &mut pending_tab, y, line_left, line_right);
+              apply_pending_aligned_tab(
+                current,
+                &mut pending_tab,
+                text_metrics,
+                y,
+                line_left,
+                line_right,
+              );
               (flow, text_frame, y, line_left, line_right) = self.advance_line(
                 TextLineAdvance {
                   current,
                   pages,
+                  text_metrics: &mut *text_metrics,
                   wrap_exclusions: &mut wrap_exclusions,
                   state: &mut text_state,
                   active: ActiveTextFrame {
@@ -11660,7 +11981,7 @@ impl<'a> TextFrameLayout<'a> {
                 },
                 &mut chunk,
                 &run.style,
-                meta.clone(),
+                &meta,
               );
               let tab_stop = next_tab_stop(
                 x,
@@ -11685,8 +12006,8 @@ impl<'a> TextFrameLayout<'a> {
               continue;
             }
 
-            let width = measure_text(&segment.text, &run.style);
-            let fit_width = line_fit_width(&segment.text, &run.style);
+            let width = text_metrics.measure_text(&segment.text, &run.style);
+            let fit_width = line_fit_width(&segment.text, &run.style, text_metrics);
             let line_capacity = (line_right - line_left).max(DEFAULT_FONT_SIZE_PT);
             let whitespace = segment.text.chars().all(char::is_whitespace);
 
@@ -11704,13 +12025,21 @@ impl<'a> TextFrameLayout<'a> {
                 },
                 &mut chunk,
                 &run.style,
-                meta.clone(),
+                &meta,
               );
-              apply_pending_aligned_tab(current, &mut pending_tab, y, line_left, line_right);
+              apply_pending_aligned_tab(
+                current,
+                &mut pending_tab,
+                text_metrics,
+                y,
+                line_left,
+                line_right,
+              );
               (flow, text_frame, y, line_left, line_right) = self.advance_line(
                 TextLineAdvance {
                   current,
                   pages,
+                  text_metrics: &mut *text_metrics,
                   wrap_exclusions: &mut wrap_exclusions,
                   state: &mut text_state,
                   active: ActiveTextFrame {
@@ -11742,14 +12071,14 @@ impl<'a> TextFrameLayout<'a> {
             if fit_width > line_capacity && x <= line_left && !whitespace {
               let mut text_offset = segment.start;
               for text in emergency_break_segments(&segment.text) {
-                let width = measure_text(&text, &run.style);
-                let fit_width = line_fit_width(&text, &run.style);
+                let width = text_metrics.measure_text(&text, &run.style);
+                let fit_width = line_fit_width(&text, &run.style, text_metrics);
                 if fit_width > line_capacity && text.chars().count() > 1 {
                   for ch in text.chars() {
                     let mut encoded = [0; 4];
                     let text = ch.encode_utf8(&mut encoded);
-                    let width = measure_text(text, &run.style);
-                    let fit_width = line_fit_width(text, &run.style);
+                    let width = text_metrics.measure_text(text, &run.style);
+                    let fit_width = line_fit_width(text, &run.style, text_metrics);
                     text_offset += text.len();
 
                     if x + fit_width > line_right && x > line_left {
@@ -11762,11 +12091,12 @@ impl<'a> TextFrameLayout<'a> {
                         },
                         &mut chunk,
                         &run.style,
-                        meta.clone(),
+                        &meta,
                       );
                       apply_pending_aligned_tab(
                         current,
                         &mut pending_tab,
+                        text_metrics,
                         y,
                         line_left,
                         line_right,
@@ -11775,6 +12105,7 @@ impl<'a> TextFrameLayout<'a> {
                         TextLineAdvance {
                           current,
                           pages,
+                          text_metrics: &mut *text_metrics,
                           wrap_exclusions: &mut wrap_exclusions,
                           state: &mut text_state,
                           active: ActiveTextFrame {
@@ -11827,13 +12158,21 @@ impl<'a> TextFrameLayout<'a> {
                     },
                     &mut chunk,
                     &run.style,
-                    meta.clone(),
+                    &meta,
                   );
-                  apply_pending_aligned_tab(current, &mut pending_tab, y, line_left, line_right);
+                  apply_pending_aligned_tab(
+                    current,
+                    &mut pending_tab,
+                    text_metrics,
+                    y,
+                    line_left,
+                    line_right,
+                  );
                   (flow, text_frame, y, line_left, line_right) = self.advance_line(
                     TextLineAdvance {
                       current,
                       pages,
+                      text_metrics: &mut *text_metrics,
                       wrap_exclusions: &mut wrap_exclusions,
                       state: &mut text_state,
                       active: ActiveTextFrame {
@@ -11900,7 +12239,7 @@ impl<'a> TextFrameLayout<'a> {
                 },
                 &mut chunk,
                 &run.style,
-                meta.clone(),
+                &meta,
               );
             }
           }
@@ -11914,9 +12253,16 @@ impl<'a> TextFrameLayout<'a> {
             },
             &mut chunk,
             &run.style,
-            meta.clone(),
+            &meta,
           );
-          apply_pending_aligned_tab(current, &mut pending_tab, y, line_left, line_right);
+          apply_pending_aligned_tab(
+            current,
+            &mut pending_tab,
+            text_metrics,
+            y,
+            line_left,
+            line_right,
+          );
         }
         InlineItem::FormWidgetStart(widget_id) => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
@@ -12099,6 +12445,7 @@ impl<'a> TextFrameLayout<'a> {
               TextLineAdvance {
                 current,
                 pages,
+                text_metrics: &mut *text_metrics,
                 wrap_exclusions: &mut wrap_exclusions,
                 state: &mut text_state,
                 active: ActiveTextFrame {
@@ -12156,6 +12503,7 @@ impl<'a> TextFrameLayout<'a> {
           pending_tab = None;
           let place_shape = |current: &mut Page,
                              shape_flow: FlowContext,
+                             text_metrics: &mut TextMetrics,
                              x_pt: f32,
                              y_pt: f32,
                              width_pt: f32,
@@ -12216,7 +12564,18 @@ impl<'a> TextFrameLayout<'a> {
                   stroke: None,
                 }));
               }
-              layout_shape_text_box(current, shape_flow, shape, x_pt, y_pt, width_pt, height_pt);
+              layout_shape_text_box(
+                current,
+                shape_flow,
+                text_metrics,
+                shape,
+                ShapeTextBoxRect {
+                  x: x_pt,
+                  y: y_pt,
+                  width: width_pt,
+                  height: height_pt,
+                },
+              );
               return (item_start, current.items.len());
             }
             if shape.fill_color.is_some() || shape.stroke.is_some() {
@@ -12257,7 +12616,18 @@ impl<'a> TextFrameLayout<'a> {
                 stroke_opacity: 0.0,
               }));
             }
-            layout_shape_text_box(current, shape_flow, shape, x_pt, y_pt, width_pt, height_pt);
+            layout_shape_text_box(
+              current,
+              shape_flow,
+              text_metrics,
+              shape,
+              ShapeTextBoxRect {
+                x: x_pt,
+                y: y_pt,
+                width: width_pt,
+                height: height_pt,
+              },
+            );
             (item_start, current.items.len())
           };
 
@@ -12318,8 +12688,15 @@ impl<'a> TextFrameLayout<'a> {
               } else {
                 keep_floating_shape_inside_page(shape_x, shape_paint_y, width, height, flow)
               };
-              let (shape_item_start, shape_item_end) =
-                place_shape(current, flow, shape_x, shape_paint_y, width, height);
+              let (shape_item_start, shape_item_end) = place_shape(
+                current,
+                flow,
+                text_metrics,
+                shape_x,
+                shape_paint_y,
+                width,
+                height,
+              );
               if placement.behind_text
                 && shape.fill_color.is_none()
                 && shape.fill_image.is_none()
@@ -12472,6 +12849,7 @@ impl<'a> TextFrameLayout<'a> {
                   TextLineAdvance {
                     current,
                     pages,
+                    text_metrics: &mut *text_metrics,
                     wrap_exclusions: &mut wrap_exclusions,
                     state: &mut text_state,
                     active: ActiveTextFrame {
@@ -12496,6 +12874,7 @@ impl<'a> TextFrameLayout<'a> {
               let _ = place_shape(
                 current,
                 flow,
+                text_metrics,
                 x + shape.offset_x_pt,
                 y + shape.offset_y_pt
                   + if shape.inline_anchor_after_line {
@@ -12601,6 +12980,7 @@ impl<'a> TextFrameLayout<'a> {
             height_pt: line_height,
           }),
         },
+        text_metrics,
       );
       let real_height = line_real_height(paragraph, line_height, line_has_form_widget);
       text_state.finish_paragraph(y, real_height, emitted);
@@ -12628,6 +13008,7 @@ impl<'a> TextFrameLayout<'a> {
               height_pt: base_line_height,
             }),
           },
+          text_metrics,
         );
         text_state.finish_paragraph(y, base_line_height, true);
       }
@@ -12651,13 +13032,14 @@ impl<'a> TextFrameLayout<'a> {
       }
       let (follow_flow, follow_y) = advance_section_flow(start_flow, current, pages);
       return TextFrameLayout::new(paragraph, follow_flow, self.spacing_after_pt)
-        .format_with_reflow(current, pages, anchor_pages, follow_y, false);
+        .format_with_reflow(current, pages, anchor_pages, text_metrics, follow_y, false);
     }
 
     if paragraph.list_label.is_none() && start_item_index <= current.items.len() {
       align_paragraph_items(
         &mut current.items[start_item_index..],
         paragraph.format.alignment,
+        text_metrics,
         default_line_right,
       );
     }
@@ -12797,15 +13179,15 @@ fn emergency_break_segments(text: &str) -> Vec<String> {
   text.chars().map(|ch| ch.to_string()).collect()
 }
 
-fn line_fit_width(text: &str, style: &TextStyle) -> f32 {
+fn line_fit_width(text: &str, style: &TextStyle, text_metrics: &mut TextMetrics) -> f32 {
   // Spaces from UAX #14 SP/BA classes are elided at line end for line-break
   // fitting. Keep the original segment width for painting and following text
   // advance; only the fit test ignores trailing collapsible blanks.
   let fit_text = text.trim_end_matches(libreoffice_line_end_elidable_blank);
   if fit_text.len() == text.len() {
-    measure_text(text, style)
+    text_metrics.measure_text(text, style)
   } else {
-    measure_text(fit_text, style)
+    text_metrics.measure_text(fit_text, style)
   }
 }
 
@@ -13082,7 +13464,12 @@ fn table_cell_paragraph_shading_bounds(flow: FlowContext) -> Option<(f32, f32, f
   ))
 }
 
-fn align_paragraph_items(items: &mut [PageItem], alignment: ParagraphAlignment, line_right: f32) {
+fn align_paragraph_items(
+  items: &mut [PageItem],
+  alignment: ParagraphAlignment,
+  text_metrics: &mut TextMetrics,
+  line_right: f32,
+) {
   if matches!(
     alignment,
     ParagraphAlignment::Left | ParagraphAlignment::Justify
@@ -13106,7 +13493,7 @@ fn align_paragraph_items(items: &mut [PageItem], alignment: ParagraphAlignment, 
     for item in items.iter() {
       if let Some(item_y) = item_y(item)
         && f32::abs(item_y - y) < 0.01
-        && let Some((x, width)) = item_horizontal_bounds(item)
+        && let Some((x, width)) = item_horizontal_bounds(item, text_metrics)
       {
         min_x = min_x.min(x);
         max_x = max_x.max(x + width);
@@ -13141,6 +13528,7 @@ fn align_paragraph_items(items: &mut [PageItem], alignment: ParagraphAlignment, 
 fn apply_pending_aligned_tab(
   page: &mut Page,
   pending_tab: &mut Option<PendingAlignedTab>,
+  text_metrics: &mut TextMetrics,
   y: f32,
   _line_left: f32,
   line_right: f32,
@@ -13157,7 +13545,7 @@ fn apply_pending_aligned_tab(
   for item in page.items.iter().skip(tab.item_start_index) {
     if let Some(item_y) = item_y(item)
       && f32::abs(item_y - y) < 0.01
-      && let Some((x, width)) = item_horizontal_bounds(item)
+      && let Some((x, width)) = item_horizontal_bounds(item, text_metrics)
     {
       min_x = min_x.min(x);
       max_x = max_x.max(x + width);
@@ -13221,9 +13609,12 @@ fn item_y(item: &PageItem) -> Option<f32> {
   }
 }
 
-fn item_horizontal_bounds(item: &PageItem) -> Option<(f32, f32)> {
+fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Option<(f32, f32)> {
   match item {
-    PageItem::Text(text) => Some((text.x_pt, measure_text(&text.text, &text.style))),
+    PageItem::Text(text) => Some((
+      text.x_pt,
+      text_metrics.measure_text(&text.text, &text.style),
+    )),
     PageItem::Image(image) => Some((image.x_pt, image.width_pt)),
     PageItem::Rect(rect) => Some((rect.x_pt, rect.width_pt)),
     PageItem::Fill(_) => None,
@@ -13330,9 +13721,9 @@ struct TextPlacement {
 #[derive(Clone, Debug)]
 struct TextChunkMeta<'a> {
   hyperlink_url: Option<&'a str>,
-  dynamic_field: Option<DynamicFieldKind>,
-  style_ref_keys: Vec<Arc<str>>,
-  style_ref_text: Option<Arc<str>>,
+  dynamic_field: Option<&'a DynamicFieldKind>,
+  style_ref_keys: &'a [Arc<str>],
+  style_ref_text: Option<&'a Arc<str>>,
   form_widget_id: Option<u32>,
   paragraph_bidi: bool,
   preserve_text_portion: bool,
@@ -13344,7 +13735,7 @@ fn flush_text(
   placement: TextPlacement,
   chunk: &mut String,
   style: &TextStyle,
-  meta: TextChunkMeta<'_>,
+  meta: &TextChunkMeta<'_>,
 ) {
   if chunk.is_empty() {
     return;
@@ -13358,9 +13749,9 @@ fn flush_text(
     style: style.clone(),
     rotation_center_pt: None,
     hyperlink_url: meta.hyperlink_url.map(ToString::to_string),
-    dynamic_field: meta.dynamic_field,
-    style_ref_keys: meta.style_ref_keys,
-    style_ref_text: meta.style_ref_text,
+    dynamic_field: meta.dynamic_field.cloned(),
+    style_ref_keys: meta.style_ref_keys.to_vec(),
+    style_ref_text: meta.style_ref_text.cloned(),
     form_widget_id: meta.form_widget_id,
     paragraph_bidi: meta.paragraph_bidi,
     preserve_text_portion: meta.preserve_text_portion,
@@ -13613,11 +14004,17 @@ mod tests {
     let first = paragraph("YN", "Initials", 0.0, 74.0);
     let second = paragraph("OBJECTIVE", "Heading3", 30.0, 8.0);
     let flow = table_cell_flow();
-    let first_content = estimated_paragraph_content_height(&first, flow);
-    let second_content = estimated_paragraph_content_height(&second, flow);
+    let mut text_metrics = TextMetrics::new();
+    let first_content = estimated_paragraph_content_height(&first, flow, &mut text_metrics);
+    let second_content = estimated_paragraph_content_height(&second, flow, &mut text_metrics);
     let blocks = vec![Block::paragraph(first), Block::paragraph(second)];
 
-    let height = table_cell_blocks_content_height(&blocks, flow, TableCellMeasureMode::WholeCell);
+    let height = table_cell_blocks_content_height(
+      &blocks,
+      flow,
+      TableCellMeasureMode::WholeCell,
+      &mut text_metrics,
+    );
     let expected = first_content + 74.0 + second_content + 8.0;
     let naive_uncollapsed = expected + 30.0;
 
@@ -13681,12 +14078,22 @@ mod tests {
       list_label_tab_stop_pt: None,
     };
     let flow = table_cell_flow();
-    let content = estimated_paragraph_content_height(&paragraph, flow);
+    let mut text_metrics = TextMetrics::new();
+    let content = estimated_paragraph_content_height(&paragraph, flow, &mut text_metrics);
     let blocks = vec![Block::paragraph(paragraph)];
 
-    let whole = table_cell_blocks_content_height(&blocks, flow, TableCellMeasureMode::WholeCell);
-    let follow =
-      table_cell_blocks_content_height(&blocks, flow, TableCellMeasureMode::LastRenderedFollow);
+    let whole = table_cell_blocks_content_height(
+      &blocks,
+      flow,
+      TableCellMeasureMode::WholeCell,
+      &mut text_metrics,
+    );
+    let follow = table_cell_blocks_content_height(
+      &blocks,
+      flow,
+      TableCellMeasureMode::LastRenderedFollow,
+      &mut text_metrics,
+    );
 
     assert!((whole - (content + 24.0 + 18.0)).abs() < 0.01);
     assert!((follow - content).abs() < 0.01);
@@ -13744,7 +14151,13 @@ mod tests {
     );
     let blocks = vec![Block::paragraph(paragraph)];
 
-    let height = table_cell_blocks_content_height(&blocks, flow, TableCellMeasureMode::WholeCell);
+    let mut text_metrics = TextMetrics::new();
+    let height = table_cell_blocks_content_height(
+      &blocks,
+      flow,
+      TableCellMeasureMode::WholeCell,
+      &mut text_metrics,
+    );
 
     assert!((height - min_height).abs() < 0.01);
   }
@@ -13922,10 +14335,11 @@ mod tests {
       list_label_tab_stop_pt: None,
     })];
 
-    let measured = measured_note_blocks_height(&blocks, flow);
+    let mut text_metrics = TextMetrics::new();
+    let measured = measured_note_blocks_height(&blocks, flow, &mut text_metrics);
     let estimated = blocks
       .iter()
-      .map(|block| estimated_block_height(block, flow))
+      .map(|block| estimated_block_height(block, flow, &mut text_metrics))
       .sum::<f32>();
 
     assert!(measured > DEFAULT_LINE_HEIGHT_PT);
@@ -14087,8 +14501,20 @@ mod tests {
       ],
     };
 
+    let mut text_metrics = TextMetrics::new();
     assert_eq!(
-      vertical_merge_content_height(&table, &[72.0], 0, 0, 10.0, PageSetup::default(), 12),
+      vertical_merge_content_height(
+        &table,
+        &[72.0],
+        VerticalMergeSpan {
+          row_index: 0,
+          grid_start: 0,
+          current_row_height: 10.0,
+        },
+        PageSetup::default(),
+        12,
+        &mut text_metrics
+      ),
       Some(38.0)
     );
     assert!(row_has_vertical_merge_context(&table, 0));

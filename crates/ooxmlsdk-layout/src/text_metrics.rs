@@ -1,6 +1,7 @@
 use crate::fonts::{
-  FontFaceData, FontStyleRef, decoration_metrics as font_decoration_metrics, font_face_data,
-  shape_text_runs as shape_font_text_runs, vertical_metrics as font_vertical_metrics,
+  FontFaceData, FontResolver, FontStyleRef, decoration_metrics as font_decoration_metrics,
+  font_face_data, shape_text_runs as shape_font_text_runs,
+  vertical_metrics as font_vertical_metrics,
 };
 
 // Last-resort vertical metrics when no usable font face can be loaded. Keep
@@ -65,6 +66,91 @@ pub struct ShapedGlyph {
   pub y_advance_em: f32,
 }
 
+#[derive(Debug, Default)]
+pub struct TextMetrics {
+  fonts: FontResolver,
+}
+
+impl TextMetrics {
+  pub fn new() -> Self {
+    Self::default()
+  }
+
+  pub fn into_font_resolver(self) -> FontResolver {
+    self.fonts
+  }
+
+  pub fn measure_text(&mut self, text: &str, style: &(impl FontStyleRef + ?Sized)) -> f32 {
+    if text.is_empty() {
+      return 0.0;
+    }
+
+    self
+      .shape_text(text, style)
+      .map_or(0.0, |shaped| shaped.width_pt)
+  }
+
+  pub fn shape_text(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<ShapedText> {
+    if text.is_empty() {
+      return Some(ShapedText {
+        glyphs: Vec::new(),
+        font_faces: Vec::new(),
+        width_pt: 0.0,
+      });
+    }
+
+    let runs = self.fonts.shape_text_runs(text, style)?;
+    shaped_text_from_runs(runs, style, |font_id| self.fonts.font_face_data(font_id))
+  }
+
+  pub fn vertical_metrics(&mut self, style: &(impl FontStyleRef + ?Sized)) -> TextVerticalMetrics {
+    self
+      .fonts
+      .vertical_metrics(style)
+      .map(|metrics| TextVerticalMetrics {
+        ascent_pt: metrics.ascent_pt,
+        descent_pt: metrics.descent_pt,
+        line_gap_pt: metrics.line_gap_pt,
+      })
+      .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt()))
+  }
+
+  pub fn text_decoration_metrics(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> TextDecorationMetrics {
+    self
+      .fonts
+      .decoration_metrics(style)
+      .and_then(|metrics| {
+        (metrics.underline_thickness_pt > f32::EPSILON
+          && metrics.strikeout_thickness_pt > f32::EPSILON)
+          .then_some(TextDecorationMetrics {
+            underline_offset_pt: metrics.underline_offset_pt,
+            underline_width_pt: metrics.underline_thickness_pt,
+            strikethrough_offset_pt: metrics.strikeout_offset_pt,
+            strikethrough_width_pt: metrics.strikeout_thickness_pt,
+          })
+      })
+      .unwrap_or_else(|| approximate_decoration_metrics(style.font_size_pt()))
+  }
+
+  pub fn baseline_offset_in_line(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+    line_height_pt: f32,
+  ) -> f32 {
+    let metrics = self.vertical_metrics(style);
+    let natural_height_pt = metrics.line_height_pt() + style.baseline_shift_pt().abs();
+    let extra_leading_pt = (line_height_pt - natural_height_pt).max(0.0) / 2.0;
+    extra_leading_pt + metrics.leading_above_pt() + metrics.ascent_pt - style.baseline_shift_pt()
+  }
+}
+
 pub fn measure_text(text: &str, style: &(impl FontStyleRef + ?Sized)) -> f32 {
   if text.is_empty() {
     return 0.0;
@@ -83,6 +169,14 @@ pub fn shape_text(text: &str, style: &(impl FontStyleRef + ?Sized)) -> Option<Sh
   }
 
   let runs = shape_font_text_runs(text, style)?;
+  shaped_text_from_runs(runs, style, font_face_data)
+}
+
+fn shaped_text_from_runs(
+  runs: Vec<ooxmlsdk_fonts::ShapedRun<'static>>,
+  style: &(impl FontStyleRef + ?Sized),
+  mut font_face: impl FnMut(&ooxmlsdk_fonts::FontId) -> Option<FontFaceData>,
+) -> Option<ShapedText> {
   let glyph_count = runs.iter().map(|run| run.glyphs.len()).sum();
   let mut glyphs = Vec::with_capacity(glyph_count);
   let mut font_faces = Vec::with_capacity(runs.len());
@@ -91,7 +185,7 @@ pub fn shape_text(text: &str, style: &(impl FontStyleRef + ?Sized)) -> Option<Sh
 
   for run in runs {
     let font_index = font_faces.len();
-    font_faces.push(font_face_data(&run.font_id)?);
+    font_faces.push(font_face(&run.font_id)?);
     width_pt += run.advance_pt;
     glyphs.extend(run.glyphs.iter().map(|glyph| ShapedGlyph {
       font_index,

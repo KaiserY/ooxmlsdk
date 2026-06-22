@@ -25,9 +25,7 @@ use crate::error::{PdfError, Result};
 use crate::options::PdfOptions;
 use ooxmlsdk_layout::common;
 use ooxmlsdk_layout::fonts::{FontFaceData, FontStyleRef};
-use ooxmlsdk_layout::text_metrics::{
-  baseline_offset_in_line, measure_text, shape_text, text_decoration_metrics, vertical_metrics,
-};
+use ooxmlsdk_layout::text_metrics::TextMetrics;
 
 const INTERNAL_LINK_DESTINATION_SHIFT_PT: f32 = 10.0;
 const LO_ARIAL_BOLD_11PT_VERTICAL_SCALE: f32 = 1.07;
@@ -185,7 +183,8 @@ pub(crate) fn render(
         && frame.split_start == plan.cursor
     })
   }));
-  let paint = PaintDocument::from_layout(document);
+  let mut text_metrics = TextMetrics::new();
+  let paint = PaintDocument::from_layout(document, &mut text_metrics);
   let internal_links = InternalLinkTargets::from_paint(&paint);
   debug_assert_eq!(paint.pages.len(), document.pages.len());
   debug_assert!(paint.pages.iter().all(|page| {
@@ -241,7 +240,7 @@ pub(crate) fn render(
       })
   }));
   let mut pdf = Document::new_with(serialize_settings(options)?);
-  let mut fonts = FontSet::load()?;
+  let mut fonts = FontSet::load(text_metrics.into_font_resolver())?;
 
   for page in &paint.pages {
     let settings = PageSettings::from_wh(page.width_pt, page.height_pt)
@@ -277,7 +276,8 @@ pub(crate) fn render(
   let pdf = pdf
     .finish()
     .map_err(|err| PdfError::Krilla(format!("{err:?}")))?;
-  inject_form_widget_annotations(document, pdf)
+  let mut annotation_text_metrics = TextMetrics::new();
+  inject_form_widget_annotations(document, pdf, &mut annotation_text_metrics)
 }
 
 #[derive(Clone, Debug)]
@@ -696,7 +696,10 @@ fn internal_link_url_parts(url: &str) -> Option<(&str, &str)> {
 }
 
 impl<'doc> PaintDocument<'doc> {
-  fn from_layout(document: &'doc common::LayoutDocument<'static>) -> Self {
+  fn from_layout(
+    document: &'doc common::LayoutDocument<'static>,
+    text_metrics: &mut TextMetrics,
+  ) -> Self {
     let pages = document
       .pages
       .iter()
@@ -708,6 +711,7 @@ impl<'doc> PaintDocument<'doc> {
             .iter()
             .filter_map(page_item_from_common)
             .collect::<Vec<_>>(),
+          text_metrics,
         );
         let line_owners = paint_line_owners(document, page_index, layout_items.len());
         let decoration_metadata = decoration_render_metadata(&layout_items);
@@ -727,6 +731,7 @@ impl<'doc> PaintDocument<'doc> {
                 text,
                 owner,
                 page.setup.size.width.0,
+                text_metrics,
               ))
             }
             PageItem::Image(image) => PaintItem::Image(image),
@@ -981,13 +986,16 @@ fn opacity(color: common::Color) -> f32 {
   f32::from(color.a) / 255.0
 }
 
-fn coalesced_writer_text_items<'doc>(items: Vec<PageItem<'doc>>) -> Vec<PageItem<'doc>> {
+fn coalesced_writer_text_items<'doc>(
+  items: Vec<PageItem<'doc>>,
+  text_metrics: &mut TextMetrics,
+) -> Vec<PageItem<'doc>> {
   let mut output: Vec<PageItem<'doc>> = Vec::with_capacity(items.len());
   for item in items {
     match item {
       PageItem::Text(text) => {
         if let Some(PageItem::Text(previous)) = output.last_mut()
-          && writer_text_items_coalesce(previous, &text)
+          && writer_text_items_coalesce(previous, &text, text_metrics)
         {
           previous.text.to_mut().push_str(&text.text);
           previous.line_height_pt = previous.line_height_pt.max(text.line_height_pt);
@@ -1005,7 +1013,11 @@ fn coalesced_writer_text_items<'doc>(items: Vec<PageItem<'doc>>) -> Vec<PageItem
   output
 }
 
-fn writer_text_items_coalesce(current: &TextItem<'_>, next: &TextItem<'_>) -> bool {
+fn writer_text_items_coalesce(
+  current: &TextItem<'_>,
+  next: &TextItem<'_>,
+  text_metrics: &mut TextMetrics,
+) -> bool {
   if current.pdf_text_segmentation != next.pdf_text_segmentation
     || current.form_widget_id.is_some()
     || next.form_widget_id.is_some()
@@ -1030,7 +1042,7 @@ fn writer_text_items_coalesce(current: &TextItem<'_>, next: &TextItem<'_>) -> bo
   {
     return false;
   }
-  let current_right = current.x_pt + measure_text(&current.text, &current.style);
+  let current_right = current.x_pt + text_metrics.measure_text(&current.text, &current.style);
   (current_right - next.x_pt).abs() < 0.25
 }
 
@@ -1039,24 +1051,26 @@ impl<'doc> PaintText<'doc> {
     text: TextItem<'doc>,
     owner: Option<PaintLineOwner>,
     page_width_pt: f32,
+    text_metrics: &mut TextMetrics,
   ) -> Self {
     let text_ref = &text;
     let glyphs = if should_shape_pdf_glyphs(text_ref) {
-      shaped_pdf_glyphs(&text_ref.text, &text_ref.style)
+      shaped_pdf_glyphs(&text_ref.text, &text_ref.style, text_metrics)
     } else {
       None
     };
     let width_pt = glyphs
       .as_ref()
       .map(|run| run.width_pt)
-      .unwrap_or_else(|| measure_text(&text_ref.text, &text_ref.style));
+      .unwrap_or_else(|| text_metrics.measure_text(&text_ref.text, &text_ref.style));
     let baseline_y = match owner.map(|owner| owner.frame_kind) {
       Some(FollowFrameKind::Table) => text_ref.y_pt - text_ref.style.baseline_shift_pt,
       Some(FollowFrameKind::Paragraph | FollowFrameKind::Notes) | None => {
-        text_ref.y_pt + baseline_offset_in_line(&text_ref.style, text_ref.line_height_pt)
+        text_ref.y_pt
+          + text_metrics.baseline_offset_in_line(&text_ref.style, text_ref.line_height_pt)
       }
     };
-    let vertical_metrics = vertical_metrics(&text_ref.style);
+    let vertical_metrics = text_metrics.vertical_metrics(&text_ref.style);
     let text_box_y_pt =
       baseline_y - vertical_metrics.ascent_pt - vertical_metrics.leading_above_pt();
     let text_box_height_pt = vertical_metrics.line_height_pt();
@@ -1067,7 +1081,7 @@ impl<'doc> PaintText<'doc> {
       height_pt: text_box_height_pt,
       color,
     });
-    let decoration_metrics = text_decoration_metrics(&text_ref.style);
+    let decoration_metrics = text_metrics.text_decoration_metrics(&text_ref.style);
     let decoration_start_x_pt = text_ref.decoration_span_start_x_pt.unwrap_or(text_ref.x_pt);
     let underline_y_pt = baseline_y + decoration_metrics.underline_offset_pt;
     let underline = text_ref.style.underline.then_some(PaintStrokeLine {
@@ -1098,18 +1112,21 @@ impl<'doc> PaintText<'doc> {
       url: url.clone(),
     });
 
-    let portions = text_paint_portions(PaintTextPortionSource {
-      text: text_ref,
-      baseline_y,
-      width_pt,
-      page_width_pt,
-      clip: owner.map(|owner| owner.clip),
-      glyphs: glyphs.map(|run| run.font_runs),
-      highlight,
-      underline,
-      strikethrough,
-      link,
-    });
+    let portions = text_paint_portions(
+      PaintTextPortionSource {
+        text: text_ref,
+        baseline_y,
+        width_pt,
+        page_width_pt,
+        clip: owner.map(|owner| owner.clip),
+        glyphs: glyphs.map(|run| run.font_runs),
+        highlight,
+        underline,
+        strikethrough,
+        link,
+      },
+      text_metrics,
+    );
 
     Self {
       item: text,
@@ -1137,6 +1154,7 @@ struct PaintTextPortionSource<'a, 'doc> {
 
 fn text_paint_portions<'doc>(
   source: PaintTextPortionSource<'_, 'doc>,
+  text_metrics: &mut TextMetrics,
 ) -> Vec<PaintTextPortion<'doc>> {
   let PaintTextPortionSource {
     text,
@@ -1161,7 +1179,7 @@ fn text_paint_portions<'doc>(
     let portion_width = portion_glyphs
       .as_ref()
       .map(|glyphs| glyph_runs_width_pt(glyphs, text.style.font_size_pt))
-      .unwrap_or_else(|| measure_text(&text.text[range.clone()], &text.style));
+      .unwrap_or_else(|| text_metrics.measure_text(&text.text[range.clone()], &text.style));
     portions.push(PaintTextPortion {
       kind,
       text_range: range.clone(),
@@ -2006,8 +2024,12 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, pdf_image: 
   }
 }
 
-fn shaped_pdf_glyphs(text: &str, style: &TextStyle<'_>) -> Option<PaintGlyphRun> {
-  let shaped = shape_text(text, style)?;
+fn shaped_pdf_glyphs(
+  text: &str,
+  style: &TextStyle<'_>,
+  text_metrics: &mut TextMetrics,
+) -> Option<PaintGlyphRun> {
+  let shaped = text_metrics.shape_text(text, style)?;
   let mut font_runs = PaintGlyphFontRuns::new();
   let mut x_offset_pt = 0.0;
   for glyph in shaped.glyphs {

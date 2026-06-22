@@ -7,7 +7,7 @@ use super::pivot::pivot_print_address;
 use super::styles::DefinedNameBuiltin;
 use super::worksheet::{CalcCell, CalcRow, CalcSheet, CellAddress, CellRange, SheetType};
 use crate::compat::TextStyle;
-use crate::text_metrics;
+use crate::text_metrics::TextMetrics;
 use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 const ZOOM_MIN: u32 = 10;
@@ -82,16 +82,17 @@ impl<'a> CalcPrintDocument<'a> {
     // This is the first ScPrintFunc-shaped owner. Full range, break, and page
     // count logic lands here; display only consumes the resulting print pages.
     let mut pages = Vec::new();
-    let visible_sheets_with_body = import
-      .sheets
-      .iter()
-      .filter(|sheet| sheet.visible())
-      .filter(|sheet| !sheet_body_is_empty(import, sheet))
-      .count();
+    let mut text_metrics = TextMetrics::new();
+    let mut visible_sheets_with_body = 0usize;
+    for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
+      if !sheet_body_is_empty(import, sheet) {
+        visible_sheets_with_body += 1;
+      }
+    }
     for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
-      let areas = print_areas_for_sheet(import, sheet, &named_ranges);
-      let scale = print_scale_state(import, sheet, &areas, &named_ranges);
+      let areas = print_areas_for_sheet(import, sheet, &named_ranges, &mut text_metrics);
+      let scale = print_scale_state(import, sheet, &areas, &named_ranges, &mut text_metrics);
       let keep_header_footer_only_page = visible_sheets_with_body == 0
         && sheet.page_settings.header_footer.has_print_content()
         && sheet_body_is_empty(import, sheet);
@@ -102,6 +103,7 @@ impl<'a> CalcPrintDocument<'a> {
         &named_ranges,
         scale.zoom,
         scale.top_down,
+        &mut text_metrics,
       );
       let mut sheet_page_index = 0usize;
       for area in page_areas {
@@ -124,7 +126,8 @@ impl<'a> CalcPrintDocument<'a> {
         // content is painted only for page ranges that survive that test. A
         // workbook made entirely of header/footer-only empty visible sheets
         // still emits one page; otherwise later empty sheets keep being hidden.
-        let empty = area.is_some_and(|area| print_area_is_empty(import, sheet, area))
+        let empty = area
+          .is_some_and(|area| print_area_is_empty(import, sheet, area, &mut text_metrics))
           && drawing_summary.anchors == 0
           && drawing_summary.charts == 0;
         if scale.skip_empty && empty && !(keep_header_footer_only_page && sheet_page_index == 0) {
@@ -168,6 +171,7 @@ fn print_scale_state(
   sheet: &CalcSheet,
   areas: &[CellRange],
   named_ranges: &CalcPrintNamedRanges,
+  text_metrics: &mut TextMetrics,
 ) -> CalcPrintScaleState {
   // UpdatePages, CalcZoom. Full page-size based CalcPages is a later bridge;
   // this keeps the exact branch ownership and forced-break constraints.
@@ -240,12 +244,18 @@ fn print_scale_state(
     }
     if fit_to_width > 0
       && fit_to_height == 0
-      && actual_row_page_count(import, sheet, areas, named_ranges, zoom) > 1
+      && actual_row_page_count(import, sheet, areas, named_ranges, zoom, text_metrics) > 1
     {
       let adjusted_zoom = ((zoom as f32) * 0.98).floor().max(ZOOM_MIN as f32) as u32;
       if adjusted_zoom < zoom
-        && actual_row_page_count(import, sheet, areas, named_ranges, adjusted_zoom)
-          < actual_row_page_count(import, sheet, areas, named_ranges, zoom)
+        && actual_row_page_count(
+          import,
+          sheet,
+          areas,
+          named_ranges,
+          adjusted_zoom,
+          text_metrics,
+        ) < actual_row_page_count(import, sheet, areas, named_ranges, zoom, text_metrics)
       {
         zoom = adjusted_zoom;
       }
@@ -271,6 +281,7 @@ fn actual_row_page_count(
   areas: &[CellRange],
   named_ranges: &CalcPrintNamedRanges,
   zoom: u32,
+  text_metrics: &mut TextMetrics,
 ) -> usize {
   areas
     .iter()
@@ -279,10 +290,13 @@ fn actual_row_page_count(
         import,
         sheet,
         *area,
-        &sheet.metrics.row_breaks,
-        true,
-        named_ranges.repeat_rows,
-        zoom,
+        PageMetricSplit {
+          breaks: &sheet.metrics.row_breaks,
+          by_row: true,
+          repeat: named_ranges.repeat_rows,
+          zoom,
+          text_metrics,
+        },
       )
       .len()
     })
@@ -464,6 +478,7 @@ fn print_areas_for_sheet(
   import: &ExcelImport,
   sheet: &CalcSheet,
   named_ranges: &CalcPrintNamedRanges,
+  text_metrics: &mut TextMetrics,
 ) -> Vec<CellRange> {
   if !named_ranges.resolved_print_areas.is_empty() {
     return named_ranges
@@ -498,7 +513,12 @@ fn print_areas_for_sheet(
         range.end.row = range.end.row.max(drawing_range.end.row);
       }
       range = extend_print_area_for_merges(sheet, range);
-      vec![extend_print_area_for_overflow(import, sheet, range)]
+      vec![extend_print_area_for_overflow(
+        import,
+        sheet,
+        range,
+        text_metrics,
+      )]
     }
     // With skip-empty disabled, a missing document print area still leaves the
     // default start/end range printable, so header/footer-only sheets export a page.
@@ -779,6 +799,7 @@ fn extend_print_area_for_overflow(
   import: &ExcelImport,
   sheet: &CalcSheet,
   mut range: CellRange,
+  text_metrics: &mut TextMetrics,
 ) -> CellRange {
   // sc/source/core/data/table1.cxx ExtendPrintArea/MaybeAddExtraColumn.
   // A text cell can extend the implicit print area to the right when the next
@@ -811,7 +832,7 @@ fn extend_print_area_for_overflow(
         continue;
       }
       let style = import.styles.text_style_for_cell(style_index);
-      let column = text_overflow_end_column(sheet, row, cell, address, &style);
+      let column = text_overflow_end_column(sheet, row, cell, address, &style, text_metrics);
       if column > range.end.col {
         range.end.col = column;
       }
@@ -826,9 +847,10 @@ fn text_overflow_end_column(
   cell: &CalcCell,
   address: CellAddress,
   style: &TextStyle,
+  text_metrics: &mut TextMetrics,
 ) -> u32 {
   let needed_width_pt = calc_cached_print_text_width_pt(
-    text_metrics::measure_text(&cell.display_text, style) + CALC_CELL_TEXT_MARGIN_PT,
+    text_metrics.measure_text(&cell.display_text, style) + CALC_CELL_TEXT_MARGIN_PT,
   );
   let mut missing = needed_width_pt - sheet.column_width_pt(address.col);
   let mut column = address.col;
@@ -888,7 +910,12 @@ fn row_cell_has_print_data_at(row: &CalcRow, col: u32) -> bool {
   })
 }
 
-fn print_area_is_empty(import: &ExcelImport, sheet: &CalcSheet, area: CellRange) -> bool {
+fn print_area_is_empty(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  area: CellRange,
+  text_metrics: &mut TextMetrics,
+) -> bool {
   // Calc treats a block as printable when it has cell content, border lines, or
   // drawing content. Drawing content is checked by the caller because it uses
   // drawing anchors rather than cell records.
@@ -932,7 +959,7 @@ fn print_area_is_empty(import: &ExcelImport, sheet: &CalcSheet, area: CellRange)
       }
     }
   }
-  if sheet_area_has_left_text_overflow(import, sheet, area) {
+  if sheet_area_has_left_text_overflow(import, sheet, area, text_metrics) {
     return false;
   }
   if area.end.col <= 2 && area_has_visible_row_attribute(import, sheet, area) {
@@ -1012,6 +1039,7 @@ fn sheet_area_has_left_text_overflow(
   import: &ExcelImport,
   sheet: &CalcSheet,
   area: CellRange,
+  text_metrics: &mut TextMetrics,
 ) -> bool {
   if area.start.col <= 1 {
     return false;
@@ -1036,7 +1064,7 @@ fn sheet_area_has_left_text_overflow(
       // of the candidate page. If a left-side string extends into this page,
       // the page is not empty even when it has no cell bodies of its own.
       let style = print_cell_text_style(import, sheet, row, cell, address);
-      text_overflow_end_column(sheet, row, cell, address, &style) >= area.start.col
+      text_overflow_end_column(sheet, row, cell, address, &style, text_metrics) >= area.start.col
     })
   })
 }
@@ -1091,6 +1119,7 @@ fn page_areas_for_sheet(
   named_ranges: &CalcPrintNamedRanges,
   zoom: u32,
   top_down: bool,
+  text_metrics: &mut TextMetrics,
 ) -> Vec<Option<CellRange>> {
   if sheet.sheet_type == SheetType::Chartsheet {
     return vec![None];
@@ -1101,19 +1130,25 @@ fn page_areas_for_sheet(
       import,
       sheet,
       *area,
-      &sheet.metrics.row_breaks,
-      true,
-      named_ranges.repeat_rows,
-      zoom,
+      PageMetricSplit {
+        breaks: &sheet.metrics.row_breaks,
+        by_row: true,
+        repeat: named_ranges.repeat_rows,
+        zoom,
+        text_metrics,
+      },
     );
     let column_slices = split_range_by_page_metrics(
       import,
       sheet,
       *area,
-      &sheet.metrics.column_breaks,
-      false,
-      named_ranges.repeat_columns,
-      zoom,
+      PageMetricSplit {
+        breaks: &sheet.metrics.column_breaks,
+        by_row: false,
+        repeat: named_ranges.repeat_columns,
+        zoom,
+        text_metrics,
+      },
     );
     if top_down {
       // bTopDown prints all Y pages for one X page before advancing rightward.
@@ -1146,67 +1181,78 @@ fn intersect_page_slices(row_slice: CellRange, column_slice: CellRange) -> CellR
   )
 }
 
+struct PageMetricSplit<'a> {
+  breaks: &'a [super::worksheet::PageBreakModel],
+  by_row: bool,
+  repeat: Option<CellRange>,
+  zoom: u32,
+  text_metrics: &'a mut TextMetrics,
+}
+
 fn split_range_by_page_metrics(
   import: &ExcelImport,
   sheet: &CalcSheet,
   area: CellRange,
-  breaks: &[super::worksheet::PageBreakModel],
-  by_row: bool,
-  repeat: Option<CellRange>,
-  zoom: u32,
+  split: PageMetricSplit<'_>,
 ) -> Vec<CellRange> {
-  let start = if by_row {
+  let start = if split.by_row {
     area.start.row
   } else {
     area.start.col
   };
-  let end = if by_row { area.end.row } else { area.end.col };
+  let end = if split.by_row {
+    area.end.row
+  } else {
+    area.end.col
+  };
   let mut slices = Vec::new();
   let content_size = print_content_size_pt(sheet);
-  let repeat_size = repeat
+  let repeat_size = split
+    .repeat
     .map(|range| {
-      if by_row {
+      if split.by_row {
         sheet.range_rect(range).height_pt
       } else {
         sheet.range_rect(range).width_pt
       }
     })
     .unwrap_or(0.0);
-  let available = ((if by_row {
+  let available = ((if split.by_row {
     content_size.1
   } else {
     content_size.0
   }) - repeat_size)
     .max(1.0)
     * 100.0
-    / zoom.max(ZOOM_MIN) as f32;
+    / split.zoom.max(ZOOM_MIN) as f32;
   let mut current_start = start;
   let mut current = start;
   let mut used = 0.0f32;
   while current <= end {
-    if breaks
+    if split
+      .breaks
       .iter()
       .any(|page_break| page_break.manual && page_break.id == current && current > current_start)
     {
-      slices.push(axis_slice(area, by_row, current_start, current - 1));
+      slices.push(axis_slice(area, split.by_row, current_start, current - 1));
       current_start = current;
       used = 0.0;
     }
-    let size = if by_row {
-      print_row_height_pt(import, sheet, current)
+    let size = if split.by_row {
+      print_row_height_pt(import, sheet, current, &mut *split.text_metrics)
     } else {
       sheet.column_width_pt(current)
     };
     if used > 0.0 && used + size > available {
-      let previous = axis_slice(area, by_row, current_start, current - 1);
+      let previous = axis_slice(area, split.by_row, current_start, current - 1);
       slices.push(previous);
-      if !by_row
+      if !split.by_row
         && !sheet_area_has_print_data(sheet, previous)
         && column_has_print_data(sheet, current)
       {
         // keeps the overflowing column as the visible page when all previous
         // columns in the automatic slice are empty.
-        slices.push(axis_slice(area, by_row, current, current));
+        slices.push(axis_slice(area, split.by_row, current, current));
         current += 1;
         current_start = current;
         used = 0.0;
@@ -1219,12 +1265,17 @@ fn split_range_by_page_metrics(
     current += 1;
   }
   if current_start <= end {
-    slices.push(axis_slice(area, by_row, current_start, end));
+    slices.push(axis_slice(area, split.by_row, current_start, end));
   }
   slices
 }
 
-fn print_row_height_pt(import: &ExcelImport, sheet: &CalcSheet, row_index: u32) -> f32 {
+fn print_row_height_pt(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  row_index: u32,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
   let base = sheet.row_height_pt(row_index);
   if base <= f32::EPSILON {
     return base;
@@ -1260,6 +1311,7 @@ fn print_row_height_pt(import: &ExcelImport, sheet: &CalcSheet, row_index: u32) 
       &cell.display_text,
       sheet.column_width_pt(address.col),
       &style,
+      text_metrics,
     );
     if line_count > 1 {
       // ScColumn::GetOptimalHeight uses GetNeededSize() for line-break cells;
@@ -1270,7 +1322,12 @@ fn print_row_height_pt(import: &ExcelImport, sheet: &CalcSheet, row_index: u32) 
   height
 }
 
-fn wrapped_print_line_count(text: &str, column_width_pt: f32, style: &TextStyle) -> usize {
+fn wrapped_print_line_count(
+  text: &str,
+  column_width_pt: f32,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> usize {
   let available = (column_width_pt - CALC_CELL_TEXT_MARGIN_PT).max(1.0);
   let mut lines = 0usize;
   for paragraph in text.split(['\n', '\r']) {
@@ -1280,9 +1337,9 @@ fn wrapped_print_line_count(text: &str, column_width_pt: f32, style: &TextStyle)
     }
     let mut current_width = 0.0f32;
     for word in paragraph.split_whitespace() {
-      let word_width = text_metrics::measure_text(word, style);
+      let word_width = text_metrics.measure_text(word, style);
       let separator_width = if current_width > 0.0 {
-        text_metrics::measure_text(" ", style)
+        text_metrics.measure_text(" ", style)
       } else {
         0.0
       };
@@ -1473,15 +1530,15 @@ fn print_cells_for_area<'a>(
       let pivot_header_number_format_code =
         pivot_header_number_format_code(import, sheet, print_address);
       let pivot_number_format_code = pivot_data_number_format_code(import, sheet, print_address);
-      let raw_text = pivot_data_cell_text_override(sheet, print_address)
-        .unwrap_or_else(|| cell.display_text.clone());
+      let raw_text =
+        pivot_data_cell_text_override(sheet, print_address).unwrap_or(cell.display_text.as_str());
       let effective_number_format_code = conditional_number_format_code
         .or(pivot_format_number_format_code)
         .or(pivot_header_number_format_code)
         .or(pivot_number_format_code)
         .or(number_format_code);
       let (rendered_text, number_format_state) = rendered_number_text(
-        raw_text.as_str(),
+        raw_text,
         effective_number_format_code,
         cell.data_type,
         import.globals.settings.date_1904,
@@ -1554,14 +1611,14 @@ fn pivot_virtual_print_cells<'a>(
         let text = pivot
           .data_field_names
           .first()
-          .cloned()
-          .unwrap_or_else(|| "(empty)".to_string());
+          .map(String::as_str)
+          .unwrap_or("(empty)");
         cells.push(CalcPrintCell {
           address,
-          text: Cow::Owned(text.clone()),
+          text: Cow::Borrowed(text),
           style_index: None,
           pivot_format_id: None,
-          rendered_text: text,
+          rendered_text: text.to_string(),
           rich_text_runs: &[],
           number_format_state: NumberFormatRenderState::Raw,
           formula: false,
@@ -2039,7 +2096,7 @@ fn pivot_data_number_format_code<'a>(
     .and_then(|id| id.and_then(|id| import.styles.number_format_code(id)))
 }
 
-fn pivot_data_cell_text_override(sheet: &CalcSheet, address: CellAddress) -> Option<String> {
+fn pivot_data_cell_text_override(sheet: &CalcSheet, address: CellAddress) -> Option<&str> {
   sheet
     .resources
     .pivot_tables
@@ -2047,7 +2104,7 @@ fn pivot_data_cell_text_override(sheet: &CalcSheet, address: CellAddress) -> Opt
     .iter()
     .flat_map(|pivot| pivot.data_cell_text_overrides.iter())
     .find(|override_text| override_text.address == address)
-    .map(|override_text| override_text.text.clone())
+    .map(|override_text| override_text.text.as_str())
 }
 
 pub(crate) fn rendered_number_text(
@@ -2494,22 +2551,22 @@ fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
   } else {
     integer.to_string()
   };
-  let rendered_fraction = render_fraction_pattern(&pattern.section, fraction);
-  let fraction = rendered_fraction.clone().unwrap_or_else(|| {
-    if pattern.decimals > 0 {
+  let (fraction, fraction_includes_suffix) =
+    if let Some(rendered) = render_fraction_pattern(&pattern.section, fraction) {
+      (rendered, true)
+    } else if pattern.decimals > 0 {
       let mut output = String::from(".");
       output.push_str(fraction);
-      output
+      (output, false)
     } else {
-      String::new()
-    }
-  });
+      (String::new(), false)
+    };
   let mut output = String::new();
   output.push_str(sign);
   output.push_str(&pattern.prefix);
   output.push_str(&integer);
   output.push_str(&fraction);
-  if rendered_fraction.is_none() {
+  if !fraction_includes_suffix {
     output.push_str(&pattern.suffix);
   }
   output.trim().to_string()

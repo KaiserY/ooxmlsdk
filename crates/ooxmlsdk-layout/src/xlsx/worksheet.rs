@@ -19,6 +19,7 @@ use super::table::TableResourceCatalog;
 use super::text::decode_excel_escaped_text;
 use super::workbook::{SharedStringModel, SharedStringRun};
 use crate::error::Result;
+use crate::text_metrics::TextMetrics;
 use crate::units;
 
 const CALC_DIGIT_WIDTH_MM: f32 = 2.0;
@@ -918,8 +919,12 @@ fn default_digit_width_pt(styles: &StylesCatalog) -> f32 {
   // Unit::Digit to 2mm, then UnitConverter::finalizeImport() replaces it with
   // the default font XFont maximum width across '0'..'9'.
   let style = styles.default_font_text_style();
+  let mut text_metrics = TextMetrics::new();
   let digit_width = ('0'..='9')
-    .map(|ch| crate::text_metrics::measure_text(&ch.to_string(), &style))
+    .map(|ch| {
+      let mut encoded = [0; 4];
+      text_metrics.measure_text(ch.encode_utf8(&mut encoded), &style)
+    })
     .fold(0.0_f32, f32::max);
   if digit_width > 0.0 {
     digit_width

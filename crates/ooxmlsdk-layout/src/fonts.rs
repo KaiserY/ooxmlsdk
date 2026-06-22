@@ -18,7 +18,7 @@ fn font_timing<T>(label: &str, work: impl FnOnce() -> T) -> T {
   }
   let start = Instant::now();
   let output = work();
-  eprintln!("[ooxmlsdk-pdf] {label}: {:?}", start.elapsed());
+  eprintln!("[ooxmlsdk-layout] {label}: {:?}", start.elapsed());
   output
 }
 
@@ -121,6 +121,133 @@ pub fn load_text_face(style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceDa
   font_face_data_from_registry(&registry, &resolved.font_id)
 }
 
+#[derive(Debug, Default)]
+pub struct FontResolver {
+  font_data_cache: HashMap<FontId, FontFaceData>,
+  font_registry_cache: HashMap<FontFaceKey, Arc<FontRegistry<'static>>>,
+  font_face_cache: HashMap<FontFaceKey, FontFaceData>,
+}
+
+impl FontResolver {
+  pub fn load_text_face(&mut self, style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
+    let request = font_request(style);
+    let registry = self.style_font_registry(style, None);
+    let resolved = registry.resolve(&request).ok()?;
+    self.font_face_data_from_registry(&registry, &resolved.font_id)
+  }
+
+  pub fn cached_text_face(&mut self, style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
+    let key = FontFaceKey::from_style(style, None);
+    if let Some(face) = self.font_face_cache.get(&key) {
+      return Some(face.clone());
+    }
+    let face = self.load_text_face(style)?;
+    self.font_face_cache.insert(key, face.clone());
+    Some(face)
+  }
+
+  pub fn shape_text_runs(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<Vec<ShapedRun<'static>>> {
+    font_timing("shape text runs", || {
+      self.shape_text_runs_inner(text, style)
+    })
+  }
+
+  pub fn font_face_data(&self, font_id: &FontId) -> Option<FontFaceData> {
+    self.font_data_cache.get(font_id).cloned()
+  }
+
+  pub fn vertical_metrics(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<ooxmlsdk_fonts::VerticalMetrics> {
+    let request = font_request(style);
+    let registry = self.style_font_registry(style, None);
+    let resolved = registry.resolve(&request).ok()?;
+    Some(
+      resolved
+        .metrics_at_size(FontSize(style.font_size_pt()))
+        .vertical,
+    )
+  }
+
+  pub fn decoration_metrics(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<ooxmlsdk_fonts::DecorationMetrics> {
+    let request = font_request(style);
+    let registry = self.style_font_registry(style, None);
+    let resolved = registry.resolve(&request).ok()?;
+    Some(
+      resolved
+        .metrics_at_size(FontSize(style.font_size_pt()))
+        .decoration,
+    )
+  }
+
+  fn shape_text_runs_inner(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<Vec<ShapedRun<'static>>> {
+    let script_runs =
+      script_direction_runs(text, FontSize(style.font_size_pt()), style.small_caps());
+    let mut output = Vec::with_capacity(script_runs.len());
+    for script_run in script_runs {
+      let registry = self.style_font_registry(style, Some(script_run.script));
+      let mut request = font_request(style);
+      request.size_pt = script_run.size_pt;
+      request.script = Some(script_run.script);
+      let mut options = ShapeOptions::from_request(&request, script_run.direction);
+      options.character_spacing_pt = style.character_spacing_pt();
+      options.small_caps = false;
+      options.scan_registered_fallbacks = false;
+      let mut runs = registry
+        .shape_text_runs_with_options(&request, Cow::Owned(script_run.text.into_owned()), &options)
+        .ok()?;
+      for run in &runs {
+        let _ = self.font_face_data_from_registry(&registry, &run.font_id);
+      }
+      for run in &mut runs {
+        run.offset_text_range(script_run.text_range.start);
+      }
+      output.extend(runs);
+    }
+    Some(output)
+  }
+
+  fn style_font_registry(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+    script: Option<TextScript>,
+  ) -> Arc<FontRegistry<'static>> {
+    let key = FontFaceKey::from_style(style, script);
+    if let Some(registry) = self.font_registry_cache.get(&key) {
+      return registry.clone();
+    }
+    let registry = Arc::new(build_style_font_registry(style, script));
+    self.font_registry_cache.insert(key, registry.clone());
+    registry
+  }
+
+  fn font_face_data_from_registry(
+    &mut self,
+    registry: &FontRegistry<'static>,
+    font_id: &FontId,
+  ) -> Option<FontFaceData> {
+    if let Some(face) = self.font_data_cache.get(font_id) {
+      return Some(face.clone());
+    }
+    let face = registry.font_face_data(font_id)?;
+    let face = font_face_data_from_shared(font_id, face)?;
+    self.font_data_cache.insert(font_id.clone(), face.clone());
+    Some(face)
+  }
+}
+
 pub fn shape_text_runs(
   text: &str,
   style: &(impl FontStyleRef + ?Sized),
@@ -132,9 +259,9 @@ fn shape_text_runs_inner(
   text: &str,
   style: &(impl FontStyleRef + ?Sized),
 ) -> Option<Vec<ShapedRun<'static>>> {
-  let mut output = Vec::new();
-  for script_run in script_direction_runs(text, FontSize(style.font_size_pt()), style.small_caps())
-  {
+  let script_runs = script_direction_runs(text, FontSize(style.font_size_pt()), style.small_caps());
+  let mut output = Vec::with_capacity(script_runs.len());
+  for script_run in script_runs {
     let registry = style_font_registry(style, Some(script_run.script));
     let mut request = font_request(style);
     request.size_pt = script_run.size_pt;

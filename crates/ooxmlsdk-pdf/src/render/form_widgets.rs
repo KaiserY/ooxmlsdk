@@ -4,7 +4,7 @@ use lopdf::{Document as LopdfDocument, Object as LopdfObject, dictionary};
 
 use crate::error::{PdfError, Result};
 use ooxmlsdk_layout::common::{self, FormWidget, FormWidgetKind};
-use ooxmlsdk_layout::text_metrics::measure_text;
+use ooxmlsdk_layout::text_metrics::TextMetrics;
 // SwContentControlPortion::DescribePDFControl() expands content-control widget
 // bounds by 20 twips before handing them to PDFWriter.
 const LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT: f32 = 20.0 / ooxmlsdk_layout::units::TWIPS_PER_POINT;
@@ -39,8 +39,9 @@ struct WidgetBounds {
 pub(super) fn inject_form_widget_annotations(
   document: &common::LayoutDocument<'static>,
   pdf: Vec<u8>,
+  text_metrics: &mut TextMetrics,
 ) -> Result<Vec<u8>> {
-  let annotations = collect_form_widget_annotations(document);
+  let annotations = collect_form_widget_annotations(document, text_metrics);
   if annotations.is_empty() {
     return Ok(pdf);
   }
@@ -107,6 +108,7 @@ pub(super) fn inject_form_widget_annotations(
 
 fn collect_form_widget_annotations(
   document: &common::LayoutDocument<'static>,
+  text_metrics: &mut TextMetrics,
 ) -> Vec<WidgetAnnotationSpec> {
   let mut annotations = Vec::new();
   for (page_index, page) in document.pages.iter().enumerate() {
@@ -125,7 +127,7 @@ fn collect_form_widget_annotations(
       {
         continue;
       }
-      let width = measure_text(text.text.as_ref(), &text.style);
+      let width = text_metrics.measure_text(text.text.as_ref(), &text.style);
       let bounds = WidgetBounds {
         left: text.origin.x.0,
         top: text.origin.y.0,

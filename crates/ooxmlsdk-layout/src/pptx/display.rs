@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -13,7 +12,7 @@ use crate::docx::{BorderStyle, ImageCrop, RgbColor, TextStyle};
 use crate::render::chart as shared_chart;
 use crate::render::diagram as shared_diagram;
 use crate::render::emf_wmf;
-use crate::text_metrics::measure_text;
+use crate::text_metrics::TextMetrics;
 use crate::units;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder};
@@ -1087,6 +1086,7 @@ fn lower_diagram(
         )
       });
       let options = TextLoweringOptions::from_text_body(&text_body);
+      let mut text_metrics = TextMetrics::new();
       let base_style = text_base_style(
         context.import,
         &text_body,
@@ -1100,6 +1100,7 @@ fn lower_diagram(
         &text_body,
         &base_style,
         &options,
+        &mut text_metrics,
       );
       let sync_auto_fit = text_body.display_properties.auto_fit == TextAutoFit::Shape;
       if sync_auto_fit && let Some(group) = diagram_shape.font_sync_group.as_deref() {
@@ -1420,8 +1421,15 @@ fn lower_diagram_text_body_at_with_style_and_scale(
     style_inputs.table_text_style,
     style_inputs.base_font_size_pt,
   );
-  let estimated_height =
-    estimate_wrapped_text_body_height(import, frame, text_body, &base_style, &options);
+  let mut text_metrics = TextMetrics::new();
+  let estimated_height = estimate_wrapped_text_body_height(
+    import,
+    frame,
+    text_body,
+    &base_style,
+    &options,
+    &mut text_metrics,
+  );
   let y_pt = match text_body.display_properties.anchor {
     a::TextAnchoringTypeValues::Center => frame.y_pt + (frame.height_pt - estimated_height) / 2.0,
     a::TextAnchoringTypeValues::Bottom => frame.y_pt + frame.height_pt - estimated_height,
@@ -1452,6 +1460,7 @@ fn lower_diagram_text_body_at_with_style_and_scale(
       None,
       &mut cursor,
       &mut paragraph_items,
+      &mut text_metrics,
     );
     let order = paragraph
       .diagram_source_order
@@ -3675,11 +3684,9 @@ fn apply_image_effects(
   let raster_data = emf_wmf::decode_metafile_as_raster(data, content_type)
     .ok()
     .flatten()
-    .map(|raster| Cow::Owned(raster.data))
-    .unwrap_or(Cow::Borrowed(data));
-  let mut image = image::load_from_memory(raster_data.as_ref())
-    .ok()?
-    .to_rgba8();
+    .map(|raster| raster.data);
+  let image_data = raster_data.as_deref().unwrap_or(data);
+  let mut image = image::load_from_memory(image_data).ok()?.to_rgba8();
   for pixel in image.pixels_mut() {
     let [mut r, mut g, mut b, mut a] = pixel.0;
     if let Some(effect) = effects.color_change
@@ -3899,23 +3906,30 @@ fn lower_text_body(
   items: &mut Vec<PageItem>,
   summary: Option<&mut PptxLayoutSummary>,
 ) {
-  let mut text_body = text_body.clone();
-  if shape.rotation.abs() > f32::EPSILON
+  let adjusted_text_body;
+  let text_body = if shape.rotation.abs() > f32::EPSILON
     && text_body
       .display_properties
       .text_camera_z_rotation
       .is_some()
   {
-    let shape_rotation = (shape.rotation * 60_000.0).round() as i32;
-    text_body.display_properties.text_area_rotation = Some(
+    adjusted_text_body = {
+      let mut text_body = text_body.clone();
+      let shape_rotation = (shape.rotation * 60_000.0).round() as i32;
+      text_body.display_properties.text_area_rotation = Some(
+        text_body
+          .display_properties
+          .text_area_rotation
+          .unwrap_or_default()
+          + shape_rotation,
+      );
       text_body
-        .display_properties
-        .text_area_rotation
-        .unwrap_or_default()
-        + shape_rotation,
-    );
-  }
-  let text_box = text_box_metrics(shape, offset, &text_body);
+    };
+    &adjusted_text_body
+  } else {
+    text_body
+  };
+  let text_box = text_box_metrics(shape, offset, text_body);
   lower_text_body_at_with_font_ref(
     TextBodyLoweringContext {
       import: context.import,
@@ -3923,7 +3937,7 @@ fn lower_text_body(
       page_index: context.page_index,
     },
     text_box,
-    &text_body,
+    text_body,
     shape
       .shape_style_refs
       .as_ref()
@@ -4045,15 +4059,31 @@ fn lower_text_body_at_with_style_and_scale(
     style_inputs.table_text_style,
     style_inputs.base_font_size_pt,
   );
+  let mut text_metrics = TextMetrics::new();
   let (font_scale, line_scale) = style_inputs.auto_fit_font_scale.map_or_else(
-    || text_auto_fit_scales(import, frame, text_body, &base_style, &options),
+    || {
+      text_auto_fit_scales(
+        import,
+        frame,
+        text_body,
+        &base_style,
+        &options,
+        &mut text_metrics,
+      )
+    },
     |font_scale| (font_scale, options.line_scale),
   );
   options.font_scale = font_scale;
   options.line_scale = line_scale;
 
-  let estimated_height =
-    estimate_wrapped_text_body_height(import, frame, text_body, &base_style, &options);
+  let estimated_height = estimate_wrapped_text_body_height(
+    import,
+    frame,
+    text_body,
+    &base_style,
+    &options,
+    &mut text_metrics,
+  );
   let y_pt = match text_body.display_properties.anchor {
     a::TextAnchoringTypeValues::Center => frame.y_pt + (frame.height_pt - estimated_height) / 2.0,
     a::TextAnchoringTypeValues::Bottom => frame.y_pt + frame.height_pt - estimated_height,
@@ -4084,19 +4114,25 @@ fn lower_text_body_at_with_style_and_scale(
       summary.as_deref_mut(),
       &mut cursor,
       items,
+      &mut text_metrics,
     );
   }
   apply_text_camera_z_rotation(
     &mut items[item_start..],
     text_body.display_properties.camera_z_rotation_degrees(),
+    &mut text_metrics,
   );
 }
 
-fn apply_text_camera_z_rotation(items: &mut [PageItem], rotation_deg: f32) {
+fn apply_text_camera_z_rotation(
+  items: &mut [PageItem],
+  rotation_deg: f32,
+  text_metrics: &mut TextMetrics,
+) {
   if rotation_deg.abs() <= f32::EPSILON {
     return;
   }
-  let Some((left, top, right, bottom)) = text_items_bounds(items) else {
+  let Some((left, top, right, bottom)) = text_items_bounds(items, text_metrics) else {
     return;
   };
   let center_x = (left + right) / 2.0;
@@ -4110,13 +4146,16 @@ fn apply_text_camera_z_rotation(items: &mut [PageItem], rotation_deg: f32) {
   }
 }
 
-fn text_items_bounds(items: &[PageItem]) -> Option<(f32, f32, f32, f32)> {
+fn text_items_bounds(
+  items: &[PageItem],
+  text_metrics: &mut TextMetrics,
+) -> Option<(f32, f32, f32, f32)> {
   let mut bounds: Option<(f32, f32, f32, f32)> = None;
   for item in items {
     let PageItem::Text(text) = item else {
       continue;
     };
-    let width_pt = measure_text(&text.text, &text.style);
+    let width_pt = text_metrics.measure_text(&text.text, &text.style);
     let left = text.x_pt;
     let top = text.y_pt - text.line_height_pt;
     let right = text.x_pt + width_pt;
@@ -4163,6 +4202,7 @@ fn text_auto_fit_scales(
   text_body: &TextBody,
   base_style: &TextStyle,
   options: &TextLoweringOptions,
+  text_metrics: &mut TextMetrics,
 ) -> (f32, f32) {
   if text_body.display_properties.auto_fit != TextAutoFit::Shape {
     return (options.font_scale, options.line_scale);
@@ -4171,8 +4211,14 @@ fn text_auto_fit_scales(
     let mut level_options = *options;
     level_options.font_scale *= font_scale;
     level_options.line_scale = line_scale;
-    let text_height =
-      estimate_wrapped_text_body_height(import, frame, text_body, base_style, &level_options);
+    let text_height = estimate_wrapped_text_body_height(
+      import,
+      frame,
+      text_body,
+      base_style,
+      &level_options,
+      text_metrics,
+    );
     if text_height <= frame.height_pt {
       return (level_options.font_scale, level_options.line_scale);
     }
@@ -4738,6 +4784,7 @@ fn lower_paragraph(
   summary: Option<&mut PptxLayoutSummary>,
   cursor: &mut TextCursor,
   items: &mut Vec<PageItem>,
+  text_metrics: &mut TextMetrics,
 ) {
   let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
   let column_width = context.options.column_width(context.frame);
@@ -4791,6 +4838,7 @@ fn lower_paragraph(
       context.options,
       &paragraph.runs[segment_start..segment_end],
       column_width,
+      text_metrics,
     );
     let alignment = if context.options.anchor_center {
       // maps horizontal text with anchorCtr=1 to TextHorizontalAdjust_CENTER,
@@ -4808,7 +4856,7 @@ fn lower_paragraph(
 
       if is_first_segment
         && line_index == 0
-        && let Some(label) = bullet.label.clone()
+        && let Some(label) = bullet.label.as_deref()
       {
         let mut bullet_style = context.base_style.clone();
         paragraph_style.apply_default_run_style(context.import, &mut bullet_style);
@@ -4836,7 +4884,7 @@ fn lower_paragraph(
               line_height_pt: bullet_line_height,
               rotation_center_pt: context.options.rotation_center_pt,
             },
-            label,
+            label.to_string(),
             bullet_style,
             context.shape_hyperlink_url.map(ToString::to_string),
           );
@@ -4844,8 +4892,8 @@ fn lower_paragraph(
       }
 
       for line_run in &text_line.runs {
-        let style = line_run.style.clone();
-        let run_line_height = paragraph_style.line_height(&style, context.options);
+        let style = &line_run.style;
+        let run_line_height = paragraph_style.line_height(style, context.options);
         max_line_height = max_line_height.max(run_line_height);
         if line_run.run.kind == TextRunKind::Math {
           push_math_ole_preview_item(
@@ -4870,8 +4918,9 @@ fn lower_paragraph(
             rotation_center_pt: context.options.rotation_center_pt,
           },
           &line_run.text,
-          &style,
+          style,
           hyperlink_url,
+          text_metrics,
         );
         run_x += line_run.width_pt;
       }
@@ -4895,6 +4944,7 @@ fn layout_text_lines<'a>(
   options: &TextLoweringOptions,
   runs: &'a [TextRun],
   column_width: f32,
+  text_metrics: &mut TextMetrics,
 ) -> Vec<TextLine<'a>> {
   let visible_runs = runs
     .iter()
@@ -4913,31 +4963,37 @@ fn layout_text_lines<'a>(
   let mut current = TextLine::default();
   for run in visible_runs {
     let style = styled_text_run(import, paragraph_style, base_style, options, run);
-    let text = run_text(run, &style);
+    let uppercase_text;
+    let text = if style.uppercase {
+      uppercase_text = run.text.to_uppercase();
+      uppercase_text.as_str()
+    } else {
+      run.text.as_str()
+    };
     for hard_line in text.split_inclusive('\n') {
       let (line_text, has_hard_break) = hard_line
         .strip_suffix('\n')
         .map_or((hard_line, false), |text| (text, true));
       for token in text_wrap_tokens(line_text) {
-        let width_pt = measure_text(token, &style);
+        let width_pt = text_metrics.measure_text(token, &style);
         if options.word_wrap
           && current.width_pt > f32::EPSILON
           && current.width_pt + width_pt > column_width
         {
-          trim_text_line_end(&mut current);
+          trim_text_line_end(&mut current, text_metrics);
           lines.push(current);
           current = TextLine::default();
         }
         push_text_line_token(&mut current, run, token, width_pt, &style);
       }
       if has_hard_break {
-        trim_text_line_end(&mut current);
+        trim_text_line_end(&mut current, text_metrics);
         lines.push(current);
         current = TextLine::default();
       }
     }
   }
-  trim_text_line_end(&mut current);
+  trim_text_line_end(&mut current, text_metrics);
   lines.push(current);
   lines
 }
@@ -4984,14 +5040,14 @@ fn text_wrap_tokens(text: &str) -> Vec<&str> {
   tokens
 }
 
-fn trim_text_line_end(line: &mut TextLine<'_>) {
+fn trim_text_line_end(line: &mut TextLine<'_>, text_metrics: &mut TextMetrics) {
   while let Some(run) = line.runs.last_mut() {
     let trimmed_len = run.text.trim_end().len();
     if trimmed_len == run.text.len() {
       break;
     }
     let trimmed = run.text[..trimmed_len].to_string();
-    let removed_width = run.width_pt - measure_text(&trimmed, &run.style);
+    let removed_width = run.width_pt - text_metrics.measure_text(&trimmed, &run.style);
     run.text = trimmed;
     run.width_pt -= removed_width;
     line.width_pt -= removed_width;
@@ -5087,6 +5143,7 @@ fn push_symbol_split_text_items(
   text: &str,
   style: &TextStyle,
   hyperlink_url: Option<String>,
+  text_metrics: &mut TextMetrics,
 ) {
   let Some(symbol_font) = style.symbol_font_family.as_deref() else {
     push_text_item(
@@ -5112,10 +5169,13 @@ fn push_symbol_split_text_items(
       items,
       placement,
       &current,
-      style,
-      current_symbol == Some(true),
-      symbol_font,
+      TextSegmentStyle {
+        style,
+        use_symbol_font: current_symbol == Some(true),
+        symbol_font,
+      },
       hyperlink_url.clone(),
+      text_metrics,
     );
     current.clear();
     current_symbol = Some(is_symbol);
@@ -5126,26 +5186,35 @@ fn push_symbol_split_text_items(
       items,
       placement,
       &current,
-      style,
-      current_symbol == Some(true),
-      symbol_font,
+      TextSegmentStyle {
+        style,
+        use_symbol_font: current_symbol == Some(true),
+        symbol_font,
+      },
       hyperlink_url,
+      text_metrics,
     );
   }
+}
+
+#[derive(Clone, Copy)]
+struct TextSegmentStyle<'a> {
+  style: &'a TextStyle,
+  use_symbol_font: bool,
+  symbol_font: &'a str,
 }
 
 fn push_text_segment(
   items: &mut Vec<PageItem>,
   placement: TextItemPlacement,
   text: &str,
-  style: &TextStyle,
-  use_symbol_font: bool,
-  symbol_font: &str,
+  segment: TextSegmentStyle<'_>,
   hyperlink_url: Option<String>,
+  text_metrics: &mut TextMetrics,
 ) -> f32 {
-  let mut segment_style = style.clone();
-  if use_symbol_font {
-    segment_style.font_family = Some(Arc::from(symbol_font));
+  let mut segment_style = segment.style.clone();
+  if segment.use_symbol_font {
+    segment_style.font_family = Some(Arc::from(segment.symbol_font));
   }
   push_text_item(
     items,
@@ -5154,7 +5223,7 @@ fn push_text_segment(
     segment_style.clone(),
     hyperlink_url,
   );
-  placement.x_pt + measure_text(text, &segment_style)
+  placement.x_pt + text_metrics.measure_text(text, &segment_style)
 }
 
 fn is_drawingml_symbol_char(ch: char) -> bool {
@@ -5205,6 +5274,7 @@ fn estimate_wrapped_text_body_height(
   text_body: &TextBody,
   base_style: &TextStyle,
   options: &TextLoweringOptions,
+  text_metrics: &mut TextMetrics,
 ) -> f32 {
   let column_width = options.column_width(frame).max(1.0);
   let mut height = 0.0;
@@ -5222,6 +5292,7 @@ fn estimate_wrapped_text_body_height(
           options,
           runs,
           column_width,
+          text_metrics,
         )
         .len() as f32
       } else {
@@ -5246,14 +5317,6 @@ fn advance_text_column_if_needed(
   }
   cursor.column_index += 1;
   cursor.y_pt = frame.y_pt;
-}
-
-fn run_text(run: &TextRun, style: &TextStyle) -> String {
-  if style.uppercase {
-    run.text.to_uppercase()
-  } else {
-    run.text.clone()
-  }
 }
 
 fn push_math_ole_preview_item(

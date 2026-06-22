@@ -12,7 +12,7 @@ use crate::compat::{
 };
 use crate::compat::{BorderStyle, ImageCrop, PageSetup, RgbColor, TextStyle};
 use crate::render::{diagram as shared_diagram, emf_wmf};
-use crate::text_metrics;
+use crate::text_metrics::TextMetrics;
 use crate::units;
 
 use super::import::ExcelImport;
@@ -29,6 +29,21 @@ struct CalcCellTextFragment {
   address: CellAddress,
   rect: CellRect,
   text: TextItem,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct CalcCellTextOrigin {
+  address: CellAddress,
+  rect: CellRect,
+}
+
+impl From<&CalcCellTextFragment> for CalcCellTextOrigin {
+  fn from(fragment: &CalcCellTextFragment) -> Self {
+    Self {
+      address: fragment.address,
+      rect: fragment.rect,
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -69,6 +84,7 @@ fn print_page_items(
   };
   let body_origin_x = setup.margin_left_pt + heading_width;
   let body_origin_y = body_origin_y + heading_height;
+  let mut text_metrics = TextMetrics::new();
   let repeat_width = page
     .repeated_columns
     .map(|range| page.sheet.range_rect(range).width_pt * zoom_scale)
@@ -90,6 +106,7 @@ fn print_page_items(
         origin_y_pt: body_origin_y,
         zoom_scale,
       },
+      &mut text_metrics,
     );
   }
   if let Some(area) = repeat_rows_for_page(page) {
@@ -104,6 +121,7 @@ fn print_page_items(
         origin_y_pt: body_origin_y,
         zoom_scale,
       },
+      &mut text_metrics,
     );
   }
   if let Some(area) = repeat_columns_for_page(page) {
@@ -118,6 +136,7 @@ fn print_page_items(
         origin_y_pt: body_origin_y + repeat_height,
         zoom_scale,
       },
+      &mut text_metrics,
     );
   }
   if let Some(area) = page.area {
@@ -132,6 +151,7 @@ fn print_page_items(
         origin_y_pt: body_origin_y + repeat_height,
         zoom_scale,
       },
+      &mut text_metrics,
     );
     if page.page_settings.print_headings {
       render_headings(
@@ -211,6 +231,7 @@ fn render_cell_area(
   cells: &[super::print::CalcPrintCell<'_>],
   area: super::worksheet::CellRange,
   layout: CellAreaRenderLayout,
+  text_metrics: &mut TextMetrics,
 ) {
   let area_rect = page.sheet.range_rect(area);
   let occupied_cells = calc_occupied_text_cells(cells);
@@ -298,15 +319,24 @@ fn render_cell_area(
       alignment = Some(pivot_alignment);
     }
     let output_area = calc_cell_output_area(
-      page.sheet,
-      &occupied_cells,
+      CalcCellOutputContext {
+        sheet: page.sheet,
+        occupied_cells: &occupied_cells,
+        text_metrics,
+      },
       cell,
       cell_rect,
       &measurement_style,
       alignment,
       layout.zoom_scale,
     );
-    let rendered_text = calc_cell_visible_text(page.sheet, cell, &measurement_style, output_area);
+    let rendered_text = calc_cell_visible_text(
+      page.sheet,
+      cell,
+      &measurement_style,
+      output_area,
+      text_metrics,
+    );
     let horizontal_alignment = calc_cell_horizontal_alignment(cell, alignment);
     let mut rendered_text_items = Vec::new();
     if !cell.rich_text_runs.is_empty() && rendered_text.as_ref() == cell.text.as_ref() {
@@ -317,6 +347,7 @@ fn render_cell_area(
         render_style,
         horizontal_alignment,
         hyperlink_url.clone(),
+        text_metrics,
       );
     } else {
       render_cell_text(
@@ -330,6 +361,7 @@ fn render_cell_area(
           hyperlink_url: hyperlink_url.clone(),
           formula: cell.formula,
         },
+        text_metrics,
       );
     }
     cell_text_items.extend(rendered_text_items.into_iter().filter_map(|item| {
@@ -352,7 +384,7 @@ fn render_cell_area(
       }));
     }
   }
-  items.extend(coalesced_calc_row_text_items(cell_text_items));
+  items.extend(coalesced_calc_row_text_items(cell_text_items, text_metrics));
   if page.page_settings.print_grid_lines {
     render_grid(
       items,
@@ -375,16 +407,23 @@ fn calc_occupied_text_cells(
     .collect()
 }
 
+struct CalcCellOutputContext<'a> {
+  sheet: &'a CalcSheet,
+  occupied_cells: &'a HashMap<(u32, u32), bool>,
+  text_metrics: &'a mut TextMetrics,
+}
+
 fn calc_cell_output_area(
-  sheet: &CalcSheet,
-  occupied_cells: &HashMap<(u32, u32), bool>,
+  context: CalcCellOutputContext<'_>,
   cell: &super::print::CalcPrintCell<'_>,
   rect: CellRect,
   style: &TextStyle,
   alignment: Option<super::styles::AlignmentRecord>,
   zoom_scale: f32,
 ) -> CalcCellOutputArea {
-  let text_width_pt = text_metrics::measure_text(&cell.rendered_text, style);
+  let text_width_pt = context
+    .text_metrics
+    .measure_text(&cell.rendered_text, style);
   let needed_width_pt = text_width_pt + XLSX_CELL_TEXT_INSET_PT * 2.0;
   let mut output = CalcCellOutputArea {
     align_rect: rect,
@@ -403,10 +442,15 @@ fn calc_cell_output_area(
   if !calc_cell_is_value(cell) && !alignment.is_some_and(|alignment| alignment.wrap_text) {
     let mut right_col = cell.address.col;
     while right_missing_pt > 0.0
-      && output_column_available(sheet, occupied_cells, right_col + 1, cell.address.row)
+      && output_column_available(
+        context.sheet,
+        context.occupied_cells,
+        right_col + 1,
+        cell.address.row,
+      )
     {
       right_col += 1;
-      let column_width_pt = sheet.column_width_pt(right_col) * zoom_scale;
+      let column_width_pt = context.sheet.column_width_pt(right_col) * zoom_scale;
       if column_width_pt <= f32::EPSILON {
         break;
       }
@@ -416,10 +460,15 @@ fn calc_cell_output_area(
     let mut left_col = cell.address.col;
     while left_missing_pt > 0.0
       && left_col > 1
-      && output_column_available(sheet, occupied_cells, left_col - 1, cell.address.row)
+      && output_column_available(
+        context.sheet,
+        context.occupied_cells,
+        left_col - 1,
+        cell.address.row,
+      )
     {
       left_col -= 1;
-      let column_width_pt = sheet.column_width_pt(left_col) * zoom_scale;
+      let column_width_pt = context.sheet.column_width_pt(left_col) * zoom_scale;
       if column_width_pt <= f32::EPSILON {
         break;
       }
@@ -482,13 +531,15 @@ fn calc_cell_visible_text<'a>(
   cell: &'a super::print::CalcPrintCell<'_>,
   style: &TextStyle,
   output_area: CalcCellOutputArea,
+  text_metrics: &mut TextMetrics,
 ) -> std::borrow::Cow<'a, str> {
   if output_area.left_clip_pt <= f32::EPSILON && output_area.right_clip_pt <= f32::EPSILON {
     return std::borrow::Cow::Borrowed(&cell.rendered_text);
   }
   if calc_cell_is_value(cell) {
     if cell.number_format_state == super::print::NumberFormatRenderState::General
-      && let Some(text) = calc_fit_general_number_text(cell, style, output_area.align_rect.width_pt)
+      && let Some(text) =
+        calc_fit_general_number_text(cell, style, output_area.align_rect.width_pt, text_metrics)
     {
       return std::borrow::Cow::Owned(text);
     }
@@ -502,7 +553,7 @@ fn calc_cell_visible_text<'a>(
   // exposes full glyph payloads even when clipped, so trim the extracted text
   // to the visible prefix/suffix while keeping the same clip decision.
   if super::pivot::pivot_table_contains_address(sheet, cell.address) {
-    clipped_string_text(cell, style, output_area)
+    clipped_string_text(cell, style, output_area, text_metrics)
       .map(std::borrow::Cow::Owned)
       .unwrap_or_else(|| std::borrow::Cow::Borrowed(cell.rendered_text.as_str()))
   } else {
@@ -537,12 +588,13 @@ fn clipped_string_text(
   cell: &super::print::CalcPrintCell<'_>,
   style: &TextStyle,
   output_area: CalcCellOutputArea,
+  text_metrics: &mut TextMetrics,
 ) -> Option<String> {
   let text = cell.rendered_text.as_str();
   if text.is_empty() {
     return None;
   }
-  let text_width = text_metrics::measure_text(text, style);
+  let text_width = text_metrics.measure_text(text, style);
   let visible_width = (text_width - output_area.right_clip_pt - output_area.left_clip_pt).max(0.0);
   if visible_width <= f32::EPSILON || visible_width >= text_width {
     return None;
@@ -550,7 +602,7 @@ fn clipped_string_text(
   if output_area.left_clip_pt > output_area.right_clip_pt {
     let mut start = text.len();
     for (index, _) in text.char_indices().rev() {
-      if text_metrics::measure_text(&text[index..], style) <= visible_width {
+      if text_metrics.measure_text(&text[index..], style) <= visible_width {
         start = index;
       } else {
         break;
@@ -561,7 +613,7 @@ fn clipped_string_text(
   let mut end = 0usize;
   for (index, ch) in text.char_indices() {
     let next = index + ch.len_utf8();
-    if text_metrics::measure_text(&text[..next], style) <= visible_width {
+    if text_metrics.measure_text(&text[..next], style) <= visible_width {
       end = next;
     } else {
       break;
@@ -574,6 +626,7 @@ fn calc_fit_general_number_text(
   cell: &super::print::CalcPrintCell<'_>,
   style: &TextStyle,
   column_width_pt: f32,
+  text_metrics: &mut TextMetrics,
 ) -> Option<String> {
   let value = cell.text.as_ref().parse::<f64>().ok()?;
   if !value.is_finite() {
@@ -585,7 +638,7 @@ fn calc_fit_general_number_text(
   }
   for significant_digits in (1..=15).rev() {
     let text = format_general_number_with_significant_digits(value, significant_digits);
-    if text_metrics::measure_text(&text, style) <= available_width {
+    if text_metrics.measure_text(&text, style) <= available_width {
       return Some(text);
     }
   }
@@ -619,29 +672,32 @@ fn format_general_number_with_significant_digits(value: f64, significant_digits:
   if text == "-0" { "0".to_string() } else { text }
 }
 
-fn coalesced_calc_row_text_items(items: Vec<CalcCellTextFragment>) -> Vec<PageItem> {
+fn coalesced_calc_row_text_items(
+  items: Vec<CalcCellTextFragment>,
+  text_metrics: &mut TextMetrics,
+) -> Vec<PageItem> {
   let mut output = Vec::with_capacity(items.len());
-  let mut previous_source: Option<CalcCellTextFragment> = None;
+  let mut previous_source: Option<CalcCellTextOrigin> = None;
   let mut items = items.into_iter().peekable();
   while let Some(item) = items.next() {
-    let text = item.text.clone();
     let next_is_row_end = !matches!(
       items.peek(),
-      Some(following) if (following.text.y_pt - text.y_pt).abs() < 0.01
+      Some(following) if (following.text.y_pt - item.text.y_pt).abs() < 0.01
     );
     if let Some(PageItem::Text(previous)) = output.last_mut()
-      && let Some(source) = previous_source.as_ref()
-      && calc_row_text_items_coalesce(previous, &text)
+      && let Some(source) = previous_source
+      && calc_row_text_items_coalesce(previous, &item.text)
     {
-      let spaces = calc_row_inter_cell_spaces(source, &item, next_is_row_end);
+      let spaces =
+        calc_row_inter_cell_spaces(source, previous, &item, next_is_row_end, text_metrics);
       previous.text.extend(std::iter::repeat_n(' ', spaces));
-      previous.text.push_str(&text.text);
-      previous.line_height_pt = previous.line_height_pt.max(text.line_height_pt);
-      previous_source = Some(item);
+      previous.text.push_str(&item.text.text);
+      previous.line_height_pt = previous.line_height_pt.max(item.text.line_height_pt);
+      previous_source = Some(CalcCellTextOrigin::from(&item));
       continue;
     }
-    output.push(PageItem::Text(text));
-    previous_source = Some(item);
+    previous_source = Some(CalcCellTextOrigin::from(&item));
+    output.push(PageItem::Text(item.text));
   }
   output
 }
@@ -668,11 +724,12 @@ fn calc_row_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
 }
 
 fn calc_row_inter_cell_spaces(
-  current: &CalcCellTextFragment,
+  current: CalcCellTextOrigin,
+  current_text: &TextItem,
   next: &CalcCellTextFragment,
   next_is_row_end: bool,
+  text_metrics: &mut TextMetrics,
 ) -> usize {
-  let current_text = &current.text;
   let next_text = &next.text;
   if current_text.text.ends_with(char::is_whitespace)
     || next_text.text.starts_with(char::is_whitespace)
@@ -683,12 +740,13 @@ fn calc_row_inter_cell_spaces(
     return 1;
   }
   let current_right =
-    current_text.x_pt + text_metrics::measure_text(&current_text.text, &current_text.style);
+    current_text.x_pt + text_metrics.measure_text(&current_text.text, &current_text.style);
   let current_layout_right = current_text.x_pt
     + approximate_text_width_pt(&current_text.text, current_text.style.font_size_pt);
   let current_cell_right = current.rect.x_pt + current.rect.width_pt;
   let gap = next_text.x_pt - current_right;
-  let space_width = text_metrics::measure_text(" ", &current_text.style)
+  let space_width = text_metrics
+    .measure_text(" ", &current_text.style)
     .max(current_text.style.font_size_pt * 0.25)
     .max(1.0);
   if current.address.row == next.address.row
@@ -759,6 +817,7 @@ fn render_cell_rich_text(
   base_style: TextStyle,
   horizontal_alignment: x::HorizontalAlignmentValues,
   hyperlink_url: Option<String>,
+  text_metrics: &mut TextMetrics,
 ) {
   let mut text = String::new();
   let mut style = base_style;
@@ -784,7 +843,7 @@ fn render_cell_rich_text(
   }
   let y_pt = rect.y_pt + XLSX_CELL_TEXT_INSET_PT;
   let line_height = (style.font_size_pt * 1.15).max(1.0);
-  let text_width_pt = text_metrics::measure_text(&text, &style);
+  let text_width_pt = text_metrics.measure_text(&text, &style);
   let x_pt = cell_text_x_pt(rect, text_width_pt, horizontal_alignment, 0.0);
   let preserve_text_portion = !text.is_ascii() && !calc_text_can_shape_as_line(&text);
   items.push(PageItem::Text(TextItem {
@@ -958,13 +1017,14 @@ fn render_cell_text(
   rect: CellRect,
   mut style: TextStyle,
   options: CellTextRenderOptions,
+  text_metrics: &mut TextMetrics,
 ) {
   let line_height = (style.font_size_pt * 1.15).max(1.0);
   let alignment = options.alignment;
   let wrap_text = alignment.is_some_and(|alignment| alignment.wrap_text);
   let fill_text;
   let text = if options.horizontal_alignment == x::HorizontalAlignmentValues::Fill && !wrap_text {
-    fill_text = repeat_cell_text_to_fill(text, rect.width_pt, &style);
+    fill_text = repeat_cell_text_to_fill(text, rect.width_pt, &style, text_metrics);
     fill_text.as_str()
   } else {
     text
@@ -999,7 +1059,7 @@ fn render_cell_text(
     };
   }
   for line in lines {
-    let full_line_width_pt = text_metrics::measure_text(line, &style);
+    let full_line_width_pt = text_metrics.measure_text(line, &style);
     let preserve_text_portion = !line.is_ascii() && !calc_text_can_shape_as_line(line);
     items.push(PageItem::Text(TextItem {
       x_pt: cell_text_x_pt(rect, full_line_width_pt, options.horizontal_alignment, 0.0),
@@ -1029,11 +1089,16 @@ fn render_cell_text(
   }
 }
 
-fn repeat_cell_text_to_fill(text: &str, width_pt: f32, style: &TextStyle) -> String {
+fn repeat_cell_text_to_fill(
+  text: &str,
+  width_pt: f32,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> String {
   if text.is_empty() || width_pt <= f32::EPSILON {
     return text.to_string();
   }
-  let text_width_pt = text_metrics::measure_text(text, style);
+  let text_width_pt = text_metrics.measure_text(text, style);
   if text_width_pt <= f32::EPSILON {
     return text.to_string();
   }
@@ -1269,6 +1334,7 @@ fn print_page_image_items(
       }
       let (x_pt, y_pt) =
         page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+      let hyperlink_url = drawing_object_hyperlink_url(drawing, &anchor.object);
       items.push(PageItem::Image(ImageItem {
         x_pt: origin_x_pt + x_pt * zoom_scale,
         y_pt: origin_y_pt + y_pt * zoom_scale,
@@ -1285,7 +1351,7 @@ fn print_page_image_items(
           .description
           .clone()
           .or_else(|| anchor.object.name.clone()),
-        hyperlink_url: drawing_object_hyperlink_url(drawing, &anchor.object),
+        hyperlink_url: hyperlink_url.as_deref().map(ToString::to_string),
         floating: false,
         behind_text: false,
       }));
@@ -1296,7 +1362,7 @@ fn print_page_image_items(
         origin_y_pt + y_pt * zoom_scale,
         width_pt * zoom_scale,
         height_pt * zoom_scale,
-        drawing_object_hyperlink_url(drawing, &anchor.object),
+        hyperlink_url.as_deref(),
       );
     }
   }
@@ -1840,6 +1906,7 @@ fn print_page_drawing_text_items(
       }
       let (x_pt, y_pt) =
         page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+      let hyperlink_url = drawing_object_hyperlink_url(drawing, &anchor.object);
       render_drawing_text(
         &mut items,
         &text,
@@ -1850,19 +1917,19 @@ fn print_page_drawing_text_items(
           height_pt: height_pt * zoom_scale,
         },
         drawing_object_text_style(&anchor.object),
-        drawing_object_hyperlink_url(drawing, &anchor.object),
+        hyperlink_url.as_deref(),
       );
     }
   }
   items
 }
 
-fn drawing_anchor_text(
-  drawing: &super::drawing::DrawingResourceCatalog,
-  anchor: &super::drawing::DrawingAnchorModel,
-) -> String {
+fn drawing_anchor_text<'a>(
+  drawing: &'a super::drawing::DrawingResourceCatalog,
+  anchor: &'a super::drawing::DrawingAnchorModel,
+) -> Cow<'a, str> {
   if !anchor.object.text.is_empty() {
-    return anchor.object.text.clone();
+    return Cow::Borrowed(anchor.object.text.as_str());
   }
   if anchor.object.kind == super::drawing::DrawingObjectKind::GraphicFrame
     && let Some(relationship_id) = anchor.object.relationship_id.as_deref()
@@ -1872,10 +1939,9 @@ fn drawing_anchor_text(
       .iter()
       .chain(drawing.extended_charts.iter())
       .find(|chart| chart.relationship_id.as_deref() == Some(relationship_id))
-      .map(|chart| chart.visible_texts.join("\n"))
-      .unwrap_or_default();
-    if !chart_text.is_empty() {
-      return chart_text;
+      .map(|chart| chart.visible_texts.join("\n"));
+    if let Some(chart_text) = chart_text.filter(|text| !text.is_empty()) {
+      return Cow::Owned(chart_text);
     }
     if drawing
       .diagrams
@@ -1883,10 +1949,10 @@ fn drawing_anchor_text(
       .iter()
       .any(|data| data.relationship_id.as_deref() == Some(relationship_id))
     {
-      return String::new();
+      return Cow::Borrowed("");
     }
   }
-  String::new()
+  Cow::Borrowed("")
 }
 
 fn render_drawing_text(
@@ -1894,7 +1960,7 @@ fn render_drawing_text(
   text: &str,
   rect: CellRect,
   style: Option<TextStyle>,
-  hyperlink_url: Option<String>,
+  hyperlink_url: Option<&str>,
 ) {
   let style = style.unwrap_or_default();
   let line_height = (style.font_size_pt * 1.15).max(1.0);
@@ -1910,7 +1976,7 @@ fn render_drawing_text(
       text: line.to_string(),
       style: style.clone(),
       rotation_center_pt: None,
-      hyperlink_url: hyperlink_url.clone(),
+      hyperlink_url: hyperlink_url.map(ToString::to_string),
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
@@ -1944,7 +2010,7 @@ fn render_metafile_texts(
   y_pt: f32,
   width_pt: f32,
   height_pt: f32,
-  hyperlink_url: Option<String>,
+  hyperlink_url: Option<&str>,
 ) {
   let runs = emf_wmf::extract_metafile_text_runs(&resource.data, resource.content_type.as_deref());
   if runs.is_empty() {
@@ -1963,7 +2029,7 @@ fn render_metafile_texts(
       text: run.text,
       style,
       rotation_center_pt: None,
-      hyperlink_url: hyperlink_url.clone(),
+      hyperlink_url: hyperlink_url.map(ToString::to_string),
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
@@ -2006,7 +2072,7 @@ fn print_page_vml_text_items(
       page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
     render_drawing_text(
       &mut items,
-      text.as_ref(),
+      text,
       CellRect {
         x_pt: origin_x_pt + x_pt * zoom_scale,
         y_pt: origin_y_pt + y_pt * zoom_scale,
@@ -2023,18 +2089,18 @@ fn print_page_vml_text_items(
 fn vml_shape_visible_text<'a>(
   sheet: &'a CalcSheet,
   shape: &'a super::object_resources::VmlShapeModel,
-) -> Cow<'a, str> {
+) -> &'a str {
   if !shape.text.trim().is_empty() {
-    return Cow::Borrowed(shape.text.as_str());
+    return shape.text.as_str();
   }
   if shape.object_type.as_deref() != Some("Note") || !shape.visible {
-    return Cow::Borrowed("");
+    return "";
   }
   let Some(row) = shape.note_row.and_then(|row| row.checked_add(1)) else {
-    return Cow::Borrowed("");
+    return "";
   };
   let Some(col) = shape.note_column.and_then(|col| col.checked_add(1)) else {
-    return Cow::Borrowed("");
+    return "";
   };
   let address = super::worksheet::CellAddress { col, row };
   // legacy comments against the VML note shape map; visible note captions use
@@ -2048,31 +2114,32 @@ fn vml_shape_visible_text<'a>(
       legacy.comments.iter().find_map(|comment| {
         super::worksheet::CellRange::parse_a1_range(&comment.reference)
           .is_some_and(|range| range.contains(address))
-          .then(|| Cow::Owned(comment.text.clone()))
+          .then_some(comment.text.as_str())
       })
     })
-    .unwrap_or(Cow::Borrowed(""))
+    .unwrap_or("")
 }
 
-fn drawing_object_hyperlink_url(
-  drawing: &super::drawing::DrawingResourceCatalog,
-  object: &super::drawing::DrawingObjectModel,
-) -> Option<String> {
+fn drawing_object_hyperlink_url<'a>(
+  drawing: &'a super::drawing::DrawingResourceCatalog,
+  object: &'a super::drawing::DrawingObjectModel,
+) -> Option<Cow<'a, str>> {
   object
     .hyperlink_relationship_id
     .as_deref()
     .and_then(|relationship_id| drawing.hyperlink_targets.get(relationship_id))
-    .cloned()
-    .or_else(|| object.hyperlink_invalid_url.clone())
+    .map(|url| Cow::Borrowed(url.as_str()))
+    .or_else(|| object.hyperlink_invalid_url.as_deref().map(Cow::Borrowed))
     .or_else(|| {
       object
         .hyperlink_action
-        .clone()
+        .as_deref()
         .and_then(drawing_hyperlink_action_url)
+        .map(Cow::Owned)
     })
 }
 
-fn drawing_hyperlink_action_url(action: String) -> Option<String> {
+fn drawing_hyperlink_action_url(action: &str) -> Option<String> {
   action
     .strip_prefix("ppaction://hlinkshowjump?jump=")
     .map(|jump| format!("ooxmlsdk-pdf-action://hlinkshowjump/{jump}"))
@@ -2292,7 +2359,7 @@ fn render_header_footer(items: &mut Vec<PageItem>, page: &CalcPrintPage<'_>, set
       setup.header_distance_pt,
       page,
       setup,
-      &header,
+      header,
     );
   }
   if let Some(footer) = footer {
@@ -2302,31 +2369,30 @@ fn render_header_footer(items: &mut Vec<PageItem>, page: &CalcPrintPage<'_>, set
       setup.height_pt - setup.footer_distance_pt - XLSX_HEADER_FOOTER_LINE_HEIGHT_PT,
       page,
       setup,
-      &footer,
+      footer,
     );
   }
 }
 
-fn header_footer_text(page: &CalcPrintPage<'_>, header: bool) -> Option<String> {
+fn header_footer_text<'a>(page: &CalcPrintPage<'a>, header: bool) -> Option<&'a str> {
   let model = &page.page_settings.header_footer;
-  let text = if page.sheet_page_index == 0 && model.different_first {
+  if page.sheet_page_index == 0 && model.different_first {
     if header {
-      model.first_header.as_ref()
+      model.first_header.as_deref()
     } else {
-      model.first_footer.as_ref()
+      model.first_footer.as_deref()
     }
   } else if page.sheet_page_index % 2 == 1 && model.different_odd_even {
     if header {
-      model.even_header.as_ref()
+      model.even_header.as_deref()
     } else {
-      model.even_footer.as_ref()
+      model.even_footer.as_deref()
     }
   } else if header {
-    model.odd_header.as_ref()
+    model.odd_header.as_deref()
   } else {
-    model.odd_footer.as_ref()
-  }?;
-  Some(text.clone())
+    model.odd_footer.as_deref()
+  }
 }
 
 fn render_header_footer_line(

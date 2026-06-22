@@ -5,9 +5,10 @@ use rustc_hash::FxHashMap as HashMap;
 
 use crate::error::{PdfError, Result};
 use ooxmlsdk_layout::common;
-use ooxmlsdk_layout::fonts::{FontFaceData, FontStyleRef, cached_text_face};
+use ooxmlsdk_layout::fonts::{FontFaceData, FontResolver, FontStyleRef};
 
 pub(super) struct FontSet {
+  resolver: FontResolver,
   fallback: Font,
   fonts: HashMap<FontKey, Font>,
   face_fonts: HashMap<FontFaceData, Font>,
@@ -15,10 +16,12 @@ pub(super) struct FontSet {
 }
 
 impl FontSet {
-  pub(super) fn load() -> Result<Self> {
+  pub(super) fn load(mut resolver: FontResolver) -> Result<Self> {
     let fallback_style = common::TextStyle::default();
+    let fallback = load_font(&mut resolver, &fallback_style)?;
     Ok(Self {
-      fallback: load_font(&fallback_style)?,
+      resolver,
+      fallback,
       fonts: HashMap::default(),
       face_fonts: HashMap::default(),
       last_font: None,
@@ -39,7 +42,7 @@ impl FontSet {
       return font;
     }
 
-    let loaded = load_font(style).unwrap_or_else(|_| self.fallback.clone());
+    let loaded = load_font(&mut self.resolver, style).unwrap_or_else(|_| self.fallback.clone());
     let font = self.fonts.entry(key.clone()).or_insert(loaded).clone();
     self.store_last_font(key, font.clone());
     font
@@ -86,8 +89,8 @@ impl FontKey {
   }
 }
 
-fn load_font(style: &(impl FontStyleRef + ?Sized)) -> Result<Font> {
-  if let Some(face) = cached_text_face(style)
+fn load_font(resolver: &mut FontResolver, style: &(impl FontStyleRef + ?Sized)) -> Result<Font> {
+  if let Some(face) = resolver.cached_text_face(style)
     && let Some(font) = font_from_face(&face)
   {
     return Ok(font);

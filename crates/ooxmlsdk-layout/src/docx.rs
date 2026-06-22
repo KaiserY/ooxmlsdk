@@ -3099,9 +3099,22 @@ fn dynamic_field_kind(instr: &str) -> Option<DynamicFieldKind> {
   match name.as_str() {
     "PAGE" => Some(DynamicFieldKind::Page),
     "NUMPAGES" => Some(DynamicFieldKind::NumPages),
+    "PAGEREF" => page_ref_field_kind(&tokens[1..]),
     "STYLEREF" => style_ref_field_kind(&tokens[1..]),
     _ => None,
   }
+}
+
+fn page_ref_field_kind(tokens: &[String]) -> Option<DynamicFieldKind> {
+  for token in tokens {
+    if token.starts_with('\\') {
+      continue;
+    }
+    return Some(DynamicFieldKind::PageRef {
+      bookmark_name: Arc::<str>::from(token.as_str()),
+    });
+  }
+  None
 }
 
 fn style_ref_field_kind(tokens: &[String]) -> Option<DynamicFieldKind> {
@@ -13889,6 +13902,16 @@ mod tests {
       panic!("expected dynamic field text");
     };
     assert_eq!(run.dynamic_field, Some(DynamicFieldKind::Page));
+  }
+
+  #[test]
+  fn pageref_field_instruction_emits_bookmark_page_marker() {
+    assert_eq!(
+      dynamic_field_kind(r#" PAGEREF "_Toc123" \h "#),
+      Some(DynamicFieldKind::PageRef {
+        bookmark_name: Arc::<str>::from("_Toc123"),
+      })
+    );
   }
 
   #[test]

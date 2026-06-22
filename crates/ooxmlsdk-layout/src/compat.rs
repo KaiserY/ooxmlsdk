@@ -617,6 +617,9 @@ impl Default for PageSetup {
 pub enum DynamicFieldKind {
   Page,
   NumPages,
+  PageRef {
+    bookmark_name: Arc<str>,
+  },
   StyleRef {
     style_name: Arc<str>,
     from_bottom: bool,

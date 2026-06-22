@@ -31,6 +31,7 @@ const TABLE_SPACING_AFTER_PT: f32 = 0.0;
 const DEFAULT_ORPHAN_LINES: usize = 2;
 const DEFAULT_WIDOW_LINES: usize = 2;
 const MOVE_BACKWARD_SUPPRESS_THRESHOLD: usize = 20;
+const LAYOUT_LOOP_CONTROL_MAX: usize = 10_000;
 const UNBOUNDED_LAYOUT_EXTENT_PT: f32 = f32::MAX / 4.0;
 const MEASURE_SCRATCH_PAGE_HEIGHT_PT: f32 = UNBOUNDED_LAYOUT_EXTENT_PT;
 const LAYOUT_EPSILON_PT: f32 = 0.1;
@@ -847,7 +848,29 @@ struct BlockArea {
 }
 
 pub(crate) fn layout(document: &DocxDocument, options: &LayoutOptions) -> Result<LayoutDocument> {
+  if !options.action.calc_layout {
+    return Ok(empty_layout_document(document));
+  }
   Ok(RootFrameLayout::new(document, options).format())
+}
+
+fn empty_layout_document(_document: &DocxDocument) -> LayoutDocument {
+  LayoutDocument {
+    pages: Vec::new(),
+    form_widgets: Vec::new(),
+    follows: Vec::new(),
+    frames: Vec::new(),
+    outline_entries: Vec::new(),
+    anchor_pages: Vec::new(),
+    page_replays: Vec::new(),
+    page_replay_applications: Vec::new(),
+    backward_moves: Vec::new(),
+    layout_reruns: Vec::new(),
+    page_invalidations: Vec::new(),
+    reflow_executions: Vec::new(),
+    reflow_requests: Vec::new(),
+    restart_plan: None,
+  }
 }
 
 pub(crate) fn layout_summary(layout: LayoutDocument) -> super::DocxLayoutSummary {
@@ -1398,6 +1421,9 @@ fn into_compat_dynamic_field(field: DynamicFieldKind) -> crate::compat::DynamicF
   match field {
     DynamicFieldKind::Page => crate::compat::DynamicFieldKind::Page,
     DynamicFieldKind::NumPages => crate::compat::DynamicFieldKind::NumPages,
+    DynamicFieldKind::PageRef { bookmark_name } => {
+      crate::compat::DynamicFieldKind::PageRef { bookmark_name }
+    }
     DynamicFieldKind::StyleRef {
       style_name,
       from_bottom,
@@ -1661,6 +1687,7 @@ impl<'a> RootFrameLayout<'a> {
         &mut self.frames,
         &mut self.follows,
         &mut self.outline_entries,
+        &mut self.anchor_pages,
       );
     }
 
@@ -1705,7 +1732,7 @@ impl<'a> RootFrameLayout<'a> {
       apply_column_separators(self.document, &mut self.pages, &self.frames);
       apply_headers_and_footers(self.document, &mut self.pages);
       apply_page_borders(&mut self.pages);
-      resolve_dynamic_fields(&mut self.pages);
+      resolve_dynamic_fields(&mut self.pages, &self.anchor_pages);
       mark_decorated_frame_invalidations(
         &mut self.frames,
         &self.pages,
@@ -3621,10 +3648,13 @@ fn apply_page_replay(page: &mut Page, replay: &mut PageReplay, preserve_replay: 
 }
 
 fn materialize_pending_floating_table_follows(pages: &mut Vec<Page>) {
-  while pages
-    .iter()
-    .any(|page| !page.pending_floating_table_follows.is_empty())
-  {
+  for _ in 0..LAYOUT_LOOP_CONTROL_MAX {
+    if !pages
+      .iter()
+      .any(|page| !page.pending_floating_table_follows.is_empty())
+    {
+      return;
+    }
     let mut pending = Vec::<PendingFloatingTableFollow>::new();
     for page in pages.iter_mut() {
       pending.append(&mut page.pending_floating_table_follows);
@@ -4380,6 +4410,7 @@ fn check_page_desc_empty_pages(
   frames: &mut [LayoutFrame],
   follows: &mut Vec<FrameFollow>,
   outline_entries: &mut Vec<OutlineEntry>,
+  anchor_pages: &mut Vec<AnchorPage>,
 ) {
   // SwFrame::CheckPageDescs() walks the page chain, inserts intentional empty
   // pages for right/left page wishes, and after every change re-evaluates the
@@ -4491,6 +4522,23 @@ fn check_page_desc_empty_pages(
       return false;
     }
     entry.page_index = mapped;
+    true
+  });
+  anchor_pages.retain_mut(|anchor| {
+    let Some(&mapped) = page_index_map.get(anchor.page_index) else {
+      return false;
+    };
+    if mapped == usize::MAX {
+      return false;
+    }
+    let Some(page) = kept.get(mapped) else {
+      return false;
+    };
+    anchor.page_index = mapped;
+    anchor.section_index = page.section_index;
+    anchor.section_page_index = page.section_page_index;
+    anchor.physical_page_number = mapped + 1;
+    anchor.virtual_page_number = virtual_page_number(page.setup, page.section_page_index, mapped);
     true
   });
   if kept.is_empty()
@@ -6177,8 +6225,17 @@ fn page_border_reference_rect(setup: PageSetup) -> (f32, f32, f32, f32) {
   }
 }
 
-fn resolve_dynamic_fields(pages: &mut [Page]) {
+fn resolve_dynamic_fields(pages: &mut [Page], anchor_pages: &[AnchorPage]) {
   let total_pages = pages.len().to_string();
+  let page_refs = anchor_pages
+    .iter()
+    .map(|anchor| {
+      (
+        anchor.name.as_str(),
+        anchor.virtual_page_number.max(1).to_string(),
+      )
+    })
+    .collect::<HashMap<_, _>>();
   let style_ref_candidates = style_ref_candidates_by_page(pages);
   for (page_index, page) in pages.iter_mut().enumerate() {
     let page_number = (page_index + 1).to_string();
@@ -6189,6 +6246,11 @@ fn resolve_dynamic_fields(pages: &mut [Page]) {
       match &text.dynamic_field {
         Some(DynamicFieldKind::Page) => text.text.clone_from(&page_number),
         Some(DynamicFieldKind::NumPages) => text.text.clone_from(&total_pages),
+        Some(DynamicFieldKind::PageRef { bookmark_name }) => {
+          if let Some(page_number) = page_refs.get(bookmark_name.as_ref()) {
+            text.text.clone_from(page_number);
+          }
+        }
         Some(DynamicFieldKind::StyleRef {
           style_name,
           from_bottom,
@@ -14075,5 +14137,51 @@ mod tests {
       state.page_split_decision(false, DEFAULT_ORPHAN_LINES, DEFAULT_WIDOW_LINES),
       TextSplitDecision::Rejected
     );
+  }
+
+  #[test]
+  fn pageref_dynamic_field_resolves_anchor_virtual_page_number() {
+    let mut page = empty_page(
+      PageSetup {
+        page_number_start: Some(7),
+        ..Default::default()
+      },
+      0,
+    );
+    page.items.push(PageItem::Text(TextItem {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      text: "1".to_string(),
+      style: TextStyle::default(),
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: Some(DynamicFieldKind::PageRef {
+        bookmark_name: Arc::<str>::from("_Toc123"),
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+    }));
+    let anchors = vec![AnchorPage {
+      name: "_Toc123".to_string(),
+      page_index: 2,
+      section_index: 0,
+      section_page_index: 2,
+      physical_page_number: 3,
+      virtual_page_number: 9,
+    }];
+    let mut pages = vec![page];
+
+    resolve_dynamic_fields(&mut pages, &anchors);
+
+    let PageItem::Text(text) = &pages[0].items[0] else {
+      panic!("expected text item");
+    };
+    assert_eq!(text.text, "9");
   }
 }

@@ -569,12 +569,12 @@ struct InternalLinkPosition {
 }
 
 #[derive(Clone, Debug, Default)]
-struct InternalLinkTargets {
-  positions: HashMap<String, InternalLinkPosition>,
+struct InternalLinkTargets<'doc> {
+  positions: HashMap<Cow<'doc, str>, InternalLinkPosition>,
 }
 
-impl InternalLinkTargets {
-  fn from_paint(paint: &PaintDocument<'_>) -> Self {
+impl<'doc> InternalLinkTargets<'doc> {
+  fn from_paint(paint: &'doc PaintDocument<'doc>) -> Self {
     let mut positions = HashMap::new();
     for (page_index, page) in paint.pages.iter().enumerate() {
       for item in &page.items {
@@ -584,7 +584,7 @@ impl InternalLinkTargets {
               && is_internal_link_url(url)
             {
               positions
-                .entry(url.to_string())
+                .entry(Cow::Borrowed(url.as_ref()))
                 .or_insert(InternalLinkPosition {
                   page_index,
                   x_pt: text.item.x_pt,
@@ -606,7 +606,7 @@ impl InternalLinkTargets {
 
   fn target_for_url(&self, url: &str) -> Option<Target> {
     let target_url = reciprocal_internal_link_url(url)?;
-    let position = self.positions.get(&target_url)?;
+    let position = self.positions.get(target_url.as_str())?;
     Some(Target::Destination(Destination::Xyz(XyzDestination::new(
       position.page_index,
       Point::from_xy(position.x_pt, position.y_pt),
@@ -698,12 +698,11 @@ impl<'doc> PaintDocument<'doc> {
         let line_owners = paint_line_owners(document, page_index, layout_items.len());
         let decoration_metadata = decoration_render_metadata(&layout_items);
         let items = layout_items
-          .iter()
+          .into_iter()
           .enumerate()
           .map(|(item_index, item)| match item {
-            PageItem::Text(text) => {
+            PageItem::Text(mut text) => {
               let owner = line_owners.get(item_index).copied().flatten();
-              let mut text = text.clone();
               let metadata = decoration_metadata[item_index];
               if metadata.suppress {
                 text.style.underline = false;
@@ -711,16 +710,16 @@ impl<'doc> PaintDocument<'doc> {
               }
               text.decoration_span_start_x_pt = metadata.span_start_x_pt;
               PaintItem::Text(PaintText::from_layout_text(
-                &text,
+                text,
                 owner,
                 page.setup.size.width.0,
               ))
             }
-            PageItem::Image(image) => PaintItem::Image(image.clone()),
-            PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area.clone()),
-            PageItem::Rect(rect) => PaintItem::Rect(*rect),
-            PageItem::Line(line) => PaintItem::Line(*line),
-            PageItem::Polyline(polyline) => PaintItem::Polyline(polyline.clone()),
+            PageItem::Image(image) => PaintItem::Image(image),
+            PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area),
+            PageItem::Rect(rect) => PaintItem::Rect(rect),
+            PageItem::Line(line) => PaintItem::Line(line),
+            PageItem::Polyline(polyline) => PaintItem::Polyline(polyline),
           })
           .collect();
         PaintPage {
@@ -894,6 +893,9 @@ fn dynamic_field_borrowed<'doc>(
   match field {
     common::DynamicField::Page => common::DynamicField::Page,
     common::DynamicField::NumPages => common::DynamicField::NumPages,
+    common::DynamicField::PageRef { bookmark_name } => common::DynamicField::PageRef {
+      bookmark_name: Cow::Borrowed(bookmark_name.as_ref()),
+    },
     common::DynamicField::StyleRef {
       style_name,
       from_bottom,
@@ -1015,82 +1017,88 @@ fn writer_text_items_coalesce(current: &TextItem<'_>, next: &TextItem<'_>) -> bo
 
 impl<'doc> PaintText<'doc> {
   fn from_layout_text(
-    text: &TextItem<'doc>,
+    text: TextItem<'doc>,
     owner: Option<PaintLineOwner>,
     page_width_pt: f32,
   ) -> Self {
-    let glyphs = if should_shape_pdf_glyphs(text) {
-      shaped_pdf_glyphs(&text.text, &text.style)
+    let text_ref = &text;
+    let glyphs = if should_shape_pdf_glyphs(text_ref) {
+      shaped_pdf_glyphs(&text_ref.text, &text_ref.style)
     } else {
       None
     };
     let width_pt = glyphs
       .as_ref()
       .map(|run| run.width_pt)
-      .unwrap_or_else(|| measure_text(&text.text, &text.style));
+      .unwrap_or_else(|| measure_text(&text_ref.text, &text_ref.style));
     let baseline_y = match owner.map(|owner| owner.frame_kind) {
-      Some(FollowFrameKind::Table) => text.y_pt - text.style.baseline_shift_pt,
+      Some(FollowFrameKind::Table) => text_ref.y_pt - text_ref.style.baseline_shift_pt,
       Some(FollowFrameKind::Paragraph | FollowFrameKind::Notes) | None => {
-        text.y_pt + baseline_offset_in_line(&text.style, text.line_height_pt)
+        text_ref.y_pt + baseline_offset_in_line(&text_ref.style, text_ref.line_height_pt)
       }
     };
-    let vertical_metrics = vertical_metrics(&text.style);
+    let vertical_metrics = vertical_metrics(&text_ref.style);
     let text_box_y_pt =
       baseline_y - vertical_metrics.ascent_pt - vertical_metrics.leading_above_pt();
     let text_box_height_pt = vertical_metrics.line_height_pt();
-    let highlight = text.style.highlight.map(|color| PaintRect {
-      x_pt: text.x_pt,
+    let highlight = text_ref.style.highlight.map(|color| PaintRect {
+      x_pt: text_ref.x_pt,
       y_pt: text_box_y_pt,
       width_pt,
       height_pt: text_box_height_pt,
       color,
     });
-    let decoration_metrics = text_decoration_metrics(&text.style);
-    let decoration_start_x_pt = text.decoration_span_start_x_pt.unwrap_or(text.x_pt);
+    let decoration_metrics = text_decoration_metrics(&text_ref.style);
+    let decoration_start_x_pt = text_ref.decoration_span_start_x_pt.unwrap_or(text_ref.x_pt);
     let underline_y_pt = baseline_y + decoration_metrics.underline_offset_pt;
-    let underline = text.style.underline.then_some(PaintStrokeLine {
+    let underline = text_ref.style.underline.then_some(PaintStrokeLine {
       x1_pt: decoration_start_x_pt,
       y1_pt: underline_y_pt,
-      x2_pt: text.x_pt + width_pt,
+      x2_pt: text_ref.x_pt + width_pt,
       y2_pt: underline_y_pt,
       width_pt: decoration_metrics.underline_width_pt,
-      color: text.style.underline_color.unwrap_or(text.style.color),
+      color: text_ref
+        .style
+        .underline_color
+        .unwrap_or(text_ref.style.color),
     });
     let strikethrough_y_pt = baseline_y - decoration_metrics.strikethrough_offset_pt;
-    let strikethrough = text.style.strikethrough.then_some(PaintStrokeLine {
+    let strikethrough = text_ref.style.strikethrough.then_some(PaintStrokeLine {
       x1_pt: decoration_start_x_pt,
       y1_pt: strikethrough_y_pt,
-      x2_pt: text.x_pt + width_pt,
+      x2_pt: text_ref.x_pt + width_pt,
       y2_pt: strikethrough_y_pt,
       width_pt: decoration_metrics.strikethrough_width_pt,
-      color: text.style.color,
+      color: text_ref.style.color,
     });
-    let link = text.hyperlink_url.as_ref().map(|url| PaintLink {
-      x_pt: text.x_pt,
+    let link = text_ref.hyperlink_url.as_ref().map(|url| PaintLink {
+      x_pt: text_ref.x_pt,
       y_pt: text_box_y_pt,
       width_pt,
       height_pt: text_box_height_pt,
       url: url.clone(),
     });
 
+    let portions = text_paint_portions(PaintTextPortionSource {
+      text: text_ref,
+      baseline_y,
+      width_pt,
+      page_width_pt,
+      clip: owner.map(|owner| owner.clip),
+      glyphs: glyphs.map(|run| run.font_runs),
+      highlight,
+      underline,
+      strikethrough,
+      link,
+    });
+
     Self {
-      item: text.clone(),
+      item: text,
       source_frame_index: owner.map(|owner| owner.frame_index),
       source_line_index: owner.map(|owner| owner.line_index),
       baseline_y,
       width_pt,
-      portions: text_paint_portions(PaintTextPortionSource {
-        text,
-        baseline_y,
-        width_pt,
-        page_width_pt,
-        clip: owner.map(|owner| owner.clip),
-        glyphs: glyphs.map(|run| run.font_runs),
-        highlight,
-        underline,
-        strikethrough,
-        link,
-      }),
+      portions,
     }
   }
 }

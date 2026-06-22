@@ -284,6 +284,9 @@ fn dynamic_field_from_compat(field: legacy::DynamicFieldKind) -> DynamicField<'s
   match field {
     legacy::DynamicFieldKind::Page => DynamicField::Page,
     legacy::DynamicFieldKind::NumPages => DynamicField::NumPages,
+    legacy::DynamicFieldKind::PageRef { bookmark_name } => DynamicField::PageRef {
+      bookmark_name: Cow::Owned(bookmark_name.to_string()),
+    },
     legacy::DynamicFieldKind::StyleRef {
       style_name,
       from_bottom,

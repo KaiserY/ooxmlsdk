@@ -321,6 +321,9 @@ pub struct TextStyle<'doc> {
 pub enum DynamicField<'doc> {
   Page,
   NumPages,
+  PageRef {
+    bookmark_name: Cow<'doc, str>,
+  },
   StyleRef {
     style_name: Cow<'doc, str>,
     from_bottom: bool,

@@ -155,6 +155,24 @@ fn paragraph_line_height_for_setup(
   }
 }
 
+fn grid_auto_line_spacing_multiplier(
+  paragraph: &crate::docx::Paragraph,
+  setup: PageSetup,
+  text_segmentation: TextSegmentation,
+) -> Option<f32> {
+  if !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    || !paragraph.format.snap_to_grid.unwrap_or(true)
+    || !matches!(text_segmentation, TextSegmentation::Body)
+    || setup.doc_grid_line_pitch_pt.is_none()
+  {
+    return None;
+  }
+  paragraph
+    .format
+    .line_height_pt
+    .map(|multiple| multiple.max(1.0))
+}
+
 fn snap_line_height_to_doc_grid(line_height: f32, doc_grid_line_pitch_pt: Option<f32>) -> f32 {
   let Some(grid_height) = doc_grid_line_pitch_pt else {
     return line_height;
@@ -227,10 +245,17 @@ fn char_uses_complex_font_size(ch: char) -> bool {
 fn line_real_height(
   paragraph: &crate::docx::Paragraph,
   line_height: f32,
+  line_index: usize,
+  grid_auto_line_spacing_multiplier: Option<f32>,
   _has_content_control: bool,
 ) -> f32 {
   if let Some(height) = placeholder_floating_line_height(paragraph, line_height) {
     return height;
+  }
+  if line_index > 0
+    && let Some(multiple) = grid_auto_line_spacing_multiplier
+  {
+    return line_height * multiple;
   }
   line_height
 }
@@ -5055,15 +5080,28 @@ fn estimated_paragraph_content_height(
     paragraph_left: 0.0,
     base_line_height,
     line_height_rule: paragraph.format.line_height_rule,
+    grid_auto_line_spacing_multiplier: grid_auto_line_spacing_multiplier(
+      paragraph,
+      flow.setup,
+      flow.text_segmentation,
+    ),
     script_sensitive_line_height: flow.script_sensitive_line_height,
   };
   let mut line_height = base_line_height;
+  let mut line_index = 0usize;
   let mut content_height = 0.0;
   let mut floating_bottom: f32 = 0.0;
   let mut has_flow_content = paragraph.list_label.is_some();
   let mut x = (paragraph.format.first_line_indent_pt).max(0.0);
-  let finish_line = |content_height: &mut f32, line_height: &mut f32| {
-    *content_height += line_real_height(paragraph, *line_height, false);
+  let finish_line = |content_height: &mut f32, line_height: &mut f32, line_index: &mut usize| {
+    *content_height += line_real_height(
+      paragraph,
+      *line_height,
+      *line_index,
+      text_frame.grid_auto_line_spacing_multiplier,
+      false,
+    );
+    *line_index += 1;
     *line_height = base_line_height;
   };
 
@@ -5072,14 +5110,14 @@ fn estimated_paragraph_content_height(
       InlineItem::Text(run) => {
         for segment in text_segments(&run.text) {
           if segment == "\n" || segment == "\t" {
-            finish_line(&mut content_height, &mut line_height);
+            finish_line(&mut content_height, &mut line_height, &mut line_index);
             x = 0.0;
             continue;
           }
           has_flow_content = true;
           let width = text_metrics.measure_text(&segment, &run.style);
           if x + width > content_width && x > 0.0 {
-            finish_line(&mut content_height, &mut line_height);
+            finish_line(&mut content_height, &mut line_height, &mut line_index);
             x = 0.0;
           }
           if width > content_width && x <= 0.0 && !segment.chars().all(char::is_whitespace) {
@@ -5091,7 +5129,7 @@ fn estimated_paragraph_content_height(
                   let text = ch.encode_utf8(&mut encoded);
                   let width = text_metrics.measure_text(text, &run.style);
                   if x + width > content_width && x > 0.0 {
-                    finish_line(&mut content_height, &mut line_height);
+                    finish_line(&mut content_height, &mut line_height, &mut line_index);
                     x = 0.0;
                   }
                   x += width;
@@ -5103,7 +5141,7 @@ fn estimated_paragraph_content_height(
                 continue;
               }
               if x + width > content_width && x > 0.0 {
-                finish_line(&mut content_height, &mut line_height);
+                finish_line(&mut content_height, &mut line_height, &mut line_index);
                 x = 0.0;
               }
               x += width;
@@ -5151,7 +5189,7 @@ fn estimated_paragraph_content_height(
         );
         has_flow_content = true;
         if x + width > content_width && x > 0.0 {
-          finish_line(&mut content_height, &mut line_height);
+          finish_line(&mut content_height, &mut line_height, &mut line_index);
         }
         line_height = line_height.max(height.min(base_line_height));
         x = width;
@@ -5177,7 +5215,7 @@ fn estimated_paragraph_content_height(
         }
         let mut compatibility_forced_shape_line = false;
         if x + shape.width_pt > content_width && x > 0.0 {
-          finish_line(&mut content_height, &mut line_height);
+          finish_line(&mut content_height, &mut line_height, &mut line_index);
           compatibility_forced_shape_line = true;
         }
         has_flow_content = true;
@@ -5192,13 +5230,13 @@ fn estimated_paragraph_content_height(
       | InlineItem::FormWidgetEnd(_)
       | InlineItem::LastRenderedPageBreak => {}
       InlineItem::PageBreak | InlineItem::ColumnBreak => {
-        finish_line(&mut content_height, &mut line_height);
+        finish_line(&mut content_height, &mut line_height, &mut line_index);
         x = 0.0;
       }
     }
   }
   if has_flow_content || floating_bottom > 0.0 {
-    finish_line(&mut content_height, &mut line_height);
+    finish_line(&mut content_height, &mut line_height, &mut line_index);
   }
   content_height = content_height.max(floating_bottom);
 
@@ -11724,6 +11762,7 @@ struct TextFrame {
   paragraph_left: f32,
   base_line_height: f32,
   line_height_rule: LineHeightRule,
+  grid_auto_line_spacing_multiplier: Option<f32>,
   script_sensitive_line_height: bool,
 }
 
@@ -11759,6 +11798,11 @@ impl TextFrame {
         text_metrics,
       ),
       line_height_rule: paragraph.format.line_height_rule,
+      grid_auto_line_spacing_multiplier: grid_auto_line_spacing_multiplier(
+        paragraph,
+        flow.setup,
+        flow.text_segmentation,
+      ),
       script_sensitive_line_height: flow.script_sensitive_line_height,
     }
   }
@@ -12111,7 +12155,14 @@ impl<'a> TextFrameLayout<'a> {
       },
       advance.text_metrics,
     );
-    let real_height = line_real_height(self.paragraph, *line_height, *advance.line_has_form_widget);
+    let line_index = advance.state.line_fragments.len();
+    let real_height = line_real_height(
+      self.paragraph,
+      *line_height,
+      line_index,
+      advance.active.frame.grid_auto_line_spacing_multiplier,
+      *advance.line_has_form_widget,
+    );
     advance.state.finish_line(y, real_height);
     let mut next_y = y + real_height;
     *advance.line_has_form_widget = false;
@@ -13548,7 +13599,14 @@ impl<'a> TextFrameLayout<'a> {
         },
         text_metrics,
       );
-      let real_height = line_real_height(paragraph, line_height, line_has_form_widget);
+      let line_index = text_state.line_fragments.len();
+      let real_height = line_real_height(
+        paragraph,
+        line_height,
+        line_index,
+        text_frame.grid_auto_line_spacing_multiplier,
+        line_has_form_widget,
+      );
       text_state.finish_paragraph(y, real_height, emitted);
       paragraph_bottom = y + real_height;
       y = paragraph_bottom + self.spacing_after_pt;
@@ -14904,11 +14962,54 @@ mod tests {
       list_label_tab_stop_pt: None,
     };
 
-    assert!((line_real_height(&paragraph, 63.25, false) - 26.62).abs() < 0.02);
+    assert!((line_real_height(&paragraph, 63.25, 0, None, false) - 26.62).abs() < 0.02);
     if let InlineItem::Text(run) = &mut paragraph.inlines[0] {
       run.preserve_text_portion = false;
     }
-    assert_eq!(line_real_height(&paragraph, 63.25, false), 63.25);
+    assert_eq!(line_real_height(&paragraph, 63.25, 0, None, false), 63.25);
+  }
+
+  #[test]
+  fn grid_auto_line_spacing_expands_only_after_first_line() {
+    let paragraph = Paragraph {
+      inlines: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        line_height_rule: LineHeightRule::Auto,
+        line_height_pt: Some(1.35),
+        snap_to_grid: Some(true),
+        ..Default::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      list_label: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let setup = PageSetup {
+      doc_grid_line_pitch_pt: Some(15.6),
+      ..Default::default()
+    };
+    let multiple = grid_auto_line_spacing_multiplier(&paragraph, setup, TextSegmentation::Body);
+
+    assert_eq!(multiple, Some(1.35));
+    assert_eq!(line_real_height(&paragraph, 15.6, 0, multiple, false), 15.6);
+    assert!((line_real_height(&paragraph, 15.6, 1, multiple, false) - 21.06).abs() < 0.01);
+
+    let mut below_single = paragraph;
+    below_single.format.line_height_pt = Some(0.75);
+    let multiple = grid_auto_line_spacing_multiplier(&below_single, setup, TextSegmentation::Body);
+    assert_eq!(multiple, Some(1.0));
+    assert_eq!(
+      line_real_height(&below_single, 15.6, 1, multiple, false),
+      15.6
+    );
   }
 
   #[test]

@@ -6,7 +6,7 @@ use ooxmlsdk::schemas::{
 };
 use ooxmlsdk::simple_type::Coordinate32Value;
 
-use crate::compat::RgbColor;
+use crate::model::RgbColor;
 use crate::render::math::text_math_text;
 
 #[derive(Clone, Debug)]

@@ -6,7 +6,7 @@ use super::page_settings::CalcPageSettings;
 use super::pivot::pivot_print_address;
 use super::styles::DefinedNameBuiltin;
 use super::worksheet::{CalcCell, CalcRow, CalcSheet, CellAddress, CellRange, SheetType};
-use crate::compat::TextStyle;
+use crate::model::TextStyle;
 use crate::text_metrics::TextMetrics;
 use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;

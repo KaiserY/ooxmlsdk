@@ -52,21 +52,22 @@ where
 /// Convert an opened Wordprocessing document into PDF bytes.
 pub fn convert_wordprocessing_document(
   document: &mut WordprocessingDocument,
-  options: PdfOptions,
+  mut options: PdfOptions,
 ) -> Result<Vec<u8>> {
-  let layout_options = ooxmlsdk_layout::options::LayoutOptions::default();
+  let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::docx::layout_document(document, &layout_options)?;
   render::krilla::render(&pages, &options)
 }
 
 /// Inspect DOCX layout line boxes without rendering to PDF.
 ///
-/// This mirrors LibreOffice layout-dump tests that assert `SwLineLayout`
-/// metrics directly instead of going through PDF text extraction.
-pub fn inspect_docx_layout<R>(reader: R, _options: PdfOptions) -> Result<DocxLayoutSummary>
+/// This mirrors upstream layout-dump tests that assert line metrics directly
+/// instead of going through PDF text extraction.
+pub fn inspect_docx_layout<R>(reader: R, options: PdfOptions) -> Result<DocxLayoutSummary>
 where
   R: Read + Seek,
 {
+  let mut options = options;
   let settings = OpenSettings {
     markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
       process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
@@ -75,13 +76,11 @@ where
     ..Default::default()
   };
   let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
-  let layout_options = ooxmlsdk_layout::options::LayoutOptions {
-    diagnostics: ooxmlsdk_layout::options::LayoutDiagnosticsOptions {
-      collect_debug_records: true,
-      collect_reflow_records: true,
-      preserve_source_links: true,
-    },
-    ..Default::default()
+  let mut layout_options = options.take_layout_options();
+  layout_options.diagnostics = ooxmlsdk_layout::options::LayoutDiagnosticsOptions {
+    collect_debug_records: true,
+    collect_reflow_records: true,
+    preserve_source_links: true,
   };
   Ok(ooxmlsdk_layout::docx::inspect_layout(
     &mut document,
@@ -91,7 +90,7 @@ where
 
 /// Inspect PPTX SmartArt layout without rendering to PDF.
 ///
-/// This mirrors LibreOffice SmartArt import tests that assert Sdr shape text
+/// This mirrors upstream SmartArt import tests that assert shape text
 /// distances and `TakeTextAnchorRect()` values directly.
 pub fn inspect_pptx_layout<R>(reader: R, _options: PdfOptions) -> Result<PptxLayoutSummary>
 where
@@ -127,9 +126,9 @@ where
 /// Convert an opened spreadsheet document into PDF bytes.
 pub fn convert_spreadsheet_document(
   document: &mut SpreadsheetDocument,
-  options: PdfOptions,
+  mut options: PdfOptions,
 ) -> Result<Vec<u8>> {
-  let pages = xlsx::layout(document, &options)?;
+  let pages = xlsx::layout(document, &mut options)?;
   render::krilla::render(&pages, &options)
 }
 
@@ -152,9 +151,9 @@ where
 /// Convert an opened presentation document into PDF bytes.
 pub fn convert_presentation_document(
   document: &mut PresentationDocument,
-  options: PdfOptions,
+  mut options: PdfOptions,
 ) -> Result<Vec<u8>> {
-  let layout_options = ooxmlsdk_layout::options::LayoutOptions::default();
+  let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::pptx::layout_document(document, &layout_options)?;
   render::krilla::render(&pages, &options)
 }

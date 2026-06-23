@@ -297,7 +297,7 @@ enum PageItem<'doc> {
   LinkArea(LinkAreaItem<'doc>),
   Rect(RectItem),
   Line(LineItem),
-  Polyline(PolylineItem),
+  Polyline(PolylineItem<'doc>),
 }
 
 #[derive(Clone, Debug)]
@@ -380,12 +380,12 @@ enum LineItemKind {
 }
 
 #[derive(Clone, Debug)]
-struct PolylineItem {
+struct PolylineItem<'doc> {
   x_pt: f32,
   y_pt: f32,
   width_pt: f32,
   height_pt: f32,
-  points: Vec<(f32, f32)>,
+  points: &'doc [common::Point],
   closed: bool,
   fill_color: Option<RgbColor>,
   stroke: Option<BorderStyle>,
@@ -490,12 +490,12 @@ struct DecorationRenderMetadata {
 
 #[derive(Clone, Debug)]
 enum PaintItem<'doc> {
-  Text(PaintText<'doc>),
+  Text(Box<PaintText<'doc>>),
   Image(ImageItem<'doc>),
   LinkArea(LinkAreaItem<'doc>),
   Rect(RectItem),
   Line(LineItem),
-  Polyline(PolylineItem),
+  Polyline(PolylineItem<'doc>),
 }
 
 #[derive(Clone, Debug)]
@@ -719,11 +719,7 @@ impl<'doc> PaintDocument<'doc> {
       .enumerate()
       .map(|(page_index, page)| {
         let layout_items = coalesced_writer_text_items(
-          page
-            .items
-            .iter()
-            .filter_map(page_item_from_common)
-            .collect::<Vec<_>>(),
+          page.items.iter().filter_map(page_item_from_common),
           text_metrics,
         );
         let line_owners = paint_line_owners(document, page_index, layout_items.len());
@@ -740,12 +736,12 @@ impl<'doc> PaintDocument<'doc> {
                 text.style.strikethrough = false;
               }
               text.decoration_span_start_x_pt = metadata.span_start_x_pt;
-              PaintItem::Text(PaintText::from_layout_text(
+              PaintItem::Text(Box::new(PaintText::from_layout_text(
                 text,
                 owner,
                 page.setup.size.width.0,
                 text_metrics,
-              ))
+              )))
             }
             PageItem::Image(image) => PaintItem::Image(image),
             PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area),
@@ -824,7 +820,7 @@ fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> Imag
   }
 }
 
-fn polyline_from_common(path: &common::PathItem<'static>) -> PolylineItem {
+fn polyline_from_common<'doc>(path: &'doc common::PathItem<'static>) -> PolylineItem<'doc> {
   let x_pt = path.bounds.origin.x.0;
   let y_pt = path.bounds.origin.y.0;
   PolylineItem {
@@ -832,11 +828,7 @@ fn polyline_from_common(path: &common::PathItem<'static>) -> PolylineItem {
     y_pt,
     width_pt: path.bounds.size.width.0,
     height_pt: path.bounds.size.height.0,
-    points: path
-      .points
-      .iter()
-      .map(|point| (point.x.0 - x_pt, point.y.0 - y_pt))
-      .collect(),
+    points: &path.points,
     closed: path.closed,
     fill_color: solid_rgb(&path.fill),
     stroke: path.stroke.as_ref().map(stroke_from_common),
@@ -1008,10 +1000,11 @@ fn opacity(color: common::Color) -> f32 {
 }
 
 fn coalesced_writer_text_items<'doc>(
-  items: Vec<PageItem<'doc>>,
+  items: impl IntoIterator<Item = PageItem<'doc>>,
   text_metrics: &mut TextMetrics,
 ) -> Vec<PageItem<'doc>> {
-  let mut output: Vec<PageItem<'doc>> = Vec::with_capacity(items.len());
+  let items = items.into_iter();
+  let mut output: Vec<PageItem<'doc>> = Vec::with_capacity(items.size_hint().0);
   for item in items {
     match item {
       PageItem::Text(text) => {
@@ -1908,7 +1901,7 @@ fn draw_line_item(surface: &mut Surface<'_>, line: &LineItem) {
   }
 }
 
-fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem) {
+fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
   if polyline.points.len() < 2 {
     return;
   }
@@ -1934,10 +1927,10 @@ fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem) {
   }
 
   let mut path = PathBuilder::new();
-  let (first_x, first_y) = polyline.points[0];
-  path.move_to(polyline.x_pt + first_x, polyline.y_pt + first_y);
-  for &(x, y) in &polyline.points[1..] {
-    path.line_to(polyline.x_pt + x, polyline.y_pt + y);
+  let first = polyline.points[0];
+  path.move_to(first.x.0, first.y.0);
+  for point in &polyline.points[1..] {
+    path.line_to(point.x.0, point.y.0);
   }
   if polyline.closed {
     path.close();

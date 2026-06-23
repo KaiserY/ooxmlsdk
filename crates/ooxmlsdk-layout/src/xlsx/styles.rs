@@ -3,8 +3,8 @@ use ooxmlsdk::parts::workbook_part::WorkbookPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use std::sync::Arc;
 
-use crate::compat::{BorderStyle, RgbColor, TextStyle};
 use crate::error::Result;
+use crate::model::{BorderStyle, RgbColor, TextStyle};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct StylesCatalog {

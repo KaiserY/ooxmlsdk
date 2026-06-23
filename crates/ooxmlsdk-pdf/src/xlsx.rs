@@ -5,11 +5,8 @@ use crate::options::PdfOptions;
 
 pub(crate) fn layout(
   package: &mut SpreadsheetDocument,
-  options: &PdfOptions,
+  options: &mut PdfOptions,
 ) -> Result<ooxmlsdk_layout::common::LayoutDocument<'static>> {
-  let options = ooxmlsdk_layout::options::LayoutOptions {
-    source_file_name: options.source_file_name.clone(),
-    ..Default::default()
-  };
+  let options = options.take_layout_options();
   Ok(ooxmlsdk_layout::xlsx::layout_document(package, &options)?)
 }

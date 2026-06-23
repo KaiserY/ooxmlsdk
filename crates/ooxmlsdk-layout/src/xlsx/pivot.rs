@@ -11,8 +11,8 @@ use super::styles::StylesCatalog;
 use super::text::decode_excel_escaped_text;
 use super::workbook::SharedStringModel;
 use super::worksheet::{CalcSheet, CellAddress, CellRange};
-use crate::compat::{BorderStyle, RgbColor};
 use crate::error::Result;
+use crate::model::{BorderStyle, RgbColor};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct PivotTableCatalog {

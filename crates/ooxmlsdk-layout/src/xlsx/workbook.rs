@@ -5,8 +5,8 @@ use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use ooxmlsdk::sdk::SdkPart;
 
-use crate::compat::RgbColor;
 use crate::error::Result;
+use crate::model::RgbColor;
 
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
 use super::text::decode_excel_escaped_text;

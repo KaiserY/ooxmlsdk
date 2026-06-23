@@ -43,7 +43,6 @@ use quick_xml::escape::unescape;
 use quick_xml::events::{Event, attributes::Attribute};
 use smallvec::SmallVec;
 
-use crate::common::{LayoutEngineKind, layout_document_from_compat};
 use crate::error::Result;
 use crate::options::{LayoutActionOptions, LayoutDiagnosticsOptions, LayoutOptions};
 use crate::render::chart as shared_chart;
@@ -97,8 +96,7 @@ const DEFAULT_SECTION_COLUMN_GAP_PT: f32 = 720.0 / units::TWIPS_PER_POINT;
 const DEFAULT_TEXTBOX_MIN_WIDTH_PT: f32 = 11.0;
 const DEFAULT_TEXTBOX_MIN_HEIGHT_PT: f32 = 14.0;
 const DEFAULT_TEXTBOX_AUTO_FIT_WIDTH_PT: f32 = 200.0;
-// LibreOffice oox/source/shape/WpsContext.cxx uses the OOXML spec defaults:
-// left/right 91440 EMU, top/bottom 45720 EMU.
+// OOXML spec defaults: left/right 91440 EMU, top/bottom 45720 EMU.
 const DEFAULT_TEXTBOX_LEFT_RIGHT_INSET_PT: f32 = 91_440.0 / sdk_units::EMUS_PER_POINT as f32;
 const DEFAULT_TEXTBOX_TOP_BOTTOM_INSET_PT: f32 = 45_720.0 / sdk_units::EMUS_PER_POINT as f32;
 const WML_DEFAULT_BORDER_WIDTH_PT: f32 = 0.5;
@@ -245,7 +243,7 @@ pub(crate) fn extract(
     .first()
     .map(|section| section.title_page)
     .unwrap_or(false);
-  let form_widgets = form_widget_ids.widgets().to_vec();
+  let form_widgets = form_widget_ids.into_widgets();
 
   Ok(DocxDocument {
     page,
@@ -282,12 +280,7 @@ pub fn layout_document(
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
   let document = extract(package, options)?;
-  let document = layout::layout_document(&document, options);
-  Ok(layout_document_from_compat(
-    LayoutEngineKind::Docx,
-    document,
-    options,
-  ))
+  Ok(layout::layout_common_document(&document, options))
 }
 
 pub fn layout_anchor_pages(

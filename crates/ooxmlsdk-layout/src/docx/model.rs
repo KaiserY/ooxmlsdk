@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
-pub(crate) use crate::compat::{
+pub(crate) use crate::model::{
   BorderStyle, CellBordersModel, DynamicFieldKind, FormWidget, FormWidgetKind, ImageCrop,
   LineNumbering, PageSetup, RgbColor, TextStyle,
 };
@@ -490,8 +490,8 @@ impl FormWidgetIdAllocator {
     id
   }
 
-  pub(crate) fn widgets(&self) -> &[FormWidget] {
-    &self.widgets
+  pub(crate) fn into_widgets(self) -> Vec<FormWidget> {
+    self.widgets
   }
 }
 

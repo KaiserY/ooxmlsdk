@@ -24,7 +24,6 @@ mod worksheet;
 
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 
-use crate::common::{LayoutEngineKind, layout_document_from_compat};
 use crate::error::Result;
 use crate::options::LayoutOptions;
 
@@ -44,12 +43,7 @@ pub fn layout_document(
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
   let import = ExcelImport::import_document(package, options)?;
-  let document = display::lower_to_layout_document(&import);
-  Ok(layout_document_from_compat(
-    LayoutEngineKind::Xlsx,
-    document,
-    options,
-  ))
+  Ok(display::lower_to_layout_document(&import, options))
 }
 
 fn normalize_hyperlink_target(target: &str) -> String {

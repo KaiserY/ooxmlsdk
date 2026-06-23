@@ -10,7 +10,6 @@ mod slide_fragment;
 
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 
-use crate::common::{LayoutEngineKind, layout_document_from_compat};
 use crate::error::Result;
 use crate::options::LayoutOptions;
 
@@ -98,8 +97,7 @@ pub fn layout_document(
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
   let import = PowerPointImport::import_document(package)?;
-  let document = display::lower_to_layout_document(&import);
-  let mut document = layout_document_from_compat(LayoutEngineKind::Pptx, document, options);
+  let mut document = display::lower_to_layout_document(&import, options);
   if options.diagnostics.collect_debug_records {
     document
       .debug_records

@@ -6,11 +6,13 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
-use crate::compat::{
-  self as layout, ImageItem, LayoutDocument, LineItem, LineItemKind, LinkAreaItem, PageItem,
-  PdfTextSegmentation, RectItem, TextItem,
+use crate::common;
+use crate::model::{
+  BorderStyle, ImageCrop, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PageSetup,
+  PdfTextSegmentation, RectItem, RgbColor, TextItem, TextStyle, common_page_setup, common_point,
+  common_rect, common_rgb, common_stroke_from_border, common_text_style,
 };
-use crate::compat::{BorderStyle, ImageCrop, PageSetup, RgbColor, TextStyle};
+use crate::options::LayoutOptions;
 use crate::render::{diagram as shared_diagram, emf_wmf};
 use crate::text_metrics::TextMetrics;
 use crate::units;
@@ -54,14 +56,146 @@ struct CalcCellOutputArea {
   right_clip_pt: f32,
 }
 
-pub(crate) fn lower_to_layout_document(import: &ExcelImport) -> LayoutDocument {
+pub(crate) fn lower_to_layout_document(
+  import: &ExcelImport,
+  options: &LayoutOptions,
+) -> common::LayoutDocument<'static> {
   let mut pages = Vec::new();
   let print_document = CalcPrintDocument::from_import(import);
   pages.extend(print_document.pages.iter().map(|page| {
     let setup = page_setup_from_calc(page);
     (setup, print_page_items(import, page, setup))
   }));
-  layout::item_pages(pages)
+  common_fixed_pages_with_items(pages, options)
+}
+
+fn common_fixed_pages_with_items(
+  pages: Vec<(PageSetup, Vec<PageItem>)>,
+  options: &LayoutOptions,
+) -> common::LayoutDocument<'static> {
+  let pages = if pages.is_empty() {
+    vec![(PageSetup::default(), Vec::new())]
+  } else {
+    pages
+  };
+  common::LayoutDocument {
+    engine_kind: common::LayoutEngineKind::Xlsx,
+    options: common::LayoutOptions {
+      collect_debug: options.diagnostics.collect_debug_records,
+      approximate_unsupported: false,
+      preserve_source_links: options.diagnostics.preserve_source_links,
+    },
+    pages: pages
+      .into_iter()
+      .map(|(setup, items)| common_display_page(setup, items))
+      .collect(),
+    ..Default::default()
+  }
+}
+
+fn common_display_page(setup: PageSetup, items: Vec<PageItem>) -> common::DisplayPage<'static> {
+  let common_setup = common_page_setup(setup);
+  common::DisplayPage {
+    section_index: 0,
+    section_page_index: 0,
+    bounds: common_rect(0.0, 0.0, setup.width_pt, setup.height_pt),
+    background: setup
+      .background
+      .map(|color| common::Fill::Solid(common_rgb(color, 1.0))),
+    setup: common_setup,
+    items: items.into_iter().map(common_display_item).collect(),
+    ..Default::default()
+  }
+}
+
+fn common_display_item(item: PageItem) -> common::DisplayItem<'static> {
+  match item {
+    PageItem::Text(item) => common::DisplayItem::Text(common_text_run(item)),
+    PageItem::Image(item) => common::DisplayItem::Image(common_image_item(item)),
+    PageItem::LinkArea(item) => common::DisplayItem::LinkArea(common::LinkArea {
+      bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
+      target: Cow::Owned(item.hyperlink_url),
+    }),
+    PageItem::Rect(item) => common::DisplayItem::Rect(common_rect_item(item)),
+    PageItem::Line(item) => common::DisplayItem::Line(common_line_item(item)),
+  }
+}
+
+fn common_text_run(item: TextItem) -> common::TextRun<'static> {
+  let color = common_rgb(item.style.color, item.style.opacity);
+  common::TextRun {
+    text: Cow::Owned(item.text),
+    origin: common_point(item.x_pt, item.y_pt),
+    line_height: common::Pt(item.line_height_pt),
+    style: common_text_style(item.style),
+    font_id: None,
+    color,
+    rotation_center: item.rotation_center_pt.map(|(x, y)| common_point(x, y)),
+    hyperlink_url: item.hyperlink_url.map(Cow::Owned),
+    dynamic_field: None,
+    form_widget_id: item.form_widget_id,
+    paragraph_bidi: item.paragraph_bidi,
+    preserve_text_portion: item.preserve_text_portion,
+    pdf_text_segmentation: match item.pdf_text_segmentation {
+      PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
+      PdfTextSegmentation::Portion => common::PdfTextSegmentation::Portion,
+    },
+    source: None,
+  }
+}
+
+fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
+  common::ImageItem {
+    bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
+    crop: Some(common::ImageCrop {
+      left: item.crop.left,
+      top: item.crop.top,
+      right: item.crop.right,
+      bottom: item.crop.bottom,
+    }),
+    rotation_degrees: item.rotation_deg,
+    flip_horizontal: item.flip_horizontal,
+    flip_vertical: item.flip_vertical,
+    content_type: item
+      .content_type
+      .map(Cow::Owned)
+      .unwrap_or(Cow::Borrowed("application/octet-stream")),
+    bytes: item.data,
+    relationship_id: None,
+    alt_text: item.alt_text.map(Cow::Owned),
+    hyperlink_url: item.hyperlink_url.map(Cow::Owned),
+    floating: item.floating,
+    behind_text: item.behind_text,
+  }
+}
+
+fn common_rect_item(item: RectItem) -> common::RectItem<'static> {
+  common::RectItem {
+    bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
+    fill: item
+      .fill_color
+      .map(|color| common::Fill::Solid(common_rgb(color, item.fill_opacity)))
+      .unwrap_or(common::Fill::None),
+    stroke: item
+      .stroke
+      .map(|stroke| common_stroke_from_border(stroke, item.stroke_opacity)),
+  }
+}
+
+fn common_line_item(item: LineItem) -> common::LineItem<'static> {
+  common::LineItem {
+    start: common_point(item.x1_pt, item.y1_pt),
+    end: common_point(item.x2_pt, item.y2_pt),
+    stroke: common::Stroke {
+      width: common::Pt(item.width_pt),
+      color: common_rgb(item.color, 1.0),
+      dash: None,
+      source_style_id: None,
+    },
+    kind: match item.kind {
+      LineItemKind::Stroke => common::LineKind::Stroke,
+    },
+  }
 }
 
 fn print_page_items(
@@ -855,8 +989,6 @@ fn render_cell_rich_text(
     rotation_center_pt: None,
     hyperlink_url,
     dynamic_field: None,
-    style_ref_keys: Vec::new(),
-    style_ref_text: None,
     form_widget_id: None,
     paragraph_bidi: false,
     preserve_text_portion,
@@ -1073,8 +1205,6 @@ fn render_cell_text(
       )),
       hyperlink_url: options.hyperlink_url.clone(),
       dynamic_field: None,
-      style_ref_keys: Vec::new(),
-      style_ref_text: None,
       form_widget_id: None,
       paragraph_bidi: false,
       preserve_text_portion,
@@ -1284,8 +1414,6 @@ fn header_text(x_pt: f32, y_pt: f32, text: String) -> PageItem {
     rotation_center_pt: None,
     hyperlink_url: None,
     dynamic_field: None,
-    style_ref_keys: Vec::new(),
-    style_ref_text: None,
     form_widget_id: None,
     paragraph_bidi: false,
     preserve_text_portion: false,
@@ -1978,8 +2106,6 @@ fn render_drawing_text(
       rotation_center_pt: None,
       hyperlink_url: hyperlink_url.map(ToString::to_string),
       dynamic_field: None,
-      style_ref_keys: Vec::new(),
-      style_ref_text: None,
       form_widget_id: None,
       paragraph_bidi: false,
       preserve_text_portion: false,
@@ -2031,8 +2157,6 @@ fn render_metafile_texts(
       rotation_center_pt: None,
       hyperlink_url: hyperlink_url.map(ToString::to_string),
       dynamic_field: None,
-      style_ref_keys: Vec::new(),
-      style_ref_text: None,
       form_widget_id: None,
       paragraph_bidi: false,
       preserve_text_portion: false,

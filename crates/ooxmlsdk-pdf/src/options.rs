@@ -46,6 +46,13 @@ impl PdfOptions {
   pub(crate) fn effective_jpeg_quality(&self) -> Option<u8> {
     self.images.jpeg_quality.or(self.jpeg_quality)
   }
+
+  pub(crate) fn take_layout_options(&mut self) -> ooxmlsdk_layout::options::LayoutOptions {
+    ooxmlsdk_layout::options::LayoutOptions {
+      source_file_name: self.source_file_name.take(),
+      ..Default::default()
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -1,8 +1,8 @@
 pub mod common;
-pub mod compat;
 pub mod docx;
 pub mod error;
 pub mod fonts;
+mod model;
 pub mod options;
 pub mod pptx;
 pub mod render;
@@ -12,6 +12,5 @@ pub mod xlsx;
 
 pub use common::LayoutDocument;
 pub use common::LayoutDocument as CommonLayoutDocument;
-pub use compat::LayoutDocument as LegacyLayoutDocument;
 pub use error::{LayoutError, Result};
 pub use options::LayoutOptions;

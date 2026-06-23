@@ -1,19 +1,25 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
+use crate::common;
 use crate::docx::{
-  Block, BorderStyle, CellBordersModel, DocxDocument, DynamicFieldKind, FloatingFrame,
-  FloatingFramePlacement, FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment,
-  FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
-  HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
-  InlineItem, InlineShape, InlineShapeGeometry, LineHeightRule, LineNumbering, PageSetup,
-  ParagraphAlignment, RgbColor, SectionBreakKind, SectionColumns, TabLeader, TabStop,
-  TabStopAlignment, Table, TableAlignment, TableCell, TableCellVerticalAlignment, TableRow,
-  TextBoxVerticalAlignment, TextStyle, VerticalImageAlignment, VerticalImageReference,
+  Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingFrame, FloatingFramePlacement,
+  FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment, FrameHorizontalAnchor,
+  FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode, HorizontalImageAlignment,
+  HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide, InlineItem, InlineShape,
+  InlineShapeGeometry, LineHeightRule, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
+  SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
+  TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
+  VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
+use crate::model::{
+  common_page_setup, common_point, common_rect, common_rgb, common_stroke_from_border,
+  common_text_style,
+};
 use crate::options::{LayoutActionOptions, LayoutOptions};
 use crate::text_metrics::TextMetrics;
 use crate::units;
@@ -967,102 +973,558 @@ pub(crate) fn layout_summary(layout: LayoutDocument) -> super::DocxLayoutSummary
   super::DocxLayoutSummary { lines, rows }
 }
 
-pub(crate) fn layout_document(
+pub(crate) fn layout_common_document(
   document: &DocxDocument,
   options: &LayoutOptions,
-) -> crate::compat::LayoutDocument {
+) -> common::LayoutDocument<'static> {
   match layout(document, options) {
-    Ok(layout) => into_compat_document(layout),
-    Err(_) => crate::compat::LayoutDocument {
-      pages: Vec::new(),
-      form_widgets: Vec::new(),
-      follows: Vec::new(),
-      frames: Vec::new(),
-      outline_entries: Vec::new(),
-      anchor_pages: Vec::new(),
-      page_replays: Vec::new(),
-      page_replay_applications: Vec::new(),
-      backward_moves: Vec::new(),
-      layout_reruns: Vec::new(),
-      page_invalidations: Vec::new(),
-      reflow_executions: Vec::new(),
-      reflow_requests: Vec::new(),
-      restart_plan: None,
+    Ok(layout) => into_common_document(layout, options),
+    Err(_) => common::LayoutDocument {
+      engine_kind: common::LayoutEngineKind::Docx,
+      options: common_layout_options(options),
+      ..Default::default()
     },
   }
 }
 
-fn into_compat_document(document: LayoutDocument) -> crate::compat::LayoutDocument {
-  crate::compat::LayoutDocument {
-    pages: document.pages.into_iter().map(into_compat_page).collect(),
+fn into_common_document(
+  document: LayoutDocument,
+  options: &LayoutOptions,
+) -> common::LayoutDocument<'static> {
+  let debug_records = if options.diagnostics.collect_debug_records {
+    common_debug_records(&document)
+  } else {
+    Vec::new()
+  };
+
+  common::LayoutDocument {
+    engine_kind: common::LayoutEngineKind::Docx,
+    options: common_layout_options(options),
+    pages: document.pages.into_iter().map(into_common_page).collect(),
     form_widgets: document
       .form_widgets
       .into_iter()
-      .map(into_compat_form_widget)
+      .map(into_common_form_widget)
       .collect(),
     follows: document
       .follows
       .into_iter()
-      .map(into_compat_frame_follow)
+      .map(into_common_frame_follow)
       .collect(),
     frames: document
       .frames
       .into_iter()
-      .map(into_compat_layout_frame)
+      .enumerate()
+      .map(|(index, frame)| into_common_layout_frame(index, frame))
       .collect(),
     outline_entries: document
       .outline_entries
       .into_iter()
-      .map(into_compat_outline_entry)
+      .map(into_common_outline_entry)
       .collect(),
     anchor_pages: document
       .anchor_pages
       .into_iter()
-      .map(into_compat_anchor_page)
+      .map(into_common_anchor_page)
       .collect(),
-    page_replays: document
-      .page_replays
-      .into_iter()
-      .map(into_compat_page_replay)
-      .collect(),
-    page_replay_applications: document
-      .page_replay_applications
-      .into_iter()
-      .map(into_compat_page_replay_application)
-      .collect(),
-    backward_moves: document
-      .backward_moves
-      .into_iter()
-      .map(into_compat_backward_move)
-      .collect(),
-    layout_reruns: document
-      .layout_reruns
-      .into_iter()
-      .map(into_compat_layout_rerun)
-      .collect(),
-    page_invalidations: document
-      .page_invalidations
-      .into_iter()
-      .map(into_compat_page_invalidation)
-      .collect(),
-    reflow_executions: document
-      .reflow_executions
-      .into_iter()
-      .map(into_compat_reflow_execution)
-      .collect(),
-    reflow_requests: document
-      .reflow_requests
-      .into_iter()
-      .map(into_compat_reflow_request)
-      .collect(),
-    restart_plan: document.restart_plan.map(into_compat_restart_plan),
+    reflow: common_reflow_diagnostics(CommonReflowParts {
+      page_replays: document.page_replays,
+      page_replay_applications: document.page_replay_applications,
+      backward_moves: document.backward_moves,
+      layout_reruns: document.layout_reruns,
+      page_invalidations: document.page_invalidations,
+      reflow_executions: document.reflow_executions,
+      reflow_requests: document.reflow_requests,
+      restart_plan: document.restart_plan,
+    }),
+    debug_records,
+    ..Default::default()
   }
 }
 
-fn into_compat_frame_follow(follow: FrameFollow) -> crate::compat::FrameFollow {
-  crate::compat::FrameFollow {
-    kind: into_compat_follow_frame_kind(follow.kind),
-    reason: into_compat_follow_reason(follow.reason),
+fn common_layout_options(options: &LayoutOptions) -> common::LayoutOptions {
+  common::LayoutOptions {
+    collect_debug: options.diagnostics.collect_debug_records,
+    approximate_unsupported: false,
+    preserve_source_links: options.diagnostics.preserve_source_links,
+  }
+}
+
+struct CommonReflowParts {
+  page_replays: Vec<PageReplay>,
+  page_replay_applications: Vec<PageReplayApplication>,
+  backward_moves: Vec<BackwardMove>,
+  layout_reruns: Vec<LayoutRerun>,
+  page_invalidations: Vec<PageInvalidation>,
+  reflow_executions: Vec<ReflowExecution>,
+  reflow_requests: Vec<ReflowRequest>,
+  restart_plan: Option<RestartPlan>,
+}
+
+fn common_reflow_diagnostics(parts: CommonReflowParts) -> common::ReflowDiagnostics<'static> {
+  common::ReflowDiagnostics {
+    page_replays: parts
+      .page_replays
+      .into_iter()
+      .map(into_common_page_replay)
+      .collect(),
+    page_replay_applications: parts
+      .page_replay_applications
+      .into_iter()
+      .map(into_common_page_replay_application)
+      .collect(),
+    backward_moves: parts
+      .backward_moves
+      .into_iter()
+      .map(into_common_backward_move)
+      .collect(),
+    layout_reruns: parts
+      .layout_reruns
+      .into_iter()
+      .map(into_common_layout_rerun)
+      .collect(),
+    page_invalidations: parts
+      .page_invalidations
+      .into_iter()
+      .map(into_common_page_invalidation)
+      .collect(),
+    reflow_executions: parts
+      .reflow_executions
+      .into_iter()
+      .map(into_common_reflow_execution)
+      .collect(),
+    reflow_requests: parts
+      .reflow_requests
+      .into_iter()
+      .map(into_common_reflow_request)
+      .collect(),
+    restart_plan: parts.restart_plan.map(into_common_restart_plan),
+  }
+}
+
+fn into_common_page_replay(replay: PageReplay) -> common::PageReplay<'static> {
+  common::PageReplay {
+    page_index: replay.page_index,
+    section_page_index: replay.section_page_index,
+    column_index: replay.column_index,
+    scope: common_reflow_scope(replay.scope),
+    item_range: common_item_range(replay.item_start, replay.item_end),
+    replacement_items: replay
+      .replacement_items
+      .into_iter()
+      .map(into_common_page_item)
+      .collect(),
+  }
+}
+
+fn into_common_page_replay_application(
+  application: PageReplayApplication,
+) -> common::PageReplayApplication {
+  common::PageReplayApplication {
+    page_index: application.page_index,
+    section_page_index: application.section_page_index,
+    column_index: application.column_index,
+    scope: common_reflow_scope(application.scope),
+    item_range: common_item_range(application.item_start, application.item_end),
+    replacement_count: application.replacement_count,
+    applied: application.applied,
+  }
+}
+
+fn into_common_backward_move(move_back: BackwardMove) -> common::BackwardMove {
+  common::BackwardMove {
+    frame_index: move_back.frame_index,
+    replay_start_frame_index: move_back.replay_start_frame_index,
+    from_page_index: move_back.from_page_index,
+    to_page_index: move_back.to_page_index,
+    from_section_page_index: move_back.from_section_page_index,
+    to_section_page_index: move_back.to_section_page_index,
+    scope: common_reflow_scope(move_back.scope),
+    reason: common_reflow_reason(move_back.reason),
+    suppressed: move_back.suppressed,
+    replayed_frames: move_back.replayed_frames,
+    replayed_items: move_back.replayed_items,
+  }
+}
+
+fn into_common_layout_rerun(rerun: LayoutRerun) -> common::LayoutRerun {
+  common::LayoutRerun {
+    checkpoint_index: rerun.checkpoint_index,
+    section_index: rerun.section_index,
+    block_index: rerun.block_index,
+    page_index: rerun.page_index,
+    frame_index: rerun.frame_index,
+    reason: common_reflow_reason(rerun.reason),
+    scope: common_reflow_scope(rerun.scope),
+    replaced_pages: rerun.replaced_pages,
+    produced_pages: rerun.produced_pages,
+    produced_frames: rerun.produced_frames,
+    constraints: rerun
+      .constraints
+      .into_iter()
+      .map(into_common_layout_rerun_constraint)
+      .collect(),
+  }
+}
+
+fn into_common_layout_rerun_constraint(
+  constraint: LayoutRerunConstraint,
+) -> common::LayoutRerunConstraint {
+  common::LayoutRerunConstraint {
+    kind: common_frame_influence_kind(constraint.kind),
+    scope: common_reflow_scope(constraint.scope),
+    bounds: constraint.bounds.map(common_rect_from_frame_bounds),
+    content_left: common::Pt(constraint.content_left_pt),
+    content_width: common::Pt(constraint.content_width),
+    content_bottom: common::Pt(constraint.content_bottom),
+  }
+}
+
+fn into_common_page_invalidation(invalidation: PageInvalidation) -> common::PageInvalidation {
+  common::PageInvalidation {
+    page_index: invalidation.page_index,
+    section_page_index: invalidation.section_page_index,
+    first_frame_index: invalidation.first_frame_index,
+    reason: common_reflow_reason(invalidation.reason),
+    scope: common_reflow_scope(invalidation.scope),
+  }
+}
+
+fn into_common_reflow_execution(execution: ReflowExecution) -> common::ReflowExecution {
+  common::ReflowExecution {
+    first_page_index: execution.first_page_index,
+    request_count: execution.request_count,
+    action: match execution.action {
+      ReflowAction::StabilizedRetainedDecorationItems => {
+        common::ReflowAction::StabilizedRetainedDecorationItems
+      }
+      ReflowAction::StabilizedInsertionInfluences => {
+        common::ReflowAction::StabilizedInsertionInfluences
+      }
+    },
+    scope: common_reflow_scope(execution.scope),
+    suppressed_moves: execution.suppressed_moves,
+    backward_moves: execution.backward_moves,
+    page_replacements: execution.page_replacements,
+    replayed_frames: execution.replayed_frames,
+    replayed_items: execution.replayed_items,
+  }
+}
+
+fn into_common_reflow_request(request: ReflowRequest) -> common::ReflowRequest {
+  common::ReflowRequest {
+    frame_index: request.frame_index,
+    kind: common_frame_kind(request.kind),
+    reason: common_reflow_reason(request.reason),
+    scope: common_reflow_scope(request.scope),
+    restart: into_common_frame_cursor(request.restart),
+    page_index: request.page_index,
+    section_page_index: request.section_page_index,
+    column_index: request.column_index,
+    influence_count: request.influence_count,
+  }
+}
+
+fn into_common_restart_plan(plan: RestartPlan) -> common::RestartPlan {
+  common::RestartPlan {
+    page_index: plan.page_index,
+    frame_index: plan.frame_index,
+    block_index: plan.block_index,
+    cursor: into_common_frame_cursor(plan.cursor),
+    reason: common_reflow_reason(plan.reason),
+    scope: common_reflow_scope(plan.scope),
+  }
+}
+
+fn common_debug_records(document: &LayoutDocument) -> Vec<common::DebugRecord<'static>> {
+  let page_records = document.pages.iter().enumerate().map(|(index, page)| {
+    common::DebugRecord::Page(common::DebugPage {
+      index,
+      name: None,
+      bounds: common_rect(0.0, 0.0, page.setup.width_pt, page.setup.height_pt),
+    })
+  });
+  let frame_records = document.frames.iter().enumerate().map(|(index, frame)| {
+    common::DebugRecord::Frame(common::DebugFrame {
+      id: common::FrameId(index as u32),
+      parent: None,
+      kind: Cow::Borrowed(common_frame_kind_name(frame.kind)),
+      bounds: frame
+        .bounds
+        .map(common_rect_from_frame_bounds)
+        .unwrap_or_default(),
+      print_bounds: frame
+        .bounds
+        .map(common_rect_from_frame_bounds)
+        .unwrap_or_default(),
+    })
+  });
+  let line_records = document
+    .frames
+    .iter()
+    .enumerate()
+    .flat_map(|(frame_index, frame)| {
+      frame
+        .lines
+        .iter()
+        .enumerate()
+        .map(move |(line_index, line)| {
+          let line = localize_line_box(*line, frame.item_start);
+          common::DebugRecord::TextLine(common::DebugTextLine {
+            frame: common::FrameId(frame_index as u32),
+            index: line_index,
+            text: Cow::Owned(frame_text_for_range(
+              &frame.items,
+              line.item_start,
+              line.item_end,
+            )),
+            bounds: common_rect(line.x_pt, line.y_pt, line.width_pt, line.height_pt),
+          })
+        })
+    });
+  page_records
+    .chain(frame_records)
+    .chain(line_records)
+    .collect()
+}
+
+fn frame_text_for_range(items: &[PageItem], start: usize, end: usize) -> String {
+  items
+    .iter()
+    .skip(start)
+    .take(end.saturating_sub(start))
+    .filter_map(|item| match item {
+      PageItem::Text(text) => Some(text.text.as_str()),
+      _ => None,
+    })
+    .collect::<Vec<_>>()
+    .join("")
+}
+
+fn into_common_anchor_page(anchor: AnchorPage) -> common::AnchorPage<'static> {
+  common::AnchorPage {
+    name: Cow::Owned(anchor.name),
+    page_index: anchor.page_index,
+    section_index: anchor.section_index,
+    section_page_index: anchor.section_page_index,
+    physical_page_number: anchor.physical_page_number,
+    virtual_page_number: anchor.virtual_page_number,
+  }
+}
+
+fn into_common_page(page: Page) -> common::DisplayPage<'static> {
+  let setup = common_page_setup(page.setup);
+  common::DisplayPage {
+    section_index: page.section_index,
+    section_page_index: page.section_page_index,
+    bounds: common_rect(0.0, 0.0, page.setup.width_pt, page.setup.height_pt),
+    background: page
+      .setup
+      .background
+      .map(|color| common::Fill::Solid(common_rgb(color, 1.0))),
+    setup,
+    items: page.items.into_iter().map(into_common_page_item).collect(),
+    ..Default::default()
+  }
+}
+
+fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
+  match item {
+    PageItem::Text(item) => common::DisplayItem::Text(into_common_text_run(item)),
+    PageItem::Image(item) => common::DisplayItem::Image(into_common_image_item(item)),
+    PageItem::Rect(item) => common::DisplayItem::Rect(into_common_rect_item(item)),
+    PageItem::Fill(item) => common::DisplayItem::Rect(common::RectItem {
+      bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
+      fill: common::Fill::Solid(common_rgb(item.color, 1.0)),
+      stroke: None,
+    }),
+    PageItem::Line(item) => common::DisplayItem::Line(into_common_line_item(item)),
+    PageItem::Polyline(item) => common::DisplayItem::Path(into_common_path_item(item)),
+  }
+}
+
+fn into_common_text_run(item: TextItem) -> common::TextRun<'static> {
+  let color = common_rgb(item.style.color, item.style.opacity);
+  common::TextRun {
+    text: Cow::Owned(item.text),
+    origin: common_point(item.x_pt, item.y_pt),
+    line_height: common::Pt(item.line_height_pt),
+    style: common_text_style(item.style),
+    font_id: None,
+    color,
+    rotation_center: item.rotation_center_pt.map(|(x, y)| common_point(x, y)),
+    hyperlink_url: item.hyperlink_url.map(Cow::Owned),
+    dynamic_field: item.dynamic_field.map(into_common_dynamic_field),
+    form_widget_id: item.form_widget_id,
+    paragraph_bidi: item.paragraph_bidi,
+    preserve_text_portion: item.preserve_text_portion,
+    pdf_text_segmentation: match item.pdf_text_segmentation {
+      PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
+      PdfTextSegmentation::Portion => common::PdfTextSegmentation::Portion,
+    },
+    source: None,
+  }
+}
+
+fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
+  common::ImageItem {
+    bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
+    crop: Some(common::ImageCrop {
+      left: item.crop.left,
+      top: item.crop.top,
+      right: item.crop.right,
+      bottom: item.crop.bottom,
+    }),
+    rotation_degrees: item.rotation_deg,
+    flip_horizontal: item.flip_horizontal,
+    flip_vertical: item.flip_vertical,
+    content_type: item
+      .content_type
+      .map(Cow::Owned)
+      .unwrap_or(Cow::Borrowed("application/octet-stream")),
+    bytes: item.data,
+    relationship_id: None,
+    alt_text: item.alt_text.map(Cow::Owned),
+    hyperlink_url: item.hyperlink_url.map(Cow::Owned),
+    floating: item.floating,
+    behind_text: item.behind_text,
+  }
+}
+
+fn into_common_rect_item(item: RectItem) -> common::RectItem<'static> {
+  common::RectItem {
+    bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
+    fill: item
+      .fill_color
+      .map(|color| common::Fill::Solid(common_rgb(color, item.fill_opacity)))
+      .unwrap_or(common::Fill::None),
+    stroke: item
+      .stroke
+      .map(|stroke| common_stroke_from_border(stroke, item.stroke_opacity)),
+  }
+}
+
+fn into_common_line_item(item: LineItem) -> common::LineItem<'static> {
+  common::LineItem {
+    start: common_point(item.x1_pt, item.y1_pt),
+    end: common_point(item.x2_pt, item.y2_pt),
+    stroke: common::Stroke {
+      width: common::Pt(item.width_pt),
+      color: common_rgb(item.color, 1.0),
+      dash: None,
+      source_style_id: None,
+    },
+    kind: match item.kind {
+      LineItemKind::Stroke => common::LineKind::Stroke,
+      LineItemKind::FilledRect => common::LineKind::FilledRect,
+    },
+  }
+}
+
+fn into_common_path_item(item: PolylineItem) -> common::PathItem<'static> {
+  common::PathItem {
+    bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
+    points: item
+      .points
+      .into_iter()
+      .map(|(x, y)| common_point(item.x_pt + x, item.y_pt + y))
+      .collect(),
+    closed: item.closed,
+    fill: item
+      .fill_color
+      .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
+      .unwrap_or(common::Fill::None),
+    stroke: item
+      .stroke
+      .map(|stroke| common_stroke_from_border(stroke, 1.0)),
+  }
+}
+
+fn into_common_dynamic_field(field: DynamicFieldKind) -> common::DynamicField<'static> {
+  match field {
+    DynamicFieldKind::Page => common::DynamicField::Page,
+    DynamicFieldKind::NumPages => common::DynamicField::NumPages,
+    DynamicFieldKind::PageRef { bookmark_name } => common::DynamicField::PageRef {
+      bookmark_name: Cow::Owned(bookmark_name.to_string()),
+    },
+    DynamicFieldKind::StyleRef {
+      style_name,
+      from_bottom,
+    } => common::DynamicField::StyleRef {
+      style_name: Cow::Owned(style_name.to_string()),
+      from_bottom,
+    },
+  }
+}
+
+fn into_common_form_widget(widget: crate::docx::FormWidget) -> common::FormWidget<'static> {
+  common::FormWidget {
+    id: widget.id,
+    kind: match widget.kind {
+      crate::docx::FormWidgetKind::Text => common::FormWidgetKind::Text,
+      crate::docx::FormWidgetKind::DropDownList => common::FormWidgetKind::DropDownList,
+      crate::docx::FormWidgetKind::ComboBox => common::FormWidgetKind::ComboBox,
+    },
+    entries: widget.entries.into_iter().map(Cow::Owned).collect(),
+  }
+}
+
+fn into_common_outline_entry(entry: OutlineEntry) -> common::OutlineEntry<'static> {
+  common::OutlineEntry {
+    level: entry.level,
+    text: Cow::Owned(entry.text),
+    page_index: entry.page_index,
+    target: common_point(entry.x_pt, entry.y_pt),
+    merged_hidden_separator: entry.merged_hidden_separator,
+  }
+}
+
+fn into_common_layout_frame(index: usize, frame: LayoutFrame) -> common::FrameRecord<'static> {
+  let item_offset = frame.item_start;
+  let item_count = frame.item_count;
+  common::FrameRecord {
+    id: common::FrameId(index as u32),
+    parent: None,
+    kind: Cow::Borrowed(common_frame_kind_name(frame.kind)),
+    block_index: frame.block_index,
+    page_index: frame.page_index,
+    section_index: frame.section_index,
+    section_page_index: frame.section_page_index,
+    column_index: frame.column_index,
+    item_range: common_item_range(0, item_count),
+    split_start: into_common_frame_cursor(localize_frame_cursor(frame.split_start, item_offset)),
+    split_end: into_common_frame_cursor(localize_frame_cursor(frame.split_end, item_offset)),
+    bounds: frame.bounds.map(common_rect_from_frame_bounds),
+    print_bounds: frame.bounds.map(common_rect_from_frame_bounds),
+    lines: frame
+      .lines
+      .into_iter()
+      .map(|line| into_common_line_box(localize_line_box(line, item_offset)))
+      .collect(),
+    fragments: frame
+      .fragments
+      .into_iter()
+      .map(|fragment| into_common_frame_fragment(localize_frame_fragment(fragment, item_offset)))
+      .collect(),
+    influences: frame
+      .influences
+      .into_iter()
+      .map(|influence| {
+        into_common_frame_influence(localize_frame_influence(influence, item_offset))
+      })
+      .collect(),
+    invalidation: into_common_frame_invalidation(frame.invalidation),
+  }
+}
+
+fn into_common_frame_follow(follow: FrameFollow) -> common::FrameFollow {
+  common::FrameFollow {
+    kind: common_frame_kind(follow.kind),
+    reason: match follow.reason {
+      FollowReason::KeepTogether => common::FollowReason::KeepTogether,
+      FollowReason::Overflow => common::FollowReason::Overflow,
+      FollowReason::ExplicitBreak => common::FollowReason::ExplicitBreak,
+    },
     block_index: follow.block_index,
     from_page_index: follow.from_page_index,
     to_page_index: follow.to_page_index,
@@ -1073,41 +1535,120 @@ fn into_compat_frame_follow(follow: FrameFollow) -> crate::compat::FrameFollow {
   }
 }
 
-fn into_compat_layout_frame(frame: LayoutFrame) -> crate::compat::LayoutFrame {
-  let item_offset = frame.item_start;
-  let item_count = frame.item_count;
-  crate::compat::LayoutFrame {
-    kind: into_compat_follow_frame_kind(frame.kind),
-    block_index: frame.block_index,
-    split_start: into_compat_frame_cursor(localize_frame_cursor(frame.split_start, item_offset)),
-    split_end: into_compat_frame_cursor(localize_frame_cursor(frame.split_end, item_offset)),
-    page_index: frame.page_index,
-    section_index: frame.section_index,
-    section_page_index: frame.section_page_index,
-    column_index: frame.column_index,
-    items: frame.items.into_iter().map(into_compat_page_item).collect(),
-    item_start: 0,
-    item_end: item_count,
-    bounds: frame.bounds.map(into_compat_frame_bounds),
-    lines: frame
-      .lines
-      .into_iter()
-      .map(|line| into_compat_line_box(localize_line_box(line, item_offset)))
-      .collect(),
-    fragments: frame
-      .fragments
-      .into_iter()
-      .map(|fragment| into_compat_frame_fragment(localize_frame_fragment(fragment, item_offset)))
-      .collect(),
-    influences: frame
-      .influences
-      .into_iter()
-      .map(|influence| {
-        into_compat_frame_influence(localize_frame_influence(influence, item_offset))
-      })
-      .collect(),
-    invalidation: into_compat_frame_invalidation(frame.invalidation),
+fn into_common_frame_cursor(cursor: FrameCursor) -> common::FrameCursor {
+  common::FrameCursor {
+    block_index: cursor.block_index,
+    kind: match cursor.kind {
+      FrameCursorKind::BlockStart => common::FrameCursorKind::BlockStart,
+      FrameCursorKind::Inline => common::FrameCursorKind::Inline,
+      FrameCursorKind::TableRow => common::FrameCursorKind::TableRow,
+      FrameCursorKind::TableCell => common::FrameCursorKind::TableCell,
+      FrameCursorKind::BlockEnd => common::FrameCursorKind::BlockEnd,
+    },
+    inline_index: cursor.inline_index,
+    text_offset: cursor.text_offset,
+    row_index: cursor.row_index,
+    cell_index: cursor.cell_index,
   }
+}
+
+fn into_common_line_box(line: LineBox) -> common::LineBox {
+  common::LineBox {
+    bounds: common_rect(line.x_pt, line.y_pt, line.width_pt, line.height_pt),
+    item_range: common_item_range(line.item_start, line.item_end),
+  }
+}
+
+fn into_common_frame_fragment(fragment: FrameFragment) -> common::FrameFragment {
+  common::FrameFragment {
+    kind: match fragment.kind {
+      FrameFragmentKind::ParagraphLine => common::FrameFragmentKind::ParagraphLine,
+      FrameFragmentKind::TableRow => common::FrameFragmentKind::TableRow,
+      FrameFragmentKind::TableCell => common::FrameFragmentKind::TableCell,
+      FrameFragmentKind::NoteLine => common::FrameFragmentKind::NoteLine,
+    },
+    split: match fragment.split {
+      FragmentSplitKind::Complete => common::FragmentSplitKind::Complete,
+      FragmentSplitKind::Master => common::FragmentSplitKind::Master,
+      FragmentSplitKind::Follow => common::FragmentSplitKind::Follow,
+      FragmentSplitKind::RepeatedHeader => common::FragmentSplitKind::RepeatedHeader,
+    },
+    index: fragment.index,
+    row_index: fragment.row_index,
+    cell_index: fragment.cell_index,
+    item_range: common_item_range(fragment.item_start, fragment.item_end),
+    bounds: fragment.bounds.map(common_rect_from_frame_bounds),
+  }
+}
+
+fn into_common_frame_influence(influence: FrameInfluence) -> common::FrameInfluence {
+  common::FrameInfluence {
+    kind: match influence.kind {
+      FrameInfluenceKind::FootnoteReservation => common::FrameInfluenceKind::FootnoteReservation,
+      FrameInfluenceKind::FlyWrap => common::FrameInfluenceKind::FlyWrap,
+      FrameInfluenceKind::TableSplit => common::FrameInfluenceKind::TableSplit,
+    },
+    count: influence.count,
+    block_index: influence.block_index,
+    item_range: common_item_range(influence.item_start, influence.item_end),
+    bounds: influence.bounds.map(common_rect_from_frame_bounds),
+  }
+}
+
+fn into_common_frame_invalidation(invalidation: FrameInvalidation) -> common::FrameInvalidation {
+  match invalidation {
+    FrameInvalidation::Clean => common::FrameInvalidation::Clean,
+    FrameInvalidation::PageItemsDecorated => common::FrameInvalidation::PageItemsDecorated,
+    FrameInvalidation::NeedsReflow => common::FrameInvalidation::NeedsReflow,
+  }
+}
+
+fn common_frame_kind(kind: FollowFrameKind) -> common::FrameKind {
+  match kind {
+    FollowFrameKind::Paragraph => common::FrameKind::Paragraph,
+    FollowFrameKind::Table => common::FrameKind::Table,
+    FollowFrameKind::Notes => common::FrameKind::Notes,
+  }
+}
+
+fn common_frame_influence_kind(kind: FrameInfluenceKind) -> common::FrameInfluenceKind {
+  match kind {
+    FrameInfluenceKind::FootnoteReservation => common::FrameInfluenceKind::FootnoteReservation,
+    FrameInfluenceKind::FlyWrap => common::FrameInfluenceKind::FlyWrap,
+    FrameInfluenceKind::TableSplit => common::FrameInfluenceKind::TableSplit,
+  }
+}
+
+fn common_reflow_scope(scope: ReflowScope) -> common::ReflowScope {
+  match scope {
+    ReflowScope::Frame => common::ReflowScope::Frame,
+    ReflowScope::Column => common::ReflowScope::Column,
+    ReflowScope::Page => common::ReflowScope::Page,
+  }
+}
+
+fn common_reflow_reason(reason: ReflowReason) -> common::ReflowReason {
+  match reason {
+    ReflowReason::DecorationChangedItems => common::ReflowReason::DecorationChangedItems,
+    ReflowReason::InsertionInfluenceChanged => common::ReflowReason::InsertionInfluenceChanged,
+    ReflowReason::InvalidBounds => common::ReflowReason::InvalidBounds,
+  }
+}
+
+fn common_frame_kind_name(kind: FollowFrameKind) -> &'static str {
+  match kind {
+    FollowFrameKind::Paragraph => "paragraph",
+    FollowFrameKind::Table => "table",
+    FollowFrameKind::Notes => "notes",
+  }
+}
+
+fn common_rect_from_frame_bounds(bounds: FrameBounds) -> common::Rect {
+  common_rect(bounds.x_pt, bounds.y_pt, bounds.width_pt, bounds.height_pt)
+}
+
+fn common_item_range(start: usize, end: usize) -> common::ItemRange {
+  common::ItemRange { start, end }
 }
 
 fn localize_frame_cursor(mut cursor: FrameCursor, item_offset: usize) -> FrameCursor {
@@ -1131,527 +1672,6 @@ fn localize_frame_influence(mut influence: FrameInfluence, item_offset: usize) -
   influence.item_start = influence.item_start.saturating_sub(item_offset);
   influence.item_end = influence.item_end.saturating_sub(item_offset);
   influence
-}
-
-fn into_compat_frame_cursor(cursor: FrameCursor) -> crate::compat::FrameCursor {
-  crate::compat::FrameCursor {
-    block_index: cursor.block_index,
-    kind: match cursor.kind {
-      FrameCursorKind::BlockStart => crate::compat::FrameCursorKind::BlockStart,
-      FrameCursorKind::Inline => crate::compat::FrameCursorKind::Inline,
-      FrameCursorKind::TableRow => crate::compat::FrameCursorKind::TableRow,
-      FrameCursorKind::TableCell => crate::compat::FrameCursorKind::TableCell,
-      FrameCursorKind::BlockEnd => crate::compat::FrameCursorKind::BlockEnd,
-    },
-    inline_index: cursor.inline_index,
-    text_offset: cursor.text_offset,
-    row_index: cursor.row_index,
-    cell_index: cursor.cell_index,
-  }
-}
-
-fn into_compat_frame_fragment(fragment: FrameFragment) -> crate::compat::FrameFragment {
-  crate::compat::FrameFragment {
-    kind: match fragment.kind {
-      FrameFragmentKind::ParagraphLine => crate::compat::FrameFragmentKind::ParagraphLine,
-      FrameFragmentKind::TableRow => crate::compat::FrameFragmentKind::TableRow,
-      FrameFragmentKind::TableCell => crate::compat::FrameFragmentKind::TableCell,
-      FrameFragmentKind::NoteLine => crate::compat::FrameFragmentKind::NoteLine,
-    },
-    split: match fragment.split {
-      FragmentSplitKind::Complete => crate::compat::FragmentSplitKind::Complete,
-      FragmentSplitKind::Master => crate::compat::FragmentSplitKind::Master,
-      FragmentSplitKind::Follow => crate::compat::FragmentSplitKind::Follow,
-      FragmentSplitKind::RepeatedHeader => crate::compat::FragmentSplitKind::RepeatedHeader,
-    },
-    index: fragment.index,
-    row_index: fragment.row_index,
-    cell_index: fragment.cell_index,
-    item_start: fragment.item_start,
-    item_end: fragment.item_end,
-    bounds: fragment.bounds.map(into_compat_frame_bounds),
-  }
-}
-
-fn into_compat_frame_influence(influence: FrameInfluence) -> crate::compat::FrameInfluence {
-  crate::compat::FrameInfluence {
-    kind: into_compat_frame_influence_kind(influence.kind),
-    count: influence.count,
-    block_index: influence.block_index,
-    item_start: influence.item_start,
-    item_end: influence.item_end,
-    bounds: influence.bounds.map(into_compat_frame_bounds),
-  }
-}
-
-fn into_compat_page_replay(replay: PageReplay) -> crate::compat::PageReplay {
-  crate::compat::PageReplay {
-    page_index: replay.page_index,
-    section_page_index: replay.section_page_index,
-    column_index: replay.column_index,
-    scope: into_compat_reflow_scope(replay.scope),
-    item_start: replay.item_start,
-    item_end: replay.item_end,
-    replacement_items: replay
-      .replacement_items
-      .into_iter()
-      .map(into_compat_page_item)
-      .collect(),
-  }
-}
-
-fn into_compat_page_replay_application(
-  application: PageReplayApplication,
-) -> crate::compat::PageReplayApplication {
-  crate::compat::PageReplayApplication {
-    page_index: application.page_index,
-    section_page_index: application.section_page_index,
-    column_index: application.column_index,
-    scope: into_compat_reflow_scope(application.scope),
-    item_start: application.item_start,
-    item_end: application.item_end,
-    replacement_count: application.replacement_count,
-    applied: application.applied,
-  }
-}
-
-fn into_compat_backward_move(move_back: BackwardMove) -> crate::compat::BackwardMove {
-  crate::compat::BackwardMove {
-    frame_index: move_back.frame_index,
-    replay_start_frame_index: move_back.replay_start_frame_index,
-    from_page_index: move_back.from_page_index,
-    to_page_index: move_back.to_page_index,
-    from_section_page_index: move_back.from_section_page_index,
-    to_section_page_index: move_back.to_section_page_index,
-    scope: into_compat_reflow_scope(move_back.scope),
-    reason: into_compat_reflow_reason(move_back.reason),
-    suppressed: move_back.suppressed,
-    replayed_frames: move_back.replayed_frames,
-    replayed_items: move_back.replayed_items,
-  }
-}
-
-fn into_compat_layout_rerun(rerun: LayoutRerun) -> crate::compat::LayoutRerun {
-  crate::compat::LayoutRerun {
-    checkpoint_index: rerun.checkpoint_index,
-    section_index: rerun.section_index,
-    block_index: rerun.block_index,
-    page_index: rerun.page_index,
-    frame_index: rerun.frame_index,
-    reason: into_compat_reflow_reason(rerun.reason),
-    scope: into_compat_reflow_scope(rerun.scope),
-    replaced_pages: rerun.replaced_pages,
-    produced_pages: rerun.produced_pages,
-    produced_frames: rerun.produced_frames,
-    constraints: rerun
-      .constraints
-      .into_iter()
-      .map(into_compat_layout_rerun_constraint)
-      .collect(),
-  }
-}
-
-fn into_compat_layout_rerun_constraint(
-  constraint: LayoutRerunConstraint,
-) -> crate::compat::LayoutRerunConstraint {
-  crate::compat::LayoutRerunConstraint {
-    kind: into_compat_frame_influence_kind(constraint.kind),
-    scope: into_compat_reflow_scope(constraint.scope),
-    bounds: constraint.bounds.map(into_compat_frame_bounds),
-    content_left_pt: constraint.content_left_pt,
-    content_width: constraint.content_width,
-    content_bottom: constraint.content_bottom,
-  }
-}
-
-fn into_compat_page_invalidation(
-  invalidation: PageInvalidation,
-) -> crate::compat::PageInvalidation {
-  crate::compat::PageInvalidation {
-    page_index: invalidation.page_index,
-    section_page_index: invalidation.section_page_index,
-    first_frame_index: invalidation.first_frame_index,
-    reason: into_compat_reflow_reason(invalidation.reason),
-    scope: into_compat_reflow_scope(invalidation.scope),
-  }
-}
-
-fn into_compat_reflow_execution(execution: ReflowExecution) -> crate::compat::ReflowExecution {
-  crate::compat::ReflowExecution {
-    first_page_index: execution.first_page_index,
-    request_count: execution.request_count,
-    action: match execution.action {
-      ReflowAction::StabilizedRetainedDecorationItems => {
-        crate::compat::ReflowAction::StabilizedRetainedDecorationItems
-      }
-      ReflowAction::StabilizedInsertionInfluences => {
-        crate::compat::ReflowAction::StabilizedInsertionInfluences
-      }
-    },
-    scope: into_compat_reflow_scope(execution.scope),
-    suppressed_moves: execution.suppressed_moves,
-    backward_moves: execution.backward_moves,
-    page_replacements: execution.page_replacements,
-    replayed_frames: execution.replayed_frames,
-    replayed_items: execution.replayed_items,
-  }
-}
-
-fn into_compat_reflow_request(request: ReflowRequest) -> crate::compat::ReflowRequest {
-  crate::compat::ReflowRequest {
-    frame_index: request.frame_index,
-    kind: into_compat_follow_frame_kind(request.kind),
-    reason: into_compat_reflow_reason(request.reason),
-    scope: into_compat_reflow_scope(request.scope),
-    restart: into_compat_frame_cursor(request.restart),
-    page_index: request.page_index,
-    section_page_index: request.section_page_index,
-    column_index: request.column_index,
-    influence_count: request.influence_count,
-  }
-}
-
-fn into_compat_restart_plan(plan: RestartPlan) -> crate::compat::RestartPlan {
-  crate::compat::RestartPlan {
-    page_index: plan.page_index,
-    frame_index: plan.frame_index,
-    block_index: plan.block_index,
-    cursor: into_compat_frame_cursor(plan.cursor),
-    reason: into_compat_reflow_reason(plan.reason),
-    scope: into_compat_reflow_scope(plan.scope),
-  }
-}
-
-fn into_compat_follow_frame_kind(kind: FollowFrameKind) -> crate::compat::FollowFrameKind {
-  match kind {
-    FollowFrameKind::Paragraph => crate::compat::FollowFrameKind::Paragraph,
-    FollowFrameKind::Table => crate::compat::FollowFrameKind::Table,
-    FollowFrameKind::Notes => crate::compat::FollowFrameKind::Notes,
-  }
-}
-
-fn into_compat_follow_reason(reason: FollowReason) -> crate::compat::FollowReason {
-  match reason {
-    FollowReason::KeepTogether => crate::compat::FollowReason::KeepTogether,
-    FollowReason::Overflow => crate::compat::FollowReason::Overflow,
-    FollowReason::ExplicitBreak => crate::compat::FollowReason::ExplicitBreak,
-  }
-}
-
-fn into_compat_frame_influence_kind(kind: FrameInfluenceKind) -> crate::compat::FrameInfluenceKind {
-  match kind {
-    FrameInfluenceKind::FootnoteReservation => {
-      crate::compat::FrameInfluenceKind::FootnoteReservation
-    }
-    FrameInfluenceKind::FlyWrap => crate::compat::FrameInfluenceKind::FlyWrap,
-    FrameInfluenceKind::TableSplit => crate::compat::FrameInfluenceKind::TableSplit,
-  }
-}
-
-fn into_compat_frame_invalidation(
-  invalidation: FrameInvalidation,
-) -> crate::compat::FrameInvalidation {
-  match invalidation {
-    FrameInvalidation::Clean => crate::compat::FrameInvalidation::Clean,
-    FrameInvalidation::PageItemsDecorated => crate::compat::FrameInvalidation::PageItemsDecorated,
-    FrameInvalidation::NeedsReflow => crate::compat::FrameInvalidation::NeedsReflow,
-  }
-}
-
-fn into_compat_reflow_reason(reason: ReflowReason) -> crate::compat::ReflowReason {
-  match reason {
-    ReflowReason::DecorationChangedItems => crate::compat::ReflowReason::DecorationChangedItems,
-    ReflowReason::InsertionInfluenceChanged => {
-      crate::compat::ReflowReason::InsertionInfluenceChanged
-    }
-    ReflowReason::InvalidBounds => crate::compat::ReflowReason::InvalidBounds,
-  }
-}
-
-fn into_compat_reflow_scope(scope: ReflowScope) -> crate::compat::ReflowScope {
-  match scope {
-    ReflowScope::Frame => crate::compat::ReflowScope::Frame,
-    ReflowScope::Column => crate::compat::ReflowScope::Column,
-    ReflowScope::Page => crate::compat::ReflowScope::Page,
-  }
-}
-
-fn into_compat_frame_bounds(bounds: FrameBounds) -> crate::compat::FrameBounds {
-  crate::compat::FrameBounds {
-    x_pt: bounds.x_pt,
-    y_pt: bounds.y_pt,
-    width_pt: bounds.width_pt,
-    height_pt: bounds.height_pt,
-  }
-}
-
-fn into_compat_line_box(line: LineBox) -> crate::compat::LineBox {
-  crate::compat::LineBox {
-    x_pt: line.x_pt,
-    y_pt: line.y_pt,
-    width_pt: line.width_pt,
-    height_pt: line.height_pt,
-    item_start: line.item_start,
-    item_end: line.item_end,
-  }
-}
-
-fn into_compat_page(page: Page) -> crate::compat::Page {
-  crate::compat::Page {
-    setup: into_compat_page_setup(page.setup),
-    section_index: page.section_index,
-    section_page_index: page.section_page_index,
-    items: page.items.into_iter().map(into_compat_page_item).collect(),
-  }
-}
-
-fn into_compat_outline_entry(entry: OutlineEntry) -> crate::compat::OutlineEntry {
-  crate::compat::OutlineEntry {
-    level: entry.level,
-    text: entry.text,
-    page_index: entry.page_index,
-    x_pt: entry.x_pt,
-    y_pt: entry.y_pt,
-    merged_hidden_separator: entry.merged_hidden_separator,
-  }
-}
-
-fn into_compat_anchor_page(anchor: AnchorPage) -> crate::compat::AnchorPage {
-  crate::compat::AnchorPage {
-    name: anchor.name,
-    page_index: anchor.page_index,
-    section_index: anchor.section_index,
-    section_page_index: anchor.section_page_index,
-    physical_page_number: anchor.physical_page_number,
-    virtual_page_number: anchor.virtual_page_number,
-  }
-}
-
-fn into_compat_form_widget(widget: crate::docx::FormWidget) -> crate::compat::FormWidget {
-  crate::compat::FormWidget {
-    id: widget.id,
-    entries: widget.entries,
-    kind: match widget.kind {
-      crate::docx::FormWidgetKind::Text => crate::compat::FormWidgetKind::Text,
-      crate::docx::FormWidgetKind::DropDownList => crate::compat::FormWidgetKind::DropDownList,
-      crate::docx::FormWidgetKind::ComboBox => crate::compat::FormWidgetKind::ComboBox,
-    },
-  }
-}
-
-fn into_compat_page_item(item: PageItem) -> crate::compat::PageItem {
-  match item {
-    PageItem::Text(item) => crate::compat::PageItem::Text(into_compat_text_item(item)),
-    PageItem::Image(item) => crate::compat::PageItem::Image(into_compat_image_item(item)),
-    PageItem::Rect(item) => crate::compat::PageItem::Rect(into_compat_rect_item(item)),
-    PageItem::Fill(item) => crate::compat::PageItem::Fill(into_compat_fill_item(item)),
-    PageItem::Line(item) => crate::compat::PageItem::Line(into_compat_line_item(item)),
-    PageItem::Polyline(item) => crate::compat::PageItem::Polyline(into_compat_polyline_item(item)),
-  }
-}
-
-fn into_compat_text_item(item: TextItem) -> crate::compat::TextItem {
-  crate::compat::TextItem {
-    x_pt: item.x_pt,
-    y_pt: item.y_pt,
-    line_height_pt: item.line_height_pt,
-    text: item.text,
-    style: into_compat_text_style(item.style),
-    rotation_center_pt: item.rotation_center_pt,
-    hyperlink_url: item.hyperlink_url,
-    dynamic_field: item.dynamic_field.map(into_compat_dynamic_field),
-    style_ref_keys: item.style_ref_keys,
-    style_ref_text: item.style_ref_text,
-    form_widget_id: item.form_widget_id,
-    paragraph_bidi: item.paragraph_bidi,
-    preserve_text_portion: item.preserve_text_portion,
-    decoration_span_start_x_pt: item.decoration_span_start_x_pt,
-    pdf_text_segmentation: match item.pdf_text_segmentation {
-      PdfTextSegmentation::Line => crate::compat::PdfTextSegmentation::Line,
-      PdfTextSegmentation::Portion => crate::compat::PdfTextSegmentation::Portion,
-    },
-  }
-}
-
-fn into_compat_dynamic_field(field: DynamicFieldKind) -> crate::compat::DynamicFieldKind {
-  match field {
-    DynamicFieldKind::Page => crate::compat::DynamicFieldKind::Page,
-    DynamicFieldKind::NumPages => crate::compat::DynamicFieldKind::NumPages,
-    DynamicFieldKind::PageRef { bookmark_name } => {
-      crate::compat::DynamicFieldKind::PageRef { bookmark_name }
-    }
-    DynamicFieldKind::StyleRef {
-      style_name,
-      from_bottom,
-    } => crate::compat::DynamicFieldKind::StyleRef {
-      style_name,
-      from_bottom,
-    },
-  }
-}
-
-fn into_compat_image_item(item: ImageItem) -> crate::compat::ImageItem {
-  crate::compat::ImageItem {
-    x_pt: item.x_pt,
-    y_pt: item.y_pt,
-    width_pt: item.width_pt,
-    height_pt: item.height_pt,
-    crop: into_compat_image_crop(item.crop),
-    rotation_deg: item.rotation_deg,
-    flip_horizontal: item.flip_horizontal,
-    flip_vertical: item.flip_vertical,
-    data: item.data,
-    content_type: item.content_type,
-    alt_text: item.alt_text,
-    hyperlink_url: item.hyperlink_url,
-    floating: item.floating,
-    behind_text: item.behind_text,
-  }
-}
-
-fn into_compat_rect_item(item: RectItem) -> crate::compat::RectItem {
-  crate::compat::RectItem {
-    x_pt: item.x_pt,
-    y_pt: item.y_pt,
-    width_pt: item.width_pt,
-    height_pt: item.height_pt,
-    fill_color: item.fill_color.map(into_compat_rgb_color),
-    fill_opacity: item.fill_opacity,
-    stroke: item.stroke.map(into_compat_border_style),
-    stroke_opacity: item.stroke_opacity,
-  }
-}
-
-fn into_compat_fill_item(item: FillItem) -> crate::compat::FillItem {
-  crate::compat::FillItem {
-    x_pt: item.x_pt,
-    y_pt: item.y_pt,
-    width_pt: item.width_pt,
-    height_pt: item.height_pt,
-    color: into_compat_rgb_color(item.color),
-  }
-}
-
-fn into_compat_line_item(item: LineItem) -> crate::compat::LineItem {
-  crate::compat::LineItem {
-    x1_pt: item.x1_pt,
-    y1_pt: item.y1_pt,
-    x2_pt: item.x2_pt,
-    y2_pt: item.y2_pt,
-    width_pt: item.width_pt,
-    color: into_compat_rgb_color(item.color),
-    kind: match item.kind {
-      LineItemKind::Stroke => crate::compat::LineItemKind::Stroke,
-      LineItemKind::FilledRect => crate::compat::LineItemKind::FilledRect,
-    },
-  }
-}
-
-fn into_compat_polyline_item(item: PolylineItem) -> crate::compat::PolylineItem {
-  crate::compat::PolylineItem {
-    x_pt: item.x_pt,
-    y_pt: item.y_pt,
-    width_pt: item.width_pt,
-    height_pt: item.height_pt,
-    points: item.points,
-    closed: item.closed,
-    fill_color: item.fill_color.map(into_compat_rgb_color),
-    stroke: item.stroke.map(into_compat_border_style),
-  }
-}
-
-fn into_compat_page_setup(setup: PageSetup) -> crate::compat::PageSetup {
-  crate::compat::PageSetup {
-    width_pt: setup.width_pt,
-    height_pt: setup.height_pt,
-    margin_top_pt: setup.margin_top_pt,
-    margin_right_pt: setup.margin_right_pt,
-    margin_bottom_pt: setup.margin_bottom_pt,
-    margin_left_pt: setup.margin_left_pt,
-    mirror_margins: setup.mirror_margins,
-    top_margin_was_negative: setup.top_margin_was_negative,
-    bottom_margin_was_negative: setup.bottom_margin_was_negative,
-    header_distance_pt: setup.header_distance_pt,
-    footer_distance_pt: setup.footer_distance_pt,
-    background: setup.background.map(into_compat_rgb_color),
-    borders: into_compat_cell_borders(setup.borders),
-    borders_offset_from_text: setup.borders_offset_from_text,
-    line_numbering: setup.line_numbering.map(into_compat_line_numbering),
-    doc_grid_line_pitch_pt: setup.doc_grid_line_pitch_pt,
-    page_number_start: setup.page_number_start,
-  }
-}
-
-fn into_compat_line_numbering(numbering: LineNumbering) -> crate::compat::LineNumbering {
-  crate::compat::LineNumbering {
-    count_by: numbering.count_by,
-    start: numbering.start,
-    distance_pt: numbering.distance_pt,
-    restart_each_page: numbering.restart_each_page,
-  }
-}
-
-fn into_compat_text_style(style: TextStyle) -> crate::compat::TextStyle {
-  crate::compat::TextStyle {
-    font_family: style.font_family,
-    east_asia_font_family: style.east_asia_font_family,
-    complex_font_family: style.complex_font_family,
-    symbol_font_family: style.symbol_font_family,
-    font_size_pt: style.font_size_pt,
-    complex_font_size_pt: style.complex_font_size_pt,
-    character_spacing_pt: style.character_spacing_pt,
-    baseline_shift_pt: style.baseline_shift_pt,
-    bold: style.bold,
-    italic: style.italic,
-    underline: style.underline,
-    strikethrough: style.strikethrough,
-    uppercase: style.uppercase,
-    small_caps: style.small_caps,
-    hidden: style.hidden,
-    rotation_deg: style.rotation_deg,
-    color: into_compat_rgb_color(style.color),
-    opacity: style.opacity,
-    outline_color: style.outline_color.map(into_compat_rgb_color),
-    outline_opacity: style.outline_opacity,
-    outline_width_pt: style.outline_width_pt,
-    highlight: style.highlight.map(into_compat_rgb_color),
-    underline_color: style.underline_color.map(into_compat_rgb_color),
-  }
-}
-
-fn into_compat_cell_borders(borders: CellBordersModel) -> crate::compat::CellBordersModel {
-  crate::compat::CellBordersModel {
-    top: borders.top.map(into_compat_border_style),
-    right: borders.right.map(into_compat_border_style),
-    bottom: borders.bottom.map(into_compat_border_style),
-    left: borders.left.map(into_compat_border_style),
-  }
-}
-
-fn into_compat_border_style(style: BorderStyle) -> crate::compat::BorderStyle {
-  crate::compat::BorderStyle {
-    width_pt: style.width_pt,
-    spacing_pt: style.spacing_pt,
-    color: into_compat_rgb_color(style.color),
-    compound: style.compound,
-  }
-}
-
-fn into_compat_rgb_color(color: RgbColor) -> crate::compat::RgbColor {
-  crate::compat::RgbColor {
-    r: color.r,
-    g: color.g,
-    b: color.b,
-  }
-}
-
-fn into_compat_image_crop(crop: ImageCrop) -> crate::compat::ImageCrop {
-  crate::compat::ImageCrop {
-    left: crop.left,
-    top: crop.top,
-    right: crop.right,
-    bottom: crop.bottom,
-  }
 }
 
 struct RootFrameLayout<'a> {
@@ -12532,12 +12552,14 @@ impl<'a> TextFrameLayout<'a> {
               } else {
                 push_tab_leader(
                   current,
-                  None,
-                  tab_stop.leader,
-                  leader_start_x,
-                  tab_stop.x_pt,
-                  y,
-                  line_height,
+                  TabLeaderPlacement {
+                    insert_index: None,
+                    leader: tab_stop.leader,
+                    start_x: leader_start_x,
+                    end_x: tab_stop.x_pt,
+                    y,
+                    line_height,
+                  },
                   &run.style,
                   text_metrics,
                 );
@@ -14348,12 +14370,14 @@ fn apply_pending_aligned_tab(
   if dx.abs() <= LAYOUT_EPSILON_PT {
     push_tab_leader(
       page,
-      Some(item_start_index),
-      leader,
-      leader_start_x,
-      aligned_left,
-      leader_y,
-      leader_line_height,
+      TabLeaderPlacement {
+        insert_index: Some(item_start_index),
+        leader,
+        start_x: leader_start_x,
+        end_x: aligned_left,
+        y: leader_y,
+        line_height: leader_line_height,
+      },
       &leader_style,
       text_metrics,
     );
@@ -14370,33 +14394,40 @@ fn apply_pending_aligned_tab(
   }
   push_tab_leader(
     page,
-    Some(item_start_index),
-    leader,
-    leader_start_x,
-    aligned_left,
-    leader_y,
-    leader_line_height,
+    TabLeaderPlacement {
+      insert_index: Some(item_start_index),
+      leader,
+      start_x: leader_start_x,
+      end_x: aligned_left,
+      y: leader_y,
+      line_height: leader_line_height,
+    },
     &leader_style,
     text_metrics,
   );
   *pending_tab = None;
 }
 
-fn push_tab_leader(
-  page: &mut Page,
+#[derive(Clone, Copy, Debug)]
+struct TabLeaderPlacement {
   insert_index: Option<usize>,
   leader: TabLeader,
   start_x: f32,
   end_x: f32,
   y: f32,
   line_height: f32,
+}
+
+fn push_tab_leader(
+  page: &mut Page,
+  placement: TabLeaderPlacement,
   style: &TextStyle,
   text_metrics: &mut TextMetrics,
 ) {
-  let Some(fill_char) = tab_leader_fill_char(leader) else {
+  let Some(fill_char) = tab_leader_fill_char(placement.leader) else {
     return;
   };
-  let width = end_x - start_x;
+  let width = placement.end_x - placement.start_x;
   if width <= LAYOUT_EPSILON_PT {
     return;
   }
@@ -14410,9 +14441,9 @@ fn push_tab_leader(
   }
   let items = (0..count).map(|index| {
     PageItem::Text(TextItem {
-      x_pt: start_x + char_width * index as f32,
-      y_pt: y,
-      line_height_pt: line_height,
+      x_pt: placement.start_x + char_width * index as f32,
+      y_pt: placement.y,
+      line_height_pt: placement.line_height,
       text: fill_char.to_string(),
       style: style.clone(),
       rotation_center_pt: None,
@@ -14427,7 +14458,10 @@ fn push_tab_leader(
       pdf_text_segmentation: PdfTextSegmentation::Portion,
     })
   });
-  if let Some(index) = insert_index.filter(|index| *index <= page.items.len()) {
+  if let Some(index) = placement
+    .insert_index
+    .filter(|index| *index <= page.items.len())
+  {
     page.items.splice(index..index, items);
   } else {
     page.items.extend(items);

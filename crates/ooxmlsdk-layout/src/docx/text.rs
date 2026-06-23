@@ -101,6 +101,8 @@ pub(super) fn paragraph_model_with_base<'a>(
     .paragraph_properties
     .as_deref()
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref());
+  let paragraph_mark_style =
+    properties::paragraph_mark_run_style(paragraph_mark_run_properties, run_style.clone(), styles);
   let has_direct_indentation = numbering_format_context.direct_indentation;
   let mut numbering_base_style = styles.doc_default_run.clone();
   numbering_base_style.color = run_style.color;
@@ -175,7 +177,7 @@ pub(super) fn paragraph_model_with_base<'a>(
   if inlines.is_empty() && paragraph_requires_placeholder_run(paragraph) {
     inlines.push(super::InlineItem::Text(TextRun {
       text: String::new(),
-      style: run_style.clone(),
+      style: paragraph_mark_style.clone(),
       hyperlink_url: None,
       dynamic_field: None,
       style_ref_keys: Vec::new(),
@@ -205,7 +207,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     footnote_reference_ids,
     endnote_reference_ids,
     starts_after_last_rendered_page_break,
-    base_style: run_style,
+    base_style: paragraph_mark_style,
     #[cfg(test)]
     runs,
     format: Box::new(format),

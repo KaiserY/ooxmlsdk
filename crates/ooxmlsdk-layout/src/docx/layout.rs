@@ -9,9 +9,9 @@ use crate::docx::{
   FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
   HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
   InlineItem, InlineShape, InlineShapeGeometry, LineHeightRule, LineNumbering, PageSetup,
-  ParagraphAlignment, RgbColor, SectionBreakKind, SectionColumns, TabStop, TabStopAlignment, Table,
-  TableAlignment, TableCell, TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment,
-  TextStyle, VerticalImageAlignment, VerticalImageReference,
+  ParagraphAlignment, RgbColor, SectionBreakKind, SectionColumns, TabLeader, TabStop,
+  TabStopAlignment, Table, TableAlignment, TableCell, TableCellVerticalAlignment, TableRow,
+  TextBoxVerticalAlignment, TextStyle, VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
 use crate::options::{LayoutActionOptions, LayoutOptions};
@@ -827,11 +827,16 @@ struct RepeatingSlotState {
 struct ResolvedTabStop {
   x_pt: f32,
   alignment: TabStopAlignment,
+  leader: TabLeader,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct PendingAlignedTab {
   stop: ResolvedTabStop,
+  leader_start_x_pt: f32,
+  y_pt: f32,
+  line_height_pt: f32,
+  style: TextStyle,
   item_start_index: usize,
 }
 
@@ -5172,6 +5177,14 @@ fn estimated_paragraph_content_height(
           if placement.behind_text {
             continue;
           }
+          if flow.text_segmentation == TextSegmentation::RepeatingSlot
+            && matches!(
+              placement.wrap,
+              ImageWrapMode::None | ImageWrapMode::Through | ImageWrapMode::Inline
+            )
+          {
+            continue;
+          }
           let frame_width =
             relative_floating_width(placement, flow).unwrap_or_else(|| image_frame_width(image));
           let frame_height =
@@ -5204,6 +5217,14 @@ fn estimated_paragraph_content_height(
           )
         {
           if placement.behind_text {
+            continue;
+          }
+          if flow.text_segmentation == TextSegmentation::RepeatingSlot
+            && matches!(
+              placement.wrap,
+              ImageWrapMode::None | ImageWrapMode::Through | ImageWrapMode::Inline
+            )
+          {
             continue;
           }
           let width = relative_floating_width(placement, flow).unwrap_or(shape.width_pt);
@@ -6100,12 +6121,6 @@ fn repeating_slot_wrap_exclusions_for_page(
   let mut adornment = empty_section_page(page.setup, page.section_index, page.section_page_index);
   let mut discarded_pages = Vec::new();
 
-  let header_height = measured_repeating_blocks_height(
-    header_blocks,
-    page.setup,
-    document.default_tab_stop_pt,
-    text_metrics,
-  );
   let header_top = page.setup.header_distance_pt.max(0.0);
   let header_repeating_slots = repeating_slot_state(document, page.section_index, text_metrics);
   layout_repeating_blocks_into_page(
@@ -6122,8 +6137,8 @@ fn repeating_slot_wrap_exclusions_for_page(
       columns: SectionColumns::default(),
       content_top_pt: header_top,
       content_left_pt: page.setup.margin_left_pt,
-      content_bottom: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
-      body_content_bottom_pt: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
+      content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+      body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
       content_width,
       layout_cell_bounds: None,
       layout_cell_print_bounds: None,
@@ -6139,16 +6154,7 @@ fn repeating_slot_wrap_exclusions_for_page(
     },
   );
 
-  let footer_height = measured_repeating_blocks_height(
-    footer_blocks,
-    page.setup,
-    document.default_tab_stop_pt,
-    text_metrics,
-  );
-  let footer_bottom = (page.setup.height_pt - page.setup.footer_distance_pt.max(0.0))
-    .max(0.0)
-    .min(page.setup.height_pt);
-  let footer_top = (footer_bottom - footer_height).max(0.0);
+  let footer_top = footer_slot_top(page.setup);
   let footer_repeating_slots = repeating_slot_state(document, page.section_index, text_metrics);
   layout_repeating_blocks_into_page(
     footer_blocks,
@@ -6164,8 +6170,8 @@ fn repeating_slot_wrap_exclusions_for_page(
       columns: SectionColumns::default(),
       content_top_pt: footer_top,
       content_left_pt: page.setup.margin_left_pt,
-      content_bottom: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
-      body_content_bottom_pt: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
+      content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+      body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
       content_width,
       layout_cell_bounds: None,
       layout_cell_print_bounds: None,
@@ -6304,12 +6310,6 @@ fn apply_headers_and_footers(
         .max(DEFAULT_FONT_SIZE_PT);
     let mut adornment = empty_section_page(page.setup, page.section_index, page.section_page_index);
     let mut discarded_pages = Vec::new();
-    let header_height = measured_repeating_blocks_height(
-      header_blocks,
-      page.setup,
-      document.default_tab_stop_pt,
-      text_metrics,
-    );
     let header_top = page.setup.header_distance_pt.max(0.0);
     let header_repeating_slots = repeating_slot_state(document, page.section_index, text_metrics);
     layout_repeating_blocks_into_page(
@@ -6326,8 +6326,8 @@ fn apply_headers_and_footers(
         columns: SectionColumns::default(),
         content_top_pt: header_top,
         content_left_pt: page.setup.margin_left_pt,
-        content_bottom: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
-        body_content_bottom_pt: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
+        content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+        body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
         content_width,
         layout_cell_bounds: None,
         layout_cell_print_bounds: None,
@@ -6343,16 +6343,7 @@ fn apply_headers_and_footers(
       },
     );
 
-    let footer_height = measured_repeating_blocks_height(
-      footer_blocks,
-      page.setup,
-      document.default_tab_stop_pt,
-      text_metrics,
-    );
-    let footer_bottom = (page.setup.height_pt - page.setup.footer_distance_pt.max(0.0))
-      .max(0.0)
-      .min(page.setup.height_pt);
-    let footer_top = (footer_bottom - footer_height).max(0.0);
+    let footer_top = footer_slot_top(page.setup);
     let footer_repeating_slots = repeating_slot_state(document, page.section_index, text_metrics);
     layout_repeating_blocks_into_page(
       footer_blocks,
@@ -6368,8 +6359,8 @@ fn apply_headers_and_footers(
         columns: SectionColumns::default(),
         content_top_pt: footer_top,
         content_left_pt: page.setup.margin_left_pt,
-        content_bottom: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
-        body_content_bottom_pt: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
+        content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+        body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
         content_width,
         layout_cell_bounds: None,
         layout_cell_print_bounds: None,
@@ -6774,24 +6765,67 @@ fn body_content_limits_for_page(
 ) -> (f32, f32) {
   let mut top = setup.margin_top_pt;
   let mut bottom = setup.height_pt - setup.margin_bottom_pt;
-  let (has_header, has_footer, header_height, footer_height) =
+  let (has_header, has_footer, header_height, footer_height, first_header) =
     repeating_slots_present_for_page(slots, page_number, section_page_index);
 
   if has_header && !setup.top_margin_was_negative {
-    top = top.max(setup.header_distance_pt.max(0.0) + header_height);
+    top = top.max(header_slot_bottom(setup));
+    if !first_header {
+      top = top.max(setup.header_distance_pt.max(0.0) + header_height);
+    }
   }
   if has_footer && !setup.bottom_margin_was_negative {
-    bottom = bottom.min(
-      (setup.height_pt - setup.footer_distance_pt.max(0.0) - footer_height)
-        .max(0.0)
-        .min(setup.height_pt),
-    );
+    let footer_bottom = (setup.height_pt - setup.footer_distance_pt.max(0.0))
+      .max(0.0)
+      .min(setup.height_pt);
+    bottom = bottom.min(footer_slot_top(setup).min((footer_bottom - footer_height).max(0.0)));
   }
+  (top, bottom) = body_doc_grid_bounds(top, bottom, setup);
   if bottom < top + DEFAULT_LINE_HEIGHT_PT {
     bottom = (top + DEFAULT_LINE_HEIGHT_PT).min(setup.height_pt);
   }
 
   (top, bottom)
+}
+
+fn header_slot_bottom(setup: PageSetup) -> f32 {
+  setup.header_distance_pt.max(0.0)
+    + header_footer_slot_height(setup.margin_top_pt, setup.header_distance_pt)
+}
+
+fn footer_slot_top(setup: PageSetup) -> f32 {
+  let footer_bottom = (setup.height_pt - setup.footer_distance_pt.max(0.0))
+    .max(0.0)
+    .min(setup.height_pt);
+  (footer_bottom - header_footer_slot_height(setup.margin_bottom_pt, setup.footer_distance_pt))
+    .max(0.0)
+    .min(setup.height_pt)
+}
+
+fn header_footer_slot_height(margin_pt: f32, distance_pt: f32) -> f32 {
+  // Header/footer slots are imported from the page margin and distance, not
+  // from the measured content in the header/footer stream.
+  (margin_pt - distance_pt.max(0.0)).max(units::millimeters_to_points(1.0))
+}
+
+fn body_doc_grid_bounds(top: f32, bottom: f32, setup: PageSetup) -> (f32, f32) {
+  let Some(grid_height) = setup.doc_grid_line_pitch_pt else {
+    return (top, bottom);
+  };
+  if grid_height <= LAYOUT_EPSILON_PT || bottom <= top {
+    return (top, bottom);
+  }
+
+  // The body print area is centered to a whole number of document-grid lines
+  // when MS Word compatible grid metrics are not active.
+  let height = bottom - top;
+  let grid_line_count = (height / grid_height).floor();
+  if grid_line_count <= 0.0 {
+    return (top, bottom);
+  }
+  let grid_height_total = grid_line_count * grid_height;
+  let border = (height - grid_height_total) / 2.0;
+  (top + border, bottom - border)
 }
 
 fn repeating_slot_state(
@@ -6900,10 +6934,10 @@ fn repeating_slots_present_for_page(
   slots: RepeatingSlotState,
   page_number: usize,
   section_page_index: usize,
-) -> (bool, bool, f32, f32) {
+) -> (bool, bool, f32, f32, bool) {
   let first_page_in_section = section_page_index == 0;
   let use_even_slot = slots.even_and_odd_headers && page_number.is_multiple_of(2);
-  let (header, header_height) = selected_repeating_slot(
+  let (header, header_height, first_header) = selected_repeating_slot(
     first_page_in_section,
     use_even_slot,
     slots.title_page,
@@ -6911,7 +6945,7 @@ fn repeating_slots_present_for_page(
     (slots.even_header, slots.even_header_height_pt),
     (slots.default_header, slots.default_header_height_pt),
   );
-  let (footer, footer_height) = selected_repeating_slot(
+  let (footer, footer_height, _) = selected_repeating_slot(
     first_page_in_section,
     use_even_slot,
     slots.title_page && slots.first_footer,
@@ -6919,7 +6953,7 @@ fn repeating_slots_present_for_page(
     (slots.even_footer, slots.even_footer_height_pt),
     (slots.default_footer, slots.default_footer_height_pt),
   );
-  (header, footer, header_height, footer_height)
+  (header, footer, header_height, footer_height, first_header)
 }
 
 fn selected_repeating_slot(
@@ -6929,17 +6963,17 @@ fn selected_repeating_slot(
   first: (bool, f32),
   even: (bool, f32),
   default_: (bool, f32),
-) -> (bool, f32) {
+) -> (bool, f32, bool) {
   if first_page_in_section && title_page {
-    return first;
+    return (first.0, first.1, true);
   }
   if use_even_slot && even.0 {
-    return even;
+    return (even.0, even.1, false);
   }
   if default_.0 {
-    return default_;
+    return (default_.0, default_.1, false);
   }
-  (false, 0.0)
+  (false, 0.0, false)
 }
 
 fn measured_repeating_blocks_height(
@@ -11025,9 +11059,13 @@ fn textbox_auto_fit_bounds_inset(shape: &crate::docx::InlineShape) -> f32 {
     .unwrap_or(BorderStyle::default().width_pt / 2.0)
 }
 
-fn shape_has_invisible_auto_fit_textbox_bounds(shape: &crate::docx::InlineShape) -> bool {
+fn shape_has_invisible_auto_fit_textbox_bounds(
+  shape: &crate::docx::InlineShape,
+  flow: FlowContext,
+) -> bool {
   shape.text_box_auto_fit
     && !shape.text_box_blocks.is_empty()
+    && flow.text_segmentation == TextSegmentation::RepeatingSlot
     && shape.fill_color.is_none()
     && shape.fill_image.is_none()
     && shape.stroke.is_none()
@@ -11533,16 +11571,6 @@ fn floating_shape_is_zero_relative_background(
     && shape.fill_image.is_none()
     && shape.stroke.is_none()
     && shape.text_box_blocks.is_empty()
-}
-
-fn floating_shape_may_extend_outside_page(placement: FloatingImagePlacement) -> bool {
-  matches!(
-    (placement.vertical_relative_to, placement.vertical_alignment),
-    (
-      VerticalImageReference::BottomMargin,
-      Some(VerticalImageAlignment::Outside)
-    )
-  )
 }
 
 fn floating_shape_intersects_page(
@@ -12481,6 +12509,7 @@ impl<'a> TextFrameLayout<'a> {
                 &paragraph.format.tab_stops,
                 flow.default_tab_stop_pt,
               );
+              let leader_start_x = x;
               x = tab_stop.x_pt;
               if x > line_right {
                 tab_over_margin_active = true;
@@ -12488,14 +12517,32 @@ impl<'a> TextFrameLayout<'a> {
               line_used_shrink_fit = false;
               line_has_tab = true;
               chunk_x = x;
-              pending_tab = matches!(
+              if matches!(
                 tab_stop.alignment,
                 TabStopAlignment::Center | TabStopAlignment::Right
-              )
-              .then_some(PendingAlignedTab {
-                stop: tab_stop,
-                item_start_index: current.items.len(),
-              });
+              ) {
+                pending_tab = Some(PendingAlignedTab {
+                  stop: tab_stop,
+                  leader_start_x_pt: leader_start_x,
+                  y_pt: y,
+                  line_height_pt: line_height,
+                  style: run.style.clone(),
+                  item_start_index: current.items.len(),
+                });
+              } else {
+                push_tab_leader(
+                  current,
+                  None,
+                  tab_stop.leader,
+                  leader_start_x,
+                  tab_stop.x_pt,
+                  y,
+                  line_height,
+                  &run.style,
+                  text_metrics,
+                );
+                pending_tab = None;
+              }
               emitted = true;
               continue;
             }
@@ -12766,7 +12813,9 @@ impl<'a> TextFrameLayout<'a> {
             }
             line_has_form_widget |= meta.form_widget_id.is_some();
             emitted = true;
-            tab_over_margin_active = pending_tab.is_some_and(|tab| tab.stop.x_pt > line_right);
+            tab_over_margin_active = pending_tab
+              .as_ref()
+              .is_some_and(|tab| tab.stop.x_pt > line_right);
             if flow.text_segmentation == TextSegmentation::DrawingLayer {
               flush_text(
                 current,
@@ -13175,7 +13224,7 @@ impl<'a> TextFrameLayout<'a> {
                 stroke_opacity: 1.0,
               }));
             }
-            if shape_has_invisible_auto_fit_textbox_bounds(shape) {
+            if shape_has_invisible_auto_fit_textbox_bounds(shape, shape_flow) {
               // content even when the owning draw shape has no fill/stroke,
               // but that layout-only frame is not painted as a polypolygon.
               current.items.push(PageItem::Rect(RectItem {
@@ -13185,7 +13234,7 @@ impl<'a> TextFrameLayout<'a> {
                 height_pt,
                 fill_color: None,
                 fill_opacity: 1.0,
-                stroke: None,
+                stroke: Some(BorderStyle::default()),
                 stroke_opacity: 0.0,
               }));
             }
@@ -13256,11 +13305,15 @@ impl<'a> TextFrameLayout<'a> {
               }
               let allows_outside_page =
                 shape.allow_outside_page || floating_shape_may_extend_outside_page(placement);
-              let (shape_x, shape_paint_y) = if allows_outside_page {
-                (shape_x, shape_paint_y)
-              } else {
-                keep_floating_shape_inside_page(shape_x, shape_paint_y, width, height, flow)
-              };
+              let allows_repeating_textbox_overflow = flow.text_segmentation
+                == TextSegmentation::RepeatingSlot
+                && !shape.text_box_blocks.is_empty();
+              let (shape_x, shape_paint_y) =
+                if allows_outside_page || allows_repeating_textbox_overflow {
+                  (shape_x, shape_paint_y)
+                } else {
+                  keep_floating_shape_inside_page(shape_x, shape_paint_y, width, height, flow)
+                };
               let (shape_item_start, shape_item_end) = place_shape(
                 current,
                 flow,
@@ -13611,7 +13664,7 @@ impl<'a> TextFrameLayout<'a> {
       paragraph_bottom = y + real_height;
       y = paragraph_bottom + self.spacing_after_pt;
     } else if behind_text_floating_only {
-      paragraph_bottom = y;
+      paragraph_bottom = y + base_line_height;
       y = paragraph_bottom + self.spacing_after_pt;
     } else {
       if flow.setup.line_numbering.is_some() {
@@ -13684,6 +13737,16 @@ impl<'a> TextFrameLayout<'a> {
 
     (flow, y)
   }
+}
+
+fn floating_shape_may_extend_outside_page(placement: FloatingImagePlacement) -> bool {
+  matches!(
+    (placement.vertical_relative_to, placement.vertical_alignment),
+    (
+      VerticalImageReference::BottomMargin,
+      Some(VerticalImageAlignment::Outside)
+    )
+  )
 }
 
 fn keep_floating_shape_inside_page(
@@ -14015,6 +14078,7 @@ fn next_tab_stop(
     return ResolvedTabStop {
       x_pt: line_left + stop.position_pt,
       alignment: stop.alignment,
+      leader: stop.leader,
     };
   }
 
@@ -14022,6 +14086,7 @@ fn next_tab_stop(
   ResolvedTabStop {
     x_pt: line_left + ((relative_x / default_tab_stop_pt).floor() + 1.0) * default_tab_stop_pt,
     alignment: TabStopAlignment::Left,
+    leader: TabLeader::None,
   }
 }
 
@@ -14238,7 +14303,7 @@ fn apply_pending_aligned_tab(
   _line_left: f32,
   line_right: f32,
 ) {
-  let Some(tab) = *pending_tab else {
+  let Some(tab) = pending_tab.as_ref() else {
     return;
   };
   if tab.item_start_index >= page.items.len() {
@@ -14274,19 +14339,110 @@ fn apply_pending_aligned_tab(
     TabStopAlignment::Right => tab_right - following_width,
   };
   let dx = aligned_left - min_x;
+  let leader = tab.stop.leader;
+  let leader_start_x = tab.leader_start_x_pt;
+  let leader_y = tab.y_pt;
+  let leader_line_height = tab.line_height_pt;
+  let leader_style = tab.style.clone();
+  let item_start_index = tab.item_start_index;
   if dx.abs() <= LAYOUT_EPSILON_PT {
+    push_tab_leader(
+      page,
+      Some(item_start_index),
+      leader,
+      leader_start_x,
+      aligned_left,
+      leader_y,
+      leader_line_height,
+      &leader_style,
+      text_metrics,
+    );
     *pending_tab = None;
     return;
   }
 
-  for item in page.items.iter_mut().skip(tab.item_start_index) {
+  for item in page.items.iter_mut().skip(item_start_index) {
     if let Some(item_y) = item_y(item)
       && f32::abs(item_y - y) < 0.01
     {
       shift_item_x(item, dx);
     }
   }
+  push_tab_leader(
+    page,
+    Some(item_start_index),
+    leader,
+    leader_start_x,
+    aligned_left,
+    leader_y,
+    leader_line_height,
+    &leader_style,
+    text_metrics,
+  );
   *pending_tab = None;
+}
+
+fn push_tab_leader(
+  page: &mut Page,
+  insert_index: Option<usize>,
+  leader: TabLeader,
+  start_x: f32,
+  end_x: f32,
+  y: f32,
+  line_height: f32,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) {
+  let Some(fill_char) = tab_leader_fill_char(leader) else {
+    return;
+  };
+  let width = end_x - start_x;
+  if width <= LAYOUT_EPSILON_PT {
+    return;
+  }
+  let char_width = text_metrics.measure_text(fill_char, style);
+  if char_width <= LAYOUT_EPSILON_PT {
+    return;
+  }
+  let count = (width / char_width).floor() as usize;
+  if count == 0 {
+    return;
+  }
+  let items = (0..count).map(|index| {
+    PageItem::Text(TextItem {
+      x_pt: start_x + char_width * index as f32,
+      y_pt: y,
+      line_height_pt: line_height,
+      text: fill_char.to_string(),
+      style: style.clone(),
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: true,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Portion,
+    })
+  });
+  if let Some(index) = insert_index.filter(|index| *index <= page.items.len()) {
+    page.items.splice(index..index, items);
+  } else {
+    page.items.extend(items);
+  }
+}
+
+fn tab_leader_fill_char(leader: TabLeader) -> Option<&'static str> {
+  match leader {
+    TabLeader::None => None,
+    TabLeader::Dot => Some("."),
+    TabLeader::Hyphen => Some("-"),
+    TabLeader::Underscore => Some("_"),
+    TabLeader::Heavy => Some("_"),
+    TabLeader::MiddleDot => Some("·"),
+  }
 }
 
 fn justify_line_items(
@@ -15013,24 +15169,50 @@ mod tests {
   }
 
   #[test]
-  fn body_limits_reserve_measured_header_footer_height() {
+  fn body_limits_use_imported_header_footer_slots() {
     let setup = PageSetup {
-      margin_top_pt: 10.0,
-      margin_bottom_pt: 10.0,
+      margin_top_pt: 56.7,
+      margin_bottom_pt: 62.35,
+      header_distance_pt: 28.35,
+      footer_distance_pt: 49.55,
       ..Default::default()
     };
     let slots = RepeatingSlotState {
       default_header: true,
       default_footer: true,
       default_header_height_pt: 20.0,
+      default_footer_height_pt: 5.0,
+      ..Default::default()
+    };
+
+    let (top, bottom) = body_content_limits_for_page(setup, slots, 1, 0);
+
+    assert_eq!(top, 56.7);
+    assert!((bottom - (setup.height_pt - 62.35)).abs() < 0.01);
+  }
+
+  #[test]
+  fn body_limits_grow_for_layout_affecting_repeating_content() {
+    let setup = PageSetup {
+      margin_top_pt: 56.7,
+      margin_bottom_pt: 62.35,
+      header_distance_pt: 28.35,
+      footer_distance_pt: 49.55,
+      ..Default::default()
+    };
+    let slots = RepeatingSlotState {
+      default_header: true,
+      default_footer: true,
+      default_header_height_pt: 40.0,
       default_footer_height_pt: 30.0,
       ..Default::default()
     };
 
     let (top, bottom) = body_content_limits_for_page(setup, slots, 1, 0);
 
-    assert_eq!(top, 56.0);
-    assert_eq!(bottom, 726.0);
+    assert!((top - (setup.header_distance_pt + 40.0)).abs() < 0.01);
+    let footer_bottom = setup.height_pt - setup.footer_distance_pt;
+    assert!((bottom - (footer_bottom - 30.0)).abs() < 0.01);
   }
 
   #[test]

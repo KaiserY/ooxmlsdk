@@ -358,6 +358,7 @@ pub(crate) enum LineHeightRule {
 pub(crate) struct TabStop {
   pub position_pt: f32,
   pub alignment: TabStopAlignment,
+  pub leader: TabLeader,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -366,6 +367,17 @@ pub(crate) enum TabStopAlignment {
   Left,
   Center,
   Right,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum TabLeader {
+  #[default]
+  None,
+  Dot,
+  Hyphen,
+  Underscore,
+  Heavy,
+  MiddleDot,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

@@ -1959,7 +1959,7 @@ fn draw_rect_item(surface: &mut Surface<'_>, rect: &RectItem) {
   }
 
   if let Some(stroke) = rect.stroke
-    && rect.stroke_opacity > f32::EPSILON
+    && (rect.stroke_opacity > f32::EPSILON || (rect.fill_color.is_none() && rect.height_pt < 50.0))
   {
     surface.set_fill(None);
     surface.set_stroke(Some(Stroke {

@@ -2904,15 +2904,28 @@ fn apply_tab_stops(stops: &mut Vec<TabStop>, tabs: &w::Tabs) {
       .find(|stop| (stop.position_pt - position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT)
     {
       existing.alignment = alignment;
+      existing.leader = tab.leader.map(tab_leader).unwrap_or_default();
     } else {
       stops.push(TabStop {
         position_pt,
         alignment,
+        leader: tab.leader.map(tab_leader).unwrap_or_default(),
       });
     }
   }
   stops.sort_by(|a, b| a.position_pt.total_cmp(&b.position_pt));
   stops.dedup_by(|a, b| (a.position_pt - b.position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT);
+}
+
+fn tab_leader(leader: w::TabStopLeaderCharValues) -> TabLeader {
+  match leader {
+    w::TabStopLeaderCharValues::Dot => TabLeader::Dot,
+    w::TabStopLeaderCharValues::Hyphen => TabLeader::Hyphen,
+    w::TabStopLeaderCharValues::Underscore => TabLeader::Underscore,
+    w::TabStopLeaderCharValues::Heavy => TabLeader::Heavy,
+    w::TabStopLeaderCharValues::MiddleDot => TabLeader::MiddleDot,
+    w::TabStopLeaderCharValues::None => TabLeader::None,
+  }
 }
 
 fn paragraph_inlines(
@@ -5729,7 +5742,10 @@ fn drawingml_textbox_frame_stroke(
   auto_fit: bool,
   placement: ImagePlacement,
 ) -> Option<BorderStyle> {
-  let _ = first_named_xml_fragment(xml, b"spPr")?;
+  let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
+  if drawingml_shape_has_no_line(&sp_pr) {
+    return None;
+  }
   let suppress_zero_width_relative_frame = matches!(
     placement,
     ImagePlacement::Floating(FloatingImagePlacement {
@@ -5742,10 +5758,13 @@ fn drawingml_textbox_frame_stroke(
 }
 
 fn wordprocessing_shape_textbox_frame_stroke(
-  _shape: &wps::WordprocessingShape,
+  shape: &wps::WordprocessingShape,
   auto_fit: bool,
   placement: ImagePlacement,
 ) -> Option<BorderStyle> {
+  if wordprocessing_shape_has_no_line(shape) {
+    return None;
+  }
   let suppress_zero_width_relative_frame = matches!(
     placement,
     ImagePlacement::Floating(FloatingImagePlacement {
@@ -14119,6 +14138,49 @@ mod tests {
       }
     );
     assert_eq!(paragraph.runs[0].style, run.style);
+  }
+
+  #[test]
+  fn paragraph_mark_run_properties_are_base_for_empty_line_height() {
+    let paragraph = w::Paragraph {
+      paragraph_properties: Some(Box::new(w::ParagraphProperties {
+        paragraph_mark_run_properties: Some(Box::new(w::ParagraphMarkRunProperties {
+          paragraph_mark_run_properties_choice2: vec![
+            w::ParagraphMarkRunPropertiesChoice2::FontSize(Box::new(w::FontSize {
+              val: "96".into(),
+            })),
+            w::ParagraphMarkRunPropertiesChoice2::FontSizeComplexScript(Box::new(
+              w::FontSizeComplexScript { val: "96".into() },
+            )),
+          ],
+          ..Default::default()
+        })),
+        ..Default::default()
+      })),
+      paragraph_choice: vec![w::ParagraphChoice::WRun(Box::new(w::Run {
+        run_choice: vec![w::RunChoice::Text(text("visible"))],
+        ..Default::default()
+      }))],
+      ..Default::default()
+    };
+    let mut numbering = NumberingCatalog::default();
+
+    let paragraph = paragraph_model_with_base(
+      &paragraph,
+      &StylesCatalog::default(),
+      &mut numbering,
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &mut FormWidgetIdAllocator::default(),
+      ParagraphImportBase::default(),
+    );
+
+    assert_eq!(paragraph.base_style.font_size_pt, 48.0);
+    assert_eq!(paragraph.base_style.complex_font_size_pt, Some(48.0));
+    let InlineItem::Text(run) = &paragraph.inlines[0] else {
+      panic!("expected text run");
+    };
+    assert_eq!(run.style.font_size_pt, TextStyle::default().font_size_pt);
   }
 
   #[test]

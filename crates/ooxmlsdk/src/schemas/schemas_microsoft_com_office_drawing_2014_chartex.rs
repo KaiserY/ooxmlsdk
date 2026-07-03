@@ -927,7 +927,7 @@ pub struct GeoPolygons {
 #[sdk(qname = "cx:copyrights")]
 pub struct Copyrights {
   /// Defines the CopyrightXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "cx:copyright"))]
+  #[sdk(text_child(qname = "cx:copyright"))]
   pub copyright_xsdstring: Vec<CopyrightXsdstring>,
 }
 /// Defines the GeoDataEntityQuery Class.
@@ -1183,7 +1183,11 @@ pub struct GeoCache {
   pub provider: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            text_child(variant = Xsdbase64Binary, qname = "cx:binary"),
+            text_child(
+                variant = Xsdbase64Binary,
+                simple_type = "Base64BinaryValue",
+                qname = "cx:binary"
+            ),
             child(variant = Clear, qname = "cx:clear")
         )
     )]
@@ -1249,7 +1253,11 @@ pub struct Binning {
                 simple_type = "DoubleValue",
                 qname = "cx:binSize"
             ),
-            text_child(variant = BinCountXsdunsignedInt, qname = "cx:binCount")
+            text_child(
+                variant = BinCountXsdunsignedInt,
+                simple_type = "UInt32Value",
+                qname = "cx:binCount"
+            )
         )
     )]
   pub binning_choice: Option<BinningChoice>,
@@ -1385,7 +1393,7 @@ pub struct DataLabel {
   #[sdk(child(qname = "cx:visibility"))]
   pub data_label_visibilities: Option<DataLabelVisibilities>,
   /// Defines the SeparatorXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "cx:separator"))]
+  #[sdk(text_child(qname = "cx:separator"))]
   pub separator_xsdstring: Option<SeparatorXsdstring>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "cx:extLst"))]
@@ -1468,7 +1476,7 @@ pub struct DataLabels {
   #[sdk(child(qname = "cx:visibility"))]
   pub data_label_visibilities: Option<DataLabelVisibilities>,
   /// Defines the SeparatorXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "cx:separator"))]
+  #[sdk(text_child(qname = "cx:separator"))]
   pub separator_xsdstring: Option<SeparatorXsdstring>,
   /// Defines the DataLabel Class.
   #[sdk(child(qname = "cx:dataLabel"))]
@@ -1757,22 +1765,22 @@ pub struct HeaderFooter {
   #[sdk(attr(qname = ":differentFirst"))]
   pub different_first: Option<crate::simple_type::BooleanValue>,
   /// Defines the OddHeaderXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "cx:oddHeader"))]
+  #[sdk(text_child(qname = "cx:oddHeader"))]
   pub odd_header_xsdstring: Option<OddHeaderXsdstring>,
   /// Defines the OddFooterXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "cx:oddFooter"))]
+  #[sdk(text_child(qname = "cx:oddFooter"))]
   pub odd_footer_xsdstring: Option<OddFooterXsdstring>,
   /// Defines the EvenHeaderXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "cx:evenHeader"))]
+  #[sdk(text_child(qname = "cx:evenHeader"))]
   pub even_header_xsdstring: Option<EvenHeaderXsdstring>,
   /// Defines the EvenFooterXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "cx:evenFooter"))]
+  #[sdk(text_child(qname = "cx:evenFooter"))]
   pub even_footer_xsdstring: Option<EvenFooterXsdstring>,
   /// Defines the FirstHeaderXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "cx:firstHeader"))]
+  #[sdk(text_child(qname = "cx:firstHeader"))]
   pub first_header_xsdstring: Option<FirstHeaderXsdstring>,
   /// Defines the FirstFooterXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "cx:firstFooter"))]
+  #[sdk(text_child(qname = "cx:firstFooter"))]
   pub first_footer_xsdstring: Option<FirstFooterXsdstring>,
 }
 /// Defines the PageMargins Class.
@@ -2044,7 +2052,7 @@ pub struct TextDataChoiceSequence {
   #[sdk(child(qname = "cx:f"))]
   pub formula: std::boxed::Box<Formula>,
   /// Defines the VXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "cx:v"))]
+  #[sdk(text_child(qname = "cx:v"))]
   pub v_xsdstring: Option<VXsdstring>,
 }
 #[derive(Clone, Debug, PartialEq)]

@@ -69,13 +69,13 @@ pub struct Sources {
 #[sdk(qname = "b:Person")]
 pub struct Person {
   /// Person's Last, or Family, Name.
-  #[sdk(text_child(simple_type = "StringValue", qname = "b:Last"))]
+  #[sdk(text_child(qname = "b:Last"))]
   pub last: Vec<Last>,
   /// Person's First, or Given, Name.
-  #[sdk(text_child(simple_type = "StringValue", qname = "b:First"))]
+  #[sdk(text_child(qname = "b:First"))]
   pub first: Vec<First>,
   /// Person's Middle, or Other, Name.
-  #[sdk(text_child(simple_type = "StringValue", qname = "b:Middle"))]
+  #[sdk(text_child(qname = "b:Middle"))]
   pub middle: Vec<Middle>,
 }
 /// Person's Last, or Family, Name.
@@ -404,7 +404,7 @@ pub struct Source {
             text_child(variant = RecordingNumber, qname = "b:RecordingNumber"),
             text_child(variant = ReferenceOrder, qname = "b:RefOrder"),
             text_child(variant = Reporter, qname = "b:Reporter"),
-            text_child(variant = SourceType, qname = "b:SourceType"),
+            text_child(variant = SourceType, enum, qname = "b:SourceType"),
             text_child(variant = ShortTitle, qname = "b:ShortTitle"),
             text_child(variant = StandardNumber, qname = "b:StandardNumber"),
             text_child(variant = StateProvince, qname = "b:StateProvince"),

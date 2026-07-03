@@ -87,7 +87,7 @@ pub struct RichValue {
   #[sdk(child(qname = "xlrd:fb"))]
   pub rich_value_fallback: Option<RichValueFallback>,
   /// Defines the Value Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xlrd:v"))]
+  #[sdk(text_child(qname = "xlrd:v"))]
   pub value: Vec<Value>,
 }
 /// Defines the ExtensionList Class.

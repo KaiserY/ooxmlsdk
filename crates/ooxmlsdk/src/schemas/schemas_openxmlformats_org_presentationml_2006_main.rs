@@ -1953,7 +1953,7 @@ pub type Text = crate::simple_type::StringValue;
 #[sdk(qname = "p:attrNameLst")]
 pub struct AttributeNameList {
   /// Attribute Name.
-  #[sdk(text_child(simple_type = "StringValue", qname = "p:attrName"))]
+  #[sdk(text_child(qname = "p:attrName"))]
   pub attribute_name: Vec<AttributeName>,
 }
 /// Boolean Variant.
@@ -2465,7 +2465,7 @@ pub struct Comment {
   #[sdk(child(qname = "p:pos"))]
   pub position: std::boxed::Box<Position>,
   /// Defines the Text Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "p:text"))]
+  #[sdk(text_child(qname = "p:text"))]
   pub text: Text,
   /// Defines the CommentExtensionList Class.
   #[sdk(child(qname = "p:extLst"))]

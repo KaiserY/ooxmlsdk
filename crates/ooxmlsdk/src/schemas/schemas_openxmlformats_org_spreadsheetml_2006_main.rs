@@ -6635,7 +6635,7 @@ pub struct DataValidation {
   #[sdk(attr(list, qname = ":sqref"))]
   pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// Defines the List Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "x12ac:list"))]
+  #[sdk(text_child(qname = "x12ac:list"))]
   pub list: Option<crate::schemas::x12ac::List>,
   /// Defines the Formula1 Class.
   #[sdk(child(qname = "x:formula1"))]
@@ -10431,11 +10431,16 @@ pub struct PivotCacheDefinitionExtension {
             child(variant = PivotCacheIdVersion, qname = "x15:pivotCacheIdVersion"),
             text_child(
                 variant = XxpimXsdboolean,
+                simple_type = "BooleanValue",
                 qname = "xxpim:implicitMeasureSupport"
             ),
             child(variant = PivotCacheRichInfo, qname = "xprd:richInfo"),
             child(variant = CacheVersionInfo, qname = "xxpvi:cacheVersionInfo"),
-            text_child(variant = XlparXsdboolean, qname = "xlpar:autoRefresh"),
+            text_child(
+                variant = XlparXsdboolean,
+                simple_type = "BooleanValue",
+                qname = "xlpar:autoRefresh"
+            ),
             child(
                 variant = PivotCacheDynamicArray,
                 qname = "xlpda:pivotCacheDynamicArray"

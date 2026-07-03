@@ -198,7 +198,7 @@ pub struct CategoryFilterException {
 #[sdk(qname = "c16:numCache")]
 pub struct NumberDataType {
   /// Format Code
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:formatCode"))]
+  #[sdk(text_child(qname = "c:formatCode"))]
   pub format_code: Option<crate::schemas::c::FormatCode>,
   /// Point Count
   #[sdk(child(qname = "c:ptCount"))]
@@ -359,7 +359,7 @@ pub struct DLblChoiceSequence {
   #[sdk(child(qname = "c:showBubbleSize"))]
   pub show_bubble_size: Option<crate::schemas::c::ShowBubbleSize>,
   /// Separator.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:separator"))]
+  #[sdk(text_child(qname = "c:separator"))]
   pub separator: Option<crate::schemas::c::Separator>,
 }
 #[derive(Clone, Debug, PartialEq)]

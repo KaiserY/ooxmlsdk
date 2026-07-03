@@ -372,10 +372,15 @@ pub struct HorizontalPosition {
   pub relative_from: HorizontalRelativePositionValues,
   #[sdk(
         choice(
-            text_child(variant = HorizontalAlignment, qname = "wp:align"),
-            text_child(variant = PositionOffset, qname = "wp:posOffset"),
+            text_child(variant = HorizontalAlignment, enum, qname = "wp:align"),
+            text_child(
+                variant = PositionOffset,
+                simple_type = "Int32Value",
+                qname = "wp:posOffset"
+            ),
             text_child(
                 variant = PercentagePositionHeightOffset,
+                simple_type = "DrawingmlPercentageValue",
                 qname = "wp14:pctPosHOffset"
             )
         )
@@ -392,10 +397,15 @@ pub struct VerticalPosition {
   pub relative_from: VerticalRelativePositionValues,
   #[sdk(
         choice(
-            text_child(variant = VerticalAlignment, qname = "wp:align"),
-            text_child(variant = PositionOffset, qname = "wp:posOffset"),
+            text_child(variant = VerticalAlignment, enum, qname = "wp:align"),
+            text_child(
+                variant = PositionOffset,
+                simple_type = "Int32Value",
+                qname = "wp:posOffset"
+            ),
             text_child(
                 variant = PercentagePositionVerticalOffset,
+                simple_type = "DrawingmlPercentageValue",
                 qname = "wp14:pctPosVOffset"
             )
         )

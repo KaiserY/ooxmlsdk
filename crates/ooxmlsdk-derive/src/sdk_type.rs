@@ -797,13 +797,18 @@ fn build_choice_write_tokens(
         variant,
         ty,
         simple_type,
+        is_enum,
         qname,
       } => {
         let child_no_prefix =
           child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
         let start_tag = write_start_tag_tokens(qname, child_no_prefix);
         let end_tag = write_end_tag_tokens(qname, child_no_prefix);
-        let content = if let Some(payload_ty) = ty.clone().or_else(|| {
+        let content = if *is_enum {
+          quote! {
+            crate::common::write_escaped_content_text(writer, value)?;
+          }
+        } else if let Some(payload_ty) = ty.clone().or_else(|| {
           simple_type
             .as_deref()
             .and_then(|simple_type| syn::parse_str::<Type>(simple_type).ok())
@@ -1054,13 +1059,18 @@ fn build_wml_table_stack_choice_next_tokens(
         variant,
         ty,
         simple_type,
+        is_enum,
         qname,
       } => {
         let child_no_prefix =
           child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
         let start_tag = write_start_tag_tokens(qname, child_no_prefix);
         let end_tag = write_end_tag_tokens(qname, child_no_prefix);
-        let content = if let Some(payload_ty) = ty.clone().or_else(|| {
+        let content = if *is_enum {
+          quote! {
+            crate::common::write_escaped_content_text(writer, value)?;
+          }
+        } else if let Some(payload_ty) = ty.clone().or_else(|| {
           simple_type
             .as_deref()
             .and_then(|simple_type| syn::parse_str::<Type>(simple_type).ok())
@@ -1602,13 +1612,35 @@ fn choice_item_parse_bodies<'a>(
         },
       ))
     }
-    SdkTypeChoiceItem::TextChild { variant, qname, .. } => {
+    SdkTypeChoiceItem::TextChild {
+      variant,
+      simple_type,
+      is_enum,
+      qname,
+      ..
+    } => {
+      let simple_type = simple_type.as_deref();
+      let empty_parse_tokens = text_child_empty_parse_tokens(
+        None,
+        simple_type,
+        *is_enum,
+        quote! { stringify!(#ident) },
+        quote! { stringify!(#variant) },
+      );
+      let value_parse_tokens = text_child_value_parse_tokens(
+        None,
+        simple_type,
+        *is_enum,
+        quote! { value },
+        quote! { stringify!(#ident) },
+        quote! { stringify!(#variant) },
+      );
       let parsed_tokens = quote! {
         let parsed_child = if next_empty {
-          crate::common::parse_value("", stringify!(#ident), stringify!(#variant))?
+          #empty_parse_tokens
         } else {
           let value = xml_reader.read_text(e.name(), stringify!(#ident), stringify!(#variant))?;
-          crate::common::parse_text_child_value(value.as_ref(), stringify!(#ident), stringify!(#variant))?
+          #value_parse_tokens
         };
       };
       let assign_tokens = if repeated {
@@ -1891,19 +1923,37 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
           }
         });
       }
-      SdkTypeChoiceItem::TextChild { variant, qname, .. } => {
+      SdkTypeChoiceItem::TextChild {
+        variant,
+        simple_type,
+        is_enum,
+        qname,
+        ..
+      } => {
+        let simple_type = simple_type.as_deref();
+        let empty_parse_tokens = text_child_empty_parse_tokens(
+          None,
+          simple_type,
+          *is_enum,
+          quote! { stringify!(#ident) },
+          quote! { stringify!(#variant) },
+        );
+        let value_parse_tokens = text_child_value_parse_tokens(
+          None,
+          simple_type,
+          *is_enum,
+          quote! { value },
+          quote! { stringify!(#ident) },
+          quote! { stringify!(#variant) },
+        );
         let targets = qname_match_targets(std::slice::from_ref(qname));
         parse_replacement_arms.push(quote! {
           #( #targets )|* => {
             let parsed_child = if next_empty {
-              crate::common::parse_value("", stringify!(#ident), stringify!(#variant))?
+              #empty_parse_tokens
             } else {
               let value = child_reader.read_text(e.name(), stringify!(#ident), stringify!(#variant))?;
-              crate::common::parse_text_child_value(
-                value.as_ref(),
-                stringify!(#ident),
-                stringify!(#variant),
-              )?
+              #value_parse_tokens
             };
             Some(#choice_ty::#variant(parsed_child))
           }
@@ -2471,6 +2521,94 @@ fn sdk_type_read_inner_value_tokens(
     quote! { <#child_ty as crate::sdk::SdkType>::read_inner(#xml_reader, e, next_empty)? }
   } else {
     quote! { crate::sdk::SdkType::read_inner(#xml_reader, e, next_empty)? }
+  }
+}
+
+fn text_child_simple_union_kind(
+  value_ty: Option<&Type>,
+  simple_type: Option<&str>,
+) -> Option<SimpleUnionTypeKind> {
+  if let Some(value_ty) = value_ty {
+    simple_union_effective_type_kind(value_ty, simple_type)
+  } else {
+    simple_type.and_then(simple_union_type_kind_name)
+  }
+}
+
+fn text_child_is_string_like(value_ty: Option<&Type>, simple_type: Option<&str>) -> bool {
+  if let Some(value_ty) = value_ty {
+    is_string_like_effective_type(value_ty, simple_type)
+  } else {
+    simple_type.is_some_and(is_string_like_type_name)
+  }
+}
+
+fn text_child_empty_parse_tokens(
+  value_ty: Option<&Type>,
+  simple_type: Option<&str>,
+  is_enum: bool,
+  owner_expr: proc_macro2::TokenStream,
+  field_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  if let Some(kind) = text_child_simple_union_kind(value_ty, simple_type) {
+    parse_simple_union_value_tokens(kind, quote! { String::new() })
+  } else if is_enum {
+    if let Some(value_ty) = value_ty {
+      quote! {
+        <#value_ty as crate::sdk::SdkEnum>::from_xml_bytes(b"")?
+      }
+    } else {
+      quote! {
+        crate::sdk::SdkEnum::from_xml_bytes(b"")?
+      }
+    }
+  } else if text_child_is_string_like(value_ty, simple_type) {
+    quote! { Default::default() }
+  } else if let Some(value_ty) = value_ty {
+    quote! {
+      crate::common::parse_value::<#value_ty>("", #owner_expr, #field_expr)?
+    }
+  } else if simple_type.is_some() {
+    quote! {
+      crate::common::parse_value("", #owner_expr, #field_expr)?
+    }
+  } else {
+    quote! { Default::default() }
+  }
+}
+
+fn text_child_value_parse_tokens(
+  value_ty: Option<&Type>,
+  simple_type: Option<&str>,
+  is_enum: bool,
+  value_expr: proc_macro2::TokenStream,
+  owner_expr: proc_macro2::TokenStream,
+  field_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  if let Some(kind) = text_child_simple_union_kind(value_ty, simple_type) {
+    parse_simple_union_value_tokens(kind, value_expr)
+  } else if is_enum {
+    if let Some(value_ty) = value_ty {
+      quote! {
+        <#value_ty as crate::sdk::SdkEnum>::from_xml_bytes(#value_expr.as_bytes())?
+      }
+    } else {
+      quote! {
+        crate::sdk::SdkEnum::from_xml_bytes(#value_expr.as_bytes())?
+      }
+    }
+  } else if text_child_is_string_like(value_ty, simple_type) {
+    quote! { #value_expr }
+  } else if let Some(value_ty) = value_ty {
+    quote! {
+      crate::common::parse_text_child_value::<#value_ty>(#value_expr.as_ref(), #owner_expr, #field_expr)?
+    }
+  } else if simple_type.is_some() {
+    quote! {
+      crate::common::parse_text_child_value(#value_expr.as_ref(), #owner_expr, #field_expr)?
+    }
+  } else {
+    quote! { #value_expr }
   }
 }
 
@@ -4797,13 +4935,29 @@ fn expand_named_struct(
                         }
                       }
                       SdkTypeChoiceSequenceChildKind::TextChild => {
+                        let simple_type = child.simple_type.as_deref();
+                        let empty_parse_tokens = text_child_empty_parse_tokens(
+                          Some(&value_ty),
+                          simple_type,
+                          child.is_enum,
+                          quote! { stringify!(#ident) },
+                          quote! { stringify!(#field_ident) },
+                        );
+                        let value_parse_tokens = text_child_value_parse_tokens(
+                          Some(&value_ty),
+                          simple_type,
+                          child.is_enum,
+                          quote! { value },
+                          quote! { stringify!(#ident) },
+                          quote! { stringify!(#field_ident) },
+                        );
                         quote! {
                           #( #targets )|* => {
                             let parsed_value = if next_empty {
-                              crate::common::parse_value::<#value_ty>("", stringify!(#ident), stringify!(#field_ident))?
+                              #empty_parse_tokens
                             } else {
                               let value = xml_reader.read_text(e.name(), stringify!(#ident), stringify!(#field_ident))?;
-                              crate::common::parse_text_child_value::<#value_ty>(value.as_ref(), stringify!(#ident), stringify!(#field_ident))?
+                              #value_parse_tokens
                             };
                             #field_ident = Some(parsed_value);
                             continue;
@@ -5215,15 +5369,31 @@ fn expand_named_struct(
                       );
                     }
                     SdkTypeChoiceSequenceChildKind::TextChild => {
+                      let simple_type = child.simple_type.as_deref();
+                      let empty_parse_tokens = text_child_empty_parse_tokens(
+                        Some(&value_ty),
+                        simple_type,
+                        child.is_enum,
+                        quote! { stringify!(#ident) },
+                        quote! { stringify!(#field_ident) },
+                      );
+                      let value_parse_tokens = text_child_value_parse_tokens(
+                        Some(&value_ty),
+                        simple_type,
+                        child.is_enum,
+                        quote! { value },
+                        quote! { stringify!(#ident) },
+                        quote! { stringify!(#field_ident) },
+                      );
                       push_qname_dispatch_arm(
                         &mut child_arms,
                         &child.qname,
                         quote! {
                           let parsed_value = if next_empty {
-                            crate::common::parse_value::<#value_ty>("", stringify!(#ident), stringify!(#field_ident))?
+                            #empty_parse_tokens
                           } else {
                             let value = xml_reader.read_text(e.name(), stringify!(#ident), stringify!(#field_ident))?;
-                            crate::common::parse_text_child_value::<#value_ty>(value.as_ref(), stringify!(#ident), stringify!(#field_ident))?
+                            #value_parse_tokens
                           };
                           #field_ident = Some(parsed_value);
                           continue;

@@ -12,6 +12,6 @@ pub struct PivotCacheDataSource {
   #[sdk(attr(qname = ":ref"))]
   pub r#ref: Option<crate::simple_type::StringValue>,
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
+  #[sdk(text_child(qname = "xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
 }

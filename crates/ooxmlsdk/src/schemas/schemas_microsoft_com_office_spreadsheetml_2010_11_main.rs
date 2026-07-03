@@ -521,7 +521,7 @@ pub struct WebExtension {
   #[sdk(attr(qname = ":appRef"))]
   pub application_reference: crate::simple_type::StringValue,
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
+  #[sdk(text_child(qname = "xne:f"))]
   pub formula: crate::schemas::xne::Formula,
 }
 /// Defines the TimelineCacheReference Class.
@@ -780,7 +780,7 @@ pub struct PivotValueCell {
   #[sdk(attr(qname = ":t"))]
   pub text: Option<SxvCellType>,
   /// Defines the Xstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "x15:v"))]
+  #[sdk(text_child(qname = "x15:v"))]
   pub xstring: Xstring,
   /// Defines the PivotValueCellExtra Class.
   #[sdk(child(qname = "x15:x"))]

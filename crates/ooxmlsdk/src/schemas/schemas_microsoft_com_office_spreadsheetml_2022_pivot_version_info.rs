@@ -9,10 +9,10 @@
 #[sdk(qname = "xxpvi:cacheVersionInfo")]
 pub struct CacheVersionInfo {
   /// Defines the RequiredFeatureXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xxpvi:requiredFeature"))]
+  #[sdk(text_child(qname = "xxpvi:requiredFeature"))]
   pub required_feature_xsdstring: Vec<RequiredFeatureXsdstring>,
   /// Defines the LastRefreshFeatureXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xxpvi:lastRefreshFeature"))]
+  #[sdk(text_child(qname = "xxpvi:lastRefreshFeature"))]
   pub last_refresh_feature_xsdstring: Vec<LastRefreshFeatureXsdstring>,
 }
 /// Defines the PivotVersionInfo Class.
@@ -20,10 +20,10 @@ pub struct CacheVersionInfo {
 #[sdk(qname = "xxpvi:pivotVersionInfo")]
 pub struct PivotVersionInfo {
   /// Defines the RequiredFeatureXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xxpvi:requiredFeature"))]
+  #[sdk(text_child(qname = "xxpvi:requiredFeature"))]
   pub required_feature_xsdstring: Vec<RequiredFeatureXsdstring>,
   /// Defines the LastUpdateFeatureXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xxpvi:lastUpdateFeature"))]
+  #[sdk(text_child(qname = "xxpvi:lastUpdateFeature"))]
   pub last_update_feature_xsdstring: Vec<LastUpdateFeatureXsdstring>,
 }
 /// Defines the RequiredFeatureXsdstring Class.

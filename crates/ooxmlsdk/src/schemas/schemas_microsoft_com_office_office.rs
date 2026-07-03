@@ -659,7 +659,7 @@ pub struct OleObject {
   #[sdk(text_child(simple_type = "TrueFalseBlankValue", qname = "o:LockedField"))]
   pub locked_field: Option<LockedField>,
   /// WordprocessingML Field Switches
-  #[sdk(text_child(simple_type = "StringValue", qname = "o:FieldCodes"))]
+  #[sdk(text_child(qname = "o:FieldCodes"))]
   pub field_codes: Option<FieldCodes>,
 }
 /// Complex.

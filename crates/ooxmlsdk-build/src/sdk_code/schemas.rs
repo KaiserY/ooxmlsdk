@@ -137,10 +137,12 @@ pub struct ResolvedOneChoice<'a> {
 #[derive(Debug, Default)]
 pub(crate) struct TypeContainmentGraph {
   edges: HashMap<String, Vec<String>>,
+  enum_keys: HashSet<String>,
   empty_leaf_marker_ambiguous_rust_names: HashSet<String>,
   empty_leaf_marker_docs: HashMap<String, String>,
   empty_leaf_marker_docs_by_rust_name: HashMap<String, String>,
   any_children_alias_keys: HashSet<String>,
+  leaf_text_alias_content: HashMap<String, TypeRefDecl>,
   leaf_text_alias_keys: HashSet<String>,
   module_alias_paths: HashMap<String, String>,
   nodes: HashSet<String>,
@@ -157,11 +159,21 @@ impl TypeContainmentGraph {
           .module_alias_paths
           .insert(module_type_namespace(&module.module_name), alias_path);
       }
+      for schema_enum in &module.enums {
+        graph
+          .enum_keys
+          .insert(local_type_key(module, &schema_enum.rust_name));
+      }
       for type_decl in &module.types {
         let type_key = local_type_key(module, &type_decl.rust_name);
         graph.nodes.insert(type_key.clone());
         if type_decl.kind == TypeKind::LeafTextAlias {
           graph.leaf_text_alias_keys.insert(type_key.clone());
+          if let Some(xml_content) = &type_decl.xml_content {
+            graph
+              .leaf_text_alias_content
+              .insert(type_key.clone(), xml_content.clone());
+          }
         }
         if is_empty_leaf_marker_type(type_decl) {
           graph
@@ -278,8 +290,16 @@ impl TypeContainmentGraph {
     self.any_children_alias_keys.contains(node)
   }
 
+  fn is_enum(&self, node: &str) -> bool {
+    self.enum_keys.contains(node)
+  }
+
   fn is_leaf_text_alias(&self, node: &str) -> bool {
     self.leaf_text_alias_keys.contains(node)
+  }
+
+  fn leaf_text_alias_content(&self, node: &str) -> Option<&TypeRefDecl> {
+    self.leaf_text_alias_content.get(node)
   }
 
   fn is_wrapped_base(&self, node: &str) -> bool {
@@ -3309,6 +3329,51 @@ fn is_value_like_type_ref(
   type_graph.is_leaf_text_alias(&type_key)
 }
 
+fn is_sdk_enum_type_ref(
+  module: &SchemaModuleDecl,
+  type_ref: &TypeRefDecl,
+  type_graph: &TypeContainmentGraph,
+) -> bool {
+  schema_type_key_from_ref(module, type_ref).is_some_and(|type_key| type_graph.is_enum(&type_key))
+}
+
+fn simple_type_sdk_attr_from_type_ref(type_ref: &TypeRefDecl) -> TokenStream {
+  if !matches!(type_ref.module_path.as_deref(), Some("crate::simple_type")) {
+    return quote! {};
+  }
+
+  let simple_type = type_ref.rust_type.as_str();
+  if simple_type == "StringValue" {
+    quote! {}
+  } else {
+    quote! { simple_type = #simple_type, }
+  }
+}
+
+fn text_child_value_metadata_attrs_from_type_ref(
+  module: &SchemaModuleDecl,
+  type_ref: &TypeRefDecl,
+  type_graph: &TypeContainmentGraph,
+) -> TokenStream {
+  if is_sdk_enum_type_ref(module, type_ref, type_graph) {
+    return quote! { enum, };
+  }
+
+  let simple_type_attr = simple_type_sdk_attr_from_type_ref(type_ref);
+  if !simple_type_attr.is_empty() {
+    return simple_type_attr;
+  }
+
+  let Some(type_key) = schema_type_key_from_ref(module, type_ref) else {
+    return quote! {};
+  };
+  let Some(xml_content) = type_graph.leaf_text_alias_content(&type_key) else {
+    return quote! {};
+  };
+
+  text_child_value_metadata_attrs_from_type_ref(module, xml_content, type_graph)
+}
+
 fn is_list_type_ref(type_ref: &TypeRefDecl) -> bool {
   type_ref.module_path.is_none() && type_ref.rust_type.starts_with("Vec<")
 }
@@ -3318,22 +3383,22 @@ fn simple_type_sdk_attr_from_qname(qname: &str) -> TokenStream {
     return quote! {};
   };
   let simple_type = simple_type_mapping(type_name);
-  if simple_type == type_name {
+  if simple_type == type_name || simple_type == "StringValue" {
     quote! {}
   } else {
     quote! { simple_type = #simple_type, }
   }
 }
 
-fn xml_schema_float_simple_type_sdk_attr_from_qname(qname: &str) -> TokenStream {
+fn choice_text_child_simple_type_sdk_attr_from_qname(qname: &str) -> TokenStream {
   let Some((type_name, _)) = qname.split_once('/') else {
     return quote! {};
   };
   let simple_type = simple_type_mapping(type_name);
-  if matches!(simple_type, "DoubleValue" | "SingleValue") {
-    quote! { simple_type = #simple_type, }
-  } else {
+  if simple_type == type_name || simple_type == "StringValue" {
     quote! {}
+  } else {
+    quote! { simple_type = #simple_type, }
   }
 }
 
@@ -3606,15 +3671,15 @@ fn choice_sequence_child_metadata_tokens(
       }
     }
     FieldWireDecl::TextChild { qname } => {
-      let simple_type_attr = if include_field_name {
-        quote! {}
+      let metadata_attrs =
+        text_child_value_metadata_attrs_from_type_ref(module, &field.type_ref, type_graph);
+      let metadata_attrs = if metadata_attrs.is_empty() {
+        choice_text_child_simple_type_sdk_attr_from_qname(qname)
       } else {
-        xml_schema_float_simple_type_sdk_attr_from_qname(qname)
+        metadata_attrs
       };
       let qname = choice_metadata_qname(qname);
-      Some(
-        quote! { text_child(#variant_attr #field_attr #ty_attr #simple_type_attr qname = #qname) },
-      )
+      Some(quote! { text_child(#variant_attr #field_attr #ty_attr #metadata_attrs qname = #qname) })
     }
     _ => None,
   })
@@ -3646,9 +3711,15 @@ fn choice_variant_metadata_tokens(
       qnames
         .iter()
         .map(|qname| {
-          let simple_type_attr = xml_schema_float_simple_type_sdk_attr_from_qname(qname);
+          let metadata_attrs =
+            text_child_value_metadata_attrs_from_type_ref(module, &variant.payload, type_graph);
+          let metadata_attrs = if metadata_attrs.is_empty() {
+            choice_text_child_simple_type_sdk_attr_from_qname(qname)
+          } else {
+            metadata_attrs
+          };
           let qname = choice_metadata_qname(qname);
-          quote! { text_child(variant = #variant_ident, #simple_type_attr qname = #qname) }
+          quote! { text_child(variant = #variant_ident, #metadata_attrs qname = #qname) }
         })
         .collect(),
     ),
@@ -4215,12 +4286,40 @@ mod tests {
 
     assert!(generated.contains("empty_child (variant = VtEmpty , qname = \"vt:empty\")"));
     assert!(generated.contains("empty_child (variant = VtNull , qname = \"vt:null\")"));
+    assert!(generated.contains(
+      "text_child (variant = VtInt32 , simple_type = \"Int32Value\" , qname = \"vt:i4\")"
+    ));
+    assert!(generated.contains(
+      "text_child (variant = VtUnsignedInt32 , simple_type = \"UInt32Value\" , qname = \"vt:ui4\")"
+    ));
+    assert!(generated.contains(
+      "text_child (variant = VtBlob , simple_type = \"Base64BinaryValue\" , qname = \"vt:blob\")"
+    ));
+    assert!(!generated.contains(
+      "text_child (variant = Vtlpstr , simple_type = \"StringValue\" , qname = \"vt:lpstr\")"
+    ));
     assert!(generated.contains("VtEmpty ,"));
     assert!(generated.contains("VtNull ,"));
     assert!(!generated.contains("pub struct VtEmpty"));
     assert!(!generated.contains("pub struct VtNull"));
     assert!(!generated.contains("VtEmpty (std :: boxed :: Box < VtEmpty >)"));
     assert!(!generated.contains("VtNull (std :: boxed :: Box < VtNull >)"));
+  }
+
+  #[test]
+  fn marks_choice_text_child_schema_enums_without_simple_type() {
+    let schema =
+      read_codegen_ir_schema_json("../../sdk_data/schemas/schemas_microsoft_com_office_excel.json");
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(
+      generated.contains("text_child (variant = AutoFill , enum , qname = \"xvml:AutoFill\")")
+    );
+    assert!(generated.contains("text_child (variant = Anchor , qname = \"xvml:Anchor\")"));
+    assert!(
+      !generated
+        .contains("text_child (variant = AutoFill , simple_type = \"BooleanEntryWithBlankValues\"")
+    );
   }
 
   #[test]

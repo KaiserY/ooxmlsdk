@@ -218,63 +218,45 @@ pub type EventDocBuildingBlockAfterInsertXsdString = crate::simple_type::StringV
 #[sdk(qname = "wne:docEvents")]
 pub struct DocEvents {
   /// Defines the EventDocNewXsdString Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocNew"))]
+  #[sdk(text_child(qname = "wne:eventDocNew"))]
   pub event_doc_new_xsd_string: Option<EventDocNewXsdString>,
   /// Defines the EventDocOpenXsdString Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocOpen"))]
+  #[sdk(text_child(qname = "wne:eventDocOpen"))]
   pub event_doc_open_xsd_string: Option<EventDocOpenXsdString>,
   /// Defines the EventDocCloseXsdString Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocClose"))]
+  #[sdk(text_child(qname = "wne:eventDocClose"))]
   pub event_doc_close_xsd_string: Option<EventDocCloseXsdString>,
   /// Defines the EventDocSyncXsdString Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocSync"))]
+  #[sdk(text_child(qname = "wne:eventDocSync"))]
   pub event_doc_sync_xsd_string: Option<EventDocSyncXsdString>,
   /// Defines the EventDocXmlAfterInsertXsdString Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocXmlAfterInsert"))]
+  #[sdk(text_child(qname = "wne:eventDocXmlAfterInsert"))]
   pub event_doc_xml_after_insert_xsd_string: Option<EventDocXmlAfterInsertXsdString>,
   /// Defines the EventDocXmlBeforeDeleteXsdString Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocXmlBeforeDelete"))]
+  #[sdk(text_child(qname = "wne:eventDocXmlBeforeDelete"))]
   pub event_doc_xml_before_delete_xsd_string: Option<EventDocXmlBeforeDeleteXsdString>,
   /// Defines the EventDocContentControlAfterInsertXsdString Class.
-  #[sdk(text_child(
-    simple_type = "StringValue",
-    qname = "wne:eventDocContentControlAfterInsert"
-  ))]
+  #[sdk(text_child(qname = "wne:eventDocContentControlAfterInsert"))]
   pub event_doc_content_control_after_insert_xsd_string:
     Option<EventDocContentControlAfterInsertXsdString>,
   /// Defines the EventDocContentControlBeforeDeleteXsdString Class.
-  #[sdk(text_child(
-    simple_type = "StringValue",
-    qname = "wne:eventDocContentControlBeforeDelete"
-  ))]
+  #[sdk(text_child(qname = "wne:eventDocContentControlBeforeDelete"))]
   pub event_doc_content_control_before_delete_xsd_string:
     Option<EventDocContentControlBeforeDeleteXsdString>,
   /// Defines the EventDocContentControlOnExistXsdString Class.
-  #[sdk(text_child(
-    simple_type = "StringValue",
-    qname = "wne:eventDocContentControlOnExit"
-  ))]
+  #[sdk(text_child(qname = "wne:eventDocContentControlOnExit"))]
   pub event_doc_content_control_on_exist_xsd_string: Option<EventDocContentControlOnExistXsdString>,
   /// Defines the EventDocContentControlOnEnterXsdString Class.
-  #[sdk(text_child(
-    simple_type = "StringValue",
-    qname = "wne:eventDocContentControlOnEnter"
-  ))]
+  #[sdk(text_child(qname = "wne:eventDocContentControlOnEnter"))]
   pub event_doc_content_control_on_enter_xsd_string: Option<EventDocContentControlOnEnterXsdString>,
   /// Defines the EventDocStoreUpdateXsdString Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocStoreUpdate"))]
+  #[sdk(text_child(qname = "wne:eventDocStoreUpdate"))]
   pub event_doc_store_update_xsd_string: Option<EventDocStoreUpdateXsdString>,
   /// Defines the EventDocContentControlUpdateXsdString Class.
-  #[sdk(text_child(
-    simple_type = "StringValue",
-    qname = "wne:eventDocContentControlContentUpdate"
-  ))]
+  #[sdk(text_child(qname = "wne:eventDocContentControlContentUpdate"))]
   pub event_doc_content_control_update_xsd_string: Option<EventDocContentControlUpdateXsdString>,
   /// Defines the EventDocBuildingBlockAfterInsertXsdString Class.
-  #[sdk(text_child(
-    simple_type = "StringValue",
-    qname = "wne:eventDocBuildingBlockAfterInsert"
-  ))]
+  #[sdk(text_child(qname = "wne:eventDocBuildingBlockAfterInsert"))]
   pub event_doc_building_block_after_insert_xsd_string:
     Option<EventDocBuildingBlockAfterInsertXsdString>,
 }

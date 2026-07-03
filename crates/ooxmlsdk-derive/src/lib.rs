@@ -359,6 +359,7 @@ enum SdkTypeChoiceItem {
     variant: Ident,
     ty: Option<Type>,
     simple_type: Option<String>,
+    is_enum: bool,
     qname: String,
   },
   AnyChild {
@@ -384,6 +385,7 @@ struct SdkTypeChoiceSequenceChild {
   field: Option<Ident>,
   ty: Option<Type>,
   simple_type: Option<String>,
+  is_enum: bool,
   qname: String,
 }
 
@@ -890,6 +892,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               let mut variant = None;
               let mut ty = None;
               let mut simple_type = None;
+              let mut is_enum = false;
               let mut qname = None;
               nested.parse_nested_meta(|choice_child| {
                 if choice_child.path.is_ident("qname") {
@@ -908,6 +911,9 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                 } else if choice_child.path.is_ident("simple_type") {
                   let value: LitStr = choice_child.value()?.parse()?;
                   simple_type = Some(value.value());
+                  Ok(())
+                } else if choice_child.path.is_ident("enum") {
+                  is_enum = true;
                   Ok(())
                 } else if is_sdk_version_marker_path(&choice_child.path) {
                   Ok(())
@@ -929,6 +935,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                   variant,
                   ty,
                   simple_type,
+                  is_enum,
                   qname,
                 });
               } else {
@@ -963,6 +970,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                   let mut field = None;
                   let mut ty = None;
                   let mut simple_type = None;
+                  let mut is_enum = false;
                   let mut qname = None;
                   sequence.parse_nested_meta(|sequence_child| {
                     if sequence_child.path.is_ident("qname") {
@@ -982,6 +990,9 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                       let value: LitStr = sequence_child.value()?.parse()?;
                       simple_type = Some(value.value());
                       Ok(())
+                    } else if sequence_child.path.is_ident("enum") {
+                      is_enum = true;
+                      Ok(())
                     } else if is_sdk_version_marker_path(&sequence_child.path) {
                       Ok(())
                     } else {
@@ -995,6 +1006,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                     field,
                     ty,
                     simple_type,
+                    is_enum,
                     qname,
                   });
                   Ok(())

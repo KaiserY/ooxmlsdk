@@ -13,9 +13,9 @@ pub type Value = crate::simple_type::StringValue;
 #[sdk(qname = "pRoam:props")]
 pub struct RoamingProperty {
   /// Defines the Key Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "pRoam:key"))]
+  #[sdk(text_child(qname = "pRoam:key"))]
   pub key: Key,
   /// Defines the Value Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "pRoam:value"))]
+  #[sdk(text_child(qname = "pRoam:value"))]
   pub value: Value,
 }

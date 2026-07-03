@@ -97,35 +97,99 @@ pub struct Variant {
             child(variant = Variant, qname = "vt:variant"),
             child(variant = VtVector, qname = "vt:vector"),
             child(variant = VtArray, qname = "vt:array"),
-            text_child(variant = VtBlob, qname = "vt:blob"),
-            text_child(variant = VtoBlob, qname = "vt:oblob"),
+            text_child(
+                variant = VtBlob,
+                simple_type = "Base64BinaryValue",
+                qname = "vt:blob"
+            ),
+            text_child(
+                variant = VtoBlob,
+                simple_type = "Base64BinaryValue",
+                qname = "vt:oblob"
+            ),
             empty_child(variant = VtEmpty, qname = "vt:empty"),
             empty_child(variant = VtNull, qname = "vt:null"),
-            text_child(variant = VtByte, qname = "vt:i1"),
-            text_child(variant = VtShort, qname = "vt:i2"),
-            text_child(variant = VtInt32, qname = "vt:i4"),
-            text_child(variant = VtInt64, qname = "vt:i8"),
-            text_child(variant = VtInteger, qname = "vt:int"),
-            text_child(variant = VtUnsignedByte, qname = "vt:ui1"),
-            text_child(variant = VtUnsignedShort, qname = "vt:ui2"),
-            text_child(variant = VtUnsignedInt32, qname = "vt:ui4"),
-            text_child(variant = VtUnsignedInt64, qname = "vt:ui8"),
-            text_child(variant = VtUnsignedInteger, qname = "vt:uint"),
+            text_child(variant = VtByte, simple_type = "SByteValue", qname = "vt:i1"),
+            text_child(variant = VtShort, simple_type = "Int16Value", qname = "vt:i2"),
+            text_child(variant = VtInt32, simple_type = "Int32Value", qname = "vt:i4"),
+            text_child(variant = VtInt64, simple_type = "Int64Value", qname = "vt:i8"),
+            text_child(
+                variant = VtInteger,
+                simple_type = "Int32Value",
+                qname = "vt:int"
+            ),
+            text_child(
+                variant = VtUnsignedByte,
+                simple_type = "ByteValue",
+                qname = "vt:ui1"
+            ),
+            text_child(
+                variant = VtUnsignedShort,
+                simple_type = "UInt16Value",
+                qname = "vt:ui2"
+            ),
+            text_child(
+                variant = VtUnsignedInt32,
+                simple_type = "UInt32Value",
+                qname = "vt:ui4"
+            ),
+            text_child(
+                variant = VtUnsignedInt64,
+                simple_type = "UInt64Value",
+                qname = "vt:ui8"
+            ),
+            text_child(
+                variant = VtUnsignedInteger,
+                simple_type = "UInt32Value",
+                qname = "vt:uint"
+            ),
             text_child(variant = VtFloat, simple_type = "SingleValue", qname = "vt:r4"),
             text_child(variant = VtDouble, simple_type = "DoubleValue", qname = "vt:r8"),
-            text_child(variant = VtDecimal, qname = "vt:decimal"),
+            text_child(
+                variant = VtDecimal,
+                simple_type = "DecimalValue",
+                qname = "vt:decimal"
+            ),
             text_child(variant = Vtlpstr, qname = "vt:lpstr"),
             text_child(variant = Vtlpwstr, qname = "vt:lpwstr"),
             text_child(variant = VtbString, qname = "vt:bstr"),
-            text_child(variant = VtDate, qname = "vt:date"),
-            text_child(variant = VtFileTime, qname = "vt:filetime"),
-            text_child(variant = VtBool, qname = "vt:bool"),
+            text_child(
+                variant = VtDate,
+                simple_type = "DateTimeValue",
+                qname = "vt:date"
+            ),
+            text_child(
+                variant = VtFileTime,
+                simple_type = "DateTimeValue",
+                qname = "vt:filetime"
+            ),
+            text_child(
+                variant = VtBool,
+                simple_type = "BooleanValue",
+                qname = "vt:bool"
+            ),
             text_child(variant = VtCurrency, qname = "vt:cy"),
             text_child(variant = VtError, qname = "vt:error"),
-            text_child(variant = VtStreamData, qname = "vt:stream"),
-            text_child(variant = VtoStreamData, qname = "vt:ostream"),
-            text_child(variant = VtStorage, qname = "vt:storage"),
-            text_child(variant = VtoStorage, qname = "vt:ostorage"),
+            text_child(
+                variant = VtStreamData,
+                simple_type = "Base64BinaryValue",
+                qname = "vt:stream"
+            ),
+            text_child(
+                variant = VtoStreamData,
+                simple_type = "Base64BinaryValue",
+                qname = "vt:ostream"
+            ),
+            text_child(
+                variant = VtStorage,
+                simple_type = "Base64BinaryValue",
+                qname = "vt:storage"
+            ),
+            text_child(
+                variant = VtoStorage,
+                simple_type = "Base64BinaryValue",
+                qname = "vt:ostorage"
+            ),
             child(variant = VtvStreamData, qname = "vt:vstream"),
             text_child(variant = VtClassId, qname = "vt:clsid"),
             child(variant = VtClipboardData, qname = "vt:cf")
@@ -146,22 +210,50 @@ pub struct VtVector {
   #[sdk(
         choice(
             child(variant = Variant, qname = "vt:variant"),
-            text_child(variant = VtByte, qname = "vt:i1"),
-            text_child(variant = VtShort, qname = "vt:i2"),
-            text_child(variant = VtInt32, qname = "vt:i4"),
-            text_child(variant = VtInt64, qname = "vt:i8"),
-            text_child(variant = VtUnsignedByte, qname = "vt:ui1"),
-            text_child(variant = VtUnsignedShort, qname = "vt:ui2"),
-            text_child(variant = VtUnsignedInt32, qname = "vt:ui4"),
-            text_child(variant = VtUnsignedInt64, qname = "vt:ui8"),
+            text_child(variant = VtByte, simple_type = "SByteValue", qname = "vt:i1"),
+            text_child(variant = VtShort, simple_type = "Int16Value", qname = "vt:i2"),
+            text_child(variant = VtInt32, simple_type = "Int32Value", qname = "vt:i4"),
+            text_child(variant = VtInt64, simple_type = "Int64Value", qname = "vt:i8"),
+            text_child(
+                variant = VtUnsignedByte,
+                simple_type = "ByteValue",
+                qname = "vt:ui1"
+            ),
+            text_child(
+                variant = VtUnsignedShort,
+                simple_type = "UInt16Value",
+                qname = "vt:ui2"
+            ),
+            text_child(
+                variant = VtUnsignedInt32,
+                simple_type = "UInt32Value",
+                qname = "vt:ui4"
+            ),
+            text_child(
+                variant = VtUnsignedInt64,
+                simple_type = "UInt64Value",
+                qname = "vt:ui8"
+            ),
             text_child(variant = VtFloat, simple_type = "SingleValue", qname = "vt:r4"),
             text_child(variant = VtDouble, simple_type = "DoubleValue", qname = "vt:r8"),
             text_child(variant = Vtlpstr, qname = "vt:lpstr"),
             text_child(variant = Vtlpwstr, qname = "vt:lpwstr"),
             text_child(variant = VtbString, qname = "vt:bstr"),
-            text_child(variant = VtDate, qname = "vt:date"),
-            text_child(variant = VtFileTime, qname = "vt:filetime"),
-            text_child(variant = VtBool, qname = "vt:bool"),
+            text_child(
+                variant = VtDate,
+                simple_type = "DateTimeValue",
+                qname = "vt:date"
+            ),
+            text_child(
+                variant = VtFileTime,
+                simple_type = "DateTimeValue",
+                qname = "vt:filetime"
+            ),
+            text_child(
+                variant = VtBool,
+                simple_type = "BooleanValue",
+                qname = "vt:bool"
+            ),
             text_child(variant = VtCurrency, qname = "vt:cy"),
             text_child(variant = VtError, qname = "vt:error"),
             text_child(variant = VtClassId, qname = "vt:clsid"),
@@ -186,20 +278,52 @@ pub struct VtArray {
   #[sdk(
         choice(
             child(variant = Variant, qname = "vt:variant"),
-            text_child(variant = VtByte, qname = "vt:i1"),
-            text_child(variant = VtShort, qname = "vt:i2"),
-            text_child(variant = VtInt32, qname = "vt:i4"),
-            text_child(variant = VtInteger, qname = "vt:int"),
-            text_child(variant = VtUnsignedByte, qname = "vt:ui1"),
-            text_child(variant = VtUnsignedShort, qname = "vt:ui2"),
-            text_child(variant = VtUnsignedInt32, qname = "vt:ui4"),
-            text_child(variant = VtUnsignedInteger, qname = "vt:uint"),
+            text_child(variant = VtByte, simple_type = "SByteValue", qname = "vt:i1"),
+            text_child(variant = VtShort, simple_type = "Int16Value", qname = "vt:i2"),
+            text_child(variant = VtInt32, simple_type = "Int32Value", qname = "vt:i4"),
+            text_child(
+                variant = VtInteger,
+                simple_type = "Int32Value",
+                qname = "vt:int"
+            ),
+            text_child(
+                variant = VtUnsignedByte,
+                simple_type = "ByteValue",
+                qname = "vt:ui1"
+            ),
+            text_child(
+                variant = VtUnsignedShort,
+                simple_type = "UInt16Value",
+                qname = "vt:ui2"
+            ),
+            text_child(
+                variant = VtUnsignedInt32,
+                simple_type = "UInt32Value",
+                qname = "vt:ui4"
+            ),
+            text_child(
+                variant = VtUnsignedInteger,
+                simple_type = "UInt32Value",
+                qname = "vt:uint"
+            ),
             text_child(variant = VtFloat, simple_type = "SingleValue", qname = "vt:r4"),
             text_child(variant = VtDouble, simple_type = "DoubleValue", qname = "vt:r8"),
-            text_child(variant = VtDecimal, qname = "vt:decimal"),
+            text_child(
+                variant = VtDecimal,
+                simple_type = "DecimalValue",
+                qname = "vt:decimal"
+            ),
             text_child(variant = VtbString, qname = "vt:bstr"),
-            text_child(variant = VtDate, qname = "vt:date"),
-            text_child(variant = VtBool, qname = "vt:bool"),
+            text_child(
+                variant = VtDate,
+                simple_type = "DateTimeValue",
+                qname = "vt:date"
+            ),
+            text_child(
+                variant = VtBool,
+                simple_type = "BooleanValue",
+                qname = "vt:bool"
+            ),
             text_child(variant = VtError, qname = "vt:error"),
             text_child(variant = VtCurrency, qname = "vt:cy")
         )

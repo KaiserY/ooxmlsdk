@@ -11,13 +11,13 @@ pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Name of Document Template
-  #[sdk(text_child(simple_type = "StringValue", qname = "ap:Template"))]
+  #[sdk(text_child(qname = "ap:Template"))]
   pub template: Option<Template>,
   /// Name of Manager
-  #[sdk(text_child(simple_type = "StringValue", qname = "ap:Manager"))]
+  #[sdk(text_child(qname = "ap:Manager"))]
   pub manager: Option<Manager>,
   /// Name of Company
-  #[sdk(text_child(simple_type = "StringValue", qname = "ap:Company"))]
+  #[sdk(text_child(qname = "ap:Company"))]
   pub company: Option<Company>,
   /// Total Number of Pages
   #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Pages"))]
@@ -29,7 +29,7 @@ pub struct Properties {
   #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Characters"))]
   pub characters: Option<Characters>,
   /// Intended Format of Presentation
-  #[sdk(text_child(simple_type = "StringValue", qname = "ap:PresentationFormat"))]
+  #[sdk(text_child(qname = "ap:PresentationFormat"))]
   pub presentation_format: Option<PresentationFormat>,
   /// Number of Lines
   #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Lines"))]
@@ -71,7 +71,7 @@ pub struct Properties {
   #[sdk(text_child(simple_type = "BooleanValue", qname = "ap:SharedDoc"))]
   pub shared_document: Option<SharedDocument>,
   /// Relative Hyperlink Base
-  #[sdk(text_child(simple_type = "StringValue", qname = "ap:HyperlinkBase"))]
+  #[sdk(text_child(qname = "ap:HyperlinkBase"))]
   pub hyperlink_base: Option<HyperlinkBase>,
   /// Hyperlink List
   #[sdk(child(qname = "ap:HLinks"))]
@@ -83,10 +83,10 @@ pub struct Properties {
   #[sdk(child(qname = "ap:DigSig"))]
   pub digital_signature: Option<DigitalSignature>,
   /// Application Name
-  #[sdk(text_child(simple_type = "StringValue", qname = "ap:Application"))]
+  #[sdk(text_child(qname = "ap:Application"))]
   pub application: Option<Application>,
   /// Application Version
-  #[sdk(text_child(simple_type = "StringValue", qname = "ap:AppVersion"))]
+  #[sdk(text_child(qname = "ap:AppVersion"))]
   pub application_version: Option<ApplicationVersion>,
   /// Document Security
   #[sdk(text_child(simple_type = "Int32Value", qname = "ap:DocSecurity"))]

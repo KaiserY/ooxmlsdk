@@ -4304,7 +4304,7 @@ pub struct Run {
   #[sdk(child(qname = "a:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
   /// Text String
-  #[sdk(text_child(simple_type = "StringValue", qname = "a:t"))]
+  #[sdk(text_child(qname = "a:t"))]
   pub text: Text,
 }
 /// Text Line Break.
@@ -4334,7 +4334,7 @@ pub struct Field {
   #[sdk(child(qname = "a:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   /// Defines the Text Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "a:t"))]
+  #[sdk(text_child(qname = "a:t"))]
   pub text: Option<Text>,
 }
 /// Graphic Object.
@@ -5213,10 +5213,12 @@ pub struct GraphicData {
             child(variant = Anchor, qname = "wp:anchor"),
             text_child(
                 variant = PercentagePositionHeightOffset,
+                simple_type = "DrawingmlPercentageValue",
                 qname = "wp14:pctPosHOffset"
             ),
             text_child(
                 variant = PercentagePositionVerticalOffset,
+                simple_type = "DrawingmlPercentageValue",
                 qname = "wp14:pctPosVOffset"
             ),
             child(variant = RelativeWidth, qname = "wp14:sizeRelH"),
@@ -5282,8 +5284,16 @@ pub struct GraphicData {
             child(variant = TaskHistoryDetails, qname = "p1912:taskHistoryDetails"),
             empty_child(variant = TextBodyPackage, qname = "oac:txBodyPkg"),
             child(variant = GroupCommand, qname = "oac:grpCmd"),
-            text_child(variant = ImgDataImgData, qname = "oac:imgData"),
-            text_child(variant = OrigImgDataImgData, qname = "oac:origImgData"),
+            text_child(
+                variant = ImgDataImgData,
+                simple_type = "Base64BinaryValue",
+                qname = "oac:imgData"
+            ),
+            text_child(
+                variant = OrigImgDataImgData,
+                simple_type = "Base64BinaryValue",
+                qname = "oac:origImgData"
+            ),
             child(variant = ImgLink, qname = "oac:imgLink"),
             any_child(variant = DrawingMonikerList, qname = "oac:dgMkLst"),
             any_child(variant = DocumentContextMonikerList, qname = "oac:dcMkLst"),

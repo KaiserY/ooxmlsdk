@@ -32,7 +32,7 @@ pub struct MsForm {
   #[sdk(attr(qname = ":latestEventMarker"))]
   pub latest_event_marker: Option<crate::simple_type::StringValue>,
   /// Defines the SyncedQuestionId Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xlmsforms:syncedQuestionId"))]
+  #[sdk(text_child(qname = "xlmsforms:syncedQuestionId"))]
   pub synced_question_id: Vec<SyncedQuestionId>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "xlmsforms:extLst"))]

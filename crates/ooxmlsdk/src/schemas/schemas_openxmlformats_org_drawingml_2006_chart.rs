@@ -1535,7 +1535,7 @@ pub struct NumericPoint {
   #[sdk(attr(qname = ":formatCode"))]
   pub format_code: Option<crate::simple_type::StringValue>,
   /// Numeric Value
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:v"))]
+  #[sdk(text_child(qname = "c:v"))]
   pub numeric_value: NumericValue,
 }
 /// Defines the ExtensionList Class.
@@ -1552,7 +1552,7 @@ pub struct ExtensionList {
 #[sdk(qname = "c:numRef")]
 pub struct NumberReference {
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:f"))]
+  #[sdk(text_child(qname = "c:f"))]
   pub formula: Formula,
   /// Defines the NumberingCache Class.
   #[sdk(child(qname = "c:numCache"))]
@@ -1566,7 +1566,7 @@ pub struct NumberReference {
 #[sdk(qname = "c:numLit")]
 pub struct NumberLiteral {
   /// Format Code
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:formatCode"))]
+  #[sdk(text_child(qname = "c:formatCode"))]
   pub format_code: Option<FormatCode>,
   /// Point Count
   #[sdk(child(qname = "c:ptCount"))]
@@ -1583,7 +1583,7 @@ pub struct NumberLiteral {
 #[sdk(qname = "c:numCache")]
 pub struct NumberingCache {
   /// Format Code
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:formatCode"))]
+  #[sdk(text_child(qname = "c:formatCode"))]
   pub format_code: Option<FormatCode>,
   /// Point Count
   #[sdk(child(qname = "c:ptCount"))]
@@ -1608,7 +1608,7 @@ pub struct Level {
 #[sdk(qname = "c:multiLvlStrRef")]
 pub struct MultiLevelStringReference {
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:f"))]
+  #[sdk(text_child(qname = "c:f"))]
   pub formula: Formula,
   /// Defines the MultiLevelStringCache Class.
   #[sdk(child(qname = "c:multiLvlStrCache"))]
@@ -1622,7 +1622,7 @@ pub struct MultiLevelStringReference {
 #[sdk(qname = "c:strRef")]
 pub struct StringReference {
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:f"))]
+  #[sdk(text_child(qname = "c:f"))]
   pub formula: Formula,
   /// Defines the StringCache Class.
   #[sdk(child(qname = "c:strCache"))]
@@ -2163,22 +2163,22 @@ pub struct HeaderFooter {
   #[sdk(attr(qname = ":differentFirst"))]
   pub different_first: Option<crate::simple_type::BooleanValue>,
   /// Odd Header
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:oddHeader"))]
+  #[sdk(text_child(qname = "c:oddHeader"))]
   pub odd_header: Option<OddHeader>,
   /// Odd Footer
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:oddFooter"))]
+  #[sdk(text_child(qname = "c:oddFooter"))]
   pub odd_footer: Option<OddFooter>,
   /// Even Header
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:evenHeader"))]
+  #[sdk(text_child(qname = "c:evenHeader"))]
   pub even_header: Option<EvenHeader>,
   /// Even Footer
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:evenFooter"))]
+  #[sdk(text_child(qname = "c:evenFooter"))]
   pub even_footer: Option<EvenFooter>,
   /// First Header
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:firstHeader"))]
+  #[sdk(text_child(qname = "c:firstHeader"))]
   pub first_header: Option<FirstHeader>,
   /// First Footer
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:firstFooter"))]
+  #[sdk(text_child(qname = "c:firstFooter"))]
   pub first_footer: Option<FirstFooter>,
 }
 /// Page Margins.
@@ -3092,7 +3092,7 @@ pub struct StringPoint {
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   /// Text Value
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:v"))]
+  #[sdk(text_child(qname = "c:v"))]
   pub numeric_value: NumericValue,
 }
 /// Thickness.
@@ -4069,7 +4069,7 @@ pub struct DataPoint {
 #[sdk(qname = "c:trendline")]
 pub struct Trendline {
   /// Trendline Name
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:name"))]
+  #[sdk(text_child(qname = "c:name"))]
   pub trendline_name: Option<TrendlineName>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "c:spPr"))]
@@ -4761,7 +4761,7 @@ pub struct ColorMapOverride {
 #[sdk(qname = "c:pivotSource")]
 pub struct PivotSource {
   /// Pivot Name
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:name"))]
+  #[sdk(text_child(qname = "c:name"))]
   pub pivot_table_name: PivotTableName,
   /// Format ID
   #[sdk(child(qname = "c:fmtId"))]
@@ -4967,7 +4967,7 @@ pub struct DataLabelsChoiceSequence {
   #[sdk(child(qname = "c:showBubbleSize"))]
   pub show_bubble_size: Option<ShowBubbleSize>,
   /// Separator.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:separator"))]
+  #[sdk(text_child(qname = "c:separator"))]
   pub separator: Option<Separator>,
   /// Show Leader Lines.
   #[sdk(child(qname = "c:showLeaderLines"))]
@@ -5107,7 +5107,7 @@ pub struct DataLabelChoiceSequence {
   #[sdk(child(qname = "c:showBubbleSize"))]
   pub show_bubble_size: Option<ShowBubbleSize>,
   /// Separator.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:separator"))]
+  #[sdk(text_child(qname = "c:separator"))]
   pub separator: Option<Separator>,
 }
 #[derive(Clone, Debug, PartialEq)]

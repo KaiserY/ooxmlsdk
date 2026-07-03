@@ -873,7 +873,7 @@ pub struct ConditionalFormatting {
   #[sdk(child(qname = "x14:cfRule"))]
   pub conditional_formatting_rule: Vec<ConditionalFormattingRule>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(list, simple_type = "StringValue", qname = "xne:sqref"))]
+  #[sdk(text_child(list, qname = "xne:sqref"))]
   pub reference_sequence: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x14:extLst"))]
@@ -928,7 +928,7 @@ pub struct ConditionalFormattingRule {
   #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
+  #[sdk(text_child(qname = "xne:f"))]
   pub formula: Vec<crate::schemas::xne::Formula>,
   /// Defines the ColorScale Class.
   #[sdk(child(qname = "x14:colorScale"))]
@@ -1002,7 +1002,7 @@ pub struct DataValidation {
   #[sdk(child(qname = "x14:formula2"))]
   pub data_validation_forumla2: Option<DataValidationForumla2>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(list, simple_type = "StringValue", qname = "xne:sqref"))]
+  #[sdk(text_child(list, qname = "xne:sqref"))]
   pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the DataValidationForumla1 Class.
@@ -1010,7 +1010,7 @@ pub struct DataValidation {
 #[sdk(no_prefix, qname = "x14:formula1")]
 pub struct DataValidationForumla1 {
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
+  #[sdk(text_child(qname = "xne:f"))]
   pub formula: crate::schemas::xne::Formula,
 }
 /// Defines the DataValidationForumla2 Class.
@@ -1018,7 +1018,7 @@ pub struct DataValidationForumla1 {
 #[sdk(no_prefix, qname = "x14:formula2")]
 pub struct DataValidationForumla2 {
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
+  #[sdk(text_child(qname = "xne:f"))]
   pub formula: crate::schemas::xne::Formula,
 }
 /// Defines the SparklineGroup Class.
@@ -1104,7 +1104,7 @@ pub struct SparklineGroup {
   #[sdk(child(qname = "x14:colorLow"))]
   pub low_marker_color: Option<LowMarkerColor>,
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
+  #[sdk(text_child(qname = "xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the Sparklines Class.
   #[sdk(child(qname = "x14:sparklines"))]
@@ -1417,10 +1417,10 @@ pub struct Sparklines {
 #[sdk(no_prefix, qname = "x14:sparkline")]
 pub struct Sparkline {
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
+  #[sdk(text_child(qname = "xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(list, simple_type = "StringValue", qname = "xne:sqref"))]
+  #[sdk(text_child(list, qname = "xne:sqref"))]
   pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the SlicerRef Class.
@@ -1678,7 +1678,7 @@ pub struct ConditionalFormattingValueObject {
   #[sdk(attr(qname = ":gte"))]
   pub greater_than_or_equal: Option<crate::simple_type::BooleanValue>,
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
+  #[sdk(text_child(qname = "xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x14:extLst"))]
@@ -1767,7 +1767,7 @@ pub struct PivotUserEdit {
 #[sdk(no_prefix, qname = "x14:tupleItems")]
 pub struct TupleItems {
   /// Defines the Xstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "x14:tupleItem"))]
+  #[sdk(text_child(qname = "x14:tupleItem"))]
   pub xstring: Vec<Xstring>,
 }
 /// Defines the PivotArea Class.
@@ -1961,7 +1961,7 @@ pub struct IgnoredError {
   #[sdk(attr(qname = ":calculatedColumn"))]
   pub calculated_column: Option<crate::simple_type::BooleanValue>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(list, simple_type = "StringValue", qname = "xne:sqref"))]
+  #[sdk(text_child(list, qname = "xne:sqref"))]
   pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the ProtectedRange Class.
@@ -1991,7 +1991,7 @@ pub struct ProtectedRange {
   #[sdk(attr(qname = ":securityDescriptor"))]
   pub security_descriptor: Option<crate::simple_type::StringValue>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(list, simple_type = "StringValue", qname = "xne:sqref"))]
+  #[sdk(text_child(list, qname = "xne:sqref"))]
   pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the CustomFilter Class.

@@ -365,7 +365,7 @@ pub struct SupportingPropertyBag {
   #[sdk(attr(qname = ":s"))]
   pub s: crate::simple_type::UInt32Value,
   /// Defines the SupportingPropertyBagValue Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xlrd2:v"))]
+  #[sdk(text_child(qname = "xlrd2:v"))]
   pub supporting_property_bag_value: Vec<SupportingPropertyBagValue>,
 }
 /// Defines the SupportingPropertyBagValue Class.

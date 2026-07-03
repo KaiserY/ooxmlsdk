@@ -9,7 +9,7 @@
 #[sdk(qname = "c15:pivotSource")]
 pub struct PivotSource {
   /// Pivot Name
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:name"))]
+  #[sdk(text_child(qname = "c:name"))]
   pub pivot_table_name: crate::schemas::c::PivotTableName,
   /// Format ID
   #[sdk(child(qname = "c:fmtId"))]
@@ -94,7 +94,7 @@ pub struct Layout {
 #[sdk(qname = "c15:fullRef")]
 pub struct FullReference {
   /// Defines the SequenceOfReferences Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c15:sqref"))]
+  #[sdk(text_child(qname = "c15:sqref"))]
   pub sequence_of_references: SequenceOfReferences,
 }
 /// Defines the LevelReference Class.
@@ -102,7 +102,7 @@ pub struct FullReference {
 #[sdk(qname = "c15:levelRef")]
 pub struct LevelReference {
   /// Defines the SequenceOfReferences Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c15:sqref"))]
+  #[sdk(text_child(qname = "c15:sqref"))]
   pub sequence_of_references: SequenceOfReferences,
 }
 /// Defines the FormulaReference Class.
@@ -110,7 +110,7 @@ pub struct LevelReference {
 #[sdk(qname = "c15:formulaRef")]
 pub struct FormulaReference {
   /// Defines the SequenceOfReferences Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c15:sqref"))]
+  #[sdk(text_child(qname = "c15:sqref"))]
   pub sequence_of_references: SequenceOfReferences,
 }
 /// Defines the FilteredSeriesTitle Class.
@@ -198,7 +198,7 @@ pub struct FilteredSurfaceSeries {
 #[sdk(qname = "c15:datalabelsRange")]
 pub struct DataLabelsRange {
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c15:f"))]
+  #[sdk(text_child(qname = "c15:f"))]
   pub formula: Formula,
   /// Defines the DataLabelsRangeChache Class.
   #[sdk(child(qname = "c15:dlblRangeCache"))]
@@ -738,7 +738,7 @@ pub struct DataLabel {
 #[sdk(qname = "c15:categoryFilterException")]
 pub struct CategoryFilterException {
   /// Defines the SequenceOfReferences Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c15:sqref"))]
+  #[sdk(text_child(qname = "c15:sqref"))]
   pub sequence_of_references: SequenceOfReferences,
   /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "c15:spPr"))]
@@ -764,10 +764,10 @@ pub struct CategoryFilterException {
 #[sdk(qname = "c15:dlblFTEntry")]
 pub struct DataLabelFieldTableEntry {
   /// Defines the TextFieldGuid Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c15:txfldGUID"))]
+  #[sdk(text_child(qname = "c15:txfldGUID"))]
   pub text_field_guid: TextFieldGuid,
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c15:f"))]
+  #[sdk(text_child(qname = "c15:f"))]
   pub formula: Formula,
   /// Defines the DataLabelFieldTableCache Class.
   #[sdk(child(qname = "c15:dlblFieldTableCache"))]
@@ -863,7 +863,7 @@ pub struct DataLabelChoiceSequence {
   #[sdk(child(qname = "c:showBubbleSize"))]
   pub show_bubble_size: Option<crate::schemas::c::ShowBubbleSize>,
   /// Separator.
-  #[sdk(text_child(simple_type = "StringValue", qname = "c:separator"))]
+  #[sdk(text_child(qname = "c:separator"))]
   pub separator: Option<crate::schemas::c::Separator>,
 }
 #[derive(Clone, Debug, PartialEq)]

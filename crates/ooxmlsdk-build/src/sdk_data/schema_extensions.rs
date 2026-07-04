@@ -1230,7 +1230,7 @@ mod tests {
           class_name: "DocGrid".to_string(),
           attributes: vec![SchemaTypeAttributeExtension {
             property_name: "CharacterSpace".to_string(),
-            override_type: "Int32ZeroOnOverflowValue".to_string(),
+            override_type: "IntegerValue".to_string(),
             ..Default::default()
           }],
           ..Default::default()
@@ -1241,10 +1241,7 @@ mod tests {
 
     apply_schema_extensions(&mut schemas, &extensions).unwrap();
 
-    assert_eq!(
-      schemas[0].types[0].attributes[0].r#type,
-      "Int32ZeroOnOverflowValue"
-    );
+    assert_eq!(schemas[0].types[0].attributes[0].r#type, "IntegerValue");
   }
 
   #[test]

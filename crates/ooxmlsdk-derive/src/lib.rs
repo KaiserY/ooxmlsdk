@@ -1712,7 +1712,6 @@ enum IntegerTypeKind {
   I16,
   U32,
   I32,
-  I32ZeroOnOverflow,
   U64,
   I64,
 }
@@ -1725,7 +1724,6 @@ fn integer_type_kind_name(name: &str) -> Option<IntegerTypeKind> {
     "Int16Value" | "i16" => IntegerTypeKind::I16,
     "UInt32Value" | "u32" => IntegerTypeKind::U32,
     "Int32Value" | "i32" => IntegerTypeKind::I32,
-    "Int32ZeroOnOverflowValue" => IntegerTypeKind::I32ZeroOnOverflow,
     "UInt64Value" | "u64" => IntegerTypeKind::U64,
     "Int64Value" | "IntegerValue" | "i64" => IntegerTypeKind::I64,
     _ => return None,
@@ -1817,7 +1815,7 @@ fn write_integer_value_tokens_by_kind(
     IntegerTypeKind::U32 => quote! {
       crate::common::write_u32_value(writer, *#value_expr)?;
     },
-    IntegerTypeKind::I32 | IntegerTypeKind::I32ZeroOnOverflow => quote! {
+    IntegerTypeKind::I32 => quote! {
       crate::common::write_i32_value(writer, *#value_expr)?;
     },
     IntegerTypeKind::U64 => quote! {
@@ -1855,15 +1853,28 @@ fn parse_integer_attr_tokens_by_kind(
     IntegerTypeKind::I32 => quote! {
       crate::common::parse_i32_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
-    IntegerTypeKind::I32ZeroOnOverflow => quote! {
-      crate::common::parse_i32_zero_on_overflow_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
-    },
     IntegerTypeKind::U64 => quote! {
       crate::common::parse_u64_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
     IntegerTypeKind::I64 => quote! {
       crate::common::parse_i64_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
+  }
+}
+
+fn parse_integer_bytes_tokens_by_kind(
+  kind: IntegerTypeKind,
+  value_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  match kind {
+    IntegerTypeKind::U8 => quote! { crate::common::parse_u8_bytes(#value_expr) },
+    IntegerTypeKind::I8 => quote! { crate::common::parse_i8_bytes(#value_expr) },
+    IntegerTypeKind::U16 => quote! { crate::common::parse_u16_bytes(#value_expr) },
+    IntegerTypeKind::I16 => quote! { crate::common::parse_i16_bytes(#value_expr) },
+    IntegerTypeKind::U32 => quote! { crate::common::parse_u32_bytes(#value_expr) },
+    IntegerTypeKind::I32 => quote! { crate::common::parse_i32_bytes(#value_expr) },
+    IntegerTypeKind::U64 => quote! { crate::common::parse_u64_bytes(#value_expr) },
+    IntegerTypeKind::I64 => quote! { crate::common::parse_i64_bytes(#value_expr) },
   }
 }
 

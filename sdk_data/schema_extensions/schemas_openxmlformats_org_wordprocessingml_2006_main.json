@@ -173,7 +173,7 @@
       "Attributes": [
         {
           "PropertyName": "CharacterSpace",
-          "OverrideType": "Int32ZeroOnOverflowValue"
+          "OverrideType": "IntegerValue"
         }
       ]
     },

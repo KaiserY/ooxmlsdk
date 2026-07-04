@@ -1627,11 +1627,12 @@ fn choice_item_parse_bodies<'a>(
         quote! { stringify!(#ident) },
         quote! { stringify!(#variant) },
       );
-      let value_parse_tokens = text_child_value_parse_tokens(
+      let read_parse_tokens = text_child_read_parse_tokens(
         None,
         simple_type,
         *is_enum,
-        quote! { value },
+        quote! { xml_reader },
+        quote! { e.name() },
         quote! { stringify!(#ident) },
         quote! { stringify!(#variant) },
       );
@@ -1639,8 +1640,7 @@ fn choice_item_parse_bodies<'a>(
         let parsed_child = if next_empty {
           #empty_parse_tokens
         } else {
-          let value = xml_reader.read_text(e.name(), stringify!(#ident), stringify!(#variant))?;
-          #value_parse_tokens
+          #read_parse_tokens
         };
       };
       let assign_tokens = if repeated {
@@ -2543,6 +2543,17 @@ fn text_child_is_string_like(value_ty: Option<&Type>, simple_type: Option<&str>)
   }
 }
 
+fn text_child_integer_kind(
+  value_ty: Option<&Type>,
+  simple_type: Option<&str>,
+) -> Option<IntegerTypeKind> {
+  if let Some(value_ty) = value_ty {
+    integer_effective_type_kind(value_ty, simple_type)
+  } else {
+    simple_type.and_then(integer_type_kind_name)
+  }
+}
+
 fn text_child_empty_parse_tokens(
   value_ty: Option<&Type>,
   simple_type: Option<&str>,
@@ -2609,6 +2620,90 @@ fn text_child_value_parse_tokens(
     }
   } else {
     quote! { #value_expr }
+  }
+}
+
+fn text_child_raw_value_parse_tokens(
+  value_ty: Option<&Type>,
+  simple_type: Option<&str>,
+  is_enum: bool,
+  value_expr: proc_macro2::TokenStream,
+) -> Option<proc_macro2::TokenStream> {
+  if let Some(kind) = text_child_simple_union_kind(value_ty, simple_type) {
+    return Some(match kind {
+      SimpleUnionTypeKind::TwipsMeasure => {
+        quote! { crate::simple_type::TwipsMeasureValue::from_bytes(#value_expr).ok() }
+      }
+      SimpleUnionTypeKind::SignedTwipsMeasure => {
+        quote! { crate::simple_type::SignedTwipsMeasureValue::from_bytes(#value_expr).ok() }
+      }
+      SimpleUnionTypeKind::DecimalNumberOrPercent => {
+        quote! { crate::simple_type::DecimalNumberOrPercentValue::from_bytes(#value_expr).ok() }
+      }
+      SimpleUnionTypeKind::MeasurementOrPercent => {
+        quote! { crate::simple_type::MeasurementOrPercentValue::from_bytes(#value_expr).ok() }
+      }
+    });
+  }
+
+  if is_enum {
+    return Some(if let Some(value_ty) = value_ty {
+      quote! { <#value_ty as crate::sdk::SdkEnum>::from_xml_bytes(#value_expr).ok() }
+    } else {
+      quote! { crate::sdk::SdkEnum::from_xml_bytes(#value_expr).ok() }
+    });
+  }
+
+  if let Some(kind) = text_child_integer_kind(value_ty, simple_type) {
+    return Some(parse_integer_bytes_tokens_by_kind(kind, value_expr));
+  }
+
+  match value_ty
+    .and_then(|value_ty| effective_type_name(value_ty, simple_type))
+    .or_else(|| simple_type.map(str::to_string))
+    .as_deref()
+  {
+    Some("SingleValue" | "f32") => Some(quote! { crate::common::parse_f32_bytes_raw(#value_expr) }),
+    Some("DoubleValue" | "f64") => Some(quote! { crate::common::parse_f64_bytes_raw(#value_expr) }),
+    _ => None,
+  }
+}
+
+fn text_child_read_parse_tokens(
+  value_ty: Option<&Type>,
+  simple_type: Option<&str>,
+  is_enum: bool,
+  xml_reader_expr: proc_macro2::TokenStream,
+  end_expr: proc_macro2::TokenStream,
+  owner_expr: proc_macro2::TokenStream,
+  field_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  let value_parse_tokens = text_child_value_parse_tokens(
+    value_ty,
+    simple_type,
+    is_enum,
+    quote! { value },
+    owner_expr.clone(),
+    field_expr.clone(),
+  );
+  if let Some(raw_parse_tokens) =
+    text_child_raw_value_parse_tokens(value_ty, simple_type, is_enum, quote! { value })
+  {
+    quote! {
+      crate::common::read_text_child_value(
+        #xml_reader_expr,
+        #end_expr,
+        #owner_expr,
+        #field_expr,
+        |value| { #raw_parse_tokens },
+        |value| { Ok({ #value_parse_tokens }) },
+      )?
+    }
+  } else {
+    quote! {{
+      let value = #xml_reader_expr.read_text(#end_expr, #owner_expr, #field_expr)?;
+      #value_parse_tokens
+    }}
   }
 }
 
@@ -2751,6 +2846,22 @@ fn build_text_child_parse_body(
       )?
     }
   };
+  let read_parse_tokens = if options.list {
+    quote! {{
+      let text = xml_reader.read_text(e.name(), stringify!(#owner_ident), stringify!(#field_ident))?;
+      #parse_from_text_tokens
+    }}
+  } else {
+    text_child_read_parse_tokens(
+      Some(&value_ty),
+      simple_type,
+      false,
+      quote! { xml_reader },
+      quote! { e.name() },
+      quote! { stringify!(#owner_ident) },
+      quote! { stringify!(#field_ident) },
+    )
+  };
   let assign_tokens = if options.repeated {
     quote! { #field_ident.push(parsed_child); }
   } else {
@@ -2766,8 +2877,7 @@ fn build_text_child_parse_body(
     let parsed_child = if next_empty {
       #empty_value_tokens
     } else {
-      let text = xml_reader.read_text(e.name(), stringify!(#owner_ident), stringify!(#field_ident))?;
-      #parse_from_text_tokens
+      #read_parse_tokens
     };
     #assign_tokens
     #xml_child_slot_assign
@@ -4973,11 +5083,12 @@ fn expand_named_struct(
                           quote! { stringify!(#ident) },
                           quote! { stringify!(#field_ident) },
                         );
-                        let value_parse_tokens = text_child_value_parse_tokens(
+                        let read_parse_tokens = text_child_read_parse_tokens(
                           Some(&value_ty),
                           simple_type,
                           child.is_enum,
-                          quote! { value },
+                          quote! { xml_reader },
+                          quote! { e.name() },
                           quote! { stringify!(#ident) },
                           quote! { stringify!(#field_ident) },
                         );
@@ -4986,8 +5097,7 @@ fn expand_named_struct(
                             let parsed_value = if next_empty {
                               #empty_parse_tokens
                             } else {
-                              let value = xml_reader.read_text(e.name(), stringify!(#ident), stringify!(#field_ident))?;
-                              #value_parse_tokens
+                              #read_parse_tokens
                             };
                             #field_ident = Some(parsed_value);
                             continue;
@@ -5407,11 +5517,12 @@ fn expand_named_struct(
                         quote! { stringify!(#ident) },
                         quote! { stringify!(#field_ident) },
                       );
-                      let value_parse_tokens = text_child_value_parse_tokens(
+                      let read_parse_tokens = text_child_read_parse_tokens(
                         Some(&value_ty),
                         simple_type,
                         child.is_enum,
-                        quote! { value },
+                        quote! { xml_reader },
+                        quote! { e.name() },
                         quote! { stringify!(#ident) },
                         quote! { stringify!(#field_ident) },
                       );
@@ -5422,8 +5533,7 @@ fn expand_named_struct(
                           let parsed_value = if next_empty {
                             #empty_parse_tokens
                           } else {
-                            let value = xml_reader.read_text(e.name(), stringify!(#ident), stringify!(#field_ident))?;
-                            #value_parse_tokens
+                            #read_parse_tokens
                           };
                           #field_ident = Some(parsed_value);
                           continue;

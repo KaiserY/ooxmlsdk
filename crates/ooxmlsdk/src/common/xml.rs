@@ -632,7 +632,7 @@ macro_rules! define_unsigned_decimal_attr_parser {
     }
 
     #[inline]
-    fn $bytes_name(value: &[u8]) -> Option<$ty> {
+    pub(crate) fn $bytes_name(value: &[u8]) -> Option<$ty> {
       let digits = match value {
         [b'+', rest @ ..] => rest,
         _ => value,
@@ -677,7 +677,7 @@ macro_rules! define_signed_decimal_attr_parser {
     }
 
     #[inline]
-    fn $bytes_name(value: &[u8]) -> Option<$ty> {
+    pub(crate) fn $bytes_name(value: &[u8]) -> Option<$ty> {
       let (negative, digits) = match value {
         [b'-', rest @ ..] => (true, rest),
         [b'+', rest @ ..] => (false, rest),
@@ -757,12 +757,12 @@ fn parse_f64_bytes(value: &[u8], ty: &'static str, field: &'static str) -> Resul
 }
 
 #[inline]
-fn parse_f32_bytes_raw(value: &[u8]) -> Option<f32> {
+pub(crate) fn parse_f32_bytes_raw(value: &[u8]) -> Option<f32> {
   <f32 as lexical_parse_float::FromLexical>::from_lexical(value).ok()
 }
 
 #[inline]
-fn parse_f64_bytes_raw(value: &[u8]) -> Option<f64> {
+pub(crate) fn parse_f64_bytes_raw(value: &[u8]) -> Option<f64> {
   <f64 as lexical_parse_float::FromLexical>::from_lexical(value).ok()
 }
 
@@ -851,64 +851,6 @@ pub(crate) fn parse_measurement_or_percent_value(
   let value = value.as_ref();
   crate::simple_type::MeasurementOrPercentValue::from_bytes(value.as_bytes())
     .map_err(|_| invalid_field_value("MeasurementOrPercentValue", "value", value))
-}
-
-#[inline]
-pub(crate) fn parse_i32_zero_on_overflow_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<i32, SdkError> {
-  if let Some(value) = parse_i32_zero_on_overflow_bytes(attr.value.as_ref()) {
-    return Ok(value);
-  }
-
-  let value = decode_attr_value_cow(attr, decoder)?;
-  parse_i32_zero_on_overflow_bytes(value.as_bytes())
-    .ok_or_else(|| invalid_field_value_bytes(ty, field, value.as_bytes()))
-}
-
-#[inline]
-fn parse_i32_zero_on_overflow_bytes(value: &[u8]) -> Option<i32> {
-  let (negative, digits) = match value {
-    [b'-', rest @ ..] => (true, rest),
-    [b'+', rest @ ..] => (false, rest),
-    _ => (false, value),
-  };
-  if digits.is_empty() {
-    return None;
-  }
-
-  let limit = if negative {
-    i32::MAX as u32 + 1
-  } else {
-    i32::MAX as u32
-  };
-  let mut parsed: u32 = 0;
-  for &digit in digits {
-    if !digit.is_ascii_digit() {
-      return None;
-    }
-
-    parsed = match parsed
-      .checked_mul(10)
-      .and_then(|current| current.checked_add((digit - b'0') as u32))
-    {
-      Some(parsed) if parsed <= limit => parsed,
-      _ => return Some(0),
-    };
-  }
-
-  if negative {
-    if parsed == i32::MAX as u32 + 1 {
-      Some(i32::MIN)
-    } else {
-      Some(-(parsed as i32))
-    }
-  } else {
-    Some(parsed as i32)
-  }
 }
 
 #[inline]
@@ -1043,19 +985,86 @@ fn read_text_events<'xml, R: XmlRead<'xml>>(
   field: &'static str,
 ) -> Result<String, SdkError> {
   let mut value = None;
-  loop {
-    match xml_reader.next()? {
-      event @ (PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_)) => {
-        append_xml_text_event(&mut value, event, ty, field)?;
+  let event = xml_reader.next()?;
+  finish_read_text_events(xml_reader, &mut value, event, end, ty, field)?;
+  Ok(value.unwrap_or_default())
+}
+
+#[inline]
+pub(crate) fn read_text_child_value<'xml, R, T, RawParse, TextParse>(
+  xml_reader: &mut R,
+  end: quick_xml::name::QName<'_>,
+  ty: &'static str,
+  field: &'static str,
+  parse_raw: RawParse,
+  parse_text: TextParse,
+) -> Result<T, SdkError>
+where
+  R: XmlRead<'xml>,
+  RawParse: FnOnce(&[u8]) -> Option<T>,
+  TextParse: FnOnce(&str) -> Result<T, SdkError>,
+{
+  let first = xml_reader.next()?;
+  if let PayloadEvent::Text(text) = first {
+    let second = xml_reader.next()?;
+    if let PayloadEvent::End(e) = second {
+      if e.name() == end {
+        if let Some(value) = parse_raw(text.as_ref()) {
+          return Ok(value);
+        }
+
+        let value = text.xml10_content()?;
+        return parse_text(value.as_ref());
       }
+
+      let second = PayloadEvent::End(e);
+      let mut value = None;
+      append_xml_text_event(&mut value, PayloadEvent::Text(text), ty, field)?;
+      finish_read_text_events(xml_reader, &mut value, second, end, ty, field)?;
+      let value = value.unwrap_or_default();
+      return parse_text(value.as_ref());
+    }
+
+    let mut value = None;
+    append_xml_text_event(&mut value, PayloadEvent::Text(text), ty, field)?;
+    finish_read_text_events(xml_reader, &mut value, second, end, ty, field)?;
+    let value = value.unwrap_or_default();
+    return parse_text(value.as_ref());
+  }
+
+  let mut value = None;
+  finish_read_text_events(xml_reader, &mut value, first, end, ty, field)?;
+  let value = value.unwrap_or_default();
+  parse_text(value.as_ref())
+}
+
+fn finish_read_text_events<'xml, R: XmlRead<'xml>>(
+  xml_reader: &mut R,
+  value: &mut Option<String>,
+  mut event: PayloadEvent<'xml>,
+  end: quick_xml::name::QName<'_>,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<(), SdkError> {
+  loop {
+    event = match event {
+      event @ (PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_)) => {
+        xml_reader.drain_text_field_from_event(value, event, ty, field)?
+      }
+      event => event,
+    };
+
+    match event {
       PayloadEvent::End(e) if e.name() == end => {
-        return Ok(value.unwrap_or_default());
+        return Ok(());
       }
       PayloadEvent::Start(e, _) => {
         return Err(unexpected_tag(ty, "text content", xml_local_name(e.name())));
       }
       PayloadEvent::Eof => return Err(unexpected_eof(ty)),
-      _ => {}
+      _ => {
+        event = xml_reader.next()?;
+      }
     }
   }
 }

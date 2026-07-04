@@ -9889,7 +9889,7 @@ pub struct DocGrid {
   pub line_pitch: Option<crate::simple_type::Int32Value>,
   /// Document Grid Character Pitch
   #[sdk(attr(qname = "w:charSpace"))]
-  pub character_space: Option<crate::simple_type::Int32ZeroOnOverflowValue>,
+  pub character_space: Option<crate::simple_type::IntegerValue>,
 }
 /// Inclusion/Exclusion Data for Data Source.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

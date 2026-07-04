@@ -33,18 +33,20 @@ pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
   PayloadEvent, XmlRead, decode_attr_value_cow, decode_utf16_xml_bytes, from_bytes_inner,
   from_reader_inner, parse_attr_value, parse_borrowed_list_attr,
-  parse_decimal_number_or_percent_attr, parse_enum_attr, parse_f32_attr, parse_f64_attr,
-  parse_i8_attr, parse_i16_attr, parse_i32_attr, parse_i32_zero_on_overflow_attr, parse_i64_attr,
+  parse_decimal_number_or_percent_attr, parse_enum_attr, parse_f32_attr, parse_f32_bytes_raw,
+  parse_f64_attr, parse_f64_bytes_raw, parse_i8_attr, parse_i8_bytes, parse_i16_attr,
+  parse_i16_bytes, parse_i32_attr, parse_i32_bytes, parse_i64_attr, parse_i64_bytes,
   parse_list_attr, parse_list_value, parse_measurement_or_percent_attr,
   parse_signed_twips_measure_attr, parse_text_child_value, parse_twips_measure_attr, parse_u8_attr,
-  parse_u16_attr, parse_u32_attr, parse_u64_attr, parse_value, read_root_start_borrowed,
-  read_root_start_io, root_element_matches_namespace_local, write_decimal_number_or_percent_value,
-  write_escaped_bytes, write_escaped_content_str, write_escaped_content_text, write_escaped_str,
-  write_escaped_text, write_f32_value, write_f64_value, write_i8_value, write_i16_value,
-  write_i32_value, write_i64_value, write_list_text_content_value, write_list_value,
-  write_measurement_or_percent_value, write_signed_twips_measure_value, write_twips_measure_value,
-  write_u8_value, write_u16_value, write_u32_value, write_u64_value, write_xmlns_attr,
-  xml_local_name,
+  parse_u8_bytes, parse_u16_attr, parse_u16_bytes, parse_u32_attr, parse_u32_bytes, parse_u64_attr,
+  parse_u64_bytes, parse_value, read_root_start_borrowed, read_root_start_io,
+  read_text_child_value, root_element_matches_namespace_local,
+  write_decimal_number_or_percent_value, write_escaped_bytes, write_escaped_content_str,
+  write_escaped_content_text, write_escaped_str, write_escaped_text, write_f32_value,
+  write_f64_value, write_i8_value, write_i16_value, write_i32_value, write_i64_value,
+  write_list_text_content_value, write_list_value, write_measurement_or_percent_value,
+  write_signed_twips_measure_value, write_twips_measure_value, write_u8_value, write_u16_value,
+  write_u32_value, write_u64_value, write_xmlns_attr, xml_local_name,
 };
 #[cfg(feature = "flat-opc")]
 pub(crate) use xml::{read_outer_xml_borrowed, read_outer_xml_io};
@@ -412,26 +414,6 @@ mod tests {
     })
     .expect("parse u8");
     assert_eq!(byte, u8::MAX);
-  }
-
-  #[test]
-  fn i32_zero_on_overflow_attr_parser_zeroes_only_overflow() {
-    let normal = with_first_attr(r#"<x val="-42"/>"#, |attr, decoder| {
-      parse_i32_zero_on_overflow_attr(&attr, decoder, "X", "val")
-    })
-    .expect("parse normal i32");
-    assert_eq!(normal, -42);
-
-    let overflow = with_first_attr(r#"<x val="4294961151"/>"#, |attr, decoder| {
-      parse_i32_zero_on_overflow_attr(&attr, decoder, "X", "val")
-    })
-    .expect("parse overflow as zero");
-    assert_eq!(overflow, 0);
-
-    let invalid = with_first_attr(r#"<x val="abc"/>"#, |attr, decoder| {
-      parse_i32_zero_on_overflow_attr(&attr, decoder, "X", "val")
-    });
-    assert!(invalid.is_err());
   }
 
   #[cfg(feature = "parts")]

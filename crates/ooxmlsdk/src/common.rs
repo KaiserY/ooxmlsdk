@@ -31,17 +31,18 @@ pub(crate) use xml::mce_choice_replacement_child_bytes;
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
-  PayloadEvent, XmlRead, attr_raw_value, decode_attr_value, decode_utf16_xml_bytes,
-  from_bytes_inner, from_reader_inner, parse_attr_value, parse_borrowed_list_attr,
-  parse_decimal_number_or_percent_attr, parse_enum_attr, parse_i8_attr, parse_i16_attr,
-  parse_i32_attr, parse_i32_zero_on_overflow_attr, parse_i64_attr, parse_list_attr,
-  parse_list_value, parse_measurement_or_percent_attr, parse_signed_twips_measure_attr,
-  parse_text_child_value, parse_twips_measure_attr, parse_u8_attr, parse_u16_attr, parse_u32_attr,
-  parse_u64_attr, parse_value, read_root_start_borrowed, read_root_start_io,
-  root_element_matches_namespace_local, write_decimal_number_or_percent_value, write_escaped_bytes,
-  write_escaped_content_str, write_escaped_content_text, write_escaped_str, write_escaped_text,
-  write_list_text_content_value, write_list_value, write_measurement_or_percent_value,
-  write_signed_twips_measure_value, write_twips_measure_value, write_xmlns_attr, xml_local_name,
+  PayloadEvent, XmlRead, decode_attr_value_cow, decode_utf16_xml_bytes, from_bytes_inner,
+  from_reader_inner, parse_attr_value, parse_borrowed_list_attr,
+  parse_decimal_number_or_percent_attr, parse_enum_attr, parse_f32_attr, parse_f64_attr,
+  parse_i8_attr, parse_i16_attr, parse_i32_attr, parse_i32_zero_on_overflow_attr, parse_i64_attr,
+  parse_list_attr, parse_list_value, parse_measurement_or_percent_attr,
+  parse_signed_twips_measure_attr, parse_text_child_value, parse_twips_measure_attr, parse_u8_attr,
+  parse_u16_attr, parse_u32_attr, parse_u64_attr, parse_value, read_root_start_borrowed,
+  read_root_start_io, root_element_matches_namespace_local, write_decimal_number_or_percent_value,
+  write_escaped_bytes, write_escaped_content_str, write_escaped_content_text, write_escaped_str,
+  write_escaped_text, write_list_text_content_value, write_list_value,
+  write_measurement_or_percent_value, write_signed_twips_measure_value, write_twips_measure_value,
+  write_xmlns_attr, xml_local_name,
 };
 #[cfg(feature = "flat-opc")]
 pub(crate) use xml::{read_outer_xml_borrowed, read_outer_xml_io};

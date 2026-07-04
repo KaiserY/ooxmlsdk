@@ -2635,16 +2635,32 @@ fn parse_from_bytes_attr_tokens(
   field_expr: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   quote! {
-    if let Some(value) = crate::common::attr_raw_value(&attr)
-      && let Ok(value) = <#value_ty>::from_bytes(value)
+    if let Ok(value) = <#value_ty>::from_bytes(attr.value.as_ref())
     {
       value
     } else {
-      let value = crate::common::decode_attr_value(&attr, decoder)?;
+      let value = crate::common::decode_attr_value_cow(&attr, decoder)?;
       <#value_ty>::from_bytes(value.as_bytes()).map_err(|_| {
         crate::common::invalid_field_value(#owner_expr, #field_expr, value)
       })?
     }
+  }
+}
+
+fn parse_float_attr_tokens(
+  value_ty: &Type,
+  simple_type: Option<&str>,
+  owner_expr: proc_macro2::TokenStream,
+  field_expr: proc_macro2::TokenStream,
+) -> Option<proc_macro2::TokenStream> {
+  match effective_type_name(value_ty, simple_type).as_deref() {
+    Some("SingleValue" | "f32") => Some(quote! {
+      crate::common::parse_f32_attr(&attr, decoder, #owner_expr, #field_expr)?
+    }),
+    Some("DoubleValue" | "f64") => Some(quote! {
+      crate::common::parse_f64_attr(&attr, decoder, #owner_expr, #field_expr)?
+    }),
+    _ => None,
   }
 }
 
@@ -3958,10 +3974,17 @@ fn expand_named_struct(
         quote! { stringify!(#ident) },
         quote! { #name_lit },
       )
+    } else if let Some(parser) = parse_float_attr_tokens(
+      &value_ty,
+      simple_type,
+      quote! { stringify!(#ident) },
+      quote! { #name_lit },
+    ) {
+      parser
     } else if is_sdk_enum_effective_type(&value_ty, simple_type) {
       quote! { crate::common::parse_enum_attr::<#value_ty>(&attr, decoder)? }
     } else if is_string_like_effective_type(&value_ty, simple_type) {
-      quote! { crate::common::decode_attr_value(&attr, decoder)? }
+      quote! { crate::common::decode_attr_value_cow(&attr, decoder)?.into_owned() }
     } else {
       quote! { crate::common::parse_attr_value::<#value_ty>(&attr, decoder, stringify!(#ident), #name_lit)? }
     };

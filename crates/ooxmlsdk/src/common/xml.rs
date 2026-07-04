@@ -3,7 +3,7 @@ use quick_xml::{
   escape::unescape,
   events::{Event, attributes::Attribute},
 };
-use std::io::BufRead;
+use std::{borrow::Cow, io::BufRead};
 
 use super::{SdkError, invalid_field_value, unexpected_eof, unexpected_tag};
 
@@ -606,25 +606,15 @@ fn find_ascii_ignore_case(haystack: &str, needle: &str) -> Option<usize> {
     .position(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
 }
 
-#[inline(always)]
-pub(crate) fn attr_raw_value<'a>(attr: &'a Attribute<'a>) -> Option<&'a [u8]> {
-  let value = attr.value.as_ref();
-  if value.contains(&b'&') {
-    None
-  } else {
-    Some(value)
-  }
-}
-
 #[inline]
-pub(crate) fn decode_attr_value(
-  attr: &Attribute<'_>,
+pub(crate) fn decode_attr_value_cow<'a>(
+  attr: &'a Attribute<'a>,
   decoder: Decoder,
-) -> Result<String, SdkError> {
-  if let Some(value) = attr_raw_value(attr) {
-    Ok(decoder.decode(value)?.into_owned())
-  } else {
-    Ok(unescape(&decoder.decode(attr.value.as_ref())?)?.into_owned())
+) -> Result<Cow<'a, str>, SdkError> {
+  let decoded = decoder.decode(attr.value.as_ref())?;
+  match unescape(&decoded)? {
+    Cow::Borrowed(_) => Ok(decoded),
+    Cow::Owned(value) => Ok(Cow::Owned(value)),
   }
 }
 
@@ -637,37 +627,38 @@ macro_rules! define_unsigned_decimal_attr_parser {
       ty: &'static str,
       field: &'static str,
     ) -> Result<$ty, SdkError> {
-      if let Some(value) = attr_raw_value(attr) {
-        $bytes_name(value, ty, field)
-      } else {
-        let value = decode_attr_value(attr, decoder)?;
-        $bytes_name(value.as_bytes(), ty, field)
+      let raw = attr.value.as_ref();
+      if let Some(value) = $bytes_name(raw) {
+        return Ok(value);
       }
+
+      let value = decode_attr_value_cow(attr, decoder)?;
+      $bytes_name(value.as_bytes())
+        .ok_or_else(|| invalid_field_value_bytes(ty, field, value.as_bytes()))
     }
 
     #[inline]
-    fn $bytes_name(value: &[u8], ty: &'static str, field: &'static str) -> Result<$ty, SdkError> {
+    fn $bytes_name(value: &[u8]) -> Option<$ty> {
       let digits = match value {
         [b'+', rest @ ..] => rest,
         _ => value,
       };
       if digits.is_empty() {
-        return Err(invalid_field_value_bytes(ty, field, value));
+        return None;
       }
 
       let mut parsed: $ty = 0;
       for &digit in digits {
         if !digit.is_ascii_digit() {
-          return Err(invalid_field_value_bytes(ty, field, value));
+          return None;
         }
 
         parsed = parsed
           .checked_mul(10)
-          .and_then(|current| current.checked_add((digit - b'0') as $ty))
-          .ok_or_else(|| invalid_field_value_bytes(ty, field, value))?;
+          .and_then(|current| current.checked_add((digit - b'0') as $ty))?;
       }
 
-      Ok(parsed)
+      Some(parsed)
     }
   };
 }
@@ -681,44 +672,43 @@ macro_rules! define_signed_decimal_attr_parser {
       ty: &'static str,
       field: &'static str,
     ) -> Result<$ty, SdkError> {
-      if let Some(value) = attr_raw_value(attr) {
-        $bytes_name(value, ty, field)
-      } else {
-        let value = decode_attr_value(attr, decoder)?;
-        $bytes_name(value.as_bytes(), ty, field)
+      let raw = attr.value.as_ref();
+      if let Some(value) = $bytes_name(raw) {
+        return Ok(value);
       }
+
+      let value = decode_attr_value_cow(attr, decoder)?;
+      $bytes_name(value.as_bytes())
+        .ok_or_else(|| invalid_field_value_bytes(ty, field, value.as_bytes()))
     }
 
     #[inline]
-    fn $bytes_name(value: &[u8], ty: &'static str, field: &'static str) -> Result<$ty, SdkError> {
+    fn $bytes_name(value: &[u8]) -> Option<$ty> {
       let (negative, digits) = match value {
         [b'-', rest @ ..] => (true, rest),
         [b'+', rest @ ..] => (false, rest),
         _ => (false, value),
       };
       if digits.is_empty() {
-        return Err(invalid_field_value_bytes(ty, field, value));
+        return None;
       }
 
       let mut parsed: $ty = 0;
       for &digit in digits {
         if !digit.is_ascii_digit() {
-          return Err(invalid_field_value_bytes(ty, field, value));
+          return None;
         }
 
-        parsed = parsed
-          .checked_mul(10)
-          .and_then(|current| {
-            if negative {
-              current.checked_sub((digit - b'0') as $ty)
-            } else {
-              current.checked_add((digit - b'0') as $ty)
-            }
-          })
-          .ok_or_else(|| invalid_field_value_bytes(ty, field, value))?;
+        parsed = parsed.checked_mul(10).and_then(|current| {
+          if negative {
+            current.checked_sub((digit - b'0') as $ty)
+          } else {
+            current.checked_add((digit - b'0') as $ty)
+          }
+        })?;
       }
 
-      Ok(parsed)
+      Some(parsed)
     }
   };
 }
@@ -733,17 +723,65 @@ define_unsigned_decimal_attr_parser!(parse_u64_attr, parse_u64_bytes, u64);
 define_signed_decimal_attr_parser!(parse_i64_attr, parse_i64_bytes, i64);
 
 #[inline]
+pub(crate) fn parse_f32_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<f32, SdkError> {
+  if let Some(value) = parse_f32_bytes_raw(attr.value.as_ref()) {
+    return Ok(value);
+  }
+
+  let value = decode_attr_value_cow(attr, decoder)?;
+  parse_f32_bytes(value.as_bytes(), ty, field)
+}
+
+#[inline]
+pub(crate) fn parse_f64_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<f64, SdkError> {
+  if let Some(value) = parse_f64_bytes_raw(attr.value.as_ref()) {
+    return Ok(value);
+  }
+
+  let value = decode_attr_value_cow(attr, decoder)?;
+  parse_f64_bytes(value.as_bytes(), ty, field)
+}
+
+#[inline]
+fn parse_f32_bytes(value: &[u8], ty: &'static str, field: &'static str) -> Result<f32, SdkError> {
+  parse_f32_bytes_raw(value).ok_or_else(|| invalid_field_value_bytes(ty, field, value))
+}
+
+#[inline]
+fn parse_f64_bytes(value: &[u8], ty: &'static str, field: &'static str) -> Result<f64, SdkError> {
+  parse_f64_bytes_raw(value).ok_or_else(|| invalid_field_value_bytes(ty, field, value))
+}
+
+#[inline]
+fn parse_f32_bytes_raw(value: &[u8]) -> Option<f32> {
+  <f32 as lexical_parse_float::FromLexical>::from_lexical(value).ok()
+}
+
+#[inline]
+fn parse_f64_bytes_raw(value: &[u8]) -> Option<f64> {
+  <f64 as lexical_parse_float::FromLexical>::from_lexical(value).ok()
+}
+
+#[inline]
 pub(crate) fn parse_twips_measure_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
 ) -> Result<crate::simple_type::TwipsMeasureValue, SdkError> {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = crate::simple_type::TwipsMeasureValue::from_bytes(value)
-  {
+  if let Ok(value) = crate::simple_type::TwipsMeasureValue::from_bytes(attr.value.as_ref()) {
     return Ok(value);
   }
-  let value = decode_attr_value(attr, decoder)?;
-  parse_twips_measure_value(value)
+  let value = decode_attr_value_cow(attr, decoder)?;
+  parse_twips_measure_value(value.as_ref())
 }
 
 #[inline]
@@ -760,13 +798,11 @@ pub(crate) fn parse_signed_twips_measure_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
 ) -> Result<crate::simple_type::SignedTwipsMeasureValue, SdkError> {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = crate::simple_type::SignedTwipsMeasureValue::from_bytes(value)
-  {
+  if let Ok(value) = crate::simple_type::SignedTwipsMeasureValue::from_bytes(attr.value.as_ref()) {
     return Ok(value);
   }
-  let value = decode_attr_value(attr, decoder)?;
-  parse_signed_twips_measure_value(value)
+  let value = decode_attr_value_cow(attr, decoder)?;
+  parse_signed_twips_measure_value(value.as_ref())
 }
 
 #[inline]
@@ -783,13 +819,13 @@ pub(crate) fn parse_decimal_number_or_percent_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
 ) -> Result<crate::simple_type::DecimalNumberOrPercentValue, SdkError> {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = crate::simple_type::DecimalNumberOrPercentValue::from_bytes(value)
+  if let Ok(value) =
+    crate::simple_type::DecimalNumberOrPercentValue::from_bytes(attr.value.as_ref())
   {
     return Ok(value);
   }
-  let value = decode_attr_value(attr, decoder)?;
-  parse_decimal_number_or_percent_value(value)
+  let value = decode_attr_value_cow(attr, decoder)?;
+  parse_decimal_number_or_percent_value(value.as_ref())
 }
 
 #[inline]
@@ -806,13 +842,12 @@ pub(crate) fn parse_measurement_or_percent_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
 ) -> Result<crate::simple_type::MeasurementOrPercentValue, SdkError> {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = crate::simple_type::MeasurementOrPercentValue::from_bytes(value)
+  if let Ok(value) = crate::simple_type::MeasurementOrPercentValue::from_bytes(attr.value.as_ref())
   {
     return Ok(value);
   }
-  let value = decode_attr_value(attr, decoder)?;
-  parse_measurement_or_percent_value(value)
+  let value = decode_attr_value_cow(attr, decoder)?;
+  parse_measurement_or_percent_value(value.as_ref())
 }
 
 #[inline]
@@ -831,27 +866,24 @@ pub(crate) fn parse_i32_zero_on_overflow_attr(
   ty: &'static str,
   field: &'static str,
 ) -> Result<i32, SdkError> {
-  if let Some(value) = attr_raw_value(attr) {
-    parse_i32_zero_on_overflow_bytes(value, ty, field)
-  } else {
-    let value = decode_attr_value(attr, decoder)?;
-    parse_i32_zero_on_overflow_bytes(value.as_bytes(), ty, field)
+  if let Some(value) = parse_i32_zero_on_overflow_bytes(attr.value.as_ref()) {
+    return Ok(value);
   }
+
+  let value = decode_attr_value_cow(attr, decoder)?;
+  parse_i32_zero_on_overflow_bytes(value.as_bytes())
+    .ok_or_else(|| invalid_field_value_bytes(ty, field, value.as_bytes()))
 }
 
 #[inline]
-fn parse_i32_zero_on_overflow_bytes(
-  value: &[u8],
-  ty: &'static str,
-  field: &'static str,
-) -> Result<i32, SdkError> {
+fn parse_i32_zero_on_overflow_bytes(value: &[u8]) -> Option<i32> {
   let (negative, digits) = match value {
     [b'-', rest @ ..] => (true, rest),
     [b'+', rest @ ..] => (false, rest),
     _ => (false, value),
   };
   if digits.is_empty() {
-    return Err(invalid_field_value_bytes(ty, field, value));
+    return None;
   }
 
   let limit = if negative {
@@ -862,7 +894,7 @@ fn parse_i32_zero_on_overflow_bytes(
   let mut parsed: u32 = 0;
   for &digit in digits {
     if !digit.is_ascii_digit() {
-      return Err(invalid_field_value_bytes(ty, field, value));
+      return None;
     }
 
     parsed = match parsed
@@ -870,18 +902,18 @@ fn parse_i32_zero_on_overflow_bytes(
       .and_then(|current| current.checked_add((digit - b'0') as u32))
     {
       Some(parsed) if parsed <= limit => parsed,
-      _ => return Ok(0),
+      _ => return Some(0),
     };
   }
 
   if negative {
     if parsed == i32::MAX as u32 + 1 {
-      Ok(i32::MIN)
+      Some(i32::MIN)
     } else {
-      Ok(-(parsed as i32))
+      Some(-(parsed as i32))
     }
   } else {
-    Ok(parsed as i32)
+    Some(parsed as i32)
   }
 }
 
@@ -895,13 +927,12 @@ pub(crate) fn parse_attr_value<T>(
 where
   T: std::str::FromStr,
 {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = std::str::from_utf8(value)
+  if let Ok(value) = std::str::from_utf8(attr.value.as_ref())
     && let Ok(value) = value.parse::<T>()
   {
     Ok(value)
   } else {
-    let value = decode_attr_value(attr, decoder)?;
+    let value = decode_attr_value_cow(attr, decoder)?;
     parse_value(value.as_ref(), ty, field)
   }
 }
@@ -911,11 +942,11 @@ pub(crate) fn parse_enum_attr<T>(attr: &Attribute<'_>, decoder: Decoder) -> Resu
 where
   T: crate::sdk::SdkEnum,
 {
-  if let Some(value) = attr_raw_value(attr) {
-    return T::from_xml_bytes(value);
+  if let Ok(value) = T::from_xml_bytes(attr.value.as_ref()) {
+    return Ok(value);
   }
 
-  let value = decode_attr_value(attr, decoder)?;
+  let value = decode_attr_value_cow(attr, decoder)?;
   T::from_xml_bytes(value.as_bytes())
 }
 
@@ -957,7 +988,6 @@ where
   }
 }
 
-#[inline]
 pub(crate) fn parse_list_attr<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -967,7 +997,7 @@ pub(crate) fn parse_list_attr<T>(
 where
   T: std::str::FromStr,
 {
-  let value = decode_attr_value(attr, decoder)?;
+  let value = decode_attr_value_cow(attr, decoder)?;
   parse_list_value(value.as_ref(), ty, field)
 }
 
@@ -981,13 +1011,13 @@ pub(crate) fn parse_borrowed_list_attr<T>(
 where
   T: std::str::FromStr,
 {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = std::str::from_utf8(value)
+  if let Ok(value) = std::str::from_utf8(attr.value.as_ref())
+    && let Ok(value) = parse_list_value(value, ty, field)
   {
-    return parse_list_value(value, ty, field);
+    return Ok(value);
   }
 
-  let value = decode_attr_value(attr, decoder)?;
+  let value = decode_attr_value_cow(attr, decoder)?;
   parse_list_value(value.as_ref(), ty, field)
 }
 
@@ -1449,15 +1479,12 @@ fn attr_value(
   for attr in start.attributes() {
     let attr = attr?;
     if attr.key.as_ref() == name {
-      return if let Some(value) = attr_raw_value(&attr) {
-        Ok(Some(value.into()))
-      } else {
-        Ok(Some(
-          decode_attr_value(&attr, reader.decoder())?
-            .into_bytes()
-            .into_boxed_slice(),
-        ))
-      };
+      return Ok(Some(
+        decode_attr_value_cow(&attr, reader.decoder())?
+          .into_owned()
+          .into_bytes()
+          .into_boxed_slice(),
+      ));
     }
   }
   Ok(None)
@@ -1905,7 +1932,7 @@ mod tests {
   use quick_xml::{Reader, events::Event};
 
   use super::{
-    decode_attr_value, parse_borrowed_list_attr, write_escaped_content_str,
+    decode_attr_value_cow, parse_borrowed_list_attr, write_escaped_content_str,
     write_escaped_content_text, write_escaped_str, write_escaped_text,
   };
 
@@ -1944,7 +1971,7 @@ mod tests {
       .expect("attribute")
       .expect("valid attribute");
 
-    let value = decode_attr_value(&attr, reader.decoder()).expect("decoded attribute");
+    let value = decode_attr_value_cow(&attr, reader.decoder()).expect("decoded attribute");
 
     assert_eq!(value, "one\ntwo & three");
   }

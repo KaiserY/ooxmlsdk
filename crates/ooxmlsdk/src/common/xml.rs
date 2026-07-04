@@ -1,9 +1,8 @@
 use quick_xml::{
-  Decoder, Reader,
-  escape::unescape,
+  Decoder, Reader, XmlVersion,
   events::{Event, attributes::Attribute},
 };
-use std::{borrow::Cow, io::BufRead};
+use std::{borrow::Cow, io::BufRead, ops::Deref, ops::Range};
 
 use super::{SdkError, invalid_field_value, unexpected_eof, unexpected_tag};
 
@@ -20,7 +19,6 @@ pub enum PayloadEvent<'xml> {
   Text(quick_xml::events::BytesText<'xml>),
   CData(quick_xml::events::BytesCData<'xml>),
   GeneralRef(quick_xml::events::BytesRef<'xml>),
-  Decl(bool),
   Eof,
 }
 
@@ -33,7 +31,6 @@ impl<'xml> PayloadEvent<'xml> {
       Self::Text(e) => PayloadEvent::Text(e.into_owned()),
       Self::CData(e) => PayloadEvent::CData(e.into_owned()),
       Self::GeneralRef(e) => PayloadEvent::GeneralRef(e.into_owned()),
-      Self::Decl(standalone) => PayloadEvent::Decl(standalone),
       Self::Eof => PayloadEvent::Eof,
     }
   }
@@ -48,10 +45,89 @@ impl<'xml> PayloadEvent<'xml> {
       Self::Text(e) => Event::Text(e),
       Self::CData(e) => Event::CData(e),
       Self::GeneralRef(e) => Event::GeneralRef(e),
-      Self::Decl(_) => return None,
       Self::Eof => Event::Eof,
     })
   }
+}
+
+#[inline]
+const fn is_non_whitespace(ch: char) -> bool {
+  !matches!(ch, ' ' | '\r' | '\n' | '\t')
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Text<'xml> {
+  text: Cow<'xml, str>,
+  content: Range<usize>,
+}
+
+impl<'xml> Text<'xml> {
+  #[inline]
+  fn new(text: Cow<'xml, str>) -> Self {
+    let start = text.find(is_non_whitespace).unwrap_or(0);
+    let end = text.rfind(is_non_whitespace).map_or(0, |index| index + 1);
+    let content = if start >= end { 0..0 } else { start..end };
+    Self { text, content }
+  }
+
+  #[inline]
+  pub fn trimmed(&self) -> Cow<'xml, str> {
+    match self.text {
+      Cow::Borrowed(text) => Cow::Borrowed(&text[self.content.clone()]),
+      Cow::Owned(ref text) => Cow::Owned(text[self.content.clone()].to_string()),
+    }
+  }
+
+  #[inline]
+  pub fn is_blank(&self) -> bool {
+    self.content.is_empty()
+  }
+}
+
+impl Deref for Text<'_> {
+  type Target = str;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target {
+    self.text.deref()
+  }
+}
+
+impl AsRef<str> for Text<'_> {
+  #[inline]
+  fn as_ref(&self) -> &str {
+    self.text.as_ref()
+  }
+}
+
+impl<'xml> From<Cow<'xml, str>> for Text<'xml> {
+  #[inline]
+  fn from(text: Cow<'xml, str>) -> Self {
+    Self::new(text)
+  }
+}
+
+impl<'xml> From<&'xml str> for Text<'xml> {
+  #[inline]
+  fn from(text: &'xml str) -> Self {
+    Self::new(Cow::Borrowed(text))
+  }
+}
+
+impl<'xml> From<String> for Text<'xml> {
+  #[inline]
+  fn from(text: String) -> Self {
+    Self::new(Cow::Owned(text))
+  }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DeEvent<'xml> {
+  Start(quick_xml::events::BytesStart<'xml>, bool),
+  End(quick_xml::events::BytesEnd<'xml>),
+  FastBytesText(quick_xml::events::BytesText<'xml>),
+  Text(Text<'xml>),
+  Eof,
 }
 
 #[inline(always)]
@@ -73,10 +149,6 @@ fn payload_event_from_event(event: Event<'_>) -> Option<PayloadEvent<'_>> {
     Event::Text(e) => PayloadEvent::Text(e),
     Event::CData(e) => PayloadEvent::CData(e),
     Event::GeneralRef(e) => PayloadEvent::GeneralRef(e),
-    Event::Decl(e) => PayloadEvent::Decl(matches!(
-      e.standalone(),
-      Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-    )),
     Event::Eof => PayloadEvent::Eof,
     _ => return None,
   })
@@ -91,20 +163,24 @@ pub trait XmlRead<'xml> {
 
   fn decoder(&self) -> Decoder;
 
+  #[inline]
+  fn next_de_event(
+    &mut self,
+    ty: &'static str,
+    field: &'static str,
+  ) -> Result<DeEvent<'xml>, SdkError>
+  where
+    Self: Sized,
+  {
+    read_de_event(self, ty, field)
+  }
+
   fn read_text(
     &mut self,
     end: quick_xml::name::QName<'_>,
     ty: &'static str,
     field: &'static str,
   ) -> Result<String, SdkError>;
-
-  fn drain_text_field_from_event(
-    &mut self,
-    value: &mut Option<String>,
-    first: PayloadEvent<'xml>,
-    ty: &'static str,
-    field: &'static str,
-  ) -> Result<PayloadEvent<'xml>, SdkError>;
 
   fn read_raw_empty_xml_bytes(
     &mut self,
@@ -167,33 +243,10 @@ impl<R: BufRead> IoReader<R> {
   }
 
   #[inline]
-  pub fn drain_text_field_from_event(
-    &mut self,
-    value: &mut Option<String>,
-    first: PayloadEvent<'static>,
-    ty: &'static str,
-    field: &'static str,
-  ) -> Result<PayloadEvent<'static>, SdkError> {
-    let mut event = first;
-    loop {
-      match event {
-        PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {
-          append_xml_text_event(value, event, ty, field)?;
-        }
-        event => return Ok(event),
-      }
-      event = self.next()?;
-    }
-  }
-
-  #[inline]
   pub fn next_tag_event(&mut self) -> Result<PayloadEvent<'static>, SdkError> {
     if let Some(event) = self.pending.take() {
       match event {
-        PayloadEvent::Start(_, _)
-        | PayloadEvent::End(_)
-        | PayloadEvent::Decl(_)
-        | PayloadEvent::Eof => return Ok(event),
+        PayloadEvent::Start(_, _) | PayloadEvent::End(_) | PayloadEvent::Eof => return Ok(event),
         PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {}
       }
     }
@@ -204,12 +257,6 @@ impl<R: BufRead> IoReader<R> {
         Event::Start(e) => return Ok(PayloadEvent::Start(e.into_owned(), false)),
         Event::Empty(e) => return Ok(PayloadEvent::Start(e.into_owned(), true)),
         Event::End(e) => return Ok(PayloadEvent::End(e.into_owned())),
-        Event::Decl(e) => {
-          return Ok(PayloadEvent::Decl(matches!(
-            e.standalone(),
-            Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-          )));
-        }
         Event::Eof => return Ok(PayloadEvent::Eof),
         _ => {}
       }
@@ -279,17 +326,6 @@ impl<R: BufRead> XmlRead<'static> for IoReader<R> {
   }
 
   #[inline]
-  fn drain_text_field_from_event(
-    &mut self,
-    value: &mut Option<String>,
-    first: PayloadEvent<'static>,
-    ty: &'static str,
-    field: &'static str,
-  ) -> Result<PayloadEvent<'static>, SdkError> {
-    IoReader::drain_text_field_from_event(self, value, first, ty, field)
-  }
-
-  #[inline]
   fn read_raw_empty_xml_bytes(
     &mut self,
     start: quick_xml::events::BytesStart<'static>,
@@ -343,33 +379,10 @@ impl<'de> SliceReader<'de> {
   }
 
   #[inline]
-  pub fn drain_text_field_from_event(
-    &mut self,
-    value: &mut Option<String>,
-    first: PayloadEvent<'de>,
-    ty: &'static str,
-    field: &'static str,
-  ) -> Result<PayloadEvent<'de>, SdkError> {
-    let mut event = first;
-    loop {
-      match event {
-        PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {
-          append_xml_text_event(value, event, ty, field)?;
-        }
-        event => return Ok(event),
-      }
-      event = self.next()?;
-    }
-  }
-
-  #[inline]
   pub fn next_tag_event(&mut self) -> Result<PayloadEvent<'de>, SdkError> {
     if let Some(event) = self.pending.take() {
       match event {
-        PayloadEvent::Start(_, _)
-        | PayloadEvent::End(_)
-        | PayloadEvent::Decl(_)
-        | PayloadEvent::Eof => return Ok(event),
+        PayloadEvent::Start(_, _) | PayloadEvent::End(_) | PayloadEvent::Eof => return Ok(event),
         PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {}
       }
     }
@@ -379,12 +392,6 @@ impl<'de> SliceReader<'de> {
         Event::Start(e) => return Ok(PayloadEvent::Start(e, false)),
         Event::Empty(e) => return Ok(PayloadEvent::Start(e, true)),
         Event::End(e) => return Ok(PayloadEvent::End(e)),
-        Event::Decl(e) => {
-          return Ok(PayloadEvent::Decl(matches!(
-            e.standalone(),
-            Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-          )));
-        }
         Event::Eof => return Ok(PayloadEvent::Eof),
         _ => {}
       }
@@ -450,17 +457,6 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
     field: &'static str,
   ) -> Result<String, SdkError> {
     SliceReader::read_text(self, end, ty, field)
-  }
-
-  #[inline]
-  fn drain_text_field_from_event(
-    &mut self,
-    value: &mut Option<String>,
-    first: PayloadEvent<'de>,
-    ty: &'static str,
-    field: &'static str,
-  ) -> Result<PayloadEvent<'de>, SdkError> {
-    SliceReader::drain_text_field_from_event(self, value, first, ty, field)
   }
 
   #[inline]
@@ -600,18 +596,6 @@ fn find_ascii_ignore_case(haystack: &str, needle: &str) -> Option<usize> {
     .position(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
 }
 
-#[inline]
-pub(crate) fn decode_attr_value_cow<'a>(
-  attr: &'a Attribute<'a>,
-  decoder: Decoder,
-) -> Result<Cow<'a, str>, SdkError> {
-  let decoded = decoder.decode(attr.value.as_ref())?;
-  match unescape(&decoded)? {
-    Cow::Borrowed(_) => Ok(decoded),
-    Cow::Owned(value) => Ok(Cow::Owned(value)),
-  }
-}
-
 macro_rules! define_unsigned_decimal_attr_parser {
   ($attr_name:ident, $bytes_name:ident, $ty:ty) => {
     #[inline]
@@ -626,7 +610,7 @@ macro_rules! define_unsigned_decimal_attr_parser {
         return Ok(value);
       }
 
-      let value = decode_attr_value_cow(attr, decoder)?;
+      let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
       $bytes_name(value.as_bytes())
         .ok_or_else(|| invalid_field_value_bytes(ty, field, value.as_bytes()))
     }
@@ -671,7 +655,7 @@ macro_rules! define_signed_decimal_attr_parser {
         return Ok(value);
       }
 
-      let value = decode_attr_value_cow(attr, decoder)?;
+      let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
       $bytes_name(value.as_bytes())
         .ok_or_else(|| invalid_field_value_bytes(ty, field, value.as_bytes()))
     }
@@ -727,7 +711,7 @@ pub(crate) fn parse_f32_attr(
     return Ok(value);
   }
 
-  let value = decode_attr_value_cow(attr, decoder)?;
+  let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
   parse_f32_bytes(value.as_bytes(), ty, field)
 }
 
@@ -742,7 +726,7 @@ pub(crate) fn parse_f64_attr(
     return Ok(value);
   }
 
-  let value = decode_attr_value_cow(attr, decoder)?;
+  let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
   parse_f64_bytes(value.as_bytes(), ty, field)
 }
 
@@ -774,7 +758,7 @@ pub(crate) fn parse_twips_measure_attr(
   if let Ok(value) = crate::simple_type::TwipsMeasureValue::from_bytes(attr.value.as_ref()) {
     return Ok(value);
   }
-  let value = decode_attr_value_cow(attr, decoder)?;
+  let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
   parse_twips_measure_value(value.as_ref())
 }
 
@@ -795,7 +779,7 @@ pub(crate) fn parse_signed_twips_measure_attr(
   if let Ok(value) = crate::simple_type::SignedTwipsMeasureValue::from_bytes(attr.value.as_ref()) {
     return Ok(value);
   }
-  let value = decode_attr_value_cow(attr, decoder)?;
+  let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
   parse_signed_twips_measure_value(value.as_ref())
 }
 
@@ -818,7 +802,7 @@ pub(crate) fn parse_decimal_number_or_percent_attr(
   {
     return Ok(value);
   }
-  let value = decode_attr_value_cow(attr, decoder)?;
+  let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
   parse_decimal_number_or_percent_value(value.as_ref())
 }
 
@@ -840,7 +824,7 @@ pub(crate) fn parse_measurement_or_percent_attr(
   {
     return Ok(value);
   }
-  let value = decode_attr_value_cow(attr, decoder)?;
+  let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
   parse_measurement_or_percent_value(value.as_ref())
 }
 
@@ -868,7 +852,7 @@ where
   {
     Ok(value)
   } else {
-    let value = decode_attr_value_cow(attr, decoder)?;
+    let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
     parse_value(value.as_ref(), ty, field)
   }
 }
@@ -882,7 +866,7 @@ where
     return Ok(value);
   }
 
-  let value = decode_attr_value_cow(attr, decoder)?;
+  let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
   T::from_xml_bytes(value.as_bytes())
 }
 
@@ -933,7 +917,7 @@ pub(crate) fn parse_list_attr<T>(
 where
   T: std::str::FromStr,
 {
-  let value = decode_attr_value_cow(attr, decoder)?;
+  let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
   parse_list_value(value.as_ref(), ty, field)
 }
 
@@ -953,7 +937,7 @@ where
     return Ok(value);
   }
 
-  let value = decode_attr_value_cow(attr, decoder)?;
+  let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
   parse_list_value(value.as_ref(), ty, field)
 }
 
@@ -977,6 +961,158 @@ fn invalid_field_value_bytes(ty: &'static str, field: &'static str, value: &[u8]
   invalid_field_value(ty, field, String::from_utf8_lossy(value).into_owned())
 }
 
+fn read_de_event<'xml, R: XmlRead<'xml>>(
+  xml_reader: &mut R,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<DeEvent<'xml>, SdkError> {
+  match xml_reader.next()? {
+    PayloadEvent::Start(e, empty) => Ok(DeEvent::Start(e, empty)),
+    PayloadEvent::End(e) => Ok(DeEvent::End(e)),
+    PayloadEvent::Text(text) => read_de_text_from_text(xml_reader, text, ty, field),
+    PayloadEvent::CData(text) => drain_de_text(xml_reader, text.xml10_content()?, ty, field),
+    PayloadEvent::GeneralRef(text) => {
+      let mut value = String::new();
+      append_de_general_ref(&mut value, text, xml_reader.decoder(), ty, field)?;
+      drain_de_text(xml_reader, Cow::Owned(value), ty, field)
+    }
+    PayloadEvent::Eof => Ok(DeEvent::Eof),
+  }
+}
+
+fn read_de_text_from_text<'xml, R: XmlRead<'xml>>(
+  xml_reader: &mut R,
+  text: quick_xml::events::BytesText<'xml>,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<DeEvent<'xml>, SdkError> {
+  match xml_reader.next()? {
+    PayloadEvent::Text(next_text) => {
+      let mut value = text.xml10_content()?;
+      append_de_text_content(&mut value, next_text.xml10_content()?);
+      drain_de_text(xml_reader, value, ty, field)
+    }
+    PayloadEvent::CData(next_text) => {
+      let mut value = text.xml10_content()?;
+      append_de_text_content(&mut value, next_text.xml10_content()?);
+      drain_de_text(xml_reader, value, ty, field)
+    }
+    PayloadEvent::GeneralRef(next_text) => {
+      let mut value = text.xml10_content()?;
+      append_de_general_ref(value.to_mut(), next_text, xml_reader.decoder(), ty, field)?;
+      drain_de_text(xml_reader, value, ty, field)
+    }
+    event => {
+      xml_reader.unread(event)?;
+      Ok(DeEvent::FastBytesText(text))
+    }
+  }
+}
+
+fn drain_de_text<'xml, R: XmlRead<'xml>>(
+  xml_reader: &mut R,
+  mut value: Cow<'xml, str>,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<DeEvent<'xml>, SdkError> {
+  loop {
+    match xml_reader.next()? {
+      PayloadEvent::Text(text) => append_de_text_content(&mut value, text.xml10_content()?),
+      PayloadEvent::CData(text) => append_de_text_content(&mut value, text.xml10_content()?),
+      PayloadEvent::GeneralRef(text) => {
+        append_de_general_ref(value.to_mut(), text, xml_reader.decoder(), ty, field)?;
+      }
+      event => {
+        xml_reader.unread(event)?;
+        return Ok(DeEvent::Text(Text::new(value)));
+      }
+    }
+  }
+}
+
+#[inline]
+fn append_de_text_content<'xml>(value: &mut Cow<'xml, str>, text: Cow<'_, str>) {
+  value.to_mut().push_str(text.as_ref());
+}
+
+fn append_de_general_ref(
+  value: &mut String,
+  text: quick_xml::events::BytesRef<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<(), SdkError> {
+  let entity = decoder.decode(&text)?;
+  if let Some(number) = entity.strip_prefix('#') {
+    let Some(ch) = parse_de_char_ref(number) else {
+      return Err(invalid_field_value(ty, field, entity.to_string()));
+    };
+    value.push(ch);
+    return Ok(());
+  }
+
+  let Some(entity) = quick_xml::escape::resolve_predefined_entity(entity.as_ref()) else {
+    return Err(invalid_field_value(ty, field, entity.to_string()));
+  };
+  value.push_str(entity);
+  Ok(())
+}
+
+fn parse_de_char_ref(number: &str) -> Option<char> {
+  let code_point = if let Some(hex) = number.strip_prefix('x') {
+    parse_unsigned_radix(hex, 16)?
+  } else {
+    parse_unsigned_radix(number, 10)?
+  };
+  if code_point == 0 {
+    return None;
+  }
+  char::from_u32(code_point)
+}
+
+#[inline]
+fn parse_unsigned_radix(src: &str, radix: u32) -> Option<u32> {
+  match src.as_bytes().first().copied() {
+    Some(b'+') | Some(b'-') => None,
+    _ => u32::from_str_radix(src, radix).ok(),
+  }
+}
+
+#[inline]
+pub(crate) fn fast_bytes_text_to_string(
+  text: quick_xml::events::BytesText<'_>,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<String, SdkError> {
+  String::from_utf8(text.into_inner().into_owned())
+    .map_err(|err| invalid_field_value(ty, field, err.to_string()))
+}
+
+#[inline]
+pub(crate) fn append_text_field(value: &mut Option<String>, text: &str) {
+  if let Some(value) = value {
+    value.push_str(text);
+  } else {
+    *value = Some(text.to_string());
+  }
+}
+
+#[inline]
+pub(crate) fn append_fast_bytes_text_field(
+  value: &mut Option<String>,
+  text: quick_xml::events::BytesText<'_>,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<(), SdkError> {
+  let text = fast_bytes_text_to_string(text, ty, field)?;
+  if let Some(value) = value {
+    value.push_str(&text);
+  } else {
+    *value = Some(text);
+  }
+  Ok(())
+}
+
 #[inline]
 fn read_text_events<'xml, R: XmlRead<'xml>>(
   xml_reader: &mut R,
@@ -985,9 +1121,18 @@ fn read_text_events<'xml, R: XmlRead<'xml>>(
   field: &'static str,
 ) -> Result<String, SdkError> {
   let mut value = None;
-  let event = xml_reader.next()?;
-  finish_read_text_events(xml_reader, &mut value, event, end, ty, field)?;
-  Ok(value.unwrap_or_default())
+  loop {
+    match xml_reader.next_de_event(ty, field)? {
+      DeEvent::FastBytesText(text) => append_fast_bytes_text_field(&mut value, text, ty, field)?,
+      DeEvent::Text(text) => append_text_field(&mut value, text.as_ref()),
+      DeEvent::End(e) if e.name() == end => return Ok(value.unwrap_or_default()),
+      DeEvent::Start(e, _) => {
+        return Err(unexpected_tag(ty, "text content", xml_local_name(e.name())));
+      }
+      DeEvent::Eof => return Err(unexpected_eof(ty)),
+      _ => {}
+    }
+  }
 }
 
 #[inline]
@@ -1004,122 +1149,45 @@ where
   RawParse: FnOnce(&[u8]) -> Option<T>,
   TextParse: FnOnce(&str) -> Result<T, SdkError>,
 {
-  let first = xml_reader.next()?;
-  if let PayloadEvent::Text(text) = first {
-    let second = xml_reader.next()?;
-    if let PayloadEvent::End(e) = second {
-      if e.name() == end {
-        if let Some(value) = parse_raw(text.as_ref()) {
-          return Ok(value);
-        }
+  let mut value = None;
+  let mut event = xml_reader.next_de_event(ty, field)?;
+  loop {
+    match event {
+      DeEvent::FastBytesText(text) => {
+        let after_text = xml_reader.next_de_event(ty, field)?;
+        match after_text {
+          DeEvent::End(e) if e.name() == end => {
+            if value.is_none()
+              && let Some(parsed) = parse_raw(text.as_ref())
+            {
+              return Ok(parsed);
+            }
 
-        let value = text.xml10_content()?;
+            append_fast_bytes_text_field(&mut value, text, ty, field)?;
+            let value = value.unwrap_or_default();
+            return parse_text(value.as_ref());
+          }
+          event_after_text => {
+            let text = text.xml10_content()?;
+            append_text_field(&mut value, text.as_ref());
+            event = event_after_text;
+            continue;
+          }
+        }
+      }
+      DeEvent::Text(text) => append_text_field(&mut value, text.as_ref()),
+      DeEvent::End(e) if e.name() == end => {
+        let value = value.unwrap_or_default();
         return parse_text(value.as_ref());
       }
-
-      let second = PayloadEvent::End(e);
-      let mut value = None;
-      append_xml_text_event(&mut value, PayloadEvent::Text(text), ty, field)?;
-      finish_read_text_events(xml_reader, &mut value, second, end, ty, field)?;
-      let value = value.unwrap_or_default();
-      return parse_text(value.as_ref());
-    }
-
-    let mut value = None;
-    append_xml_text_event(&mut value, PayloadEvent::Text(text), ty, field)?;
-    finish_read_text_events(xml_reader, &mut value, second, end, ty, field)?;
-    let value = value.unwrap_or_default();
-    return parse_text(value.as_ref());
-  }
-
-  let mut value = None;
-  finish_read_text_events(xml_reader, &mut value, first, end, ty, field)?;
-  let value = value.unwrap_or_default();
-  parse_text(value.as_ref())
-}
-
-fn finish_read_text_events<'xml, R: XmlRead<'xml>>(
-  xml_reader: &mut R,
-  value: &mut Option<String>,
-  mut event: PayloadEvent<'xml>,
-  end: quick_xml::name::QName<'_>,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<(), SdkError> {
-  loop {
-    event = match event {
-      event @ (PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_)) => {
-        xml_reader.drain_text_field_from_event(value, event, ty, field)?
-      }
-      event => event,
-    };
-
-    match event {
-      PayloadEvent::End(e) if e.name() == end => {
-        return Ok(());
-      }
-      PayloadEvent::Start(e, _) => {
+      DeEvent::Start(e, _) => {
         return Err(unexpected_tag(ty, "text content", xml_local_name(e.name())));
       }
-      PayloadEvent::Eof => return Err(unexpected_eof(ty)),
-      _ => {
-        event = xml_reader.next()?;
-      }
+      DeEvent::Eof => return Err(unexpected_eof(ty)),
+      _ => {}
     }
+    event = xml_reader.next_de_event(ty, field)?;
   }
-}
-
-fn append_xml_text_event(
-  value: &mut Option<String>,
-  event: PayloadEvent<'_>,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<(), SdkError> {
-  match event {
-    PayloadEvent::Text(text) => append_cow_text(value, text.xml10_content()?),
-    PayloadEvent::CData(text) => append_cow_text(value, text.xml10_content()?),
-    PayloadEvent::GeneralRef(text) => {
-      let entity = text.xml10_content()?;
-      let entity = resolve_general_ref_entity(entity.as_ref())
-        .ok_or_else(|| invalid_field_value(ty, field, entity.to_string()))?;
-      append_cow_text(value, entity);
-    }
-    _ => unreachable!("append_xml_text_event expects text-like XML events"),
-  }
-  Ok(())
-}
-
-#[inline]
-fn append_cow_text(value: &mut Option<String>, text: std::borrow::Cow<'_, str>) {
-  if let Some(value) = value {
-    value.push_str(text.as_ref());
-  } else {
-    *value = Some(text.into_owned());
-  }
-}
-
-#[inline]
-fn resolve_general_ref_entity(entity: &str) -> Option<std::borrow::Cow<'_, str>> {
-  if let Some(entity) = quick_xml::escape::resolve_predefined_entity(entity) {
-    return Some(std::borrow::Cow::Borrowed(entity));
-  }
-
-  if let Some(hex) = entity
-    .strip_prefix("#x")
-    .or_else(|| entity.strip_prefix("#X"))
-  {
-    let code_point = u32::from_str_radix(hex, 16).ok()?;
-    let ch = char::from_u32(code_point)?;
-    return Some(std::borrow::Cow::Owned(ch.to_string()));
-  }
-
-  if let Some(decimal) = entity.strip_prefix('#') {
-    let code_point = decimal.parse::<u32>().ok()?;
-    let ch = char::from_u32(code_point)?;
-    return Some(std::borrow::Cow::Owned(ch.to_string()));
-  }
-
-  None
 }
 
 #[cfg(feature = "flat-opc")]
@@ -1483,7 +1551,8 @@ fn attr_value(
     let attr = attr?;
     if attr.key.as_ref() == name {
       return Ok(Some(
-        decode_attr_value_cow(&attr, reader.decoder())?
+        attr
+          .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())?
           .into_owned()
           .into_bytes()
           .into_boxed_slice(),
@@ -1593,19 +1662,11 @@ pub(crate) fn read_root_start_borrowed<'de>(
   ),
   SdkError,
 > {
-  let mut xml_header = crate::common::XmlHeaderType::None;
   loop {
     match reader.next_tag_event()? {
-      PayloadEvent::Decl(standalone) => {
-        xml_header = if standalone {
-          crate::common::XmlHeaderType::Standalone
-        } else {
-          crate::common::XmlHeaderType::Plain
-        };
-      }
       PayloadEvent::Start(e, empty) => {
         if xml_local_name(e.name()) == local_name {
-          return Ok((e, empty, xml_header));
+          return Ok((e, empty, crate::common::XmlHeaderType::None));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
       }
@@ -1629,19 +1690,11 @@ pub(crate) fn read_root_start_io<R: std::io::BufRead>(
   ),
   SdkError,
 > {
-  let mut xml_header = crate::common::XmlHeaderType::None;
   loop {
     match reader.next_tag_event()? {
-      PayloadEvent::Decl(standalone) => {
-        xml_header = if standalone {
-          crate::common::XmlHeaderType::Standalone
-        } else {
-          crate::common::XmlHeaderType::Plain
-        };
-      }
       PayloadEvent::Start(e, empty) => {
         if xml_local_name(e.name()) == local_name {
-          return Ok((e, empty, xml_header));
+          return Ok((e, empty, crate::common::XmlHeaderType::None));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
       }
@@ -1956,7 +2009,7 @@ pub(crate) fn write_twips_measure_value<W: std::io::Write>(
   value: &crate::simple_type::TwipsMeasureValue,
 ) -> std::io::Result<()> {
   match value {
-    crate::simple_type::TwipsMeasureValue::Twips(value) => write_escaped_text(writer, value),
+    crate::simple_type::TwipsMeasureValue::Twips(value) => write_u64_value(writer, *value),
     crate::simple_type::TwipsMeasureValue::UniversalMeasure(value) => {
       crate::units::write_universal_measure_lexical(writer, *value)
     }
@@ -1969,7 +2022,7 @@ pub(crate) fn write_signed_twips_measure_value<W: std::io::Write>(
   value: &crate::simple_type::SignedTwipsMeasureValue,
 ) -> std::io::Result<()> {
   match value {
-    crate::simple_type::SignedTwipsMeasureValue::Twips(value) => write_escaped_text(writer, value),
+    crate::simple_type::SignedTwipsMeasureValue::Twips(value) => write_i64_value(writer, *value),
     crate::simple_type::SignedTwipsMeasureValue::UniversalMeasure(value) => {
       crate::units::write_universal_measure_lexical(writer, *value)
     }
@@ -1983,7 +2036,7 @@ pub(crate) fn write_decimal_number_or_percent_value<W: std::io::Write>(
 ) -> std::io::Result<()> {
   match value {
     crate::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value) => {
-      write_escaped_text(writer, value)
+      write_i64_value(writer, *value)
     }
     crate::simple_type::DecimalNumberOrPercentValue::Percent(value) => {
       crate::units::write_percent_lexical(writer, *value)
@@ -2029,8 +2082,8 @@ mod tests {
   use quick_xml::{Reader, events::Event};
 
   use super::{
-    decode_attr_value_cow, parse_borrowed_list_attr, write_escaped_content_str,
-    write_escaped_content_text, write_escaped_str, write_escaped_text,
+    parse_borrowed_list_attr, write_escaped_content_str, write_escaped_content_text,
+    write_escaped_str, write_escaped_text,
   };
 
   struct DisplayXml;
@@ -2053,24 +2106,6 @@ mod tests {
       .expect("attribute")
       .expect("valid attribute");
     parse_borrowed_list_attr::<u32>(&attr, reader.decoder(), "Test", "a").expect("parsed list")
-  }
-
-  #[test]
-  fn attribute_decode_preserves_literal_newlines_for_round_trip() {
-    let mut reader = Reader::from_str("<x a=\"one\ntwo &amp; three\"/>");
-    let Event::Empty(event) = reader.read_event().expect("empty event") else {
-      panic!("expected empty element");
-    };
-    let attr = event
-      .attributes()
-      .with_checks(false)
-      .next()
-      .expect("attribute")
-      .expect("valid attribute");
-
-    let value = decode_attr_value_cow(&attr, reader.decoder()).expect("decoded attribute");
-
-    assert_eq!(value, "one\ntwo & three");
   }
 
   #[test]

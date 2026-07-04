@@ -2195,10 +2195,14 @@ fn read_flat_opc_part<R: std::io::BufRead>(
   for attr in start.attributes() {
     let attr = attr?;
     if qname_matches(attr.key.as_ref(), b"name") {
-      let value = super::decode_attr_value_cow(&attr, decoder)?;
+      let value = attr.decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)?;
       path = Some(normalize_flat_opc_part_name(&value));
     } else if qname_matches(attr.key.as_ref(), b"contentType") {
-      content_type = Some(super::decode_attr_value_cow(&attr, decoder)?.into_owned());
+      content_type = Some(
+        attr
+          .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)?
+          .into_owned(),
+      );
     }
   }
 

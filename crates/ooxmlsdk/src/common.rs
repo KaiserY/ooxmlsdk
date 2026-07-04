@@ -31,12 +31,12 @@ pub(crate) use xml::mce_choice_replacement_child_bytes;
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
-  PayloadEvent, XmlRead, decode_attr_value_cow, decode_utf16_xml_bytes, from_bytes_inner,
-  from_reader_inner, parse_attr_value, parse_borrowed_list_attr,
-  parse_decimal_number_or_percent_attr, parse_enum_attr, parse_f32_attr, parse_f32_bytes_raw,
-  parse_f64_attr, parse_f64_bytes_raw, parse_i8_attr, parse_i8_bytes, parse_i16_attr,
-  parse_i16_bytes, parse_i32_attr, parse_i32_bytes, parse_i64_attr, parse_i64_bytes,
-  parse_list_attr, parse_list_value, parse_measurement_or_percent_attr,
+  DeEvent, PayloadEvent, XmlRead, append_fast_bytes_text_field, append_text_field,
+  decode_utf16_xml_bytes, from_bytes_inner, from_reader_inner, parse_attr_value,
+  parse_borrowed_list_attr, parse_decimal_number_or_percent_attr, parse_enum_attr, parse_f32_attr,
+  parse_f32_bytes_raw, parse_f64_attr, parse_f64_bytes_raw, parse_i8_attr, parse_i8_bytes,
+  parse_i16_attr, parse_i16_bytes, parse_i32_attr, parse_i32_bytes, parse_i64_attr,
+  parse_i64_bytes, parse_list_attr, parse_list_value, parse_measurement_or_percent_attr,
   parse_signed_twips_measure_attr, parse_text_child_value, parse_twips_measure_attr, parse_u8_attr,
   parse_u8_bytes, parse_u16_attr, parse_u16_bytes, parse_u32_attr, parse_u32_bytes, parse_u64_attr,
   parse_u64_bytes, parse_value, read_root_start_borrowed, read_root_start_io,

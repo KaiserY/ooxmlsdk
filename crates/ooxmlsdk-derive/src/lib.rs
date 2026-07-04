@@ -382,10 +382,9 @@ enum SdkTypeChoiceItem {
 #[derive(Clone)]
 struct SdkTypeChoiceSequenceChild {
   kind: SdkTypeChoiceSequenceChildKind,
-  field: Option<Ident>,
+  option_field: Option<Ident>,
   ty: Option<Type>,
   simple_type: Option<String>,
-  is_enum: bool,
   qname: String,
 }
 
@@ -967,10 +966,9 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                   } else {
                     SdkTypeChoiceSequenceChildKind::AnyChild
                   };
-                  let mut field = None;
+                  let mut option_field = None;
                   let mut ty = None;
                   let mut simple_type = None;
-                  let mut is_enum = false;
                   let mut qname = None;
                   sequence.parse_nested_meta(|sequence_child| {
                     if sequence_child.path.is_ident("qname") {
@@ -979,8 +977,8 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                       Ok(())
                     } else if sequence_child.path.is_ident("no_prefix") {
                       Ok(())
-                    } else if sequence_child.path.is_ident("field") {
-                      field = Some(sequence_child.value()?.parse()?);
+                    } else if sequence_child.path.is_ident("option_field") {
+                      option_field = Some(sequence_child.value()?.parse()?);
                       Ok(())
                     } else if sequence_child.path.is_ident("ty") {
                       let value: LitStr = sequence_child.value()?.parse()?;
@@ -990,10 +988,9 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                       let value: LitStr = sequence_child.value()?.parse()?;
                       simple_type = Some(value.value());
                       Ok(())
-                    } else if sequence_child.path.is_ident("enum") {
-                      is_enum = true;
-                      Ok(())
-                    } else if is_sdk_version_marker_path(&sequence_child.path) {
+                    } else if sequence_child.path.is_ident("enum")
+                      || is_sdk_version_marker_path(&sequence_child.path)
+                    {
                       Ok(())
                     } else {
                       Err(sequence_child.error("unsupported sdk choice sequence child attribute"))
@@ -1003,10 +1000,9 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                   choice_qnames.push(qname.clone());
                   children.push(SdkTypeChoiceSequenceChild {
                     kind,
-                    field,
+                    option_field,
                     ty,
                     simple_type,
-                    is_enum,
                     qname,
                   });
                   Ok(())

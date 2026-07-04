@@ -185,7 +185,7 @@ impl UniversalMeasureValue {
 impl std::fmt::Display for UniversalMeasureValue {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    write_universal_measure_fmt(f, *self)
   }
 }
 
@@ -248,7 +248,10 @@ impl TwipsMeasureValue {
 impl std::fmt::Display for TwipsMeasureValue {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    match *self {
+      Self::Twips(value) => write_integer_fmt(f, value),
+      Self::UniversalMeasure(value) => write_universal_measure_fmt(f, value),
+    }
   }
 }
 
@@ -309,7 +312,10 @@ impl SignedTwipsMeasureValue {
 impl std::fmt::Display for SignedTwipsMeasureValue {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    match *self {
+      Self::Twips(value) => write_integer_fmt(f, value),
+      Self::UniversalMeasure(value) => write_universal_measure_fmt(f, value),
+    }
   }
 }
 
@@ -368,7 +374,10 @@ impl HpsMeasureValue {
 impl std::fmt::Display for HpsMeasureValue {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    match *self {
+      Self::HalfPoints(value) => write_integer_fmt(f, value),
+      Self::UniversalMeasure(value) => write_universal_measure_fmt(f, value),
+    }
   }
 }
 
@@ -427,7 +436,10 @@ impl SignedHpsMeasureValue {
 impl std::fmt::Display for SignedHpsMeasureValue {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    match *self {
+      Self::HalfPoints(value) => write_integer_fmt(f, value),
+      Self::UniversalMeasure(value) => write_universal_measure_fmt(f, value),
+    }
   }
 }
 
@@ -498,7 +510,10 @@ impl CoordinateValue {
 impl std::fmt::Display for CoordinateValue {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    match *self {
+      Self::Emu(value) => write_integer_fmt(f, value),
+      Self::UniversalMeasure(value) => write_universal_measure_fmt(f, value),
+    }
   }
 }
 
@@ -560,7 +575,10 @@ impl Coordinate32Value {
 impl std::fmt::Display for Coordinate32Value {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    match *self {
+      Self::Emu(value) => write_integer_fmt(f, value),
+      Self::UniversalMeasure(value) => write_universal_measure_fmt(f, value),
+    }
   }
 }
 
@@ -638,7 +656,10 @@ impl DecimalNumberOrPercentValue {
 impl std::fmt::Display for DecimalNumberOrPercentValue {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    match *self {
+      Self::DecimalNumber(value) => write_integer_fmt(f, value),
+      Self::Percent(value) => write_percent_fmt(f, value),
+    }
   }
 }
 
@@ -715,7 +736,10 @@ impl DrawingmlPercentageValue {
 impl std::fmt::Display for DrawingmlPercentageValue {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    match *self {
+      Self::Decimal(value) => write_integer_fmt(f, value),
+      Self::PercentString(value) => write_percent_fmt(f, value),
+    }
   }
 }
 
@@ -778,7 +802,10 @@ impl TextPointValue {
 impl std::fmt::Display for TextPointValue {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    match *self {
+      Self::Points100(value) => write_integer_fmt(f, value),
+      Self::UniversalMeasure(value) => write_universal_measure_fmt(f, value),
+    }
   }
 }
 
@@ -842,7 +869,10 @@ impl TextBulletSizeValue {
 impl std::fmt::Display for TextBulletSizeValue {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    match *self {
+      Self::Decimal(value) => write_integer_fmt(f, value),
+      Self::PercentString(value) => write_percent_fmt(f, value),
+    }
   }
 }
 
@@ -919,7 +949,10 @@ impl MeasurementOrPercentValue {
 impl std::fmt::Display for MeasurementOrPercentValue {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.to_lexical().as_str())
+    match *self {
+      Self::DecimalNumberOrPercent(value) => std::fmt::Display::fmt(&value, f),
+      Self::UniversalMeasure(value) => write_universal_measure_fmt(f, value),
+    }
   }
 }
 
@@ -1536,6 +1569,49 @@ fn mul_div_round_i128(value: i128, mul: i128, div: i128) -> Result<i128, UnitPar
 }
 
 fn format_decimal_ratio(value: i64, scale: i64, suffix: &str) -> String {
+  let mut output = String::new();
+  write_decimal_ratio_fmt(&mut output, value, scale, suffix).expect("writing to String failed");
+  output
+}
+
+#[inline]
+fn write_percent_fmt<W: std::fmt::Write + ?Sized>(
+  writer: &mut W,
+  value: DrawingmlPercentValue,
+) -> std::fmt::Result {
+  write_decimal_ratio_fmt(
+    writer,
+    i64::from(value),
+    i64::from(DRAWINGML_PERCENT_UNITS_PER_PERCENT),
+    "%",
+  )
+}
+
+#[inline]
+fn write_universal_measure_fmt<W: std::fmt::Write + ?Sized>(
+  writer: &mut W,
+  value: UniversalMeasureValue,
+) -> std::fmt::Result {
+  let unit = value.unit();
+  write_decimal_ratio_fmt(writer, value.emu(), unit.emus_per_unit(), unit.suffix())
+}
+
+#[inline]
+fn write_integer_fmt<W, I>(writer: &mut W, value: I) -> std::fmt::Result
+where
+  W: std::fmt::Write + ?Sized,
+  I: itoa::Integer,
+{
+  let mut buffer = itoa::Buffer::new();
+  writer.write_str(buffer.format(value))
+}
+
+fn write_decimal_ratio_fmt<W: std::fmt::Write + ?Sized>(
+  writer: &mut W,
+  value: i64,
+  scale: i64,
+  suffix: &str,
+) -> std::fmt::Result {
   const MAX_FRACTION_DIGITS: usize = 9;
 
   let negative = value.is_negative();
@@ -1546,23 +1622,28 @@ fn format_decimal_ratio(value: i64, scale: i64, suffix: &str) -> String {
   let integer = rounded / rounding_scale;
   let fraction = rounded % rounding_scale;
 
-  let mut output = String::new();
   if negative && rounded != 0 {
-    output.push('-');
+    writer.write_str("-")?;
   }
-  output.push_str(&integer.to_string());
+  write_integer_fmt(writer, integer)?;
 
   if fraction != 0 {
-    let mut digits = format!("{fraction:0MAX_FRACTION_DIGITS$}");
-    while digits.ends_with('0') {
-      digits.pop();
+    let mut digits = [b'0'; MAX_FRACTION_DIGITS];
+    let mut value = fraction;
+    for digit in digits.iter_mut().rev() {
+      *digit = b'0' + (value % 10) as u8;
+      value /= 10;
     }
-    output.push('.');
-    output.push_str(&digits);
+
+    let mut end = digits.len();
+    while end > 0 && digits[end - 1] == b'0' {
+      end -= 1;
+    }
+    writer.write_str(".")?;
+    writer.write_str(std::str::from_utf8(&digits[..end]).expect("decimal digits are utf-8"))?;
   }
 
-  output.push_str(suffix);
-  output
+  writer.write_str(suffix)
 }
 
 fn write_decimal_ratio_lexical<W: std::io::Write>(

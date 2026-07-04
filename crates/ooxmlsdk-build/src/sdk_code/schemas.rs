@@ -3615,59 +3615,29 @@ fn choice_metadata_qname(qname: &str) -> String {
 fn choice_sequence_child_metadata_tokens(
   field: &FieldDecl,
   variant_ident: Option<&Ident>,
-  include_field_name: bool,
+  include_option_field: bool,
   module: &SchemaModuleDecl,
   type_graph: &TypeContainmentGraph,
 ) -> Result<Option<TokenStream>> {
   let variant_attr = variant_ident.map(|variant_ident| quote! { variant = #variant_ident, });
-  let field_name = include_field_name.then(|| {
+  let option_field_name = include_option_field.then(|| {
     let ident: Result<Ident> = parse_str(&field.rust_name).map_err(Into::into);
     ident
   });
-  let field_name = field_name.transpose()?;
-  let field_attr = field_name
+  let option_field_name = option_field_name.transpose()?;
+  let option_field_attr = option_field_name
     .as_ref()
-    .map(|field_name| quote! { field = #field_name, });
-  let ty_attr = if include_field_name {
-    let field_ty = type_from_decl_ref(&field.type_ref, type_graph)?;
-    let field_ty = if variant_ident.is_some() && !include_field_name {
-      if matches!(field.wire, FieldWireDecl::Child { .. })
-        && !is_value_like_type_ref(module, &field.type_ref, type_graph)
-      {
-        quote! { std::boxed::Box<#field_ty> }
-      } else {
-        quote! { #field_ty }
-      }
-    } else {
-      match field.cardinality {
-        Cardinality::Optional => quote! { Option<#field_ty> },
-        Cardinality::Many => quote! { Vec<#field_ty> },
-        Cardinality::One => {
-          if matches!(field.wire, FieldWireDecl::Child { .. })
-            && !is_value_like_type_ref(module, &field.type_ref, type_graph)
-          {
-            quote! { std::boxed::Box<#field_ty> }
-          } else {
-            quote! { #field_ty }
-          }
-        }
-      }
-    };
-    let field_ty = field_ty.to_string();
-    Some(quote! { ty = #field_ty, })
-  } else {
-    None
-  };
+    .map(|field_name| quote! { option_field = #field_name, });
 
   Ok(match &field.wire {
     FieldWireDecl::Child { qname } => {
       let qname = choice_metadata_qname(qname);
       if empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph).is_some() {
-        Some(quote! { empty_child(#variant_attr #field_attr #ty_attr qname = #qname) })
+        Some(quote! { empty_child(#variant_attr #option_field_attr qname = #qname) })
       } else if is_any_children_alias_type_ref(module, &field.type_ref, type_graph) {
-        Some(quote! { any_child(#variant_attr #field_attr #ty_attr qname = #qname) })
+        Some(quote! { any_child(#variant_attr #option_field_attr qname = #qname) })
       } else {
-        Some(quote! { child(#variant_attr #field_attr #ty_attr qname = #qname) })
+        Some(quote! { child(#variant_attr #option_field_attr qname = #qname) })
       }
     }
     FieldWireDecl::TextChild { qname } => {
@@ -3679,7 +3649,7 @@ fn choice_sequence_child_metadata_tokens(
         metadata_attrs
       };
       let qname = choice_metadata_qname(qname);
-      Some(quote! { text_child(#variant_attr #field_attr #ty_attr #metadata_attrs qname = #qname) })
+      Some(quote! { text_child(#variant_attr #option_field_attr #metadata_attrs qname = #qname) })
     }
     _ => None,
   })
@@ -3765,11 +3735,19 @@ fn choice_variant_metadata_tokens(
           variant_ident,
           helper_fields,
         } => {
+          let include_option_field = helper_fields.iter().all(|field| {
+            field.cardinality == Cardinality::Optional
+              && matches!(field.wire, FieldWireDecl::Child { .. })
+          });
           let mut children = Vec::new();
           for field in helper_fields {
-            if let Some(child) =
-              choice_sequence_child_metadata_tokens(field, None, false, module, type_graph)?
-            {
+            if let Some(child) = choice_sequence_child_metadata_tokens(
+              field,
+              None,
+              include_option_field,
+              module,
+              type_graph,
+            )? {
               children.push(child);
             }
           }

@@ -940,7 +940,11 @@ pub struct RunProperties {
   #[sdk(
         choice(
             child(variant = NormalText, qname = "m:nor"),
-            sequence(variant = Sequence, child(qname = "m:scr"), child(qname = "m:sty"))
+            sequence(
+                variant = Sequence,
+                child(option_field = script, qname = "m:scr"),
+                child(option_field = style, qname = "m:sty")
+            )
         )
     )]
   pub run_properties_choice: Option<RunPropertiesChoice>,

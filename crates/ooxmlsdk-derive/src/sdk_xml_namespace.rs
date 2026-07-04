@@ -11,7 +11,9 @@ pub(crate) fn expand_sdk_xml_namespace(
     ));
   };
 
+  let mut prefix_arms = Vec::with_capacity(variants.len());
   let mut prefix_bytes_arms = Vec::with_capacity(variants.len());
+  let mut uri_arms = Vec::with_capacity(variants.len());
   let mut uri_bytes_arms = Vec::with_capacity(variants.len());
   let mut from_uri_bytes_arms = Vec::with_capacity(variants.len());
 
@@ -30,9 +32,17 @@ pub(crate) fn expand_sdk_xml_namespace(
     let uri_lit = LitStr::new(&uri, Span::call_site());
     let uri_bytes_lit = LitByteStr::new(uri.as_bytes(), Span::call_site());
 
+    prefix_arms.push(quote! {
+      #(#cfg_attrs)*
+      Self::#variant_ident => #prefix_lit,
+    });
     prefix_bytes_arms.push(quote! {
       #(#cfg_attrs)*
       Self::#variant_ident => #prefix_lit.as_bytes(),
+    });
+    uri_arms.push(quote! {
+      #(#cfg_attrs)*
+      Self::#variant_ident => #uri_lit,
     });
     uri_bytes_arms.push(quote! {
       #(#cfg_attrs)*
@@ -53,8 +63,9 @@ pub(crate) fn expand_sdk_xml_namespace(
       }
 
       pub const fn prefix(self) -> &'static str {
-        // Generated namespace prefixes are ASCII and therefore valid UTF-8.
-        unsafe { std::str::from_utf8_unchecked(self.prefix_bytes()) }
+        match self {
+          #( #prefix_arms )*
+        }
       }
 
       pub const fn uri_bytes(self) -> &'static [u8] {
@@ -64,8 +75,9 @@ pub(crate) fn expand_sdk_xml_namespace(
       }
 
       pub const fn uri(self) -> &'static str {
-        // Generated namespace URIs are ASCII and therefore valid UTF-8.
-        unsafe { std::str::from_utf8_unchecked(self.uri_bytes()) }
+        match self {
+          #( #uri_arms )*
+        }
       }
 
       pub fn from_uri(uri: &str) -> Option<Self> {

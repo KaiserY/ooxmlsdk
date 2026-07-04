@@ -1775,6 +1775,11 @@ fn write_xml_schema_float_effective_tokens(
   } else {
     (quote! { f64::INFINITY }, quote! { f64::NEG_INFINITY })
   };
+  let write_finite = if single_precision {
+    quote! { crate::common::write_f32_value(writer, __ooxmlsdk_float_value)?; }
+  } else {
+    quote! { crate::common::write_f64_value(writer, __ooxmlsdk_float_value)?; }
+  };
 
   quote! {
     {
@@ -1786,9 +1791,41 @@ fn write_xml_schema_float_effective_tokens(
       } else if __ooxmlsdk_float_value == #negative_infinity {
         writer.write_all(b"-INF")?;
       } else {
-        crate::common::write_escaped_text(writer, #value_expr)?;
+        #write_finite
       }
     }
+  }
+}
+
+fn write_integer_value_tokens_by_kind(
+  kind: IntegerTypeKind,
+  value_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  match kind {
+    IntegerTypeKind::U8 => quote! {
+      crate::common::write_u8_value(writer, *#value_expr)?;
+    },
+    IntegerTypeKind::I8 => quote! {
+      crate::common::write_i8_value(writer, *#value_expr)?;
+    },
+    IntegerTypeKind::U16 => quote! {
+      crate::common::write_u16_value(writer, *#value_expr)?;
+    },
+    IntegerTypeKind::I16 => quote! {
+      crate::common::write_i16_value(writer, *#value_expr)?;
+    },
+    IntegerTypeKind::U32 => quote! {
+      crate::common::write_u32_value(writer, *#value_expr)?;
+    },
+    IntegerTypeKind::I32 | IntegerTypeKind::I32ZeroOnOverflow => quote! {
+      crate::common::write_i32_value(writer, *#value_expr)?;
+    },
+    IntegerTypeKind::U64 => quote! {
+      crate::common::write_u64_value(writer, *#value_expr)?;
+    },
+    IntegerTypeKind::I64 => quote! {
+      crate::common::write_i64_value(writer, *#value_expr)?;
+    },
   }
 }
 

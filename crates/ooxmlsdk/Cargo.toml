@@ -21,9 +21,11 @@ mce = ["parts"]
 
 [dependencies]
 base64 = { workspace = true, optional = true }
+itoa = { workspace = true }
 lexical-parse-float = { workspace = true }
 ooxmlsdk-derive = { workspace = true }
 quick-xml = { workspace = true }
 regex = { workspace = true, optional = true }
 thiserror = { workspace = true }
 zip = { workspace = true, optional = true }
+zmij = { workspace = true }

@@ -1726,6 +1726,100 @@ pub(crate) fn write_escaped_bytes<W: std::io::Write>(
 }
 
 #[inline]
+pub(crate) fn write_u8_value<W: std::io::Write>(writer: &mut W, value: u8) -> std::io::Result<()> {
+  write_integer_value(writer, value)
+}
+
+#[inline]
+pub(crate) fn write_i8_value<W: std::io::Write>(writer: &mut W, value: i8) -> std::io::Result<()> {
+  write_integer_value(writer, value)
+}
+
+#[inline]
+pub(crate) fn write_u16_value<W: std::io::Write>(
+  writer: &mut W,
+  value: u16,
+) -> std::io::Result<()> {
+  write_integer_value(writer, value)
+}
+
+#[inline]
+pub(crate) fn write_i16_value<W: std::io::Write>(
+  writer: &mut W,
+  value: i16,
+) -> std::io::Result<()> {
+  write_integer_value(writer, value)
+}
+
+#[inline]
+pub(crate) fn write_u32_value<W: std::io::Write>(
+  writer: &mut W,
+  value: u32,
+) -> std::io::Result<()> {
+  write_integer_value(writer, value)
+}
+
+#[inline]
+pub(crate) fn write_i32_value<W: std::io::Write>(
+  writer: &mut W,
+  value: i32,
+) -> std::io::Result<()> {
+  write_integer_value(writer, value)
+}
+
+#[inline]
+pub(crate) fn write_u64_value<W: std::io::Write>(
+  writer: &mut W,
+  value: u64,
+) -> std::io::Result<()> {
+  write_integer_value(writer, value)
+}
+
+#[inline]
+pub(crate) fn write_i64_value<W: std::io::Write>(
+  writer: &mut W,
+  value: i64,
+) -> std::io::Result<()> {
+  write_integer_value(writer, value)
+}
+
+#[inline]
+fn write_integer_value<W, I>(writer: &mut W, value: I) -> std::io::Result<()>
+where
+  W: std::io::Write,
+  I: itoa::Integer,
+{
+  let mut buffer = itoa::Buffer::new();
+  writer.write_all(buffer.format(value).as_bytes())
+}
+
+#[inline]
+pub(crate) fn write_f32_value<W: std::io::Write>(
+  writer: &mut W,
+  value: f32,
+) -> std::io::Result<()> {
+  write_float_value(writer, value)
+}
+
+#[inline]
+pub(crate) fn write_f64_value<W: std::io::Write>(
+  writer: &mut W,
+  value: f64,
+) -> std::io::Result<()> {
+  write_float_value(writer, value)
+}
+
+#[inline]
+fn write_float_value<W, F>(writer: &mut W, value: F) -> std::io::Result<()>
+where
+  W: std::io::Write,
+  F: zmij::Float,
+{
+  let mut buffer = zmij::Buffer::new();
+  writer.write_all(buffer.format_finite(value).as_bytes())
+}
+
+#[inline]
 fn write_escaped_xml_bytes<W: std::io::Write>(
   writer: &mut W,
   bytes: &[u8],

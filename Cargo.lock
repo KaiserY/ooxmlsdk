@@ -1154,12 +1154,14 @@ name = "ooxmlsdk"
 version = "0.10.3"
 dependencies = [
  "base64",
+ "itoa",
  "lexical-parse-float",
  "ooxmlsdk-derive",
  "quick-xml",
  "regex",
  "thiserror",
  "zip",
+ "zmij",
 ]
 
 [[package]]

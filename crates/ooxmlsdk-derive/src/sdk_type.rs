@@ -4044,6 +4044,13 @@ fn expand_named_struct(
       }
     } else if let Some(kind) = simple_union_kind {
       write_simple_union_attr_tokens(kind, &attr_prefix_lit, quote! { value })
+    } else if let Some(kind) = integer_kind {
+      let write_value_tokens = write_integer_value_tokens_by_kind(kind, quote! { value });
+      quote! {
+        writer.write_all(#attr_prefix_lit)?;
+        #write_value_tokens
+        writer.write_all(b"\"")?;
+      }
     } else if effective_type_name(&value_ty, simple_type)
       .as_deref()
       .is_some_and(is_xml_schema_float_type_name)

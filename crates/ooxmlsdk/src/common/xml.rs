@@ -104,7 +104,7 @@ pub trait XmlRead<'xml> {
     first: PayloadEvent<'xml>,
     ty: &'static str,
     field: &'static str,
-  ) -> Result<(), SdkError>;
+  ) -> Result<PayloadEvent<'xml>, SdkError>;
 
   fn read_raw_empty_xml_bytes(
     &mut self,
@@ -173,17 +173,14 @@ impl<R: BufRead> IoReader<R> {
     first: PayloadEvent<'static>,
     ty: &'static str,
     field: &'static str,
-  ) -> Result<(), SdkError> {
+  ) -> Result<PayloadEvent<'static>, SdkError> {
     let mut event = first;
     loop {
       match event {
         PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {
           append_xml_text_event(value, event, ty, field)?;
         }
-        event => {
-          self.pending = Some(event);
-          return Ok(());
-        }
+        event => return Ok(event),
       }
       event = self.next()?;
     }
@@ -288,7 +285,7 @@ impl<R: BufRead> XmlRead<'static> for IoReader<R> {
     first: PayloadEvent<'static>,
     ty: &'static str,
     field: &'static str,
-  ) -> Result<(), SdkError> {
+  ) -> Result<PayloadEvent<'static>, SdkError> {
     IoReader::drain_text_field_from_event(self, value, first, ty, field)
   }
 
@@ -352,17 +349,14 @@ impl<'de> SliceReader<'de> {
     first: PayloadEvent<'de>,
     ty: &'static str,
     field: &'static str,
-  ) -> Result<(), SdkError> {
+  ) -> Result<PayloadEvent<'de>, SdkError> {
     let mut event = first;
     loop {
       match event {
         PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {
           append_xml_text_event(value, event, ty, field)?;
         }
-        event => {
-          self.pending = Some(event);
-          return Ok(());
-        }
+        event => return Ok(event),
       }
       event = self.next()?;
     }
@@ -465,7 +459,7 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
     first: PayloadEvent<'de>,
     ty: &'static str,
     field: &'static str,
-  ) -> Result<(), SdkError> {
+  ) -> Result<PayloadEvent<'de>, SdkError> {
     SliceReader::drain_text_field_from_event(self, value, first, ty, field)
   }
 

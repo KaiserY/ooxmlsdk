@@ -6005,12 +6005,21 @@ fn expand_named_struct(
         | crate::common::PayloadEvent::CData(_)
         | crate::common::PayloadEvent::GeneralRef(_)
       ) => {
-        xml_reader.drain_text_field_from_event(
+        match xml_reader.drain_text_field_from_event(
           &mut #field_ident,
           event,
           stringify!(#ident),
           stringify!(#field_ident),
-        )?;
+        )? {
+          crate::common::PayloadEvent::End(e) => {
+            if #end_name_matches {
+              break;
+            }
+          }
+          event => {
+            xml_reader.unread(event)?;
+          }
+        }
       }
     }
   } else {
@@ -6024,7 +6033,7 @@ fn expand_named_struct(
           | crate::common::PayloadEvent::GeneralRef(_)
         ) => {
           let mut text_value = None;
-          xml_reader.drain_text_field_from_event(
+          let __ooxmlsdk_after_text = xml_reader.drain_text_field_from_event(
             &mut text_value,
             event,
             stringify!(#ident),
@@ -6039,6 +6048,16 @@ fn expand_named_struct(
                 "known child",
                 b"#text",
               ));
+            }
+          }
+          match __ooxmlsdk_after_text {
+            crate::common::PayloadEvent::End(e) => {
+              if #end_name_matches {
+                break;
+              }
+            }
+            event => {
+              xml_reader.unread(event)?;
             }
           }
         }

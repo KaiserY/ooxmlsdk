@@ -6,10 +6,9 @@
 
 /// Defines the WebImagesSupportingRichData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xlrdwi:webImagesSrd")]
+#[sdk(xml_header, qname = "xlrdwi:webImagesSrd")]
 pub struct WebImagesSupportingRichData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the WebImageSupportingRichData Class.
   #[sdk(child(qname = "xlrdwi:webImageSrd"))]
   pub web_image_supporting_rich_data: Vec<WebImageSupportingRichData>,

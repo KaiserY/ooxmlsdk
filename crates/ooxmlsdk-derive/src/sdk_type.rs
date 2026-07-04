@@ -3610,6 +3610,7 @@ fn expand_named_struct(
   } = parse_qname_info(schema_qname);
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
   let no_prefix = parse_sdk_no_prefix(&input.attrs)?;
+  let has_xml_header = parse_sdk_xml_header(&input.attrs)?;
   let extra_xmlns = parse_sdk_extra_xmlns(&input.attrs)?;
   let (extra_xmlns_init_tokens, extra_xmlns_mark_tokens, extra_xmlns_write_tokens) =
     extra_xmlns_tokens(&extra_xmlns)?;
@@ -3629,7 +3630,6 @@ fn expand_named_struct(
   let mut any_fields = Vec::new();
   let mut text_field = None;
   let mut xmlns_fields = Vec::new();
-  let mut xml_header_field = None;
   let mut xml_other_attrs_field = None;
   let mut xml_other_children_field = None;
   let mut compact_xml_other_children = false;
@@ -3642,10 +3642,6 @@ fn expand_named_struct(
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
     if is_xmlns_field(field_ident) {
       xmlns_fields.push(field_ident.clone());
-      continue;
-    }
-    if field_ident == "xml_header" {
-      xml_header_field = Some(field_ident.clone());
       continue;
     }
     if field_ident == "xml_other_attrs" {
@@ -3759,7 +3755,6 @@ fn expand_named_struct(
   }
 
   let has_xmlns_fields = !xmlns_fields.is_empty();
-  let has_xml_header_field = xml_header_field.is_some();
   let has_xml_other_attrs_field = xml_other_attrs_field.is_some();
   let has_xml_other_children_field = xml_other_children_field.is_some();
   let needs_canonical_xmlns_prefix = !canonical_namespace_prefixes.is_empty();
@@ -4199,13 +4194,6 @@ fn expand_named_struct(
         },
       }
     };
-  let xml_header_decl_tokens = if has_xml_header_field {
-    quote! {
-      let xml_header_state = crate::common::XmlHeaderType::default();
-    }
-  } else {
-    quote! {}
-  };
   let mut child_match_tokens_borrowed =
     std::collections::BTreeMap::<String, Vec<QNameDispatchArm>>::new();
   let mut child_match_tokens_io =
@@ -5891,11 +5879,6 @@ fn expand_named_struct(
         self.#field_ident = #field_ident;
       });
     }
-    if let Some(field_ident) = &xml_header_field {
-      tokens.push(quote! {
-        self.#field_ident = xml_header_state;
-      });
-    }
     if let Some(field_ident) = &xml_other_attrs_field {
       tokens.push(quote! {
         self.#field_ident = #field_ident;
@@ -6468,7 +6451,7 @@ fn expand_named_struct(
 
   let special_namespace_write_tokens = if has_xmlns_fields {
     if needs_canonical_xmlns_prefix
-      && has_xml_header_field
+      && has_xml_header
       && no_prefix
       && let Some(fixed_namespace_uri) = fixed_namespace_uri
     {
@@ -6507,7 +6490,7 @@ fn expand_named_struct(
         }
         #extra_xmlns_write_tokens
       }
-    } else if has_xml_header_field
+    } else if has_xml_header
       && no_prefix
       && let Some(fixed_namespace_uri) = fixed_namespace_uri
     {
@@ -6598,14 +6581,7 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let xml_header_init_tokens = if has_xml_header_field {
-    quote! {
-      xml_header: xml_header_state,
-    }
-  } else {
-    quote! {}
-  };
-  let xml_header_tokens = if has_xml_header_field {
+  let xml_header_tokens = if has_xml_header {
     quote! {
       writer.write_all(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")?;
     }
@@ -6692,7 +6668,6 @@ fn expand_named_struct(
   };
   let stack_frame_enum_tokens = wml_table_stack_frame_enum_tokens(wml_table_kind);
   let default_read_inner_body = quote! {
-    #xml_header_decl_tokens
     #end_qname_decl
     #( #attr_decl_tokens )*
     #namespace_attr_parse_tokens
@@ -6712,14 +6687,12 @@ fn expand_named_struct(
       #text_finish_tokens
       #( #attr_finish_tokens, )*
       #special_namespace_init_tokens
-      #xml_header_init_tokens
       #xml_other_attrs_init_tokens
       #xml_other_children_init_tokens
     })
   };
   let stack_read_inner_method_tokens = if wml_table_kind.is_some() {
     let stack_read_inner_start_body = quote! {
-        #xml_header_decl_tokens
         #( #attr_decl_tokens )*
         #namespace_attr_parse_tokens
         #stack_attr_assign_tokens

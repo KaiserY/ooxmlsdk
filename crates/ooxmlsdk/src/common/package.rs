@@ -695,7 +695,6 @@ impl RelationshipSet {
         "",
         "http://schemas.openxmlformats.org/package/2006/relationships",
       )],
-      xml_header: self.xml_header,
       relationship: self
         .relationships
         .iter()
@@ -735,7 +734,7 @@ impl RelationshipSet {
 
     let source_parent_path = super::parent_zip_path(source_path);
     let mut set = Self {
-      xml_header: relationships.xml_header,
+      xml_header: super::XmlHeaderType::default(),
       relationships: Vec::with_capacity(relationships.relationship.len()),
       by_id: HashMap::with_capacity(relationships.relationship.len()),
       raw_bytes: None,
@@ -2132,7 +2131,6 @@ fn empty_content_types() -> Types {
       "",
       "http://schemas.openxmlformats.org/package/2006/content-types",
     )],
-    xml_header: super::XmlHeaderType::Standalone,
     types_choice: vec![TypesChoice::Default(Box::new(
       crate::schemas::opc_content_types::Default {
         extension: "rels".to_string(),

@@ -46,10 +46,9 @@ pub struct RichValueBlock {
 }
 /// Defines the RichValueData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd:rvData")]
+#[sdk(no_prefix, xml_header, qname = "xlrd:rvData")]
 pub struct RichValueData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// count
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
@@ -62,10 +61,9 @@ pub struct RichValueData {
 }
 /// Defines the RichValueStructures Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd:rvStructures")]
+#[sdk(no_prefix, xml_header, qname = "xlrd:rvStructures")]
 pub struct RichValueStructures {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// count
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,

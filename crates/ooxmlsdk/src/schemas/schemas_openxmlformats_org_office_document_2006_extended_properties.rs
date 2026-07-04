@@ -6,10 +6,9 @@
 
 /// Application Specific File Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "ap:Properties")]
+#[sdk(no_prefix, xml_header, qname = "ap:Properties")]
 pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Name of Document Template
   #[sdk(text_child(qname = "ap:Template"))]
   pub template: Option<Template>,

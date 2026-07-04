@@ -6,10 +6,9 @@
 
 /// Content Types.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "pct:Types")]
+#[sdk(no_prefix, xml_header, qname = "pct:Types")]
 pub struct Types {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   #[sdk(
         choice(
             child(variant = Default, qname = "pct:Default"),

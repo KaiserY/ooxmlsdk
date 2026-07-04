@@ -6,10 +6,9 @@
 
 /// Defines the FeaturePropertyBags Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xfpb:FeaturePropertyBags")]
+#[sdk(xml_header, qname = "xfpb:FeaturePropertyBags")]
 pub struct FeaturePropertyBags {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,

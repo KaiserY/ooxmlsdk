@@ -581,6 +581,24 @@ fn parse_sdk_no_prefix(attrs: &[Attribute]) -> syn::Result<bool> {
   Ok(false)
 }
 
+fn parse_sdk_xml_header(attrs: &[Attribute]) -> syn::Result<bool> {
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      if let Meta::Path(path) = meta
+        && path.is_ident("xml_header")
+      {
+        return Ok(true);
+      }
+    }
+  }
+  Ok(false)
+}
+
 enum ExtraXmlnsArg {
   Ident(Ident),
   Lit(LitStr),

@@ -6,10 +6,9 @@
 
 /// Defines the ClassificationLabelList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "clbl:labelList")]
+#[sdk(xml_header, qname = "clbl:labelList")]
 pub struct ClassificationLabelList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the ClassificationLabel Class.
   #[sdk(child(qname = "clbl:label"))]
   pub classification_label: Vec<ClassificationLabel>,

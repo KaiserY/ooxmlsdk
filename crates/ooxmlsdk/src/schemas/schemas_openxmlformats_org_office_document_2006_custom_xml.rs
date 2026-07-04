@@ -6,10 +6,9 @@
 
 /// Custom XML Data Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ds:datastoreItem")]
+#[sdk(xml_header, qname = "ds:datastoreItem")]
 pub struct DataStoreItem {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Custom XML Data ID
   #[sdk(attr(qname = "ds:itemID"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]

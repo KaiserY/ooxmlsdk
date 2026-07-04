@@ -6,10 +6,9 @@
 
 /// Custom File Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "op:Properties")]
+#[sdk(no_prefix, xml_header, qname = "op:Properties")]
 pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Custom File Property.
   #[sdk(child(qname = "op:property"))]
   pub custom_document_property: Vec<CustomDocumentProperty>,

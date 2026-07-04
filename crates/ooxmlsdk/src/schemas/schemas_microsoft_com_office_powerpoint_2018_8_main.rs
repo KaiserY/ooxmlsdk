@@ -38,20 +38,18 @@ pub struct CommentPropertiesExtensionList {
 }
 /// Defines the AuthorList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p188:authorLst")]
+#[sdk(xml_header, qname = "p188:authorLst")]
 pub struct AuthorList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Author Class.
   #[sdk(child(qname = "p188:author"))]
   pub author: Vec<Author>,
 }
 /// Defines the CommentList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p188:cmLst")]
+#[sdk(xml_header, qname = "p188:cmLst")]
 pub struct CommentList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Comment Class.
   #[sdk(child(qname = "p188:cm"))]
   pub comment: Vec<Comment>,

@@ -68,10 +68,9 @@ pub struct Appearance {
 }
 /// Defines the CommentsEx Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w15:commentsEx")]
+#[sdk(xml_header, qname = "w15:commentsEx")]
 pub struct CommentsEx {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the CommentEx Class.
   #[sdk(child(qname = "w15:commentEx"))]
@@ -79,10 +78,9 @@ pub struct CommentsEx {
 }
 /// Defines the People Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w15:people")]
+#[sdk(xml_header, qname = "w15:people")]
 pub struct People {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the Person Class.
   #[sdk(child(qname = "w15:person"))]

@@ -6,10 +6,9 @@
 
 /// Defines the NamedSheetViews Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xnsv:namedSheetViews")]
+#[sdk(no_prefix, xml_header, qname = "xnsv:namedSheetViews")]
 pub struct NamedSheetViews {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the NamedSheetView Class.
   #[sdk(child(qname = "xnsv:namedSheetView"))]

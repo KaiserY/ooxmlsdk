@@ -1393,10 +1393,9 @@ pub struct MinAxisValue {
 }
 /// Chart Space.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(extra_xmlns("c"), qname = "c:chartSpace")]
+#[sdk(extra_xmlns("c"), xml_header, qname = "c:chartSpace")]
 pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Version number of the file, as determined by the features used by this chart
   #[sdk(attr(qname = ":version"))]
   pub version: Option<crate::simple_type::StringValue>,
@@ -1456,10 +1455,9 @@ pub struct ChartSpace {
 }
 /// User Shapes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:userShapes")]
+#[sdk(xml_header, qname = "c:userShapes")]
 pub struct UserShapes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   #[sdk(
         choice(
             child(variant = RelativeAnchorSize, qname = "cdr:relSizeAnchor"),

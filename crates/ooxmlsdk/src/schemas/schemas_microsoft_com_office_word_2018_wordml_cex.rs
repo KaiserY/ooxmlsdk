@@ -6,10 +6,9 @@
 
 /// Defines the CommentsExtensible Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w16cex:commentsExtensible")]
+#[sdk(xml_header, qname = "w16cex:commentsExtensible")]
 pub struct CommentsExtensible {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the CommentExtensible Class.
   #[sdk(child(qname = "w16cex:commentExtensible"))]

@@ -9,11 +9,11 @@
 #[sdk(
   extra_xmlns("x"),
   canonical_namespace_prefix("xm:xne"),
+  xml_header,
   qname = "xne:macrosheet"
 )]
 pub struct Macrosheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Sheet Properties
   #[sdk(child(qname = "x:sheetPr"))]
@@ -99,10 +99,9 @@ pub struct Macrosheet {
 }
 /// Worksheet Sort Map.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xne:worksheetSortMap")]
+#[sdk(xml_header, qname = "xne:worksheetSortMap")]
 pub struct WorksheetSortMap {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Row Sort Map
   #[sdk(child(qname = "xne:rowSortMap"))]
   pub row_sort_map: Option<RowSortMap>,

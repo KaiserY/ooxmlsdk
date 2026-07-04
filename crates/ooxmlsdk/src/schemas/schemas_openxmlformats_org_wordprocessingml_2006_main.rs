@@ -9893,10 +9893,9 @@ pub struct DocGrid {
 }
 /// Inclusion/Exclusion Data for Data Source.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:recipients")]
+#[sdk(xml_header, qname = "w:recipients")]
 pub struct Recipients {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Data About Single Data Source Record.
   #[sdk(child(qname = "w:recipientData"))]
   pub recipient_data: Vec<RecipientData>,
@@ -9972,10 +9971,9 @@ pub struct TextBoxContent {
 }
 /// Comments Collection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:comments")]
+#[sdk(xml_header, qname = "w:comments")]
 pub struct Comments {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Comment Content.
   #[sdk(child(qname = "w:comment"))]
@@ -9983,10 +9981,9 @@ pub struct Comments {
 }
 /// Document Footnotes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:footnotes")]
+#[sdk(xml_header, qname = "w:footnotes")]
 pub struct Footnotes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Footnote Content.
   #[sdk(child(qname = "w:footnote"))]
@@ -9994,10 +9991,9 @@ pub struct Footnotes {
 }
 /// Document Endnotes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:endnotes")]
+#[sdk(xml_header, qname = "w:endnotes")]
 pub struct Endnotes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Endnote Content.
   #[sdk(child(qname = "w:endnote"))]
@@ -10005,10 +10001,9 @@ pub struct Endnotes {
 }
 /// Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:hdr")]
+#[sdk(xml_header, qname = "w:hdr")]
 pub struct Header {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   #[sdk(
         choice(
@@ -10077,10 +10072,9 @@ pub struct Header {
 }
 /// Footer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:ftr")]
+#[sdk(xml_header, qname = "w:ftr")]
 pub struct Footer {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   #[sdk(
         choice(
@@ -10149,10 +10143,9 @@ pub struct Footer {
 }
 /// Document Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:settings")]
+#[sdk(xml_header, qname = "w:settings")]
 pub struct Settings {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Write Protection
@@ -10467,10 +10460,9 @@ pub struct Settings {
 }
 /// Web Page Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:webSettings")]
+#[sdk(xml_header, qname = "w:webSettings")]
 pub struct WebSettings {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Nested Frameset Definition.
   #[sdk(child(qname = "w:frameset"))]
@@ -10511,20 +10503,18 @@ pub struct WebSettings {
 }
 /// Font Table Root Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:fonts")]
+#[sdk(xml_header, qname = "w:fonts")]
 pub struct Fonts {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   #[sdk(choice(child(variant = Font, qname = "w:font"), any))]
   pub xml_children: Vec<FontsChoice>,
 }
 /// Numbering Definitions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:numbering")]
+#[sdk(xml_header, qname = "w:numbering")]
 pub struct Numbering {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Picture Numbering Symbol Definition.
   #[sdk(child(qname = "w:numPicBullet"))]
@@ -10541,10 +10531,9 @@ pub struct Numbering {
 }
 /// Style Definitions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:styles")]
+#[sdk(xml_header, qname = "w:styles")]
 pub struct Styles {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Document Default Paragraph and Run Properties
   #[sdk(child(qname = "w:docDefaults"))]
@@ -10558,10 +10547,9 @@ pub struct Styles {
 }
 /// Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(canonical_namespace_prefix("ns2:r"), qname = "w:document")]
+#[sdk(canonical_namespace_prefix("ns2:r"), xml_header, qname = "w:document")]
 pub struct Document {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// conformance
   #[sdk(attr(qname = "w:conformance"))]
@@ -10575,10 +10563,9 @@ pub struct Document {
 }
 /// Glossary Document Root Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:glossaryDocument")]
+#[sdk(xml_header, qname = "w:glossaryDocument")]
 pub struct GlossaryDocument {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Document Background
   #[sdk(child(qname = "w:background"))]

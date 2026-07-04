@@ -6,10 +6,9 @@
 
 /// Defines the Drawing Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dsp:drawing")]
+#[sdk(xml_header, qname = "dsp:drawing")]
 pub struct Drawing {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the ShapeTree Class.
   #[sdk(child(qname = "dsp:spTree"))]
   pub shape_tree: std::boxed::Box<ShapeTree>,

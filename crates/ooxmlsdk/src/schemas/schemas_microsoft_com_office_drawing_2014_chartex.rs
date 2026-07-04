@@ -254,10 +254,9 @@ pub enum PageOrientation {
 }
 /// Defines the ChartSpace Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "cx:chartSpace")]
+#[sdk(xml_header, qname = "cx:chartSpace")]
 pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// version
   #[sdk(attr(qname = ":version"))]

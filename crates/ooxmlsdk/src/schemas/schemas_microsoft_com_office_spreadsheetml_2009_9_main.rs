@@ -703,10 +703,9 @@ pub struct SourceConnection {
 }
 /// Defines the DatastoreItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:datastoreItem")]
+#[sdk(no_prefix, xml_header, qname = "x14:datastoreItem")]
 pub struct DatastoreItem {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// id
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::StringValue,
@@ -716,10 +715,9 @@ pub struct DatastoreItem {
 }
 /// Defines the FormControlProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:formControlPr")]
+#[sdk(no_prefix, xml_header, qname = "x14:formControlPr")]
 pub struct FormControlProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// objectType
   #[sdk(attr(qname = ":objectType"))]
   #[sdk(string_format(kind = "token"))]
@@ -827,20 +825,18 @@ pub struct FormControlProperties {
 }
 /// Defines the Slicers Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:slicers")]
+#[sdk(no_prefix, xml_header, qname = "x14:slicers")]
 pub struct Slicers {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Slicer Class.
   #[sdk(child(qname = "x14:slicer"))]
   pub slicer: Vec<Slicer>,
 }
 /// Defines the SlicerCacheDefinition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:slicerCacheDefinition")]
+#[sdk(no_prefix, xml_header, qname = "x14:slicerCacheDefinition")]
 pub struct SlicerCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,

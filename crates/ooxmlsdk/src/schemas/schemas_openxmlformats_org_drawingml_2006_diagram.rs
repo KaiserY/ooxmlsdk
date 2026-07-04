@@ -886,10 +886,9 @@ pub enum VerticalAlignmentValues {
 }
 /// Color Transform Definitions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dgm:colorsDef")]
+#[sdk(xml_header, qname = "dgm:colorsDef")]
 pub struct ColorsDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Unique ID
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
@@ -948,10 +947,9 @@ pub struct ColorsDefinitionHeaderList {
 }
 /// Data Model.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dgm:dataModel")]
+#[sdk(xml_header, qname = "dgm:dataModel")]
 pub struct DataModelRoot {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Point List
   #[sdk(child(qname = "dgm:ptLst"))]
   pub point_list: std::boxed::Box<PointList>,
@@ -970,10 +968,9 @@ pub struct DataModelRoot {
 }
 /// Layout Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dgm:layoutDef")]
+#[sdk(xml_header, qname = "dgm:layoutDef")]
 pub struct LayoutDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// uniqueId
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
@@ -1065,10 +1062,9 @@ pub struct RelationshipIds {
 }
 /// Style Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dgm:styleDef")]
+#[sdk(xml_header, qname = "dgm:styleDef")]
 pub struct StyleDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Unique Style ID
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,

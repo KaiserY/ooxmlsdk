@@ -140,10 +140,9 @@ pub enum TitlePosition {
 }
 /// Defines the ColorStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "cs:colorStyle")]
+#[sdk(xml_header, qname = "cs:colorStyle")]
 pub struct ColorStyle {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// meth
   #[sdk(attr(qname = ":meth"))]
   #[sdk(
@@ -182,10 +181,9 @@ pub struct ColorStyle {
 }
 /// Defines the ChartStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "cs:chartStyle")]
+#[sdk(xml_header, qname = "cs:chartStyle")]
 pub struct ChartStyle {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// id
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::UInt32Value>,

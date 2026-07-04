@@ -4389,10 +4389,9 @@ pub struct Blip {
 }
 /// Theme.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:theme")]
+#[sdk(xml_header, qname = "a:theme")]
 pub struct Theme {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -4423,10 +4422,9 @@ pub struct Theme {
 }
 /// Theme Override.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:themeOverride")]
+#[sdk(xml_header, qname = "a:themeOverride")]
 pub struct ThemeOverride {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Color Scheme
   #[sdk(child(qname = "a:clrScheme"))]
   pub color_scheme: Option<std::boxed::Box<ColorScheme>>,
@@ -4453,10 +4451,9 @@ pub struct Table {
 }
 /// Table Style List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:tblStyleLst")]
+#[sdk(xml_header, qname = "a:tblStyleLst")]
 pub struct TableStyleList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Default
   #[sdk(attr(qname = ":def"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]

@@ -1393,8 +1393,13 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           .collect::<Vec<_>>();
         quote! { canonical_namespace_prefix(#(#prefixes),*), }
       };
+      let xml_header = if type_decl.support.xml_header == XmlHeaderMode::None {
+        quote! {}
+      } else {
+        quote! { xml_header, }
+      };
       quote! {
-        #[sdk(#(#type_sdk_version_markers,)* #no_prefix #extra_xmlns #canonical_namespace_prefix qname = #qname)]
+        #[sdk(#(#type_sdk_version_markers,)* #no_prefix #extra_xmlns #canonical_namespace_prefix #xml_header qname = #qname)]
       }
     } else {
       quote! {}
@@ -3499,12 +3504,6 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
   if support.have_xmlns_fields {
     fields.push(quote! {
       pub xmlns: Vec<crate::common::XmlNamespace>,
-    });
-  }
-
-  if support.xml_header != crate::sdk_code::codegen_ir::XmlHeaderMode::None {
-    fields.push(quote! {
-      pub xml_header: crate::common::XmlHeaderType,
     });
   }
 

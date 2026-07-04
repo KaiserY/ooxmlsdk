@@ -6,10 +6,9 @@
 
 /// Defines the WebExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "we:webextension")]
+#[sdk(xml_header, qname = "we:webextension")]
 pub struct WebExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// id
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::StringValue,

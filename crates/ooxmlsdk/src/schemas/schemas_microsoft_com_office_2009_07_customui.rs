@@ -4645,10 +4645,9 @@ pub struct MenuRoot {
 }
 /// Defines the CustomUI Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso14:customUI")]
+#[sdk(xml_header, qname = "mso14:customUI")]
 pub struct CustomUi {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// onLoad
   #[sdk(attr(qname = ":onLoad"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]

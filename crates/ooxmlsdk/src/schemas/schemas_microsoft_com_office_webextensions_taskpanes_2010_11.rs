@@ -6,10 +6,9 @@
 
 /// Defines the Taskpanes Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wetp:taskpanes")]
+#[sdk(xml_header, qname = "wetp:taskpanes")]
 pub struct Taskpanes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the WebExtensionTaskpane Class.
   #[sdk(child(qname = "wetp:taskpane"))]
   pub web_extension_taskpane: Vec<WebExtensionTaskpane>,

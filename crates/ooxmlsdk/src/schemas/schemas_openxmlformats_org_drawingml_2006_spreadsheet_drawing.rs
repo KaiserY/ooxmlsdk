@@ -236,10 +236,9 @@ pub struct ContentPart {
 }
 /// Worksheet Drawing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(extra_xmlns("xdr"), qname = "xdr:wsDr")]
+#[sdk(extra_xmlns("xdr"), xml_header, qname = "xdr:wsDr")]
 pub struct WorksheetDrawing {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   #[sdk(
         choice(
             child(variant = TwoCellAnchor, qname = "xdr:twoCellAnchor"),

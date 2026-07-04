@@ -6,10 +6,9 @@
 
 /// Defines the TemplateCommandGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:tcg")]
+#[sdk(xml_header, qname = "wne:tcg")]
 pub struct TemplateCommandGroup {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the KeyMapCustomizations Class.
   #[sdk(child(qname = "wne:keymaps"))]
   pub key_map_customizations: Vec<KeyMapCustomizations>,
@@ -33,10 +32,9 @@ pub struct Mcds {
 }
 /// Defines the VbaSuppData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:vbaSuppData")]
+#[sdk(xml_header, qname = "wne:vbaSuppData")]
 pub struct VbaSuppData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the DocEvents Class.
   #[sdk(child(qname = "wne:docEvents"))]
@@ -47,10 +45,9 @@ pub struct VbaSuppData {
 }
 /// Defines the MailMergeRecipients Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:recipients")]
+#[sdk(xml_header, qname = "wne:recipients")]
 pub struct MailMergeRecipients {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the SingleDataSourceRecord Class.
   #[sdk(child(qname = "wne:recipientData"))]
   pub single_data_source_record: Vec<SingleDataSourceRecord>,

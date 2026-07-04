@@ -6,10 +6,9 @@
 
 /// Defines the PersonList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xltc:personList")]
+#[sdk(no_prefix, xml_header, qname = "xltc:personList")]
 pub struct PersonList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Person Class.
   #[sdk(child(qname = "xltc:person"))]
   pub person: Vec<Person>,
@@ -19,10 +18,9 @@ pub struct PersonList {
 }
 /// Defines the ThreadedComments Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xltc:ThreadedComments")]
+#[sdk(no_prefix, xml_header, qname = "xltc:ThreadedComments")]
 pub struct ThreadedComments {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the ThreadedComment Class.
   #[sdk(child(qname = "xltc:threadedComment"))]
   pub threaded_comment: Vec<ThreadedComment>,

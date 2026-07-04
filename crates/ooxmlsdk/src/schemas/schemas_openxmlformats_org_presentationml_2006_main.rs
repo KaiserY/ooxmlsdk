@@ -940,20 +940,18 @@ pub struct CommentPropertiesExtension {
 }
 /// List of Comment Authors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:cmAuthorLst")]
+#[sdk(xml_header, qname = "p:cmAuthorLst")]
 pub struct CommentAuthorList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Comment Author.
   #[sdk(child(qname = "p:cmAuthor"))]
   pub comment_author: Vec<CommentAuthor>,
 }
 /// Comment List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:cmLst")]
+#[sdk(xml_header, qname = "p:cmLst")]
 pub struct CommentList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Comment.
   #[sdk(child(qname = "p:cm"))]
   pub comment: Vec<Comment>,
@@ -999,10 +997,9 @@ pub struct OleObject {
 }
 /// Presentation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:presentation")]
+#[sdk(xml_header, qname = "p:presentation")]
 pub struct Presentation {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// serverZoom
   #[sdk(attr(qname = ":serverZoom"))]
@@ -1086,10 +1083,9 @@ pub struct Presentation {
 }
 /// Presentation-wide Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:presentationPr")]
+#[sdk(xml_header, qname = "p:presentationPr")]
 pub struct PresentationProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// HTML Publishing Properties
   #[sdk(child(qname = "p:htmlPubPr"))]
@@ -1112,10 +1108,9 @@ pub struct PresentationProperties {
 }
 /// Presentation Slide.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:sld")]
+#[sdk(xml_header, qname = "p:sld")]
 pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Show Master Shapes
@@ -1145,10 +1140,9 @@ pub struct Slide {
 }
 /// Slide Layout.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:sldLayout")]
+#[sdk(xml_header, qname = "p:sldLayout")]
 pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Show Master Shapes
@@ -1191,10 +1185,9 @@ pub struct SlideLayout {
 }
 /// Slide Master.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:sldMaster")]
+#[sdk(xml_header, qname = "p:sldMaster")]
 pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// preserve
@@ -1227,10 +1220,9 @@ pub struct SlideMaster {
 }
 /// Handout Master.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:handoutMaster")]
+#[sdk(xml_header, qname = "p:handoutMaster")]
 pub struct HandoutMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
@@ -1246,10 +1238,9 @@ pub struct HandoutMaster {
 }
 /// Notes Master.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:notesMaster")]
+#[sdk(xml_header, qname = "p:notesMaster")]
 pub struct NotesMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:cSld"))]
@@ -1269,10 +1260,9 @@ pub struct NotesMaster {
 }
 /// Notes Slide.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:notes")]
+#[sdk(xml_header, qname = "p:notes")]
 pub struct NotesSlide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
@@ -1292,10 +1282,9 @@ pub struct NotesSlide {
 }
 /// Slide Synchronization Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:sldSyncPr")]
+#[sdk(xml_header, qname = "p:sldSyncPr")]
 pub struct SlideSyncProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Server's Slide File ID
   #[sdk(attr(qname = ":serverSldId"))]
   pub server_slide_id: crate::simple_type::StringValue,
@@ -1311,20 +1300,18 @@ pub struct SlideSyncProperties {
 }
 /// Programmable Tab List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:tagLst")]
+#[sdk(xml_header, qname = "p:tagLst")]
 pub struct TagList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Programmable Extensibility Tag.
   #[sdk(child(qname = "p:tag"))]
   pub tag: Vec<Tag>,
 }
 /// Presentation-wide View Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:viewPr")]
+#[sdk(xml_header, qname = "p:viewPr")]
 pub struct ViewProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Last View
   #[sdk(attr(qname = ":lastView"))]

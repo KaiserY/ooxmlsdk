@@ -475,20 +475,18 @@ pub struct Survey {
 }
 /// Defines the Timelines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x15:timelines")]
+#[sdk(xml_header, qname = "x15:timelines")]
 pub struct Timelines {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Timeline Class.
   #[sdk(child(qname = "x15:timeline"))]
   pub timeline: Vec<Timeline>,
 }
 /// Defines the TimelineCacheDefinition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x15:timelineCacheDefinition")]
+#[sdk(xml_header, qname = "x15:timelineCacheDefinition")]
 pub struct TimelineCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,

@@ -6,10 +6,9 @@
 
 /// Defines the Tasks Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "t:Tasks")]
+#[sdk(xml_header, qname = "t:Tasks")]
 pub struct Tasks {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Task Class.
   #[sdk(child(qname = "t:Task"))]
   pub task: Vec<Task>,

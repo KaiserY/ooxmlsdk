@@ -12,10 +12,9 @@ pub enum XsiTypeValue {
 }
 /// Core File Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "cp:coreProperties")]
+#[sdk(no_prefix, xml_header, qname = "cp:coreProperties")]
 pub struct CoreProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// cp:category
   #[sdk(text_child(qname = "cp:category"))]

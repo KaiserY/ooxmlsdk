@@ -110,10 +110,9 @@ pub struct RichSortCondition {
 }
 /// Defines the SupportingPropertyBags Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:supportingPropertyBags")]
+#[sdk(no_prefix, xml_header, qname = "xlrd2:supportingPropertyBags")]
 pub struct SupportingPropertyBags {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the SupportingPropertyBagArrayData Class.
   #[sdk(child(qname = "xlrd2:spbArrays"))]
   pub supporting_property_bag_array_data: Option<std::boxed::Box<SupportingPropertyBagArrayData>>,
@@ -123,10 +122,9 @@ pub struct SupportingPropertyBags {
 }
 /// Defines the SupportingPropertyBagStructures Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:spbStructures")]
+#[sdk(no_prefix, xml_header, qname = "xlrd2:spbStructures")]
 pub struct SupportingPropertyBagStructures {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// count
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
@@ -139,10 +137,9 @@ pub struct SupportingPropertyBagStructures {
 }
 /// Defines the ArrayData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:arrayData")]
+#[sdk(no_prefix, xml_header, qname = "xlrd2:arrayData")]
 pub struct ArrayData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// count
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
@@ -155,10 +152,9 @@ pub struct ArrayData {
 }
 /// Defines the RichStylesheet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:richStyleSheet")]
+#[sdk(no_prefix, xml_header, qname = "xlrd2:richStyleSheet")]
 pub struct RichStylesheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Dxfs Class.
   #[sdk(child(qname = "xlrd2:dxfs"))]
   pub dxfs: Option<Dxfs>,
@@ -174,10 +170,9 @@ pub struct RichStylesheet {
 }
 /// Defines the RichValueTypesInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:rvTypesInfo")]
+#[sdk(no_prefix, xml_header, qname = "xlrd2:rvTypesInfo")]
 pub struct RichValueTypesInfo {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the RichValueGlobalType Class.
   #[sdk(child(qname = "xlrd2:global"))]

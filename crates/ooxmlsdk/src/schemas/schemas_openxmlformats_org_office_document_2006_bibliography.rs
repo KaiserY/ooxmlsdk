@@ -44,10 +44,9 @@ pub enum DataSourceValues {
 }
 /// Sources.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "b:Sources")]
+#[sdk(xml_header, qname = "b:Sources")]
 pub struct Sources {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_header: crate::common::XmlHeaderType,
   /// Selected Style
   #[sdk(attr(qname = ":SelectedStyle"))]
   #[sdk(string_length(min = 0u32, max = 255u32))]

@@ -611,8 +611,10 @@ macro_rules! define_unsigned_decimal_attr_parser {
       }
 
       let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
-      $bytes_name(value.as_bytes())
-        .ok_or_else(|| invalid_field_value_bytes(ty, field, value.as_bytes()))
+      match $bytes_name(value.as_bytes()) {
+        Some(value) => Ok(value),
+        None => Err(invalid_field_value_bytes(ty, field, value.as_bytes())),
+      }
     }
 
     #[inline]
@@ -656,8 +658,10 @@ macro_rules! define_signed_decimal_attr_parser {
       }
 
       let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
-      $bytes_name(value.as_bytes())
-        .ok_or_else(|| invalid_field_value_bytes(ty, field, value.as_bytes()))
+      match $bytes_name(value.as_bytes()) {
+        Some(value) => Ok(value),
+        None => Err(invalid_field_value_bytes(ty, field, value.as_bytes())),
+      }
     }
 
     #[inline]
@@ -732,12 +736,18 @@ pub(crate) fn parse_f64_attr(
 
 #[inline]
 fn parse_f32_bytes(value: &[u8], ty: &'static str, field: &'static str) -> Result<f32, SdkError> {
-  parse_f32_bytes_raw(value).ok_or_else(|| invalid_field_value_bytes(ty, field, value))
+  match parse_f32_bytes_raw(value) {
+    Some(value) => Ok(value),
+    None => Err(invalid_field_value_bytes(ty, field, value)),
+  }
 }
 
 #[inline]
 fn parse_f64_bytes(value: &[u8], ty: &'static str, field: &'static str) -> Result<f64, SdkError> {
-  parse_f64_bytes_raw(value).ok_or_else(|| invalid_field_value_bytes(ty, field, value))
+  match parse_f64_bytes_raw(value) {
+    Some(value) => Ok(value),
+    None => Err(invalid_field_value_bytes(ty, field, value)),
+  }
 }
 
 #[inline]
@@ -767,8 +777,10 @@ pub(crate) fn parse_twips_measure_value(
   value: impl AsRef<str>,
 ) -> Result<crate::simple_type::TwipsMeasureValue, SdkError> {
   let value = value.as_ref();
-  crate::simple_type::TwipsMeasureValue::from_bytes(value.as_bytes())
-    .map_err(|_| invalid_field_value("TwipsMeasureValue", "value", value))
+  match crate::simple_type::TwipsMeasureValue::from_bytes(value.as_bytes()) {
+    Ok(value) => Ok(value),
+    Err(_) => Err(invalid_field_value("TwipsMeasureValue", "value", value)),
+  }
 }
 
 #[inline]
@@ -788,8 +800,14 @@ pub(crate) fn parse_signed_twips_measure_value(
   value: impl AsRef<str>,
 ) -> Result<crate::simple_type::SignedTwipsMeasureValue, SdkError> {
   let value = value.as_ref();
-  crate::simple_type::SignedTwipsMeasureValue::from_bytes(value.as_bytes())
-    .map_err(|_| invalid_field_value("SignedTwipsMeasureValue", "value", value))
+  match crate::simple_type::SignedTwipsMeasureValue::from_bytes(value.as_bytes()) {
+    Ok(value) => Ok(value),
+    Err(_) => Err(invalid_field_value(
+      "SignedTwipsMeasureValue",
+      "value",
+      value,
+    )),
+  }
 }
 
 #[inline]
@@ -811,8 +829,14 @@ pub(crate) fn parse_decimal_number_or_percent_value(
   value: impl AsRef<str>,
 ) -> Result<crate::simple_type::DecimalNumberOrPercentValue, SdkError> {
   let value = value.as_ref();
-  crate::simple_type::DecimalNumberOrPercentValue::from_bytes(value.as_bytes())
-    .map_err(|_| invalid_field_value("DecimalNumberOrPercentValue", "value", value))
+  match crate::simple_type::DecimalNumberOrPercentValue::from_bytes(value.as_bytes()) {
+    Ok(value) => Ok(value),
+    Err(_) => Err(invalid_field_value(
+      "DecimalNumberOrPercentValue",
+      "value",
+      value,
+    )),
+  }
 }
 
 #[inline]
@@ -833,8 +857,14 @@ pub(crate) fn parse_measurement_or_percent_value(
   value: impl AsRef<str>,
 ) -> Result<crate::simple_type::MeasurementOrPercentValue, SdkError> {
   let value = value.as_ref();
-  crate::simple_type::MeasurementOrPercentValue::from_bytes(value.as_bytes())
-    .map_err(|_| invalid_field_value("MeasurementOrPercentValue", "value", value))
+  match crate::simple_type::MeasurementOrPercentValue::from_bytes(value.as_bytes()) {
+    Ok(value) => Ok(value),
+    Err(_) => Err(invalid_field_value(
+      "MeasurementOrPercentValue",
+      "value",
+      value,
+    )),
+  }
 }
 
 #[inline]
@@ -879,9 +909,10 @@ pub(crate) fn parse_value<T>(
 where
   T: std::str::FromStr,
 {
-  value
-    .parse::<T>()
-    .map_err(|_| invalid_field_value(ty, field, value))
+  match value.parse::<T>() {
+    Ok(value) => Ok(value),
+    Err(_) => Err(invalid_field_value(ty, field, value)),
+  }
 }
 
 #[inline]
@@ -901,9 +932,10 @@ where
         return Err(invalid_field_value(ty, field, value));
       }
 
-      trimmed
-        .parse::<T>()
-        .map_err(|_| invalid_field_value(ty, field, value))
+      match trimmed.parse::<T>() {
+        Ok(value) => Ok(value),
+        Err(_) => Err(invalid_field_value(ty, field, value)),
+      }
     }
   }
 }
@@ -1084,8 +1116,10 @@ pub(crate) fn fast_bytes_text_to_string(
   ty: &'static str,
   field: &'static str,
 ) -> Result<String, SdkError> {
-  String::from_utf8(text.into_inner().into_owned())
-    .map_err(|err| invalid_field_value(ty, field, err.to_string()))
+  match String::from_utf8(text.into_inner().into_owned()) {
+    Ok(value) => Ok(value),
+    Err(err) => Err(invalid_field_value(ty, field, err.to_string())),
+  }
 }
 
 #[inline]

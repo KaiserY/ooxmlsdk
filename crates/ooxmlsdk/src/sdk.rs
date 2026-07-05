@@ -522,8 +522,12 @@ pub trait SdkType: Sized {
   }
 
   fn to_xml(&self) -> Result<String, crate::common::SdkError> {
-    String::from_utf8(sdk_type_to_bytes(self)?)
-      .map_err(|err| crate::common::SdkError::CommonError(format!("invalid utf-8 xml: {err}")))
+    match String::from_utf8(sdk_type_to_bytes(self)?) {
+      Ok(xml) => Ok(xml),
+      Err(err) => Err(crate::common::SdkError::CommonError(format!(
+        "invalid utf-8 xml: {err}"
+      ))),
+    }
   }
 
   fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(

@@ -262,11 +262,14 @@ fn wml_table_stack_read_table_value_tokens() -> proc_macro2::TokenStream {
             }
           }
         }
-        parsed_child = __ooxmlsdk_completed_root.ok_or_else(|| {
-          crate::common::SdkError::CommonError(
-            "WML table stack completed without root table".to_string(),
-          )
-        })?;
+        parsed_child = match __ooxmlsdk_completed_root {
+          Some(value) => value,
+          None => {
+            return Err(crate::common::SdkError::CommonError(
+              "WML table stack completed without root table".to_string(),
+            ));
+          }
+        };
       }
       parsed_child
     }
@@ -1268,7 +1271,11 @@ fn sdk_type_root_methods_tokens(
 fn sdk_type_display_method_tokens() -> proc_macro2::TokenStream {
   quote! {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-      f.write_str(&<Self as crate::sdk::SdkType>::to_xml(self).map_err(|_| ::std::fmt::Error)?)
+      let xml = match <Self as crate::sdk::SdkType>::to_xml(self) {
+        Ok(xml) => xml,
+        Err(_) => return Err(::std::fmt::Error),
+      };
+      f.write_str(&xml)
     }
   }
 }
@@ -2228,10 +2235,13 @@ fn field_decl_init_tokens(
     (
       quote! { let mut #field_ident = None; },
       quote! {
-        #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-          stringify!(#owner_ident),
-          stringify!(#field_ident),
-        ))?
+        #field_ident: match #field_ident {
+          Some(value) => value,
+          None => return Err(crate::common::missing_field(
+            stringify!(#owner_ident),
+            stringify!(#field_ident),
+          )),
+        }
       },
     )
   }
@@ -2546,9 +2556,12 @@ fn parse_from_bytes_attr_tokens(
     } else {
       let value =
         attr.decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)?;
-      <#value_ty>::from_bytes(value.as_bytes()).map_err(|_| {
-        crate::common::invalid_field_value(#owner_expr, #field_expr, value)
-      })?
+      match <#value_ty>::from_bytes(value.as_bytes()) {
+        Ok(value) => value,
+        Err(_) => {
+          return Err(crate::common::invalid_field_value(#owner_expr, #field_expr, value));
+        }
+      }
     }
   }
 }
@@ -3944,10 +3957,13 @@ fn expand_named_struct(
         #attr_local_fallback_parse_tokens
       });
       attr_finish_tokens.push(quote! {
-        #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-          stringify!(#ident),
-          stringify!(#field_ident),
-        ))?
+        #field_ident: match #field_ident {
+          Some(value) => value,
+          None => return Err(crate::common::missing_field(
+            stringify!(#ident),
+            stringify!(#field_ident),
+          )),
+        }
       });
     }
     let attr_prefix_lit = LitByteStr::new(
@@ -5811,10 +5827,13 @@ fn expand_named_struct(
       } else {
         quote! {
           #field_ident: {
-            let value = #field_ident.ok_or_else(|| crate::common::missing_field(
-              stringify!(#ident),
-              #field_name_lit,
-            ))?;
+            let value = match #field_ident {
+              Some(value) => value,
+              None => return Err(crate::common::missing_field(
+                stringify!(#ident),
+                #field_name_lit,
+              )),
+            };
             #parse_value_tokens
           },
         }
@@ -5831,10 +5850,13 @@ fn expand_named_struct(
       } else {
         quote! {
           #field_ident: {
-            let value = #field_ident.ok_or_else(|| crate::common::missing_field(
-              stringify!(#ident),
-              #field_name_lit,
-            ))?;
+            let value = match #field_ident {
+              Some(value) => value,
+              None => return Err(crate::common::missing_field(
+                stringify!(#ident),
+                #field_name_lit,
+              )),
+            };
             #parse_value_tokens
           },
         }
@@ -5857,10 +5879,13 @@ fn expand_named_struct(
       } else {
         quote! {
           #field_ident: {
-            let value = #field_ident.ok_or_else(|| crate::common::missing_field(
-              stringify!(#ident),
-              #field_name_lit,
-            ))?;
+            let value = match #field_ident {
+              Some(value) => value,
+              None => return Err(crate::common::missing_field(
+                stringify!(#ident),
+                #field_name_lit,
+              )),
+            };
             #parse_value_tokens
           },
         }
@@ -5922,10 +5947,13 @@ fn expand_named_struct(
         });
       } else {
         tokens.push(quote! {
-          self.#field_ident = #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?;
+          self.#field_ident = match #field_ident {
+            Some(value) => value,
+            None => return Err(crate::common::missing_field(
+              stringify!(#ident),
+              stringify!(#field_ident),
+            )),
+          };
         });
       }
     }

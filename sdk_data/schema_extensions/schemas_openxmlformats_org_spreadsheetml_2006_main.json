@@ -119,10 +119,6 @@
       ]
     },
     {
-      "ClassName": "CellValue",
-      "HaveXmlOtherAttrs": true
-    },
-    {
       "ClassName": "NumberingFormat",
       "HaveXmlOtherAttrs": true
     },

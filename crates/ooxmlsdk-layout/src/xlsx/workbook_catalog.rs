@@ -436,7 +436,7 @@ fn external_cached_cells_from_part(
         if let Some(value) = cell
           .xstring
           .as_ref()
-          .and_then(|value| value.xml_content.clone())
+          .and_then(|value| value.0.xml_content.clone())
         {
           cells.push(ExternalCachedCell {
             link_index,

@@ -2831,14 +2831,7 @@ pub struct Text {
 /// Cell Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix, qname = "x:v")]
-pub struct CellValue {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct CellValue(pub XstringType);
 /// Formula.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix, qname = "x:formula")]

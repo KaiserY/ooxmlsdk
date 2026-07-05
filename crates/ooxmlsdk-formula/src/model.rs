@@ -3994,7 +3994,7 @@ fn external_cached_cells_from_part<'doc>(
         if let Some(value) = cell
           .xstring
           .as_ref()
-          .and_then(|value| value.xml_content.as_ref())
+          .and_then(|value| value.0.xml_content.as_ref())
         {
           cells.push(ExternalCachedCell {
             link_index,
@@ -4157,10 +4157,10 @@ mod tests {
               calculate_cell: Some(ooxmlsdk::simple_type::BooleanValue::True),
               ..x::CellFormula::default()
             }),
-            cell_value: Some(x::CellValue {
+            cell_value: Some(x::CellValue(x::XstringType {
               xml_content: Some("2".to_string()),
-              ..x::CellValue::default()
-            }),
+              ..x::XstringType::default()
+            })),
             ..x::Cell::default()
           }],
           ..x::Row::default()
@@ -4231,10 +4231,10 @@ mod tests {
           cell: vec![x::Cell {
             cell_reference: Some("B1".to_string()),
             data_type: Some(x::CellValues::SharedString),
-            cell_value: Some(x::CellValue {
+            cell_value: Some(x::CellValue(x::XstringType {
               xml_content: Some("0".to_string()),
-              ..x::CellValue::default()
-            }),
+              ..x::XstringType::default()
+            })),
             ..x::Cell::default()
           }],
           ..x::Row::default()
@@ -4280,10 +4280,10 @@ mod tests {
           cell: vec![x::Cell {
             cell_reference: Some("A1".to_string()),
             data_type: Some(x::CellValues::Number),
-            cell_value: Some(x::CellValue {
+            cell_value: Some(x::CellValue(x::XstringType {
               xml_content: Some("4.0999999999999996".to_string()),
-              ..x::CellValue::default()
-            }),
+              ..x::XstringType::default()
+            })),
             ..x::Cell::default()
           }],
           ..x::Row::default()
@@ -4365,11 +4365,10 @@ mod tests {
               x::Cell {
                 cell_reference: Some("A4".to_string()),
                 data_type: Some(x::CellValues::SharedString),
-                cell_value: Some(x::CellValue {
+                cell_value: Some(x::CellValue(x::XstringType {
                   xml_content: Some("1".to_string()),
-                  space: None,
-                  xml_other_attrs: Vec::new(),
-                }),
+                  ..x::XstringType::default()
+                })),
                 ..x::Cell::default()
               },
               x::Cell {
@@ -4956,10 +4955,10 @@ mod tests {
               xml_content: Some("NOW()+B1".to_string()),
               ..x::CellFormula::default()
             }),
-            cell_value: Some(x::CellValue {
+            cell_value: Some(x::CellValue(x::XstringType {
               xml_content: Some("1".to_string()),
-              ..x::CellValue::default()
-            }),
+              ..x::XstringType::default()
+            })),
             ..x::Cell::default()
           }],
           ..x::Row::default()
@@ -5026,17 +5025,17 @@ mod tests {
           row_index: Some(2),
           cell: vec![
             x::Cell {
-              cell_value: Some(x::CellValue {
+              cell_value: Some(x::CellValue(x::XstringType {
                 xml_content: Some("1".to_string()),
-                ..x::CellValue::default()
-              }),
+                ..x::XstringType::default()
+              })),
               ..x::Cell::default()
             },
             x::Cell {
-              cell_value: Some(x::CellValue {
+              cell_value: Some(x::CellValue(x::XstringType {
                 xml_content: Some("2".to_string()),
-                ..x::CellValue::default()
-              }),
+                ..x::XstringType::default()
+              })),
               ..x::Cell::default()
             },
           ],

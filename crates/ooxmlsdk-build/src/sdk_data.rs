@@ -13,6 +13,7 @@ pub mod sdk_data_model;
 pub mod xsd;
 
 use crate::Result;
+use crate::sdk_code::codegen_ir::annotate_estimated_type_sizes;
 use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
 use crate::sdk_code::part_codegen_ir::build_part_codegen_ir;
 use crate::sdk_code::schemas::CodegenContext;
@@ -74,6 +75,7 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
       )
     })?;
     apply_codegen_ir_schema_extensions(&schema.module_name, &mut ir, &schema_extensions)?;
+    annotate_estimated_type_sizes(&mut ir);
     write_json(
       out_schemas_dir_path.join(format!("{}.json", schema.module_name)),
       &ir,

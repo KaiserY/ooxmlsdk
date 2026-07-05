@@ -42,7 +42,7 @@ pub struct TwoCellAnchor {
   pub two_cell_anchor_choice: Option<TwoCellAnchorChoice>,
   /// Client Data.
   #[sdk(child(qname = "xdr:clientData"))]
-  pub client_data: std::boxed::Box<ClientData>,
+  pub client_data: ClientData,
 }
 /// One Cell Anchor Shape Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -53,7 +53,7 @@ pub struct OneCellAnchor {
   pub from_marker: std::boxed::Box<FromMarker>,
   /// Defines the Extent Class.
   #[sdk(child(qname = "xdr:ext"))]
-  pub extent: std::boxed::Box<Extent>,
+  pub extent: Extent,
   #[sdk(
         choice(
             child(variant = Shape, qname = "xdr:sp"),
@@ -67,7 +67,7 @@ pub struct OneCellAnchor {
   pub one_cell_anchor_choice: Option<OneCellAnchorChoice>,
   /// Client Data.
   #[sdk(child(qname = "xdr:clientData"))]
-  pub client_data: std::boxed::Box<ClientData>,
+  pub client_data: ClientData,
 }
 /// Absolute Anchor Shape Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -75,10 +75,10 @@ pub struct OneCellAnchor {
 pub struct AbsoluteAnchor {
   /// Position
   #[sdk(child(qname = "xdr:pos"))]
-  pub position: std::boxed::Box<Position>,
+  pub position: Position,
   /// Shape Extent
   #[sdk(child(qname = "xdr:ext"))]
-  pub extent: std::boxed::Box<Extent>,
+  pub extent: Extent,
   #[sdk(
         choice(
             child(variant = Shape, qname = "xdr:sp"),
@@ -92,7 +92,7 @@ pub struct AbsoluteAnchor {
   pub absolute_anchor_choice: Option<AbsoluteAnchorChoice>,
   /// Client Data.
   #[sdk(child(qname = "xdr:clientData"))]
-  pub client_data: std::boxed::Box<ClientData>,
+  pub client_data: ClientData,
 }
 /// Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

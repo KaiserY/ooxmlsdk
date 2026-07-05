@@ -1104,7 +1104,7 @@ pub struct SparklineGroup {
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the Sparklines Class.
   #[sdk(child(qname = "x14:sparklines"))]
-  pub sparklines: std::boxed::Box<Sparklines>,
+  pub sparklines: Sparklines,
 }
 /// Defines the SeriesColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1479,10 +1479,10 @@ pub struct TupleSet {
   pub column_count: Option<crate::simple_type::UInt32Value>,
   /// Defines the TupleSetHeaders Class.
   #[sdk(child(qname = "x14:headers"))]
-  pub tuple_set_headers: std::boxed::Box<TupleSetHeaders>,
+  pub tuple_set_headers: TupleSetHeaders,
   /// Defines the TupleSetRows Class.
   #[sdk(child(qname = "x14:rows"))]
-  pub tuple_set_rows: std::boxed::Box<TupleSetRows>,
+  pub tuple_set_rows: TupleSetRows,
 }
 /// Defines the TupleSetHeaders Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1738,7 +1738,7 @@ pub struct PivotEdit {
   pub pivot_user_edit: std::boxed::Box<PivotUserEdit>,
   /// Defines the TupleItems Class.
   #[sdk(child(qname = "x14:tupleItems"))]
-  pub tuple_items: std::boxed::Box<TupleItems>,
+  pub tuple_items: TupleItems,
   /// Defines the PivotArea Class.
   #[sdk(child(qname = "x14:pivotArea"))]
   pub pivot_area: std::boxed::Box<PivotArea>,
@@ -1825,10 +1825,10 @@ pub struct PivotChange {
   pub weight_expression: Option<crate::simple_type::StringValue>,
   /// Defines the PivotEditValue Class.
   #[sdk(child(qname = "x14:editValue"))]
-  pub pivot_edit_value: std::boxed::Box<PivotEditValue>,
+  pub pivot_edit_value: PivotEditValue,
   /// Defines the TupleItems Class.
   #[sdk(child(qname = "x14:tupleItems"))]
-  pub tuple_items: std::boxed::Box<TupleItems>,
+  pub tuple_items: TupleItems,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -2067,10 +2067,10 @@ pub struct OlapSlicerCache {
   pub pivot_cache_id: crate::simple_type::UInt32Value,
   /// Defines the OlapSlicerCacheLevelsData Class.
   #[sdk(child(qname = "x14:levels"))]
-  pub olap_slicer_cache_levels_data: std::boxed::Box<OlapSlicerCacheLevelsData>,
+  pub olap_slicer_cache_levels_data: OlapSlicerCacheLevelsData,
   /// Defines the OlapSlicerCacheSelections Class.
   #[sdk(child(qname = "x14:selections"))]
-  pub olap_slicer_cache_selections: std::boxed::Box<OlapSlicerCacheSelections>,
+  pub olap_slicer_cache_selections: OlapSlicerCacheSelections,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -2096,7 +2096,7 @@ pub struct TabularSlicerCache {
   pub cross_filter: Option<SlicerCacheCrossFilterValues>,
   /// Defines the TabularSlicerCacheItems Class.
   #[sdk(child(qname = "x14:items"))]
-  pub tabular_slicer_cache_items: std::boxed::Box<TabularSlicerCacheItems>,
+  pub tabular_slicer_cache_items: TabularSlicerCacheItems,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x14:extLst"))]
   pub extension_list: Option<ExtensionList>,

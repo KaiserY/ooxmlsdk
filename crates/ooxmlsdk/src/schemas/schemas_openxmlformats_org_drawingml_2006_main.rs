@@ -1948,10 +1948,10 @@ pub enum PresetColorValues {
 pub struct AudioFromCd {
   /// Audio Start Time
   #[sdk(child(qname = "a:st"))]
-  pub start_time: std::boxed::Box<StartTime>,
+  pub start_time: StartTime,
   /// Audio End Time
   #[sdk(child(qname = "a:end"))]
-  pub end_time: std::boxed::Box<EndTime>,
+  pub end_time: EndTime,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -3340,7 +3340,7 @@ pub struct CustomGeometry {
   pub rectangle: Option<Rectangle>,
   /// List of Shape Paths
   #[sdk(child(qname = "a:pathLst"))]
-  pub path_list: std::boxed::Box<PathList>,
+  pub path_list: PathList,
 }
 /// Preset geometry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4344,7 +4344,7 @@ pub struct Graphic {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Graphic Object Data
   #[sdk(child(qname = "a:graphicData"))]
-  pub graphic_data: std::boxed::Box<GraphicData>,
+  pub graphic_data: GraphicData,
 }
 /// Defines the Blip Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4444,7 +4444,7 @@ pub struct Table {
   pub table_properties: Option<std::boxed::Box<TableProperties>>,
   /// Table Grid
   #[sdk(child(qname = "a:tblGrid"))]
-  pub table_grid: std::boxed::Box<TableGrid>,
+  pub table_grid: TableGrid,
   /// Table Row.
   #[sdk(child(qname = "a:tr"))]
   pub table_row: Vec<TableRow>,
@@ -4680,16 +4680,16 @@ pub struct FormatScheme {
   pub name: Option<crate::simple_type::StringValue>,
   /// Fill Style List
   #[sdk(child(qname = "a:fillStyleLst"))]
-  pub fill_style_list: std::boxed::Box<FillStyleList>,
+  pub fill_style_list: FillStyleList,
   /// Line Style List
   #[sdk(child(qname = "a:lnStyleLst"))]
-  pub line_style_list: std::boxed::Box<LineStyleList>,
+  pub line_style_list: LineStyleList,
   /// Effect Style List
   #[sdk(child(qname = "a:effectStyleLst"))]
-  pub effect_style_list: std::boxed::Box<EffectStyleList>,
+  pub effect_style_list: EffectStyleList,
   /// Background Fill Style List
   #[sdk(child(qname = "a:bgFillStyleLst"))]
-  pub background_fill_style_list: std::boxed::Box<BackgroundFillStyleList>,
+  pub background_fill_style_list: BackgroundFillStyleList,
 }
 /// Dark 1.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5898,13 +5898,13 @@ pub struct LightRig {
 pub struct Backdrop {
   /// Anchor Point
   #[sdk(child(qname = "a:anchor"))]
-  pub anchor: std::boxed::Box<Anchor>,
+  pub anchor: Anchor,
   /// Normal
   #[sdk(child(qname = "a:norm"))]
-  pub normal: std::boxed::Box<Normal>,
+  pub normal: Normal,
   /// Up Vector
   #[sdk(child(qname = "a:up"))]
-  pub up_vector: std::boxed::Box<UpVector>,
+  pub up_vector: UpVector,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -6241,7 +6241,7 @@ pub struct AdjustHandleXy {
   pub max_y: Option<crate::simple_type::StringValue>,
   /// Position
   #[sdk(child(qname = "a:pos"))]
-  pub position: std::boxed::Box<Position>,
+  pub position: Position,
 }
 /// Polar Adjust Handle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6291,7 +6291,7 @@ pub struct AdjustHandlePolar {
   pub max_angle: Option<crate::simple_type::StringValue>,
   /// Shape Position Coordinate
   #[sdk(child(qname = "a:pos"))]
-  pub position: std::boxed::Box<Position>,
+  pub position: Position,
 }
 /// Shape Connection Site.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6304,7 +6304,7 @@ pub struct ConnectionSite {
   pub angle: crate::simple_type::StringValue,
   /// Position
   #[sdk(child(qname = "a:pos"))]
-  pub position: std::boxed::Box<Position>,
+  pub position: Position,
 }
 /// Move Path To.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6312,7 +6312,7 @@ pub struct ConnectionSite {
 pub struct MoveTo {
   /// Move end point
   #[sdk(child(qname = "a:pt"))]
-  pub point: std::boxed::Box<Point>,
+  pub point: Point,
 }
 /// Draw Line To.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6320,7 +6320,7 @@ pub struct MoveTo {
 pub struct LineTo {
   /// Line end point
   #[sdk(child(qname = "a:pt"))]
-  pub point: std::boxed::Box<Point>,
+  pub point: Point,
 }
 /// Draw Arc To.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

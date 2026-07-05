@@ -4116,7 +4116,7 @@ mod tests {
         reference_mode: Some(x::ReferenceModeValues::R1c1),
         ..x::CalculationProperties::default()
       }),
-      sheets: Box::new(x::Sheets {
+      sheets: x::Sheets {
         sheet: vec![x::Sheet {
           name: "Sheet1".to_string(),
           sheet_id: 7,
@@ -4124,7 +4124,7 @@ mod tests {
           state: Some(x::SheetStateValues::Hidden),
           ..x::Sheet::default()
         }],
-      }),
+      },
       ..x::Workbook::default()
     };
 
@@ -4146,7 +4146,7 @@ mod tests {
       visible: true,
     };
     let worksheet = x::Worksheet {
-      sheet_data: Box::new(x::SheetData {
+      sheet_data: x::SheetData {
         row: vec![x::Row {
           row_index: Some(1),
           cell: vec![x::Cell {
@@ -4165,7 +4165,7 @@ mod tests {
           }],
           ..x::Row::default()
         }],
-      }),
+      },
       ..x::Worksheet::default()
     };
 
@@ -4225,7 +4225,7 @@ mod tests {
       visible: true,
     };
     let worksheet = x::Worksheet {
-      sheet_data: Box::new(x::SheetData {
+      sheet_data: x::SheetData {
         row: vec![x::Row {
           row_index: Some(1),
           cell: vec![x::Cell {
@@ -4239,7 +4239,7 @@ mod tests {
           }],
           ..x::Row::default()
         }],
-      }),
+      },
       ..x::Worksheet::default()
     };
 
@@ -4274,7 +4274,7 @@ mod tests {
       visible: true,
     };
     let worksheet = x::Worksheet {
-      sheet_data: Box::new(x::SheetData {
+      sheet_data: x::SheetData {
         row: vec![x::Row {
           row_index: Some(1),
           cell: vec![x::Cell {
@@ -4288,7 +4288,7 @@ mod tests {
           }],
           ..x::Row::default()
         }],
-      }),
+      },
       ..x::Worksheet::default()
     };
 
@@ -4320,7 +4320,7 @@ mod tests {
       visible: true,
     };
     let worksheet = x::Worksheet {
-      sheet_data: Box::new(x::SheetData {
+      sheet_data: x::SheetData {
         row: vec![
           x::Row {
             row_index: Some(1),
@@ -4385,7 +4385,7 @@ mod tests {
             ..x::Row::default()
           },
         ],
-      }),
+      },
       ..x::Worksheet::default()
     };
     let mut sheets = vec![
@@ -4454,7 +4454,7 @@ mod tests {
       visible: true,
     };
     let worksheet = x::Worksheet {
-      sheet_data: Box::new(x::SheetData {
+      sheet_data: x::SheetData {
         row: vec![x::Row {
           row_index: Some(1),
           cell: vec![
@@ -4486,7 +4486,7 @@ mod tests {
           ],
           ..x::Row::default()
         }],
-      }),
+      },
       ..x::Worksheet::default()
     };
     let sheet = worksheet_value_model(
@@ -4947,7 +4947,7 @@ mod tests {
       visible: true,
     };
     let worksheet = x::Worksheet {
-      sheet_data: Box::new(x::SheetData {
+      sheet_data: x::SheetData {
         row: vec![x::Row {
           row_index: Some(1),
           cell: vec![x::Cell {
@@ -4964,7 +4964,7 @@ mod tests {
           }],
           ..x::Row::default()
         }],
-      }),
+      },
       ..x::Worksheet::default()
     };
 
@@ -5021,7 +5021,7 @@ mod tests {
       visible: true,
     };
     let worksheet = x::Worksheet {
-      sheet_data: Box::new(x::SheetData {
+      sheet_data: x::SheetData {
         row: vec![x::Row {
           row_index: Some(2),
           cell: vec![
@@ -5042,7 +5042,7 @@ mod tests {
           ],
           ..x::Row::default()
         }],
-      }),
+      },
       ..x::Worksheet::default()
     };
 

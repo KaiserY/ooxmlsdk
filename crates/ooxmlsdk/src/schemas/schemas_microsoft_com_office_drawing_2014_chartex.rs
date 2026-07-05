@@ -1103,7 +1103,7 @@ pub struct GeoParentEntity {
 pub struct GeoParentEntitiesQueryResult {
   /// Defines the GeoParentEntitiesQuery Class.
   #[sdk(child(qname = "cx:geoParentEntitiesQuery"))]
-  pub geo_parent_entities_query: std::boxed::Box<GeoParentEntitiesQuery>,
+  pub geo_parent_entities_query: GeoParentEntitiesQuery,
   /// Defines the GeoEntity Class.
   #[sdk(child(qname = "cx:geoEntity"))]
   pub geo_entity: Option<GeoEntity>,

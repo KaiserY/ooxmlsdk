@@ -100,7 +100,7 @@ pub struct Marker {
 pub struct DLbl {
   /// Index.
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<crate::schemas::c::Index>,
+  pub index: crate::schemas::c::Index,
   #[sdk(
         choice(
             child(variant = Delete, qname = "c:delete"),
@@ -173,7 +173,7 @@ pub struct UniqueId {
 pub struct CategoryFilterException {
   /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(qname = "c16:uniqueId"))]
-  pub unique_id_chart_unique_id: std::boxed::Box<UniqueIdChartUniqueId>,
+  pub unique_id_chart_unique_id: UniqueIdChartUniqueId,
   /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "c16:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
@@ -289,7 +289,7 @@ pub struct ChartDataPointUniqueIdMapEntry {
   pub xsdunsigned_int: XsdunsignedInt,
   /// Defines the UniqueID Class.
   #[sdk(child(qname = "c16:uniqueID"))]
-  pub unique_id: std::boxed::Box<UniqueId>,
+  pub unique_id: UniqueId,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {

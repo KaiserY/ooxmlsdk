@@ -582,7 +582,7 @@ pub struct Section {
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the SectionSlideIdList Class.
   #[sdk(child(qname = "p14:sldIdLst"))]
-  pub section_slide_id_list: std::boxed::Box<SectionSlideIdList>,
+  pub section_slide_id_list: SectionSlideIdList,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p14:extLst"))]
   pub extension_list: Option<ExtensionList>,

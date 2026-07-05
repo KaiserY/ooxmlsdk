@@ -947,10 +947,10 @@ pub struct Grouping {
 pub struct LineChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<Order>,
+  pub order: Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
@@ -1044,10 +1044,10 @@ pub struct BarGrouping {
 pub struct BarChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<Order>,
+  pub order: Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
@@ -1091,10 +1091,10 @@ pub struct BarChartSeries {
 pub struct AreaChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<Order>,
+  pub order: Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
@@ -1135,7 +1135,7 @@ pub struct PieChartSeries {
   pub index: Option<Index>,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<Order>,
+  pub order: Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
@@ -1170,10 +1170,10 @@ pub struct PieChartSeries {
 pub struct SurfaceChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<Order>,
+  pub order: Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
@@ -2037,7 +2037,7 @@ pub struct SecondPieSize {
 pub struct BandFormat {
   /// Index.
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
@@ -2107,7 +2107,7 @@ pub struct Orientation {
 pub struct PivotFormat {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "c:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
@@ -2135,7 +2135,7 @@ pub struct LegendPosition {
 pub struct LegendEntry {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   #[sdk(
         choice(
             child(variant = Delete, qname = "c:delete"),
@@ -2289,7 +2289,7 @@ pub struct ShapeProperties {
 pub struct DataLabel {
   /// Index.
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   #[sdk(
         choice(
             child(variant = Delete, qname = "c:delete"),
@@ -2415,7 +2415,7 @@ pub struct LineChart {
 pub struct Line3DChart {
   /// Grouping
   #[sdk(child(qname = "c:grouping"))]
-  pub grouping: std::boxed::Box<Grouping>,
+  pub grouping: Grouping,
   /// Defines the VaryColors Class.
   #[sdk(child(qname = "c:varyColors"))]
   pub vary_colors: Option<VaryColors>,
@@ -2470,7 +2470,7 @@ pub struct StockChart {
 pub struct RadarChart {
   /// Defines the RadarStyle Class.
   #[sdk(child(qname = "c:radarStyle"))]
-  pub radar_style: std::boxed::Box<RadarStyle>,
+  pub radar_style: RadarStyle,
   /// Defines the VaryColors Class.
   #[sdk(child(qname = "c:varyColors"))]
   pub vary_colors: Option<VaryColors>,
@@ -2493,7 +2493,7 @@ pub struct RadarChart {
 pub struct ScatterChart {
   /// Defines the ScatterStyle Class.
   #[sdk(child(qname = "c:scatterStyle"))]
-  pub scatter_style: std::boxed::Box<ScatterStyle>,
+  pub scatter_style: ScatterStyle,
   /// Defines the VaryColors Class.
   #[sdk(child(qname = "c:varyColors"))]
   pub vary_colors: Option<VaryColors>,
@@ -2565,7 +2565,7 @@ pub struct DoughnutChart {
   pub first_slice_angle: Option<FirstSliceAngle>,
   /// Hole Size.
   #[sdk(child(qname = "c:holeSize"))]
-  pub hole_size: std::boxed::Box<HoleSize>,
+  pub hole_size: HoleSize,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -2576,7 +2576,7 @@ pub struct DoughnutChart {
 pub struct BarChart {
   /// Bar Direction
   #[sdk(child(qname = "c:barDir"))]
-  pub bar_direction: std::boxed::Box<BarDirection>,
+  pub bar_direction: BarDirection,
   /// Bar Grouping
   #[sdk(child(qname = "c:grouping"))]
   pub bar_grouping: Option<BarGrouping>,
@@ -2611,7 +2611,7 @@ pub struct BarChart {
 pub struct Bar3DChart {
   /// Bar Direction
   #[sdk(child(qname = "c:barDir"))]
-  pub bar_direction: std::boxed::Box<BarDirection>,
+  pub bar_direction: BarDirection,
   /// Bar Grouping
   #[sdk(child(qname = "c:grouping"))]
   pub bar_grouping: Option<BarGrouping>,
@@ -2646,7 +2646,7 @@ pub struct Bar3DChart {
 pub struct OfPieChart {
   /// Pie of Pie or Bar of Pie Type
   #[sdk(child(qname = "c:ofPieType"))]
-  pub of_pie_type: std::boxed::Box<OfPieType>,
+  pub of_pie_type: OfPieType,
   /// Defines the VaryColors Class.
   #[sdk(child(qname = "c:varyColors"))]
   pub vary_colors: Option<VaryColors>,
@@ -2759,7 +2759,7 @@ pub struct BubbleChart {
 pub struct ValueAxis {
   /// Axis ID
   #[sdk(child(qname = "c:axId"))]
-  pub axis_id: std::boxed::Box<AxisId>,
+  pub axis_id: AxisId,
   /// Scaling
   #[sdk(child(qname = "c:scaling"))]
   pub scaling: std::boxed::Box<Scaling>,
@@ -2768,7 +2768,7 @@ pub struct ValueAxis {
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:axPos"))]
-  pub axis_position: std::boxed::Box<AxisPosition>,
+  pub axis_position: AxisPosition,
   /// Major Gridlines
   #[sdk(child(qname = "c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -2798,7 +2798,7 @@ pub struct ValueAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:crossAx"))]
-  pub crossing_axis: std::boxed::Box<CrossingAxis>,
+  pub crossing_axis: CrossingAxis,
   #[sdk(
         choice(
             child(variant = Crosses, qname = "c:crosses"),
@@ -2828,7 +2828,7 @@ pub struct ValueAxis {
 pub struct CategoryAxis {
   /// Axis ID
   #[sdk(child(qname = "c:axId"))]
-  pub axis_id: std::boxed::Box<AxisId>,
+  pub axis_id: AxisId,
   /// Scaling
   #[sdk(child(qname = "c:scaling"))]
   pub scaling: std::boxed::Box<Scaling>,
@@ -2837,7 +2837,7 @@ pub struct CategoryAxis {
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:axPos"))]
-  pub axis_position: std::boxed::Box<AxisPosition>,
+  pub axis_position: AxisPosition,
   /// Major Gridlines
   #[sdk(child(qname = "c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -2867,7 +2867,7 @@ pub struct CategoryAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:crossAx"))]
-  pub crossing_axis: std::boxed::Box<CrossingAxis>,
+  pub crossing_axis: CrossingAxis,
   #[sdk(
         choice(
             child(variant = Crosses, qname = "c:crosses"),
@@ -2903,7 +2903,7 @@ pub struct CategoryAxis {
 pub struct DateAxis {
   /// Axis ID
   #[sdk(child(qname = "c:axId"))]
-  pub axis_id: std::boxed::Box<AxisId>,
+  pub axis_id: AxisId,
   /// Scaling
   #[sdk(child(qname = "c:scaling"))]
   pub scaling: std::boxed::Box<Scaling>,
@@ -2912,7 +2912,7 @@ pub struct DateAxis {
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:axPos"))]
-  pub axis_position: std::boxed::Box<AxisPosition>,
+  pub axis_position: AxisPosition,
   /// Major Gridlines
   #[sdk(child(qname = "c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -2942,7 +2942,7 @@ pub struct DateAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:crossAx"))]
-  pub crossing_axis: std::boxed::Box<CrossingAxis>,
+  pub crossing_axis: CrossingAxis,
   #[sdk(
         choice(
             child(variant = Crosses, qname = "c:crosses"),
@@ -2981,7 +2981,7 @@ pub struct DateAxis {
 pub struct SeriesAxis {
   /// Axis ID
   #[sdk(child(qname = "c:axId"))]
-  pub axis_id: std::boxed::Box<AxisId>,
+  pub axis_id: AxisId,
   /// Scaling
   #[sdk(child(qname = "c:scaling"))]
   pub scaling: std::boxed::Box<Scaling>,
@@ -2990,7 +2990,7 @@ pub struct SeriesAxis {
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:axPos"))]
-  pub axis_position: std::boxed::Box<AxisPosition>,
+  pub axis_position: AxisPosition,
   /// Major Gridlines
   #[sdk(child(qname = "c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -3020,7 +3020,7 @@ pub struct SeriesAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:crossAx"))]
-  pub crossing_axis: std::boxed::Box<CrossingAxis>,
+  pub crossing_axis: CrossingAxis,
   #[sdk(
         choice(
             child(variant = Crosses, qname = "c:crosses"),
@@ -3614,10 +3614,10 @@ pub struct ScatterStyle {
 pub struct ScatterChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<Order>,
+  pub order: Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
@@ -3675,10 +3675,10 @@ pub struct RadarStyle {
 pub struct RadarChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<Order>,
+  pub order: Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
@@ -3775,10 +3775,10 @@ pub struct Area3DChartExtensionList {
 pub struct BubbleChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<Order>,
+  pub order: Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
@@ -4039,7 +4039,7 @@ pub struct DLblExtension {
 pub struct DataPoint {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Index,
   /// Invert if Negative
   #[sdk(child(qname = "c:invertIfNegative"))]
   pub invert_if_negative: Option<InvertIfNegative>,
@@ -4074,7 +4074,7 @@ pub struct Trendline {
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
   /// Trendline Type
   #[sdk(child(qname = "c:trendlineType"))]
-  pub trendline_type: std::boxed::Box<TrendlineType>,
+  pub trendline_type: TrendlineType,
   /// Polynomial Trendline Order
   #[sdk(child(qname = "c:order"))]
   pub polynomial_order: Option<PolynomialOrder>,
@@ -4112,10 +4112,10 @@ pub struct ErrorBars {
   pub error_direction: Option<ErrorDirection>,
   /// Error Bar Type
   #[sdk(child(qname = "c:errBarType"))]
-  pub error_bar_type: std::boxed::Box<ErrorBarType>,
+  pub error_bar_type: ErrorBarType,
   /// Error Bar Value Type
   #[sdk(child(qname = "c:errValType"))]
-  pub error_bar_value_type: std::boxed::Box<ErrorBarValueType>,
+  pub error_bar_value_type: ErrorBarValueType,
   /// No End Cap
   #[sdk(child(qname = "c:noEndCap"))]
   pub no_end_cap: Option<NoEndCap>,
@@ -4763,7 +4763,7 @@ pub struct PivotSource {
   pub pivot_table_name: PivotTableName,
   /// Format ID
   #[sdk(child(qname = "c:fmtId"))]
-  pub format_id: std::boxed::Box<FormatId>,
+  pub format_id: FormatId,
   /// Chart Extensibility
   #[sdk(child(qname = "c:extLst"))]
   pub extension_list: Option<ExtensionList>,

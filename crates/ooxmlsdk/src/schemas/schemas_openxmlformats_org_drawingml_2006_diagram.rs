@@ -952,7 +952,7 @@ pub struct DataModelRoot {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Point List
   #[sdk(child(qname = "dgm:ptLst"))]
-  pub point_list: std::boxed::Box<PointList>,
+  pub point_list: PointList,
   /// Connection List
   #[sdk(child(qname = "dgm:cxnLst"))]
   pub connection_list: Option<ConnectionList>,
@@ -2236,7 +2236,7 @@ pub struct DataModel {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Point List
   #[sdk(child(qname = "dgm:ptLst"))]
-  pub point_list: std::boxed::Box<PointList>,
+  pub point_list: PointList,
   /// Connection List
   #[sdk(child(qname = "dgm:cxnLst"))]
   pub connection_list: Option<ConnectionList>,

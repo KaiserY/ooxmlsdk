@@ -333,7 +333,7 @@ pub struct SingleDataSourceRecord {
   pub record_included: Option<RecordIncluded>,
   /// Defines the RecordHashCode Class.
   #[sdk(child(qname = "wne:hash"))]
-  pub record_hash_code: std::boxed::Box<RecordHashCode>,
+  pub record_hash_code: RecordHashCode,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum KeyMapEntryChoice {

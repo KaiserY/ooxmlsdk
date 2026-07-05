@@ -13,7 +13,7 @@ pub struct CommentV2MonikerList {
   pub slide_moniker_list: std::boxed::Box<crate::schemas::pc::SlideMonikerList>,
   /// Defines the CommentV2Moniker Class.
   #[sdk(child(qname = "pc2:cmMK"))]
-  pub comment_v2_moniker: std::boxed::Box<CommentV2Moniker>,
+  pub comment_v2_moniker: CommentV2Moniker,
 }
 /// Defines the CommentReplyV2MonikerList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -24,7 +24,7 @@ pub struct CommentReplyV2MonikerList {
   pub comment_v2_moniker_list: std::boxed::Box<CommentV2MonikerList>,
   /// Defines the CommentReplyV2Moniker Class.
   #[sdk(child(qname = "pc2:cmRplyMk"))]
-  pub comment_reply_v2_moniker: std::boxed::Box<CommentReplyV2Moniker>,
+  pub comment_reply_v2_moniker: CommentReplyV2Moniker,
 }
 /// Defines the CommentV2Moniker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -844,6 +844,7 @@ fn build_type_decl(
         extra_xmlns: schema_type.extra_xmlns.clone(),
         canonical_namespace_prefixes: schema_type.canonical_namespace_prefixes.clone(),
       },
+      estimated_size: 0,
       members,
     },
     extra_types,
@@ -955,6 +956,7 @@ fn promote_single_repeated_child_to_xml_other_choice(
     base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
+    estimated_size: 0,
     members: choice_members,
   });
 
@@ -1218,6 +1220,7 @@ fn build_recursive_choice_enum_decl(
     base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
+    estimated_size: 0,
     members,
   })
 }
@@ -2389,6 +2392,7 @@ fn build_simple_one_choice_members(
     base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
+    estimated_size: 0,
     members: enum_members,
   }])
 }
@@ -2586,6 +2590,7 @@ fn build_flatten_one_sequence_members(
           base_module_path: None,
           xml_content: None,
           support: SystemSupportDecl::default(),
+          estimated_size: 0,
           members: enum_members,
         });
       }
@@ -2799,6 +2804,7 @@ fn build_structured_one_sequence_members(
           base_module_path: None,
           xml_content: None,
           support: SystemSupportDecl::default(),
+          estimated_size: 0,
           members: enum_members,
         });
       }
@@ -3023,6 +3029,7 @@ fn build_structured_one_sequence_helper_struct_decl(
     base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
+    estimated_size: 0,
     members: sequence_variant
       .fields
       .iter()
@@ -3204,6 +3211,7 @@ fn build_mixed_choice_children_members(
     base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
+    estimated_size: 0,
     members: enum_members,
   });
 
@@ -3665,6 +3673,7 @@ fn build_generic_children_members(
     base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
+    estimated_size: 0,
     members: enum_members,
   });
 

@@ -51,7 +51,7 @@ pub struct WebExtensionTaskpane {
   pub locked: Option<crate::simple_type::BooleanValue>,
   /// Defines the WebExtensionPartReference Class.
   #[sdk(child(qname = "wetp:webextensionref"))]
-  pub web_extension_part_reference: std::boxed::Box<WebExtensionPartReference>,
+  pub web_extension_part_reference: WebExtensionPartReference,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(qname = "wetp:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,

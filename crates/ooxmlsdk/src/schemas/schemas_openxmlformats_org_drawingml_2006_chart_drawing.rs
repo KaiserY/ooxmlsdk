@@ -11,10 +11,10 @@ pub struct RelativeAnchorSize {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Starting Anchor Point
   #[sdk(child(qname = "cdr:from"))]
-  pub from_anchor: std::boxed::Box<FromAnchor>,
+  pub from_anchor: FromAnchor,
   /// Ending Anchor Point
   #[sdk(child(qname = "cdr:to"))]
-  pub to_anchor: std::boxed::Box<ToAnchor>,
+  pub to_anchor: ToAnchor,
   #[sdk(
         choice(
             child(variant = Shape, qname = "cdr:sp"),
@@ -33,10 +33,10 @@ pub struct RelativeAnchorSize {
 pub struct AbsoluteAnchorSize {
   /// Starting Anchor Point.
   #[sdk(child(qname = "cdr:from"))]
-  pub from_anchor: std::boxed::Box<FromAnchor>,
+  pub from_anchor: FromAnchor,
   /// Shape Extent
   #[sdk(child(qname = "cdr:ext"))]
-  pub extent: std::boxed::Box<Extent>,
+  pub extent: Extent,
   #[sdk(
         choice(
             child(variant = Shape, qname = "cdr:sp"),

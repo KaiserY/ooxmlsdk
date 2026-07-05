@@ -23,10 +23,10 @@ pub struct WebExtension {
   pub web_extension_reference_list: Option<WebExtensionReferenceList>,
   /// Defines the WebExtensionPropertyBag Class.
   #[sdk(child(qname = "we:properties"))]
-  pub web_extension_property_bag: std::boxed::Box<WebExtensionPropertyBag>,
+  pub web_extension_property_bag: WebExtensionPropertyBag,
   /// Defines the WebExtensionBindingList Class.
   #[sdk(child(qname = "we:bindings"))]
-  pub web_extension_binding_list: std::boxed::Box<WebExtensionBindingList>,
+  pub web_extension_binding_list: WebExtensionBindingList,
   /// Defines the Snapshot Class.
   #[sdk(child(qname = "we:snapshot"))]
   pub snapshot: Option<std::boxed::Box<Snapshot>>,

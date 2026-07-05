@@ -2,7 +2,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::{Group, Ident as TokenIdent, Span, TokenStream, TokenTree};
 use quote::quote;
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use syn::{Attribute, Ident, LitStr, Type, Variant, parse_str, parse2};
 
 use crate::Result;
@@ -137,6 +137,7 @@ pub struct ResolvedOneChoice<'a> {
 #[derive(Debug, Default)]
 pub(crate) struct TypeContainmentGraph {
   edges: HashMap<String, Vec<String>>,
+  estimated_sizes: HashMap<String, usize>,
   enum_keys: HashSet<String>,
   empty_leaf_marker_ambiguous_rust_names: HashSet<String>,
   empty_leaf_marker_docs: HashMap<String, String>,
@@ -146,6 +147,7 @@ pub(crate) struct TypeContainmentGraph {
   leaf_text_alias_keys: HashSet<String>,
   module_alias_paths: HashMap<String, String>,
   nodes: HashSet<String>,
+  shallow_depths: HashMap<String, usize>,
   wrapped_base_keys: HashSet<String>,
 }
 
@@ -167,6 +169,11 @@ impl TypeContainmentGraph {
       for type_decl in &module.types {
         let type_key = local_type_key(module, &type_decl.rust_name);
         graph.nodes.insert(type_key.clone());
+        if type_decl.estimated_size > 0 {
+          graph
+            .estimated_sizes
+            .insert(type_key.clone(), type_decl.estimated_size);
+        }
         if type_decl.kind == TypeKind::LeafTextAlias {
           graph.leaf_text_alias_keys.insert(type_key.clone());
           if let Some(xml_content) = &type_decl.xml_content {
@@ -272,6 +279,18 @@ impl TypeContainmentGraph {
       }
     }
 
+    let missing_leaf_size_nodes = graph
+      .nodes
+      .iter()
+      .filter(|node| {
+        !graph.estimated_sizes.contains_key(*node) && !graph.has_outgoing_edges(node.as_str())
+      })
+      .cloned()
+      .collect::<Vec<_>>();
+    for node in missing_leaf_size_nodes {
+      graph.estimated_sizes.insert(node, 32);
+    }
+    graph.shallow_depths = graph.compute_shallow_depths();
     graph
   }
 
@@ -284,6 +303,51 @@ impl TypeContainmentGraph {
       .edges
       .get(node)
       .is_some_and(|children| !children.is_empty())
+  }
+
+  fn estimated_size(&self, node: &str) -> Option<usize> {
+    self.estimated_sizes.get(node).copied()
+  }
+
+  fn shallow_depth(&self, node: &str) -> Option<usize> {
+    self.shallow_depths.get(node).copied()
+  }
+
+  fn compute_shallow_depths(&self) -> HashMap<String, usize> {
+    let mut indegrees = HashMap::<&str, usize>::new();
+    for node in &self.nodes {
+      indegrees.entry(node.as_str()).or_insert(0);
+    }
+    for children in self.edges.values() {
+      for child in children {
+        *indegrees.entry(child.as_str()).or_insert(0) += 1;
+      }
+    }
+
+    let mut queue = VecDeque::<(&str, usize)>::new();
+    for (node, indegree) in indegrees {
+      if indegree == 0 {
+        queue.push_back((node, 0));
+      }
+    }
+
+    let mut depths = HashMap::<String, usize>::new();
+    while let Some((node, depth)) = queue.pop_front() {
+      if depths.get(node).is_some_and(|existing| *existing <= depth) {
+        continue;
+      }
+      depths.insert(node.to_string(), depth);
+      if depth >= 8 {
+        continue;
+      }
+      if let Some(children) = self.edges.get(node) {
+        for child in children {
+          queue.push_back((child.as_str(), depth + 1));
+        }
+      }
+    }
+
+    depths
   }
 
   fn is_any_children_alias(&self, node: &str) -> bool {
@@ -3448,6 +3512,40 @@ fn schema_type_key_from_ref(module: &SchemaModuleDecl, type_ref: &TypeRefDecl) -
   ))
 }
 
+const DIRECT_CHILD_INLINE_SIZE_LIMIT: usize = 64;
+const DIRECT_CHILD_INLINE_DEPTH_LIMIT: usize = 2;
+
+fn type_graph_small_leaf_like(
+  type_graph: &TypeContainmentGraph,
+  target_key: &str,
+  size_limit: usize,
+) -> bool {
+  type_graph.contains_node(target_key)
+    && !type_graph.has_outgoing_edges(target_key)
+    && type_graph
+      .estimated_size(target_key)
+      .is_some_and(|size| size <= size_limit)
+}
+
+fn direct_child_field_can_inline(
+  owner_rust_name: &str,
+  field: &FieldDecl,
+  module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
+) -> bool {
+  let Some(target_key) = schema_type_key_from_ref(module, &field.type_ref) else {
+    return false;
+  };
+  let owner_key = local_type_key(module, owner_rust_name);
+  if type_graph.can_reach(&target_key, &owner_key) {
+    return false;
+  }
+  type_graph_small_leaf_like(type_graph, &target_key, DIRECT_CHILD_INLINE_SIZE_LIMIT)
+    && type_graph
+      .shallow_depth(&target_key)
+      .is_some_and(|depth| depth <= DIRECT_CHILD_INLINE_DEPTH_LIMIT)
+}
+
 fn direct_child_field_needs_box(
   owner_rust_name: &str,
   field: &FieldDecl,
@@ -3479,7 +3577,7 @@ fn direct_child_field_needs_box(
   }
 
   if matches!(effective_cardinality, Cardinality::One) {
-    return true;
+    return !direct_child_field_can_inline(owner_rust_name, field, module, type_graph);
   }
 
   let Some(target_key) = schema_type_key_from_ref(module, &field.type_ref) else {
@@ -4432,6 +4530,7 @@ mod tests {
           kind: TypeKind::ElementStruct,
           element_kind: Some(ElementKind::Composite),
           content_model: Some(ContentModelDecl::OneSequenceFlatten),
+          estimated_size: 0,
           members: vec![
             MemberDecl::Field(FieldDecl {
               rust_name: "c_sld_moniker".to_string(),
@@ -4535,6 +4634,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(
             crate::sdk_code::codegen_ir::VariantDecl {
               rust_name: "Sequence1".to_string(),
@@ -4557,6 +4657,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoiceSequence1".to_string(),
           kind: TypeKind::HelperStruct,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Field(FieldDecl {
               rust_name: "first".to_string(),
@@ -4617,6 +4718,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "EgThing".to_string(),
             docs: " Sequence of t:first".to_string(),
@@ -4634,6 +4736,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoiceSequence1".to_string(),
           kind: TypeKind::HelperStruct,
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "first".to_string(),
             docs: " _".to_string(),
@@ -4678,6 +4781,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(
             crate::sdk_code::codegen_ir::VariantDecl {
               rust_name: "Sequence1".to_string(),
@@ -4697,6 +4801,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoiceSequence1".to_string(),
           kind: TypeKind::HelperStruct,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Field(FieldDecl {
               rust_name: "formula".to_string(),
@@ -4765,6 +4870,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "Choice1".to_string(),
             docs: " Choice wrapper".to_string(),
@@ -4782,6 +4888,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice1".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TFirst".to_string(),
@@ -4848,6 +4955,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TFirst".to_string(),
@@ -4879,6 +4987,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice1".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TFirst".to_string(),
@@ -4949,6 +5058,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "Choice1".to_string(),
@@ -4980,6 +5090,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice1".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TFirst".to_string(),
@@ -5011,6 +5122,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice2".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "TThird".to_string(),
             docs: " _".to_string(),
@@ -5028,6 +5140,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoiceSequence1".to_string(),
           kind: TypeKind::HelperStruct,
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "second".to_string(),
             docs: " _".to_string(),
@@ -5073,6 +5186,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "Choice1".to_string(),
@@ -5104,6 +5218,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice1".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "TFirst".to_string(),
             docs: " _".to_string(),
@@ -5121,6 +5236,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice2".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "TFirst".to_string(),
             docs: " _".to_string(),
@@ -5172,6 +5288,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "Choice1".to_string(),
@@ -5203,6 +5320,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice1".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "TFirst".to_string(),
             docs: " _".to_string(),
@@ -5220,6 +5338,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice2".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "TSecond".to_string(),
             docs: " _".to_string(),
@@ -5277,6 +5396,7 @@ mod tests {
         TypeDecl {
           rust_name: "RootChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "WAltChunk".to_string(),
@@ -5308,6 +5428,7 @@ mod tests {
         TypeDecl {
           rust_name: "RootChoice1".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "Choice1".to_string(),
@@ -5339,6 +5460,7 @@ mod tests {
         TypeDecl {
           rust_name: "RootChoice2".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "WProofErr".to_string(),
             docs: " _".to_string(),
@@ -5388,6 +5510,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TFirst".to_string(),
@@ -5421,6 +5544,7 @@ mod tests {
           xml_qname: Some("t:CT_Holder/t:holder".to_string()),
           kind: TypeKind::ElementStruct,
           element_kind: Some(ElementKind::Composite),
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "holder_choice".to_string(),
             docs: " _".to_string(),
@@ -5470,6 +5594,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "Always".to_string(),
@@ -5503,6 +5628,7 @@ mod tests {
           xml_qname: Some("t:CT_Holder/t:holder".to_string()),
           kind: TypeKind::ElementStruct,
           element_kind: Some(ElementKind::Composite),
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "holder_choice".to_string(),
             docs: " _".to_string(),
@@ -5561,6 +5687,7 @@ mod tests {
         TypeDecl {
           rust_name: "RootChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "Choice1".to_string(),
@@ -5592,6 +5719,7 @@ mod tests {
         TypeDecl {
           rust_name: "RootChoice1".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "Choice1".to_string(),
             docs: " Nested wrapper".to_string(),
@@ -5609,6 +5737,7 @@ mod tests {
         TypeDecl {
           rust_name: "RootChoice2".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TFirst".to_string(),
@@ -5680,6 +5809,7 @@ mod tests {
         TypeDecl {
           rust_name: "RootChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TDirect".to_string(),
@@ -5711,6 +5841,7 @@ mod tests {
         TypeDecl {
           rust_name: "RangeMarkupChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TFirst".to_string(),
@@ -5793,6 +5924,7 @@ mod tests {
         TypeDecl {
           rust_name: "RootChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TDirect".to_string(),
@@ -5862,6 +5994,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TFirst".to_string(),
@@ -5893,6 +6026,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoiceSequence32".to_string(),
           kind: TypeKind::HelperStruct,
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "second".to_string(),
             docs: " _".to_string(),
@@ -5944,6 +6078,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "Sequence32".to_string(),
@@ -5975,6 +6110,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoiceSequence32".to_string(),
           kind: TypeKind::HelperStruct,
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "first".to_string(),
             docs: " _".to_string(),
@@ -5994,6 +6130,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoiceSequence8".to_string(),
           kind: TypeKind::HelperStruct,
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "second".to_string(),
             docs: " _".to_string(),
@@ -6047,6 +6184,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "Sequence".to_string(),
@@ -6078,6 +6216,7 @@ mod tests {
         TypeDecl {
           rust_name: "HolderChoiceSequence32".to_string(),
           kind: TypeKind::HelperStruct,
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "second".to_string(),
             docs: " _".to_string(),
@@ -6153,6 +6292,7 @@ mod tests {
           kind: TypeKind::ElementStruct,
           element_kind: Some(ElementKind::Composite),
           content_model: Some(ContentModelDecl::MixedChoiceChildren),
+          estimated_size: 0,
           members: vec![
             MemberDecl::Field(FieldDecl {
               rust_name: "before_choice".to_string(),
@@ -6212,6 +6352,7 @@ mod tests {
         TypeDecl {
           rust_name: "BodyLikeChoice1".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "Choice1".to_string(),
             docs: " wrapper".to_string(),
@@ -6229,6 +6370,7 @@ mod tests {
         TypeDecl {
           rust_name: "RangeMarkupChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TBookmarkStart".to_string(),
@@ -6260,6 +6402,7 @@ mod tests {
         TypeDecl {
           rust_name: "BodyLikeChoice2".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "TRow".to_string(),
             docs: " _".to_string(),
@@ -6282,8 +6425,8 @@ mod tests {
 
     assert!(generated.contains("pub struct BodyLike"));
     assert!(generated.contains("pub before_choice : Vec < BodyLikeChoice >"));
-    assert!(generated.contains("pub table_properties : std :: boxed :: Box < TableProperties >"));
-    assert!(generated.contains("pub table_grid : std :: boxed :: Box < TableGrid >"));
+    assert!(generated.contains("pub table_properties : TableProperties"));
+    assert!(generated.contains("pub table_grid : TableGrid"));
     assert!(generated.contains("pub after_choice : Vec < BodyLikeChoice2 >"));
     assert!(generated.contains("pub enum BodyLikeChoice"));
     assert!(generated.contains("TBookmarkStart (std :: boxed :: Box < BookmarkStart >)"));
@@ -6293,11 +6436,9 @@ mod tests {
       .find("pub before_choice : Vec < BodyLikeChoice >")
       .unwrap();
     let tbl_pr_idx = generated
-      .find("pub table_properties : std :: boxed :: Box < TableProperties >")
+      .find("pub table_properties : TableProperties")
       .unwrap();
-    let tbl_grid_idx = generated
-      .find("pub table_grid : std :: boxed :: Box < TableGrid >")
-      .unwrap();
+    let tbl_grid_idx = generated.find("pub table_grid : TableGrid").unwrap();
     let after_idx = generated
       .find("pub after_choice : Vec < BodyLikeChoice2 >")
       .unwrap();
@@ -6409,6 +6550,7 @@ mod tests {
           kind: TypeKind::ElementStruct,
           element_kind: Some(ElementKind::Leaf),
           base_rust_name: Some("OpenXmlLeafElement".to_string()),
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "value".to_string(),
             docs: "Value".to_string(),
@@ -6430,6 +6572,7 @@ mod tests {
         TypeDecl {
           rust_name: "MarkerChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![
             MemberDecl::Variant(VariantDecl {
               rust_name: "TMarker".to_string(),
@@ -6541,7 +6684,7 @@ mod tests {
       .unwrap()
       .to_string();
 
-    assert!(generated.contains("pub leaf_child : std :: boxed :: Box < Leaf >"));
+    assert!(generated.contains("pub leaf_child : Leaf"));
     assert!(generated.contains("pub text_child : Option < TextLeaf >"));
     assert!(generated.contains("pub unknown_xml : Vec < std :: boxed :: Box < [u8] > >"));
     assert!(!generated.contains("pub enum SequenceHolderChoice"));
@@ -6613,6 +6756,7 @@ mod tests {
           kind: TypeKind::ElementStruct,
           element_kind: Some(ElementKind::Composite),
           content_model: Some(ContentModelDecl::DirectChildrenOnly),
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "child".to_string(),
             docs: "Child".to_string(),
@@ -6635,6 +6779,7 @@ mod tests {
           kind: TypeKind::ElementStruct,
           element_kind: Some(ElementKind::Composite),
           content_model: Some(ContentModelDecl::DirectChildrenOnly),
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "node".to_string(),
             docs: "Node".to_string(),
@@ -6695,6 +6840,7 @@ mod tests {
         kind: TypeKind::ElementStruct,
         element_kind: Some(ElementKind::Composite),
         content_model: Some(ContentModelDecl::DirectChildrenOnly),
+        estimated_size: 0,
         members: vec![MemberDecl::Field(FieldDecl {
           rust_name: "shared_text".to_string(),
           docs: "Shared text".to_string(),
@@ -6823,12 +6969,12 @@ mod tests {
       .unwrap()
       .to_string();
 
-    assert!(generated.contains("pub leaf_a : std :: boxed :: Box < LeafA >"));
+    assert!(generated.contains("pub leaf_a : LeafA"));
     assert!(generated.contains("pub structured_holder_choice : Option < StructuredHolderChoice >"));
     assert!(generated.contains("pub enum StructuredHolderChoice"));
     assert!(generated.contains("Sequence {"));
-    assert!(generated.contains("leaf_c : std :: boxed :: Box < LeafC >"));
-    assert!(generated.contains("leaf_d : std :: boxed :: Box < LeafD >"));
+    assert!(generated.contains("leaf_c : LeafC"));
+    assert!(generated.contains("leaf_d : LeafD"));
     assert!(!generated.contains("pub struct StructuredHolderChoiceSequence2"));
   }
 
@@ -6931,9 +7077,9 @@ mod tests {
       .unwrap()
       .to_string();
 
-    assert!(generated.contains("pub leaf_a : std :: boxed :: Box < LeafA >"));
+    assert!(generated.contains("pub leaf_a : LeafA"));
     assert!(generated.contains("pub mixed_holder_choice : Option < MixedHolderChoice >"));
-    assert!(generated.contains("pub trailing_leaf : std :: boxed :: Box < LeafD >"));
+    assert!(generated.contains("pub trailing_leaf : LeafD"));
     assert!(generated.contains("pub enum MixedHolderChoice"));
     assert!(generated.contains("LeafB (std :: boxed :: Box < LeafB >)"));
     assert!(generated.contains("LeafC (std :: boxed :: Box < LeafC >)"));

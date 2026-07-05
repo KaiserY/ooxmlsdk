@@ -1055,7 +1055,7 @@ pub struct Presentation {
   pub slide_size: Option<SlideSize>,
   /// Defines the NotesSize Class.
   #[sdk(child(qname = "p:notesSz"))]
-  pub notes_size: std::boxed::Box<NotesSize>,
+  pub notes_size: NotesSize,
   /// Defines the EmbeddedFontList Class.
   #[sdk(child(qname = "p:embeddedFontLst"))]
   pub embedded_font_list: Option<EmbeddedFontList>,
@@ -2111,7 +2111,7 @@ pub struct CommonBehavior {
 pub struct Progress {
   /// Float Value.
   #[sdk(child(qname = "p:fltVal"))]
-  pub float_variant_value: std::boxed::Box<FloatVariantValue>,
+  pub float_variant_value: FloatVariantValue,
 }
 /// To.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2450,7 +2450,7 @@ pub struct Comment {
   pub index: crate::simple_type::UInt32Value,
   /// Defines the Position Class.
   #[sdk(child(qname = "p:pos"))]
-  pub position: std::boxed::Box<Position>,
+  pub position: Position,
   /// Defines the Text Class.
   #[sdk(text_child(qname = "p:text"))]
   pub text: Text,
@@ -2640,7 +2640,7 @@ pub struct CustomShow {
   pub id: crate::simple_type::UInt32Value,
   /// List of Presentation Slides
   #[sdk(child(qname = "p:sldLst"))]
-  pub slide_list: std::boxed::Box<SlideList>,
+  pub slide_list: SlideList,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -3412,10 +3412,10 @@ pub struct NormalViewProperties {
   pub prefer_single_view: Option<crate::simple_type::BooleanValue>,
   /// Normal View Restored Left Properties
   #[sdk(child(qname = "p:restoredLeft"))]
-  pub restored_left: std::boxed::Box<RestoredLeft>,
+  pub restored_left: RestoredLeft,
   /// Normal View Restored Top Properties
   #[sdk(child(qname = "p:restoredTop"))]
-  pub restored_top: std::boxed::Box<RestoredTop>,
+  pub restored_top: RestoredTop,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:extLst"))]
   pub extension_list: Option<ExtensionList>,

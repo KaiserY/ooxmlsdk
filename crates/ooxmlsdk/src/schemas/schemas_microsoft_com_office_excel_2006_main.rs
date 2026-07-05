@@ -32,7 +32,7 @@ pub struct Macrosheet {
   pub columns: Vec<crate::schemas::x::Columns>,
   /// Sheet Data.
   #[sdk(child(qname = "x:sheetData"))]
-  pub sheet_data: std::boxed::Box<crate::schemas::x::SheetData>,
+  pub sheet_data: crate::schemas::x::SheetData,
   /// Sheet Protection.
   #[sdk(child(qname = "x:sheetProtection"))]
   pub sheet_protection: Option<crate::schemas::x::SheetProtection>,

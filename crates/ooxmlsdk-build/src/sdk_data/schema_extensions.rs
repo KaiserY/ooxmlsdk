@@ -1425,6 +1425,7 @@ mod tests {
       types: vec![TypeDecl {
         rust_name: "ControlPropertiesChoice".to_string(),
         kind: TypeKind::ChoiceEnum,
+        estimated_size: 0,
         members: vec![MemberDecl::Variant(VariantDecl {
           rust_name: "RunProperties".to_string(),
           wire: VariantWireDecl::Child {
@@ -1487,6 +1488,7 @@ mod tests {
       types: vec![TypeDecl {
         rust_name: "RunChoice".to_string(),
         kind: TypeKind::ChoiceEnum,
+        estimated_size: 0,
         members: vec![MemberDecl::Variant(VariantDecl {
           rust_name: "Text".to_string(),
           wire: VariantWireDecl::Child {
@@ -1535,6 +1537,7 @@ mod tests {
         TypeDecl {
           rust_name: "DataLabel".to_string(),
           kind: TypeKind::ElementStruct,
+          estimated_size: 0,
           members: vec![MemberDecl::Field(FieldDecl {
             rust_name: "data_label_choice".to_string(),
             wire: FieldWireDecl::Choice,
@@ -1550,6 +1553,7 @@ mod tests {
         TypeDecl {
           rust_name: "DataLabelChoice".to_string(),
           kind: TypeKind::ChoiceEnum,
+          estimated_size: 0,
           members: vec![MemberDecl::Variant(VariantDecl {
             rust_name: "Delete".to_string(),
             wire: VariantWireDecl::Child {

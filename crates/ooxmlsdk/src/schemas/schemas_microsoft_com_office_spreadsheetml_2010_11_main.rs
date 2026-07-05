@@ -688,7 +688,7 @@ pub struct DataFeedProperties {
   pub connection: crate::simple_type::StringValue,
   /// Defines the DbTables Class.
   #[sdk(child(qname = "x15:dbTables"))]
-  pub db_tables: std::boxed::Box<DbTables>,
+  pub db_tables: DbTables,
 }
 /// Defines the FieldListActiveTabTopLevelEntity Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1188,7 +1188,7 @@ pub struct TimelineState {
   pub selection_timeline_range: Option<SelectionTimelineRange>,
   /// Defines the BoundsTimelineRange Class.
   #[sdk(child(qname = "x15:bounds"))]
-  pub bounds_timeline_range: std::boxed::Box<BoundsTimelineRange>,
+  pub bounds_timeline_range: BoundsTimelineRange,
   /// Defines the MovingPeriodState Class.
   #[sdk(child(qname = "x15:movingPeriodState"))]
   pub moving_period_state: Option<MovingPeriodState>,

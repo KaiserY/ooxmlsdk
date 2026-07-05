@@ -23,7 +23,7 @@ pub struct WebImageSupportingRichData {
   /// Defines the AddressWebImageSupportingRichDataRelationship Class.
   #[sdk(child(qname = "xlrdwi:address"))]
   pub address_web_image_supporting_rich_data_relationship:
-    std::boxed::Box<AddressWebImageSupportingRichDataRelationship>,
+    AddressWebImageSupportingRichDataRelationship,
   /// Defines the MoreImagesAddressWebImageSupportingRichDataRelationship Class.
   #[sdk(child(qname = "xlrdwi:moreImagesAddress"))]
   pub more_images_address_web_image_supporting_rich_data_relationship:

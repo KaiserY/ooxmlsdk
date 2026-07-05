@@ -5159,10 +5159,10 @@ pub struct Ruby {
   pub ruby_properties: std::boxed::Box<RubyProperties>,
   /// Phonetic Guide Text
   #[sdk(child(qname = "w:rt"))]
-  pub ruby_content: std::boxed::Box<RubyContent>,
+  pub ruby_content: RubyContent,
   /// Phonetic Guide Base Text
   #[sdk(child(qname = "w:rubyBase"))]
-  pub ruby_base: std::boxed::Box<RubyBase>,
+  pub ruby_base: RubyBase,
 }
 /// Footnote Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11729,19 +11729,19 @@ pub struct LanguageId {
 pub struct RubyProperties {
   /// Phonetic Guide Text Alignment
   #[sdk(child(qname = "w:rubyAlign"))]
-  pub ruby_align: std::boxed::Box<RubyAlign>,
+  pub ruby_align: RubyAlign,
   /// Phonetic Guide Text Font Size
   #[sdk(child(qname = "w:hps"))]
-  pub phonetic_guide_text_font_size: std::boxed::Box<PhoneticGuideTextFontSize>,
+  pub phonetic_guide_text_font_size: PhoneticGuideTextFontSize,
   /// Distance Between Phonetic Guide Text and Phonetic Guide Base Text
   #[sdk(child(qname = "w:hpsRaise"))]
-  pub phonetic_guide_raise: std::boxed::Box<PhoneticGuideRaise>,
+  pub phonetic_guide_raise: PhoneticGuideRaise,
   /// Phonetic Guide Base Text Font Size
   #[sdk(child(qname = "w:hpsBaseText"))]
-  pub phonetic_guide_base_text_size: std::boxed::Box<PhoneticGuideBaseTextSize>,
+  pub phonetic_guide_base_text_size: PhoneticGuideBaseTextSize,
   /// Language ID for Phonetic Guide
   #[sdk(child(qname = "w:lid"))]
-  pub language_id: std::boxed::Box<LanguageId>,
+  pub language_id: LanguageId,
   /// Invalidated Field Cache
   #[sdk(child(qname = "w:dirty"))]
   pub dirty: Option<Dirty>,
@@ -12771,10 +12771,10 @@ pub struct RecipientData {
   pub active: Option<Active>,
   /// Index of Column Containing Unique Values for Record
   #[sdk(child(qname = "w:column"))]
-  pub column_index: std::boxed::Box<ColumnIndex>,
+  pub column_index: ColumnIndex,
   /// Unique Value for Record
   #[sdk(child(qname = "w:uniqueTag"))]
-  pub unique_tag: std::boxed::Box<UniqueTag>,
+  pub unique_tag: UniqueTag,
 }
 /// Merge Field Mapping.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13755,7 +13755,7 @@ pub struct NumberingInstance {
   pub w_durable_id: Option<crate::simple_type::Int32Value>,
   /// Defines the AbstractNumId Class.
   #[sdk(child(qname = "w:abstractNumId"))]
-  pub abstract_num_id: std::boxed::Box<AbstractNumId>,
+  pub abstract_num_id: AbstractNumId,
   /// Defines the LevelOverride Class.
   #[sdk(child(qname = "w:lvlOverride"))]
   pub level_override: Vec<LevelOverride>,
@@ -14464,16 +14464,16 @@ pub struct Div {
   pub body_div: Option<BodyDiv>,
   /// Left Margin for HTML div
   #[sdk(child(qname = "w:marLeft"))]
-  pub left_margin_div: std::boxed::Box<LeftMarginDiv>,
+  pub left_margin_div: LeftMarginDiv,
   /// Right Margin for HTML div
   #[sdk(child(qname = "w:marRight"))]
-  pub right_margin_div: std::boxed::Box<RightMarginDiv>,
+  pub right_margin_div: RightMarginDiv,
   /// Top Margin for HTML div
   #[sdk(child(qname = "w:marTop"))]
-  pub top_margin_div: std::boxed::Box<TopMarginDiv>,
+  pub top_margin_div: TopMarginDiv,
   /// Bottom Margin for HTML div
   #[sdk(child(qname = "w:marBottom"))]
-  pub bottom_margin_div: std::boxed::Box<BottomMarginDiv>,
+  pub bottom_margin_div: BottomMarginDiv,
   /// Set of Borders for HTML div
   #[sdk(child(qname = "w:divBdr"))]
   pub div_border: Option<std::boxed::Box<DivBorder>>,
@@ -14815,7 +14815,7 @@ pub struct DocPartName {
 pub struct Category {
   /// Category Associated With Entry
   #[sdk(child(qname = "w:name"))]
-  pub name: std::boxed::Box<Name>,
+  pub name: Name,
   /// Gallery Associated With Entry
   #[sdk(child(qname = "w:gallery"))]
   pub gallery: std::boxed::Box<Gallery>,

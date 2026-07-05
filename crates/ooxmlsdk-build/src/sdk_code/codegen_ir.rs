@@ -1,3 +1,6 @@
+use std::collections::{HashMap, HashSet};
+
+use heck::ToUpperCamelCase;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -69,8 +72,14 @@ pub struct TypeDecl {
   pub base_module_path: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub xml_content: Option<TypeRefDecl>,
+  #[serde(skip_serializing_if = "is_zero_usize")]
+  pub estimated_size: usize,
   pub support: SystemSupportDecl,
   pub members: Vec<MemberDecl>,
+}
+
+fn is_zero_usize(value: &usize) -> bool {
+  *value == 0
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -241,6 +250,198 @@ pub struct TypeRefDecl {
   pub module_path: Option<String>,
 }
 
+const POINTER_SIZE: usize = 8;
+const VEC_SIZE: usize = 24;
+const STRING_SIZE: usize = 24;
+const OPTION_DISCRIMINANT_SIZE: usize = 8;
+const ESTIMATED_TYPE_SIZE_CAP: usize = 512;
+
+pub fn annotate_estimated_type_sizes(module: &mut SchemaModuleDecl) {
+  let type_indexes: HashMap<String, usize> = module
+    .types
+    .iter()
+    .enumerate()
+    .map(|(index, ty)| (ty.rust_name.to_upper_camel_case(), index))
+    .collect();
+  let mut memo = HashMap::<String, usize>::new();
+
+  for index in 0..module.types.len() {
+    let mut visiting = HashSet::new();
+    let size = estimate_type_decl_size(module, &type_indexes, index, &mut memo, &mut visiting);
+    module.types[index].estimated_size = size;
+  }
+}
+
+fn estimate_type_decl_size(
+  module: &SchemaModuleDecl,
+  type_indexes: &HashMap<String, usize>,
+  index: usize,
+  memo: &mut HashMap<String, usize>,
+  visiting: &mut HashSet<String>,
+) -> usize {
+  let ty = &module.types[index];
+  let key = ty.rust_name.to_upper_camel_case();
+  if let Some(size) = memo.get(&key) {
+    return *size;
+  }
+  if !visiting.insert(key.clone()) {
+    return POINTER_SIZE;
+  }
+
+  let mut size = estimate_support_size(&ty.support);
+  if let Some(base_rust_name) = &ty.base_rust_name
+    && ty.base_module_path.is_none()
+  {
+    size = size.saturating_add(estimate_schema_type_ref_size_by_name(
+      module,
+      type_indexes,
+      base_rust_name,
+      memo,
+      visiting,
+    ));
+  }
+  if let Some(xml_content) = &ty.xml_content {
+    size = size.saturating_add(estimate_type_ref_size(
+      module,
+      type_indexes,
+      xml_content,
+      memo,
+      visiting,
+    ));
+  }
+
+  match ty.kind {
+    TypeKind::ChoiceEnum => {
+      let max_variant_size = ty
+        .members
+        .iter()
+        .filter_map(|member| match member {
+          MemberDecl::Variant(variant) => Some(estimate_type_ref_size(
+            module,
+            type_indexes,
+            &variant.payload,
+            memo,
+            visiting,
+          )),
+          MemberDecl::Field(_) => None,
+        })
+        .max()
+        .unwrap_or(0);
+      size = size.saturating_add(max_variant_size + OPTION_DISCRIMINANT_SIZE);
+    }
+    TypeKind::ElementStruct | TypeKind::HelperStruct | TypeKind::LeafTextAlias => {
+      for member in &ty.members {
+        let MemberDecl::Field(field) = member else {
+          continue;
+        };
+        size = size.saturating_add(estimate_field_size(
+          module,
+          type_indexes,
+          field,
+          memo,
+          visiting,
+        ));
+      }
+    }
+  }
+
+  visiting.remove(&key);
+  size = size.min(ESTIMATED_TYPE_SIZE_CAP);
+  memo.insert(key, size);
+  size
+}
+
+fn estimate_support_size(support: &SystemSupportDecl) -> usize {
+  let mut size = 0usize;
+  if support.have_xmlns_fields {
+    size += VEC_SIZE;
+  }
+  if support.have_xml_other_attrs {
+    size += VEC_SIZE;
+  }
+  if support.have_xml_other_children {
+    size += VEC_SIZE;
+  }
+  if !support.extra_xmlns.is_empty() {
+    size += VEC_SIZE;
+  }
+  if !support.canonical_namespace_prefixes.is_empty() {
+    size += VEC_SIZE;
+  }
+  size
+}
+
+fn estimate_field_size(
+  module: &SchemaModuleDecl,
+  type_indexes: &HashMap<String, usize>,
+  field: &FieldDecl,
+  memo: &mut HashMap<String, usize>,
+  visiting: &mut HashSet<String>,
+) -> usize {
+  match field.cardinality {
+    Cardinality::Many => VEC_SIZE,
+    Cardinality::Optional => {
+      estimate_type_ref_size(module, type_indexes, &field.type_ref, memo, visiting)
+        .saturating_add(OPTION_DISCRIMINANT_SIZE)
+    }
+    Cardinality::One => {
+      estimate_type_ref_size(module, type_indexes, &field.type_ref, memo, visiting)
+    }
+  }
+}
+
+fn estimate_type_ref_size(
+  module: &SchemaModuleDecl,
+  type_indexes: &HashMap<String, usize>,
+  type_ref: &TypeRefDecl,
+  memo: &mut HashMap<String, usize>,
+  visiting: &mut HashSet<String>,
+) -> usize {
+  if type_ref.module_path.is_some() {
+    return estimate_external_type_size(type_ref);
+  }
+  estimate_schema_type_ref_size_by_name(module, type_indexes, &type_ref.rust_type, memo, visiting)
+}
+
+fn estimate_schema_type_ref_size_by_name(
+  module: &SchemaModuleDecl,
+  type_indexes: &HashMap<String, usize>,
+  rust_type: &str,
+  memo: &mut HashMap<String, usize>,
+  visiting: &mut HashSet<String>,
+) -> usize {
+  let rust_name = rust_type.to_upper_camel_case();
+  if let Some(index) = type_indexes.get(&rust_name) {
+    return estimate_type_decl_size(module, type_indexes, *index, memo, visiting);
+  }
+  estimate_named_rust_type_size(&rust_name)
+}
+
+fn estimate_external_type_size(type_ref: &TypeRefDecl) -> usize {
+  match type_ref.module_path.as_deref() {
+    Some("crate::simple_type") => estimate_named_rust_type_size(&type_ref.rust_type),
+    Some(_) => POINTER_SIZE,
+    None => estimate_named_rust_type_size(&type_ref.rust_type),
+  }
+}
+
+fn estimate_named_rust_type_size(rust_type: &str) -> usize {
+  match rust_type {
+    "bool" | "BooleanValue" | "OnOffValue" => 1,
+    "i8" | "u8" | "ByteValue" | "SByteValue" => 1,
+    "i16" | "u16" | "Int16Value" | "UInt16Value" => 2,
+    "i32" | "u32" | "Int32Value" | "UInt32Value" | "IntegerValue" | "EnumValue" => 4,
+    "i64" | "u64" | "Int64Value" | "UInt64Value" | "DoubleValue" | "DateTimeValue" => 8,
+    "f32" | "SingleValue" => 4,
+    "f64" => 8,
+    "String" | "StringValue" | "HexBinaryValue" | "Base64BinaryValue" => STRING_SIZE,
+    _ if rust_type.starts_with("Vec<") => VEC_SIZE,
+    _ if rust_type.starts_with("Option<") => POINTER_SIZE + OPTION_DISCRIMINANT_SIZE,
+    _ if rust_type.starts_with("Box<") => POINTER_SIZE,
+    _ => POINTER_SIZE,
+  }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct ValidatorDecl {
@@ -357,6 +558,7 @@ mod tests {
           extra_xmlns: Vec::new(),
           canonical_namespace_prefixes: Vec::new(),
         },
+        estimated_size: 0,
         members: vec![
           MemberDecl::Field(FieldDecl {
             rust_name: "id".to_string(),
@@ -437,6 +639,7 @@ mod tests {
         base_module_path: None,
         xml_content: None,
         support: SystemSupportDecl::default(),
+        estimated_size: 0,
         members: vec![MemberDecl::Variant(VariantDecl {
           rust_name: "Text".to_string(),
           docs: String::new(),

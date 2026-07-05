@@ -16,7 +16,7 @@ pub struct TaskDetails {
   pub inactive: Option<crate::simple_type::BooleanValue>,
   /// Defines the TaskHistory Class.
   #[sdk(child(qname = "p228:history"))]
-  pub task_history: std::boxed::Box<TaskHistory>,
+  pub task_history: TaskHistory,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p228:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -63,7 +63,7 @@ pub struct AsgnTaskAssignUnassignUser {
 pub struct TaskAnchor {
   /// Defines the CommentAnchor Class.
   #[sdk(child(qname = "p228:comment"))]
-  pub comment_anchor: std::boxed::Box<CommentAnchor>,
+  pub comment_anchor: CommentAnchor,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p228:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -120,7 +120,7 @@ pub struct TaskHistoryEvent {
   pub id: crate::simple_type::StringValue,
   /// Defines the AtrbtnTaskAssignUnassignUser Class.
   #[sdk(child(qname = "p228:atrbtn"))]
-  pub atrbtn_task_assign_unassign_user: std::boxed::Box<AtrbtnTaskAssignUnassignUser>,
+  pub atrbtn_task_assign_unassign_user: AtrbtnTaskAssignUnassignUser,
   /// Defines the TaskAnchor Class.
   #[sdk(child(qname = "p228:anchr"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,

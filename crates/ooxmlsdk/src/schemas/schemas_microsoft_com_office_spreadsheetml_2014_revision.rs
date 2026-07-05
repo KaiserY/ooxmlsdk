@@ -1337,7 +1337,7 @@ pub struct SparklineGroup {
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the Sparklines Class.
   #[sdk(child(qname = "x14:sparklines"))]
-  pub sparklines: std::boxed::Box<crate::schemas::x14::Sparklines>,
+  pub sparklines: crate::schemas::x14::Sparklines,
 }
 /// Represents one comment within a cell..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1345,10 +1345,10 @@ pub struct SparklineGroup {
 pub struct Comments {
   /// Authors
   #[sdk(child(qname = "x:authors"))]
-  pub authors: std::boxed::Box<crate::schemas::x::Authors>,
+  pub authors: crate::schemas::x::Authors,
   /// List of Comments
   #[sdk(child(qname = "x:commentList"))]
-  pub comment_list: std::boxed::Box<crate::schemas::x::CommentList>,
+  pub comment_list: crate::schemas::x::CommentList,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:extLst"))]
   pub extension_list: Option<crate::schemas::x::ExtensionList>,

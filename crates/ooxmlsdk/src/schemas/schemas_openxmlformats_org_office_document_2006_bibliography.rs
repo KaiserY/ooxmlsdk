@@ -199,7 +199,7 @@ pub struct NameList {
 pub struct Artist {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Book Author.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -207,7 +207,7 @@ pub struct Artist {
 pub struct BookAuthor {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Compiler.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -215,7 +215,7 @@ pub struct BookAuthor {
 pub struct Compiler {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Composer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -223,7 +223,7 @@ pub struct Compiler {
 pub struct Composer {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Conductor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -231,7 +231,7 @@ pub struct Composer {
 pub struct Conductor {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Counsel.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -239,7 +239,7 @@ pub struct Conductor {
 pub struct Counsel {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Director.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -247,7 +247,7 @@ pub struct Counsel {
 pub struct Director {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Editor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -255,7 +255,7 @@ pub struct Director {
 pub struct Editor {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Interviewee.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -263,7 +263,7 @@ pub struct Editor {
 pub struct Interviewee {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Interviewer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -271,7 +271,7 @@ pub struct Interviewee {
 pub struct Interviewer {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Inventor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -279,7 +279,7 @@ pub struct Interviewer {
 pub struct Inventor {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Producer Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -287,7 +287,7 @@ pub struct Inventor {
 pub struct ProducerName {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Translator.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -295,7 +295,7 @@ pub struct ProducerName {
 pub struct Translator {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Writer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -303,7 +303,7 @@ pub struct Translator {
 pub struct Writer {
   /// Name List
   #[sdk(child(qname = "b:NameList"))]
-  pub name_list: std::boxed::Box<NameList>,
+  pub name_list: NameList,
 }
 /// Author.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

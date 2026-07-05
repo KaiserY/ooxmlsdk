@@ -186,7 +186,7 @@ pub struct Inline {
   pub edit_id: Option<crate::simple_type::HexBinaryValue>,
   /// Drawing Object Size
   #[sdk(child(qname = "wp:extent"))]
-  pub extent: std::boxed::Box<Extent>,
+  pub extent: Extent,
   /// Inline Wrapping Extent
   #[sdk(child(qname = "wp:effectExtent"))]
   pub effect_extent: Option<EffectExtent>,
@@ -259,7 +259,7 @@ pub struct Anchor {
   pub vertical_position: Option<std::boxed::Box<VerticalPosition>>,
   /// Inline Drawing Object Extents
   #[sdk(child(qname = "wp:extent"))]
-  pub extent: std::boxed::Box<Extent>,
+  pub extent: Extent,
   /// Object Extents Including Effects.
   #[sdk(child(qname = "wp:effectExtent"))]
   pub effect_extent: Option<EffectExtent>,
@@ -357,7 +357,7 @@ pub struct WrapPolygon {
   pub edited: Option<crate::simple_type::BooleanValue>,
   /// Wrapping Polygon Start
   #[sdk(child(qname = "wp:start"))]
-  pub start_point: std::boxed::Box<StartPoint>,
+  pub start_point: StartPoint,
   /// Wrapping Polygon Line End Position.
   #[sdk(child(qname = "wp:lineTo"))]
   pub line_to: Vec<LineTo>,

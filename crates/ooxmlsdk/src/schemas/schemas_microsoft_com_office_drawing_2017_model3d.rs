@@ -256,7 +256,7 @@ pub struct LookAtPoint3D {
 pub struct OrthographicProjection {
   /// Defines the SzPositiveRatio Class.
   #[sdk(child(qname = "am3d:sz"))]
-  pub sz_positive_ratio: std::boxed::Box<SzPositiveRatio>,
+  pub sz_positive_ratio: SzPositiveRatio,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
@@ -401,13 +401,13 @@ pub struct ShapeProperties {
 pub struct Model3DCamera {
   /// Defines the PosPoint3D Class.
   #[sdk(child(qname = "am3d:pos"))]
-  pub pos_point3_d: std::boxed::Box<PosPoint3D>,
+  pub pos_point3_d: PosPoint3D,
   /// Defines the UpVector3D Class.
   #[sdk(child(qname = "am3d:up"))]
-  pub up_vector3_d: std::boxed::Box<UpVector3D>,
+  pub up_vector3_d: UpVector3D,
   /// Defines the LookAtPoint3D Class.
   #[sdk(child(qname = "am3d:lookAt"))]
-  pub look_at_point3_d: std::boxed::Box<LookAtPoint3D>,
+  pub look_at_point3_d: LookAtPoint3D,
   #[sdk(
         choice(
             child(variant = OrthographicProjection, qname = "am3d:orthographic"),
@@ -504,7 +504,7 @@ pub struct AmbientLight {
   pub color_type: std::boxed::Box<ColorType>,
   /// Defines the IlluminancePositiveRatio Class.
   #[sdk(child(qname = "am3d:illuminance"))]
-  pub illuminance_positive_ratio: std::boxed::Box<IlluminancePositiveRatio>,
+  pub illuminance_positive_ratio: IlluminancePositiveRatio,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
@@ -525,10 +525,10 @@ pub struct PointLight {
   pub color_type: std::boxed::Box<ColorType>,
   /// Defines the IntensityPositiveRatio Class.
   #[sdk(child(qname = "am3d:intensity"))]
-  pub intensity_positive_ratio: std::boxed::Box<IntensityPositiveRatio>,
+  pub intensity_positive_ratio: IntensityPositiveRatio,
   /// Defines the PosPoint3D Class.
   #[sdk(child(qname = "am3d:pos"))]
-  pub pos_point3_d: std::boxed::Box<PosPoint3D>,
+  pub pos_point3_d: PosPoint3D,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
@@ -553,13 +553,13 @@ pub struct SpotLight {
   pub color_type: std::boxed::Box<ColorType>,
   /// Defines the IntensityPositiveRatio Class.
   #[sdk(child(qname = "am3d:intensity"))]
-  pub intensity_positive_ratio: std::boxed::Box<IntensityPositiveRatio>,
+  pub intensity_positive_ratio: IntensityPositiveRatio,
   /// Defines the PosPoint3D Class.
   #[sdk(child(qname = "am3d:pos"))]
-  pub pos_point3_d: std::boxed::Box<PosPoint3D>,
+  pub pos_point3_d: PosPoint3D,
   /// Defines the LookAtPoint3D Class.
   #[sdk(child(qname = "am3d:lookAt"))]
-  pub look_at_point3_d: std::boxed::Box<LookAtPoint3D>,
+  pub look_at_point3_d: LookAtPoint3D,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
@@ -580,13 +580,13 @@ pub struct DirectionalLight {
   pub color_type: std::boxed::Box<ColorType>,
   /// Defines the IlluminancePositiveRatio Class.
   #[sdk(child(qname = "am3d:illuminance"))]
-  pub illuminance_positive_ratio: std::boxed::Box<IlluminancePositiveRatio>,
+  pub illuminance_positive_ratio: IlluminancePositiveRatio,
   /// Defines the PosPoint3D Class.
   #[sdk(child(qname = "am3d:pos"))]
-  pub pos_point3_d: std::boxed::Box<PosPoint3D>,
+  pub pos_point3_d: PosPoint3D,
   /// Defines the LookAtPoint3D Class.
   #[sdk(child(qname = "am3d:lookAt"))]
-  pub look_at_point3_d: std::boxed::Box<LookAtPoint3D>,
+  pub look_at_point3_d: LookAtPoint3D,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,

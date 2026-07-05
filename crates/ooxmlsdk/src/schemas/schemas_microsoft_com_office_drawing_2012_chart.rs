@@ -13,7 +13,7 @@ pub struct PivotSource {
   pub pivot_table_name: crate::schemas::c::PivotTableName,
   /// Format ID
   #[sdk(child(qname = "c:fmtId"))]
-  pub format_id: std::boxed::Box<crate::schemas::c::FormatId>,
+  pub format_id: crate::schemas::c::FormatId,
   /// Chart Extensibility
   #[sdk(child(qname = "c:extLst"))]
   pub extension_list: Option<crate::schemas::c::ExtensionList>,
@@ -316,10 +316,10 @@ pub struct AxisDataSourceType {
 pub struct BarChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<crate::schemas::c::Index>,
+  pub index: crate::schemas::c::Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<crate::schemas::c::Order>,
+  pub order: crate::schemas::c::Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
@@ -363,10 +363,10 @@ pub struct BarChartSeries {
 pub struct LineChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<crate::schemas::c::Index>,
+  pub index: crate::schemas::c::Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<crate::schemas::c::Order>,
+  pub order: crate::schemas::c::Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
@@ -410,10 +410,10 @@ pub struct LineChartSeries {
 pub struct ScatterChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<crate::schemas::c::Index>,
+  pub index: crate::schemas::c::Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<crate::schemas::c::Order>,
+  pub order: crate::schemas::c::Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
@@ -454,10 +454,10 @@ pub struct ScatterChartSeries {
 pub struct AreaChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<crate::schemas::c::Index>,
+  pub index: crate::schemas::c::Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<crate::schemas::c::Order>,
+  pub order: crate::schemas::c::Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
@@ -495,10 +495,10 @@ pub struct AreaChartSeries {
 pub struct PieChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<crate::schemas::c::Index>,
+  pub index: crate::schemas::c::Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<crate::schemas::c::Order>,
+  pub order: crate::schemas::c::Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
@@ -533,10 +533,10 @@ pub struct PieChartSeries {
 pub struct BubbleChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<crate::schemas::c::Index>,
+  pub index: crate::schemas::c::Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<crate::schemas::c::Order>,
+  pub order: crate::schemas::c::Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
@@ -583,10 +583,10 @@ pub struct BubbleChartSeries {
 pub struct RadarChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<crate::schemas::c::Index>,
+  pub index: crate::schemas::c::Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<crate::schemas::c::Order>,
+  pub order: crate::schemas::c::Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
@@ -621,10 +621,10 @@ pub struct RadarChartSeries {
 pub struct SurfaceChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<crate::schemas::c::Index>,
+  pub index: crate::schemas::c::Index,
   /// Order
   #[sdk(child(qname = "c:order"))]
-  pub order: std::boxed::Box<crate::schemas::c::Order>,
+  pub order: crate::schemas::c::Order,
   /// Series Text
   #[sdk(child(qname = "c:tx"))]
   pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
@@ -706,7 +706,7 @@ pub struct Marker {
 pub struct DataLabel {
   /// Index.
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<crate::schemas::c::Index>,
+  pub index: crate::schemas::c::Index,
   #[sdk(
         choice(
             child(variant = Delete, qname = "c:delete"),

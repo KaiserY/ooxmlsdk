@@ -5008,7 +5008,7 @@ fn inline_image_impl(
     }
     w::DrawingChoice::Anchor(anchor) => {
       let graphic = anchor.graphic.as_ref();
-      let extent = anchor.extent.as_ref();
+      let extent = &anchor.extent;
       let properties = drawing_image_properties(&graphic.graphic_data, &styles.theme_colors)?;
       let relationship_id = properties.relationship_id.as_deref()?;
       let resource = images.by_relationship_id.get(relationship_id)?;
@@ -7314,7 +7314,7 @@ fn drawing_chart_extent_and_placement(drawing: &w::Drawing) -> Option<(f32, f32,
       ImagePlacement::Inline,
     )),
     w::DrawingChoice::Anchor(anchor) => {
-      let extent = anchor.extent.as_ref();
+      let extent = &anchor.extent;
       Some((
         units::emu_to_points(extent.cx),
         units::emu_to_points(extent.cy),
@@ -7331,7 +7331,7 @@ fn drawing_extent_size(drawing: &w::Drawing) -> Option<(f32, f32)> {
       units::emu_to_points(inline.extent.cy),
     )),
     w::DrawingChoice::Anchor(anchor) => {
-      let extent = anchor.extent.as_ref();
+      let extent = &anchor.extent;
       Some((
         units::emu_to_points(extent.cx),
         units::emu_to_points(extent.cy),
@@ -7732,7 +7732,7 @@ fn anchor_wrap_polygon_shape(
   anchor: &wp::Anchor,
   placement: ImagePlacement,
 ) -> Option<InlineShape> {
-  let extent = anchor.extent.as_ref();
+  let extent = &anchor.extent;
   let width_pt = units::emu_to_points(extent.cx);
   let height_pt = units::emu_to_points(extent.cy);
   let geometry = anchor_wrap_polygon_geometry(anchor, width_pt, height_pt)?;
@@ -14482,12 +14482,12 @@ mod tests {
   fn ruby_runs_emit_base_text() {
     let mut inlines = Vec::new();
     let ruby = w::Ruby {
-      ruby_base: Box::new(w::RubyBase {
+      ruby_base: w::RubyBase {
         ruby_base_choice: vec![w::RubyBaseChoice::WRun(Box::new(w::Run {
           run_choice: vec![w::RunChoice::Text(text("漢"))],
           ..Default::default()
         }))],
-      }),
+      },
       ..Default::default()
     };
     let run = w::Run {

@@ -207,7 +207,7 @@ pub struct ImageProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ImageLayer Class.
   #[sdk(child(qname = "a14:imgLayer"))]
-  pub image_layer: std::boxed::Box<ImageLayer>,
+  pub image_layer: ImageLayer,
 }
 /// Defines the UseLocalDpi Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

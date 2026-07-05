@@ -1594,10 +1594,10 @@ pub struct Comments {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Authors
   #[sdk(child(qname = "x:authors"))]
-  pub authors: std::boxed::Box<Authors>,
+  pub authors: Authors,
   /// List of Comments
   #[sdk(child(qname = "x:commentList"))]
-  pub comment_list: std::boxed::Box<CommentList>,
+  pub comment_list: CommentList,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -1695,7 +1695,7 @@ pub struct PivotCacheDefinition {
   pub cache_source: std::boxed::Box<CacheSource>,
   /// Defines the CacheFields Class.
   #[sdk(child(qname = "x:cacheFields"))]
-  pub cache_fields: std::boxed::Box<CacheFields>,
+  pub cache_fields: CacheFields,
   /// Defines the CacheHierarchies Class.
   #[sdk(child(qname = "x:cacheHierarchies"))]
   pub cache_hierarchies: Option<CacheHierarchies>,
@@ -2213,7 +2213,7 @@ pub struct Worksheet {
   pub columns: Vec<Columns>,
   /// Sheet Data.
   #[sdk(child(qname = "x:sheetData"))]
-  pub sheet_data: std::boxed::Box<SheetData>,
+  pub sheet_data: SheetData,
   /// Defines the SheetCalculationProperties Class.
   #[sdk(child(qname = "x:sheetCalcPr"))]
   pub sheet_calculation_properties: Option<SheetCalculationProperties>,
@@ -2339,7 +2339,7 @@ pub struct Chartsheet {
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
   /// Drawing
   #[sdk(child(qname = "x:drawing"))]
-  pub drawing: std::boxed::Box<Drawing>,
+  pub drawing: Drawing,
   /// Defines the LegacyDrawing Class.
   #[sdk(child(qname = "x:legacyDrawing"))]
   pub legacy_drawing: Option<LegacyDrawing>,
@@ -2396,7 +2396,7 @@ pub struct DialogSheet {
   pub drawing: Option<Drawing>,
   /// Legacy Drawing
   #[sdk(child(qname = "x:legacyDrawing"))]
-  pub legacy_drawing: std::boxed::Box<LegacyDrawing>,
+  pub legacy_drawing: LegacyDrawing,
   /// Legacy Drawing Header Footer
   #[sdk(child(qname = "x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
@@ -2587,7 +2587,7 @@ pub struct Table {
   pub sort_state: Option<std::boxed::Box<SortState>>,
   /// Table Columns
   #[sdk(child(qname = "x:tableColumns"))]
-  pub table_columns: std::boxed::Box<TableColumns>,
+  pub table_columns: TableColumns,
   /// Table Style
   #[sdk(child(qname = "x:tableStyleInfo"))]
   pub table_style_info: Option<TableStyleInfo>,
@@ -2637,7 +2637,7 @@ pub struct Workbook {
   pub book_views: Option<BookViews>,
   /// Defines the Sheets Class.
   #[sdk(child(qname = "x:sheets"))]
-  pub sheets: std::boxed::Box<Sheets>,
+  pub sheets: Sheets,
   /// Defines the FunctionGroups Class.
   #[sdk(child(qname = "x:functionGroups"))]
   pub function_groups: Option<FunctionGroups>,
@@ -3650,7 +3650,7 @@ pub struct Group {
   pub id: Option<crate::simple_type::Int32Value>,
   /// OLAP Group Members
   #[sdk(child(qname = "x:groupMembers"))]
-  pub group_members: std::boxed::Box<GroupMembers>,
+  pub group_members: GroupMembers,
 }
 /// OLAP Group Members.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4161,7 +4161,7 @@ pub struct ConditionalFormat {
   pub priority: crate::simple_type::UInt32Value,
   /// Pivot Areas
   #[sdk(child(qname = "x:pivotAreas"))]
-  pub pivot_areas: std::boxed::Box<PivotAreas>,
+  pub pivot_areas: PivotAreas,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -5017,7 +5017,7 @@ pub struct Header {
   pub max_revision_id: Option<crate::simple_type::UInt32Value>,
   /// Sheet Id Map
   #[sdk(child(qname = "x:sheetIdMap"))]
-  pub sheet_id_map: std::boxed::Box<SheetIdMap>,
+  pub sheet_id_map: SheetIdMap,
   /// Reviewed List
   #[sdk(child(qname = "x:reviewedList"))]
   pub reviewed_list: Option<ReviewedList>,
@@ -9006,7 +9006,7 @@ pub struct Consolidation {
   pub pages: Option<Pages>,
   /// Range Sets
   #[sdk(child(qname = "x:rangeSets"))]
-  pub range_sets: std::boxed::Box<RangeSets>,
+  pub range_sets: RangeSets,
 }
 /// Defines the CacheSourceExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9721,7 +9721,7 @@ pub struct QueryTableRefresh {
   pub unbound_columns_right: Option<crate::simple_type::UInt32Value>,
   /// Query table fields
   #[sdk(child(qname = "x:queryTableFields"))]
-  pub query_table_fields: std::boxed::Box<QueryTableFields>,
+  pub query_table_fields: QueryTableFields,
   /// Deleted Fields
   #[sdk(child(qname = "x:queryTableDeletedFields"))]
   pub query_table_deleted_fields: Option<QueryTableDeletedFields>,

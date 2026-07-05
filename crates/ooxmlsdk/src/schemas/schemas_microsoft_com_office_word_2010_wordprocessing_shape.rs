@@ -322,7 +322,7 @@ pub enum ShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -346,7 +346,7 @@ pub enum TextBodyPropertiesChoice {
   /// No AutoFit.
   NoAutoFit,
   /// Normal AutoFit.
-  NormalAutoFit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
+  NormalAutoFit(crate::schemas::a::NormalAutoFit),
   /// Shape AutoFit.
   ShapeAutoFit,
 }
@@ -355,5 +355,5 @@ pub enum TextBodyPropertiesChoice2 {
   /// Apply 3D shape properties.
   Shape3DType(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
-  FlatText(std::boxed::Box<crate::schemas::a::FlatText>),
+  FlatText(crate::schemas::a::FlatText),
 }

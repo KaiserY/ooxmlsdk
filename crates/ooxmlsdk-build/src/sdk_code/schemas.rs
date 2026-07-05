@@ -2652,7 +2652,12 @@ fn gen_choice_variant_tokens(
           &variant.payload,
           render_context.type_graph,
         );
-        let payload_tokens = if is_any_children_alias {
+        let payload_tokens = if is_any_children_alias
+          || choice_child_variant_can_inline(
+            &variant.payload,
+            render_context.module,
+            render_context.type_graph,
+          ) {
           quote! { #payload_type }
         } else {
           quote! { std::boxed::Box<#payload_type> }
@@ -3514,6 +3519,8 @@ fn schema_type_key_from_ref(module: &SchemaModuleDecl, type_ref: &TypeRefDecl) -
 
 const DIRECT_CHILD_INLINE_SIZE_LIMIT: usize = 64;
 const DIRECT_CHILD_INLINE_DEPTH_LIMIT: usize = 2;
+const CHOICE_CHILD_INLINE_SIZE_LIMIT: usize = 96;
+const CHOICE_CHILD_INLINE_DEPTH_LIMIT: usize = 2;
 
 fn type_graph_small_leaf_like(
   type_graph: &TypeContainmentGraph,
@@ -3544,6 +3551,21 @@ fn direct_child_field_can_inline(
     && type_graph
       .shallow_depth(&target_key)
       .is_some_and(|depth| depth <= DIRECT_CHILD_INLINE_DEPTH_LIMIT)
+}
+
+fn choice_child_variant_can_inline(
+  payload: &TypeRefDecl,
+  module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
+) -> bool {
+  let Some(target_key) = schema_type_key_from_ref(module, payload) else {
+    return false;
+  };
+
+  type_graph_small_leaf_like(type_graph, &target_key, CHOICE_CHILD_INLINE_SIZE_LIMIT)
+    && type_graph
+      .shallow_depth(&target_key)
+      .is_some_and(|depth| depth <= CHOICE_CHILD_INLINE_DEPTH_LIMIT)
 }
 
 fn direct_child_field_needs_box(
@@ -4924,8 +4946,8 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum HolderChoice"));
-    assert!(generated.contains("TFirst (std :: boxed :: Box < First >)"));
-    assert!(generated.contains("TSecond (std :: boxed :: Box < Second >)"));
+    assert!(generated.contains("TFirst (First)"));
+    assert!(generated.contains("TSecond (Second)"));
     assert!(!generated.contains("# [sdk (choice)] Choice1"));
     assert!(!generated.contains("pub enum HolderChoice1"));
   }
@@ -5023,7 +5045,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum HolderChoice"));
-    assert!(generated.contains("Choice (std :: boxed :: Box < HolderChoice2 >)"));
+    assert!(generated.contains("Choice (HolderChoice2)"));
   }
 
   #[test]
@@ -5164,8 +5186,8 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum HolderChoice"));
-    assert!(generated.contains("Choice1 (std :: boxed :: Box <"));
-    assert!(generated.contains("Choice2 (std :: boxed :: Box <"));
+    assert!(generated.contains("Choice1 (HolderChoice2)"));
+    assert!(generated.contains("Second (std :: boxed :: Box < Second >)"));
   }
 
   #[test]
@@ -5259,8 +5281,8 @@ mod tests {
 
     assert!(generated.contains("pub enum HolderChoice2"));
     assert!(generated.contains("pub enum HolderChoice3"));
-    assert!(generated.contains("Choice1 (std :: boxed :: Box < HolderChoice2 >)"));
-    assert!(generated.contains("Choice2 (std :: boxed :: Box < HolderChoice3 >)"));
+    assert!(generated.contains("Choice1 (HolderChoice2)"));
+    assert!(generated.contains("Choice2 (HolderChoice3)"));
   }
 
   #[test]
@@ -5360,8 +5382,8 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum HolderChoice"));
-    assert!(generated.contains("Choice1 (std :: boxed :: Box <"));
-    assert!(generated.contains("Choice2 (std :: boxed :: Box <"));
+    assert!(generated.contains("Choice1 (HolderChoice2)"));
+    assert!(generated.contains("Choice2 (HolderChoice3)"));
   }
 
   #[test]
@@ -5482,7 +5504,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum RootChoice"));
-    assert!(generated.contains("Choice (std :: boxed :: Box < RootChoice2 >)"));
+    assert!(generated.contains("Choice (RootChoice2)"));
   }
 
   #[test]
@@ -5773,8 +5795,8 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum RootChoice"));
-    assert!(generated.contains("TThird (std :: boxed :: Box < Third >)"));
-    assert!(generated.contains("Choice (std :: boxed :: Box < RootChoice2 >)"));
+    assert!(generated.contains("TThird (Third)"));
+    assert!(generated.contains("Choice (RootChoice2)"));
   }
 
   #[test]
@@ -5877,7 +5899,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum RootChoice"));
-    assert!(generated.contains("Choice (std :: boxed :: Box < RangeMarkupChoice >)"));
+    assert!(generated.contains("Choice (RangeMarkupChoice)"));
     assert!(generated.contains("pub enum RangeMarkupChoice"));
   }
 
@@ -5966,7 +5988,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum RangeMarkupChoice"));
-    assert!(generated.contains("Choice (std :: boxed :: Box < RangeMarkupChoice >)"));
+    assert!(generated.contains("Choice (RangeMarkupChoice)"));
   }
 
   #[test]
@@ -6239,7 +6261,7 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("Sequence (std :: boxed :: Box < First >)"));
+    assert!(generated.contains("Sequence (First)"));
     assert!(generated.contains("Second (std :: boxed :: Box < Second >)"));
   }
 
@@ -6429,8 +6451,8 @@ mod tests {
     assert!(generated.contains("pub table_grid : TableGrid"));
     assert!(generated.contains("pub after_choice : Vec < BodyLikeChoice2 >"));
     assert!(generated.contains("pub enum BodyLikeChoice"));
-    assert!(generated.contains("TBookmarkStart (std :: boxed :: Box < BookmarkStart >)"));
-    assert!(generated.contains("TBookmarkEnd (std :: boxed :: Box < BookmarkEnd >)"));
+    assert!(generated.contains("TBookmarkStart (BookmarkStart)"));
+    assert!(generated.contains("TBookmarkEnd (BookmarkEnd)"));
 
     let before_idx = generated
       .find("pub before_choice : Vec < BodyLikeChoice >")
@@ -6610,7 +6632,7 @@ mod tests {
     assert!(generated.contains("# [doc = \" Defines the Marker Class.\"]"));
     assert!(generated.contains("TMarker ,"));
     assert!(generated.contains("# [doc = \" Defines the AttributedMarker Class.\"]"));
-    assert!(generated.contains("TAttributedMarker (std :: boxed :: Box < AttributedMarker >)"));
+    assert!(generated.contains("TAttributedMarker (AttributedMarker)"));
   }
 
   #[test]
@@ -7081,9 +7103,9 @@ mod tests {
     assert!(generated.contains("pub mixed_holder_choice : Option < MixedHolderChoice >"));
     assert!(generated.contains("pub trailing_leaf : LeafD"));
     assert!(generated.contains("pub enum MixedHolderChoice"));
-    assert!(generated.contains("LeafB (std :: boxed :: Box < LeafB >)"));
-    assert!(generated.contains("LeafC (std :: boxed :: Box < LeafC >)"));
-    assert!(generated.contains("LeafD (std :: boxed :: Box < LeafD >)"));
+    assert!(generated.contains("B (LeafB)"));
+    assert!(generated.contains("LeafC (LeafC)"));
+    assert!(generated.contains("LeafD (LeafD)"));
   }
 
   #[test]
@@ -7154,7 +7176,7 @@ mod tests {
 
     assert!(generated.contains("pub fallback_holder_choice : Option < FallbackHolderChoice >"));
     assert!(generated.contains("pub enum FallbackHolderChoice"));
-    assert!(generated.contains("A (std :: boxed :: Box < LeafA >)"));
+    assert!(generated.contains("A (LeafA)"));
     assert!(generated.contains("LeafB (std :: boxed :: Box < LeafB >)"));
     assert!(!generated.contains("pub struct FallbackHolderChoiceSequence2"));
     assert!(!generated.contains("leaf_b"));

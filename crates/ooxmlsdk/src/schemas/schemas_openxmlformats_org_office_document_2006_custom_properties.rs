@@ -139,9 +139,9 @@ pub struct CustomDocumentProperty {
 #[derive(Clone, Debug, PartialEq)]
 pub enum CustomDocumentPropertyChoice {
   /// Vector.
-  VtVector(std::boxed::Box<crate::schemas::vt::VtVector>),
+  VtVector(crate::schemas::vt::VtVector),
   /// Array.
-  VtArray(std::boxed::Box<crate::schemas::vt::VtArray>),
+  VtArray(crate::schemas::vt::VtArray),
   /// Binary Blob.
   VtBlob(crate::schemas::vt::VtBlob),
   /// Binary Blob Object.
@@ -201,9 +201,9 @@ pub enum CustomDocumentPropertyChoice {
   /// Binary Storage Object.
   VtoStorage(crate::schemas::vt::VtoStorage),
   /// Binary Versioned Stream.
-  VtvStreamData(std::boxed::Box<crate::schemas::vt::VtvStreamData>),
+  VtvStreamData(crate::schemas::vt::VtvStreamData),
   /// Class ID.
   VtClassId(crate::schemas::vt::VtClassId),
   /// Clipboard Data.
-  VtClipboardData(std::boxed::Box<crate::schemas::vt::VtClipboardData>),
+  VtClipboardData(crate::schemas::vt::VtClipboardData),
 }

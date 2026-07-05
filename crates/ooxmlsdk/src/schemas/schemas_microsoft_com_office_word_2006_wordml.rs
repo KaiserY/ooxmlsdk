@@ -340,11 +340,11 @@ pub enum KeyMapEntryChoice {
   /// Defines the FixedCommandKeyboardCustomization Class.
   FixedCommandKeyboardCustomization(std::boxed::Box<FixedCommandKeyboardCustomization>),
   /// Defines the MacroKeyboardCustomization Class.
-  MacroKeyboardCustomization(std::boxed::Box<MacroKeyboardCustomization>),
+  MacroKeyboardCustomization(MacroKeyboardCustomization),
   /// Defines the AllocatedCommandKeyboardCustomization Class.
-  AllocatedCommandKeyboardCustomization(std::boxed::Box<AllocatedCommandKeyboardCustomization>),
+  AllocatedCommandKeyboardCustomization(AllocatedCommandKeyboardCustomization),
   /// Defines the WllMacroKeyboardCustomization Class.
-  WllMacroKeyboardCustomization(std::boxed::Box<WllMacroKeyboardCustomization>),
+  WllMacroKeyboardCustomization(WllMacroKeyboardCustomization),
   /// Defines the CharacterInsertion Class.
-  CharacterInsertion(std::boxed::Box<CharacterInsertion>),
+  CharacterInsertion(CharacterInsertion),
 }

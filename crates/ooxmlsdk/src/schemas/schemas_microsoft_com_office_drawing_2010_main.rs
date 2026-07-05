@@ -801,7 +801,7 @@ pub struct Transform2D {
 #[derive(Clone, Debug, PartialEq)]
 pub enum HiddenFillPropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -816,7 +816,7 @@ pub enum HiddenFillPropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum HiddenLinePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -827,9 +827,9 @@ pub enum HiddenLinePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum HiddenLinePropertiesChoice2 {
   /// Preset Dash.
-  PresetDash(std::boxed::Box<crate::schemas::a::PresetDash>),
+  PresetDash(crate::schemas::a::PresetDash),
   /// Custom Dash.
-  CustomDash(std::boxed::Box<crate::schemas::a::CustomDash>),
+  CustomDash(crate::schemas::a::CustomDash),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum HiddenLinePropertiesChoice3 {
@@ -838,7 +838,7 @@ pub enum HiddenLinePropertiesChoice3 {
   /// Line Join Bevel.
   LineJoinBevel,
   /// Miter Line Join.
-  Miter(std::boxed::Box<crate::schemas::a::Miter>),
+  Miter(crate::schemas::a::Miter),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum HiddenEffectsPropertiesChoice {
@@ -850,57 +850,57 @@ pub enum HiddenEffectsPropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ImageEffectChoice {
   /// Defines the ArtisticBlur Class.
-  ArtisticBlur(std::boxed::Box<ArtisticBlur>),
+  ArtisticBlur(ArtisticBlur),
   /// Defines the ArtisticCement Class.
-  ArtisticCement(std::boxed::Box<ArtisticCement>),
+  ArtisticCement(ArtisticCement),
   /// Defines the ArtisticChalkSketch Class.
-  ArtisticChalkSketch(std::boxed::Box<ArtisticChalkSketch>),
+  ArtisticChalkSketch(ArtisticChalkSketch),
   /// Defines the ArtisticCrisscrossEtching Class.
-  ArtisticCrisscrossEtching(std::boxed::Box<ArtisticCrisscrossEtching>),
+  ArtisticCrisscrossEtching(ArtisticCrisscrossEtching),
   /// Defines the ArtisticCutout Class.
-  ArtisticCutout(std::boxed::Box<ArtisticCutout>),
+  ArtisticCutout(ArtisticCutout),
   /// Defines the ArtisticFilmGrain Class.
-  ArtisticFilmGrain(std::boxed::Box<ArtisticFilmGrain>),
+  ArtisticFilmGrain(ArtisticFilmGrain),
   /// Defines the ArtisticGlass Class.
-  ArtisticGlass(std::boxed::Box<ArtisticGlass>),
+  ArtisticGlass(ArtisticGlass),
   /// Defines the ArtisticGlowDiffused Class.
-  ArtisticGlowDiffused(std::boxed::Box<ArtisticGlowDiffused>),
+  ArtisticGlowDiffused(ArtisticGlowDiffused),
   /// Defines the ArtisticGlowEdges Class.
-  ArtisticGlowEdges(std::boxed::Box<ArtisticGlowEdges>),
+  ArtisticGlowEdges(ArtisticGlowEdges),
   /// Defines the ArtisticLightScreen Class.
-  ArtisticLightScreen(std::boxed::Box<ArtisticLightScreen>),
+  ArtisticLightScreen(ArtisticLightScreen),
   /// Defines the ArtisticLineDrawing Class.
-  ArtisticLineDrawing(std::boxed::Box<ArtisticLineDrawing>),
+  ArtisticLineDrawing(ArtisticLineDrawing),
   /// Defines the ArtisticMarker Class.
-  ArtisticMarker(std::boxed::Box<ArtisticMarker>),
+  ArtisticMarker(ArtisticMarker),
   /// Defines the ArtisticMosaicBubbles Class.
-  ArtisticMosaicBubbles(std::boxed::Box<ArtisticMosaicBubbles>),
+  ArtisticMosaicBubbles(ArtisticMosaicBubbles),
   /// Defines the ArtisticPaintStrokes Class.
-  ArtisticPaintStrokes(std::boxed::Box<ArtisticPaintStrokes>),
+  ArtisticPaintStrokes(ArtisticPaintStrokes),
   /// Defines the ArtisticPaintBrush Class.
-  ArtisticPaintBrush(std::boxed::Box<ArtisticPaintBrush>),
+  ArtisticPaintBrush(ArtisticPaintBrush),
   /// Defines the ArtisticPastelsSmooth Class.
-  ArtisticPastelsSmooth(std::boxed::Box<ArtisticPastelsSmooth>),
+  ArtisticPastelsSmooth(ArtisticPastelsSmooth),
   /// Defines the ArtisticPencilGrayscale Class.
-  ArtisticPencilGrayscale(std::boxed::Box<ArtisticPencilGrayscale>),
+  ArtisticPencilGrayscale(ArtisticPencilGrayscale),
   /// Defines the ArtisticPencilSketch Class.
-  ArtisticPencilSketch(std::boxed::Box<ArtisticPencilSketch>),
+  ArtisticPencilSketch(ArtisticPencilSketch),
   /// Defines the ArtisticPhotocopy Class.
-  ArtisticPhotocopy(std::boxed::Box<ArtisticPhotocopy>),
+  ArtisticPhotocopy(ArtisticPhotocopy),
   /// Defines the ArtisticPlasticWrap Class.
-  ArtisticPlasticWrap(std::boxed::Box<ArtisticPlasticWrap>),
+  ArtisticPlasticWrap(ArtisticPlasticWrap),
   /// Defines the ArtisticTexturizer Class.
-  ArtisticTexturizer(std::boxed::Box<ArtisticTexturizer>),
+  ArtisticTexturizer(ArtisticTexturizer),
   /// Defines the ArtisticWatercolorSponge Class.
-  ArtisticWatercolorSponge(std::boxed::Box<ArtisticWatercolorSponge>),
+  ArtisticWatercolorSponge(ArtisticWatercolorSponge),
   /// Defines the BackgroundRemoval Class.
-  BackgroundRemoval(std::boxed::Box<BackgroundRemoval>),
+  BackgroundRemoval(BackgroundRemoval),
   /// Defines the BrightnessContrast Class.
-  BrightnessContrast(std::boxed::Box<BrightnessContrast>),
+  BrightnessContrast(BrightnessContrast),
   /// Defines the ColorTemperature Class.
-  ColorTemperature(std::boxed::Box<ColorTemperature>),
+  ColorTemperature(ColorTemperature),
   /// Defines the Saturation Class.
-  Saturation(std::boxed::Box<Saturation>),
+  Saturation(Saturation),
   /// Defines the SharpenSoften Class.
-  SharpenSoften(std::boxed::Box<SharpenSoften>),
+  SharpenSoften(SharpenSoften),
 }

@@ -698,39 +698,39 @@ pub struct NullEventRecord {
 #[derive(Clone, Debug, PartialEq)]
 pub enum LaserColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShowEventRecordListChoice {
   /// Defines the TriggerEventRecord Class.
-  TriggerEventRecord(std::boxed::Box<TriggerEventRecord>),
+  TriggerEventRecord(TriggerEventRecord),
   /// Defines the PlayEventRecord Class.
-  PlayEventRecord(std::boxed::Box<PlayEventRecord>),
+  PlayEventRecord(PlayEventRecord),
   /// Defines the StopEventRecord Class.
-  StopEventRecord(std::boxed::Box<StopEventRecord>),
+  StopEventRecord(StopEventRecord),
   /// Defines the PauseEventRecord Class.
-  PauseEventRecord(std::boxed::Box<PauseEventRecord>),
+  PauseEventRecord(PauseEventRecord),
   /// Defines the ResumeEventRecord Class.
-  ResumeEventRecord(std::boxed::Box<ResumeEventRecord>),
+  ResumeEventRecord(ResumeEventRecord),
   /// Defines the SeekEventRecord Class.
-  SeekEventRecord(std::boxed::Box<SeekEventRecord>),
+  SeekEventRecord(SeekEventRecord),
   /// Defines the NullEventRecord Class.
-  NullEventRecord(std::boxed::Box<NullEventRecord>),
+  NullEventRecord(NullEventRecord),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ApplicationNonVisualDrawingPropertiesChoice {
   AudioFromCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
-  WaveAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
+  WaveAudioFile(crate::schemas::a::WaveAudioFile),
   AudioFromFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
   VideoFromFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
   QuickTimeFromFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),

@@ -1680,7 +1680,7 @@ pub enum StateBasedObjectChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum RevExChgObjChoice {
   /// Defines the RevisionStateLink Class.
-  RevisionStateLink(std::boxed::Box<RevisionStateLink>),
+  RevisionStateLink(RevisionStateLink),
   /// Defines the RevisionState Class.
   RevisionState(std::boxed::Box<RevisionState>),
 }
@@ -1716,26 +1716,26 @@ pub enum RevGroupChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum RevisionStateChoice {
   /// Defines the RowColVisualOps Class.
-  RowColVisualOps(std::boxed::Box<RowColVisualOps>),
+  RowColVisualOps(RowColVisualOps),
   /// Defines the HideUnhideSheet Class.
-  HideUnhideSheet(std::boxed::Box<HideUnhideSheet>),
+  HideUnhideSheet(HideUnhideSheet),
   /// Defines the ShowGridlinesHeadings Class.
-  ShowGridlinesHeadings(std::boxed::Box<ShowGridlinesHeadings>),
+  ShowGridlinesHeadings(ShowGridlinesHeadings),
   /// Defines the FreezePanes Class.
-  FreezePanes(std::boxed::Box<FreezePanes>),
+  FreezePanes(FreezePanes),
   /// Defines the Outlines Class.
-  Outlines(std::boxed::Box<Outlines>),
+  Outlines(Outlines),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum RefMapChoice {
   /// Defines the RefCell Class.
   RefCell(std::boxed::Box<RefCell>),
   /// Defines the SheetXluid Class.
-  SheetXluid(std::boxed::Box<SheetXluid>),
+  SheetXluid(SheetXluid),
   /// Defines the RefOartAnchor Class.
   RefOartAnchor(std::boxed::Box<RefOartAnchor>),
   /// Defines the RefFuture Class.
   RefFuture,
   /// Defines the RefTest Class.
-  RefTest(std::boxed::Box<RefTest>),
+  RefTest(RefTest),
 }

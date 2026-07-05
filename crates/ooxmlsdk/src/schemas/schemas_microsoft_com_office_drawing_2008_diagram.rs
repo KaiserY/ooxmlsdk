@@ -333,7 +333,7 @@ pub enum ShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -355,7 +355,7 @@ pub enum ShapePropertiesChoice3 {
 #[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.

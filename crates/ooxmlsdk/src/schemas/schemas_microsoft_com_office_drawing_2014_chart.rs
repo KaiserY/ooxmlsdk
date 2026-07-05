@@ -301,7 +301,7 @@ pub enum ShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -364,7 +364,7 @@ pub struct DLblChoiceSequence {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DLblChoice {
-  Delete(std::boxed::Box<crate::schemas::c::Delete>),
+  Delete(crate::schemas::c::Delete),
   /// Sequence of c:layout, c:tx, c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator
   Sequence(std::boxed::Box<DLblChoiceSequence>),
 }

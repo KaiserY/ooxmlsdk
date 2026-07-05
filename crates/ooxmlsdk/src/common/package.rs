@@ -1806,15 +1806,12 @@ impl SdkPackageStorage {
       return;
     }
 
-    self
-      .content_types
-      .types_choice
-      .push(TypesChoice::Override(Box::new(
-        crate::schemas::opc_content_types::Override {
-          content_type: content_type.to_string(),
-          part_name,
-        },
-      )));
+    self.content_types.types_choice.push(TypesChoice::Override(
+      crate::schemas::opc_content_types::Override {
+        content_type: content_type.to_string(),
+        part_name,
+      },
+    ));
   }
 
   fn remove_content_type_override(&mut self, path: &str) {
@@ -2115,10 +2112,10 @@ fn content_types_from_raw_parts(raw_parts: &[RawPart]) -> Types {
     types_choice: raw_parts
       .iter()
       .map(|part| {
-        TypesChoice::Override(Box::new(crate::schemas::opc_content_types::Override {
+        TypesChoice::Override(crate::schemas::opc_content_types::Override {
           content_type: part.content_type.to_string(),
           part_name: format!("/{}", part.path),
-        }))
+        })
       })
       .collect(),
     ..empty_content_types()
@@ -2131,12 +2128,12 @@ fn empty_content_types() -> Types {
       "",
       "http://schemas.openxmlformats.org/package/2006/content-types",
     )],
-    types_choice: vec![TypesChoice::Default(Box::new(
+    types_choice: vec![TypesChoice::Default(
       crate::schemas::opc_content_types::Default {
         extension: "rels".to_string(),
         content_type: RELATIONSHIP_CONTENT_TYPE.to_string(),
       },
-    ))],
+    )],
   }
 }
 

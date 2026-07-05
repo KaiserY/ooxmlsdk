@@ -9744,9 +9744,9 @@ pub struct BlipExtension {
 #[derive(Clone, Debug, PartialEq)]
 pub enum RgbColorModelPercentageChoice {
   /// Tint.
-  Tint(std::boxed::Box<Tint>),
+  Tint(Tint),
   /// Shade.
-  Shade(std::boxed::Box<Shade>),
+  Shade(Shade),
   /// Complement.
   Complement,
   /// Inverse.
@@ -9754,47 +9754,47 @@ pub enum RgbColorModelPercentageChoice {
   /// Gray.
   Gray,
   /// Alpha.
-  Alpha(std::boxed::Box<Alpha>),
+  Alpha(Alpha),
   /// Alpha Offset.
-  AlphaOffset(std::boxed::Box<AlphaOffset>),
+  AlphaOffset(AlphaOffset),
   /// Alpha Modulation.
-  AlphaModulation(std::boxed::Box<AlphaModulation>),
+  AlphaModulation(AlphaModulation),
   /// Hue.
-  Hue(std::boxed::Box<Hue>),
+  Hue(Hue),
   /// Hue Offset.
-  HueOffset(std::boxed::Box<HueOffset>),
+  HueOffset(HueOffset),
   /// Hue Modulate.
-  HueModulation(std::boxed::Box<HueModulation>),
+  HueModulation(HueModulation),
   /// Saturation.
-  Saturation(std::boxed::Box<Saturation>),
+  Saturation(Saturation),
   /// Saturation Offset.
-  SaturationOffset(std::boxed::Box<SaturationOffset>),
+  SaturationOffset(SaturationOffset),
   /// Saturation Modulation.
-  SaturationModulation(std::boxed::Box<SaturationModulation>),
+  SaturationModulation(SaturationModulation),
   /// Luminance.
-  Luminance(std::boxed::Box<Luminance>),
+  Luminance(Luminance),
   /// Luminance Offset.
-  LuminanceOffset(std::boxed::Box<LuminanceOffset>),
+  LuminanceOffset(LuminanceOffset),
   /// Luminance Modulation.
-  LuminanceModulation(std::boxed::Box<LuminanceModulation>),
+  LuminanceModulation(LuminanceModulation),
   /// Red.
-  Red(std::boxed::Box<Red>),
+  Red(Red),
   /// Red Offset.
-  RedOffset(std::boxed::Box<RedOffset>),
+  RedOffset(RedOffset),
   /// Red Modulation.
-  RedModulation(std::boxed::Box<RedModulation>),
+  RedModulation(RedModulation),
   /// Green.
-  Green(std::boxed::Box<Green>),
+  Green(Green),
   /// Green Offset.
-  GreenOffset(std::boxed::Box<GreenOffset>),
+  GreenOffset(GreenOffset),
   /// Green Modification.
-  GreenModulation(std::boxed::Box<GreenModulation>),
+  GreenModulation(GreenModulation),
   /// Blue.
-  Blue(std::boxed::Box<Blue>),
+  Blue(Blue),
   /// Blue Offset.
-  BlueOffset(std::boxed::Box<BlueOffset>),
+  BlueOffset(BlueOffset),
   /// Blue Modification.
-  BlueModulation(std::boxed::Box<BlueModulation>),
+  BlueModulation(BlueModulation),
   /// Gamma.
   Gamma,
   /// Inverse Gamma.
@@ -9803,9 +9803,9 @@ pub enum RgbColorModelPercentageChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum RgbColorModelHexChoice {
   /// Tint.
-  Tint(std::boxed::Box<Tint>),
+  Tint(Tint),
   /// Shade.
-  Shade(std::boxed::Box<Shade>),
+  Shade(Shade),
   /// Complement.
   Complement,
   /// Inverse.
@@ -9813,47 +9813,47 @@ pub enum RgbColorModelHexChoice {
   /// Gray.
   Gray,
   /// Alpha.
-  Alpha(std::boxed::Box<Alpha>),
+  Alpha(Alpha),
   /// Alpha Offset.
-  AlphaOffset(std::boxed::Box<AlphaOffset>),
+  AlphaOffset(AlphaOffset),
   /// Alpha Modulation.
-  AlphaModulation(std::boxed::Box<AlphaModulation>),
+  AlphaModulation(AlphaModulation),
   /// Hue.
-  Hue(std::boxed::Box<Hue>),
+  Hue(Hue),
   /// Hue Offset.
-  HueOffset(std::boxed::Box<HueOffset>),
+  HueOffset(HueOffset),
   /// Hue Modulate.
-  HueModulation(std::boxed::Box<HueModulation>),
+  HueModulation(HueModulation),
   /// Saturation.
-  Saturation(std::boxed::Box<Saturation>),
+  Saturation(Saturation),
   /// Saturation Offset.
-  SaturationOffset(std::boxed::Box<SaturationOffset>),
+  SaturationOffset(SaturationOffset),
   /// Saturation Modulation.
-  SaturationModulation(std::boxed::Box<SaturationModulation>),
+  SaturationModulation(SaturationModulation),
   /// Luminance.
-  Luminance(std::boxed::Box<Luminance>),
+  Luminance(Luminance),
   /// Luminance Offset.
-  LuminanceOffset(std::boxed::Box<LuminanceOffset>),
+  LuminanceOffset(LuminanceOffset),
   /// Luminance Modulation.
-  LuminanceModulation(std::boxed::Box<LuminanceModulation>),
+  LuminanceModulation(LuminanceModulation),
   /// Red.
-  Red(std::boxed::Box<Red>),
+  Red(Red),
   /// Red Offset.
-  RedOffset(std::boxed::Box<RedOffset>),
+  RedOffset(RedOffset),
   /// Red Modulation.
-  RedModulation(std::boxed::Box<RedModulation>),
+  RedModulation(RedModulation),
   /// Green.
-  Green(std::boxed::Box<Green>),
+  Green(Green),
   /// Green Offset.
-  GreenOffset(std::boxed::Box<GreenOffset>),
+  GreenOffset(GreenOffset),
   /// Green Modification.
-  GreenModulation(std::boxed::Box<GreenModulation>),
+  GreenModulation(GreenModulation),
   /// Blue.
-  Blue(std::boxed::Box<Blue>),
+  Blue(Blue),
   /// Blue Offset.
-  BlueOffset(std::boxed::Box<BlueOffset>),
+  BlueOffset(BlueOffset),
   /// Blue Modification.
-  BlueModulation(std::boxed::Box<BlueModulation>),
+  BlueModulation(BlueModulation),
   /// Gamma.
   Gamma,
   /// Inverse Gamma.
@@ -9862,9 +9862,9 @@ pub enum RgbColorModelHexChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum HslColorChoice {
   /// Tint.
-  Tint(std::boxed::Box<Tint>),
+  Tint(Tint),
   /// Shade.
-  Shade(std::boxed::Box<Shade>),
+  Shade(Shade),
   /// Complement.
   Complement,
   /// Inverse.
@@ -9872,47 +9872,47 @@ pub enum HslColorChoice {
   /// Gray.
   Gray,
   /// Alpha.
-  Alpha(std::boxed::Box<Alpha>),
+  Alpha(Alpha),
   /// Alpha Offset.
-  AlphaOffset(std::boxed::Box<AlphaOffset>),
+  AlphaOffset(AlphaOffset),
   /// Alpha Modulation.
-  AlphaModulation(std::boxed::Box<AlphaModulation>),
+  AlphaModulation(AlphaModulation),
   /// Hue.
-  Hue(std::boxed::Box<Hue>),
+  Hue(Hue),
   /// Hue Offset.
-  HueOffset(std::boxed::Box<HueOffset>),
+  HueOffset(HueOffset),
   /// Hue Modulate.
-  HueModulation(std::boxed::Box<HueModulation>),
+  HueModulation(HueModulation),
   /// Saturation.
-  Saturation(std::boxed::Box<Saturation>),
+  Saturation(Saturation),
   /// Saturation Offset.
-  SaturationOffset(std::boxed::Box<SaturationOffset>),
+  SaturationOffset(SaturationOffset),
   /// Saturation Modulation.
-  SaturationModulation(std::boxed::Box<SaturationModulation>),
+  SaturationModulation(SaturationModulation),
   /// Luminance.
-  Luminance(std::boxed::Box<Luminance>),
+  Luminance(Luminance),
   /// Luminance Offset.
-  LuminanceOffset(std::boxed::Box<LuminanceOffset>),
+  LuminanceOffset(LuminanceOffset),
   /// Luminance Modulation.
-  LuminanceModulation(std::boxed::Box<LuminanceModulation>),
+  LuminanceModulation(LuminanceModulation),
   /// Red.
-  Red(std::boxed::Box<Red>),
+  Red(Red),
   /// Red Offset.
-  RedOffset(std::boxed::Box<RedOffset>),
+  RedOffset(RedOffset),
   /// Red Modulation.
-  RedModulation(std::boxed::Box<RedModulation>),
+  RedModulation(RedModulation),
   /// Green.
-  Green(std::boxed::Box<Green>),
+  Green(Green),
   /// Green Offset.
-  GreenOffset(std::boxed::Box<GreenOffset>),
+  GreenOffset(GreenOffset),
   /// Green Modification.
-  GreenModulation(std::boxed::Box<GreenModulation>),
+  GreenModulation(GreenModulation),
   /// Blue.
-  Blue(std::boxed::Box<Blue>),
+  Blue(Blue),
   /// Blue Offset.
-  BlueOffset(std::boxed::Box<BlueOffset>),
+  BlueOffset(BlueOffset),
   /// Blue Modification.
-  BlueModulation(std::boxed::Box<BlueModulation>),
+  BlueModulation(BlueModulation),
   /// Gamma.
   Gamma,
   /// Inverse Gamma.
@@ -9921,9 +9921,9 @@ pub enum HslColorChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum SystemColorChoice {
   /// Tint.
-  Tint(std::boxed::Box<Tint>),
+  Tint(Tint),
   /// Shade.
-  Shade(std::boxed::Box<Shade>),
+  Shade(Shade),
   /// Complement.
   Complement,
   /// Inverse.
@@ -9931,47 +9931,47 @@ pub enum SystemColorChoice {
   /// Gray.
   Gray,
   /// Alpha.
-  Alpha(std::boxed::Box<Alpha>),
+  Alpha(Alpha),
   /// Alpha Offset.
-  AlphaOffset(std::boxed::Box<AlphaOffset>),
+  AlphaOffset(AlphaOffset),
   /// Alpha Modulation.
-  AlphaModulation(std::boxed::Box<AlphaModulation>),
+  AlphaModulation(AlphaModulation),
   /// Hue.
-  Hue(std::boxed::Box<Hue>),
+  Hue(Hue),
   /// Hue Offset.
-  HueOffset(std::boxed::Box<HueOffset>),
+  HueOffset(HueOffset),
   /// Hue Modulate.
-  HueModulation(std::boxed::Box<HueModulation>),
+  HueModulation(HueModulation),
   /// Saturation.
-  Saturation(std::boxed::Box<Saturation>),
+  Saturation(Saturation),
   /// Saturation Offset.
-  SaturationOffset(std::boxed::Box<SaturationOffset>),
+  SaturationOffset(SaturationOffset),
   /// Saturation Modulation.
-  SaturationModulation(std::boxed::Box<SaturationModulation>),
+  SaturationModulation(SaturationModulation),
   /// Luminance.
-  Luminance(std::boxed::Box<Luminance>),
+  Luminance(Luminance),
   /// Luminance Offset.
-  LuminanceOffset(std::boxed::Box<LuminanceOffset>),
+  LuminanceOffset(LuminanceOffset),
   /// Luminance Modulation.
-  LuminanceModulation(std::boxed::Box<LuminanceModulation>),
+  LuminanceModulation(LuminanceModulation),
   /// Red.
-  Red(std::boxed::Box<Red>),
+  Red(Red),
   /// Red Offset.
-  RedOffset(std::boxed::Box<RedOffset>),
+  RedOffset(RedOffset),
   /// Red Modulation.
-  RedModulation(std::boxed::Box<RedModulation>),
+  RedModulation(RedModulation),
   /// Green.
-  Green(std::boxed::Box<Green>),
+  Green(Green),
   /// Green Offset.
-  GreenOffset(std::boxed::Box<GreenOffset>),
+  GreenOffset(GreenOffset),
   /// Green Modification.
-  GreenModulation(std::boxed::Box<GreenModulation>),
+  GreenModulation(GreenModulation),
   /// Blue.
-  Blue(std::boxed::Box<Blue>),
+  Blue(Blue),
   /// Blue Offset.
-  BlueOffset(std::boxed::Box<BlueOffset>),
+  BlueOffset(BlueOffset),
   /// Blue Modification.
-  BlueModulation(std::boxed::Box<BlueModulation>),
+  BlueModulation(BlueModulation),
   /// Gamma.
   Gamma,
   /// Inverse Gamma.
@@ -9980,9 +9980,9 @@ pub enum SystemColorChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum SchemeColorChoice {
   /// Tint.
-  Tint(std::boxed::Box<Tint>),
+  Tint(Tint),
   /// Shade.
-  Shade(std::boxed::Box<Shade>),
+  Shade(Shade),
   /// Complement.
   Complement,
   /// Inverse.
@@ -9990,47 +9990,47 @@ pub enum SchemeColorChoice {
   /// Gray.
   Gray,
   /// Alpha.
-  Alpha(std::boxed::Box<Alpha>),
+  Alpha(Alpha),
   /// Alpha Offset.
-  AlphaOffset(std::boxed::Box<AlphaOffset>),
+  AlphaOffset(AlphaOffset),
   /// Alpha Modulation.
-  AlphaModulation(std::boxed::Box<AlphaModulation>),
+  AlphaModulation(AlphaModulation),
   /// Hue.
-  Hue(std::boxed::Box<Hue>),
+  Hue(Hue),
   /// Hue Offset.
-  HueOffset(std::boxed::Box<HueOffset>),
+  HueOffset(HueOffset),
   /// Hue Modulate.
-  HueModulation(std::boxed::Box<HueModulation>),
+  HueModulation(HueModulation),
   /// Saturation.
-  Saturation(std::boxed::Box<Saturation>),
+  Saturation(Saturation),
   /// Saturation Offset.
-  SaturationOffset(std::boxed::Box<SaturationOffset>),
+  SaturationOffset(SaturationOffset),
   /// Saturation Modulation.
-  SaturationModulation(std::boxed::Box<SaturationModulation>),
+  SaturationModulation(SaturationModulation),
   /// Luminance.
-  Luminance(std::boxed::Box<Luminance>),
+  Luminance(Luminance),
   /// Luminance Offset.
-  LuminanceOffset(std::boxed::Box<LuminanceOffset>),
+  LuminanceOffset(LuminanceOffset),
   /// Luminance Modulation.
-  LuminanceModulation(std::boxed::Box<LuminanceModulation>),
+  LuminanceModulation(LuminanceModulation),
   /// Red.
-  Red(std::boxed::Box<Red>),
+  Red(Red),
   /// Red Offset.
-  RedOffset(std::boxed::Box<RedOffset>),
+  RedOffset(RedOffset),
   /// Red Modulation.
-  RedModulation(std::boxed::Box<RedModulation>),
+  RedModulation(RedModulation),
   /// Green.
-  Green(std::boxed::Box<Green>),
+  Green(Green),
   /// Green Offset.
-  GreenOffset(std::boxed::Box<GreenOffset>),
+  GreenOffset(GreenOffset),
   /// Green Modification.
-  GreenModulation(std::boxed::Box<GreenModulation>),
+  GreenModulation(GreenModulation),
   /// Blue.
-  Blue(std::boxed::Box<Blue>),
+  Blue(Blue),
   /// Blue Offset.
-  BlueOffset(std::boxed::Box<BlueOffset>),
+  BlueOffset(BlueOffset),
   /// Blue Modification.
-  BlueModulation(std::boxed::Box<BlueModulation>),
+  BlueModulation(BlueModulation),
   /// Gamma.
   Gamma,
   /// Inverse Gamma.
@@ -10039,9 +10039,9 @@ pub enum SchemeColorChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum PresetColorChoice {
   /// Tint.
-  Tint(std::boxed::Box<Tint>),
+  Tint(Tint),
   /// Shade.
-  Shade(std::boxed::Box<Shade>),
+  Shade(Shade),
   /// Complement.
   Complement,
   /// Inverse.
@@ -10049,47 +10049,47 @@ pub enum PresetColorChoice {
   /// Gray.
   Gray,
   /// Alpha.
-  Alpha(std::boxed::Box<Alpha>),
+  Alpha(Alpha),
   /// Alpha Offset.
-  AlphaOffset(std::boxed::Box<AlphaOffset>),
+  AlphaOffset(AlphaOffset),
   /// Alpha Modulation.
-  AlphaModulation(std::boxed::Box<AlphaModulation>),
+  AlphaModulation(AlphaModulation),
   /// Hue.
-  Hue(std::boxed::Box<Hue>),
+  Hue(Hue),
   /// Hue Offset.
-  HueOffset(std::boxed::Box<HueOffset>),
+  HueOffset(HueOffset),
   /// Hue Modulate.
-  HueModulation(std::boxed::Box<HueModulation>),
+  HueModulation(HueModulation),
   /// Saturation.
-  Saturation(std::boxed::Box<Saturation>),
+  Saturation(Saturation),
   /// Saturation Offset.
-  SaturationOffset(std::boxed::Box<SaturationOffset>),
+  SaturationOffset(SaturationOffset),
   /// Saturation Modulation.
-  SaturationModulation(std::boxed::Box<SaturationModulation>),
+  SaturationModulation(SaturationModulation),
   /// Luminance.
-  Luminance(std::boxed::Box<Luminance>),
+  Luminance(Luminance),
   /// Luminance Offset.
-  LuminanceOffset(std::boxed::Box<LuminanceOffset>),
+  LuminanceOffset(LuminanceOffset),
   /// Luminance Modulation.
-  LuminanceModulation(std::boxed::Box<LuminanceModulation>),
+  LuminanceModulation(LuminanceModulation),
   /// Red.
-  Red(std::boxed::Box<Red>),
+  Red(Red),
   /// Red Offset.
-  RedOffset(std::boxed::Box<RedOffset>),
+  RedOffset(RedOffset),
   /// Red Modulation.
-  RedModulation(std::boxed::Box<RedModulation>),
+  RedModulation(RedModulation),
   /// Green.
-  Green(std::boxed::Box<Green>),
+  Green(Green),
   /// Green Offset.
-  GreenOffset(std::boxed::Box<GreenOffset>),
+  GreenOffset(GreenOffset),
   /// Green Modification.
-  GreenModulation(std::boxed::Box<GreenModulation>),
+  GreenModulation(GreenModulation),
   /// Blue.
-  Blue(std::boxed::Box<Blue>),
+  Blue(Blue),
   /// Blue Offset.
-  BlueOffset(std::boxed::Box<BlueOffset>),
+  BlueOffset(BlueOffset),
   /// Blue Modification.
-  BlueModulation(std::boxed::Box<BlueModulation>),
+  BlueModulation(BlueModulation),
   /// Gamma.
   Gamma,
   /// Inverse Gamma.
@@ -10098,22 +10098,22 @@ pub enum PresetColorChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum SolidFillChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum GradientFillChoice {
   /// Linear Gradient Fill.
-  LinearGradientFill(std::boxed::Box<LinearGradientFill>),
+  LinearGradientFill(LinearGradientFill),
   /// Path Gradient.
   PathGradientFill(std::boxed::Box<PathGradientFill>),
 }
@@ -10129,9 +10129,9 @@ pub enum EffectContainerChoice {
   /// Effect Container.
   EffectContainer(std::boxed::Box<EffectContainer>),
   /// Effect.
-  Effect(std::boxed::Box<Effect>),
+  Effect(Effect),
   /// Defines the AlphaBiLevel Class.
-  AlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
+  AlphaBiLevel(AlphaBiLevel),
   /// Alpha Ceiling Effect.
   AlphaCeiling,
   /// Alpha Floor Effect.
@@ -10141,23 +10141,23 @@ pub enum EffectContainerChoice {
   /// Alpha Modulate Effect.
   AlphaModulationEffect(std::boxed::Box<AlphaModulationEffect>),
   /// Defines the AlphaModulationFixed Class.
-  AlphaModulationFixed(std::boxed::Box<AlphaModulationFixed>),
+  AlphaModulationFixed(AlphaModulationFixed),
   /// Alpha Inset/Outset Effect.
-  AlphaOutset(std::boxed::Box<AlphaOutset>),
+  AlphaOutset(AlphaOutset),
   /// Alpha Replace Effect.
-  AlphaReplace(std::boxed::Box<AlphaReplace>),
+  AlphaReplace(AlphaReplace),
   /// Defines the BiLevel Class.
-  BiLevel(std::boxed::Box<BiLevel>),
+  BiLevel(BiLevel),
   /// Blend Effect.
   Blend(std::boxed::Box<Blend>),
   /// Defines the Blur Class.
-  Blur(std::boxed::Box<Blur>),
+  Blur(Blur),
   /// Color Change Effect.
   ColorChange(std::boxed::Box<ColorChange>),
   /// Defines the ColorReplacement Class.
   ColorReplacement(std::boxed::Box<ColorReplacement>),
   /// Duotone Effect.
-  Duotone(std::boxed::Box<Duotone>),
+  Duotone(Duotone),
   /// Fill.
   Fill(std::boxed::Box<Fill>),
   /// Fill Overlay Effect.
@@ -10167,11 +10167,11 @@ pub enum EffectContainerChoice {
   /// Gray Scale Effect.
   Grayscale,
   /// Hue Saturation Luminance Effect.
-  Hsl(std::boxed::Box<Hsl>),
+  Hsl(Hsl),
   /// Inner Shadow Effect.
   InnerShadow(std::boxed::Box<InnerShadow>),
   /// Luminance.
-  LuminanceEffect(std::boxed::Box<LuminanceEffect>),
+  LuminanceEffect(LuminanceEffect),
   /// Outer Shadow Effect.
   OuterShadow(std::boxed::Box<OuterShadow>),
   /// Preset Shadow.
@@ -10179,11 +10179,11 @@ pub enum EffectContainerChoice {
   /// Reflection Effect.
   Reflection(std::boxed::Box<Reflection>),
   /// Relative Offset Effect.
-  RelativeOffset(std::boxed::Box<RelativeOffset>),
+  RelativeOffset(RelativeOffset),
   /// Soft Edge Effect.
-  SoftEdge(std::boxed::Box<SoftEdge>),
+  SoftEdge(SoftEdge),
   /// Defines the TintEffect Class.
-  TintEffect(std::boxed::Box<TintEffect>),
+  TintEffect(TintEffect),
   /// Transform Effect.
   TransformEffect(std::boxed::Box<TransformEffect>),
 }
@@ -10192,9 +10192,9 @@ pub enum EffectDagChoice {
   /// Effect Container.
   EffectContainer(std::boxed::Box<EffectContainer>),
   /// Effect.
-  Effect(std::boxed::Box<Effect>),
+  Effect(Effect),
   /// Defines the AlphaBiLevel Class.
-  AlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
+  AlphaBiLevel(AlphaBiLevel),
   /// Alpha Ceiling Effect.
   AlphaCeiling,
   /// Alpha Floor Effect.
@@ -10204,23 +10204,23 @@ pub enum EffectDagChoice {
   /// Alpha Modulate Effect.
   AlphaModulationEffect(std::boxed::Box<AlphaModulationEffect>),
   /// Defines the AlphaModulationFixed Class.
-  AlphaModulationFixed(std::boxed::Box<AlphaModulationFixed>),
+  AlphaModulationFixed(AlphaModulationFixed),
   /// Alpha Inset/Outset Effect.
-  AlphaOutset(std::boxed::Box<AlphaOutset>),
+  AlphaOutset(AlphaOutset),
   /// Alpha Replace Effect.
-  AlphaReplace(std::boxed::Box<AlphaReplace>),
+  AlphaReplace(AlphaReplace),
   /// Defines the BiLevel Class.
-  BiLevel(std::boxed::Box<BiLevel>),
+  BiLevel(BiLevel),
   /// Blend Effect.
   Blend(std::boxed::Box<Blend>),
   /// Defines the Blur Class.
-  Blur(std::boxed::Box<Blur>),
+  Blur(Blur),
   /// Color Change Effect.
   ColorChange(std::boxed::Box<ColorChange>),
   /// Defines the ColorReplacement Class.
   ColorReplacement(std::boxed::Box<ColorReplacement>),
   /// Duotone Effect.
-  Duotone(std::boxed::Box<Duotone>),
+  Duotone(Duotone),
   /// Fill.
   Fill(std::boxed::Box<Fill>),
   /// Fill Overlay Effect.
@@ -10230,11 +10230,11 @@ pub enum EffectDagChoice {
   /// Gray Scale Effect.
   Grayscale,
   /// Hue Saturation Luminance Effect.
-  Hsl(std::boxed::Box<Hsl>),
+  Hsl(Hsl),
   /// Inner Shadow Effect.
   InnerShadow(std::boxed::Box<InnerShadow>),
   /// Luminance.
-  LuminanceEffect(std::boxed::Box<LuminanceEffect>),
+  LuminanceEffect(LuminanceEffect),
   /// Outer Shadow Effect.
   OuterShadow(std::boxed::Box<OuterShadow>),
   /// Preset Shadow.
@@ -10242,63 +10242,63 @@ pub enum EffectDagChoice {
   /// Reflection Effect.
   Reflection(std::boxed::Box<Reflection>),
   /// Relative Offset Effect.
-  RelativeOffset(std::boxed::Box<RelativeOffset>),
+  RelativeOffset(RelativeOffset),
   /// Soft Edge Effect.
-  SoftEdge(std::boxed::Box<SoftEdge>),
+  SoftEdge(SoftEdge),
   /// Defines the TintEffect Class.
-  TintEffect(std::boxed::Box<TintEffect>),
+  TintEffect(TintEffect),
   /// Transform Effect.
   TransformEffect(std::boxed::Box<TransformEffect>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum AlphaInverseChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColorReplacementChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DuotoneChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FillChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10313,7 +10313,7 @@ pub enum FillChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FillOverlayChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10328,67 +10328,67 @@ pub enum FillOverlayChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum GlowChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum InnerShadowChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum OuterShadowChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PresetShadowChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FillPropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10403,47 +10403,47 @@ pub enum FillPropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FillReferenceChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum EffectReferenceChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum LineReferenceChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum EffectPropertiesTypeChoice {
@@ -10455,142 +10455,142 @@ pub enum EffectPropertiesTypeChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FontReferenceChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BulletColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExtrusionColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ContourColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColorFromChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColorToChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ForegroundColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum HighlightChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum UnderlineChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10601,9 +10601,9 @@ pub enum UnderlineChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum UnderlineChoice2 {
   /// Preset Dash.
-  PresetDash(std::boxed::Box<PresetDash>),
+  PresetDash(PresetDash),
   /// Custom Dash.
-  CustomDash(std::boxed::Box<CustomDash>),
+  CustomDash(CustomDash),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum UnderlineChoice3 {
@@ -10612,12 +10612,12 @@ pub enum UnderlineChoice3 {
   /// Line Join Bevel.
   LineJoinBevel,
   /// Miter Line Join.
-  Miter(std::boxed::Box<Miter>),
+  Miter(Miter),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum OutlineChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10628,9 +10628,9 @@ pub enum OutlineChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum OutlineChoice2 {
   /// Preset Dash.
-  PresetDash(std::boxed::Box<PresetDash>),
+  PresetDash(PresetDash),
   /// Custom Dash.
-  CustomDash(std::boxed::Box<CustomDash>),
+  CustomDash(CustomDash),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum OutlineChoice3 {
@@ -10639,12 +10639,12 @@ pub enum OutlineChoice3 {
   /// Line Join Bevel.
   LineJoinBevel,
   /// Miter Line Join.
-  Miter(std::boxed::Box<Miter>),
+  Miter(Miter),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum LeftBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10655,9 +10655,9 @@ pub enum LeftBorderLinePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum LeftBorderLinePropertiesChoice2 {
   /// Preset Dash.
-  PresetDash(std::boxed::Box<PresetDash>),
+  PresetDash(PresetDash),
   /// Custom Dash.
-  CustomDash(std::boxed::Box<CustomDash>),
+  CustomDash(CustomDash),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum LeftBorderLinePropertiesChoice3 {
@@ -10666,12 +10666,12 @@ pub enum LeftBorderLinePropertiesChoice3 {
   /// Line Join Bevel.
   LineJoinBevel,
   /// Miter Line Join.
-  Miter(std::boxed::Box<Miter>),
+  Miter(Miter),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum RightBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10682,9 +10682,9 @@ pub enum RightBorderLinePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum RightBorderLinePropertiesChoice2 {
   /// Preset Dash.
-  PresetDash(std::boxed::Box<PresetDash>),
+  PresetDash(PresetDash),
   /// Custom Dash.
-  CustomDash(std::boxed::Box<CustomDash>),
+  CustomDash(CustomDash),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum RightBorderLinePropertiesChoice3 {
@@ -10693,12 +10693,12 @@ pub enum RightBorderLinePropertiesChoice3 {
   /// Line Join Bevel.
   LineJoinBevel,
   /// Miter Line Join.
-  Miter(std::boxed::Box<Miter>),
+  Miter(Miter),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TopBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10709,9 +10709,9 @@ pub enum TopBorderLinePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TopBorderLinePropertiesChoice2 {
   /// Preset Dash.
-  PresetDash(std::boxed::Box<PresetDash>),
+  PresetDash(PresetDash),
   /// Custom Dash.
-  CustomDash(std::boxed::Box<CustomDash>),
+  CustomDash(CustomDash),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TopBorderLinePropertiesChoice3 {
@@ -10720,12 +10720,12 @@ pub enum TopBorderLinePropertiesChoice3 {
   /// Line Join Bevel.
   LineJoinBevel,
   /// Miter Line Join.
-  Miter(std::boxed::Box<Miter>),
+  Miter(Miter),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BottomBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10736,9 +10736,9 @@ pub enum BottomBorderLinePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum BottomBorderLinePropertiesChoice2 {
   /// Preset Dash.
-  PresetDash(std::boxed::Box<PresetDash>),
+  PresetDash(PresetDash),
   /// Custom Dash.
-  CustomDash(std::boxed::Box<CustomDash>),
+  CustomDash(CustomDash),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BottomBorderLinePropertiesChoice3 {
@@ -10747,12 +10747,12 @@ pub enum BottomBorderLinePropertiesChoice3 {
   /// Line Join Bevel.
   LineJoinBevel,
   /// Miter Line Join.
-  Miter(std::boxed::Box<Miter>),
+  Miter(Miter),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TopLeftToBottomRightBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10763,9 +10763,9 @@ pub enum TopLeftToBottomRightBorderLinePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TopLeftToBottomRightBorderLinePropertiesChoice2 {
   /// Preset Dash.
-  PresetDash(std::boxed::Box<PresetDash>),
+  PresetDash(PresetDash),
   /// Custom Dash.
-  CustomDash(std::boxed::Box<CustomDash>),
+  CustomDash(CustomDash),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TopLeftToBottomRightBorderLinePropertiesChoice3 {
@@ -10774,12 +10774,12 @@ pub enum TopLeftToBottomRightBorderLinePropertiesChoice3 {
   /// Line Join Bevel.
   LineJoinBevel,
   /// Miter Line Join.
-  Miter(std::boxed::Box<Miter>),
+  Miter(Miter),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BottomLeftToTopRightBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10790,9 +10790,9 @@ pub enum BottomLeftToTopRightBorderLinePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum BottomLeftToTopRightBorderLinePropertiesChoice2 {
   /// Preset Dash.
-  PresetDash(std::boxed::Box<PresetDash>),
+  PresetDash(PresetDash),
   /// Custom Dash.
-  CustomDash(std::boxed::Box<CustomDash>),
+  CustomDash(CustomDash),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BottomLeftToTopRightBorderLinePropertiesChoice3 {
@@ -10801,12 +10801,12 @@ pub enum BottomLeftToTopRightBorderLinePropertiesChoice3 {
   /// Line Join Bevel.
   LineJoinBevel,
   /// Miter Line Join.
-  Miter(std::boxed::Box<Miter>),
+  Miter(Miter),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum UnderlineFillChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10821,7 +10821,7 @@ pub enum UnderlineFillChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum BlipChoice {
   /// Defines the AlphaBiLevel Class.
-  AlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
+  AlphaBiLevel(AlphaBiLevel),
   /// Alpha Ceiling Effect.
   AlphaCeiling,
   /// Alpha Floor Effect.
@@ -10831,29 +10831,29 @@ pub enum BlipChoice {
   /// Alpha Modulate Effect.
   AlphaModulationEffect(std::boxed::Box<AlphaModulationEffect>),
   /// Defines the AlphaModulationFixed Class.
-  AlphaModulationFixed(std::boxed::Box<AlphaModulationFixed>),
+  AlphaModulationFixed(AlphaModulationFixed),
   /// Alpha Replace Effect.
-  AlphaReplace(std::boxed::Box<AlphaReplace>),
+  AlphaReplace(AlphaReplace),
   /// Defines the BiLevel Class.
-  BiLevel(std::boxed::Box<BiLevel>),
+  BiLevel(BiLevel),
   /// Defines the Blur Class.
-  Blur(std::boxed::Box<Blur>),
+  Blur(Blur),
   /// Color Change Effect.
   ColorChange(std::boxed::Box<ColorChange>),
   /// Defines the ColorReplacement Class.
   ColorReplacement(std::boxed::Box<ColorReplacement>),
   /// Duotone Effect.
-  Duotone(std::boxed::Box<Duotone>),
+  Duotone(Duotone),
   /// Fill Overlay Effect.
   FillOverlay(std::boxed::Box<FillOverlay>),
   /// Gray Scale Effect.
   Grayscale,
   /// Hue Saturation Luminance Effect.
-  Hsl(std::boxed::Box<Hsl>),
+  Hsl(Hsl),
   /// Luminance.
-  LuminanceEffect(std::boxed::Box<LuminanceEffect>),
+  LuminanceEffect(LuminanceEffect),
   /// Defines the TintEffect Class.
-  TintEffect(std::boxed::Box<TintEffect>),
+  TintEffect(TintEffect),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableStyleListChoice {
@@ -10865,17 +10865,17 @@ pub enum TableStyleListChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum CustomColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum EffectStyleChoice {
@@ -10887,7 +10887,7 @@ pub enum EffectStyleChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FillStyleListChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10902,7 +10902,7 @@ pub enum FillStyleListChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundFillStyleListChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -10917,158 +10917,158 @@ pub enum BackgroundFillStyleListChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Dark1ColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Light1ColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Dark2ColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Light2ColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Accent1ColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Accent2ColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Accent3ColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Accent4ColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Accent5ColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Accent6ColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum HyperlinkChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FollowedHyperlinkColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum GraphicDataChoice {
@@ -11085,83 +11085,81 @@ pub enum GraphicDataChoice {
   /// Table.
   Table(std::boxed::Box<Table>),
   /// Table Style List.
-  TableStyleList(std::boxed::Box<TableStyleList>),
+  TableStyleList(TableStyleList),
   OEmbedShared(std::boxed::Box<crate::schemas::aoe::OEmbedShared>),
-  OEmbed(std::boxed::Box<crate::schemas::woe::OEmbed>),
-  ImageFormula(std::boxed::Box<crate::schemas::aif::ImageFormula>),
+  OEmbed(crate::schemas::woe::OEmbed),
+  ImageFormula(crate::schemas::aif::ImageFormula),
   LiveFeedProperties(std::boxed::Box<crate::schemas::alf::LiveFeedProperties>),
   ScriptLink(std::boxed::Box<crate::schemas::asl::ScriptLink>),
-  ClassificationOutcome(std::boxed::Box<crate::schemas::aclsh::ClassificationOutcome>),
+  ClassificationOutcome(crate::schemas::aclsh::ClassificationOutcome),
   LineSketchStyleProperties(std::boxed::Box<crate::schemas::ask::LineSketchStyleProperties>),
-  PictureAttributionSourceUrl(std::boxed::Box<crate::schemas::a1611::PictureAttributionSourceUrl>),
-  SvgBlip(std::boxed::Box<crate::schemas::asvg::SvgBlip>),
-  Decorative(std::boxed::Box<crate::schemas::adec::Decorative>),
-  A16CreationId(std::boxed::Box<crate::schemas::a16::CreationId>),
-  PredecessorDrawingElementReference(
-    std::boxed::Box<crate::schemas::a16::PredecessorDrawingElementReference>,
-  ),
-  ConnectableReferences(std::boxed::Box<crate::schemas::a16::ConnectableReferences>),
-  RowIdIdentifier(std::boxed::Box<crate::schemas::a16::RowIdIdentifier>),
-  ColIdIdentifier(std::boxed::Box<crate::schemas::a16::ColIdIdentifier>),
-  HyperlinkColor(std::boxed::Box<crate::schemas::ahyp::HyperlinkColor>),
-  WebVideoProperty(std::boxed::Box<crate::schemas::wp15::WebVideoProperty>),
+  PictureAttributionSourceUrl(crate::schemas::a1611::PictureAttributionSourceUrl),
+  SvgBlip(crate::schemas::asvg::SvgBlip),
+  Decorative(crate::schemas::adec::Decorative),
+  A16CreationId(crate::schemas::a16::CreationId),
+  PredecessorDrawingElementReference(crate::schemas::a16::PredecessorDrawingElementReference),
+  ConnectableReferences(crate::schemas::a16::ConnectableReferences),
+  RowIdIdentifier(crate::schemas::a16::RowIdIdentifier),
+  ColIdIdentifier(crate::schemas::a16::ColIdIdentifier),
+  HyperlinkColor(crate::schemas::ahyp::HyperlinkColor),
+  WebVideoProperty(crate::schemas::wp15::WebVideoProperty),
   ThemeFamily(std::boxed::Box<crate::schemas::thm15::ThemeFamily>),
-  BackgroundProperties(std::boxed::Box<crate::schemas::a15::BackgroundProperties>),
-  NonVisualGroupProperties(std::boxed::Box<crate::schemas::a15::NonVisualGroupProperties>),
+  BackgroundProperties(crate::schemas::a15::BackgroundProperties),
+  NonVisualGroupProperties(crate::schemas::a15::NonVisualGroupProperties),
   ObjectProperties(std::boxed::Box<crate::schemas::a15::ObjectProperties>),
   A15SignatureLine(std::boxed::Box<crate::schemas::a15::SignatureLine>),
-  CameraTool(std::boxed::Box<crate::schemas::a14::CameraTool>),
-  CompatExtension(std::boxed::Box<crate::schemas::a14::CompatExtension>),
-  IsCanvas(std::boxed::Box<crate::schemas::a14::IsCanvas>),
+  CameraTool(crate::schemas::a14::CameraTool),
+  CompatExtension(crate::schemas::a14::CompatExtension),
+  IsCanvas(crate::schemas::a14::IsCanvas),
   GvmlContentPart(std::boxed::Box<crate::schemas::a14::GvmlContentPart>),
-  ShadowObscured(std::boxed::Box<crate::schemas::a14::ShadowObscured>),
+  ShadowObscured(crate::schemas::a14::ShadowObscured),
   HiddenFillProperties(std::boxed::Box<crate::schemas::a14::HiddenFillProperties>),
   HiddenLineProperties(std::boxed::Box<crate::schemas::a14::HiddenLineProperties>),
   HiddenEffectsProperties(std::boxed::Box<crate::schemas::a14::HiddenEffectsProperties>),
   HiddenScene3D(std::boxed::Box<crate::schemas::a14::HiddenScene3D>),
   HiddenShape3D(std::boxed::Box<crate::schemas::a14::HiddenShape3D>),
   ImageProperties(std::boxed::Box<crate::schemas::a14::ImageProperties>),
-  UseLocalDpi(std::boxed::Box<crate::schemas::a14::UseLocalDpi>),
-  TextMath(std::boxed::Box<crate::schemas::a14::TextMath>),
+  UseLocalDpi(crate::schemas::a14::UseLocalDpi),
+  TextMath(crate::schemas::a14::TextMath),
   NonVisualDrawingProperties(std::boxed::Box<crate::schemas::dgm14::NonVisualDrawingProperties>),
-  RecolorImages(std::boxed::Box<crate::schemas::dgm14::RecolorImages>),
+  RecolorImages(crate::schemas::dgm14::RecolorImages),
   Drawing(std::boxed::Box<crate::schemas::dsp::Drawing>),
-  DataModelExtensionBlock(std::boxed::Box<crate::schemas::dsp::DataModelExtensionBlock>),
+  DataModelExtensionBlock(crate::schemas::dsp::DataModelExtensionBlock),
   ColorsDefinition(std::boxed::Box<crate::schemas::dgm::ColorsDefinition>),
   ColorsDefinitionHeader(std::boxed::Box<crate::schemas::dgm::ColorsDefinitionHeader>),
-  ColorsDefinitionHeaderList(std::boxed::Box<crate::schemas::dgm::ColorsDefinitionHeaderList>),
+  ColorsDefinitionHeaderList(crate::schemas::dgm::ColorsDefinitionHeaderList),
   DataModelRoot(std::boxed::Box<crate::schemas::dgm::DataModelRoot>),
   LayoutDefinition(std::boxed::Box<crate::schemas::dgm::LayoutDefinition>),
   LayoutDefinitionHeader(std::boxed::Box<crate::schemas::dgm::LayoutDefinitionHeader>),
-  LayoutDefinitionHeaderList(std::boxed::Box<crate::schemas::dgm::LayoutDefinitionHeaderList>),
+  LayoutDefinitionHeaderList(crate::schemas::dgm::LayoutDefinitionHeaderList),
   RelationshipIds(std::boxed::Box<crate::schemas::dgm::RelationshipIds>),
   StyleDefinition(std::boxed::Box<crate::schemas::dgm::StyleDefinition>),
   StyleDefinitionHeader(std::boxed::Box<crate::schemas::dgm::StyleDefinitionHeader>),
-  StyleDefinitionHeaderList(std::boxed::Box<crate::schemas::dgm::StyleDefinitionHeaderList>),
+  StyleDefinitionHeaderList(crate::schemas::dgm::StyleDefinitionHeaderList),
   Dgm1612ShapeProperties(std::boxed::Box<crate::schemas::dgm1612::ShapeProperties>),
   TextListStyleType(std::boxed::Box<crate::schemas::dgm1612::TextListStyleType>),
-  NumberDiagramInfoList(std::boxed::Box<crate::schemas::dgm1611::NumberDiagramInfoList>),
+  NumberDiagramInfoList(crate::schemas::dgm1611::NumberDiagramInfoList),
   ChartSpace(std::boxed::Box<crate::schemas::c::ChartSpace>),
-  UserShapes(std::boxed::Box<crate::schemas::c::UserShapes>),
-  ChartReference(std::boxed::Box<crate::schemas::c::ChartReference>),
+  UserShapes(crate::schemas::c::UserShapes),
+  ChartReference(crate::schemas::c::ChartReference),
   DataDisplayOptions16(std::boxed::Box<crate::schemas::c16r3::DataDisplayOptions16>),
   C16ShapeProperties(std::boxed::Box<crate::schemas::c16::ShapeProperties>),
-  UnsignedIntegerType(std::boxed::Box<crate::schemas::c16::UnsignedIntegerType>),
-  InvertIfNegativeBoolean(std::boxed::Box<crate::schemas::c16::InvertIfNegativeBoolean>),
-  Bubble3DBoolean(std::boxed::Box<crate::schemas::c16::Bubble3DBoolean>),
+  UnsignedIntegerType(crate::schemas::c16::UnsignedIntegerType),
+  InvertIfNegativeBoolean(crate::schemas::c16::InvertIfNegativeBoolean),
+  Bubble3DBoolean(crate::schemas::c16::Bubble3DBoolean),
   Marker(std::boxed::Box<crate::schemas::c16::Marker>),
   DLbl(std::boxed::Box<crate::schemas::c16::DLbl>),
-  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
+  C16CategoryFilterExceptions(crate::schemas::c16::CategoryFilterExceptions),
   PivotOptions16(std::boxed::Box<crate::schemas::c16::PivotOptions16>),
-  ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
-  UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
+  ChartDataPointUniqueIdMap(crate::schemas::c16::ChartDataPointUniqueIdMap),
+  UniqueIdChartUniqueId(crate::schemas::c16::UniqueIdChartUniqueId),
   PivotSource(std::boxed::Box<crate::schemas::c15::PivotSource>),
-  NumberingFormat(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
+  NumberingFormat(crate::schemas::c15::NumberingFormat),
   C15ShapeProperties(std::boxed::Box<crate::schemas::c15::ShapeProperties>),
   Layout(std::boxed::Box<crate::schemas::c15::Layout>),
-  FullReference(std::boxed::Box<crate::schemas::c15::FullReference>),
-  LevelReference(std::boxed::Box<crate::schemas::c15::LevelReference>),
-  FormulaReference(std::boxed::Box<crate::schemas::c15::FormulaReference>),
+  FullReference(crate::schemas::c15::FullReference),
+  LevelReference(crate::schemas::c15::LevelReference),
+  FormulaReference(crate::schemas::c15::FormulaReference),
   FilteredSeriesTitle(std::boxed::Box<crate::schemas::c15::FilteredSeriesTitle>),
   FilteredCategoryTitle(std::boxed::Box<crate::schemas::c15::FilteredCategoryTitle>),
   FilteredAreaSeries(std::boxed::Box<crate::schemas::c15::FilteredAreaSeries>),
@@ -11173,31 +11171,31 @@ pub enum GraphicDataChoice {
   FilteredScatterSeries(std::boxed::Box<crate::schemas::c15::FilteredScatterSeries>),
   FilteredSurfaceSeries(std::boxed::Box<crate::schemas::c15::FilteredSurfaceSeries>),
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
-  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
-  DataLabelFieldTable(std::boxed::Box<crate::schemas::c15::DataLabelFieldTable>),
-  ExceptionForSave(std::boxed::Box<crate::schemas::c15::ExceptionForSave>),
-  ShowDataLabelsRange(std::boxed::Box<crate::schemas::c15::ShowDataLabelsRange>),
+  C15CategoryFilterExceptions(crate::schemas::c15::CategoryFilterExceptions),
+  DataLabelFieldTable(crate::schemas::c15::DataLabelFieldTable),
+  ExceptionForSave(crate::schemas::c15::ExceptionForSave),
+  ShowDataLabelsRange(crate::schemas::c15::ShowDataLabelsRange),
   ChartText(std::boxed::Box<crate::schemas::c15::ChartText>),
-  ShowLeaderLines(std::boxed::Box<crate::schemas::c15::ShowLeaderLines>),
+  ShowLeaderLines(crate::schemas::c15::ShowLeaderLines),
   LeaderLines(std::boxed::Box<crate::schemas::c15::LeaderLines>),
-  AutoGeneneratedCategories(std::boxed::Box<crate::schemas::c15::AutoGeneneratedCategories>),
+  AutoGeneneratedCategories(crate::schemas::c15::AutoGeneneratedCategories),
   PivotOptions(std::boxed::Box<crate::schemas::c14::PivotOptions>),
   SketchOptions(std::boxed::Box<crate::schemas::c14::SketchOptions>),
   InvertSolidFillFormat(std::boxed::Box<crate::schemas::c14::InvertSolidFillFormat>),
-  Style(std::boxed::Box<crate::schemas::c14::Style>),
+  Style(crate::schemas::c14::Style),
   Cdr14ContentPart(std::boxed::Box<crate::schemas::cdr14::ContentPart>),
-  LegacyDrawing(std::boxed::Box<crate::schemas::comp::LegacyDrawing>),
+  LegacyDrawing(crate::schemas::comp::LegacyDrawing),
   LockedCanvas(std::boxed::Box<crate::schemas::lc::LockedCanvas>),
   Inline(std::boxed::Box<crate::schemas::wp::Inline>),
   Anchor(std::boxed::Box<crate::schemas::wp::Anchor>),
   PercentagePositionHeightOffset(crate::schemas::wp14::PercentagePositionHeightOffset),
   PercentagePositionVerticalOffset(crate::schemas::wp14::PercentagePositionVerticalOffset),
-  RelativeWidth(std::boxed::Box<crate::schemas::wp14::RelativeWidth>),
-  RelativeHeight(std::boxed::Box<crate::schemas::wp14::RelativeHeight>),
+  RelativeWidth(crate::schemas::wp14::RelativeWidth),
+  RelativeHeight(crate::schemas::wp14::RelativeHeight),
   Picture(std::boxed::Box<crate::schemas::pic::Picture>),
   ShapeStyle(std::boxed::Box<crate::schemas::pic14::ShapeStyle>),
-  OfficeArtExtensionList(std::boxed::Box<crate::schemas::pic14::OfficeArtExtensionList>),
-  WorksheetDrawing(std::boxed::Box<crate::schemas::xdr::WorksheetDrawing>),
+  OfficeArtExtensionList(crate::schemas::pic14::OfficeArtExtensionList),
+  WorksheetDrawing(crate::schemas::xdr::WorksheetDrawing),
   XdrContentPart(std::boxed::Box<crate::schemas::xdr::ContentPart>),
   Xdr14ContentPart(std::boxed::Box<crate::schemas::xdr14::ContentPart>),
   CommentAuthorMonikerList(crate::schemas::pc::CommentAuthorMonikerList),
@@ -11226,8 +11224,8 @@ pub enum GraphicDataChoice {
   SectionLinkObjMonikerList(crate::schemas::pc::SectionLinkObjMonikerList),
   DesignerTagMonikerList(crate::schemas::pc::DesignerTagMonikerList),
   CustomXmlPartMonikerList(crate::schemas::pc::CustomXmlPartMonikerList),
-  CommentAuthorList(std::boxed::Box<crate::schemas::p::CommentAuthorList>),
-  PCommentList(std::boxed::Box<crate::schemas::p::CommentList>),
+  CommentAuthorList(crate::schemas::p::CommentAuthorList),
+  PCommentList(crate::schemas::p::CommentList),
   POleObject(std::boxed::Box<crate::schemas::p::OleObject>),
   Presentation(std::boxed::Box<crate::schemas::p::Presentation>),
   PresentationProperties(std::boxed::Box<crate::schemas::p::PresentationProperties>),
@@ -11238,14 +11236,14 @@ pub enum GraphicDataChoice {
   NotesMaster(std::boxed::Box<crate::schemas::p::NotesMaster>),
   NotesSlide(std::boxed::Box<crate::schemas::p::NotesSlide>),
   SlideSyncProperties(std::boxed::Box<crate::schemas::p::SlideSyncProperties>),
-  TagList(std::boxed::Box<crate::schemas::p::TagList>),
+  TagList(crate::schemas::p::TagList),
   ViewProperties(std::boxed::Box<crate::schemas::p::ViewProperties>),
   PContentPart(std::boxed::Box<crate::schemas::p::ContentPart>),
   PlaceholderTypeExtension(std::boxed::Box<crate::schemas::p232::PlaceholderTypeExtension>),
-  AuthorList(std::boxed::Box<crate::schemas::p188::AuthorList>),
-  P188CommentList(std::boxed::Box<crate::schemas::p188::CommentList>),
-  CommentRelationship(std::boxed::Box<crate::schemas::p188::CommentRelationship>),
-  Reactions(std::boxed::Box<crate::schemas::p223::Reactions>),
+  AuthorList(crate::schemas::p188::AuthorList),
+  P188CommentList(crate::schemas::p188::CommentList),
+  CommentRelationship(crate::schemas::p188::CommentRelationship),
+  Reactions(crate::schemas::p223::Reactions),
   TaskDetails(std::boxed::Box<crate::schemas::p228::TaskDetails>),
   TaskHistoryDetails(std::boxed::Box<crate::schemas::p1912::TaskHistoryDetails>),
   /// Defines the TextBodyPackage Class.
@@ -11253,7 +11251,7 @@ pub enum GraphicDataChoice {
   GroupCommand(std::boxed::Box<crate::schemas::oac::GroupCommand>),
   ImgDataImgData(crate::schemas::oac::ImgDataImgData),
   OrigImgDataImgData(crate::schemas::oac::OrigImgDataImgData),
-  ImgLink(std::boxed::Box<crate::schemas::oac::ImgLink>),
+  ImgLink(crate::schemas::oac::ImgLink),
   DrawingMonikerList(crate::schemas::oac::DrawingMonikerList),
   DocumentContextMonikerList(crate::schemas::oac::DocumentContextMonikerList),
   GraphicParentMonikerList(crate::schemas::oac::GraphicParentMonikerList),
@@ -11278,129 +11276,121 @@ pub enum GraphicDataChoice {
   TableCellMonikerList(crate::schemas::oac::TableCellMonikerList),
   TableRowMonikerList(crate::schemas::oac::TableRowMonikerList),
   TableColumnMonikerList(crate::schemas::oac::TableColumnMonikerList),
-  InkmlInk(std::boxed::Box<crate::schemas::inkml::Ink>),
+  InkmlInk(crate::schemas::inkml::Ink),
   OneOf(std::boxed::Box<crate::schemas::emma::OneOf>),
   EmmaGroup(std::boxed::Box<crate::schemas::emma::Group>),
   Sequence(std::boxed::Box<crate::schemas::emma::Sequence>),
   EndPoint(std::boxed::Box<crate::schemas::emma::EndPoint>),
-  EndPointInfo(std::boxed::Box<crate::schemas::emma::EndPointInfo>),
-  Info(std::boxed::Box<crate::schemas::emma::Info>),
-  Grammar(std::boxed::Box<crate::schemas::emma::Grammar>),
-  DerivedFrom(std::boxed::Box<crate::schemas::emma::DerivedFrom>),
-  Node(std::boxed::Box<crate::schemas::emma::Node>),
+  EndPointInfo(crate::schemas::emma::EndPointInfo),
+  Info(crate::schemas::emma::Info),
+  Grammar(crate::schemas::emma::Grammar),
+  DerivedFrom(crate::schemas::emma::DerivedFrom),
+  Node(crate::schemas::emma::Node),
   EmmaArc(std::boxed::Box<crate::schemas::emma::Arc>),
-  Lattice(std::boxed::Box<crate::schemas::emma::Lattice>),
+  Lattice(crate::schemas::emma::Lattice),
   Literal(crate::schemas::emma::Literal),
   Interpretation(std::boxed::Box<crate::schemas::emma::Interpretation>),
-  GroupInfo(std::boxed::Box<crate::schemas::emma::GroupInfo>),
-  Derivation(std::boxed::Box<crate::schemas::emma::Derivation>),
-  Model(std::boxed::Box<crate::schemas::emma::Model>),
-  Emma(std::boxed::Box<crate::schemas::emma::Emma>),
+  GroupInfo(crate::schemas::emma::GroupInfo),
+  Derivation(crate::schemas::emma::Derivation),
+  Model(crate::schemas::emma::Model),
+  Emma(crate::schemas::emma::Emma),
   ContextNode(std::boxed::Box<crate::schemas::msink::ContextNode>),
-  PresetTransition(std::boxed::Box<crate::schemas::p15::PresetTransition>),
-  PresenceInfo(std::boxed::Box<crate::schemas::p15::PresenceInfo>),
+  PresetTransition(crate::schemas::p15::PresetTransition),
+  PresenceInfo(crate::schemas::p15::PresenceInfo),
   ThreadingInfo(std::boxed::Box<crate::schemas::p15::ThreadingInfo>),
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   NotesGuideList(std::boxed::Box<crate::schemas::p15::NotesGuideList>),
-  ChartTrackingReferenceBased(std::boxed::Box<crate::schemas::p15::ChartTrackingReferenceBased>),
+  ChartTrackingReferenceBased(crate::schemas::p15::ChartTrackingReferenceBased),
   NonVisualContentPartProperties(
     std::boxed::Box<crate::schemas::p14::NonVisualContentPartProperties>,
   ),
   Transform2D(std::boxed::Box<crate::schemas::p14::Transform2D>),
-  ExtensionListModify(std::boxed::Box<crate::schemas::p14::ExtensionListModify>),
+  ExtensionListModify(crate::schemas::p14::ExtensionListModify),
   Media(std::boxed::Box<crate::schemas::p14::Media>),
-  VortexTransition(std::boxed::Box<crate::schemas::p14::VortexTransition>),
-  SwitchTransition(std::boxed::Box<crate::schemas::p14::SwitchTransition>),
-  FlipTransition(std::boxed::Box<crate::schemas::p14::FlipTransition>),
-  RippleTransition(std::boxed::Box<crate::schemas::p14::RippleTransition>),
+  VortexTransition(crate::schemas::p14::VortexTransition),
+  SwitchTransition(crate::schemas::p14::SwitchTransition),
+  FlipTransition(crate::schemas::p14::FlipTransition),
+  RippleTransition(crate::schemas::p14::RippleTransition),
   /// Defines the HoneycombTransition Class.
   HoneycombTransition,
-  PrismTransition(std::boxed::Box<crate::schemas::p14::PrismTransition>),
-  DoorsTransition(std::boxed::Box<crate::schemas::p14::DoorsTransition>),
-  WindowTransition(std::boxed::Box<crate::schemas::p14::WindowTransition>),
-  FerrisTransition(std::boxed::Box<crate::schemas::p14::FerrisTransition>),
-  GalleryTransition(std::boxed::Box<crate::schemas::p14::GalleryTransition>),
-  ConveyorTransition(std::boxed::Box<crate::schemas::p14::ConveyorTransition>),
-  PanTransition(std::boxed::Box<crate::schemas::p14::PanTransition>),
-  GlitterTransition(std::boxed::Box<crate::schemas::p14::GlitterTransition>),
-  WarpTransition(std::boxed::Box<crate::schemas::p14::WarpTransition>),
-  FlythroughTransition(std::boxed::Box<crate::schemas::p14::FlythroughTransition>),
+  PrismTransition(crate::schemas::p14::PrismTransition),
+  DoorsTransition(crate::schemas::p14::DoorsTransition),
+  WindowTransition(crate::schemas::p14::WindowTransition),
+  FerrisTransition(crate::schemas::p14::FerrisTransition),
+  GalleryTransition(crate::schemas::p14::GalleryTransition),
+  ConveyorTransition(crate::schemas::p14::ConveyorTransition),
+  PanTransition(crate::schemas::p14::PanTransition),
+  GlitterTransition(crate::schemas::p14::GlitterTransition),
+  WarpTransition(crate::schemas::p14::WarpTransition),
+  FlythroughTransition(crate::schemas::p14::FlythroughTransition),
   /// Defines the FlashTransition Class.
   FlashTransition,
-  ShredTransition(std::boxed::Box<crate::schemas::p14::ShredTransition>),
-  RevealTransition(std::boxed::Box<crate::schemas::p14::RevealTransition>),
-  WheelReverseTransition(std::boxed::Box<crate::schemas::p14::WheelReverseTransition>),
-  BookmarkTarget(std::boxed::Box<crate::schemas::p14::BookmarkTarget>),
-  SectionProperties(std::boxed::Box<crate::schemas::p14::SectionProperties>),
-  SectionList(std::boxed::Box<crate::schemas::p14::SectionList>),
-  BrowseMode(std::boxed::Box<crate::schemas::p14::BrowseMode>),
+  ShredTransition(crate::schemas::p14::ShredTransition),
+  RevealTransition(crate::schemas::p14::RevealTransition),
+  WheelReverseTransition(crate::schemas::p14::WheelReverseTransition),
+  BookmarkTarget(crate::schemas::p14::BookmarkTarget),
+  SectionProperties(crate::schemas::p14::SectionProperties),
+  SectionList(crate::schemas::p14::SectionList),
+  BrowseMode(crate::schemas::p14::BrowseMode),
   LaserColor(std::boxed::Box<crate::schemas::p14::LaserColor>),
-  P14DefaultImageDpi(std::boxed::Box<crate::schemas::p14::DefaultImageDpi>),
-  DiscardImageEditData(std::boxed::Box<crate::schemas::p14::DiscardImageEditData>),
-  ShowMediaControls(std::boxed::Box<crate::schemas::p14::ShowMediaControls>),
-  LaserTraceList(std::boxed::Box<crate::schemas::p14::LaserTraceList>),
-  P14CreationId(std::boxed::Box<crate::schemas::p14::CreationId>),
-  ModificationId(std::boxed::Box<crate::schemas::p14::ModificationId>),
-  ShowEventRecordList(std::boxed::Box<crate::schemas::p14::ShowEventRecordList>),
-  Recipients(std::boxed::Box<crate::schemas::w::Recipients>),
-  TextBoxContent(std::boxed::Box<crate::schemas::w::TextBoxContent>),
-  Comments(std::boxed::Box<crate::schemas::w::Comments>),
-  Footnotes(std::boxed::Box<crate::schemas::w::Footnotes>),
-  Endnotes(std::boxed::Box<crate::schemas::w::Endnotes>),
-  Header(std::boxed::Box<crate::schemas::w::Header>),
-  Footer(std::boxed::Box<crate::schemas::w::Footer>),
+  P14DefaultImageDpi(crate::schemas::p14::DefaultImageDpi),
+  DiscardImageEditData(crate::schemas::p14::DiscardImageEditData),
+  ShowMediaControls(crate::schemas::p14::ShowMediaControls),
+  LaserTraceList(crate::schemas::p14::LaserTraceList),
+  P14CreationId(crate::schemas::p14::CreationId),
+  ModificationId(crate::schemas::p14::ModificationId),
+  ShowEventRecordList(crate::schemas::p14::ShowEventRecordList),
+  Recipients(crate::schemas::w::Recipients),
+  TextBoxContent(crate::schemas::w::TextBoxContent),
+  Comments(crate::schemas::w::Comments),
+  Footnotes(crate::schemas::w::Footnotes),
+  Endnotes(crate::schemas::w::Endnotes),
+  Header(crate::schemas::w::Header),
+  Footer(crate::schemas::w::Footer),
   Settings(std::boxed::Box<crate::schemas::w::Settings>),
   WebSettings(std::boxed::Box<crate::schemas::w::WebSettings>),
-  Fonts(std::boxed::Box<crate::schemas::w::Fonts>),
+  Fonts(crate::schemas::w::Fonts),
   Numbering(std::boxed::Box<crate::schemas::w::Numbering>),
   Styles(std::boxed::Box<crate::schemas::w::Styles>),
   Document(std::boxed::Box<crate::schemas::w::Document>),
   GlossaryDocument(std::boxed::Box<crate::schemas::w::GlossaryDocument>),
   Color(std::boxed::Box<crate::schemas::w15::Color>),
-  DataBinding(std::boxed::Box<crate::schemas::w15::DataBinding>),
-  Appearance(std::boxed::Box<crate::schemas::w15::Appearance>),
-  CommentsEx(std::boxed::Box<crate::schemas::w15::CommentsEx>),
-  People(std::boxed::Box<crate::schemas::w15::People>),
+  DataBinding(crate::schemas::w15::DataBinding),
+  Appearance(crate::schemas::w15::Appearance),
+  CommentsEx(crate::schemas::w15::CommentsEx),
+  People(crate::schemas::w15::People),
   SdtRepeatedSection(std::boxed::Box<crate::schemas::w15::SdtRepeatedSection>),
   /// Defines the SdtRepeatedSectionItem Class.
   SdtRepeatedSectionItem,
-  ChartTrackingRefBased(std::boxed::Box<crate::schemas::w15::ChartTrackingRefBased>),
-  DefaultCollapsed(std::boxed::Box<crate::schemas::w15::DefaultCollapsed>),
-  PersistentDocumentId(std::boxed::Box<crate::schemas::w15::PersistentDocumentId>),
+  ChartTrackingRefBased(crate::schemas::w15::ChartTrackingRefBased),
+  DefaultCollapsed(crate::schemas::w15::DefaultCollapsed),
+  PersistentDocumentId(crate::schemas::w15::PersistentDocumentId),
   FootnoteColumns(std::boxed::Box<crate::schemas::w15::FootnoteColumns>),
-  WebExtensionLinked(std::boxed::Box<crate::schemas::w15::WebExtensionLinked>),
-  WebExtensionCreated(std::boxed::Box<crate::schemas::w15::WebExtensionCreated>),
+  WebExtensionLinked(crate::schemas::w15::WebExtensionLinked),
+  WebExtensionCreated(crate::schemas::w15::WebExtensionCreated),
   W14ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
-  DocumentId(std::boxed::Box<crate::schemas::w14::DocumentId>),
-  ConflictMode(std::boxed::Box<crate::schemas::w14::ConflictMode>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
-  DiscardImageEditingData(std::boxed::Box<crate::schemas::w14::DiscardImageEditingData>),
-  W14DefaultImageDpi(std::boxed::Box<crate::schemas::w14::DefaultImageDpi>),
+  DocumentId(crate::schemas::w14::DocumentId),
+  ConflictMode(crate::schemas::w14::ConflictMode),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
+  DiscardImageEditingData(crate::schemas::w14::DiscardImageEditingData),
+  W14DefaultImageDpi(crate::schemas::w14::DefaultImageDpi),
   /// Defines the EntityPickerEmpty Class.
   EntityPickerEmpty,
   SdtContentCheckBox(std::boxed::Box<crate::schemas::w14::SdtContentCheckBox>),
-  SchemaLibrary(std::boxed::Box<crate::schemas::sl::SchemaLibrary>),
+  SchemaLibrary(crate::schemas::sl::SchemaLibrary),
   MathProperties(std::boxed::Box<crate::schemas::m::MathProperties>),
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   Shape(std::boxed::Box<crate::schemas::v::Shape>),
   Shapetype(std::boxed::Box<crate::schemas::v::Shapetype>),
   VGroup(std::boxed::Box<crate::schemas::v::Group>),
   Background(std::boxed::Box<crate::schemas::v::Background>),
   Fill(std::boxed::Box<crate::schemas::v::Fill>),
-  Formulas(std::boxed::Box<crate::schemas::v::Formulas>),
-  ShapeHandles(std::boxed::Box<crate::schemas::v::ShapeHandles>),
+  Formulas(crate::schemas::v::Formulas),
+  ShapeHandles(crate::schemas::v::ShapeHandles),
   ImageData(std::boxed::Box<crate::schemas::v::ImageData>),
   Path(std::boxed::Box<crate::schemas::v::Path>),
   TextBox(std::boxed::Box<crate::schemas::v::TextBox>),
@@ -11418,32 +11408,32 @@ pub enum GraphicDataChoice {
   ShapeDefaults(std::boxed::Box<crate::schemas::o::ShapeDefaults>),
   ShapeLayout(std::boxed::Box<crate::schemas::o::ShapeLayout>),
   OSignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
-  OInk(std::boxed::Box<crate::schemas::o::Ink>),
+  OInk(crate::schemas::o::Ink),
   Diagram(std::boxed::Box<crate::schemas::o::Diagram>),
   Skew(std::boxed::Box<crate::schemas::o::Skew>),
   Extrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   Callout(std::boxed::Box<crate::schemas::o::Callout>),
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
   OOleObject(std::boxed::Box<crate::schemas::o::OleObject>),
-  Complex(std::boxed::Box<crate::schemas::o::Complex>),
+  Complex(crate::schemas::o::Complex),
   LeftStroke(std::boxed::Box<crate::schemas::o::LeftStroke>),
   TopStroke(std::boxed::Box<crate::schemas::o::TopStroke>),
   RightStroke(std::boxed::Box<crate::schemas::o::RightStroke>),
   BottomStroke(std::boxed::Box<crate::schemas::o::BottomStroke>),
   ColumnStroke(std::boxed::Box<crate::schemas::o::ColumnStroke>),
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
-  FillExtendedProperties(std::boxed::Box<crate::schemas::o::FillExtendedProperties>),
-  TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
-  LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
-  RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
-  BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  ClipPath(crate::schemas::o::ClipPath),
+  FillExtendedProperties(crate::schemas::o::FillExtendedProperties),
+  TopBorder(crate::schemas::w10::TopBorder),
+  LeftBorder(crate::schemas::w10::LeftBorder),
+  RightBorder(crate::schemas::w10::RightBorder),
+  BottomBorder(crate::schemas::w10::BottomBorder),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
+  ClientData(crate::schemas::xvml::ClientData),
   /// Ink Annotation Flag.
   InkAnnotationFlag,
-  TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
+  TextData(crate::schemas::pvml::TextData),
   WordprocessingCanvas(std::boxed::Box<crate::schemas::wpc::WordprocessingCanvas>),
   WordprocessingGroup(std::boxed::Box<crate::schemas::wpg::WordprocessingGroup>),
   WordprocessingShape(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
@@ -11451,7 +11441,7 @@ pub enum GraphicDataChoice {
   ColorStyle(std::boxed::Box<crate::schemas::cs::ColorStyle>),
   ChartStyle(std::boxed::Box<crate::schemas::cs::ChartStyle>),
   WebExtension(std::boxed::Box<crate::schemas::we::WebExtension>),
-  WebExtensionReference(std::boxed::Box<crate::schemas::we::WebExtensionReference>),
+  WebExtensionReference(crate::schemas::we::WebExtensionReference),
   TimeSlicer(std::boxed::Box<crate::schemas::tsle::TimeSlicer>),
   XmlAny(std::boxed::Box<[u8]>),
 }
@@ -11465,7 +11455,7 @@ pub enum ShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -11494,17 +11484,17 @@ pub enum TextShapeChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum GradientStopChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PathChoice {
@@ -11517,9 +11507,9 @@ pub enum PathChoice {
   /// Draw Arc To.
   ArcTo(std::boxed::Box<ArcTo>),
   /// Draw Quadratic Bezier Curve To.
-  QuadraticBezierCurveTo(std::boxed::Box<QuadraticBezierCurveTo>),
+  QuadraticBezierCurveTo(QuadraticBezierCurveTo),
   /// Draw Cubic Bezier Curve To.
-  CubicBezierCurveTo(std::boxed::Box<CubicBezierCurveTo>),
+  CubicBezierCurveTo(CubicBezierCurveTo),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum AdjustHandleListChoice {
@@ -11533,7 +11523,7 @@ pub enum BodyPropertiesChoice {
   /// No AutoFit.
   NoAutoFit,
   /// Normal AutoFit.
-  NormalAutoFit(std::boxed::Box<NormalAutoFit>),
+  NormalAutoFit(NormalAutoFit),
   /// Shape AutoFit.
   ShapeAutoFit,
 }
@@ -11542,12 +11532,12 @@ pub enum BodyPropertiesChoice2 {
   /// Apply 3D shape properties.
   Shape3DType(std::boxed::Box<Shape3DType>),
   /// No text in 3D scene.
-  FlatText(std::boxed::Box<FlatText>),
+  FlatText(FlatText),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableCellPropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -11562,7 +11552,7 @@ pub enum TableCellPropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TablePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -11654,17 +11644,17 @@ pub enum TableCellTextStyleChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableCellTextStyleChoice2 {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
+  RgbColorModelPercentage(RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<SystemColor>),
+  SystemColor(SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<PresetColor>),
+  PresetColor(PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableCellStyleChoice {
@@ -11699,25 +11689,25 @@ pub enum ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
+  BulletSizePercentage(BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<BulletSizePoints>),
+  BulletSizePoints(BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphPropertiesChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<BulletFont>),
+  BulletFont(BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphPropertiesChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
+  AutoNumberedBullet(AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<CharacterBullet>),
+  CharacterBullet(CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
@@ -11733,25 +11723,25 @@ pub enum DefaultParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
+  BulletSizePercentage(BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<BulletSizePoints>),
+  BulletSizePoints(BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DefaultParagraphPropertiesChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<BulletFont>),
+  BulletFont(BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DefaultParagraphPropertiesChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
+  AutoNumberedBullet(AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<CharacterBullet>),
+  CharacterBullet(CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
@@ -11767,25 +11757,25 @@ pub enum Level1ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
+  BulletSizePercentage(BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<BulletSizePoints>),
+  BulletSizePoints(BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level1ParagraphPropertiesChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<BulletFont>),
+  BulletFont(BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level1ParagraphPropertiesChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
+  AutoNumberedBullet(AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<CharacterBullet>),
+  CharacterBullet(CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
@@ -11801,25 +11791,25 @@ pub enum Level2ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
+  BulletSizePercentage(BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<BulletSizePoints>),
+  BulletSizePoints(BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level2ParagraphPropertiesChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<BulletFont>),
+  BulletFont(BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level2ParagraphPropertiesChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
+  AutoNumberedBullet(AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<CharacterBullet>),
+  CharacterBullet(CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
@@ -11835,25 +11825,25 @@ pub enum Level3ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
+  BulletSizePercentage(BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<BulletSizePoints>),
+  BulletSizePoints(BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level3ParagraphPropertiesChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<BulletFont>),
+  BulletFont(BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level3ParagraphPropertiesChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
+  AutoNumberedBullet(AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<CharacterBullet>),
+  CharacterBullet(CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
@@ -11869,25 +11859,25 @@ pub enum Level4ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
+  BulletSizePercentage(BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<BulletSizePoints>),
+  BulletSizePoints(BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level4ParagraphPropertiesChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<BulletFont>),
+  BulletFont(BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level4ParagraphPropertiesChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
+  AutoNumberedBullet(AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<CharacterBullet>),
+  CharacterBullet(CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
@@ -11903,25 +11893,25 @@ pub enum Level5ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
+  BulletSizePercentage(BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<BulletSizePoints>),
+  BulletSizePoints(BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level5ParagraphPropertiesChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<BulletFont>),
+  BulletFont(BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level5ParagraphPropertiesChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
+  AutoNumberedBullet(AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<CharacterBullet>),
+  CharacterBullet(CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
@@ -11937,25 +11927,25 @@ pub enum Level6ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
+  BulletSizePercentage(BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<BulletSizePoints>),
+  BulletSizePoints(BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level6ParagraphPropertiesChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<BulletFont>),
+  BulletFont(BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level6ParagraphPropertiesChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
+  AutoNumberedBullet(AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<CharacterBullet>),
+  CharacterBullet(CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
@@ -11971,25 +11961,25 @@ pub enum Level7ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
+  BulletSizePercentage(BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<BulletSizePoints>),
+  BulletSizePoints(BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level7ParagraphPropertiesChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<BulletFont>),
+  BulletFont(BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level7ParagraphPropertiesChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
+  AutoNumberedBullet(AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<CharacterBullet>),
+  CharacterBullet(CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
@@ -12005,25 +11995,25 @@ pub enum Level8ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
+  BulletSizePercentage(BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<BulletSizePoints>),
+  BulletSizePoints(BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level8ParagraphPropertiesChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<BulletFont>),
+  BulletFont(BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level8ParagraphPropertiesChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
+  AutoNumberedBullet(AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<CharacterBullet>),
+  CharacterBullet(CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
@@ -12039,32 +12029,32 @@ pub enum Level9ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
+  BulletSizePercentage(BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<BulletSizePoints>),
+  BulletSizePoints(BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level9ParagraphPropertiesChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<BulletFont>),
+  BulletFont(BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Level9ParagraphPropertiesChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
+  AutoNumberedBullet(AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<CharacterBullet>),
+  CharacterBullet(CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum EndParagraphRunPropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -12100,7 +12090,7 @@ pub enum EndParagraphRunPropertiesChoice4 {
 #[derive(Clone, Debug, PartialEq)]
 pub enum RunPropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -12136,7 +12126,7 @@ pub enum RunPropertiesChoice4 {
 #[derive(Clone, Debug, PartialEq)]
 pub enum DefaultRunPropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -12177,28 +12167,28 @@ pub enum ParagraphChoice {
   Break(std::boxed::Box<Break>),
   /// Text Field.
   Field(std::boxed::Box<Field>),
-  TextMath(std::boxed::Box<crate::schemas::a14::TextMath>),
+  TextMath(crate::schemas::a14::TextMath),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum LineSpacingChoice {
   /// Spacing Percent.
-  SpacingPercent(std::boxed::Box<SpacingPercent>),
+  SpacingPercent(SpacingPercent),
   /// Spacing Points.
-  SpacingPoints(std::boxed::Box<SpacingPoints>),
+  SpacingPoints(SpacingPoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SpaceBeforeChoice {
   /// Spacing Percent.
-  SpacingPercent(std::boxed::Box<SpacingPercent>),
+  SpacingPercent(SpacingPercent),
   /// Spacing Points.
-  SpacingPoints(std::boxed::Box<SpacingPoints>),
+  SpacingPoints(SpacingPoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SpaceAfterChoice {
   /// Spacing Percent.
-  SpacingPercent(std::boxed::Box<SpacingPercent>),
+  SpacingPercent(SpacingPercent),
   /// Spacing Points.
-  SpacingPoints(std::boxed::Box<SpacingPoints>),
+  SpacingPoints(SpacingPoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesExtensionChoice {
@@ -12213,19 +12203,19 @@ pub enum ShapePropertiesExtensionChoice {
   /// Defines the HiddenShape3D Class.
   HiddenShape3D(std::boxed::Box<crate::schemas::a14::HiddenShape3D>),
   /// Defines the ShadowObscured Class.
-  ShadowObscured(std::boxed::Box<crate::schemas::a14::ShadowObscured>),
+  ShadowObscured(crate::schemas::a14::ShadowObscured),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum GvmlGroupShapeExtensionChoice {
   /// Defines the IsCanvas Class.
-  IsCanvas(std::boxed::Box<crate::schemas::a14::IsCanvas>),
+  IsCanvas(crate::schemas::a14::IsCanvas),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum VisualGroupShapePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<NoFill>),
+  NoFill(NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<SolidFill>),
   /// Defines the GradientFill Class.
@@ -12263,7 +12253,7 @@ pub enum GroupShapeChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum NonVisualGroupDrawingShapePropsExtensionChoice {
   /// Defines the NonVisualGroupProperties Class.
-  NonVisualGroupProperties(std::boxed::Box<crate::schemas::a15::NonVisualGroupProperties>),
+  NonVisualGroupProperties(crate::schemas::a15::NonVisualGroupProperties),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -12281,9 +12271,9 @@ pub enum ConnectorLockingExtensionChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum DataModelExtensionChoice {
   /// Defines the DataModelExtensionBlock Class.
-  DataModelExtensionBlock(std::boxed::Box<crate::schemas::dsp::DataModelExtensionBlock>),
+  DataModelExtensionBlock(crate::schemas::dsp::DataModelExtensionBlock),
   /// Defines the RecolorImages Class.
-  RecolorImages(std::boxed::Box<crate::schemas::dgm14::RecolorImages>),
+  RecolorImages(crate::schemas::dgm14::RecolorImages),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -12295,7 +12285,7 @@ pub enum PtExtensionChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum HyperlinkExtensionChoice {
   /// Defines the HyperlinkColor Class.
-  HyperlinkColor(std::boxed::Box<crate::schemas::ahyp::HyperlinkColor>),
+  HyperlinkColor(crate::schemas::ahyp::HyperlinkColor),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -12307,19 +12297,17 @@ pub enum LinePropertiesExtensionChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum NonVisualDrawingPropertiesExtensionChoice {
   /// Defines the CompatExtension Class.
-  CompatExtension(std::boxed::Box<crate::schemas::a14::CompatExtension>),
+  CompatExtension(crate::schemas::a14::CompatExtension),
   /// Defines the BackgroundProperties Class.
-  BackgroundProperties(std::boxed::Box<crate::schemas::a15::BackgroundProperties>),
+  BackgroundProperties(crate::schemas::a15::BackgroundProperties),
   /// Defines the CreationId Class.
-  CreationId(std::boxed::Box<crate::schemas::a16::CreationId>),
+  CreationId(crate::schemas::a16::CreationId),
   /// Defines the PredecessorDrawingElementReference Class.
-  PredecessorDrawingElementReference(
-    std::boxed::Box<crate::schemas::a16::PredecessorDrawingElementReference>,
-  ),
+  PredecessorDrawingElementReference(crate::schemas::a16::PredecessorDrawingElementReference),
   /// Defines the Decorative Class.
-  Decorative(std::boxed::Box<crate::schemas::adec::Decorative>),
+  Decorative(crate::schemas::adec::Decorative),
   /// Defines the ClassificationOutcome Class.
-  ClassificationOutcome(std::boxed::Box<crate::schemas::aclsh::ClassificationOutcome>),
+  ClassificationOutcome(crate::schemas::aclsh::ClassificationOutcome),
   /// Defines the ScriptLink Class.
   ScriptLink(std::boxed::Box<crate::schemas::asl::ScriptLink>),
   XmlAny(std::boxed::Box<[u8]>),
@@ -12327,7 +12315,7 @@ pub enum NonVisualDrawingPropertiesExtensionChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum NonVisualPicturePropertiesExtensionChoice {
   /// Defines the CameraTool Class.
-  CameraTool(std::boxed::Box<crate::schemas::a14::CameraTool>),
+  CameraTool(crate::schemas::a14::CameraTool),
   /// Defines the SignatureLine Class.
   SignatureLine(std::boxed::Box<crate::schemas::a15::SignatureLine>),
   /// Defines the ObjectProperties Class.
@@ -12335,7 +12323,7 @@ pub enum NonVisualPicturePropertiesExtensionChoice {
   /// Defines the LiveFeedProperties Class.
   LiveFeedProperties(std::boxed::Box<crate::schemas::alf::LiveFeedProperties>),
   /// Defines the ImageFormula Class.
-  ImageFormula(std::boxed::Box<crate::schemas::aif::ImageFormula>),
+  ImageFormula(crate::schemas::aif::ImageFormula),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -12343,15 +12331,15 @@ pub enum BlipExtensionChoice {
   /// Defines the ImageProperties Class.
   ImageProperties(std::boxed::Box<crate::schemas::a14::ImageProperties>),
   /// Defines the UseLocalDpi Class.
-  UseLocalDpi(std::boxed::Box<crate::schemas::a14::UseLocalDpi>),
+  UseLocalDpi(crate::schemas::a14::UseLocalDpi),
   /// Defines the WebVideoProperty Class.
-  WebVideoProperty(std::boxed::Box<crate::schemas::wp15::WebVideoProperty>),
+  WebVideoProperty(crate::schemas::wp15::WebVideoProperty),
   /// Defines the SVGBlip Class.
-  SvgBlip(std::boxed::Box<crate::schemas::asvg::SvgBlip>),
+  SvgBlip(crate::schemas::asvg::SvgBlip),
   /// Defines the PictureAttributionSourceURL Class.
-  PictureAttributionSourceUrl(std::boxed::Box<crate::schemas::a1611::PictureAttributionSourceUrl>),
+  PictureAttributionSourceUrl(crate::schemas::a1611::PictureAttributionSourceUrl),
   /// Defines the OEmbed Class.
-  OEmbed(std::boxed::Box<crate::schemas::woe::OEmbed>),
+  OEmbed(crate::schemas::woe::OEmbed),
   /// Defines the OEmbedShared Class.
   OEmbedShared(std::boxed::Box<crate::schemas::aoe::OEmbedShared>),
   XmlAny(std::boxed::Box<[u8]>),

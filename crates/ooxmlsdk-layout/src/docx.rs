@@ -13437,11 +13437,11 @@ mod tests {
     )
   }
 
-  fn text(value: &str) -> Box<w::Text> {
-    Box::new(w::Text(w::TextType {
+  fn text(value: &str) -> w::Text {
+    w::Text(w::TextType {
       xml_content: Some(value.into()),
       ..Default::default()
-    }))
+    })
   }
 
   #[test]
@@ -13533,18 +13533,18 @@ mod tests {
     let mut inlines = Vec::new();
     let run = w::Run {
       run_choice: vec![
-        w::RunChoice::SymbolChar(Box::new(w::SymbolChar {
+        w::RunChoice::SymbolChar(w::SymbolChar {
           font: Some("Symbol".into()),
           char: Some("F0B7".into()),
-        })),
-        w::RunChoice::SymbolChar(Box::new(w::SymbolChar {
+        }),
+        w::RunChoice::SymbolChar(w::SymbolChar {
           font: Some("Wingdings".into()),
           char: Some("F0FC".into()),
-        })),
-        w::RunChoice::SymbolChar(Box::new(w::SymbolChar {
+        }),
+        w::RunChoice::SymbolChar(w::SymbolChar {
           font: None,
           char: Some("00A9".into()),
-        })),
+        }),
       ],
       ..Default::default()
     };
@@ -13605,8 +13605,8 @@ mod tests {
   fn table_row_grid_properties_preserve_skipped_grid_columns() {
     let properties = w::TableRowProperties {
       table_row_properties_choice1: vec![
-        w::TableRowPropertiesChoice::GridBefore(Box::new(w::GridBefore { val: 1 })),
-        w::TableRowPropertiesChoice::GridAfter(Box::new(w::GridAfter { val: 2 })),
+        w::TableRowPropertiesChoice::GridBefore(w::GridBefore { val: 1 }),
+        w::TableRowPropertiesChoice::GridAfter(w::GridAfter { val: 2 }),
       ],
       ..Default::default()
     };
@@ -13935,17 +13935,17 @@ mod tests {
           table_style_conditional_formatting_table_row_properties: Some(
             w::TableStyleConditionalFormattingTableRowProperties {
               table_style_conditional_formatting_table_row_properties_choice: vec![
-                w::TableStyleConditionalFormattingTableRowPropertiesChoice::TableHeader(Box::new(
+                w::TableStyleConditionalFormattingTableRowPropertiesChoice::TableHeader(
                   w::TableHeader { val: None },
-                )),
-                w::TableStyleConditionalFormattingTableRowPropertiesChoice::CantSplit(Box::new(
+                ),
+                w::TableStyleConditionalFormattingTableRowPropertiesChoice::CantSplit(
                   w::CantSplit { val: None },
-                )),
+                ),
                 w::TableStyleConditionalFormattingTableRowPropertiesChoice::TableCellSpacing(
-                  Box::new(w::TableCellSpacing {
+                  w::TableCellSpacing {
                     width: Some(measurement(240)),
                     r#type: Some(w::TableWidthUnitValues::Dxa),
-                  }),
+                  },
                 ),
               ],
             },
@@ -13977,13 +13977,13 @@ mod tests {
       &mut first_row,
       &direct_table_row_style(Some(&w::TableRowProperties {
         table_row_properties_choice1: vec![
-          w::TableRowPropertiesChoice::TableHeader(Box::new(w::TableHeader {
+          w::TableRowPropertiesChoice::TableHeader(w::TableHeader {
             val: Some(ooxmlsdk::simple_type::OnOffValue::Off),
-          })),
-          w::TableRowPropertiesChoice::TableCellSpacing(Box::new(w::TableCellSpacing {
+          }),
+          w::TableRowPropertiesChoice::TableCellSpacing(w::TableCellSpacing {
             width: Some(measurement(120)),
             r#type: Some(w::TableWidthUnitValues::Dxa),
-          })),
+          }),
         ],
         ..Default::default()
       })),
@@ -14085,9 +14085,9 @@ mod tests {
       paragraph_choice: vec![w::ParagraphChoice::WRun(Box::new(w::Run {
         run_properties: Some(Box::new(w::RunProperties {
           run_properties_choice: vec![
-            w::RunPropertiesChoice::Bold(Box::new(w::Bold {
+            w::RunPropertiesChoice::Bold(w::Bold {
               val: Some(false.into()),
-            })),
+            }),
             w::RunPropertiesChoice::Color(Box::new(w::Color {
               val: Some("0000FF".into()),
               ..Default::default()
@@ -14139,12 +14139,10 @@ mod tests {
       paragraph_properties: Some(Box::new(w::ParagraphProperties {
         paragraph_mark_run_properties: Some(Box::new(w::ParagraphMarkRunProperties {
           paragraph_mark_run_properties_choice2: vec![
-            w::ParagraphMarkRunPropertiesChoice2::FontSize(Box::new(w::FontSize {
+            w::ParagraphMarkRunPropertiesChoice2::FontSize(w::FontSize { val: "96".into() }),
+            w::ParagraphMarkRunPropertiesChoice2::FontSizeComplexScript(w::FontSizeComplexScript {
               val: "96".into(),
-            })),
-            w::ParagraphMarkRunPropertiesChoice2::FontSizeComplexScript(Box::new(
-              w::FontSizeComplexScript { val: "96".into() },
-            )),
+            }),
           ],
           ..Default::default()
         })),
@@ -14305,12 +14303,10 @@ mod tests {
         ..Default::default()
       },
       w::Run {
-        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode(
-          w::TextType {
-            xml_content: Some(r#" PAGEREF "_Toc123" \h "#.into()),
-            ..Default::default()
-          },
-        )))],
+        run_choice: vec![w::RunChoice::FieldCode(w::FieldCode(w::TextType {
+          xml_content: Some(r#" PAGEREF "_Toc123" \h "#.into()),
+          ..Default::default()
+        }))],
         ..Default::default()
       },
       w::Run {
@@ -14376,12 +14372,10 @@ mod tests {
         ..Default::default()
       },
       w::Run {
-        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode(
-          w::TextType {
-            xml_content: Some(r#" HYPERLINK \l md_intro "#.into()),
-            ..Default::default()
-          },
-        )))],
+        run_choice: vec![w::RunChoice::FieldCode(w::FieldCode(w::TextType {
+          xml_content: Some(r#" HYPERLINK \l md_intro "#.into()),
+          ..Default::default()
+        }))],
         ..Default::default()
       },
       w::Run {
@@ -14407,12 +14401,10 @@ mod tests {
         ..Default::default()
       },
       w::Run {
-        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode(
-          w::TextType {
-            xml_content: Some(r#" PAGEREF md_intro \h "#.into()),
-            ..Default::default()
-          },
-        )))],
+        run_choice: vec![w::RunChoice::FieldCode(w::FieldCode(w::TextType {
+          xml_content: Some(r#" PAGEREF md_intro \h "#.into()),
+          ..Default::default()
+        }))],
         ..Default::default()
       },
       w::Run {
@@ -14628,19 +14620,17 @@ mod tests {
       run_choice: vec![w::RunChoice::Picture(Box::new(w::Picture {
         picture_choice: vec![w::PictureChoice::Shape(Box::new(v::Shape {
           shape_choice: vec![v::ShapeChoice::TextBox(Box::new(v::TextBox {
-            text_box_choice: Some(v::TextBoxChoice::TextBoxContent(Box::new(
-              w::TextBoxContent {
-                text_box_content_choice: vec![w::TextBoxContentChoice::Paragraph(Box::new(
-                  w::Paragraph {
-                    paragraph_choice: vec![w::ParagraphChoice::WRun(Box::new(w::Run {
-                      run_choice: vec![w::RunChoice::Text(text("Text inside VML box"))],
-                      ..Default::default()
-                    }))],
+            text_box_choice: Some(v::TextBoxChoice::TextBoxContent(w::TextBoxContent {
+              text_box_content_choice: vec![w::TextBoxContentChoice::Paragraph(Box::new(
+                w::Paragraph {
+                  paragraph_choice: vec![w::ParagraphChoice::WRun(Box::new(w::Run {
+                    run_choice: vec![w::RunChoice::Text(text("Text inside VML box"))],
                     ..Default::default()
-                  },
-                ))],
-              },
-            ))),
+                  }))],
+                  ..Default::default()
+                },
+              ))],
+            })),
             ..Default::default()
           }))],
           ..Default::default()

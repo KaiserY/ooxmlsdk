@@ -425,14 +425,14 @@ pub struct Source {
 #[derive(Clone, Debug, PartialEq)]
 pub enum AuthorChoice {
   /// Name List.
-  NameList(std::boxed::Box<NameList>),
+  NameList(NameList),
   /// Corporate Author.
   Corporate(Corporate),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PerformerChoice {
   /// Name List.
-  NameList(std::boxed::Box<NameList>),
+  NameList(NameList),
   /// Corporate Author.
   Corporate(Corporate),
 }
@@ -478,7 +478,7 @@ pub enum SourceChoice {
   /// Album Title.
   AlbumTitle(AlbumTitle),
   /// Contributors List.
-  AuthorList(std::boxed::Box<AuthorList>),
+  AuthorList(AuthorList),
   /// Book Title.
   BookTitle(BookTitle),
   /// Broadcaster.

@@ -12,6 +12,13 @@ pub trait SdkValidator {
   fn validate_into(&self, _context: &mut ValidationContext) {}
 }
 
+impl<T: SdkValidator + ?Sized> SdkValidator for Box<T> {
+  #[inline]
+  fn validate_into(&self, context: &mut ValidationContext) {
+    self.as_ref().validate_into(context);
+  }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ValidationErrorType {
   #[default]

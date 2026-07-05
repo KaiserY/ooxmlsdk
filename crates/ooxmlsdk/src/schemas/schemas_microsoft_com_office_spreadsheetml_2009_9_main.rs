@@ -2270,7 +2270,7 @@ pub enum PivotUserEditChoice {
   /// Defines the Formula Class.
   Formula(crate::schemas::xne::Formula),
   /// Defines the PivotEditValue Class.
-  PivotEditValue(std::boxed::Box<PivotEditValue>),
+  PivotEditValue(PivotEditValue),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SlicerCacheDataChoice {

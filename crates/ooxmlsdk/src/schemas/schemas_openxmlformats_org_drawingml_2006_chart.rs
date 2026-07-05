@@ -4899,7 +4899,7 @@ pub enum ChartShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ChartShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -4977,15 +4977,15 @@ pub struct DataLabelsChoiceSequence {
 #[derive(Clone, Debug, PartialEq)]
 pub enum DataLabelsChoice {
   /// Delete.
-  Delete(std::boxed::Box<Delete>),
+  Delete(Delete),
   /// Sequence of c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator, c:showLeaderLines, c:leaderLines
   Sequence(std::boxed::Box<DataLabelsChoiceSequence>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ChartSpaceChoice {
-  C14Style(std::boxed::Box<crate::schemas::c14::Style>),
+  C14Style(crate::schemas::c14::Style),
   /// Defines the Style Class.
-  CStyle(std::boxed::Box<Style>),
+  CStyle(Style),
   /// Unknown XML child.
   XmlAny(std::boxed::Box<[u8]>),
 }
@@ -5034,7 +5034,7 @@ pub enum BubbleSizeChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum LegendEntryChoice {
   /// Delete.
-  Delete(std::boxed::Box<Delete>),
+  Delete(Delete),
   TextProperties(std::boxed::Box<TextProperties>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -5047,7 +5047,7 @@ pub enum ShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -5111,37 +5111,37 @@ pub struct DataLabelChoiceSequence {
 #[derive(Clone, Debug, PartialEq)]
 pub enum DataLabelChoice {
   /// Delete.
-  Delete(std::boxed::Box<Delete>),
+  Delete(Delete),
   /// Sequence of c:layout, c:tx, c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator
   Sequence(std::boxed::Box<DataLabelChoiceSequence>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ValueAxisChoice {
   /// Crosses.
-  Crosses(std::boxed::Box<Crosses>),
+  Crosses(Crosses),
   /// Crossing Value.
-  CrossesAt(std::boxed::Box<CrossesAt>),
+  CrossesAt(CrossesAt),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CategoryAxisChoice {
   /// Crosses.
-  Crosses(std::boxed::Box<Crosses>),
+  Crosses(Crosses),
   /// Crossing Value.
-  CrossesAt(std::boxed::Box<CrossesAt>),
+  CrossesAt(CrossesAt),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DateAxisChoice {
   /// Crosses.
-  Crosses(std::boxed::Box<Crosses>),
+  Crosses(Crosses),
   /// Crossing Value.
-  CrossesAt(std::boxed::Box<CrossesAt>),
+  CrossesAt(CrossesAt),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SeriesAxisChoice {
   /// Crosses.
-  Crosses(std::boxed::Box<Crosses>),
+  Crosses(Crosses),
   /// Crossing Value.
-  CrossesAt(std::boxed::Box<CrossesAt>),
+  CrossesAt(CrossesAt),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum StockChartExtensionChoice {
@@ -5164,37 +5164,37 @@ pub enum Pie3DChartExtensionChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum NumRefExtensionChoice {
   /// Defines the FullReference Class.
-  FullReference(std::boxed::Box<crate::schemas::c15::FullReference>),
+  FullReference(crate::schemas::c15::FullReference),
   /// Defines the LevelReference Class.
-  LevelReference(std::boxed::Box<crate::schemas::c15::LevelReference>),
+  LevelReference(crate::schemas::c15::LevelReference),
   /// Defines the FormulaReference Class.
-  FormulaReference(std::boxed::Box<crate::schemas::c15::FormulaReference>),
+  FormulaReference(crate::schemas::c15::FormulaReference),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum StrDataExtensionChoice {
   /// Defines the AutoGeneneratedCategories Class.
-  AutoGeneneratedCategories(std::boxed::Box<crate::schemas::c15::AutoGeneneratedCategories>),
+  AutoGeneneratedCategories(crate::schemas::c15::AutoGeneneratedCategories),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum StrRefExtensionChoice {
   /// Defines the FullReference Class.
-  FullReference(std::boxed::Box<crate::schemas::c15::FullReference>),
+  FullReference(crate::schemas::c15::FullReference),
   /// Defines the LevelReference Class.
-  LevelReference(std::boxed::Box<crate::schemas::c15::LevelReference>),
+  LevelReference(crate::schemas::c15::LevelReference),
   /// Defines the FormulaReference Class.
-  FormulaReference(std::boxed::Box<crate::schemas::c15::FormulaReference>),
+  FormulaReference(crate::schemas::c15::FormulaReference),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum MultiLvlStrRefExtensionChoice {
   /// Defines the FullReference Class.
-  FullReference(std::boxed::Box<crate::schemas::c15::FullReference>),
+  FullReference(crate::schemas::c15::FullReference),
   /// Defines the LevelReference Class.
-  LevelReference(std::boxed::Box<crate::schemas::c15::LevelReference>),
+  LevelReference(crate::schemas::c15::LevelReference),
   /// Defines the FormulaReference Class.
-  FormulaReference(std::boxed::Box<crate::schemas::c15::FormulaReference>),
+  FormulaReference(crate::schemas::c15::FormulaReference),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -5202,15 +5202,15 @@ pub enum DLblsExtensionChoice {
   /// Defines the ChartText Class.
   ChartText(std::boxed::Box<crate::schemas::c15::ChartText>),
   /// Defines the DataLabelFieldTable Class.
-  DataLabelFieldTable(std::boxed::Box<crate::schemas::c15::DataLabelFieldTable>),
+  DataLabelFieldTable(crate::schemas::c15::DataLabelFieldTable),
   /// Defines the ShowDataLabelsRange Class.
-  ShowDataLabelsRange(std::boxed::Box<crate::schemas::c15::ShowDataLabelsRange>),
+  ShowDataLabelsRange(crate::schemas::c15::ShowDataLabelsRange),
   /// Defines the ShapeProperties Class.
   ShapeProperties(std::boxed::Box<crate::schemas::c15::ShapeProperties>),
   /// Defines the Layout Class.
   Layout(std::boxed::Box<crate::schemas::c15::Layout>),
   /// Defines the ShowLeaderLines Class.
-  ShowLeaderLines(std::boxed::Box<crate::schemas::c15::ShowLeaderLines>),
+  ShowLeaderLines(crate::schemas::c15::ShowLeaderLines),
   /// Defines the LeaderLines Class.
   LeaderLines(std::boxed::Box<crate::schemas::c15::LeaderLines>),
   XmlAny(std::boxed::Box<[u8]>),
@@ -5284,48 +5284,48 @@ pub enum Surface3DChartExtensionChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum CatAxExtensionChoice {
   /// Defines the NumberingFormat Class.
-  NumberingFormat(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
+  NumberingFormat(crate::schemas::c15::NumberingFormat),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DateAxExtensionChoice {
   /// Defines the NumberingFormat Class.
-  NumberingFormat(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
+  NumberingFormat(crate::schemas::c15::NumberingFormat),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SerAxExtensionChoice {
   /// Defines the NumberingFormat Class.
-  NumberingFormat(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
+  NumberingFormat(crate::schemas::c15::NumberingFormat),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ValAxExtensionChoice {
   /// Defines the NumberingFormat Class.
-  NumberingFormat(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
+  NumberingFormat(crate::schemas::c15::NumberingFormat),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DisplayUnitsChoice {
   /// Custom Display Unit.
-  CustomDisplayUnit(std::boxed::Box<CustomDisplayUnit>),
+  CustomDisplayUnit(CustomDisplayUnit),
   /// Built in Display Unit Value.
-  BuiltInUnit(std::boxed::Box<BuiltInUnit>),
+  BuiltInUnit(BuiltInUnit),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DLblExtensionChoice {
   /// Defines the DataLabelFieldTable Class.
-  DataLabelFieldTable(std::boxed::Box<crate::schemas::c15::DataLabelFieldTable>),
+  DataLabelFieldTable(crate::schemas::c15::DataLabelFieldTable),
   /// Defines the ExceptionForSave Class.
-  ExceptionForSave(std::boxed::Box<crate::schemas::c15::ExceptionForSave>),
+  ExceptionForSave(crate::schemas::c15::ExceptionForSave),
   /// Defines the ShowDataLabelsRange Class.
-  ShowDataLabelsRange(std::boxed::Box<crate::schemas::c15::ShowDataLabelsRange>),
+  ShowDataLabelsRange(crate::schemas::c15::ShowDataLabelsRange),
   /// Defines the ShapeProperties Class.
   ShapeProperties(std::boxed::Box<crate::schemas::c15::ShapeProperties>),
   /// Defines the Layout Class.
   Layout(std::boxed::Box<crate::schemas::c15::Layout>),
   /// Defines the UniqueIdChartUniqueID Class.
-  UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
+  UniqueIdChartUniqueId(crate::schemas::c16::UniqueIdChartUniqueId),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -5363,13 +5363,13 @@ pub enum LineSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
+  C15CategoryFilterExceptions(crate::schemas::c15::CategoryFilterExceptions),
   /// Defines the CategoryFilterExceptions Class.
-  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
+  C16CategoryFilterExceptions(crate::schemas::c16::CategoryFilterExceptions),
   /// Defines the ChartDataPointUniqueIDMap Class.
-  ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
+  ChartDataPointUniqueIdMap(crate::schemas::c16::ChartDataPointUniqueIdMap),
   /// Defines the UniqueIdChartUniqueID Class.
-  UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
+  UniqueIdChartUniqueId(crate::schemas::c16::UniqueIdChartUniqueId),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -5381,13 +5381,13 @@ pub enum ScatterSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
+  C15CategoryFilterExceptions(crate::schemas::c15::CategoryFilterExceptions),
   /// Defines the CategoryFilterExceptions Class.
-  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
+  C16CategoryFilterExceptions(crate::schemas::c16::CategoryFilterExceptions),
   /// Defines the ChartDataPointUniqueIDMap Class.
-  ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
+  ChartDataPointUniqueIdMap(crate::schemas::c16::ChartDataPointUniqueIdMap),
   /// Defines the UniqueIdChartUniqueID Class.
-  UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
+  UniqueIdChartUniqueId(crate::schemas::c16::UniqueIdChartUniqueId),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -5399,13 +5399,13 @@ pub enum RadarSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
+  C15CategoryFilterExceptions(crate::schemas::c15::CategoryFilterExceptions),
   /// Defines the CategoryFilterExceptions Class.
-  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
+  C16CategoryFilterExceptions(crate::schemas::c16::CategoryFilterExceptions),
   /// Defines the ChartDataPointUniqueIDMap Class.
-  ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
+  ChartDataPointUniqueIdMap(crate::schemas::c16::ChartDataPointUniqueIdMap),
   /// Defines the UniqueIdChartUniqueID Class.
-  UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
+  UniqueIdChartUniqueId(crate::schemas::c16::UniqueIdChartUniqueId),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -5419,13 +5419,13 @@ pub enum BarSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
+  C15CategoryFilterExceptions(crate::schemas::c15::CategoryFilterExceptions),
   /// Defines the CategoryFilterExceptions Class.
-  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
+  C16CategoryFilterExceptions(crate::schemas::c16::CategoryFilterExceptions),
   /// Defines the ChartDataPointUniqueIDMap Class.
-  ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
+  ChartDataPointUniqueIdMap(crate::schemas::c16::ChartDataPointUniqueIdMap),
   /// Defines the UniqueIdChartUniqueID Class.
-  UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
+  UniqueIdChartUniqueId(crate::schemas::c16::UniqueIdChartUniqueId),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -5437,13 +5437,13 @@ pub enum AreaSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
+  C15CategoryFilterExceptions(crate::schemas::c15::CategoryFilterExceptions),
   /// Defines the CategoryFilterExceptions Class.
-  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
+  C16CategoryFilterExceptions(crate::schemas::c16::CategoryFilterExceptions),
   /// Defines the ChartDataPointUniqueIDMap Class.
-  ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
+  ChartDataPointUniqueIdMap(crate::schemas::c16::ChartDataPointUniqueIdMap),
   /// Defines the UniqueIdChartUniqueID Class.
-  UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
+  UniqueIdChartUniqueId(crate::schemas::c16::UniqueIdChartUniqueId),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -5455,13 +5455,13 @@ pub enum PieSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
+  C15CategoryFilterExceptions(crate::schemas::c15::CategoryFilterExceptions),
   /// Defines the CategoryFilterExceptions Class.
-  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
+  C16CategoryFilterExceptions(crate::schemas::c16::CategoryFilterExceptions),
   /// Defines the ChartDataPointUniqueIDMap Class.
-  ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
+  ChartDataPointUniqueIdMap(crate::schemas::c16::ChartDataPointUniqueIdMap),
   /// Defines the UniqueIdChartUniqueID Class.
-  UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
+  UniqueIdChartUniqueId(crate::schemas::c16::UniqueIdChartUniqueId),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -5473,13 +5473,13 @@ pub enum BubbleSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
+  C15CategoryFilterExceptions(crate::schemas::c15::CategoryFilterExceptions),
   /// Defines the CategoryFilterExceptions Class.
-  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
+  C16CategoryFilterExceptions(crate::schemas::c16::CategoryFilterExceptions),
   /// Defines the ChartDataPointUniqueIDMap Class.
-  ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
+  ChartDataPointUniqueIdMap(crate::schemas::c16::ChartDataPointUniqueIdMap),
   /// Defines the UniqueIdChartUniqueID Class.
-  UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
+  UniqueIdChartUniqueId(crate::schemas::c16::UniqueIdChartUniqueId),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -5489,13 +5489,13 @@ pub enum SurfaceSerExtensionChoice {
   /// Defines the FilteredCategoryTitle Class.
   FilteredCategoryTitle(std::boxed::Box<crate::schemas::c15::FilteredCategoryTitle>),
   /// Defines the CategoryFilterExceptions Class.
-  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
+  C15CategoryFilterExceptions(crate::schemas::c15::CategoryFilterExceptions),
   /// Defines the CategoryFilterExceptions Class.
-  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
+  C16CategoryFilterExceptions(crate::schemas::c16::CategoryFilterExceptions),
   /// Defines the ChartDataPointUniqueIDMap Class.
-  ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
+  ChartDataPointUniqueIdMap(crate::schemas::c16::ChartDataPointUniqueIdMap),
   /// Defines the UniqueIdChartUniqueID Class.
-  UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
+  UniqueIdChartUniqueId(crate::schemas::c16::UniqueIdChartUniqueId),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]

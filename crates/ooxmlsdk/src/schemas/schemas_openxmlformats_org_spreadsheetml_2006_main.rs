@@ -10885,11 +10885,11 @@ pub enum RevisionsChoice {
   /// Revision Cell Move.
   RevisionMove(std::boxed::Box<RevisionMove>),
   /// Revision Custom View.
-  RevisionCustomView(std::boxed::Box<RevisionCustomView>),
+  RevisionCustomView(RevisionCustomView),
   /// Revision Sheet Name.
   RevisionSheetName(std::boxed::Box<RevisionSheetName>),
   /// Revision Insert Sheet.
-  RevisionInsertSheet(std::boxed::Box<RevisionInsertSheet>),
+  RevisionInsertSheet(RevisionInsertSheet),
   /// Revision Cell Change.
   RevisionCellChange(std::boxed::Box<RevisionCellChange>),
   /// Revision Format.
@@ -10901,9 +10901,9 @@ pub enum RevisionsChoice {
   /// Revision Cell Comment.
   RevisionComment(std::boxed::Box<RevisionComment>),
   /// Revision Query Table.
-  RevisionQueryTable(std::boxed::Box<RevisionQueryTable>),
+  RevisionQueryTable(RevisionQueryTable),
   /// Revision Merge Conflict.
-  RevisionConflict(std::boxed::Box<RevisionConflict>),
+  RevisionConflict(RevisionConflict),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExternalLinkChoice {
@@ -10917,23 +10917,23 @@ pub enum ExternalLinkChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FilterColumnChoice {
   /// Filter Criteria.
-  Filters(std::boxed::Box<Filters>),
+  Filters(Filters),
   /// Top 10.
-  Top10(std::boxed::Box<Top10>),
+  Top10(Top10),
   /// Defines the CustomFilters Class.
-  X14CustomFilters(std::boxed::Box<crate::schemas::x14::CustomFilters>),
+  X14CustomFilters(crate::schemas::x14::CustomFilters),
   /// Custom Filters.
-  XCustomFilters(std::boxed::Box<CustomFilters>),
+  XCustomFilters(CustomFilters),
   /// Dynamic Filter.
-  DynamicFilter(std::boxed::Box<DynamicFilter>),
+  DynamicFilter(DynamicFilter),
   /// Color Filter Criteria.
-  ColorFilter(std::boxed::Box<ColorFilter>),
+  ColorFilter(ColorFilter),
   /// Defines the IconFilter Class.
-  X14IconFilter(std::boxed::Box<crate::schemas::x14::IconFilter>),
+  X14IconFilter(crate::schemas::x14::IconFilter),
   /// Icon Filter.
-  XIconFilter(std::boxed::Box<IconFilter>),
+  XIconFilter(IconFilter),
   /// Defines the ExtensionList Class.
-  ExtensionList(std::boxed::Box<ExtensionList>),
+  ExtensionList(ExtensionList),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SortStateChoice {
@@ -10946,9 +10946,9 @@ pub enum TablesChoice {
   /// No Value.
   MissingTable,
   /// Character Value.
-  CharacterValue(std::boxed::Box<CharacterValue>),
+  CharacterValue(CharacterValue),
   /// Index.
-  FieldItem(std::boxed::Box<FieldItem>),
+  FieldItem(FieldItem),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PivotCacheRecordChoice {
@@ -10957,7 +10957,7 @@ pub enum PivotCacheRecordChoice {
   /// Numeric.
   NumberItem(std::boxed::Box<NumberItem>),
   /// Boolean.
-  BooleanItem(std::boxed::Box<BooleanItem>),
+  BooleanItem(BooleanItem),
   /// Error Value.
   ErrorItem(std::boxed::Box<ErrorItem>),
   /// Character Value.
@@ -10965,7 +10965,7 @@ pub enum PivotCacheRecordChoice {
   /// Date Time.
   DateTimeItem(std::boxed::Box<DateTimeItem>),
   /// Index.
-  FieldItem(std::boxed::Box<FieldItem>),
+  FieldItem(FieldItem),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum EntriesChoice {
@@ -10985,7 +10985,7 @@ pub enum GroupItemsChoice {
   /// Numeric.
   NumberItem(std::boxed::Box<NumberItem>),
   /// Boolean.
-  BooleanItem(std::boxed::Box<BooleanItem>),
+  BooleanItem(BooleanItem),
   /// Error Value.
   ErrorItem(std::boxed::Box<ErrorItem>),
   /// Character Value.
@@ -10996,35 +10996,35 @@ pub enum GroupItemsChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum RunPropertiesChoice {
   /// Bold.
-  Bold(std::boxed::Box<Bold>),
+  Bold(Bold),
   /// Italic.
-  Italic(std::boxed::Box<Italic>),
+  Italic(Italic),
   /// Strike Through.
-  Strike(std::boxed::Box<Strike>),
+  Strike(Strike),
   /// Condense.
-  Condense(std::boxed::Box<Condense>),
+  Condense(Condense),
   /// Extend.
-  Extend(std::boxed::Box<Extend>),
+  Extend(Extend),
   /// Outline.
-  Outline(std::boxed::Box<Outline>),
+  Outline(Outline),
   /// Shadow.
-  Shadow(std::boxed::Box<Shadow>),
+  Shadow(Shadow),
   /// Underline.
-  Underline(std::boxed::Box<Underline>),
+  Underline(Underline),
   /// Vertical Alignment.
-  VerticalTextAlignment(std::boxed::Box<VerticalTextAlignment>),
+  VerticalTextAlignment(VerticalTextAlignment),
   /// Font Size.
-  FontSize(std::boxed::Box<FontSize>),
+  FontSize(FontSize),
   /// Text Color.
-  Color(std::boxed::Box<Color>),
+  Color(Color),
   /// Font.
-  RunFont(std::boxed::Box<RunFont>),
+  RunFont(RunFont),
   /// Font Family.
-  FontFamily(std::boxed::Box<FontFamily>),
+  FontFamily(FontFamily),
   /// Character Set.
-  RunPropertyCharSet(std::boxed::Box<RunPropertyCharSet>),
+  RunPropertyCharSet(RunPropertyCharSet),
   /// Font Scheme.
-  FontScheme(std::boxed::Box<FontScheme>),
+  FontScheme(FontScheme),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum RevisionRowColumnChoice {
@@ -11049,44 +11049,44 @@ pub enum MdxChoice {
   /// Tuple MDX Metadata.
   MdxTuple(std::boxed::Box<MdxTuple>),
   /// Set MDX Metadata.
-  MdxSet(std::boxed::Box<MdxSet>),
+  MdxSet(MdxSet),
   /// Member Property MDX Metadata.
-  MdxMemberProp(std::boxed::Box<MdxMemberProp>),
+  MdxMemberProp(MdxMemberProp),
   /// KPI MDX Metadata.
-  MdxKpi(std::boxed::Box<MdxKpi>),
+  MdxKpi(MdxKpi),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FontChoice {
   /// Bold.
-  Bold(std::boxed::Box<Bold>),
+  Bold(Bold),
   /// Italic.
-  Italic(std::boxed::Box<Italic>),
+  Italic(Italic),
   /// Strike Through.
-  Strike(std::boxed::Box<Strike>),
+  Strike(Strike),
   /// Condense.
-  Condense(std::boxed::Box<Condense>),
+  Condense(Condense),
   /// Extend.
-  Extend(std::boxed::Box<Extend>),
+  Extend(Extend),
   /// Outline.
-  Outline(std::boxed::Box<Outline>),
+  Outline(Outline),
   /// Shadow.
-  Shadow(std::boxed::Box<Shadow>),
+  Shadow(Shadow),
   /// Underline.
-  Underline(std::boxed::Box<Underline>),
+  Underline(Underline),
   /// Vertical Alignment.
-  VerticalTextAlignment(std::boxed::Box<VerticalTextAlignment>),
+  VerticalTextAlignment(VerticalTextAlignment),
   /// Font Size.
-  FontSize(std::boxed::Box<FontSize>),
+  FontSize(FontSize),
   /// Text Color.
-  Color(std::boxed::Box<Color>),
+  Color(Color),
   /// Font Name.
-  FontName(std::boxed::Box<FontName>),
+  FontName(FontName),
   /// Font Family.
-  FontFamilyNumbering(std::boxed::Box<FontFamilyNumbering>),
+  FontFamilyNumbering(FontFamilyNumbering),
   /// Character Set.
-  FontCharSet(std::boxed::Box<FontCharSet>),
+  FontCharSet(FontCharSet),
   /// Font Scheme.
-  FontScheme(std::boxed::Box<FontScheme>),
+  FontScheme(FontScheme),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FillChoice {
@@ -11098,7 +11098,7 @@ pub enum FillChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum OleItemsChoice {
   /// OLE Link Item.
-  XOleItem(std::boxed::Box<OleItem>),
+  XOleItem(OleItem),
   /// Defines the OleItem Class.
   X14OleItem(std::boxed::Box<crate::schemas::x14::OleItem>),
 }
@@ -11111,19 +11111,19 @@ pub enum ConditionalFormattingRuleExtensionChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum PivotHierarchyExtensionChoice {
   /// Defines the PivotHierarchy Class.
-  PivotHierarchy(std::boxed::Box<crate::schemas::x14::PivotHierarchy>),
+  PivotHierarchy(crate::schemas::x14::PivotHierarchy),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PivotFieldExtensionChoice {
   /// Defines the PivotField Class.
-  PivotField(std::boxed::Box<crate::schemas::x14::PivotField>),
+  PivotField(crate::schemas::x14::PivotField),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CacheSourceExtensionChoice {
   /// Defines the SourceConnection Class.
-  SourceConnection(std::boxed::Box<crate::schemas::x14::SourceConnection>),
+  SourceConnection(crate::schemas::x14::SourceConnection),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -11143,36 +11143,34 @@ pub enum ControlsChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FiltersChoice {
   /// Defines the Filter Class.
-  X14Filter(std::boxed::Box<crate::schemas::x14::Filter>),
+  X14Filter(crate::schemas::x14::Filter),
   /// Filter.
-  XFilter(std::boxed::Box<Filter>),
+  XFilter(Filter),
   /// Date Grouping.
-  DateGroupItem(std::boxed::Box<DateGroupItem>),
+  DateGroupItem(DateGroupItem),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SlicerCacheDefinitionExtensionChoice {
   /// Defines the SlicerCachePivotTables Class.
-  SlicerCachePivotTables(std::boxed::Box<crate::schemas::x15::SlicerCachePivotTables>),
+  SlicerCachePivotTables(crate::schemas::x15::SlicerCachePivotTables),
   /// Defines the TableSlicerCache Class.
   TableSlicerCache(std::boxed::Box<crate::schemas::x15::TableSlicerCache>),
   /// Defines the SlicerCacheHideItemsWithNoData Class.
-  SlicerCacheHideItemsWithNoData(
-    std::boxed::Box<crate::schemas::x15::SlicerCacheHideItemsWithNoData>,
-  ),
+  SlicerCacheHideItemsWithNoData(crate::schemas::x15::SlicerCacheHideItemsWithNoData),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PivotFilterExtensionChoice {
   /// Defines the PivotFilter Class.
-  PivotFilter(std::boxed::Box<crate::schemas::x15::PivotFilter>),
+  PivotFilter(crate::schemas::x15::PivotFilter),
   /// Defines the MovingPeriodState Class.
-  MovingPeriodState(std::boxed::Box<crate::schemas::x15::MovingPeriodState>),
+  MovingPeriodState(crate::schemas::x15::MovingPeriodState),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum QueryTableExtensionChoice {
   /// Defines the QueryTable Class.
-  QueryTable(std::boxed::Box<crate::schemas::x15::QueryTable>),
+  QueryTable(crate::schemas::x15::QueryTable),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -11190,7 +11188,7 @@ pub enum SharedItemsChoice {
   /// Numeric.
   NumberItem(std::boxed::Box<NumberItem>),
   /// Boolean.
-  BooleanItem(std::boxed::Box<BooleanItem>),
+  BooleanItem(BooleanItem),
   /// Error Value.
   ErrorItem(std::boxed::Box<ErrorItem>),
   /// Character Value.
@@ -11203,14 +11201,14 @@ pub enum FieldGroupChoice {
   /// Range Grouping Properties.
   RangeProperties(std::boxed::Box<RangeProperties>),
   /// Discrete Grouping Properties.
-  DiscreteProperties(std::boxed::Box<DiscreteProperties>),
+  DiscreteProperties(DiscreteProperties),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CacheFieldExtensionChoice {
   /// Defines the CacheField Class.
-  CacheField(std::boxed::Box<crate::schemas::x14::CacheField>),
+  CacheField(crate::schemas::x14::CacheField),
   /// Defines the CachedUniqueNames Class.
-  CachedUniqueNames(std::boxed::Box<crate::schemas::x15::CachedUniqueNames>),
+  CachedUniqueNames(crate::schemas::x15::CachedUniqueNames),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -11218,7 +11216,7 @@ pub enum CacheHierarchyExtensionChoice {
   /// Defines the CacheHierarchy Class.
   X14CacheHierarchy(std::boxed::Box<crate::schemas::x14::CacheHierarchy>),
   /// Defines the CacheHierarchy Class.
-  X15CacheHierarchy(std::boxed::Box<crate::schemas::x15::CacheHierarchy>),
+  X15CacheHierarchy(crate::schemas::x15::CacheHierarchy),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -11226,41 +11224,41 @@ pub enum CalculatedMemberExtensionChoice {
   /// Defines the CalculatedMember Class.
   X14CalculatedMember(std::boxed::Box<crate::schemas::x14::CalculatedMember>),
   /// Defines the CalculatedMember Class.
-  X15CalculatedMember(std::boxed::Box<crate::schemas::x15::CalculatedMember>),
+  X15CalculatedMember(crate::schemas::x15::CalculatedMember),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DataFieldExtensionChoice {
   /// Defines the DataField Class.
-  X14DataField(std::boxed::Box<crate::schemas::x14::DataField>),
+  X14DataField(crate::schemas::x14::DataField),
   /// Defines the DataField Class.
-  X15DataField(std::boxed::Box<crate::schemas::x15::DataField>),
+  X15DataField(crate::schemas::x15::DataField),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum WorksheetExtensionChoice {
   /// Defines the ConditionalFormattings Class.
-  ConditionalFormattings(std::boxed::Box<crate::schemas::x14::ConditionalFormattings>),
+  ConditionalFormattings(crate::schemas::x14::ConditionalFormattings),
   /// Defines the DataValidations Class.
   DataValidations(std::boxed::Box<crate::schemas::x14::DataValidations>),
   /// Defines the SparklineGroups Class.
-  SparklineGroups(std::boxed::Box<crate::schemas::x14::SparklineGroups>),
+  SparklineGroups(crate::schemas::x14::SparklineGroups),
   /// Defines the SlicerList Class.
-  SlicerList(std::boxed::Box<crate::schemas::x14::SlicerList>),
+  SlicerList(crate::schemas::x14::SlicerList),
   /// Defines the ProtectedRanges Class.
-  ProtectedRanges(std::boxed::Box<crate::schemas::x14::ProtectedRanges>),
+  ProtectedRanges(crate::schemas::x14::ProtectedRanges),
   /// Defines the IgnoredErrors Class.
   IgnoredErrors(std::boxed::Box<crate::schemas::x14::IgnoredErrors>),
   /// Defines the WebExtensions Class.
-  WebExtensions(std::boxed::Box<crate::schemas::x15::WebExtensions>),
+  WebExtensions(crate::schemas::x15::WebExtensions),
   /// Defines the TimelineReferences Class.
-  TimelineReferences(std::boxed::Box<crate::schemas::x15::TimelineReferences>),
+  TimelineReferences(crate::schemas::x15::TimelineReferences),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FontsChoice {
   /// Font Properties.
-  Font(std::boxed::Box<Font>),
+  Font(Font),
   /// Unknown XML child.
   XmlAny(std::boxed::Box<[u8]>),
 }
@@ -11288,13 +11286,13 @@ pub enum DifferentialFormatsChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum StylesheetExtensionChoice {
   /// Defines the DifferentialFormats Class.
-  X14DifferentialFormats(std::boxed::Box<crate::schemas::x14::DifferentialFormats>),
+  X14DifferentialFormats(crate::schemas::x14::DifferentialFormats),
   /// Defines the SlicerStyles Class.
-  SlicerStyles(std::boxed::Box<crate::schemas::x14::SlicerStyles>),
+  SlicerStyles(crate::schemas::x14::SlicerStyles),
   /// Defines the DifferentialFormats Class.
-  X15DifferentialFormats(std::boxed::Box<crate::schemas::x15::DifferentialFormats>),
+  X15DifferentialFormats(crate::schemas::x15::DifferentialFormats),
   /// Defines the TimelineStyles Class.
-  TimelineStyles(std::boxed::Box<crate::schemas::x15::TimelineStyles>),
+  TimelineStyles(crate::schemas::x15::TimelineStyles),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -11302,11 +11300,11 @@ pub enum PivotTableDefinitionExtensionChoice {
   /// Defines the PivotTableDefinition Class.
   PivotTableDefinition(std::boxed::Box<crate::schemas::x14::PivotTableDefinition>),
   /// Defines the PivotTableData Class.
-  PivotTableData(std::boxed::Box<crate::schemas::x15::PivotTableData>),
+  PivotTableData(crate::schemas::x15::PivotTableData),
   /// Defines the PivotTableUISettings Class.
   PivotTableUiSettings(std::boxed::Box<crate::schemas::x15::PivotTableUiSettings>),
   /// Defines the PivotVersionInfo Class.
-  PivotVersionInfo(std::boxed::Box<crate::schemas::xxpvi::PivotVersionInfo>),
+  PivotVersionInfo(crate::schemas::xxpvi::PivotVersionInfo),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -11316,34 +11314,34 @@ pub enum CacheSourceChoice {
   /// Defines the Consolidation Class.
   Consolidation(std::boxed::Box<Consolidation>),
   /// Defines the CacheSourceExtensionList Class.
-  CacheSourceExtensionList(std::boxed::Box<CacheSourceExtensionList>),
+  CacheSourceExtensionList(CacheSourceExtensionList),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PivotCacheDefinitionExtensionChoice {
   /// Defines the PivotCacheDefinition Class.
-  PivotCacheDefinition(std::boxed::Box<crate::schemas::x14::PivotCacheDefinition>),
+  PivotCacheDefinition(crate::schemas::x14::PivotCacheDefinition),
   /// Defines the PivotCacheDecoupled Class.
-  PivotCacheDecoupled(std::boxed::Box<crate::schemas::x15::PivotCacheDecoupled>),
+  PivotCacheDecoupled(crate::schemas::x15::PivotCacheDecoupled),
   /// Defines the TimelinePivotCacheDefinition Class.
-  TimelinePivotCacheDefinition(std::boxed::Box<crate::schemas::x15::TimelinePivotCacheDefinition>),
+  TimelinePivotCacheDefinition(crate::schemas::x15::TimelinePivotCacheDefinition),
   /// Defines the PivotCacheIdVersion Class.
-  PivotCacheIdVersion(std::boxed::Box<crate::schemas::x15::PivotCacheIdVersion>),
+  PivotCacheIdVersion(crate::schemas::x15::PivotCacheIdVersion),
   /// Defines the Xsdboolean Class.
   XxpimXsdboolean(crate::schemas::xxpim::Xsdboolean),
   /// Defines the PivotCacheRichInfo Class.
-  PivotCacheRichInfo(std::boxed::Box<crate::schemas::xprd::PivotCacheRichInfo>),
+  PivotCacheRichInfo(crate::schemas::xprd::PivotCacheRichInfo),
   /// Defines the CacheVersionInfo Class.
-  CacheVersionInfo(std::boxed::Box<crate::schemas::xxpvi::CacheVersionInfo>),
+  CacheVersionInfo(crate::schemas::xxpvi::CacheVersionInfo),
   /// Defines the Xsdboolean Class.
   XlparXsdboolean(crate::schemas::xlpar::Xsdboolean),
   /// Defines the PivotCacheDynamicArray Class.
-  PivotCacheDynamicArray(std::boxed::Box<crate::schemas::xlpda::PivotCacheDynamicArray>),
+  PivotCacheDynamicArray(crate::schemas::xlpda::PivotCacheDynamicArray),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableExtensionChoice {
   /// Defines the Table Class.
-  Table(std::boxed::Box<crate::schemas::x14::Table>),
+  Table(crate::schemas::x14::Table),
   /// Defines the MsForm Class.
   MsForm(std::boxed::Box<crate::schemas::xlmsforms::MsForm>),
   XmlAny(std::boxed::Box<[u8]>),
@@ -11351,34 +11349,32 @@ pub enum TableExtensionChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum WorkbookExtensionChoice {
   /// Defines the DefinedNames Class.
-  DefinedNames(std::boxed::Box<crate::schemas::x14::DefinedNames>),
+  DefinedNames(crate::schemas::x14::DefinedNames),
   /// Defines the PivotCaches Class.
-  X14PivotCaches(std::boxed::Box<crate::schemas::x14::PivotCaches>),
+  X14PivotCaches(crate::schemas::x14::PivotCaches),
   /// Defines the SlicerCaches Class.
-  X14SlicerCaches(std::boxed::Box<crate::schemas::x14::SlicerCaches>),
+  X14SlicerCaches(crate::schemas::x14::SlicerCaches),
   /// Defines the SlicerCaches Class.
-  X15SlicerCaches(std::boxed::Box<crate::schemas::x15::SlicerCaches>),
+  X15SlicerCaches(crate::schemas::x15::SlicerCaches),
   /// Defines the WorkbookProperties Class.
-  X14WorkbookProperties(std::boxed::Box<crate::schemas::x14::WorkbookProperties>),
+  X14WorkbookProperties(crate::schemas::x14::WorkbookProperties),
   /// Defines the PivotCaches Class.
-  X15PivotCaches(std::boxed::Box<crate::schemas::x15::PivotCaches>),
+  X15PivotCaches(crate::schemas::x15::PivotCaches),
   /// Defines the PivotTableReferences Class.
-  PivotTableReferences(std::boxed::Box<crate::schemas::x15::PivotTableReferences>),
+  PivotTableReferences(crate::schemas::x15::PivotTableReferences),
   /// Defines the TimelineCachePivotCaches Class.
-  TimelineCachePivotCaches(std::boxed::Box<crate::schemas::x15::TimelineCachePivotCaches>),
+  TimelineCachePivotCaches(crate::schemas::x15::TimelineCachePivotCaches),
   /// Defines the TimelineCacheReferences Class.
-  TimelineCacheReferences(std::boxed::Box<crate::schemas::x15::TimelineCacheReferences>),
+  TimelineCacheReferences(crate::schemas::x15::TimelineCacheReferences),
   /// Defines the WorkbookProperties Class.
-  X15WorkbookProperties(std::boxed::Box<crate::schemas::x15::WorkbookProperties>),
+  X15WorkbookProperties(crate::schemas::x15::WorkbookProperties),
   /// Defines the DataModel Class.
   DataModel(std::boxed::Box<crate::schemas::x15::DataModel>),
   /// Defines the ExternalCodeService Class.
-  ExternalCodeService(std::boxed::Box<crate::schemas::xlecs::ExternalCodeService>),
+  ExternalCodeService(crate::schemas::xlecs::ExternalCodeService),
   /// Defines the Version Class.
-  Version(std::boxed::Box<crate::schemas::xlwcv::Version>),
+  Version(crate::schemas::xlwcv::Version),
   /// Defines the ExternalCodeServiceImageAsInput Class.
-  ExternalCodeServiceImageAsInput(
-    std::boxed::Box<crate::schemas::xlecs2::ExternalCodeServiceImageAsInput>,
-  ),
+  ExternalCodeServiceImageAsInput(crate::schemas::xlecs2::ExternalCodeServiceImageAsInput),
   XmlAny(std::boxed::Box<[u8]>),
 }

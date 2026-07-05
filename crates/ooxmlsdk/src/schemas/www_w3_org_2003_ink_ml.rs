@@ -1315,11 +1315,11 @@ pub struct Definitions {
 #[derive(Clone, Debug, PartialEq)]
 pub enum InkChoice {
   /// Defines the Annotation Class.
-  Annotation(std::boxed::Box<Annotation>),
+  Annotation(Annotation),
   /// Defines the AnnotationXml Class.
   AnnotationXml(std::boxed::Box<AnnotationXml>),
   /// Defines the Definitions Class.
-  Definitions(std::boxed::Box<Definitions>),
+  Definitions(Definitions),
   /// Defines the Context Class.
   Context(std::boxed::Box<Context>),
   /// Defines the Trace Class.
@@ -1332,14 +1332,14 @@ pub enum InkChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum MappingChoice {
   /// Defines the Table Class.
-  Table(std::boxed::Box<Table>),
+  Table(Table),
   /// Defines the Matrix Class.
-  Matrix(std::boxed::Box<Matrix>),
+  Matrix(Matrix),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TraceGroupChoice {
   /// Defines the Annotation Class.
-  Annotation(std::boxed::Box<Annotation>),
+  Annotation(Annotation),
   /// Defines the AnnotationXml Class.
   AnnotationXml(std::boxed::Box<AnnotationXml>),
   /// Defines the Trace Class.
@@ -1350,7 +1350,7 @@ pub enum TraceGroupChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TraceViewChoice {
   /// Defines the Annotation Class.
-  Annotation(std::boxed::Box<Annotation>),
+  Annotation(Annotation),
   /// Defines the AnnotationXml Class.
   AnnotationXml(std::boxed::Box<AnnotationXml>),
   /// Defines the TraceView Class.
@@ -1363,7 +1363,7 @@ pub enum DefinitionsChoice {
   /// Defines the Canvas Class.
   Canvas(std::boxed::Box<Canvas>),
   /// Defines the CanvasTransform Class.
-  CanvasTransform(std::boxed::Box<CanvasTransform>),
+  CanvasTransform(CanvasTransform),
   /// Defines the Context Class.
   Context(std::boxed::Box<Context>),
   /// Defines the InkSource Class.

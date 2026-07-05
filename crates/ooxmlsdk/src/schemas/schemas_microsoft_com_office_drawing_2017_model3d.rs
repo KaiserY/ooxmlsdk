@@ -611,48 +611,48 @@ pub enum Model3DChoice2 {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BlipChoice {
-  AlphaBiLevel(std::boxed::Box<crate::schemas::a::AlphaBiLevel>),
+  AlphaBiLevel(crate::schemas::a::AlphaBiLevel),
   /// Alpha Ceiling Effect.
   AlphaCeiling,
   /// Alpha Floor Effect.
   AlphaFloor,
   AlphaInverse(std::boxed::Box<crate::schemas::a::AlphaInverse>),
   AlphaModulationEffect(std::boxed::Box<crate::schemas::a::AlphaModulationEffect>),
-  AlphaModulationFixed(std::boxed::Box<crate::schemas::a::AlphaModulationFixed>),
-  AlphaReplace(std::boxed::Box<crate::schemas::a::AlphaReplace>),
-  BiLevel(std::boxed::Box<crate::schemas::a::BiLevel>),
-  Blur(std::boxed::Box<crate::schemas::a::Blur>),
+  AlphaModulationFixed(crate::schemas::a::AlphaModulationFixed),
+  AlphaReplace(crate::schemas::a::AlphaReplace),
+  BiLevel(crate::schemas::a::BiLevel),
+  Blur(crate::schemas::a::Blur),
   ColorChange(std::boxed::Box<crate::schemas::a::ColorChange>),
   ColorReplacement(std::boxed::Box<crate::schemas::a::ColorReplacement>),
-  Duotone(std::boxed::Box<crate::schemas::a::Duotone>),
+  Duotone(crate::schemas::a::Duotone),
   FillOverlay(std::boxed::Box<crate::schemas::a::FillOverlay>),
   /// Gray Scale Effect.
   Grayscale,
-  Hsl(std::boxed::Box<crate::schemas::a::Hsl>),
-  LuminanceEffect(std::boxed::Box<crate::schemas::a::LuminanceEffect>),
-  TintEffect(std::boxed::Box<crate::schemas::a::TintEffect>),
+  Hsl(crate::schemas::a::Hsl),
+  LuminanceEffect(crate::schemas::a::LuminanceEffect),
+  TintEffect(crate::schemas::a::TintEffect),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColorTypeChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Model3DExtensionChoice {
   /// Defines the EmbeddedAnimation Class.
   EmbeddedAnimation(std::boxed::Box<crate::schemas::a3danim::EmbeddedAnimation>),
   /// Defines the PosterFrame Class.
-  PosterFrame(std::boxed::Box<crate::schemas::a3danim::PosterFrame>),
+  PosterFrame(crate::schemas::a3danim::PosterFrame),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -665,7 +665,7 @@ pub enum ShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.

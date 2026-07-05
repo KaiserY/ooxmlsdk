@@ -60,9 +60,9 @@ pub enum DiagramAutoBulletChoice {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<crate::schemas::a::AutoNumberedBullet>),
+  AutoNumberedBullet(crate::schemas::a::AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<crate::schemas::a::CharacterBullet>),
+  CharacterBullet(crate::schemas::a::CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<crate::schemas::a::PictureBullet>),
 }

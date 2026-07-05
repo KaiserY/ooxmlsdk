@@ -16521,9 +16521,9 @@ pub enum PictureChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FieldCharChoice {
   /// Custom Field Data.
-  FieldData(std::boxed::Box<FieldData>),
+  FieldData(FieldData),
   /// Form Field Properties.
-  FormFieldData(std::boxed::Box<FormFieldData>),
+  FormFieldData(FormFieldData),
   /// Previous Paragraph Numbering Properties.
   NumberingChange(std::boxed::Box<NumberingChange>),
 }
@@ -16537,81 +16537,81 @@ pub enum DrawingChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum RunPropertiesChoice {
   /// Defines the RunStyle Class.
-  RunStyle(std::boxed::Box<RunStyle>),
+  RunStyle(RunStyle),
   /// Defines the RunFonts Class.
   RunFonts(std::boxed::Box<RunFonts>),
   /// Defines the Bold Class.
-  Bold(std::boxed::Box<Bold>),
+  Bold(Bold),
   /// Defines the BoldComplexScript Class.
-  BoldComplexScript(std::boxed::Box<BoldComplexScript>),
+  BoldComplexScript(BoldComplexScript),
   /// Defines the Italic Class.
-  Italic(std::boxed::Box<Italic>),
+  Italic(Italic),
   /// Defines the ItalicComplexScript Class.
-  ItalicComplexScript(std::boxed::Box<ItalicComplexScript>),
+  ItalicComplexScript(ItalicComplexScript),
   /// Defines the Caps Class.
-  Caps(std::boxed::Box<Caps>),
+  Caps(Caps),
   /// Defines the SmallCaps Class.
-  SmallCaps(std::boxed::Box<SmallCaps>),
+  SmallCaps(SmallCaps),
   /// Defines the Strike Class.
-  Strike(std::boxed::Box<Strike>),
+  Strike(Strike),
   /// Defines the DoubleStrike Class.
-  DoubleStrike(std::boxed::Box<DoubleStrike>),
+  DoubleStrike(DoubleStrike),
   /// Defines the Outline Class.
-  Outline(std::boxed::Box<Outline>),
+  Outline(Outline),
   /// Defines the Shadow Class.
-  Shadow(std::boxed::Box<Shadow>),
+  Shadow(Shadow),
   /// Defines the Emboss Class.
-  Emboss(std::boxed::Box<Emboss>),
+  Emboss(Emboss),
   /// Defines the Imprint Class.
-  Imprint(std::boxed::Box<Imprint>),
+  Imprint(Imprint),
   /// Defines the NoProof Class.
-  NoProof(std::boxed::Box<NoProof>),
+  NoProof(NoProof),
   /// Defines the SnapToGrid Class.
-  SnapToGrid(std::boxed::Box<SnapToGrid>),
+  SnapToGrid(SnapToGrid),
   /// Defines the Vanish Class.
-  Vanish(std::boxed::Box<Vanish>),
+  Vanish(Vanish),
   /// Defines the WebHidden Class.
-  WebHidden(std::boxed::Box<WebHidden>),
+  WebHidden(WebHidden),
   /// Defines the Color Class.
   Color(std::boxed::Box<Color>),
   /// Defines the Spacing Class.
-  Spacing(std::boxed::Box<Spacing>),
+  Spacing(Spacing),
   /// Defines the CharacterScale Class.
-  CharacterScale(std::boxed::Box<CharacterScale>),
+  CharacterScale(CharacterScale),
   /// Defines the Kern Class.
-  Kern(std::boxed::Box<Kern>),
+  Kern(Kern),
   /// Defines the Position Class.
-  Position(std::boxed::Box<Position>),
+  Position(Position),
   /// Defines the FontSize Class.
-  FontSize(std::boxed::Box<FontSize>),
+  FontSize(FontSize),
   /// Defines the FontSizeComplexScript Class.
-  FontSizeComplexScript(std::boxed::Box<FontSizeComplexScript>),
+  FontSizeComplexScript(FontSizeComplexScript),
   /// Defines the Highlight Class.
   Highlight(std::boxed::Box<Highlight>),
   /// Defines the Underline Class.
   Underline(std::boxed::Box<Underline>),
   /// Defines the TextEffect Class.
-  TextEffect(std::boxed::Box<TextEffect>),
+  TextEffect(TextEffect),
   /// Defines the Border Class.
   Border(std::boxed::Box<Border>),
   /// Defines the Shading Class.
   Shading(std::boxed::Box<Shading>),
   /// Defines the FitText Class.
-  FitText(std::boxed::Box<FitText>),
+  FitText(FitText),
   /// Defines the VerticalTextAlignment Class.
-  VerticalTextAlignment(std::boxed::Box<VerticalTextAlignment>),
+  VerticalTextAlignment(VerticalTextAlignment),
   /// Defines the RightToLeftText Class.
   RightToLeftText(std::boxed::Box<RightToLeftText>),
   /// Defines the ComplexScript Class.
   ComplexScript(std::boxed::Box<ComplexScript>),
   /// Defines the Emphasis Class.
-  Emphasis(std::boxed::Box<Emphasis>),
+  Emphasis(Emphasis),
   /// Defines the Languages Class.
   Languages(std::boxed::Box<Languages>),
   /// Defines the EastAsianLayout Class.
-  EastAsianLayout(std::boxed::Box<EastAsianLayout>),
+  EastAsianLayout(EastAsianLayout),
   /// Defines the SpecVanish Class.
-  SpecVanish(std::boxed::Box<SpecVanish>),
+  SpecVanish(SpecVanish),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum InsertedMathControlChoice {
@@ -16648,59 +16648,51 @@ pub enum CustomXmlRubyChoice {
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -16710,7 +16702,7 @@ pub enum CustomXmlRubyChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -16718,7 +16710,7 @@ pub enum CustomXmlRubyChoice {
   /// Defines the Paragraph Class.
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   /// Accent.
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
@@ -16773,59 +16765,51 @@ pub enum SimpleFieldRubyChoice {
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -16835,7 +16819,7 @@ pub enum SimpleFieldRubyChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -16843,7 +16827,7 @@ pub enum SimpleFieldRubyChoice {
   /// Defines the Paragraph Class.
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   /// Accent.
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
@@ -16898,55 +16882,47 @@ pub enum HyperlinkRubyChoice {
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -16956,11 +16932,11 @@ pub enum HyperlinkRubyChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   Bar(std::boxed::Box<crate::schemas::m::Bar>),
   Box(std::boxed::Box<crate::schemas::m::Box>),
@@ -16985,15 +16961,15 @@ pub enum HyperlinkRubyChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum RunChoice {
   /// Break.
-  Break(std::boxed::Box<Break>),
+  Break(Break),
   /// Text.
-  Text(std::boxed::Box<Text>),
+  Text(Text),
   /// Deleted Text.
-  DeletedText(std::boxed::Box<DeletedText>),
+  DeletedText(DeletedText),
   /// Field Code.
-  FieldCode(std::boxed::Box<FieldCode>),
+  FieldCode(FieldCode),
   /// Deleted Field Code.
-  DeletedFieldCode(std::boxed::Box<DeletedFieldCode>),
+  DeletedFieldCode(DeletedFieldCode),
   /// Non Breaking Hyphen Character.
   NoBreakHyphen,
   /// Optional Hyphen Character.
@@ -17021,7 +16997,7 @@ pub enum RunChoice {
   /// Continuation Separator Mark.
   ContinuationSeparatorMark,
   /// Symbol Character.
-  SymbolChar(std::boxed::Box<SymbolChar>),
+  SymbolChar(SymbolChar),
   /// Page Number Block.
   PageNumber,
   /// Carriage Return.
@@ -17037,131 +17013,115 @@ pub enum RunChoice {
   /// Phonetic Guide.
   Ruby(std::boxed::Box<Ruby>),
   /// Footnote Reference.
-  FootnoteReference(std::boxed::Box<FootnoteReference>),
+  FootnoteReference(FootnoteReference),
   /// Endnote Reference.
-  EndnoteReference(std::boxed::Box<EndnoteReference>),
+  EndnoteReference(EndnoteReference),
   /// Comment Content Reference Mark.
-  CommentReference(std::boxed::Box<CommentReference>),
+  CommentReference(CommentReference),
   /// DrawingML Object.
   Drawing(std::boxed::Box<Drawing>),
   /// Absolute Position Tab Character.
-  PositionalTab(std::boxed::Box<PositionalTab>),
+  PositionalTab(PositionalTab),
   /// Position of Last Calculated Page Break.
   LastRenderedPageBreak,
   /// Extended Symbol Character.
-  SymbolCharExt(std::boxed::Box<SymbolChar>),
+  SymbolCharExt(SymbolChar),
   /// Unknown XML child.
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SdtRunRubyChoice {
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum InsertedRunChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -17171,7 +17131,7 @@ pub enum InsertedRunChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -17179,7 +17139,7 @@ pub enum InsertedRunChoice {
   /// Defines the Paragraph Class.
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   /// Accent.
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
@@ -17223,68 +17183,60 @@ pub enum InsertedRunChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
+  BidirectionalOverride(BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
+  BidirectionalEmbedding(BidirectionalEmbedding),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DeletedRunChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -17294,7 +17246,7 @@ pub enum DeletedRunChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -17302,7 +17254,7 @@ pub enum DeletedRunChoice {
   /// Defines the Paragraph Class.
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   /// Accent.
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
@@ -17346,68 +17298,60 @@ pub enum DeletedRunChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
+  BidirectionalOverride(BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
+  BidirectionalEmbedding(BidirectionalEmbedding),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum MoveFromRunChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -17417,7 +17361,7 @@ pub enum MoveFromRunChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -17425,7 +17369,7 @@ pub enum MoveFromRunChoice {
   /// Defines the Paragraph Class.
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   /// Accent.
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
@@ -17469,68 +17413,60 @@ pub enum MoveFromRunChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
+  BidirectionalOverride(BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
+  BidirectionalEmbedding(BidirectionalEmbedding),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum MoveToRunChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -17540,7 +17476,7 @@ pub enum MoveToRunChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -17548,7 +17484,7 @@ pub enum MoveToRunChoice {
   /// Defines the Paragraph Class.
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   /// Accent.
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
@@ -17592,60 +17528,52 @@ pub enum MoveToRunChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
+  BidirectionalOverride(BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
+  BidirectionalEmbedding(BidirectionalEmbedding),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SdtRunChoice {
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CustomXmlBlockChoice {
@@ -17658,59 +17586,51 @@ pub enum CustomXmlBlockChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -17720,7 +17640,7 @@ pub enum CustomXmlBlockChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -17729,53 +17649,45 @@ pub enum CustomXmlBlockChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum SdtBlockChoice {
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphChoice {
@@ -17788,59 +17700,51 @@ pub enum ParagraphChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -17850,7 +17754,7 @@ pub enum ParagraphChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -17858,7 +17762,7 @@ pub enum ParagraphChoice {
   /// Defines the Paragraph Class.
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   /// Accent.
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
@@ -17902,64 +17806,56 @@ pub enum ParagraphChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
+  BidirectionalOverride(BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
+  BidirectionalEmbedding(BidirectionalEmbedding),
   /// Anchor for Subdocument Location.
-  SubDocumentReference(std::boxed::Box<SubDocumentReference>),
+  SubDocumentReference(SubDocumentReference),
   /// Unknown XML child.
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableChoice {
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableChoice2 {
@@ -17970,59 +17866,51 @@ pub enum TableChoice2 {
   /// Row-Level Structured Document Tag.
   SdtRow(std::boxed::Box<SdtRow>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -18032,7 +17920,7 @@ pub enum TableChoice2 {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -18047,59 +17935,51 @@ pub enum TableRowChoice {
   /// Cell-Level Structured Document Tag.
   SdtCell(std::boxed::Box<SdtCell>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -18109,7 +17989,7 @@ pub enum TableRowChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -18124,59 +18004,51 @@ pub enum CustomXmlRowChoice {
   /// Row-Level Structured Document Tag.
   SdtRow(std::boxed::Box<SdtRow>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -18186,7 +18058,7 @@ pub enum CustomXmlRowChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -18195,53 +18067,45 @@ pub enum CustomXmlRowChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum SdtRowChoice {
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableCellChoice {
@@ -18256,59 +18120,51 @@ pub enum TableCellChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -18318,13 +18174,13 @@ pub enum TableCellChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Out-of-place break in table cell.
-  Break(std::boxed::Box<Break>),
+  Break(Break),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CustomXmlCellChoice {
@@ -18335,59 +18191,51 @@ pub enum CustomXmlCellChoice {
   /// Cell-Level Structured Document Tag.
   SdtCell(std::boxed::Box<SdtCell>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -18397,7 +18245,7 @@ pub enum CustomXmlCellChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -18406,53 +18254,45 @@ pub enum CustomXmlCellChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum SdtCellChoice {
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CustomXmlRunChoice {
@@ -18465,59 +18305,51 @@ pub enum CustomXmlRunChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -18527,7 +18359,7 @@ pub enum CustomXmlRunChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -18535,7 +18367,7 @@ pub enum CustomXmlRunChoice {
   /// Defines the Paragraph Class.
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   /// Accent.
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
@@ -18579,11 +18411,11 @@ pub enum CustomXmlRunChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
+  BidirectionalOverride(BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
+  BidirectionalEmbedding(BidirectionalEmbedding),
   /// Anchor for Subdocument Location.
-  SubDocumentReference(std::boxed::Box<SubDocumentReference>),
+  SubDocumentReference(SubDocumentReference),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SimpleFieldChoice {
@@ -18596,59 +18428,51 @@ pub enum SimpleFieldChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -18658,7 +18482,7 @@ pub enum SimpleFieldChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -18666,7 +18490,7 @@ pub enum SimpleFieldChoice {
   /// Defines the Paragraph Class.
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   /// Accent.
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
@@ -18710,11 +18534,11 @@ pub enum SimpleFieldChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
+  BidirectionalOverride(BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
+  BidirectionalEmbedding(BidirectionalEmbedding),
   /// Anchor for Subdocument Location.
-  SubDocumentReference(std::boxed::Box<SubDocumentReference>),
+  SubDocumentReference(SubDocumentReference),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum HyperlinkChoice {
@@ -18727,55 +18551,47 @@ pub enum HyperlinkChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -18785,11 +18601,11 @@ pub enum HyperlinkChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   Bar(std::boxed::Box<crate::schemas::m::Bar>),
   Box(std::boxed::Box<crate::schemas::m::Box>),
@@ -18813,11 +18629,11 @@ pub enum HyperlinkChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
+  BidirectionalOverride(BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
+  BidirectionalEmbedding(BidirectionalEmbedding),
   /// Anchor for Subdocument Location.
-  SubDocumentReference(std::boxed::Box<SubDocumentReference>),
+  SubDocumentReference(SubDocumentReference),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BidirectionalOverrideChoice {
@@ -18830,55 +18646,47 @@ pub enum BidirectionalOverrideChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -18888,11 +18696,11 @@ pub enum BidirectionalOverrideChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   Bar(std::boxed::Box<crate::schemas::m::Bar>),
   Box(std::boxed::Box<crate::schemas::m::Box>),
@@ -18916,11 +18724,11 @@ pub enum BidirectionalOverrideChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
+  BidirectionalOverride(BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
+  BidirectionalEmbedding(BidirectionalEmbedding),
   /// Anchor for Subdocument Location.
-  SubDocumentReference(std::boxed::Box<SubDocumentReference>),
+  SubDocumentReference(SubDocumentReference),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BidirectionalEmbeddingChoice {
@@ -18933,55 +18741,47 @@ pub enum BidirectionalEmbeddingChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -18991,11 +18791,11 @@ pub enum BidirectionalEmbeddingChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   Bar(std::boxed::Box<crate::schemas::m::Bar>),
   Box(std::boxed::Box<crate::schemas::m::Box>),
@@ -19019,11 +18819,11 @@ pub enum BidirectionalEmbeddingChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
+  BidirectionalOverride(BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
+  BidirectionalEmbedding(BidirectionalEmbedding),
   /// Anchor for Subdocument Location.
-  SubDocumentReference(std::boxed::Box<SubDocumentReference>),
+  SubDocumentReference(SubDocumentReference),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextBoxContentChoice {
@@ -19038,55 +18838,47 @@ pub enum TextBoxContentChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -19096,7 +18888,7 @@ pub enum TextBoxContentChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
@@ -19113,55 +18905,47 @@ pub enum HeaderChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -19171,7 +18955,7 @@ pub enum HeaderChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
@@ -19188,55 +18972,47 @@ pub enum FooterChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -19246,7 +19022,7 @@ pub enum FooterChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
@@ -19260,9 +19036,9 @@ pub enum FontsChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum PreviousTableCellPropertiesChoice {
   /// Table Cell Insertion.
-  CellInsertion(std::boxed::Box<CellInsertion>),
+  CellInsertion(CellInsertion),
   /// Table Cell Deletion.
-  CellDeletion(std::boxed::Box<CellDeletion>),
+  CellDeletion(CellDeletion),
   /// Vertically Merged/Split Table Cells.
   CellMerge(std::boxed::Box<CellMerge>),
 }
@@ -19271,302 +19047,302 @@ pub enum PreviousTableRowPropertiesChoice {
   /// Defines the ConditionalFormatStyle Class.
   ConditionalFormatStyle(std::boxed::Box<ConditionalFormatStyle>),
   /// Defines the DivId Class.
-  DivId(std::boxed::Box<DivId>),
+  DivId(DivId),
   /// Defines the GridBefore Class.
-  GridBefore(std::boxed::Box<GridBefore>),
+  GridBefore(GridBefore),
   /// Defines the GridAfter Class.
-  GridAfter(std::boxed::Box<GridAfter>),
+  GridAfter(GridAfter),
   /// Defines the WidthBeforeTableRow Class.
-  WidthBeforeTableRow(std::boxed::Box<WidthBeforeTableRow>),
+  WidthBeforeTableRow(WidthBeforeTableRow),
   /// Defines the WidthAfterTableRow Class.
-  WidthAfterTableRow(std::boxed::Box<WidthAfterTableRow>),
+  WidthAfterTableRow(WidthAfterTableRow),
   /// Defines the TableRowHeight Class.
-  TableRowHeight(std::boxed::Box<TableRowHeight>),
+  TableRowHeight(TableRowHeight),
   /// Defines the Hidden Class.
-  Hidden(std::boxed::Box<Hidden>),
+  Hidden(Hidden),
   /// Defines the CantSplit Class.
-  CantSplit(std::boxed::Box<CantSplit>),
+  CantSplit(CantSplit),
   /// Defines the TableHeader Class.
-  TableHeader(std::boxed::Box<TableHeader>),
+  TableHeader(TableHeader),
   /// Defines the TableCellSpacing Class.
-  TableCellSpacing(std::boxed::Box<TableCellSpacing>),
+  TableCellSpacing(TableCellSpacing),
   /// Defines the TableJustification Class.
-  TableJustification(std::boxed::Box<TableJustification>),
+  TableJustification(TableJustification),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PreviousRunPropertiesChoice {
   /// Defines the RunStyle Class.
-  RunStyle(std::boxed::Box<RunStyle>),
+  RunStyle(RunStyle),
   /// Defines the RunFonts Class.
   RunFonts(std::boxed::Box<RunFonts>),
   /// Defines the Bold Class.
-  Bold(std::boxed::Box<Bold>),
+  Bold(Bold),
   /// Defines the BoldComplexScript Class.
-  BoldComplexScript(std::boxed::Box<BoldComplexScript>),
+  BoldComplexScript(BoldComplexScript),
   /// Defines the Italic Class.
-  Italic(std::boxed::Box<Italic>),
+  Italic(Italic),
   /// Defines the ItalicComplexScript Class.
-  ItalicComplexScript(std::boxed::Box<ItalicComplexScript>),
+  ItalicComplexScript(ItalicComplexScript),
   /// Defines the Caps Class.
-  Caps(std::boxed::Box<Caps>),
+  Caps(Caps),
   /// Defines the SmallCaps Class.
-  SmallCaps(std::boxed::Box<SmallCaps>),
+  SmallCaps(SmallCaps),
   /// Defines the Strike Class.
-  Strike(std::boxed::Box<Strike>),
+  Strike(Strike),
   /// Defines the DoubleStrike Class.
-  DoubleStrike(std::boxed::Box<DoubleStrike>),
+  DoubleStrike(DoubleStrike),
   /// Defines the Outline Class.
-  Outline(std::boxed::Box<Outline>),
+  Outline(Outline),
   /// Defines the Shadow Class.
-  Shadow(std::boxed::Box<Shadow>),
+  Shadow(Shadow),
   /// Defines the Emboss Class.
-  Emboss(std::boxed::Box<Emboss>),
+  Emboss(Emboss),
   /// Defines the Imprint Class.
-  Imprint(std::boxed::Box<Imprint>),
+  Imprint(Imprint),
   /// Defines the NoProof Class.
-  NoProof(std::boxed::Box<NoProof>),
+  NoProof(NoProof),
   /// Defines the SnapToGrid Class.
-  SnapToGrid(std::boxed::Box<SnapToGrid>),
+  SnapToGrid(SnapToGrid),
   /// Defines the Vanish Class.
-  Vanish(std::boxed::Box<Vanish>),
+  Vanish(Vanish),
   /// Defines the WebHidden Class.
-  WebHidden(std::boxed::Box<WebHidden>),
+  WebHidden(WebHidden),
   /// Defines the Color Class.
   Color(std::boxed::Box<Color>),
   /// Defines the Spacing Class.
-  Spacing(std::boxed::Box<Spacing>),
+  Spacing(Spacing),
   /// Defines the CharacterScale Class.
-  CharacterScale(std::boxed::Box<CharacterScale>),
+  CharacterScale(CharacterScale),
   /// Defines the Kern Class.
-  Kern(std::boxed::Box<Kern>),
+  Kern(Kern),
   /// Defines the Position Class.
-  Position(std::boxed::Box<Position>),
+  Position(Position),
   /// Defines the FontSize Class.
-  FontSize(std::boxed::Box<FontSize>),
+  FontSize(FontSize),
   /// Defines the FontSizeComplexScript Class.
-  FontSizeComplexScript(std::boxed::Box<FontSizeComplexScript>),
+  FontSizeComplexScript(FontSizeComplexScript),
   /// Defines the Highlight Class.
   Highlight(std::boxed::Box<Highlight>),
   /// Defines the Underline Class.
   Underline(std::boxed::Box<Underline>),
   /// Defines the TextEffect Class.
-  TextEffect(std::boxed::Box<TextEffect>),
+  TextEffect(TextEffect),
   /// Defines the Border Class.
   Border(std::boxed::Box<Border>),
   /// Defines the Shading Class.
   Shading(std::boxed::Box<Shading>),
   /// Defines the FitText Class.
-  FitText(std::boxed::Box<FitText>),
+  FitText(FitText),
   /// Defines the VerticalTextAlignment Class.
-  VerticalTextAlignment(std::boxed::Box<VerticalTextAlignment>),
+  VerticalTextAlignment(VerticalTextAlignment),
   /// Defines the RightToLeftText Class.
   RightToLeftText(std::boxed::Box<RightToLeftText>),
   /// Defines the ComplexScript Class.
   ComplexScript(std::boxed::Box<ComplexScript>),
   /// Defines the Emphasis Class.
-  Emphasis(std::boxed::Box<Emphasis>),
+  Emphasis(Emphasis),
   /// Defines the Languages Class.
   Languages(std::boxed::Box<Languages>),
   /// Defines the EastAsianLayout Class.
-  EastAsianLayout(std::boxed::Box<EastAsianLayout>),
+  EastAsianLayout(EastAsianLayout),
   /// Defines the SpecVanish Class.
-  SpecVanish(std::boxed::Box<SpecVanish>),
+  SpecVanish(SpecVanish),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PreviousParagraphMarkRunPropertiesChoice {
   /// Defines the ConflictInsertion Class.
-  ConflictInsertion(std::boxed::Box<crate::schemas::w14::ConflictInsertion>),
+  ConflictInsertion(crate::schemas::w14::ConflictInsertion),
   /// Defines the ConflictDeletion Class.
-  ConflictDeletion(std::boxed::Box<crate::schemas::w14::ConflictDeletion>),
+  ConflictDeletion(crate::schemas::w14::ConflictDeletion),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PreviousParagraphMarkRunPropertiesChoice2 {
   /// Defines the RunStyle Class.
-  RunStyle(std::boxed::Box<RunStyle>),
+  RunStyle(RunStyle),
   /// Defines the RunFonts Class.
   RunFonts(std::boxed::Box<RunFonts>),
   /// Defines the Bold Class.
-  Bold(std::boxed::Box<Bold>),
+  Bold(Bold),
   /// Defines the BoldComplexScript Class.
-  BoldComplexScript(std::boxed::Box<BoldComplexScript>),
+  BoldComplexScript(BoldComplexScript),
   /// Defines the Italic Class.
-  Italic(std::boxed::Box<Italic>),
+  Italic(Italic),
   /// Defines the ItalicComplexScript Class.
-  ItalicComplexScript(std::boxed::Box<ItalicComplexScript>),
+  ItalicComplexScript(ItalicComplexScript),
   /// Defines the Caps Class.
-  Caps(std::boxed::Box<Caps>),
+  Caps(Caps),
   /// Defines the SmallCaps Class.
-  SmallCaps(std::boxed::Box<SmallCaps>),
+  SmallCaps(SmallCaps),
   /// Defines the Strike Class.
-  Strike(std::boxed::Box<Strike>),
+  Strike(Strike),
   /// Defines the DoubleStrike Class.
-  DoubleStrike(std::boxed::Box<DoubleStrike>),
+  DoubleStrike(DoubleStrike),
   /// Defines the Outline Class.
-  Outline(std::boxed::Box<Outline>),
+  Outline(Outline),
   /// Defines the Shadow Class.
-  Shadow(std::boxed::Box<Shadow>),
+  Shadow(Shadow),
   /// Defines the Emboss Class.
-  Emboss(std::boxed::Box<Emboss>),
+  Emboss(Emboss),
   /// Defines the Imprint Class.
-  Imprint(std::boxed::Box<Imprint>),
+  Imprint(Imprint),
   /// Defines the NoProof Class.
-  NoProof(std::boxed::Box<NoProof>),
+  NoProof(NoProof),
   /// Defines the SnapToGrid Class.
-  SnapToGrid(std::boxed::Box<SnapToGrid>),
+  SnapToGrid(SnapToGrid),
   /// Defines the Vanish Class.
-  Vanish(std::boxed::Box<Vanish>),
+  Vanish(Vanish),
   /// Defines the WebHidden Class.
-  WebHidden(std::boxed::Box<WebHidden>),
+  WebHidden(WebHidden),
   /// Defines the Color Class.
   Color(std::boxed::Box<Color>),
   /// Defines the Spacing Class.
-  Spacing(std::boxed::Box<Spacing>),
+  Spacing(Spacing),
   /// Defines the CharacterScale Class.
-  CharacterScale(std::boxed::Box<CharacterScale>),
+  CharacterScale(CharacterScale),
   /// Defines the Kern Class.
-  Kern(std::boxed::Box<Kern>),
+  Kern(Kern),
   /// Defines the Position Class.
-  Position(std::boxed::Box<Position>),
+  Position(Position),
   /// Defines the FontSize Class.
-  FontSize(std::boxed::Box<FontSize>),
+  FontSize(FontSize),
   /// Defines the FontSizeComplexScript Class.
-  FontSizeComplexScript(std::boxed::Box<FontSizeComplexScript>),
+  FontSizeComplexScript(FontSizeComplexScript),
   /// Defines the Highlight Class.
   Highlight(std::boxed::Box<Highlight>),
   /// Defines the Underline Class.
   Underline(std::boxed::Box<Underline>),
   /// Defines the TextEffect Class.
-  TextEffect(std::boxed::Box<TextEffect>),
+  TextEffect(TextEffect),
   /// Defines the Border Class.
   Border(std::boxed::Box<Border>),
   /// Defines the Shading Class.
   Shading(std::boxed::Box<Shading>),
   /// Defines the FitText Class.
-  FitText(std::boxed::Box<FitText>),
+  FitText(FitText),
   /// Defines the VerticalTextAlignment Class.
-  VerticalTextAlignment(std::boxed::Box<VerticalTextAlignment>),
+  VerticalTextAlignment(VerticalTextAlignment),
   /// Defines the RightToLeftText Class.
   RightToLeftText(std::boxed::Box<RightToLeftText>),
   /// Defines the ComplexScript Class.
   ComplexScript(std::boxed::Box<ComplexScript>),
   /// Defines the Emphasis Class.
-  Emphasis(std::boxed::Box<Emphasis>),
+  Emphasis(Emphasis),
   /// Defines the Languages Class.
   Languages(std::boxed::Box<Languages>),
   /// Defines the EastAsianLayout Class.
-  EastAsianLayout(std::boxed::Box<EastAsianLayout>),
+  EastAsianLayout(EastAsianLayout),
   /// Defines the SpecVanish Class.
-  SpecVanish(std::boxed::Box<SpecVanish>),
+  SpecVanish(SpecVanish),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphMarkRunPropertiesChoice {
   /// Defines the ConflictInsertion Class.
-  ConflictInsertion(std::boxed::Box<crate::schemas::w14::ConflictInsertion>),
+  ConflictInsertion(crate::schemas::w14::ConflictInsertion),
   /// Defines the ConflictDeletion Class.
-  ConflictDeletion(std::boxed::Box<crate::schemas::w14::ConflictDeletion>),
+  ConflictDeletion(crate::schemas::w14::ConflictDeletion),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphMarkRunPropertiesChoice2 {
   /// Defines the RunStyle Class.
-  RunStyle(std::boxed::Box<RunStyle>),
+  RunStyle(RunStyle),
   /// Defines the RunFonts Class.
   RunFonts(std::boxed::Box<RunFonts>),
   /// Defines the Bold Class.
-  Bold(std::boxed::Box<Bold>),
+  Bold(Bold),
   /// Defines the BoldComplexScript Class.
-  BoldComplexScript(std::boxed::Box<BoldComplexScript>),
+  BoldComplexScript(BoldComplexScript),
   /// Defines the Italic Class.
-  Italic(std::boxed::Box<Italic>),
+  Italic(Italic),
   /// Defines the ItalicComplexScript Class.
-  ItalicComplexScript(std::boxed::Box<ItalicComplexScript>),
+  ItalicComplexScript(ItalicComplexScript),
   /// Defines the Caps Class.
-  Caps(std::boxed::Box<Caps>),
+  Caps(Caps),
   /// Defines the SmallCaps Class.
-  SmallCaps(std::boxed::Box<SmallCaps>),
+  SmallCaps(SmallCaps),
   /// Defines the Strike Class.
-  Strike(std::boxed::Box<Strike>),
+  Strike(Strike),
   /// Defines the DoubleStrike Class.
-  DoubleStrike(std::boxed::Box<DoubleStrike>),
+  DoubleStrike(DoubleStrike),
   /// Defines the Outline Class.
-  Outline(std::boxed::Box<Outline>),
+  Outline(Outline),
   /// Defines the Shadow Class.
-  Shadow(std::boxed::Box<Shadow>),
+  Shadow(Shadow),
   /// Defines the Emboss Class.
-  Emboss(std::boxed::Box<Emboss>),
+  Emboss(Emboss),
   /// Defines the Imprint Class.
-  Imprint(std::boxed::Box<Imprint>),
+  Imprint(Imprint),
   /// Defines the NoProof Class.
-  NoProof(std::boxed::Box<NoProof>),
+  NoProof(NoProof),
   /// Defines the SnapToGrid Class.
-  SnapToGrid(std::boxed::Box<SnapToGrid>),
+  SnapToGrid(SnapToGrid),
   /// Defines the Vanish Class.
-  Vanish(std::boxed::Box<Vanish>),
+  Vanish(Vanish),
   /// Defines the WebHidden Class.
-  WebHidden(std::boxed::Box<WebHidden>),
+  WebHidden(WebHidden),
   /// Defines the Color Class.
   Color(std::boxed::Box<Color>),
   /// Defines the Spacing Class.
-  Spacing(std::boxed::Box<Spacing>),
+  Spacing(Spacing),
   /// Defines the CharacterScale Class.
-  CharacterScale(std::boxed::Box<CharacterScale>),
+  CharacterScale(CharacterScale),
   /// Defines the Kern Class.
-  Kern(std::boxed::Box<Kern>),
+  Kern(Kern),
   /// Defines the Position Class.
-  Position(std::boxed::Box<Position>),
+  Position(Position),
   /// Defines the FontSize Class.
-  FontSize(std::boxed::Box<FontSize>),
+  FontSize(FontSize),
   /// Defines the FontSizeComplexScript Class.
-  FontSizeComplexScript(std::boxed::Box<FontSizeComplexScript>),
+  FontSizeComplexScript(FontSizeComplexScript),
   /// Defines the Highlight Class.
   Highlight(std::boxed::Box<Highlight>),
   /// Defines the Underline Class.
   Underline(std::boxed::Box<Underline>),
   /// Defines the TextEffect Class.
-  TextEffect(std::boxed::Box<TextEffect>),
+  TextEffect(TextEffect),
   /// Defines the Border Class.
   Border(std::boxed::Box<Border>),
   /// Defines the Shading Class.
   Shading(std::boxed::Box<Shading>),
   /// Defines the FitText Class.
-  FitText(std::boxed::Box<FitText>),
+  FitText(FitText),
   /// Defines the VerticalTextAlignment Class.
-  VerticalTextAlignment(std::boxed::Box<VerticalTextAlignment>),
+  VerticalTextAlignment(VerticalTextAlignment),
   /// Defines the RightToLeftText Class.
   RightToLeftText(std::boxed::Box<RightToLeftText>),
   /// Defines the ComplexScript Class.
   ComplexScript(std::boxed::Box<ComplexScript>),
   /// Defines the Emphasis Class.
-  Emphasis(std::boxed::Box<Emphasis>),
+  Emphasis(Emphasis),
   /// Defines the Languages Class.
   Languages(std::boxed::Box<Languages>),
   /// Defines the EastAsianLayout Class.
-  EastAsianLayout(std::boxed::Box<EastAsianLayout>),
+  EastAsianLayout(EastAsianLayout),
   /// Defines the SpecVanish Class.
-  SpecVanish(std::boxed::Box<SpecVanish>),
+  SpecVanish(SpecVanish),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SectionPropertiesChoice {
   /// Header Reference.
-  HeaderReference(std::boxed::Box<HeaderReference>),
+  HeaderReference(HeaderReference),
   /// Footer Reference.
-  FooterReference(std::boxed::Box<FooterReference>),
+  FooterReference(FooterReference),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FormFieldDataChoice {
   /// Form Field Name.
-  FormFieldName(std::boxed::Box<FormFieldName>),
+  FormFieldName(FormFieldName),
   /// Form Field Enabled.
-  Enabled(std::boxed::Box<Enabled>),
+  Enabled(Enabled),
   /// Recalculate Fields When Current Field Is Modified.
-  CalculateOnExit(std::boxed::Box<CalculateOnExit>),
+  CalculateOnExit(CalculateOnExit),
   /// Script Function to Execute on Form Field Entry.
-  EntryMacro(std::boxed::Box<EntryMacro>),
+  EntryMacro(EntryMacro),
   /// Script Function to Execute on Form Field Exit.
-  ExitMacro(std::boxed::Box<ExitMacro>),
+  ExitMacro(ExitMacro),
   /// Associated Help Text.
-  HelpText(std::boxed::Box<HelpText>),
+  HelpText(HelpText),
   /// Associated Status Text.
-  StatusText(std::boxed::Box<StatusText>),
+  StatusText(StatusText),
   /// Checkbox Form Field Properties.
   CheckBox(std::boxed::Box<CheckBox>),
   /// Drop-Down List Form Field Properties.
@@ -19577,9 +19353,9 @@ pub enum FormFieldDataChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum CheckBoxChoice {
   /// Checkbox Form Field Size.
-  FormFieldSize(std::boxed::Box<FormFieldSize>),
+  FormFieldSize(FormFieldSize),
   /// Automatically Size Form Field.
-  AutomaticallySizeFormField(std::boxed::Box<AutomaticallySizeFormField>),
+  AutomaticallySizeFormField(AutomaticallySizeFormField),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum RubyContentChoice {
@@ -19594,55 +19370,47 @@ pub enum RubyContentChoice {
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -19652,11 +19420,11 @@ pub enum RubyContentChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   Bar(std::boxed::Box<crate::schemas::m::Bar>),
   Box(std::boxed::Box<crate::schemas::m::Box>),
@@ -19691,55 +19459,47 @@ pub enum RubyBaseChoice {
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -19749,11 +19509,11 @@ pub enum RubyBaseChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   Bar(std::boxed::Box<crate::schemas::m::Bar>),
   Box(std::boxed::Box<crate::schemas::m::Box>),
@@ -19780,30 +19540,30 @@ pub enum SdtPropertiesChoice {
   /// Run Properties.
   RunProperties(std::boxed::Box<RunProperties>),
   /// Defines the SdtAlias Class.
-  SdtAlias(std::boxed::Box<SdtAlias>),
+  SdtAlias(SdtAlias),
   /// Defines the Lock Class.
-  Lock(std::boxed::Box<Lock>),
+  Lock(Lock),
   /// Defines the SdtPlaceholder Class.
   SdtPlaceholder(std::boxed::Box<SdtPlaceholder>),
   /// Defines the ShowingPlaceholder Class.
-  ShowingPlaceholder(std::boxed::Box<ShowingPlaceholder>),
+  ShowingPlaceholder(ShowingPlaceholder),
   /// Defines the DataBinding Class.
-  WDataBinding(std::boxed::Box<DataBinding>),
-  W15DataBinding(std::boxed::Box<crate::schemas::w15::DataBinding>),
+  WDataBinding(DataBinding),
+  W15DataBinding(crate::schemas::w15::DataBinding),
   /// Defines the TemporarySdt Class.
-  TemporarySdt(std::boxed::Box<TemporarySdt>),
+  TemporarySdt(TemporarySdt),
   /// Defines the SdtId Class.
-  SdtId(std::boxed::Box<SdtId>),
+  SdtId(SdtId),
   /// Defines the Tag Class.
-  Tag(std::boxed::Box<Tag>),
+  Tag(Tag),
   Color(std::boxed::Box<crate::schemas::w15::Color>),
-  Appearance(std::boxed::Box<crate::schemas::w15::Appearance>),
-  WebExtensionLinked(std::boxed::Box<crate::schemas::w15::WebExtensionLinked>),
-  WebExtensionCreated(std::boxed::Box<crate::schemas::w15::WebExtensionCreated>),
+  Appearance(crate::schemas::w15::Appearance),
+  WebExtensionLinked(crate::schemas::w15::WebExtensionLinked),
+  WebExtensionCreated(crate::schemas::w15::WebExtensionCreated),
   /// Defines the SdtContentEquation Class.
   SdtContentEquation,
   /// Defines the SdtContentComboBox Class.
-  SdtContentComboBox(std::boxed::Box<SdtContentComboBox>),
+  SdtContentComboBox(SdtContentComboBox),
   /// Defines the SdtContentDate Class.
   SdtContentDate(std::boxed::Box<SdtContentDate>),
   /// Defines the SdtContentDocPartObject Class.
@@ -19811,13 +19571,13 @@ pub enum SdtPropertiesChoice {
   /// Defines the SdtContentDocPartList Class.
   SdtContentDocPartList(std::boxed::Box<SdtContentDocPartList>),
   /// Defines the SdtContentDropDownList Class.
-  SdtContentDropDownList(std::boxed::Box<SdtContentDropDownList>),
+  SdtContentDropDownList(SdtContentDropDownList),
   /// Defines the SdtContentPicture Class.
   SdtContentPicture,
   /// Defines the SdtContentRichText Class.
   SdtContentRichText,
   /// Defines the SdtContentText Class.
-  SdtContentText(std::boxed::Box<SdtContentText>),
+  SdtContentText(SdtContentText),
   /// Defines the SdtContentCitation Class.
   SdtContentCitation,
   /// Defines the SdtContentGroup Class.
@@ -19831,7 +19591,7 @@ pub enum SdtPropertiesChoice {
   /// Defines the SdtRepeatedSectionItem Class.
   SdtRepeatedSectionItem,
   /// Structured Document Tag Tab Index.
-  TabIndex(std::boxed::Box<TabIndex>),
+  TabIndex(TabIndex),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SdtContentBlockChoice {
@@ -19844,55 +19604,47 @@ pub enum SdtContentBlockChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -19902,7 +19654,7 @@ pub enum SdtContentBlockChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
@@ -19918,55 +19670,47 @@ pub enum SdtContentRunChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -19976,11 +19720,11 @@ pub enum SdtContentRunChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   Bar(std::boxed::Box<crate::schemas::m::Bar>),
   Box(std::boxed::Box<crate::schemas::m::Box>),
@@ -20003,11 +19747,11 @@ pub enum SdtContentRunChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
+  BidirectionalOverride(BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
+  BidirectionalEmbedding(BidirectionalEmbedding),
   /// Anchor for Subdocument Location.
-  SubDocumentReference(std::boxed::Box<SubDocumentReference>),
+  SubDocumentReference(SubDocumentReference),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SdtContentRunRubyChoice {
@@ -20022,55 +19766,47 @@ pub enum SdtContentRunRubyChoice {
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -20080,11 +19816,11 @@ pub enum SdtContentRunRubyChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   Bar(std::boxed::Box<crate::schemas::m::Bar>),
   Box(std::boxed::Box<crate::schemas::m::Box>),
@@ -20115,55 +19851,47 @@ pub enum SdtContentCellChoice {
   /// Cell-Level Structured Document Tag.
   SdtCell(std::boxed::Box<SdtCell>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -20173,7 +19901,7 @@ pub enum SdtContentCellChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
@@ -20186,55 +19914,47 @@ pub enum SdtContentRowChoice {
   /// Row-Level Structured Document Tag.
   SdtRow(std::boxed::Box<SdtRow>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -20244,16 +19964,16 @@ pub enum SdtContentRowChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableCellPropertiesChoice {
   /// Table Cell Insertion.
-  CellInsertion(std::boxed::Box<CellInsertion>),
+  CellInsertion(CellInsertion),
   /// Table Cell Deletion.
-  CellDeletion(std::boxed::Box<CellDeletion>),
+  CellDeletion(CellDeletion),
   /// Vertically Merged/Split Table Cells.
   CellMerge(std::boxed::Box<CellMerge>),
 }
@@ -20267,36 +19987,36 @@ pub enum FramesetChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum NumberingPictureBulletChoice {
   /// Defines the PictureBulletBase Class.
-  PictureBulletBase(std::boxed::Box<PictureBulletBase>),
+  PictureBulletBase(PictureBulletBase),
   /// DrawingML Object.
   Drawing(std::boxed::Box<Drawing>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableStyleConditionalFormattingTableRowPropertiesChoice {
   /// Defines the Hidden Class.
-  Hidden(std::boxed::Box<Hidden>),
+  Hidden(Hidden),
   /// Defines the CantSplit Class.
-  CantSplit(std::boxed::Box<CantSplit>),
+  CantSplit(CantSplit),
   /// Defines the TableHeader Class.
-  TableHeader(std::boxed::Box<TableHeader>),
+  TableHeader(TableHeader),
   /// Defines the TableCellSpacing Class.
-  TableCellSpacing(std::boxed::Box<TableCellSpacing>),
+  TableCellSpacing(TableCellSpacing),
   /// Defines the TableJustification Class.
-  TableJustification(std::boxed::Box<TableJustification>),
+  TableJustification(TableJustification),
   /// Defines the ConditionalFormatStyle Class.
   ConditionalFormatStyle(std::boxed::Box<ConditionalFormatStyle>),
   /// Defines the DivId Class.
-  DivId(std::boxed::Box<DivId>),
+  DivId(DivId),
   /// Defines the GridBefore Class.
-  GridBefore(std::boxed::Box<GridBefore>),
+  GridBefore(GridBefore),
   /// Defines the GridAfter Class.
-  GridAfter(std::boxed::Box<GridAfter>),
+  GridAfter(GridAfter),
   /// Defines the WidthBeforeTableRow Class.
-  WidthBeforeTableRow(std::boxed::Box<WidthBeforeTableRow>),
+  WidthBeforeTableRow(WidthBeforeTableRow),
   /// Defines the WidthAfterTableRow Class.
-  WidthAfterTableRow(std::boxed::Box<WidthAfterTableRow>),
+  WidthAfterTableRow(WidthAfterTableRow),
   /// Defines the TableRowHeight Class.
-  TableRowHeight(std::boxed::Box<TableRowHeight>),
+  TableRowHeight(TableRowHeight),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommentChoice {
@@ -20311,19 +20031,19 @@ pub enum CommentChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FootnoteChoice {
@@ -20338,59 +20058,51 @@ pub enum FootnoteChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -20400,7 +20112,7 @@ pub enum FootnoteChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -20419,59 +20131,51 @@ pub enum EndnoteChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -20481,7 +20185,7 @@ pub enum EndnoteChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -20500,59 +20204,51 @@ pub enum DocPartBodyChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -20562,7 +20258,7 @@ pub enum DocPartBodyChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -20581,59 +20277,51 @@ pub enum BodyChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<ProofError>),
+  ProofError(ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<PermEnd>),
+  PermEnd(PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<BookmarkStart>),
+  BookmarkStart(BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  BookmarkEnd(BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  CommentRangeStart(CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  CommentRangeEnd(CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  MoveFromRangeEnd(MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  MoveToRangeEnd(MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
+  CustomXmlConflictInsertionRangeStart(crate::schemas::w14::CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
+  CustomXmlConflictInsertionRangeEnd(crate::schemas::w14::CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
+  CustomXmlConflictDeletionRangeStart(crate::schemas::w14::CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
+  CustomXmlConflictDeletionRangeEnd(crate::schemas::w14::CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<InsertedRun>),
   /// Deleted Run Content.
@@ -20643,7 +20331,7 @@ pub enum BodyChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -20656,34 +20344,34 @@ pub enum TableRowPropertiesChoice {
   /// Defines the ConditionalFormatStyle Class.
   ConditionalFormatStyle(std::boxed::Box<ConditionalFormatStyle>),
   /// Defines the DivId Class.
-  DivId(std::boxed::Box<DivId>),
+  DivId(DivId),
   /// Defines the GridBefore Class.
-  GridBefore(std::boxed::Box<GridBefore>),
+  GridBefore(GridBefore),
   /// Defines the GridAfter Class.
-  GridAfter(std::boxed::Box<GridAfter>),
+  GridAfter(GridAfter),
   /// Defines the WidthBeforeTableRow Class.
-  WidthBeforeTableRow(std::boxed::Box<WidthBeforeTableRow>),
+  WidthBeforeTableRow(WidthBeforeTableRow),
   /// Defines the WidthAfterTableRow Class.
-  WidthAfterTableRow(std::boxed::Box<WidthAfterTableRow>),
+  WidthAfterTableRow(WidthAfterTableRow),
   /// Defines the TableRowHeight Class.
-  TableRowHeight(std::boxed::Box<TableRowHeight>),
+  TableRowHeight(TableRowHeight),
   /// Defines the Hidden Class.
-  Hidden(std::boxed::Box<Hidden>),
+  Hidden(Hidden),
   /// Defines the CantSplit Class.
-  CantSplit(std::boxed::Box<CantSplit>),
+  CantSplit(CantSplit),
   /// Defines the TableHeader Class.
-  TableHeader(std::boxed::Box<TableHeader>),
+  TableHeader(TableHeader),
   /// Defines the TableCellSpacing Class.
-  TableCellSpacing(std::boxed::Box<TableCellSpacing>),
+  TableCellSpacing(TableCellSpacing),
   /// Defines the TableJustification Class.
-  TableJustification(std::boxed::Box<TableJustification>),
+  TableJustification(TableJustification),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableRowPropertiesChoice2 {
   /// Defines the ConflictInsertion Class.
-  ConflictInsertion(std::boxed::Box<crate::schemas::w14::ConflictInsertion>),
+  ConflictInsertion(crate::schemas::w14::ConflictInsertion),
   /// Defines the ConflictDeletion Class.
-  ConflictDeletion(std::boxed::Box<crate::schemas::w14::ConflictDeletion>),
+  ConflictDeletion(crate::schemas::w14::ConflictDeletion),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum HeaderShapeDefaultsChoice {

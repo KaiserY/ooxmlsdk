@@ -556,18 +556,18 @@ pub enum RichFilterColumnChoice {
   /// Defines the RichFilters Class.
   RichFilters(std::boxed::Box<RichFilters>),
   /// Defines the RichTop10 Class.
-  RichTop10(std::boxed::Box<RichTop10>),
+  RichTop10(RichTop10),
   /// Defines the CustomRichFilters Class.
-  CustomRichFilters(std::boxed::Box<CustomRichFilters>),
+  CustomRichFilters(CustomRichFilters),
   /// Defines the DynamicRichFilter Class.
   DynamicRichFilter(std::boxed::Box<DynamicRichFilter>),
   /// Defines the ExtensionList Class.
-  ExtensionList(std::boxed::Box<ExtensionList>),
+  ExtensionList(ExtensionList),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CustomRichFiltersChoice {
   /// Defines the CustomRichFilter Class.
-  CustomRichFilter(std::boxed::Box<CustomRichFilter>),
+  CustomRichFilter(CustomRichFilter),
   /// Defines the ExtensionList Class.
-  ExtensionList(std::boxed::Box<ExtensionList>),
+  ExtensionList(ExtensionList),
 }

@@ -1889,51 +1889,51 @@ pub enum RunConflictInsertionChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<crate::schemas::w::ProofError>),
+  ProofError(crate::schemas::w::ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<crate::schemas::w::PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
+  PermEnd(crate::schemas::w::PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<crate::schemas::w::BookmarkStart>),
+  BookmarkStart(crate::schemas::w::BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<crate::schemas::w::BookmarkEnd>),
+  BookmarkEnd(crate::schemas::w::BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<crate::schemas::w::CommentRangeStart>),
+  CommentRangeStart(crate::schemas::w::CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<crate::schemas::w::CommentRangeEnd>),
+  CommentRangeEnd(crate::schemas::w::CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<crate::schemas::w::MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<crate::schemas::w::MoveFromRangeEnd>),
+  MoveFromRangeEnd(crate::schemas::w::MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<crate::schemas::w::MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<crate::schemas::w::MoveToRangeEnd>),
+  MoveToRangeEnd(crate::schemas::w::MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(crate::schemas::w::CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(crate::schemas::w::CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(crate::schemas::w::CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(crate::schemas::w::CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(crate::schemas::w::CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(crate::schemas::w::CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(crate::schemas::w::CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(crate::schemas::w::CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(std::boxed::Box<CustomXmlConflictInsertionRangeStart>),
+  CustomXmlConflictInsertionRangeStart(CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(std::boxed::Box<CustomXmlConflictInsertionRangeEnd>),
+  CustomXmlConflictInsertionRangeEnd(CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(std::boxed::Box<CustomXmlConflictDeletionRangeStart>),
+  CustomXmlConflictDeletionRangeStart(CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
+  CustomXmlConflictDeletionRangeEnd(CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<crate::schemas::w::InsertedRun>),
   /// Deleted Run Content.
@@ -1943,7 +1943,7 @@ pub enum RunConflictInsertionChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<crate::schemas::w::MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<crate::schemas::w::ContentPart>),
+  ContentPart(crate::schemas::w::ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -1951,7 +1951,7 @@ pub enum RunConflictInsertionChoice {
   /// Defines the Paragraph Class.
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   /// Accent.
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
@@ -1995,60 +1995,60 @@ pub enum RunConflictInsertionChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<crate::schemas::w::Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<crate::schemas::w::BidirectionalOverride>),
+  BidirectionalOverride(crate::schemas::w::BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<crate::schemas::w::BidirectionalEmbedding>),
+  BidirectionalEmbedding(crate::schemas::w::BidirectionalEmbedding),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum RunConflictDeletionChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
-  ProofError(std::boxed::Box<crate::schemas::w::ProofError>),
+  ProofError(crate::schemas::w::ProofError),
   /// Defines the PermStart Class.
   PermStart(std::boxed::Box<crate::schemas::w::PermStart>),
   /// Defines the PermEnd Class.
-  PermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
+  PermEnd(crate::schemas::w::PermEnd),
   /// Defines the BookmarkStart Class.
-  BookmarkStart(std::boxed::Box<crate::schemas::w::BookmarkStart>),
+  BookmarkStart(crate::schemas::w::BookmarkStart),
   /// Defines the BookmarkEnd Class.
-  BookmarkEnd(std::boxed::Box<crate::schemas::w::BookmarkEnd>),
+  BookmarkEnd(crate::schemas::w::BookmarkEnd),
   /// Defines the CommentRangeStart Class.
-  CommentRangeStart(std::boxed::Box<crate::schemas::w::CommentRangeStart>),
+  CommentRangeStart(crate::schemas::w::CommentRangeStart),
   /// Defines the CommentRangeEnd Class.
-  CommentRangeEnd(std::boxed::Box<crate::schemas::w::CommentRangeEnd>),
+  CommentRangeEnd(crate::schemas::w::CommentRangeEnd),
   /// Defines the MoveFromRangeStart Class.
   MoveFromRangeStart(std::boxed::Box<crate::schemas::w::MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  MoveFromRangeEnd(std::boxed::Box<crate::schemas::w::MoveFromRangeEnd>),
+  MoveFromRangeEnd(crate::schemas::w::MoveFromRangeEnd),
   /// Defines the MoveToRangeStart Class.
   MoveToRangeStart(std::boxed::Box<crate::schemas::w::MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  MoveToRangeEnd(std::boxed::Box<crate::schemas::w::MoveToRangeEnd>),
+  MoveToRangeEnd(crate::schemas::w::MoveToRangeEnd),
   /// Defines the CustomXmlInsRangeStart Class.
-  CustomXmlInsRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeStart>),
+  CustomXmlInsRangeStart(crate::schemas::w::CustomXmlInsRangeStart),
   /// Defines the CustomXmlInsRangeEnd Class.
-  CustomXmlInsRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeEnd>),
+  CustomXmlInsRangeEnd(crate::schemas::w::CustomXmlInsRangeEnd),
   /// Defines the CustomXmlDelRangeStart Class.
-  CustomXmlDelRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeStart>),
+  CustomXmlDelRangeStart(crate::schemas::w::CustomXmlDelRangeStart),
   /// Defines the CustomXmlDelRangeEnd Class.
-  CustomXmlDelRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeEnd>),
+  CustomXmlDelRangeEnd(crate::schemas::w::CustomXmlDelRangeEnd),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  CustomXmlMoveFromRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeStart>),
+  CustomXmlMoveFromRangeStart(crate::schemas::w::CustomXmlMoveFromRangeStart),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  CustomXmlMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeEnd>),
+  CustomXmlMoveFromRangeEnd(crate::schemas::w::CustomXmlMoveFromRangeEnd),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  CustomXmlMoveToRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeStart>),
+  CustomXmlMoveToRangeStart(crate::schemas::w::CustomXmlMoveToRangeStart),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  CustomXmlMoveToRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeEnd>),
+  CustomXmlMoveToRangeEnd(crate::schemas::w::CustomXmlMoveToRangeEnd),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  CustomXmlConflictInsertionRangeStart(std::boxed::Box<CustomXmlConflictInsertionRangeStart>),
+  CustomXmlConflictInsertionRangeStart(CustomXmlConflictInsertionRangeStart),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  CustomXmlConflictInsertionRangeEnd(std::boxed::Box<CustomXmlConflictInsertionRangeEnd>),
+  CustomXmlConflictInsertionRangeEnd(CustomXmlConflictInsertionRangeEnd),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  CustomXmlConflictDeletionRangeStart(std::boxed::Box<CustomXmlConflictDeletionRangeStart>),
+  CustomXmlConflictDeletionRangeStart(CustomXmlConflictDeletionRangeStart),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  CustomXmlConflictDeletionRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
+  CustomXmlConflictDeletionRangeEnd(CustomXmlConflictDeletionRangeEnd),
   /// Inserted Run Content.
   InsertedRun(std::boxed::Box<crate::schemas::w::InsertedRun>),
   /// Deleted Run Content.
@@ -2058,7 +2058,7 @@ pub enum RunConflictDeletionChoice {
   /// Move Destination Run Content.
   MoveToRun(std::boxed::Box<crate::schemas::w::MoveToRun>),
   /// Defines the ContentPart Class.
-  ContentPart(std::boxed::Box<crate::schemas::w::ContentPart>),
+  ContentPart(crate::schemas::w::ContentPart),
   /// Defines the RunConflictInsertion Class.
   RunConflictInsertion(std::boxed::Box<RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
@@ -2066,7 +2066,7 @@ pub enum RunConflictDeletionChoice {
   /// Defines the Paragraph Class.
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  OfficeMath(crate::schemas::m::OfficeMath),
   /// Accent.
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
@@ -2110,83 +2110,83 @@ pub enum RunConflictDeletionChoice {
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<crate::schemas::w::Run>),
   /// Defines the BidirectionalOverride Class.
-  BidirectionalOverride(std::boxed::Box<crate::schemas::w::BidirectionalOverride>),
+  BidirectionalOverride(crate::schemas::w::BidirectionalOverride),
   /// Defines the BidirectionalEmbedding Class.
-  BidirectionalEmbedding(std::boxed::Box<crate::schemas::w::BidirectionalEmbedding>),
+  BidirectionalEmbedding(crate::schemas::w::BidirectionalEmbedding),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum RgbColorModelHexChoice {
   /// Defines the Tint Class.
-  Tint(std::boxed::Box<Tint>),
+  Tint(Tint),
   /// Defines the Shade Class.
-  Shade(std::boxed::Box<Shade>),
+  Shade(Shade),
   /// Defines the Alpha Class.
-  Alpha(std::boxed::Box<Alpha>),
+  Alpha(Alpha),
   /// Defines the HueModulation Class.
-  HueModulation(std::boxed::Box<HueModulation>),
+  HueModulation(HueModulation),
   /// Defines the Saturation Class.
-  Saturation(std::boxed::Box<Saturation>),
+  Saturation(Saturation),
   /// Defines the SaturationOffset Class.
-  SaturationOffset(std::boxed::Box<SaturationOffset>),
+  SaturationOffset(SaturationOffset),
   /// Defines the SaturationModulation Class.
-  SaturationModulation(std::boxed::Box<SaturationModulation>),
+  SaturationModulation(SaturationModulation),
   /// Defines the Luminance Class.
-  Luminance(std::boxed::Box<Luminance>),
+  Luminance(Luminance),
   /// Defines the LuminanceOffset Class.
-  LuminanceOffset(std::boxed::Box<LuminanceOffset>),
+  LuminanceOffset(LuminanceOffset),
   /// Defines the LuminanceModulation Class.
-  LuminanceModulation(std::boxed::Box<LuminanceModulation>),
+  LuminanceModulation(LuminanceModulation),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SchemeColorChoice {
   /// Defines the Tint Class.
-  Tint(std::boxed::Box<Tint>),
+  Tint(Tint),
   /// Defines the Shade Class.
-  Shade(std::boxed::Box<Shade>),
+  Shade(Shade),
   /// Defines the Alpha Class.
-  Alpha(std::boxed::Box<Alpha>),
+  Alpha(Alpha),
   /// Defines the HueModulation Class.
-  HueModulation(std::boxed::Box<HueModulation>),
+  HueModulation(HueModulation),
   /// Defines the Saturation Class.
-  Saturation(std::boxed::Box<Saturation>),
+  Saturation(Saturation),
   /// Defines the SaturationOffset Class.
-  SaturationOffset(std::boxed::Box<SaturationOffset>),
+  SaturationOffset(SaturationOffset),
   /// Defines the SaturationModulation Class.
-  SaturationModulation(std::boxed::Box<SaturationModulation>),
+  SaturationModulation(SaturationModulation),
   /// Defines the Luminance Class.
-  Luminance(std::boxed::Box<Luminance>),
+  Luminance(Luminance),
   /// Defines the LuminanceOffset Class.
-  LuminanceOffset(std::boxed::Box<LuminanceOffset>),
+  LuminanceOffset(LuminanceOffset),
   /// Defines the LuminanceModulation Class.
-  LuminanceModulation(std::boxed::Box<LuminanceModulation>),
+  LuminanceModulation(LuminanceModulation),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SolidColorFillPropertiesChoice {
   /// Defines the RgbColorModelHex Class.
-  RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
+  RgbColorModelHex(RgbColorModelHex),
   /// Defines the SchemeColor Class.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum GradientFillPropertiesChoice {
   /// Defines the LinearShadeProperties Class.
-  LinearShadeProperties(std::boxed::Box<LinearShadeProperties>),
+  LinearShadeProperties(LinearShadeProperties),
   /// Defines the PathShadeProperties Class.
   PathShadeProperties(std::boxed::Box<PathShadeProperties>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum GlowChoice {
   /// Defines the RgbColorModelHex Class.
-  RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
+  RgbColorModelHex(RgbColorModelHex),
   /// Defines the SchemeColor Class.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShadowChoice {
   /// Defines the RgbColorModelHex Class.
-  RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
+  RgbColorModelHex(RgbColorModelHex),
   /// Defines the SchemeColor Class.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextOutlineEffectChoice {
@@ -2204,7 +2204,7 @@ pub enum TextOutlineEffectChoice2 {
   /// Defines the BevelEmpty Class.
   BevelEmpty,
   /// Defines the LineJoinMiterProperties Class.
-  LineJoinMiterProperties(std::boxed::Box<LineJoinMiterProperties>),
+  LineJoinMiterProperties(LineJoinMiterProperties),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FillTextEffectChoice {
@@ -2218,21 +2218,21 @@ pub enum FillTextEffectChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum GradientStopChoice {
   /// Defines the RgbColorModelHex Class.
-  RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
+  RgbColorModelHex(RgbColorModelHex),
   /// Defines the SchemeColor Class.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExtrusionColorChoice {
   /// Defines the RgbColorModelHex Class.
-  RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
+  RgbColorModelHex(RgbColorModelHex),
   /// Defines the SchemeColor Class.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ContourColorChoice {
   /// Defines the RgbColorModelHex Class.
-  RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
+  RgbColorModelHex(RgbColorModelHex),
   /// Defines the SchemeColor Class.
-  SchemeColor(std::boxed::Box<SchemeColor>),
+  SchemeColor(SchemeColor),
 }

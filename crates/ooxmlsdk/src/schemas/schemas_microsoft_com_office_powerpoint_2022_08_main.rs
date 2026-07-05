@@ -152,19 +152,19 @@ pub struct TaskHistory {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TaskHistoryEventChoice {
   /// Defines the AsgnTaskAssignUnassignUser Class.
-  AsgnTaskAssignUnassignUser(std::boxed::Box<AsgnTaskAssignUnassignUser>),
+  AsgnTaskAssignUnassignUser(AsgnTaskAssignUnassignUser),
   /// Defines the AddEmpty Class.
   AddEmpty,
   /// Defines the TaskTitleEventInfo Class.
-  TaskTitleEventInfo(std::boxed::Box<TaskTitleEventInfo>),
+  TaskTitleEventInfo(TaskTitleEventInfo),
   /// Defines the TaskScheduleEventInfo Class.
-  TaskScheduleEventInfo(std::boxed::Box<TaskScheduleEventInfo>),
+  TaskScheduleEventInfo(TaskScheduleEventInfo),
   /// Defines the TaskProgressEventInfo Class.
-  TaskProgressEventInfo(std::boxed::Box<TaskProgressEventInfo>),
+  TaskProgressEventInfo(TaskProgressEventInfo),
   /// Defines the UnasgnAllEmpty Class.
   UnasgnAllEmpty,
   /// Defines the TaskUndo Class.
-  TaskUndo(std::boxed::Box<TaskUndo>),
+  TaskUndo(TaskUndo),
   /// Defines the TaskUnknownRecord Class.
   TaskUnknownRecord,
 }

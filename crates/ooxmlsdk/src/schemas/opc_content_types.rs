@@ -42,7 +42,7 @@ pub struct Override {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypesChoice {
   /// Default content type.
-  Default(std::boxed::Box<Default>),
+  Default(Default),
   /// Override content type.
-  Override(std::boxed::Box<Override>),
+  Override(Override),
 }

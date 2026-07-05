@@ -108,7 +108,7 @@ pub enum WordprocessingCanvasChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundFormattingChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.

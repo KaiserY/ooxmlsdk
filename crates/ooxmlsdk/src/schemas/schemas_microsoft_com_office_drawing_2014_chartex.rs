@@ -1958,47 +1958,47 @@ pub struct UnsignedIntegerType {
 #[derive(Clone, Debug, PartialEq)]
 pub enum MinColorSolidColorFillPropertiesChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum MidColorSolidColorFillPropertiesChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum MaxColorSolidColorFillPropertiesChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 pub struct NumericDimensionChoiceSequence {
@@ -2036,7 +2036,7 @@ pub enum StringDimensionChoice {
   /// Sequence of cx:f, cx:nf, cx:lvl
   Sequence(std::boxed::Box<StringDimensionChoiceSequence>),
   /// Defines the StringLevel Class.
-  StringLevel(std::boxed::Box<StringLevel>),
+  StringLevel(StringLevel),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DataChoice {
@@ -2078,7 +2078,7 @@ pub enum ShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -2116,25 +2116,25 @@ pub enum MinValueColorEndPositionChoice {
   /// Defines the ExtremeValueColorPosition Class.
   ExtremeValueColorPosition,
   /// Defines the NumberColorPosition Class.
-  NumberColorPosition(std::boxed::Box<NumberColorPosition>),
+  NumberColorPosition(NumberColorPosition),
   /// Defines the PercentageColorPosition Class.
-  PercentageColorPosition(std::boxed::Box<PercentageColorPosition>),
+  PercentageColorPosition(PercentageColorPosition),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum MaxValueColorEndPositionChoice {
   /// Defines the ExtremeValueColorPosition Class.
   ExtremeValueColorPosition,
   /// Defines the NumberColorPosition Class.
-  NumberColorPosition(std::boxed::Box<NumberColorPosition>),
+  NumberColorPosition(NumberColorPosition),
   /// Defines the PercentageColorPosition Class.
-  PercentageColorPosition(std::boxed::Box<PercentageColorPosition>),
+  PercentageColorPosition(PercentageColorPosition),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ValueColorMiddlePositionChoice {
   /// Defines the NumberColorPosition Class.
-  NumberColorPosition(std::boxed::Box<NumberColorPosition>),
+  NumberColorPosition(NumberColorPosition),
   /// Defines the PercentageColorPosition Class.
-  PercentageColorPosition(std::boxed::Box<PercentageColorPosition>),
+  PercentageColorPosition(PercentageColorPosition),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SeriesLayoutPropertiesChoice {
@@ -2146,7 +2146,7 @@ pub enum SeriesLayoutPropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum AxisChoice {
   /// Defines the CategoryAxisScaling Class.
-  CategoryAxisScaling(std::boxed::Box<CategoryAxisScaling>),
+  CategoryAxisScaling(CategoryAxisScaling),
   /// Defines the ValueAxisScaling Class.
   ValueAxisScaling(std::boxed::Box<ValueAxisScaling>),
 }

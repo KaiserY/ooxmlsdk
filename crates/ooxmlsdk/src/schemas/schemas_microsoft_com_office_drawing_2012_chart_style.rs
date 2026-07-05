@@ -2072,19 +2072,19 @@ pub struct MarkerLayoutProperties {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColorStyleChoice {
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  HslColor(crate::schemas::a::HslColor),
+  SystemColor(crate::schemas::a::SystemColor),
+  SchemeColor(crate::schemas::a::SchemeColor),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColorStyleVariationChoice {
   /// Tint.
-  Tint(std::boxed::Box<crate::schemas::a::Tint>),
+  Tint(crate::schemas::a::Tint),
   /// Shade.
-  Shade(std::boxed::Box<crate::schemas::a::Shade>),
+  Shade(crate::schemas::a::Shade),
   /// Complement.
   Complement,
   /// Inverse.
@@ -2092,47 +2092,47 @@ pub enum ColorStyleVariationChoice {
   /// Gray.
   Gray,
   /// Alpha.
-  Alpha(std::boxed::Box<crate::schemas::a::Alpha>),
+  Alpha(crate::schemas::a::Alpha),
   /// Alpha Offset.
-  AlphaOffset(std::boxed::Box<crate::schemas::a::AlphaOffset>),
+  AlphaOffset(crate::schemas::a::AlphaOffset),
   /// Alpha Modulation.
-  AlphaModulation(std::boxed::Box<crate::schemas::a::AlphaModulation>),
+  AlphaModulation(crate::schemas::a::AlphaModulation),
   /// Hue.
-  Hue(std::boxed::Box<crate::schemas::a::Hue>),
+  Hue(crate::schemas::a::Hue),
   /// Hue Offset.
-  HueOffset(std::boxed::Box<crate::schemas::a::HueOffset>),
+  HueOffset(crate::schemas::a::HueOffset),
   /// Hue Modulate.
-  HueModulation(std::boxed::Box<crate::schemas::a::HueModulation>),
+  HueModulation(crate::schemas::a::HueModulation),
   /// Saturation.
-  Saturation(std::boxed::Box<crate::schemas::a::Saturation>),
+  Saturation(crate::schemas::a::Saturation),
   /// Saturation Offset.
-  SaturationOffset(std::boxed::Box<crate::schemas::a::SaturationOffset>),
+  SaturationOffset(crate::schemas::a::SaturationOffset),
   /// Saturation Modulation.
-  SaturationModulation(std::boxed::Box<crate::schemas::a::SaturationModulation>),
+  SaturationModulation(crate::schemas::a::SaturationModulation),
   /// Luminance.
-  Luminance(std::boxed::Box<crate::schemas::a::Luminance>),
+  Luminance(crate::schemas::a::Luminance),
   /// Luminance Offset.
-  LuminanceOffset(std::boxed::Box<crate::schemas::a::LuminanceOffset>),
+  LuminanceOffset(crate::schemas::a::LuminanceOffset),
   /// Luminance Modulation.
-  LuminanceModulation(std::boxed::Box<crate::schemas::a::LuminanceModulation>),
+  LuminanceModulation(crate::schemas::a::LuminanceModulation),
   /// Red.
-  Red(std::boxed::Box<crate::schemas::a::Red>),
+  Red(crate::schemas::a::Red),
   /// Red Offset.
-  RedOffset(std::boxed::Box<crate::schemas::a::RedOffset>),
+  RedOffset(crate::schemas::a::RedOffset),
   /// Red Modulation.
-  RedModulation(std::boxed::Box<crate::schemas::a::RedModulation>),
+  RedModulation(crate::schemas::a::RedModulation),
   /// Green.
-  Green(std::boxed::Box<crate::schemas::a::Green>),
+  Green(crate::schemas::a::Green),
   /// Green Offset.
-  GreenOffset(std::boxed::Box<crate::schemas::a::GreenOffset>),
+  GreenOffset(crate::schemas::a::GreenOffset),
   /// Green Modification.
-  GreenModulation(std::boxed::Box<crate::schemas::a::GreenModulation>),
+  GreenModulation(crate::schemas::a::GreenModulation),
   /// Blue.
-  Blue(std::boxed::Box<crate::schemas::a::Blue>),
+  Blue(crate::schemas::a::Blue),
   /// Blue Offset.
-  BlueOffset(std::boxed::Box<crate::schemas::a::BlueOffset>),
+  BlueOffset(crate::schemas::a::BlueOffset),
   /// Blue Modification.
-  BlueModulation(std::boxed::Box<crate::schemas::a::BlueModulation>),
+  BlueModulation(crate::schemas::a::BlueModulation),
   /// Gamma.
   Gamma,
   /// Inverse Gamma.
@@ -2141,9 +2141,9 @@ pub enum ColorStyleVariationChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum StyleColorChoice {
   /// Tint.
-  Tint(std::boxed::Box<crate::schemas::a::Tint>),
+  Tint(crate::schemas::a::Tint),
   /// Shade.
-  Shade(std::boxed::Box<crate::schemas::a::Shade>),
+  Shade(crate::schemas::a::Shade),
   /// Complement.
   Complement,
   /// Inverse.
@@ -2151,47 +2151,47 @@ pub enum StyleColorChoice {
   /// Gray.
   Gray,
   /// Alpha.
-  Alpha(std::boxed::Box<crate::schemas::a::Alpha>),
+  Alpha(crate::schemas::a::Alpha),
   /// Alpha Offset.
-  AlphaOffset(std::boxed::Box<crate::schemas::a::AlphaOffset>),
+  AlphaOffset(crate::schemas::a::AlphaOffset),
   /// Alpha Modulation.
-  AlphaModulation(std::boxed::Box<crate::schemas::a::AlphaModulation>),
+  AlphaModulation(crate::schemas::a::AlphaModulation),
   /// Hue.
-  Hue(std::boxed::Box<crate::schemas::a::Hue>),
+  Hue(crate::schemas::a::Hue),
   /// Hue Offset.
-  HueOffset(std::boxed::Box<crate::schemas::a::HueOffset>),
+  HueOffset(crate::schemas::a::HueOffset),
   /// Hue Modulate.
-  HueModulation(std::boxed::Box<crate::schemas::a::HueModulation>),
+  HueModulation(crate::schemas::a::HueModulation),
   /// Saturation.
-  Saturation(std::boxed::Box<crate::schemas::a::Saturation>),
+  Saturation(crate::schemas::a::Saturation),
   /// Saturation Offset.
-  SaturationOffset(std::boxed::Box<crate::schemas::a::SaturationOffset>),
+  SaturationOffset(crate::schemas::a::SaturationOffset),
   /// Saturation Modulation.
-  SaturationModulation(std::boxed::Box<crate::schemas::a::SaturationModulation>),
+  SaturationModulation(crate::schemas::a::SaturationModulation),
   /// Luminance.
-  Luminance(std::boxed::Box<crate::schemas::a::Luminance>),
+  Luminance(crate::schemas::a::Luminance),
   /// Luminance Offset.
-  LuminanceOffset(std::boxed::Box<crate::schemas::a::LuminanceOffset>),
+  LuminanceOffset(crate::schemas::a::LuminanceOffset),
   /// Luminance Modulation.
-  LuminanceModulation(std::boxed::Box<crate::schemas::a::LuminanceModulation>),
+  LuminanceModulation(crate::schemas::a::LuminanceModulation),
   /// Red.
-  Red(std::boxed::Box<crate::schemas::a::Red>),
+  Red(crate::schemas::a::Red),
   /// Red Offset.
-  RedOffset(std::boxed::Box<crate::schemas::a::RedOffset>),
+  RedOffset(crate::schemas::a::RedOffset),
   /// Red Modulation.
-  RedModulation(std::boxed::Box<crate::schemas::a::RedModulation>),
+  RedModulation(crate::schemas::a::RedModulation),
   /// Green.
-  Green(std::boxed::Box<crate::schemas::a::Green>),
+  Green(crate::schemas::a::Green),
   /// Green Offset.
-  GreenOffset(std::boxed::Box<crate::schemas::a::GreenOffset>),
+  GreenOffset(crate::schemas::a::GreenOffset),
   /// Green Modification.
-  GreenModulation(std::boxed::Box<crate::schemas::a::GreenModulation>),
+  GreenModulation(crate::schemas::a::GreenModulation),
   /// Blue.
-  Blue(std::boxed::Box<crate::schemas::a::Blue>),
+  Blue(crate::schemas::a::Blue),
   /// Blue Offset.
-  BlueOffset(std::boxed::Box<crate::schemas::a::BlueOffset>),
+  BlueOffset(crate::schemas::a::BlueOffset),
   /// Blue Modification.
-  BlueModulation(std::boxed::Box<crate::schemas::a::BlueModulation>),
+  BlueModulation(crate::schemas::a::BlueModulation),
   /// Gamma.
   Gamma,
   /// Inverse Gamma.
@@ -2199,39 +2199,39 @@ pub enum StyleColorChoice {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum LineReferenceChoice {
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  HslColor(crate::schemas::a::HslColor),
+  SystemColor(crate::schemas::a::SystemColor),
+  SchemeColor(crate::schemas::a::SchemeColor),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FillReferenceChoice {
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  HslColor(crate::schemas::a::HslColor),
+  SystemColor(crate::schemas::a::SystemColor),
+  SchemeColor(crate::schemas::a::SchemeColor),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum EffectReferenceChoice {
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  HslColor(crate::schemas::a::HslColor),
+  SystemColor(crate::schemas::a::SystemColor),
+  SchemeColor(crate::schemas::a::SchemeColor),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FontReferenceChoice {
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  HslColor(crate::schemas::a::HslColor),
+  SystemColor(crate::schemas::a::SystemColor),
+  SchemeColor(crate::schemas::a::SchemeColor),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
@@ -2243,7 +2243,7 @@ pub enum ShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -2265,7 +2265,7 @@ pub enum ShapePropertiesChoice3 {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextCharacterPropertiesTypeChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -2303,7 +2303,7 @@ pub enum TextBodyPropertiesChoice {
   /// No AutoFit.
   NoAutoFit,
   /// Normal AutoFit.
-  NormalAutoFit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
+  NormalAutoFit(crate::schemas::a::NormalAutoFit),
   /// Shape AutoFit.
   ShapeAutoFit,
 }
@@ -2312,5 +2312,5 @@ pub enum TextBodyPropertiesChoice2 {
   /// Apply 3D shape properties.
   Shape3DType(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
-  FlatText(std::boxed::Box<crate::schemas::a::FlatText>),
+  FlatText(crate::schemas::a::FlatText),
 }

@@ -179,9 +179,9 @@ impl DiagramTextBody {
           properties.indent = Some(-285_750);
         }
         properties.paragraph_properties_choice4 = Some(
-          a::ParagraphPropertiesChoice4::CharacterBullet(Box::new(a::CharacterBullet {
+          a::ParagraphPropertiesChoice4::CharacterBullet(a::CharacterBullet {
             char: "\u{2022}".to_string(),
-          })),
+          }),
         );
         is_bullet_list = true;
       } else if properties.paragraph_properties_choice4.is_none() {
@@ -1582,7 +1582,7 @@ fn direct_constraints(node: &dgm::LayoutNode) -> Vec<DiagramConstraint> {
     .layout_node_choice
     .iter()
     .filter_map(|choice| match choice {
-      dgm::LayoutNodeChoice::Constraints(constraints) => Some(constraints.as_ref()),
+      dgm::LayoutNodeChoice::Constraints(constraints) => Some(constraints),
       _ => None,
     })
     .flat_map(|constraints| parse_constraints(constraints, true))
@@ -1594,7 +1594,7 @@ fn direct_constraints_unfiltered(node: &dgm::LayoutNode) -> Vec<DiagramConstrain
     .layout_node_choice
     .iter()
     .filter_map(|choice| match choice {
-      dgm::LayoutNodeChoice::Constraints(constraints) => Some(constraints.as_ref()),
+      dgm::LayoutNodeChoice::Constraints(constraints) => Some(constraints),
       _ => None,
     })
     .flat_map(parse_constraints_unfiltered)
@@ -1686,7 +1686,7 @@ fn direct_rules(node: &dgm::LayoutNode) -> Vec<DiagramRule> {
     .layout_node_choice
     .iter()
     .filter_map(|choice| match choice {
-      dgm::LayoutNodeChoice::RuleList(rules) => Some(rules.as_ref()),
+      dgm::LayoutNodeChoice::RuleList(rules) => Some(rules),
       _ => None,
     })
     .flat_map(parse_rules)

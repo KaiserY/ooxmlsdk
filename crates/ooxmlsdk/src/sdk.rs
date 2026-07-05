@@ -537,6 +537,32 @@ pub trait SdkType: Sized {
   }
 }
 
+impl<T: SdkType> SdkType for Box<T> {
+  #[inline]
+  fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
+    T::from_bytes(bytes).map(Box::new)
+  }
+
+  #[inline]
+  fn from_reader<R: std::io::BufRead>(reader: R) -> Result<Self, crate::common::SdkError> {
+    T::from_reader(reader).map(Box::new)
+  }
+
+  #[inline]
+  fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
+    self.as_ref().write_to(writer)
+  }
+
+  #[inline]
+  fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
+    xml_reader: &mut R,
+    start: quick_xml::events::BytesStart<'xml>,
+    empty: bool,
+  ) -> Result<Self, crate::common::SdkError> {
+    T::read_inner(xml_reader, start, empty).map(Box::new)
+  }
+}
+
 #[inline]
 pub(crate) fn sdk_type_to_bytes<T: SdkType>(value: &T) -> Result<Vec<u8>, std::io::Error> {
   let mut writer = Vec::with_capacity(32);

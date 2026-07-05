@@ -2812,92 +2812,92 @@ pub struct DiagramDefinitionExtensionList {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FillColorListChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum LineColorListChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum EffectColorListChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextLineColorListChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextFillColorListChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextEffectColorListChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ForEachChoice {
@@ -2908,9 +2908,9 @@ pub enum ForEachChoice {
   /// Presentation Of.
   PresentationOf(std::boxed::Box<PresentationOf>),
   /// Constraint List.
-  Constraints(std::boxed::Box<Constraints>),
+  Constraints(Constraints),
   /// Rule List.
-  RuleList(std::boxed::Box<RuleList>),
+  RuleList(RuleList),
   /// For Each.
   ForEach(std::boxed::Box<ForEach>),
   /// Layout Node.
@@ -2918,7 +2918,7 @@ pub enum ForEachChoice {
   /// Choose Element.
   Choose(std::boxed::Box<Choose>),
   /// Defines the ExtensionList Class.
-  ExtensionList(std::boxed::Box<ExtensionList>),
+  ExtensionList(ExtensionList),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum LayoutNodeChoice {
@@ -2929,9 +2929,9 @@ pub enum LayoutNodeChoice {
   /// Presentation Of.
   PresentationOf(std::boxed::Box<PresentationOf>),
   /// Constraint List.
-  Constraints(std::boxed::Box<Constraints>),
+  Constraints(Constraints),
   /// Rule List.
-  RuleList(std::boxed::Box<RuleList>),
+  RuleList(RuleList),
   /// Variable List.
   VariableList(std::boxed::Box<VariableList>),
   /// For Each.
@@ -2941,7 +2941,7 @@ pub enum LayoutNodeChoice {
   /// Choose Element.
   Choose(std::boxed::Box<Choose>),
   /// Defines the ExtensionList Class.
-  ExtensionList(std::boxed::Box<ExtensionList>),
+  ExtensionList(ExtensionList),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DiagramChooseIfChoice {
@@ -2952,9 +2952,9 @@ pub enum DiagramChooseIfChoice {
   /// Presentation Of.
   PresentationOf(std::boxed::Box<PresentationOf>),
   /// Constraint List.
-  Constraints(std::boxed::Box<Constraints>),
+  Constraints(Constraints),
   /// Rule List.
-  RuleList(std::boxed::Box<RuleList>),
+  RuleList(RuleList),
   /// For Each.
   ForEach(std::boxed::Box<ForEach>),
   /// Layout Node.
@@ -2962,7 +2962,7 @@ pub enum DiagramChooseIfChoice {
   /// Choose Element.
   Choose(std::boxed::Box<Choose>),
   /// Defines the ExtensionList Class.
-  ExtensionList(std::boxed::Box<ExtensionList>),
+  ExtensionList(ExtensionList),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum DiagramChooseElseChoice {
@@ -2973,9 +2973,9 @@ pub enum DiagramChooseElseChoice {
   /// Presentation Of.
   PresentationOf(std::boxed::Box<PresentationOf>),
   /// Constraint List.
-  Constraints(std::boxed::Box<Constraints>),
+  Constraints(Constraints),
   /// Rule List.
-  RuleList(std::boxed::Box<RuleList>),
+  RuleList(RuleList),
   /// For Each.
   ForEach(std::boxed::Box<ForEach>),
   /// Layout Node.
@@ -2983,14 +2983,14 @@ pub enum DiagramChooseElseChoice {
   /// Choose Element.
   Choose(std::boxed::Box<Choose>),
   /// Defines the ExtensionList Class.
-  ExtensionList(std::boxed::Box<ExtensionList>),
+  ExtensionList(ExtensionList),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextPropertiesChoice {
   /// Apply 3D shape properties.
   Shape3DType(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
-  FlatText(std::boxed::Box<crate::schemas::a::FlatText>),
+  FlatText(crate::schemas::a::FlatText),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PointListChoice {
@@ -3002,7 +3002,7 @@ pub enum PointListChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -3036,7 +3036,7 @@ pub enum ShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -3058,7 +3058,7 @@ pub enum ShapePropertiesChoice3 {
 #[derive(Clone, Debug, PartialEq)]
 pub enum DiagramDefinitionExtensionChoice {
   /// Defines the NumberDiagramInfoList Class.
-  NumberDiagramInfoList(std::boxed::Box<crate::schemas::dgm1611::NumberDiagramInfoList>),
+  NumberDiagramInfoList(crate::schemas::dgm1611::NumberDiagramInfoList),
   /// Defines the TextListStyleType Class.
   TextListStyleType(std::boxed::Box<crate::schemas::dgm1612::TextListStyleType>),
   XmlAny(std::boxed::Box<[u8]>),

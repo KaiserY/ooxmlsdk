@@ -81,7 +81,7 @@ pub struct SharedComPicture {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ActiveXObjectPropertyChoice {
   /// Defines the SharedComFont Class.
-  SharedComFont(std::boxed::Box<SharedComFont>),
+  SharedComFont(SharedComFont),
   /// Defines the SharedComPicture Class.
-  SharedComPicture(std::boxed::Box<SharedComPicture>),
+  SharedComPicture(SharedComPicture),
 }

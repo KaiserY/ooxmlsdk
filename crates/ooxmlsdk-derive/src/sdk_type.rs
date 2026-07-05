@@ -1113,7 +1113,7 @@ fn build_choice_validate_tokens(
           build_choice_payload_validate_tokens(quote! { value }, ty)
         } else {
           quote! {
-            crate::validator::SdkValidator::validate_into(value.as_ref(), context);
+            crate::validator::SdkValidator::validate_into(value, context);
           }
         };
         arms.push(quote! {
@@ -1126,7 +1126,7 @@ fn build_choice_validate_tokens(
         let _ = children;
         arms.push(quote! {
           #choice_ty::#variant(value) => {
-            crate::validator::SdkValidator::validate_into(value.as_ref(), context);
+            crate::validator::SdkValidator::validate_into(value, context);
           }
         });
       }
@@ -1174,6 +1174,12 @@ fn build_choice_validate_tokens(
 pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
+  let as_ref_self_impl_tokens = as_ref_self_impl_tokens(
+    quote! { #impl_generics },
+    ident,
+    quote! { #type_generics },
+    quote! { #where_clause },
+  );
   let Data::Struct(data_struct) = &input.data else {
     return Err(syn::Error::new_spanned(
       input,
@@ -1198,12 +1204,29 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
       ))
     }
     _ => Ok(quote! {
+      #as_ref_self_impl_tokens
       impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {}
       #[cfg(feature = "mce")]
       impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {}
       #[cfg(feature = "validators")]
       impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {}
     }),
+  }
+}
+
+fn as_ref_self_impl_tokens(
+  impl_generics: proc_macro2::TokenStream,
+  ident: &Ident,
+  type_generics: proc_macro2::TokenStream,
+  where_clause: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  quote! {
+    impl #impl_generics std::convert::AsRef<#ident #type_generics> for #ident #type_generics #where_clause {
+      #[inline]
+      fn as_ref(&self) -> &#ident #type_generics {
+        self
+      }
+    }
   }
 }
 
@@ -1344,15 +1367,21 @@ fn choice_item_parse_bodies<'a>(
       } else {
         sdk_type_read_inner_value_tokens(ty.as_ref(), quote! { xml_reader })
       };
+      let choice_value_tokens = if wml_table_kind == Some(WmlTableStackKind::Cell)
+        && field_ident == "table_cell_choice"
+        && variant == "Table"
+        && qname == "w:tbl"
+      {
+        quote! { std::boxed::Box::new(#read_child_tokens) }
+      } else {
+        read_child_tokens
+      };
+      let borrowed_choice_value = choice_value_tokens.clone();
       let borrowed_choice = quote! {
-        #choice_ty::#variant(std::boxed::Box::new(
-          #read_child_tokens
-        ))
+        #choice_ty::#variant(#borrowed_choice_value)
       };
       let io_choice = quote! {
-        #choice_ty::#variant(std::boxed::Box::new(
-          #read_child_tokens
-        ))
+        #choice_ty::#variant(#choice_value_tokens)
       };
       let borrowed_assign_tokens = if repeated {
         quote! { #field_ident.push(#borrowed_choice); }
@@ -1530,8 +1559,16 @@ fn expand_tuple_wrapper(
     quote! { #type_generics },
     quote! { #where_clause },
   );
+  let as_ref_self_impl_tokens = as_ref_self_impl_tokens(
+    quote! { #impl_generics },
+    ident,
+    quote! { #type_generics },
+    quote! { #where_clause },
+  );
 
   Ok(quote! {
+    #as_ref_self_impl_tokens
+
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
       fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
         xml_reader: &mut R,
@@ -1684,9 +1721,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
           sdk_type_read_inner_value_tokens(ty.as_ref(), quote! { &mut child_reader });
         parse_replacement_arms.push(quote! {
           #( #targets )|* => {
-            Some(#choice_ty::#variant(std::boxed::Box::new(
-              #read_child_tokens
-            )))
+            Some(#choice_ty::#variant(#read_child_tokens))
           }
         });
       }
@@ -3546,9 +3581,16 @@ fn expand_helper_struct(
     #( #ordered_write_tokens )*
     Ok(false)
   });
+  let as_ref_self_impl_tokens = as_ref_self_impl_tokens(
+    quote! { #impl_generics },
+    ident,
+    quote! { #type_generics },
+    quote! { #where_clause },
+  );
 
   Ok(quote! {
     #( #mce_choice_impl_tokens )*
+    #as_ref_self_impl_tokens
 
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
       fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
@@ -6050,8 +6092,7 @@ fn expand_named_struct(
         } else {
           let read_child_tokens =
             sdk_type_read_inner_value_tokens(ty.as_ref(), quote! { xml_reader });
-          let choice_assign_tokens =
-            choice_assign_tokens(quote! { std::boxed::Box::new(#read_child_tokens) });
+          let choice_assign_tokens = choice_assign_tokens(quote! { #read_child_tokens });
           quote! {
             #choice_assign_tokens
             #terminal
@@ -6189,17 +6230,19 @@ fn expand_named_struct(
               "WML table stack read supports only child choice items",
             ));
           };
-          let choice_assign_tokens = if field.repeated {
-            quote! {
-              self.#field_ident.push(#choice_ty::#variant(std::boxed::Box::new(parsed_child)));
-            }
-          } else if field.optional {
-            quote! {
-              self.#field_ident = Some(#choice_ty::#variant(std::boxed::Box::new(parsed_child)));
-            }
-          } else {
-            quote! {
-              self.#field_ident = #choice_ty::#variant(std::boxed::Box::new(parsed_child));
+          let choice_assign_tokens = |parsed_child_expr: proc_macro2::TokenStream| {
+            if field.repeated {
+              quote! {
+                self.#field_ident.push(#choice_ty::#variant(#parsed_child_expr));
+              }
+            } else if field.optional {
+              quote! {
+                self.#field_ident = Some(#choice_ty::#variant(#parsed_child_expr));
+              }
+            } else {
+              quote! {
+                self.#field_ident = #choice_ty::#variant(#parsed_child_expr);
+              }
             }
           };
           let recursive_frame_tokens =
@@ -6226,6 +6269,8 @@ fn expand_named_struct(
               None
             };
           let tokens = if let Some((child_ty, frame_tokens)) = recursive_frame_tokens {
+            let choice_assign_tokens =
+              choice_assign_tokens(quote! { std::boxed::Box::new(parsed_child) });
             quote! {
                 let mut parsed_child = #child_ty::default();
                 if parsed_child.__ooxmlsdk_read_inner_stack_start(xml_reader, e, next_empty)? {
@@ -6237,6 +6282,7 @@ fn expand_named_struct(
           } else {
             let read_child_tokens =
               sdk_type_read_inner_value_tokens(ty.as_ref(), quote! { xml_reader });
+            let choice_assign_tokens = choice_assign_tokens(quote! { parsed_child });
             quote! {
               let parsed_child = #read_child_tokens;
               #choice_assign_tokens
@@ -6884,6 +6930,12 @@ fn expand_named_struct(
     #xml_other_attrs_write_tokens
     #body_write_tokens
   });
+  let as_ref_self_impl_tokens = as_ref_self_impl_tokens(
+    quote! { #impl_generics },
+    ident,
+    quote! { #type_generics },
+    quote! { #where_clause },
+  );
   let write_inner_no_prefix_method_tokens = if no_prefix {
     let write_inner_no_prefix_body = write_inner_body_tokens(quote! {
       #special_namespace_write_tokens
@@ -6907,6 +6959,7 @@ fn expand_named_struct(
     #stack_frame_enum_tokens
     #stack_read_inner_method_tokens
     #stack_write_inner_method_tokens
+    #as_ref_self_impl_tokens
 
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
       fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(

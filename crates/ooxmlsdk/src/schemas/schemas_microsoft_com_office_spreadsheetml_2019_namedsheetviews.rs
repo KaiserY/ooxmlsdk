@@ -243,23 +243,23 @@ pub struct RichSortCondition {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FilterColumnChoice {
   /// Filter Criteria.
-  Filters(std::boxed::Box<crate::schemas::x::Filters>),
+  Filters(crate::schemas::x::Filters),
   /// Top 10.
-  Top10(std::boxed::Box<crate::schemas::x::Top10>),
+  Top10(crate::schemas::x::Top10),
   /// Defines the CustomFilters Class.
-  X14CustomFilters(std::boxed::Box<crate::schemas::x14::CustomFilters>),
+  X14CustomFilters(crate::schemas::x14::CustomFilters),
   /// Custom Filters.
-  XCustomFilters(std::boxed::Box<crate::schemas::x::CustomFilters>),
+  XCustomFilters(crate::schemas::x::CustomFilters),
   /// Dynamic Filter.
-  DynamicFilter(std::boxed::Box<crate::schemas::x::DynamicFilter>),
+  DynamicFilter(crate::schemas::x::DynamicFilter),
   /// Color Filter Criteria.
-  ColorFilter(std::boxed::Box<crate::schemas::x::ColorFilter>),
+  ColorFilter(crate::schemas::x::ColorFilter),
   /// Defines the IconFilter Class.
-  X14IconFilter(std::boxed::Box<crate::schemas::x14::IconFilter>),
+  X14IconFilter(crate::schemas::x14::IconFilter),
   /// Icon Filter.
-  XIconFilter(std::boxed::Box<crate::schemas::x::IconFilter>),
+  XIconFilter(crate::schemas::x::IconFilter),
   /// Defines the ExtensionList Class.
-  ExtensionList(std::boxed::Box<crate::schemas::x::ExtensionList>),
+  ExtensionList(crate::schemas::x::ExtensionList),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SortRuleChoice {

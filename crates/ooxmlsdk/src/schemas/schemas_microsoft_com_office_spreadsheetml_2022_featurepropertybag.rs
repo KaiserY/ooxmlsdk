@@ -346,19 +346,19 @@ pub type Xsddouble = crate::simple_type::DoubleValue;
 #[derive(Clone, Debug, PartialEq)]
 pub enum FeaturePropertyBagChoice {
   /// Defines the ArrayFeatureProperty Class.
-  ArrayFeatureProperty(std::boxed::Box<ArrayFeatureProperty>),
+  ArrayFeatureProperty(ArrayFeatureProperty),
   /// Defines the BagFeatureProperty Class.
-  BagFeatureProperty(std::boxed::Box<BagFeatureProperty>),
+  BagFeatureProperty(BagFeatureProperty),
   /// Defines the IntFeatureProperty Class.
-  IntFeatureProperty(std::boxed::Box<IntFeatureProperty>),
+  IntFeatureProperty(IntFeatureProperty),
   /// Defines the StringFeatureProperty Class.
-  StringFeatureProperty(std::boxed::Box<StringFeatureProperty>),
+  StringFeatureProperty(StringFeatureProperty),
   /// Defines the BoolFeatureProperty Class.
-  BoolFeatureProperty(std::boxed::Box<BoolFeatureProperty>),
+  BoolFeatureProperty(BoolFeatureProperty),
   /// Defines the DecimalFeatureProperty Class.
-  DecimalFeatureProperty(std::boxed::Box<DecimalFeatureProperty>),
+  DecimalFeatureProperty(DecimalFeatureProperty),
   /// Defines the RelFeatureProperty Class.
-  RelFeatureProperty(std::boxed::Box<RelFeatureProperty>),
+  RelFeatureProperty(RelFeatureProperty),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ArrayFeaturePropertyChoice {

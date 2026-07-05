@@ -4826,7 +4826,7 @@ pub enum ColorMapOverrideChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundPropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -4846,17 +4846,17 @@ pub enum BackgroundPropertiesChoice2 {
 #[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundStyleReferenceChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum OleObjectChoice {
@@ -4870,94 +4870,94 @@ pub enum TargetElementChoice {
   /// Slide Target.
   SlideTarget,
   /// Sound Target.
-  SoundTarget(std::boxed::Box<SoundTarget>),
+  SoundTarget(SoundTarget),
   /// Shape Target.
   ShapeTarget(std::boxed::Box<ShapeTarget>),
   /// Ink Target.
-  InkTarget(std::boxed::Box<InkTarget>),
+  InkTarget(InkTarget),
   /// Defines the BookmarkTarget Class.
-  BookmarkTarget(std::boxed::Box<crate::schemas::p14::BookmarkTarget>),
+  BookmarkTarget(crate::schemas::p14::BookmarkTarget),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ConditionChoice {
   /// Target Element Trigger Choice.
   TargetElement(std::boxed::Box<TargetElement>),
   /// Time Node.
-  TimeNode(std::boxed::Box<TimeNode>),
+  TimeNode(TimeNode),
   /// Runtime Node Trigger Choice.
-  RuntimeNodeTrigger(std::boxed::Box<RuntimeNodeTrigger>),
+  RuntimeNodeTrigger(RuntimeNodeTrigger),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum EndSyncChoice {
   /// Target Element Trigger Choice.
   TargetElement(std::boxed::Box<TargetElement>),
   /// Time Node.
-  TimeNode(std::boxed::Box<TimeNode>),
+  TimeNode(TimeNode),
   /// Runtime Node Trigger Choice.
-  RuntimeNodeTrigger(std::boxed::Box<RuntimeNodeTrigger>),
+  RuntimeNodeTrigger(RuntimeNodeTrigger),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColorValueChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PenColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ToVariantValueChoice {
   /// Boolean Variant.
-  BooleanVariantValue(std::boxed::Box<BooleanVariantValue>),
+  BooleanVariantValue(BooleanVariantValue),
   /// Integer.
-  IntegerVariantValue(std::boxed::Box<IntegerVariantValue>),
+  IntegerVariantValue(IntegerVariantValue),
   /// Float Value.
-  FloatVariantValue(std::boxed::Box<FloatVariantValue>),
+  FloatVariantValue(FloatVariantValue),
   /// String Value.
-  StringVariantValue(std::boxed::Box<StringVariantValue>),
+  StringVariantValue(StringVariantValue),
   /// Color Value.
   ColorValue(std::boxed::Box<ColorValue>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum VariantValueChoice {
   /// Boolean Variant.
-  BooleanVariantValue(std::boxed::Box<BooleanVariantValue>),
+  BooleanVariantValue(BooleanVariantValue),
   /// Integer.
-  IntegerVariantValue(std::boxed::Box<IntegerVariantValue>),
+  IntegerVariantValue(IntegerVariantValue),
   /// Float Value.
-  FloatVariantValue(std::boxed::Box<FloatVariantValue>),
+  FloatVariantValue(FloatVariantValue),
   /// String Value.
-  StringVariantValue(std::boxed::Box<StringVariantValue>),
+  StringVariantValue(StringVariantValue),
   /// Color Value.
   ColorValue(std::boxed::Box<ColorValue>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BuildSubElementChoice {
   /// Build Diagram.
-  BuildDiagram(std::boxed::Box<crate::schemas::a::BuildDiagram>),
+  BuildDiagram(crate::schemas::a::BuildDiagram),
   /// Build Chart.
-  BuildChart(std::boxed::Box<crate::schemas::a::BuildChart>),
+  BuildChart(crate::schemas::a::BuildChart),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BuildGraphicsChoice {
@@ -4971,53 +4971,53 @@ pub enum BuildListChoice {
   /// Build Paragraph.
   BuildParagraph(std::boxed::Box<BuildParagraph>),
   /// Build Diagram.
-  BuildDiagram(std::boxed::Box<BuildDiagram>),
+  BuildDiagram(BuildDiagram),
   /// Build OLE Chart.
-  BuildOleChart(std::boxed::Box<BuildOleChart>),
+  BuildOleChart(BuildOleChart),
   /// Build Graphics.
   BuildGraphics(std::boxed::Box<BuildGraphics>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ByColorChoice {
   /// RGB.
-  RgbColor(std::boxed::Box<RgbColor>),
+  RgbColor(RgbColor),
   /// HSL.
-  HslColor(std::boxed::Box<HslColor>),
+  HslColor(HslColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FromColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ToColorChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ApplicationNonVisualDrawingPropertiesChoice {
   AudioFromCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
-  WaveAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
+  WaveAudioFile(crate::schemas::a::WaveAudioFile),
   AudioFromFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
   VideoFromFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
   QuickTimeFromFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
@@ -5032,7 +5032,7 @@ pub enum ShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -5059,95 +5059,95 @@ pub enum BlipFillChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum SlideExtensionChoice {
   /// Defines the LaserTraceList Class.
-  LaserTraceList(std::boxed::Box<crate::schemas::p14::LaserTraceList>),
+  LaserTraceList(crate::schemas::p14::LaserTraceList),
   /// Defines the ShowEventRecordList Class.
-  ShowEventRecordList(std::boxed::Box<crate::schemas::p14::ShowEventRecordList>),
+  ShowEventRecordList(crate::schemas::p14::ShowEventRecordList),
   /// Defines the CommentRelationship Class.
-  CommentRelationship(std::boxed::Box<crate::schemas::p188::CommentRelationship>),
+  CommentRelationship(crate::schemas::p188::CommentRelationship),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommonSlideDataExtensionChoice {
   /// Defines the CreationId Class.
-  CreationId(std::boxed::Box<crate::schemas::p14::CreationId>),
+  CreationId(crate::schemas::p14::CreationId),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShowPropertiesExtensionChoice {
   /// Defines the BrowseMode Class.
-  BrowseMode(std::boxed::Box<crate::schemas::p14::BrowseMode>),
+  BrowseMode(crate::schemas::p14::BrowseMode),
   /// Defines the LaserColor Class.
   LaserColor(std::boxed::Box<crate::schemas::p14::LaserColor>),
   /// Defines the ShowMediaControls Class.
-  ShowMediaControls(std::boxed::Box<crate::schemas::p14::ShowMediaControls>),
+  ShowMediaControls(crate::schemas::p14::ShowMediaControls),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TransitionChoice {
   /// Defines the BlindsTransition Class.
-  BlindsTransition(std::boxed::Box<BlindsTransition>),
+  BlindsTransition(BlindsTransition),
   /// Defines the CheckerTransition Class.
-  CheckerTransition(std::boxed::Box<CheckerTransition>),
+  CheckerTransition(CheckerTransition),
   /// Defines the CircleTransition Class.
   CircleTransition,
   /// Defines the DissolveTransition Class.
   DissolveTransition,
   /// Defines the CombTransition Class.
-  CombTransition(std::boxed::Box<CombTransition>),
+  CombTransition(CombTransition),
   /// Defines the CoverTransition Class.
-  CoverTransition(std::boxed::Box<CoverTransition>),
+  CoverTransition(CoverTransition),
   /// Defines the CutTransition Class.
-  CutTransition(std::boxed::Box<CutTransition>),
+  CutTransition(CutTransition),
   /// Defines the DiamondTransition Class.
   DiamondTransition,
   /// Defines the FadeTransition Class.
-  FadeTransition(std::boxed::Box<FadeTransition>),
+  FadeTransition(FadeTransition),
   /// Defines the NewsflashTransition Class.
   NewsflashTransition,
   /// Defines the PlusTransition Class.
   PlusTransition,
   /// Defines the PullTransition Class.
-  PullTransition(std::boxed::Box<PullTransition>),
+  PullTransition(PullTransition),
   /// Defines the PushTransition Class.
-  PushTransition(std::boxed::Box<PushTransition>),
+  PushTransition(PushTransition),
   /// Defines the RandomTransition Class.
   RandomTransition,
   /// Defines the RandomBarTransition Class.
-  RandomBarTransition(std::boxed::Box<RandomBarTransition>),
+  RandomBarTransition(RandomBarTransition),
   /// Defines the SplitTransition Class.
-  SplitTransition(std::boxed::Box<SplitTransition>),
+  SplitTransition(SplitTransition),
   /// Defines the StripsTransition Class.
-  StripsTransition(std::boxed::Box<StripsTransition>),
+  StripsTransition(StripsTransition),
   /// Defines the WedgeTransition Class.
   WedgeTransition,
   /// Defines the WheelTransition Class.
-  WheelTransition(std::boxed::Box<WheelTransition>),
+  WheelTransition(WheelTransition),
   /// Defines the WipeTransition Class.
-  WipeTransition(std::boxed::Box<WipeTransition>),
+  WipeTransition(WipeTransition),
   /// Defines the ZoomTransition Class.
-  ZoomTransition(std::boxed::Box<ZoomTransition>),
+  ZoomTransition(ZoomTransition),
   /// Defines the FlashTransition Class.
   FlashTransition,
-  VortexTransition(std::boxed::Box<crate::schemas::p14::VortexTransition>),
-  SwitchTransition(std::boxed::Box<crate::schemas::p14::SwitchTransition>),
-  FlipTransition(std::boxed::Box<crate::schemas::p14::FlipTransition>),
-  RippleTransition(std::boxed::Box<crate::schemas::p14::RippleTransition>),
-  GlitterTransition(std::boxed::Box<crate::schemas::p14::GlitterTransition>),
+  VortexTransition(crate::schemas::p14::VortexTransition),
+  SwitchTransition(crate::schemas::p14::SwitchTransition),
+  FlipTransition(crate::schemas::p14::FlipTransition),
+  RippleTransition(crate::schemas::p14::RippleTransition),
+  GlitterTransition(crate::schemas::p14::GlitterTransition),
   /// Defines the HoneycombTransition Class.
   HoneycombTransition,
-  PrismTransition(std::boxed::Box<crate::schemas::p14::PrismTransition>),
-  DoorsTransition(std::boxed::Box<crate::schemas::p14::DoorsTransition>),
-  WindowTransition(std::boxed::Box<crate::schemas::p14::WindowTransition>),
-  ShredTransition(std::boxed::Box<crate::schemas::p14::ShredTransition>),
-  FerrisTransition(std::boxed::Box<crate::schemas::p14::FerrisTransition>),
-  FlythroughTransition(std::boxed::Box<crate::schemas::p14::FlythroughTransition>),
-  WarpTransition(std::boxed::Box<crate::schemas::p14::WarpTransition>),
-  GalleryTransition(std::boxed::Box<crate::schemas::p14::GalleryTransition>),
-  ConveyorTransition(std::boxed::Box<crate::schemas::p14::ConveyorTransition>),
-  PanTransition(std::boxed::Box<crate::schemas::p14::PanTransition>),
-  RevealTransition(std::boxed::Box<crate::schemas::p14::RevealTransition>),
-  WheelReverseTransition(std::boxed::Box<crate::schemas::p14::WheelReverseTransition>),
-  PresetTransition(std::boxed::Box<crate::schemas::p15::PresetTransition>),
+  PrismTransition(crate::schemas::p14::PrismTransition),
+  DoorsTransition(crate::schemas::p14::DoorsTransition),
+  WindowTransition(crate::schemas::p14::WindowTransition),
+  ShredTransition(crate::schemas::p14::ShredTransition),
+  FerrisTransition(crate::schemas::p14::FerrisTransition),
+  FlythroughTransition(crate::schemas::p14::FlythroughTransition),
+  WarpTransition(crate::schemas::p14::WarpTransition),
+  GalleryTransition(crate::schemas::p14::GalleryTransition),
+  ConveyorTransition(crate::schemas::p14::ConveyorTransition),
+  PanTransition(crate::schemas::p14::PanTransition),
+  RevealTransition(crate::schemas::p14::RevealTransition),
+  WheelReverseTransition(crate::schemas::p14::WheelReverseTransition),
+  PresetTransition(crate::schemas::p15::PresetTransition),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundChoice {
@@ -5200,7 +5200,7 @@ pub enum ControlListChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -5224,9 +5224,9 @@ pub enum ShapeTargetChoice {
   /// Background.
   BackgroundAnimation,
   /// Subshape.
-  SubShape(std::boxed::Box<SubShape>),
+  SubShape(SubShape),
   /// OLE Chart Element.
-  OleChartElement(std::boxed::Box<OleChartElement>),
+  OleChartElement(OleChartElement),
   /// Text Element.
   TextElement(std::boxed::Box<TextElement>),
   /// Graphic Element.
@@ -5235,7 +5235,7 @@ pub enum ShapeTargetChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommentAuthorExtensionChoice {
   /// Defines the PresenceInfo Class.
-  PresenceInfo(std::boxed::Box<crate::schemas::p15::PresenceInfo>),
+  PresenceInfo(crate::schemas::p15::PresenceInfo),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -5273,15 +5273,15 @@ pub enum ApplicationNonVisualDrawingPropertiesExtensionChoice {
   /// Defines the Media Class.
   Media(std::boxed::Box<crate::schemas::p14::Media>),
   /// Defines the ModificationId Class.
-  ModificationId(std::boxed::Box<crate::schemas::p14::ModificationId>),
+  ModificationId(crate::schemas::p14::ModificationId),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum IterateChoice {
   /// Time Absolute.
-  TimeAbsolute(std::boxed::Box<TimeAbsolute>),
+  TimeAbsolute(TimeAbsolute),
   /// Time Percentage.
-  TimePercentage(std::boxed::Box<TimePercentage>),
+  TimePercentage(TimePercentage),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ChildTimeNodeListChoice {
@@ -5344,9 +5344,9 @@ pub enum SubTimeNodeListChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum PresentationExtensionChoice {
   /// Defines the SectionProperties Class.
-  SectionProperties(std::boxed::Box<crate::schemas::p14::SectionProperties>),
+  SectionProperties(crate::schemas::p14::SectionProperties),
   /// Defines the SectionList Class.
-  SectionList(std::boxed::Box<crate::schemas::p14::SectionList>),
+  SectionList(crate::schemas::p14::SectionList),
   /// Defines the SlideGuideList Class.
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   /// Defines the NotesGuideList Class.
@@ -5358,68 +5358,68 @@ pub enum HtmlPublishPropertiesChoice {
   /// All Slides.
   SlideAll,
   /// Slide Range.
-  SlideRange(std::boxed::Box<SlideRange>),
+  SlideRange(SlideRange),
   /// Custom Show.
-  CustomShowReference(std::boxed::Box<CustomShowReference>),
+  CustomShowReference(CustomShowReference),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShowPropertiesChoice {
   /// Presenter Slide Show Mode.
   PresenterSlideMode,
   /// Browse Slide Show Mode.
-  BrowseSlideMode(std::boxed::Box<BrowseSlideMode>),
+  BrowseSlideMode(BrowseSlideMode),
   /// Kiosk Slide Show Mode.
-  KioskSlideMode(std::boxed::Box<KioskSlideMode>),
+  KioskSlideMode(KioskSlideMode),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShowPropertiesChoice2 {
   /// All Slides.
   SlideAll,
   /// Slide Range.
-  SlideRange(std::boxed::Box<SlideRange>),
+  SlideRange(SlideRange),
   /// Custom Show.
-  CustomShowReference(std::boxed::Box<CustomShowReference>),
+  CustomShowReference(CustomShowReference),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColorMostRecentlyUsedChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PresentationPropertiesExtensionChoice {
   /// Defines the DiscardImageEditData Class.
-  DiscardImageEditData(std::boxed::Box<crate::schemas::p14::DiscardImageEditData>),
+  DiscardImageEditData(crate::schemas::p14::DiscardImageEditData),
   /// Defines the DefaultImageDpi Class.
-  DefaultImageDpi(std::boxed::Box<crate::schemas::p14::DefaultImageDpi>),
+  DefaultImageDpi(crate::schemas::p14::DefaultImageDpi),
   /// Defines the TextMath Class.
-  TextMath(std::boxed::Box<crate::schemas::a14::TextMath>),
+  TextMath(crate::schemas::a14::TextMath),
   /// Defines the ChartTrackingReferenceBased Class.
-  ChartTrackingReferenceBased(std::boxed::Box<crate::schemas::p15::ChartTrackingReferenceBased>),
+  ChartTrackingReferenceBased(crate::schemas::p15::ChartTrackingReferenceBased),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextElementChoice {
   /// Character Range.
-  CharRange(std::boxed::Box<CharRange>),
+  CharRange(CharRange),
   /// Paragraph Text Range.
-  ParagraphIndexRange(std::boxed::Box<ParagraphIndexRange>),
+  ParagraphIndexRange(ParagraphIndexRange),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum GraphicElementChoice {
   /// Diagram to Animate.
-  Diagram(std::boxed::Box<crate::schemas::a::Diagram>),
+  Diagram(crate::schemas::a::Diagram),
   /// Chart to Animate.
-  Chart(std::boxed::Box<crate::schemas::a::Chart>),
+  Chart(crate::schemas::a::Chart),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SoundActionChoice {

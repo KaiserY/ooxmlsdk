@@ -1213,7 +1213,7 @@ pub struct PivotRow {
 #[derive(Clone, Debug, PartialEq)]
 pub enum OleDbPrpopertiesChoice {
   /// Defines the DbTables Class.
-  DbTables(std::boxed::Box<DbTables>),
+  DbTables(DbTables),
   /// Defines the DbCommand Class.
-  DbCommand(std::boxed::Box<DbCommand>),
+  DbCommand(DbCommand),
 }

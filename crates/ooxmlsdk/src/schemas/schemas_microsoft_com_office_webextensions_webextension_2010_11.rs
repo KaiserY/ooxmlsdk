@@ -165,24 +165,24 @@ pub struct Snapshot {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SnapshotChoice {
-  AlphaBiLevel(std::boxed::Box<crate::schemas::a::AlphaBiLevel>),
+  AlphaBiLevel(crate::schemas::a::AlphaBiLevel),
   /// Alpha Ceiling Effect.
   AlphaCeiling,
   /// Alpha Floor Effect.
   AlphaFloor,
   AlphaInverse(std::boxed::Box<crate::schemas::a::AlphaInverse>),
   AlphaModulationEffect(std::boxed::Box<crate::schemas::a::AlphaModulationEffect>),
-  AlphaModulationFixed(std::boxed::Box<crate::schemas::a::AlphaModulationFixed>),
-  AlphaReplace(std::boxed::Box<crate::schemas::a::AlphaReplace>),
-  BiLevel(std::boxed::Box<crate::schemas::a::BiLevel>),
-  Blur(std::boxed::Box<crate::schemas::a::Blur>),
+  AlphaModulationFixed(crate::schemas::a::AlphaModulationFixed),
+  AlphaReplace(crate::schemas::a::AlphaReplace),
+  BiLevel(crate::schemas::a::BiLevel),
+  Blur(crate::schemas::a::Blur),
   ColorChange(std::boxed::Box<crate::schemas::a::ColorChange>),
   ColorReplacement(std::boxed::Box<crate::schemas::a::ColorReplacement>),
-  Duotone(std::boxed::Box<crate::schemas::a::Duotone>),
+  Duotone(crate::schemas::a::Duotone),
   FillOverlay(std::boxed::Box<crate::schemas::a::FillOverlay>),
   /// Gray Scale Effect.
   Grayscale,
-  Hsl(std::boxed::Box<crate::schemas::a::Hsl>),
-  LuminanceEffect(std::boxed::Box<crate::schemas::a::LuminanceEffect>),
-  TintEffect(std::boxed::Box<crate::schemas::a::TintEffect>),
+  Hsl(crate::schemas::a::Hsl),
+  LuminanceEffect(crate::schemas::a::LuminanceEffect),
+  TintEffect(crate::schemas::a::TintEffect),
 }

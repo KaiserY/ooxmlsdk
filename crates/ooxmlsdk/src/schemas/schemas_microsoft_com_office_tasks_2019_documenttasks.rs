@@ -200,19 +200,19 @@ pub struct CommentAnchor {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TaskHistoryEventChoice {
   /// Defines the AssignTaskUser Class.
-  AssignTaskUser(std::boxed::Box<AssignTaskUser>),
+  AssignTaskUser(AssignTaskUser),
   /// Defines the UnassignTaskUser Class.
-  UnassignTaskUser(std::boxed::Box<UnassignTaskUser>),
+  UnassignTaskUser(UnassignTaskUser),
   /// Defines the TaskCreateEventInfo Class.
   TaskCreateEventInfo,
   /// Defines the TaskTitleEventInfo Class.
-  TaskTitleEventInfo(std::boxed::Box<TaskTitleEventInfo>),
+  TaskTitleEventInfo(TaskTitleEventInfo),
   /// Defines the TaskScheduleEventInfo Class.
-  TaskScheduleEventInfo(std::boxed::Box<TaskScheduleEventInfo>),
+  TaskScheduleEventInfo(TaskScheduleEventInfo),
   /// Defines the TaskProgressEventInfo Class.
-  TaskProgressEventInfo(std::boxed::Box<TaskProgressEventInfo>),
+  TaskProgressEventInfo(TaskProgressEventInfo),
   /// Defines the TaskPriorityEventInfo Class.
-  TaskPriorityEventInfo(std::boxed::Box<TaskPriorityEventInfo>),
+  TaskPriorityEventInfo(TaskPriorityEventInfo),
   /// Defines the TaskDeleteEventInfo Class.
   TaskDeleteEventInfo,
   /// Defines the TaskUndeleteEventInfo Class.
@@ -220,5 +220,5 @@ pub enum TaskHistoryEventChoice {
   /// Defines the TaskUnassignAll Class.
   TaskUnassignAll,
   /// Defines the TaskUndo Class.
-  TaskUndo(std::boxed::Box<TaskUndo>),
+  TaskUndo(TaskUndo),
 }

@@ -70,7 +70,7 @@ fn sdt_data_binding(properties: &w::SdtProperties) -> Option<&w::DataBinding> {
     .sdt_properties_choice
     .iter()
     .find_map(|choice| match choice {
-      w::SdtPropertiesChoice::WDataBinding(binding) => Some(binding.as_ref()),
+      w::SdtPropertiesChoice::WDataBinding(binding) => Some(binding),
       _ => None,
     })
 }

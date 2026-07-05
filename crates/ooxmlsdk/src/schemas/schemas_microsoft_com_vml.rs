@@ -2773,7 +2773,7 @@ pub struct VmlTextWrap {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextBoxChoice {
   /// Rich Text Box Content Container.
-  TextBoxContent(std::boxed::Box<crate::schemas::w::TextBoxContent>),
+  TextBoxContent(crate::schemas::w::TextBoxContent),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -2781,9 +2781,9 @@ pub enum ShapeChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
   /// Defines the Formulas Class.
-  Formulas(std::boxed::Box<Formulas>),
+  Formulas(Formulas),
   /// Defines the ShapeHandles Class.
-  ShapeHandles(std::boxed::Box<ShapeHandles>),
+  ShapeHandles(ShapeHandles),
   /// Defines the Fill Class.
   Fill(std::boxed::Box<Fill>),
   /// Defines the Stroke Class.
@@ -2800,31 +2800,31 @@ pub enum ShapeChoice {
   Extrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   Callout(std::boxed::Box<crate::schemas::o::Callout>),
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
+  ClipPath(crate::schemas::o::ClipPath),
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
-  TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
-  BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
-  LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
-  RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
-  TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
-  Ink(std::boxed::Box<crate::schemas::o::Ink>),
+  TopBorder(crate::schemas::w10::TopBorder),
+  BottomBorder(crate::schemas::w10::BottomBorder),
+  LeftBorder(crate::schemas::w10::LeftBorder),
+  RightBorder(crate::schemas::w10::RightBorder),
+  ClientData(crate::schemas::xvml::ClientData),
+  TextData(crate::schemas::pvml::TextData),
+  Ink(crate::schemas::o::Ink),
   /// Ink Annotation Flag.
   InkAnnotationFlag,
   /// VML namespace text wrapping used by LibreOffice fixtures.
-  VmlTextWrap(std::boxed::Box<VmlTextWrap>),
+  VmlTextWrap(VmlTextWrap),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapetypeChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
   /// Defines the Formulas Class.
-  Formulas(std::boxed::Box<Formulas>),
+  Formulas(Formulas),
   /// Defines the ShapeHandles Class.
-  ShapeHandles(std::boxed::Box<ShapeHandles>),
+  ShapeHandles(ShapeHandles),
   /// Defines the Fill Class.
   Fill(std::boxed::Box<Fill>),
   /// Defines the Stroke Class.
@@ -2841,17 +2841,17 @@ pub enum ShapetypeChoice {
   Extrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   Callout(std::boxed::Box<crate::schemas::o::Callout>),
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
+  ClipPath(crate::schemas::o::ClipPath),
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
-  TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
-  BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
-  LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
-  RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
-  TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
+  TopBorder(crate::schemas::w10::TopBorder),
+  BottomBorder(crate::schemas::w10::BottomBorder),
+  LeftBorder(crate::schemas::w10::LeftBorder),
+  RightBorder(crate::schemas::w10::RightBorder),
+  ClientData(crate::schemas::xvml::ClientData),
+  TextData(crate::schemas::pvml::TextData),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum GroupChoice {
@@ -2882,22 +2882,22 @@ pub enum GroupChoice {
   /// Defines the Lock Class.
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
   /// Shape Clipping Path.
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
+  ClipPath(crate::schemas::o::ClipPath),
   /// Text Wrapping.
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
   /// Attached Object Data.
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
+  ClientData(crate::schemas::xvml::ClientData),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ArcChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
   /// Defines the Formulas Class.
-  Formulas(std::boxed::Box<Formulas>),
+  Formulas(Formulas),
   /// Defines the ShapeHandles Class.
-  ShapeHandles(std::boxed::Box<ShapeHandles>),
+  ShapeHandles(ShapeHandles),
   /// Defines the Fill Class.
   Fill(std::boxed::Box<Fill>),
   /// Defines the Stroke Class.
@@ -2919,34 +2919,34 @@ pub enum ArcChoice {
   /// Defines the Lock Class.
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
   /// Shape Clipping Path.
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
+  ClipPath(crate::schemas::o::ClipPath),
   /// Digital Signature Line.
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   /// Text Wrapping.
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
   /// Top Border.
-  TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
+  TopBorder(crate::schemas::w10::TopBorder),
   /// Bottom Border.
-  BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
+  BottomBorder(crate::schemas::w10::BottomBorder),
   /// Left Border.
-  LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
+  LeftBorder(crate::schemas::w10::LeftBorder),
   /// Right Border.
-  RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
+  RightBorder(crate::schemas::w10::RightBorder),
   /// Attached Object Data.
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
+  ClientData(crate::schemas::xvml::ClientData),
   /// VML Diagram Text.
-  TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
+  TextData(crate::schemas::pvml::TextData),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CurveChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
   /// Defines the Formulas Class.
-  Formulas(std::boxed::Box<Formulas>),
+  Formulas(Formulas),
   /// Defines the ShapeHandles Class.
-  ShapeHandles(std::boxed::Box<ShapeHandles>),
+  ShapeHandles(ShapeHandles),
   /// Defines the Fill Class.
   Fill(std::boxed::Box<Fill>),
   /// Defines the Stroke Class.
@@ -2968,34 +2968,34 @@ pub enum CurveChoice {
   /// Defines the Lock Class.
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
   /// Shape Clipping Path.
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
+  ClipPath(crate::schemas::o::ClipPath),
   /// Digital Signature Line.
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   /// Text Wrapping.
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
   /// Top Border.
-  TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
+  TopBorder(crate::schemas::w10::TopBorder),
   /// Bottom Border.
-  BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
+  BottomBorder(crate::schemas::w10::BottomBorder),
   /// Left Border.
-  LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
+  LeftBorder(crate::schemas::w10::LeftBorder),
   /// Right Border.
-  RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
+  RightBorder(crate::schemas::w10::RightBorder),
   /// Attached Object Data.
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
+  ClientData(crate::schemas::xvml::ClientData),
   /// VML Diagram Text.
-  TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
+  TextData(crate::schemas::pvml::TextData),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ImageFileChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
   /// Defines the Formulas Class.
-  Formulas(std::boxed::Box<Formulas>),
+  Formulas(Formulas),
   /// Defines the ShapeHandles Class.
-  ShapeHandles(std::boxed::Box<ShapeHandles>),
+  ShapeHandles(ShapeHandles),
   /// Defines the Fill Class.
   Fill(std::boxed::Box<Fill>),
   /// Defines the Stroke Class.
@@ -3017,34 +3017,34 @@ pub enum ImageFileChoice {
   /// Defines the Lock Class.
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
   /// Shape Clipping Path.
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
+  ClipPath(crate::schemas::o::ClipPath),
   /// Digital Signature Line.
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   /// Text Wrapping.
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
   /// Top Border.
-  TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
+  TopBorder(crate::schemas::w10::TopBorder),
   /// Bottom Border.
-  BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
+  BottomBorder(crate::schemas::w10::BottomBorder),
   /// Left Border.
-  LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
+  LeftBorder(crate::schemas::w10::LeftBorder),
   /// Right Border.
-  RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
+  RightBorder(crate::schemas::w10::RightBorder),
   /// Attached Object Data.
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
+  ClientData(crate::schemas::xvml::ClientData),
   /// VML Diagram Text.
-  TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
+  TextData(crate::schemas::pvml::TextData),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum LineChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
   /// Defines the Formulas Class.
-  Formulas(std::boxed::Box<Formulas>),
+  Formulas(Formulas),
   /// Defines the ShapeHandles Class.
-  ShapeHandles(std::boxed::Box<ShapeHandles>),
+  ShapeHandles(ShapeHandles),
   /// Defines the Fill Class.
   Fill(std::boxed::Box<Fill>),
   /// Defines the Stroke Class.
@@ -3066,34 +3066,34 @@ pub enum LineChoice {
   /// Defines the Lock Class.
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
   /// Shape Clipping Path.
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
+  ClipPath(crate::schemas::o::ClipPath),
   /// Digital Signature Line.
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   /// Text Wrapping.
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
   /// Top Border.
-  TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
+  TopBorder(crate::schemas::w10::TopBorder),
   /// Bottom Border.
-  BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
+  BottomBorder(crate::schemas::w10::BottomBorder),
   /// Left Border.
-  LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
+  LeftBorder(crate::schemas::w10::LeftBorder),
   /// Right Border.
-  RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
+  RightBorder(crate::schemas::w10::RightBorder),
   /// Attached Object Data.
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
+  ClientData(crate::schemas::xvml::ClientData),
   /// VML Diagram Text.
-  TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
+  TextData(crate::schemas::pvml::TextData),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum OvalChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
   /// Defines the Formulas Class.
-  Formulas(std::boxed::Box<Formulas>),
+  Formulas(Formulas),
   /// Defines the ShapeHandles Class.
-  ShapeHandles(std::boxed::Box<ShapeHandles>),
+  ShapeHandles(ShapeHandles),
   /// Defines the Fill Class.
   Fill(std::boxed::Box<Fill>),
   /// Defines the Stroke Class.
@@ -3110,26 +3110,26 @@ pub enum OvalChoice {
   Extrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   Callout(std::boxed::Box<crate::schemas::o::Callout>),
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
+  ClipPath(crate::schemas::o::ClipPath),
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
-  TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
-  BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
-  LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
-  RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
-  TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
+  TopBorder(crate::schemas::w10::TopBorder),
+  BottomBorder(crate::schemas::w10::BottomBorder),
+  LeftBorder(crate::schemas::w10::LeftBorder),
+  RightBorder(crate::schemas::w10::RightBorder),
+  ClientData(crate::schemas::xvml::ClientData),
+  TextData(crate::schemas::pvml::TextData),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PolyLineChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
   /// Defines the Formulas Class.
-  Formulas(std::boxed::Box<Formulas>),
+  Formulas(Formulas),
   /// Defines the ShapeHandles Class.
-  ShapeHandles(std::boxed::Box<ShapeHandles>),
+  ShapeHandles(ShapeHandles),
   /// Defines the Fill Class.
   Fill(std::boxed::Box<Fill>),
   /// Defines the Stroke Class.
@@ -3146,27 +3146,27 @@ pub enum PolyLineChoice {
   Extrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   Callout(std::boxed::Box<crate::schemas::o::Callout>),
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
+  ClipPath(crate::schemas::o::ClipPath),
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
-  TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
-  BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
-  LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
-  RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
-  TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
-  Ink(std::boxed::Box<crate::schemas::o::Ink>),
+  TopBorder(crate::schemas::w10::TopBorder),
+  BottomBorder(crate::schemas::w10::BottomBorder),
+  LeftBorder(crate::schemas::w10::LeftBorder),
+  RightBorder(crate::schemas::w10::RightBorder),
+  ClientData(crate::schemas::xvml::ClientData),
+  TextData(crate::schemas::pvml::TextData),
+  Ink(crate::schemas::o::Ink),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum RectangleChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
   /// Defines the Formulas Class.
-  Formulas(std::boxed::Box<Formulas>),
+  Formulas(Formulas),
   /// Defines the ShapeHandles Class.
-  ShapeHandles(std::boxed::Box<ShapeHandles>),
+  ShapeHandles(ShapeHandles),
   /// Defines the Fill Class.
   Fill(std::boxed::Box<Fill>),
   /// Defines the Stroke Class.
@@ -3183,28 +3183,28 @@ pub enum RectangleChoice {
   Extrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   Callout(std::boxed::Box<crate::schemas::o::Callout>),
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
+  ClipPath(crate::schemas::o::ClipPath),
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
-  TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
-  BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
-  LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
-  RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
-  TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
+  TopBorder(crate::schemas::w10::TopBorder),
+  BottomBorder(crate::schemas::w10::BottomBorder),
+  LeftBorder(crate::schemas::w10::LeftBorder),
+  RightBorder(crate::schemas::w10::RightBorder),
+  ClientData(crate::schemas::xvml::ClientData),
+  TextData(crate::schemas::pvml::TextData),
   /// VML namespace text wrapping used by LibreOffice fixtures.
-  VmlTextWrap(std::boxed::Box<VmlTextWrap>),
+  VmlTextWrap(VmlTextWrap),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum RoundRectangleChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
   /// Defines the Formulas Class.
-  Formulas(std::boxed::Box<Formulas>),
+  Formulas(Formulas),
   /// Defines the ShapeHandles Class.
-  ShapeHandles(std::boxed::Box<ShapeHandles>),
+  ShapeHandles(ShapeHandles),
   /// Defines the Fill Class.
   Fill(std::boxed::Box<Fill>),
   /// Defines the Stroke Class.
@@ -3221,15 +3221,15 @@ pub enum RoundRectangleChoice {
   Extrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   Callout(std::boxed::Box<crate::schemas::o::Callout>),
   Lock(std::boxed::Box<crate::schemas::o::Lock>),
-  ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
+  ClipPath(crate::schemas::o::ClipPath),
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
-  TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
+  TextWrap(crate::schemas::w10::TextWrap),
   /// Anchor Location Is Locked.
   AnchorLock,
-  TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
-  BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
-  LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
-  RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
-  ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
-  TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
+  TopBorder(crate::schemas::w10::TopBorder),
+  BottomBorder(crate::schemas::w10::BottomBorder),
+  LeftBorder(crate::schemas::w10::LeftBorder),
+  RightBorder(crate::schemas::w10::RightBorder),
+  ClientData(crate::schemas::xvml::ClientData),
+  TextData(crate::schemas::pvml::TextData),
 }

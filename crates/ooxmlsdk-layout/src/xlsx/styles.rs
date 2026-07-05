@@ -176,7 +176,7 @@ impl StylesCatalog {
             .xml_children
             .iter()
             .filter_map(|child| match child {
-              x::FontsChoice::Font(font) => Some(font.as_ref()),
+              x::FontsChoice::Font(font) => Some(font),
               x::FontsChoice::XmlAny(_) => None,
             })
             .map(|font| FontRecord::from_font_with_colors(font, &indexed_colors))

@@ -418,9 +418,9 @@ pub enum VariantChoice {
   /// Variant.
   Variant(std::boxed::Box<Variant>),
   /// Vector.
-  VtVector(std::boxed::Box<VtVector>),
+  VtVector(VtVector),
   /// Array.
-  VtArray(std::boxed::Box<VtArray>),
+  VtArray(VtArray),
   /// Binary Blob.
   VtBlob(VtBlob),
   /// Binary Blob Object.
@@ -480,11 +480,11 @@ pub enum VariantChoice {
   /// Binary Storage Object.
   VtoStorage(VtoStorage),
   /// Binary Versioned Stream.
-  VtvStreamData(std::boxed::Box<VtvStreamData>),
+  VtvStreamData(VtvStreamData),
   /// Class ID.
   VtClassId(VtClassId),
   /// Clipboard Data.
-  VtClipboardData(std::boxed::Box<VtClipboardData>),
+  VtClipboardData(VtClipboardData),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum VtVectorChoice {
@@ -529,7 +529,7 @@ pub enum VtVectorChoice {
   /// Class ID.
   VtClassId(VtClassId),
   /// Clipboard Data.
-  VtClipboardData(std::boxed::Box<VtClipboardData>),
+  VtClipboardData(VtClipboardData),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum VtArrayChoice {

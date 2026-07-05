@@ -688,16 +688,16 @@ pub enum LatticeChoice {
   /// Defines the Arc Class.
   Arc(std::boxed::Box<Arc>),
   /// Defines the Node Class.
-  Node(std::boxed::Box<Node>),
+  Node(Node),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum InterpretationChoice {
   /// Defines the DerivedFrom Class.
-  DerivedFrom(std::boxed::Box<DerivedFrom>),
+  DerivedFrom(DerivedFrom),
   /// Defines the Info Class.
-  Info(std::boxed::Box<Info>),
+  Info(Info),
   /// Defines the Lattice Class.
-  Lattice(std::boxed::Box<Lattice>),
+  Lattice(Lattice),
   /// Defines the Literal Class.
   Literal(Literal),
   /// Defines the ContextNode Class.
@@ -706,9 +706,9 @@ pub enum InterpretationChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum OneOfChoice {
   /// Defines the DerivedFrom Class.
-  DerivedFrom(std::boxed::Box<DerivedFrom>),
+  DerivedFrom(DerivedFrom),
   /// Defines the Info Class.
-  Info(std::boxed::Box<Info>),
+  Info(Info),
   /// Defines the Interpretation Class.
   Interpretation(std::boxed::Box<Interpretation>),
   /// Defines the OneOf Class.
@@ -721,11 +721,11 @@ pub enum OneOfChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum GroupChoice {
   /// Defines the DerivedFrom Class.
-  DerivedFrom(std::boxed::Box<DerivedFrom>),
+  DerivedFrom(DerivedFrom),
   /// Defines the GroupInfo Class.
-  GroupInfo(std::boxed::Box<GroupInfo>),
+  GroupInfo(GroupInfo),
   /// Defines the Info Class.
-  Info(std::boxed::Box<Info>),
+  Info(Info),
   /// Defines the Interpretation Class.
   Interpretation(std::boxed::Box<Interpretation>),
   /// Defines the OneOf Class.
@@ -738,9 +738,9 @@ pub enum GroupChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum SequenceChoice {
   /// Defines the DerivedFrom Class.
-  DerivedFrom(std::boxed::Box<DerivedFrom>),
+  DerivedFrom(DerivedFrom),
   /// Defines the Info Class.
-  Info(std::boxed::Box<Info>),
+  Info(Info),
   /// Defines the Interpretation Class.
   Interpretation(std::boxed::Box<Interpretation>),
   /// Defines the OneOf Class.
@@ -764,15 +764,15 @@ pub enum DerivationChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum EmmaChoice {
   /// Defines the Derivation Class.
-  Derivation(std::boxed::Box<Derivation>),
+  Derivation(Derivation),
   /// Defines the Grammar Class.
-  Grammar(std::boxed::Box<Grammar>),
+  Grammar(Grammar),
   /// Defines the Model Class.
-  Model(std::boxed::Box<Model>),
+  Model(Model),
   /// Defines the EndPointInfo Class.
-  EndPointInfo(std::boxed::Box<EndPointInfo>),
+  EndPointInfo(EndPointInfo),
   /// Defines the Info Class.
-  Info(std::boxed::Box<Info>),
+  Info(Info),
   /// Defines the Interpretation Class.
   Interpretation(std::boxed::Box<Interpretation>),
   /// Defines the OneOf Class.

@@ -1312,17 +1312,17 @@ pub struct TextCharRangeContext {
 #[derive(Clone, Debug, PartialEq)]
 pub enum GroupCommandChoice {
   /// Defines the ShapeMoniker Class.
-  ShapeMoniker(std::boxed::Box<ShapeMoniker>),
+  ShapeMoniker(ShapeMoniker),
   /// Defines the GroupShapeMoniker Class.
-  GroupShapeMoniker(std::boxed::Box<GroupShapeMoniker>),
+  GroupShapeMoniker(GroupShapeMoniker),
   /// Defines the GraphicFrameMoniker Class.
-  GraphicFrameMoniker(std::boxed::Box<GraphicFrameMoniker>),
+  GraphicFrameMoniker(GraphicFrameMoniker),
   /// Defines the ConnectorMoniker Class.
-  ConnectorMoniker(std::boxed::Box<ConnectorMoniker>),
+  ConnectorMoniker(ConnectorMoniker),
   /// Defines the PictureMoniker Class.
-  PictureMoniker(std::boxed::Box<PictureMoniker>),
+  PictureMoniker(PictureMoniker),
   /// Defines the InkMoniker Class.
-  InkMoniker(std::boxed::Box<InkMoniker>),
+  InkMoniker(InkMoniker),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextParagraphPropertiesTypeChoice {
@@ -1336,25 +1336,25 @@ pub enum TextParagraphPropertiesTypeChoice2 {
   /// Bullet Size Follows Text.
   BulletSizeText,
   /// Bullet Size Percentage.
-  BulletSizePercentage(std::boxed::Box<crate::schemas::a::BulletSizePercentage>),
+  BulletSizePercentage(crate::schemas::a::BulletSizePercentage),
   /// Bullet Size Points.
-  BulletSizePoints(std::boxed::Box<crate::schemas::a::BulletSizePoints>),
+  BulletSizePoints(crate::schemas::a::BulletSizePoints),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextParagraphPropertiesTypeChoice3 {
   /// Follow text.
   BulletFontText,
   /// Specified.
-  BulletFont(std::boxed::Box<crate::schemas::a::BulletFont>),
+  BulletFont(crate::schemas::a::BulletFont),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextParagraphPropertiesTypeChoice4 {
   /// No Bullet.
   NoBullet,
   /// Auto-Numbered Bullet.
-  AutoNumberedBullet(std::boxed::Box<crate::schemas::a::AutoNumberedBullet>),
+  AutoNumberedBullet(crate::schemas::a::AutoNumberedBullet),
   /// Character Bullet.
-  CharacterBullet(std::boxed::Box<crate::schemas::a::CharacterBullet>),
+  CharacterBullet(crate::schemas::a::CharacterBullet),
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<crate::schemas::a::PictureBullet>),
 }
@@ -1363,7 +1363,7 @@ pub enum TextBodyPropertiesChoice {
   /// No AutoFit.
   NoAutoFit,
   /// Normal AutoFit.
-  NormalAutoFit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
+  NormalAutoFit(crate::schemas::a::NormalAutoFit),
   /// Shape AutoFit.
   ShapeAutoFit,
 }
@@ -1372,7 +1372,7 @@ pub enum TextBodyPropertiesChoice2 {
   /// Apply 3D shape properties.
   Shape3DType(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
-  FlatText(std::boxed::Box<crate::schemas::a::FlatText>),
+  FlatText(crate::schemas::a::FlatText),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
@@ -1384,7 +1384,7 @@ pub enum ShapePropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -1406,62 +1406,62 @@ pub enum ShapePropertiesChoice3 {
 #[derive(Clone, Debug, PartialEq)]
 pub enum LnRefStyleMatrixReferenceChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FillRefStyleMatrixReferenceChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum EffectRefStyleMatrixReferenceChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FontReferenceChoice {
   /// RGB Color Model - Percentage Variant.
-  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(crate::schemas::a::RgbColorModelPercentage),
   /// RGB Color Model - Hex Variant.
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(crate::schemas::a::HslColor),
   /// System Color.
-  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(crate::schemas::a::SystemColor),
   /// Scheme Color.
-  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(crate::schemas::a::SchemeColor),
   /// Preset Color.
-  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(crate::schemas::a::PresetColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BlipFillPropertiesChoice {
@@ -1471,7 +1471,7 @@ pub enum BlipFillPropertiesChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -1493,7 +1493,7 @@ pub enum GroupShapePropertiesChoice2 {
 #[derive(Clone, Debug, PartialEq)]
 pub enum LinePropertiesTypeChoice {
   /// Defines the NoFill Class.
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(crate::schemas::a::NoFill),
   /// Defines the SolidFill Class.
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
@@ -1504,9 +1504,9 @@ pub enum LinePropertiesTypeChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum LinePropertiesTypeChoice2 {
   /// Preset Dash.
-  PresetDash(std::boxed::Box<crate::schemas::a::PresetDash>),
+  PresetDash(crate::schemas::a::PresetDash),
   /// Custom Dash.
-  CustomDash(std::boxed::Box<crate::schemas::a::CustomDash>),
+  CustomDash(crate::schemas::a::CustomDash),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum LinePropertiesTypeChoice3 {
@@ -1515,5 +1515,5 @@ pub enum LinePropertiesTypeChoice3 {
   /// Line Join Bevel.
   LineJoinBevel,
   /// Miter Line Join.
-  Miter(std::boxed::Box<crate::schemas::a::Miter>),
+  Miter(crate::schemas::a::Miter),
 }

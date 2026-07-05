@@ -14305,10 +14305,12 @@ mod tests {
         ..Default::default()
       },
       w::Run {
-        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode {
-          xml_content: Some(r#" PAGEREF "_Toc123" \h "#.into()),
-          ..Default::default()
-        }))],
+        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode(
+          w::TextType {
+            xml_content: Some(r#" PAGEREF "_Toc123" \h "#.into()),
+            ..Default::default()
+          },
+        )))],
         ..Default::default()
       },
       w::Run {
@@ -14374,10 +14376,12 @@ mod tests {
         ..Default::default()
       },
       w::Run {
-        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode {
-          xml_content: Some(r#" HYPERLINK \l md_intro "#.into()),
-          ..Default::default()
-        }))],
+        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode(
+          w::TextType {
+            xml_content: Some(r#" HYPERLINK \l md_intro "#.into()),
+            ..Default::default()
+          },
+        )))],
         ..Default::default()
       },
       w::Run {
@@ -14403,10 +14407,12 @@ mod tests {
         ..Default::default()
       },
       w::Run {
-        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode {
-          xml_content: Some(r#" PAGEREF md_intro \h "#.into()),
-          ..Default::default()
-        }))],
+        run_choice: vec![w::RunChoice::FieldCode(Box::new(w::FieldCode(
+          w::TextType {
+            xml_content: Some(r#" PAGEREF md_intro \h "#.into()),
+            ..Default::default()
+          },
+        )))],
         ..Default::default()
       },
       w::Run {

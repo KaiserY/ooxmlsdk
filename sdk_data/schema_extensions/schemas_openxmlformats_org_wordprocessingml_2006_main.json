@@ -632,14 +632,6 @@
       ]
     },
     {
-      "ClassName": "TextType",
-      "HaveXmlOtherAttrs": true
-    },
-    {
-      "ClassName": "Text",
-      "HaveXmlOtherAttrs": true
-    },
-    {
       "ClassName": "WebSettings",
       "HaveXmlOtherAttrs": true
     },

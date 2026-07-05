@@ -5000,38 +5000,19 @@ pub struct Text(pub TextType);
 /// Deleted Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:delText")]
-pub struct DeletedText {
-  /// space
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct DeletedText(pub TextType);
 /// Field Code.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:instrText")]
-pub struct FieldCode {
-  /// space
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct FieldCode(pub TextType);
 /// Deleted Field Code.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:delInstrText")]
-pub struct DeletedFieldCode {
-  /// space
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct DeletedFieldCode(pub TextType);
 /// Defines the TextType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "")]
 pub struct TextType {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// space
   #[sdk(attr(qname = "xml:space"))]
   pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,

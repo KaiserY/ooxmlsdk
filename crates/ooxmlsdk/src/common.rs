@@ -31,7 +31,7 @@ pub(crate) use xml::mce_choice_replacement_child_bytes;
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
-  DeEvent, PayloadEvent, XmlRead, append_fast_bytes_text_field, append_text_field,
+  DeEvent, PayloadEvent, XmlRead, append_de_text_field, append_fast_bytes_text_field,
   decode_utf16_xml_bytes, from_bytes_inner, from_reader_inner, parse_attr_value,
   parse_borrowed_list_attr, parse_decimal_number_or_percent_attr, parse_enum_attr, parse_f32_attr,
   parse_f32_bytes_raw, parse_f64_attr, parse_f64_bytes_raw, parse_i8_attr, parse_i8_bytes,
@@ -44,9 +44,10 @@ pub(crate) use xml::{
   write_decimal_number_or_percent_value, write_escaped_bytes, write_escaped_content_str,
   write_escaped_content_text, write_escaped_str, write_escaped_text, write_f32_value,
   write_f64_value, write_i8_value, write_i16_value, write_i32_value, write_i64_value,
-  write_list_text_content_value, write_list_value, write_measurement_or_percent_value,
-  write_signed_twips_measure_value, write_twips_measure_value, write_u8_value, write_u16_value,
-  write_u32_value, write_u64_value, write_xmlns_attr, xml_local_name,
+  write_list_content_str_value, write_list_str_value, write_list_value,
+  write_measurement_or_percent_value, write_signed_twips_measure_value, write_twips_measure_value,
+  write_u8_value, write_u16_value, write_u32_value, write_u64_value, write_xmlns_attr,
+  xml_local_name,
 };
 #[cfg(feature = "flat-opc")]
 pub(crate) use xml::{read_outer_xml_borrowed, read_outer_xml_io};

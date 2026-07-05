@@ -71,16 +71,16 @@ impl<'xml> Text<'xml> {
   }
 
   #[inline]
-  pub fn trimmed(&self) -> Cow<'xml, str> {
-    match self.text {
-      Cow::Borrowed(text) => Cow::Borrowed(&text[self.content.clone()]),
-      Cow::Owned(ref text) => Cow::Owned(text[self.content.clone()].to_string()),
-    }
+  pub fn is_blank(&self) -> bool {
+    self.content.is_empty()
   }
 
   #[inline]
-  pub fn is_blank(&self) -> bool {
-    self.content.is_empty()
+  fn into_string(self) -> String {
+    match self.text {
+      Cow::Borrowed(text) => text.to_string(),
+      Cow::Owned(text) => text,
+    }
   }
 }
 
@@ -1089,11 +1089,23 @@ pub(crate) fn fast_bytes_text_to_string(
 }
 
 #[inline]
-pub(crate) fn append_text_field(value: &mut Option<String>, text: &str) {
+pub(crate) fn append_de_text_field(value: &mut Option<String>, text: Text<'_>) {
   if let Some(value) = value {
-    value.push_str(text);
+    value.push_str(text.as_ref());
   } else {
-    *value = Some(text.to_string());
+    *value = Some(text.into_string());
+  }
+}
+
+#[inline]
+fn append_cow_text_field(value: &mut Option<String>, text: Cow<'_, str>) {
+  if let Some(value) = value {
+    value.push_str(text.as_ref());
+  } else {
+    *value = Some(match text {
+      Cow::Borrowed(text) => text.to_string(),
+      Cow::Owned(text) => text,
+    });
   }
 }
 
@@ -1124,7 +1136,7 @@ fn read_text_events<'xml, R: XmlRead<'xml>>(
   loop {
     match xml_reader.next_de_event(ty, field)? {
       DeEvent::FastBytesText(text) => append_fast_bytes_text_field(&mut value, text, ty, field)?,
-      DeEvent::Text(text) => append_text_field(&mut value, text.as_ref()),
+      DeEvent::Text(text) => append_de_text_field(&mut value, text),
       DeEvent::End(e) if e.name() == end => return Ok(value.unwrap_or_default()),
       DeEvent::Start(e, _) => {
         return Err(unexpected_tag(ty, "text content", xml_local_name(e.name())));
@@ -1169,13 +1181,13 @@ where
           }
           event_after_text => {
             let text = text.xml10_content()?;
-            append_text_field(&mut value, text.as_ref());
+            append_cow_text_field(&mut value, text);
             event = event_after_text;
             continue;
           }
         }
       }
-      DeEvent::Text(text) => append_text_field(&mut value, text.as_ref()),
+      DeEvent::Text(text) => append_de_text_field(&mut value, text),
       DeEvent::End(e) if e.name() == end => {
         let value = value.unwrap_or_default();
         return parse_text(value.as_ref());
@@ -1762,7 +1774,7 @@ pub(crate) fn write_escaped_str<W: std::io::Write>(
   writer: &mut W,
   value: &str,
 ) -> std::io::Result<()> {
-  write_escaped_xml_bytes(writer, value.as_bytes(), true)
+  write_escaped_attr_bytes(writer, value.as_bytes())
 }
 
 #[inline]
@@ -1770,7 +1782,7 @@ pub(crate) fn write_escaped_content_str<W: std::io::Write>(
   writer: &mut W,
   value: &str,
 ) -> std::io::Result<()> {
-  write_escaped_xml_bytes(writer, value.as_bytes(), false)
+  write_escaped_content_bytes(writer, value.as_bytes())
 }
 
 #[inline]
@@ -1778,7 +1790,7 @@ pub(crate) fn write_escaped_bytes<W: std::io::Write>(
   writer: &mut W,
   value: &[u8],
 ) -> std::io::Result<()> {
-  write_escaped_xml_bytes(writer, value, true)
+  write_escaped_attr_bytes(writer, value)
 }
 
 #[inline]
@@ -1876,21 +1888,52 @@ where
 }
 
 #[inline]
-fn write_escaped_xml_bytes<W: std::io::Write>(
+fn write_escaped_attr_bytes<W: std::io::Write>(
   writer: &mut W,
   bytes: &[u8],
-  escape_quotes: bool,
 ) -> std::io::Result<()> {
   let mut copied = 0usize;
   let mut escaped = false;
 
-  for (index, byte) in bytes.iter().copied().enumerate() {
+  for (index, &byte) in bytes.iter().enumerate() {
     let replacement: Option<&[u8]> = match byte {
       b'<' => Some(b"&lt;"),
       b'&' => Some(b"&amp;"),
-      b'>' if escape_quotes => Some(b"&gt;"),
-      b'\'' if escape_quotes => Some(b"&apos;"),
-      b'"' if escape_quotes => Some(b"&quot;"),
+      b'"' => Some(b"&quot;"),
+      _ => None,
+    };
+
+    if let Some(replacement) = replacement {
+      escaped = true;
+      if copied < index {
+        writer.write_all(&bytes[copied..index])?;
+      }
+      writer.write_all(replacement)?;
+      copied = index + 1;
+    }
+  }
+
+  if !escaped {
+    writer.write_all(bytes)
+  } else if copied < bytes.len() {
+    writer.write_all(&bytes[copied..])
+  } else {
+    Ok(())
+  }
+}
+
+#[inline]
+fn write_escaped_content_bytes<W: std::io::Write>(
+  writer: &mut W,
+  bytes: &[u8],
+) -> std::io::Result<()> {
+  let mut copied = 0usize;
+  let mut escaped = false;
+
+  for (index, &byte) in bytes.iter().enumerate() {
+    let replacement: Option<&[u8]> = match byte {
+      b'<' => Some(b"&lt;"),
+      b'&' => Some(b"&amp;"),
       _ => None,
     };
 
@@ -1959,7 +2002,12 @@ struct EscapedDisplayWriter<'a, W: std::io::Write> {
 impl<W: std::io::Write> std::fmt::Write for EscapedDisplayWriter<'_, W> {
   #[inline]
   fn write_str(&mut self, value: &str) -> std::fmt::Result {
-    write_escaped_xml_bytes(self.writer, value.as_bytes(), self.escape_quotes).map_err(|err| {
+    let result = if self.escape_quotes {
+      write_escaped_attr_bytes(self.writer, value.as_bytes())
+    } else {
+      write_escaped_content_bytes(self.writer, value.as_bytes())
+    };
+    result.map_err(|err| {
       self.error = Some(err);
       std::fmt::Error
     })
@@ -1984,20 +2032,37 @@ where
 }
 
 #[inline]
-pub(crate) fn write_list_text_content_value<W, T>(
+pub(crate) fn write_list_str_value<W, T>(writer: &mut W, values: &[T]) -> std::io::Result<()>
+where
+  W: std::io::Write,
+  T: AsRef<str>,
+{
+  let mut iter = values.iter();
+  if let Some(first) = iter.next() {
+    write_escaped_str(writer, first.as_ref())?;
+    for value in iter {
+      writer.write_all(b" ")?;
+      write_escaped_str(writer, value.as_ref())?;
+    }
+  }
+  Ok(())
+}
+
+#[inline]
+pub(crate) fn write_list_content_str_value<W, T>(
   writer: &mut W,
   values: &[T],
 ) -> std::io::Result<()>
 where
   W: std::io::Write,
-  T: std::fmt::Display,
+  T: AsRef<str>,
 {
   let mut iter = values.iter();
   if let Some(first) = iter.next() {
-    write_escaped_content_text(writer, first)?;
+    write_escaped_content_str(writer, first.as_ref())?;
     for value in iter {
       writer.write_all(b" ")?;
-      write_escaped_content_text(writer, value)?;
+      write_escaped_content_str(writer, value.as_ref())?;
     }
   }
   Ok(())
@@ -2120,7 +2185,7 @@ mod tests {
     write_escaped_str(&mut attr, r#"<tag attr="one&two">'text'</tag>"#).expect("write attr");
     assert_eq!(
       String::from_utf8(attr).expect("utf-8 attr"),
-      "&lt;tag attr=&quot;one&amp;two&quot;&gt;&apos;text&apos;&lt;/tag&gt;"
+      "&lt;tag attr=&quot;one&amp;two&quot;>'text'&lt;/tag>"
     );
 
     let mut content = Vec::new();
@@ -2135,7 +2200,7 @@ mod tests {
     write_escaped_text(&mut display_attr, &DisplayXml).expect("write display attr");
     assert_eq!(
       String::from_utf8(display_attr).expect("utf-8 display attr"),
-      "&lt;tag attr=&quot;one&amp;two&quot;&gt;&apos;text&apos;&lt;/tag&gt;"
+      "&lt;tag attr=&quot;one&amp;two&quot;>'text'&lt;/tag>"
     );
 
     let mut display_content = Vec::new();

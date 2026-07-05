@@ -2730,10 +2730,12 @@ fn build_text_child_write_tokens(
       child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
     let start_tag = write_start_tag_tokens(qname, child_no_prefix);
     let end_tag = write_end_tag_tokens(qname, child_no_prefix);
-    let value_write_tokens = if list {
+    let value_write_tokens = if list && is_string_like_effective_type(&inner_ty, simple_type) {
       quote! {
-        crate::common::write_list_text_content_value(writer, #value_expr.as_slice())?;
+        crate::common::write_list_content_str_value(writer, #value_expr.as_slice())?;
       }
+    } else if list {
+      panic!("text_child list fields must be string-like");
     } else if let Some(kind) = simple_union_effective_type_kind(&inner_ty, simple_type) {
       write_simple_union_value_tokens(kind, value_expr.clone())
     } else if effective_type_name(&inner_ty, simple_type)
@@ -3952,51 +3954,58 @@ fn expand_named_struct(
       format!(" {}=\"", field.name).as_bytes(),
       proc_macro2::Span::call_site(),
     );
-    let attr_write_value_tokens = if field.list {
-      quote! {
-        writer.write_all(#attr_prefix_lit)?;
-        crate::common::write_list_value(writer, value.as_slice())?;
-        writer.write_all(b"\"")?;
-      }
-    } else if let Some(kind) = simple_union_kind {
-      write_simple_union_attr_tokens(kind, &attr_prefix_lit, quote! { value })
-    } else if let Some(kind) = integer_kind {
-      let write_value_tokens = write_integer_value_tokens_by_kind(kind, quote! { value });
-      quote! {
-        writer.write_all(#attr_prefix_lit)?;
-        #write_value_tokens
-        writer.write_all(b"\"")?;
-      }
-    } else if effective_type_name(&value_ty, simple_type)
-      .as_deref()
-      .is_some_and(is_xml_schema_float_type_name)
-    {
-      let write_value_tokens =
-        write_xml_schema_float_effective_tokens(quote! { value }, &value_ty, simple_type, "");
-      quote! {
-        writer.write_all(#attr_prefix_lit)?;
-        #write_value_tokens
-        writer.write_all(b"\"")?;
-      }
-    } else if is_string_like_effective_type(&value_ty, simple_type) {
-      quote! {
-        writer.write_all(#attr_prefix_lit)?;
-        crate::common::write_escaped_str(writer, value.as_ref())?;
-        writer.write_all(b"\"")?;
-      }
-    } else if is_sdk_enum_effective_type(&value_ty, simple_type) {
-      quote! {
-        writer.write_all(#attr_prefix_lit)?;
-        value.write_xml_attr_value(writer)?;
-        writer.write_all(b"\"")?;
-      }
-    } else {
-      quote! {
-        writer.write_all(#attr_prefix_lit)?;
-        crate::common::write_escaped_text(writer, value)?;
-        writer.write_all(b"\"")?;
-      }
-    };
+    let attr_write_value_tokens =
+      if field.list && is_string_like_effective_type(&value_ty, simple_type) {
+        quote! {
+          writer.write_all(#attr_prefix_lit)?;
+          crate::common::write_list_str_value(writer, value.as_slice())?;
+          writer.write_all(b"\"")?;
+        }
+      } else if field.list {
+        quote! {
+          writer.write_all(#attr_prefix_lit)?;
+          crate::common::write_list_value(writer, value.as_slice())?;
+          writer.write_all(b"\"")?;
+        }
+      } else if let Some(kind) = simple_union_kind {
+        write_simple_union_attr_tokens(kind, &attr_prefix_lit, quote! { value })
+      } else if let Some(kind) = integer_kind {
+        let write_value_tokens = write_integer_value_tokens_by_kind(kind, quote! { value });
+        quote! {
+          writer.write_all(#attr_prefix_lit)?;
+          #write_value_tokens
+          writer.write_all(b"\"")?;
+        }
+      } else if effective_type_name(&value_ty, simple_type)
+        .as_deref()
+        .is_some_and(is_xml_schema_float_type_name)
+      {
+        let write_value_tokens =
+          write_xml_schema_float_effective_tokens(quote! { value }, &value_ty, simple_type, "");
+        quote! {
+          writer.write_all(#attr_prefix_lit)?;
+          #write_value_tokens
+          writer.write_all(b"\"")?;
+        }
+      } else if is_string_like_effective_type(&value_ty, simple_type) {
+        quote! {
+          writer.write_all(#attr_prefix_lit)?;
+          crate::common::write_escaped_str(writer, value.as_ref())?;
+          writer.write_all(b"\"")?;
+        }
+      } else if is_sdk_enum_effective_type(&value_ty, simple_type) {
+        quote! {
+          writer.write_all(#attr_prefix_lit)?;
+          value.write_xml_attr_value(writer)?;
+          writer.write_all(b"\"")?;
+        }
+      } else {
+        quote! {
+          writer.write_all(#attr_prefix_lit)?;
+          crate::common::write_escaped_text(writer, value)?;
+          writer.write_all(b"\"")?;
+        }
+      };
     if field.optional {
       attr_write_tokens.push(quote! {
         if let Some(value) = &self.#field_ident {
@@ -5486,7 +5495,7 @@ fn expand_named_struct(
         )?;
       }
       crate::common::DeEvent::Text(text) => {
-        crate::common::append_text_field(&mut #field_ident, text.as_ref());
+        crate::common::append_de_text_field(&mut #field_ident, text);
       }
     }
   } else {
@@ -5713,10 +5722,12 @@ fn expand_named_struct(
           } else {
             unwrap_wrapped_type(field_ty)
           };
-          let optional_text_write_tokens = if *list {
+          let optional_text_write_tokens = if *list && is_string_like_type(&inner_ty) {
             quote! {
-              crate::common::write_list_text_content_value(writer, value.as_slice())?;
+              crate::common::write_list_content_str_value(writer, value.as_slice())?;
             }
+          } else if *list {
+            panic!("text list fields must be string-like");
           } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
             write_simple_union_value_tokens(kind, quote! { value })
           } else if is_xml_schema_float_type(&inner_ty) {
@@ -5730,10 +5741,12 @@ fn expand_named_struct(
               crate::common::write_escaped_content_text(writer, value)?;
             }
           };
-          let required_text_write_tokens = if *list {
+          let required_text_write_tokens = if *list && is_string_like_type(&inner_ty) {
             quote! {
-              crate::common::write_list_text_content_value(writer, self.#field_ident.as_slice())?;
+              crate::common::write_list_content_str_value(writer, self.#field_ident.as_slice())?;
             }
+          } else if *list {
+            panic!("text list fields must be string-like");
           } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
             write_simple_union_value_tokens(kind, quote! { &self.#field_ident })
           } else if is_xml_schema_float_type(&inner_ty) {

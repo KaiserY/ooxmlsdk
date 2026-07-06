@@ -1182,7 +1182,7 @@ fn read_text_events<'xml, R: XmlRead<'xml>>(
 }
 
 #[inline]
-pub(crate) fn read_text_child_value<'xml, R, T, RawParse, TextParse>(
+fn read_text_child_value<'xml, R, T, RawParse, TextParse>(
   xml_reader: &mut R,
   end: quick_xml::name::QName<'_>,
   ty: &'static str,
@@ -1234,6 +1234,85 @@ where
     }
     event = xml_reader.next_de_event(ty, field)?;
   }
+}
+
+macro_rules! define_integer_text_child_reader {
+  ($name:ident, $parse_bytes:ident, $ty:ty) => {
+    #[inline]
+    pub(crate) fn $name<'xml, R>(
+      xml_reader: &mut R,
+      end: quick_xml::name::QName<'_>,
+      ty: &'static str,
+      field: &'static str,
+    ) -> Result<$ty, SdkError>
+    where
+      R: XmlRead<'xml>,
+    {
+      read_text_child_value(xml_reader, end, ty, field, $parse_bytes, |value| {
+        parse_text_child_value::<$ty>(value, ty, field)
+      })
+    }
+  };
+}
+
+define_integer_text_child_reader!(read_u8_text_child_value, parse_u8_bytes, u8);
+define_integer_text_child_reader!(read_i8_text_child_value, parse_i8_bytes, i8);
+define_integer_text_child_reader!(read_u16_text_child_value, parse_u16_bytes, u16);
+define_integer_text_child_reader!(read_i16_text_child_value, parse_i16_bytes, i16);
+define_integer_text_child_reader!(read_u32_text_child_value, parse_u32_bytes, u32);
+define_integer_text_child_reader!(read_i32_text_child_value, parse_i32_bytes, i32);
+define_integer_text_child_reader!(read_u64_text_child_value, parse_u64_bytes, u64);
+define_integer_text_child_reader!(read_i64_text_child_value, parse_i64_bytes, i64);
+
+#[inline]
+pub(crate) fn read_f32_text_child_value<'xml, R>(
+  xml_reader: &mut R,
+  end: quick_xml::name::QName<'_>,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<f32, SdkError>
+where
+  R: XmlRead<'xml>,
+{
+  read_text_child_value(xml_reader, end, ty, field, parse_f32_bytes_raw, |value| {
+    parse_text_child_value::<f32>(value, ty, field)
+  })
+}
+
+#[inline]
+pub(crate) fn read_f64_text_child_value<'xml, R>(
+  xml_reader: &mut R,
+  end: quick_xml::name::QName<'_>,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<f64, SdkError>
+where
+  R: XmlRead<'xml>,
+{
+  read_text_child_value(xml_reader, end, ty, field, parse_f64_bytes_raw, |value| {
+    parse_text_child_value::<f64>(value, ty, field)
+  })
+}
+
+#[inline]
+pub(crate) fn read_enum_text_child_value<'xml, R, T>(
+  xml_reader: &mut R,
+  end: quick_xml::name::QName<'_>,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<T, SdkError>
+where
+  R: XmlRead<'xml>,
+  T: crate::sdk::SdkEnum,
+{
+  read_text_child_value(
+    xml_reader,
+    end,
+    ty,
+    field,
+    |value| T::from_xml_bytes(value).ok(),
+    |value| T::from_xml_bytes(value.as_bytes()),
+  )
 }
 
 #[cfg(feature = "flat-opc")]
@@ -1957,7 +2036,7 @@ fn write_escaped_attr_bytes<W: std::io::Write>(
 }
 
 #[inline]
-fn write_escaped_content_bytes<W: std::io::Write>(
+pub(crate) fn write_escaped_content_bytes<W: std::io::Write>(
   writer: &mut W,
   bytes: &[u8],
 ) -> std::io::Result<()> {

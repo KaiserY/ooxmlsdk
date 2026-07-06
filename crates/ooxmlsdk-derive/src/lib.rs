@@ -1876,22 +1876,6 @@ fn parse_integer_attr_tokens_by_kind(
   }
 }
 
-fn parse_integer_bytes_tokens_by_kind(
-  kind: IntegerTypeKind,
-  value_expr: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  match kind {
-    IntegerTypeKind::U8 => quote! { crate::common::parse_u8_bytes(#value_expr) },
-    IntegerTypeKind::I8 => quote! { crate::common::parse_i8_bytes(#value_expr) },
-    IntegerTypeKind::U16 => quote! { crate::common::parse_u16_bytes(#value_expr) },
-    IntegerTypeKind::I16 => quote! { crate::common::parse_i16_bytes(#value_expr) },
-    IntegerTypeKind::U32 => quote! { crate::common::parse_u32_bytes(#value_expr) },
-    IntegerTypeKind::I32 => quote! { crate::common::parse_i32_bytes(#value_expr) },
-    IntegerTypeKind::U64 => quote! { crate::common::parse_u64_bytes(#value_expr) },
-    IntegerTypeKind::I64 => quote! { crate::common::parse_i64_bytes(#value_expr) },
-  }
-}
-
 fn is_hex_binary_type(ty: &Type) -> bool {
   type_terminal_name(ty).as_deref() == Some("HexBinaryValue")
 }

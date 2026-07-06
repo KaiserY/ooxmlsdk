@@ -608,11 +608,17 @@ fn write_text_value_content_tokens(
 ) -> proc_macro2::TokenStream {
   if let Some(kind) = simple_union_effective_type_kind(value_ty, simple_type) {
     write_simple_union_value_tokens(kind, value_expr)
+  } else if let Some(kind) = integer_effective_type_kind(value_ty, simple_type) {
+    write_integer_value_tokens_by_kind(kind, value_expr)
   } else if effective_type_name(value_ty, simple_type)
     .as_deref()
     .is_some_and(is_xml_schema_float_type_name)
   {
     write_xml_schema_float_effective_tokens(value_expr, value_ty, simple_type, qname)
+  } else if is_sdk_enum_effective_type(value_ty, simple_type) {
+    quote! {
+      (#value_expr).write_xml_content_value(writer)?;
+    }
   } else if is_string_like_effective_type(value_ty, simple_type) {
     quote! {
       crate::common::write_escaped_content_str(writer, #value_expr.as_ref())?;
@@ -684,7 +690,7 @@ fn build_choice_write_tokens(
         let end_tag = write_end_tag_tokens(qname, child_no_prefix);
         let content = if *is_enum {
           quote! {
-            crate::common::write_escaped_content_text(writer, value)?;
+            value.write_xml_content_value(writer)?;
           }
         } else if let Some(payload_ty) = ty.clone().or_else(|| {
           simple_type
@@ -924,7 +930,7 @@ fn build_wml_table_stack_choice_next_tokens(
         let end_tag = write_end_tag_tokens(qname, child_no_prefix);
         let content = if *is_enum {
           quote! {
-            crate::common::write_escaped_content_text(writer, value)?;
+            value.write_xml_content_value(writer)?;
           }
         } else if let Some(payload_ty) = ty.clone().or_else(|| {
           simple_type
@@ -2443,50 +2449,56 @@ fn text_child_value_parse_tokens(
   }
 }
 
-fn text_child_raw_value_parse_tokens(
+fn text_child_is_sdk_enum(value_ty: Option<&Type>, simple_type: Option<&str>) -> bool {
+  if let Some(value_ty) = value_ty {
+    is_sdk_enum_effective_type(value_ty, simple_type)
+  } else {
+    simple_type.is_some_and(is_sdk_enum_type_name)
+  }
+}
+
+fn read_integer_text_child_tokens(
+  kind: IntegerTypeKind,
+  xml_reader_expr: proc_macro2::TokenStream,
+  end_expr: proc_macro2::TokenStream,
+  owner_expr: proc_macro2::TokenStream,
+  field_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  let read_fn = match kind {
+    IntegerTypeKind::U8 => quote! { crate::common::read_u8_text_child_value },
+    IntegerTypeKind::I8 => quote! { crate::common::read_i8_text_child_value },
+    IntegerTypeKind::U16 => quote! { crate::common::read_u16_text_child_value },
+    IntegerTypeKind::I16 => quote! { crate::common::read_i16_text_child_value },
+    IntegerTypeKind::U32 => quote! { crate::common::read_u32_text_child_value },
+    IntegerTypeKind::I32 => quote! { crate::common::read_i32_text_child_value },
+    IntegerTypeKind::U64 => quote! { crate::common::read_u64_text_child_value },
+    IntegerTypeKind::I64 => quote! { crate::common::read_i64_text_child_value },
+  };
+  quote! {
+    #read_fn(#xml_reader_expr, #end_expr, #owner_expr, #field_expr)?
+  }
+}
+
+fn read_float_text_child_tokens(
   value_ty: Option<&Type>,
   simple_type: Option<&str>,
-  is_enum: bool,
-  value_expr: proc_macro2::TokenStream,
+  xml_reader_expr: proc_macro2::TokenStream,
+  end_expr: proc_macro2::TokenStream,
+  owner_expr: proc_macro2::TokenStream,
+  field_expr: proc_macro2::TokenStream,
 ) -> Option<proc_macro2::TokenStream> {
-  if let Some(kind) = text_child_simple_union_kind(value_ty, simple_type) {
-    return Some(match kind {
-      SimpleUnionTypeKind::TwipsMeasure => {
-        quote! { crate::simple_type::TwipsMeasureValue::from_bytes(#value_expr).ok() }
-      }
-      SimpleUnionTypeKind::SignedTwipsMeasure => {
-        quote! { crate::simple_type::SignedTwipsMeasureValue::from_bytes(#value_expr).ok() }
-      }
-      SimpleUnionTypeKind::DecimalNumberOrPercent => {
-        quote! { crate::simple_type::DecimalNumberOrPercentValue::from_bytes(#value_expr).ok() }
-      }
-      SimpleUnionTypeKind::MeasurementOrPercent => {
-        quote! { crate::simple_type::MeasurementOrPercentValue::from_bytes(#value_expr).ok() }
-      }
-    });
-  }
-
-  if is_enum {
-    return Some(if let Some(value_ty) = value_ty {
-      quote! { <#value_ty as crate::sdk::SdkEnum>::from_xml_bytes(#value_expr).ok() }
-    } else {
-      quote! { crate::sdk::SdkEnum::from_xml_bytes(#value_expr).ok() }
-    });
-  }
-
-  if let Some(kind) = text_child_integer_kind(value_ty, simple_type) {
-    return Some(parse_integer_bytes_tokens_by_kind(kind, value_expr));
-  }
-
-  match value_ty
+  let read_fn = match value_ty
     .and_then(|value_ty| effective_type_name(value_ty, simple_type))
     .or_else(|| simple_type.map(str::to_string))
     .as_deref()
   {
-    Some("SingleValue" | "f32") => Some(quote! { crate::common::parse_f32_bytes_raw(#value_expr) }),
-    Some("DoubleValue" | "f64") => Some(quote! { crate::common::parse_f64_bytes_raw(#value_expr) }),
-    _ => None,
-  }
+    Some("SingleValue" | "f32") => quote! { crate::common::read_f32_text_child_value },
+    Some("DoubleValue" | "f64") => quote! { crate::common::read_f64_text_child_value },
+    _ => return None,
+  };
+  Some(quote! {
+    #read_fn(#xml_reader_expr, #end_expr, #owner_expr, #field_expr)?
+  })
 }
 
 fn text_child_read_parse_tokens(
@@ -2498,6 +2510,40 @@ fn text_child_read_parse_tokens(
   owner_expr: proc_macro2::TokenStream,
   field_expr: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
+  if let Some(kind) = text_child_simple_union_kind(value_ty, simple_type) {
+    let parse_value_tokens = parse_simple_union_value_tokens(kind, quote! { value });
+    return quote! {{
+      let value = #xml_reader_expr.read_text(#end_expr, #owner_expr, #field_expr)?;
+      #parse_value_tokens
+    }};
+  }
+
+  if is_enum || text_child_is_sdk_enum(value_ty, simple_type) {
+    let read_fn = if let Some(value_ty) = value_ty {
+      quote! { crate::common::read_enum_text_child_value::<_, #value_ty> }
+    } else {
+      quote! { crate::common::read_enum_text_child_value }
+    };
+    return quote! {
+      #read_fn(#xml_reader_expr, #end_expr, #owner_expr, #field_expr)?
+    };
+  }
+
+  if let Some(kind) = text_child_integer_kind(value_ty, simple_type) {
+    return read_integer_text_child_tokens(kind, xml_reader_expr, end_expr, owner_expr, field_expr);
+  }
+
+  if let Some(tokens) = read_float_text_child_tokens(
+    value_ty,
+    simple_type,
+    xml_reader_expr.clone(),
+    end_expr.clone(),
+    owner_expr.clone(),
+    field_expr.clone(),
+  ) {
+    return tokens;
+  }
+
   let value_parse_tokens = text_child_value_parse_tokens(
     value_ty,
     simple_type,
@@ -2506,25 +2552,10 @@ fn text_child_read_parse_tokens(
     owner_expr.clone(),
     field_expr.clone(),
   );
-  if let Some(raw_parse_tokens) =
-    text_child_raw_value_parse_tokens(value_ty, simple_type, is_enum, quote! { value })
-  {
-    quote! {
-      crate::common::read_text_child_value(
-        #xml_reader_expr,
-        #end_expr,
-        #owner_expr,
-        #field_expr,
-        |value| { #raw_parse_tokens },
-        |value| { Ok({ #value_parse_tokens }) },
-      )?
-    }
-  } else {
-    quote! {{
-      let value = #xml_reader_expr.read_text(#end_expr, #owner_expr, #field_expr)?;
-      #value_parse_tokens
-    }}
-  }
+  quote! {{
+    let value = #xml_reader_expr.read_text(#end_expr, #owner_expr, #field_expr)?;
+    #value_parse_tokens
+  }}
 }
 
 fn parse_simple_union_attr_tokens(kind: SimpleUnionTypeKind) -> proc_macro2::TokenStream {
@@ -2751,11 +2782,17 @@ fn build_text_child_write_tokens(
       panic!("text_child list fields must be string-like");
     } else if let Some(kind) = simple_union_effective_type_kind(&inner_ty, simple_type) {
       write_simple_union_value_tokens(kind, value_expr.clone())
+    } else if let Some(kind) = integer_effective_type_kind(&inner_ty, simple_type) {
+      write_integer_value_tokens_by_kind(kind, value_expr.clone())
     } else if effective_type_name(&inner_ty, simple_type)
       .as_deref()
       .is_some_and(is_xml_schema_float_type_name)
     {
       write_xml_schema_float_effective_tokens(value_expr.clone(), &inner_ty, simple_type, qname)
+    } else if is_sdk_enum_effective_type(&inner_ty, simple_type) {
+      quote! {
+        (#value_expr).write_xml_content_value(writer)?;
+      }
     } else if is_string_like_effective_type(&inner_ty, simple_type) {
       quote! {
         crate::common::write_escaped_content_str(writer, #value_expr.as_ref())?;
@@ -5746,8 +5783,14 @@ fn expand_named_struct(
             panic!("text list fields must be string-like");
           } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
             write_simple_union_value_tokens(kind, quote! { value })
+          } else if let Some(kind) = integer_effective_type_kind(&inner_ty, None) {
+            write_integer_value_tokens_by_kind(kind, quote! { value })
           } else if is_xml_schema_float_type(&inner_ty) {
             write_xml_schema_float_tokens(quote! { value }, &inner_ty)
+          } else if is_sdk_enum_effective_type(&inner_ty, None) {
+            quote! {
+              (*value).write_xml_content_value(writer)?;
+            }
           } else if is_string_like_type(&inner_ty) {
             quote! {
               crate::common::write_escaped_content_str(writer, value.as_ref())?;
@@ -5765,8 +5808,14 @@ fn expand_named_struct(
             panic!("text list fields must be string-like");
           } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
             write_simple_union_value_tokens(kind, quote! { &self.#field_ident })
+          } else if let Some(kind) = integer_effective_type_kind(&inner_ty, None) {
+            write_integer_value_tokens_by_kind(kind, quote! { &self.#field_ident })
           } else if is_xml_schema_float_type(&inner_ty) {
             write_xml_schema_float_tokens(quote! { &self.#field_ident }, &inner_ty)
+          } else if is_sdk_enum_effective_type(&inner_ty, None) {
+            quote! {
+              self.#field_ident.write_xml_content_value(writer)?;
+            }
           } else if is_string_like_type(&inner_ty) {
             quote! {
               crate::common::write_escaped_content_str(writer, self.#field_ident.as_ref())?;

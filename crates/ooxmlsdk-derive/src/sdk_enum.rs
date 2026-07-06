@@ -12,6 +12,7 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
   let mut as_xml_bytes_arms = Vec::with_capacity(variants.len());
   let mut from_bytes_arms = Vec::with_capacity(variants.len());
   let mut write_xml_attr_value_other_arm = None;
+  let mut write_xml_content_value_other_arm = None;
   let mut other_arm = None;
 
   for variant in variants {
@@ -71,6 +72,10 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
       write_xml_attr_value_other_arm = Some(quote! {
         #(#cfg_attrs)*
         Self::#variant_ident(value) => crate::common::write_escaped_bytes(writer, value),
+      });
+      write_xml_content_value_other_arm = Some(quote! {
+        #(#cfg_attrs)*
+        Self::#variant_ident(value) => crate::common::write_escaped_content_bytes(writer, value),
       });
       other_arm = Some(quote! {
         #(#cfg_attrs)*
@@ -146,6 +151,17 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
           _ => writer.write_all(<Self as crate::sdk::SdkEnum>::as_xml_bytes(self)),
         }
       }
+
+      #[inline]
+      pub(crate) fn write_xml_content_value<W: ::std::io::Write>(
+        &self,
+        writer: &mut W,
+      ) -> ::std::io::Result<()> {
+        match self {
+          #write_xml_content_value_other_arm
+          _ => writer.write_all(<Self as crate::sdk::SdkEnum>::as_xml_bytes(self)),
+        }
+      }
     }
 
     impl ::std::str::FromStr for #ident {
@@ -158,10 +174,11 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
     impl ::std::fmt::Display for #ident {
       fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        f.write_str(
-          std::str::from_utf8(<Self as crate::sdk::SdkEnum>::as_xml_bytes(self))
-            .map_err(|_| ::std::fmt::Error)?,
-        )
+        let value = match std::str::from_utf8(<Self as crate::sdk::SdkEnum>::as_xml_bytes(self)) {
+          Ok(value) => value,
+          Err(_) => return Err(::std::fmt::Error),
+        };
+        f.write_str(value)
       }
     }
   })

@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+## 0.11.0
+
+### Breaking Changes
+
+- Regenerated schema APIs with smaller generated payloads. Some required child fields that were previously boxed now store their value inline, and some small choice payloads are inlined directly in generated choice variants.
+- Removed generated `xml_header` fields from root schema structs. XML declaration writing is now controlled by `#[sdk(xml_header)]` metadata on the generated type instead of a stored `XmlHeaderType` field.
+- Removed unused raw-attribute preservation from selected hot leaf types, including WordprocessingML text leaves and SpreadsheetML cell values. These leaves now model only the schema-supported fields needed for round trips.
+
+### Changed
+
+- Updated XML declaration output to the fixed upstream-compatible form used by generated root writers.
+- Moved focused integration tests, package compatibility smoke tests, and runtime benchmarks out of the main workspace and into the adjacent `ooxmlsdk-test-suite` checkout.
+- Updated XML dependencies and runtime helpers around `quick-xml` 0.41.
+
+### Fixed
+
+- Preserved `mc:AlternateContent` attributes during MCE processing.
+- Aligned MCE context processing more closely with upstream behavior for ignored, preserved, and process-content branches.
+- Kept generated XML reader and writer behavior stable after the schema payload and XML header field removals.
+
+### Performance
+
+- Optimized XML event dispatch and slice-reader tag handling by keeping more name matching on borrowed bytes.
+- Optimized attribute parsing for enums, integers, floats, and common simple-union values with bytes-first fast paths and lazy decode fallback.
+- Optimized numeric and enum XML serialization with direct bytes writers, using `itoa`, `zmij`, and enum byte values instead of formatting through intermediate strings.
+- Optimized text reading by draining text events through a quick-xml-style text path and using bytes fast paths for numeric and enum text children.
+- Reduced generated XML parser compile-time cost by replacing per-field text-child parse closures with fixed runtime helpers and by simplifying hot error-construction paths.
+- Reduced generated schema size and allocation pressure by removing low-value boxes and raw-attribute fields from hot generated types.
+
+### Testing
+
+- Validated the release with workspace tests, clippy, XML benchmarks, macro expansion checks, and the external corpus round-trip suite.
+- External round-trip corpus status remains zero-failure: Apache POI `677 passed / 0 failed`, LibreOffice `3368 passed / 0 failed`, and Open-XML-SDK `884 passed / 0 failed`.
+
 ## 0.10.2
 
 ### Changed

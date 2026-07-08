@@ -703,7 +703,7 @@ pub struct SourceConnection {
 }
 /// Defines the DatastoreItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "x14:datastoreItem")]
+#[sdk(no_prefix_only, xml_header, qname = "x14:datastoreItem")]
 pub struct DatastoreItem {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// id
@@ -715,7 +715,7 @@ pub struct DatastoreItem {
 }
 /// Defines the FormControlProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "x14:formControlPr")]
+#[sdk(no_prefix_only, xml_header, qname = "x14:formControlPr")]
 pub struct FormControlProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// objectType
@@ -825,7 +825,7 @@ pub struct FormControlProperties {
 }
 /// Defines the Slicers Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "x14:slicers")]
+#[sdk(no_prefix_only, xml_header, qname = "x14:slicers")]
 pub struct Slicers {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the Slicer Class.
@@ -834,7 +834,7 @@ pub struct Slicers {
 }
 /// Defines the SlicerCacheDefinition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "x14:slicerCacheDefinition")]
+#[sdk(no_prefix_only, xml_header, qname = "x14:slicerCacheDefinition")]
 pub struct SlicerCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// name
@@ -2003,7 +2003,7 @@ pub struct CustomFilter {
 }
 /// Defines the ListItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:item")]
+#[sdk(no_prefix_only, qname = "x14:item")]
 pub struct ListItem {
   /// val
   #[sdk(attr(qname = ":val"))]
@@ -2011,7 +2011,7 @@ pub struct ListItem {
 }
 /// Defines the ListItems Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:itemLst")]
+#[sdk(no_prefix_only, qname = "x14:itemLst")]
 pub struct ListItems {
   /// Defines the ListItem Class.
   #[sdk(child(qname = "x14:item"))]
@@ -2022,7 +2022,7 @@ pub struct ListItems {
 }
 /// Defines the Slicer Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:slicer")]
+#[sdk(no_prefix_only, qname = "x14:slicer")]
 pub struct Slicer {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -2060,7 +2060,7 @@ pub struct Slicer {
 }
 /// Defines the OlapSlicerCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:olap")]
+#[sdk(no_prefix_only, qname = "x14:olap")]
 pub struct OlapSlicerCache {
   /// pivotCacheId
   #[sdk(attr(qname = ":pivotCacheId"))]
@@ -2077,7 +2077,7 @@ pub struct OlapSlicerCache {
 }
 /// Defines the TabularSlicerCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:tabular")]
+#[sdk(no_prefix_only, qname = "x14:tabular")]
 pub struct TabularSlicerCache {
   /// pivotCacheId
   #[sdk(attr(qname = ":pivotCacheId"))]
@@ -2103,7 +2103,7 @@ pub struct TabularSlicerCache {
 }
 /// Defines the SlicerCachePivotTable Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:pivotTable")]
+#[sdk(no_prefix_only, qname = "x14:pivotTable")]
 pub struct SlicerCachePivotTable {
   /// tabId
   #[sdk(attr(qname = ":tabId"))]
@@ -2114,7 +2114,7 @@ pub struct SlicerCachePivotTable {
 }
 /// Defines the OlapSlicerCacheItemParent Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:p")]
+#[sdk(no_prefix_only, qname = "x14:p")]
 pub struct OlapSlicerCacheItemParent {
   /// n
   #[sdk(attr(qname = ":n"))]
@@ -2122,7 +2122,7 @@ pub struct OlapSlicerCacheItemParent {
 }
 /// Defines the OlapSlicerCacheItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:i")]
+#[sdk(no_prefix_only, qname = "x14:i")]
 pub struct OlapSlicerCacheItem {
   /// n
   #[sdk(attr(qname = ":n"))]
@@ -2139,7 +2139,7 @@ pub struct OlapSlicerCacheItem {
 }
 /// Defines the OlapSlicerCacheRange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:range")]
+#[sdk(no_prefix_only, qname = "x14:range")]
 pub struct OlapSlicerCacheRange {
   /// startItem
   #[sdk(attr(qname = ":startItem"))]
@@ -2150,7 +2150,7 @@ pub struct OlapSlicerCacheRange {
 }
 /// Defines the OlapSlicerCacheRanges Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:ranges")]
+#[sdk(no_prefix_only, qname = "x14:ranges")]
 pub struct OlapSlicerCacheRanges {
   /// Defines the OlapSlicerCacheRange Class.
   #[sdk(child(qname = "x14:range"))]
@@ -2158,7 +2158,7 @@ pub struct OlapSlicerCacheRanges {
 }
 /// Defines the OlapSlicerCacheLevelData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:level")]
+#[sdk(no_prefix_only, qname = "x14:level")]
 pub struct OlapSlicerCacheLevelData {
   /// uniqueName
   #[sdk(attr(qname = ":uniqueName"))]
@@ -2181,7 +2181,7 @@ pub struct OlapSlicerCacheLevelData {
 }
 /// Defines the OlapSlicerCacheLevelsData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:levels")]
+#[sdk(no_prefix_only, qname = "x14:levels")]
 pub struct OlapSlicerCacheLevelsData {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -2192,7 +2192,7 @@ pub struct OlapSlicerCacheLevelsData {
 }
 /// Defines the OlapSlicerCacheSelections Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:selections")]
+#[sdk(no_prefix_only, qname = "x14:selections")]
 pub struct OlapSlicerCacheSelections {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -2203,7 +2203,7 @@ pub struct OlapSlicerCacheSelections {
 }
 /// Defines the OlapSlicerCacheSelection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:selection")]
+#[sdk(no_prefix_only, qname = "x14:selection")]
 pub struct OlapSlicerCacheSelection {
   /// n
   #[sdk(attr(qname = ":n"))]
@@ -2214,7 +2214,7 @@ pub struct OlapSlicerCacheSelection {
 }
 /// Defines the TabularSlicerCacheItems Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:items")]
+#[sdk(no_prefix_only, qname = "x14:items")]
 pub struct TabularSlicerCacheItems {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -2225,7 +2225,7 @@ pub struct TabularSlicerCacheItems {
 }
 /// Defines the TabularSlicerCacheItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:i")]
+#[sdk(no_prefix_only, qname = "x14:i")]
 pub struct TabularSlicerCacheItem {
   /// x
   #[sdk(attr(qname = ":x"))]
@@ -2239,7 +2239,7 @@ pub struct TabularSlicerCacheItem {
 }
 /// Defines the SlicerCachePivotTables Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:pivotTables")]
+#[sdk(no_prefix_only, qname = "x14:pivotTables")]
 pub struct SlicerCachePivotTables {
   /// Defines the SlicerCachePivotTable Class.
   #[sdk(child(qname = "x14:pivotTable"))]
@@ -2247,7 +2247,7 @@ pub struct SlicerCachePivotTables {
 }
 /// Defines the SlicerCacheData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:data")]
+#[sdk(no_prefix_only, qname = "x14:data")]
 pub struct SlicerCacheData {
   #[sdk(
         choice(
@@ -2259,7 +2259,7 @@ pub struct SlicerCacheData {
 }
 /// Defines the SlicerCacheDefinitionExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x14:extLst")]
+#[sdk(no_prefix_only, qname = "x14:extLst")]
 pub struct SlicerCacheDefinitionExtensionList {
   /// Defines the SlicerCacheDefinitionExtension Class.
   #[sdk(child(qname = "x:ext"))]

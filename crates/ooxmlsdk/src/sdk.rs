@@ -522,7 +522,9 @@ pub trait SdkType: Sized {
   }
 
   fn to_xml(&self) -> Result<String, crate::common::SdkError> {
-    match String::from_utf8(sdk_type_to_bytes(self)?) {
+    let mut writer = Vec::with_capacity(32);
+    self.write_to(&mut writer)?;
+    match String::from_utf8(writer) {
       Ok(xml) => Ok(xml),
       Err(err) => Err(crate::common::SdkError::CommonError(format!(
         "invalid utf-8 xml: {err}"
@@ -565,13 +567,6 @@ impl<T: SdkType> SdkType for Box<T> {
   ) -> Result<Self, crate::common::SdkError> {
     T::read_inner(xml_reader, start, empty).map(Box::new)
   }
-}
-
-#[inline]
-pub(crate) fn sdk_type_to_bytes<T: SdkType>(value: &T) -> Result<Vec<u8>, std::io::Error> {
-  let mut writer = Vec::with_capacity(32);
-  value.write_to(&mut writer)?;
-  Ok(writer)
 }
 
 #[cfg(feature = "mce")]

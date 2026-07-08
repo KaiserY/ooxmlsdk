@@ -6,7 +6,7 @@
 
 /// Application Specific File Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "ap:Properties")]
+#[sdk(no_prefix_only, xml_header, qname = "ap:Properties")]
 pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Name of Document Template
@@ -139,7 +139,7 @@ pub type SharedDocument = crate::simple_type::BooleanValue;
 pub type HyperlinksChanged = crate::simple_type::BooleanValue;
 /// Heading Pairs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "ap:HeadingPairs")]
+#[sdk(no_prefix_only, qname = "ap:HeadingPairs")]
 pub struct HeadingPairs {
   /// Vector
   #[sdk(child(qname = "vt:vector"))]
@@ -147,7 +147,7 @@ pub struct HeadingPairs {
 }
 /// Hyperlink List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "ap:HLinks")]
+#[sdk(no_prefix_only, qname = "ap:HLinks")]
 pub struct HyperlinkList {
   /// Vector
   #[sdk(child(qname = "vt:vector"))]
@@ -155,7 +155,7 @@ pub struct HyperlinkList {
 }
 /// Part Titles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "ap:TitlesOfParts")]
+#[sdk(no_prefix_only, qname = "ap:TitlesOfParts")]
 pub struct TitlesOfParts {
   /// Vector
   #[sdk(child(qname = "vt:vector"))]
@@ -163,7 +163,7 @@ pub struct TitlesOfParts {
 }
 /// Digital Signature.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "ap:DigSig")]
+#[sdk(no_prefix_only, qname = "ap:DigSig")]
 pub struct DigitalSignature {
   /// Binary Blob
   #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "vt:blob"))]

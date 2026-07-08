@@ -6,7 +6,7 @@
 
 /// Defines the NamedSheetViews Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "xnsv:namedSheetViews")]
+#[sdk(no_prefix_only, xml_header, qname = "xnsv:namedSheetViews")]
 pub struct NamedSheetViews {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
@@ -19,7 +19,7 @@ pub struct NamedSheetViews {
 }
 /// Defines the NamedSheetView Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xnsv:namedSheetView")]
+#[sdk(no_prefix_only, qname = "xnsv:namedSheetView")]
 pub struct NamedSheetView {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -38,7 +38,7 @@ pub struct NamedSheetView {
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xnsv:extLst")]
+#[sdk(no_prefix_only, qname = "xnsv:extLst")]
 pub struct ExtensionList {
   /// Extension.
   #[sdk(child(qname = "x:ext"))]
@@ -46,7 +46,7 @@ pub struct ExtensionList {
 }
 /// Defines the NsvFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xnsv:nsvFilter")]
+#[sdk(no_prefix_only, qname = "xnsv:nsvFilter")]
 pub struct NsvFilter {
   /// filterId
   #[sdk(attr(qname = ":filterId"))]
@@ -71,7 +71,7 @@ pub struct NsvFilter {
 }
 /// Defines the ColumnFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xnsv:columnFilter")]
+#[sdk(no_prefix_only, qname = "xnsv:columnFilter")]
 pub struct ColumnFilter {
   /// colId
   #[sdk(attr(qname = ":colId"))]
@@ -93,7 +93,7 @@ pub struct ColumnFilter {
 }
 /// Defines the SortRules Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xnsv:sortRules")]
+#[sdk(no_prefix_only, qname = "xnsv:sortRules")]
 pub struct SortRules {
   /// sortMethod
   #[sdk(attr(qname = ":sortMethod"))]
@@ -110,7 +110,7 @@ pub struct SortRules {
 }
 /// Defines the DifferentialFormatType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xnsv:dxf")]
+#[sdk(no_prefix_only, qname = "xnsv:dxf")]
 pub struct DifferentialFormatType {
   /// Font Properties
   #[sdk(child(qname = "x:font"))]
@@ -136,7 +136,7 @@ pub struct DifferentialFormatType {
 }
 /// Defines the FilterColumn Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xnsv:filter")]
+#[sdk(no_prefix_only, qname = "xnsv:filter")]
 pub struct FilterColumn {
   /// Filter Column Data
   #[sdk(attr(qname = ":colId"))]
@@ -164,7 +164,7 @@ pub struct FilterColumn {
 }
 /// Defines the SortRule Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xnsv:sortRule")]
+#[sdk(no_prefix_only, qname = "xnsv:sortRule")]
 pub struct SortRule {
   /// colId
   #[sdk(attr(qname = ":colId"))]
@@ -187,7 +187,7 @@ pub struct SortRule {
 }
 /// Defines the SortCondition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xnsv:sortCondition")]
+#[sdk(no_prefix_only, qname = "xnsv:sortCondition")]
 pub struct SortCondition {
   /// descending
   #[sdk(attr(qname = ":descending"))]
@@ -213,7 +213,7 @@ pub struct SortCondition {
 }
 /// Defines the RichSortCondition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xnsv:richSortCondition")]
+#[sdk(no_prefix_only, qname = "xnsv:richSortCondition")]
 pub struct RichSortCondition {
   /// richSortKey
   #[sdk(attr(qname = ":richSortKey"))]

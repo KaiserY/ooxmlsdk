@@ -66,7 +66,7 @@ pub enum RichFormatPropertyType {
 }
 /// Defines the RichFilterColumn Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:filterColumn")]
+#[sdk(no_prefix_only, qname = "xlrd2:filterColumn")]
 pub struct RichFilterColumn {
   #[sdk(
         choice(
@@ -81,7 +81,7 @@ pub struct RichFilterColumn {
 }
 /// Defines the RichSortCondition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:richSortCondition")]
+#[sdk(no_prefix_only, qname = "xlrd2:richSortCondition")]
 pub struct RichSortCondition {
   /// richSortKey
   #[sdk(attr(qname = ":richSortKey"))]
@@ -110,7 +110,7 @@ pub struct RichSortCondition {
 }
 /// Defines the SupportingPropertyBags Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "xlrd2:supportingPropertyBags")]
+#[sdk(no_prefix_only, xml_header, qname = "xlrd2:supportingPropertyBags")]
 pub struct SupportingPropertyBags {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the SupportingPropertyBagArrayData Class.
@@ -122,7 +122,7 @@ pub struct SupportingPropertyBags {
 }
 /// Defines the SupportingPropertyBagStructures Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "xlrd2:spbStructures")]
+#[sdk(no_prefix_only, xml_header, qname = "xlrd2:spbStructures")]
 pub struct SupportingPropertyBagStructures {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// count
@@ -137,7 +137,7 @@ pub struct SupportingPropertyBagStructures {
 }
 /// Defines the ArrayData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "xlrd2:arrayData")]
+#[sdk(no_prefix_only, xml_header, qname = "xlrd2:arrayData")]
 pub struct ArrayData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// count
@@ -152,7 +152,7 @@ pub struct ArrayData {
 }
 /// Defines the RichStylesheet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "xlrd2:richStyleSheet")]
+#[sdk(no_prefix_only, xml_header, qname = "xlrd2:richStyleSheet")]
 pub struct RichStylesheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the Dxfs Class.
@@ -170,7 +170,7 @@ pub struct RichStylesheet {
 }
 /// Defines the RichValueTypesInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "xlrd2:rvTypesInfo")]
+#[sdk(no_prefix_only, xml_header, qname = "xlrd2:rvTypesInfo")]
 pub struct RichValueTypesInfo {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
@@ -186,7 +186,7 @@ pub struct RichValueTypesInfo {
 }
 /// Defines the RichFilters Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:filters")]
+#[sdk(no_prefix_only, qname = "xlrd2:filters")]
 pub struct RichFilters {
   /// Defines the RichFilter Class.
   #[sdk(child(qname = "xlrd2:filter"))]
@@ -200,7 +200,7 @@ pub struct RichFilters {
 }
 /// Defines the RichTop10 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:top10")]
+#[sdk(no_prefix_only, qname = "xlrd2:top10")]
 pub struct RichTop10 {
   /// key
   #[sdk(attr(qname = ":key"))]
@@ -220,7 +220,7 @@ pub struct RichTop10 {
 }
 /// Defines the CustomRichFilters Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:customFilters")]
+#[sdk(no_prefix_only, qname = "xlrd2:customFilters")]
 pub struct CustomRichFilters {
   /// and
   #[sdk(attr(qname = ":and"))]
@@ -235,7 +235,7 @@ pub struct CustomRichFilters {
 }
 /// Defines the DynamicRichFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:dynamicFilter")]
+#[sdk(no_prefix_only, qname = "xlrd2:dynamicFilter")]
 pub struct DynamicRichFilter {
   /// key
   #[sdk(attr(qname = ":key"))]
@@ -258,7 +258,7 @@ pub struct DynamicRichFilter {
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:extLst")]
+#[sdk(no_prefix_only, qname = "xlrd2:extLst")]
 pub struct ExtensionList {
   /// Extension.
   #[sdk(child(qname = "x:ext"))]
@@ -266,7 +266,7 @@ pub struct ExtensionList {
 }
 /// Defines the RichFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:filter")]
+#[sdk(no_prefix_only, qname = "xlrd2:filter")]
 pub struct RichFilter {
   /// key
   #[sdk(attr(qname = ":key"))]
@@ -283,7 +283,7 @@ pub struct RichFilter {
 }
 /// Defines the RichDateGroupItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:dateGroupItem")]
+#[sdk(no_prefix_only, qname = "xlrd2:dateGroupItem")]
 pub struct RichDateGroupItem {
   /// key
   #[sdk(attr(qname = ":key"))]
@@ -312,7 +312,7 @@ pub struct RichDateGroupItem {
 }
 /// Defines the CustomRichFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:customFilter")]
+#[sdk(no_prefix_only, qname = "xlrd2:customFilter")]
 pub struct CustomRichFilter {
   /// key
   #[sdk(attr(qname = ":key"))]
@@ -326,7 +326,7 @@ pub struct CustomRichFilter {
 }
 /// Defines the SupportingPropertyBagArrayData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:spbArrays")]
+#[sdk(no_prefix_only, qname = "xlrd2:spbArrays")]
 pub struct SupportingPropertyBagArrayData {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -340,7 +340,7 @@ pub struct SupportingPropertyBagArrayData {
 }
 /// Defines the SupportingPropertyBagData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:spbData")]
+#[sdk(no_prefix_only, qname = "xlrd2:spbData")]
 pub struct SupportingPropertyBagData {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -354,7 +354,7 @@ pub struct SupportingPropertyBagData {
 }
 /// Defines the SupportingPropertyBag Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:spb")]
+#[sdk(no_prefix_only, qname = "xlrd2:spb")]
 pub struct SupportingPropertyBag {
   /// s
   #[sdk(attr(qname = ":s"))]
@@ -367,7 +367,7 @@ pub struct SupportingPropertyBag {
 pub type SupportingPropertyBagValue = crate::simple_type::StringValue;
 /// Defines the SupportingPropertyBagStructure Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:s")]
+#[sdk(no_prefix_only, qname = "xlrd2:s")]
 pub struct SupportingPropertyBagStructure {
   /// Defines the SupportingPropertyBagKey Class.
   #[sdk(child(qname = "xlrd2:k"))]
@@ -375,7 +375,7 @@ pub struct SupportingPropertyBagStructure {
 }
 /// Defines the SupportingPropertyBagKey Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:k")]
+#[sdk(no_prefix_only, qname = "xlrd2:k")]
 pub struct SupportingPropertyBagKey {
   /// n
   #[sdk(attr(qname = ":n"))]
@@ -386,7 +386,7 @@ pub struct SupportingPropertyBagKey {
 }
 /// Defines the SupportingPropertyBagArray Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:a")]
+#[sdk(no_prefix_only, qname = "xlrd2:a")]
 pub struct SupportingPropertyBagArray {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -397,7 +397,7 @@ pub struct SupportingPropertyBagArray {
 }
 /// Defines the SupportingPropertyBagArrayValue Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:v")]
+#[sdk(no_prefix_only, qname = "xlrd2:v")]
 pub struct SupportingPropertyBagArrayValue {
   /// t
   #[sdk(attr(qname = ":t"))]
@@ -407,7 +407,7 @@ pub struct SupportingPropertyBagArrayValue {
 }
 /// Defines the Array Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:a")]
+#[sdk(no_prefix_only, qname = "xlrd2:a")]
 pub struct Array {
   /// r
   #[sdk(attr(qname = ":r"))]
@@ -421,7 +421,7 @@ pub struct Array {
 }
 /// Defines the ArrayValue Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:v")]
+#[sdk(no_prefix_only, qname = "xlrd2:v")]
 pub struct ArrayValue {
   /// t
   #[sdk(attr(qname = ":t"))]
@@ -431,7 +431,7 @@ pub struct ArrayValue {
 }
 /// Defines the Dxfs Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:dxfs")]
+#[sdk(no_prefix_only, qname = "xlrd2:dxfs")]
 pub struct Dxfs {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
@@ -442,7 +442,7 @@ pub struct Dxfs {
 }
 /// Defines the RichFormatProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:richProperties")]
+#[sdk(no_prefix_only, qname = "xlrd2:richProperties")]
 pub struct RichFormatProperties {
   /// Defines the RichFormatProperty Class.
   #[sdk(child(qname = "xlrd2:rPr"))]
@@ -450,7 +450,7 @@ pub struct RichFormatProperties {
 }
 /// Defines the RichStyles Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:richStyles")]
+#[sdk(no_prefix_only, qname = "xlrd2:richStyles")]
 pub struct RichStyles {
   /// Defines the RichStyle Class.
   #[sdk(child(qname = "xlrd2:rSty"))]
@@ -458,7 +458,7 @@ pub struct RichStyles {
 }
 /// Defines the RichFormatProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:rPr")]
+#[sdk(no_prefix_only, qname = "xlrd2:rPr")]
 pub struct RichFormatProperty {
   /// n
   #[sdk(attr(qname = ":n"))]
@@ -469,7 +469,7 @@ pub struct RichFormatProperty {
 }
 /// Defines the RichStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:rSty")]
+#[sdk(no_prefix_only, qname = "xlrd2:rSty")]
 pub struct RichStyle {
   /// dxfid
   #[sdk(attr(qname = ":dxfid"))]
@@ -480,7 +480,7 @@ pub struct RichStyle {
 }
 /// Defines the RichStylePropertyValue Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:rpv")]
+#[sdk(no_prefix_only, qname = "xlrd2:rpv")]
 pub struct RichStylePropertyValue {
   /// i
   #[sdk(attr(qname = ":i"))]
@@ -490,7 +490,7 @@ pub struct RichStylePropertyValue {
 }
 /// Defines the RichValueGlobalType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:global")]
+#[sdk(no_prefix_only, qname = "xlrd2:global")]
 pub struct RichValueGlobalType {
   /// Defines the RichValueTypeKeyFlags Class.
   #[sdk(child(qname = "xlrd2:keyFlags"))]
@@ -501,7 +501,7 @@ pub struct RichValueGlobalType {
 }
 /// Defines the RichValueTypes Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:types")]
+#[sdk(no_prefix_only, qname = "xlrd2:types")]
 pub struct RichValueTypes {
   /// Defines the RichValueType Class.
   #[sdk(child(qname = "xlrd2:type"))]
@@ -509,7 +509,7 @@ pub struct RichValueTypes {
 }
 /// Defines the RichValueType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:type")]
+#[sdk(no_prefix_only, qname = "xlrd2:type")]
 pub struct RichValueType {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -523,7 +523,7 @@ pub struct RichValueType {
 }
 /// Defines the RichValueTypeKeyFlags Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:keyFlags")]
+#[sdk(no_prefix_only, qname = "xlrd2:keyFlags")]
 pub struct RichValueTypeKeyFlags {
   /// Defines the RichValueTypeReservedKey Class.
   #[sdk(child(qname = "xlrd2:key"))]
@@ -531,7 +531,7 @@ pub struct RichValueTypeKeyFlags {
 }
 /// Defines the RichValueTypeReservedKey Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:key")]
+#[sdk(no_prefix_only, qname = "xlrd2:key")]
 pub struct RichValueTypeReservedKey {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -542,7 +542,7 @@ pub struct RichValueTypeReservedKey {
 }
 /// Defines the RichValueTypeReservedKeyFlag Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd2:flag")]
+#[sdk(no_prefix_only, qname = "xlrd2:flag")]
 pub struct RichValueTypeReservedKeyFlag {
   /// name
   #[sdk(attr(qname = ":name"))]

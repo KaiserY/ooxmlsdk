@@ -6,7 +6,7 @@
 
 /// Defines the PersonList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "xltc:personList")]
+#[sdk(no_prefix_only, xml_header, qname = "xltc:personList")]
 pub struct PersonList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the Person Class.
@@ -18,7 +18,7 @@ pub struct PersonList {
 }
 /// Defines the ThreadedComments Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "xltc:ThreadedComments")]
+#[sdk(no_prefix_only, xml_header, qname = "xltc:ThreadedComments")]
 pub struct ThreadedComments {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ThreadedComment Class.
@@ -30,7 +30,7 @@ pub struct ThreadedComments {
 }
 /// Defines the Person Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xltc:person")]
+#[sdk(no_prefix_only, qname = "xltc:person")]
 pub struct Person {
   /// displayName
   #[sdk(attr(qname = ":displayName"))]
@@ -52,7 +52,7 @@ pub struct Person {
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xltc:extLst")]
+#[sdk(no_prefix_only, qname = "xltc:extLst")]
 pub struct ExtensionList {
   /// Extension.
   #[sdk(child(qname = "x:ext"))]
@@ -60,7 +60,7 @@ pub struct ExtensionList {
 }
 /// Defines the ThreadedComment Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xltc:threadedComment")]
+#[sdk(no_prefix_only, qname = "xltc:threadedComment")]
 pub struct ThreadedComment {
   /// ref
   #[sdk(attr(qname = ":ref"))]
@@ -98,11 +98,11 @@ pub struct ThreadedComment {
 }
 /// Defines the ThreadedCommentText Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xltc:text")]
+#[sdk(no_prefix_only, qname = "xltc:text")]
 pub struct ThreadedCommentText(pub crate::schemas::x::XstringType);
 /// Defines the ThreadedCommentMentions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xltc:mentions")]
+#[sdk(no_prefix_only, qname = "xltc:mentions")]
 pub struct ThreadedCommentMentions {
   /// Defines the Mention Class.
   #[sdk(child(qname = "xltc:mention"))]
@@ -110,7 +110,7 @@ pub struct ThreadedCommentMentions {
 }
 /// Defines the Mention Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xltc:mention")]
+#[sdk(no_prefix_only, qname = "xltc:mention")]
 pub struct Mention {
   /// mentionpersonId
   #[sdk(attr(qname = ":mentionpersonId"))]

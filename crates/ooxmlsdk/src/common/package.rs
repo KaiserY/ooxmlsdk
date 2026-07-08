@@ -708,9 +708,9 @@ impl RelationshipSet {
     if let Some(bytes) = &self.raw_bytes {
       return Ok(Cow::Borrowed(bytes));
     }
-    Ok(Cow::Owned(crate::sdk::sdk_type_to_bytes(
-      &self.to_relationships(),
-    )?))
+    let mut bytes = Vec::with_capacity(32);
+    crate::sdk::SdkType::write_to(&self.to_relationships(), &mut bytes)?;
+    Ok(Cow::Owned(bytes))
   }
 
   #[inline]

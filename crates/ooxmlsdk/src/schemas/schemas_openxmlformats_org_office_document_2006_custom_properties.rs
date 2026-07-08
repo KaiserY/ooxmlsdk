@@ -6,7 +6,7 @@
 
 /// Custom File Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "op:Properties")]
+#[sdk(no_prefix_only, xml_header, qname = "op:Properties")]
 pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Custom File Property.
@@ -15,7 +15,7 @@ pub struct Properties {
 }
 /// Custom File Property.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "op:property")]
+#[sdk(no_prefix_only, qname = "op:property")]
 pub struct CustomDocumentProperty {
   /// Format ID
   #[sdk(attr(qname = ":fmtid"))]

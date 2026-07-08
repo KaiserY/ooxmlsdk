@@ -1546,10 +1546,11 @@ fn expand_tuple_wrapper(
   }
 
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  let no_prefix = parse_sdk_no_prefix(&input.attrs)?;
+  let prefix_write_mode = parse_sdk_prefix_write_mode(&input.attrs)?;
+  let no_prefix = prefix_write_mode.writes_no_prefix();
   let start_tag_open = write_start_tag_open_tokens(schema_qname, no_prefix);
   let end_tag = write_end_tag_tokens(schema_qname, no_prefix);
-  let write_inner_root_call = if no_prefix {
+  let write_inner_root_call = if prefix_write_mode == PrefixWriteMode::NoPrefixDual {
     quote! { self.write_inner_no_prefix(writer)? }
   } else {
     quote! { self.write_inner(writer)? }
@@ -3703,7 +3704,9 @@ fn expand_named_struct(
     local_name,
   } = parse_qname_info(schema_qname);
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  let no_prefix = parse_sdk_no_prefix(&input.attrs)?;
+  let prefix_write_mode = parse_sdk_prefix_write_mode(&input.attrs)?;
+  let no_prefix = prefix_write_mode.writes_no_prefix();
+  let no_prefix_only = prefix_write_mode.writes_no_prefix_only();
   let has_xml_header = parse_sdk_xml_header(&input.attrs)?;
   let extra_xmlns = parse_sdk_extra_xmlns(&input.attrs)?;
   let (extra_xmlns_init_tokens, extra_xmlns_mark_tokens, extra_xmlns_write_tokens) =
@@ -5847,8 +5850,8 @@ fn expand_named_struct(
     }
     Ok(ordered_write_tokens)
   };
-  let ordered_write_tokens = build_ordered_write_tokens(false, None)?;
-  let ordered_write_tokens_no_prefix = if no_prefix {
+  let ordered_write_tokens = build_ordered_write_tokens(no_prefix_only, None)?;
+  let ordered_write_tokens_no_prefix = if prefix_write_mode == PrefixWriteMode::NoPrefixDual {
     Some(build_ordered_write_tokens(true, None)?)
   } else {
     None
@@ -6735,7 +6738,7 @@ fn expand_named_struct(
     || has_xml_other_children_field
     || text_field.is_some();
   let body_write_tokens = body_write_tokens_for(&ordered_write_tokens, writes_body);
-  let body_write_no_prefix_tokens = if no_prefix {
+  let body_write_no_prefix_tokens = if prefix_write_mode == PrefixWriteMode::NoPrefixDual {
     let ordered_write_tokens_no_prefix = ordered_write_tokens_no_prefix
       .as_ref()
       .expect("no-prefix write tokens");
@@ -6743,7 +6746,7 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let write_inner_root_call = if no_prefix {
+  let write_inner_root_call = if prefix_write_mode == PrefixWriteMode::NoPrefixDual {
     quote! { self.write_inner_no_prefix(writer)? }
   } else {
     quote! { self.write_inner(writer)? }
@@ -7026,7 +7029,7 @@ fn expand_named_struct(
     quote! { #type_generics },
     quote! { #where_clause },
   );
-  let write_inner_no_prefix_method_tokens = if no_prefix {
+  let write_inner_no_prefix_method_tokens = if prefix_write_mode == PrefixWriteMode::NoPrefixDual {
     let write_inner_no_prefix_body = write_inner_body_tokens(quote! {
       #special_namespace_write_tokens
       #( #attr_write_tokens )*
@@ -7039,6 +7042,15 @@ fn expand_named_struct(
         writer: &mut W,
       ) -> Result<bool, std::io::Error> {
         #write_inner_no_prefix_body
+      }
+    }
+  } else if prefix_write_mode == PrefixWriteMode::NoPrefixOnly {
+    quote! {
+      pub(crate) fn write_inner_no_prefix<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+      ) -> Result<bool, std::io::Error> {
+        self.write_inner(writer)
       }
     }
   } else {

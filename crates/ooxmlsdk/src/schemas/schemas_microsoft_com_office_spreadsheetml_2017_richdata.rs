@@ -38,7 +38,7 @@ pub enum RichValueValueType {
 }
 /// Defines the RichValueBlock Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd:rvb")]
+#[sdk(no_prefix_only, qname = "xlrd:rvb")]
 pub struct RichValueBlock {
   /// i
   #[sdk(attr(qname = ":i"))]
@@ -46,7 +46,7 @@ pub struct RichValueBlock {
 }
 /// Defines the RichValueData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "xlrd:rvData")]
+#[sdk(no_prefix_only, xml_header, qname = "xlrd:rvData")]
 pub struct RichValueData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// count
@@ -61,7 +61,7 @@ pub struct RichValueData {
 }
 /// Defines the RichValueStructures Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "xlrd:rvStructures")]
+#[sdk(no_prefix_only, xml_header, qname = "xlrd:rvStructures")]
 pub struct RichValueStructures {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// count
@@ -76,7 +76,7 @@ pub struct RichValueStructures {
 }
 /// Defines the RichValue Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd:rv")]
+#[sdk(no_prefix_only, qname = "xlrd:rv")]
 pub struct RichValue {
   /// s
   #[sdk(attr(qname = ":s"))]
@@ -90,7 +90,7 @@ pub struct RichValue {
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd:extLst")]
+#[sdk(no_prefix_only, qname = "xlrd:extLst")]
 pub struct ExtensionList {
   /// Extension.
   #[sdk(child(qname = "x:ext"))]
@@ -98,7 +98,7 @@ pub struct ExtensionList {
 }
 /// Defines the RichValueFallback Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd:fb")]
+#[sdk(no_prefix_only, qname = "xlrd:fb")]
 pub struct RichValueFallback {
   /// t
   #[sdk(attr(qname = ":t"))]
@@ -110,7 +110,7 @@ pub struct RichValueFallback {
 pub type Value = crate::simple_type::StringValue;
 /// Defines the RichValueStructure Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd:s")]
+#[sdk(no_prefix_only, qname = "xlrd:s")]
 pub struct RichValueStructure {
   /// t
   #[sdk(attr(qname = ":t"))]
@@ -121,7 +121,7 @@ pub struct RichValueStructure {
 }
 /// Defines the Key Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "xlrd:k")]
+#[sdk(no_prefix_only, qname = "xlrd:k")]
 pub struct Key {
   /// n
   #[sdk(attr(qname = ":n"))]

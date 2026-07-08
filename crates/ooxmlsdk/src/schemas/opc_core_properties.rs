@@ -12,7 +12,7 @@ pub enum XsiTypeValue {
 }
 /// Core File Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, xml_header, qname = "cp:coreProperties")]
+#[sdk(no_prefix_only, xml_header, qname = "cp:coreProperties")]
 pub struct CoreProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
@@ -128,7 +128,7 @@ pub type Title = crate::simple_type::StringValue;
 pub type Version = crate::simple_type::StringValue;
 /// Keywords.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "cp:keywords")]
+#[sdk(no_prefix_only, qname = "cp:keywords")]
 pub struct Keywords {
   /// lang
   #[sdk(attr(qname = "xml:lang"))]
@@ -141,7 +141,7 @@ pub struct Keywords {
 }
 /// Keyword.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "cp:value")]
+#[sdk(no_prefix_only, qname = "cp:value")]
 pub struct Keyword {
   /// lang
   #[sdk(attr(qname = "xml:lang"))]

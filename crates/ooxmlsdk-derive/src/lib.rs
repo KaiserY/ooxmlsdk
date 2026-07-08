@@ -563,7 +563,25 @@ fn parse_sdk_qname(attrs: &[Attribute]) -> syn::Result<Option<String>> {
   Ok(None)
 }
 
-fn parse_sdk_no_prefix(attrs: &[Attribute]) -> syn::Result<bool> {
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PrefixWriteMode {
+  Normal,
+  NoPrefixDual,
+  NoPrefixOnly,
+}
+
+impl PrefixWriteMode {
+  fn writes_no_prefix(self) -> bool {
+    matches!(self, Self::NoPrefixDual | Self::NoPrefixOnly)
+  }
+
+  fn writes_no_prefix_only(self) -> bool {
+    self == Self::NoPrefixOnly
+  }
+}
+
+fn parse_sdk_prefix_write_mode(attrs: &[Attribute]) -> syn::Result<PrefixWriteMode> {
+  let mut mode = PrefixWriteMode::Normal;
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
       continue;
@@ -571,14 +589,28 @@ fn parse_sdk_no_prefix(attrs: &[Attribute]) -> syn::Result<bool> {
     let metas =
       attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
     for meta in metas {
-      if let Meta::Path(path) = meta
-        && (path.is_ident("no_prefix") || path.is_ident("default_ns"))
-      {
-        return Ok(true);
+      if let Meta::Path(path) = meta {
+        if path.is_ident("no_prefix") || path.is_ident("default_ns") {
+          if mode == PrefixWriteMode::NoPrefixOnly {
+            return Err(syn::Error::new_spanned(
+              path,
+              "no_prefix_only cannot be combined with no_prefix/default_ns",
+            ));
+          }
+          mode = PrefixWriteMode::NoPrefixDual;
+        } else if path.is_ident("no_prefix_only") {
+          if mode == PrefixWriteMode::NoPrefixDual {
+            return Err(syn::Error::new_spanned(
+              path,
+              "no_prefix_only cannot be combined with no_prefix/default_ns",
+            ));
+          }
+          mode = PrefixWriteMode::NoPrefixOnly;
+        }
       }
     }
   }
-  Ok(false)
+  Ok(mode)
 }
 
 fn parse_sdk_xml_header(attrs: &[Attribute]) -> syn::Result<bool> {

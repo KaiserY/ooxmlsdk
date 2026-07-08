@@ -244,7 +244,11 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
     let variant_ident = &variant.ident;
     quote! {
       #( #attrs )*
-      Self::#variant_ident(root) => Ok(crate::sdk::sdk_type_to_bytes(root.as_ref())?),
+      Self::#variant_ident(root) => {
+        let mut bytes = Vec::with_capacity(32);
+        crate::sdk::SdkType::write_to(root.as_ref(), &mut bytes)?;
+        Ok(bytes)
+      },
     }
   });
   let root_write_to_arms = root_variants.clone().map(|(variant, _)| {

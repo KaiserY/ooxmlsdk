@@ -146,6 +146,7 @@ pub(crate) struct TypeContainmentGraph {
   leaf_text_alias_content: HashMap<String, TypeRefDecl>,
   leaf_text_alias_keys: HashSet<String>,
   module_alias_paths: HashMap<String, String>,
+  no_prefix_only_keys: HashSet<String>,
   nodes: HashSet<String>,
   shallow_depths: HashMap<String, usize>,
   wrapped_base_keys: HashSet<String>,
@@ -154,6 +155,8 @@ pub(crate) struct TypeContainmentGraph {
 impl TypeContainmentGraph {
   pub(crate) fn from_modules(modules: &[&SchemaModuleDecl]) -> Self {
     let mut graph = Self::default();
+    let mut no_prefix_keys = HashSet::new();
+    let mut type_decl_by_key = HashMap::<String, (&SchemaModuleDecl, &TypeDecl)>::new();
 
     for module in modules {
       if let Some(alias_path) = schema_prefix_alias_path(module) {
@@ -169,6 +172,14 @@ impl TypeContainmentGraph {
       for type_decl in &module.types {
         let type_key = local_type_key(module, &type_decl.rust_name);
         graph.nodes.insert(type_key.clone());
+        type_decl_by_key.insert(type_key.clone(), (*module, type_decl));
+        if type_decl
+          .xml_qname
+          .as_deref()
+          .is_some_and(|qname| type_uses_default_namespace(module.prefix.as_str(), qname))
+        {
+          no_prefix_keys.insert(type_key.clone());
+        }
         if type_decl.estimated_size > 0 {
           graph
             .estimated_sizes
@@ -204,6 +215,53 @@ impl TypeContainmentGraph {
         }
       }
     }
+
+    let mut needs_prefixed_write_keys = HashSet::new();
+    for module in modules {
+      for type_decl in &module.types {
+        let owner_key = local_type_key(module, &type_decl.rust_name);
+        if !no_prefix_keys.contains(&owner_key) {
+          continue;
+        }
+        let Some(parent_prefix) = type_decl.xml_qname.as_deref().and_then(type_qname_prefix) else {
+          continue;
+        };
+        collect_prefixed_write_requirements_from_members(
+          module,
+          type_decl.members.as_slice(),
+          parent_prefix,
+          &no_prefix_keys,
+          &type_decl_by_key,
+          &mut needs_prefixed_write_keys,
+        );
+      }
+    }
+    let mut changed = true;
+    while changed {
+      changed = false;
+      for owner_key in needs_prefixed_write_keys
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>()
+      {
+        let Some((module, type_decl)) = type_decl_by_key.get(&owner_key).copied() else {
+          continue;
+        };
+        let len_before = needs_prefixed_write_keys.len();
+        collect_prefixed_write_descendants_from_members(
+          module,
+          type_decl.members.as_slice(),
+          &no_prefix_keys,
+          &type_decl_by_key,
+          &mut needs_prefixed_write_keys,
+        );
+        changed |= needs_prefixed_write_keys.len() != len_before;
+      }
+    }
+    graph.no_prefix_only_keys = no_prefix_keys
+      .difference(&needs_prefixed_write_keys)
+      .cloned()
+      .collect();
 
     for module in modules {
       for type_decl in &module.types {
@@ -368,6 +426,10 @@ impl TypeContainmentGraph {
 
   fn is_wrapped_base(&self, node: &str) -> bool {
     self.wrapped_base_keys.contains(node)
+  }
+
+  fn is_no_prefix_only(&self, node: &str) -> bool {
+    self.no_prefix_only_keys.contains(node)
   }
 
   fn rendered_module_path<'a>(&'a self, module_path: &'a str) -> &'a str {
@@ -601,21 +663,256 @@ pub(crate) fn schema_choice_variant_name_from_qname(qname: &str) -> String {
   }
 }
 
-fn no_prefix_sdk_attr_from_qname(module_prefix: &str, qname: &str) -> TokenStream {
-  if !matches!(
+fn supports_default_namespace_write(module_prefix: &str) -> bool {
+  matches!(
     module_prefix,
     "ap" | "cp" | "op" | "x" | "x14" | "xltc" | "xlrd" | "xlrd2" | "xnsv" | "pct"
-  ) {
-    return quote! {};
-  }
-  let element_qname = schema_qname_element_name(qname);
-  let Some((prefix, _)) = element_qname.split_once(':') else {
+  )
+}
+
+fn type_qname_prefix(qname: &str) -> Option<&str> {
+  schema_qname_element_name(qname)
+    .split_once(':')
+    .map(|(prefix, _)| prefix)
+}
+
+fn type_uses_default_namespace(module_prefix: &str, qname: &str) -> bool {
+  supports_default_namespace_write(module_prefix)
+    && type_qname_prefix(qname).is_some_and(|prefix| prefix == module_prefix)
+}
+
+fn child_uses_parent_default_namespace(parent_prefix: &str, qname: &str) -> bool {
+  schema_qname_element_name(qname)
+    .split_once(':')
+    .is_some_and(|(prefix, _)| prefix == parent_prefix)
+}
+
+fn no_prefix_sdk_attr_from_qname(
+  module: &SchemaModuleDecl,
+  type_decl: &TypeDecl,
+  type_graph: &TypeContainmentGraph,
+) -> TokenStream {
+  let Some(qname) = type_decl.xml_qname.as_deref() else {
     return quote! {};
   };
-  if prefix == module_prefix {
-    quote! { no_prefix, }
+  if !type_uses_default_namespace(module.prefix.as_str(), qname) {
+    return quote! {};
+  }
+  let type_key = local_type_key(module, &type_decl.rust_name);
+  if type_graph.is_no_prefix_only(&type_key) {
+    quote! { no_prefix_only, }
   } else {
-    quote! {}
+    quote! { no_prefix, }
+  }
+}
+
+fn collect_prefixed_write_requirement_for_child(
+  module: &SchemaModuleDecl,
+  parent_prefix: &str,
+  qname: &str,
+  type_ref: &TypeRefDecl,
+  no_prefix_keys: &HashSet<String>,
+  needs_prefixed_write_keys: &mut HashSet<String>,
+) {
+  let Some(target_key) = schema_type_key_from_ref(module, type_ref) else {
+    return;
+  };
+  if no_prefix_keys.contains(&target_key)
+    && !child_uses_parent_default_namespace(parent_prefix, qname)
+  {
+    needs_prefixed_write_keys.insert(target_key);
+  }
+}
+
+fn collect_prefixed_write_descendant_for_child(
+  module: &SchemaModuleDecl,
+  type_ref: &TypeRefDecl,
+  no_prefix_keys: &HashSet<String>,
+  needs_prefixed_write_keys: &mut HashSet<String>,
+) {
+  let Some(target_key) = schema_type_key_from_ref(module, type_ref) else {
+    return;
+  };
+  if no_prefix_keys.contains(&target_key) {
+    needs_prefixed_write_keys.insert(target_key);
+  }
+}
+
+fn collect_prefixed_write_descendants_from_choice(
+  choice_type_decl: &TypeDecl,
+  choice_module: &SchemaModuleDecl,
+  no_prefix_keys: &HashSet<String>,
+  type_decl_by_key: &HashMap<String, (&SchemaModuleDecl, &TypeDecl)>,
+  needs_prefixed_write_keys: &mut HashSet<String>,
+) {
+  for member in &choice_type_decl.members {
+    let MemberDecl::Variant(variant) = member else {
+      continue;
+    };
+    match &variant.wire {
+      VariantWireDecl::Child { .. } => {
+        collect_prefixed_write_descendant_for_child(
+          choice_module,
+          &variant.payload,
+          no_prefix_keys,
+          needs_prefixed_write_keys,
+        );
+      }
+      VariantWireDecl::Sequence { .. } => {
+        let Some(helper_key) = schema_type_key_from_ref(choice_module, &variant.payload) else {
+          continue;
+        };
+        let Some((helper_module, helper_type_decl)) = type_decl_by_key.get(&helper_key).copied()
+        else {
+          continue;
+        };
+        collect_prefixed_write_descendants_from_members(
+          helper_module,
+          helper_type_decl.members.as_slice(),
+          no_prefix_keys,
+          type_decl_by_key,
+          needs_prefixed_write_keys,
+        );
+      }
+      VariantWireDecl::Any { .. } | VariantWireDecl::Text | VariantWireDecl::TextChild { .. } => {}
+    }
+  }
+}
+
+fn collect_prefixed_write_descendants_from_members(
+  module: &SchemaModuleDecl,
+  members: &[MemberDecl],
+  no_prefix_keys: &HashSet<String>,
+  type_decl_by_key: &HashMap<String, (&SchemaModuleDecl, &TypeDecl)>,
+  needs_prefixed_write_keys: &mut HashSet<String>,
+) {
+  for member in members {
+    let MemberDecl::Field(field) = member else {
+      continue;
+    };
+    match &field.wire {
+      FieldWireDecl::Child { .. } => {
+        collect_prefixed_write_descendant_for_child(
+          module,
+          &field.type_ref,
+          no_prefix_keys,
+          needs_prefixed_write_keys,
+        );
+      }
+      FieldWireDecl::Choice => {
+        let Some(choice_key) = schema_type_key_from_ref(module, &field.type_ref) else {
+          continue;
+        };
+        let Some((choice_module, choice_type_decl)) = type_decl_by_key.get(&choice_key).copied()
+        else {
+          continue;
+        };
+        collect_prefixed_write_descendants_from_choice(
+          choice_type_decl,
+          choice_module,
+          no_prefix_keys,
+          type_decl_by_key,
+          needs_prefixed_write_keys,
+        );
+      }
+      FieldWireDecl::Attribute { .. }
+      | FieldWireDecl::Text
+      | FieldWireDecl::TextChild { .. }
+      | FieldWireDecl::Any { .. } => {}
+    }
+  }
+}
+
+fn collect_prefixed_write_requirements_from_choice(
+  choice_type_decl: &TypeDecl,
+  choice_module: &SchemaModuleDecl,
+  parent_prefix: &str,
+  no_prefix_keys: &HashSet<String>,
+  type_decl_by_key: &HashMap<String, (&SchemaModuleDecl, &TypeDecl)>,
+  needs_prefixed_write_keys: &mut HashSet<String>,
+) {
+  for member in &choice_type_decl.members {
+    let MemberDecl::Variant(variant) = member else {
+      continue;
+    };
+    match &variant.wire {
+      VariantWireDecl::Child { qnames } => {
+        for qname in qnames {
+          collect_prefixed_write_requirement_for_child(
+            choice_module,
+            parent_prefix,
+            qname,
+            &variant.payload,
+            no_prefix_keys,
+            needs_prefixed_write_keys,
+          );
+        }
+      }
+      VariantWireDecl::Sequence { .. } => {
+        let Some(helper_key) = schema_type_key_from_ref(choice_module, &variant.payload) else {
+          continue;
+        };
+        let Some((helper_module, helper_type_decl)) = type_decl_by_key.get(&helper_key).copied()
+        else {
+          continue;
+        };
+        collect_prefixed_write_requirements_from_members(
+          helper_module,
+          helper_type_decl.members.as_slice(),
+          parent_prefix,
+          no_prefix_keys,
+          type_decl_by_key,
+          needs_prefixed_write_keys,
+        );
+      }
+      VariantWireDecl::Any { .. } | VariantWireDecl::Text | VariantWireDecl::TextChild { .. } => {}
+    }
+  }
+}
+
+fn collect_prefixed_write_requirements_from_members(
+  module: &SchemaModuleDecl,
+  members: &[MemberDecl],
+  parent_prefix: &str,
+  no_prefix_keys: &HashSet<String>,
+  type_decl_by_key: &HashMap<String, (&SchemaModuleDecl, &TypeDecl)>,
+  needs_prefixed_write_keys: &mut HashSet<String>,
+) {
+  for member in members {
+    let MemberDecl::Field(field) = member else {
+      continue;
+    };
+    match &field.wire {
+      FieldWireDecl::Child { qname } => collect_prefixed_write_requirement_for_child(
+        module,
+        parent_prefix,
+        qname,
+        &field.type_ref,
+        no_prefix_keys,
+        needs_prefixed_write_keys,
+      ),
+      FieldWireDecl::Choice => {
+        let Some(choice_key) = schema_type_key_from_ref(module, &field.type_ref) else {
+          continue;
+        };
+        let Some((choice_module, choice_type_decl)) = type_decl_by_key.get(&choice_key).copied()
+        else {
+          continue;
+        };
+        collect_prefixed_write_requirements_from_choice(
+          choice_type_decl,
+          choice_module,
+          parent_prefix,
+          no_prefix_keys,
+          type_decl_by_key,
+          needs_prefixed_write_keys,
+        );
+      }
+      FieldWireDecl::Attribute { .. }
+      | FieldWireDecl::Any
+      | FieldWireDecl::Text
+      | FieldWireDecl::TextChild { .. } => {}
+    }
   }
 }
 
@@ -1433,7 +1730,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     let type_sdk_version_markers = sdk_version_markers(schema_type_version);
     let sdk_type_attrs = if let Some(raw_qname) = &type_decl.xml_qname {
       let qname = sdk_element_qname(raw_qname);
-      let no_prefix = no_prefix_sdk_attr_from_qname(&ir.prefix, raw_qname);
+      let no_prefix = no_prefix_sdk_attr_from_qname(ir, type_decl, type_graph);
       let extra_xmlns = if type_decl.support.extra_xmlns.is_empty() {
         quote! {}
       } else {

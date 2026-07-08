@@ -818,7 +818,7 @@ fn collect_prefixed_write_descendants_from_members(
       FieldWireDecl::Attribute { .. }
       | FieldWireDecl::Text
       | FieldWireDecl::TextChild { .. }
-      | FieldWireDecl::Any { .. } => {}
+      | FieldWireDecl::Any => {}
     }
   }
 }
@@ -2505,7 +2505,6 @@ fn gen_schema_enum_from_decl(
   let nested_version_cfg = version_cfg.child(schema_enum_version);
   let sdk_enum_attrs = quote! {};
   let default_facet = schema_enum.variants.first().expect("schema enum facet");
-  let has_other_variant = schema_enum.other_variant.is_some();
 
   let mut alias_map: HashMap<String, Vec<String>> = HashMap::new();
   for facet in &schema_enum.variants {
@@ -2523,20 +2522,13 @@ fn gen_schema_enum_from_decl(
     &alias_map,
     nested_version_cfg,
   )?;
-  let other_variant = gen_schema_enum_other_variant(schema_enum.other_variant.as_ref())?;
-  let derive_tokens = if has_other_variant {
-    quote! { #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)] }
-  } else {
-    quote! { #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)] }
-  };
 
   Ok(quote! {
     #( #enum_attrs )*
-    #derive_tokens
+    #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
     #sdk_enum_attrs
     pub enum #enum_name_ident {
       #( #variants, )*
-      #other_variant
     }
   })
 }
@@ -3387,24 +3379,6 @@ fn gen_schema_enum_decl_variants(
   }
 
   Ok(variants)
-}
-
-fn gen_schema_enum_other_variant(
-  other_variant: Option<&crate::sdk_code::codegen_ir::EnumOtherVariantDecl>,
-) -> Result<TokenStream> {
-  let Some(other_variant) = other_variant else {
-    return Ok(quote! {});
-  };
-
-  let variant_ident: Ident = parse_str(&escape_upper_camel_case(
-    other_variant.rust_name.to_upper_camel_case(),
-  ))?;
-  let variant_ty: Type = parse_str(&other_variant.rust_type)?;
-
-  Ok(quote! {
-    #[sdk(other)]
-    #variant_ident(#variant_ty),
-  })
 }
 
 fn module_version_cfg_attrs(version: &str, version_cfg: VersionCfgContext) -> Vec<Attribute> {

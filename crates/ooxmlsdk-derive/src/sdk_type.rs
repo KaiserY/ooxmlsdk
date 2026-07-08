@@ -617,7 +617,7 @@ fn write_text_value_content_tokens(
     write_xml_schema_float_effective_tokens(value_expr, value_ty, simple_type, qname)
   } else if is_sdk_enum_effective_type(value_ty, simple_type) {
     quote! {
-      (#value_expr).write_xml_content_value(writer)?;
+      writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(#value_expr))?;
     }
   } else if is_string_like_effective_type(value_ty, simple_type) {
     quote! {
@@ -690,7 +690,7 @@ fn build_choice_write_tokens(
         let end_tag = write_end_tag_tokens(qname, child_no_prefix);
         let content = if *is_enum {
           quote! {
-            value.write_xml_content_value(writer)?;
+            writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(value))?;
           }
         } else if let Some(payload_ty) = ty.clone().or_else(|| {
           simple_type
@@ -930,7 +930,7 @@ fn build_wml_table_stack_choice_next_tokens(
         let end_tag = write_end_tag_tokens(qname, child_no_prefix);
         let content = if *is_enum {
           quote! {
-            value.write_xml_content_value(writer)?;
+            writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(value))?;
           }
         } else if let Some(payload_ty) = ty.clone().or_else(|| {
           simple_type
@@ -2792,7 +2792,7 @@ fn build_text_child_write_tokens(
       write_xml_schema_float_effective_tokens(value_expr.clone(), &inner_ty, simple_type, qname)
     } else if is_sdk_enum_effective_type(&inner_ty, simple_type) {
       quote! {
-        (#value_expr).write_xml_content_value(writer)?;
+        writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(#value_expr))?;
       }
     } else if is_string_like_effective_type(&inner_ty, simple_type) {
       quote! {
@@ -4052,7 +4052,7 @@ fn expand_named_struct(
       } else if is_sdk_enum_effective_type(&value_ty, simple_type) {
         quote! {
           writer.write_all(#attr_prefix_lit)?;
-          value.write_xml_attr_value(writer)?;
+          writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(value))?;
           writer.write_all(b"\"")?;
         }
       } else {
@@ -5792,7 +5792,7 @@ fn expand_named_struct(
             write_xml_schema_float_tokens(quote! { value }, &inner_ty)
           } else if is_sdk_enum_effective_type(&inner_ty, None) {
             quote! {
-              (*value).write_xml_content_value(writer)?;
+              writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(value))?;
             }
           } else if is_string_like_type(&inner_ty) {
             quote! {
@@ -5817,7 +5817,7 @@ fn expand_named_struct(
             write_xml_schema_float_tokens(quote! { &self.#field_ident }, &inner_ty)
           } else if is_sdk_enum_effective_type(&inner_ty, None) {
             quote! {
-              self.#field_ident.write_xml_content_value(writer)?;
+              writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(&self.#field_ident))?;
             }
           } else if is_string_like_type(&inner_ty) {
             quote! {

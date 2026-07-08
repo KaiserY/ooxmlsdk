@@ -680,7 +680,7 @@ pub enum RangePermissionEditingGroupValues {
   #[sdk(rename = "current")]
   Current,
 }
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FontTypeHintValues {
   #[sdk(rename = "default")]
   #[default]
@@ -689,8 +689,8 @@ pub enum FontTypeHintValues {
   EastAsia,
   #[sdk(rename = "cs")]
   ComplexScript,
-  #[sdk(other)]
-  OtherVariant(Box<[u8]>),
+  #[sdk(rename = "ascii")]
+  Ascii,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ThemeFontValues {
@@ -1974,7 +1974,7 @@ pub enum DocumentConformance {
   #[sdk(rename = "strict")]
   Strict,
 }
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StrictCharacterSet {
   #[sdk(rename = "iso-8859-1")]
   #[default]
@@ -2009,8 +2009,12 @@ pub enum StrictCharacterSet {
   ChsThai,
   #[sdk(rename = "windows-1250")]
   ChsEastEurope,
-  #[sdk(other)]
-  OtherVariant(Box<[u8]>),
+  #[sdk(rename = "windows-1252")]
+  ChsWindows1252,
+  #[sdk(rename = "utf-8")]
+  ChsUtf8,
+  #[sdk(rename = "iso-8859-2")]
+  ChsIso88592,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ObjectDrawAspect {
@@ -2028,7 +2032,7 @@ pub enum ObjectUpdateMode {
   #[sdk(rename = "onCall")]
   OnCall,
 }
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum CompatSettingNameValues {
   #[sdk(rename = "compatibilityMode")]
   #[default]
@@ -2047,8 +2051,8 @@ pub enum CompatSettingNameValues {
   AllowHyphenationAtTrackBottom,
   #[sdk(rename = "allowTextAfterFloatingTableBreak")]
   AllowTextAfterFloatingTableBreak,
-  #[sdk(other)]
-  OtherVariant(Box<[u8]>),
+  #[sdk(rename = "paraSpaceMax")]
+  ParaSpaceMax,
 }
 /// Table Cell Insertion.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -2,11 +2,38 @@
   "Enums": [
     {
       "Name": "StrictCharacterSet",
-      "HasOtherVariant": true
+      "AddFacets": [
+        {
+          "Name": "ChsWindows1252",
+          "Value": "windows-1252"
+        },
+        {
+          "Name": "ChsUtf8",
+          "Value": "utf-8"
+        },
+        {
+          "Name": "ChsIso88592",
+          "Value": "iso-8859-2"
+        }
+      ]
     },
     {
       "Name": "CompatSettingNameValues",
-      "HasOtherVariant": true
+      "AddFacets": [
+        {
+          "Name": "ParaSpaceMax",
+          "Value": "paraSpaceMax"
+        }
+      ]
+    },
+    {
+      "Name": "FontTypeHintValues",
+      "AddFacets": [
+        {
+          "Name": "Ascii",
+          "Value": "ascii"
+        }
+      ]
     },
     {
       "Name": "LevelJustificationValues",
@@ -71,10 +98,6 @@
           ]
         }
       ]
-    },
-    {
-      "Name": "FontTypeHintValues",
-      "HasOtherVariant": true
     }
   ],
   "AddTypes": [

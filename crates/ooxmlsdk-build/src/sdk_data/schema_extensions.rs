@@ -24,8 +24,6 @@ pub struct SchemaExtensions {
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaEnumExtension {
   pub name: String,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub has_other_variant: Option<bool>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub add_facets: Vec<SchemaEnumFacetExtension>,
 }
@@ -229,13 +227,6 @@ pub fn apply_schema_extensions(
           .into(),
         );
       };
-
-      if extension.has_other_variant.unwrap_or(false) {
-        schema_enum.other_variant = Some(crate::sdk_data::sdk_data_model::SchemaEnumOtherVariant {
-          name: "OtherVariant".to_string(),
-          r#type: "Box<[u8]>".to_string(),
-        });
-      }
 
       for facet_extension in &extension.add_facets {
         let existing_facet = schema_enum.facets.iter_mut().find(|facet| {
@@ -890,40 +881,6 @@ mod tests {
   };
 
   #[test]
-  fn applies_enum_other_variant_extension() {
-    let mut schemas = vec![Schema {
-      module_name: "test_schema".to_string(),
-      enums: vec![SchemaEnum {
-        name: "StrictCharacterSet".to_string(),
-        facets: vec![SchemaEnumFacet {
-          name: "Known".to_string(),
-          value: "known".to_string(),
-          ..Default::default()
-        }],
-        ..Default::default()
-      }],
-      ..Default::default()
-    }];
-    let extensions = vec![(
-      "test_schema".to_string(),
-      SchemaExtensions {
-        enums: vec![SchemaEnumExtension {
-          name: "StrictCharacterSet".to_string(),
-          has_other_variant: Some(true),
-          add_facets: vec![],
-        }],
-        ..Default::default()
-      },
-    )];
-
-    apply_schema_extensions(&mut schemas, &extensions).unwrap();
-
-    let other = schemas[0].enums[0].other_variant.as_ref().unwrap();
-    assert_eq!(other.name, "OtherVariant");
-    assert_eq!(other.r#type, "Box<[u8]>");
-  }
-
-  #[test]
   fn applies_child_optional_extension_by_property_name() {
     let mut schemas = vec![Schema {
       module_name: "test_schema".to_string(),
@@ -1363,7 +1320,6 @@ mod tests {
               aliases: vec![],
             },
           ],
-          ..Default::default()
         }],
         ..Default::default()
       },
@@ -1406,7 +1362,6 @@ mod tests {
             aliases: vec!["odd".to_string()],
             ..Default::default()
           }],
-          ..Default::default()
         }],
         ..Default::default()
       },

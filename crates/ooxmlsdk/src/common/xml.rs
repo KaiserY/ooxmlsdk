@@ -1899,14 +1899,6 @@ pub(crate) fn write_escaped_content_str<W: std::io::Write>(
 }
 
 #[inline]
-pub(crate) fn write_escaped_bytes<W: std::io::Write>(
-  writer: &mut W,
-  value: &[u8],
-) -> std::io::Result<()> {
-  write_escaped_attr_bytes(writer, value)
-}
-
-#[inline]
 pub(crate) fn write_u8_value<W: std::io::Write>(writer: &mut W, value: u8) -> std::io::Result<()> {
   write_integer_value(writer, value)
 }
@@ -2036,7 +2028,7 @@ fn write_escaped_attr_bytes<W: std::io::Write>(
 }
 
 #[inline]
-pub(crate) fn write_escaped_content_bytes<W: std::io::Write>(
+fn write_escaped_content_bytes<W: std::io::Write>(
   writer: &mut W,
   bytes: &[u8],
 ) -> std::io::Result<()> {

@@ -1392,10 +1392,9 @@ fn normalize_attr_qname(qname: &str) -> String {
 fn parse_sdk_enum_variant_attrs(
   attrs: &[Attribute],
   variant_ident: &Ident,
-) -> syn::Result<(Option<String>, Vec<String>, bool)> {
+) -> syn::Result<(Option<String>, Vec<String>)> {
   let mut rename = None;
   let mut aliases = Vec::new();
-  let mut is_other = false;
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
       continue;
@@ -1410,9 +1409,6 @@ fn parse_sdk_enum_variant_attrs(
         Meta::NameValue(meta) if meta.path.is_ident("alias") => {
           aliases.extend(parse_alias_expr(meta.value)?);
         }
-        Meta::Path(path) if path.is_ident("other") => {
-          is_other = true;
-        }
         Meta::Path(path) if path.is_ident("default") => {}
         other => {
           return Err(syn::Error::new_spanned(
@@ -1424,10 +1420,10 @@ fn parse_sdk_enum_variant_attrs(
     }
   }
 
-  if rename.is_none() && aliases.is_empty() && !is_other {
+  if rename.is_none() && aliases.is_empty() {
     rename = Some(variant_ident.to_string());
   }
-  Ok((rename, aliases, is_other))
+  Ok((rename, aliases))
 }
 
 fn parse_alias_expr(expr: syn::Expr) -> syn::Result<Vec<String>> {

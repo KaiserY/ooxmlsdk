@@ -154,7 +154,6 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
         })
         .collect(),
       version: Some("Office2007".to_string()),
-      other_variant: None,
     }],
   })
 }
@@ -394,7 +393,6 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
         ..Default::default()
       }],
       version: Some("Office2007".to_string()),
-      other_variant: None,
     }],
   })
 }

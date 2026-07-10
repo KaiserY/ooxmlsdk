@@ -286,7 +286,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         let bytes = part.data().bytes();
         #chart_raw_fallback
         let root = if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
-          <#root_ty as crate::sdk::SdkType>::from_reader(std::io::Cursor::new(bytes))?
+          <#root_ty as crate::sdk::SdkType>::from_bytes(&bytes)?
         } else {
           <#root_ty as crate::sdk::SdkType>::from_bytes(bytes)?
         };

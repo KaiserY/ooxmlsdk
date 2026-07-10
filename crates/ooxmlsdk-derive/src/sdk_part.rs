@@ -1006,7 +1006,7 @@ fn part_handle_root_method_tokens(
             })?;
             let bytes = part.data().bytes();
             if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
-              <#root_ty as crate::sdk::SdkType>::from_reader(std::io::Cursor::new(bytes))?
+              <#root_ty as crate::sdk::SdkType>::from_bytes(&bytes)?
             } else {
               <#root_ty as crate::sdk::SdkType>::from_bytes(bytes)?
             }
@@ -1047,7 +1047,7 @@ fn part_handle_root_method_tokens(
             })?;
             let bytes = part.data().bytes();
             if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
-              <#root_ty as crate::sdk::SdkType>::from_reader(std::io::Cursor::new(bytes))?
+              <#root_ty as crate::sdk::SdkType>::from_bytes(&bytes)?
             } else {
               <#root_ty as crate::sdk::SdkType>::from_bytes(bytes)?
             }

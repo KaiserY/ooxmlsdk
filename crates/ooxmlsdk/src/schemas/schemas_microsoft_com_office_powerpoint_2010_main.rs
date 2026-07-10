@@ -323,7 +323,7 @@ pub struct LaserColor {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -461,11 +461,11 @@ pub struct ApplicationNonVisualDrawingProperties {
   pub placeholder_shape: Option<std::boxed::Box<crate::schemas::p::PlaceholderShape>>,
   #[sdk(
         choice(
-            child(variant = AudioFromCd, qname = "a:audioCd"),
+            child(variant = AudioFromCd, boxed, qname = "a:audioCd"),
             child(variant = WaveAudioFile, qname = "a:wavAudioFile"),
-            child(variant = AudioFromFile, qname = "a:audioFile"),
-            child(variant = VideoFromFile, qname = "a:videoFile"),
-            child(variant = QuickTimeFromFile, qname = "a:quickTimeFile")
+            child(variant = AudioFromFile, boxed, qname = "a:audioFile"),
+            child(variant = VideoFromFile, boxed, qname = "a:videoFile"),
+            child(variant = QuickTimeFromFile, boxed, qname = "a:quickTimeFile")
         )
     )]
   pub application_non_visual_drawing_properties_choice:

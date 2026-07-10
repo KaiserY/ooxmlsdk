@@ -12,8 +12,8 @@ pub struct AlternateContent {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   #[sdk(
         choice(
-            child(variant = Choice, qname = "mc:Choice"),
-            child(variant = Fallback, qname = "mc:Fallback")
+            child(variant = Choice, boxed, qname = "mc:Choice"),
+            child(variant = Fallback, boxed, qname = "mc:Fallback")
         )
     )]
   pub alternate_content_choice: Vec<AlternateContentChoice>,

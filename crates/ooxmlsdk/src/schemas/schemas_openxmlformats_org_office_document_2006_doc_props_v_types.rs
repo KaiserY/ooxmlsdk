@@ -94,7 +94,7 @@ pub enum ArrayBaseValues {
 pub struct Variant {
   #[sdk(
         choice(
-            child(variant = Variant, qname = "vt:variant"),
+            child(variant = Variant, boxed, qname = "vt:variant"),
             child(variant = VtVector, qname = "vt:vector"),
             child(variant = VtArray, qname = "vt:array"),
             text_child(
@@ -209,7 +209,7 @@ pub struct VtVector {
   pub size: crate::simple_type::UInt32Value,
   #[sdk(
         choice(
-            child(variant = Variant, qname = "vt:variant"),
+            child(variant = Variant, boxed, qname = "vt:variant"),
             text_child(variant = VtByte, simple_type = "SByteValue", qname = "vt:i1"),
             text_child(variant = VtShort, simple_type = "Int16Value", qname = "vt:i2"),
             text_child(variant = VtInt32, simple_type = "Int32Value", qname = "vt:i4"),
@@ -277,7 +277,7 @@ pub struct VtArray {
   pub base_type: ArrayBaseValues,
   #[sdk(
         choice(
-            child(variant = Variant, qname = "vt:variant"),
+            child(variant = Variant, boxed, qname = "vt:variant"),
             text_child(variant = VtByte, simple_type = "SByteValue", qname = "vt:i1"),
             text_child(variant = VtShort, simple_type = "Int16Value", qname = "vt:i2"),
             text_child(variant = VtInt32, simple_type = "Int32Value", qname = "vt:i4"),

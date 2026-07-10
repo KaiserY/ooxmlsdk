@@ -16,8 +16,12 @@ pub struct WordprocessingShape {
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
   #[sdk(
         choice(
-            child(variant = NonVisualDrawingShapeProperties, qname = "wps:cNvSpPr"),
-            child(variant = NonVisualConnectorProperties, qname = "wps:cNvCnPr")
+            child(
+                variant = NonVisualDrawingShapeProperties,
+                boxed,
+                qname = "wps:cNvSpPr"
+            ),
+            child(variant = NonVisualConnectorProperties, boxed, qname = "wps:cNvCnPr")
         )
     )]
   pub wordprocessing_shape_choice1: Option<WordprocessingShapeChoice>,
@@ -32,8 +36,8 @@ pub struct WordprocessingShape {
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
   #[sdk(
         choice(
-            child(variant = TextBoxInfo2, qname = "wps:txbx"),
-            child(variant = LinkedTextBox, qname = "wps:linkedTxbx")
+            child(variant = TextBoxInfo2, boxed, qname = "wps:txbx"),
+            child(variant = LinkedTextBox, boxed, qname = "wps:linkedTxbx")
         )
     )]
   pub wordprocessing_shape_choice2: Option<WordprocessingShapeChoice2>,
@@ -123,18 +127,18 @@ pub struct ShapeProperties {
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -144,8 +148,8 @@ pub struct ShapeProperties {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
@@ -289,7 +293,7 @@ pub struct TextBodyProperties {
   pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   #[sdk(
         choice(
-            child(variant = Shape3DType, qname = "a:sp3d"),
+            child(variant = Shape3DType, boxed, qname = "a:sp3d"),
             child(variant = FlatText, qname = "a:flatTx")
         )
     )]

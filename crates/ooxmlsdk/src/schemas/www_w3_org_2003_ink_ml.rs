@@ -374,12 +374,12 @@ pub struct Ink {
   #[sdk(
         choice(
             child(variant = Annotation, qname = "inkml:annotation"),
-            child(variant = AnnotationXml, qname = "inkml:annotationXML"),
+            child(variant = AnnotationXml, boxed, qname = "inkml:annotationXML"),
             child(variant = Definitions, qname = "inkml:definitions"),
-            child(variant = Context, qname = "inkml:context"),
-            child(variant = Trace, qname = "inkml:trace"),
-            child(variant = TraceGroup, qname = "inkml:traceGroup"),
-            child(variant = TraceView, qname = "inkml:traceView")
+            child(variant = Context, boxed, qname = "inkml:context"),
+            child(variant = Trace, boxed, qname = "inkml:trace"),
+            child(variant = TraceGroup, boxed, qname = "inkml:traceGroup"),
+            child(variant = TraceView, boxed, qname = "inkml:traceView")
         )
     )]
   pub ink_choice: Vec<InkChoice>,
@@ -1200,9 +1200,9 @@ pub struct TraceGroup {
   #[sdk(
         choice(
             child(variant = Annotation, qname = "inkml:annotation"),
-            child(variant = AnnotationXml, qname = "inkml:annotationXML"),
-            child(variant = Trace, qname = "inkml:trace"),
-            child(variant = TraceGroup, qname = "inkml:traceGroup")
+            child(variant = AnnotationXml, boxed, qname = "inkml:annotationXML"),
+            child(variant = Trace, boxed, qname = "inkml:trace"),
+            child(variant = TraceGroup, boxed, qname = "inkml:traceGroup")
         )
     )]
   pub trace_group_choice: Vec<TraceGroupChoice>,
@@ -1231,8 +1231,8 @@ pub struct TraceView {
   #[sdk(
         choice(
             child(variant = Annotation, qname = "inkml:annotation"),
-            child(variant = AnnotationXml, qname = "inkml:annotationXML"),
-            child(variant = TraceView, qname = "inkml:traceView")
+            child(variant = AnnotationXml, boxed, qname = "inkml:annotationXML"),
+            child(variant = TraceView, boxed, qname = "inkml:traceView")
         )
     )]
   pub trace_view_choice: Vec<TraceViewChoice>,
@@ -1297,17 +1297,17 @@ pub struct Context {
 pub struct Definitions {
   #[sdk(
         choice(
-            child(variant = Brush, qname = "inkml:brush"),
-            child(variant = Canvas, qname = "inkml:canvas"),
+            child(variant = Brush, boxed, qname = "inkml:brush"),
+            child(variant = Canvas, boxed, qname = "inkml:canvas"),
             child(variant = CanvasTransform, qname = "inkml:canvasTransform"),
-            child(variant = Context, qname = "inkml:context"),
-            child(variant = InkSource, qname = "inkml:inkSource"),
-            child(variant = Mapping, qname = "inkml:mapping"),
-            child(variant = Timestamp, qname = "inkml:timestamp"),
-            child(variant = Trace, qname = "inkml:trace"),
-            child(variant = TraceFormat, qname = "inkml:traceFormat"),
-            child(variant = TraceGroup, qname = "inkml:traceGroup"),
-            child(variant = TraceView, qname = "inkml:traceView")
+            child(variant = Context, boxed, qname = "inkml:context"),
+            child(variant = InkSource, boxed, qname = "inkml:inkSource"),
+            child(variant = Mapping, boxed, qname = "inkml:mapping"),
+            child(variant = Timestamp, boxed, qname = "inkml:timestamp"),
+            child(variant = Trace, boxed, qname = "inkml:trace"),
+            child(variant = TraceFormat, boxed, qname = "inkml:traceFormat"),
+            child(variant = TraceGroup, boxed, qname = "inkml:traceGroup"),
+            child(variant = TraceView, boxed, qname = "inkml:traceView")
         )
     )]
   pub definitions_choice: Vec<DefinitionsChoice>,

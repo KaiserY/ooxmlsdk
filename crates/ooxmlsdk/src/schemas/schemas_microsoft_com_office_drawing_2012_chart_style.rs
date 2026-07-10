@@ -164,7 +164,7 @@ pub struct ColorStyle {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -387,7 +387,7 @@ pub struct LineReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -412,7 +412,7 @@ pub struct FillReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -437,7 +437,7 @@ pub struct EffectReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -465,7 +465,7 @@ pub struct FontReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -490,18 +490,18 @@ pub struct ShapeProperties {
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -511,8 +511,8 @@ pub struct ShapeProperties {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
@@ -599,18 +599,18 @@ pub struct TextCharacterPropertiesType {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
   pub text_character_properties_type_choice1: Option<TextCharacterPropertiesTypeChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub text_character_properties_type_choice2: Option<TextCharacterPropertiesTypeChoice2>,
@@ -620,14 +620,14 @@ pub struct TextCharacterPropertiesType {
   #[sdk(
         choice(
             empty_child(variant = UnderlineFollowsText, qname = "a:uLnTx"),
-            child(variant = Underline, qname = "a:uLn")
+            child(variant = Underline, boxed, qname = "a:uLn")
         )
     )]
   pub text_character_properties_type_choice3: Option<TextCharacterPropertiesTypeChoice3>,
   #[sdk(
         choice(
             empty_child(variant = UnderlineFillText, qname = "a:uFillTx"),
-            child(variant = UnderlineFill, qname = "a:uFill")
+            child(variant = UnderlineFill, boxed, qname = "a:uFill")
         )
     )]
   pub text_character_properties_type_choice4: Option<TextCharacterPropertiesTypeChoice4>,
@@ -740,7 +740,7 @@ pub struct TextBodyProperties {
   pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   #[sdk(
         choice(
-            child(variant = Shape3DType, qname = "a:sp3d"),
+            child(variant = Shape3DType, boxed, qname = "a:sp3d"),
             child(variant = FlatText, qname = "a:flatTx")
         )
     )]

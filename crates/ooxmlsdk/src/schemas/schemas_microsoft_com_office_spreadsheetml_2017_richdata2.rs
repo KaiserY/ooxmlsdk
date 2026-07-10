@@ -70,10 +70,10 @@ pub enum RichFormatPropertyType {
 pub struct RichFilterColumn {
   #[sdk(
         choice(
-            child(variant = RichFilters, qname = "xlrd2:filters"),
+            child(variant = RichFilters, boxed, qname = "xlrd2:filters"),
             child(variant = RichTop10, qname = "xlrd2:top10"),
             child(variant = CustomRichFilters, qname = "xlrd2:customFilters"),
-            child(variant = DynamicRichFilter, qname = "xlrd2:dynamicFilter"),
+            child(variant = DynamicRichFilter, boxed, qname = "xlrd2:dynamicFilter"),
             child(variant = ExtensionList, qname = "xlrd2:extLst")
         )
     )]

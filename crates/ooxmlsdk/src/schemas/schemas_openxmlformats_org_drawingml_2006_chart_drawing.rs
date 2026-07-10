@@ -17,12 +17,12 @@ pub struct RelativeAnchorSize {
   pub to_anchor: ToAnchor,
   #[sdk(
         choice(
-            child(variant = Shape, qname = "cdr:sp"),
-            child(variant = GroupShape, qname = "cdr:grpSp"),
-            child(variant = GraphicFrame, qname = "cdr:graphicFrame"),
-            child(variant = ConnectionShape, qname = "cdr:cxnSp"),
-            child(variant = Picture, qname = "cdr:pic"),
-            child(variant = ContentPart, qname = "cdr14:contentPart")
+            child(variant = Shape, boxed, qname = "cdr:sp"),
+            child(variant = GroupShape, boxed, qname = "cdr:grpSp"),
+            child(variant = GraphicFrame, boxed, qname = "cdr:graphicFrame"),
+            child(variant = ConnectionShape, boxed, qname = "cdr:cxnSp"),
+            child(variant = Picture, boxed, qname = "cdr:pic"),
+            child(variant = ContentPart, boxed, qname = "cdr14:contentPart")
         )
     )]
   pub relative_anchor_size_choice: Option<RelativeAnchorSizeChoice>,
@@ -39,12 +39,12 @@ pub struct AbsoluteAnchorSize {
   pub extent: Extent,
   #[sdk(
         choice(
-            child(variant = Shape, qname = "cdr:sp"),
-            child(variant = GroupShape, qname = "cdr:grpSp"),
-            child(variant = GraphicFrame, qname = "cdr:graphicFrame"),
-            child(variant = ConnectionShape, qname = "cdr:cxnSp"),
-            child(variant = Picture, qname = "cdr:pic"),
-            child(variant = ContentPart, qname = "cdr14:contentPart")
+            child(variant = Shape, boxed, qname = "cdr:sp"),
+            child(variant = GroupShape, boxed, qname = "cdr:grpSp"),
+            child(variant = GraphicFrame, boxed, qname = "cdr:graphicFrame"),
+            child(variant = ConnectionShape, boxed, qname = "cdr:cxnSp"),
+            child(variant = Picture, boxed, qname = "cdr:pic"),
+            child(variant = ContentPart, boxed, qname = "cdr14:contentPart")
         )
     )]
   pub absolute_anchor_size_choice: Option<AbsoluteAnchorSizeChoice>,
@@ -90,12 +90,12 @@ pub struct GroupShape {
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(
         choice(
-            child(variant = Shape, qname = "cdr:sp"),
-            child(variant = GroupShape, qname = "cdr:grpSp"),
-            child(variant = GraphicFrame, qname = "cdr:graphicFrame"),
-            child(variant = ConnectionShape, qname = "cdr:cxnSp"),
-            child(variant = Picture, qname = "cdr:pic"),
-            child(variant = ContentPart, qname = "cdr14:contentPart")
+            child(variant = Shape, boxed, qname = "cdr:sp"),
+            child(variant = GroupShape, boxed, qname = "cdr:grpSp"),
+            child(variant = GraphicFrame, boxed, qname = "cdr:graphicFrame"),
+            child(variant = ConnectionShape, boxed, qname = "cdr:cxnSp"),
+            child(variant = Picture, boxed, qname = "cdr:pic"),
+            child(variant = ContentPart, boxed, qname = "cdr14:contentPart")
         )
     )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
@@ -232,18 +232,18 @@ pub struct ShapeProperties {
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -253,8 +253,8 @@ pub struct ShapeProperties {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
@@ -371,8 +371,8 @@ pub struct BlipFill {
   pub source_rectangle: Option<crate::schemas::a::SourceRectangle>,
   #[sdk(
         choice(
-            child(variant = Tile, qname = "a:tile"),
-            child(variant = Stretch, qname = "a:stretch")
+            child(variant = Tile, boxed, qname = "a:tile"),
+            child(variant = Stretch, boxed, qname = "a:stretch")
         )
     )]
   pub blip_fill_choice: Option<BlipFillChoice>,
@@ -497,18 +497,18 @@ pub struct GroupShapeProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,

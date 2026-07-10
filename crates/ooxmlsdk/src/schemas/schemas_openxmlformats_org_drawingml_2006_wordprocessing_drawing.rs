@@ -266,10 +266,10 @@ pub struct Anchor {
   #[sdk(
         choice(
             empty_child(variant = WrapNone, qname = "wp:wrapNone"),
-            child(variant = WrapSquare, qname = "wp:wrapSquare"),
-            child(variant = WrapTight, qname = "wp:wrapTight"),
-            child(variant = WrapThrough, qname = "wp:wrapThrough"),
-            child(variant = WrapTopBottom, qname = "wp:wrapTopAndBottom")
+            child(variant = WrapSquare, boxed, qname = "wp:wrapSquare"),
+            child(variant = WrapTight, boxed, qname = "wp:wrapTight"),
+            child(variant = WrapThrough, boxed, qname = "wp:wrapThrough"),
+            child(variant = WrapTopBottom, boxed, qname = "wp:wrapTopAndBottom")
         )
     )]
   pub anchor_choice: Option<AnchorChoice>,

@@ -2619,7 +2619,7 @@ pub struct SolidFill {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -2645,7 +2645,7 @@ pub struct GradientFill {
   #[sdk(
         choice(
             child(variant = LinearGradientFill, qname = "a:lin"),
-            child(variant = PathGradientFill, qname = "a:path")
+            child(variant = PathGradientFill, boxed, qname = "a:path")
         )
     )]
   pub gradient_fill_choice: Option<GradientFillChoice>,
@@ -2671,8 +2671,8 @@ pub struct BlipFill {
   pub source_rectangle: Option<SourceRectangle>,
   #[sdk(
         choice(
-            child(variant = Tile, qname = "a:tile"),
-            child(variant = Stretch, qname = "a:stretch")
+            child(variant = Tile, boxed, qname = "a:tile"),
+            child(variant = Stretch, boxed, qname = "a:stretch")
         )
     )]
   pub blip_fill_choice: Option<BlipFillChoice>,
@@ -2706,36 +2706,36 @@ pub struct EffectContainer {
   pub name: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = EffectContainer, qname = "a:cont"),
+            child(variant = EffectContainer, boxed, qname = "a:cont"),
             child(variant = Effect, qname = "a:effect"),
             child(variant = AlphaBiLevel, qname = "a:alphaBiLevel"),
             empty_child(variant = AlphaCeiling, qname = "a:alphaCeiling"),
             empty_child(variant = AlphaFloor, qname = "a:alphaFloor"),
-            child(variant = AlphaInverse, qname = "a:alphaInv"),
-            child(variant = AlphaModulationEffect, qname = "a:alphaMod"),
+            child(variant = AlphaInverse, boxed, qname = "a:alphaInv"),
+            child(variant = AlphaModulationEffect, boxed, qname = "a:alphaMod"),
             child(variant = AlphaModulationFixed, qname = "a:alphaModFix"),
             child(variant = AlphaOutset, qname = "a:alphaOutset"),
             child(variant = AlphaReplace, qname = "a:alphaRepl"),
             child(variant = BiLevel, qname = "a:biLevel"),
-            child(variant = Blend, qname = "a:blend"),
+            child(variant = Blend, boxed, qname = "a:blend"),
             child(variant = Blur, qname = "a:blur"),
-            child(variant = ColorChange, qname = "a:clrChange"),
-            child(variant = ColorReplacement, qname = "a:clrRepl"),
+            child(variant = ColorChange, boxed, qname = "a:clrChange"),
+            child(variant = ColorReplacement, boxed, qname = "a:clrRepl"),
             child(variant = Duotone, qname = "a:duotone"),
-            child(variant = Fill, qname = "a:fill"),
-            child(variant = FillOverlay, qname = "a:fillOverlay"),
-            child(variant = Glow, qname = "a:glow"),
+            child(variant = Fill, boxed, qname = "a:fill"),
+            child(variant = FillOverlay, boxed, qname = "a:fillOverlay"),
+            child(variant = Glow, boxed, qname = "a:glow"),
             empty_child(variant = Grayscale, qname = "a:grayscl"),
             child(variant = Hsl, qname = "a:hsl"),
-            child(variant = InnerShadow, qname = "a:innerShdw"),
+            child(variant = InnerShadow, boxed, qname = "a:innerShdw"),
             child(variant = LuminanceEffect, qname = "a:lum"),
-            child(variant = OuterShadow, qname = "a:outerShdw"),
-            child(variant = PresetShadow, qname = "a:prstShdw"),
-            child(variant = Reflection, qname = "a:reflection"),
+            child(variant = OuterShadow, boxed, qname = "a:outerShdw"),
+            child(variant = PresetShadow, boxed, qname = "a:prstShdw"),
+            child(variant = Reflection, boxed, qname = "a:reflection"),
             child(variant = RelativeOffset, qname = "a:relOff"),
             child(variant = SoftEdge, qname = "a:softEdge"),
             child(variant = TintEffect, qname = "a:tint"),
-            child(variant = TransformEffect, qname = "a:xfrm")
+            child(variant = TransformEffect, boxed, qname = "a:xfrm")
         )
     )]
   pub effect_container_choice: Vec<EffectContainerChoice>,
@@ -2754,36 +2754,36 @@ pub struct EffectDag {
   pub name: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = EffectContainer, qname = "a:cont"),
+            child(variant = EffectContainer, boxed, qname = "a:cont"),
             child(variant = Effect, qname = "a:effect"),
             child(variant = AlphaBiLevel, qname = "a:alphaBiLevel"),
             empty_child(variant = AlphaCeiling, qname = "a:alphaCeiling"),
             empty_child(variant = AlphaFloor, qname = "a:alphaFloor"),
-            child(variant = AlphaInverse, qname = "a:alphaInv"),
-            child(variant = AlphaModulationEffect, qname = "a:alphaMod"),
+            child(variant = AlphaInverse, boxed, qname = "a:alphaInv"),
+            child(variant = AlphaModulationEffect, boxed, qname = "a:alphaMod"),
             child(variant = AlphaModulationFixed, qname = "a:alphaModFix"),
             child(variant = AlphaOutset, qname = "a:alphaOutset"),
             child(variant = AlphaReplace, qname = "a:alphaRepl"),
             child(variant = BiLevel, qname = "a:biLevel"),
-            child(variant = Blend, qname = "a:blend"),
+            child(variant = Blend, boxed, qname = "a:blend"),
             child(variant = Blur, qname = "a:blur"),
-            child(variant = ColorChange, qname = "a:clrChange"),
-            child(variant = ColorReplacement, qname = "a:clrRepl"),
+            child(variant = ColorChange, boxed, qname = "a:clrChange"),
+            child(variant = ColorReplacement, boxed, qname = "a:clrRepl"),
             child(variant = Duotone, qname = "a:duotone"),
-            child(variant = Fill, qname = "a:fill"),
-            child(variant = FillOverlay, qname = "a:fillOverlay"),
-            child(variant = Glow, qname = "a:glow"),
+            child(variant = Fill, boxed, qname = "a:fill"),
+            child(variant = FillOverlay, boxed, qname = "a:fillOverlay"),
+            child(variant = Glow, boxed, qname = "a:glow"),
             empty_child(variant = Grayscale, qname = "a:grayscl"),
             child(variant = Hsl, qname = "a:hsl"),
-            child(variant = InnerShadow, qname = "a:innerShdw"),
+            child(variant = InnerShadow, boxed, qname = "a:innerShdw"),
             child(variant = LuminanceEffect, qname = "a:lum"),
-            child(variant = OuterShadow, qname = "a:outerShdw"),
-            child(variant = PresetShadow, qname = "a:prstShdw"),
-            child(variant = Reflection, qname = "a:reflection"),
+            child(variant = OuterShadow, boxed, qname = "a:outerShdw"),
+            child(variant = PresetShadow, boxed, qname = "a:prstShdw"),
+            child(variant = Reflection, boxed, qname = "a:reflection"),
             child(variant = RelativeOffset, qname = "a:relOff"),
             child(variant = SoftEdge, qname = "a:softEdge"),
             child(variant = TintEffect, qname = "a:tint"),
-            child(variant = TransformEffect, qname = "a:xfrm")
+            child(variant = TransformEffect, boxed, qname = "a:xfrm")
         )
     )]
   pub effect_dag_choice: Vec<EffectDagChoice>,
@@ -2813,7 +2813,7 @@ pub struct AlphaInverse {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -2911,7 +2911,7 @@ pub struct ColorReplacement {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -2928,7 +2928,7 @@ pub struct Duotone {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -2944,10 +2944,10 @@ pub struct Fill {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -2964,10 +2964,10 @@ pub struct FillOverlay {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -2984,7 +2984,7 @@ pub struct Glow {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3029,7 +3029,7 @@ pub struct InnerShadow {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3105,7 +3105,7 @@ pub struct OuterShadow {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3133,7 +3133,7 @@ pub struct PresetShadow {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3400,10 +3400,10 @@ pub struct FillProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -3420,7 +3420,7 @@ pub struct FillReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3440,7 +3440,7 @@ pub struct EffectReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3460,7 +3460,7 @@ pub struct LineReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3475,8 +3475,8 @@ pub struct LineReference {
 pub struct EffectPropertiesType {
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub effect_properties_type_choice: Option<EffectPropertiesTypeChoice>,
@@ -3553,7 +3553,7 @@ pub struct FontReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3582,7 +3582,7 @@ pub struct BulletColor {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3598,7 +3598,7 @@ pub struct ExtrusionColor {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3614,7 +3614,7 @@ pub struct ContourColor {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3630,7 +3630,7 @@ pub struct ColorFrom {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3646,7 +3646,7 @@ pub struct ColorTo {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3662,7 +3662,7 @@ pub struct ForegroundColor {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3678,7 +3678,7 @@ pub struct BackgroundColor {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3694,7 +3694,7 @@ pub struct Highlight {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -3863,9 +3863,9 @@ pub struct Underline {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = PatternFill, qname = "a:pattFill")
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill")
         )
     )]
   pub underline_choice1: Option<UnderlineChoice>,
@@ -3918,9 +3918,9 @@ pub struct Outline {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = PatternFill, qname = "a:pattFill")
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill")
         )
     )]
   pub outline_choice1: Option<OutlineChoice>,
@@ -3972,9 +3972,9 @@ pub struct LeftBorderLineProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = PatternFill, qname = "a:pattFill")
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill")
         )
     )]
   pub left_border_line_properties_choice1: Option<LeftBorderLinePropertiesChoice>,
@@ -4026,9 +4026,9 @@ pub struct RightBorderLineProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = PatternFill, qname = "a:pattFill")
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill")
         )
     )]
   pub right_border_line_properties_choice1: Option<RightBorderLinePropertiesChoice>,
@@ -4080,9 +4080,9 @@ pub struct TopBorderLineProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = PatternFill, qname = "a:pattFill")
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill")
         )
     )]
   pub top_border_line_properties_choice1: Option<TopBorderLinePropertiesChoice>,
@@ -4134,9 +4134,9 @@ pub struct BottomBorderLineProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = PatternFill, qname = "a:pattFill")
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill")
         )
     )]
   pub bottom_border_line_properties_choice1: Option<BottomBorderLinePropertiesChoice>,
@@ -4188,9 +4188,9 @@ pub struct TopLeftToBottomRightBorderLineProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = PatternFill, qname = "a:pattFill")
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill")
         )
     )]
   pub top_left_to_bottom_right_border_line_properties_choice1:
@@ -4245,9 +4245,9 @@ pub struct BottomLeftToTopRightBorderLineProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = PatternFill, qname = "a:pattFill")
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill")
         )
     )]
   pub bottom_left_to_top_right_border_line_properties_choice1:
@@ -4286,10 +4286,10 @@ pub struct UnderlineFill {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -4366,16 +4366,16 @@ pub struct Blip {
             child(variant = AlphaBiLevel, qname = "a:alphaBiLevel"),
             empty_child(variant = AlphaCeiling, qname = "a:alphaCeiling"),
             empty_child(variant = AlphaFloor, qname = "a:alphaFloor"),
-            child(variant = AlphaInverse, qname = "a:alphaInv"),
-            child(variant = AlphaModulationEffect, qname = "a:alphaMod"),
+            child(variant = AlphaInverse, boxed, qname = "a:alphaInv"),
+            child(variant = AlphaModulationEffect, boxed, qname = "a:alphaMod"),
             child(variant = AlphaModulationFixed, qname = "a:alphaModFix"),
             child(variant = AlphaReplace, qname = "a:alphaRepl"),
             child(variant = BiLevel, qname = "a:biLevel"),
             child(variant = Blur, qname = "a:blur"),
-            child(variant = ColorChange, qname = "a:clrChange"),
-            child(variant = ColorReplacement, qname = "a:clrRepl"),
+            child(variant = ColorChange, boxed, qname = "a:clrChange"),
+            child(variant = ColorReplacement, boxed, qname = "a:clrRepl"),
             child(variant = Duotone, qname = "a:duotone"),
-            child(variant = FillOverlay, qname = "a:fillOverlay"),
+            child(variant = FillOverlay, boxed, qname = "a:fillOverlay"),
             empty_child(variant = Grayscale, qname = "a:grayscl"),
             child(variant = Hsl, qname = "a:hsl"),
             child(variant = LuminanceEffect, qname = "a:lum"),
@@ -4459,7 +4459,7 @@ pub struct TableStyleList {
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub default: crate::simple_type::StringValue,
-  #[sdk(choice(child(variant = TableStyleEntry, qname = "a:tblStyle"), any))]
+  #[sdk(choice(child(variant = TableStyleEntry, boxed, qname = "a:tblStyle"), any))]
   pub xml_children: Vec<TableStyleListChoice>,
 }
 /// Defines the ExtensionList Class.
@@ -4503,7 +4503,7 @@ pub struct CustomColor {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -4547,8 +4547,8 @@ pub struct Scene3DType {
 pub struct EffectStyle {
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub effect_style_choice: Option<EffectStyleChoice>,
@@ -4566,10 +4566,10 @@ pub struct FillStyleList {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -4598,10 +4598,10 @@ pub struct BackgroundFillStyleList {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -4698,7 +4698,7 @@ pub struct Dark1Color {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -4713,7 +4713,7 @@ pub struct Light1Color {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -4728,7 +4728,7 @@ pub struct Dark2Color {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -4743,7 +4743,7 @@ pub struct Light2Color {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -4758,7 +4758,7 @@ pub struct Accent1Color {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -4773,7 +4773,7 @@ pub struct Accent2Color {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -4788,7 +4788,7 @@ pub struct Accent3Color {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -4803,7 +4803,7 @@ pub struct Accent4Color {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -4818,7 +4818,7 @@ pub struct Accent5Color {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -4833,7 +4833,7 @@ pub struct Accent6Color {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -4848,7 +4848,7 @@ pub struct Hyperlink {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -4863,7 +4863,7 @@ pub struct FollowedHyperlinkColor {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = PresetColor, qname = "a:prstClr")
@@ -5084,21 +5084,22 @@ pub struct GraphicData {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = Graphic, qname = "a:graphic"),
-            child(variant = Blip, qname = "a:blip"),
-            child(variant = Theme, qname = "a:theme"),
-            child(variant = ThemeOverride, qname = "a:themeOverride"),
+            child(variant = Graphic, boxed, qname = "a:graphic"),
+            child(variant = Blip, boxed, qname = "a:blip"),
+            child(variant = Theme, boxed, qname = "a:theme"),
+            child(variant = ThemeOverride, boxed, qname = "a:themeOverride"),
             empty_child(variant = ThemeManager, qname = "a:themeManager"),
-            child(variant = Table, qname = "a:tbl"),
+            child(variant = Table, boxed, qname = "a:tbl"),
             child(variant = TableStyleList, qname = "a:tblStyleLst"),
-            child(variant = OEmbedShared, qname = "aoe:oembedShared"),
+            child(variant = OEmbedShared, boxed, qname = "aoe:oembedShared"),
             child(variant = OEmbed, qname = "woe:oembed"),
             child(variant = ImageFormula, qname = "aif:imageFormula"),
-            child(variant = LiveFeedProperties, qname = "alf:liveFeedProps"),
-            child(variant = ScriptLink, qname = "asl:scriptLink"),
+            child(variant = LiveFeedProperties, boxed, qname = "alf:liveFeedProps"),
+            child(variant = ScriptLink, boxed, qname = "asl:scriptLink"),
             child(variant = ClassificationOutcome, qname = "aclsh:classification"),
             child(
                 variant = LineSketchStyleProperties,
+                boxed,
                 qname = "ask:lineSketchStyleProps"
             ),
             child(variant = PictureAttributionSourceUrl, qname = "a1611:picAttrSrcUrl"),
@@ -5111,83 +5112,112 @@ pub struct GraphicData {
             child(variant = ColIdIdentifier, qname = "a16:colId"),
             child(variant = HyperlinkColor, qname = "ahyp:hlinkClr"),
             child(variant = WebVideoProperty, qname = "wp15:webVideoPr"),
-            child(variant = ThemeFamily, qname = "thm15:themeFamily"),
+            child(variant = ThemeFamily, boxed, qname = "thm15:themeFamily"),
             child(variant = BackgroundProperties, qname = "a15:backgroundPr"),
             child(variant = NonVisualGroupProperties, qname = "a15:nonVisualGroupProps"),
-            child(variant = ObjectProperties, qname = "a15:objectPr"),
-            child(variant = A15SignatureLine, qname = "a15:signatureLine"),
+            child(variant = ObjectProperties, boxed, qname = "a15:objectPr"),
+            child(variant = A15SignatureLine, boxed, qname = "a15:signatureLine"),
             child(variant = CameraTool, qname = "a14:cameraTool"),
             child(variant = CompatExtension, qname = "a14:compatExt"),
             child(variant = IsCanvas, qname = "a14:isCanvas"),
-            child(variant = GvmlContentPart, qname = "a14:contentPart"),
+            child(variant = GvmlContentPart, boxed, qname = "a14:contentPart"),
             child(variant = ShadowObscured, qname = "a14:shadowObscured"),
-            child(variant = HiddenFillProperties, qname = "a14:hiddenFill"),
-            child(variant = HiddenLineProperties, qname = "a14:hiddenLine"),
-            child(variant = HiddenEffectsProperties, qname = "a14:hiddenEffects"),
-            child(variant = HiddenScene3D, qname = "a14:hiddenScene3d"),
-            child(variant = HiddenShape3D, qname = "a14:hiddenSp3d"),
-            child(variant = ImageProperties, qname = "a14:imgProps"),
+            child(variant = HiddenFillProperties, boxed, qname = "a14:hiddenFill"),
+            child(variant = HiddenLineProperties, boxed, qname = "a14:hiddenLine"),
+            child(variant = HiddenEffectsProperties, boxed, qname = "a14:hiddenEffects"),
+            child(variant = HiddenScene3D, boxed, qname = "a14:hiddenScene3d"),
+            child(variant = HiddenShape3D, boxed, qname = "a14:hiddenSp3d"),
+            child(variant = ImageProperties, boxed, qname = "a14:imgProps"),
             child(variant = UseLocalDpi, qname = "a14:useLocalDpi"),
             child(variant = TextMath, qname = "a14:m"),
-            child(variant = NonVisualDrawingProperties, qname = "dgm14:cNvPr"),
+            child(variant = NonVisualDrawingProperties, boxed, qname = "dgm14:cNvPr"),
             child(variant = RecolorImages, qname = "dgm14:recolorImg"),
-            child(variant = Drawing, qname = "dsp:drawing"),
+            child(variant = Drawing, boxed, qname = "dsp:drawing"),
             child(variant = DataModelExtensionBlock, qname = "dsp:dataModelExt"),
-            child(variant = ColorsDefinition, qname = "dgm:colorsDef"),
-            child(variant = ColorsDefinitionHeader, qname = "dgm:colorsDefHdr"),
+            child(variant = ColorsDefinition, boxed, qname = "dgm:colorsDef"),
+            child(variant = ColorsDefinitionHeader, boxed, qname = "dgm:colorsDefHdr"),
             child(variant = ColorsDefinitionHeaderList, qname = "dgm:colorsDefHdrLst"),
-            child(variant = DataModelRoot, qname = "dgm:dataModel"),
-            child(variant = LayoutDefinition, qname = "dgm:layoutDef"),
-            child(variant = LayoutDefinitionHeader, qname = "dgm:layoutDefHdr"),
+            child(variant = DataModelRoot, boxed, qname = "dgm:dataModel"),
+            child(variant = LayoutDefinition, boxed, qname = "dgm:layoutDef"),
+            child(variant = LayoutDefinitionHeader, boxed, qname = "dgm:layoutDefHdr"),
             child(variant = LayoutDefinitionHeaderList, qname = "dgm:layoutDefHdrLst"),
-            child(variant = RelationshipIds, qname = "dgm:relIds"),
-            child(variant = StyleDefinition, qname = "dgm:styleDef"),
-            child(variant = StyleDefinitionHeader, qname = "dgm:styleDefHdr"),
+            child(variant = RelationshipIds, boxed, qname = "dgm:relIds"),
+            child(variant = StyleDefinition, boxed, qname = "dgm:styleDef"),
+            child(variant = StyleDefinitionHeader, boxed, qname = "dgm:styleDefHdr"),
             child(variant = StyleDefinitionHeaderList, qname = "dgm:styleDefHdrLst"),
-            child(variant = Dgm1612ShapeProperties, qname = "dgm1612:spPr"),
-            child(variant = TextListStyleType, qname = "dgm1612:lstStyle"),
+            child(variant = Dgm1612ShapeProperties, boxed, qname = "dgm1612:spPr"),
+            child(variant = TextListStyleType, boxed, qname = "dgm1612:lstStyle"),
             child(variant = NumberDiagramInfoList, qname = "dgm1611:autoBuNodeInfoLst"),
-            child(variant = ChartSpace, qname = "c:chartSpace"),
+            child(variant = ChartSpace, boxed, qname = "c:chartSpace"),
             child(variant = UserShapes, qname = "c:userShapes"),
             child(variant = ChartReference, qname = "c:chart"),
-            child(variant = DataDisplayOptions16, qname = "c16r3:dataDisplayOptions16"),
-            child(variant = C16ShapeProperties, qname = "c16:spPr"),
+            child(
+                variant = DataDisplayOptions16,
+                boxed,
+                qname = "c16r3:dataDisplayOptions16"
+            ),
+            child(variant = C16ShapeProperties, boxed, qname = "c16:spPr"),
             child(variant = UnsignedIntegerType, qname = "c16:explosion"),
             child(variant = InvertIfNegativeBoolean, qname = "c16:invertIfNegative"),
             child(variant = Bubble3DBoolean, qname = "c16:bubble3D"),
-            child(variant = Marker, qname = "c16:marker"),
-            child(variant = DLbl, qname = "c16:dLbl"),
+            child(variant = Marker, boxed, qname = "c16:marker"),
+            child(variant = DLbl, boxed, qname = "c16:dLbl"),
             child(
                 variant = C16CategoryFilterExceptions,
                 qname = "c16:categoryFilterExceptions"
             ),
-            child(variant = PivotOptions16, qname = "c16:pivotOptions16"),
+            child(variant = PivotOptions16, boxed, qname = "c16:pivotOptions16"),
             child(
                 variant = ChartDataPointUniqueIdMap,
                 qname = "c16:datapointuniqueidmap"
             ),
             child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
-            child(variant = PivotSource, qname = "c15:pivotSource"),
+            child(variant = PivotSource, boxed, qname = "c15:pivotSource"),
             child(variant = NumberingFormat, qname = "c15:numFmt"),
-            child(variant = C15ShapeProperties, qname = "c15:spPr"),
-            child(variant = Layout, qname = "c15:layout"),
+            child(variant = C15ShapeProperties, boxed, qname = "c15:spPr"),
+            child(variant = Layout, boxed, qname = "c15:layout"),
             child(variant = FullReference, qname = "c15:fullRef"),
             child(variant = LevelReference, qname = "c15:levelRef"),
             child(variant = FormulaReference, qname = "c15:formulaRef"),
-            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
-            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
-            child(variant = FilteredAreaSeries, qname = "c15:filteredAreaSeries"),
-            child(variant = FilteredBarSeries, qname = "c15:filteredBarSeries"),
-            child(variant = FilteredBubbleSeries, qname = "c15:filteredBubbleSeries"),
+            child(
+                variant = FilteredSeriesTitle,
+                boxed,
+                qname = "c15:filteredSeriesTitle"
+            ),
+            child(
+                variant = FilteredCategoryTitle,
+                boxed,
+                qname = "c15:filteredCategoryTitle"
+            ),
+            child(variant = FilteredAreaSeries, boxed, qname = "c15:filteredAreaSeries"),
+            child(variant = FilteredBarSeries, boxed, qname = "c15:filteredBarSeries"),
+            child(
+                variant = FilteredBubbleSeries,
+                boxed,
+                qname = "c15:filteredBubbleSeries"
+            ),
             child(
                 variant = FilteredLineSeriesExtension,
+                boxed,
                 qname = "c15:filteredLineSeries"
             ),
-            child(variant = FilteredPieSeries, qname = "c15:filteredPieSeries"),
-            child(variant = FilteredRadarSeries, qname = "c15:filteredRadarSeries"),
-            child(variant = FilteredScatterSeries, qname = "c15:filteredScatterSeries"),
-            child(variant = FilteredSurfaceSeries, qname = "c15:filteredSurfaceSeries"),
-            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(variant = FilteredPieSeries, boxed, qname = "c15:filteredPieSeries"),
+            child(
+                variant = FilteredRadarSeries,
+                boxed,
+                qname = "c15:filteredRadarSeries"
+            ),
+            child(
+                variant = FilteredScatterSeries,
+                boxed,
+                qname = "c15:filteredScatterSeries"
+            ),
+            child(
+                variant = FilteredSurfaceSeries,
+                boxed,
+                qname = "c15:filteredSurfaceSeries"
+            ),
+            child(variant = DataLabelsRange, boxed, qname = "c15:datalabelsRange"),
             child(
                 variant = C15CategoryFilterExceptions,
                 qname = "c15:categoryFilterExceptions"
@@ -5195,19 +5225,23 @@ pub struct GraphicData {
             child(variant = DataLabelFieldTable, qname = "c15:dlblFieldTable"),
             child(variant = ExceptionForSave, qname = "c15:xForSave"),
             child(variant = ShowDataLabelsRange, qname = "c15:showDataLabelsRange"),
-            child(variant = ChartText, qname = "c15:tx"),
+            child(variant = ChartText, boxed, qname = "c15:tx"),
             child(variant = ShowLeaderLines, qname = "c15:showLeaderLines"),
-            child(variant = LeaderLines, qname = "c15:leaderLines"),
+            child(variant = LeaderLines, boxed, qname = "c15:leaderLines"),
             child(variant = AutoGeneneratedCategories, qname = "c15:autoCat"),
-            child(variant = PivotOptions, qname = "c14:pivotOptions"),
-            child(variant = SketchOptions, qname = "c14:sketchOptions"),
-            child(variant = InvertSolidFillFormat, qname = "c14:invertSolidFillFmt"),
+            child(variant = PivotOptions, boxed, qname = "c14:pivotOptions"),
+            child(variant = SketchOptions, boxed, qname = "c14:sketchOptions"),
+            child(
+                variant = InvertSolidFillFormat,
+                boxed,
+                qname = "c14:invertSolidFillFmt"
+            ),
             child(variant = Style, qname = "c14:style"),
-            child(variant = Cdr14ContentPart, qname = "cdr14:contentPart"),
+            child(variant = Cdr14ContentPart, boxed, qname = "cdr14:contentPart"),
             child(variant = LegacyDrawing, qname = "comp:legacyDrawing"),
-            child(variant = LockedCanvas, qname = "lc:lockedCanvas"),
-            child(variant = Inline, qname = "wp:inline"),
-            child(variant = Anchor, qname = "wp:anchor"),
+            child(variant = LockedCanvas, boxed, qname = "lc:lockedCanvas"),
+            child(variant = Inline, boxed, qname = "wp:inline"),
+            child(variant = Anchor, boxed, qname = "wp:anchor"),
             text_child(
                 variant = PercentagePositionHeightOffset,
                 simple_type = "DrawingmlPercentageValue",
@@ -5220,12 +5254,12 @@ pub struct GraphicData {
             ),
             child(variant = RelativeWidth, qname = "wp14:sizeRelH"),
             child(variant = RelativeHeight, qname = "wp14:sizeRelV"),
-            child(variant = Picture, qname = "pic:pic"),
-            child(variant = ShapeStyle, qname = "pic14:style"),
+            child(variant = Picture, boxed, qname = "pic:pic"),
+            child(variant = ShapeStyle, boxed, qname = "pic14:style"),
             child(variant = OfficeArtExtensionList, qname = "pic14:extLst"),
             child(variant = WorksheetDrawing, qname = "xdr:wsDr"),
-            child(variant = XdrContentPart, qname = "xdr:contentPart"),
-            child(variant = Xdr14ContentPart, qname = "xdr14:contentPart"),
+            child(variant = XdrContentPart, boxed, qname = "xdr:contentPart"),
+            child(variant = Xdr14ContentPart, boxed, qname = "xdr14:contentPart"),
             any_child(variant = CommentAuthorMonikerList, qname = "pc:cmAuthorMkLst"),
             any_child(variant = CommentMonikerList, qname = "pc:cmMkLst"),
             any_child(variant = StringTagMonikerList, qname = "pc:tagMkLst"),
@@ -5235,7 +5269,7 @@ pub struct GraphicData {
             any_child(variant = SlideBaseMonikerList, qname = "pc:sldBaseMkLst"),
             any_child(variant = SlideLayoutMonikerList, qname = "pc:sldLayoutMkLst"),
             any_child(variant = MainMasterMonikerList, qname = "pc:sldMasterMkLst"),
-            child(variant = SlideMonikerList, qname = "pc:sldMkLst"),
+            child(variant = SlideMonikerList, boxed, qname = "pc:sldMkLst"),
             any_child(variant = SlidePosMonikerList, qname = "pc:sldPosMkLst"),
             any_child(variant = NotesMonikerList, qname = "pc:notesMkLst"),
             any_child(variant = NotesTextMonikerList, qname = "pc:notesTxtMkLst"),
@@ -5259,28 +5293,32 @@ pub struct GraphicData {
             any_child(variant = CustomXmlPartMonikerList, qname = "pc:cXmlMkLst"),
             child(variant = CommentAuthorList, qname = "p:cmAuthorLst"),
             child(variant = PCommentList, qname = "p:cmLst"),
-            child(variant = POleObject, qname = "p:oleObj"),
-            child(variant = Presentation, qname = "p:presentation"),
-            child(variant = PresentationProperties, qname = "p:presentationPr"),
-            child(variant = Slide, qname = "p:sld"),
-            child(variant = SlideLayout, qname = "p:sldLayout"),
-            child(variant = SlideMaster, qname = "p:sldMaster"),
-            child(variant = HandoutMaster, qname = "p:handoutMaster"),
-            child(variant = NotesMaster, qname = "p:notesMaster"),
-            child(variant = NotesSlide, qname = "p:notes"),
-            child(variant = SlideSyncProperties, qname = "p:sldSyncPr"),
+            child(variant = POleObject, boxed, qname = "p:oleObj"),
+            child(variant = Presentation, boxed, qname = "p:presentation"),
+            child(variant = PresentationProperties, boxed, qname = "p:presentationPr"),
+            child(variant = Slide, boxed, qname = "p:sld"),
+            child(variant = SlideLayout, boxed, qname = "p:sldLayout"),
+            child(variant = SlideMaster, boxed, qname = "p:sldMaster"),
+            child(variant = HandoutMaster, boxed, qname = "p:handoutMaster"),
+            child(variant = NotesMaster, boxed, qname = "p:notesMaster"),
+            child(variant = NotesSlide, boxed, qname = "p:notes"),
+            child(variant = SlideSyncProperties, boxed, qname = "p:sldSyncPr"),
             child(variant = TagList, qname = "p:tagLst"),
-            child(variant = ViewProperties, qname = "p:viewPr"),
-            child(variant = PContentPart, qname = "p:contentPart"),
-            child(variant = PlaceholderTypeExtension, qname = "p232:phTypeExt"),
+            child(variant = ViewProperties, boxed, qname = "p:viewPr"),
+            child(variant = PContentPart, boxed, qname = "p:contentPart"),
+            child(variant = PlaceholderTypeExtension, boxed, qname = "p232:phTypeExt"),
             child(variant = AuthorList, qname = "p188:authorLst"),
             child(variant = P188CommentList, qname = "p188:cmLst"),
             child(variant = CommentRelationship, qname = "p188:commentRel"),
             child(variant = Reactions, qname = "p223:reactions"),
-            child(variant = TaskDetails, qname = "p228:taskDetails"),
-            child(variant = TaskHistoryDetails, qname = "p1912:taskHistoryDetails"),
+            child(variant = TaskDetails, boxed, qname = "p228:taskDetails"),
+            child(
+                variant = TaskHistoryDetails,
+                boxed,
+                qname = "p1912:taskHistoryDetails"
+            ),
             empty_child(variant = TextBodyPackage, qname = "oac:txBodyPkg"),
-            child(variant = GroupCommand, qname = "oac:grpCmd"),
+            child(variant = GroupCommand, boxed, qname = "oac:grpCmd"),
             text_child(
                 variant = ImgDataImgData,
                 simple_type = "Base64BinaryValue",
@@ -5324,40 +5362,41 @@ pub struct GraphicData {
             any_child(variant = TableRowMonikerList, qname = "oac:trMkLst"),
             any_child(variant = TableColumnMonikerList, qname = "oac:gridColMkLst"),
             child(variant = InkmlInk, qname = "inkml:ink"),
-            child(variant = OneOf, qname = "emma:one-of"),
-            child(variant = EmmaGroup, qname = "emma:group"),
-            child(variant = Sequence, qname = "emma:sequence"),
-            child(variant = EndPoint, qname = "emma:endpoint"),
+            child(variant = OneOf, boxed, qname = "emma:one-of"),
+            child(variant = EmmaGroup, boxed, qname = "emma:group"),
+            child(variant = Sequence, boxed, qname = "emma:sequence"),
+            child(variant = EndPoint, boxed, qname = "emma:endpoint"),
             child(variant = EndPointInfo, qname = "emma:endpoint-info"),
             child(variant = Info, qname = "emma:info"),
             child(variant = Grammar, qname = "emma:grammar"),
             child(variant = DerivedFrom, qname = "emma:derived-from"),
             child(variant = Node, qname = "emma:node"),
-            child(variant = EmmaArc, qname = "emma:arc"),
+            child(variant = EmmaArc, boxed, qname = "emma:arc"),
             child(variant = Lattice, qname = "emma:lattice"),
             text_child(variant = Literal, qname = "emma:literal"),
-            child(variant = Interpretation, qname = "emma:interpretation"),
+            child(variant = Interpretation, boxed, qname = "emma:interpretation"),
             child(variant = GroupInfo, qname = "emma:group-info"),
             child(variant = Derivation, qname = "emma:derivation"),
             child(variant = Model, qname = "emma:model"),
             child(variant = Emma, qname = "emma:emma"),
-            child(variant = ContextNode, qname = "msink:context"),
+            child(variant = ContextNode, boxed, qname = "msink:context"),
             child(variant = PresetTransition, qname = "p15:prstTrans"),
             child(variant = PresenceInfo, qname = "p15:presenceInfo"),
-            child(variant = ThreadingInfo, qname = "p15:threadingInfo"),
-            child(variant = SlideGuideList, qname = "p15:sldGuideLst"),
-            child(variant = NotesGuideList, qname = "p15:notesGuideLst"),
+            child(variant = ThreadingInfo, boxed, qname = "p15:threadingInfo"),
+            child(variant = SlideGuideList, boxed, qname = "p15:sldGuideLst"),
+            child(variant = NotesGuideList, boxed, qname = "p15:notesGuideLst"),
             child(
                 variant = ChartTrackingReferenceBased,
                 qname = "p15:chartTrackingRefBased"
             ),
             child(
                 variant = NonVisualContentPartProperties,
+                boxed,
                 qname = "p14:nvContentPartPr"
             ),
-            child(variant = Transform2D, qname = "p14:xfrm"),
+            child(variant = Transform2D, boxed, qname = "p14:xfrm"),
             child(variant = ExtensionListModify, qname = "p14:extLst"),
-            child(variant = Media, qname = "p14:media"),
+            child(variant = Media, boxed, qname = "p14:media"),
             child(variant = VortexTransition, qname = "p14:vortex"),
             child(variant = SwitchTransition, qname = "p14:switch"),
             child(variant = FlipTransition, qname = "p14:flip"),
@@ -5381,7 +5420,7 @@ pub struct GraphicData {
             child(variant = SectionProperties, qname = "p14:sectionPr"),
             child(variant = SectionList, qname = "p14:sectionLst"),
             child(variant = BrowseMode, qname = "p14:browseMode"),
-            child(variant = LaserColor, qname = "p14:laserClr"),
+            child(variant = LaserColor, boxed, qname = "p14:laserClr"),
             child(variant = P14DefaultImageDpi, qname = "p14:defaultImageDpi"),
             child(variant = DiscardImageEditData, qname = "p14:discardImageEditData"),
             child(variant = ShowMediaControls, qname = "p14:showMediaCtrls"),
@@ -5396,19 +5435,19 @@ pub struct GraphicData {
             child(variant = Endnotes, qname = "w:endnotes"),
             child(variant = Header, qname = "w:hdr"),
             child(variant = Footer, qname = "w:ftr"),
-            child(variant = Settings, qname = "w:settings"),
-            child(variant = WebSettings, qname = "w:webSettings"),
+            child(variant = Settings, boxed, qname = "w:settings"),
+            child(variant = WebSettings, boxed, qname = "w:webSettings"),
             child(variant = Fonts, qname = "w:fonts"),
-            child(variant = Numbering, qname = "w:numbering"),
-            child(variant = Styles, qname = "w:styles"),
-            child(variant = Document, qname = "w:document"),
-            child(variant = GlossaryDocument, qname = "w:glossaryDocument"),
-            child(variant = Color, qname = "w15:color"),
+            child(variant = Numbering, boxed, qname = "w:numbering"),
+            child(variant = Styles, boxed, qname = "w:styles"),
+            child(variant = Document, boxed, qname = "w:document"),
+            child(variant = GlossaryDocument, boxed, qname = "w:glossaryDocument"),
+            child(variant = Color, boxed, qname = "w15:color"),
             child(variant = DataBinding, qname = "w15:dataBinding"),
             child(variant = Appearance, qname = "w15:appearance"),
             child(variant = CommentsEx, qname = "w15:commentsEx"),
             child(variant = People, qname = "w15:people"),
-            child(variant = SdtRepeatedSection, qname = "w15:repeatingSection"),
+            child(variant = SdtRepeatedSection, boxed, qname = "w15:repeatingSection"),
             empty_child(
                 variant = SdtRepeatedSectionItem,
                 qname = "w15:repeatingSectionItem"
@@ -5416,10 +5455,10 @@ pub struct GraphicData {
             child(variant = ChartTrackingRefBased, qname = "w15:chartTrackingRefBased"),
             child(variant = DefaultCollapsed, qname = "w15:collapsed"),
             child(variant = PersistentDocumentId, qname = "w15:docId"),
-            child(variant = FootnoteColumns, qname = "w15:footnoteColumns"),
+            child(variant = FootnoteColumns, boxed, qname = "w15:footnoteColumns"),
             child(variant = WebExtensionLinked, qname = "w15:webExtensionLinked"),
             child(variant = WebExtensionCreated, qname = "w15:webExtensionCreated"),
-            child(variant = W14ContentPart, qname = "w14:contentPart"),
+            child(variant = W14ContentPart, boxed, qname = "w14:contentPart"),
             child(variant = DocumentId, qname = "w14:docId"),
             child(variant = ConflictMode, qname = "w14:conflictMode"),
             child(
@@ -5444,48 +5483,48 @@ pub struct GraphicData {
             ),
             child(variant = W14DefaultImageDpi, qname = "w14:defaultImageDpi"),
             empty_child(variant = EntityPickerEmpty, qname = "w14:entityPicker"),
-            child(variant = SdtContentCheckBox, qname = "w14:checkbox"),
+            child(variant = SdtContentCheckBox, boxed, qname = "w14:checkbox"),
             child(variant = SchemaLibrary, qname = "sl:schemaLibrary"),
-            child(variant = MathProperties, qname = "m:mathPr"),
-            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = MathProperties, boxed, qname = "m:mathPr"),
+            child(variant = Paragraph, boxed, qname = "m:oMathPara"),
             child(variant = OfficeMath, qname = "m:oMath"),
-            child(variant = Shape, qname = "v:shape"),
-            child(variant = Shapetype, qname = "v:shapetype"),
-            child(variant = VGroup, qname = "v:group"),
-            child(variant = Background, qname = "v:background"),
-            child(variant = Fill, qname = "v:fill"),
+            child(variant = Shape, boxed, qname = "v:shape"),
+            child(variant = Shapetype, boxed, qname = "v:shapetype"),
+            child(variant = VGroup, boxed, qname = "v:group"),
+            child(variant = Background, boxed, qname = "v:background"),
+            child(variant = Fill, boxed, qname = "v:fill"),
             child(variant = Formulas, qname = "v:formulas"),
             child(variant = ShapeHandles, qname = "v:handles"),
-            child(variant = ImageData, qname = "v:imagedata"),
-            child(variant = Path, qname = "v:path"),
-            child(variant = TextBox, qname = "v:textbox"),
-            child(variant = Shadow, qname = "v:shadow"),
-            child(variant = Stroke, qname = "v:stroke"),
-            child(variant = TextPath, qname = "v:textpath"),
-            child(variant = VArc, qname = "v:arc"),
-            child(variant = Curve, qname = "v:curve"),
-            child(variant = ImageFile, qname = "v:image"),
-            child(variant = Line, qname = "v:line"),
-            child(variant = Oval, qname = "v:oval"),
-            child(variant = PolyLine, qname = "v:polyline"),
-            child(variant = Rectangle, qname = "v:rect"),
-            child(variant = RoundRectangle, qname = "v:roundrect"),
-            child(variant = ShapeDefaults, qname = "o:shapedefaults"),
-            child(variant = ShapeLayout, qname = "o:shapelayout"),
-            child(variant = OSignatureLine, qname = "o:signatureline"),
+            child(variant = ImageData, boxed, qname = "v:imagedata"),
+            child(variant = Path, boxed, qname = "v:path"),
+            child(variant = TextBox, boxed, qname = "v:textbox"),
+            child(variant = Shadow, boxed, qname = "v:shadow"),
+            child(variant = Stroke, boxed, qname = "v:stroke"),
+            child(variant = TextPath, boxed, qname = "v:textpath"),
+            child(variant = VArc, boxed, qname = "v:arc"),
+            child(variant = Curve, boxed, qname = "v:curve"),
+            child(variant = ImageFile, boxed, qname = "v:image"),
+            child(variant = Line, boxed, qname = "v:line"),
+            child(variant = Oval, boxed, qname = "v:oval"),
+            child(variant = PolyLine, boxed, qname = "v:polyline"),
+            child(variant = Rectangle, boxed, qname = "v:rect"),
+            child(variant = RoundRectangle, boxed, qname = "v:roundrect"),
+            child(variant = ShapeDefaults, boxed, qname = "o:shapedefaults"),
+            child(variant = ShapeLayout, boxed, qname = "o:shapelayout"),
+            child(variant = OSignatureLine, boxed, qname = "o:signatureline"),
             child(variant = OInk, qname = "o:ink"),
-            child(variant = Diagram, qname = "o:diagram"),
-            child(variant = Skew, qname = "o:skew"),
-            child(variant = Extrusion, qname = "o:extrusion"),
-            child(variant = Callout, qname = "o:callout"),
-            child(variant = Lock, qname = "o:lock"),
-            child(variant = OOleObject, qname = "o:OLEObject"),
+            child(variant = Diagram, boxed, qname = "o:diagram"),
+            child(variant = Skew, boxed, qname = "o:skew"),
+            child(variant = Extrusion, boxed, qname = "o:extrusion"),
+            child(variant = Callout, boxed, qname = "o:callout"),
+            child(variant = Lock, boxed, qname = "o:lock"),
+            child(variant = OOleObject, boxed, qname = "o:OLEObject"),
             child(variant = Complex, qname = "o:complex"),
-            child(variant = LeftStroke, qname = "o:left"),
-            child(variant = TopStroke, qname = "o:top"),
-            child(variant = RightStroke, qname = "o:right"),
-            child(variant = BottomStroke, qname = "o:bottom"),
-            child(variant = ColumnStroke, qname = "o:column"),
+            child(variant = LeftStroke, boxed, qname = "o:left"),
+            child(variant = TopStroke, boxed, qname = "o:top"),
+            child(variant = RightStroke, boxed, qname = "o:right"),
+            child(variant = BottomStroke, boxed, qname = "o:bottom"),
+            child(variant = ColumnStroke, boxed, qname = "o:column"),
             child(variant = ClipPath, qname = "o:clippath"),
             child(variant = FillExtendedProperties, qname = "o:fill"),
             child(variant = TopBorder, qname = "w10:bordertop"),
@@ -5497,15 +5536,15 @@ pub struct GraphicData {
             child(variant = ClientData, qname = "xvml:ClientData"),
             empty_child(variant = InkAnnotationFlag, qname = "pvml:iscomment"),
             child(variant = TextData, qname = "pvml:textdata"),
-            child(variant = WordprocessingCanvas, qname = "wpc:wpc"),
-            child(variant = WordprocessingGroup, qname = "wpg:wgp"),
-            child(variant = WordprocessingShape, qname = "wps:wsp"),
-            child(variant = Slicer, qname = "sle:slicer"),
-            child(variant = ColorStyle, qname = "cs:colorStyle"),
-            child(variant = ChartStyle, qname = "cs:chartStyle"),
-            child(variant = WebExtension, qname = "we:webextension"),
+            child(variant = WordprocessingCanvas, boxed, qname = "wpc:wpc"),
+            child(variant = WordprocessingGroup, boxed, qname = "wpg:wgp"),
+            child(variant = WordprocessingShape, boxed, qname = "wps:wsp"),
+            child(variant = Slicer, boxed, qname = "sle:slicer"),
+            child(variant = ColorStyle, boxed, qname = "cs:colorStyle"),
+            child(variant = ChartStyle, boxed, qname = "cs:chartStyle"),
+            child(variant = WebExtension, boxed, qname = "we:webextension"),
             child(variant = WebExtensionReference, qname = "we:webextensionref"),
-            child(variant = TimeSlicer, qname = "tsle:timeslicer"),
+            child(variant = TimeSlicer, boxed, qname = "tsle:timeslicer"),
             any(qnames = ["wp:wsp"])
         )
     )]
@@ -5679,18 +5718,18 @@ pub struct ShapeProperties {
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -5700,8 +5739,8 @@ pub struct ShapeProperties {
   pub outline: Option<std::boxed::Box<Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
@@ -5725,7 +5764,7 @@ pub struct TextShape {
   #[sdk(
         choice(
             empty_child(variant = UseShapeRectangle, qname = "a:useSpRect"),
-            child(variant = Transform2D, qname = "a:xfrm")
+            child(variant = Transform2D, boxed, qname = "a:xfrm")
         )
     )]
   pub text_shape_choice: Option<TextShapeChoice>,
@@ -6092,7 +6131,7 @@ pub struct GradientStop {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -6402,9 +6441,9 @@ pub struct Path {
   #[sdk(
         choice(
             empty_child(variant = CloseShapePath, qname = "a:close"),
-            child(variant = MoveTo, qname = "a:moveTo"),
-            child(variant = LineTo, qname = "a:lnTo"),
-            child(variant = ArcTo, qname = "a:arcTo"),
+            child(variant = MoveTo, boxed, qname = "a:moveTo"),
+            child(variant = LineTo, boxed, qname = "a:lnTo"),
+            child(variant = ArcTo, boxed, qname = "a:arcTo"),
             child(variant = QuadraticBezierCurveTo, qname = "a:quadBezTo"),
             child(variant = CubicBezierCurveTo, qname = "a:cubicBezTo")
         )
@@ -6433,8 +6472,8 @@ pub struct ShapeGuideList {
 pub struct AdjustHandleList {
   #[sdk(
         choice(
-            child(variant = AdjustHandleXy, qname = "a:ahXY"),
-            child(variant = AdjustHandlePolar, qname = "a:ahPolar")
+            child(variant = AdjustHandleXy, boxed, qname = "a:ahXY"),
+            child(variant = AdjustHandlePolar, boxed, qname = "a:ahPolar")
         )
     )]
   pub adjust_handle_list_choice: Vec<AdjustHandleListChoice>,
@@ -6633,7 +6672,7 @@ pub struct BodyProperties {
   pub scene3_d_type: Option<std::boxed::Box<Scene3DType>>,
   #[sdk(
         choice(
-            child(variant = Shape3DType, qname = "a:sp3d"),
+            child(variant = Shape3DType, boxed, qname = "a:sp3d"),
             child(variant = FlatText, qname = "a:flatTx")
         )
     )]
@@ -6956,10 +6995,10 @@ pub struct TableCellProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -7153,24 +7192,24 @@ pub struct TableProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
   pub table_properties_choice1: Option<TablePropertiesChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub table_properties_choice2: Option<TablePropertiesChoice2>,
   #[sdk(
         choice(
-            child(variant = TableStyle, qname = "a:tableStyle"),
+            child(variant = TableStyle, boxed, qname = "a:tableStyle"),
             text_child(variant = TableStyleId, qname = "a:tableStyleId")
         )
     )]
@@ -7208,8 +7247,8 @@ pub struct TableRow {
 pub struct LeftBorder {
   #[sdk(
         choice(
-            child(variant = Outline, qname = "a:ln"),
-            child(variant = LineReference, qname = "a:lnRef")
+            child(variant = Outline, boxed, qname = "a:ln"),
+            child(variant = LineReference, boxed, qname = "a:lnRef")
         )
     )]
   pub left_border_choice: Option<LeftBorderChoice>,
@@ -7220,8 +7259,8 @@ pub struct LeftBorder {
 pub struct RightBorder {
   #[sdk(
         choice(
-            child(variant = Outline, qname = "a:ln"),
-            child(variant = LineReference, qname = "a:lnRef")
+            child(variant = Outline, boxed, qname = "a:ln"),
+            child(variant = LineReference, boxed, qname = "a:lnRef")
         )
     )]
   pub right_border_choice: Option<RightBorderChoice>,
@@ -7232,8 +7271,8 @@ pub struct RightBorder {
 pub struct TopBorder {
   #[sdk(
         choice(
-            child(variant = Outline, qname = "a:ln"),
-            child(variant = LineReference, qname = "a:lnRef")
+            child(variant = Outline, boxed, qname = "a:ln"),
+            child(variant = LineReference, boxed, qname = "a:lnRef")
         )
     )]
   pub top_border_choice: Option<TopBorderChoice>,
@@ -7244,8 +7283,8 @@ pub struct TopBorder {
 pub struct BottomBorder {
   #[sdk(
         choice(
-            child(variant = Outline, qname = "a:ln"),
-            child(variant = LineReference, qname = "a:lnRef")
+            child(variant = Outline, boxed, qname = "a:ln"),
+            child(variant = LineReference, boxed, qname = "a:lnRef")
         )
     )]
   pub bottom_border_choice: Option<BottomBorderChoice>,
@@ -7256,8 +7295,8 @@ pub struct BottomBorder {
 pub struct InsideHorizontalBorder {
   #[sdk(
         choice(
-            child(variant = Outline, qname = "a:ln"),
-            child(variant = LineReference, qname = "a:lnRef")
+            child(variant = Outline, boxed, qname = "a:ln"),
+            child(variant = LineReference, boxed, qname = "a:lnRef")
         )
     )]
   pub inside_horizontal_border_choice: Option<InsideHorizontalBorderChoice>,
@@ -7268,8 +7307,8 @@ pub struct InsideHorizontalBorder {
 pub struct InsideVerticalBorder {
   #[sdk(
         choice(
-            child(variant = Outline, qname = "a:ln"),
-            child(variant = LineReference, qname = "a:lnRef")
+            child(variant = Outline, boxed, qname = "a:ln"),
+            child(variant = LineReference, boxed, qname = "a:lnRef")
         )
     )]
   pub inside_vertical_border_choice: Option<InsideVerticalBorderChoice>,
@@ -7280,8 +7319,8 @@ pub struct InsideVerticalBorder {
 pub struct TopLeftToBottomRightBorder {
   #[sdk(
         choice(
-            child(variant = Outline, qname = "a:ln"),
-            child(variant = LineReference, qname = "a:lnRef")
+            child(variant = Outline, boxed, qname = "a:ln"),
+            child(variant = LineReference, boxed, qname = "a:lnRef")
         )
     )]
   pub top_left_to_bottom_right_border_choice: Option<TopLeftToBottomRightBorderChoice>,
@@ -7292,8 +7331,8 @@ pub struct TopLeftToBottomRightBorder {
 pub struct TopRightToBottomLeftBorder {
   #[sdk(
         choice(
-            child(variant = Outline, qname = "a:ln"),
-            child(variant = LineReference, qname = "a:lnRef")
+            child(variant = Outline, boxed, qname = "a:ln"),
+            child(variant = LineReference, boxed, qname = "a:lnRef")
         )
     )]
   pub top_right_to_bottom_left_border_choice: Option<TopRightToBottomLeftBorderChoice>,
@@ -7344,15 +7383,15 @@ pub struct TableCellTextStyle {
   pub italic: Option<BooleanStyleValues>,
   #[sdk(
         choice(
-            child(variant = Fonts, qname = "a:font"),
-            child(variant = FontReference, qname = "a:fontRef")
+            child(variant = Fonts, boxed, qname = "a:font"),
+            child(variant = FontReference, boxed, qname = "a:fontRef")
         )
     )]
   pub table_cell_text_style_choice1: Option<TableCellTextStyleChoice>,
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -7373,8 +7412,8 @@ pub struct TableCellStyle {
   pub table_cell_borders: Option<std::boxed::Box<TableCellBorders>>,
   #[sdk(
         choice(
-            child(variant = FillProperties, qname = "a:fill"),
-            child(variant = FillReference, qname = "a:fillRef")
+            child(variant = FillProperties, boxed, qname = "a:fill"),
+            child(variant = FillReference, boxed, qname = "a:fillRef")
         )
     )]
   pub table_cell_style_choice: Option<TableCellStyleChoice>,
@@ -7388,15 +7427,15 @@ pub struct TableCellStyle {
 pub struct TableBackground {
   #[sdk(
         choice(
-            child(variant = FillProperties, qname = "a:fill"),
-            child(variant = FillReference, qname = "a:fillRef")
+            child(variant = FillProperties, boxed, qname = "a:fill"),
+            child(variant = FillReference, boxed, qname = "a:fillRef")
         )
     )]
   pub table_background_choice1: Option<TableBackgroundChoice>,
   #[sdk(
         choice(
-            child(variant = EffectPropertiesType, qname = "a:effect"),
-            child(variant = EffectReference, qname = "a:effectRef")
+            child(variant = EffectPropertiesType, boxed, qname = "a:effect"),
+            child(variant = EffectReference, boxed, qname = "a:effectRef")
         )
     )]
   pub table_background_choice2: Option<TableBackgroundChoice2>,
@@ -7599,7 +7638,7 @@ pub struct ParagraphProperties {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub paragraph_properties_choice1: Option<ParagraphPropertiesChoice>,
@@ -7623,7 +7662,7 @@ pub struct ParagraphProperties {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub paragraph_properties_choice4: Option<ParagraphPropertiesChoice4>,
@@ -7692,7 +7731,7 @@ pub struct DefaultParagraphProperties {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub default_paragraph_properties_choice1: Option<DefaultParagraphPropertiesChoice>,
@@ -7716,7 +7755,7 @@ pub struct DefaultParagraphProperties {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub default_paragraph_properties_choice4: Option<DefaultParagraphPropertiesChoice4>,
@@ -7785,7 +7824,7 @@ pub struct Level1ParagraphProperties {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub level1_paragraph_properties_choice1: Option<Level1ParagraphPropertiesChoice>,
@@ -7809,7 +7848,7 @@ pub struct Level1ParagraphProperties {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub level1_paragraph_properties_choice4: Option<Level1ParagraphPropertiesChoice4>,
@@ -7878,7 +7917,7 @@ pub struct Level2ParagraphProperties {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub level2_paragraph_properties_choice1: Option<Level2ParagraphPropertiesChoice>,
@@ -7902,7 +7941,7 @@ pub struct Level2ParagraphProperties {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub level2_paragraph_properties_choice4: Option<Level2ParagraphPropertiesChoice4>,
@@ -7971,7 +8010,7 @@ pub struct Level3ParagraphProperties {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub level3_paragraph_properties_choice1: Option<Level3ParagraphPropertiesChoice>,
@@ -7995,7 +8034,7 @@ pub struct Level3ParagraphProperties {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub level3_paragraph_properties_choice4: Option<Level3ParagraphPropertiesChoice4>,
@@ -8064,7 +8103,7 @@ pub struct Level4ParagraphProperties {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub level4_paragraph_properties_choice1: Option<Level4ParagraphPropertiesChoice>,
@@ -8088,7 +8127,7 @@ pub struct Level4ParagraphProperties {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub level4_paragraph_properties_choice4: Option<Level4ParagraphPropertiesChoice4>,
@@ -8157,7 +8196,7 @@ pub struct Level5ParagraphProperties {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub level5_paragraph_properties_choice1: Option<Level5ParagraphPropertiesChoice>,
@@ -8181,7 +8220,7 @@ pub struct Level5ParagraphProperties {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub level5_paragraph_properties_choice4: Option<Level5ParagraphPropertiesChoice4>,
@@ -8250,7 +8289,7 @@ pub struct Level6ParagraphProperties {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub level6_paragraph_properties_choice1: Option<Level6ParagraphPropertiesChoice>,
@@ -8274,7 +8313,7 @@ pub struct Level6ParagraphProperties {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub level6_paragraph_properties_choice4: Option<Level6ParagraphPropertiesChoice4>,
@@ -8343,7 +8382,7 @@ pub struct Level7ParagraphProperties {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub level7_paragraph_properties_choice1: Option<Level7ParagraphPropertiesChoice>,
@@ -8367,7 +8406,7 @@ pub struct Level7ParagraphProperties {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub level7_paragraph_properties_choice4: Option<Level7ParagraphPropertiesChoice4>,
@@ -8436,7 +8475,7 @@ pub struct Level8ParagraphProperties {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub level8_paragraph_properties_choice1: Option<Level8ParagraphPropertiesChoice>,
@@ -8460,7 +8499,7 @@ pub struct Level8ParagraphProperties {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub level8_paragraph_properties_choice4: Option<Level8ParagraphPropertiesChoice4>,
@@ -8529,7 +8568,7 @@ pub struct Level9ParagraphProperties {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub level9_paragraph_properties_choice1: Option<Level9ParagraphPropertiesChoice>,
@@ -8553,7 +8592,7 @@ pub struct Level9ParagraphProperties {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub level9_paragraph_properties_choice4: Option<Level9ParagraphPropertiesChoice4>,
@@ -8640,18 +8679,18 @@ pub struct EndParagraphRunProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
   pub end_paragraph_run_properties_choice1: Option<EndParagraphRunPropertiesChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub end_paragraph_run_properties_choice2: Option<EndParagraphRunPropertiesChoice2>,
@@ -8661,14 +8700,14 @@ pub struct EndParagraphRunProperties {
   #[sdk(
         choice(
             empty_child(variant = UnderlineFollowsText, qname = "a:uLnTx"),
-            child(variant = Underline, qname = "a:uLn")
+            child(variant = Underline, boxed, qname = "a:uLn")
         )
     )]
   pub end_paragraph_run_properties_choice3: Option<EndParagraphRunPropertiesChoice3>,
   #[sdk(
         choice(
             empty_child(variant = UnderlineFillText, qname = "a:uFillTx"),
-            child(variant = UnderlineFill, qname = "a:uFill")
+            child(variant = UnderlineFill, boxed, qname = "a:uFill")
         )
     )]
   pub end_paragraph_run_properties_choice4: Option<EndParagraphRunPropertiesChoice4>,
@@ -8770,18 +8809,18 @@ pub struct RunProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
   pub run_properties_choice1: Option<RunPropertiesChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub run_properties_choice2: Option<RunPropertiesChoice2>,
@@ -8791,14 +8830,14 @@ pub struct RunProperties {
   #[sdk(
         choice(
             empty_child(variant = UnderlineFollowsText, qname = "a:uLnTx"),
-            child(variant = Underline, qname = "a:uLn")
+            child(variant = Underline, boxed, qname = "a:uLn")
         )
     )]
   pub run_properties_choice3: Option<RunPropertiesChoice3>,
   #[sdk(
         choice(
             empty_child(variant = UnderlineFillText, qname = "a:uFillTx"),
-            child(variant = UnderlineFill, qname = "a:uFill")
+            child(variant = UnderlineFill, boxed, qname = "a:uFill")
         )
     )]
   pub run_properties_choice4: Option<RunPropertiesChoice4>,
@@ -8900,18 +8939,18 @@ pub struct DefaultRunProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
   pub default_run_properties_choice1: Option<DefaultRunPropertiesChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub default_run_properties_choice2: Option<DefaultRunPropertiesChoice2>,
@@ -8921,14 +8960,14 @@ pub struct DefaultRunProperties {
   #[sdk(
         choice(
             empty_child(variant = UnderlineFollowsText, qname = "a:uLnTx"),
-            child(variant = Underline, qname = "a:uLn")
+            child(variant = Underline, boxed, qname = "a:uLn")
         )
     )]
   pub default_run_properties_choice3: Option<DefaultRunPropertiesChoice3>,
   #[sdk(
         choice(
             empty_child(variant = UnderlineFillText, qname = "a:uFillTx"),
-            child(variant = UnderlineFill, qname = "a:uFill")
+            child(variant = UnderlineFill, boxed, qname = "a:uFill")
         )
     )]
   pub default_run_properties_choice4: Option<DefaultRunPropertiesChoice4>,
@@ -8967,9 +9006,9 @@ pub struct Paragraph {
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   #[sdk(
         choice(
-            child(variant = Run, qname = "a:r"),
-            child(variant = Break, qname = "a:br"),
-            child(variant = Field, qname = "a:fld"),
+            child(variant = Run, boxed, qname = "a:r"),
+            child(variant = Break, boxed, qname = "a:br"),
+            child(variant = Field, boxed, qname = "a:fld"),
             child(variant = TextMath, qname = "a14:m")
         )
     )]
@@ -9064,11 +9103,11 @@ pub struct ShapePropertiesExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = HiddenFillProperties, qname = "a14:hiddenFill"),
-            child(variant = HiddenLineProperties, qname = "a14:hiddenLine"),
-            child(variant = HiddenEffectsProperties, qname = "a14:hiddenEffects"),
-            child(variant = HiddenScene3D, qname = "a14:hiddenScene3d"),
-            child(variant = HiddenShape3D, qname = "a14:hiddenSp3d"),
+            child(variant = HiddenFillProperties, boxed, qname = "a14:hiddenFill"),
+            child(variant = HiddenLineProperties, boxed, qname = "a14:hiddenLine"),
+            child(variant = HiddenEffectsProperties, boxed, qname = "a14:hiddenEffects"),
+            child(variant = HiddenScene3D, boxed, qname = "a14:hiddenScene3d"),
+            child(variant = HiddenShape3D, boxed, qname = "a14:hiddenSp3d"),
             child(variant = ShadowObscured, qname = "a14:shadowObscured"),
             any
         )
@@ -9121,18 +9160,18 @@ pub struct VisualGroupShapeProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
   pub visual_group_shape_properties_choice1: Option<VisualGroupShapePropertiesChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub visual_group_shape_properties_choice2: Option<VisualGroupShapePropertiesChoice2>,
@@ -9229,13 +9268,13 @@ pub struct GroupShape {
   pub visual_group_shape_properties: std::boxed::Box<VisualGroupShapeProperties>,
   #[sdk(
         choice(
-            child(variant = TextShape, qname = "a:txSp"),
-            child(variant = Shape, qname = "a:sp"),
-            child(variant = ConnectionShape, qname = "a:cxnSp"),
-            child(variant = Picture, qname = "a:pic"),
-            child(variant = GvmlContentPart, qname = "a14:contentPart"),
-            child(variant = GraphicFrame, qname = "a:graphicFrame"),
-            child(variant = GroupShape, qname = "a:grpSp")
+            child(variant = TextShape, boxed, qname = "a:txSp"),
+            child(variant = Shape, boxed, qname = "a:sp"),
+            child(variant = ConnectionShape, boxed, qname = "a:cxnSp"),
+            child(variant = Picture, boxed, qname = "a:pic"),
+            child(variant = GvmlContentPart, boxed, qname = "a14:contentPart"),
+            child(variant = GraphicFrame, boxed, qname = "a:graphicFrame"),
+            child(variant = GroupShape, boxed, qname = "a:grpSp")
         )
     )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
@@ -9277,7 +9316,7 @@ pub struct OfficeStyleSheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(child(variant = ThemeFamily, qname = "thm15:themeFamily"), any))]
+  #[sdk(choice(child(variant = ThemeFamily, boxed, qname = "thm15:themeFamily"), any))]
   pub office_style_sheet_extension_choice: Option<OfficeStyleSheetExtensionChoice>,
 }
 /// Defines the ConnectorLockingExtension Class.
@@ -9288,7 +9327,7 @@ pub struct ConnectorLockingExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(child(variant = Graphic, qname = "a:graphic"), any))]
+  #[sdk(choice(child(variant = Graphic, boxed, qname = "a:graphic"), any))]
   pub connector_locking_extension_choice: Option<ConnectorLockingExtensionChoice>,
 }
 /// Defines the GroupShapeLocks Class.
@@ -9529,7 +9568,10 @@ pub struct PtExtension {
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(
-        choice(child(variant = NonVisualDrawingProperties, qname = "dgm14:cNvPr"), any)
+        choice(
+            child(variant = NonVisualDrawingProperties, boxed, qname = "dgm14:cNvPr"),
+            any
+        )
     )]
   pub pt_extension_choice: Option<PtExtensionChoice>,
 }
@@ -9565,6 +9607,7 @@ pub struct LinePropertiesExtension {
         choice(
             child(
                 variant = LineSketchStyleProperties,
+                boxed,
                 qname = "ask:lineSketchStyleProps"
             ),
             any
@@ -9631,7 +9674,7 @@ pub struct NonVisualDrawingPropertiesExtension {
             child(variant = PredecessorDrawingElementReference, qname = "a16:predDERef"),
             child(variant = Decorative, qname = "adec:decorative"),
             child(variant = ClassificationOutcome, qname = "aclsh:classification"),
-            child(variant = ScriptLink, qname = "asl:scriptLink"),
+            child(variant = ScriptLink, boxed, qname = "asl:scriptLink"),
             any
         )
     )]
@@ -9700,9 +9743,9 @@ pub struct NonVisualPicturePropertiesExtension {
   #[sdk(
         choice(
             child(variant = CameraTool, qname = "a14:cameraTool"),
-            child(variant = SignatureLine, qname = "a15:signatureLine"),
-            child(variant = ObjectProperties, qname = "a15:objectPr"),
-            child(variant = LiveFeedProperties, qname = "alf:liveFeedProps"),
+            child(variant = SignatureLine, boxed, qname = "a15:signatureLine"),
+            child(variant = ObjectProperties, boxed, qname = "a15:objectPr"),
+            child(variant = LiveFeedProperties, boxed, qname = "alf:liveFeedProps"),
             child(variant = ImageFormula, qname = "aif:imageFormula"),
             any
         )
@@ -9729,13 +9772,13 @@ pub struct BlipExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = ImageProperties, qname = "a14:imgProps"),
+            child(variant = ImageProperties, boxed, qname = "a14:imgProps"),
             child(variant = UseLocalDpi, qname = "a14:useLocalDpi"),
             child(variant = WebVideoProperty, qname = "wp15:webVideoPr"),
             child(variant = SvgBlip, qname = "asvg:svgBlip"),
             child(variant = PictureAttributionSourceUrl, qname = "a1611:picAttrSrcUrl"),
             child(variant = OEmbed, qname = "woe:oembed"),
-            child(variant = OEmbedShared, qname = "aoe:oembedShared"),
+            child(variant = OEmbedShared, boxed, qname = "aoe:oembedShared"),
             any
         )
     )]

@@ -135,7 +135,7 @@ pub struct KeyMapEntry {
   pub mask: Option<crate::simple_type::OnOffValue>,
   #[sdk(
         choice(
-            child(variant = FixedCommandKeyboardCustomization, qname = "wne:fci"),
+            child(variant = FixedCommandKeyboardCustomization, boxed, qname = "wne:fci"),
             child(variant = MacroKeyboardCustomization, qname = "wne:macro"),
             child(variant = AllocatedCommandKeyboardCustomization, qname = "wne:acd"),
             child(variant = WllMacroKeyboardCustomization, qname = "wne:wll"),

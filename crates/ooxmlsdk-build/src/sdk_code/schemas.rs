@@ -4100,7 +4100,11 @@ fn choice_variant_metadata_tokens(
           .iter()
           .map(|qname| {
             let qname = choice_metadata_qname(qname);
-            quote! { #item_name(variant = #variant_ident, qname = #qname) }
+            let boxed = (!is_empty_leaf_marker
+              && !is_any_children_alias
+              && !choice_child_variant_can_inline(&variant.payload, module, type_graph))
+            .then(|| quote! { boxed, });
+            quote! { #item_name(variant = #variant_ident, #boxed qname = #qname) }
           })
           .collect(),
       )

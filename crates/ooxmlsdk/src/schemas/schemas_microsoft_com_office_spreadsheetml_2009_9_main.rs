@@ -2251,8 +2251,8 @@ pub struct SlicerCachePivotTables {
 pub struct SlicerCacheData {
   #[sdk(
         choice(
-            child(variant = OlapSlicerCache, qname = "x14:olap"),
-            child(variant = TabularSlicerCache, qname = "x14:tabular")
+            child(variant = OlapSlicerCache, boxed, qname = "x14:olap"),
+            child(variant = TabularSlicerCache, boxed, qname = "x14:tabular")
         )
     )]
   pub slicer_cache_data_choice: Option<SlicerCacheDataChoice>,

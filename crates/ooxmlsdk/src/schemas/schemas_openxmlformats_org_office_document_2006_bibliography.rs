@@ -335,22 +335,22 @@ pub struct Performer {
 pub struct AuthorList {
   #[sdk(
         choice(
-            child(variant = Artist, qname = "b:Artist"),
-            child(variant = Author, qname = "b:Author"),
-            child(variant = BookAuthor, qname = "b:BookAuthor"),
-            child(variant = Compiler, qname = "b:Compiler"),
-            child(variant = Composer, qname = "b:Composer"),
-            child(variant = Conductor, qname = "b:Conductor"),
-            child(variant = Counsel, qname = "b:Counsel"),
-            child(variant = Director, qname = "b:Director"),
-            child(variant = Editor, qname = "b:Editor"),
-            child(variant = Interviewee, qname = "b:Interviewee"),
-            child(variant = Interviewer, qname = "b:Interviewer"),
-            child(variant = Inventor, qname = "b:Inventor"),
-            child(variant = Performer, qname = "b:Performer"),
-            child(variant = ProducerName, qname = "b:ProducerName"),
-            child(variant = Translator, qname = "b:Translator"),
-            child(variant = Writer, qname = "b:Writer")
+            child(variant = Artist, boxed, qname = "b:Artist"),
+            child(variant = Author, boxed, qname = "b:Author"),
+            child(variant = BookAuthor, boxed, qname = "b:BookAuthor"),
+            child(variant = Compiler, boxed, qname = "b:Compiler"),
+            child(variant = Composer, boxed, qname = "b:Composer"),
+            child(variant = Conductor, boxed, qname = "b:Conductor"),
+            child(variant = Counsel, boxed, qname = "b:Counsel"),
+            child(variant = Director, boxed, qname = "b:Director"),
+            child(variant = Editor, boxed, qname = "b:Editor"),
+            child(variant = Interviewee, boxed, qname = "b:Interviewee"),
+            child(variant = Interviewer, boxed, qname = "b:Interviewer"),
+            child(variant = Inventor, boxed, qname = "b:Inventor"),
+            child(variant = Performer, boxed, qname = "b:Performer"),
+            child(variant = ProducerName, boxed, qname = "b:ProducerName"),
+            child(variant = Translator, boxed, qname = "b:Translator"),
+            child(variant = Writer, boxed, qname = "b:Writer")
         )
     )]
   pub author_list_choice: Vec<AuthorListChoice>,

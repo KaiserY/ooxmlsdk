@@ -349,6 +349,7 @@ enum SdkTypeChoiceItem {
   Child {
     variant: Ident,
     ty: Option<Type>,
+    boxed: bool,
     qname: String,
   },
   EmptyChild {
@@ -940,6 +941,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
             {
               let mut variant = None;
               let mut ty = None;
+              let mut boxed = false;
               let mut simple_type = None;
               let mut is_enum = false;
               let mut qname = None;
@@ -956,6 +958,9 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                 } else if choice_child.path.is_ident("ty") {
                   let value: LitStr = choice_child.value()?.parse()?;
                   ty = Some(parse_str(&value.value())?);
+                  Ok(())
+                } else if choice_child.path.is_ident("boxed") {
+                  boxed = true;
                   Ok(())
                 } else if choice_child.path.is_ident("simple_type") {
                   let value: LitStr = choice_child.value()?.parse()?;
@@ -976,7 +981,12 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                 syn::Error::new_spanned(&nested.path, "sdk choice child requires variant")
               })?;
               if nested.path.is_ident("child") {
-                choice_items.push(SdkTypeChoiceItem::Child { variant, ty, qname });
+                choice_items.push(SdkTypeChoiceItem::Child {
+                  variant,
+                  ty,
+                  boxed,
+                  qname,
+                });
               } else if nested.path.is_ident("empty_child") {
                 choice_items.push(SdkTypeChoiceItem::EmptyChild { variant, qname });
               } else if nested.path.is_ident("text_child") {

@@ -42,18 +42,18 @@ pub struct ShapeProperties {
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -63,8 +63,8 @@ pub struct ShapeProperties {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
@@ -274,9 +274,9 @@ pub struct Bubble3D {
 pub struct ChartText {
   #[sdk(
         choice(
-            child(variant = StringReference, qname = "c:strRef"),
-            child(variant = RichText, qname = "c:rich"),
-            child(variant = StringLiteral, qname = "c:strLit")
+            child(variant = StringReference, boxed, qname = "c:strRef"),
+            child(variant = RichText, boxed, qname = "c:rich"),
+            child(variant = StringLiteral, boxed, qname = "c:strLit")
         )
     )]
   pub chart_text_choice: Option<ChartTextChoice>,
@@ -301,11 +301,15 @@ pub type TextFieldGuid = crate::simple_type::StringValue;
 pub struct AxisDataSourceType {
   #[sdk(
         choice(
-            child(variant = MultiLevelStringReference, qname = "c:multiLvlStrRef"),
-            child(variant = NumberReference, qname = "c:numRef"),
-            child(variant = NumberLiteral, qname = "c:numLit"),
-            child(variant = StringReference, qname = "c:strRef"),
-            child(variant = StringLiteral, qname = "c:strLit")
+            child(
+                variant = MultiLevelStringReference,
+                boxed,
+                qname = "c:multiLvlStrRef"
+            ),
+            child(variant = NumberReference, boxed, qname = "c:numRef"),
+            child(variant = NumberLiteral, boxed, qname = "c:numLit"),
+            child(variant = StringReference, boxed, qname = "c:strRef"),
+            child(variant = StringLiteral, boxed, qname = "c:strLit")
         )
     )]
   pub axis_data_source_type_choice: Option<AxisDataSourceTypeChoice>,

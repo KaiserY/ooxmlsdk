@@ -524,12 +524,7 @@ pub trait SdkType: Sized {
   fn to_xml(&self) -> Result<String, crate::common::SdkError> {
     let mut writer = Vec::with_capacity(32);
     self.write_to(&mut writer)?;
-    match String::from_utf8(writer) {
-      Ok(xml) => Ok(xml),
-      Err(err) => Err(crate::common::SdkError::CommonError(format!(
-        "invalid utf-8 xml: {err}"
-      ))),
-    }
+    sdk_type_xml_string(writer)
   }
 
   fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
@@ -540,6 +535,16 @@ pub trait SdkType: Sized {
     Err(crate::common::SdkError::CommonError(
       "SdkType does not support deserialization".to_string(),
     ))
+  }
+}
+
+#[inline(never)]
+fn sdk_type_xml_string(writer: Vec<u8>) -> Result<String, crate::common::SdkError> {
+  match String::from_utf8(writer) {
+    Ok(xml) => Ok(xml),
+    Err(err) => Err(crate::common::SdkError::CommonError(format!(
+      "invalid utf-8 xml: {err}"
+    ))),
   }
 }
 

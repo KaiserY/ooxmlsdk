@@ -875,7 +875,7 @@ pub struct ColorMapOverride {
   #[sdk(
         choice(
             empty_child(variant = MasterColorMapping, qname = "a:masterClrMapping"),
-            child(variant = OverrideColorMapping, qname = "a:overrideClrMapping")
+            child(variant = OverrideColorMapping, boxed, qname = "a:overrideClrMapping")
         )
     )]
   pub color_map_override_choice: Option<ColorMapOverrideChoice>,
@@ -890,17 +890,17 @@ pub struct BackgroundProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill")
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill")
         )
     )]
   pub background_properties_choice1: Option<BackgroundPropertiesChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub background_properties_choice2: Option<BackgroundPropertiesChoice2>,
@@ -918,7 +918,7 @@ pub struct BackgroundStyleReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -986,8 +986,8 @@ pub struct OleObject {
   pub prog_id: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = OleObjectEmbed, qname = "p:embed"),
-            child(variant = OleObjectLink, qname = "p:link")
+            child(variant = OleObjectEmbed, boxed, qname = "p:embed"),
+            child(variant = OleObjectLink, boxed, qname = "p:link")
         )
     )]
   pub ole_object_choice: Option<OleObjectChoice>,
@@ -1434,7 +1434,7 @@ pub struct TargetElement {
         choice(
             empty_child(variant = SlideTarget, qname = "p:sldTgt"),
             child(variant = SoundTarget, qname = "p:sndTgt"),
-            child(variant = ShapeTarget, qname = "p:spTgt"),
+            child(variant = ShapeTarget, boxed, qname = "p:spTgt"),
             child(variant = InkTarget, qname = "p:inkTgt"),
             child(variant = BookmarkTarget, qname = "p14:bmkTgt")
         )
@@ -1475,7 +1475,7 @@ pub struct Condition {
   pub delay: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = TargetElement, qname = "p:tgtEl"),
+            child(variant = TargetElement, boxed, qname = "p:tgtEl"),
             child(variant = TimeNode, qname = "p:tn"),
             child(variant = RuntimeNodeTrigger, qname = "p:rtn")
         )
@@ -1499,7 +1499,7 @@ pub struct EndSync {
   pub delay: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = TargetElement, qname = "p:tgtEl"),
+            child(variant = TargetElement, boxed, qname = "p:tgtEl"),
             child(variant = TimeNode, qname = "p:tn"),
             child(variant = RuntimeNodeTrigger, qname = "p:rtn")
         )
@@ -1982,7 +1982,7 @@ pub struct ColorValue {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -1998,7 +1998,7 @@ pub struct PenColor {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -2123,7 +2123,7 @@ pub struct ToVariantValue {
             child(variant = IntegerVariantValue, qname = "p:intVal"),
             child(variant = FloatVariantValue, qname = "p:fltVal"),
             child(variant = StringVariantValue, qname = "p:strVal"),
-            child(variant = ColorValue, qname = "p:clrVal")
+            child(variant = ColorValue, boxed, qname = "p:clrVal")
         )
     )]
   pub to_variant_value_choice: Option<ToVariantValueChoice>,
@@ -2138,7 +2138,7 @@ pub struct VariantValue {
             child(variant = IntegerVariantValue, qname = "p:intVal"),
             child(variant = FloatVariantValue, qname = "p:fltVal"),
             child(variant = StringVariantValue, qname = "p:strVal"),
-            child(variant = ColorValue, qname = "p:clrVal")
+            child(variant = ColorValue, boxed, qname = "p:clrVal")
         )
     )]
   pub variant_value_choice: Option<VariantValueChoice>,
@@ -2313,7 +2313,7 @@ pub struct BuildGraphics {
   #[sdk(
         choice(
             empty_child(variant = BuildAsOne, qname = "p:bldAsOne"),
-            child(variant = BuildSubElement, qname = "p:bldSub")
+            child(variant = BuildSubElement, boxed, qname = "p:bldSub")
         )
     )]
   pub build_graphics_choice: Option<BuildGraphicsChoice>,
@@ -2324,10 +2324,10 @@ pub struct BuildGraphics {
 pub struct BuildList {
   #[sdk(
         choice(
-            child(variant = BuildParagraph, qname = "p:bldP"),
+            child(variant = BuildParagraph, boxed, qname = "p:bldP"),
             child(variant = BuildDiagram, qname = "p:bldDgm"),
             child(variant = BuildOleChart, qname = "p:bldOleChart"),
-            child(variant = BuildGraphics, qname = "p:bldGraphic")
+            child(variant = BuildGraphics, boxed, qname = "p:bldGraphic")
         )
     )]
   pub build_list_choice: Vec<BuildListChoice>,
@@ -2362,7 +2362,7 @@ pub struct FromColor {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -2378,7 +2378,7 @@ pub struct ToColor {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -2704,11 +2704,11 @@ pub struct ApplicationNonVisualDrawingProperties {
   pub placeholder_shape: Option<std::boxed::Box<PlaceholderShape>>,
   #[sdk(
         choice(
-            child(variant = AudioFromCd, qname = "a:audioCd"),
+            child(variant = AudioFromCd, boxed, qname = "a:audioCd"),
             child(variant = WaveAudioFile, qname = "a:wavAudioFile"),
-            child(variant = AudioFromFile, qname = "a:audioFile"),
-            child(variant = VideoFromFile, qname = "a:videoFile"),
-            child(variant = QuickTimeFromFile, qname = "a:quickTimeFile")
+            child(variant = AudioFromFile, boxed, qname = "a:audioFile"),
+            child(variant = VideoFromFile, boxed, qname = "a:videoFile"),
+            child(variant = QuickTimeFromFile, boxed, qname = "a:quickTimeFile")
         )
     )]
   pub application_non_visual_drawing_properties_choice:
@@ -2749,18 +2749,18 @@ pub struct ShapeProperties {
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -2770,8 +2770,8 @@ pub struct ShapeProperties {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
@@ -2897,8 +2897,8 @@ pub struct BlipFill {
   pub source_rectangle: Option<crate::schemas::a::SourceRectangle>,
   #[sdk(
         choice(
-            child(variant = Tile, qname = "a:tile"),
-            child(variant = Stretch, qname = "a:stretch")
+            child(variant = Tile, boxed, qname = "a:tile"),
+            child(variant = Stretch, boxed, qname = "a:stretch")
         )
     )]
   pub blip_fill_choice: Option<BlipFillChoice>,
@@ -3547,7 +3547,7 @@ pub struct ShowPropertiesExtension {
   #[sdk(
         choice(
             child(variant = BrowseMode, qname = "p14:browseMode"),
-            child(variant = LaserColor, qname = "p14:laserClr"),
+            child(variant = LaserColor, boxed, qname = "p14:laserClr"),
             child(variant = ShowMediaControls, qname = "p14:showMediaCtrls"),
             any
         )
@@ -3704,8 +3704,8 @@ pub struct Background {
   pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   #[sdk(
         choice(
-            child(variant = BackgroundProperties, qname = "p:bgPr"),
-            child(variant = BackgroundStyleReference, qname = "p:bgRef")
+            child(variant = BackgroundProperties, boxed, qname = "p:bgPr"),
+            child(variant = BackgroundStyleReference, boxed, qname = "p:bgRef")
         )
     )]
   pub background_choice: Option<BackgroundChoice>,
@@ -3722,12 +3722,12 @@ pub struct ShapeTree {
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(
         choice(
-            child(variant = Shape, qname = "p:sp"),
-            child(variant = GroupShape, qname = "p:grpSp"),
-            child(variant = GraphicFrame, qname = "p:graphicFrame"),
-            child(variant = ConnectionShape, qname = "p:cxnSp"),
-            child(variant = Picture, qname = "p:pic"),
-            child(variant = ContentPart, qname = "p:contentPart"),
+            child(variant = Shape, boxed, qname = "p:sp"),
+            child(variant = GroupShape, boxed, qname = "p:grpSp"),
+            child(variant = GraphicFrame, boxed, qname = "p:graphicFrame"),
+            child(variant = ConnectionShape, boxed, qname = "p:cxnSp"),
+            child(variant = Picture, boxed, qname = "p:pic"),
+            child(variant = ContentPart, boxed, qname = "p:contentPart"),
             any
         )
     )]
@@ -3748,12 +3748,12 @@ pub struct GroupShape {
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(
         choice(
-            child(variant = Shape, qname = "p:sp"),
-            child(variant = GroupShape, qname = "p:grpSp"),
-            child(variant = GraphicFrame, qname = "p:graphicFrame"),
-            child(variant = ConnectionShape, qname = "p:cxnSp"),
-            child(variant = Picture, qname = "p:pic"),
-            child(variant = ContentPart, qname = "p:contentPart"),
+            child(variant = Shape, boxed, qname = "p:sp"),
+            child(variant = GroupShape, boxed, qname = "p:grpSp"),
+            child(variant = GraphicFrame, boxed, qname = "p:graphicFrame"),
+            child(variant = ConnectionShape, boxed, qname = "p:cxnSp"),
+            child(variant = Picture, boxed, qname = "p:pic"),
+            child(variant = ContentPart, boxed, qname = "p:contentPart"),
             any
         )
     )]
@@ -3777,7 +3777,7 @@ pub struct CustomerDataList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:controls")]
 pub struct ControlList {
-  #[sdk(choice(child(variant = Control, qname = "p:control"), any))]
+  #[sdk(choice(child(variant = Control, boxed, qname = "p:control"), any))]
   pub xml_children: Vec<ControlListChoice>,
 }
 /// Defines the CommonSlideDataExtensionList Class.
@@ -3818,18 +3818,18 @@ pub struct GroupShapeProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
@@ -3921,8 +3921,8 @@ pub struct ShapeTarget {
             empty_child(variant = BackgroundAnimation, qname = "p:bg"),
             child(variant = SubShape, qname = "p:subSp"),
             child(variant = OleChartElement, qname = "p:oleChartEl"),
-            child(variant = TextElement, qname = "p:txEl"),
-            child(variant = GraphicElement, qname = "p:graphicEl")
+            child(variant = TextElement, boxed, qname = "p:txEl"),
+            child(variant = GraphicElement, boxed, qname = "p:graphicEl")
         )
     )]
   pub shape_target_choice: Option<ShapeTargetChoice>,
@@ -3964,7 +3964,9 @@ pub struct CommentExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(child(variant = ThreadingInfo, qname = "p15:threadingInfo"), any))]
+  #[sdk(
+        choice(child(variant = ThreadingInfo, boxed, qname = "p15:threadingInfo"), any)
+    )]
   pub comment_extension_choice: Option<CommentExtensionChoice>,
 }
 /// Defines the SlideLayoutExtension Class.
@@ -3975,7 +3977,9 @@ pub struct SlideLayoutExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(child(variant = SlideGuideList, qname = "p15:sldGuideLst"), any))]
+  #[sdk(
+        choice(child(variant = SlideGuideList, boxed, qname = "p15:sldGuideLst"), any)
+    )]
   pub slide_layout_extension_choice: Option<SlideLayoutExtensionChoice>,
 }
 /// Defines the SlideMasterExtension Class.
@@ -3986,7 +3990,9 @@ pub struct SlideMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(child(variant = SlideGuideList, qname = "p15:sldGuideLst"), any))]
+  #[sdk(
+        choice(child(variant = SlideGuideList, boxed, qname = "p15:sldGuideLst"), any)
+    )]
   pub slide_master_extension_choice: Option<SlideMasterExtensionChoice>,
 }
 /// Defines the HandoutMasterExtension Class.
@@ -3997,7 +4003,9 @@ pub struct HandoutMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(child(variant = SlideGuideList, qname = "p15:sldGuideLst"), any))]
+  #[sdk(
+        choice(child(variant = SlideGuideList, boxed, qname = "p15:sldGuideLst"), any)
+    )]
   pub handout_master_extension_choice: Option<HandoutMasterExtensionChoice>,
 }
 /// Defines the NotesMasterExtension Class.
@@ -4008,7 +4016,9 @@ pub struct NotesMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(child(variant = SlideGuideList, qname = "p15:sldGuideLst"), any))]
+  #[sdk(
+        choice(child(variant = SlideGuideList, boxed, qname = "p15:sldGuideLst"), any)
+    )]
   pub notes_master_extension_choice: Option<NotesMasterExtensionChoice>,
 }
 /// Placeholder Shape.
@@ -4056,7 +4066,7 @@ pub struct ApplicationNonVisualDrawingPropertiesExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = Media, qname = "p14:media"),
+            child(variant = Media, boxed, qname = "p14:media"),
             child(variant = ModificationId, qname = "p14:modId"),
             any
         )
@@ -4089,19 +4099,19 @@ pub struct Iterate {
 pub struct ChildTimeNodeList {
   #[sdk(
         choice(
-            child(variant = ParallelTimeNode, qname = "p:par"),
-            child(variant = SequenceTimeNode, qname = "p:seq"),
-            child(variant = ExclusiveTimeNode, qname = "p:excl"),
-            child(variant = Animate, qname = "p:anim"),
-            child(variant = AnimateColor, qname = "p:animClr"),
-            child(variant = AnimateEffect, qname = "p:animEffect"),
-            child(variant = AnimateMotion, qname = "p:animMotion"),
-            child(variant = AnimateRotation, qname = "p:animRot"),
-            child(variant = AnimateScale, qname = "p:animScale"),
-            child(variant = Command, qname = "p:cmd"),
-            child(variant = SetBehavior, qname = "p:set"),
-            child(variant = Audio, qname = "p:audio"),
-            child(variant = Video, qname = "p:video")
+            child(variant = ParallelTimeNode, boxed, qname = "p:par"),
+            child(variant = SequenceTimeNode, boxed, qname = "p:seq"),
+            child(variant = ExclusiveTimeNode, boxed, qname = "p:excl"),
+            child(variant = Animate, boxed, qname = "p:anim"),
+            child(variant = AnimateColor, boxed, qname = "p:animClr"),
+            child(variant = AnimateEffect, boxed, qname = "p:animEffect"),
+            child(variant = AnimateMotion, boxed, qname = "p:animMotion"),
+            child(variant = AnimateRotation, boxed, qname = "p:animRot"),
+            child(variant = AnimateScale, boxed, qname = "p:animScale"),
+            child(variant = Command, boxed, qname = "p:cmd"),
+            child(variant = SetBehavior, boxed, qname = "p:set"),
+            child(variant = Audio, boxed, qname = "p:audio"),
+            child(variant = Video, boxed, qname = "p:video")
         )
     )]
   pub child_time_node_list_choice: Vec<ChildTimeNodeListChoice>,
@@ -4112,19 +4122,19 @@ pub struct ChildTimeNodeList {
 pub struct SubTimeNodeList {
   #[sdk(
         choice(
-            child(variant = ParallelTimeNode, qname = "p:par"),
-            child(variant = SequenceTimeNode, qname = "p:seq"),
-            child(variant = ExclusiveTimeNode, qname = "p:excl"),
-            child(variant = Animate, qname = "p:anim"),
-            child(variant = AnimateColor, qname = "p:animClr"),
-            child(variant = AnimateEffect, qname = "p:animEffect"),
-            child(variant = AnimateMotion, qname = "p:animMotion"),
-            child(variant = AnimateRotation, qname = "p:animRot"),
-            child(variant = AnimateScale, qname = "p:animScale"),
-            child(variant = Command, qname = "p:cmd"),
-            child(variant = SetBehavior, qname = "p:set"),
-            child(variant = Audio, qname = "p:audio"),
-            child(variant = Video, qname = "p:video")
+            child(variant = ParallelTimeNode, boxed, qname = "p:par"),
+            child(variant = SequenceTimeNode, boxed, qname = "p:seq"),
+            child(variant = ExclusiveTimeNode, boxed, qname = "p:excl"),
+            child(variant = Animate, boxed, qname = "p:anim"),
+            child(variant = AnimateColor, boxed, qname = "p:animClr"),
+            child(variant = AnimateEffect, boxed, qname = "p:animEffect"),
+            child(variant = AnimateMotion, boxed, qname = "p:animMotion"),
+            child(variant = AnimateRotation, boxed, qname = "p:animRot"),
+            child(variant = AnimateScale, boxed, qname = "p:animScale"),
+            child(variant = Command, boxed, qname = "p:cmd"),
+            child(variant = SetBehavior, boxed, qname = "p:set"),
+            child(variant = Audio, boxed, qname = "p:audio"),
+            child(variant = Video, boxed, qname = "p:video")
         )
     )]
   pub sub_time_node_list_choice: Vec<SubTimeNodeListChoice>,
@@ -4371,8 +4381,8 @@ pub struct PresentationExtension {
         choice(
             child(variant = SectionProperties, qname = "p14:sectionPr"),
             child(variant = SectionList, qname = "p14:sectionLst"),
-            child(variant = SlideGuideList, qname = "p15:sldGuideLst"),
-            child(variant = NotesGuideList, qname = "p15:notesGuideLst"),
+            child(variant = SlideGuideList, boxed, qname = "p15:sldGuideLst"),
+            child(variant = NotesGuideList, boxed, qname = "p15:notesGuideLst"),
             any
         )
     )]
@@ -4512,7 +4522,7 @@ pub struct ColorMostRecentlyUsed {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -4801,7 +4811,7 @@ pub struct ZoomTransition {
 pub struct SoundAction {
   #[sdk(
         choice(
-            child(variant = StartSoundAction, qname = "p:stSnd"),
+            child(variant = StartSoundAction, boxed, qname = "p:stSnd"),
             empty_child(variant = EndSoundAction, qname = "p:endSnd")
         )
     )]

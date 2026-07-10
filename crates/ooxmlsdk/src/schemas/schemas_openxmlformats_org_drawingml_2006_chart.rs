@@ -388,18 +388,18 @@ pub struct ChartShapeProperties {
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub chart_shape_properties_choice1: Option<ChartShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill")
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill")
         )
     )]
   pub chart_shape_properties_choice2: Option<ChartShapePropertiesChoice2>,
@@ -408,8 +408,8 @@ pub struct ChartShapeProperties {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub chart_shape_properties_choice3: Option<ChartShapePropertiesChoice3>,
@@ -802,9 +802,9 @@ pub struct Layout {
 pub struct ChartText {
   #[sdk(
         choice(
-            child(variant = StringReference, qname = "c:strRef"),
-            child(variant = RichText, qname = "c:rich"),
-            child(variant = StringLiteral, qname = "c:strLit")
+            child(variant = StringReference, boxed, qname = "c:strRef"),
+            child(variant = RichText, boxed, qname = "c:rich"),
+            child(variant = StringLiteral, boxed, qname = "c:strLit")
         )
     )]
   pub chart_text_choice: Option<ChartTextChoice>,
@@ -927,7 +927,7 @@ pub struct FormatId {
 pub struct SeriesText {
   #[sdk(
         choice(
-            child(variant = StringReference, qname = "c:strRef"),
+            child(variant = StringReference, boxed, qname = "c:strRef"),
             text_child(variant = NumericValue, qname = "c:v")
         )
     )]
@@ -1460,8 +1460,8 @@ pub struct UserShapes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(
         choice(
-            child(variant = RelativeAnchorSize, qname = "cdr:relSizeAnchor"),
-            child(variant = AbsoluteAnchorSize, qname = "cdr:absSizeAnchor")
+            child(variant = RelativeAnchorSize, boxed, qname = "cdr:relSizeAnchor"),
+            child(variant = AbsoluteAnchorSize, boxed, qname = "cdr:absSizeAnchor")
         )
     )]
   pub user_shapes_choice: Vec<UserShapesChoice>,
@@ -1910,8 +1910,8 @@ pub struct ErrorBarValueType {
 pub struct Plus {
   #[sdk(
         choice(
-            child(variant = NumberReference, qname = "c:numRef"),
-            child(variant = NumberLiteral, qname = "c:numLit")
+            child(variant = NumberReference, boxed, qname = "c:numRef"),
+            child(variant = NumberLiteral, boxed, qname = "c:numLit")
         )
     )]
   pub plus_choice: Option<PlusChoice>,
@@ -1922,8 +1922,8 @@ pub struct Plus {
 pub struct Minus {
   #[sdk(
         choice(
-            child(variant = NumberReference, qname = "c:numRef"),
-            child(variant = NumberLiteral, qname = "c:numLit")
+            child(variant = NumberReference, boxed, qname = "c:numRef"),
+            child(variant = NumberLiteral, boxed, qname = "c:numLit")
         )
     )]
   pub minus_choice: Option<MinusChoice>,
@@ -1934,8 +1934,8 @@ pub struct Minus {
 pub struct Values {
   #[sdk(
         choice(
-            child(variant = NumberReference, qname = "c:numRef"),
-            child(variant = NumberLiteral, qname = "c:numLit")
+            child(variant = NumberReference, boxed, qname = "c:numRef"),
+            child(variant = NumberLiteral, boxed, qname = "c:numLit")
         )
     )]
   pub values_choice: Option<ValuesChoice>,
@@ -1946,8 +1946,8 @@ pub struct Values {
 pub struct YValues {
   #[sdk(
         choice(
-            child(variant = NumberReference, qname = "c:numRef"),
-            child(variant = NumberLiteral, qname = "c:numLit")
+            child(variant = NumberReference, boxed, qname = "c:numRef"),
+            child(variant = NumberLiteral, boxed, qname = "c:numLit")
         )
     )]
   pub y_values_choice: Option<YValuesChoice>,
@@ -1958,8 +1958,8 @@ pub struct YValues {
 pub struct BubbleSize {
   #[sdk(
         choice(
-            child(variant = NumberReference, qname = "c:numRef"),
-            child(variant = NumberLiteral, qname = "c:numLit")
+            child(variant = NumberReference, boxed, qname = "c:numRef"),
+            child(variant = NumberLiteral, boxed, qname = "c:numLit")
         )
     )]
   pub bubble_size_choice: Option<BubbleSizeChoice>,
@@ -2247,18 +2247,18 @@ pub struct ShapeProperties {
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -2268,8 +2268,8 @@ pub struct ShapeProperties {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
@@ -3115,6 +3115,7 @@ pub struct StockChartExtension {
         choice(
             child(
                 variant = FilteredLineSeriesExtension,
+                boxed,
                 qname = "c15:filteredLineSeries"
             ),
             any
@@ -3132,7 +3133,10 @@ pub struct PieChartExtension {
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(
-        choice(child(variant = FilteredPieSeries, qname = "c15:filteredPieSeries"), any)
+        choice(
+            child(variant = FilteredPieSeries, boxed, qname = "c15:filteredPieSeries"),
+            any
+        )
     )]
   pub pie_chart_extension_choice: Option<PieChartExtensionChoice>,
 }
@@ -3146,7 +3150,10 @@ pub struct Pie3DChartExtension {
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(
-        choice(child(variant = FilteredPieSeries, qname = "c15:filteredPieSeries"), any)
+        choice(
+            child(variant = FilteredPieSeries, boxed, qname = "c15:filteredPieSeries"),
+            any
+        )
     )]
   pub pie3_d_chart_extension_choice: Option<Pie3DChartExtensionChoice>,
 }
@@ -3232,13 +3239,13 @@ pub struct DLblsExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = ChartText, qname = "c15:tx"),
+            child(variant = ChartText, boxed, qname = "c15:tx"),
             child(variant = DataLabelFieldTable, qname = "c15:dlblFieldTable"),
             child(variant = ShowDataLabelsRange, qname = "c15:showDataLabelsRange"),
-            child(variant = ShapeProperties, qname = "c15:spPr"),
-            child(variant = Layout, qname = "c15:layout"),
+            child(variant = ShapeProperties, boxed, qname = "c15:spPr"),
+            child(variant = Layout, boxed, qname = "c15:layout"),
             child(variant = ShowLeaderLines, qname = "c15:showLeaderLines"),
-            child(variant = LeaderLines, qname = "c15:leaderLines"),
+            child(variant = LeaderLines, boxed, qname = "c15:leaderLines"),
             any
         )
     )]
@@ -3257,6 +3264,7 @@ pub struct LineChartExtension {
         choice(
             child(
                 variant = FilteredLineSeriesExtension,
+                boxed,
                 qname = "c15:filteredLineSeries"
             ),
             any
@@ -3277,6 +3285,7 @@ pub struct Line3DChartExtension {
         choice(
             child(
                 variant = FilteredLineSeriesExtension,
+                boxed,
                 qname = "c15:filteredLineSeries"
             ),
             any
@@ -3295,7 +3304,11 @@ pub struct ScatterChartExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredScatterSeries, qname = "c15:filteredScatterSeries"),
+            child(
+                variant = FilteredScatterSeries,
+                boxed,
+                qname = "c15:filteredScatterSeries"
+            ),
             any
         )
     )]
@@ -3312,7 +3325,11 @@ pub struct RadarChartExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredRadarSeries, qname = "c15:filteredRadarSeries"),
+            child(
+                variant = FilteredRadarSeries,
+                boxed,
+                qname = "c15:filteredRadarSeries"
+            ),
             any
         )
     )]
@@ -3328,7 +3345,10 @@ pub struct BarChartExtension {
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(
-        choice(child(variant = FilteredBarSeries, qname = "c15:filteredBarSeries"), any)
+        choice(
+            child(variant = FilteredBarSeries, boxed, qname = "c15:filteredBarSeries"),
+            any
+        )
     )]
   pub bar_chart_extension_choice: Option<BarChartExtensionChoice>,
 }
@@ -3342,7 +3362,10 @@ pub struct Bar3DChartExtension {
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(
-        choice(child(variant = FilteredBarSeries, qname = "c15:filteredBarSeries"), any)
+        choice(
+            child(variant = FilteredBarSeries, boxed, qname = "c15:filteredBarSeries"),
+            any
+        )
     )]
   pub bar3_d_chart_extension_choice: Option<Bar3DChartExtensionChoice>,
 }
@@ -3357,7 +3380,7 @@ pub struct AreaChartExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredAreaSeries, qname = "c15:filteredAreaSeries"),
+            child(variant = FilteredAreaSeries, boxed, qname = "c15:filteredAreaSeries"),
             any
         )
     )]
@@ -3374,7 +3397,7 @@ pub struct Area3DChartExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredAreaSeries, qname = "c15:filteredAreaSeries"),
+            child(variant = FilteredAreaSeries, boxed, qname = "c15:filteredAreaSeries"),
             any
         )
     )]
@@ -3391,7 +3414,11 @@ pub struct BubbleChartExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredBubbleSeries, qname = "c15:filteredBubbleSeries"),
+            child(
+                variant = FilteredBubbleSeries,
+                boxed,
+                qname = "c15:filteredBubbleSeries"
+            ),
             any
         )
     )]
@@ -3408,7 +3435,11 @@ pub struct SurfaceChartExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredSurfaceSeries, qname = "c15:filteredSurfaceSeries"),
+            child(
+                variant = FilteredSurfaceSeries,
+                boxed,
+                qname = "c15:filteredSurfaceSeries"
+            ),
             any
         )
     )]
@@ -3425,7 +3456,11 @@ pub struct Surface3DChartExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredSurfaceSeries, qname = "c15:filteredSurfaceSeries"),
+            child(
+                variant = FilteredSurfaceSeries,
+                boxed,
+                qname = "c15:filteredSurfaceSeries"
+            ),
             any
         )
     )]
@@ -4025,8 +4060,8 @@ pub struct DLblExtension {
             child(variant = DataLabelFieldTable, qname = "c15:dlblFieldTable"),
             child(variant = ExceptionForSave, qname = "c15:xForSave"),
             child(variant = ShowDataLabelsRange, qname = "c15:showDataLabelsRange"),
-            child(variant = ShapeProperties, qname = "c15:spPr"),
-            child(variant = Layout, qname = "c15:layout"),
+            child(variant = ShapeProperties, boxed, qname = "c15:spPr"),
+            child(variant = Layout, boxed, qname = "c15:layout"),
             child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
             any
         )
@@ -4141,11 +4176,15 @@ pub struct ErrorBars {
 pub struct CategoryAxisData {
   #[sdk(
         choice(
-            child(variant = MultiLevelStringReference, qname = "c:multiLvlStrRef"),
-            child(variant = NumberReference, qname = "c:numRef"),
-            child(variant = NumberLiteral, qname = "c:numLit"),
-            child(variant = StringReference, qname = "c:strRef"),
-            child(variant = StringLiteral, qname = "c:strLit")
+            child(
+                variant = MultiLevelStringReference,
+                boxed,
+                qname = "c:multiLvlStrRef"
+            ),
+            child(variant = NumberReference, boxed, qname = "c:numRef"),
+            child(variant = NumberLiteral, boxed, qname = "c:numLit"),
+            child(variant = StringReference, boxed, qname = "c:strRef"),
+            child(variant = StringLiteral, boxed, qname = "c:strLit")
         )
     )]
   pub category_axis_data_choice: Option<CategoryAxisDataChoice>,
@@ -4156,11 +4195,15 @@ pub struct CategoryAxisData {
 pub struct XValues {
   #[sdk(
         choice(
-            child(variant = MultiLevelStringReference, qname = "c:multiLvlStrRef"),
-            child(variant = NumberReference, qname = "c:numRef"),
-            child(variant = NumberLiteral, qname = "c:numLit"),
-            child(variant = StringReference, qname = "c:strRef"),
-            child(variant = StringLiteral, qname = "c:strLit")
+            child(
+                variant = MultiLevelStringReference,
+                boxed,
+                qname = "c:multiLvlStrRef"
+            ),
+            child(variant = NumberReference, boxed, qname = "c:numRef"),
+            child(variant = NumberLiteral, boxed, qname = "c:numLit"),
+            child(variant = StringReference, boxed, qname = "c:strRef"),
+            child(variant = StringLiteral, boxed, qname = "c:strLit")
         )
     )]
   pub x_values_choice: Option<XValuesChoice>,
@@ -4185,9 +4228,17 @@ pub struct LineSerExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
-            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
-            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = FilteredSeriesTitle,
+                boxed,
+                qname = "c15:filteredSeriesTitle"
+            ),
+            child(
+                variant = FilteredCategoryTitle,
+                boxed,
+                qname = "c15:filteredCategoryTitle"
+            ),
+            child(variant = DataLabelsRange, boxed, qname = "c15:datalabelsRange"),
             child(
                 variant = C15CategoryFilterExceptions,
                 qname = "c15:categoryFilterExceptions"
@@ -4226,9 +4277,17 @@ pub struct ScatterSerExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
-            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
-            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = FilteredSeriesTitle,
+                boxed,
+                qname = "c15:filteredSeriesTitle"
+            ),
+            child(
+                variant = FilteredCategoryTitle,
+                boxed,
+                qname = "c15:filteredCategoryTitle"
+            ),
+            child(variant = DataLabelsRange, boxed, qname = "c15:datalabelsRange"),
             child(
                 variant = C15CategoryFilterExceptions,
                 qname = "c15:categoryFilterExceptions"
@@ -4267,9 +4326,17 @@ pub struct RadarSerExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
-            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
-            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = FilteredSeriesTitle,
+                boxed,
+                qname = "c15:filteredSeriesTitle"
+            ),
+            child(
+                variant = FilteredCategoryTitle,
+                boxed,
+                qname = "c15:filteredCategoryTitle"
+            ),
+            child(variant = DataLabelsRange, boxed, qname = "c15:datalabelsRange"),
             child(
                 variant = C15CategoryFilterExceptions,
                 qname = "c15:categoryFilterExceptions"
@@ -4308,10 +4375,22 @@ pub struct BarSerExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = InvertSolidFillFormat, qname = "c14:invertSolidFillFmt"),
-            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
-            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
-            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = InvertSolidFillFormat,
+                boxed,
+                qname = "c14:invertSolidFillFmt"
+            ),
+            child(
+                variant = FilteredSeriesTitle,
+                boxed,
+                qname = "c15:filteredSeriesTitle"
+            ),
+            child(
+                variant = FilteredCategoryTitle,
+                boxed,
+                qname = "c15:filteredCategoryTitle"
+            ),
+            child(variant = DataLabelsRange, boxed, qname = "c15:datalabelsRange"),
             child(
                 variant = C15CategoryFilterExceptions,
                 qname = "c15:categoryFilterExceptions"
@@ -4350,9 +4429,17 @@ pub struct AreaSerExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
-            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
-            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = FilteredSeriesTitle,
+                boxed,
+                qname = "c15:filteredSeriesTitle"
+            ),
+            child(
+                variant = FilteredCategoryTitle,
+                boxed,
+                qname = "c15:filteredCategoryTitle"
+            ),
+            child(variant = DataLabelsRange, boxed, qname = "c15:datalabelsRange"),
             child(
                 variant = C15CategoryFilterExceptions,
                 qname = "c15:categoryFilterExceptions"
@@ -4391,9 +4478,17 @@ pub struct PieSerExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
-            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
-            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = FilteredSeriesTitle,
+                boxed,
+                qname = "c15:filteredSeriesTitle"
+            ),
+            child(
+                variant = FilteredCategoryTitle,
+                boxed,
+                qname = "c15:filteredCategoryTitle"
+            ),
+            child(variant = DataLabelsRange, boxed, qname = "c15:datalabelsRange"),
             child(
                 variant = C15CategoryFilterExceptions,
                 qname = "c15:categoryFilterExceptions"
@@ -4432,9 +4527,17 @@ pub struct BubbleSerExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = InvertSolidFillFormat, qname = "c14:invertSolidFillFmt"),
-            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
-            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = InvertSolidFillFormat,
+                boxed,
+                qname = "c14:invertSolidFillFmt"
+            ),
+            child(
+                variant = FilteredCategoryTitle,
+                boxed,
+                qname = "c15:filteredCategoryTitle"
+            ),
+            child(variant = DataLabelsRange, boxed, qname = "c15:datalabelsRange"),
             child(
                 variant = C15CategoryFilterExceptions,
                 qname = "c15:categoryFilterExceptions"
@@ -4473,8 +4576,16 @@ pub struct SurfaceSerExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
-            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
+            child(
+                variant = FilteredSeriesTitle,
+                boxed,
+                qname = "c15:filteredSeriesTitle"
+            ),
+            child(
+                variant = FilteredCategoryTitle,
+                boxed,
+                qname = "c15:filteredCategoryTitle"
+            ),
             child(
                 variant = C15CategoryFilterExceptions,
                 qname = "c15:categoryFilterExceptions"
@@ -4600,31 +4711,31 @@ pub struct PlotArea {
   pub layout: Option<std::boxed::Box<Layout>>,
   #[sdk(
         choice(
-            child(variant = AreaChart, qname = "c:areaChart"),
-            child(variant = Area3DChart, qname = "c:area3DChart"),
-            child(variant = LineChart, qname = "c:lineChart"),
-            child(variant = Line3DChart, qname = "c:line3DChart"),
-            child(variant = StockChart, qname = "c:stockChart"),
-            child(variant = RadarChart, qname = "c:radarChart"),
-            child(variant = ScatterChart, qname = "c:scatterChart"),
-            child(variant = PieChart, qname = "c:pieChart"),
-            child(variant = Pie3DChart, qname = "c:pie3DChart"),
-            child(variant = DoughnutChart, qname = "c:doughnutChart"),
-            child(variant = BarChart, qname = "c:barChart"),
-            child(variant = Bar3DChart, qname = "c:bar3DChart"),
-            child(variant = OfPieChart, qname = "c:ofPieChart"),
-            child(variant = SurfaceChart, qname = "c:surfaceChart"),
-            child(variant = Surface3DChart, qname = "c:surface3DChart"),
-            child(variant = BubbleChart, qname = "c:bubbleChart")
+            child(variant = AreaChart, boxed, qname = "c:areaChart"),
+            child(variant = Area3DChart, boxed, qname = "c:area3DChart"),
+            child(variant = LineChart, boxed, qname = "c:lineChart"),
+            child(variant = Line3DChart, boxed, qname = "c:line3DChart"),
+            child(variant = StockChart, boxed, qname = "c:stockChart"),
+            child(variant = RadarChart, boxed, qname = "c:radarChart"),
+            child(variant = ScatterChart, boxed, qname = "c:scatterChart"),
+            child(variant = PieChart, boxed, qname = "c:pieChart"),
+            child(variant = Pie3DChart, boxed, qname = "c:pie3DChart"),
+            child(variant = DoughnutChart, boxed, qname = "c:doughnutChart"),
+            child(variant = BarChart, boxed, qname = "c:barChart"),
+            child(variant = Bar3DChart, boxed, qname = "c:bar3DChart"),
+            child(variant = OfPieChart, boxed, qname = "c:ofPieChart"),
+            child(variant = SurfaceChart, boxed, qname = "c:surfaceChart"),
+            child(variant = Surface3DChart, boxed, qname = "c:surface3DChart"),
+            child(variant = BubbleChart, boxed, qname = "c:bubbleChart")
         )
     )]
   pub plot_area_choice1: Vec<PlotAreaChoice>,
   #[sdk(
         choice(
-            child(variant = ValueAxis, qname = "c:valAx"),
-            child(variant = CategoryAxis, qname = "c:catAx"),
-            child(variant = DateAxis, qname = "c:dateAx"),
-            child(variant = SeriesAxis, qname = "c:serAx")
+            child(variant = ValueAxis, boxed, qname = "c:valAx"),
+            child(variant = CategoryAxis, boxed, qname = "c:catAx"),
+            child(variant = DateAxis, boxed, qname = "c:dateAx"),
+            child(variant = SeriesAxis, boxed, qname = "c:serAx")
         )
     )]
   pub plot_area_choice2: Vec<PlotAreaChoice2>,
@@ -4881,9 +4992,9 @@ pub struct ChartSpaceExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = PivotOptions, qname = "c14:pivotOptions"),
-            child(variant = SketchOptions, qname = "c14:sketchOptions"),
-            child(variant = PivotSource, qname = "c15:pivotSource"),
+            child(variant = PivotOptions, boxed, qname = "c14:pivotOptions"),
+            child(variant = SketchOptions, boxed, qname = "c14:sketchOptions"),
+            child(variant = PivotSource, boxed, qname = "c15:pivotSource"),
             any
         )
     )]

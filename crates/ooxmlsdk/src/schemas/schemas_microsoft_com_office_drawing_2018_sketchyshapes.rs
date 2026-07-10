@@ -13,8 +13,8 @@ pub struct LineSketchStyleProperties {
   pub sd: Option<crate::simple_type::UInt32Value>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub line_sketch_style_properties_choice: Option<LineSketchStylePropertiesChoice>,

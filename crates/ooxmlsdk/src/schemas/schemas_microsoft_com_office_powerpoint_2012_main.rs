@@ -92,7 +92,7 @@ pub struct ColorType {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),

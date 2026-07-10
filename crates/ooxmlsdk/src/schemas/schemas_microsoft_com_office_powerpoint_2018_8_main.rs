@@ -194,7 +194,7 @@ pub struct Comment {
   pub title: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = SlideMonikerList, qname = "pc:sldMkLst"),
+            child(variant = SlideMonikerList, boxed, qname = "pc:sldMkLst"),
             any_child(variant = SlideLayoutMonikerList, qname = "pc:sldLayoutMkLst"),
             any_child(variant = MainMasterMonikerList, qname = "pc:sldMasterMkLst"),
             any_child(variant = DeMkLstDrawingElementMonikerList, qname = "oac:deMkLst"),

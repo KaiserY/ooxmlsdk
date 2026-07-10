@@ -179,8 +179,8 @@ pub struct SortRule {
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
   #[sdk(
         choice(
-            child(variant = SortCondition, qname = "xnsv:sortCondition"),
-            child(variant = RichSortCondition, qname = "xnsv:richSortCondition")
+            child(variant = SortCondition, boxed, qname = "xnsv:sortCondition"),
+            child(variant = RichSortCondition, boxed, qname = "xnsv:richSortCondition")
         )
     )]
   pub sort_rule_choice: Option<SortRuleChoice>,

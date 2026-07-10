@@ -90,7 +90,7 @@ pub struct Lattice {
   pub time_reference_anchor_point: Option<AnchorPointValues>,
   #[sdk(
         choice(
-            child(variant = Arc, qname = "emma:arc"),
+            child(variant = Arc, boxed, qname = "emma:arc"),
             child(variant = Node, qname = "emma:node")
         )
     )]
@@ -191,7 +191,7 @@ pub struct Interpretation {
             child(variant = Info, qname = "emma:info"),
             child(variant = Lattice, qname = "emma:lattice"),
             text_child(variant = Literal, qname = "emma:literal"),
-            child(variant = ContextNode, qname = "msink:context")
+            child(variant = ContextNode, boxed, qname = "msink:context")
         )
     )]
   pub interpretation_choice: Vec<InterpretationChoice>,
@@ -284,10 +284,10 @@ pub struct OneOf {
         choice(
             child(variant = DerivedFrom, qname = "emma:derived-from"),
             child(variant = Info, qname = "emma:info"),
-            child(variant = Interpretation, qname = "emma:interpretation"),
-            child(variant = OneOf, qname = "emma:one-of"),
-            child(variant = Group, qname = "emma:group"),
-            child(variant = Sequence, qname = "emma:sequence")
+            child(variant = Interpretation, boxed, qname = "emma:interpretation"),
+            child(variant = OneOf, boxed, qname = "emma:one-of"),
+            child(variant = Group, boxed, qname = "emma:group"),
+            child(variant = Sequence, boxed, qname = "emma:sequence")
         )
     )]
   pub one_of_choice: Vec<OneOfChoice>,
@@ -378,10 +378,10 @@ pub struct Group {
             child(variant = DerivedFrom, qname = "emma:derived-from"),
             child(variant = GroupInfo, qname = "emma:group-info"),
             child(variant = Info, qname = "emma:info"),
-            child(variant = Interpretation, qname = "emma:interpretation"),
-            child(variant = OneOf, qname = "emma:one-of"),
-            child(variant = Group, qname = "emma:group"),
-            child(variant = Sequence, qname = "emma:sequence")
+            child(variant = Interpretation, boxed, qname = "emma:interpretation"),
+            child(variant = OneOf, boxed, qname = "emma:one-of"),
+            child(variant = Group, boxed, qname = "emma:group"),
+            child(variant = Sequence, boxed, qname = "emma:sequence")
         )
     )]
   pub group_choice: Vec<GroupChoice>,
@@ -471,10 +471,10 @@ pub struct Sequence {
         choice(
             child(variant = DerivedFrom, qname = "emma:derived-from"),
             child(variant = Info, qname = "emma:info"),
-            child(variant = Interpretation, qname = "emma:interpretation"),
-            child(variant = OneOf, qname = "emma:one-of"),
-            child(variant = Group, qname = "emma:group"),
-            child(variant = Sequence, qname = "emma:sequence")
+            child(variant = Interpretation, boxed, qname = "emma:interpretation"),
+            child(variant = OneOf, boxed, qname = "emma:one-of"),
+            child(variant = Group, boxed, qname = "emma:group"),
+            child(variant = Sequence, boxed, qname = "emma:sequence")
         )
     )]
   pub sequence_choice: Vec<SequenceChoice>,
@@ -496,10 +496,10 @@ pub struct GroupInfo {
 pub struct Derivation {
   #[sdk(
         choice(
-            child(variant = Interpretation, qname = "emma:interpretation"),
-            child(variant = OneOf, qname = "emma:one-of"),
-            child(variant = Sequence, qname = "emma:sequence"),
-            child(variant = Group, qname = "emma:group")
+            child(variant = Interpretation, boxed, qname = "emma:interpretation"),
+            child(variant = OneOf, boxed, qname = "emma:one-of"),
+            child(variant = Sequence, boxed, qname = "emma:sequence"),
+            child(variant = Group, boxed, qname = "emma:group")
         )
     )]
   pub derivation_choice: Vec<DerivationChoice>,
@@ -675,10 +675,10 @@ pub struct Emma {
             child(variant = Model, qname = "emma:model"),
             child(variant = EndPointInfo, qname = "emma:endpoint-info"),
             child(variant = Info, qname = "emma:info"),
-            child(variant = Interpretation, qname = "emma:interpretation"),
-            child(variant = OneOf, qname = "emma:one-of"),
-            child(variant = Group, qname = "emma:group"),
-            child(variant = Sequence, qname = "emma:sequence")
+            child(variant = Interpretation, boxed, qname = "emma:interpretation"),
+            child(variant = OneOf, boxed, qname = "emma:one-of"),
+            child(variant = Group, boxed, qname = "emma:group"),
+            child(variant = Sequence, boxed, qname = "emma:sequence")
         )
     )]
   pub emma_choice: Vec<EmmaChoice>,

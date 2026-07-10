@@ -357,7 +357,7 @@ pub struct TextParagraphPropertiesType {
   #[sdk(
         choice(
             empty_child(variant = BulletColorText, qname = "a:buClrTx"),
-            child(variant = BulletColor, qname = "a:buClr")
+            child(variant = BulletColor, boxed, qname = "a:buClr")
         )
     )]
   pub text_paragraph_properties_type_choice1: Option<TextParagraphPropertiesTypeChoice>,
@@ -381,7 +381,7 @@ pub struct TextParagraphPropertiesType {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub text_paragraph_properties_type_choice4: Option<TextParagraphPropertiesTypeChoice4>,
@@ -479,7 +479,7 @@ pub struct TextBodyProperties {
   pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   #[sdk(
         choice(
-            child(variant = Shape3DType, qname = "a:sp3d"),
+            child(variant = Shape3DType, boxed, qname = "a:sp3d"),
             child(variant = FlatText, qname = "a:flatTx")
         )
     )]
@@ -544,18 +544,18 @@ pub struct ShapeProperties {
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -565,8 +565,8 @@ pub struct ShapeProperties {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
@@ -622,7 +622,7 @@ pub struct LnRefStyleMatrixReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -641,7 +641,7 @@ pub struct FillRefStyleMatrixReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -660,7 +660,7 @@ pub struct EffectRefStyleMatrixReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -680,7 +680,7 @@ pub struct FontReference {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -728,8 +728,8 @@ pub struct BlipFillProperties {
   pub source_rectangle: Option<crate::schemas::a::SourceRectangle>,
   #[sdk(
         choice(
-            child(variant = Tile, qname = "a:tile"),
-            child(variant = Stretch, qname = "a:stretch")
+            child(variant = Tile, boxed, qname = "a:tile"),
+            child(variant = Stretch, boxed, qname = "a:stretch")
         )
     )]
   pub blip_fill_properties_choice: Option<BlipFillPropertiesChoice>,
@@ -825,18 +825,18 @@ pub struct GroupShapeProperties {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
@@ -1149,9 +1149,9 @@ pub struct LinePropertiesType {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = PatternFill, qname = "a:pattFill")
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill")
         )
     )]
   pub line_properties_type_choice1: Option<LinePropertiesTypeChoice>,

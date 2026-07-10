@@ -16,11 +16,11 @@ pub struct WordprocessingCanvas {
   pub whole_formatting: Option<std::boxed::Box<WholeFormatting>>,
   #[sdk(
         choice(
-            child(variant = WordprocessingShape, qname = "wps:wsp"),
-            child(variant = Picture, qname = "pic:pic"),
-            child(variant = ContentPart, qname = "w14:contentPart"),
-            child(variant = WordprocessingGroup, qname = "wpg:wgp"),
-            child(variant = GraphicFrameType, qname = "wpc:graphicFrame")
+            child(variant = WordprocessingShape, boxed, qname = "wps:wsp"),
+            child(variant = Picture, boxed, qname = "pic:pic"),
+            child(variant = ContentPart, boxed, qname = "w14:contentPart"),
+            child(variant = WordprocessingGroup, boxed, qname = "wpg:wgp"),
+            child(variant = GraphicFrameType, boxed, qname = "wpc:graphicFrame")
         )
     )]
   pub wordprocessing_canvas_choice: Vec<WordprocessingCanvasChoice>,
@@ -35,18 +35,18 @@ pub struct BackgroundFormatting {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
   pub background_formatting_choice1: Option<BackgroundFormattingChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub background_formatting_choice2: Option<BackgroundFormattingChoice2>,
@@ -60,8 +60,8 @@ pub struct WholeFormatting {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub whole_formatting_choice: Option<WholeFormattingChoice>,

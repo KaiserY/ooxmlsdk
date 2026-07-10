@@ -875,8 +875,8 @@ pub struct UnsizedSplitButton {
   pub get_show_label: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = VisibleButton, qname = "mso:button"),
-            child(variant = VisibleToggleButton, qname = "mso:toggleButton")
+            child(variant = VisibleButton, boxed, qname = "mso:button"),
+            child(variant = VisibleToggleButton, boxed, qname = "mso:toggleButton")
         )
     )]
   pub unsized_split_button_choice: Option<UnsizedSplitButtonChoice>,
@@ -1020,15 +1020,15 @@ pub struct UnsizedMenu {
   pub get_show_image: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = UnsizedControlClone, qname = "mso:control"),
-            child(variant = UnsizedButton, qname = "mso:button"),
-            child(variant = CheckBox, qname = "mso:checkBox"),
-            child(variant = UnsizedGallery, qname = "mso:gallery"),
-            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
-            child(variant = MenuSeparator, qname = "mso:menuSeparator"),
-            child(variant = UnsizedSplitButton, qname = "mso:splitButton"),
-            child(variant = UnsizedMenu, qname = "mso:menu"),
-            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu")
+            child(variant = UnsizedControlClone, boxed, qname = "mso:control"),
+            child(variant = UnsizedButton, boxed, qname = "mso:button"),
+            child(variant = CheckBox, boxed, qname = "mso:checkBox"),
+            child(variant = UnsizedGallery, boxed, qname = "mso:gallery"),
+            child(variant = UnsizedToggleButton, boxed, qname = "mso:toggleButton"),
+            child(variant = MenuSeparator, boxed, qname = "mso:menuSeparator"),
+            child(variant = UnsizedSplitButton, boxed, qname = "mso:splitButton"),
+            child(variant = UnsizedMenu, boxed, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, boxed, qname = "mso:dynamicMenu")
         )
     )]
   pub unsized_menu_choice: Vec<UnsizedMenuChoice>,
@@ -1252,8 +1252,8 @@ pub struct SplitButtonWithTitle {
   pub get_show_label: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = VisibleButton, qname = "mso:button"),
-            child(variant = VisibleToggleButton, qname = "mso:toggleButton")
+            child(variant = VisibleButton, boxed, qname = "mso:button"),
+            child(variant = VisibleToggleButton, boxed, qname = "mso:toggleButton")
         )
     )]
   pub split_button_with_title_choice: Option<SplitButtonWithTitleChoice>,
@@ -1397,15 +1397,15 @@ pub struct MenuWithTitle {
   pub get_show_image: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = UnsizedControlClone, qname = "mso:control"),
-            child(variant = UnsizedButton, qname = "mso:button"),
-            child(variant = CheckBox, qname = "mso:checkBox"),
-            child(variant = UnsizedGallery, qname = "mso:gallery"),
-            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
-            child(variant = MenuSeparator, qname = "mso:menuSeparator"),
-            child(variant = SplitButtonWithTitle, qname = "mso:splitButton"),
-            child(variant = MenuWithTitle, qname = "mso:menu"),
-            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu")
+            child(variant = UnsizedControlClone, boxed, qname = "mso:control"),
+            child(variant = UnsizedButton, boxed, qname = "mso:button"),
+            child(variant = CheckBox, boxed, qname = "mso:checkBox"),
+            child(variant = UnsizedGallery, boxed, qname = "mso:gallery"),
+            child(variant = UnsizedToggleButton, boxed, qname = "mso:toggleButton"),
+            child(variant = MenuSeparator, boxed, qname = "mso:menuSeparator"),
+            child(variant = SplitButtonWithTitle, boxed, qname = "mso:splitButton"),
+            child(variant = MenuWithTitle, boxed, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, boxed, qname = "mso:dynamicMenu")
         )
     )]
   pub menu_with_title_choice: Vec<MenuWithTitleChoice>,
@@ -2782,15 +2782,15 @@ pub struct Menu {
   pub get_show_image: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = UnsizedControlClone, qname = "mso:control"),
-            child(variant = UnsizedButton, qname = "mso:button"),
-            child(variant = CheckBox, qname = "mso:checkBox"),
-            child(variant = UnsizedGallery, qname = "mso:gallery"),
-            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
-            child(variant = MenuSeparator, qname = "mso:menuSeparator"),
-            child(variant = UnsizedSplitButton, qname = "mso:splitButton"),
-            child(variant = UnsizedMenu, qname = "mso:menu"),
-            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu")
+            child(variant = UnsizedControlClone, boxed, qname = "mso:control"),
+            child(variant = UnsizedButton, boxed, qname = "mso:button"),
+            child(variant = CheckBox, boxed, qname = "mso:checkBox"),
+            child(variant = UnsizedGallery, boxed, qname = "mso:gallery"),
+            child(variant = UnsizedToggleButton, boxed, qname = "mso:toggleButton"),
+            child(variant = MenuSeparator, boxed, qname = "mso:menuSeparator"),
+            child(variant = UnsizedSplitButton, boxed, qname = "mso:splitButton"),
+            child(variant = UnsizedMenu, boxed, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, boxed, qname = "mso:dynamicMenu")
         )
     )]
   pub menu_choice: Vec<MenuChoice>,
@@ -3028,8 +3028,8 @@ pub struct SplitButton {
   pub get_show_label: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = VisibleButton, qname = "mso:button"),
-            child(variant = VisibleToggleButton, qname = "mso:toggleButton")
+            child(variant = VisibleButton, boxed, qname = "mso:button"),
+            child(variant = VisibleToggleButton, boxed, qname = "mso:toggleButton")
         )
     )]
   pub split_button_choice: Option<SplitButtonChoice>,
@@ -3087,20 +3087,20 @@ pub struct Box {
   pub box_style: Option<BoxStyleValues>,
   #[sdk(
         choice(
-            child(variant = ControlClone, qname = "mso:control"),
-            child(variant = TextLabel, qname = "mso:labelControl"),
-            child(variant = Button, qname = "mso:button"),
-            child(variant = ToggleButton, qname = "mso:toggleButton"),
-            child(variant = CheckBox, qname = "mso:checkBox"),
-            child(variant = EditBox, qname = "mso:editBox"),
-            child(variant = ComboBox, qname = "mso:comboBox"),
-            child(variant = DropDown, qname = "mso:dropDown"),
-            child(variant = Gallery, qname = "mso:gallery"),
-            child(variant = Menu, qname = "mso:menu"),
-            child(variant = DynamicMenu, qname = "mso:dynamicMenu"),
-            child(variant = SplitButton, qname = "mso:splitButton"),
-            child(variant = Box, qname = "mso:box"),
-            child(variant = ButtonGroup, qname = "mso:buttonGroup")
+            child(variant = ControlClone, boxed, qname = "mso:control"),
+            child(variant = TextLabel, boxed, qname = "mso:labelControl"),
+            child(variant = Button, boxed, qname = "mso:button"),
+            child(variant = ToggleButton, boxed, qname = "mso:toggleButton"),
+            child(variant = CheckBox, boxed, qname = "mso:checkBox"),
+            child(variant = EditBox, boxed, qname = "mso:editBox"),
+            child(variant = ComboBox, boxed, qname = "mso:comboBox"),
+            child(variant = DropDown, boxed, qname = "mso:dropDown"),
+            child(variant = Gallery, boxed, qname = "mso:gallery"),
+            child(variant = Menu, boxed, qname = "mso:menu"),
+            child(variant = DynamicMenu, boxed, qname = "mso:dynamicMenu"),
+            child(variant = SplitButton, boxed, qname = "mso:splitButton"),
+            child(variant = Box, boxed, qname = "mso:box"),
+            child(variant = ButtonGroup, boxed, qname = "mso:buttonGroup")
         )
     )]
   pub box_choice: Vec<BoxChoice>,
@@ -3152,13 +3152,13 @@ pub struct ButtonGroup {
   pub insert_before_q: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = UnsizedControlClone, qname = "mso:control"),
-            child(variant = UnsizedButton, qname = "mso:button"),
-            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
-            child(variant = UnsizedGallery, qname = "mso:gallery"),
-            child(variant = UnsizedMenu, qname = "mso:menu"),
-            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu"),
-            child(variant = UnsizedSplitButton, qname = "mso:splitButton")
+            child(variant = UnsizedControlClone, boxed, qname = "mso:control"),
+            child(variant = UnsizedButton, boxed, qname = "mso:button"),
+            child(variant = UnsizedToggleButton, boxed, qname = "mso:toggleButton"),
+            child(variant = UnsizedGallery, boxed, qname = "mso:gallery"),
+            child(variant = UnsizedMenu, boxed, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, boxed, qname = "mso:dynamicMenu"),
+            child(variant = UnsizedSplitButton, boxed, qname = "mso:splitButton")
         )
     )]
   pub button_group_choice: Vec<ButtonGroupChoice>,
@@ -3180,15 +3180,15 @@ pub struct MenuRoot {
   pub item_size: Option<ItemSizeValues>,
   #[sdk(
         choice(
-            child(variant = UnsizedControlClone, qname = "mso:control"),
-            child(variant = UnsizedButton, qname = "mso:button"),
-            child(variant = CheckBox, qname = "mso:checkBox"),
-            child(variant = UnsizedGallery, qname = "mso:gallery"),
-            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
-            child(variant = MenuSeparator, qname = "mso:menuSeparator"),
-            child(variant = UnsizedSplitButton, qname = "mso:splitButton"),
-            child(variant = UnsizedMenu, qname = "mso:menu"),
-            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu")
+            child(variant = UnsizedControlClone, boxed, qname = "mso:control"),
+            child(variant = UnsizedButton, boxed, qname = "mso:button"),
+            child(variant = CheckBox, boxed, qname = "mso:checkBox"),
+            child(variant = UnsizedGallery, boxed, qname = "mso:gallery"),
+            child(variant = UnsizedToggleButton, boxed, qname = "mso:toggleButton"),
+            child(variant = MenuSeparator, boxed, qname = "mso:menuSeparator"),
+            child(variant = UnsizedSplitButton, boxed, qname = "mso:splitButton"),
+            child(variant = UnsizedMenu, boxed, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, boxed, qname = "mso:dynamicMenu")
         )
     )]
   pub menu_root_choice: Vec<MenuRootChoice>,
@@ -3667,21 +3667,21 @@ pub struct Group {
   pub get_keytip: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = ControlClone, qname = "mso:control"),
-            child(variant = TextLabel, qname = "mso:labelControl"),
-            child(variant = Button, qname = "mso:button"),
-            child(variant = ToggleButton, qname = "mso:toggleButton"),
-            child(variant = CheckBox, qname = "mso:checkBox"),
-            child(variant = EditBox, qname = "mso:editBox"),
-            child(variant = ComboBox, qname = "mso:comboBox"),
-            child(variant = DropDown, qname = "mso:dropDown"),
-            child(variant = Gallery, qname = "mso:gallery"),
-            child(variant = Menu, qname = "mso:menu"),
-            child(variant = DynamicMenu, qname = "mso:dynamicMenu"),
-            child(variant = SplitButton, qname = "mso:splitButton"),
-            child(variant = Box, qname = "mso:box"),
-            child(variant = ButtonGroup, qname = "mso:buttonGroup"),
-            child(variant = VerticalSeparator, qname = "mso:separator")
+            child(variant = ControlClone, boxed, qname = "mso:control"),
+            child(variant = TextLabel, boxed, qname = "mso:labelControl"),
+            child(variant = Button, boxed, qname = "mso:button"),
+            child(variant = ToggleButton, boxed, qname = "mso:toggleButton"),
+            child(variant = CheckBox, boxed, qname = "mso:checkBox"),
+            child(variant = EditBox, boxed, qname = "mso:editBox"),
+            child(variant = ComboBox, boxed, qname = "mso:comboBox"),
+            child(variant = DropDown, boxed, qname = "mso:dropDown"),
+            child(variant = Gallery, boxed, qname = "mso:gallery"),
+            child(variant = Menu, boxed, qname = "mso:menu"),
+            child(variant = DynamicMenu, boxed, qname = "mso:dynamicMenu"),
+            child(variant = SplitButton, boxed, qname = "mso:splitButton"),
+            child(variant = Box, boxed, qname = "mso:box"),
+            child(variant = ButtonGroup, boxed, qname = "mso:buttonGroup"),
+            child(variant = VerticalSeparator, boxed, qname = "mso:separator")
         )
     )]
   pub group_choice: Vec<GroupChoice>,
@@ -3829,9 +3829,13 @@ pub struct QuickAccessToolbarControlClone {
 pub struct SharedQatControls {
   #[sdk(
         choice(
-            child(variant = QuickAccessToolbarControlClone, qname = "mso:control"),
-            child(variant = UnsizedButton, qname = "mso:button"),
-            child(variant = VerticalSeparator, qname = "mso:separator")
+            child(
+                variant = QuickAccessToolbarControlClone,
+                boxed,
+                qname = "mso:control"
+            ),
+            child(variant = UnsizedButton, boxed, qname = "mso:button"),
+            child(variant = VerticalSeparator, boxed, qname = "mso:separator")
         )
     )]
   pub shared_qat_controls_choice: Vec<SharedQatControlsChoice>,
@@ -3842,9 +3846,13 @@ pub struct SharedQatControls {
 pub struct DocumentSpecificQuickAccessToolbarControls {
   #[sdk(
         choice(
-            child(variant = QuickAccessToolbarControlClone, qname = "mso:control"),
-            child(variant = UnsizedButton, qname = "mso:button"),
-            child(variant = VerticalSeparator, qname = "mso:separator")
+            child(
+                variant = QuickAccessToolbarControlClone,
+                boxed,
+                qname = "mso:control"
+            ),
+            child(variant = UnsizedButton, boxed, qname = "mso:button"),
+            child(variant = VerticalSeparator, boxed, qname = "mso:separator")
         )
     )]
   pub document_specific_quick_access_toolbar_controls_choice:
@@ -3975,15 +3983,15 @@ pub struct RepurposedCommand {
 pub struct OfficeMenu {
   #[sdk(
         choice(
-            child(variant = UnsizedControlClone, qname = "mso:control"),
-            child(variant = UnsizedButton, qname = "mso:button"),
-            child(variant = CheckBox, qname = "mso:checkBox"),
-            child(variant = UnsizedGallery, qname = "mso:gallery"),
-            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
-            child(variant = MenuSeparator, qname = "mso:menuSeparator"),
-            child(variant = SplitButtonWithTitle, qname = "mso:splitButton"),
-            child(variant = MenuWithTitle, qname = "mso:menu"),
-            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu")
+            child(variant = UnsizedControlClone, boxed, qname = "mso:control"),
+            child(variant = UnsizedButton, boxed, qname = "mso:button"),
+            child(variant = CheckBox, boxed, qname = "mso:checkBox"),
+            child(variant = UnsizedGallery, boxed, qname = "mso:gallery"),
+            child(variant = UnsizedToggleButton, boxed, qname = "mso:toggleButton"),
+            child(variant = MenuSeparator, boxed, qname = "mso:menuSeparator"),
+            child(variant = SplitButtonWithTitle, boxed, qname = "mso:splitButton"),
+            child(variant = MenuWithTitle, boxed, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, boxed, qname = "mso:dynamicMenu")
         )
     )]
   pub office_menu_choice: Vec<OfficeMenuChoice>,

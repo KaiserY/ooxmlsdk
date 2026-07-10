@@ -182,20 +182,20 @@ pub struct RevExHeaders {
 pub struct RevExStream {
   #[sdk(
         choice(
-            child(variant = RevExFuture, qname = "xr:xrrftr"),
-            child(variant = RevExUnsupported, qname = "xr:xrrUspt"),
-            child(variant = RevExTrimmed, qname = "xr:xrrTrim"),
-            child(variant = RevExRowColumn, qname = "xr:xrrrc"),
-            child(variant = RevExMove, qname = "xr:xrrm"),
-            child(variant = RevExChangeCell, qname = "xr:xrrc"),
-            child(variant = RevExFormatting, qname = "xr:xrrf"),
-            child(variant = RevExDefinedName, qname = "xr:xrrDefName"),
-            child(variant = RevExDelObj, qname = "xr:xrrdo"),
-            child(variant = RevExChgObj, qname = "xr:xrrco"),
-            child(variant = RevExSheetOp, qname = "xr:xrrSheet"),
-            child(variant = RevisionList, qname = "xr:xrrList"),
-            child(variant = RevListAutoExpandRw, qname = "xr:xrrListExpR"),
-            child(variant = RevGroup, qname = "xr:xrrg")
+            child(variant = RevExFuture, boxed, qname = "xr:xrrftr"),
+            child(variant = RevExUnsupported, boxed, qname = "xr:xrrUspt"),
+            child(variant = RevExTrimmed, boxed, qname = "xr:xrrTrim"),
+            child(variant = RevExRowColumn, boxed, qname = "xr:xrrrc"),
+            child(variant = RevExMove, boxed, qname = "xr:xrrm"),
+            child(variant = RevExChangeCell, boxed, qname = "xr:xrrc"),
+            child(variant = RevExFormatting, boxed, qname = "xr:xrrf"),
+            child(variant = RevExDefinedName, boxed, qname = "xr:xrrDefName"),
+            child(variant = RevExDelObj, boxed, qname = "xr:xrrdo"),
+            child(variant = RevExChgObj, boxed, qname = "xr:xrrco"),
+            child(variant = RevExSheetOp, boxed, qname = "xr:xrrSheet"),
+            child(variant = RevisionList, boxed, qname = "xr:xrrList"),
+            child(variant = RevListAutoExpandRw, boxed, qname = "xr:xrrListExpR"),
+            child(variant = RevGroup, boxed, qname = "xr:xrrg")
         )
     )]
   pub rev_ex_stream_choice: Vec<RevExStreamChoice>,
@@ -244,12 +244,16 @@ pub struct RevisionPtr {
 pub struct StateBasedObject {
   #[sdk(
         choice(
-            child(variant = DataValidation, qname = "xr:dataValidation"),
-            child(variant = Hyperlink, qname = "xr:hyperlink"),
-            child(variant = SparklineGroup, qname = "xr:sparklineGroup"),
-            child(variant = Comments, qname = "xr:comments"),
-            child(variant = AutoFilter, qname = "xr:autoFilter"),
-            child(variant = PivotTableDefinition, qname = "xr:pivotTableDefinition")
+            child(variant = DataValidation, boxed, qname = "xr:dataValidation"),
+            child(variant = Hyperlink, boxed, qname = "xr:hyperlink"),
+            child(variant = SparklineGroup, boxed, qname = "xr:sparklineGroup"),
+            child(variant = Comments, boxed, qname = "xr:comments"),
+            child(variant = AutoFilter, boxed, qname = "xr:autoFilter"),
+            child(
+                variant = PivotTableDefinition,
+                boxed,
+                qname = "xr:pivotTableDefinition"
+            )
         )
     )]
   pub state_based_object_choice: Option<StateBasedObjectChoice>,
@@ -677,7 +681,7 @@ pub struct RevExChgObj {
   #[sdk(
         choice(
             child(variant = RevisionStateLink, qname = "xr:link"),
-            child(variant = RevisionState, qname = "xr:body")
+            child(variant = RevisionState, boxed, qname = "xr:body")
         )
     )]
   pub rev_ex_chg_obj_choice: Option<RevExChgObjChoice>,
@@ -831,19 +835,19 @@ pub struct RevGroup {
   pub ctx: Option<RevisionContext>,
   #[sdk(
         choice(
-            child(variant = RevExFuture, qname = "xr:xrrftr"),
-            child(variant = RevExUnsupported, qname = "xr:xrrUspt"),
-            child(variant = RevExTrimmed, qname = "xr:xrrTrim"),
-            child(variant = RevExRowColumn, qname = "xr:xrrrc"),
-            child(variant = RevExMove, qname = "xr:xrrm"),
-            child(variant = RevExChangeCell, qname = "xr:xrrc"),
-            child(variant = RevExFormatting, qname = "xr:xrrf"),
-            child(variant = RevExDefinedName, qname = "xr:xrrDefName"),
-            child(variant = RevExDelObj, qname = "xr:xrrdo"),
-            child(variant = RevExChgObj, qname = "xr:xrrco"),
-            child(variant = RevExSheetOp, qname = "xr:xrrSheet"),
-            child(variant = RevisionList, qname = "xr:xrrList"),
-            child(variant = RevListAutoExpandRw, qname = "xr:xrrListExpR")
+            child(variant = RevExFuture, boxed, qname = "xr:xrrftr"),
+            child(variant = RevExUnsupported, boxed, qname = "xr:xrrUspt"),
+            child(variant = RevExTrimmed, boxed, qname = "xr:xrrTrim"),
+            child(variant = RevExRowColumn, boxed, qname = "xr:xrrrc"),
+            child(variant = RevExMove, boxed, qname = "xr:xrrm"),
+            child(variant = RevExChangeCell, boxed, qname = "xr:xrrc"),
+            child(variant = RevExFormatting, boxed, qname = "xr:xrrf"),
+            child(variant = RevExDefinedName, boxed, qname = "xr:xrrDefName"),
+            child(variant = RevExDelObj, boxed, qname = "xr:xrrdo"),
+            child(variant = RevExChgObj, boxed, qname = "xr:xrrco"),
+            child(variant = RevExSheetOp, boxed, qname = "xr:xrrSheet"),
+            child(variant = RevisionList, boxed, qname = "xr:xrrList"),
+            child(variant = RevListAutoExpandRw, boxed, qname = "xr:xrrListExpR")
         )
     )]
   pub rev_group_choice: Vec<RevGroupChoice>,
@@ -960,9 +964,9 @@ pub struct RevisionState {
 pub struct RefMap {
   #[sdk(
         choice(
-            child(variant = RefCell, qname = "xr:ref"),
+            child(variant = RefCell, boxed, qname = "xr:ref"),
             child(variant = SheetXluid, qname = "xr:sheetUid"),
-            child(variant = RefOartAnchor, qname = "xr:oartAnchor"),
+            child(variant = RefOartAnchor, boxed, qname = "xr:oartAnchor"),
             empty_child(variant = RefFuture, qname = "xr:future"),
             child(variant = RefTest, qname = "xr:test")
         )

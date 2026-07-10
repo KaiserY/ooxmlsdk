@@ -1151,7 +1151,7 @@ pub struct FillColorList {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -1175,7 +1175,7 @@ pub struct LineColorList {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -1199,7 +1199,7 @@ pub struct EffectColorList {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -1223,7 +1223,7 @@ pub struct TextLineColorList {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -1247,7 +1247,7 @@ pub struct TextFillColorList {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -1271,7 +1271,7 @@ pub struct TextEffectColorList {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -2062,14 +2062,14 @@ pub struct ForEach {
   pub step: Option<Vec<crate::simple_type::Int32Value>>,
   #[sdk(
         choice(
-            child(variant = Algorithm, qname = "dgm:alg"),
-            child(variant = Shape, qname = "dgm:shape"),
-            child(variant = PresentationOf, qname = "dgm:presOf"),
+            child(variant = Algorithm, boxed, qname = "dgm:alg"),
+            child(variant = Shape, boxed, qname = "dgm:shape"),
+            child(variant = PresentationOf, boxed, qname = "dgm:presOf"),
             child(variant = Constraints, qname = "dgm:constrLst"),
             child(variant = RuleList, qname = "dgm:ruleLst"),
-            child(variant = ForEach, qname = "dgm:forEach"),
-            child(variant = LayoutNode, qname = "dgm:layoutNode"),
-            child(variant = Choose, qname = "dgm:choose"),
+            child(variant = ForEach, boxed, qname = "dgm:forEach"),
+            child(variant = LayoutNode, boxed, qname = "dgm:layoutNode"),
+            child(variant = Choose, boxed, qname = "dgm:choose"),
             child(variant = ExtensionList, qname = "dgm:extLst")
         )
     )]
@@ -2094,15 +2094,15 @@ pub struct LayoutNode {
   pub move_with: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = Algorithm, qname = "dgm:alg"),
-            child(variant = Shape, qname = "dgm:shape"),
-            child(variant = PresentationOf, qname = "dgm:presOf"),
+            child(variant = Algorithm, boxed, qname = "dgm:alg"),
+            child(variant = Shape, boxed, qname = "dgm:shape"),
+            child(variant = PresentationOf, boxed, qname = "dgm:presOf"),
             child(variant = Constraints, qname = "dgm:constrLst"),
             child(variant = RuleList, qname = "dgm:ruleLst"),
-            child(variant = VariableList, qname = "dgm:varLst"),
-            child(variant = ForEach, qname = "dgm:forEach"),
-            child(variant = LayoutNode, qname = "dgm:layoutNode"),
-            child(variant = Choose, qname = "dgm:choose"),
+            child(variant = VariableList, boxed, qname = "dgm:varLst"),
+            child(variant = ForEach, boxed, qname = "dgm:forEach"),
+            child(variant = LayoutNode, boxed, qname = "dgm:layoutNode"),
+            child(variant = Choose, boxed, qname = "dgm:choose"),
             child(variant = ExtensionList, qname = "dgm:extLst")
         )
     )]
@@ -2194,14 +2194,14 @@ pub struct DiagramChooseIf {
   pub val: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = Algorithm, qname = "dgm:alg"),
-            child(variant = Shape, qname = "dgm:shape"),
-            child(variant = PresentationOf, qname = "dgm:presOf"),
+            child(variant = Algorithm, boxed, qname = "dgm:alg"),
+            child(variant = Shape, boxed, qname = "dgm:shape"),
+            child(variant = PresentationOf, boxed, qname = "dgm:presOf"),
             child(variant = Constraints, qname = "dgm:constrLst"),
             child(variant = RuleList, qname = "dgm:ruleLst"),
-            child(variant = ForEach, qname = "dgm:forEach"),
-            child(variant = LayoutNode, qname = "dgm:layoutNode"),
-            child(variant = Choose, qname = "dgm:choose"),
+            child(variant = ForEach, boxed, qname = "dgm:forEach"),
+            child(variant = LayoutNode, boxed, qname = "dgm:layoutNode"),
+            child(variant = Choose, boxed, qname = "dgm:choose"),
             child(variant = ExtensionList, qname = "dgm:extLst")
         )
     )]
@@ -2216,14 +2216,14 @@ pub struct DiagramChooseElse {
   pub name: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            child(variant = Algorithm, qname = "dgm:alg"),
-            child(variant = Shape, qname = "dgm:shape"),
-            child(variant = PresentationOf, qname = "dgm:presOf"),
+            child(variant = Algorithm, boxed, qname = "dgm:alg"),
+            child(variant = Shape, boxed, qname = "dgm:shape"),
+            child(variant = PresentationOf, boxed, qname = "dgm:presOf"),
             child(variant = Constraints, qname = "dgm:constrLst"),
             child(variant = RuleList, qname = "dgm:ruleLst"),
-            child(variant = ForEach, qname = "dgm:forEach"),
-            child(variant = LayoutNode, qname = "dgm:layoutNode"),
-            child(variant = Choose, qname = "dgm:choose"),
+            child(variant = ForEach, boxed, qname = "dgm:forEach"),
+            child(variant = LayoutNode, boxed, qname = "dgm:layoutNode"),
+            child(variant = Choose, boxed, qname = "dgm:choose"),
             child(variant = ExtensionList, qname = "dgm:extLst")
         )
     )]
@@ -2459,7 +2459,7 @@ pub struct Shape3D {
 pub struct TextProperties {
   #[sdk(
         choice(
-            child(variant = Shape3DType, qname = "a:sp3d"),
+            child(variant = Shape3DType, boxed, qname = "a:sp3d"),
             child(variant = FlatText, qname = "a:flatTx")
         )
     )]
@@ -2522,7 +2522,7 @@ pub struct StyleLabel {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:ptLst")]
 pub struct PointList {
-  #[sdk(choice(child(variant = Point, qname = "dgm:pt"), any))]
+  #[sdk(choice(child(variant = Point, boxed, qname = "dgm:pt"), any))]
   pub xml_children: Vec<PointListChoice>,
 }
 /// Connection List.
@@ -2540,18 +2540,18 @@ pub struct Background {
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
   pub background_choice1: Option<BackgroundChoice>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub background_choice2: Option<BackgroundChoice2>,
@@ -2565,8 +2565,8 @@ pub struct Whole {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub whole_choice: Option<WholeChoice>,
@@ -2693,18 +2693,18 @@ pub struct ShapeProperties {
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -2714,8 +2714,8 @@ pub struct ShapeProperties {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
@@ -2762,7 +2762,7 @@ pub struct DiagramDefinitionExtension {
   #[sdk(
         choice(
             child(variant = NumberDiagramInfoList, qname = "dgm1611:autoBuNodeInfoLst"),
-            child(variant = TextListStyleType, qname = "dgm1612:lstStyle"),
+            child(variant = TextListStyleType, boxed, qname = "dgm1612:lstStyle"),
             any
         )
     )]

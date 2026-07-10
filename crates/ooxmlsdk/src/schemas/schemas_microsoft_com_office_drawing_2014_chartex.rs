@@ -323,7 +323,7 @@ pub struct MinColorSolidColorFillProperties {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -339,7 +339,7 @@ pub struct MidColorSolidColorFillProperties {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -355,7 +355,7 @@ pub struct MaxColorSolidColorFillProperties {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -448,7 +448,7 @@ pub struct NumericDimension {
                 child(qname = "cx:nf"),
                 child(qname = "cx:lvl")
             ),
-            child(variant = NumericLevel, qname = "cx:lvl")
+            child(variant = NumericLevel, boxed, qname = "cx:lvl")
         )
     )]
   pub numeric_dimension_choice: Option<NumericDimensionChoice>,
@@ -502,8 +502,8 @@ pub struct Data {
   pub id: crate::simple_type::UInt32Value,
   #[sdk(
         choice(
-            child(variant = NumericDimension, qname = "cx:numDim"),
-            child(variant = StringDimension, qname = "cx:strDim")
+            child(variant = NumericDimension, boxed, qname = "cx:numDim"),
+            child(variant = StringDimension, boxed, qname = "cx:strDim")
         )
     )]
   pub data_choice: Vec<DataChoice>,
@@ -579,8 +579,8 @@ pub struct TxPrTextBody {
 pub struct Text {
   #[sdk(
         choice(
-            child(variant = TextData, qname = "cx:txData"),
-            child(variant = RichTextBody, qname = "cx:rich")
+            child(variant = TextData, boxed, qname = "cx:txData"),
+            child(variant = RichTextBody, boxed, qname = "cx:rich")
         )
     )]
   pub text_choice: Option<TextChoice>,
@@ -598,18 +598,18 @@ pub struct ShapeProperties {
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -619,8 +619,8 @@ pub struct ShapeProperties {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
@@ -1187,7 +1187,7 @@ pub struct GeoCache {
                 simple_type = "Base64BinaryValue",
                 qname = "cx:binary"
             ),
-            child(variant = Clear, qname = "cx:clear")
+            child(variant = Clear, boxed, qname = "cx:clear")
         )
     )]
   pub geo_cache_choice: Vec<GeoCacheChoice>,
@@ -1511,7 +1511,7 @@ pub struct SeriesLayoutProperties {
   #[sdk(
         choice(
             empty_child(variant = Aggregation, qname = "cx:aggregation"),
-            child(variant = Binning, qname = "cx:binning")
+            child(variant = Binning, boxed, qname = "cx:binning")
         )
     )]
   pub series_layout_properties_choice: Option<SeriesLayoutPropertiesChoice>,
@@ -1626,7 +1626,7 @@ pub struct Axis {
   #[sdk(
         choice(
             child(variant = CategoryAxisScaling, qname = "cx:catScaling"),
-            child(variant = ValueAxisScaling, qname = "cx:valScaling")
+            child(variant = ValueAxisScaling, boxed, qname = "cx:valScaling")
         )
     )]
   pub axis_choice: Option<AxisChoice>,

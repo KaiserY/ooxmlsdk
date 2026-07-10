@@ -35,7 +35,7 @@ pub struct DiagramAutoBullet {
             empty_child(variant = NoBullet, qname = "a:buNone"),
             child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
             child(variant = CharacterBullet, qname = "a:buChar"),
-            child(variant = PictureBullet, qname = "a:buBlip")
+            child(variant = PictureBullet, boxed, qname = "a:buBlip")
         )
     )]
   pub diagram_auto_bullet_choice: Option<DiagramAutoBulletChoice>,

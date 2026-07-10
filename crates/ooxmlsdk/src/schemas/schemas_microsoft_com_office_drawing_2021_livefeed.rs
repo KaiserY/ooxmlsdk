@@ -61,10 +61,10 @@ pub struct OfficeArtExtensionList {
 pub struct LiveFeedBackgroundProperties {
   #[sdk(
         choice(
-            child(variant = BackgroundNormalProperties, qname = "alf:Normal"),
-            child(variant = BackgroundRemovedProperties, qname = "alf:Removed"),
-            child(variant = BackgroundBlurProperties, qname = "alf:Blur"),
-            child(variant = BackgroundCustomProperties, qname = "alf:Custom")
+            child(variant = BackgroundNormalProperties, boxed, qname = "alf:Normal"),
+            child(variant = BackgroundRemovedProperties, boxed, qname = "alf:Removed"),
+            child(variant = BackgroundBlurProperties, boxed, qname = "alf:Blur"),
+            child(variant = BackgroundCustomProperties, boxed, qname = "alf:Custom")
         )
     )]
   pub live_feed_background_properties_choice: Option<LiveFeedBackgroundPropertiesChoice>,

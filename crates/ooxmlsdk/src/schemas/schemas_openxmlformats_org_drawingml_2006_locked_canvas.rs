@@ -18,13 +18,13 @@ pub struct LockedCanvas {
   pub visual_group_shape_properties: std::boxed::Box<crate::schemas::a::VisualGroupShapeProperties>,
   #[sdk(
         choice(
-            child(variant = TextShape, qname = "a:txSp"),
-            child(variant = Shape, qname = "a:sp"),
-            child(variant = ConnectionShape, qname = "a:cxnSp"),
-            child(variant = Picture, qname = "a:pic"),
-            child(variant = GvmlContentPart, qname = "a14:contentPart"),
-            child(variant = GraphicFrame, qname = "a:graphicFrame"),
-            child(variant = GroupShape, qname = "a:grpSp")
+            child(variant = TextShape, boxed, qname = "a:txSp"),
+            child(variant = Shape, boxed, qname = "a:sp"),
+            child(variant = ConnectionShape, boxed, qname = "a:cxnSp"),
+            child(variant = Picture, boxed, qname = "a:pic"),
+            child(variant = GvmlContentPart, boxed, qname = "a14:contentPart"),
+            child(variant = GraphicFrame, boxed, qname = "a:graphicFrame"),
+            child(variant = GroupShape, boxed, qname = "a:grpSp")
         )
     )]
   pub locked_canvas_choice: Vec<LockedCanvasChoice>,

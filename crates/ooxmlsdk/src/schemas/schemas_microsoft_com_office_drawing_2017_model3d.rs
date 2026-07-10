@@ -34,8 +34,8 @@ pub struct Model3D {
   pub model3_d_extension_list: Option<Model3DExtensionList>,
   #[sdk(
         choice(
-            child(variant = ObjectViewport, qname = "am3d:objViewport"),
-            child(variant = WindowViewport, qname = "am3d:winViewport")
+            child(variant = ObjectViewport, boxed, qname = "am3d:objViewport"),
+            child(variant = WindowViewport, boxed, qname = "am3d:winViewport")
         )
     )]
   pub model3_d_choice1: Option<Model3DChoice>,
@@ -44,9 +44,9 @@ pub struct Model3D {
   pub ambient_light: Option<std::boxed::Box<AmbientLight>>,
   #[sdk(
         choice(
-            child(variant = PointLight, qname = "am3d:ptLight"),
-            child(variant = SpotLight, qname = "am3d:spotLight"),
-            child(variant = DirectionalLight, qname = "am3d:dirLight"),
+            child(variant = PointLight, boxed, qname = "am3d:ptLight"),
+            child(variant = SpotLight, boxed, qname = "am3d:spotLight"),
+            child(variant = DirectionalLight, boxed, qname = "am3d:dirLight"),
             empty_child(variant = UnknownLight, qname = "am3d:unkLight")
         )
     )]
@@ -292,16 +292,16 @@ pub struct Blip {
             child(variant = AlphaBiLevel, qname = "a:alphaBiLevel"),
             empty_child(variant = AlphaCeiling, qname = "a:alphaCeiling"),
             empty_child(variant = AlphaFloor, qname = "a:alphaFloor"),
-            child(variant = AlphaInverse, qname = "a:alphaInv"),
-            child(variant = AlphaModulationEffect, qname = "a:alphaMod"),
+            child(variant = AlphaInverse, boxed, qname = "a:alphaInv"),
+            child(variant = AlphaModulationEffect, boxed, qname = "a:alphaMod"),
             child(variant = AlphaModulationFixed, qname = "a:alphaModFix"),
             child(variant = AlphaReplace, qname = "a:alphaRepl"),
             child(variant = BiLevel, qname = "a:biLevel"),
             child(variant = Blur, qname = "a:blur"),
-            child(variant = ColorChange, qname = "a:clrChange"),
-            child(variant = ColorReplacement, qname = "a:clrRepl"),
+            child(variant = ColorChange, boxed, qname = "a:clrChange"),
+            child(variant = ColorReplacement, boxed, qname = "a:clrRepl"),
             child(variant = Duotone, qname = "a:duotone"),
-            child(variant = FillOverlay, qname = "a:fillOverlay"),
+            child(variant = FillOverlay, boxed, qname = "a:fillOverlay"),
             empty_child(variant = Grayscale, qname = "a:grayscl"),
             child(variant = Hsl, qname = "a:hsl"),
             child(variant = LuminanceEffect, qname = "a:lum"),
@@ -320,7 +320,7 @@ pub struct ColorType {
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
-            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = RgbColorModelHex, boxed, qname = "a:srgbClr"),
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
@@ -339,7 +339,7 @@ pub struct Model3DExtension {
   pub uri: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            child(variant = EmbeddedAnimation, qname = "a3danim:embedAnim"),
+            child(variant = EmbeddedAnimation, boxed, qname = "a3danim:embedAnim"),
             child(variant = PosterFrame, qname = "a3danim:posterFrame"),
             any
         )
@@ -359,18 +359,18 @@ pub struct ShapeProperties {
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
-            child(variant = CustomGeometry, qname = "a:custGeom"),
-            child(variant = PresetGeometry, qname = "a:prstGeom")
+            child(variant = CustomGeometry, boxed, qname = "a:custGeom"),
+            child(variant = PresetGeometry, boxed, qname = "a:prstGeom")
         )
     )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(
         choice(
             child(variant = NoFill, qname = "a:noFill"),
-            child(variant = SolidFill, qname = "a:solidFill"),
-            child(variant = GradientFill, qname = "a:gradFill"),
-            child(variant = BlipFill, qname = "a:blipFill"),
-            child(variant = PatternFill, qname = "a:pattFill"),
+            child(variant = SolidFill, boxed, qname = "a:solidFill"),
+            child(variant = GradientFill, boxed, qname = "a:gradFill"),
+            child(variant = BlipFill, boxed, qname = "a:blipFill"),
+            child(variant = PatternFill, boxed, qname = "a:pattFill"),
             empty_child(variant = GroupFill, qname = "a:grpFill")
         )
     )]
@@ -380,8 +380,8 @@ pub struct ShapeProperties {
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
-            child(variant = EffectList, qname = "a:effectLst"),
-            child(variant = EffectDag, qname = "a:effectDag")
+            child(variant = EffectList, boxed, qname = "a:effectLst"),
+            child(variant = EffectDag, boxed, qname = "a:effectDag")
         )
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
@@ -410,8 +410,8 @@ pub struct Model3DCamera {
   pub look_at_point3_d: LookAtPoint3D,
   #[sdk(
         choice(
-            child(variant = OrthographicProjection, qname = "am3d:orthographic"),
-            child(variant = PerspectiveProjection, qname = "am3d:perspective")
+            child(variant = OrthographicProjection, boxed, qname = "am3d:orthographic"),
+            child(variant = PerspectiveProjection, boxed, qname = "am3d:perspective")
         )
     )]
   pub model3_d_camera_choice: Option<Model3DCameraChoice>,

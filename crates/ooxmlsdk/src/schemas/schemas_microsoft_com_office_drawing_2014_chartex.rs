@@ -485,7 +485,6 @@ pub struct ExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cx:externalData")]
 pub struct ExternalData {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// RelId of the relationship for the external data
   #[sdk(attr(qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,

@@ -1,202 +1,178 @@
 # Repository Guidelines
 
-This file is the entrypoint for agents working in this repository. Keep it
-short, stable, and map-like. Treat deeper docs as the source of truth.
+This file is the entry point for agents working in the implementation
+repository. Keep it short and map-like; deeper documents and the adjacent test
+workspace are the sources of truth.
 
 Read first:
 
-1. `README.md` for public API and feature surface
-2. `ARCHITECTURE.md` for workspace layout, data flow, test buckets, and upstreams
-3. `docs/tests/` for fixture taxonomy and coverage matrices when touching tests
-4. `docs/specs/` for user-facing format notes when touching behavior or docs
+1. `README.md` for the public API and feature surface.
+2. `ARCHITECTURE.md` for crate boundaries, generated-code flow, and test ownership.
+3. `../ooxmlsdk-test-suite/AGENTS.md` before changing or running integration,
+   corpus, rendering, or benchmark tests.
+4. `../ooxmlsdk-test-suite/docs/` for current upstream coverage matrices.
+5. `docs/specs/` for user-facing format and behavior notes.
 
-## Project Stage
+## Repository Boundary
 
-The current phase of this repository is focused on rewriting upstream
-`Open-XML-SDK` and LibreOffice logic in Rust while reusing as much upstream
-test coverage and fixture evidence as possible.
+This repository owns the Rust implementation, generator, generated code, and
+implementation-local unit tests. The adjacent `../ooxmlsdk-test-suite` is the
+primary test workspace and owns focused public-API integration tests, imported
+fixtures and corpora, round-trip tests, rendering/layout parity tests, and
+benchmarks.
 
-Priority by subsystem:
+Put a test in this repository only when it directly tests private crate logic,
+generator behavior, derive expansion, or a small implementation-local unit.
+Put public behavior and fixture-backed tests in the matching test-suite crate.
+Do not add corpus fixtures to this repository.
 
-- `ooxmlsdk`: use `Open-XML-SDK` as the primary reference and LibreOffice as a secondary reference
-- `ooxmlsdk-pdf`: use LibreOffice as the primary reference
+## Implementation Strategy
 
-Until the implementation reaches a higher maturity level:
+The current phase rewrites upstream behavior in idiomatic Rust while reusing
+upstream source, tests, and fixture evidence:
 
-- prefer translating upstream behavior into idiomatic Rust over inventing new behavior
-- prefer upstream tests, fixtures, and source code over local guesswork
-- for `ooxmlsdk`, check `Open-XML-SDK` first and use LibreOffice mainly for supplemental evidence
-- for `ooxmlsdk-pdf`, check LibreOffice first
-- when behavior is unclear, inspect upstream first instead of inferring a new rule
-- do not broaden the feature surface or add novel logic unless the task explicitly requires it
-- treat unexplained behavioral differences from upstream as bugs or gaps to investigate, not as opportunities to design a new model
+- for `ooxmlsdk`, use `../Open-XML-SDK` as the primary reference and
+  `../core` (LibreOffice) as supplemental evidence;
+- for `ooxmlsdk-pdf`, layout, formula, and visible-output behavior, use the
+  subsystem mappings in `ARCHITECTURE.md`; LibreOffice is the primary PDF and
+  layout reference;
+- prefer translating source-backed behavior over inventing new behavior;
+- treat unexplained differences from upstream as gaps to investigate;
+- do not broaden the public feature surface without an explicit requirement.
 
 ## Working Style
 
-- Start from local evidence. Use `rg` / `rg --files` first.
-- Read only the files needed for the task.
-- Keep summaries diff-based rather than conversation-based.
-- Do not paste broad search output or large generated snippets unless asked.
-- Run commands from the repository root.
-- Do not fix clippy or compiler warnings by adding `#[allow(...)]` or `#![allow(...)]`; remove dead code, tighten cfgs, or improve the implementation instead.
-- Cargo generation, format, test, clippy, and bench commands must run sequentially in the default `target/` directory; do not set `CARGO_TARGET_DIR`.
-- This repository has long Cargo build/test times. After starting any Cargo command, let it run to completion and wait for the final result.
-- Never start a second Cargo command while another Cargo command is still running, even for a quick verification, retry, status check, or no-op probe.
-- While a Cargo command is running, do not launch other repository commands just to inspect progress. Do not poll with extra Cargo invocations. If output is quiet for a while, keep waiting.
-- After starting a Cargo command, wait for the background command to return before doing any other repository work. Do not interrupt yourself to inspect files, diffs, or partial results while that Cargo command is still running; only look at the result after the command exits.
-- For long-running Cargo commands, use the longest practical command wait interval available. If the command returns a background session, poll with long intervals, preferably several minutes, so the terminal does not emit frequent intermediate wait messages.
-- Do not send progress commentary while waiting for Cargo. Report only after the Cargo command exits, unless the user explicitly asks for a status update.
-- If Cargo reports a target lock or another Cargo process is already running, do not probe processes or start competing commands; just wait for the active Cargo command to finish and then continue.
-- If Cargo reports a target lock, wait for Cargo rather than probing processes.
-- Never create ad hoc Cargo projects, temporary manifests, or throwaway crates
-  for inspection, reproduction, debugging, or code execution. This ban applies
-  everywhere: `/tmp`, other workspace directories, sibling checkouts, nested
-  repository subdirectories, and any other path.
-- Do not work around the ban by generating temporary Cargo files, helper
-  projects, or one-off crates outside the repository. Analyze with existing
-  repository commands, checked-in fixtures, and existing tests only.
-- If inspecting runtime output requires instrumentation, prefer an existing
-  test or existing repository binary. Ask the user before adding temporary
-  debugging code.
+- Start from local evidence with `rg` and `rg --files`.
+- Run commands from the root of the repository they belong to.
+- Read only the files needed for the task and summarize diffs, not exploration.
+- Preserve unrelated changes in a dirty worktree.
+- Do not silence warnings with `#[allow(...)]` or `#![allow(...)]`; fix the
+  implementation, dead code, or cfg boundary.
+- Do not run `git add`, `git commit`, `git commit --amend`, or other index or
+  history mutations. When asked whether changes are ready, report verification
+  and suggest a commit subject.
 
-## Commands
+## Cargo Discipline
 
-- `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`: regenerate `sdk_data/` and runtime generated code from checked-in `data/` and package schemas.
-- `cargo test -p ooxmlsdk-test`: fast integration lane for common runtime and package behavior.
-- `cargo test --workspace`: default full test lane.
-- `cargo test --workspace --no-default-features`: no-default-features lane.
-- `cargo test --workspace --no-default-features --features parts`: parts lane without validators or MCE-specific behavior.
-- `cargo test --workspace --no-default-features --features flat-opc`: Flat OPC lane without validators or MCE-specific behavior.
-- `cargo test --workspace --no-default-features --features mce`: MCE lane without validators or Flat OPC-specific behavior.
-- `cargo test -p ooxmlsdk-test --features validators`: validator-focused lane.
-- `cargo fmt --all`: format.
-- `cargo clippy --workspace --all-targets -- -D warnings`: default clippy lane.
-- `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`: no-default-features clippy lane.
-- `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`: Office2007 parts clippy lane.
-- `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`: Flat OPC clippy lane.
-- `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`: MCE clippy lane.
-- `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`: validator clippy lane.
-- `cargo bench -p ooxmlsdk-test --bench perf`: package and XML performance benches.
+Cargo generation, format, check, test, clippy, and bench commands must run
+sequentially in the default `target/` directory of the current repository. Do
+not set `CARGO_TARGET_DIR` and never start a second Cargo command while one is
+running. Let long commands finish; if Cargo waits on a target lock, wait rather
+than probing processes or launching competing commands.
 
-### Dev Loop
+Never create an ad hoc Cargo project, temporary manifest, or throwaway crate for
+inspection or debugging. Use checked-in tests and binaries. Ask before adding
+temporary instrumentation.
 
-Default dev loop after generator work:
+## Commands: Implementation Repository
 
-1. `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
-2. `cargo fmt --all`
-3. `cargo test --workspace`
-4. `cargo clippy --workspace --all-targets -- -D warnings`
-5. `cargo fmt --all`
+- `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`: regenerate
+  `sdk_data/` and generated runtime code from checked-in inputs.
+- `cargo fmt --all`: format the implementation workspace.
+- `cargo test --workspace`: run implementation-local tests with default features.
+- `cargo test --workspace --no-default-features`: test the minimal feature shape.
+- `cargo test --workspace --no-default-features --features parts`: test package APIs.
+- `cargo test --workspace --no-default-features --features flat-opc`: test Flat OPC.
+- `cargo test --workspace --no-default-features --features mce`: test MCE.
+- `cargo clippy --workspace --all-targets -- -D warnings`: lint the default shape.
+- Add the same `--no-default-features` and feature selections above when a
+  change affects feature gates.
 
-Full generator/feature validation:
+The implementation workspace has no `ooxmlsdk-test` package and no primary
+integration benchmark target. Commands for those belong to the adjacent suite.
 
-1. `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
-2. `cargo fmt --all`
-3. `cargo test --workspace`
-4. `cargo test --workspace --no-default-features`
-5. `cargo test --workspace --no-default-features --features parts`
-6. `cargo test --workspace --no-default-features --features flat-opc`
-7. `cargo test --workspace --no-default-features --features mce`
-8. `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`
-9. `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`
-10. `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`
-11. `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`
-12. `cargo clippy --workspace --all-targets -- -D warnings`
-13. `cargo fmt --all`
+## Commands: Test Suite
 
-For runtime/doc-sample iteration, start with `cargo test -p ooxmlsdk-test`. If the change touches Flat OPC, also run Flat OPC test. If the change touches MCE behavior, also run MCE tests. Add broader lanes only when the change touches generator code, shared runtime behavior, feature gates, package behavior, or validators.
+Run these from `../ooxmlsdk-test-suite` and follow its `AGENTS.md`:
 
-### Macro Expansion Checks
+For changes to the core `ooxmlsdk` runtime or generated schemas, run this
+focused feature matrix in order. Do not substitute the whole test-suite
+workspace: it contains independent EMF, OLE/CFB, fonts, formula, layout, and PDF
+projects with additional sibling path dependencies.
 
-When changing `crates/ooxmlsdk-derive`, dump macro expansion with the existing
-ignored test before deciding the implementation is correct:
+1. `cargo test -p ooxmlsdk-test --no-default-features`: schema, XML, properties,
+   and simple-type behavior without package APIs.
+2. `cargo test -p ooxmlsdk-test`: default `parts` lane and focused package tests.
+3. `cargo test -p ooxmlsdk-test --features flat-opc`: default parts plus Flat OPC.
+4. `cargo test -p ooxmlsdk-test --features mce`: default parts plus MCE package
+   and calibration tests.
+5. `cargo test -p ooxmlsdk-test --features validators`: default parts plus
+   schema and package validator tests.
 
-- `cargo test -p ooxmlsdk-derive dump_context_node_expansion -- --ignored --nocapture`
+After that matrix, package-fidelity changes must run these three generated
+round-trip lanes, in order. They are ignored by default and each command runs
+one upstream corpus:
 
-The dump test expands one derive target at a time. Select the target with
-environment variables:
+1. `cargo test -p ooxmlsdk-roundtrip-tests --test apache_poi_roundtrip -- --ignored`
+2. `cargo test -p ooxmlsdk-roundtrip-tests --test libreoffice_roundtrip -- --ignored`
+3. `cargo test -p ooxmlsdk-roundtrip-tests --test open_xml_sdk_roundtrip -- --ignored`
 
-- `OOXMLSDK_DUMP_KIND`: one of `SdkEnum`, `SdkType`, `SdkChoice`, `SdkPart`, or
-  `SdkPackage`; defaults to `SdkPart`
-- `OOXMLSDK_DUMP_FILE`: runtime source file under `crates/ooxmlsdk/src/`;
-  defaults to `parts/main_document_part.rs`
-- `OOXMLSDK_DUMP_TARGET`: item name to expand; defaults to `MainDocumentPart`
+Stop at the first failure when the task asks for failure analysis; do not start
+later feature or corpus lanes after a failure.
 
-Examples:
+Run other suite crates only when their subsystem is affected:
 
-- `OOXMLSDK_DUMP_KIND=SdkType OOXMLSDK_DUMP_FILE=schemas/schemas_microsoft_com_office_word_2010_wordml.rs OOXMLSDK_DUMP_TARGET=Shadow cargo test -p ooxmlsdk-derive dump_context_node_expansion -- --ignored --nocapture`
-- `OOXMLSDK_DUMP_KIND=SdkChoice OOXMLSDK_DUMP_FILE=schemas/schemas_microsoft_com_office_word_2010_wordml.rs OOXMLSDK_DUMP_TARGET=ShadowChoice cargo test -p ooxmlsdk-derive dump_context_node_expansion -- --ignored --nocapture`
+- `cargo test -p ooxmlsdk-formula-test`: formula parser/evaluator/import tests.
+- `cargo test -p ooxmlsdk-fonts-test`: font and font/layout integration tests.
+- `cargo test -p ooxmlsdk-layout-test`: DOCX, PPTX, and XLSX layout parity tests.
+- `cargo test -p ooxmlsdk-pdf-test`: PDF rendering and object/visible-output tests.
+- `cargo bench -p ooxmlsdk-bench`: run package and XML benchmark targets.
 
-The dump writes expanded Rust under `target/ooxmlsdk_macro_expanded/`. Inspect
-the relevant expanded file and keep generated code direct, predictable, and
-cheap: prefer static decisions from generator metadata, avoid redundant runtime
-branches, avoid duplicate parsing/writing paths, and remove helper code that no
-longer appears in expansion. Do not add temporary macro-dump crates or external
-tools.
+Test-suite infrastructure or release-wide work may additionally use
+`cargo check --workspace --tests`, `cargo test --workspace`, and
+`cargo clippy --workspace --tests -- -D warnings`, but these are not the core
+`ooxmlsdk` validation lane. Run
+`cargo test -p ooxmlsdk-corpus-test-support --test float_rules_sync -- --ignored`
+only when schema float normalization rules change.
 
-## Upstream Sources
-
-Prefer local checkouts before browsing:
-
-- `../Open-XML-SDK`: primary upstream for package API, generated metadata, tests, and assets
-- `../core`: LibreOffice upstream for PDF rendering fixtures and visible-output expectations
-- `../ooxmlsdk-test-suite`: package round-trip corpus suite for Open-XML-SDK, LibreOffice, Apache POI, and other external fixture sets; remote: `https://github.com/KaiserY/ooxmlsdk-test-suite`
-- `../ooxmlsdk`: sibling checkout reference when it is distinct from this repository
-- `../open-xml-docs`: Microsoft Learn Open XML docs and samples
-
-Use GitHub only when the local checkout is missing or clearly stale.
-
-## Test Fixture Boundaries
-
-Important:
-
-- full package round-trip corpus coverage belongs in `../ooxmlsdk-test-suite`, not in this repository
-- focused package fixtures live in `../ooxmlsdk-test-suite/fixtures/ooxmlsdk-test`
-- LibreOffice package/PDF/layout corpora live in `../ooxmlsdk-test-suite/corpus/LibreOffice`
-- do not add new fixture corpus files under this repository
+Use the smallest relevant suite crate during iteration. Run the complete
+`ooxmlsdk-test` matrix and three round-trip lanes when changing generated
+schemas, shared runtime XML/package behavior, or package fidelity.
 
 ## Generated Code
 
-- Treat `data/`, `sdk_data/`, and `schemas/OpenPackagingConventions-XMLSchema/` as generator inputs.
-- `crates/ooxmlsdk-build/src/sdk_data/sdk_data_model.rs` is hand-written input model code.
-- Treat `data/` as the source of truth for schema modeling; use checked-in XSDs as auxiliary references.
-- Do not invent semantic names when upstream data/XSDs do not provide them; keep generic names such as `Choice` and `Sequence` until a source-backed name exists.
-- Avoid editing generated runtime files directly unless you are intentionally changing generator inputs and regenerating output.
-- After regeneration, run `cargo fmt --all` before reviewing diffs.
+- `data/`, `sdk_data/`, and `schemas/OpenPackagingConventions-XMLSchema/` are
+  generator inputs; `data/` is the schema-model source of truth.
+- `crates/ooxmlsdk-build/src/sdk_data/sdk_data_model.rs` is hand-written input
+  model code.
+- Runtime files under `crates/ooxmlsdk/src/{schemas,deserializers,serializers,parts}/`
+  and their generated module files are generated artifacts.
+- Change generator inputs or generator logic, regenerate, then run
+  `cargo fmt --all`; do not patch generated runtime output as a substitute.
+- Keep generic schema names such as `Choice` and `Sequence` when upstream data
+  or XSDs provide no semantic name.
 
-## Editing Guidance
+## Derive Expansion
 
-- Keep hand-written logic in `crates/ooxmlsdk-build`, `crates/ooxmlsdk-derive`, `crates/ooxmlsdk-pdf`, or small runtime helpers.
-- Preserve upstream Open XML SDK concepts in the public package API:
-  `new`, `new_with_settings`, `new_from_file`, `save`, relationship helpers, and typed part traversal.
-- In implementation work, rewrite upstream logic with Rust language features and Rust library structure, but do not replace upstream semantics with speculative local designs.
-- Do not expose raw storage or internal caches just to match upstream internals.
+After changing `crates/ooxmlsdk-derive`, run the checked-in ignored expansion
+test before deciding the implementation is correct:
 
-## Testing Guidance
+```sh
+cargo test -p ooxmlsdk-derive dump_context_node_expansion -- --ignored --nocapture
+```
 
-Place tests near the behavior they protect:
+Select a target with `OOXMLSDK_DUMP_KIND`, `OOXMLSDK_DUMP_FILE`, and
+`OOXMLSDK_DUMP_TARGET`. Output is written under
+`target/ooxmlsdk_macro_expanded/`. Keep expansions direct and predictable; do
+not create external macro-dump crates.
 
-- schema/simple XML: `wordprocessing.rs`, `presentation.rs`, `spreadsheet.rs`, `properties.rs`, `simple_types.rs`
-- package/parts and Flat OPC: `packages.rs`
-- MCE: `packages.rs` or `markup_compatibility_calibration.rs`
-- validators: `validators.rs` and `file_validators.rs`
-- corpus-scale package round trips: `../ooxmlsdk-test-suite`
+## Upstream And Fixture Map
 
-## Documentation Guidance
+- `../Open-XML-SDK`: package API, schema metadata, validators, tests, and assets.
+- `../core`: LibreOffice source and primary PDF/layout visible-output evidence.
+- `../ooxmlsdk-test-suite`: all focused integration tests, corpora, benchmarks,
+  and test coverage documentation.
+- `../open-xml-docs`: Microsoft Open XML documentation and samples.
 
-When updating docs, start with checked-in repository docs before browsing:
+Within the test suite:
 
-- `README.md`
-- `CHANGELOG.md`
-- `COMPATIBILITY.md`
-- `ARCHITECTURE.md`
-- `docs/specs/`
-- `docs/tests/`
+- `crates/ooxmlsdk-test/` owns focused core runtime integration tests;
+- `crates/ooxmlsdk-{fonts,formula,layout,pdf}-test/` own subsystem tests;
+- `crates/ooxmlsdk-roundtrip-tests/` and
+  `crates/ooxmlsdk-corpus-test-support/` own package corpus round trips;
+- `crates/ooxmlsdk-bench/` owns runtime benchmarks;
+- `corpus/` stores imported package corpora and corpus-local manifests;
+- `fixtures/` stores focused, provenance-specific test inputs.
 
-## Commit Guidance
-
-- Keep commit subjects short, imperative, and scoped.
-- Base commit messages on repository state, not the latest chat turn.
-- Inspect `git status --short`, `git diff --stat`, and relevant diffs before writing a message.
-- Do not run `git add`, `git commit`, `git commit --amend`, or other git index/history update commands. The user creates commits.
-- When the user asks whether changes can be committed, report the verification status and provide a suggested commit message instead of staging or committing.
+Follow `../ooxmlsdk-test-suite/AGENTS.md` for corpus manifests, ignored-test
+semantics, locks, licensing, and coverage-report updates.

@@ -116,7 +116,11 @@ pub enum ContentModelDecl {
 pub struct SystemSupportDecl {
   pub have_xmlns_fields: bool,
   pub xml_header: XmlHeaderMode,
-  pub have_xml_other_attrs: bool,
+  pub have_mc_ignorable: bool,
+  pub have_mc_preserve_attributes: bool,
+  pub have_mc_preserve_elements: bool,
+  pub have_mc_process_content: bool,
+  pub have_mc_must_understand: bool,
   pub have_xml_other_children: bool,
   pub compact_xml_other_children: bool,
   #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -126,9 +130,17 @@ pub struct SystemSupportDecl {
 }
 
 impl SystemSupportDecl {
+  pub fn has_mce_attributes(&self) -> bool {
+    self.have_mc_ignorable
+      || self.have_mc_preserve_attributes
+      || self.have_mc_preserve_elements
+      || self.have_mc_process_content
+      || self.have_mc_must_understand
+  }
+
   pub fn has_extra_support_fields(&self) -> bool {
     self.have_xmlns_fields
-      || self.have_xml_other_attrs
+      || self.has_mce_attributes()
       || self.have_xml_other_children
       || !self.extra_xmlns.is_empty()
       || !self.canonical_namespace_prefixes.is_empty()
@@ -242,6 +254,7 @@ pub struct TypeRefDecl {
 }
 
 const POINTER_SIZE: usize = 8;
+const BOXED_SLICE_SIZE: usize = 16;
 const VEC_SIZE: usize = 24;
 const STRING_SIZE: usize = 24;
 const OPTION_DISCRIMINANT_SIZE: usize = 8;
@@ -347,9 +360,17 @@ fn estimate_support_size(support: &SystemSupportDecl) -> usize {
   if support.have_xmlns_fields {
     size += VEC_SIZE;
   }
-  if support.have_xml_other_attrs {
-    size += VEC_SIZE;
-  }
+  size += BOXED_SLICE_SIZE
+    * [
+      support.have_mc_ignorable,
+      support.have_mc_preserve_attributes,
+      support.have_mc_preserve_elements,
+      support.have_mc_process_content,
+      support.have_mc_must_understand,
+    ]
+    .into_iter()
+    .filter(|enabled| *enabled)
+    .count();
   if support.have_xml_other_children {
     size += VEC_SIZE;
   }
@@ -542,7 +563,11 @@ mod tests {
         support: SystemSupportDecl {
           have_xmlns_fields: true,
           xml_header: XmlHeaderMode::Standalone,
-          have_xml_other_attrs: true,
+          have_mc_ignorable: false,
+          have_mc_preserve_attributes: false,
+          have_mc_preserve_elements: false,
+          have_mc_process_content: false,
+          have_mc_must_understand: false,
           have_xml_other_children: true,
           compact_xml_other_children: false,
           extra_xmlns: Vec::new(),

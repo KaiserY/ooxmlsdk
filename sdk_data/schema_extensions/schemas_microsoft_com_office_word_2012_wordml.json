@@ -2,31 +2,35 @@
   "Types": [
     {
       "ClassName": "CommentsEx",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "People",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
-      "ClassName": "Appearance",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "Appearance"
     },
     {
-      "ClassName": "CommentEx",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "CommentEx"
     },
     {
-      "ClassName": "PersistentDocumentId",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "PersistentDocumentId"
     },
     {
       "ClassName": "Person",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "w15:contact",
+          "PropertyName": "Contact",
+          "PropertyComments": "Legacy contact identity",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
-      "ClassName": "PresenceInfo",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "PresenceInfo"
     }
   ]
 }

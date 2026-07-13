@@ -230,7 +230,6 @@ pub struct DifferentialFormatType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:revisionPtr")]
 pub struct RevisionPtr {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// revIDLastSave
   #[sdk(attr(qname = ":revIDLastSave"))]
   pub rev_id_last_save: crate::simple_type::UInt64Value,

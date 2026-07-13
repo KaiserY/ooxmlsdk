@@ -33,30 +33,111 @@
     },
     {
       "ClassName": "Group",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "w14:anchorId",
+          "PropertyName": "W14AnchorId",
+          "PropertyComments": "Word 2010 Anchor Identifier",
+          "Optional": true,
+          "OverrideType": "HexBinaryValue"
+        }
+      ]
     },
     {
       "ClassName": "Line",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "w14:anchorId",
+          "PropertyName": "W14AnchorId",
+          "PropertyComments": "Word 2010 Anchor Identifier",
+          "Optional": true,
+          "OverrideType": "HexBinaryValue"
+        }
+      ]
     },
     {
       "ClassName": "Oval",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "w14:anchorId",
+          "PropertyName": "W14AnchorId",
+          "PropertyComments": "Word 2010 Anchor Identifier",
+          "Optional": true,
+          "OverrideType": "HexBinaryValue"
+        },
+        {
+          "QName": "wp14:anchorId",
+          "PropertyName": "Wp14AnchorId",
+          "PropertyComments": "Wordprocessing Drawing 2010 Anchor Identifier",
+          "Optional": true,
+          "OverrideType": "HexBinaryValue"
+        }
+      ]
     },
     {
       "ClassName": "Rectangle",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": ":type",
+          "PropertyName": "Type",
+          "PropertyComments": "Shape Type Reference",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        },
+        {
+          "QName": "w14:anchorId",
+          "PropertyName": "W14AnchorId",
+          "PropertyComments": "Word 2010 Anchor Identifier",
+          "Optional": true,
+          "OverrideType": "HexBinaryValue"
+        },
+        {
+          "QName": "wp14:anchorId",
+          "PropertyName": "Wp14AnchorId",
+          "PropertyComments": "Wordprocessing Drawing 2010 Anchor Identifier",
+          "Optional": true,
+          "OverrideType": "HexBinaryValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "RoundRectangle",
+      "Attributes": [
+        {
+          "QName": "w14:anchorId",
+          "PropertyName": "W14AnchorId",
+          "PropertyComments": "Word 2010 Anchor Identifier",
+          "Optional": true,
+          "OverrideType": "HexBinaryValue"
+        }
+      ]
     },
     {
       "ClassName": "Shape",
-      "HaveXmlOtherAttrs": true,
+      "Attributes": [
+        {
+          "QName": "w14:anchorId",
+          "PropertyName": "W14AnchorId",
+          "PropertyComments": "Word 2010 Anchor Identifier",
+          "Optional": true,
+          "OverrideType": "HexBinaryValue"
+        }
+      ],
       "CanonicalNamespacePrefixes": [
         "wvml:w10"
       ]
     },
     {
       "ClassName": "Shapetype",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "w14:anchorId",
+          "PropertyName": "W14AnchorId",
+          "PropertyComments": "Word 2010 Anchor Identifier",
+          "Optional": true,
+          "OverrideType": "HexBinaryValue"
+        }
+      ]
     }
   ],
   "ChoiceEnums": [

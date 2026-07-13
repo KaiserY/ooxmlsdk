@@ -163,7 +163,6 @@ pub struct WrapTopBottom {
 #[sdk(qname = "wp:inline")]
 pub struct Inline {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Distance From Text on Top Edge
   #[sdk(attr(qname = ":distT"))]
   pub distance_from_top: Option<crate::simple_type::UInt32Value>,
@@ -205,7 +204,6 @@ pub struct Inline {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:anchor")]
 pub struct Anchor {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Distance From Text on Top Edge
   #[sdk(attr(qname = ":distT"))]

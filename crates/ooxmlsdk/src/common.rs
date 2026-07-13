@@ -177,59 +177,6 @@ fn split_raw_namespace(raw: &[u8]) -> (&[u8], &[u8]) {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct XmlOtherAttr(Box<[u8]>);
-
-impl XmlOtherAttr {
-  #[inline]
-  pub fn new_raw(name: impl AsRef<[u8]>, raw_value: impl AsRef<[u8]>) -> Self {
-    let name = name.as_ref();
-    let raw_value = raw_value.as_ref();
-    let mut attr = Vec::with_capacity(name.len() + 1 + raw_value.len());
-    attr.extend_from_slice(name);
-    attr.push(0);
-    attr.extend_from_slice(raw_value);
-    Self(attr.into_boxed_slice())
-  }
-
-  #[inline]
-  pub fn name_bytes(&self) -> &[u8] {
-    self.split_bytes().0
-  }
-
-  #[inline]
-  pub fn raw_value_bytes(&self) -> &[u8] {
-    self.split_bytes().1
-  }
-
-  #[inline]
-  pub fn name(&self) -> &str {
-    std::str::from_utf8(self.name_bytes()).unwrap_or("")
-  }
-
-  #[inline]
-  pub fn raw_value(&self) -> &str {
-    std::str::from_utf8(self.raw_value_bytes()).unwrap_or("")
-  }
-
-  #[inline]
-  pub(crate) fn write<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-    let (name, raw_value) = self.split_bytes();
-    writer.write_all(b" ")?;
-    writer.write_all(name)?;
-    write_raw_attr_value(writer, raw_value)
-  }
-
-  #[inline]
-  fn split_bytes(&self) -> (&[u8], &[u8]) {
-    if let Some(separator) = self.0.iter().position(|byte| *byte == 0) {
-      (&self.0[..separator], &self.0[separator + 1..])
-    } else {
-      (self.0.as_ref(), &[])
-    }
-  }
-}
-
 #[inline]
 fn write_raw_attr_value<W: std::io::Write>(
   writer: &mut W,
@@ -255,6 +202,48 @@ fn write_raw_attr_value<W: std::io::Write>(
     }
     writer.write_all(b"\"")
   }
+}
+
+#[inline]
+pub(crate) fn write_mc_ignorable_attr<W: std::io::Write>(
+  writer: &mut W,
+  raw_value: &[u8],
+) -> std::io::Result<()> {
+  write_mc_attr(writer, b" mc:Ignorable", raw_value)
+}
+
+#[inline]
+pub(crate) fn write_mc_preserve_attributes_attr<W: std::io::Write>(
+  writer: &mut W,
+  raw_value: &[u8],
+) -> std::io::Result<()> {
+  write_mc_attr(writer, b" mc:PreserveAttributes", raw_value)
+}
+
+#[inline]
+pub(crate) fn write_mc_process_content_attr<W: std::io::Write>(
+  writer: &mut W,
+  raw_value: &[u8],
+) -> std::io::Result<()> {
+  write_mc_attr(writer, b" mc:ProcessContent", raw_value)
+}
+
+#[inline]
+pub(crate) fn write_mc_must_understand_attr<W: std::io::Write>(
+  writer: &mut W,
+  raw_value: &[u8],
+) -> std::io::Result<()> {
+  write_mc_attr(writer, b" mc:MustUnderstand", raw_value)
+}
+
+#[inline]
+pub(crate) fn write_mc_attr<W: std::io::Write>(
+  writer: &mut W,
+  name: &[u8],
+  raw_value: &[u8],
+) -> std::io::Result<()> {
+  writer.write_all(name)?;
+  write_raw_attr_value(writer, raw_value)
 }
 
 #[inline]
@@ -373,6 +362,7 @@ pub(crate) fn part_relationships_directory_path(path: &str) -> String {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::sdk::SdkType;
   use quick_xml::Decoder;
   use quick_xml::events::attributes::Attribute;
 
@@ -415,6 +405,58 @@ mod tests {
     })
     .expect("parse u8");
     assert_eq!(byte, u8::MAX);
+  }
+
+  fn serialize_word_document(xml: &str) -> String {
+    crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document::from_bytes(
+      xml.as_bytes(),
+    )
+    .expect("parse document")
+    .to_xml()
+    .expect("serialize document")
+  }
+
+  #[test]
+  fn word_document_canonicalizes_mc_namespace_aliases() {
+    const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+    for alias in ["ve", "ns1"] {
+      let xml = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:{alias}="{MC}" {alias}:Ignorable="w14"><w:body/></w:document>"#,
+      );
+      let serialized = serialize_word_document(&xml);
+      assert!(serialized.contains(&format!(r#"xmlns:mc="{MC}""#)));
+      assert!(serialized.contains(r#"mc:Ignorable="w14""#));
+      assert!(!serialized.contains(&format!("xmlns:{alias}=")));
+    }
+  }
+
+  #[test]
+  fn word_document_deduplicates_canonical_mc_namespace() {
+    const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+    let xml = format!(
+      r#"<w:document xmlns:w="{W}" xmlns:ve="{MC}" xmlns:mc="{MC}" ve:Ignorable="w14"><w:body/></w:document>"#,
+    );
+
+    let serialized = serialize_word_document(&xml);
+    assert_eq!(serialized.matches("xmlns:mc=").count(), 1);
+    assert!(!serialized.contains("xmlns:ve="));
+    assert!(serialized.contains(r#"mc:Ignorable="w14""#));
+  }
+
+  #[test]
+  fn word_document_does_not_rewrite_alias_with_unrelated_uri() {
+    const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+    let xml = format!(
+      r#"<w:document xmlns:w="{W}" xmlns:ns1="urn:not-mc" xmlns:mc="{MC}" mc:Ignorable="w14"><w:body/></w:document>"#,
+    );
+
+    let serialized = serialize_word_document(&xml);
+    assert!(serialized.contains(r#"xmlns:ns1="urn:not-mc""#));
+    assert_eq!(serialized.matches("xmlns:mc=").count(), 1);
   }
 
   #[cfg(feature = "parts")]

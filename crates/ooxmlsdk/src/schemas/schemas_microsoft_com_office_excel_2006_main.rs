@@ -14,7 +14,10 @@
 )]
 pub struct Macrosheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  /// Revision 6 Unique Identifier
+  #[sdk(attr(qname = "xr6:uid"))]
+  pub xr6_uid: Option<crate::simple_type::StringValue>,
   /// Sheet Properties
   #[sdk(child(qname = "x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<crate::schemas::x::SheetProperties>>,

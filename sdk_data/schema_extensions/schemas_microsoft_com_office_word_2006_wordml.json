@@ -2,11 +2,14 @@
   "Types": [
     {
       "ClassName": "VbaSuppData",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
-      "ClassName": "KeyMapEntry",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "MailMergeRecipients",
+      "HaveMcIgnorable": true
+    },
+    {
+      "ClassName": "KeyMapEntry"
     }
   ]
 }

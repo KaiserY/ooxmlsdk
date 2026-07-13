@@ -725,71 +725,51 @@ pub struct MceContext<'a> {
 }
 
 #[cfg(feature = "mce")]
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct MceContextAttributes<'a> {
+  pub(crate) ignorable: Option<&'a [u8]>,
+  pub(crate) process_content: Option<&'a [u8]>,
+  pub(crate) preserve_attributes: Option<&'a [u8]>,
+  pub(crate) preserve_elements: Option<&'a [u8]>,
+  pub(crate) must_understand: Option<&'a [u8]>,
+}
+
+#[cfg(feature = "mce")]
 impl<'a> MceContext<'a> {
   pub(crate) fn child_context(
     &'a self,
     namespaces: &'a [crate::common::XmlNamespace],
-    attrs: &'a [crate::common::XmlOtherAttr],
+    mce_attrs: MceContextAttributes<'a>,
     settings: &MarkupCompatibilityProcessSettings,
   ) -> Result<Self, crate::common::SdkError> {
     let context = Self {
       parent: Some(self),
       namespaces,
-      ignorable_namespaces: self.current_ignorable_namespaces(namespaces, attrs)?,
-      process_content: mce_attr(attrs, b"ProcessContent")
+      ignorable_namespaces: self.current_ignorable_namespaces(namespaces, mce_attrs.ignorable)?,
+      process_content: mce_attrs
+        .process_content
         .map(|value| MceQNameList::new(self, namespaces, value))
         .transpose()?,
-      preserve_attributes: mce_attr(attrs, b"PreserveAttributes")
+      preserve_attributes: mce_attrs
+        .preserve_attributes
         .map(|value| MceQNameList::new(self, namespaces, value))
         .transpose()?,
-      preserve_elements: mce_attr(attrs, b"PreserveElements")
+      preserve_elements: mce_attrs
+        .preserve_elements
         .map(|value| MceQNameList::new(self, namespaces, value))
         .transpose()?,
     };
 
-    context.validate_must_understand(attrs, settings)?;
+    context.validate_must_understand(mce_attrs.must_understand, settings)?;
     Ok(context)
-  }
-
-  pub(crate) fn process_current_attrs(
-    &self,
-    namespaces: &[crate::common::XmlNamespace],
-    attrs: &mut Vec<crate::common::XmlOtherAttr>,
-  ) -> Result<(), crate::common::SdkError> {
-    let remove_indexes = {
-      let current_ignorable_namespaces = self.current_ignorable_namespaces(namespaces, attrs)?;
-      let current_preserve_attributes = mce_attr(attrs, b"PreserveAttributes")
-        .map(|value| MceQNameList::new(self, namespaces, value))
-        .transpose()?;
-      let current_preserve_attributes = current_preserve_attributes.as_ref();
-      let mut remove_indexes = Vec::new();
-
-      for (index, attr) in attrs.iter().enumerate() {
-        if self.should_remove_ignorable_attribute_with_current_bytes(
-          namespaces,
-          &current_ignorable_namespaces,
-          current_preserve_attributes,
-          attr.name_bytes(),
-        ) {
-          remove_indexes.push(index);
-        }
-      }
-
-      remove_indexes
-    };
-
-    for index in remove_indexes.into_iter().rev() {
-      attrs.remove(index);
-    }
-    Ok(())
   }
 
   fn validate_must_understand(
     &self,
-    attrs: &[crate::common::XmlOtherAttr],
+    mc_must_understand: Option<&[u8]>,
     settings: &MarkupCompatibilityProcessSettings,
   ) -> Result<(), crate::common::SdkError> {
-    if let Some(value) = mce_attr(attrs, b"MustUnderstand") {
+    if let Some(value) = mc_must_understand {
       let prefixes = McePrefixList::new(value)?;
       for prefix in prefixes.prefixes() {
         let Some(ns) = self.namespace_for_prefix_bytes(prefix) else {
@@ -847,22 +827,12 @@ impl<'a> MceContext<'a> {
         .is_some_and(|parent| parent.is_preserved_element_qname_with_current_bytes(&[], qname))
   }
 
-  fn should_remove_ignorable_attribute_with_current_bytes(
-    &self,
-    namespaces: &[crate::common::XmlNamespace],
-    current_ignorable_namespaces: &[&[u8]],
-    current_preserve_attributes: Option<&MceQNameList<'_>>,
-    qname: &[u8],
-  ) -> bool {
-    let Some((namespace, local_name)) = self.qname_parts_with_current_bytes(namespaces, qname)
-    else {
+  pub(crate) fn should_remove_attribute_qname_bytes(&self, qname: &[u8]) -> bool {
+    let Some((namespace, local_name)) = self.qname_parts_with_current_bytes(&[], qname) else {
       return false;
     };
-    let ignorable = self.is_ignorable_namespace_bytes(namespace)
-      || current_ignorable_namespaces.contains(&namespace);
-    let preserved = self.is_preserved_attribute_qname_bytes(namespace, local_name)
-      || current_preserve_attributes.is_some_and(|list| list.contains(namespace, local_name));
-    ignorable && !preserved
+    self.is_ignorable_namespace_bytes(namespace)
+      && !self.is_preserved_attribute_qname_bytes(namespace, local_name)
   }
 
   fn is_preserved_attribute_qname_bytes(&self, namespace: &[u8], local_name: &[u8]) -> bool {
@@ -920,10 +890,10 @@ impl<'a> MceContext<'a> {
   fn current_ignorable_namespaces<'b>(
     &'b self,
     namespaces: &'b [crate::common::XmlNamespace],
-    attrs: &'b [crate::common::XmlOtherAttr],
+    mc_ignorable: Option<&'b [u8]>,
   ) -> Result<Vec<&'b [u8]>, crate::common::SdkError> {
     let mut ignorable_namespaces = Vec::new();
-    if let Some(value) = mce_attr(attrs, b"Ignorable") {
+    if let Some(value) = mc_ignorable {
       let prefixes = McePrefixList::new(value)?;
       for prefix in prefixes.prefixes() {
         if let Some(ns) = self.namespace_for_prefix_with_current_bytes(namespaces, prefix) {
@@ -994,15 +964,6 @@ fn file_format_rank(version: FileFormatVersion) -> u8 {
     FileFormatVersion::Office2021 => 5,
     FileFormatVersion::Microsoft365 => 6,
   }
-}
-
-#[cfg(feature = "mce")]
-fn mce_attr<'a>(attrs: &'a [crate::common::XmlOtherAttr], local_name: &[u8]) -> Option<&'a [u8]> {
-  attrs.iter().find_map(|attr| {
-    let name = attr.name_bytes();
-    (name.strip_prefix(b"mc:") == Some(local_name) || name == local_name)
-      .then_some(attr.raw_value_bytes())
-  })
 }
 
 #[cfg(feature = "mce")]
@@ -4260,12 +4221,15 @@ mod tests {
     };
     let context = super::MceContext::default();
     let namespaces = [crate::common::XmlNamespace::raw(b"p", b"urn:one")];
-    let attrs = [crate::common::XmlOtherAttr::new_raw(
-      b"mc:ProcessContent",
-      b"p:item",
-    )];
     let context = context
-      .child_context(&namespaces, &attrs, &settings)
+      .child_context(
+        &namespaces,
+        super::MceContextAttributes {
+          process_content: Some(b"p:item"),
+          ..Default::default()
+        },
+        &settings,
+      )
       .expect("valid MCE context");
 
     let alias_namespaces = [crate::common::XmlNamespace::raw(b"q", b"urn:one")];

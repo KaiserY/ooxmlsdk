@@ -380,6 +380,7 @@ struct NamespacesInput<'a> {
 
 fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
   let mut prefix_to_uri_arms: Vec<syn::Arm> = vec![];
+  let mut prefix_to_minimum_version_arms: Vec<syn::Arm> = vec![];
   let mut known_namespace_variants: Vec<TokenStream> = vec![];
   let mut seen_uris = HashSet::new();
   let mut seen_prefixes = HashSet::new();
@@ -410,6 +411,12 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
         #( #attrs )*
         #prefix => Some(#uri),
       })?);
+      if !namespace.version.is_empty() {
+        let version = namespace.version.as_str();
+        prefix_to_minimum_version_arms.push(parse2(quote! {
+          #prefix => Some(#version),
+        })?);
+      }
     }
   }
 
@@ -418,6 +425,13 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
       pub(crate) fn uri_by_prefix(prefix: &str) -> Option<&'static str> {
         match prefix {
           #( #prefix_to_uri_arms )*
+          _ => None,
+        }
+      }
+
+      pub(crate) fn minimum_version_by_prefix(prefix: &str) -> Option<&'static str> {
+        match prefix {
+          #( #prefix_to_minimum_version_arms )*
           _ => None,
         }
       }

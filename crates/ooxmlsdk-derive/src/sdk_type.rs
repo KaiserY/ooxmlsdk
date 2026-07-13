@@ -27,6 +27,19 @@ fn extra_xmlns_ident(prefix: &str) -> Ident {
   Ident::new(&ident, Span::call_site())
 }
 
+fn canonical_xmlns_ident(prefix: &str) -> Ident {
+  let mut ident = String::from("has_canonical_xmlns");
+  for byte in prefix.bytes() {
+    if byte.is_ascii_alphanumeric() {
+      ident.push('_');
+      ident.push(byte.to_ascii_lowercase() as char);
+    } else {
+      ident.push('_');
+    }
+  }
+  Ident::new(&ident, Span::call_site())
+}
+
 fn choice_child_read_tokens(
   choice_ty: &Type,
   variant: &Ident,
@@ -74,12 +87,13 @@ fn static_xmlns_attr_tokens(prefix: Option<&str>, uri: &str) -> proc_macro2::Tok
 
 fn canonical_namespace_prefix_tokens(
   prefix_pairs: &[String],
-) -> syn::Result<proc_macro2::TokenStream> {
+) -> syn::Result<(proc_macro2::TokenStream, proc_macro2::TokenStream)> {
   if prefix_pairs.is_empty() {
-    return Ok(quote! {});
+    return Ok((quote! {}, quote! {}));
   }
 
-  let mut arms = Vec::new();
+  let mut mappings = Vec::with_capacity(prefix_pairs.len());
+  let mut targets = Vec::<String>::new();
   for prefix_pair in prefix_pairs {
     let Some((from_prefix, to_prefix)) = prefix_pair.split_once(':') else {
       return Err(syn::Error::new(
@@ -93,17 +107,70 @@ fn canonical_namespace_prefix_tokens(
         format!("canonical_namespace_prefix expects non-empty from:to, got {prefix_pair}"),
       ));
     }
-    let from_lit = LitByteStr::new(from_prefix.as_bytes(), Span::call_site());
-    let to_lit = LitByteStr::new(to_prefix.as_bytes(), Span::call_site());
-    arms.push(quote! { #from_lit => #to_lit, });
+    let Some(target_uri) = namespaces::uri_by_prefix(to_prefix) else {
+      return Err(syn::Error::new(
+        Span::call_site(),
+        format!("unknown canonical namespace prefix {to_prefix}"),
+      ));
+    };
+    if mappings
+      .iter()
+      .any(|(candidate, _, _)| candidate == from_prefix)
+    {
+      return Err(syn::Error::new(
+        Span::call_site(),
+        format!("duplicate canonical namespace source prefix {from_prefix}"),
+      ));
+    }
+    mappings.push((from_prefix.to_string(), to_prefix.to_string(), target_uri));
+    if !targets.iter().any(|candidate| candidate == to_prefix) {
+      targets.push(to_prefix.to_string());
+    }
   }
 
-  Ok(quote! {
-    let declaration_prefix = match declaration_prefix {
-      #(#arms)*
-      _ => declaration_prefix,
-    };
-  })
+  let init_tokens = targets.iter().map(|prefix| {
+    let ident = canonical_xmlns_ident(prefix);
+    quote! { let mut #ident = false; }
+  });
+  let source_arms = mappings.iter().map(|(from_prefix, to_prefix, target_uri)| {
+    let from_lit = LitByteStr::new(from_prefix.as_bytes(), Span::call_site());
+    let to_lit = LitByteStr::new(to_prefix.as_bytes(), Span::call_site());
+    let target_uri_lit = LitByteStr::new(target_uri.as_bytes(), Span::call_site());
+    let seen_ident = canonical_xmlns_ident(to_prefix);
+    quote! {
+      #from_lit if declaration_uri == #target_uri_lit => {
+        if #seen_ident {
+          continue;
+        }
+        #seen_ident = true;
+        #to_lit.as_slice()
+      }
+    }
+  });
+  let target_arms = targets.iter().map(|target_prefix| {
+    let target_lit = LitByteStr::new(target_prefix.as_bytes(), Span::call_site());
+    let seen_ident = canonical_xmlns_ident(target_prefix);
+    quote! {
+      #target_lit => {
+        if #seen_ident {
+          continue;
+        }
+        #seen_ident = true;
+        declaration_prefix
+      }
+    }
+  });
+
+  Ok((
+    quote! { #( #init_tokens )* },
+    quote! {
+      let declaration_prefix = match declaration_prefix {
+        #( #source_arms )*
+        #( #target_arms )*
+        _ => declaration_prefix,
+      };
+    },
+  ))
 }
 
 fn extra_xmlns_tokens(
@@ -1703,6 +1770,82 @@ fn mce_process_child_field_tokens(field: &SdkChildField) -> proc_macro2::TokenSt
   }
 }
 
+fn mce_process_static_attr_field_tokens(
+  field: &SdkAttrField,
+) -> syn::Result<Option<proc_macro2::TokenStream>> {
+  if !field.optional {
+    return Ok(None);
+  }
+
+  let prefix = parse_qname_info(&field.name).tag_prefix;
+  let Some(minimum_version) = namespaces::minimum_version_by_prefix(&prefix) else {
+    return Ok(None);
+  };
+  let target_is_older = match minimum_version {
+    "Office2007" => return Ok(None),
+    "Office2010" => quote! {
+      matches!(
+        settings.target_file_format_version,
+        crate::sdk::FileFormatVersion::Office2007
+      )
+    },
+    "Office2013" => quote! {
+      matches!(
+        settings.target_file_format_version,
+        crate::sdk::FileFormatVersion::Office2007
+          | crate::sdk::FileFormatVersion::Office2010
+      )
+    },
+    "Office2016" => quote! {
+      matches!(
+        settings.target_file_format_version,
+        crate::sdk::FileFormatVersion::Office2007
+          | crate::sdk::FileFormatVersion::Office2010
+          | crate::sdk::FileFormatVersion::Office2013
+      )
+    },
+    "Office2019" => quote! {
+      matches!(
+        settings.target_file_format_version,
+        crate::sdk::FileFormatVersion::Office2007
+          | crate::sdk::FileFormatVersion::Office2010
+          | crate::sdk::FileFormatVersion::Office2013
+          | crate::sdk::FileFormatVersion::Office2016
+      )
+    },
+    "Office2021" => quote! {
+      !matches!(
+        settings.target_file_format_version,
+        crate::sdk::FileFormatVersion::Office2021
+          | crate::sdk::FileFormatVersion::Microsoft365
+      )
+    },
+    "Microsoft365" => quote! {
+      !matches!(
+        settings.target_file_format_version,
+        crate::sdk::FileFormatVersion::Microsoft365
+      )
+    },
+    version => {
+      return Err(syn::Error::new(
+        Span::call_site(),
+        format!("unsupported namespace minimum version {version}"),
+      ));
+    }
+  };
+  let ident = &field.ident;
+  let qname = LitByteStr::new(field.name.as_bytes(), Span::call_site());
+
+  Ok(Some(quote! {
+    if self.#ident.is_some()
+      && #target_is_older
+      && context.should_remove_attribute_qname_bytes(#qname)
+    {
+      self.#ident = None;
+    }
+  }))
+}
+
 fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStream {
   let ident = &field.ident;
   let choice_ty = unwrap_option_vec_type(&field.ty);
@@ -1999,7 +2142,11 @@ fn mce_xml_other_children_process_tokens(
 
 fn mce_context_scope_tokens(
   xmlns_fields: &[Ident],
-  xml_other_attrs_field: Option<&Ident>,
+  mc_ignorable_field: Option<&Ident>,
+  mc_process_content_field: Option<&Ident>,
+  mc_preserve_attributes_field: Option<&Ident>,
+  mc_preserve_elements_field: Option<&Ident>,
+  mc_must_understand_field: Option<&Ident>,
 ) -> (
   proc_macro2::TokenStream,
   proc_macro2::TokenStream,
@@ -2010,26 +2157,55 @@ fn mce_context_scope_tokens(
   } else {
     quote! { &[] as &[crate::common::XmlNamespace] }
   };
-  let attrs_expr = if let Some(ident) = xml_other_attrs_field {
-    quote! { self.#ident.as_slice() }
+  let mc_ignorable_expr = if let Some(ident) = mc_ignorable_field {
+    quote! { self.#ident.as_deref() }
   } else {
-    quote! { &[] as &[crate::common::XmlOtherAttr] }
+    quote! { None }
+  };
+  let mc_process_content_expr = if let Some(ident) = mc_process_content_field {
+    quote! { self.#ident.as_deref() }
+  } else {
+    quote! { None }
+  };
+  let mc_preserve_attributes_expr = if let Some(ident) = mc_preserve_attributes_field {
+    quote! { self.#ident.as_deref() }
+  } else {
+    quote! { None }
+  };
+  let mc_preserve_elements_expr = if let Some(ident) = mc_preserve_elements_field {
+    quote! { self.#ident.as_deref() }
+  } else {
+    quote! { None }
+  };
+  let mc_must_understand_expr = if let Some(ident) = mc_must_understand_field {
+    quote! { self.#ident.as_deref() }
+  } else {
+    quote! { None }
   };
 
-  if xmlns_fields.is_empty() && xml_other_attrs_field.is_none() {
+  if xmlns_fields.is_empty()
+    && mc_ignorable_field.is_none()
+    && mc_process_content_field.is_none()
+    && mc_preserve_attributes_field.is_none()
+    && mc_preserve_elements_field.is_none()
+    && mc_must_understand_field.is_none()
+  {
     (quote! {}, quote! {}, quote! {})
   } else {
-    let process_attrs_tokens = if let Some(ident) = xml_other_attrs_field {
-      quote! {
-        context.process_current_attrs(#xmlns_expr, &mut self.#ident)?;
-      }
-    } else {
-      quote! {}
-    };
     (
-      process_attrs_tokens,
+      quote! {},
       quote! {
-        let __mce_context = context.child_context(#xmlns_expr, #attrs_expr, settings)?;
+        let __mce_context = context.child_context(
+          #xmlns_expr,
+          crate::sdk::MceContextAttributes {
+            ignorable: #mc_ignorable_expr,
+            process_content: #mc_process_content_expr,
+            preserve_attributes: #mc_preserve_attributes_expr,
+            preserve_elements: #mc_preserve_elements_expr,
+            must_understand: #mc_must_understand_expr,
+          },
+          settings,
+        )?;
         let context = &__mce_context;
       },
       quote! {},
@@ -3640,7 +3816,7 @@ fn expand_named_struct(
   let (extra_xmlns_init_tokens, extra_xmlns_mark_tokens, extra_xmlns_write_tokens) =
     extra_xmlns_tokens(&extra_xmlns)?;
   let canonical_namespace_prefixes = parse_sdk_canonical_namespace_prefixes(&input.attrs)?;
-  let canonical_namespace_prefix_tokens =
+  let (canonical_namespace_prefix_init_tokens, canonical_namespace_prefix_tokens) =
     canonical_namespace_prefix_tokens(&canonical_namespace_prefixes)?;
   let start_tag_open = write_start_tag_open_tokens(schema_qname, no_prefix);
   let end_tag = write_end_tag_tokens(schema_qname, no_prefix);
@@ -3655,7 +3831,11 @@ fn expand_named_struct(
   let mut any_fields = Vec::new();
   let mut text_field = None;
   let mut xmlns_fields = Vec::new();
-  let mut xml_other_attrs_field = None;
+  let mut mc_ignorable_field = None;
+  let mut mc_preserve_attributes_field = None;
+  let mut mc_preserve_elements_field = None;
+  let mut mc_process_content_field = None;
+  let mut mc_must_understand_field = None;
   let mut xml_other_children_field = None;
   let mut compact_xml_other_children = false;
   let mut ordered_field_specs = Vec::new();
@@ -3669,8 +3849,24 @@ fn expand_named_struct(
       xmlns_fields.push(field_ident.clone());
       continue;
     }
-    if field_ident == "xml_other_attrs" {
-      xml_other_attrs_field = Some(field_ident.clone());
+    if field_ident == "mc_ignorable" {
+      mc_ignorable_field = Some(field_ident.clone());
+      continue;
+    }
+    if field_ident == "mc_preserve_attributes" {
+      mc_preserve_attributes_field = Some(field_ident.clone());
+      continue;
+    }
+    if field_ident == "mc_preserve_elements" {
+      mc_preserve_elements_field = Some(field_ident.clone());
+      continue;
+    }
+    if field_ident == "mc_process_content" {
+      mc_process_content_field = Some(field_ident.clone());
+      continue;
+    }
+    if field_ident == "mc_must_understand" {
+      mc_must_understand_field = Some(field_ident.clone());
       continue;
     }
     if field_ident == "xml_other_children" {
@@ -3780,7 +3976,16 @@ fn expand_named_struct(
   }
 
   let has_xmlns_fields = !xmlns_fields.is_empty();
-  let has_xml_other_attrs_field = xml_other_attrs_field.is_some();
+  let has_mc_ignorable_field = mc_ignorable_field.is_some();
+  let has_mc_preserve_attributes_field = mc_preserve_attributes_field.is_some();
+  let has_mc_preserve_elements_field = mc_preserve_elements_field.is_some();
+  let has_mc_process_content_field = mc_process_content_field.is_some();
+  let has_mc_must_understand_field = mc_must_understand_field.is_some();
+  let has_mc_fields = has_mc_ignorable_field
+    || has_mc_preserve_attributes_field
+    || has_mc_preserve_elements_field
+    || has_mc_process_content_field
+    || has_mc_must_understand_field;
   let has_xml_other_children_field = xml_other_children_field.is_some();
   let needs_canonical_xmlns_prefix = !canonical_namespace_prefixes.is_empty();
   let end_name_matches = quote! { e.name() == __end_qname };
@@ -4162,73 +4367,161 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let xml_other_attrs_parse_tokens = if has_xml_other_attrs_field {
+  let mc_ignorable_parse_tokens = has_mc_ignorable_field.then(|| {
     quote! {
-      key => {
-        xml_other_attrs.push(crate::common::XmlOtherAttr::new_raw(key, attr.value.as_ref()));
+      b"mc:Ignorable" => { mc_ignorable = Some(attr.value.as_ref().into()); }
+    }
+  });
+  let mc_preserve_attributes_parse_tokens = has_mc_preserve_attributes_field.then(|| {
+    quote! {
+      b"mc:PreserveAttributes" => {
+        mc_preserve_attributes = Some(attr.value.as_ref().into());
+      }
+    }
+  });
+  let mc_preserve_elements_parse_tokens = has_mc_preserve_elements_field.then(|| {
+    quote! {
+      b"mc:PreserveElements" => {
+        mc_preserve_elements = Some(attr.value.as_ref().into());
+      }
+    }
+  });
+  let mc_process_content_parse_tokens = has_mc_process_content_field.then(|| {
+    quote! {
+      b"mc:ProcessContent" => {
+        mc_process_content = Some(attr.value.as_ref().into());
+      }
+    }
+  });
+  let mc_must_understand_parse_tokens = has_mc_must_understand_field.then(|| {
+    quote! {
+      b"mc:MustUnderstand" => {
+        mc_must_understand = Some(attr.value.as_ref().into());
+      }
+    }
+  });
+  let mc_ignorable_local_parse_tokens = has_mc_ignorable_field.then(|| {
+    quote! {
+      b"Ignorable" => { mc_ignorable = Some(attr.value.as_ref().into()); }
+    }
+  });
+  let mc_preserve_attributes_local_parse_tokens = has_mc_preserve_attributes_field.then(|| {
+    quote! {
+      b"PreserveAttributes" => {
+        mc_preserve_attributes = Some(attr.value.as_ref().into());
+      }
+    }
+  });
+  let mc_preserve_elements_local_parse_tokens = has_mc_preserve_elements_field.then(|| {
+    quote! {
+      b"PreserveElements" => {
+        mc_preserve_elements = Some(attr.value.as_ref().into());
+      }
+    }
+  });
+  let mc_process_content_local_parse_tokens = has_mc_process_content_field.then(|| {
+    quote! {
+      b"ProcessContent" => {
+        mc_process_content = Some(attr.value.as_ref().into());
+      }
+    }
+  });
+  let mc_must_understand_local_parse_tokens = has_mc_must_understand_field.then(|| {
+    quote! {
+      b"MustUnderstand" => {
+        mc_must_understand = Some(attr.value.as_ref().into());
+      }
+    }
+  });
+  let unknown_attr_parse_tokens = if has_mc_fields {
+    quote! {
+      #mc_ignorable_parse_tokens
+      #mc_preserve_attributes_parse_tokens
+      #mc_preserve_elements_parse_tokens
+      #mc_process_content_parse_tokens
+      #mc_must_understand_parse_tokens
+      key => match crate::common::xml_local_name(quick_xml::name::QName(key)) {
+        #mc_ignorable_local_parse_tokens
+        #mc_preserve_attributes_local_parse_tokens
+        #mc_preserve_elements_local_parse_tokens
+        #mc_process_content_local_parse_tokens
+        #mc_must_understand_local_parse_tokens
+        _ => {}
       }
     }
   } else {
     quote! { _ => {} }
   };
-  let namespace_attr_parse_tokens =
-    if attr_fields.is_empty() && !has_xmlns_fields && !has_xml_other_attrs_field {
+  let mc_ignorable_decl_tokens = has_mc_ignorable_field.then(|| {
+    quote! {
+      let mut mc_ignorable = None::<std::boxed::Box<[u8]>>;
+    }
+  });
+  let mc_preserve_attributes_decl_tokens = has_mc_preserve_attributes_field.then(|| {
+    quote! {
+      let mut mc_preserve_attributes = None::<std::boxed::Box<[u8]>>;
+    }
+  });
+  let mc_preserve_elements_decl_tokens = has_mc_preserve_elements_field.then(|| {
+    quote! {
+      let mut mc_preserve_elements = None::<std::boxed::Box<[u8]>>;
+    }
+  });
+  let mc_process_content_decl_tokens = has_mc_process_content_field.then(|| {
+    quote! {
+      let mut mc_process_content = None::<std::boxed::Box<[u8]>>;
+    }
+  });
+  let mc_must_understand_decl_tokens = has_mc_must_understand_field.then(|| {
+    quote! {
+      let mut mc_must_understand = None::<std::boxed::Box<[u8]>>;
+    }
+  });
+  let namespace_attr_parse_tokens = if attr_fields.is_empty() && !has_xmlns_fields && !has_mc_fields
+  {
+    quote! {}
+  } else {
+    let decoder_decl_tokens = if attr_fields.is_empty() {
       quote! {}
     } else {
-      let decoder_decl_tokens = if attr_fields.is_empty() {
-        quote! {}
-      } else {
-        quote! { let decoder = xml_reader.decoder(); }
-      };
-      match (has_xmlns_fields, has_xml_other_attrs_field) {
-        (true, true) => quote! {
-          let mut xmlns = Vec::<crate::common::XmlNamespace>::new();
-          let mut xml_other_attrs = Vec::<crate::common::XmlOtherAttr>::new();
-          #decoder_decl_tokens
-          for attr in e.attributes().with_checks(false) {
-            let attr = attr?;
-              match attr.key.as_ref() {
-                #xmlns_parse_tokens
-                #( #attr_parse_tokens )*
-                #xml_other_attrs_parse_tokens
-            }
-          }
-        },
-        (true, false) => quote! {
-          let mut xmlns = Vec::<crate::common::XmlNamespace>::new();
-          #decoder_decl_tokens
-          for attr in e.attributes().with_checks(false) {
-            let attr = attr?;
-            match attr.key.as_ref() {
-              #xmlns_parse_tokens
-              #( #attr_parse_tokens )*
-              _ => {}
-            }
-          }
-        },
-        (false, true) => quote! {
-          let mut xml_other_attrs = Vec::<crate::common::XmlOtherAttr>::new();
-          #decoder_decl_tokens
-          for attr in e.attributes().with_checks(false) {
-            let attr = attr?;
-            match attr.key.as_ref() {
-              #( #attr_parse_tokens )*
-              #xml_other_attrs_parse_tokens
-            }
-          }
-        },
-        (false, false) => quote! {
-          #decoder_decl_tokens
-          for attr in e.attributes().with_checks(false) {
-            let attr = attr?;
-            match attr.key.as_ref() {
-              #( #attr_parse_tokens )*
-              _ => {}
-            }
-          }
-        },
-      }
+      quote! { let decoder = xml_reader.decoder(); }
     };
+    if has_xmlns_fields {
+      quote! {
+        let mut xmlns = Vec::<crate::common::XmlNamespace>::new();
+        #mc_ignorable_decl_tokens
+        #mc_preserve_attributes_decl_tokens
+        #mc_preserve_elements_decl_tokens
+        #mc_process_content_decl_tokens
+        #mc_must_understand_decl_tokens
+        #decoder_decl_tokens
+        for attr in e.attributes().with_checks(false) {
+          let attr = attr?;
+          match attr.key.as_ref() {
+            #xmlns_parse_tokens
+            #( #attr_parse_tokens )*
+            #unknown_attr_parse_tokens
+          }
+        }
+      }
+    } else {
+      quote! {
+        #mc_ignorable_decl_tokens
+        #mc_preserve_attributes_decl_tokens
+        #mc_preserve_elements_decl_tokens
+        #mc_process_content_decl_tokens
+        #mc_must_understand_decl_tokens
+        #decoder_decl_tokens
+        for attr in e.attributes().with_checks(false) {
+          let attr = attr?;
+          match attr.key.as_ref() {
+            #( #attr_parse_tokens )*
+            #unknown_attr_parse_tokens
+          }
+        }
+      }
+    }
+  };
   let mut child_match_tokens_borrowed =
     std::collections::BTreeMap::<String, Vec<QNameDispatchArm>>::new();
   let mut child_decl_tokens = Vec::new();
@@ -5603,7 +5896,20 @@ fn expand_named_struct(
         self.#field_ident = #field_ident;
       });
     }
-    if let Some(field_ident) = &xml_other_attrs_field {
+    if let Some(field_ident) = &mc_ignorable_field {
+      tokens.push(quote! {
+        self.#field_ident = #field_ident;
+      });
+    }
+    for field_ident in [
+      &mc_preserve_attributes_field,
+      &mc_preserve_elements_field,
+      &mc_process_content_field,
+      &mc_must_understand_field,
+    ]
+    .into_iter()
+    .flatten()
+    {
       tokens.push(quote! {
         self.#field_ident = #field_ident;
       });
@@ -6147,6 +6453,7 @@ fn expand_named_struct(
       let fixed_xmlns_tokens = static_xmlns_attr_tokens(None, fixed_namespace_uri);
       quote! {
         #extra_xmlns_init_tokens
+        #canonical_namespace_prefix_init_tokens
         let mut has_default_xmlns = false;
         for declaration in &self.xmlns {
           let (declaration_prefix, declaration_uri) = declaration.parts();
@@ -6167,6 +6474,7 @@ fn expand_named_struct(
     } else if needs_canonical_xmlns_prefix {
       quote! {
         #extra_xmlns_init_tokens
+        #canonical_namespace_prefix_init_tokens
         for declaration in &self.xmlns {
           let (declaration_prefix, declaration_uri) = declaration.parts();
           if declaration_prefix.is_empty() {
@@ -6226,15 +6534,43 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let xml_other_attrs_write_tokens = if has_xml_other_attrs_field {
+  let mc_ignorable_write_tokens = if has_mc_ignorable_field {
     quote! {
-      for attr in &self.xml_other_attrs {
-        attr.write(writer)?;
+      if let Some(value) = &self.mc_ignorable {
+        crate::common::write_mc_ignorable_attr(writer, value.as_ref())?;
       }
     }
   } else {
     quote! {}
   };
+  let mc_preserve_attributes_write_tokens = has_mc_preserve_attributes_field.then(|| {
+    quote! {
+      if let Some(value) = &self.mc_preserve_attributes {
+        crate::common::write_mc_preserve_attributes_attr(writer, value.as_ref())?;
+      }
+    }
+  });
+  let mc_preserve_elements_write_tokens = has_mc_preserve_elements_field.then(|| {
+    quote! {
+      if let Some(value) = &self.mc_preserve_elements {
+        crate::common::write_mc_attr(writer, b" mc:PreserveElements", value.as_ref())?;
+      }
+    }
+  });
+  let mc_process_content_write_tokens = has_mc_process_content_field.then(|| {
+    quote! {
+      if let Some(value) = &self.mc_process_content {
+        crate::common::write_mc_process_content_attr(writer, value.as_ref())?;
+      }
+    }
+  });
+  let mc_must_understand_write_tokens = has_mc_must_understand_field.then(|| {
+    quote! {
+      if let Some(value) = &self.mc_must_understand {
+        crate::common::write_mc_must_understand_attr(writer, value.as_ref())?;
+      }
+    }
+  });
   let special_namespace_init_tokens = if has_xmlns_fields {
     quote! {
       xmlns,
@@ -6242,13 +6578,21 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let xml_other_attrs_init_tokens = if has_xml_other_attrs_field {
+  let mc_ignorable_init_tokens = if has_mc_ignorable_field {
     quote! {
-      xml_other_attrs,
+      mc_ignorable,
     }
   } else {
     quote! {}
   };
+  let mc_preserve_attributes_init_tokens =
+    has_mc_preserve_attributes_field.then(|| quote! { mc_preserve_attributes, });
+  let mc_preserve_elements_init_tokens =
+    has_mc_preserve_elements_field.then(|| quote! { mc_preserve_elements, });
+  let mc_process_content_init_tokens =
+    has_mc_process_content_field.then(|| quote! { mc_process_content, });
+  let mc_must_understand_init_tokens =
+    has_mc_must_understand_field.then(|| quote! { mc_must_understand, });
   let xml_other_children_decl_tokens = if has_xml_other_children_field {
     if compact_xml_other_children {
       quote! {
@@ -6301,6 +6645,13 @@ fn expand_named_struct(
   } else {
     quote! { self.write_inner(writer)? }
   };
+  let mce_static_attr_process_tokens = attr_fields
+    .iter()
+    .map(mce_process_static_attr_field_tokens)
+    .collect::<syn::Result<Vec<_>>>()?
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
   let mce_child_process_tokens = child_fields
     .iter()
     .map(mce_process_child_field_tokens)
@@ -6319,8 +6670,15 @@ fn expand_named_struct(
         .then(|| mce_choice_impl_tokens(field))
     })
     .collect::<Vec<_>>();
-  let (mce_context_push_tokens, mce_xml_other_attrs_process_tokens, mce_context_pop_tokens) =
-    mce_context_scope_tokens(&xmlns_fields, xml_other_attrs_field.as_ref());
+  let (mce_context_push_tokens, mce_context_process_tokens, mce_context_pop_tokens) =
+    mce_context_scope_tokens(
+      &xmlns_fields,
+      mc_ignorable_field.as_ref(),
+      mc_process_content_field.as_ref(),
+      mc_preserve_attributes_field.as_ref(),
+      mc_preserve_elements_field.as_ref(),
+      mc_must_understand_field.as_ref(),
+    );
   let mce_xml_other_children_process_tokens =
     mce_xml_other_children_process_tokens(has_xml_other_children_field, compact_xml_other_children);
   let public_root_from_str_tokens = if local_name.is_empty() {
@@ -6376,7 +6734,11 @@ fn expand_named_struct(
       #text_finish_tokens
       #( #attr_finish_tokens, )*
       #special_namespace_init_tokens
-      #xml_other_attrs_init_tokens
+      #mc_ignorable_init_tokens
+      #mc_preserve_attributes_init_tokens
+      #mc_preserve_elements_init_tokens
+      #mc_process_content_init_tokens
+      #mc_must_understand_init_tokens
       #xml_other_children_init_tokens
     })
   };
@@ -6542,7 +6904,11 @@ fn expand_named_struct(
         ) -> Result<(), std::io::Error> {
           #special_namespace_write_tokens
           #( #attr_write_tokens )*
-          #xml_other_attrs_write_tokens
+          #mc_ignorable_write_tokens
+          #mc_preserve_attributes_write_tokens
+          #mc_preserve_elements_write_tokens
+          #mc_process_content_write_tokens
+          #mc_must_understand_write_tokens
           #stack_start_body
         }
 
@@ -6570,7 +6936,11 @@ fn expand_named_struct(
   let write_inner_body = write_inner_body_tokens(quote! {
     #special_namespace_write_tokens
     #( #attr_write_tokens )*
-    #xml_other_attrs_write_tokens
+    #mc_ignorable_write_tokens
+    #mc_preserve_attributes_write_tokens
+    #mc_preserve_elements_write_tokens
+    #mc_process_content_write_tokens
+    #mc_must_understand_write_tokens
     #body_write_tokens
   });
   let as_ref_self_impl_tokens = as_ref_self_impl_tokens(
@@ -6583,7 +6953,11 @@ fn expand_named_struct(
     let write_inner_no_prefix_body = write_inner_body_tokens(quote! {
       #special_namespace_write_tokens
       #( #attr_write_tokens )*
-      #xml_other_attrs_write_tokens
+      #mc_ignorable_write_tokens
+      #mc_preserve_attributes_write_tokens
+      #mc_preserve_elements_write_tokens
+      #mc_process_content_write_tokens
+      #mc_must_understand_write_tokens
       #body_write_no_prefix_tokens
     });
     quote! {
@@ -6658,7 +7032,8 @@ fn expand_named_struct(
           return Ok(());
         }
         #mce_context_push_tokens
-        #mce_xml_other_attrs_process_tokens
+        #mce_context_process_tokens
+        #( #mce_static_attr_process_tokens )*
         #mce_xml_other_children_process_tokens
         #( #mce_child_process_tokens )*
         #( #mce_choice_process_tokens )*

@@ -1,8 +1,7 @@
 {
   "Types": [
     {
-      "ClassName": "TextBoxInfo2",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "TextBoxInfo2"
     },
     {
       "ClassName": "WordprocessingShape",

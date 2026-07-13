@@ -1496,7 +1496,6 @@ pub struct ContentPart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w14:docId")]
 pub struct DocumentId {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// val
   #[sdk(attr(qname = "w14:val"))]
   #[sdk(string_length(source = 2u32, union = 0u64, min = 4u32, max = 4u32))]

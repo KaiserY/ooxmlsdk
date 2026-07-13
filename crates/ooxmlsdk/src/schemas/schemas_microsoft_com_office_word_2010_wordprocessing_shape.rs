@@ -184,7 +184,6 @@ pub struct ShapeStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wps:txbx")]
 pub struct TextBoxInfo2 {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// id
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::UInt16Value>,

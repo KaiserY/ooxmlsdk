@@ -3898,9 +3898,33 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
     });
   }
 
-  if support.have_xml_other_attrs {
+  if support.have_mc_ignorable {
     fields.push(quote! {
-      pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+      pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+    });
+  }
+
+  if support.have_mc_preserve_attributes {
+    fields.push(quote! {
+      pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+    });
+  }
+
+  if support.have_mc_preserve_elements {
+    fields.push(quote! {
+      pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
+    });
+  }
+
+  if support.have_mc_process_content {
+    fields.push(quote! {
+      pub mc_process_content: Option<std::boxed::Box<[u8]>>,
+    });
+  }
+
+  if support.have_mc_must_understand {
+    fields.push(quote! {
+      pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
     });
   }
 
@@ -4488,7 +4512,7 @@ fn can_alias_raw_children_leaf_decl(type_decl: &TypeDecl, attr_fields: &[&FieldD
     && type_decl.members.is_empty()
     && type_decl.xml_content.is_none()
     && !type_decl.support.have_xmlns_fields
-    && !type_decl.support.have_xml_other_attrs
+    && !type_decl.support.has_mce_attributes()
     && type_decl.support.have_xml_other_children
     && type_decl.support.xml_header == crate::sdk_code::codegen_ir::XmlHeaderMode::None
 }
@@ -4509,7 +4533,7 @@ fn should_emit_schema_type_decl(type_decl: &TypeDecl) -> bool {
     || (type_decl.kind == TypeKind::ElementStruct
       && type_decl.element_kind == Some(ElementKind::LeafText)
       && type_decl.xml_content.is_some()
-      && type_decl.support.have_xml_other_attrs)
+      && type_decl.support.has_mce_attributes())
 }
 
 fn is_any_children_alias_type_ref(
@@ -4561,6 +4585,11 @@ fn child_kind_for_schema_type(schema_type: &SchemaType) -> SchemaTypeChildKind {
   if schema_type.base_class == "OpenXmlLeafTextElement"
     && schema_type.attributes.is_empty()
     && !schema_type.have_xmlns_fields
+    && !schema_type.have_mc_ignorable
+    && !schema_type.have_mc_preserve_attributes
+    && !schema_type.have_mc_preserve_elements
+    && !schema_type.have_mc_process_content
+    && !schema_type.have_mc_must_understand
   {
     SchemaTypeChildKind::TextChild
   } else {
@@ -4737,7 +4766,6 @@ mod tests {
     assert!(!generated.contains("pub struct StyleMatrixReferenceType"));
     assert!(!generated.contains("pub enum StyleMatrixReferenceTypeChoice"));
     assert!(generated.contains("pub struct FillReference"));
-    assert!(generated.contains("pub xml_other_attrs : Vec < crate :: common :: XmlOtherAttr >"));
     assert!(
       generated.contains("pub xml_other_children : Vec < (usize , std :: boxed :: Box < [u8] >) >")
     );

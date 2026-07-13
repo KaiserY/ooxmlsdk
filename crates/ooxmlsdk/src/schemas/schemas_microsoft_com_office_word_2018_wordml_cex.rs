@@ -9,7 +9,7 @@
 #[sdk(xml_header, qname = "w16cex:commentsExtensible")]
 pub struct CommentsExtensible {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Defines the CommentExtensible Class.
   #[sdk(child(qname = "w16cex:commentExtensible"))]
   pub comment_extensible: Vec<CommentExtensible>,

@@ -581,7 +581,6 @@ pub struct ImageData {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(canonical_namespace_prefix("wvml:w10"), qname = "v:shape")]
 pub struct Shape {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -751,6 +750,9 @@ pub struct Shape {
   /// Storage for Alternate Math Content
   #[sdk(attr(qname = ":equationxml"))]
   pub equation_xml: Option<crate::simple_type::StringValue>,
+  /// Word 2010 Anchor Identifier
+  #[sdk(attr(qname = "w14:anchorId"))]
+  pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(
         choice(
             child(variant = Path, boxed, qname = "v:path"),
@@ -787,7 +789,6 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:shapetype")]
 pub struct Shapetype {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -951,6 +952,9 @@ pub struct Shapetype {
   /// Master Element Toggle
   #[sdk(attr(qname = "o:master"))]
   pub master: Option<crate::simple_type::StringValue>,
+  /// Word 2010 Anchor Identifier
+  #[sdk(attr(qname = "w14:anchorId"))]
+  pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(
         choice(
             child(variant = Path, boxed, qname = "v:path"),
@@ -987,7 +991,6 @@ pub struct Shapetype {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:group")]
 pub struct Group {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -1090,6 +1093,9 @@ pub struct Group {
   /// Table Row Height Limits
   #[sdk(attr(qname = "o:tablelimits"))]
   pub table_limits: Option<crate::simple_type::StringValue>,
+  /// Word 2010 Anchor Identifier
+  #[sdk(attr(qname = "w14:anchorId"))]
+  pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(
         choice(
             child(variant = Group, boxed, qname = "v:group"),
@@ -1762,7 +1768,6 @@ pub struct ImageFile {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:line")]
 pub struct Line {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -1926,6 +1931,9 @@ pub struct Line {
   /// Line End Point
   #[sdk(attr(qname = ":to"))]
   pub to: Option<crate::simple_type::StringValue>,
+  /// Word 2010 Anchor Identifier
+  #[sdk(attr(qname = "w14:anchorId"))]
+  pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(
         choice(
             child(variant = Path, boxed, qname = "v:path"),
@@ -1959,7 +1967,6 @@ pub struct Line {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:oval")]
 pub struct Oval {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -2117,6 +2124,12 @@ pub struct Oval {
   /// Encoded Package
   #[sdk(attr(qname = "o:gfxdata"))]
   pub o_gfxdata: Option<crate::simple_type::Base64BinaryValue>,
+  /// Word 2010 Anchor Identifier
+  #[sdk(attr(qname = "w14:anchorId"))]
+  pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
+  /// Wordprocessing Drawing 2010 Anchor Identifier
+  #[sdk(attr(qname = "wp14:anchorId"))]
+  pub wp14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(
         choice(
             child(variant = Path, boxed, qname = "v:path"),
@@ -2344,7 +2357,6 @@ pub struct PolyLine {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:rect")]
 pub struct Rectangle {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -2502,6 +2514,15 @@ pub struct Rectangle {
   /// Encoded Package
   #[sdk(attr(qname = "o:gfxdata"))]
   pub o_gfxdata: Option<crate::simple_type::Base64BinaryValue>,
+  /// Shape Type Reference
+  #[sdk(attr(qname = ":type"))]
+  pub r#type: Option<crate::simple_type::StringValue>,
+  /// Word 2010 Anchor Identifier
+  #[sdk(attr(qname = "w14:anchorId"))]
+  pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
+  /// Wordprocessing Drawing 2010 Anchor Identifier
+  #[sdk(attr(qname = "wp14:anchorId"))]
+  pub wp14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(
         choice(
             child(variant = Path, boxed, qname = "v:path"),
@@ -2693,6 +2714,9 @@ pub struct RoundRectangle {
   /// Rounded Corner Arc Size
   #[sdk(attr(qname = ":arcsize"))]
   pub arc_size: Option<crate::simple_type::StringValue>,
+  /// Word 2010 Anchor Identifier
+  #[sdk(attr(qname = "w14:anchorId"))]
+  pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(
         choice(
             child(variant = Path, boxed, qname = "v:path"),

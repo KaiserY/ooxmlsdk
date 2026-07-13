@@ -183,7 +183,11 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               ty.name.as_str(),
               &mut children,
             );
-            let have_xml_other_attrs = false;
+            let have_mc_ignorable = false;
+            let have_mc_preserve_attributes = false;
+            let have_mc_preserve_elements = false;
+            let have_mc_process_content = false;
+            let have_mc_must_understand = false;
             let have_xmlns_fields = ty.has_xmlns_fields
               || !ty.part.is_empty()
               || ty.base_class == "OpenXmlPartRootElement";
@@ -209,7 +213,11 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               xml_header,
               is_abstract: ty.is_abstract,
               have_xmlns_fields,
-              have_xml_other_attrs,
+              have_mc_ignorable,
+              have_mc_preserve_attributes,
+              have_mc_preserve_elements,
+              have_mc_process_content,
+              have_mc_must_understand,
               have_xml_other_children,
               have_direct_xml_other_children,
               extra_xmlns: Vec::new(),

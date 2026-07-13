@@ -173,7 +173,7 @@ pub struct RichStylesheet {
 #[sdk(no_prefix_only, xml_header, qname = "xlrd2:rvTypesInfo")]
 pub struct RichValueTypesInfo {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Defines the RichValueGlobalType Class.
   #[sdk(child(qname = "xlrd2:global"))]
   pub rich_value_global_type: Option<std::boxed::Box<RichValueGlobalType>>,

@@ -2271,7 +2271,7 @@ pub struct RgbColorModelPercentage {
 #[sdk(qname = "a:srgbClr")]
 pub struct RgbColorModelHex {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(string_length(min = 3u32, max = 3u32))]
@@ -2924,7 +2924,12 @@ pub struct ColorReplacement {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:duotone")]
 pub struct Duotone {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  /// xfr1
+  #[sdk(attr(qname = "xfr1"))]
+  pub xfr1: Option<crate::simple_type::StringValue>,
+  /// xfr2
+  #[sdk(attr(qname = "xfr2"))]
+  pub xfr2: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
@@ -4392,7 +4397,7 @@ pub struct Blip {
 #[sdk(xml_header, qname = "a:theme")]
 pub struct Theme {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
@@ -7095,7 +7100,6 @@ pub struct TableStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:tblStyle")]
 pub struct TableStyleEntry {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Style ID
   #[sdk(attr(qname = ":styleId"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]

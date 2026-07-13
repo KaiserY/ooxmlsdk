@@ -53,7 +53,7 @@ pub struct CoreProperties {
   #[sdk(text_child(qname = "cp:revision"))]
   pub revision: Option<Revision>,
   /// dc:subject
-  #[sdk(child(qname = "dc:subject"))]
+  #[sdk(text_child(qname = "dc:subject"))]
   pub subject: Option<Subject>,
   /// dc:title
   #[sdk(text_child(qname = "dc:title"))]
@@ -115,13 +115,7 @@ pub struct Modified {
 /// cp:revision
 pub type Revision = crate::simple_type::StringValue;
 /// dc:subject
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dc:subject")]
-pub struct Subject {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub type Subject = crate::simple_type::StringValue;
 /// dc:title
 pub type Title = crate::simple_type::StringValue;
 /// cp:version

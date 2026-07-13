@@ -120,6 +120,10 @@
   ],
   "Types": [
     {
+      "ClassName": "Text",
+      "HaveMcIgnorable": false
+    },
+    {
       "ClassName": "DocDefaults",
       "HaveXmlnsFields": true
     },
@@ -129,7 +133,7 @@
     },
     {
       "ClassName": "Comments",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "ConditionalFormatStyle",
@@ -186,9 +190,23 @@
     },
     {
       "ClassName": "Document",
-      "HaveXmlOtherAttrs": true,
+      "HaveMcIgnorable": true,
+      "HaveMcPreserveAttributes": true,
+      "HaveMcProcessContent": true,
+      "HaveMcMustUnderstand": true,
       "CanonicalNamespacePrefixes": [
-        "ns2:r"
+        "ns2:r",
+        "ve:mc",
+        "ns1:mc"
+      ],
+      "Attributes": [
+        {
+          "QName": "xml:space",
+          "PropertyName": "Space",
+          "PropertyComments": "Content Contains Significant Whitespace",
+          "Optional": true,
+          "OverrideType": "EnumValue<DocumentFormat.OpenXml.SpaceProcessingModeValues>"
+        }
       ]
     },
     {
@@ -232,11 +250,11 @@
     },
     {
       "ClassName": "Drawing",
-      "HaveXmlOtherAttrs": true
+      "HaveMcMustUnderstand": true
     },
     {
       "ClassName": "Endnotes",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "FieldData",
@@ -264,7 +282,7 @@
     },
     {
       "ClassName": "Fonts",
-      "HaveXmlOtherAttrs": true,
+      "HaveMcIgnorable": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
@@ -278,23 +296,23 @@
     },
     {
       "ClassName": "Footnotes",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "Footer",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "GlossaryDocument",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "Header",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "Numbering",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "PreviousTableProperties",
@@ -492,7 +510,20 @@
     {
       "ClassName": "Paragraph",
       "HaveXmlnsFields": true,
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "PropertyName": "TextId",
+          "MatchLocalName": true
+        },
+        {
+          "QName": "w14:editId",
+          "PropertyName": "W14EditId",
+          "PropertyComments": "Legacy paragraph edit identifier",
+          "Version": "Office2010",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "ParagraphPropertiesChange",
@@ -537,17 +568,15 @@
       ]
     },
     {
-      "ClassName": "Run",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "Run"
     },
     {
-      "ClassName": "RunFonts",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "RunFonts"
     },
     {
       "ClassName": "RunPropertiesDefault",
+      "HaveMcIgnorable": true,
       "HaveXmlnsFields": true,
-      "HaveXmlOtherAttrs": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
@@ -565,7 +594,7 @@
     },
     {
       "ClassName": "Settings",
-      "HaveXmlOtherAttrs": true,
+      "HaveMcIgnorable": true,
       "HaveDirectXmlOtherChildren": true,
       "Children": [
         {
@@ -576,7 +605,6 @@
     },
     {
       "ClassName": "SpacingBetweenLines",
-      "HaveXmlOtherAttrs": true,
       "Attributes": [
         {
           "PropertyName": "Before",
@@ -590,7 +618,7 @@
     },
     {
       "ClassName": "Styles",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "StyleRunProperties",
@@ -656,51 +684,62 @@
     },
     {
       "ClassName": "WebSettings",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "AbstractNum",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "w15:restartNumberingAfterBreak",
+          "PropertyName": "W15RestartNumberingAfterBreak",
+          "PropertyComments": "Restart Numbering After Break",
+          "Optional": true,
+          "OverrideType": "OnOffValue"
+        }
+      ]
     },
     {
-      "ClassName": "CustomXmlRuby",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "CustomXmlElement",
+      "Attributes": [
+        {
+          "QName": "w:uri",
+          "PropertyName": "Uri",
+          "PropertyComments": "Custom XML Markup Namespace",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        },
+        {
+          "QName": "w:element",
+          "PropertyName": "Element",
+          "PropertyComments": "Custom XML Element Name",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
-      "ClassName": "CustomXmlBlock",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "Deleted"
     },
     {
-      "ClassName": "CustomXmlRow",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "EmbeddedObject"
     },
     {
-      "ClassName": "CustomXmlCell",
-      "HaveXmlOtherAttrs": true
-    },
-    {
-      "ClassName": "CustomXmlRun",
-      "HaveXmlOtherAttrs": true
-    },
-    {
-      "ClassName": "Deleted",
-      "HaveXmlOtherAttrs": true
-    },
-    {
-      "ClassName": "EmbeddedObject",
-      "HaveXmlOtherAttrs": true
-    },
-    {
-      "ClassName": "Inserted",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "Inserted"
     },
     {
       "ClassName": "NumberingInstance",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "w16cid:durableId",
+          "PropertyName": "W16CidDurableId",
+          "PropertyComments": "Durable Numbering Definition Identifier",
+          "Optional": true,
+          "OverrideType": "Int32Value"
+        }
+      ]
     },
     {
-      "ClassName": "ParagraphPropertiesExtended",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "ParagraphPropertiesExtended"
     },
     {
       "ClassName": "ParagraphPropertiesDefault",
@@ -708,16 +747,13 @@
     },
     {
       "ClassName": "ParagraphProperties",
-      "HaveXmlOtherAttrs": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
-      "ClassName": "Picture",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "Picture"
     },
     {
       "ClassName": "RunProperties",
-      "HaveXmlOtherAttrs": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
@@ -726,7 +762,16 @@
     },
     {
       "ClassName": "TableRow",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "w14:editId",
+          "PropertyName": "W14EditId",
+          "PropertyComments": "Legacy table row edit identifier",
+          "Version": "Office2010",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "Table",

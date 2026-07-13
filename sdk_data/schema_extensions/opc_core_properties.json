@@ -21,8 +21,7 @@
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "Subject",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "Subject"
     }
   ]
 }

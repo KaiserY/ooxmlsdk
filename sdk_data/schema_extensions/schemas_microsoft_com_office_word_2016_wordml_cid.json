@@ -2,7 +2,7 @@
   "Types": [
     {
       "ClassName": "CommentsIds",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     }
   ]
 }

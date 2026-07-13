@@ -24,11 +24,13 @@
     },
     {
       "ClassName": "Presentation",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true,
+      "HaveMcPreserveAttributes": true
     },
     {
       "ClassName": "PresentationProperties",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true,
+      "HaveMcPreserveAttributes": true
     },
     {
       "ClassName": "Shape",
@@ -36,17 +38,27 @@
     },
     {
       "ClassName": "Slide",
-      "HaveXmlOtherAttrs": true,
+      "HaveMcIgnorable": true,
+      "HaveMcPreserveAttributes": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "SlideLayout",
-      "HaveXmlOtherAttrs": true,
+      "HaveMcIgnorable": true,
+      "HaveMcPreserveAttributes": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "SlideLayoutExtensionList",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": ":mod",
+          "PropertyName": "Modify",
+          "PropertyComments": "Modify",
+          "Optional": true,
+          "OverrideType": "BooleanValue"
+        }
+      ]
     },
     {
       "ClassName": "SlideListEntry",
@@ -54,20 +66,31 @@
     },
     {
       "ClassName": "SlideMaster",
-      "HaveXmlOtherAttrs": true,
+      "HaveMcIgnorable": true,
+      "HaveMcPreserveAttributes": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "NotesMaster",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true,
+      "HaveMcPreserveAttributes": true
     },
     {
       "ClassName": "NotesSlide",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true,
+      "HaveMcPreserveAttributes": true
     },
     {
       "ClassName": "SlideMasterExtensionList",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": ":mod",
+          "PropertyName": "Modify",
+          "PropertyComments": "Modify",
+          "Optional": true,
+          "OverrideType": "BooleanValue"
+        }
+      ]
     },
     {
       "ClassName": "Transition",
@@ -75,7 +98,8 @@
     },
     {
       "ClassName": "ViewProperties",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true,
+      "HaveMcPreserveAttributes": true
     },
     {
       "ClassName": "TitleStyle",

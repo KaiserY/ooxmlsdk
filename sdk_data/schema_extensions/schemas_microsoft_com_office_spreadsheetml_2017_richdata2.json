@@ -2,7 +2,7 @@
   "Types": [
     {
       "ClassName": "RichValueTypesInfo",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     }
   ]
 }

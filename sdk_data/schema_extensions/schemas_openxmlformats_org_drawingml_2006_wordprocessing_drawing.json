@@ -2,8 +2,7 @@
   "Types": [
     {
       "ClassName": "Inline",
-      "HaveXmlnsFields": true,
-      "HaveXmlOtherAttrs": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Anchor",
@@ -31,8 +30,7 @@
           "Name": "a:CT_NonVisualDrawingProps/wp:docPr",
           "Optional": true
         }
-      ],
-      "HaveXmlOtherAttrs": true
+      ]
     },
     {
       "ClassName": "SimplePosition",

@@ -48,7 +48,11 @@ pub struct SchemaTypeExtension {
   #[serde(skip_serializing_if = "String::is_empty")]
   pub override_base_class: String,
   pub have_xmlns_fields: Option<bool>,
-  pub have_xml_other_attrs: Option<bool>,
+  pub have_mc_ignorable: Option<bool>,
+  pub have_mc_preserve_attributes: Option<bool>,
+  pub have_mc_preserve_elements: Option<bool>,
+  pub have_mc_process_content: Option<bool>,
+  pub have_mc_must_understand: Option<bool>,
   pub have_xml_other_children: Option<bool>,
   pub have_direct_xml_other_children: Option<bool>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -76,7 +80,11 @@ pub struct SchemaTypeAddTypeExtension {
   pub xml_header: crate::sdk_data::sdk_data_model::SchemaTypeXmlHeader,
   pub api_kind: crate::sdk_data::sdk_data_model::SchemaTypeApiKind,
   pub have_xmlns_fields: bool,
-  pub have_xml_other_attrs: bool,
+  pub have_mc_ignorable: bool,
+  pub have_mc_preserve_attributes: bool,
+  pub have_mc_preserve_elements: bool,
+  pub have_mc_process_content: bool,
+  pub have_mc_must_understand: bool,
   pub have_xml_other_children: bool,
   pub have_direct_xml_other_children: bool,
   #[serde(skip_serializing_if = "String::is_empty")]
@@ -92,6 +100,8 @@ pub struct SchemaTypeAttributeExtension {
   pub property_name: String,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub property_comments: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub version: String,
   pub optional: Option<bool>,
   pub match_local_name: Option<bool>,
   pub empty_as_none: Option<bool>,
@@ -260,11 +270,26 @@ pub fn apply_schema_extensions(
     }
 
     for extension in &extensions.types {
-      let Some(schema_type) = schema
+      let mut type_indices: Vec<usize> = schema
         .types
-        .iter_mut()
-        .find(|schema_type| schema_type.class_name == extension.class_name)
-      else {
+        .iter()
+        .enumerate()
+        .filter_map(|(index, schema_type)| {
+          (schema_type.class_name == extension.class_name).then_some(index)
+        })
+        .collect();
+      if type_indices.is_empty() {
+        type_indices.extend(
+          schema
+            .types
+            .iter()
+            .enumerate()
+            .filter_map(|(index, schema_type)| {
+              (schema_type.base_class == extension.class_name).then_some(index)
+            }),
+        );
+      }
+      if type_indices.is_empty() {
         return Err(
           format!(
             "schema extension type {}.{} not found",
@@ -272,138 +297,158 @@ pub fn apply_schema_extensions(
           )
           .into(),
         );
-      };
-
-      if let Some(have_xmlns_fields) = extension.have_xmlns_fields {
-        schema_type.have_xmlns_fields = have_xmlns_fields;
-      }
-      if !extension.override_name.is_empty() {
-        schema_type.name = extension.override_name.clone();
-      }
-      if !extension.override_base_class.is_empty() {
-        schema_type.base_class = extension.override_base_class.clone();
-        let base_class_name = explicit_schema_base_class_name(schema_type.base_class.as_str())
-          .unwrap_or(schema_type.base_class.as_str());
-        match base_class_name {
-          "OpenXmlLeafElement" => {
-            schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf;
-            schema_type.api_kind = crate::sdk_data::sdk_data_model::SchemaTypeApiKind::Struct;
-          }
-          "OpenXmlCompositeElement" | "OpenXmlPartRootElement" => {
-            schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite;
-            schema_type.api_kind = crate::sdk_data::sdk_data_model::SchemaTypeApiKind::Struct;
-          }
-          "OpenXmlLeafTextElement" => {
-            schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::LeafText;
-            schema_type.api_kind =
-              crate::sdk_data::sdk_data_model::SchemaTypeApiKind::LeafTextWrapper;
-          }
-          _ if explicit_schema_base_class_name(schema_type.base_class.as_str()).is_some() => {
-            schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::Derived;
-            schema_type.api_kind = crate::sdk_data::sdk_data_model::SchemaTypeApiKind::Struct;
-          }
-          _ => {}
-        }
-      }
-      if let Some(have_xml_other_attrs) = extension.have_xml_other_attrs {
-        schema_type.have_xml_other_attrs = have_xml_other_attrs;
-      }
-      if let Some(have_xml_other_children) = extension.have_xml_other_children {
-        schema_type.have_xml_other_children = have_xml_other_children;
-      }
-      if let Some(have_direct_xml_other_children) = extension.have_direct_xml_other_children {
-        schema_type.have_direct_xml_other_children = have_direct_xml_other_children;
-      }
-      for prefix in &extension.extra_xmlns {
-        if !schema_type.extra_xmlns.contains(prefix) {
-          schema_type.extra_xmlns.push(prefix.clone());
-        }
-      }
-      for prefix in &extension.canonical_namespace_prefixes {
-        if !schema_type.canonical_namespace_prefixes.contains(prefix) {
-          schema_type
-            .canonical_namespace_prefixes
-            .push(prefix.clone());
-        }
       }
 
-      for attr_extension in &extension.attributes {
-        let Some(attr) = schema_type.attributes.iter_mut().find(|attr| {
-          (!attr_extension.q_name.is_empty() && attr.q_name == attr_extension.q_name)
-            || (!attr_extension.property_name.is_empty()
-              && attr.property_name == attr_extension.property_name)
-        }) else {
-          if attr_extension.q_name.is_empty()
-            || attr_extension.property_name.is_empty()
-            || attr_extension.override_type.is_empty()
-          {
+      for type_index in type_indices {
+        let schema_type = &mut schema.types[type_index];
+
+        if let Some(have_xmlns_fields) = extension.have_xmlns_fields {
+          schema_type.have_xmlns_fields = have_xmlns_fields;
+        }
+        if !extension.override_name.is_empty() {
+          schema_type.name = extension.override_name.clone();
+        }
+        if !extension.override_base_class.is_empty() {
+          schema_type.base_class = extension.override_base_class.clone();
+          let base_class_name = explicit_schema_base_class_name(schema_type.base_class.as_str())
+            .unwrap_or(schema_type.base_class.as_str());
+          match base_class_name {
+            "OpenXmlLeafElement" => {
+              schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf;
+              schema_type.api_kind = crate::sdk_data::sdk_data_model::SchemaTypeApiKind::Struct;
+            }
+            "OpenXmlCompositeElement" | "OpenXmlPartRootElement" => {
+              schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite;
+              schema_type.api_kind = crate::sdk_data::sdk_data_model::SchemaTypeApiKind::Struct;
+            }
+            "OpenXmlLeafTextElement" => {
+              schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::LeafText;
+              schema_type.api_kind =
+                crate::sdk_data::sdk_data_model::SchemaTypeApiKind::LeafTextWrapper;
+            }
+            _ if explicit_schema_base_class_name(schema_type.base_class.as_str()).is_some() => {
+              schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::Derived;
+              schema_type.api_kind = crate::sdk_data::sdk_data_model::SchemaTypeApiKind::Struct;
+            }
+            _ => {}
+          }
+        }
+        if let Some(have_mc_ignorable) = extension.have_mc_ignorable {
+          schema_type.have_mc_ignorable = have_mc_ignorable;
+        }
+        if let Some(have_mc_preserve_attributes) = extension.have_mc_preserve_attributes {
+          schema_type.have_mc_preserve_attributes = have_mc_preserve_attributes;
+        }
+        if let Some(have_mc_preserve_elements) = extension.have_mc_preserve_elements {
+          schema_type.have_mc_preserve_elements = have_mc_preserve_elements;
+        }
+        if let Some(have_mc_process_content) = extension.have_mc_process_content {
+          schema_type.have_mc_process_content = have_mc_process_content;
+        }
+        if let Some(have_mc_must_understand) = extension.have_mc_must_understand {
+          schema_type.have_mc_must_understand = have_mc_must_understand;
+        }
+        if let Some(have_xml_other_children) = extension.have_xml_other_children {
+          schema_type.have_xml_other_children = have_xml_other_children;
+        }
+        if let Some(have_direct_xml_other_children) = extension.have_direct_xml_other_children {
+          schema_type.have_direct_xml_other_children = have_direct_xml_other_children;
+        }
+        for prefix in &extension.extra_xmlns {
+          if !schema_type.extra_xmlns.contains(prefix) {
+            schema_type.extra_xmlns.push(prefix.clone());
+          }
+        }
+        for prefix in &extension.canonical_namespace_prefixes {
+          if !schema_type.canonical_namespace_prefixes.contains(prefix) {
+            schema_type
+              .canonical_namespace_prefixes
+              .push(prefix.clone());
+          }
+        }
+
+        for attr_extension in &extension.attributes {
+          let Some(attr) = schema_type.attributes.iter_mut().find(|attr| {
+            (!attr_extension.q_name.is_empty() && attr.q_name == attr_extension.q_name)
+              || (!attr_extension.property_name.is_empty()
+                && attr.property_name == attr_extension.property_name)
+          }) else {
+            if attr_extension.q_name.is_empty()
+              || attr_extension.property_name.is_empty()
+              || attr_extension.override_type.is_empty()
+            {
+              return Err(
+                format!(
+                  "schema extension attribute {}.{} not found",
+                  module_name, extension.class_name
+                )
+                .into(),
+              );
+            }
+
+            schema_type
+              .attributes
+              .push(crate::sdk_data::sdk_data_model::SchemaTypeAttribute {
+                q_name: attr_extension.q_name.clone(),
+                property_name: attr_extension.property_name.clone(),
+                r#type: attr_extension.override_type.clone(),
+                property_comments: attr_extension.property_comments.clone(),
+                version: attr_extension.version.clone(),
+                required: !attr_extension.optional.unwrap_or(false),
+                match_local_name: attr_extension.match_local_name.unwrap_or(false),
+                empty_as_none: attr_extension.empty_as_none.unwrap_or(false),
+                ..Default::default()
+              });
+            continue;
+          };
+
+          if !attr_extension.override_type.is_empty() {
+            attr.r#type = attr_extension.override_type.clone();
+          }
+          if !attr_extension.version.is_empty() {
+            attr.version = attr_extension.version.clone();
+          }
+          if let Some(match_local_name) = attr_extension.match_local_name {
+            attr.match_local_name = match_local_name;
+          }
+          if let Some(empty_as_none) = attr_extension.empty_as_none {
+            attr.empty_as_none = empty_as_none;
+          }
+          if let Some(optional) = attr_extension.optional {
+            attr.required = !optional;
+          }
+        }
+
+        for child_extension in &extension.children {
+          let Some(child) = find_child_mut(&mut schema_type.children, child_extension) else {
             return Err(
               format!(
-                "schema extension attribute {}.{} not found",
+                "schema extension child {}.{} not found",
                 module_name, extension.class_name
               )
               .into(),
             );
+          };
+
+          if let Some(optional) = child_extension.optional {
+            child.optional = optional;
           }
+          if let Some(repeated) = child_extension.repeated {
+            child.repeated = repeated;
+          }
+          if !child_extension.override_name.is_empty() {
+            child.name = child_extension.override_name.clone();
+          }
+        }
 
-          schema_type
-            .attributes
-            .push(crate::sdk_data::sdk_data_model::SchemaTypeAttribute {
-              q_name: attr_extension.q_name.clone(),
-              property_name: attr_extension.property_name.clone(),
-              r#type: attr_extension.override_type.clone(),
-              property_comments: attr_extension.property_comments.clone(),
-              required: !attr_extension.optional.unwrap_or(false),
-              match_local_name: attr_extension.match_local_name.unwrap_or(false),
-              empty_as_none: attr_extension.empty_as_none.unwrap_or(false),
-              ..Default::default()
-            });
-          continue;
-        };
-
-        if !attr_extension.override_type.is_empty() {
-          attr.r#type = attr_extension.override_type.clone();
+        for child_extension in &extension.add_children {
+          add_schema_type_child(
+            module_name,
+            &extension.class_name,
+            schema_type,
+            child_extension,
+          )?;
         }
-        if let Some(match_local_name) = attr_extension.match_local_name {
-          attr.match_local_name = match_local_name;
-        }
-        if let Some(empty_as_none) = attr_extension.empty_as_none {
-          attr.empty_as_none = empty_as_none;
-        }
-        if let Some(optional) = attr_extension.optional {
-          attr.required = !optional;
-        }
-      }
-
-      for child_extension in &extension.children {
-        let Some(child) = find_child_mut(&mut schema_type.children, child_extension) else {
-          return Err(
-            format!(
-              "schema extension child {}.{} not found",
-              module_name, extension.class_name
-            )
-            .into(),
-          );
-        };
-
-        if let Some(optional) = child_extension.optional {
-          child.optional = optional;
-        }
-        if let Some(repeated) = child_extension.repeated {
-          child.repeated = repeated;
-        }
-        if !child_extension.override_name.is_empty() {
-          child.name = child_extension.override_name.clone();
-        }
-      }
-
-      for child_extension in &extension.add_children {
-        add_schema_type_child(
-          module_name,
-          &extension.class_name,
-          schema_type,
-          child_extension,
-        )?;
       }
     }
   }
@@ -462,6 +507,7 @@ fn add_schema_type(
       property_name: attr.property_name.clone(),
       r#type: attr.override_type.clone(),
       property_comments: attr.property_comments.clone(),
+      version: attr.version.clone(),
       required: !attr.optional.unwrap_or(false),
       ..Default::default()
     });
@@ -494,7 +540,11 @@ fn add_schema_type(
       composite_kind: extension.composite_kind,
       xml_header: extension.xml_header,
       have_xmlns_fields: extension.have_xmlns_fields,
-      have_xml_other_attrs: extension.have_xml_other_attrs,
+      have_mc_ignorable: extension.have_mc_ignorable,
+      have_mc_preserve_attributes: extension.have_mc_preserve_attributes,
+      have_mc_preserve_elements: extension.have_mc_preserve_elements,
+      have_mc_process_content: extension.have_mc_process_content,
+      have_mc_must_understand: extension.have_mc_must_understand,
       have_xml_other_children: extension.have_xml_other_children,
       have_direct_xml_other_children: extension.have_direct_xml_other_children,
       text_value_type: extension.text_value_type.clone(),
@@ -901,6 +951,11 @@ mod tests {
       SchemaExtensions {
         types: vec![SchemaTypeExtension {
           class_name: "Parent".to_string(),
+          have_mc_ignorable: Some(true),
+          have_mc_preserve_attributes: Some(true),
+          have_mc_preserve_elements: Some(true),
+          have_mc_process_content: Some(true),
+          have_mc_must_understand: Some(true),
           have_direct_xml_other_children: Some(true),
           children: vec![SchemaTypeChildExtension {
             property_name: "Child".to_string(),
@@ -917,6 +972,11 @@ mod tests {
 
     assert!(schemas[0].types[0].children[0].optional);
     assert!(schemas[0].types[0].have_direct_xml_other_children);
+    assert!(schemas[0].types[0].have_mc_ignorable);
+    assert!(schemas[0].types[0].have_mc_preserve_attributes);
+    assert!(schemas[0].types[0].have_mc_preserve_elements);
+    assert!(schemas[0].types[0].have_mc_process_content);
+    assert!(schemas[0].types[0].have_mc_must_understand);
   }
 
   #[test]
@@ -1188,6 +1248,7 @@ mod tests {
           attributes: vec![SchemaTypeAttributeExtension {
             property_name: "CharacterSpace".to_string(),
             override_type: "IntegerValue".to_string(),
+            version: "Office2010".to_string(),
             ..Default::default()
           }],
           ..Default::default()
@@ -1199,6 +1260,60 @@ mod tests {
     apply_schema_extensions(&mut schemas, &extensions).unwrap();
 
     assert_eq!(schemas[0].types[0].attributes[0].r#type, "IntegerValue");
+    assert_eq!(schemas[0].types[0].attributes[0].version, "Office2010");
+  }
+
+  #[test]
+  fn applies_type_extension_to_types_with_matching_base_class() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      types: vec![
+        SchemaType {
+          class_name: "FirstDerived".to_string(),
+          base_class: "SharedBase".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          class_name: "SecondDerived".to_string(),
+          base_class: "SharedBase".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          class_name: "Unrelated".to_string(),
+          base_class: "OtherBase".to_string(),
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "SharedBase".to_string(),
+          attributes: vec![SchemaTypeAttributeExtension {
+            q_name: "t:shared".to_string(),
+            property_name: "Shared".to_string(),
+            override_type: "StringValue".to_string(),
+            optional: Some(true),
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    for schema_type in &schemas[0].types[..2] {
+      assert_eq!(schema_type.attributes.len(), 1);
+      assert_eq!(schema_type.attributes[0].q_name, "t:shared");
+      assert_eq!(schema_type.attributes[0].property_name, "Shared");
+      assert_eq!(schema_type.attributes[0].r#type, "StringValue");
+      assert!(!schema_type.attributes[0].required);
+    }
+    assert!(schemas[0].types[2].attributes.is_empty());
   }
 
   #[test]
@@ -1260,6 +1375,7 @@ mod tests {
             q_name: ":val".to_string(),
             property_name: "Val".to_string(),
             property_comments: "Integer Value".to_string(),
+            version: "Office2010".to_string(),
             optional: Some(false),
             match_local_name: None,
             empty_as_none: None,
@@ -1282,6 +1398,7 @@ mod tests {
     assert_eq!(attr.q_name, ":val");
     assert_eq!(attr.property_name, "Val");
     assert_eq!(attr.property_comments, "Integer Value");
+    assert_eq!(attr.version, "Office2010");
     assert_eq!(attr.r#type, "Int32Value");
     assert!(attr.required);
   }

@@ -2,18 +2,22 @@
   "Types": [
     {
       "ClassName": "AlternateContent",
-      "HaveXmlnsFields": true,
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true,
+      "HaveMcProcessContent": true,
+      "HaveMcMustUnderstand": true,
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Choice",
-      "HaveXmlnsFields": true,
-      "HaveXmlOtherAttrs": true
+      "HaveMcPreserveAttributes": true,
+      "HaveMcPreserveElements": true,
+      "HaveMcProcessContent": true,
+      "HaveMcMustUnderstand": true,
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Fallback",
-      "HaveXmlnsFields": true,
-      "HaveXmlOtherAttrs": true
+      "HaveXmlnsFields": true
     }
   ]
 }

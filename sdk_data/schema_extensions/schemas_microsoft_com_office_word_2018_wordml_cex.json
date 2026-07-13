@@ -2,7 +2,7 @@
   "Types": [
     {
       "ClassName": "CommentsExtensible",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     }
   ]
 }

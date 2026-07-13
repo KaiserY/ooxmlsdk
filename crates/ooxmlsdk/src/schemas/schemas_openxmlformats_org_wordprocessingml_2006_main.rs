@@ -2250,7 +2250,6 @@ pub struct CustomXmlMoveToRangeStart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:ins")]
 pub struct Inserted {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(max = 255u32))]
@@ -2283,7 +2282,6 @@ pub struct Inserted {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:del")]
 pub struct Deleted {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(max = 255u32))]
@@ -4661,7 +4659,6 @@ pub struct Tabs {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:spacing")]
 pub struct SpacingBetweenLines {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Spacing Above Paragraph
   #[sdk(attr(qname = "w:before"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
@@ -5040,7 +5037,6 @@ pub struct SymbolChar {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:object")]
 pub struct EmbeddedObject {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// dxaOrig
   #[sdk(attr(qname = "w:dxaOrig"))]
   pub dxa_original: Option<crate::simple_type::TwipsMeasureValue>,
@@ -5084,7 +5080,6 @@ pub struct EmbeddedObject {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:pict")]
 pub struct Picture {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// anchorId
   #[sdk(attr(qname = "w14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
@@ -5177,7 +5172,7 @@ pub struct EndnoteReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:drawing")]
 pub struct Drawing {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
   #[sdk(
         choice(
             child(variant = Anchor, boxed, qname = "wp:anchor"),
@@ -5312,7 +5307,6 @@ pub struct DefaultTableStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:rFonts")]
 pub struct RunFonts {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Font Content Type
   #[sdk(attr(qname = "w:hint"))]
   pub hint: Option<FontTypeHintValues>,
@@ -6280,7 +6274,6 @@ pub struct RunPropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:rPr")]
 pub struct RunProperties {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   #[sdk(
         choice(
@@ -6523,7 +6516,12 @@ pub struct MoveToMathControl {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:customXml")]
 pub struct CustomXmlRuby {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  /// Custom XML Markup Namespace
+  #[sdk(attr(qname = "w:uri"))]
+  pub uri: Option<crate::simple_type::StringValue>,
+  /// Custom XML Element Name
+  #[sdk(attr(qname = "w:element"))]
+  pub element: Option<crate::simple_type::StringValue>,
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -6834,7 +6832,6 @@ pub struct HyperlinkRuby {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:r")]
 pub struct Run {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Revision Identifier for Run Properties
   #[sdk(attr(qname = "w:rsidRPr"))]
   #[sdk(string_length(min = 4u32, max = 4u32))]
@@ -7546,7 +7543,12 @@ pub struct SdtRun {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:customXml")]
 pub struct CustomXmlBlock {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  /// Custom XML Markup Namespace
+  #[sdk(attr(qname = "w:uri"))]
+  pub uri: Option<crate::simple_type::StringValue>,
+  /// Custom XML Element Name
+  #[sdk(attr(qname = "w:element"))]
+  pub element: Option<crate::simple_type::StringValue>,
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -7682,7 +7684,6 @@ pub struct SdtBlock {
 #[sdk(qname = "w:p")]
 pub struct Paragraph {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Revision Identifier for Paragraph Glyph Formatting
   #[sdk(attr(qname = "w:rsidRPr"))]
   #[sdk(string_length(min = 4u32, max = 4u32))]
@@ -7708,12 +7709,15 @@ pub struct Paragraph {
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub paragraph_id: Option<crate::simple_type::HexBinaryValue>,
   /// textId
-  #[sdk(attr(qname = "w14:textId"))]
+  #[sdk(attr(match_local_name, qname = "w14:textId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub text_id: Option<crate::simple_type::HexBinaryValue>,
   /// noSpellErr
   #[sdk(attr(qname = "w14:noSpellErr"))]
   pub no_spell_error: Option<crate::simple_type::OnOffValue>,
+  /// Legacy paragraph edit identifier
+  #[sdk(attr(qname = "w14:editId"))]
+  pub w14_edit_id: Option<crate::simple_type::StringValue>,
   /// Paragraph Properties
   #[sdk(child(qname = "w:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
@@ -7934,7 +7938,6 @@ pub struct Table {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tr")]
 pub struct TableRow {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Revision Identifier for Table Row Glyph Formatting
   #[sdk(attr(qname = "w:rsidRPr"))]
   #[sdk(string_length(min = 4u32, max = 4u32))]
@@ -7959,6 +7962,9 @@ pub struct TableRow {
   #[sdk(attr(qname = "w14:textId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub text_id: Option<crate::simple_type::HexBinaryValue>,
+  /// Legacy table row edit identifier
+  #[sdk(attr(qname = "w14:editId"))]
+  pub w14_edit_id: Option<crate::simple_type::StringValue>,
   /// Table-Level Property Exceptions
   #[sdk(child(qname = "w:tblPrEx"))]
   pub table_property_exceptions: Option<std::boxed::Box<TablePropertyExceptions>>,
@@ -8032,7 +8038,12 @@ pub struct TableRow {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:customXml")]
 pub struct CustomXmlRow {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  /// Custom XML Markup Namespace
+  #[sdk(attr(qname = "w:uri"))]
+  pub uri: Option<crate::simple_type::StringValue>,
+  /// Custom XML Element Name
+  #[sdk(attr(qname = "w:element"))]
+  pub element: Option<crate::simple_type::StringValue>,
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -8239,7 +8250,12 @@ pub struct TableCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:customXml")]
 pub struct CustomXmlCell {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  /// Custom XML Markup Namespace
+  #[sdk(attr(qname = "w:uri"))]
+  pub uri: Option<crate::simple_type::StringValue>,
+  /// Custom XML Element Name
+  #[sdk(attr(qname = "w:element"))]
+  pub element: Option<crate::simple_type::StringValue>,
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -8373,7 +8389,12 @@ pub struct SdtCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:customXml")]
 pub struct CustomXmlRun {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  /// Custom XML Markup Namespace
+  #[sdk(attr(qname = "w:uri"))]
+  pub uri: Option<crate::simple_type::StringValue>,
+  /// Custom XML Element Name
+  #[sdk(attr(qname = "w:element"))]
+  pub element: Option<crate::simple_type::StringValue>,
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -9959,7 +9980,7 @@ pub struct TextBoxContent {
 #[sdk(xml_header, qname = "w:comments")]
 pub struct Comments {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Comment Content.
   #[sdk(child(qname = "w:comment"))]
   pub comment: Vec<Comment>,
@@ -9969,7 +9990,7 @@ pub struct Comments {
 #[sdk(xml_header, qname = "w:footnotes")]
 pub struct Footnotes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Footnote Content.
   #[sdk(child(qname = "w:footnote"))]
   pub footnote: Vec<Footnote>,
@@ -9979,7 +10000,7 @@ pub struct Footnotes {
 #[sdk(xml_header, qname = "w:endnotes")]
 pub struct Endnotes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Endnote Content.
   #[sdk(child(qname = "w:endnote"))]
   pub endnote: Vec<Endnote>,
@@ -9989,7 +10010,7 @@ pub struct Endnotes {
 #[sdk(xml_header, qname = "w:hdr")]
 pub struct Header {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   #[sdk(
         choice(
             child(variant = AltChunk, boxed, qname = "w:altChunk"),
@@ -10060,7 +10081,7 @@ pub struct Header {
 #[sdk(xml_header, qname = "w:ftr")]
 pub struct Footer {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   #[sdk(
         choice(
             child(variant = AltChunk, boxed, qname = "w:altChunk"),
@@ -10131,7 +10152,7 @@ pub struct Footer {
 #[sdk(xml_header, qname = "w:settings")]
 pub struct Settings {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Write Protection
   #[sdk(child(qname = "w:writeProtection"))]
@@ -10448,7 +10469,7 @@ pub struct Settings {
 #[sdk(xml_header, qname = "w:webSettings")]
 pub struct WebSettings {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Nested Frameset Definition.
   #[sdk(child(qname = "w:frameset"))]
   pub frameset: Option<std::boxed::Box<Frameset>>,
@@ -10491,7 +10512,7 @@ pub struct WebSettings {
 #[sdk(xml_header, qname = "w:fonts")]
 pub struct Fonts {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   #[sdk(choice(child(variant = Font, boxed, qname = "w:font"), any))]
   pub xml_children: Vec<FontsChoice>,
 }
@@ -10500,7 +10521,7 @@ pub struct Fonts {
 #[sdk(xml_header, qname = "w:numbering")]
 pub struct Numbering {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Picture Numbering Symbol Definition.
   #[sdk(child(qname = "w:numPicBullet"))]
   pub numbering_picture_bullet: Vec<NumberingPictureBullet>,
@@ -10519,7 +10540,7 @@ pub struct Numbering {
 #[sdk(xml_header, qname = "w:styles")]
 pub struct Styles {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Document Default Paragraph and Run Properties
   #[sdk(child(qname = "w:docDefaults"))]
   pub doc_defaults: Option<std::boxed::Box<DocDefaults>>,
@@ -10532,13 +10553,23 @@ pub struct Styles {
 }
 /// Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(canonical_namespace_prefix("ns2:r"), xml_header, qname = "w:document")]
+#[sdk(
+  canonical_namespace_prefix("ns2:r", "ve:mc", "ns1:mc"),
+  xml_header,
+  qname = "w:document"
+)]
 pub struct Document {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_process_content: Option<std::boxed::Box<[u8]>>,
+  pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
   /// conformance
   #[sdk(attr(qname = "w:conformance"))]
   pub w_conformance: Option<DocumentConformance>,
+  /// Content Contains Significant Whitespace
+  #[sdk(attr(qname = "xml:space"))]
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   /// Document Background
   #[sdk(child(qname = "w:background"))]
   pub document_background: Option<std::boxed::Box<DocumentBackground>>,
@@ -10551,7 +10582,7 @@ pub struct Document {
 #[sdk(xml_header, qname = "w:glossaryDocument")]
 pub struct GlossaryDocument {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Document Background
   #[sdk(child(qname = "w:background"))]
   pub document_background: Option<std::boxed::Box<DocumentBackground>>,
@@ -10806,7 +10837,6 @@ pub struct PreviousSectionProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:pPr")]
 pub struct ParagraphPropertiesExtended {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the ParagraphStyleId Class.
   #[sdk(child(qname = "w:pStyle"))]
   pub paragraph_style_id: Option<ParagraphStyleId>,
@@ -13111,7 +13141,7 @@ pub struct ParagraphPropertiesBaseStyle {
 #[sdk(qname = "w:rPrDefault")]
 pub struct RunPropertiesDefault {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Run Properties
   #[sdk(child(qname = "w:rPr"))]
@@ -13700,11 +13730,13 @@ pub struct NumberingPictureBullet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:abstractNum")]
 pub struct AbstractNum {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Abstract Numbering Definition ID
   #[sdk(attr(qname = "w:abstractNumId"))]
   #[sdk(number_range(range = 0..))]
   pub abstract_number_id: crate::simple_type::Int32Value,
+  /// Restart Numbering After Break
+  #[sdk(attr(qname = "w15:restartNumberingAfterBreak"))]
+  pub w15_restart_numbering_after_break: Option<crate::simple_type::OnOffValue>,
   /// Abstract Numbering Definition Identifier
   #[sdk(child(qname = "w:nsid"))]
   pub nsid: Option<Nsid>,
@@ -13731,13 +13763,15 @@ pub struct AbstractNum {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:num")]
 pub struct NumberingInstance {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// numId
   #[sdk(attr(qname = "w:numId"))]
   pub number_id: crate::simple_type::Int32Value,
   /// durableId
   #[sdk(attr(qname = "w:durableId"))]
   pub w_durable_id: Option<crate::simple_type::Int32Value>,
+  /// Durable Numbering Definition Identifier
+  #[sdk(attr(qname = "w16cid:durableId"))]
+  pub w16_cid_durable_id: Option<crate::simple_type::Int32Value>,
   /// Defines the AbstractNumId Class.
   #[sdk(child(qname = "w:abstractNumId"))]
   pub abstract_num_id: AbstractNumId,
@@ -15174,7 +15208,6 @@ pub struct TableRowPropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:pPr")]
 pub struct ParagraphProperties {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the ParagraphStyleId Class.
   #[sdk(child(qname = "w:pStyle"))]

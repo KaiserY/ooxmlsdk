@@ -9,7 +9,15 @@
     },
     {
       "ClassName": "ConditionalFormattingValueObject",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": ":value",
+          "PropertyName": "Value",
+          "PropertyComments": "Value",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "DifferentialType",
@@ -26,7 +34,15 @@
     },
     {
       "ClassName": "DataValidation",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "XrUid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "PivotTableDefinition",

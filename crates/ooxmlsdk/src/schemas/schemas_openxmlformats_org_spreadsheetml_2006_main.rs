@@ -1591,7 +1591,7 @@ pub struct CalculationChain {
 #[sdk(no_prefix_only, xml_header, qname = "x:comments")]
 pub struct Comments {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Authors
   #[sdk(child(qname = "x:authors"))]
   pub authors: Authors,
@@ -1622,7 +1622,7 @@ pub struct MapInfo {
 #[sdk(no_prefix_only, xml_header, qname = "x:connections")]
 pub struct Connections {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Connection.
   #[sdk(child(qname = "x:connection"))]
   pub connection: Vec<Connection>,
@@ -1632,7 +1632,7 @@ pub struct Connections {
 #[sdk(no_prefix_only, xml_header, qname = "x:pivotCacheDefinition")]
 pub struct PivotCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -1690,6 +1690,9 @@ pub struct PivotCacheDefinition {
   /// supportAdvancedDrill
   #[sdk(attr(qname = ":supportAdvancedDrill"))]
   pub support_advanced_drill: Option<crate::simple_type::BooleanValue>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr:uid"))]
+  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// Defines the CacheSource Class.
   #[sdk(child(qname = "x:cacheSource"))]
   pub cache_source: std::boxed::Box<CacheSource>,
@@ -1729,7 +1732,7 @@ pub struct PivotCacheDefinition {
 #[sdk(no_prefix_only, xml_header, qname = "x:pivotCacheRecords")]
 pub struct PivotCacheRecords {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// PivotCache Records Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
@@ -1745,7 +1748,7 @@ pub struct PivotCacheRecords {
 #[sdk(no_prefix_only, xml_header, qname = "x:pivotTableDefinition")]
 pub struct PivotTableDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
@@ -1950,6 +1953,9 @@ pub struct PivotTableDefinition {
   /// customListSort
   #[sdk(attr(qname = ":customListSort"))]
   pub custom_list_sort: Option<crate::simple_type::BooleanValue>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr:uid"))]
+  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// Defines the Location Class.
   #[sdk(child(qname = "x:location"))]
   pub location: std::boxed::Box<Location>,
@@ -2007,7 +2013,7 @@ pub struct PivotTableDefinition {
 #[sdk(no_prefix_only, xml_header, qname = "x:queryTable")]
 pub struct QueryTable {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
@@ -2074,6 +2080,9 @@ pub struct QueryTable {
   /// Apply Width / Height Formats
   #[sdk(attr(qname = ":applyWidthHeightFormats"))]
   pub apply_width_height_formats: Option<crate::simple_type::BooleanValue>,
+  /// Revision 16 Unique Identifier
+  #[sdk(attr(qname = "xr16:uid"))]
+  pub xr16_uid: Option<crate::simple_type::StringValue>,
   /// Defines the QueryTableRefresh Class.
   #[sdk(child(qname = "x:queryTableRefresh"))]
   pub query_table_refresh: Option<std::boxed::Box<QueryTableRefresh>>,
@@ -2107,7 +2116,7 @@ pub struct SharedStringTable {
 #[sdk(no_prefix_only, xml_header, qname = "x:headers")]
 pub struct Headers {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Last Revision GUID
   #[sdk(attr(qname = ":guid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
@@ -2157,7 +2166,7 @@ pub struct Headers {
 #[sdk(no_prefix_only, xml_header, qname = "x:revisions")]
 pub struct Revisions {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   #[sdk(
         choice(
             child(variant = RevisionRowColumn, boxed, qname = "x:rrc"),
@@ -2181,7 +2190,7 @@ pub struct Revisions {
 #[sdk(no_prefix_only, xml_header, qname = "x:users")]
 pub struct Users {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Active User Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
@@ -2194,8 +2203,12 @@ pub struct Users {
 #[sdk(no_prefix_only, xml_header, qname = "x:worksheet")]
 pub struct Worksheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr:uid"))]
+  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// Sheet Properties.
   #[sdk(child(qname = "x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<SheetProperties>>,
@@ -2454,7 +2467,10 @@ pub struct SingleXmlCells {
 #[sdk(no_prefix_only, xml_header, qname = "x:styleSheet")]
 pub struct Stylesheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  /// Content Contains Significant Whitespace
+  #[sdk(attr(qname = "xml:space"))]
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   /// Defines the NumberingFormats Class.
   #[sdk(child(qname = "x:numFmts"))]
   pub numbering_formats: Option<NumberingFormats>,
@@ -2494,7 +2510,7 @@ pub struct Stylesheet {
 #[sdk(no_prefix_only, xml_header, qname = "x:externalLink")]
 pub struct ExternalLink {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   #[sdk(
         choice(
             child(variant = ExternalBook, boxed, qname = "x:externalBook"),
@@ -2512,7 +2528,7 @@ pub struct ExternalLink {
 #[sdk(no_prefix_only, xml_header, qname = "x:table")]
 pub struct Table {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Table Id
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
@@ -2579,6 +2595,9 @@ pub struct Table {
   /// Connection ID
   #[sdk(attr(qname = ":connectionId"))]
   pub connection_id: Option<crate::simple_type::UInt32Value>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr:uid"))]
+  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// Table AutoFilter
   #[sdk(child(qname = "x:autoFilter"))]
   pub auto_filter: Option<std::boxed::Box<AutoFilter>>,
@@ -2612,11 +2631,14 @@ pub struct VolatileTypes {
 #[sdk(no_prefix_only, xml_header, qname = "x:workbook")]
 pub struct Workbook {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// conformance
   #[sdk(attr(qname = ":conformance"))]
   pub conformance: Option<ConformanceClass>,
+  /// Content Contains Significant Whitespace
+  #[sdk(attr(qname = "xml:space"))]
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   /// Defines the FileVersion Class.
   #[sdk(child(qname = "x:fileVersion"))]
   pub file_version: Option<FileVersion>,
@@ -2790,7 +2812,6 @@ pub struct CommentList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:comment")]
 pub struct Comment {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Cell Reference
   #[sdk(attr(qname = ":ref"))]
@@ -2806,6 +2827,9 @@ pub struct Comment {
   /// shapeId
   #[sdk(attr(qname = ":shapeId"))]
   pub shape_id: Option<crate::simple_type::UInt32Value>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr:uid"))]
+  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// Comment Text
   #[sdk(child(qname = "x:text"))]
   pub comment_text: std::boxed::Box<CommentText>,
@@ -2820,14 +2844,7 @@ pub struct Author(pub XstringType);
 /// Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:t")]
-pub struct Text {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Text(pub XstringType);
 /// Cell Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:v")]
@@ -2967,7 +2984,6 @@ pub struct DataBinding {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:connection")]
 pub struct Connection {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// id
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
@@ -3028,6 +3044,9 @@ pub struct Connection {
   /// singleSignOnId
   #[sdk(attr(qname = ":singleSignOnId"))]
   pub single_sign_on_id: Option<crate::simple_type::StringValue>,
+  /// Revision 16 Unique Identifier
+  #[sdk(attr(qname = "xr16:uid"))]
+  pub xr16_uid: Option<crate::simple_type::StringValue>,
   /// Defines the DatabaseProperties Class.
   #[sdk(child(qname = "x:dbPr"))]
   pub database_properties: Option<DatabaseProperties>,
@@ -4672,7 +4691,6 @@ pub struct QueryTableField {
 #[sdk(no_prefix_only, qname = "x:si")]
 pub struct SharedStringItem {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Text
   #[sdk(child(qname = "x:t"))]
@@ -5762,7 +5780,6 @@ pub struct UserInfo {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:row")]
 pub struct Row {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Row Index
   #[sdk(attr(qname = ":r"))]
   pub row_index: Option<crate::simple_type::UInt32Value>,
@@ -6171,10 +6188,12 @@ pub struct HeaderFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:autoFilter")]
 pub struct AutoFilter {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Cell or Range Reference
   #[sdk(attr(qname = ":ref"))]
   pub reference: Option<crate::simple_type::StringValue>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr:uid"))]
+  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// AutoFilter Column.
   #[sdk(child(qname = "x:filterColumn"))]
   pub filter_column: Vec<FilterColumn>,
@@ -6248,7 +6267,6 @@ pub struct ConditionalFormattingRule {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:hyperlink")]
 pub struct Hyperlink {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Reference
   #[sdk(attr(qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
@@ -6264,6 +6282,9 @@ pub struct Hyperlink {
   /// Display String
   #[sdk(attr(qname = ":display"))]
   pub display: Option<crate::simple_type::StringValue>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr:uid"))]
+  pub xr_uid: Option<crate::simple_type::StringValue>,
 }
 /// Conditional Format Value Object.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6564,7 +6585,6 @@ pub struct MergeCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:dataValidation")]
 pub struct DataValidation {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// type
   #[sdk(attr(qname = ":type"))]
@@ -6605,6 +6625,9 @@ pub struct DataValidation {
   /// sqref
   #[sdk(attr(list, qname = ":sqref"))]
   pub sequence_of_references: Vec<crate::simple_type::StringValue>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr:uid"))]
+  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// Defines the List Class.
   #[sdk(text_child(qname = "x12ac:list"))]
   pub list: Option<crate::schemas::x12ac::List>,
@@ -7225,13 +7248,15 @@ pub struct GradientStop {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix, qname = "x:numFmt")]
 pub struct NumberingFormat {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Number Format Id
   #[sdk(attr(qname = ":numFmtId"))]
   pub number_format_id: crate::simple_type::UInt32Value,
   /// Number Format Code
   #[sdk(attr(qname = ":formatCode"))]
   pub format_code: crate::simple_type::StringValue,
+  /// Revision 2 Number Format Code
+  #[sdk(attr(qname = "x16r2:formatCode16"))]
+  pub x16r2_format_code16: Option<crate::simple_type::StringValue>,
 }
 /// Alignment.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7377,7 +7402,6 @@ pub struct MruColors {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:tableStyle")]
 pub struct TableStyle {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Table Style Name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
@@ -7390,6 +7414,9 @@ pub struct TableStyle {
   /// Table Style Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
+  /// Revision 9 Unique Identifier
+  #[sdk(attr(qname = "xr9:uid"))]
+  pub xr9_uid: Option<crate::simple_type::StringValue>,
   /// Table Style.
   #[sdk(child(qname = "x:tableStyleElement"))]
   pub table_style_element: Vec<TableStyleElement>,
@@ -7407,7 +7434,6 @@ pub struct RgbColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:cellStyle")]
 pub struct CellStyle {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// User Defined Cell Style
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
@@ -7426,6 +7452,9 @@ pub struct CellStyle {
   /// Custom Built In
   #[sdk(attr(qname = ":customBuiltin"))]
   pub custom_builtin: Option<crate::simple_type::BooleanValue>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr:uid"))]
+  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -7434,7 +7463,6 @@ pub struct CellStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:xf")]
 pub struct CellFormat {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Number Format Id
   #[sdk(attr(qname = ":numFmtId"))]
   pub number_format_id: Option<crate::simple_type::UInt32Value>,
@@ -7710,7 +7738,6 @@ pub type Xstring = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:tableColumn")]
 pub struct TableColumn {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Table Field Id
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
@@ -7747,6 +7774,9 @@ pub struct TableColumn {
   /// Totals Row Style Name
   #[sdk(attr(qname = ":totalsRowCellStyle"))]
   pub totals_row_cell_style: Option<crate::simple_type::StringValue>,
+  /// Revision 3 Unique Identifier
+  #[sdk(attr(qname = "xr3:uid"))]
+  pub xr3_uid: Option<crate::simple_type::StringValue>,
   /// Calculated Column Formula
   #[sdk(child(qname = "x:calculatedColumnFormula"))]
   pub calculated_column_formula: Option<CalculatedColumnFormula>,
@@ -7997,7 +8027,6 @@ pub struct Sheet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:workbookView")]
 pub struct WorkbookView {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Visibility
   #[sdk(attr(qname = ":visibility"))]
   pub visibility: Option<VisibilityValues>,
@@ -8037,6 +8066,9 @@ pub struct WorkbookView {
   /// AutoFilter Date Grouping
   #[sdk(attr(qname = ":autoFilterDateGrouping"))]
   pub auto_filter_date_grouping: Option<crate::simple_type::BooleanValue>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr2:uid"))]
+  pub xr2_uid: Option<crate::simple_type::StringValue>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -8045,7 +8077,6 @@ pub struct WorkbookView {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:definedName")]
 pub struct DefinedName {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defined Name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
@@ -8091,6 +8122,9 @@ pub struct DefinedName {
   /// Workbook Parameter (Server)
   #[sdk(attr(qname = ":workbookParameter"))]
   pub workbook_parameter: Option<crate::simple_type::BooleanValue>,
+  /// Content Contains Significant Whitespace
+  #[sdk(attr(qname = "xml:space"))]
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -8713,7 +8747,6 @@ pub struct SheetViews {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:sheetFormatPr")]
 pub struct SheetFormatProperties {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Base Column Width
   #[sdk(attr(qname = ":baseColWidth"))]
   pub base_column_width: Option<crate::simple_type::UInt32Value>,
@@ -9887,7 +9920,6 @@ pub struct NumberingFormats {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:fonts")]
 pub struct Fonts {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Font Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
@@ -10716,7 +10748,7 @@ pub struct DefinedNames {
 #[sdk(no_prefix_only, qname = "x:calcPr")]
 pub struct CalculationProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Calculation Id
   #[sdk(attr(qname = ":calcId"))]
   pub calculation_id: Option<crate::simple_type::UInt32Value>,
@@ -10756,6 +10788,9 @@ pub struct CalculationProperties {
   /// Force Full Calculation
   #[sdk(attr(qname = ":forceFullCalc"))]
   pub force_full_calculation: Option<crate::simple_type::BooleanValue>,
+  /// Haansoft Calculation Identifier
+  #[sdk(attr(qname = "hs:hclCalcId"))]
+  pub hs_hcl_calc_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the OleSize Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

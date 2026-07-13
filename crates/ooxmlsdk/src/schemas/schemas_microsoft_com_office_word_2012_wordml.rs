@@ -61,7 +61,6 @@ pub struct DataBinding {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:appearance")]
 pub struct Appearance {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// val
   #[sdk(attr(qname = "w15:val"))]
   pub val: Option<SdtAppearance>,
@@ -71,7 +70,7 @@ pub struct Appearance {
 #[sdk(xml_header, qname = "w15:commentsEx")]
 pub struct CommentsEx {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Defines the CommentEx Class.
   #[sdk(child(qname = "w15:commentEx"))]
   pub comment_ex: Vec<CommentEx>,
@@ -81,7 +80,7 @@ pub struct CommentsEx {
 #[sdk(xml_header, qname = "w15:people")]
 pub struct People {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Defines the Person Class.
   #[sdk(child(qname = "w15:person"))]
   pub person: Vec<Person>,
@@ -141,7 +140,6 @@ pub struct DoNotAllowInsertDeleteSection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:docId")]
 pub struct PersistentDocumentId {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// val
   #[sdk(attr(qname = "w15:val"))]
   #[sdk(pattern(
@@ -164,7 +162,6 @@ pub struct FootnoteColumns {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:commentEx")]
 pub struct CommentEx {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// paraId
   #[sdk(attr(qname = "w15:paraId"))]
   #[sdk(string_length(source = 2u32, union = 0u64, min = 4u32, max = 4u32))]
@@ -181,10 +178,12 @@ pub struct CommentEx {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:person")]
 pub struct Person {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// author
   #[sdk(attr(qname = "w15:author"))]
   pub author: crate::simple_type::StringValue,
+  /// Legacy contact identity
+  #[sdk(attr(qname = "w15:contact"))]
+  pub contact: Option<crate::simple_type::StringValue>,
   /// Defines the PresenceInfo Class.
   #[sdk(child(qname = "w15:presenceInfo"))]
   pub presence_info: Option<PresenceInfo>,
@@ -193,7 +192,6 @@ pub struct Person {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:presenceInfo")]
 pub struct PresenceInfo {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// providerId
   #[sdk(attr(qname = "w15:providerId"))]
   pub w15_provider_id: crate::simple_type::StringValue,

@@ -146,8 +146,8 @@ Each `<w:tc>` contains:
 
 **Known generator limitation:** `ST_VerticalJc` value `"both"` (vertical
 justification) is not represented in the generated `TableVerticalAlignmentValues`
-enum. Documents using `<w:vAlign w:val="both"/>` will have that attribute
-preserved in `xml_other_attrs` rather than the typed field.
+enum. Documents using `<w:vAlign w:val="both"/>` cannot represent that value in
+the typed field.
 
 ---
 

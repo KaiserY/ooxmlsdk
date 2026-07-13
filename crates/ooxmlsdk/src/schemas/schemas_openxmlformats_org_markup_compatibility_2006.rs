@@ -9,7 +9,9 @@
 #[sdk(qname = "mc:AlternateContent")]
 pub struct AlternateContent {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_process_content: Option<std::boxed::Box<[u8]>>,
+  pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
   #[sdk(
         choice(
             child(variant = Choice, boxed, qname = "mc:Choice"),
@@ -23,7 +25,10 @@ pub struct AlternateContent {
 #[sdk(qname = "mc:Choice")]
 pub struct Choice {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
+  pub mc_process_content: Option<std::boxed::Box<[u8]>>,
+  pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
   #[sdk(any)]
   pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
@@ -32,7 +37,6 @@ pub struct Choice {
 #[sdk(qname = "mc:Fallback")]
 pub struct Fallback {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   #[sdk(any)]
   pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }

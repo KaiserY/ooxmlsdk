@@ -41,7 +41,22 @@
     },
     {
       "ClassName": "Duotone",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xfr1",
+          "PropertyName": "Xfr1",
+          "PropertyComments": "xfr1",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        },
+        {
+          "QName": "xfr2",
+          "PropertyName": "Xfr2",
+          "PropertyComments": "xfr2",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "EffectList",
@@ -137,8 +152,8 @@
     },
     {
       "ClassName": "RgbColorModelHex",
-      "HaveXmlnsFields": true,
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true,
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Scene3DType",
@@ -178,7 +193,7 @@
     },
     {
       "ClassName": "Theme",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "Transform2D",
@@ -193,8 +208,7 @@
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "TableStyleEntry",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "TableStyleEntry"
     }
   ]
 }

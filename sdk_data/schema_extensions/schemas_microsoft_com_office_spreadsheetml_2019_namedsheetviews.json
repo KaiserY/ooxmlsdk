@@ -2,7 +2,7 @@
   "Types": [
     {
       "ClassName": "NamedSheetViews",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     }
   ]
 }

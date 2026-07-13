@@ -59,7 +59,15 @@
     {
       "ClassName": "Comment",
       "HaveDirectXmlOtherChildren": true,
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "XrUid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "ConditionalFormattingRuleExtension",
@@ -120,7 +128,15 @@
     },
     {
       "ClassName": "NumberingFormat",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "x16r2:formatCode16",
+          "PropertyName": "X16r2FormatCode16",
+          "PropertyComments": "Revision 2 Number Format Code",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "OleObjects",
@@ -168,7 +184,16 @@
     },
     {
       "ClassName": "QueryTable",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true,
+      "Attributes": [
+        {
+          "QName": "xr16:uid",
+          "PropertyName": "Xr16Uid",
+          "PropertyComments": "Revision 16 Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "QueryTableExtension",
@@ -180,8 +205,8 @@
     },
     {
       "ClassName": "SharedStringItem",
+      "HaveMcIgnorable": false,
       "HaveXmlnsFields": true,
-      "HaveXmlOtherAttrs": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
@@ -202,7 +227,16 @@
     },
     {
       "ClassName": "Stylesheet",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xml:space",
+          "PropertyName": "Space",
+          "PropertyComments": "Content Contains Significant Whitespace",
+          "Optional": true,
+          "OverrideType": "EnumValue<DocumentFormat.OpenXml.SpaceProcessingModeValues>"
+        }
+      ],
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "TableExtension",
@@ -214,51 +248,94 @@
     },
     {
       "ClassName": "TableStyle",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xr9:uid",
+          "PropertyName": "Xr9Uid",
+          "PropertyComments": "Revision 9 Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "Comments",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "Connections",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "Connection",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xr16:uid",
+          "PropertyName": "Xr16Uid",
+          "PropertyComments": "Revision 16 Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "ExternalLink",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "Headers",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "PivotCacheDefinition",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true,
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "XrUid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "PivotCacheRecords",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "PivotTableDefinition",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true,
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "XrUid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "Table",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true,
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "XrUid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "Revisions",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "Users",
-      "HaveXmlOtherAttrs": true
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "Topic",
@@ -271,7 +348,16 @@
     },
     {
       "ClassName": "Workbook",
-      "HaveXmlOtherAttrs": true,
+      "Attributes": [
+        {
+          "QName": "xml:space",
+          "PropertyName": "Space",
+          "PropertyComments": "Content Contains Significant Whitespace",
+          "Optional": true,
+          "OverrideType": "EnumValue<DocumentFormat.OpenXml.SpaceProcessingModeValues>"
+        }
+      ],
+      "HaveMcIgnorable": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
@@ -284,8 +370,18 @@
     },
     {
       "ClassName": "Worksheet",
-      "HaveXmlOtherAttrs": true,
-      "HaveDirectXmlOtherChildren": true
+      "HaveMcIgnorable": true,
+      "HaveMcPreserveAttributes": true,
+      "HaveDirectXmlOtherChildren": true,
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "XrUid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "WorksheetExtension",
@@ -297,20 +393,44 @@
     },
     {
       "ClassName": "AutoFilter",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "XrUid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
-      "ClassName": "CellFormat",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "CellFormat"
     },
     {
       "ClassName": "CellStyle",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "XrUid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "CalculationProperties",
+      "HaveMcIgnorable": true,
       "HaveXmlnsFields": true,
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "hs:hclCalcId",
+          "PropertyName": "HsHclCalcId",
+          "PropertyComments": "Haansoft Calculation Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "CellFormats",
@@ -318,8 +438,16 @@
     },
     {
       "ClassName": "DataValidation",
-      "HaveXmlOtherAttrs": true,
-      "HaveDirectXmlOtherChildren": true
+      "HaveDirectXmlOtherChildren": true,
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "XrUid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "Drawing",
@@ -327,7 +455,15 @@
     },
     {
       "ClassName": "DefinedName",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xml:space",
+          "PropertyName": "Space",
+          "PropertyComments": "Content Contains Significant Whitespace",
+          "Optional": true,
+          "OverrideType": "EnumValue<DocumentFormat.OpenXml.SpaceProcessingModeValues>"
+        }
+      ]
     },
     {
       "ClassName": "DifferentialFormats",
@@ -343,32 +479,52 @@
     },
     {
       "ClassName": "Fonts",
-      "HaveXmlOtherAttrs": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "Hyperlink",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "XrUid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
-      "ClassName": "Row",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "Row"
     },
     {
-      "ClassName": "SheetFormatProperties",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "SheetFormatProperties"
     },
     {
       "ClassName": "TableColumn",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xr3:uid",
+          "PropertyName": "Xr3Uid",
+          "PropertyComments": "Revision 3 Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
-      "ClassName": "Text",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "Text"
     },
     {
       "ClassName": "WorkbookView",
-      "HaveXmlOtherAttrs": true
+      "Attributes": [
+        {
+          "QName": "xr2:uid",
+          "PropertyName": "Xr2Uid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     }
   ]
 }

@@ -35,7 +35,7 @@ pub struct Mcds {
 #[sdk(xml_header, qname = "wne:vbaSuppData")]
 pub struct VbaSuppData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Defines the DocEvents Class.
   #[sdk(child(qname = "wne:docEvents"))]
   pub doc_events: Option<DocEvents>,
@@ -48,6 +48,7 @@ pub struct VbaSuppData {
 #[sdk(xml_header, qname = "wne:recipients")]
 pub struct MailMergeRecipients {
   pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Defines the SingleDataSourceRecord Class.
   #[sdk(child(qname = "wne:recipientData"))]
   pub single_data_source_record: Vec<SingleDataSourceRecord>,
@@ -113,7 +114,6 @@ pub struct CharacterInsertion {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:keymap")]
 pub struct KeyMapEntry {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// chmPrimary
   #[sdk(attr(qname = "wne:chmPrimary"))]
   #[sdk(string_length(min = 2u32, max = 2u32))]

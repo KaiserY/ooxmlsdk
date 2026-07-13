@@ -99,7 +99,11 @@ pub struct SchemaType {
   pub xml_header: SchemaTypeXmlHeader,
   pub is_abstract: bool,
   pub have_xmlns_fields: bool,
-  pub have_xml_other_attrs: bool,
+  pub have_mc_ignorable: bool,
+  pub have_mc_preserve_attributes: bool,
+  pub have_mc_preserve_elements: bool,
+  pub have_mc_process_content: bool,
+  pub have_mc_must_understand: bool,
   pub have_xml_other_children: bool,
   pub have_direct_xml_other_children: bool,
   #[serde(skip_serializing_if = "Vec::is_empty")]

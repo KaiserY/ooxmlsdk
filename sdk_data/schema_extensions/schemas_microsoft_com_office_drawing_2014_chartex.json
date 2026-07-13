@@ -31,8 +31,7 @@
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "ExternalData",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "ExternalData"
     }
   ]
 }

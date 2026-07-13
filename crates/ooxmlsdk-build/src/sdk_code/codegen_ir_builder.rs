@@ -831,7 +831,11 @@ fn build_type_decl(
           SchemaTypeXmlHeader::Plain => XmlHeaderMode::Plain,
           SchemaTypeXmlHeader::Standalone => XmlHeaderMode::Standalone,
         },
-        have_xml_other_attrs: schema_type.have_xml_other_attrs,
+        have_mc_ignorable: schema_type.have_mc_ignorable,
+        have_mc_preserve_attributes: schema_type.have_mc_preserve_attributes,
+        have_mc_preserve_elements: schema_type.have_mc_preserve_elements,
+        have_mc_process_content: schema_type.have_mc_process_content,
+        have_mc_must_understand: schema_type.have_mc_must_understand,
         have_xml_other_children,
         compact_xml_other_children,
         extra_xmlns: schema_type.extra_xmlns.clone(),
@@ -1997,7 +2001,11 @@ fn effective_child_kind_from_name(
   if child_type.api_kind == SchemaTypeApiKind::LeafTextWrapper
     && child_type.attributes.is_empty()
     && !child_type.have_xmlns_fields
-    && !child_type.have_xml_other_attrs
+    && !child_type.have_mc_ignorable
+    && !child_type.have_mc_preserve_attributes
+    && !child_type.have_mc_preserve_elements
+    && !child_type.have_mc_process_content
+    && !child_type.have_mc_must_understand
     && child_type.xml_header == SchemaTypeXmlHeader::None
   {
     SchemaTypeChildKind::TextChild
@@ -4313,7 +4321,11 @@ mod tests {
           summary: "Paragraph.".to_string(),
           version: Some("Office2007".to_string()),
           have_xmlns_fields: true,
-          have_xml_other_attrs: true,
+          have_mc_ignorable: true,
+          have_mc_preserve_attributes: true,
+          have_mc_preserve_elements: true,
+          have_mc_process_content: true,
+          have_mc_must_understand: true,
           have_xml_other_children: false,
           xml_header: SchemaTypeXmlHeader::Standalone,
           ..Default::default()
@@ -4338,7 +4350,11 @@ mod tests {
     assert_eq!(ir.types[0].xml_qname.as_deref(), Some("t:CT_P/t:p"));
     assert!(ir.types[0].support.have_xmlns_fields);
     assert_eq!(ir.types[0].support.xml_header, XmlHeaderMode::Standalone);
-    assert!(ir.types[0].support.have_xml_other_attrs);
+    assert!(ir.types[0].support.have_mc_ignorable);
+    assert!(ir.types[0].support.have_mc_preserve_attributes);
+    assert!(ir.types[0].support.have_mc_preserve_elements);
+    assert!(ir.types[0].support.have_mc_process_content);
+    assert!(ir.types[0].support.have_mc_must_understand);
 
     assert_eq!(ir.types[1].rust_name, "TextValue");
     assert_eq!(ir.types[1].kind, TypeKind::LeafTextAlias);
@@ -4953,7 +4969,7 @@ mod tests {
   }
 
   #[test]
-  fn direct_xml_other_children_promotion_ignores_attributes() {
+  fn direct_xml_other_children_promotion_preserves_attributes() {
     let schema = Schema {
       module_name: "test_module".to_string(),
       target_namespace: "urn:test".to_string(),
@@ -4970,7 +4986,6 @@ mod tests {
           name: "t:CT_Parent/t:parent".to_string(),
           class_name: "Parent".to_string(),
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
-          have_xml_other_attrs: true,
           have_direct_xml_other_children: true,
           attributes: vec![SchemaTypeAttribute {
             q_name: ":count".to_string(),
@@ -4995,7 +5010,6 @@ mod tests {
     let ir = build_codegen_ir(&schema, &context).unwrap();
 
     let parent = ir.types.iter().find(|ty| ty.rust_name == "Parent").unwrap();
-    assert!(parent.support.have_xml_other_attrs);
     assert!(!parent.support.have_xml_other_children);
     assert!(parent.members.iter().any(|member| {
       matches!(

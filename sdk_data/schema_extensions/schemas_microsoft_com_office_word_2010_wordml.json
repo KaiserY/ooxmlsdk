@@ -1,8 +1,7 @@
 {
   "Types": [
     {
-      "ClassName": "DocumentId",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "DocumentId"
     }
   ]
 }

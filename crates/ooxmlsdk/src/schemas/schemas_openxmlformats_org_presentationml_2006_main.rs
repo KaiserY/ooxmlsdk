@@ -1000,7 +1000,8 @@ pub struct OleObject {
 #[sdk(xml_header, qname = "p:presentation")]
 pub struct Presentation {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// serverZoom
   #[sdk(attr(qname = ":serverZoom"))]
   pub server_zoom: Option<crate::simple_type::DrawingmlPercentageValue>,
@@ -1086,7 +1087,8 @@ pub struct Presentation {
 #[sdk(xml_header, qname = "p:presentationPr")]
 pub struct PresentationProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// HTML Publishing Properties
   #[sdk(child(qname = "p:htmlPubPr"))]
   pub html_publish_properties: Option<std::boxed::Box<HtmlPublishProperties>>,
@@ -1111,7 +1113,8 @@ pub struct PresentationProperties {
 #[sdk(xml_header, qname = "p:sld")]
 pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
@@ -1143,7 +1146,8 @@ pub struct Slide {
 #[sdk(xml_header, qname = "p:sldLayout")]
 pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
@@ -1188,7 +1192,8 @@ pub struct SlideLayout {
 #[sdk(xml_header, qname = "p:sldMaster")]
 pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// preserve
   #[sdk(attr(qname = ":preserve"))]
@@ -1241,7 +1246,8 @@ pub struct HandoutMaster {
 #[sdk(xml_header, qname = "p:notesMaster")]
 pub struct NotesMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
@@ -1263,7 +1269,8 @@ pub struct NotesMaster {
 #[sdk(xml_header, qname = "p:notes")]
 pub struct NotesSlide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1312,7 +1319,8 @@ pub struct TagList {
 #[sdk(xml_header, qname = "p:viewPr")]
 pub struct ViewProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// Last View
   #[sdk(attr(qname = ":lastView"))]
   #[sdk(string_format(kind = "token"))]
@@ -4585,7 +4593,9 @@ pub struct HeaderFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:extLst")]
 pub struct SlideLayoutExtensionList {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  /// Modify
+  #[sdk(attr(qname = ":mod"))]
+  pub modify: Option<crate::simple_type::BooleanValue>,
   /// Defines the SlideLayoutExtension Class.
   #[sdk(child(qname = "p:ext"))]
   pub slide_layout_extension: Vec<SlideLayoutExtension>,
@@ -4619,7 +4629,9 @@ pub struct TextStyles {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:extLst")]
 pub struct SlideMasterExtensionList {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  /// Modify
+  #[sdk(attr(qname = ":mod"))]
+  pub modify: Option<crate::simple_type::BooleanValue>,
   /// Defines the SlideMasterExtension Class.
   #[sdk(child(qname = "p:ext"))]
   pub slide_master_extension: Vec<SlideMasterExtension>,

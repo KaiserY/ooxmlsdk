@@ -954,7 +954,6 @@ pub struct ExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix, qname = "x14:dataValidation")]
 pub struct DataValidation {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<crate::schemas::x::DataValidationValues>,
@@ -991,6 +990,9 @@ pub struct DataValidation {
   /// prompt
   #[sdk(attr(qname = ":prompt"))]
   pub prompt: Option<crate::simple_type::StringValue>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr:uid"))]
+  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// Defines the DataValidationForumla1 Class.
   #[sdk(child(qname = "x14:formula1"))]
   pub data_validation_forumla1: Option<DataValidationForumla1>,
@@ -1666,13 +1668,15 @@ pub struct DifferentialType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix, qname = "x14:cfvo")]
 pub struct ConditionalFormattingValueObject {
-  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// type
   #[sdk(attr(qname = ":type"))]
   pub r#type: ConditionalFormattingValueObjectTypeValues,
   /// gte
   #[sdk(attr(qname = ":gte"))]
   pub greater_than_or_equal: Option<crate::simple_type::BooleanValue>,
+  /// Value
+  #[sdk(attr(qname = ":value"))]
+  pub value: Option<crate::simple_type::StringValue>,
   /// Defines the Formula Class.
   #[sdk(text_child(qname = "xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,

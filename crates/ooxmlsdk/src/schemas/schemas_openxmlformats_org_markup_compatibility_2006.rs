@@ -25,10 +25,14 @@ pub struct AlternateContent {
 #[sdk(qname = "mc:Choice")]
 pub struct Choice {
   pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   pub mc_process_content: Option<std::boxed::Box<[u8]>>,
   pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
+  /// Requires
+  #[sdk(attr(qname = "Requires"))]
+  pub requires: crate::simple_type::StringValue,
   #[sdk(any)]
   pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
@@ -37,6 +41,9 @@ pub struct Choice {
 #[sdk(qname = "mc:Fallback")]
 pub struct Fallback {
   pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_process_content: Option<std::boxed::Box<[u8]>>,
+  pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
   #[sdk(any)]
   pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }

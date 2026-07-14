@@ -25,6 +25,7 @@ pub mod helpers;
 pub mod part_codegen_ir;
 pub mod parts;
 pub mod schemas;
+pub mod simple_type_mapping;
 pub mod versioning;
 
 const FILE_HEADER: &str = r#"//
@@ -64,6 +65,7 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
 }
 
 pub fn gen_derive_namespace_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
+  let loaded_schemas = read_schemas(&sdk_data_dir.as_ref().join("schemas"))?;
   let namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   write_namespaces(NamespacesInput {
     sdk_data_namespaces: &namespaces,
@@ -71,7 +73,8 @@ pub fn gen_derive_namespace_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) ->
     include_known_namespace: false,
     include_uri_by_prefix: true,
     include_default_namespace_style: false,
-  })
+  })?;
+  simple_type_mapping::write_simple_type_mapping(&loaded_schemas, out_dir.as_ref())
 }
 
 fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<LoadedSchema>> {

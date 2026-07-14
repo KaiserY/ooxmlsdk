@@ -5,13 +5,6 @@ use crate::sdk_data::sdk_data_model::{
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SimpleValueKind {
-  StringLike,
-  BoolLike,
-  NumericLike,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AttrTypeKind<'a> {
   List,
   Enum {
@@ -20,7 +13,6 @@ pub enum AttrTypeKind<'a> {
   },
   Simple {
     simple_type: &'a str,
-    value_kind: SimpleValueKind,
   },
 }
 
@@ -448,59 +440,6 @@ fn structure_sequence_variant_child<'a>(
   }
 }
 
-pub fn classify_simple_type(simple_type: &str) -> Option<SimpleValueKind> {
-  match simple_type {
-    "Base64BinaryValue"
-    | "DateTimeValue"
-    | "DecimalValue"
-    | "HexBinaryValue"
-    | "StringValue"
-    | "TwipsMeasureValue"
-    | "SignedTwipsMeasureValue"
-    | "DecimalNumberOrPercentValue"
-    | "MeasurementOrPercentValue" => Some(SimpleValueKind::StringLike),
-    "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => {
-      Some(SimpleValueKind::BoolLike)
-    }
-    "ByteValue"
-    | "SByteValue"
-    | "Int16Value"
-    | "Int32Value"
-    | "Int64Value"
-    | "IntegerValue"
-    | "CoordinateValue"
-    | "Coordinate32Value"
-    | "DrawingmlAngleValue"
-    | "DrawingmlPercentageValue"
-    | "DrawingmlPercentValue"
-    | "EmuValue"
-    | "FixedPercentageValue"
-    | "HpsMeasureValue"
-    | "PositiveCoordinateValue"
-    | "PositiveCoordinate32Value"
-    | "PositiveDrawingmlPercentageValue"
-    | "PositiveFixedPercentageValue"
-    | "PositiveUniversalMeasureValue"
-    | "SignedHpsMeasureValue"
-    | "TextBulletSizeDecimalValue"
-    | "TextBulletSizePercentValue"
-    | "TextBulletSizeValue"
-    | "TextFontScalePercentOrPercentStringValue"
-    | "TextFontSizeValue"
-    | "TextPointValue"
-    | "TextSpacingPercentOrPercentStringValue"
-    | "TextSpacingPointValue"
-    | "TwipsValue"
-    | "UniversalMeasureValue"
-    | "UInt16Value"
-    | "UInt32Value"
-    | "UInt64Value"
-    | "DoubleValue"
-    | "SingleValue" => Some(SimpleValueKind::NumericLike),
-    _ => None,
-  }
-}
-
 pub fn classify_attr_type(attr_type: &str) -> Option<AttrTypeKind<'_>> {
   if attr_type.starts_with("ListValue<") {
     return Some(AttrTypeKind::List);
@@ -517,6 +456,5 @@ pub fn classify_attr_type(attr_type: &str) -> Option<AttrTypeKind<'_>> {
 
   Some(AttrTypeKind::Simple {
     simple_type: attr_type,
-    value_kind: classify_simple_type(attr_type)?,
   })
 }

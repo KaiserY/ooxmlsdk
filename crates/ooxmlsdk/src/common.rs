@@ -32,23 +32,27 @@ pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
   DeEvent, PayloadEvent, XmlRead, append_de_text_field, append_fast_bytes_text_field,
-  decode_utf16_xml_bytes, from_bytes_inner, from_reader_inner, parse_attr_value,
-  parse_borrowed_list_attr, parse_decimal_number_or_percent_attr, parse_enum_attr, parse_f32_attr,
-  parse_f64_attr, parse_i8_attr, parse_i16_attr, parse_i32_attr, parse_i64_attr, parse_list_attr,
+  attribute_qname_has_namespace, from_bytes_inner, from_reader_inner, parse_bytes_list_attr,
+  parse_decimal_number_or_percent_attr, parse_enum_attr, parse_f32_attr, parse_f64_attr,
+  parse_i8_attr, parse_i16_attr, parse_i32_attr, parse_i32_bytes, parse_i64_attr, parse_list_attr,
   parse_list_value, parse_measurement_or_percent_attr, parse_signed_twips_measure_attr,
   parse_text_child_value, parse_twips_measure_attr, parse_u8_attr, parse_u16_attr, parse_u32_attr,
-  parse_u64_attr, parse_value, read_enum_text_child_value, read_f32_text_child_value,
-  read_f64_text_child_value, read_i8_text_child_value, read_i16_text_child_value,
-  read_i32_text_child_value, read_i64_text_child_value, read_root_start_borrowed,
-  read_root_start_io, read_u8_text_child_value, read_u16_text_child_value,
-  read_u32_text_child_value, read_u64_text_child_value, root_element_matches_namespace_local,
-  write_decimal_number_or_percent_value, write_escaped_content_str, write_escaped_content_text,
-  write_escaped_str, write_escaped_text, write_f32_value, write_f64_value, write_i8_value,
+  parse_u32_bytes, parse_u64_attr, parse_value, read_enum_text_child_value,
+  read_f32_text_child_value, read_f64_text_child_value, read_i8_text_child_value,
+  read_i16_text_child_value, read_i32_text_child_value, read_i64_text_child_value,
+  read_root_start_borrowed, read_root_start_io, read_text_child_value, read_u8_text_child_value,
+  read_u16_text_child_value, read_u32_text_child_value, read_u64_text_child_value,
+  write_coordinate_value, write_coordinate32_value, write_decimal_number_or_percent_value,
+  write_drawingml_percentage_value, write_escaped_content_str, write_escaped_content_text,
+  write_escaped_str, write_f32_value, write_f64_value, write_hps_measure_value, write_i8_value,
   write_i16_value, write_i32_value, write_i64_value, write_list_content_str_value,
-  write_list_str_value, write_list_value, write_measurement_or_percent_value,
-  write_signed_twips_measure_value, write_twips_measure_value, write_u8_value, write_u16_value,
+  write_list_str_value, write_list_value_with, write_measurement_or_percent_value,
+  write_signed_hps_measure_value, write_signed_twips_measure_value, write_text_bullet_size_value,
+  write_text_point_value, write_twips_measure_value, write_u8_value, write_u16_value,
   write_u32_value, write_u64_value, write_xmlns_attr, xml_local_name,
 };
+#[cfg(feature = "parts")]
+pub(crate) use xml::{decode_utf16_xml_bytes, root_element_matches_namespace_local};
 #[cfg(feature = "flat-opc")]
 pub(crate) use xml::{read_outer_xml_borrowed, read_outer_xml_io};
 
@@ -178,38 +182,11 @@ fn split_raw_namespace(raw: &[u8]) -> (&[u8], &[u8]) {
 }
 
 #[inline]
-fn write_raw_attr_value<W: std::io::Write>(
-  writer: &mut W,
-  raw_value: &[u8],
-) -> std::io::Result<()> {
-  if !raw_value.contains(&b'"') {
-    writer.write_all(b"=\"")?;
-    writer.write_all(raw_value)?;
-    writer.write_all(b"\"")
-  } else if !raw_value.contains(&b'\'') {
-    writer.write_all(b"='")?;
-    writer.write_all(raw_value)?;
-    writer.write_all(b"'")
-  } else {
-    writer.write_all(b"=\"")?;
-    let mut chunks = raw_value.split(|byte| *byte == b'"');
-    if let Some(first) = chunks.next() {
-      writer.write_all(first)?;
-    }
-    for chunk in chunks {
-      writer.write_all(b"&quot;")?;
-      writer.write_all(chunk)?;
-    }
-    writer.write_all(b"\"")
-  }
-}
-
-#[inline]
 pub(crate) fn write_mc_ignorable_attr<W: std::io::Write>(
   writer: &mut W,
   raw_value: &[u8],
 ) -> std::io::Result<()> {
-  write_mc_attr(writer, b" mc:Ignorable", raw_value)
+  write_mc_attr(writer, b" mc:Ignorable=\"", raw_value)
 }
 
 #[inline]
@@ -217,7 +194,7 @@ pub(crate) fn write_mc_preserve_attributes_attr<W: std::io::Write>(
   writer: &mut W,
   raw_value: &[u8],
 ) -> std::io::Result<()> {
-  write_mc_attr(writer, b" mc:PreserveAttributes", raw_value)
+  write_mc_attr(writer, b" mc:PreserveAttributes=\"", raw_value)
 }
 
 #[inline]
@@ -225,7 +202,7 @@ pub(crate) fn write_mc_process_content_attr<W: std::io::Write>(
   writer: &mut W,
   raw_value: &[u8],
 ) -> std::io::Result<()> {
-  write_mc_attr(writer, b" mc:ProcessContent", raw_value)
+  write_mc_attr(writer, b" mc:ProcessContent=\"", raw_value)
 }
 
 #[inline]
@@ -233,17 +210,18 @@ pub(crate) fn write_mc_must_understand_attr<W: std::io::Write>(
   writer: &mut W,
   raw_value: &[u8],
 ) -> std::io::Result<()> {
-  write_mc_attr(writer, b" mc:MustUnderstand", raw_value)
+  write_mc_attr(writer, b" mc:MustUnderstand=\"", raw_value)
 }
 
 #[inline]
 pub(crate) fn write_mc_attr<W: std::io::Write>(
   writer: &mut W,
-  name: &[u8],
+  prefix: &[u8],
   raw_value: &[u8],
 ) -> std::io::Result<()> {
-  writer.write_all(name)?;
-  write_raw_attr_value(writer, raw_value)
+  writer.write_all(prefix)?;
+  writer.write_all(raw_value)?;
+  writer.write_all(b"\"")
 }
 
 #[inline]
@@ -451,12 +429,14 @@ mod tests {
     const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
     let xml = format!(
-      r#"<w:document xmlns:w="{W}" xmlns:ns1="urn:not-mc" xmlns:mc="{MC}" mc:Ignorable="w14"><w:body/></w:document>"#,
+      r#"<w:document xmlns:w="{W}" xmlns:ns1="urn:not-mc" xmlns:mc="{MC}" ns1:Ignorable="bad" mc:Ignorable="w14"><w:body/></w:document>"#,
     );
 
     let serialized = serialize_word_document(&xml);
     assert!(serialized.contains(r#"xmlns:ns1="urn:not-mc""#));
     assert_eq!(serialized.matches("xmlns:mc=").count(), 1);
+    assert!(!serialized.contains("bad"));
+    assert!(serialized.contains(r#"mc:Ignorable="w14""#));
   }
 
   #[cfg(feature = "parts")]

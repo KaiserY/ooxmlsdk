@@ -13431,6 +13431,10 @@ mod tests {
     SignedTwipsMeasureValue::Twips(value)
   }
 
+  fn hps(value: u64) -> ooxmlsdk::simple_type::HpsMeasureValue {
+    ooxmlsdk::simple_type::HpsMeasureValue::HalfPoints(value)
+  }
+
   fn measurement(value: i32) -> MeasurementOrPercentValue {
     MeasurementOrPercentValue::DecimalNumberOrPercent(
       ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value.into()),
@@ -14139,9 +14143,9 @@ mod tests {
       paragraph_properties: Some(Box::new(w::ParagraphProperties {
         paragraph_mark_run_properties: Some(Box::new(w::ParagraphMarkRunProperties {
           paragraph_mark_run_properties_choice2: vec![
-            w::ParagraphMarkRunPropertiesChoice2::FontSize(w::FontSize { val: "96".into() }),
+            w::ParagraphMarkRunPropertiesChoice2::FontSize(w::FontSize { val: hps(96) }),
             w::ParagraphMarkRunPropertiesChoice2::FontSizeComplexScript(w::FontSizeComplexScript {
-              val: "96".into(),
+              val: hps(96),
             }),
           ],
           ..Default::default()

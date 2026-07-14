@@ -33,14 +33,14 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
     });
     from_bytes_arms.push(quote! {
       #(#cfg_attrs)*
-      #xml_bytes_lit => Ok(Self::#variant_ident),
+      #xml_bytes_lit => Some(Self::#variant_ident),
     });
 
     for alias in aliases {
       let alias_bytes_lit = LitByteStr::new(alias.as_bytes(), Span::call_site());
       from_bytes_arms.push(quote! {
         #(#cfg_attrs)*
-        #alias_bytes_lit => Ok(Self::#variant_ident),
+        #alias_bytes_lit => Some(Self::#variant_ident),
       });
     }
   }
@@ -55,14 +55,19 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
         }
       }
 
-      fn from_xml_bytes(b: &[u8]) -> Result<Self, crate::common::SdkError> {
+      #[inline]
+      fn try_from_xml_bytes(b: &[u8]) -> Option<Self> {
         match b {
           #( #from_bytes_arms )*
-          other => Err(crate::common::invalid_enum_value(
-            #ty_name,
-            String::from_utf8_lossy(other).into_owned(),
-          )),
+          _ => None,
         }
+      }
+
+      fn from_xml_bytes(b: &[u8]) -> Result<Self, crate::common::SdkError> {
+        Self::try_from_xml_bytes(b).ok_or_else(|| crate::common::invalid_enum_value(
+            #ty_name,
+            String::from_utf8_lossy(b).into_owned(),
+        ))
       }
     }
 

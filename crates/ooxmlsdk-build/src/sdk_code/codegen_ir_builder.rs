@@ -1937,6 +1937,15 @@ fn build_xml_content_type_ref(
   }
 
   if let Some(type_ref) = build_simple_type_ref_from_name(first_name) {
+    if let Some(inner_type) = type_ref
+      .rust_type
+      .strip_prefix("ListValue<")
+      .and_then(|value| value.strip_suffix('>'))
+    {
+      return Ok(Some(build_list_type_ref_from_inner_type(
+        inner_type, schema, context,
+      )?));
+    }
     return Ok(Some(type_ref));
   }
 

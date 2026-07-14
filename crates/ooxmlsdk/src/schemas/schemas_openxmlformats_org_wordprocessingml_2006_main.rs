@@ -5408,7 +5408,7 @@ pub struct Position {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::SignedHpsMeasureValue,
 }
 /// Defines the FontSize Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5430,7 +5430,7 @@ pub struct FontSize {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::HpsMeasureValue,
 }
 /// Defines the FontSizeComplexScript Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5452,7 +5452,7 @@ pub struct FontSizeComplexScript {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::HpsMeasureValue,
 }
 /// Checkbox Form Field Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5474,7 +5474,7 @@ pub struct FormFieldSize {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::HpsMeasureValue,
 }
 /// Phonetic Guide Text Font Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5496,7 +5496,7 @@ pub struct PhoneticGuideTextFontSize {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::HpsMeasureValue,
 }
 /// Phonetic Guide Base Text Font Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5518,7 +5518,7 @@ pub struct PhoneticGuideBaseTextSize {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::HpsMeasureValue,
 }
 /// Defines the Highlight Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

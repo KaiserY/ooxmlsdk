@@ -1657,7 +1657,7 @@ pub struct AnimateMotion {
   pub path_edit_mode: Option<AnimateMotionPathEditModeValues>,
   /// rAng
   #[sdk(attr(qname = ":rAng"))]
-  pub relative_angle: Option<crate::simple_type::Int32Value>,
+  pub relative_angle: Option<crate::simple_type::DrawingmlAngleValue>,
   /// ptsTypes
   #[sdk(attr(qname = ":ptsTypes"))]
   pub point_types: Option<crate::simple_type::StringValue>,
@@ -1694,13 +1694,13 @@ pub struct AnimateMotion {
 pub struct AnimateRotation {
   /// by
   #[sdk(attr(qname = ":by"))]
-  pub by: Option<crate::simple_type::Int32Value>,
+  pub by: Option<crate::simple_type::DrawingmlAngleValue>,
   /// from
   #[sdk(attr(qname = ":from"))]
-  pub from: Option<crate::simple_type::Int32Value>,
+  pub from: Option<crate::simple_type::DrawingmlAngleValue>,
   /// to
   #[sdk(attr(qname = ":to"))]
-  pub to: Option<crate::simple_type::Int32Value>,
+  pub to: Option<crate::simple_type::DrawingmlAngleValue>,
   /// bounceEnd
   #[sdk(attr(qname = "p14:bounceEnd"))]
   #[sdk(number_range(
@@ -2061,7 +2061,7 @@ pub struct RgbColor {
 pub struct HslColor {
   /// Hue
   #[sdk(attr(qname = ":h"))]
-  pub hue: crate::simple_type::Int32Value,
+  pub hue: crate::simple_type::DrawingmlAngleValue,
   /// Saturation
   #[sdk(attr(qname = ":s"))]
   #[sdk(number_range(range = -100000..= 100000))]

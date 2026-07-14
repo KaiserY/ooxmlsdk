@@ -16,6 +16,7 @@ mod sdk_part;
 mod sdk_part_ref;
 mod sdk_type;
 mod sdk_xml_namespace;
+mod simple_type_mapping;
 
 #[proc_macro_derive(SdkEnum, attributes(sdk))]
 pub fn sdk_enum(input: TokenStream) -> TokenStream {
@@ -1612,7 +1613,9 @@ fn unwrap_option_vec_type(ty: &Type) -> Type {
 }
 
 fn is_string_like_type(ty: &Type) -> bool {
-  type_terminal_name(ty).is_some_and(|name| is_string_like_type_name(name.as_str()))
+  effective_type_name(ty, None)
+    .as_deref()
+    .is_some_and(is_string_like_type_name)
 }
 
 fn type_terminal_name(ty: &Type) -> Option<String> {
@@ -1626,9 +1629,30 @@ fn type_terminal_name(ty: &Type) -> Option<String> {
 }
 
 fn effective_type_name<'a>(ty: &'a Type, simple_type: Option<&'a str>) -> Option<String> {
-  simple_type
-    .map(str::to_string)
-    .or_else(|| type_terminal_name(ty))
+  effective_type_name_with_qname(ty, simple_type, "")
+}
+
+fn effective_type_name_with_qname(
+  ty: &Type,
+  simple_type: Option<&str>,
+  qname: &str,
+) -> Option<String> {
+  let type_name = type_terminal_name(ty);
+  simple_type_mapping::resolve(type_name.as_deref(), simple_type, qname, false)
+    .map(|shape| shape.kind.canonical_type_name().to_string())
+    .or_else(|| simple_type.map(str::to_string))
+    .or(type_name)
+}
+
+fn mapped_simple_type_name(
+  ty: Option<&Type>,
+  simple_type: Option<&str>,
+  qname: &str,
+  list: bool,
+) -> Option<&'static str> {
+  let type_name = ty.and_then(type_terminal_name);
+  simple_type_mapping::resolve(type_name.as_deref(), simple_type, qname, list)
+    .map(|shape| shape.kind.canonical_type_name())
 }
 
 fn is_string_like_type_name(name: &str) -> bool {
@@ -1653,7 +1677,7 @@ fn is_string_like_effective_type(ty: &Type, simple_type: Option<&str>) -> bool {
 fn is_sdk_enum_type_name(name: &str) -> bool {
   matches!(
     name,
-    "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue"
+    "__SdkEnum" | "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue"
   ) || name.ends_with("Values")
 }
 
@@ -1672,7 +1696,7 @@ enum SimpleUnionTypeKind {
 }
 
 fn simple_union_type_kind(ty: &Type) -> Option<SimpleUnionTypeKind> {
-  type_terminal_name(ty).and_then(|ident| simple_union_type_kind_name(ident.as_str()))
+  effective_type_name(ty, None).and_then(|ident| simple_union_type_kind_name(ident.as_str()))
 }
 
 fn simple_union_type_kind_name(name: &str) -> Option<SimpleUnionTypeKind> {
@@ -1735,7 +1759,10 @@ fn write_simple_union_value_tokens(
 fn is_from_bytes_attr_type_name(name: &str) -> bool {
   matches!(
     name,
-    "DrawingmlPercentageValue"
+    "UniversalMeasureValue"
+      | "HpsMeasureValue"
+      | "SignedHpsMeasureValue"
+      | "DrawingmlPercentageValue"
       | "PositiveDrawingmlPercentageValue"
       | "FixedPercentageValue"
       | "PositiveFixedPercentageValue"
@@ -1748,6 +1775,27 @@ fn is_from_bytes_attr_type_name(name: &str) -> bool {
       | "TextPointValue"
       | "TextBulletSizeValue"
   )
+}
+
+fn write_from_bytes_value_tokens(
+  value_ty: &Type,
+  simple_type: Option<&str>,
+  value_expr: proc_macro2::TokenStream,
+) -> Option<proc_macro2::TokenStream> {
+  let write_fn = match effective_type_name(value_ty, simple_type).as_deref() {
+    Some("UniversalMeasureValue") => quote! { crate::common::write_universal_measure_value },
+    Some("HpsMeasureValue") => quote! { crate::common::write_hps_measure_value },
+    Some("SignedHpsMeasureValue") => quote! { crate::common::write_signed_hps_measure_value },
+    Some("CoordinateValue") => quote! { crate::common::write_coordinate_value },
+    Some("Coordinate32Value") => quote! { crate::common::write_coordinate32_value },
+    Some("DrawingmlPercentageValue") => {
+      quote! { crate::common::write_drawingml_percentage_value }
+    }
+    Some("TextPointValue") => quote! { crate::common::write_text_point_value },
+    Some("TextBulletSizeValue") => quote! { crate::common::write_text_bullet_size_value },
+    _ => return None,
+  };
+  Some(quote! { #write_fn(writer, #value_expr)?; })
 }
 
 fn is_from_bytes_attr_effective_type(ty: &Type, simple_type: Option<&str>) -> bool {
@@ -1787,7 +1835,9 @@ fn integer_effective_type_kind(ty: &Type, simple_type: Option<&str>) -> Option<I
 }
 
 fn is_xml_schema_float_type(ty: &Type) -> bool {
-  type_terminal_name(ty).is_some_and(|name| is_xml_schema_float_type_name(name.as_str()))
+  effective_type_name(ty, None)
+    .as_deref()
+    .is_some_and(is_xml_schema_float_type_name)
 }
 
 fn is_xml_schema_float_type_name(name: &str) -> bool {
@@ -1911,6 +1961,19 @@ fn parse_integer_attr_tokens_by_kind(
     IntegerTypeKind::I64 => quote! {
       crate::common::parse_i64_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
+  }
+}
+
+fn parse_integer_bytes_fn_by_kind(kind: IntegerTypeKind) -> proc_macro2::TokenStream {
+  match kind {
+    IntegerTypeKind::U8 => quote! { crate::common::parse_u8_bytes },
+    IntegerTypeKind::I8 => quote! { crate::common::parse_i8_bytes },
+    IntegerTypeKind::U16 => quote! { crate::common::parse_u16_bytes },
+    IntegerTypeKind::I16 => quote! { crate::common::parse_i16_bytes },
+    IntegerTypeKind::U32 => quote! { crate::common::parse_u32_bytes },
+    IntegerTypeKind::I32 => quote! { crate::common::parse_i32_bytes },
+    IntegerTypeKind::U64 => quote! { crate::common::parse_u64_bytes },
+    IntegerTypeKind::I64 => quote! { crate::common::parse_i64_bytes },
   }
 }
 

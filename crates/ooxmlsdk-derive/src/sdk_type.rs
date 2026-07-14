@@ -699,6 +699,8 @@ fn write_text_value_content_tokens(
   simple_type: Option<&str>,
   qname: &str,
 ) -> proc_macro2::TokenStream {
+  let simple_type =
+    mapped_simple_type_name(Some(value_ty), simple_type, qname, false).or(simple_type);
   if let Some(kind) = simple_union_effective_type_kind(value_ty, simple_type) {
     write_simple_union_value_tokens(kind, value_expr)
   } else if let Some(kind) = integer_effective_type_kind(value_ty, simple_type) {
@@ -712,6 +714,10 @@ fn write_text_value_content_tokens(
     quote! {
       writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(#value_expr))?;
     }
+  } else if let Some(tokens) =
+    write_from_bytes_value_tokens(value_ty, simple_type, value_expr.clone())
+  {
+    tokens
   } else if is_string_like_effective_type(value_ty, simple_type) {
     quote! {
       crate::common::write_escaped_content_str(writer, #value_expr.as_ref())?;
@@ -1537,7 +1543,8 @@ fn choice_item_parse_bodies<'a>(
       qname,
       ..
     } => {
-      let simple_type = simple_type.as_deref();
+      let simple_type = mapped_simple_type_name(None, simple_type.as_deref(), qname, false)
+        .or(simple_type.as_deref());
       let empty_parse_tokens = text_child_empty_parse_tokens(
         None,
         simple_type,
@@ -2692,6 +2699,18 @@ fn text_child_read_parse_tokens(
 ) -> proc_macro2::TokenStream {
   if let Some(kind) = text_child_simple_union_kind(value_ty, simple_type) {
     let parse_value_tokens = parse_simple_union_value_tokens(kind, quote! { value });
+    if let Some(value_ty) = value_ty {
+      return quote! {
+        crate::common::read_text_child_value(
+          #xml_reader_expr,
+          #end_expr,
+          #owner_expr,
+          #field_expr,
+          |value| <#value_ty>::from_bytes(value).ok(),
+          |value| { #parse_value_tokens },
+        )?
+      };
+    }
     return quote! {{
       let value = #xml_reader_expr.read_text(#end_expr, #owner_expr, #field_expr)?;
       #parse_value_tokens
@@ -2722,6 +2741,25 @@ fn text_child_read_parse_tokens(
     field_expr.clone(),
   ) {
     return tokens;
+  }
+
+  if let Some(value_ty) = value_ty
+    && is_from_bytes_attr_effective_type(value_ty, simple_type)
+  {
+    return quote! {
+      crate::common::read_text_child_value(
+        #xml_reader_expr,
+        #end_expr,
+        #owner_expr,
+        #field_expr,
+        |value| <#value_ty>::from_bytes(value).ok(),
+        |value| crate::common::parse_text_child_value::<#value_ty>(
+          value,
+          #owner_expr,
+          #field_expr,
+        ),
+      )?
+    };
   }
 
   let value_parse_tokens = text_child_value_parse_tokens(
@@ -2777,6 +2815,80 @@ fn parse_from_bytes_attr_tokens(
   }
 }
 
+fn parse_bytes_list_attr_tokens(
+  value_ty: &Type,
+  simple_type: Option<&str>,
+  owner_expr: proc_macro2::TokenStream,
+  field_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  let parse = parse_bytes_value_tokens(value_ty, simple_type);
+  quote! {
+    crate::common::parse_bytes_list_attr::<#value_ty, _>(
+      &attr,
+      decoder,
+      #owner_expr,
+      #field_expr,
+      #parse,
+    )?
+  }
+}
+
+fn parse_bytes_value_tokens(
+  value_ty: &Type,
+  simple_type: Option<&str>,
+) -> proc_macro2::TokenStream {
+  if let Some(kind) = integer_effective_type_kind(value_ty, simple_type) {
+    parse_integer_bytes_fn_by_kind(kind)
+  } else if effective_type_name(value_ty, simple_type).as_deref() == Some("SingleValue") {
+    quote! { crate::common::parse_f32_bytes_raw }
+  } else if effective_type_name(value_ty, simple_type).as_deref() == Some("DoubleValue") {
+    quote! { crate::common::parse_f64_bytes_raw }
+  } else if is_sdk_enum_effective_type(value_ty, simple_type) {
+    quote! { <#value_ty as crate::sdk::SdkEnum>::try_from_xml_bytes }
+  } else if simple_union_effective_type_kind(value_ty, simple_type).is_some()
+    || is_from_bytes_attr_effective_type(value_ty, simple_type)
+  {
+    quote! { |value| <#value_ty>::from_bytes(value).ok() }
+  } else {
+    quote! { compile_error!("unmapped XML list value type") }
+  }
+}
+
+fn write_list_attr_tokens(
+  value_ty: &Type,
+  simple_type: Option<&str>,
+  values_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  let value_write = if let Some(kind) = simple_union_effective_type_kind(value_ty, simple_type) {
+    write_simple_union_value_tokens(kind, quote! { value })
+  } else if let Some(kind) = integer_effective_type_kind(value_ty, simple_type) {
+    write_integer_value_tokens_by_kind(kind, quote! { value })
+  } else if effective_type_name(value_ty, simple_type)
+    .as_deref()
+    .is_some_and(is_xml_schema_float_type_name)
+  {
+    write_xml_schema_float_effective_tokens(quote! { value }, value_ty, simple_type, "")
+  } else if is_sdk_enum_effective_type(value_ty, simple_type) {
+    quote! { writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(value))?; }
+  } else if let Some(tokens) =
+    write_from_bytes_value_tokens(value_ty, simple_type, quote! { value })
+  {
+    tokens
+  } else {
+    quote! { compile_error!("unmapped XML list value type"); }
+  };
+  quote! {
+    crate::common::write_list_value_with(
+      writer,
+      #values_expr,
+      |writer, value| {
+        #value_write
+        Ok(())
+      },
+    )?;
+  }
+}
+
 fn parse_float_attr_tokens(
   value_ty: &Type,
   simple_type: Option<&str>,
@@ -2823,6 +2935,7 @@ fn write_simple_union_attr_tokens(
 fn build_text_child_parse_body(
   owner_ident: &Ident,
   field_ident: &Ident,
+  qname: &str,
   simple_type: Option<&str>,
   field_ty: &Type,
   xml_child_slot_assign: proc_macro2::TokenStream,
@@ -2834,7 +2947,10 @@ fn build_text_child_parse_body(
   } else {
     unwrap_option_vec_type(field_ty)
   };
+  let simple_type =
+    mapped_simple_type_name(Some(&value_ty), simple_type, qname, options.list).or(simple_type);
   let simple_union_kind = simple_union_effective_type_kind(&value_ty, simple_type);
+  let list_is_string_like = is_string_like_effective_type(&value_ty, simple_type);
   let parse_from_text_tokens = if options.list {
     quote! {{
       crate::common::parse_list_value::<#value_ty>(
@@ -2882,10 +2998,28 @@ fn build_text_child_parse_body(
     }
   };
   let read_parse_tokens = if options.list {
-    quote! {{
-      let text = xml_reader.read_text(e.name(), stringify!(#owner_ident), stringify!(#field_ident))?;
-      #parse_from_text_tokens
-    }}
+    if list_is_string_like {
+      quote! {{
+        let text = xml_reader.read_text(e.name(), stringify!(#owner_ident), stringify!(#field_ident))?;
+        #parse_from_text_tokens
+      }}
+    } else {
+      let parse = parse_bytes_value_tokens(&value_ty, simple_type);
+      quote! {
+        crate::common::read_text_child_value(
+          xml_reader,
+          e.name(),
+          stringify!(#owner_ident),
+          stringify!(#field_ident),
+          |value| crate::common::try_parse_bytes_list_value(value, &#parse),
+          |value| crate::common::parse_list_value::<#value_ty>(
+            value,
+            stringify!(#owner_ident),
+            stringify!(#field_ident),
+          ),
+        )?
+      }
+    }
   } else {
     text_child_read_parse_tokens(
       Some(&value_ty),
@@ -2949,6 +3083,8 @@ fn build_text_child_write_tokens(
   } else {
     unwrap_wrapped_type(field_ty)
   };
+  let simple_type =
+    mapped_simple_type_name(Some(&inner_ty), simple_type, qname, list).or(simple_type);
   let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
     let child_no_prefix =
       child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
@@ -2959,7 +3095,7 @@ fn build_text_child_write_tokens(
         crate::common::write_list_content_str_value(writer, #value_expr.as_slice())?;
       }
     } else if list {
-      panic!("text_child list fields must be string-like");
+      write_list_attr_tokens(&inner_ty, simple_type, quote! { #value_expr.as_slice() })
     } else if let Some(kind) = simple_union_effective_type_kind(&inner_ty, simple_type) {
       write_simple_union_value_tokens(kind, value_expr.clone())
     } else if let Some(kind) = integer_effective_type_kind(&inner_ty, simple_type) {
@@ -2973,6 +3109,10 @@ fn build_text_child_write_tokens(
       quote! {
         writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(#value_expr))?;
       }
+    } else if let Some(tokens) =
+      write_from_bytes_value_tokens(&inner_ty, simple_type, value_expr.clone())
+    {
+      tokens
     } else if is_string_like_effective_type(&inner_ty, simple_type) {
       quote! {
         crate::common::write_escaped_content_str(writer, #value_expr.as_ref())?;
@@ -3521,6 +3661,7 @@ fn expand_helper_struct(
     let parse_body = build_text_child_parse_body(
       ident,
       field_ident,
+      &field.qname,
       field.simple_type.as_deref(),
       &field.ty,
       quote! { __ooxmlsdk_seen_child = true; },
@@ -4041,22 +4182,29 @@ fn expand_named_struct(
       unwrap_wrapped_type(&field.ty)
     };
     let simple_type = field.simple_type.as_deref();
+    let mapped_simple_type =
+      mapped_simple_type_name(Some(&value_ty), simple_type, &field.name, field.list);
+    let simple_type = mapped_simple_type.or(simple_type);
     let simple_union_kind = simple_union_effective_type_kind(&value_ty, simple_type);
     let from_bytes_attr = is_from_bytes_attr_effective_type(&value_ty, simple_type);
     let integer_kind = integer_effective_type_kind(&value_ty, simple_type);
     let parser = if field.list {
-      let parse_list_fn = if is_string_like_effective_type(&value_ty, simple_type) {
-        quote! { crate::common::parse_list_attr }
+      if is_string_like_effective_type(&value_ty, simple_type) {
+        quote! {
+          crate::common::parse_list_attr::<#value_ty>(
+            &attr,
+            decoder,
+            stringify!(#ident),
+            #name_lit,
+          )?
+        }
       } else {
-        quote! { crate::common::parse_borrowed_list_attr }
-      };
-      quote! {
-        #parse_list_fn::<#value_ty>(
-          &attr,
-          decoder,
-          stringify!(#ident),
-          #name_lit,
-        )?
+        parse_bytes_list_attr_tokens(
+          &value_ty,
+          simple_type,
+          quote! { stringify!(#ident) },
+          quote! { #name_lit },
+        )
       }
     } else if let Some(kind) = simple_union_kind {
       parse_simple_union_attr_tokens(kind)
@@ -4090,7 +4238,9 @@ fn expand_named_struct(
           .into_owned()
       }
     } else {
-      quote! { crate::common::parse_attr_value::<#value_ty>(&attr, decoder, stringify!(#ident), #name_lit)? }
+      quote! {
+        compile_error!("unmapped XML attribute value type")
+      }
     };
     let assign_attr_tokens = if field.empty_as_none {
       quote! {
@@ -4151,9 +4301,11 @@ fn expand_named_struct(
           writer.write_all(b"\"")?;
         }
       } else if field.list {
+        let write_list_tokens =
+          write_list_attr_tokens(&value_ty, simple_type, quote! { value.as_slice() });
         quote! {
           writer.write_all(#attr_prefix_lit)?;
-          crate::common::write_list_value(writer, value.as_slice())?;
+          #write_list_tokens
           writer.write_all(b"\"")?;
         }
       } else if let Some(kind) = simple_union_kind {
@@ -4188,10 +4340,18 @@ fn expand_named_struct(
           writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(value))?;
           writer.write_all(b"\"")?;
         }
+      } else if let Some(write_value_tokens) =
+        write_from_bytes_value_tokens(&value_ty, simple_type, quote! { value })
+      {
+        quote! {
+          writer.write_all(#attr_prefix_lit)?;
+          #write_value_tokens
+          writer.write_all(b"\"")?;
+        }
       } else {
         quote! {
           writer.write_all(#attr_prefix_lit)?;
-          crate::common::write_escaped_text(writer, value)?;
+          compile_error!("unmapped XML attribute value type");
           writer.write_all(b"\"")?;
         }
       };
@@ -4367,6 +4527,12 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
+  let mc_namespace_uri = LitByteStr::new(
+    namespaces::uri_by_prefix("mc")
+      .expect("mc namespace must be registered")
+      .as_bytes(),
+    Span::call_site(),
+  );
   let mc_ignorable_parse_tokens = has_mc_ignorable_field.then(|| {
     quote! {
       b"mc:Ignorable" => { mc_ignorable = Some(attr.value.as_ref().into()); }
@@ -4402,34 +4568,46 @@ fn expand_named_struct(
   });
   let mc_ignorable_local_parse_tokens = has_mc_ignorable_field.then(|| {
     quote! {
-      b"Ignorable" => { mc_ignorable = Some(attr.value.as_ref().into()); }
+      b"Ignorable" => {
+        if crate::common::attribute_qname_has_namespace(&e, key, #mc_namespace_uri)? {
+          mc_ignorable = Some(attr.value.as_ref().into());
+        }
+      }
     }
   });
   let mc_preserve_attributes_local_parse_tokens = has_mc_preserve_attributes_field.then(|| {
     quote! {
       b"PreserveAttributes" => {
-        mc_preserve_attributes = Some(attr.value.as_ref().into());
+        if crate::common::attribute_qname_has_namespace(&e, key, #mc_namespace_uri)? {
+          mc_preserve_attributes = Some(attr.value.as_ref().into());
+        }
       }
     }
   });
   let mc_preserve_elements_local_parse_tokens = has_mc_preserve_elements_field.then(|| {
     quote! {
       b"PreserveElements" => {
-        mc_preserve_elements = Some(attr.value.as_ref().into());
+        if crate::common::attribute_qname_has_namespace(&e, key, #mc_namespace_uri)? {
+          mc_preserve_elements = Some(attr.value.as_ref().into());
+        }
       }
     }
   });
   let mc_process_content_local_parse_tokens = has_mc_process_content_field.then(|| {
     quote! {
       b"ProcessContent" => {
-        mc_process_content = Some(attr.value.as_ref().into());
+        if crate::common::attribute_qname_has_namespace(&e, key, #mc_namespace_uri)? {
+          mc_process_content = Some(attr.value.as_ref().into());
+        }
       }
     }
   });
   let mc_must_understand_local_parse_tokens = has_mc_must_understand_field.then(|| {
     quote! {
       b"MustUnderstand" => {
-        mc_must_understand = Some(attr.value.as_ref().into());
+        if crate::common::attribute_qname_has_namespace(&e, key, #mc_namespace_uri)? {
+          mc_must_understand = Some(attr.value.as_ref().into());
+        }
       }
     }
   });
@@ -4682,6 +4860,7 @@ fn expand_named_struct(
     let parse_body = build_text_child_parse_body(
       ident,
       field_ident,
+      &field.qname,
       field.simple_type.as_deref(),
       &field.ty,
       xml_child_slot_assign.clone(),
@@ -5677,7 +5856,7 @@ fn expand_named_struct(
               crate::common::write_list_content_str_value(writer, value.as_slice())?;
             }
           } else if *list {
-            panic!("text list fields must be string-like");
+            write_list_attr_tokens(&inner_ty, None, quote! { value.as_slice() })
           } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
             write_simple_union_value_tokens(kind, quote! { value })
           } else if let Some(kind) = integer_effective_type_kind(&inner_ty, None) {
@@ -5688,6 +5867,10 @@ fn expand_named_struct(
             quote! {
               writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(value))?;
             }
+          } else if let Some(tokens) =
+            write_from_bytes_value_tokens(&inner_ty, None, quote! { value })
+          {
+            tokens
           } else if is_string_like_type(&inner_ty) {
             quote! {
               crate::common::write_escaped_content_str(writer, value.as_ref())?;
@@ -5702,7 +5885,7 @@ fn expand_named_struct(
               crate::common::write_list_content_str_value(writer, self.#field_ident.as_slice())?;
             }
           } else if *list {
-            panic!("text list fields must be string-like");
+            write_list_attr_tokens(&inner_ty, None, quote! { self.#field_ident.as_slice() })
           } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
             write_simple_union_value_tokens(kind, quote! { &self.#field_ident })
           } else if let Some(kind) = integer_effective_type_kind(&inner_ty, None) {
@@ -5713,6 +5896,10 @@ fn expand_named_struct(
             quote! {
               writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(&self.#field_ident))?;
             }
+          } else if let Some(tokens) =
+            write_from_bytes_value_tokens(&inner_ty, None, quote! { &self.#field_ident })
+          {
+            tokens
           } else if is_string_like_type(&inner_ty) {
             quote! {
               crate::common::write_escaped_content_str(writer, self.#field_ident.as_ref())?;
@@ -6553,7 +6740,7 @@ fn expand_named_struct(
   let mc_preserve_elements_write_tokens = has_mc_preserve_elements_field.then(|| {
     quote! {
       if let Some(value) = &self.mc_preserve_elements {
-        crate::common::write_mc_attr(writer, b" mc:PreserveElements", value.as_ref())?;
+        crate::common::write_mc_attr(writer, b" mc:PreserveElements=\"", value.as_ref())?;
       }
     }
   });

@@ -3719,6 +3719,26 @@ fn text_child_value_metadata_attrs_from_type_ref(
   text_child_value_metadata_attrs_from_type_ref(module, xml_content, type_graph)
 }
 
+fn text_child_simple_type_attr_from_type_ref(
+  module: &SchemaModuleDecl,
+  type_ref: &TypeRefDecl,
+  type_graph: &TypeContainmentGraph,
+) -> TokenStream {
+  let simple_type_attr = simple_type_sdk_attr_from_type_ref(type_ref);
+  if !simple_type_attr.is_empty() {
+    return simple_type_attr;
+  }
+
+  let Some(type_key) = schema_type_key_from_ref(module, type_ref) else {
+    return quote! {};
+  };
+  let Some(xml_content) = type_graph.leaf_text_alias_content(&type_key) else {
+    return quote! {};
+  };
+
+  text_child_simple_type_attr_from_type_ref(module, xml_content, type_graph)
+}
+
 fn is_list_type_ref(type_ref: &TypeRefDecl) -> bool {
   type_ref.module_path.is_none() && type_ref.rust_type.starts_with("Vec<")
 }
@@ -3728,7 +3748,10 @@ fn simple_type_sdk_attr_from_qname(qname: &str) -> TokenStream {
     return quote! {};
   };
   let simple_type = simple_type_mapping(type_name);
-  if simple_type == type_name || simple_type == "StringValue" {
+  if simple_type == type_name
+    || simple_type == "StringValue"
+    || simple_type.starts_with("ListValue<")
+  {
     quote! {}
   } else {
     quote! { simple_type = #simple_type, }
@@ -3740,7 +3763,10 @@ fn choice_text_child_simple_type_sdk_attr_from_qname(qname: &str) -> TokenStream
     return quote! {};
   };
   let simple_type = simple_type_mapping(type_name);
-  if simple_type == type_name || simple_type == "StringValue" {
+  if simple_type == type_name
+    || simple_type == "StringValue"
+    || simple_type.starts_with("ListValue<")
+  {
     quote! {}
   } else {
     quote! { simple_type = #simple_type, }
@@ -4259,7 +4285,13 @@ fn gen_direct_child_fields_from_decl_with_context(
       }
       FieldWireDecl::TextChild { qname } => {
         let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
-        let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
+        let simple_type_attr =
+          text_child_simple_type_attr_from_type_ref(module, &field.type_ref, type_graph);
+        let simple_type_attr = if simple_type_attr.is_empty() {
+          simple_type_sdk_attr_from_qname(qname)
+        } else {
+          simple_type_attr
+        };
         let qname = sdk_element_qname(qname);
         quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))] }
       }
@@ -4769,6 +4801,22 @@ mod tests {
     assert!(
       generated.contains("pub xml_other_children : Vec < (usize , std :: boxed :: Box < [u8] >) >")
     );
+  }
+
+  #[test]
+  fn keeps_xsd_unit_aliases_and_only_marks_indirect_text_values() {
+    let drawing =
+      render_workspace_schema("schemas_microsoft_com_office_word_2010_wordprocessing_drawing");
+    assert!(drawing.contains(
+      "pub type PercentagePositionHeightOffset = crate :: simple_type :: DrawingmlPercentageValue"
+    ));
+    assert!(drawing.contains(
+      "text_child (simple_type = \"PositiveDrawingmlPercentageValue\" , qname = \"wp14:pctWidth\")"
+    ));
+
+    let math = render_workspace_schema("schemas_openxmlformats_org_office_document_2006_math");
+    assert!(math.contains("pub val : crate :: simple_type :: TwipsMeasureValue"));
+    assert!(!math.contains("attr (simple_type = \"TwipsMeasureValue\" , qname = \"m:val\")"));
   }
 
   fn read_codegen_ir_schema_json(path: &str) -> SchemaModuleDecl {

@@ -183,11 +183,11 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               ty.name.as_str(),
               &mut children,
             );
-            let have_mc_ignorable = false;
-            let have_mc_preserve_attributes = false;
-            let have_mc_preserve_elements = false;
-            let have_mc_process_content = false;
-            let have_mc_must_understand = false;
+            let have_mc_ignorable = has_attribute(ty, "mc:Ignorable");
+            let have_mc_preserve_attributes = has_attribute(ty, "mc:PreserveAttributes");
+            let have_mc_preserve_elements = has_attribute(ty, "mc:PreserveElements");
+            let have_mc_process_content = has_attribute(ty, "mc:ProcessContent");
+            let have_mc_must_understand = has_attribute(ty, "mc:MustUnderstand");
             let have_xmlns_fields = ty.has_xmlns_fields
               || !ty.part.is_empty()
               || ty.base_class == "OpenXmlPartRootElement";
@@ -222,11 +222,12 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               have_direct_xml_other_children,
               extra_xmlns: Vec::new(),
               canonical_namespace_prefixes: Vec::new(),
-              text_value_type: text_value_type_from_type_validators(ty),
+              text_value_type: text_value_type_from_sources(ty),
               api_kind: resolve_api_kind(ty, &type_map),
               attributes: ty
                 .attributes
                 .iter()
+                .filter(|attr| !is_mc_support_attribute(attr.q_name.as_str()))
                 .map(|attr| SchemaTypeAttribute {
                   q_name: attr.q_name.clone(),
                   property_name: attr.property_name.clone(),
@@ -305,14 +306,36 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
   schemas
 }
 
-fn text_value_type_from_type_validators(
-  ty: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-) -> String {
-  ty.validators
+fn has_attribute(ty: &crate::sdk_data::open_xml::OpenXmlSchemaType, q_name: &str) -> bool {
+  ty.attributes.iter().any(|attr| attr.q_name == q_name)
+}
+
+fn is_mc_support_attribute(q_name: &str) -> bool {
+  matches!(
+    q_name,
+    "mc:Ignorable"
+      | "mc:PreserveAttributes"
+      | "mc:PreserveElements"
+      | "mc:ProcessContent"
+      | "mc:MustUnderstand"
+  )
+}
+
+fn text_value_type_from_sources(ty: &crate::sdk_data::open_xml::OpenXmlSchemaType) -> String {
+  if let Some(value_type) = ty
+    .validators
     .iter()
     .find(|validator| validator.is_list && !validator.r#type.is_empty())
     .map(|validator| format!("ListValue<{}>", validator.r#type))
+  {
+    return value_type;
+  }
+
+  ty.name
+    .split_once('/')
+    .and_then(|(type_name, _)| xsd_measure_value_type(type_name))
     .unwrap_or_default()
+    .to_string()
 }
 
 fn xsd_on_off_only_to_on_off_qname_overrides(
@@ -538,6 +561,8 @@ fn xsd_measure_value_type(type_name: &str) -> Option<&'static str> {
   match xsd_type_local_name(type_name) {
     "ST_TwipsMeasure" => Some("TwipsMeasureValue"),
     "ST_SignedTwipsMeasure" => Some("SignedTwipsMeasureValue"),
+    "ST_HpsMeasure" => Some("HpsMeasureValue"),
+    "ST_SignedHpsMeasure" => Some("SignedHpsMeasureValue"),
     "ST_Coordinate" => Some("CoordinateValue"),
     "ST_Coordinate32" => Some("Coordinate32Value"),
     "ST_PositiveCoordinate" => Some("PositiveCoordinateValue"),
@@ -546,6 +571,7 @@ fn xsd_measure_value_type(type_name: &str) -> Option<&'static str> {
     "ST_PositivePercentage" => Some("PositiveDrawingmlPercentageValue"),
     "ST_FixedPercentage" => Some("FixedPercentageValue"),
     "ST_PositiveFixedPercentage" => Some("PositiveFixedPercentageValue"),
+    "ST_Angle" => Some("DrawingmlAngleValue"),
     "ST_TextBulletSize" => Some("TextBulletSizeValue"),
     "ST_TextBulletSizeDecimal" => Some("TextBulletSizeValue"),
     "ST_TextBulletSizePercent" => Some("TextBulletSizeValue"),

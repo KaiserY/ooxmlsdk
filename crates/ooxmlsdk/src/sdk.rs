@@ -498,6 +498,10 @@ impl PresentationDocumentType {
 pub trait SdkEnum: Sized {
   fn as_xml_bytes(&self) -> &[u8];
 
+  fn try_from_xml_bytes(value: &[u8]) -> Option<Self> {
+    Self::from_xml_bytes(value).ok()
+  }
+
   fn from_xml_bytes(value: &[u8]) -> Result<Self, crate::common::SdkError>;
 }
 

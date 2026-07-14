@@ -6,7 +6,6 @@ use super::{
 };
 use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
-use ooxmlsdk::simple_type::HpsMeasureValue;
 
 pub(super) fn paragraph_format(
   styles: &StylesCatalog,
@@ -124,14 +123,12 @@ pub(super) fn merge_run_style(
   if let Some(italic) = properties.italic() {
     style.italic = italic.val.is_none_or(|value| value.as_bool());
   }
-  if let Some(font_size) = properties.font_size()
-    && let Ok(size) = font_size.val.as_str().parse::<HpsMeasureValue>()
-  {
+  if let Some(font_size) = properties.font_size() {
+    let size = font_size.val;
     style.font_size_pt = (size.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
   }
-  if let Some(font_size) = properties.complex_script_font_size()
-    && let Ok(size) = font_size.val.as_str().parse::<HpsMeasureValue>()
-  {
+  if let Some(font_size) = properties.complex_script_font_size() {
+    let size = font_size.val;
     // imports w:szCs as CharHeightComplex. Keep it separate from Western
     // CharHeight so Latin shaping width remains source-backed, while layout
     // line height can still see the complex-script font height.

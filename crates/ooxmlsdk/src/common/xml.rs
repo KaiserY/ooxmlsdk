@@ -1,6 +1,6 @@
 use quick_xml::{
   Decoder, Reader, XmlVersion,
-  events::{Event, attributes::Attribute},
+  events::{BytesStart, Event, attributes::Attribute},
 };
 use std::{borrow::Cow, io::BufRead, ops::Deref, ops::Range};
 
@@ -138,6 +138,30 @@ pub(crate) fn xml_local_name<'a>(name: quick_xml::name::QName<'a>) -> &'a [u8] {
   } else {
     name.local_name().into_inner()
   }
+}
+
+#[inline]
+pub(crate) fn attribute_qname_has_namespace(
+  start: &BytesStart<'_>,
+  qname: &[u8],
+  namespace_uri: &[u8],
+) -> Result<bool, SdkError> {
+  let Some(separator) = qname.iter().rposition(|byte| *byte == b':') else {
+    return Ok(false);
+  };
+  let prefix = &qname[..separator];
+  for attr in start.attributes().with_checks(false) {
+    let attr = attr?;
+    if attr
+      .key
+      .as_ref()
+      .strip_prefix(b"xmlns:")
+      .is_some_and(|candidate| candidate == prefix)
+    {
+      return Ok(attr.value.as_ref() == namespace_uri);
+    }
+  }
+  Ok(false)
 }
 
 #[inline]
@@ -517,6 +541,7 @@ pub(crate) fn from_bytes_inner(bytes: &[u8]) -> Result<SliceReader<'_>, SdkError
   Ok(SliceReader::new(xml_reader))
 }
 
+#[cfg(feature = "parts")]
 pub(crate) fn decode_utf16_xml_bytes(bytes: &[u8]) -> Result<Option<Vec<u8>>, SdkError> {
   let (endian, bytes) = match bytes {
     [0xFF, 0xFE, rest @ ..] => (Utf16Endian::Little, rest),
@@ -544,11 +569,13 @@ pub(crate) fn decode_utf16_xml_bytes(bytes: &[u8]) -> Result<Option<Vec<u8>>, Sd
 }
 
 #[derive(Clone, Copy)]
+#[cfg(feature = "parts")]
 enum Utf16Endian {
   Little,
   Big,
 }
 
+#[cfg(feature = "parts")]
 fn normalize_utf16_xml_decl(mut xml: String) -> String {
   let Some(decl_end) = xml.find("?>").map(|end| end + 2) else {
     return xml;
@@ -589,6 +616,7 @@ fn normalize_utf16_xml_decl(mut xml: String) -> String {
   xml
 }
 
+#[cfg(feature = "parts")]
 fn find_ascii_ignore_case(haystack: &str, needle: &str) -> Option<usize> {
   haystack
     .as_bytes()
@@ -868,31 +896,11 @@ pub(crate) fn parse_measurement_or_percent_value(
 }
 
 #[inline]
-pub(crate) fn parse_attr_value<T>(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<T, SdkError>
-where
-  T: std::str::FromStr,
-{
-  if let Ok(value) = std::str::from_utf8(attr.value.as_ref())
-    && let Ok(value) = value.parse::<T>()
-  {
-    Ok(value)
-  } else {
-    let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
-    parse_value(value.as_ref(), ty, field)
-  }
-}
-
-#[inline]
 pub(crate) fn parse_enum_attr<T>(attr: &Attribute<'_>, decoder: Decoder) -> Result<T, SdkError>
 where
   T: crate::sdk::SdkEnum,
 {
-  if let Ok(value) = T::from_xml_bytes(attr.value.as_ref()) {
+  if let Some(value) = T::try_from_xml_bytes(attr.value.as_ref()) {
     return Ok(value);
   }
 
@@ -954,23 +962,35 @@ where
 }
 
 #[inline]
-pub(crate) fn parse_borrowed_list_attr<T>(
+pub(crate) fn parse_bytes_list_attr<T, Parse>(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
   field: &'static str,
+  parse: Parse,
 ) -> Result<Vec<T>, SdkError>
 where
-  T: std::str::FromStr,
+  Parse: Fn(&[u8]) -> Option<T>,
 {
-  if let Ok(value) = std::str::from_utf8(attr.value.as_ref())
-    && let Ok(value) = parse_list_value(value, ty, field)
-  {
+  if let Some(value) = try_parse_bytes_list_value(attr.value.as_ref(), &parse) {
     return Ok(value);
   }
 
   let value = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
-  parse_list_value(value.as_ref(), ty, field)
+  try_parse_bytes_list_value(value.as_bytes(), &parse)
+    .ok_or_else(|| invalid_field_value_bytes(ty, field, value.as_bytes()))
+}
+
+#[inline]
+pub(crate) fn try_parse_bytes_list_value<T, Parse>(value: &[u8], parse: &Parse) -> Option<Vec<T>>
+where
+  Parse: Fn(&[u8]) -> Option<T>,
+{
+  value
+    .split(|byte| byte.is_ascii_whitespace())
+    .filter(|item| !item.is_empty())
+    .map(parse)
+    .collect()
 }
 
 #[inline]
@@ -1182,7 +1202,7 @@ fn read_text_events<'xml, R: XmlRead<'xml>>(
 }
 
 #[inline]
-fn read_text_child_value<'xml, R, T, RawParse, TextParse>(
+pub(crate) fn read_text_child_value<'xml, R, T, RawParse, TextParse>(
   xml_reader: &mut R,
   end: quick_xml::name::QName<'_>,
   ty: &'static str,
@@ -1305,14 +1325,9 @@ where
   R: XmlRead<'xml>,
   T: crate::sdk::SdkEnum,
 {
-  read_text_child_value(
-    xml_reader,
-    end,
-    ty,
-    field,
-    |value| T::from_xml_bytes(value).ok(),
-    |value| T::from_xml_bytes(value.as_bytes()),
-  )
+  read_text_child_value(xml_reader, end, ty, field, T::try_from_xml_bytes, |value| {
+    T::from_xml_bytes(value.as_bytes())
+  })
 }
 
 #[cfg(feature = "flat-opc")]
@@ -1830,6 +1845,7 @@ pub(crate) fn read_root_start_io<R: std::io::BufRead>(
   }
 }
 
+#[cfg(feature = "parts")]
 pub(crate) fn root_element_matches_namespace_local(
   bytes: &[u8],
   namespace_uri: &[u8],
@@ -1856,6 +1872,7 @@ pub(crate) fn root_element_matches_namespace_local(
   }
 }
 
+#[cfg(feature = "parts")]
 fn split_qname(qname: &[u8]) -> (Option<&[u8]>, &[u8]) {
   if let Some(index) = qname.iter().position(|byte| *byte == b':') {
     (Some(&qname[..index]), &qname[index + 1..])
@@ -1864,6 +1881,7 @@ fn split_qname(qname: &[u8]) -> (Option<&[u8]>, &[u8]) {
   }
 }
 
+#[cfg(feature = "parts")]
 fn root_namespace_matches(
   start: &quick_xml::events::BytesStart<'_>,
   prefix: Option<&[u8]>,
@@ -2066,26 +2084,16 @@ pub(crate) fn write_escaped_content_text<W: std::io::Write, T: std::fmt::Display
   writer: &mut W,
   value: &T,
 ) -> std::io::Result<()> {
-  write_escaped_display(writer, value, false)
-}
-
-#[inline]
-pub(crate) fn write_escaped_text<W: std::io::Write, T: std::fmt::Display + ?Sized>(
-  writer: &mut W,
-  value: &T,
-) -> std::io::Result<()> {
-  write_escaped_display(writer, value, true)
+  write_escaped_display(writer, value)
 }
 
 #[inline]
 fn write_escaped_display<W: std::io::Write, T: std::fmt::Display + ?Sized>(
   writer: &mut W,
   value: &T,
-  escape_quotes: bool,
 ) -> std::io::Result<()> {
   let mut escaped_writer = EscapedDisplayWriter {
     writer,
-    escape_quotes,
     error: None,
   };
   match std::fmt::write(&mut escaped_writer, format_args!("{value}")) {
@@ -2100,18 +2108,13 @@ fn write_escaped_display<W: std::io::Write, T: std::fmt::Display + ?Sized>(
 
 struct EscapedDisplayWriter<'a, W: std::io::Write> {
   writer: &'a mut W,
-  escape_quotes: bool,
   error: Option<std::io::Error>,
 }
 
 impl<W: std::io::Write> std::fmt::Write for EscapedDisplayWriter<'_, W> {
   #[inline]
   fn write_str(&mut self, value: &str) -> std::fmt::Result {
-    let result = if self.escape_quotes {
-      write_escaped_attr_bytes(self.writer, value.as_bytes())
-    } else {
-      write_escaped_content_bytes(self.writer, value.as_bytes())
-    };
+    let result = write_escaped_content_bytes(self.writer, value.as_bytes());
     result.map_err(|err| {
       self.error = Some(err);
       std::fmt::Error
@@ -2120,17 +2123,21 @@ impl<W: std::io::Write> std::fmt::Write for EscapedDisplayWriter<'_, W> {
 }
 
 #[inline]
-pub(crate) fn write_list_value<W, T>(writer: &mut W, values: &[T]) -> std::io::Result<()>
+pub(crate) fn write_list_value_with<W, T, WriteValue>(
+  writer: &mut W,
+  values: &[T],
+  mut write_value: WriteValue,
+) -> std::io::Result<()>
 where
   W: std::io::Write,
-  T: std::fmt::Display,
+  WriteValue: FnMut(&mut W, &T) -> std::io::Result<()>,
 {
-  let mut iter = values.iter();
-  if let Some(first) = iter.next() {
-    write_escaped_text(writer, first)?;
-    for value in iter {
+  let mut values = values.iter();
+  if let Some(value) = values.next() {
+    write_value(writer, value)?;
+    for value in values {
       writer.write_all(b" ")?;
-      write_escaped_text(writer, value)?;
+      write_value(writer, value)?;
     }
   }
   Ok(())
@@ -2182,6 +2189,105 @@ pub(crate) fn write_twips_measure_value<W: std::io::Write>(
     crate::simple_type::TwipsMeasureValue::Twips(value) => write_u64_value(writer, *value),
     crate::simple_type::TwipsMeasureValue::UniversalMeasure(value) => {
       crate::units::write_universal_measure_lexical(writer, *value)
+    }
+  }
+}
+
+#[inline]
+pub(crate) fn write_universal_measure_value<W: std::io::Write>(
+  writer: &mut W,
+  value: &crate::units::UniversalMeasureValue,
+) -> std::io::Result<()> {
+  crate::units::write_universal_measure_lexical(writer, *value)
+}
+
+#[inline]
+pub(crate) fn write_hps_measure_value<W: std::io::Write>(
+  writer: &mut W,
+  value: &crate::units::HpsMeasureValue,
+) -> std::io::Result<()> {
+  match value {
+    crate::units::HpsMeasureValue::HalfPoints(value) => write_u64_value(writer, *value),
+    crate::units::HpsMeasureValue::UniversalMeasure(value) => {
+      write_universal_measure_value(writer, value)
+    }
+  }
+}
+
+#[inline]
+pub(crate) fn write_signed_hps_measure_value<W: std::io::Write>(
+  writer: &mut W,
+  value: &crate::units::SignedHpsMeasureValue,
+) -> std::io::Result<()> {
+  match value {
+    crate::units::SignedHpsMeasureValue::HalfPoints(value) => write_i64_value(writer, *value),
+    crate::units::SignedHpsMeasureValue::UniversalMeasure(value) => {
+      write_universal_measure_value(writer, value)
+    }
+  }
+}
+
+#[inline]
+pub(crate) fn write_coordinate_value<W: std::io::Write>(
+  writer: &mut W,
+  value: &crate::units::CoordinateValue,
+) -> std::io::Result<()> {
+  match value {
+    crate::units::CoordinateValue::Emu(value) => write_i64_value(writer, *value),
+    crate::units::CoordinateValue::UniversalMeasure(value) => {
+      write_universal_measure_value(writer, value)
+    }
+  }
+}
+
+#[inline]
+pub(crate) fn write_coordinate32_value<W: std::io::Write>(
+  writer: &mut W,
+  value: &crate::units::Coordinate32Value,
+) -> std::io::Result<()> {
+  match value {
+    crate::units::Coordinate32Value::Emu(value) => write_i32_value(writer, *value),
+    crate::units::Coordinate32Value::UniversalMeasure(value) => {
+      write_universal_measure_value(writer, value)
+    }
+  }
+}
+
+#[inline]
+pub(crate) fn write_drawingml_percentage_value<W: std::io::Write>(
+  writer: &mut W,
+  value: &crate::units::DrawingmlPercentageValue,
+) -> std::io::Result<()> {
+  match value {
+    crate::units::DrawingmlPercentageValue::Decimal(value) => write_i32_value(writer, *value),
+    crate::units::DrawingmlPercentageValue::PercentString(value) => {
+      crate::units::write_percent_lexical(writer, *value)
+    }
+  }
+}
+
+#[inline]
+pub(crate) fn write_text_point_value<W: std::io::Write>(
+  writer: &mut W,
+  value: &crate::units::TextPointValue,
+) -> std::io::Result<()> {
+  match value {
+    crate::units::TextPointValue::Points100(value) => write_i32_value(writer, *value),
+    crate::units::TextPointValue::UniversalMeasure(value) => {
+      write_universal_measure_value(writer, value)
+    }
+  }
+}
+
+#[inline]
+pub(crate) fn write_text_bullet_size_value<W: std::io::Write>(
+  writer: &mut W,
+  value: &crate::units::TextBulletSizeValue,
+) -> std::io::Result<()> {
+  match value {
+    crate::units::TextBulletSizeValue::Decimal(value) => write_i32_value(writer, *value),
+    crate::units::TextBulletSizeValue::PercentString(value) => {
+      crate::units::write_percent_lexical(writer, *value)
     }
   }
 }
@@ -2252,8 +2358,8 @@ mod tests {
   use quick_xml::{Reader, events::Event};
 
   use super::{
-    parse_borrowed_list_attr, write_escaped_content_str, write_escaped_content_text,
-    write_escaped_str, write_escaped_text,
+    parse_bytes_list_attr, parse_u32_bytes, write_escaped_content_str, write_escaped_content_text,
+    write_escaped_str,
   };
 
   struct DisplayXml;
@@ -2275,11 +2381,12 @@ mod tests {
       .next()
       .expect("attribute")
       .expect("valid attribute");
-    parse_borrowed_list_attr::<u32>(&attr, reader.decoder(), "Test", "a").expect("parsed list")
+    parse_bytes_list_attr(&attr, reader.decoder(), "Test", "a", parse_u32_bytes)
+      .expect("parsed list")
   }
 
   #[test]
-  fn borrowed_list_attr_parses_raw_and_escaped_values() {
+  fn static_list_attr_parses_raw_and_escaped_values() {
     assert_eq!(parse_u32_list_attr("<x a=\"1 2 3\"/>"), vec![1, 2, 3]);
     assert_eq!(parse_u32_list_attr("<x a=\"1&#32;2 3\"/>"), vec![1, 2, 3]);
   }
@@ -2299,13 +2406,6 @@ mod tests {
     assert_eq!(
       String::from_utf8(content).expect("utf-8 content"),
       r#"&lt;tag attr="one&amp;two">'text'&lt;/tag>"#
-    );
-
-    let mut display_attr = Vec::new();
-    write_escaped_text(&mut display_attr, &DisplayXml).expect("write display attr");
-    assert_eq!(
-      String::from_utf8(display_attr).expect("utf-8 display attr"),
-      "&lt;tag attr=&quot;one&amp;two&quot;>'text'&lt;/tag>"
     );
 
     let mut display_content = Vec::new();

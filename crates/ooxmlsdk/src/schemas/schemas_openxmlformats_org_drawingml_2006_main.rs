@@ -2086,7 +2086,7 @@ pub struct Hue {
 pub struct HueOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DrawingmlAngleValue,
 }
 /// Saturation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5642,7 +5642,7 @@ pub struct Transform2D {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
-  pub rotation: Option<crate::simple_type::Int32Value>,
+  pub rotation: Option<crate::simple_type::DrawingmlAngleValue>,
   /// Horizontal Flip
   #[sdk(attr(qname = ":flipH"))]
   pub horizontal_flip: Option<crate::simple_type::BooleanValue>,
@@ -6572,7 +6572,7 @@ pub struct TransformGroup {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
-  pub rotation: Option<crate::simple_type::Int32Value>,
+  pub rotation: Option<crate::simple_type::DrawingmlAngleValue>,
   /// Horizontal Flip
   #[sdk(attr(qname = ":flipH"))]
   pub horizontal_flip: Option<crate::simple_type::BooleanValue>,
@@ -6599,7 +6599,7 @@ pub struct BodyProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
-  pub rotation: Option<crate::simple_type::Int32Value>,
+  pub rotation: Option<crate::simple_type::DrawingmlAngleValue>,
   /// Paragraph Spacing
   #[sdk(attr(qname = ":spcFirstLastPara"))]
   pub use_paragraph_spacing: Option<crate::simple_type::BooleanValue>,

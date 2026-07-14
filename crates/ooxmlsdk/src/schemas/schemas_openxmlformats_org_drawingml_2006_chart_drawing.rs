@@ -441,10 +441,10 @@ pub type YPosition = crate::simple_type::DoubleValue;
 #[sdk(qname = "cdr:from")]
 pub struct FromAnchor {
   /// Relative X Coordinate
-  #[sdk(text_child(simple_type = "DoubleValue", qname = "cdr:x"))]
+  #[sdk(text_child(qname = "cdr:x"))]
   pub x_position: XPosition,
   /// Relative Y Coordinate
-  #[sdk(text_child(simple_type = "DoubleValue", qname = "cdr:y"))]
+  #[sdk(text_child(qname = "cdr:y"))]
   pub y_position: YPosition,
 }
 /// Ending Anchor Point.
@@ -452,10 +452,10 @@ pub struct FromAnchor {
 #[sdk(qname = "cdr:to")]
 pub struct ToAnchor {
   /// Relative X Coordinate
-  #[sdk(text_child(simple_type = "DoubleValue", qname = "cdr:x"))]
+  #[sdk(text_child(qname = "cdr:x"))]
   pub x_position: XPosition,
   /// Relative Y Coordinate
-  #[sdk(text_child(simple_type = "DoubleValue", qname = "cdr:y"))]
+  #[sdk(text_child(qname = "cdr:y"))]
   pub y_position: YPosition,
 }
 /// Shape Extent.

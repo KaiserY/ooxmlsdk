@@ -43,13 +43,13 @@ pub(crate) use xml::{
   read_root_start_borrowed, read_root_start_io, read_text_child_value, read_u8_text_child_value,
   read_u16_text_child_value, read_u32_text_child_value, read_u64_text_child_value,
   write_coordinate_value, write_coordinate32_value, write_decimal_number_or_percent_value,
-  write_drawingml_percentage_value, write_escaped_content_str, write_escaped_content_text,
-  write_escaped_str, write_f32_value, write_f64_value, write_hps_measure_value, write_i8_value,
-  write_i16_value, write_i32_value, write_i64_value, write_list_content_str_value,
-  write_list_str_value, write_list_value_with, write_measurement_or_percent_value,
-  write_signed_hps_measure_value, write_signed_twips_measure_value, write_text_bullet_size_value,
-  write_text_point_value, write_twips_measure_value, write_u8_value, write_u16_value,
-  write_u32_value, write_u64_value, write_xmlns_attr, xml_local_name,
+  write_drawingml_percentage_value, write_escaped_content_str, write_escaped_str, write_f32_value,
+  write_f64_value, write_hps_measure_value, write_i8_value, write_i16_value, write_i32_value,
+  write_i64_value, write_list_content_str_value, write_list_str_value, write_list_value_with,
+  write_measurement_or_percent_value, write_signed_hps_measure_value,
+  write_signed_twips_measure_value, write_text_bullet_size_value, write_text_point_value,
+  write_twips_measure_value, write_u8_value, write_u16_value, write_u32_value, write_u64_value,
+  write_xmlns_attr, xml_local_name,
 };
 #[cfg(feature = "parts")]
 pub(crate) use xml::{decode_utf16_xml_bytes, root_element_matches_namespace_local};

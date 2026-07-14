@@ -2080,49 +2080,6 @@ fn write_escaped_content_bytes<W: std::io::Write>(
 }
 
 #[inline]
-pub(crate) fn write_escaped_content_text<W: std::io::Write, T: std::fmt::Display + ?Sized>(
-  writer: &mut W,
-  value: &T,
-) -> std::io::Result<()> {
-  write_escaped_display(writer, value)
-}
-
-#[inline]
-fn write_escaped_display<W: std::io::Write, T: std::fmt::Display + ?Sized>(
-  writer: &mut W,
-  value: &T,
-) -> std::io::Result<()> {
-  let mut escaped_writer = EscapedDisplayWriter {
-    writer,
-    error: None,
-  };
-  match std::fmt::write(&mut escaped_writer, format_args!("{value}")) {
-    Ok(()) => Ok(()),
-    Err(_) => Err(
-      escaped_writer
-        .error
-        .unwrap_or_else(|| std::io::Error::other("failed to format escaped XML value")),
-    ),
-  }
-}
-
-struct EscapedDisplayWriter<'a, W: std::io::Write> {
-  writer: &'a mut W,
-  error: Option<std::io::Error>,
-}
-
-impl<W: std::io::Write> std::fmt::Write for EscapedDisplayWriter<'_, W> {
-  #[inline]
-  fn write_str(&mut self, value: &str) -> std::fmt::Result {
-    let result = write_escaped_content_bytes(self.writer, value.as_bytes());
-    result.map_err(|err| {
-      self.error = Some(err);
-      std::fmt::Error
-    })
-  }
-}
-
-#[inline]
 pub(crate) fn write_list_value_with<W, T, WriteValue>(
   writer: &mut W,
   values: &[T],
@@ -2358,17 +2315,8 @@ mod tests {
   use quick_xml::{Reader, events::Event};
 
   use super::{
-    parse_bytes_list_attr, parse_u32_bytes, write_escaped_content_str, write_escaped_content_text,
-    write_escaped_str,
+    parse_bytes_list_attr, parse_u32_bytes, write_escaped_content_str, write_escaped_str,
   };
-
-  struct DisplayXml;
-
-  impl std::fmt::Display for DisplayXml {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-      f.write_str(r#"<tag attr="one&two">'text'</tag>"#)
-    }
-  }
 
   fn parse_u32_list_attr(xml: &str) -> Vec<u32> {
     let mut reader = Reader::from_str(xml);
@@ -2405,13 +2353,6 @@ mod tests {
       .expect("write content");
     assert_eq!(
       String::from_utf8(content).expect("utf-8 content"),
-      r#"&lt;tag attr="one&amp;two">'text'&lt;/tag>"#
-    );
-
-    let mut display_content = Vec::new();
-    write_escaped_content_text(&mut display_content, &DisplayXml).expect("write display content");
-    assert_eq!(
-      String::from_utf8(display_content).expect("utf-8 display content"),
       r#"&lt;tag attr="one&amp;two">'text'&lt;/tag>"#
     );
   }

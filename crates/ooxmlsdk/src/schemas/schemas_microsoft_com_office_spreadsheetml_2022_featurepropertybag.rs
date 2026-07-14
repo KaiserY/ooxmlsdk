@@ -219,27 +219,11 @@ pub struct ArrayFeatureProperty {
   pub k: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            text_child(
-                variant = XsdunsignedInt,
-                simple_type = "UInt32Value",
-                qname = "xfpb:bagId"
-            ),
-            text_child(
-                variant = Xsdinteger,
-                simple_type = "IntegerValue",
-                qname = "xfpb:i"
-            ),
+            text_child(variant = XsdunsignedInt, qname = "xfpb:bagId"),
+            text_child(variant = Xsdinteger, qname = "xfpb:i"),
             text_child(variant = SXsdstring, qname = "xfpb:s"),
-            text_child(
-                variant = Xsdboolean,
-                simple_type = "BooleanValue",
-                qname = "xfpb:b"
-            ),
-            text_child(
-                variant = Xsddouble,
-                simple_type = "DoubleValue",
-                qname = "xfpb:d"
-            ),
+            text_child(variant = Xsdboolean, qname = "xfpb:b"),
+            text_child(variant = Xsddouble, qname = "xfpb:d"),
             text_child(variant = RelXsdstring, qname = "xfpb:rel")
         )
     )]

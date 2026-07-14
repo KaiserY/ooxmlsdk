@@ -20,7 +20,6 @@ use crate::sdk_code::versioning::{common_choice_version, version_cfg_attrs};
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeChildKind,
 };
-use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
 #[derive(Debug)]
@@ -3682,19 +3681,6 @@ fn is_sdk_enum_type_ref(
   schema_type_key_from_ref(module, type_ref).is_some_and(|type_key| type_graph.is_enum(&type_key))
 }
 
-fn simple_type_sdk_attr_from_type_ref(type_ref: &TypeRefDecl) -> TokenStream {
-  if !matches!(type_ref.module_path.as_deref(), Some("crate::simple_type")) {
-    return quote! {};
-  }
-
-  let simple_type = type_ref.rust_type.as_str();
-  if simple_type == "StringValue" {
-    quote! {}
-  } else {
-    quote! { simple_type = #simple_type, }
-  }
-}
-
 fn text_child_value_metadata_attrs_from_type_ref(
   module: &SchemaModuleDecl,
   type_ref: &TypeRefDecl,
@@ -3702,11 +3688,6 @@ fn text_child_value_metadata_attrs_from_type_ref(
 ) -> TokenStream {
   if is_sdk_enum_type_ref(module, type_ref, type_graph) {
     return quote! { enum, };
-  }
-
-  let simple_type_attr = simple_type_sdk_attr_from_type_ref(type_ref);
-  if !simple_type_attr.is_empty() {
-    return simple_type_attr;
   }
 
   let Some(type_key) = schema_type_key_from_ref(module, type_ref) else {
@@ -3719,58 +3700,8 @@ fn text_child_value_metadata_attrs_from_type_ref(
   text_child_value_metadata_attrs_from_type_ref(module, xml_content, type_graph)
 }
 
-fn text_child_simple_type_attr_from_type_ref(
-  module: &SchemaModuleDecl,
-  type_ref: &TypeRefDecl,
-  type_graph: &TypeContainmentGraph,
-) -> TokenStream {
-  let simple_type_attr = simple_type_sdk_attr_from_type_ref(type_ref);
-  if !simple_type_attr.is_empty() {
-    return simple_type_attr;
-  }
-
-  let Some(type_key) = schema_type_key_from_ref(module, type_ref) else {
-    return quote! {};
-  };
-  let Some(xml_content) = type_graph.leaf_text_alias_content(&type_key) else {
-    return quote! {};
-  };
-
-  text_child_simple_type_attr_from_type_ref(module, xml_content, type_graph)
-}
-
 fn is_list_type_ref(type_ref: &TypeRefDecl) -> bool {
   type_ref.module_path.is_none() && type_ref.rust_type.starts_with("Vec<")
-}
-
-fn simple_type_sdk_attr_from_qname(qname: &str) -> TokenStream {
-  let Some((type_name, _)) = qname.split_once('/') else {
-    return quote! {};
-  };
-  let simple_type = simple_type_mapping(type_name);
-  if simple_type == type_name
-    || simple_type == "StringValue"
-    || simple_type.starts_with("ListValue<")
-  {
-    quote! {}
-  } else {
-    quote! { simple_type = #simple_type, }
-  }
-}
-
-fn choice_text_child_simple_type_sdk_attr_from_qname(qname: &str) -> TokenStream {
-  let Some((type_name, _)) = qname.split_once('/') else {
-    return quote! {};
-  };
-  let simple_type = simple_type_mapping(type_name);
-  if simple_type == type_name
-    || simple_type == "StringValue"
-    || simple_type.starts_with("ListValue<")
-  {
-    quote! {}
-  } else {
-    quote! { simple_type = #simple_type, }
-  }
 }
 
 fn sdk_element_qname(qname: &str) -> String {
@@ -4083,11 +4014,6 @@ fn choice_sequence_child_metadata_tokens(
     FieldWireDecl::TextChild { qname } => {
       let metadata_attrs =
         text_child_value_metadata_attrs_from_type_ref(module, &field.type_ref, type_graph);
-      let metadata_attrs = if metadata_attrs.is_empty() {
-        choice_text_child_simple_type_sdk_attr_from_qname(qname)
-      } else {
-        metadata_attrs
-      };
       let qname = choice_metadata_qname(qname);
       Some(quote! { text_child(#variant_attr #option_field_attr #metadata_attrs qname = #qname) })
     }
@@ -4123,11 +4049,6 @@ fn choice_variant_metadata_tokens(
         .map(|qname| {
           let metadata_attrs =
             text_child_value_metadata_attrs_from_type_ref(module, &variant.payload, type_graph);
-          let metadata_attrs = if metadata_attrs.is_empty() {
-            choice_text_child_simple_type_sdk_attr_from_qname(qname)
-          } else {
-            metadata_attrs
-          };
           let qname = choice_metadata_qname(qname);
           quote! { text_child(variant = #variant_ident, #metadata_attrs qname = #qname) }
         })
@@ -4285,15 +4206,8 @@ fn gen_direct_child_fields_from_decl_with_context(
       }
       FieldWireDecl::TextChild { qname } => {
         let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
-        let simple_type_attr =
-          text_child_simple_type_attr_from_type_ref(module, &field.type_ref, type_graph);
-        let simple_type_attr = if simple_type_attr.is_empty() {
-          simple_type_sdk_attr_from_qname(qname)
-        } else {
-          simple_type_attr
-        };
         let qname = sdk_element_qname(qname);
-        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))] }
+        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr qname = #qname))] }
       }
       _ => return Err(format!("expected direct child field, got {:?}", field.wire).into()),
     };
@@ -4719,18 +4633,11 @@ mod tests {
 
     assert!(generated.contains("empty_child (variant = VtEmpty , qname = \"vt:empty\")"));
     assert!(generated.contains("empty_child (variant = VtNull , qname = \"vt:null\")"));
-    assert!(generated.contains(
-      "text_child (variant = VtInt32 , simple_type = \"Int32Value\" , qname = \"vt:i4\")"
-    ));
-    assert!(generated.contains(
-      "text_child (variant = VtUnsignedInt32 , simple_type = \"UInt32Value\" , qname = \"vt:ui4\")"
-    ));
-    assert!(generated.contains(
-      "text_child (variant = VtBlob , simple_type = \"Base64BinaryValue\" , qname = \"vt:blob\")"
-    ));
-    assert!(!generated.contains(
-      "text_child (variant = Vtlpstr , simple_type = \"StringValue\" , qname = \"vt:lpstr\")"
-    ));
+    assert!(generated.contains("text_child (variant = VtInt32 , qname = \"vt:i4\")"));
+    assert!(generated.contains("text_child (variant = VtUnsignedInt32 , qname = \"vt:ui4\")"));
+    assert!(generated.contains("text_child (variant = VtBlob , qname = \"vt:blob\")"));
+    assert!(generated.contains("text_child (variant = Vtlpstr , qname = \"vt:lpstr\")"));
+    assert!(!generated.contains("simple_type ="));
     assert!(generated.contains("VtEmpty ,"));
     assert!(generated.contains("VtNull ,"));
     assert!(!generated.contains("pub struct VtEmpty"));
@@ -4740,7 +4647,7 @@ mod tests {
   }
 
   #[test]
-  fn marks_choice_text_child_schema_enums_without_simple_type() {
+  fn marks_choice_text_child_schema_enums() {
     let schema =
       read_codegen_ir_schema_json("../../sdk_data/schemas/schemas_microsoft_com_office_excel.json");
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
@@ -4749,10 +4656,7 @@ mod tests {
       generated.contains("text_child (variant = AutoFill , enum , qname = \"xvml:AutoFill\")")
     );
     assert!(generated.contains("text_child (variant = Anchor , qname = \"xvml:Anchor\")"));
-    assert!(
-      !generated
-        .contains("text_child (variant = AutoFill , simple_type = \"BooleanEntryWithBlankValues\"")
-    );
+    assert!(!generated.contains("simple_type ="));
   }
 
   #[test]
@@ -4804,19 +4708,18 @@ mod tests {
   }
 
   #[test]
-  fn keeps_xsd_unit_aliases_and_only_marks_indirect_text_values() {
+  fn keeps_xsd_unit_aliases_without_emitting_simple_type_metadata() {
     let drawing =
       render_workspace_schema("schemas_microsoft_com_office_word_2010_wordprocessing_drawing");
     assert!(drawing.contains(
       "pub type PercentagePositionHeightOffset = crate :: simple_type :: DrawingmlPercentageValue"
     ));
-    assert!(drawing.contains(
-      "text_child (simple_type = \"PositiveDrawingmlPercentageValue\" , qname = \"wp14:pctWidth\")"
-    ));
+    assert!(drawing.contains("text_child (qname = \"wp14:pctWidth\")"));
+    assert!(!drawing.contains("simple_type ="));
 
     let math = render_workspace_schema("schemas_openxmlformats_org_office_document_2006_math");
     assert!(math.contains("pub val : crate :: simple_type :: TwipsMeasureValue"));
-    assert!(!math.contains("attr (simple_type = \"TwipsMeasureValue\" , qname = \"m:val\")"));
+    assert!(!math.contains("simple_type ="));
   }
 
   fn read_codegen_ir_schema_json(path: &str) -> SchemaModuleDecl {

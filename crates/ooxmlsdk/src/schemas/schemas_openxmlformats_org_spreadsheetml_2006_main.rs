@@ -8161,16 +8161,16 @@ pub struct ObjectAnchor {
 #[sdk(no_prefix_only, qname = "x:from")]
 pub struct FromMarker {
   /// Column)
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:col"))]
+  #[sdk(text_child(qname = "xdr:col"))]
   pub column_id: crate::schemas::xdr::ColumnId,
   /// Column Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:colOff"))]
+  #[sdk(text_child(qname = "xdr:colOff"))]
   pub column_offset: crate::schemas::xdr::ColumnOffset,
   /// Row
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:row"))]
+  #[sdk(text_child(qname = "xdr:row"))]
   pub row_id: crate::schemas::xdr::RowId,
   /// Row Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:rowOff"))]
+  #[sdk(text_child(qname = "xdr:rowOff"))]
   pub row_offset: crate::schemas::xdr::RowOffset,
 }
 /// Defines the ToMarker Class.
@@ -8178,16 +8178,16 @@ pub struct FromMarker {
 #[sdk(no_prefix_only, qname = "x:to")]
 pub struct ToMarker {
   /// Column)
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:col"))]
+  #[sdk(text_child(qname = "xdr:col"))]
   pub column_id: crate::schemas::xdr::ColumnId,
   /// Column Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:colOff"))]
+  #[sdk(text_child(qname = "xdr:colOff"))]
   pub column_offset: crate::schemas::xdr::ColumnOffset,
   /// Row
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:row"))]
+  #[sdk(text_child(qname = "xdr:row"))]
   pub row_id: crate::schemas::xdr::RowId,
   /// Row Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:rowOff"))]
+  #[sdk(text_child(qname = "xdr:rowOff"))]
   pub row_offset: crate::schemas::xdr::RowOffset,
 }
 /// Defines the ConditionalFormattingRuleExtension Class.
@@ -10442,16 +10442,11 @@ pub struct PivotCacheDefinitionExtension {
             child(variant = PivotCacheIdVersion, qname = "x15:pivotCacheIdVersion"),
             text_child(
                 variant = XxpimXsdboolean,
-                simple_type = "BooleanValue",
                 qname = "xxpim:implicitMeasureSupport"
             ),
             child(variant = PivotCacheRichInfo, qname = "xprd:richInfo"),
             child(variant = CacheVersionInfo, qname = "xxpvi:cacheVersionInfo"),
-            text_child(
-                variant = XlparXsdboolean,
-                simple_type = "BooleanValue",
-                qname = "xlpar:autoRefresh"
-            ),
+            text_child(variant = XlparXsdboolean, qname = "xlpar:autoRefresh"),
             child(
                 variant = PivotCacheDynamicArray,
                 qname = "xlpda:pivotCacheDynamicArray"

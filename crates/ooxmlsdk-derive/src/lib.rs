@@ -115,7 +115,6 @@ fn relationship_match_condition_tokens(
 struct SdkAttrField {
   ident: Ident,
   name: String,
-  simple_type: Option<String>,
   ty: Type,
   optional: bool,
   list: bool,
@@ -145,7 +144,6 @@ struct SdkEmptyChildField {
 struct SdkTextChildField {
   ident: Ident,
   qname: String,
-  simple_type: Option<String>,
   ty: Type,
   optional: bool,
   repeated: bool,
@@ -192,7 +190,6 @@ struct SdkTextField {
 enum SdkTypeFieldKind {
   Attr {
     name: String,
-    simple_type: Option<String>,
     list: bool,
     match_local_name: bool,
     empty_as_none: bool,
@@ -205,7 +202,6 @@ enum SdkTypeFieldKind {
   },
   TextChild {
     qname: String,
-    simple_type: Option<String>,
     list: bool,
   },
   AnyChild {
@@ -360,7 +356,6 @@ enum SdkTypeChoiceItem {
   TextChild {
     variant: Ident,
     ty: Option<Type>,
-    simple_type: Option<String>,
     is_enum: bool,
     qname: String,
   },
@@ -386,7 +381,6 @@ struct SdkTypeChoiceSequenceChild {
   kind: SdkTypeChoiceSequenceChildKind,
   option_field: Option<Ident>,
   ty: Option<Type>,
-  simple_type: Option<String>,
   qname: String,
 }
 
@@ -724,7 +718,6 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
   let mut attr_list = false;
   let mut attr_match_local_name = false;
   let mut attr_empty_as_none = false;
-  let mut attr_simple_type = None;
   let mut kind = None;
   let mut choice_accepts_text = None;
   let mut choice_accepts_any = None;
@@ -746,10 +739,6 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               attr_name = Some(normalize_attr_qname(&value.value()));
-              Ok(())
-            } else if nested.path.is_ident("simple_type") {
-              let value: LitStr = nested.value()?.parse()?;
-              attr_simple_type = Some(value.value());
               Ok(())
             } else if nested.path.is_ident("list") {
               attr_list = true;
@@ -808,16 +797,11 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
         }
         Meta::List(meta) if meta.path.is_ident("text_child") => {
           let mut qname = None;
-          let mut simple_type = None;
           let mut list = false;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
-              Ok(())
-            } else if nested.path.is_ident("simple_type") {
-              let value: LitStr = nested.value()?.parse()?;
-              simple_type = Some(value.value());
               Ok(())
             } else if nested.path.is_ident("list") {
               list = true;
@@ -831,7 +815,6 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           })?;
           kind = Some(SdkTypeFieldKind::TextChild {
             qname: qname.unwrap_or_default(),
-            simple_type,
             list,
           });
         }
@@ -943,7 +926,6 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               let mut variant = None;
               let mut ty = None;
               let mut boxed = false;
-              let mut simple_type = None;
               let mut is_enum = false;
               let mut qname = None;
               nested.parse_nested_meta(|choice_child| {
@@ -962,10 +944,6 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                   Ok(())
                 } else if choice_child.path.is_ident("boxed") {
                   boxed = true;
-                  Ok(())
-                } else if choice_child.path.is_ident("simple_type") {
-                  let value: LitStr = choice_child.value()?.parse()?;
-                  simple_type = Some(value.value());
                   Ok(())
                 } else if choice_child.path.is_ident("enum") {
                   is_enum = true;
@@ -994,7 +972,6 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                 choice_items.push(SdkTypeChoiceItem::TextChild {
                   variant,
                   ty,
-                  simple_type,
                   is_enum,
                   qname,
                 });
@@ -1029,7 +1006,6 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                   };
                   let mut option_field = None;
                   let mut ty = None;
-                  let mut simple_type = None;
                   let mut qname = None;
                   sequence.parse_nested_meta(|sequence_child| {
                     if sequence_child.path.is_ident("qname") {
@@ -1045,10 +1021,6 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                       let value: LitStr = sequence_child.value()?.parse()?;
                       ty = Some(parse_str(&value.value())?);
                       Ok(())
-                    } else if sequence_child.path.is_ident("simple_type") {
-                      let value: LitStr = sequence_child.value()?.parse()?;
-                      simple_type = Some(value.value());
-                      Ok(())
                     } else if sequence_child.path.is_ident("enum")
                       || is_sdk_version_marker_path(&sequence_child.path)
                     {
@@ -1063,7 +1035,6 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                     kind,
                     option_field,
                     ty,
-                    simple_type,
                     qname,
                   });
                   Ok(())
@@ -1379,7 +1350,6 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
   if kind.is_none() && attr_name.is_some() {
     kind = Some(SdkTypeFieldKind::Attr {
       name: attr_name.unwrap_or_default(),
-      simple_type: attr_simple_type,
       list: attr_list,
       match_local_name: attr_match_local_name,
       empty_as_none: attr_empty_as_none,
@@ -1638,20 +1608,18 @@ fn effective_type_name_with_qname(
   qname: &str,
 ) -> Option<String> {
   let type_name = type_terminal_name(ty);
-  simple_type_mapping::resolve(type_name.as_deref(), simple_type, qname, false)
-    .map(|shape| shape.kind.canonical_type_name().to_string())
-    .or_else(|| simple_type.map(str::to_string))
+  simple_type
+    .map(str::to_string)
+    .or_else(|| {
+      simple_type_mapping::resolve(type_name.as_deref(), qname, false)
+        .map(|shape| shape.kind.canonical_type_name().to_string())
+    })
     .or(type_name)
 }
 
-fn mapped_simple_type_name(
-  ty: Option<&Type>,
-  simple_type: Option<&str>,
-  qname: &str,
-  list: bool,
-) -> Option<&'static str> {
+fn mapped_simple_type_name(ty: Option<&Type>, qname: &str, list: bool) -> Option<&'static str> {
   let type_name = ty.and_then(type_terminal_name);
-  simple_type_mapping::resolve(type_name.as_deref(), simple_type, qname, list)
+  simple_type_mapping::resolve(type_name.as_deref(), qname, list)
     .map(|shape| shape.kind.canonical_type_name())
 }
 
@@ -2013,6 +1981,27 @@ mod tests {
     "/../../target/ooxmlsdk_macro_expanded"
   );
   const RUNTIME_SRC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../ooxmlsdk/src");
+
+  #[test]
+  fn rejects_simple_type_field_metadata() {
+    for source in [
+      r#"struct Value { #[sdk(attr(simple_type = "DoubleValue", qname = ":value"))] value: f64 }"#,
+      r#"struct Value { #[sdk(text_child(simple_type = "DoubleValue", qname = "x:value"))] value: f64 }"#,
+      r#"struct Value { #[sdk(choice(text_child(variant = Value, simple_type = "DoubleValue", qname = "x:value")))] value: f64 }"#,
+      r#"struct Value { #[sdk(choice(sequence(variant = Value, text_child(simple_type = "DoubleValue", qname = "x:value"))))] value: f64 }"#,
+    ] {
+      let input: DeriveInput = parse_str(source).expect("derive input");
+      let Data::Struct(data) = input.data else {
+        unreachable!();
+      };
+      let field = data.fields.iter().next().expect("field");
+      let error = match parse_sdk_type_field_attrs(&field.attrs) {
+        Ok(_) => panic!("simple_type must be rejected"),
+        Err(error) => error,
+      };
+      assert!(error.to_string().contains("unsupported sdk"));
+    }
+  }
 
   #[test]
   #[ignore]

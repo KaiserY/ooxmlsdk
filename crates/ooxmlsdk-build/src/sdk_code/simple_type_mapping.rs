@@ -525,13 +525,6 @@ pub(super) fn write_simple_type_mapping(
       pub(crate) list: bool,
     }
 
-    fn strip_list_value(value: &str) -> (&str, bool) {
-      value
-        .strip_prefix("ListValue<")
-        .and_then(|value| value.strip_suffix('>'))
-        .map_or((value, false), |value| (value, true))
-    }
-
     fn kind_by_type_name(name: &str) -> Option<ValueKind> {
       match name {
         #( #type_arms )*
@@ -555,23 +548,17 @@ pub(super) fn write_simple_type_mapping(
 
     pub(crate) fn resolve(
       type_name: Option<&str>,
-      simple_type: Option<&str>,
       qname: &str,
       list: bool,
     ) -> Option<ValueShape> {
-      let (simple_type, simple_type_list) = simple_type.map(strip_list_value).unzip();
-      let simple_type_list = simple_type_list.unwrap_or(false);
-      let kind = simple_type
-        .and_then(|name| kind_by_type_and_qname(name, qname).or_else(|| kind_by_type_name(name)))
-        .or_else(|| {
-          type_name.and_then(|name| {
-            kind_by_type_and_qname(name, qname).or_else(|| kind_by_type_name(name))
-          })
+      let kind = type_name
+        .and_then(|name| {
+          kind_by_type_and_qname(name, qname).or_else(|| kind_by_type_name(name))
         })
         .or_else(|| kind_by_qname(qname))?;
       Some(ValueShape {
         kind,
-        list: list || simple_type_list,
+        list,
       })
     }
   };

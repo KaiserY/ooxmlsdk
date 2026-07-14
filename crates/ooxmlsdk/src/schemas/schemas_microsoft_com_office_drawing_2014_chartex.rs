@@ -1181,11 +1181,7 @@ pub struct GeoCache {
   pub provider: crate::simple_type::StringValue,
   #[sdk(
         choice(
-            text_child(
-                variant = Xsdbase64Binary,
-                simple_type = "Base64BinaryValue",
-                qname = "cx:binary"
-            ),
+            text_child(variant = Xsdbase64Binary, qname = "cx:binary"),
             child(variant = Clear, boxed, qname = "cx:clear")
         )
     )]
@@ -1246,16 +1242,8 @@ pub struct Binning {
   pub overflow: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            text_child(
-                variant = Xsddouble,
-                simple_type = "DoubleValue",
-                qname = "cx:binSize"
-            ),
-            text_child(
-                variant = BinCountXsdunsignedInt,
-                simple_type = "UInt32Value",
-                qname = "cx:binCount"
-            )
+            text_child(variant = Xsddouble, qname = "cx:binSize"),
+            text_child(variant = BinCountXsdunsignedInt, qname = "cx:binCount")
         )
     )]
   pub binning_choice: Option<BinningChoice>,

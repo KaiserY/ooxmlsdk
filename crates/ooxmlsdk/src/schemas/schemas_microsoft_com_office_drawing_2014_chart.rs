@@ -285,7 +285,7 @@ pub type XsdunsignedInt = crate::simple_type::UInt32Value;
 #[sdk(qname = "c16:ptentry")]
 pub struct ChartDataPointUniqueIdMapEntry {
   /// Defines the XsdunsignedInt Class.
-  #[sdk(text_child(simple_type = "UInt32Value", qname = "c16:ptidx"))]
+  #[sdk(text_child(qname = "c16:ptidx"))]
   pub xsdunsigned_int: XsdunsignedInt,
   /// Defines the UniqueID Class.
   #[sdk(child(qname = "c16:uniqueID"))]

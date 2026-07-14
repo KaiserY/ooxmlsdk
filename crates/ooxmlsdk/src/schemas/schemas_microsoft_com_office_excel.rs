@@ -102,48 +102,20 @@ pub struct ClientData {
             text_child(variant = HelpButton, enum, qname = "xvml:Help"),
             text_child(variant = CancelButton, enum, qname = "xvml:Cancel"),
             text_child(variant = DismissButton, enum, qname = "xvml:Dismiss"),
-            text_child(
-                variant = AcceleratorPrimary,
-                simple_type = "ByteValue",
-                qname = "xvml:Accel"
-            ),
-            text_child(
-                variant = AcceleratorSecondary,
-                simple_type = "ByteValue",
-                qname = "xvml:Accel2"
-            ),
-            text_child(
-                variant = CommentRowTarget,
-                simple_type = "IntegerValue",
-                qname = "xvml:Row"
-            ),
-            text_child(
-                variant = CommentColumnTarget,
-                simple_type = "IntegerValue",
-                qname = "xvml:Column"
-            ),
+            text_child(variant = AcceleratorPrimary, qname = "xvml:Accel"),
+            text_child(variant = AcceleratorSecondary, qname = "xvml:Accel2"),
+            text_child(variant = CommentRowTarget, qname = "xvml:Row"),
+            text_child(variant = CommentColumnTarget, qname = "xvml:Column"),
             text_child(variant = Visible, enum, qname = "xvml:Visible"),
             text_child(variant = RowHidden, enum, qname = "xvml:RowHidden"),
             text_child(variant = ColumnHidden, enum, qname = "xvml:ColHidden"),
-            text_child(
-                variant = InputValidationType,
-                simple_type = "IntegerValue",
-                qname = "xvml:VTEdit"
-            ),
+            text_child(variant = InputValidationType, qname = "xvml:VTEdit"),
             text_child(variant = MultiLine, enum, qname = "xvml:MultiLine"),
             text_child(variant = VerticalScrollBar, enum, qname = "xvml:VScroll"),
             text_child(variant = ValidIds, enum, qname = "xvml:ValidIds"),
             text_child(variant = FormulaRange, qname = "xvml:FmlaRange"),
-            text_child(
-                variant = MinDropDownWidth,
-                simple_type = "IntegerValue",
-                qname = "xvml:WidthMin"
-            ),
-            text_child(
-                variant = SelectionEntry,
-                simple_type = "IntegerValue",
-                qname = "xvml:Sel"
-            ),
+            text_child(variant = MinDropDownWidth, qname = "xvml:WidthMin"),
+            text_child(variant = SelectionEntry, qname = "xvml:Sel"),
             text_child(
                 variant = Disable3DForListBoxAndDropDown,
                 enum,
@@ -155,52 +127,20 @@ pub struct ClientData {
             text_child(variant = ListItem, qname = "xvml:ListItem"),
             text_child(variant = DropStyle, qname = "xvml:DropStyle"),
             text_child(variant = Colored, enum, qname = "xvml:Colored"),
-            text_child(
-                variant = DropLines,
-                simple_type = "IntegerValue",
-                qname = "xvml:DropLines"
-            ),
-            text_child(
-                variant = Checked,
-                simple_type = "IntegerValue",
-                qname = "xvml:Checked"
-            ),
+            text_child(variant = DropLines, qname = "xvml:DropLines"),
+            text_child(variant = Checked, qname = "xvml:Checked"),
             text_child(variant = FormulaLink, qname = "xvml:FmlaLink"),
             text_child(variant = FormulaPicture, qname = "xvml:FmlaPict"),
             text_child(variant = Disable3D, enum, qname = "xvml:NoThreeD"),
             text_child(variant = FirstButton, enum, qname = "xvml:FirstButton"),
             text_child(variant = FormulaGroup, qname = "xvml:FmlaGroup"),
-            text_child(
-                variant = ScrollBarPosition,
-                simple_type = "IntegerValue",
-                qname = "xvml:Val"
-            ),
-            text_child(
-                variant = ScrollBarMin,
-                simple_type = "IntegerValue",
-                qname = "xvml:Min"
-            ),
-            text_child(
-                variant = ScrollBarMax,
-                simple_type = "IntegerValue",
-                qname = "xvml:Max"
-            ),
-            text_child(
-                variant = ScrollBarIncrement,
-                simple_type = "IntegerValue",
-                qname = "xvml:Inc"
-            ),
-            text_child(
-                variant = ScrollBarPageIncrement,
-                simple_type = "IntegerValue",
-                qname = "xvml:Page"
-            ),
+            text_child(variant = ScrollBarPosition, qname = "xvml:Val"),
+            text_child(variant = ScrollBarMin, qname = "xvml:Min"),
+            text_child(variant = ScrollBarMax, qname = "xvml:Max"),
+            text_child(variant = ScrollBarIncrement, qname = "xvml:Inc"),
+            text_child(variant = ScrollBarPageIncrement, qname = "xvml:Page"),
             text_child(variant = HorizontalScrollBar, enum, qname = "xvml:Horiz"),
-            text_child(
-                variant = ScrollBarWidth,
-                simple_type = "IntegerValue",
-                qname = "xvml:Dx"
-            ),
+            text_child(variant = ScrollBarWidth, qname = "xvml:Dx"),
             text_child(variant = MapOcxControl, enum, qname = "xvml:MapOCX"),
             text_child(variant = ClipboardFormat, enum, qname = "xvml:CF"),
             text_child(variant = CameraObject, enum, qname = "xvml:Camera"),
@@ -210,16 +150,8 @@ pub struct ClientData {
             text_child(variant = UiObject, enum, qname = "xvml:UIObj"),
             text_child(variant = ScriptText, qname = "xvml:ScriptText"),
             text_child(variant = ScriptExtended, qname = "xvml:ScriptExtended"),
-            text_child(
-                variant = ScriptLanguage,
-                simple_type = "IntegerValue",
-                qname = "xvml:ScriptLanguage"
-            ),
-            text_child(
-                variant = ScriptLocation,
-                simple_type = "IntegerValue",
-                qname = "xvml:ScriptLocation"
-            ),
+            text_child(variant = ScriptLanguage, qname = "xvml:ScriptLanguage"),
+            text_child(variant = ScriptLocation, qname = "xvml:ScriptLocation"),
             text_child(variant = FormulaTextBox, qname = "xvml:FmlaTxbx")
         )
     )]

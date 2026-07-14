@@ -656,7 +656,7 @@ pub struct OleObject {
   #[sdk(text_child(qname = "o:LinkType"))]
   pub link_type: Option<LinkType>,
   /// Embedded Object Cannot Be Refreshed
-  #[sdk(text_child(simple_type = "TrueFalseBlankValue", qname = "o:LockedField"))]
+  #[sdk(text_child(qname = "o:LockedField"))]
   pub locked_field: Option<LockedField>,
   /// WordprocessingML Field Switches
   #[sdk(text_child(qname = "o:FieldCodes"))]

@@ -19,40 +19,40 @@ pub struct Properties {
   #[sdk(text_child(qname = "ap:Company"))]
   pub company: Option<Company>,
   /// Total Number of Pages
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Pages"))]
+  #[sdk(text_child(qname = "ap:Pages"))]
   pub pages: Option<Pages>,
   /// Word Count
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Words"))]
+  #[sdk(text_child(qname = "ap:Words"))]
   pub words: Option<Words>,
   /// Total Number of Characters
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Characters"))]
+  #[sdk(text_child(qname = "ap:Characters"))]
   pub characters: Option<Characters>,
   /// Intended Format of Presentation
   #[sdk(text_child(qname = "ap:PresentationFormat"))]
   pub presentation_format: Option<PresentationFormat>,
   /// Number of Lines
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Lines"))]
+  #[sdk(text_child(qname = "ap:Lines"))]
   pub lines: Option<Lines>,
   /// Total Number of Paragraphs
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Paragraphs"))]
+  #[sdk(text_child(qname = "ap:Paragraphs"))]
   pub paragraphs: Option<Paragraphs>,
   /// Slides Metadata Element
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Slides"))]
+  #[sdk(text_child(qname = "ap:Slides"))]
   pub slides: Option<Slides>,
   /// Number of Slides Containing Notes
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Notes"))]
+  #[sdk(text_child(qname = "ap:Notes"))]
   pub notes: Option<Notes>,
   /// Total Edit Time Metadata Element
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:TotalTime"))]
+  #[sdk(text_child(qname = "ap:TotalTime"))]
   pub total_time: Option<TotalTime>,
   /// Number of Hidden Slides
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:HiddenSlides"))]
+  #[sdk(text_child(qname = "ap:HiddenSlides"))]
   pub hidden_slides: Option<HiddenSlides>,
   /// Total Number of Multimedia Clips
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:MMClips"))]
+  #[sdk(text_child(qname = "ap:MMClips"))]
   pub multimedia_clips: Option<MultimediaClips>,
   /// Thumbnail Display Mode
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "ap:ScaleCrop"))]
+  #[sdk(text_child(qname = "ap:ScaleCrop"))]
   pub scale_crop: Option<ScaleCrop>,
   /// Heading Pairs
   #[sdk(child(qname = "ap:HeadingPairs"))]
@@ -61,13 +61,13 @@ pub struct Properties {
   #[sdk(child(qname = "ap:TitlesOfParts"))]
   pub titles_of_parts: Option<std::boxed::Box<TitlesOfParts>>,
   /// Links Up-to-Date
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "ap:LinksUpToDate"))]
+  #[sdk(text_child(qname = "ap:LinksUpToDate"))]
   pub links_up_to_date: Option<LinksUpToDate>,
   /// Number of Characters (With Spaces)
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:CharactersWithSpaces"))]
+  #[sdk(text_child(qname = "ap:CharactersWithSpaces"))]
   pub characters_with_spaces: Option<CharactersWithSpaces>,
   /// Shared Document
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "ap:SharedDoc"))]
+  #[sdk(text_child(qname = "ap:SharedDoc"))]
   pub shared_document: Option<SharedDocument>,
   /// Relative Hyperlink Base
   #[sdk(text_child(qname = "ap:HyperlinkBase"))]
@@ -76,7 +76,7 @@ pub struct Properties {
   #[sdk(child(qname = "ap:HLinks"))]
   pub hyperlink_list: Option<std::boxed::Box<HyperlinkList>>,
   /// Hyperlinks Changed
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "ap:HyperlinksChanged"))]
+  #[sdk(text_child(qname = "ap:HyperlinksChanged"))]
   pub hyperlinks_changed: Option<HyperlinksChanged>,
   /// Digital Signature
   #[sdk(child(qname = "ap:DigSig"))]
@@ -88,7 +88,7 @@ pub struct Properties {
   #[sdk(text_child(qname = "ap:AppVersion"))]
   pub application_version: Option<ApplicationVersion>,
   /// Document Security
-  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:DocSecurity"))]
+  #[sdk(text_child(qname = "ap:DocSecurity"))]
   pub document_security: Option<DocumentSecurity>,
 }
 /// Name of Document Template.
@@ -166,6 +166,6 @@ pub struct TitlesOfParts {
 #[sdk(no_prefix_only, qname = "ap:DigSig")]
 pub struct DigitalSignature {
   /// Binary Blob
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "vt:blob"))]
+  #[sdk(text_child(qname = "vt:blob"))]
   pub vt_blob: crate::schemas::vt::VtBlob,
 }

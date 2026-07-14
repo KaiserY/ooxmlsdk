@@ -5249,12 +5249,10 @@ pub struct GraphicData {
             child(variant = Anchor, boxed, qname = "wp:anchor"),
             text_child(
                 variant = PercentagePositionHeightOffset,
-                simple_type = "DrawingmlPercentageValue",
                 qname = "wp14:pctPosHOffset"
             ),
             text_child(
                 variant = PercentagePositionVerticalOffset,
-                simple_type = "DrawingmlPercentageValue",
                 qname = "wp14:pctPosVOffset"
             ),
             child(variant = RelativeWidth, qname = "wp14:sizeRelH"),
@@ -5324,16 +5322,8 @@ pub struct GraphicData {
             ),
             empty_child(variant = TextBodyPackage, qname = "oac:txBodyPkg"),
             child(variant = GroupCommand, boxed, qname = "oac:grpCmd"),
-            text_child(
-                variant = ImgDataImgData,
-                simple_type = "Base64BinaryValue",
-                qname = "oac:imgData"
-            ),
-            text_child(
-                variant = OrigImgDataImgData,
-                simple_type = "Base64BinaryValue",
-                qname = "oac:origImgData"
-            ),
+            text_child(variant = ImgDataImgData, qname = "oac:imgData"),
+            text_child(variant = OrigImgDataImgData, qname = "oac:origImgData"),
             child(variant = ImgLink, qname = "oac:imgLink"),
             any_child(variant = DrawingMonikerList, qname = "oac:dgMkLst"),
             any_child(variant = DocumentContextMonikerList, qname = "oac:dcMkLst"),

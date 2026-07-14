@@ -49,10 +49,7 @@ pub struct RelativeWidth {
   #[sdk(string_format(kind = "token"))]
   pub object_id: SizeRelativeHorizontallyValues,
   /// Defines the PercentageWidth Class.
-  #[sdk(text_child(
-    simple_type = "PositiveDrawingmlPercentageValue",
-    qname = "wp14:pctWidth"
-  ))]
+  #[sdk(text_child(qname = "wp14:pctWidth"))]
   pub percentage_width: PercentageWidth,
 }
 /// Defines the RelativeHeight Class.
@@ -64,10 +61,7 @@ pub struct RelativeHeight {
   #[sdk(string_format(kind = "token"))]
   pub relative_from: SizeRelativeVerticallyValues,
   /// Defines the PercentageHeight Class.
-  #[sdk(text_child(
-    simple_type = "PositiveDrawingmlPercentageValue",
-    qname = "wp14:pctHeight"
-  ))]
+  #[sdk(text_child(qname = "wp14:pctHeight"))]
   pub percentage_height: PercentageHeight,
 }
 /// Defines the PercentageWidth Class.

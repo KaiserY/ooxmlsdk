@@ -10,7 +10,7 @@
 pub struct CustomPropertyEditors {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ShowOnOpen Class.
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "cdip:showOnOpen"))]
+  #[sdk(text_child(qname = "cdip:showOnOpen"))]
   pub show_on_open: ShowOnOpen,
   /// Defines the DefaultPropertyEditorNamespace Class.
   #[sdk(text_child(qname = "cdip:defaultPropertyEditorNamespace"))]

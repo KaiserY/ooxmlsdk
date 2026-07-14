@@ -1244,7 +1244,7 @@ pub struct HlinkClickHyperlinkProps {
   #[sdk(attr(qname = ":sndName"))]
   pub snd_name: Option<crate::simple_type::StringValue>,
   /// Defines the SndDataImgData Class.
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "oac:sndData"))]
+  #[sdk(text_child(qname = "oac:sndData"))]
   pub snd_data_img_data: Option<SndDataImgData>,
 }
 /// Defines the HlinkHoverHyperlinkProps Class.
@@ -1273,7 +1273,7 @@ pub struct HlinkHoverHyperlinkProps {
   #[sdk(attr(qname = ":sndName"))]
   pub snd_name: Option<crate::simple_type::StringValue>,
   /// Defines the SndDataImgData Class.
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "oac:sndData"))]
+  #[sdk(text_child(qname = "oac:sndData"))]
   pub snd_data_img_data: Option<SndDataImgData>,
 }
 /// Defines the ModifyHyperlinkProps Class.

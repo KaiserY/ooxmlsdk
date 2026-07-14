@@ -429,16 +429,16 @@ pub type RowId = crate::simple_type::Int32Value;
 #[sdk(qname = "xdr:from")]
 pub struct FromMarker {
   /// Column)
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:col"))]
+  #[sdk(text_child(qname = "xdr:col"))]
   pub column_id: ColumnId,
   /// Column Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:colOff"))]
+  #[sdk(text_child(qname = "xdr:colOff"))]
   pub column_offset: ColumnOffset,
   /// Row
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:row"))]
+  #[sdk(text_child(qname = "xdr:row"))]
   pub row_id: RowId,
   /// Row Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:rowOff"))]
+  #[sdk(text_child(qname = "xdr:rowOff"))]
   pub row_offset: RowOffset,
 }
 /// Ending Anchor Point.
@@ -446,16 +446,16 @@ pub struct FromMarker {
 #[sdk(qname = "xdr:to")]
 pub struct ToMarker {
   /// Column)
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:col"))]
+  #[sdk(text_child(qname = "xdr:col"))]
   pub column_id: ColumnId,
   /// Column Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:colOff"))]
+  #[sdk(text_child(qname = "xdr:colOff"))]
   pub column_offset: ColumnOffset,
   /// Row
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:row"))]
+  #[sdk(text_child(qname = "xdr:row"))]
   pub row_id: RowId,
   /// Row Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:rowOff"))]
+  #[sdk(text_child(qname = "xdr:rowOff"))]
   pub row_offset: RowOffset,
 }
 /// Client Data.

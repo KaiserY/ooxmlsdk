@@ -696,11 +696,9 @@ fn write_typed_child_tokens(
 fn write_text_value_content_tokens(
   value_expr: proc_macro2::TokenStream,
   value_ty: &syn::Type,
-  simple_type: Option<&str>,
   qname: &str,
 ) -> proc_macro2::TokenStream {
-  let simple_type =
-    mapped_simple_type_name(Some(value_ty), simple_type, qname, false).or(simple_type);
+  let simple_type = mapped_simple_type_name(Some(value_ty), qname, false);
   if let Some(kind) = simple_union_effective_type_kind(value_ty, simple_type) {
     write_simple_union_value_tokens(kind, value_expr)
   } else if let Some(kind) = integer_effective_type_kind(value_ty, simple_type) {
@@ -723,9 +721,13 @@ fn write_text_value_content_tokens(
       crate::common::write_escaped_content_str(writer, #value_expr.as_ref())?;
     }
   } else {
-    quote! {
-      crate::common::write_escaped_content_text(writer, #value_expr)?;
-    }
+    missing_static_value_mapping_tokens()
+  }
+}
+
+fn missing_static_value_mapping_tokens() -> proc_macro2::TokenStream {
+  quote! {
+    compile_error!("missing static XML value mapping");
   }
 }
 
@@ -781,7 +783,6 @@ fn build_choice_write_tokens(
       SdkTypeChoiceItem::TextChild {
         variant,
         ty,
-        simple_type,
         is_enum,
         qname,
       } => {
@@ -794,20 +795,12 @@ fn build_choice_write_tokens(
             writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(value))?;
           }
         } else if let Some(payload_ty) = ty.clone().or_else(|| {
-          simple_type
-            .as_deref()
-            .and_then(|simple_type| syn::parse_str::<Type>(simple_type).ok())
+          mapped_simple_type_name(None, qname, false)
+            .and_then(|mapped_type| syn::parse_str::<Type>(mapped_type).ok())
         }) {
-          write_text_value_content_tokens(
-            quote! { value },
-            &payload_ty,
-            simple_type.as_deref(),
-            qname,
-          )
+          write_text_value_content_tokens(quote! { value }, &payload_ty, qname)
         } else {
-          quote! {
-            crate::common::write_escaped_content_text(writer, value)?;
-          }
+          missing_static_value_mapping_tokens()
         };
         arms.push(quote! {
           #choice_ty::#variant(value) => {
@@ -863,12 +856,7 @@ fn build_choice_write_tokens(
                 child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
               let start_tag = write_start_tag_tokens(qname, child_no_prefix);
               let end_tag = write_end_tag_tokens(qname, child_no_prefix);
-              let content = write_text_value_content_tokens(
-                value_expr,
-                &child_ty,
-                child.simple_type.as_deref(),
-                qname,
-              );
+              let content = write_text_value_content_tokens(value_expr, &child_ty, qname);
               quote! {
                 #start_tag
                 #content
@@ -917,7 +905,7 @@ fn build_choice_write_tokens(
       SdkTypeChoiceItem::Text { variant } => {
         arms.push(quote! {
           #choice_ty::#variant(value) => {
-            crate::common::write_escaped_content_text(writer, value)?;
+            crate::common::write_escaped_content_str(writer, value.as_ref())?;
           }
         });
       }
@@ -1023,7 +1011,6 @@ fn build_wml_table_stack_choice_next_tokens(
       SdkTypeChoiceItem::TextChild {
         variant,
         ty,
-        simple_type,
         is_enum,
         qname,
       } => {
@@ -1036,20 +1023,12 @@ fn build_wml_table_stack_choice_next_tokens(
             writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(value))?;
           }
         } else if let Some(payload_ty) = ty.clone().or_else(|| {
-          simple_type
-            .as_deref()
-            .and_then(|simple_type| syn::parse_str::<Type>(simple_type).ok())
+          mapped_simple_type_name(None, qname, false)
+            .and_then(|mapped_type| syn::parse_str::<Type>(mapped_type).ok())
         }) {
-          write_text_value_content_tokens(
-            quote! { value },
-            &payload_ty,
-            simple_type.as_deref(),
-            qname,
-          )
+          write_text_value_content_tokens(quote! { value }, &payload_ty, qname)
         } else {
-          quote! {
-            crate::common::write_escaped_content_text(writer, value)?;
-          }
+          missing_static_value_mapping_tokens()
         };
         arms.push(quote! {
           #choice_ty::#variant(value) => {
@@ -1105,12 +1084,7 @@ fn build_wml_table_stack_choice_next_tokens(
                 child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
               let start_tag = write_start_tag_tokens(qname, child_no_prefix);
               let end_tag = write_end_tag_tokens(qname, child_no_prefix);
-              let content = write_text_value_content_tokens(
-                value_expr,
-                &child_ty,
-                child.simple_type.as_deref(),
-                qname,
-              );
+              let content = write_text_value_content_tokens(value_expr, &child_ty, qname);
               quote! {
                 #start_tag
                 #content
@@ -1159,7 +1133,7 @@ fn build_wml_table_stack_choice_next_tokens(
       SdkTypeChoiceItem::Text { variant } => {
         arms.push(quote! {
           #choice_ty::#variant(value) => {
-            crate::common::write_escaped_content_text(writer, value)?;
+            crate::common::write_escaped_content_str(writer, value.as_ref())?;
           }
         });
       }
@@ -1538,13 +1512,11 @@ fn choice_item_parse_bodies<'a>(
     }
     SdkTypeChoiceItem::TextChild {
       variant,
-      simple_type,
       is_enum,
       qname,
       ..
     } => {
-      let simple_type = mapped_simple_type_name(None, simple_type.as_deref(), qname, false)
-        .or(simple_type.as_deref());
+      let simple_type = mapped_simple_type_name(None, qname, false);
       let empty_parse_tokens = text_child_empty_parse_tokens(
         None,
         simple_type,
@@ -1930,12 +1902,11 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
       }
       SdkTypeChoiceItem::TextChild {
         variant,
-        simple_type,
         is_enum,
         qname,
         ..
       } => {
-        let simple_type = simple_type.as_deref();
+        let simple_type = mapped_simple_type_name(None, qname, false);
         let empty_parse_tokens = text_child_empty_parse_tokens(
           None,
           simple_type,
@@ -2936,7 +2907,6 @@ fn build_text_child_parse_body(
   owner_ident: &Ident,
   field_ident: &Ident,
   qname: &str,
-  simple_type: Option<&str>,
   field_ty: &Type,
   xml_child_slot_assign: proc_macro2::TokenStream,
   options: TextChildParseArmOptions,
@@ -2947,8 +2917,7 @@ fn build_text_child_parse_body(
   } else {
     unwrap_option_vec_type(field_ty)
   };
-  let simple_type =
-    mapped_simple_type_name(Some(&value_ty), simple_type, qname, options.list).or(simple_type);
+  let simple_type = mapped_simple_type_name(Some(&value_ty), qname, options.list);
   let simple_union_kind = simple_union_effective_type_kind(&value_ty, simple_type);
   let list_is_string_like = is_string_like_effective_type(&value_ty, simple_type);
   let parse_from_text_tokens = if options.list {
@@ -3058,7 +3027,6 @@ struct TextChildWriteSpec<'a> {
   qname: &'a str,
   parent_tag_prefix: &'a str,
   parent_no_prefix: bool,
-  simple_type: Option<&'a str>,
   repeated: bool,
   optional: bool,
   list: bool,
@@ -3073,7 +3041,6 @@ fn build_text_child_write_tokens(
     qname,
     parent_tag_prefix,
     parent_no_prefix,
-    simple_type,
     repeated,
     optional,
     list,
@@ -3083,8 +3050,7 @@ fn build_text_child_write_tokens(
   } else {
     unwrap_wrapped_type(field_ty)
   };
-  let simple_type =
-    mapped_simple_type_name(Some(&inner_ty), simple_type, qname, list).or(simple_type);
+  let simple_type = mapped_simple_type_name(Some(&inner_ty), qname, list);
   let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
     let child_no_prefix =
       child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
@@ -3118,9 +3084,7 @@ fn build_text_child_write_tokens(
         crate::common::write_escaped_content_str(writer, #value_expr.as_ref())?;
       }
     } else {
-      quote! {
-        crate::common::write_escaped_content_text(writer, #value_expr)?;
-      }
+      missing_static_value_mapping_tokens()
     };
     quote! {
       #start_tag
@@ -3425,19 +3389,16 @@ fn expand_helper_struct(
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      Some(SdkTypeFieldKind::TextChild {
-        qname,
-        simple_type,
-        list,
-      }) => text_child_fields.push(SdkTextChildField {
-        ident: field_ident.clone(),
-        qname,
-        simple_type,
-        ty: field.ty.clone(),
-        optional: is_option_type(&field.ty),
-        repeated: !list && contains_vec_type(&field.ty),
-        list,
-      }),
+      Some(SdkTypeFieldKind::TextChild { qname, list }) => {
+        text_child_fields.push(SdkTextChildField {
+          ident: field_ident.clone(),
+          qname,
+          ty: field.ty.clone(),
+          optional: is_option_type(&field.ty),
+          repeated: !list && contains_vec_type(&field.ty),
+          list,
+        })
+      }
       Some(SdkTypeFieldKind::AnyChild { qname }) => any_child_fields.push(SdkAnyChildField {
         ident: field_ident.clone(),
         qname,
@@ -3652,7 +3613,6 @@ fn expand_helper_struct(
         qname: &field.qname,
         parent_tag_prefix: "",
         parent_no_prefix: false,
-        simple_type: field.simple_type.as_deref(),
         repeated: field.repeated,
         optional: field.optional,
         list: field.list,
@@ -3662,7 +3622,6 @@ fn expand_helper_struct(
       ident,
       field_ident,
       &field.qname,
-      field.simple_type.as_deref(),
       &field.ty,
       quote! { __ooxmlsdk_seen_child = true; },
       TextChildParseArmOptions {
@@ -3780,12 +3739,7 @@ fn expand_helper_struct(
           });
         }
       }
-      Some(SdkTypeFieldKind::TextChild {
-        qname,
-        simple_type,
-        list,
-        ..
-      }) => {
+      Some(SdkTypeFieldKind::TextChild { qname, list, .. }) => {
         let repeated = !list && contains_vec_type(&field.ty);
         ordered_write_tokens.push(build_text_child_write_tokens(
           field_ident,
@@ -3794,7 +3748,6 @@ fn expand_helper_struct(
             qname: &qname,
             parent_tag_prefix: "",
             parent_no_prefix: false,
-            simple_type: simple_type.as_deref(),
             repeated,
             optional: is_option_type(&field.ty),
             list,
@@ -4035,14 +3988,12 @@ fn expand_named_struct(
     match field_kind {
       SdkTypeFieldKind::Attr {
         name,
-        simple_type,
         list,
         match_local_name,
         empty_as_none,
       } => attr_fields.push(SdkAttrField {
         ident: field_ident.clone(),
         name,
-        simple_type,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         list,
@@ -4063,14 +4014,9 @@ fn expand_named_struct(
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      SdkTypeFieldKind::TextChild {
-        qname,
-        simple_type,
-        list,
-      } => text_child_fields.push(SdkTextChildField {
+      SdkTypeFieldKind::TextChild { qname, list } => text_child_fields.push(SdkTextChildField {
         ident: field_ident.clone(),
         qname,
-        simple_type,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: !list && contains_vec_type(&field.ty),
@@ -4181,10 +4127,7 @@ fn expand_named_struct(
     } else {
       unwrap_wrapped_type(&field.ty)
     };
-    let simple_type = field.simple_type.as_deref();
-    let mapped_simple_type =
-      mapped_simple_type_name(Some(&value_ty), simple_type, &field.name, field.list);
-    let simple_type = mapped_simple_type.or(simple_type);
+    let simple_type = mapped_simple_type_name(Some(&value_ty), &field.name, field.list);
     let simple_union_kind = simple_union_effective_type_kind(&value_ty, simple_type);
     let from_bytes_attr = is_from_bytes_attr_effective_type(&value_ty, simple_type);
     let integer_kind = integer_effective_type_kind(&value_ty, simple_type);
@@ -4851,7 +4794,6 @@ fn expand_named_struct(
         qname: &field.qname,
         parent_tag_prefix: "",
         parent_no_prefix: false,
-        simple_type: field.simple_type.as_deref(),
         repeated: field.repeated,
         optional: field.optional,
         list: field.list,
@@ -4861,7 +4803,6 @@ fn expand_named_struct(
       ident,
       field_ident,
       &field.qname,
-      field.simple_type.as_deref(),
       &field.ty,
       xml_child_slot_assign.clone(),
       TextChildParseArmOptions {
@@ -5758,12 +5699,7 @@ fn expand_named_struct(
             });
           }
         }
-        SdkTypeFieldKind::TextChild {
-          qname,
-          simple_type,
-          list,
-          ..
-        } => {
+        SdkTypeFieldKind::TextChild { qname, list, .. } => {
           let repeated = !list && contains_vec_type(field_ty);
           ordered_write_tokens.push(build_text_child_write_tokens(
             field_ident,
@@ -5772,7 +5708,6 @@ fn expand_named_struct(
               qname,
               parent_tag_prefix: &tag_prefix,
               parent_no_prefix,
-              simple_type: simple_type.as_deref(),
               repeated,
               optional: is_option_type(field_ty),
               list: *list,
@@ -5876,9 +5811,7 @@ fn expand_named_struct(
               crate::common::write_escaped_content_str(writer, value.as_ref())?;
             }
           } else {
-            quote! {
-              crate::common::write_escaped_content_text(writer, value)?;
-            }
+            missing_static_value_mapping_tokens()
           };
           let required_text_write_tokens = if *list && is_string_like_type(&inner_ty) {
             quote! {
@@ -5905,9 +5838,7 @@ fn expand_named_struct(
               crate::common::write_escaped_content_str(writer, self.#field_ident.as_ref())?;
             }
           } else {
-            quote! {
-              crate::common::write_escaped_content_text(writer, &self.#field_ident)?;
-            }
+            missing_static_value_mapping_tokens()
           };
           if is_option_type(field_ty) {
             ordered_write_tokens.push(quote! {

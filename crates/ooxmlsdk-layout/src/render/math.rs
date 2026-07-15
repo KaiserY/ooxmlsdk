@@ -1,54 +1,15 @@
 use ooxmlsdk::schemas::{m, schemas_microsoft_com_office_drawing_2010_main as a14};
-use ooxmlsdk::sdk::SdkType;
 
 pub fn text_math_text(math: &a14::TextMath) -> String {
-  text_math_fragments_text(
-    math
-      .xml_other_children
-      .iter()
-      .map(|fragment| fragment.as_ref()),
-  )
-}
-
-fn text_math_fragments_text<'a>(math: impl IntoIterator<Item = &'a [u8]>) -> String {
   let mut text = String::new();
-  for fragment in math {
-    append_math_fragment_text(fragment, &mut text);
+  for child in &math.text_math_choice {
+    match child {
+      a14::TextMathChoice::Paragraph(paragraph) => append_paragraph_text(paragraph, &mut text),
+      a14::TextMathChoice::OfficeMath(math) => append_office_math_text(math, &mut text),
+      a14::TextMathChoice::Run(run) => append_run_text(run, &mut text),
+    }
   }
   text
-}
-
-fn append_math_fragment_text(fragment: &[u8], text: &mut String) {
-  match root_local_name(fragment) {
-    Some(b"oMathPara") => {
-      if let Ok(paragraph) = m::Paragraph::from_bytes(fragment) {
-        append_paragraph_text(&paragraph, text);
-      }
-    }
-    Some(b"oMath") => {
-      if let Ok(math) = m::OfficeMath::from_bytes(fragment) {
-        append_office_math_text(&math, text);
-      }
-    }
-    Some(b"r") => {
-      if let Ok(run) = m::Run::from_bytes(fragment) {
-        append_run_text(&run, text);
-      }
-    }
-    _ => {}
-  }
-}
-
-fn root_local_name(xml: &[u8]) -> Option<&[u8]> {
-  let start = xml
-    .iter()
-    .position(|byte| !byte.is_ascii_whitespace())
-    .map(|index| &xml[index..])?;
-  let start = start.strip_prefix(b"<")?;
-  let name = start
-    .split(|byte| byte.is_ascii_whitespace() || matches!(byte, b'>' | b'/'))
-    .next()?;
-  Some(name.rsplit(|byte| *byte == b':').next().unwrap_or(name))
 }
 
 fn append_paragraph_text(paragraph: &m::Paragraph, text: &mut String) {
@@ -167,19 +128,17 @@ fn append_run_text(run: &m::Run, text: &mut String) {
 
 #[cfg(test)]
 mod tests {
-  use super::text_math_fragments_text;
+  use super::text_math_text;
+  use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2010_main::TextMath;
+  use ooxmlsdk::sdk::SdkType;
 
   #[test]
   fn text_math_text_reads_generated_math_fragment() {
     // ppt/diagrams/data1.xml. a14:m preserves selected MCE math as raw XML bytes;
     // the selected MCE dgm:pt already contains the m:oMathPara child.
-    let math = [
-      r#"<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMathParaPr><m:jc m:val="centerGroup"/></m:oMathParaPr><m:oMath><m:r><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="en-US" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr><m:t>𝐴</m:t></m:r><m:r><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="en-US" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr><m:t>=</m:t></m:r><m:r><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="el-GR" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr><m:t>𝜋</m:t></m:r><m:sSup><m:sSupPr><m:ctrlPr><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="en-US" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr></m:ctrlPr></m:sSupPr><m:e><m:r><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="en-US" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr><m:t>𝑟</m:t></m:r></m:e><m:sup><m:r><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="en-US" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr><m:t>2</m:t></m:r></m:sup></m:sSup></m:oMath></m:oMathPara>"#,
-    ];
+    let xml = r#"<a14:m xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMathPara><m:oMathParaPr><m:jc m:val="centerGroup"/></m:oMathParaPr><m:oMath><m:r><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="en-US" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr><m:t>𝐴</m:t></m:r><m:r><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="en-US" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr><m:t>=</m:t></m:r><m:r><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="el-GR" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr><m:t>𝜋</m:t></m:r><m:sSup><m:sSupPr><m:ctrlPr><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="en-US" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr></m:ctrlPr></m:sSupPr><m:e><m:r><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="en-US" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr><m:t>𝑟</m:t></m:r></m:e><m:sup><m:r><a:rPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lang="en-US" altLang="zh-CN" i="1" smtClean="0"><a:latin typeface="Cambria Math"/></a:rPr><m:t>2</m:t></m:r></m:sup></m:sSup></m:oMath></m:oMathPara></a14:m>"#;
+    let math = TextMath::from_bytes(xml.as_bytes()).unwrap();
 
-    assert_eq!(
-      text_math_fragments_text(math.iter().map(|xml| xml.as_bytes())),
-      "𝐴=𝜋𝑟^2"
-    );
+    assert_eq!(text_math_text(&math), "𝐴=𝜋𝑟^2");
   }
 }

@@ -992,7 +992,6 @@ pub struct LineChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:dLbls")]
 pub struct DataLabels {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Data Label.
   #[sdk(child(qname = "c:dLbl"))]
   pub data_label: Vec<DataLabel>,
@@ -1418,7 +1417,7 @@ pub struct ChartSpace {
         choice(
             child(variant = C14Style, qname = "c14:style"),
             child(variant = CStyle, qname = "c:style"),
-            any
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
     )]
   pub chart_space_choice: Option<ChartSpaceChoice>,
@@ -4609,13 +4608,16 @@ pub struct SurfaceSerExtension {
 #[sdk(qname = "c:ext")]
 pub struct DataDisplayOptions16 {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Uniform Resource Identifier
   #[sdk(attr(qname = ":uri"))]
   pub uri: Option<crate::simple_type::StringValue>,
   /// Defines the BooleanFalse Class.
   #[sdk(child(qname = "c16r3:dispNaAsBlank"))]
   pub boolean_false: Option<crate::schemas::c16r3::BooleanFalse>,
+  /// Office 2019 data display options.
+  #[sdk(child(qname = "c16r3:dataDisplayOptions16"))]
+  pub c16r3_data_display_options16:
+    Option<std::boxed::Box<crate::schemas::c16r3::DataDisplayOptions16>>,
 }
 /// pivot chart format persistence data.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5097,8 +5099,7 @@ pub enum ChartSpaceChoice {
   C14Style(crate::schemas::c14::Style),
   /// Defines the Style Class.
   CStyle(Style),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum UserShapesChoice {

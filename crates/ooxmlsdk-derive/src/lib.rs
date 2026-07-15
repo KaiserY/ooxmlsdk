@@ -133,6 +133,16 @@ struct SdkChildField {
 }
 
 #[derive(Clone)]
+struct SdkAlternateContentField {
+  ident: Ident,
+  qname: String,
+  children: Vec<Ident>,
+  ty: Type,
+  optional: bool,
+  repeated: bool,
+}
+
+#[derive(Clone)]
 struct SdkEmptyChildField {
   ident: Ident,
   qname: String,
@@ -196,6 +206,10 @@ enum SdkTypeFieldKind {
   },
   Child {
     qname: String,
+  },
+  Mce {
+    qname: String,
+    children: Vec<Ident>,
   },
   EmptyChild {
     qname: String,
@@ -776,6 +790,44 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
         }
         Meta::Path(path) if path.is_ident("child") => {
           return Err(syn::Error::new_spanned(path, "sdk child requires qname"));
+        }
+        Meta::List(meta) if meta.path.is_ident("mce") => {
+          let mut qname = None;
+          let mut children = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("qname") {
+              let value: LitStr = nested.value()?.parse()?;
+              qname = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("children") {
+              let value: ExprArray = nested.value()?.parse()?;
+              let parsed = value
+                .elems
+                .into_iter()
+                .map(|child| match child {
+                  Expr::Path(path) if path.qself.is_none() => {
+                    path.path.get_ident().cloned().ok_or_else(|| {
+                      syn::Error::new_spanned(path, "sdk mce child must be a field name")
+                    })
+                  }
+                  child => Err(syn::Error::new_spanned(
+                    child,
+                    "sdk mce child must be a field name",
+                  )),
+                })
+                .collect::<syn::Result<Vec<_>>>()?;
+              children = Some(parsed);
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk mce attribute"))
+            }
+          })?;
+          let qname =
+            qname.ok_or_else(|| syn::Error::new_spanned(&meta.path, "sdk mce requires qname"))?;
+          let children = children
+            .filter(|children| !children.is_empty())
+            .ok_or_else(|| syn::Error::new_spanned(&meta.path, "sdk mce requires children"))?;
+          kind = Some(SdkTypeFieldKind::Mce { qname, children });
         }
         Meta::List(meta) if meta.path.is_ident("empty_child") => {
           let mut qname = None;
@@ -2000,6 +2052,49 @@ mod tests {
         Err(error) => error,
       };
       assert!(error.to_string().contains("unsupported sdk"));
+    }
+  }
+
+  #[test]
+  fn parses_static_mce_children() {
+    let input: DeriveInput = parse_str(
+      r#"struct Parent {
+        #[sdk(mce(qname = "mc:AlternateContent", children = [first, second]))]
+        alternate_content: Vec<AlternateContent>,
+      }"#,
+    )
+    .expect("derive input");
+    let Data::Struct(data) = input.data else {
+      unreachable!();
+    };
+    let field = data.fields.iter().next().expect("field");
+    let parsed = parse_sdk_type_field_attrs(&field.attrs).expect("MCE field metadata");
+    let Some(SdkTypeFieldKind::Mce { qname, children }) = parsed.kind else {
+      panic!("expected MCE field metadata");
+    };
+    assert_eq!(qname, "mc:AlternateContent");
+    assert_eq!(
+      children.iter().map(ToString::to_string).collect::<Vec<_>>(),
+      ["first", "second"]
+    );
+  }
+
+  #[test]
+  fn rejects_static_mce_without_children() {
+    for source in [
+      r#"struct Parent { #[sdk(mce(qname = "mc:AlternateContent"))] field: Vec<AlternateContent> }"#,
+      r#"struct Parent { #[sdk(mce(qname = "mc:AlternateContent", children = []))] field: Vec<AlternateContent> }"#,
+    ] {
+      let input: DeriveInput = parse_str(source).expect("derive input");
+      let Data::Struct(data) = input.data else {
+        unreachable!();
+      };
+      let field = data.fields.iter().next().expect("field");
+      let error = match parse_sdk_type_field_attrs(&field.attrs) {
+        Ok(_) => panic!("children are required"),
+        Err(error) => error,
+      };
+      assert!(error.to_string().contains("requires children"));
     }
   }
 

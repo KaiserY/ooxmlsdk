@@ -191,7 +191,7 @@ impl TableStyleList {
         .iter()
         .filter_map(|child| match child {
           a::TableStyleListChoice::TableStyleEntry(entry) => Some(entry.as_ref()),
-          a::TableStyleListChoice::XmlAny(_) => None,
+          a::TableStyleListChoice::AlternateContent(_) => None,
         })
         .map(TableStyle::from_dml_table_style_entry)
         .collect(),

@@ -338,34 +338,42 @@ Expected fix:
 - Treat non-empty/non-Office2007 version on wrappers as a reason not to flatten
   unless explicitly tested.
 
-### 10. Any/Unknown XML Preservation Depends On Generated Shape
+### 10. MCE Positions Must Be Represented Statically
+
+Status: fixed.
 
 Location:
 
-- `ChoiceEnums[].AddXmlAny` extension handling in schema extensions
-- `HaveDirectXmlOtherChildren` type extension handling in schema extensions
+- `Types[].AlternateContent` extension handling
+- `Types[].AlternateContentChoice` and `Types[].AddChoice` handling
+- typed `AlternateContent` variants in choice enum extensions
 - schema extensions under `sdk_data/schema_extensions/`
 
 Problem:
 
-- Parent raw-XML preservation depends on whether MCE appears in an existing
-  choice stream or in a direct child slot.
-- If choice flattening changes the parent field shape, the extension may need
-  to move between `AddXmlAny` and `HaveDirectXmlOtherChildren`.
+- Extension-added raw XML made ordering possible but erased which children an
+  MCE branch may contain.
+- Generic raw storage also caused MCE processing to be generated for types
+  that have no observed MCE position.
 
 Why this matters:
 
-- MCE wrappers such as `mc:AlternateContent` must be preserved in ordered child
-  streams for parse-not-verify behavior.
+- `mc:AlternateContent` can select zero or more sibling children, so it belongs
+  to the parent content model rather than any one child.
+- Typed positions preserve round-trip order while keeping normal child parsing
+  static.
 
-Expected fix:
+Implemented shape:
 
-- When changing choice flattening, re-check MCE-backed parents in
-  `sdk_data/schema_extensions/`. Existing choice streams should use
-  `ChoiceEnums[].AddXmlAny`; direct child slots should use
-  `HaveDirectXmlOtherChildren`. Single repeated child parents rely on
-  `HaveDirectXmlOtherChildren` to promote the child list into a choice stream
-  with `XmlAny`.
+- Fixed parent positions use typed `AlternateContent` fields; one position has
+  no numeric suffix and multiple positions are numbered from zero.
+- Every fixed position declares its supported parent fields explicitly. One
+  selected branch may flatten zero or more of those children into the parent;
+  children outside the position's declared set are rejected.
+- Ordered streams use a typed choice containing every known child and
+  `AlternateContent`.
+- Extension-added `AddXmlAny` and `HaveDirectXmlOtherChildren` paths were
+  removed. Schema-native wildcard content remains raw by design.
 
 ### 11. Mixed Sequence Direct Children Were Forced Optional
 
@@ -440,7 +448,8 @@ When reviewing generated diffs, check:
 - Did a direct child field become a choice enum or helper struct?
 - Did a helper struct disappear where upstream has a repeatable sequence branch?
 - Did a choice enum lose nested grouping around sequence variants?
-- Did `XmlAny` remain in the same ordered stream for MCE-sensitive parents?
+- Did typed `AlternateContent` remain in the correct parent slot or ordered
+  choice stream for MCE-sensitive parents?
 - Did Office version attributes remain on the field or variant that actually
   owns the version gate?
 

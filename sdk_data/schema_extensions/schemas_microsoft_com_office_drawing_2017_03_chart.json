@@ -1,0 +1,13 @@
+{
+  "Types": [
+    {
+      "ClassName": "BooleanFalse",
+      "Attributes": [
+        {
+          "QName": "c16r3:val",
+          "OverrideQName": ":val"
+        }
+      ]
+    }
+  ]
+}

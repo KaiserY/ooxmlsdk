@@ -6,7 +6,7 @@
     },
     {
       "ClassName": "PointList",
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContentChoice": true
     },
     {
       "ClassName": "RelationshipIds",

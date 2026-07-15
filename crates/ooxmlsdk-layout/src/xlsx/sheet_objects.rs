@@ -67,7 +67,7 @@ impl SheetObjectCatalog {
               x::OleObjectsChoice::OleObject(object) => {
                 Some(OleObjectModel::from_ole_object(object))
               }
-              x::OleObjectsChoice::XmlAny(_) => None,
+              x::OleObjectsChoice::AlternateContent(_) => None,
             })
             .collect()
         })
@@ -79,7 +79,7 @@ impl SheetObjectCatalog {
             .iter()
             .filter_map(|child| match child {
               x::ControlsChoice::Control(control) => Some(ControlModel::from_control(control)),
-              x::ControlsChoice::XmlAny(_) => None,
+              x::ControlsChoice::AlternateContent(_) => None,
             })
             .collect()
         })
@@ -88,7 +88,7 @@ impl SheetObjectCatalog {
         controls
           .xml_children
           .iter()
-          .filter(|child| matches!(child, x::ControlsChoice::XmlAny(_)))
+          .filter(|child| matches!(child, x::ControlsChoice::AlternateContent(_)))
           .count()
       }),
     }

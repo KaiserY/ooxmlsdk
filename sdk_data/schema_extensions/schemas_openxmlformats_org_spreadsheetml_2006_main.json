@@ -54,11 +54,18 @@
     },
     {
       "ClassName": "Controls",
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContentChoice": true
     },
     {
       "ClassName": "Comment",
-      "HaveDirectXmlOtherChildren": true,
+      "AlternateContent": [
+        {
+          "AfterField": "comment_text",
+          "Children": [
+            "comment_properties"
+          ]
+        }
+      ],
       "Attributes": [
         {
           "QName": "xr:uid",
@@ -140,7 +147,7 @@
     },
     {
       "ClassName": "OleObjects",
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContentChoice": true
     },
     {
       "ClassName": "PivotCacheDefinitionExtension",
@@ -206,8 +213,7 @@
     {
       "ClassName": "SharedStringItem",
       "HaveMcIgnorable": false,
-      "HaveXmlnsFields": true,
-      "HaveDirectXmlOtherChildren": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Sheet",
@@ -358,7 +364,24 @@
         }
       ],
       "HaveMcIgnorable": true,
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContent": [
+        {
+          "AfterField": "workbook_properties",
+          "Children": [
+            "absolute_path"
+          ]
+        }
+      ],
+      "AddChildren": [
+        {
+          "Name": "xr:CT_RevisionPtr/xr:revisionPtr",
+          "PropertyName": "RevisionPtr",
+          "PropertyComments": "Defines the RevisionPtr Class.",
+          "Optional": true,
+          "InitialVersion": "Office2016",
+          "AfterPropertyName": "AbsolutePath"
+        }
+      ]
     },
     {
       "ClassName": "WorkbookExtension",
@@ -372,7 +395,20 @@
       "ClassName": "Worksheet",
       "HaveMcIgnorable": true,
       "HaveMcPreserveAttributes": true,
-      "HaveDirectXmlOtherChildren": true,
+      "AlternateContent": [
+        {
+          "AfterField": "drawing",
+          "Children": [
+            "legacy_drawing"
+          ]
+        },
+        {
+          "AfterField": "legacy_drawing",
+          "Children": [
+            "controls"
+          ]
+        }
+      ],
       "Attributes": [
         {
           "QName": "xr:uid",
@@ -434,11 +470,19 @@
     },
     {
       "ClassName": "CellFormats",
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContentChoice": true
     },
     {
       "ClassName": "DataValidation",
-      "HaveDirectXmlOtherChildren": true,
+      "AlternateContent": [
+        {
+          "BeforeField": "list",
+          "Children": [
+            "list",
+            "formula1"
+          ]
+        }
+      ],
       "Attributes": [
         {
           "QName": "xr:uid",
@@ -467,11 +511,11 @@
     },
     {
       "ClassName": "DifferentialFormats",
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContentChoice": true
     },
     {
       "ClassName": "Fills",
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContentChoice": true
     },
     {
       "ClassName": "Filters",
@@ -479,7 +523,7 @@
     },
     {
       "ClassName": "Fonts",
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContentChoice": true
     },
     {
       "ClassName": "Hyperlink",

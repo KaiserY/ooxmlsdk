@@ -206,7 +206,7 @@ pub struct Run {
             ),
             child(variant = MText, qname = "m:t"),
             child(variant = DrawingRunProperties, boxed, qname = "a:rPr"),
-            any
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
     )]
   pub run_choice: Vec<RunChoice>,
@@ -526,7 +526,7 @@ pub struct Paragraph {
             child(variant = RunConflictInsertion, boxed, qname = "w14:conflictIns"),
             child(variant = RunConflictDeletion, boxed, qname = "w14:conflictDel"),
             child(variant = WRun, boxed, qname = "w:r"),
-            any
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
     )]
   pub paragraph_choice: Vec<ParagraphChoice>,
@@ -2441,8 +2441,7 @@ pub enum RunChoice {
   /// Text.
   MText(Text),
   DrawingRunProperties(std::boxed::Box<crate::schemas::a::RunProperties>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphChoice {
@@ -2512,8 +2511,7 @@ pub enum ParagraphChoice {
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Phonetic Guide Text Run.
   WRun(std::boxed::Box<crate::schemas::w::Run>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum OfficeMathChoice {

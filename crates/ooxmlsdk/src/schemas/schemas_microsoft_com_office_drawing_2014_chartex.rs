@@ -257,7 +257,6 @@ pub enum PageOrientation {
 #[sdk(xml_header, qname = "cx:chartSpace")]
 pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// version
   #[sdk(attr(qname = ":version"))]
   pub version: Option<crate::simple_type::StringValue>,

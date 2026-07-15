@@ -74,7 +74,7 @@ impl PPTShapeGroupContext {
       p::ShapeTreeChoice::ContentPart(content_part) => {
         Some(self.import_content_part(slide_persist, content_part))
       }
-      p::ShapeTreeChoice::XmlAny(_) => None,
+      p::ShapeTreeChoice::AlternateContent(_) => None,
     }
   }
 
@@ -98,7 +98,7 @@ impl PPTShapeGroupContext {
       p::GroupShapeChoice::ContentPart(content_part) => {
         Some(self.import_content_part(slide_persist, content_part))
       }
-      p::GroupShapeChoice::XmlAny(_) => None,
+      p::GroupShapeChoice::AlternateContent(_) => None,
     }
   }
 

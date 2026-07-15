@@ -1115,7 +1115,6 @@ pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1131,6 +1130,9 @@ pub struct Slide {
   /// Color Scheme Map Override
   #[sdk(child(qname = "p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [transition]))]
+  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
   /// Slide Transition
   #[sdk(child(qname = "p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
@@ -1148,7 +1150,6 @@ pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1174,6 +1175,9 @@ pub struct SlideLayout {
   /// Color Scheme Map Override
   #[sdk(child(qname = "p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [transition]))]
+  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
   /// Slide Transition.
   #[sdk(child(qname = "p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
@@ -1194,7 +1198,6 @@ pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// preserve
   #[sdk(attr(qname = ":preserve"))]
   pub preserve: Option<crate::simple_type::BooleanValue>,
@@ -1207,6 +1210,9 @@ pub struct SlideMaster {
   /// Defines the SlideLayoutIdList Class.
   #[sdk(child(qname = "p:sldLayoutIdLst"))]
   pub slide_layout_id_list: Option<SlideLayoutIdList>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [transition]))]
+  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
   /// Slide Transition.
   #[sdk(child(qname = "p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
@@ -2974,7 +2980,6 @@ pub struct NonVisualGroupShapeDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:titleStyle")]
 pub struct TitleStyle {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Default Paragraph Style
   #[sdk(child(qname = "a:defPPr"))]
   pub default_paragraph_properties:
@@ -3023,7 +3028,6 @@ pub struct TitleStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:bodyStyle")]
 pub struct BodyStyle {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Default Paragraph Style
   #[sdk(child(qname = "a:defPPr"))]
   pub default_paragraph_properties:
@@ -3072,7 +3076,6 @@ pub struct BodyStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:otherStyle")]
 pub struct OtherStyle {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Default Paragraph Style
   #[sdk(child(qname = "a:defPPr"))]
   pub default_paragraph_properties:
@@ -3566,10 +3569,12 @@ pub struct ShowPropertiesExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:pic")]
 pub struct Picture {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Non-Visual Properties for a Picture
   #[sdk(child(qname = "p:nvPicPr"))]
   pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [blip_fill]))]
+  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
   /// Picture Fill
   #[sdk(child(qname = "p:blipFill"))]
   pub blip_fill: Option<std::boxed::Box<BlipFill>>,
@@ -3736,7 +3741,7 @@ pub struct ShapeTree {
             child(variant = ConnectionShape, boxed, qname = "p:cxnSp"),
             child(variant = Picture, boxed, qname = "p:pic"),
             child(variant = ContentPart, boxed, qname = "p:contentPart"),
-            any
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
     )]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
@@ -3762,7 +3767,7 @@ pub struct GroupShape {
             child(variant = ConnectionShape, boxed, qname = "p:cxnSp"),
             child(variant = Picture, boxed, qname = "p:pic"),
             child(variant = ContentPart, boxed, qname = "p:contentPart"),
-            any
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
     )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
@@ -3785,7 +3790,12 @@ pub struct CustomerDataList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:controls")]
 pub struct ControlList {
-  #[sdk(choice(child(variant = Control, boxed, qname = "p:control"), any))]
+  #[sdk(
+        choice(
+            child(variant = Control, boxed, qname = "p:control"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
+        )
+    )]
   pub xml_children: Vec<ControlListChoice>,
 }
 /// Defines the CommonSlideDataExtensionList Class.
@@ -5192,8 +5202,7 @@ pub enum ShapeTreeChoice {
   Picture(std::boxed::Box<Picture>),
   /// Defines the ContentPart Class.
   ContentPart(std::boxed::Box<ContentPart>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapeChoice {
@@ -5209,15 +5218,7 @@ pub enum GroupShapeChoice {
   Picture(std::boxed::Box<Picture>),
   /// Defines the ContentPart Class.
   ContentPart(std::boxed::Box<ContentPart>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
-}
-#[derive(Clone, Debug, PartialEq)]
-pub enum ControlListChoice {
-  /// Embedded Control.
-  Control(std::boxed::Box<Control>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapePropertiesChoice {
@@ -5449,4 +5450,11 @@ pub enum SoundActionChoice {
   StartSoundAction(std::boxed::Box<StartSoundAction>),
   /// Stop Sound Action.
   EndSoundAction,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum ControlListChoice {
+  /// Embedded Control.
+  Control(std::boxed::Box<Control>),
+  /// Markup Compatibility alternate content.
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }

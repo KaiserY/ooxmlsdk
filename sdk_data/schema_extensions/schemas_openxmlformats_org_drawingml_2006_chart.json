@@ -2,7 +2,14 @@
   "ChoiceEnums": [
     {
       "RustName": "ChartSpaceChoice",
-      "AddXmlAny": []
+      "AddVariants": [
+        {
+          "RustName": "AlternateContent",
+          "QName": "mc:AlternateContent",
+          "PayloadRustType": "AlternateContent",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006"
+        }
+      ]
     },
     {
       "RustName": "DataLabelChoice",
@@ -44,6 +51,16 @@
     },
     {
       "ClassName": "DataDisplayOptions16",
+      "AddChildren": [
+        {
+          "Name": "c16r3:CT_DataDisplayOptions16/c16r3:dataDisplayOptions16",
+          "PropertyName": "C16r3DataDisplayOptions16",
+          "PropertyComments": "Office 2019 data display options.",
+          "Optional": true,
+          "InitialVersion": "Office2019",
+          "AfterPropertyName": "BooleanFalse"
+        }
+      ],
       "Attributes": [
         {
           "QName": ":uri",
@@ -195,12 +212,7 @@
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "DataLabels",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
       "ClassName": "DataDisplayOptions16",
-      "HaveDirectXmlOtherChildren": true,
       "HaveXmlnsFields": true
     },
     {

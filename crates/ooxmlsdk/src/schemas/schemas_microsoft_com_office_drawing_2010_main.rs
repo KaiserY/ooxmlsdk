@@ -223,7 +223,14 @@ pub struct UseLocalDpi {
 #[sdk(qname = "a14:m")]
 pub struct TextMath {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_children: Vec<std::boxed::Box<[u8]>>,
+  #[sdk(
+        choice(
+            child(variant = Paragraph, boxed, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Run, boxed, qname = "m:r")
+        )
+    )]
+  pub text_math_choice: Vec<TextMathChoice>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -903,4 +910,10 @@ pub enum ImageEffectChoice {
   Saturation(Saturation),
   /// Defines the SharpenSoften Class.
   SharpenSoften(SharpenSoften),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum TextMathChoice {
+  Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
+  OfficeMath(crate::schemas::m::OfficeMath),
+  Run(std::boxed::Box<crate::schemas::m::Run>),
 }

@@ -6,7 +6,7 @@
     },
     {
       "ClassName": "ControlList",
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContentChoice": true
     },
     {
       "ClassName": "OutlineViewSlideListEntry",
@@ -14,7 +14,14 @@
     },
     {
       "ClassName": "Picture",
-      "HaveDirectXmlOtherChildren": true,
+      "AlternateContent": [
+        {
+          "AfterField": "non_visual_picture_properties",
+          "Children": [
+            "blip_fill"
+          ]
+        }
+      ],
       "Children": [
         {
           "PropertyName": "BlipFill",
@@ -40,13 +47,27 @@
       "ClassName": "Slide",
       "HaveMcIgnorable": true,
       "HaveMcPreserveAttributes": true,
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContent": [
+        {
+          "AfterField": "color_map_override",
+          "Children": [
+            "transition"
+          ]
+        }
+      ]
     },
     {
       "ClassName": "SlideLayout",
       "HaveMcIgnorable": true,
       "HaveMcPreserveAttributes": true,
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContent": [
+        {
+          "AfterField": "color_map_override",
+          "Children": [
+            "transition"
+          ]
+        }
+      ]
     },
     {
       "ClassName": "SlideLayoutExtensionList",
@@ -68,7 +89,14 @@
       "ClassName": "SlideMaster",
       "HaveMcIgnorable": true,
       "HaveMcPreserveAttributes": true,
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContent": [
+        {
+          "AfterField": "slide_layout_id_list",
+          "Children": [
+            "transition"
+          ]
+        }
+      ]
     },
     {
       "ClassName": "NotesMaster",
@@ -100,28 +128,30 @@
       "ClassName": "ViewProperties",
       "HaveMcIgnorable": true,
       "HaveMcPreserveAttributes": true
-    },
-    {
-      "ClassName": "TitleStyle",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
-      "ClassName": "BodyStyle",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
-      "ClassName": "OtherStyle",
-      "HaveDirectXmlOtherChildren": true
     }
   ],
   "ChoiceEnums": [
     {
       "RustName": "ShapeTreeChoice",
-      "AddXmlAny": []
+      "AddVariants": [
+        {
+          "RustName": "AlternateContent",
+          "QName": "mc:AlternateContent",
+          "PayloadRustType": "AlternateContent",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006"
+        }
+      ]
     },
     {
       "RustName": "GroupShapeChoice",
-      "AddXmlAny": []
+      "AddVariants": [
+        {
+          "RustName": "AlternateContent",
+          "QName": "mc:AlternateContent",
+          "PayloadRustType": "AlternateContent",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006"
+        }
+      ]
     }
   ]
 }

@@ -1,8 +1,26 @@
 {
+  "AddTypes": [
+    {
+      "Name": "cp:CT_ContentType/cp:contentType",
+      "ClassName": "ContentType",
+      "Summary": "cp:contentType",
+      "Kind": "LeafText",
+      "ApiKind": "LeafTextWrapper",
+      "TextValueType": "StringValue"
+    }
+  ],
   "Types": [
     {
       "ClassName": "CoreProperties",
-      "HaveDirectXmlOtherChildren": true
+      "AddChildren": [
+        {
+          "Name": "cp:CT_ContentType/cp:contentType",
+          "PropertyName": "ContentType",
+          "PropertyComments": "cp:contentType",
+          "Optional": true,
+          "AfterName": "cp:CT_ContentStatus/cp:contentStatus"
+        }
+      ]
     },
     {
       "ClassName": "Creator",

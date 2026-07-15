@@ -4304,7 +4304,6 @@ pub struct UnderlineFill {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:r")]
 pub struct Run {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Text Character Properties
   #[sdk(child(qname = "a:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
@@ -4464,7 +4463,12 @@ pub struct TableStyleList {
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub default: crate::simple_type::StringValue,
-  #[sdk(choice(child(variant = TableStyleEntry, boxed, qname = "a:tblStyle"), any))]
+  #[sdk(
+        choice(
+            child(variant = TableStyleEntry, boxed, qname = "a:tblStyle"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
+        )
+    )]
   pub xml_children: Vec<TableStyleListChoice>,
 }
 /// Defines the ExtensionList Class.
@@ -5540,7 +5544,8 @@ pub struct GraphicData {
             child(variant = WebExtension, boxed, qname = "we:webextension"),
             child(variant = WebExtensionReference, qname = "we:webextensionref"),
             child(variant = TimeSlicer, boxed, qname = "tsle:timeslicer"),
-            any(qnames = ["wp:wsp"])
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent"),
+            any
         )
     )]
   pub graphic_data_choice: Vec<GraphicDataChoice>,
@@ -10893,13 +10898,6 @@ pub enum BlipChoice {
   TintEffect(TintEffect),
 }
 #[derive(Clone, Debug, PartialEq)]
-pub enum TableStyleListChoice {
-  /// Table Style.
-  TableStyleEntry(std::boxed::Box<TableStyleEntry>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
-}
-#[derive(Clone, Debug, PartialEq)]
 pub enum CustomColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(RgbColorModelPercentage),
@@ -11480,6 +11478,7 @@ pub enum GraphicDataChoice {
   WebExtension(std::boxed::Box<crate::schemas::we::WebExtension>),
   WebExtensionReference(crate::schemas::we::WebExtensionReference),
   TimeSlicer(std::boxed::Box<crate::schemas::tsle::TimeSlicer>),
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -12380,4 +12379,11 @@ pub enum BlipExtensionChoice {
   /// Defines the OEmbedShared Class.
   OEmbedShared(std::boxed::Box<crate::schemas::aoe::OEmbedShared>),
   XmlAny(std::boxed::Box<[u8]>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum TableStyleListChoice {
+  /// Table Style.
+  TableStyleEntry(std::boxed::Box<TableStyleEntry>),
+  /// Markup Compatibility alternate content.
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }

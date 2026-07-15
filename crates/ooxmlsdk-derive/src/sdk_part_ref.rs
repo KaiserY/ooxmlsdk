@@ -293,10 +293,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         #[cfg(feature = "mce")]
         let mut root = root;
         #[cfg(feature = "mce")]
-        crate::sdk::SdkMce::process_mce(
-          &mut root,
-          &open_settings.markup_compatibility_process_settings,
-        )?;
+        root.process_mce(&open_settings.markup_compatibility_process_settings)?;
         return Ok(Some(Self::#variant_ident(Box::new(root))));
       }
     }

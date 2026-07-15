@@ -15,13 +15,15 @@ pub enum XsiTypeValue {
 #[sdk(no_prefix_only, xml_header, qname = "cp:coreProperties")]
 pub struct CoreProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// cp:category
   #[sdk(text_child(qname = "cp:category"))]
   pub category: Option<Category>,
   /// cp:contentStatus
   #[sdk(text_child(qname = "cp:contentStatus"))]
   pub content_status: Option<ContentStatus>,
+  /// cp:contentType
+  #[sdk(text_child(qname = "cp:contentType"))]
+  pub content_type: Option<ContentType>,
   /// dcterms:created
   #[sdk(child(qname = "dcterms:created"))]
   pub created: Option<Created>,
@@ -143,3 +145,5 @@ pub struct Keyword {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
+/// cp:contentType
+pub type ContentType = crate::simple_type::StringValue;

@@ -116,6 +116,53 @@
           "OverrideType": "Int32Value"
         }
       ]
+    },
+    {
+      "Name": "w:CT_Empty/w:doNotEmbedSmartTags",
+      "ClassName": "DoNotEmbedSmartTags",
+      "Summary": "Do Not Embed Smart Tags.",
+      "BaseClass": "EmptyType",
+      "Kind": "Leaf",
+      "ApiKind": "Struct"
+    },
+    {
+      "Name": "w:CT_SmartTagType/w:smartTagType",
+      "ClassName": "SmartTagType",
+      "Summary": "Smart Tag Type.",
+      "BaseClass": "OpenXmlLeafElement",
+      "Kind": "Leaf",
+      "ApiKind": "Struct",
+      "Attributes": [
+        {
+          "QName": "w:namespaceuri",
+          "PropertyName": "NamespaceUri",
+          "PropertyComments": "Smart tag namespace URI.",
+          "OverrideType": "StringValue"
+        },
+        {
+          "QName": "w:name",
+          "PropertyName": "Name",
+          "PropertyComments": "Smart tag name.",
+          "OverrideType": "StringValue"
+        }
+      ]
+    },
+    {
+      "Name": "w:CT_SmartTagPr/w:smartTagPr",
+      "ClassName": "SmartTagProperties",
+      "Summary": "Smart Tag Properties.",
+      "BaseClass": "OpenXmlCompositeElement",
+      "Kind": "Composite",
+      "CompositeKind": "OneSequence",
+      "ApiKind": "Struct",
+      "Children": [
+        {
+          "Name": "w:CT_XmlAttr/w:attr",
+          "PropertyName": "CustomXmlAttribute",
+          "PropertyComments": "Smart tag attribute.",
+          "Repeated": true
+        }
+      ]
     }
   ],
   "Types": [
@@ -174,10 +221,6 @@
           "OverrideType": "SignedTwipsMeasureValue"
         }
       ]
-    },
-    {
-      "ClassName": "Compatibility",
-      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "DataBinding",
@@ -283,7 +326,7 @@
     {
       "ClassName": "Fonts",
       "HaveMcIgnorable": true,
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContentChoice": true
     },
     {
       "ClassName": "MoveBookmarkType",
@@ -375,16 +418,18 @@
       ]
     },
     {
-      "ClassName": "TableGrid",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
       "ClassName": "Level",
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContent": [
+        {
+          "AfterField": "start_numbering_value",
+          "Children": [
+            "numbering_format"
+          ]
+        }
+      ]
     },
     {
       "ClassName": "NumberingSymbolRunProperties",
-      "HaveDirectXmlOtherChildren": true,
       "Children": [
         {
           "Name": "w:CT_Fonts/w:rFonts",
@@ -535,16 +580,7 @@
       ]
     },
     {
-      "ClassName": "ParagraphBorders",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
-      "ClassName": "ParagraphPropertiesBaseStyle",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
       "ClassName": "StyleParagraphProperties",
-      "HaveDirectXmlOtherChildren": true,
       "AddChildren": [
         {
           "Name": "w:CT_ParaRPr/w:rPr",
@@ -571,13 +607,24 @@
       "ClassName": "Run"
     },
     {
+      "ClassName": "CustomXmlRun",
+      "AddChildren": [
+        {
+          "Name": "w:CT_SmartTagPr/w:smartTagPr",
+          "PropertyName": "SmartTagProperties",
+          "PropertyComments": "Smart Tag Properties.",
+          "Optional": true,
+          "AfterPropertyName": "CustomXmlProperties"
+        }
+      ]
+    },
+    {
       "ClassName": "RunFonts"
     },
     {
       "ClassName": "RunPropertiesDefault",
       "HaveMcIgnorable": true,
-      "HaveXmlnsFields": true,
-      "HaveDirectXmlOtherChildren": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "SdtPlaceholder",
@@ -589,17 +636,35 @@
       ]
     },
     {
-      "ClassName": "SectionProperties",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
       "ClassName": "Settings",
       "HaveMcIgnorable": true,
-      "HaveDirectXmlOtherChildren": true,
       "Children": [
         {
           "Name": "w:CT_Compat/w:compat",
           "Repeated": true
+        }
+      ],
+      "AddChildren": [
+        {
+          "Name": "w:CT_Empty/w:doNotEmbedSmartTags",
+          "PropertyName": "DoNotEmbedSmartTags",
+          "PropertyComments": "Do Not Embed Smart Tags.",
+          "Optional": true,
+          "AfterName": "w:CT_ShapeDefaults/w:shapeDefaults"
+        },
+        {
+          "Name": "w:CT_CompatSetting/w:compatSetting",
+          "PropertyName": "CompatibilitySetting",
+          "PropertyComments": "Compatibility Setting.",
+          "Optional": true,
+          "AfterName": "w14:CT_LongHexNumber/w14:docId"
+        },
+        {
+          "Name": "w:CT_SmartTagType/w:smartTagType",
+          "PropertyName": "SmartTagType",
+          "PropertyComments": "Smart Tag Type.",
+          "Repeated": true,
+          "AfterPropertyName": "DoNotEmbedSmartTags"
         }
       ]
     },
@@ -622,8 +687,14 @@
     },
     {
       "ClassName": "StyleRunProperties",
-      "HaveDirectXmlOtherChildren": true,
       "AddChildren": [
+        {
+          "Name": "w:CT_Highlight/w:highlight",
+          "PropertyName": "Highlight",
+          "PropertyComments": "Text Highlighting.",
+          "Optional": true,
+          "AfterPropertyName": "FontSizeComplexScript"
+        },
         {
           "Name": "w14:CT_Glow/w14:glow",
           "PropertyName": "W14Glow",
@@ -679,6 +750,98 @@
           "Optional": true,
           "InitialVersion": "Office2010",
           "AfterPropertyName": "W14Scene3D"
+        },
+        {
+          "Name": "w14:CT_Ligatures/w14:ligatures",
+          "PropertyName": "W14Ligatures",
+          "PropertyComments": "Defines the Ligatures Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14Properties3D"
+        },
+        {
+          "Name": "w14:CT_NumForm/w14:numForm",
+          "PropertyName": "W14NumberingFormat",
+          "PropertyComments": "Defines the NumberingFormat Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14Ligatures"
+        },
+        {
+          "Name": "w14:CT_NumSpacing/w14:numSpacing",
+          "PropertyName": "W14NumberSpacing",
+          "PropertyComments": "Defines the NumberSpacing Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14NumberingFormat"
+        },
+        {
+          "Name": "w14:CT_StylisticSets/w14:stylisticSets",
+          "PropertyName": "W14StylisticSets",
+          "PropertyComments": "Defines the StylisticSets Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14NumberSpacing"
+        },
+        {
+          "Name": "w14:CT_OnOff/w14:cntxtAlts",
+          "PropertyName": "W14ContextualAlternatives",
+          "PropertyComments": "Defines the ContextualAlternatives Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14StylisticSets"
+        }
+      ]
+    },
+    {
+      "ClassName": "RunPropertiesBaseStyle",
+      "AddChildren": [
+        {
+          "Name": "w:CT_Highlight/w:highlight",
+          "PropertyName": "Highlight",
+          "PropertyComments": "Text Highlighting.",
+          "Optional": true,
+          "AfterPropertyName": "FontSizeComplexScript"
+        },
+        {
+          "Name": "w14:CT_Ligatures/w14:ligatures",
+          "PropertyName": "W14Ligatures",
+          "PropertyComments": "Defines the Ligatures Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "SpecVanish"
+        },
+        {
+          "Name": "w14:CT_NumForm/w14:numForm",
+          "PropertyName": "W14NumberingFormat",
+          "PropertyComments": "Defines the NumberingFormat Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14Ligatures"
+        },
+        {
+          "Name": "w14:CT_NumSpacing/w14:numSpacing",
+          "PropertyName": "W14NumberSpacing",
+          "PropertyComments": "Defines the NumberSpacing Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14NumberingFormat"
+        },
+        {
+          "Name": "w14:CT_StylisticSets/w14:stylisticSets",
+          "PropertyName": "W14StylisticSets",
+          "PropertyComments": "Defines the StylisticSets Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14NumberSpacing"
+        },
+        {
+          "Name": "w14:CT_OnOff/w14:cntxtAlts",
+          "PropertyName": "W14ContextualAlternatives",
+          "PropertyComments": "Defines the ContextualAlternatives Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14StylisticSets"
         }
       ]
     },
@@ -742,23 +905,7 @@
       "ClassName": "ParagraphPropertiesExtended"
     },
     {
-      "ClassName": "ParagraphPropertiesDefault",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
-      "ClassName": "ParagraphProperties",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
       "ClassName": "Picture"
-    },
-    {
-      "ClassName": "RunProperties",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
-      "ClassName": "RunPropertiesBaseStyle",
-      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "TableRow",
@@ -790,11 +937,42 @@
   "ChoiceEnums": [
     {
       "RustName": "BodyChoice",
-      "AddXmlAny": []
+      "AddVariants": [
+        {
+          "RustName": "AlternateContent",
+          "QName": "mc:AlternateContent",
+          "PayloadRustType": "AlternateContent",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006"
+        }
+      ]
     },
     {
       "RustName": "ParagraphChoice",
-      "AddXmlAny": []
+      "AddVariants": [
+        {
+          "RustName": "SmartTagRun",
+          "QName": "w:smartTag",
+          "Docs": "Smart tag run content.",
+          "PayloadRustType": "CustomXmlRun"
+        },
+        {
+          "RustName": "AlternateContent",
+          "QName": "mc:AlternateContent",
+          "PayloadRustType": "AlternateContent",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006"
+        }
+      ]
+    },
+    {
+      "RustName": "CustomXmlRunChoice",
+      "AddVariants": [
+        {
+          "RustName": "SmartTagRun",
+          "QName": "w:smartTag",
+          "Docs": "Smart tag run content.",
+          "PayloadRustType": "CustomXmlRun"
+        }
+      ]
     },
     {
       "RustName": "RunChoice",
@@ -804,9 +982,14 @@
           "QName": "w16se:sym",
           "Docs": "Extended Symbol Character.",
           "PayloadRustType": "SymbolChar"
+        },
+        {
+          "RustName": "AlternateContent",
+          "QName": "mc:AlternateContent",
+          "PayloadRustType": "AlternateContent",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006"
         }
-      ],
-      "AddXmlAny": []
+      ]
     },
     {
       "RustName": "SdtPropertiesChoice",

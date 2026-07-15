@@ -224,6 +224,7 @@ fn kind_by_type_name(name: &str) -> Option<ValueKind> {
     "ConstraintRelationshipValues" => Some(ValueKind::Enum),
     "ConstraintValues" => Some(ValueKind::Enum),
     "ContentStatus" => Some(ValueKind::String),
+    "ContentType" => Some(ValueKind::String),
     "ContinueDirectionValues" => Some(ValueKind::Enum),
     "Coordinate32Value" => Some(ValueKind::Coordinate32),
     "CoordinateValue" => Some(ValueKind::Coordinate),

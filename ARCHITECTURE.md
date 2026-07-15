@@ -121,15 +121,19 @@ are reviewable artifacts, not the normal hand-edit surface.
 Files under `sdk_data/schema_extensions/` patch gaps in upstream metadata. Keep
 entries small and backed by an upstream schema, source test, or real fixture.
 
-`HaveDirectXmlOtherChildren` belongs to the current type. It preserves unknown
-direct children in ordered raw XML storage. Use it for children owned by that
-element, including promotion of a sole repeated child list when ordering must
-be retained.
+Represent observed MCE positions statically. Use `AlternateContent` to add a
+typed `mc:AlternateContent` slot at a known parent position, and declare the
+parent fields accepted from that slot with its non-empty `Children` list. A
+parent with one slot gets `alternate_content`; multiple slots are numbered
+from `alternate_content_0` in schema order. MCE processing rejects a selected
+branch child that is outside the slot's declared field set.
 
-`ChoiceEnums[].AddXmlAny` belongs to an existing choice enum. It adds raw XML as
-an ordered choice item and is appropriate when an MCE wrapper such as
-`mc:AlternateContent` occurs inside an already modeled choice stream. Do not use
-it to represent a direct child slot on the parent.
+Use `AlternateContentChoice` when a repeated direct child and
+`mc:AlternateContent` share one ordered stream. Use `AddChoice` to model a
+previously untyped ordered child stream, and add a typed `AlternateContent`
+variant to an existing choice enum when the wrapper occurs there. Raw
+`xml_other_children` and `XmlAny` remain only where the source schema itself
+declares wildcard content; schema extensions must not add them for MCE.
 
 ## Test Workspace
 

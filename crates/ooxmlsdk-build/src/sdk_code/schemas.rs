@@ -3318,7 +3318,6 @@ fn gen_helper_struct_type_decl(
     &HashSet::new(),
   )?;
   let sdk_type_derive = sdk_type_derive_tokens();
-
   Ok(quote! {
     #( #type_attrs )*
     #sdk_type_derive
@@ -4178,6 +4177,11 @@ fn gen_direct_child_fields_from_decl_with_context(
   force_optional_when_not_repeated: bool,
 ) -> Result<Vec<TokenStream>> {
   let mut tokens = Vec::new();
+  let alternate_content_children = module
+    .types
+    .iter()
+    .find(|type_decl| type_decl.rust_name == owner_rust_name)
+    .map(|type_decl| &type_decl.support.alternate_content_children);
 
   for field in fields {
     let attr = module_version_cfg_attrs(&field.version, field_cfg);
@@ -4199,6 +4203,21 @@ fn gen_direct_child_fields_from_decl_with_context(
       FieldWireDecl::Child { qname } if is_any_children_alias => {
         let qname = sdk_element_qname(qname);
         quote! { #[sdk(any_child(#(#field_sdk_version_markers,)* qname = #qname))] }
+      }
+      FieldWireDecl::Child { qname } if qname == "mc:AlternateContent" => {
+        let qname = sdk_element_qname(qname);
+        let children = alternate_content_children
+          .and_then(|children| children.get(&field.rust_name))
+          .ok_or_else(|| {
+            format!(
+              "static MCE field {owner_rust_name}.{} must declare children",
+              field.rust_name
+            )
+          })?
+          .iter()
+          .map(|child| parse_str::<Ident>(child))
+          .collect::<syn::Result<Vec<_>>>()?;
+        quote! { #[sdk(mce(qname = #qname, children = [#(#children),*]))] }
       }
       FieldWireDecl::Child { qname } => {
         let qname = sdk_element_qname(qname);
@@ -4702,9 +4721,7 @@ mod tests {
     assert!(!generated.contains("pub struct StyleMatrixReferenceType"));
     assert!(!generated.contains("pub enum StyleMatrixReferenceTypeChoice"));
     assert!(generated.contains("pub struct FillReference"));
-    assert!(
-      generated.contains("pub xml_other_children : Vec < (usize , std :: boxed :: Box < [u8] >) >")
-    );
+    assert!(generated.contains("pub xmlns : Vec < crate :: common :: XmlNamespace >"));
   }
 
   #[test]
@@ -7552,49 +7569,5 @@ mod tests {
     );
     assert!(!generated.contains("pub enum AnyHolderChoice"));
     assert!(!generated.contains("UnknownXml (String)"));
-  }
-
-  #[test]
-  fn aliases_raw_children_leaf_and_uses_any_child_refs() {
-    let schema = Schema {
-      module_name: "test_module".to_string(),
-      target_namespace: "urn:test".to_string(),
-      prefix: "t".to_string(),
-      typed_namespace: "Test.Namespace".to_string(),
-      types: vec![
-        SchemaType {
-          name: "t:CT_TextMath/t:m".to_string(),
-          class_name: "TextMath".to_string(),
-          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
-          base_class: "OpenXmlLeafElement".to_string(),
-          have_direct_xml_other_children: true,
-          ..Default::default()
-        },
-        SchemaType {
-          name: "t:CT_Paragraph/t:p".to_string(),
-          class_name: "Paragraph".to_string(),
-          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
-          composite_kind: SchemaTypeCompositeKind::OneSequence,
-          children: vec![SchemaTypeChild {
-            name: "t:CT_TextMath/t:m".to_string(),
-            property_name: "TextMath".to_string(),
-            ..Default::default()
-          }],
-          ..Default::default()
-        },
-      ],
-      ..Default::default()
-    };
-    let context = CodegenContext::new(std::slice::from_ref(&schema));
-
-    let generated = gen_schema(&schema, None, &context, false)
-      .unwrap()
-      .to_string();
-
-    assert!(generated.contains("pub type TextMath = Vec < String >"));
-    assert!(generated.contains("# [sdk (any_child (qname = \"t:m\"))]"));
-    assert!(generated.contains("pub text_math : TextMath"));
-    assert!(!generated.contains("pub struct TextMath"));
-    assert!(!generated.contains("# [sdk (empty_child (qname = \"t:m\"))]"));
   }
 }

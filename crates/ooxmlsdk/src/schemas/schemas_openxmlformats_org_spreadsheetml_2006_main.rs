@@ -2205,7 +2205,6 @@ pub struct Worksheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Revision Unique Identifier
   #[sdk(attr(qname = "xr:uid"))]
   pub xr_uid: Option<crate::simple_type::StringValue>,
@@ -2296,9 +2295,15 @@ pub struct Worksheet {
   /// Drawing.
   #[sdk(child(qname = "x:drawing"))]
   pub drawing: Option<Drawing>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [legacy_drawing]))]
+  pub alternate_content_0: Vec<crate::schemas::mc::AlternateContent>,
   /// Defines the LegacyDrawing Class.
   #[sdk(child(qname = "x:legacyDrawing"))]
   pub legacy_drawing: Option<LegacyDrawing>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [controls]))]
+  pub alternate_content_1: Vec<crate::schemas::mc::AlternateContent>,
   /// Legacy Drawing Reference in  Header Footer.
   #[sdk(child(qname = "x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
@@ -2632,7 +2637,6 @@ pub struct VolatileTypes {
 pub struct Workbook {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// conformance
   #[sdk(attr(qname = ":conformance"))]
   pub conformance: Option<ConformanceClass>,
@@ -2648,9 +2652,15 @@ pub struct Workbook {
   /// Defines the WorkbookProperties Class.
   #[sdk(child(qname = "x:workbookPr"))]
   pub workbook_properties: Option<WorkbookProperties>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [absolute_path]))]
+  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
   /// Defines the AbsolutePath Class.
   #[sdk(child(qname = "x15ac:absPath"))]
   pub absolute_path: Option<crate::schemas::x15ac::AbsolutePath>,
+  /// Defines the RevisionPtr Class.
+  #[sdk(child(qname = "xr:revisionPtr"))]
+  pub revision_ptr: Option<crate::schemas::xr::RevisionPtr>,
   /// Defines the WorkbookProtection Class.
   #[sdk(child(qname = "x:workbookProtection"))]
   pub workbook_protection: Option<WorkbookProtection>,
@@ -2812,7 +2822,6 @@ pub struct CommentList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:comment")]
 pub struct Comment {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Cell Reference
   #[sdk(attr(qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
@@ -2833,6 +2842,9 @@ pub struct Comment {
   /// Comment Text
   #[sdk(child(qname = "x:text"))]
   pub comment_text: std::boxed::Box<CommentText>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [comment_properties]))]
+  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
   /// Defines the CommentProperties Class.
   #[sdk(child(qname = "x:commentPr"))]
   pub comment_properties: Option<std::boxed::Box<CommentProperties>>,
@@ -4691,7 +4703,6 @@ pub struct QueryTableField {
 #[sdk(no_prefix_only, qname = "x:si")]
 pub struct SharedStringItem {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Text
   #[sdk(child(qname = "x:t"))]
   pub text: Option<Text>,
@@ -6585,7 +6596,6 @@ pub struct MergeCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:dataValidation")]
 pub struct DataValidation {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<DataValidationValues>,
@@ -6628,6 +6638,9 @@ pub struct DataValidation {
   /// Revision Unique Identifier
   #[sdk(attr(qname = "xr:uid"))]
   pub xr_uid: Option<crate::simple_type::StringValue>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [list, formula1]))]
+  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
   /// Defines the List Class.
   #[sdk(text_child(qname = "x12ac:list"))]
   pub list: Option<crate::schemas::x12ac::List>,
@@ -8859,14 +8872,24 @@ pub struct CustomSheetViews {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:oleObjects")]
 pub struct OleObjects {
-  #[sdk(choice(child(variant = OleObject, boxed, qname = "x:oleObject"), any))]
+  #[sdk(
+        choice(
+            child(variant = OleObject, boxed, qname = "x:oleObject"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
+        )
+    )]
   pub xml_children: Vec<OleObjectsChoice>,
 }
 /// Defines the Controls Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix_only, qname = "x:controls")]
 pub struct Controls {
-  #[sdk(choice(child(variant = Control, boxed, qname = "x:control"), any))]
+  #[sdk(
+        choice(
+            child(variant = Control, boxed, qname = "x:control"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
+        )
+    )]
   pub xml_children: Vec<ControlsChoice>,
 }
 /// Macro Sheet Dimensions.
@@ -9926,7 +9949,12 @@ pub struct Fonts {
   /// knownFonts
   #[sdk(attr(qname = "x14ac:knownFonts"))]
   pub known_fonts: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(child(variant = Font, qname = "x:font"), any))]
+  #[sdk(
+        choice(
+            child(variant = Font, qname = "x:font"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
+        )
+    )]
   pub xml_children: Vec<FontsChoice>,
 }
 /// Defines the Fills Class.
@@ -9936,7 +9964,12 @@ pub struct Fills {
   /// Fill Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(child(variant = Fill, boxed, qname = "x:fill"), any))]
+  #[sdk(
+        choice(
+            child(variant = Fill, boxed, qname = "x:fill"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
+        )
+    )]
   pub xml_children: Vec<FillsChoice>,
 }
 /// Defines the Borders Class.
@@ -9968,7 +10001,12 @@ pub struct CellFormats {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(child(variant = CellFormat, boxed, qname = "x:xf"), any))]
+  #[sdk(
+        choice(
+            child(variant = CellFormat, boxed, qname = "x:xf"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
+        )
+    )]
   pub xml_children: Vec<CellFormatsChoice>,
 }
 /// Defines the CellStyles Class.
@@ -9989,7 +10027,12 @@ pub struct DifferentialFormats {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(child(variant = DifferentialFormat, boxed, qname = "x:dxf"), any))]
+  #[sdk(
+        choice(
+            child(variant = DifferentialFormat, boxed, qname = "x:dxf"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
+        )
+    )]
   pub xml_children: Vec<DifferentialFormatsChoice>,
 }
 /// Defines the TableStyles Class.
@@ -11165,20 +11208,6 @@ pub enum CacheSourceExtensionChoice {
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
-pub enum OleObjectsChoice {
-  /// OLE Object.
-  OleObject(std::boxed::Box<OleObject>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
-}
-#[derive(Clone, Debug, PartialEq)]
-pub enum ControlsChoice {
-  /// Embedded Control.
-  Control(std::boxed::Box<Control>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
-}
-#[derive(Clone, Debug, PartialEq)]
 pub enum FiltersChoice {
   /// Defines the Filter Class.
   X14Filter(crate::schemas::x14::Filter),
@@ -11294,34 +11323,6 @@ pub enum WorksheetExtensionChoice {
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
-pub enum FontsChoice {
-  /// Font Properties.
-  Font(Font),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
-}
-#[derive(Clone, Debug, PartialEq)]
-pub enum FillsChoice {
-  /// Fill.
-  Fill(std::boxed::Box<Fill>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
-}
-#[derive(Clone, Debug, PartialEq)]
-pub enum CellFormatsChoice {
-  /// Formatting Elements.
-  CellFormat(std::boxed::Box<CellFormat>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
-}
-#[derive(Clone, Debug, PartialEq)]
-pub enum DifferentialFormatsChoice {
-  /// Formatting.
-  DifferentialFormat(std::boxed::Box<DifferentialFormat>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
-}
-#[derive(Clone, Debug, PartialEq)]
 pub enum StylesheetExtensionChoice {
   /// Defines the DifferentialFormats Class.
   X14DifferentialFormats(crate::schemas::x14::DifferentialFormats),
@@ -11415,4 +11416,46 @@ pub enum WorkbookExtensionChoice {
   /// Defines the ExternalCodeServiceImageAsInput Class.
   ExternalCodeServiceImageAsInput(crate::schemas::xlecs2::ExternalCodeServiceImageAsInput),
   XmlAny(std::boxed::Box<[u8]>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum ControlsChoice {
+  /// Embedded Control.
+  Control(std::boxed::Box<Control>),
+  /// Markup Compatibility alternate content.
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum OleObjectsChoice {
+  /// OLE Object.
+  OleObject(std::boxed::Box<OleObject>),
+  /// Markup Compatibility alternate content.
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum CellFormatsChoice {
+  /// Formatting Elements.
+  CellFormat(std::boxed::Box<CellFormat>),
+  /// Markup Compatibility alternate content.
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum DifferentialFormatsChoice {
+  /// Formatting.
+  DifferentialFormat(std::boxed::Box<DifferentialFormat>),
+  /// Markup Compatibility alternate content.
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum FillsChoice {
+  /// Fill.
+  Fill(std::boxed::Box<Fill>),
+  /// Markup Compatibility alternate content.
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum FontsChoice {
+  /// Font Properties.
+  Font(Font),
+  /// Markup Compatibility alternate content.
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }

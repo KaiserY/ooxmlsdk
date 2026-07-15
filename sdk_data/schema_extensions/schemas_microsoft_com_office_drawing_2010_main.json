@@ -23,7 +23,26 @@
     {
       "ClassName": "TextMath",
       "HaveXmlnsFields": true,
-      "HaveDirectXmlOtherChildren": true
+      "AddChoice": [
+        {
+          "RustName": "Paragraph",
+          "QName": "m:oMathPara",
+          "PayloadRustType": "Paragraph",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_office_document_2006_math"
+        },
+        {
+          "RustName": "OfficeMath",
+          "QName": "m:oMath",
+          "PayloadRustType": "OfficeMath",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_office_document_2006_math"
+        },
+        {
+          "RustName": "Run",
+          "QName": "m:r",
+          "PayloadRustType": "Run",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_office_document_2006_math"
+        }
+      ]
     },
     {
       "ClassName": "UseLocalDpi",

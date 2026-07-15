@@ -495,7 +495,7 @@ fn diagram_points(data: &dgm::DataModelRoot) -> Vec<&dgm::Point> {
     .iter()
     .filter_map(|child| match child {
       dgm::PointListChoice::Point(point) => Some(point.as_ref()),
-      dgm::PointListChoice::XmlAny(_) => None,
+      dgm::PointListChoice::AlternateContent(_) => None,
     })
     .collect()
 }

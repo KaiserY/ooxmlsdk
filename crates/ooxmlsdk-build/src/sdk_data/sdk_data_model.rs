@@ -105,7 +105,6 @@ pub struct SchemaType {
   pub have_mc_process_content: bool,
   pub have_mc_must_understand: bool,
   pub have_xml_other_children: bool,
-  pub have_direct_xml_other_children: bool,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub extra_xmlns: Vec<String>,
   #[serde(skip_serializing_if = "Vec::is_empty")]

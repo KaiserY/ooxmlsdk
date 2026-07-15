@@ -3027,17 +3027,7 @@ fn paragraph_inlines(
         None,
         &mut inline_context,
       ),
-      w::ParagraphChoice::XmlAny(xml) => {
-        push_run_xml_any(
-          xml,
-          &mut inlines,
-          base_style.clone(),
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-        );
-      }
+      w::ParagraphChoice::AlternateContent(_) => {}
       _ => {}
     }
   }
@@ -3939,24 +3929,7 @@ fn push_run(
         }
       }
       w::RunChoice::PositionalTab(_) => text.push('\t'),
-      w::RunChoice::XmlAny(xml) => {
-        flush_run_text(
-          inlines,
-          &mut text,
-          style.clone(),
-          hyperlink_url,
-          &style_ref_keys,
-        );
-        push_run_xml_any(
-          xml,
-          inlines,
-          base_style.clone(),
-          style.clone(),
-          styles,
-          images,
-          hyperlinks,
-        );
-      }
+      w::RunChoice::AlternateContent(_) => {}
       w::RunChoice::Ruby(ruby) => {
         flush_run_text(
           inlines,
@@ -4333,6 +4306,7 @@ fn sdt_list_item_display_texts(items: &[w::ListItem]) -> Vec<String> {
     .collect()
 }
 
+#[cfg(test)]
 fn push_run_xml_any(
   xml: &[u8],
   inlines: &mut Vec<InlineItem>,
@@ -4390,6 +4364,7 @@ fn push_run_xml_any(
   }
 }
 
+#[cfg(test)]
 fn push_alternate_content_pict_textboxes(
   xml: &[u8],
   inlines: &mut Vec<InlineItem>,
@@ -7186,7 +7161,7 @@ fn diagram_text_fill_colors_by_model_id(
     .iter()
     .filter_map(|child| match child {
       dgm::PointListChoice::Point(point) => Some(point.as_ref()),
-      dgm::PointListChoice::XmlAny(_) => None,
+      dgm::PointListChoice::AlternateContent(_) => None,
     })
   {
     let Some(style_label) = point

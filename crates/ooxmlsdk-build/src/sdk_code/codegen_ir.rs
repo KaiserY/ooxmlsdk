@@ -127,6 +127,8 @@ pub struct SystemSupportDecl {
   pub extra_xmlns: Vec<String>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub canonical_namespace_prefixes: Vec<String>,
+  #[serde(skip_serializing_if = "HashMap::is_empty")]
+  pub alternate_content_children: HashMap<String, Vec<String>>,
 }
 
 impl SystemSupportDecl {
@@ -563,6 +565,7 @@ mod tests {
           compact_xml_other_children: false,
           extra_xmlns: Vec::new(),
           canonical_namespace_prefixes: Vec::new(),
+          alternate_content_children: HashMap::new(),
         },
         estimated_size: 0,
         members: vec![

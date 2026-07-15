@@ -2907,7 +2907,7 @@ fn workbook_styles(
         .iter()
         .filter_map(|choice| match choice {
           x::CellFormatsChoice::CellFormat(format) => Some(format.as_ref()),
-          x::CellFormatsChoice::XmlAny(_) => None,
+          x::CellFormatsChoice::AlternateContent(_) => None,
         })
         .enumerate()
         .filter_map(|(index, format)| {

@@ -2522,7 +2522,12 @@ pub struct StyleLabel {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:ptLst")]
 pub struct PointList {
-  #[sdk(choice(child(variant = Point, boxed, qname = "dgm:pt"), any))]
+  #[sdk(
+        choice(
+            child(variant = Point, boxed, qname = "dgm:pt"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
+        )
+    )]
   pub xml_children: Vec<PointListChoice>,
 }
 /// Connection List.
@@ -2993,13 +2998,6 @@ pub enum TextPropertiesChoice {
   FlatText(crate::schemas::a::FlatText),
 }
 #[derive(Clone, Debug, PartialEq)]
-pub enum PointListChoice {
-  /// Point.
-  Point(std::boxed::Box<Point>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
-}
-#[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundChoice {
   /// Defines the NoFill Class.
   NoFill(crate::schemas::a::NoFill),
@@ -3062,4 +3060,11 @@ pub enum DiagramDefinitionExtensionChoice {
   /// Defines the TextListStyleType Class.
   TextListStyleType(std::boxed::Box<crate::schemas::dgm1612::TextListStyleType>),
   XmlAny(std::boxed::Box<[u8]>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum PointListChoice {
+  /// Point.
+  Point(std::boxed::Box<Point>),
+  /// Markup Compatibility alternate content.
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }

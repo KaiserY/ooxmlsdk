@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
+use heck::{ToSnakeCase, ToUpperCamelCase};
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
@@ -54,7 +55,6 @@ pub struct SchemaTypeExtension {
   pub have_mc_process_content: Option<bool>,
   pub have_mc_must_understand: Option<bool>,
   pub have_xml_other_children: Option<bool>,
-  pub have_direct_xml_other_children: Option<bool>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub extra_xmlns: Vec<String>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -62,6 +62,22 @@ pub struct SchemaTypeExtension {
   pub attributes: Vec<SchemaTypeAttributeExtension>,
   pub children: Vec<SchemaTypeChildExtension>,
   pub add_children: Vec<SchemaTypeAddChildExtension>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub alternate_content: Vec<SchemaTypeAlternateContentExtension>,
+  pub alternate_content_choice: bool,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub add_choice: Vec<SchemaChoiceVariantExtension>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaTypeAlternateContentExtension {
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub before_field: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub after_field: String,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub children: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -86,7 +102,6 @@ pub struct SchemaTypeAddTypeExtension {
   pub have_mc_process_content: bool,
   pub have_mc_must_understand: bool,
   pub have_xml_other_children: bool,
-  pub have_direct_xml_other_children: bool,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub text_value_type: String,
   pub attributes: Vec<SchemaTypeAttributeExtension>,
@@ -97,6 +112,8 @@ pub struct SchemaTypeAddTypeExtension {
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaTypeAttributeExtension {
   pub q_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub override_q_name: String,
   pub property_name: String,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub property_comments: String,
@@ -160,8 +177,6 @@ pub struct SchemaTypeAddChildExtension {
 pub struct SchemaChoiceEnumExtension {
   pub rust_name: String,
   pub repeated: Option<bool>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub add_xml_any: Option<Vec<String>>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub add_variants: Vec<SchemaChoiceVariantExtension>,
 }
@@ -351,9 +366,6 @@ pub fn apply_schema_extensions(
         if let Some(have_xml_other_children) = extension.have_xml_other_children {
           schema_type.have_xml_other_children = have_xml_other_children;
         }
-        if let Some(have_direct_xml_other_children) = extension.have_direct_xml_other_children {
-          schema_type.have_direct_xml_other_children = have_direct_xml_other_children;
-        }
         for prefix in &extension.extra_xmlns {
           if !schema_type.extra_xmlns.contains(prefix) {
             schema_type.extra_xmlns.push(prefix.clone());
@@ -404,6 +416,9 @@ pub fn apply_schema_extensions(
 
           if !attr_extension.override_type.is_empty() {
             attr.r#type = attr_extension.override_type.clone();
+          }
+          if !attr_extension.override_q_name.is_empty() {
+            attr.q_name = attr_extension.override_q_name.clone();
           }
           if !attr_extension.version.is_empty() {
             attr.version = attr_extension.version.clone();
@@ -546,7 +561,6 @@ fn add_schema_type(
       have_mc_process_content: extension.have_mc_process_content,
       have_mc_must_understand: extension.have_mc_must_understand,
       have_xml_other_children: extension.have_xml_other_children,
-      have_direct_xml_other_children: extension.have_direct_xml_other_children,
       text_value_type: extension.text_value_type.clone(),
       api_kind: extension.api_kind.clone(),
       attributes,
@@ -579,8 +593,21 @@ pub fn apply_codegen_ir_schema_extensions(
   for type_extension in &extensions.types {
     if type_extension.extra_xmlns.is_empty()
       && type_extension.canonical_namespace_prefixes.is_empty()
+      && type_extension.alternate_content.is_empty()
+      && !type_extension.alternate_content_choice
+      && type_extension.add_choice.is_empty()
     {
       continue;
+    }
+    if type_extension.alternate_content_choice {
+      promote_repeated_child_to_alternate_content_choice(
+        module_name,
+        ir,
+        &type_extension.class_name,
+      )?;
+    }
+    if !type_extension.add_choice.is_empty() {
+      add_static_choice(module_name, ir, type_extension)?;
     }
     let Some(type_decl) = ir
       .types
@@ -612,6 +639,10 @@ pub fn apply_codegen_ir_schema_extensions(
           .canonical_namespace_prefixes
           .push(prefix.clone());
       }
+    }
+
+    if !type_extension.alternate_content.is_empty() {
+      add_alternate_content_fields(module_name, type_decl, type_extension)?;
     }
   }
 
@@ -719,12 +750,325 @@ pub fn apply_codegen_ir_schema_extensions(
         }),
       );
     }
-
-    if let Some(qnames) = &choice_extension.add_xml_any {
-      add_xml_any_choice_variant(type_decl, qnames.clone());
-    }
   }
 
+  Ok(())
+}
+
+fn add_static_choice(
+  module_name: &str,
+  ir: &mut SchemaModuleDecl,
+  extension: &SchemaTypeExtension,
+) -> Result<()> {
+  let Some(type_index) = ir
+    .types
+    .iter()
+    .position(|type_decl| type_decl.rust_name == extension.class_name)
+  else {
+    return Err(
+      format!(
+        "schema extension static choice {module_name}.{} not found",
+        extension.class_name
+      )
+      .into(),
+    );
+  };
+  if extension.add_choice.iter().any(|variant| {
+    variant.rust_name.is_empty()
+      || variant.q_name.is_empty()
+      || variant.payload_rust_type.is_empty()
+  }) {
+    return Err(
+      format!(
+        "schema extension static choice {module_name}.{} has an incomplete variant",
+        extension.class_name
+      )
+      .into(),
+    );
+  }
+  let choice_name = format!("{}Choice", extension.class_name);
+  let field_name = format!("{}_choice", extension.class_name.to_snake_case());
+  ir.types[type_index]
+    .members
+    .push(MemberDecl::Field(crate::sdk_code::codegen_ir::FieldDecl {
+      rust_name: field_name,
+      docs: "Ordered typed XML children.".to_string(),
+      version: String::new(),
+      wire: FieldWireDecl::Choice,
+      cardinality: Cardinality::Many,
+      type_ref: TypeRefDecl {
+        rust_type: choice_name.clone(),
+        module_path: None,
+      },
+      validators: Vec::new(),
+    }));
+  ir.types[type_index].content_model =
+    Some(crate::sdk_code::codegen_ir::ContentModelDecl::ChoiceOnly);
+  ir.types[type_index].element_kind = Some(crate::sdk_code::codegen_ir::ElementKind::Composite);
+  ir.types[type_index].base_rust_name = Some("OpenXmlCompositeElement".to_string());
+  let version = ir.types[type_index].version.clone();
+  ir.types.push(crate::sdk_code::codegen_ir::TypeDecl {
+    rust_name: choice_name,
+    xml_qname: None,
+    docs: "Ordered typed XML children.".to_string(),
+    version,
+    is_abstract: false,
+    kind: TypeKind::ChoiceEnum,
+    element_kind: None,
+    content_model: None,
+    base_rust_name: None,
+    base_module_path: None,
+    xml_content: None,
+    support: crate::sdk_code::codegen_ir::SystemSupportDecl::default(),
+    estimated_size: 0,
+    members: extension
+      .add_choice
+      .iter()
+      .map(|variant| {
+        MemberDecl::Variant(VariantDecl {
+          rust_name: variant.rust_name.clone(),
+          docs: variant.docs.clone(),
+          version: variant.version.clone(),
+          wire: VariantWireDecl::Child {
+            qnames: vec![variant.q_name.clone()],
+          },
+          payload: TypeRefDecl {
+            rust_type: variant.payload_rust_type.clone(),
+            module_path: (!variant.payload_module_path.is_empty())
+              .then(|| variant.payload_module_path.clone()),
+          },
+        })
+      })
+      .collect(),
+  });
+  Ok(())
+}
+
+fn promote_repeated_child_to_alternate_content_choice(
+  module_name: &str,
+  ir: &mut SchemaModuleDecl,
+  class_name: &str,
+) -> Result<()> {
+  let Some(type_index) = ir
+    .types
+    .iter()
+    .position(|type_decl| type_decl.rust_name == class_name)
+  else {
+    return Err(format!("schema extension type {module_name}.{class_name} not found").into());
+  };
+  let type_decl = &ir.types[type_index];
+  let child_field_indexes = type_decl
+    .members
+    .iter()
+    .enumerate()
+    .filter_map(|(index, member)| match member {
+      MemberDecl::Field(field)
+        if matches!(
+          field.wire,
+          FieldWireDecl::Child { .. }
+            | FieldWireDecl::TextChild { .. }
+            | FieldWireDecl::Any
+            | FieldWireDecl::Choice
+        ) =>
+      {
+        Some(index)
+      }
+      _ => None,
+    })
+    .collect::<Vec<_>>();
+  let [field_index] = child_field_indexes.as_slice() else {
+    return Err(format!(
+      "schema extension alternate content choice {module_name}.{class_name} requires one child field"
+    )
+    .into());
+  };
+  let MemberDecl::Field(field) = &type_decl.members[*field_index] else {
+    unreachable!();
+  };
+  if field.cardinality != Cardinality::Many {
+    return Err(format!(
+      "schema extension alternate content choice {module_name}.{class_name} requires a repeated child"
+    )
+    .into());
+  }
+  let FieldWireDecl::Child { qname } = &field.wire else {
+    return Err(format!(
+      "schema extension alternate content choice {module_name}.{class_name} requires a typed child"
+    )
+    .into());
+  };
+  let field = field.clone();
+  let qname = qname.clone();
+  let choice_name = format!("{class_name}Choice");
+  let known_variant_name = field
+    .rust_name
+    .trim_end_matches('s')
+    .to_string()
+    .to_upper_camel_case();
+  let version = ir.types[type_index].version.clone();
+
+  ir.types[type_index].members[*field_index] =
+    MemberDecl::Field(crate::sdk_code::codegen_ir::FieldDecl {
+      rust_name: "xml_children".to_string(),
+      docs: field.docs.clone(),
+      version: field.version.clone(),
+      wire: FieldWireDecl::Choice,
+      cardinality: Cardinality::Many,
+      type_ref: TypeRefDecl {
+        rust_type: choice_name.clone(),
+        module_path: None,
+      },
+      validators: field.validators.clone(),
+    });
+  ir.types[type_index].content_model =
+    Some(crate::sdk_code::codegen_ir::ContentModelDecl::ChoiceOnly);
+  ir.types.push(crate::sdk_code::codegen_ir::TypeDecl {
+    rust_name: choice_name,
+    xml_qname: None,
+    docs: field.docs.clone(),
+    version,
+    is_abstract: false,
+    kind: TypeKind::ChoiceEnum,
+    element_kind: None,
+    content_model: None,
+    base_rust_name: None,
+    base_module_path: None,
+    xml_content: None,
+    support: crate::sdk_code::codegen_ir::SystemSupportDecl::default(),
+    estimated_size: 0,
+    members: vec![
+      MemberDecl::Variant(VariantDecl {
+        rust_name: known_variant_name,
+        docs: field.docs,
+        version: field.version,
+        wire: VariantWireDecl::Child {
+          qnames: vec![qname],
+        },
+        payload: field.type_ref,
+      }),
+      MemberDecl::Variant(VariantDecl {
+        rust_name: "AlternateContent".to_string(),
+        docs: "Markup Compatibility alternate content.".to_string(),
+        version: String::new(),
+        wire: VariantWireDecl::Child {
+          qnames: vec!["mc:AlternateContent".to_string()],
+        },
+        payload: TypeRefDecl {
+          rust_type: "AlternateContent".to_string(),
+          module_path: Some(
+            "crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006".to_string(),
+          ),
+        },
+      }),
+    ],
+  });
+  Ok(())
+}
+
+fn add_alternate_content_fields(
+  module_name: &str,
+  type_decl: &mut crate::sdk_code::codegen_ir::TypeDecl,
+  extension: &SchemaTypeExtension,
+) -> Result<()> {
+  let field_count = extension.alternate_content.len();
+  for (slot, alternate_content) in extension.alternate_content.iter().enumerate() {
+    let location_count = [
+      alternate_content.before_field.as_str(),
+      alternate_content.after_field.as_str(),
+    ]
+    .into_iter()
+    .filter(|field| !field.is_empty())
+    .count();
+    if location_count != 1 {
+      return Err(
+        format!(
+          "schema extension alternate content {module_name}.{} must specify one field location",
+          extension.class_name
+        )
+        .into(),
+      );
+    }
+    if alternate_content.children.is_empty() {
+      return Err(
+        format!(
+          "schema extension alternate content {module_name}.{} must declare children",
+          extension.class_name
+        )
+        .into(),
+      );
+    }
+    for child_name in &alternate_content.children {
+      let child_is_supported = type_decl.members.iter().any(|member| {
+        matches!(
+          member,
+          MemberDecl::Field(field)
+            if field.rust_name == *child_name
+              && matches!(field.wire, FieldWireDecl::Child { .. } | FieldWireDecl::TextChild { .. })
+        )
+      });
+      if !child_is_supported {
+        return Err(
+          format!(
+            "schema extension alternate content {module_name}.{} child {child_name} is not a direct child field",
+            extension.class_name
+          )
+          .into(),
+        );
+      }
+    }
+
+    let location = if !alternate_content.before_field.is_empty() {
+      alternate_content.before_field.as_str()
+    } else {
+      alternate_content.after_field.as_str()
+    };
+    let Some(location_index) = type_decl
+      .members
+      .iter()
+      .position(|member| matches!(member, MemberDecl::Field(field) if field.rust_name == location))
+    else {
+      return Err(
+        format!(
+          "schema extension alternate content {module_name}.{} location {location} not found",
+          extension.class_name
+        )
+        .into(),
+      );
+    };
+    let insert_index = if alternate_content.before_field.is_empty() {
+      location_index + 1
+    } else {
+      location_index
+    };
+    let rust_name = if field_count == 1 {
+      "alternate_content".to_string()
+    } else {
+      format!("alternate_content_{slot}")
+    };
+    type_decl
+      .support
+      .alternate_content_children
+      .insert(rust_name.clone(), alternate_content.children.clone());
+    type_decl.members.insert(
+      insert_index,
+      MemberDecl::Field(crate::sdk_code::codegen_ir::FieldDecl {
+        rust_name,
+        docs: "Markup Compatibility alternate content at this schema position.".to_string(),
+        version: String::new(),
+        wire: FieldWireDecl::Child {
+          qname: "mc:AlternateContent".to_string(),
+        },
+        cardinality: Cardinality::Many,
+        type_ref: TypeRefDecl {
+          rust_type: "AlternateContent".to_string(),
+          module_path: Some(
+            "crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006".to_string(),
+          ),
+        },
+        validators: Vec::new(),
+      }),
+    );
+  }
   Ok(())
 }
 
@@ -765,32 +1109,6 @@ fn apply_choice_enum_repeated(
         .into(),
     )
   }
-}
-
-fn add_xml_any_choice_variant(
-  type_decl: &mut crate::sdk_code::codegen_ir::TypeDecl,
-  qnames: Vec<String>,
-) {
-  if let Some(existing) = type_decl.members.iter_mut().find_map(|member| {
-    let MemberDecl::Variant(variant) = member else {
-      return None;
-    };
-    (variant.rust_name == "XmlAny").then_some(variant)
-  }) {
-    existing.wire = VariantWireDecl::Any { qnames };
-    return;
-  }
-
-  type_decl.members.push(MemberDecl::Variant(VariantDecl {
-    rust_name: "XmlAny".to_string(),
-    docs: "Unknown XML child.".to_string(),
-    version: String::new(),
-    wire: VariantWireDecl::Any { qnames },
-    payload: TypeRefDecl {
-      rust_type: "std::boxed::Box<[u8]>".to_string(),
-      module_path: None,
-    },
-  }));
 }
 
 fn variant_wire_qnames(wire: &VariantWireDecl) -> Option<&[String]> {
@@ -956,7 +1274,6 @@ mod tests {
           have_mc_preserve_elements: Some(true),
           have_mc_process_content: Some(true),
           have_mc_must_understand: Some(true),
-          have_direct_xml_other_children: Some(true),
           children: vec![SchemaTypeChildExtension {
             property_name: "Child".to_string(),
             optional: Some(true),
@@ -971,7 +1288,6 @@ mod tests {
     apply_schema_extensions(&mut schemas, &extensions).unwrap();
 
     assert!(schemas[0].types[0].children[0].optional);
-    assert!(schemas[0].types[0].have_direct_xml_other_children);
     assert!(schemas[0].types[0].have_mc_ignorable);
     assert!(schemas[0].types[0].have_mc_preserve_attributes);
     assert!(schemas[0].types[0].have_mc_preserve_elements);
@@ -1264,6 +1580,41 @@ mod tests {
   }
 
   #[test]
+  fn applies_attribute_override_q_name_extension() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      types: vec![SchemaType {
+        class_name: "BooleanFalse".to_string(),
+        attributes: vec![SchemaTypeAttribute {
+          q_name: "c16r3:val".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "BooleanFalse".to_string(),
+          attributes: vec![SchemaTypeAttributeExtension {
+            q_name: "c16r3:val".to_string(),
+            override_q_name: ":val".to_string(),
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    assert_eq!(schemas[0].types[0].attributes[0].q_name, ":val");
+  }
+
+  #[test]
   fn applies_type_extension_to_types_with_matching_base_class() {
     let mut schemas = vec![Schema {
       module_name: "test_schema".to_string(),
@@ -1373,6 +1724,7 @@ mod tests {
           override_base_class: "OpenXmlLeafElement".to_string(),
           attributes: vec![SchemaTypeAttributeExtension {
             q_name: ":val".to_string(),
+            override_q_name: String::new(),
             property_name: "Val".to_string(),
             property_comments: "Integer Value".to_string(),
             version: "Office2010".to_string(),
@@ -1519,7 +1871,6 @@ mod tests {
         choice_enums: vec![SchemaChoiceEnumExtension {
           rust_name: "ControlPropertiesChoice".to_string(),
           repeated: None,
-          add_xml_any: None,
           add_variants: vec![SchemaChoiceVariantExtension {
             rust_name: "DrawingRunProperties".to_string(),
             q_name: "a:CT_TextCharacterProperties/a:rPr".to_string(),
@@ -1551,54 +1902,6 @@ mod tests {
       variant.payload.module_path.as_deref(),
       Some("crate::schemas::a")
     );
-  }
-
-  #[test]
-  fn applies_choice_enum_add_xml_any_extension() {
-    let mut ir = SchemaModuleDecl {
-      module_name: "test_schema".to_string(),
-      types: vec![TypeDecl {
-        rust_name: "RunChoice".to_string(),
-        kind: TypeKind::ChoiceEnum,
-        estimated_size: 0,
-        members: vec![MemberDecl::Variant(VariantDecl {
-          rust_name: "Text".to_string(),
-          wire: VariantWireDecl::Child {
-            qnames: vec!["w:CT_Text/w:t".to_string()],
-          },
-          payload: TypeRefDecl {
-            rust_type: "Text".to_string(),
-            module_path: None,
-          },
-          ..Default::default()
-        })],
-        ..Default::default()
-      }],
-      ..Default::default()
-    };
-    let extensions = vec![(
-      "test_schema".to_string(),
-      SchemaExtensions {
-        choice_enums: vec![SchemaChoiceEnumExtension {
-          rust_name: "RunChoice".to_string(),
-          add_xml_any: Some(Vec::new()),
-          ..Default::default()
-        }],
-        ..Default::default()
-      },
-    )];
-
-    apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions).unwrap();
-
-    let choice = &ir.types[0];
-    assert_eq!(choice.members.len(), 2);
-    let MemberDecl::Variant(variant) = &choice.members[1] else {
-      panic!("expected variant");
-    };
-    assert_eq!(variant.rust_name, "XmlAny");
-    assert_eq!(variant.wire, VariantWireDecl::Any { qnames: Vec::new() });
-    assert_eq!(variant.payload.rust_type, "std::boxed::Box<[u8]>");
-    assert!(variant.payload.module_path.is_none());
   }
 
   #[test]
@@ -1660,5 +1963,184 @@ mod tests {
       panic!("expected field");
     };
     assert_eq!(field.cardinality, Cardinality::Many);
+  }
+
+  #[test]
+  fn adds_positioned_alternate_content_fields_without_single_slot_suffix() {
+    let mut ir = SchemaModuleDecl {
+      module_name: "test_schema".to_string(),
+      types: vec![TypeDecl {
+        rust_name: "Parent".to_string(),
+        kind: TypeKind::ElementStruct,
+        estimated_size: 0,
+        members: vec![MemberDecl::Field(FieldDecl {
+          rust_name: "known_child".to_string(),
+          wire: FieldWireDecl::Child {
+            qname: "t:known".to_string(),
+          },
+          cardinality: Cardinality::Optional,
+          type_ref: TypeRefDecl {
+            rust_type: "KnownChild".to_string(),
+            module_path: None,
+          },
+          ..Default::default()
+        })],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Parent".to_string(),
+          alternate_content: vec![SchemaTypeAlternateContentExtension {
+            after_field: "known_child".to_string(),
+            children: vec!["known_child".to_string()],
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions).unwrap();
+
+    let MemberDecl::Field(field) = &ir.types[0].members[1] else {
+      panic!("expected alternate content field");
+    };
+    assert_eq!(field.rust_name, "alternate_content");
+    assert_eq!(field.cardinality, Cardinality::Many);
+    assert_eq!(
+      ir.types[0]
+        .support
+        .alternate_content_children
+        .get("alternate_content"),
+      Some(&vec!["known_child".to_string()])
+    );
+    assert_eq!(
+      field.wire,
+      FieldWireDecl::Child {
+        qname: "mc:AlternateContent".to_string()
+      }
+    );
+  }
+
+  #[test]
+  fn numbers_multiple_positioned_alternate_content_fields_from_zero() {
+    let child = |rust_name: &str| {
+      MemberDecl::Field(FieldDecl {
+        rust_name: rust_name.to_string(),
+        wire: FieldWireDecl::Child {
+          qname: format!("t:{rust_name}"),
+        },
+        cardinality: Cardinality::Optional,
+        type_ref: TypeRefDecl {
+          rust_type: "KnownChild".to_string(),
+          module_path: None,
+        },
+        ..Default::default()
+      })
+    };
+    let mut ir = SchemaModuleDecl {
+      module_name: "test_schema".to_string(),
+      types: vec![TypeDecl {
+        rust_name: "Parent".to_string(),
+        kind: TypeKind::ElementStruct,
+        estimated_size: 0,
+        members: vec![child("first"), child("second")],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Parent".to_string(),
+          alternate_content: vec![
+            SchemaTypeAlternateContentExtension {
+              after_field: "first".to_string(),
+              children: vec!["first".to_string()],
+              ..Default::default()
+            },
+            SchemaTypeAlternateContentExtension {
+              after_field: "second".to_string(),
+              children: vec!["second".to_string()],
+              ..Default::default()
+            },
+          ],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions).unwrap();
+
+    let names = ir.types[0]
+      .members
+      .iter()
+      .filter_map(|member| match member {
+        MemberDecl::Field(field) => Some(field.rust_name.as_str()),
+        MemberDecl::Variant(_) => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(
+      names,
+      [
+        "first",
+        "alternate_content_0",
+        "second",
+        "alternate_content_1"
+      ]
+    );
+  }
+
+  #[test]
+  fn rejects_positioned_alternate_content_without_known_children() {
+    let make_ir = || SchemaModuleDecl {
+      module_name: "test_schema".to_string(),
+      types: vec![TypeDecl {
+        rust_name: "Parent".to_string(),
+        kind: TypeKind::ElementStruct,
+        members: vec![MemberDecl::Field(FieldDecl {
+          rust_name: "known_child".to_string(),
+          wire: FieldWireDecl::Child {
+            qname: "t:known".to_string(),
+          },
+          cardinality: Cardinality::Optional,
+          type_ref: TypeRefDecl {
+            rust_type: "KnownChild".to_string(),
+            module_path: None,
+          },
+          ..Default::default()
+        })],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    for children in [Vec::new(), vec!["missing_child".to_string()]] {
+      let mut ir = make_ir();
+      let extensions = vec![(
+        "test_schema".to_string(),
+        SchemaExtensions {
+          types: vec![SchemaTypeExtension {
+            class_name: "Parent".to_string(),
+            alternate_content: vec![SchemaTypeAlternateContentExtension {
+              after_field: "known_child".to_string(),
+              children,
+              ..Default::default()
+            }],
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      )];
+      let error = apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions)
+        .expect_err("invalid static MCE children");
+      assert!(error.to_string().contains("alternate content"));
+    }
   }
 }

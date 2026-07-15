@@ -1474,232 +1474,92 @@ pub(crate) fn read_raw_element_xml_io_bytes<R: BufRead>(
 }
 
 #[cfg(feature = "mce")]
-const MC_ALTERNATE_CONTENT_NAMES: &[&[u8]] = &[b"mc:AlternateContent", b"AlternateContent"];
-#[cfg(feature = "mce")]
-const MC_CHOICE_NAMES: &[&[u8]] = &[b"mc:Choice", b"Choice"];
-#[cfg(feature = "mce")]
-const MC_FALLBACK_NAMES: &[&[u8]] = &[b"mc:Fallback", b"Fallback"];
-
-#[cfg(feature = "mce")]
-pub(crate) fn mce_choice_replacement_child_bytes(
-  xml: &[u8],
+pub(crate) fn process_alternate_content_children<F>(
+  alternate_content: &mut crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
   settings: &crate::sdk::MarkupCompatibilityProcessSettings,
   context: &crate::sdk::MceContext<'_>,
-) -> Result<Option<Vec<Box<[u8]>>>, SdkError> {
-  let mut reader = Reader::from_reader(xml);
-  reader.config_mut().check_end_names = false;
-  let mut fallback = None;
+  mut process_child: F,
+) -> Result<(), SdkError>
+where
+  F: FnMut(Box<[u8]>, &crate::sdk::MceContext<'_>) -> Result<(), SdkError>,
+{
+  use crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::{
+    AlternateContent, AlternateContentChoice,
+  };
 
-  loop {
-    match reader.read_event()? {
-      Event::Start(e) if qname_in(e.name().as_ref(), MC_ALTERNATE_CONTENT_NAMES) => {
-        let namespaces = namespace_decls(&e)?;
-        loop {
-          match reader.read_event()? {
-            Event::Start(e) if qname_in(e.name().as_ref(), MC_CHOICE_NAMES) => {
-              let choice_namespaces = namespace_decls(&e)?;
-              let requires = attr_value(&reader, &e, b"Requires")?;
-              let children = read_mce_container_children_bytes(&mut reader, MC_CHOICE_NAMES)?;
-              if choice_requires_supported(
-                requires.as_deref(),
-                context,
-                &[choice_namespaces.as_slice(), namespaces.as_slice()],
-                settings.target_file_format_version,
-              )? {
-                return Ok(Some(children));
-              }
-            }
-            Event::Empty(e) if qname_in(e.name().as_ref(), MC_CHOICE_NAMES) => {
-              let choice_namespaces = namespace_decls(&e)?;
-              let requires = attr_value(&reader, &e, b"Requires")?;
-              if choice_requires_supported(
-                requires.as_deref(),
-                context,
-                &[choice_namespaces.as_slice(), namespaces.as_slice()],
-                settings.target_file_format_version,
-              )? {
-                return Ok(Some(Vec::new()));
-              }
-            }
-            Event::Start(e) if qname_in(e.name().as_ref(), MC_FALLBACK_NAMES) => {
-              fallback = Some(read_mce_container_children_bytes(
-                &mut reader,
-                MC_FALLBACK_NAMES,
-              )?);
-            }
-            Event::Empty(e) if qname_in(e.name().as_ref(), MC_FALLBACK_NAMES) => {
-              fallback = Some(Vec::new());
-            }
-            Event::Start(e) => {
-              skip_element(&mut reader, e.name())?;
-            }
-            Event::End(e) if qname_in(e.name().as_ref(), MC_ALTERNATE_CONTENT_NAMES) => {
-              return Ok(Some(fallback.unwrap_or_default()));
-            }
-            Event::Eof => return Err(unexpected_eof("mce AlternateContent")),
-            _ => {}
-          }
+  let AlternateContent {
+    xmlns,
+    mc_ignorable,
+    mc_must_understand,
+    alternate_content_choice,
+    ..
+  } = alternate_content;
+  let alternate_context = context.child_context(
+    xmlns,
+    crate::sdk::MceContextAttributes {
+      ignorable: mc_ignorable.as_deref(),
+      must_understand: mc_must_understand.as_deref(),
+      ..Default::default()
+    },
+    settings,
+  )?;
+  let mut fallback_index = None;
+
+  for (index, branch) in alternate_content_choice.iter_mut().enumerate() {
+    match branch {
+      AlternateContentChoice::Choice(choice) => {
+        let supported = choice_requires_supported(
+          Some(choice.requires.as_bytes()),
+          &alternate_context,
+          &[choice.xmlns.as_slice(), xmlns.as_slice()],
+          settings.target_file_format_version,
+        )?;
+        if !supported {
+          continue;
         }
+        let children = std::mem::take(&mut choice.xml_children);
+        let branch_context = alternate_context.child_context(
+          &choice.xmlns,
+          crate::sdk::MceContextAttributes {
+            ignorable: choice.mc_ignorable.as_deref(),
+            preserve_attributes: choice.mc_preserve_attributes.as_deref(),
+            must_understand: choice.mc_must_understand.as_deref(),
+          },
+          settings,
+        )?;
+        for child in children {
+          process_child(child, &branch_context)?;
+        }
+        return Ok(());
       }
-      Event::Empty(e) if qname_in(e.name().as_ref(), MC_ALTERNATE_CONTENT_NAMES) => {
-        return Ok(Some(Vec::new()));
+      AlternateContentChoice::Fallback(_) if fallback_index.is_none() => {
+        fallback_index = Some(index);
       }
-      Event::Start(e) => {
-        return mce_unknown_element_replacement_bytes(&mut reader, e, context, false);
-      }
-      Event::Empty(e) => {
-        return mce_unknown_element_replacement_bytes(&mut reader, e, context, true);
-      }
-      Event::Eof => return Ok(None),
-      _ => {}
+      AlternateContentChoice::Fallback(_) => {}
     }
   }
-}
 
-#[cfg(feature = "mce")]
-fn mce_unknown_element_replacement_bytes(
-  reader: &mut Reader<&[u8]>,
-  start: quick_xml::events::BytesStart<'_>,
-  context: &crate::sdk::MceContext<'_>,
-  empty_tag: bool,
-) -> Result<Option<Vec<Box<[u8]>>>, SdkError> {
-  let qname = start.name();
-  let qname = qname.as_ref();
-  let namespaces = namespace_decls(&start)?;
-  let namespace_frames = [namespaces.as_slice()];
-  let is_ignorable = qname_prefix(qname)
-    .and_then(|prefix| namespace_for_prefix_with_frames(context, &namespace_frames, prefix))
-    .is_some_and(|ns| context.is_ignorable_namespace_bytes(ns));
-
-  if is_ignorable && context.is_preserved_element_qname_with_current_bytes(&namespaces, qname) {
-    return Ok(None);
+  let Some(fallback_index) = fallback_index else {
+    return Ok(());
+  };
+  let AlternateContentChoice::Fallback(fallback) = &mut alternate_content_choice[fallback_index]
+  else {
+    unreachable!();
+  };
+  let children = std::mem::take(&mut fallback.xml_children);
+  let fallback_context = alternate_context.child_context(
+    &fallback.xmlns,
+    crate::sdk::MceContextAttributes {
+      ignorable: fallback.mc_ignorable.as_deref(),
+      must_understand: fallback.mc_must_understand.as_deref(),
+      ..Default::default()
+    },
+    settings,
+  )?;
+  for child in children {
+    process_child(child, &fallback_context)?;
   }
-
-  if is_ignorable && context.is_process_content_qname_with_current_bytes(&namespaces, qname) {
-    if empty_tag {
-      return Ok(Some(Vec::new()));
-    }
-    return read_mce_container_children_qname_bytes(reader, start.name()).map(Some);
-  }
-
-  if is_ignorable {
-    if !empty_tag {
-      skip_element(reader, start.name())?;
-    }
-    return Ok(Some(Vec::new()));
-  }
-
-  if !qname.contains(&b':') {
-    if !empty_tag {
-      skip_element(reader, start.name())?;
-    }
-    return Ok(None);
-  }
-
-  if !empty_tag {
-    skip_element(reader, start.name())?;
-  }
-  Ok(None)
-}
-
-#[cfg(feature = "mce")]
-fn read_mce_container_children_bytes(
-  reader: &mut Reader<&[u8]>,
-  end_names: &[&[u8]],
-) -> Result<Vec<Box<[u8]>>, SdkError> {
-  let mut children = Vec::new();
-  loop {
-    match reader.read_event()? {
-      Event::Start(e) => {
-        children.push(read_outer_xml_from_str_reader_bytes(reader, e, false)?);
-      }
-      Event::Empty(e) => {
-        children.push(read_outer_xml_from_str_reader_bytes(reader, e, true)?);
-      }
-      Event::End(e) if qname_in(e.name().as_ref(), end_names) => return Ok(children),
-      Event::Eof => return Err(unexpected_eof("mce choice/fallback")),
-      _ => {}
-    }
-  }
-}
-
-#[cfg(feature = "mce")]
-fn read_mce_container_children_qname_bytes(
-  reader: &mut Reader<&[u8]>,
-  end_name: quick_xml::name::QName<'_>,
-) -> Result<Vec<Box<[u8]>>, SdkError> {
-  let mut children = Vec::new();
-  loop {
-    match reader.read_event()? {
-      Event::Start(e) => {
-        children.push(read_outer_xml_from_str_reader_bytes(reader, e, false)?);
-      }
-      Event::Empty(e) => {
-        children.push(read_outer_xml_from_str_reader_bytes(reader, e, true)?);
-      }
-      Event::End(e) if e.name() == end_name => return Ok(children),
-      Event::Eof => return Err(unexpected_eof("mce choice/fallback")),
-      _ => {}
-    }
-  }
-}
-
-#[cfg(feature = "mce")]
-fn read_outer_xml_from_str_reader_bytes(
-  reader: &mut Reader<&[u8]>,
-  start: quick_xml::events::BytesStart<'_>,
-  empty_tag: bool,
-) -> Result<Box<[u8]>, SdkError> {
-  if empty_tag {
-    return Ok(read_raw_empty_xml_start_bytes(start));
-  }
-
-  let start_bytes = start.as_ref();
-  let end_name = start.name();
-  let inner = reader.read_text(end_name)?;
-  Ok(build_raw_element_xml_bytes(
-    start_bytes,
-    inner.as_ref(),
-    end_name.as_ref(),
-  ))
-}
-
-#[cfg(feature = "mce")]
-fn qname_prefix(qname: &[u8]) -> Option<&[u8]> {
-  qname
-    .iter()
-    .position(|byte| *byte == b':')
-    .map(|index| &qname[..index])
-}
-
-#[cfg(feature = "mce")]
-fn skip_element(
-  reader: &mut Reader<&[u8]>,
-  name: quick_xml::name::QName<'_>,
-) -> Result<(), SdkError> {
-  reader.read_to_end(name)?;
   Ok(())
-}
-
-#[cfg(feature = "mce")]
-fn attr_value(
-  reader: &Reader<&[u8]>,
-  start: &quick_xml::events::BytesStart<'_>,
-  name: &[u8],
-) -> Result<Option<Box<[u8]>>, SdkError> {
-  for attr in start.attributes() {
-    let attr = attr?;
-    if attr.key.as_ref() == name {
-      return Ok(Some(
-        attr
-          .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())?
-          .into_owned()
-          .into_bytes()
-          .into_boxed_slice(),
-      ));
-    }
-  }
-  Ok(None)
 }
 
 #[cfg(feature = "mce")]
@@ -1750,43 +1610,8 @@ fn namespace_for_prefix_in_frame<'a>(
 }
 
 #[cfg(feature = "mce")]
-fn namespace_decls(
-  start: &quick_xml::events::BytesStart<'_>,
-) -> Result<Vec<crate::common::XmlNamespace>, SdkError> {
-  let mut namespaces = Vec::new();
-  for attr in start.attributes() {
-    let attr = attr?;
-    let key = attr.key.as_ref();
-    if let Some(prefix) = key.strip_prefix(b"xmlns:") {
-      namespaces.push(crate::common::XmlNamespace::raw(
-        prefix,
-        attr.value.as_ref(),
-      ));
-    }
-  }
-  Ok(namespaces)
-}
-
-#[cfg(feature = "mce")]
 fn namespace_supported(ns: &[u8], target: crate::sdk::FileFormatVersion) -> bool {
   crate::sdk::namespace_supported(ns, target)
-}
-
-#[cfg(feature = "mce")]
-fn qname_in(name: &[u8], expected: &[&[u8]]) -> bool {
-  if expected.contains(&name) {
-    return true;
-  }
-
-  let mut index = name.len();
-  while index > 0 {
-    index -= 1;
-    if name[index] == b':' {
-      return expected.contains(&&name[index + 1..]);
-    }
-  }
-
-  false
 }
 
 #[inline]

@@ -1,7 +1,33 @@
 {
   "Types": [
     {
-      "ClassName": "RevisionPtr"
+      "ClassName": "RevisionPtr",
+      "Attributes": [
+        {
+          "QName": "xr6:coauthVersionLast",
+          "PropertyName": "CoauthVersionLast",
+          "PropertyComments": "Last coauthoring version.",
+          "Version": "Office2019",
+          "Optional": true,
+          "OverrideType": "UInt64Value"
+        },
+        {
+          "QName": "xr6:coauthVersionMax",
+          "PropertyName": "CoauthVersionMax",
+          "PropertyComments": "Maximum coauthoring version.",
+          "Version": "Office2019",
+          "Optional": true,
+          "OverrideType": "UInt64Value"
+        },
+        {
+          "QName": "xr10:uidLastSave",
+          "PropertyName": "UidLastSave",
+          "PropertyComments": "Unique identifier at last save.",
+          "Version": "Office2019",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     }
   ]
 }

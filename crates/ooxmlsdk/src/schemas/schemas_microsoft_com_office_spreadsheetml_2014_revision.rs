@@ -236,6 +236,15 @@ pub struct RevisionPtr {
   /// documentId
   #[sdk(attr(qname = ":documentId"))]
   pub document_id: crate::simple_type::StringValue,
+  /// Last coauthoring version.
+  #[sdk(attr(qname = "xr6:coauthVersionLast"))]
+  pub coauth_version_last: Option<crate::simple_type::UInt64Value>,
+  /// Maximum coauthoring version.
+  #[sdk(attr(qname = "xr6:coauthVersionMax"))]
+  pub coauth_version_max: Option<crate::simple_type::UInt64Value>,
+  /// Unique identifier at last save.
+  #[sdk(attr(qname = "xr10:uidLastSave"))]
+  pub uid_last_save: Option<crate::simple_type::StringValue>,
 }
 /// Defines the StateBasedObject Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

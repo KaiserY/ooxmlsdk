@@ -733,7 +733,7 @@ fn build_type_decl(
     .map(|attr| build_attr_member_decl(attr, schema, context))
     .collect::<Result<Vec<_>>>()?;
   let mut source_content_model = build_content_model_decl(schema_type);
-  let mut extra_types = if should_build_recursive_one_sequence_choices(schema_type) {
+  let extra_types = if should_build_recursive_one_sequence_choices(schema_type) {
     source_content_model = Some(ContentModelDecl::OneSequenceStructured);
     build_recursive_one_sequence_choice_members(schema_type, schema, context, &mut members)
       .map_err(|err| format!("recursive one-sequence choices: {err}"))?
@@ -780,14 +780,7 @@ fn build_type_decl(
     }
   };
 
-  let generate_direct_xml_other_children = schema_type.have_direct_xml_other_children;
-  let promoted_xml_other_choice = generate_direct_xml_other_children
-    && promote_single_repeated_child_to_xml_other_choice(
-      schema_type,
-      &mut members,
-      &mut extra_types,
-    );
-  let have_xml_other_children = generate_direct_xml_other_children && !promoted_xml_other_choice;
+  let have_xml_other_children = schema_type.have_xml_other_children;
   let xml_content = build_xml_content_type_ref(schema_type, schema, context)?;
   let content_model =
     refine_content_model_decl(source_content_model, &members, xml_content.as_ref());
@@ -835,6 +828,7 @@ fn build_type_decl(
         compact_xml_other_children,
         extra_xmlns: schema_type.extra_xmlns.clone(),
         canonical_namespace_prefixes: schema_type.canonical_namespace_prefixes.clone(),
+        alternate_content_children: Default::default(),
       },
       estimated_size: 0,
       members,
@@ -856,103 +850,6 @@ fn has_child_like_members(members: &[MemberDecl]) -> bool {
       })
     )
   })
-}
-
-fn promote_single_repeated_child_to_xml_other_choice(
-  schema_type: &SchemaType,
-  members: &mut [MemberDecl],
-  extra_types: &mut Vec<TypeDecl>,
-) -> bool {
-  let child_field_indexes: Vec<usize> = members
-    .iter()
-    .enumerate()
-    .filter_map(|(index, member)| match member {
-      MemberDecl::Field(field)
-        if matches!(
-          field.wire,
-          FieldWireDecl::Child { .. }
-            | FieldWireDecl::TextChild { .. }
-            | FieldWireDecl::Any
-            | FieldWireDecl::Choice
-        ) =>
-      {
-        Some(index)
-      }
-      _ => None,
-    })
-    .collect();
-  let [field_index] = child_field_indexes.as_slice() else {
-    return false;
-  };
-  let MemberDecl::Field(field) = &members[*field_index] else {
-    return false;
-  };
-  let field = field.clone();
-
-  if field.cardinality != Cardinality::Many {
-    return false;
-  }
-
-  let FieldWireDecl::Child { qname } = &field.wire else {
-    return false;
-  };
-  let qname = qname.clone();
-
-  let choice_name = format!("{}Choice", schema_type.class_name);
-  let mut choice_members = vec![
-    MemberDecl::Variant(VariantDecl {
-      rust_name: schema_choice_variant_name_from_field_name(&field.rust_name),
-      docs: field.docs.clone(),
-      version: field.version.clone(),
-      wire: VariantWireDecl::Child {
-        qnames: vec![qname],
-      },
-      payload: field.type_ref.clone(),
-    }),
-    MemberDecl::Variant(VariantDecl {
-      rust_name: "XmlAny".to_string(),
-      docs: "Unknown XML child.".to_string(),
-      version: String::new(),
-      wire: VariantWireDecl::Any { qnames: Vec::new() },
-      payload: TypeRefDecl {
-        rust_type: "std::boxed::Box<[u8]>".to_string(),
-        module_path: None,
-      },
-    }),
-  ];
-  disambiguate_choice_variant_names(&mut choice_members);
-
-  members[*field_index] = MemberDecl::Field(FieldDecl {
-    rust_name: "xml_children".to_string(),
-    docs: field.docs.clone(),
-    version: field.version.clone(),
-    wire: FieldWireDecl::Choice,
-    cardinality: Cardinality::Many,
-    type_ref: TypeRefDecl {
-      rust_type: choice_name.clone(),
-      module_path: None,
-    },
-    validators: field.validators.clone(),
-  });
-
-  extra_types.push(TypeDecl {
-    rust_name: choice_name,
-    xml_qname: None,
-    docs: field.docs.clone(),
-    version: schema_type.version.clone(),
-    is_abstract: false,
-    kind: TypeKind::ChoiceEnum,
-    element_kind: None,
-    content_model: None,
-    base_rust_name: None,
-    base_module_path: None,
-    xml_content: None,
-    support: SystemSupportDecl::default(),
-    estimated_size: 0,
-    members: choice_members,
-  });
-
-  true
 }
 
 fn should_build_recursive_one_sequence_choices(schema_type: &SchemaType) -> bool {
@@ -4910,131 +4807,6 @@ mod tests {
       })
       .unwrap();
     assert_eq!(choice_field.cardinality, Cardinality::Many);
-  }
-
-  #[test]
-  fn direct_xml_other_children_promotes_single_repeated_child_to_choice_stream() {
-    let schema = Schema {
-      module_name: "test_module".to_string(),
-      target_namespace: "urn:test".to_string(),
-      prefix: "t".to_string(),
-      typed_namespace: "Test.Namespace".to_string(),
-      types: vec![
-        SchemaType {
-          name: "t:CT_Leaf/t:leaf".to_string(),
-          class_name: "Leaf".to_string(),
-          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
-          ..Default::default()
-        },
-        SchemaType {
-          name: "t:CT_Parent/t:parent".to_string(),
-          class_name: "Parent".to_string(),
-          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
-          have_direct_xml_other_children: true,
-          children: vec![SchemaTypeChild {
-            particle_id: String::new(),
-            name: "t:CT_Leaf/t:leaf".to_string(),
-            kind: SchemaTypeChildKind::Child,
-            repeated: true,
-            ..Default::default()
-          }],
-          ..Default::default()
-        },
-      ],
-      ..Default::default()
-    };
-    let context = CodegenContext::new(std::slice::from_ref(&schema));
-
-    let ir = build_codegen_ir(&schema, &context).unwrap();
-
-    let parent = ir.types.iter().find(|ty| ty.rust_name == "Parent").unwrap();
-    let field = parent
-      .members
-      .iter()
-      .find_map(|member| match member {
-        MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Choice) => Some(field),
-        _ => None,
-      })
-      .unwrap();
-    assert_eq!(field.rust_name, "xml_children");
-    assert_eq!(field.cardinality, Cardinality::Many);
-    assert_eq!(parent.content_model, Some(ContentModelDecl::ChoiceOnly));
-
-    let choice = ir
-      .types
-      .iter()
-      .find(|ty| ty.rust_name == "ParentChoice")
-      .unwrap();
-    assert!(choice.members.iter().any(|member| {
-      matches!(member, MemberDecl::Variant(variant) if variant.rust_name == "XmlAny")
-    }));
-  }
-
-  #[test]
-  fn direct_xml_other_children_promotion_preserves_attributes() {
-    let schema = Schema {
-      module_name: "test_module".to_string(),
-      target_namespace: "urn:test".to_string(),
-      prefix: "t".to_string(),
-      typed_namespace: "Test.Namespace".to_string(),
-      types: vec![
-        SchemaType {
-          name: "t:CT_Leaf/t:leaf".to_string(),
-          class_name: "Leaf".to_string(),
-          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
-          ..Default::default()
-        },
-        SchemaType {
-          name: "t:CT_Parent/t:parent".to_string(),
-          class_name: "Parent".to_string(),
-          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
-          have_direct_xml_other_children: true,
-          attributes: vec![SchemaTypeAttribute {
-            q_name: ":count".to_string(),
-            property_name: "Count".to_string(),
-            r#type: "UInt32Value".to_string(),
-            ..Default::default()
-          }],
-          children: vec![SchemaTypeChild {
-            particle_id: String::new(),
-            name: "t:CT_Leaf/t:leaf".to_string(),
-            kind: SchemaTypeChildKind::Child,
-            repeated: true,
-            ..Default::default()
-          }],
-          ..Default::default()
-        },
-      ],
-      ..Default::default()
-    };
-    let context = CodegenContext::new(std::slice::from_ref(&schema));
-
-    let ir = build_codegen_ir(&schema, &context).unwrap();
-
-    let parent = ir.types.iter().find(|ty| ty.rust_name == "Parent").unwrap();
-    assert!(!parent.support.have_xml_other_children);
-    assert!(parent.members.iter().any(|member| {
-      matches!(
-        member,
-        MemberDecl::Field(FieldDecl {
-          rust_name,
-          wire: FieldWireDecl::Attribute { .. },
-          ..
-        }) if rust_name == "count"
-      )
-    }));
-    assert!(parent.members.iter().any(|member| {
-      matches!(
-        member,
-        MemberDecl::Field(FieldDecl {
-          rust_name,
-          wire: FieldWireDecl::Choice,
-          cardinality: Cardinality::Many,
-          ..
-        }) if rust_name == "xml_children"
-      )
-    }));
-    assert!(ir.types.iter().any(|ty| ty.rust_name == "ParentChoice"));
   }
 
   #[test]

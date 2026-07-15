@@ -6,7 +6,15 @@
     },
     {
       "ClassName": "Anchor",
-      "HaveDirectXmlOtherChildren": true,
+      "AlternateContent": [
+        {
+          "AfterField": "simple_position",
+          "Children": [
+            "horizontal_position",
+            "vertical_position"
+          ]
+        }
+      ],
       "Attributes": [
         {
           "QName": ":relativeHeight",

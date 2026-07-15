@@ -384,10 +384,10 @@ impl DrawingAnchorModel {
           .as_ref()
           .is_none_or(|value| value.as_bool()),
       },
-      xdr::WorksheetDrawingChoice::XmlAny(value) => Self {
+      xdr::WorksheetDrawingChoice::AlternateContent(_) => Self {
         kind: DrawingAnchorKind::Absolute,
         object: DrawingObjectModel {
-          text_len: value.len(),
+          text_len: 0,
           ..DrawingObjectModel::unknown()
         },
         from: None,
@@ -431,8 +431,8 @@ impl DrawingObjectModel {
       xdr::TwoCellAnchorChoice::ConnectionShape(shape) => Self::from_connection_shape(shape),
       xdr::TwoCellAnchorChoice::Picture(picture) => Self::from_picture(picture),
       xdr::TwoCellAnchorChoice::ContentPart(part) => Self::from_content_part(&part.relationship_id),
-      xdr::TwoCellAnchorChoice::XmlAny(value) => Self {
-        text_len: value.len(),
+      xdr::TwoCellAnchorChoice::AlternateContent(_) => Self {
+        text_len: 0,
         ..Self::unknown()
       },
     }
@@ -1016,9 +1016,8 @@ impl DiagramDataCatalog {
             .as_ref()
             .map_or(0, |list| list.pt_extension.len());
         }
-        dgm::PointListChoice::XmlAny(value) => {
+        dgm::PointListChoice::AlternateContent(_) => {
           catalog.unknown_points += 1;
-          catalog.text_len += value.len();
         }
       }
     }

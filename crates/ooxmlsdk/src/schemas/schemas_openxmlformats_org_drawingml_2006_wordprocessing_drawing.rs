@@ -204,7 +204,6 @@ pub struct Inline {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:anchor")]
 pub struct Anchor {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Distance From Text on Top Edge
   #[sdk(attr(qname = ":distT"))]
   pub distance_from_top: Option<crate::simple_type::UInt32Value>,
@@ -249,6 +248,15 @@ pub struct Anchor {
   /// Simple Positioning Coordinates
   #[sdk(child(qname = "wp:simplePos"))]
   pub simple_position: Option<SimplePosition>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(
+        mce(
+            qname = "mc:AlternateContent",
+            children = [horizontal_position,
+            vertical_position]
+        )
+    )]
+  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
   /// Horizontal Positioning
   #[sdk(child(qname = "wp:positionH"))]
   pub horizontal_position: Option<std::boxed::Box<HorizontalPosition>>,

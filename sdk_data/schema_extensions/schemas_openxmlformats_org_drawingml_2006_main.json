@@ -17,8 +17,13 @@
   "ChoiceEnums": [
     {
       "RustName": "GraphicDataChoice",
-      "AddXmlAny": [
-        "wp:wsp"
+      "AddVariants": [
+        {
+          "RustName": "AlternateContent",
+          "QName": "mc:AlternateContent",
+          "PayloadRustType": "AlternateContent",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006"
+        }
       ]
     }
   ],
@@ -164,10 +169,6 @@
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "Run",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
       "ClassName": "ShapeLocks",
       "HaveXmlnsFields": true
     },
@@ -189,7 +190,7 @@
     },
     {
       "ClassName": "TableStyleList",
-      "HaveDirectXmlOtherChildren": true
+      "AlternateContentChoice": true
     },
     {
       "ClassName": "Theme",

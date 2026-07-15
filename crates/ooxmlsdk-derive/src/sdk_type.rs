@@ -1308,14 +1308,40 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
     }
     _ => {
       let validator_methods_tokens = validator_methods_tokens(quote! {});
+      let public_mce_method_tokens = parse_sdk_xml_header(&input.attrs)?.then(|| {
+        quote! {
+          #[inline]
+          pub fn process_mce(
+            &mut self,
+            settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+          ) -> Result<(), crate::common::SdkError> {
+            let context = crate::sdk::MceContext::default();
+            self.process_mce_with_context(settings, &context)
+          }
+        }
+      });
+      let mce_methods_tokens = quote! {
+        #[cfg(feature = "mce")]
+        impl #impl_generics #ident #type_generics #where_clause {
+          #public_mce_method_tokens
+
+          #[inline]
+          pub(crate) fn process_mce_with_context(
+            &mut self,
+            _settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+            _context: &crate::sdk::MceContext<'_>,
+          ) -> Result<(), crate::common::SdkError> {
+            Ok(())
+          }
+        }
+      };
       Ok(quote! {
         #as_ref_self_impl_tokens
         impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {}
         impl #impl_generics #ident #type_generics #where_clause {
           #validator_methods_tokens
         }
-        #[cfg(feature = "mce")]
-        impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {}
+        #mce_methods_tokens
       })
     }
   }
@@ -1671,6 +1697,33 @@ fn expand_tuple_wrapper(
   let validator_methods_tokens = validator_methods_tokens(quote! {
     self.0.validate_into(context);
   });
+  let public_mce_method_tokens = parse_sdk_xml_header(&input.attrs)?.then(|| {
+    quote! {
+      #[inline]
+      pub fn process_mce(
+        &mut self,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+      ) -> Result<(), crate::common::SdkError> {
+        let context = crate::sdk::MceContext::default();
+        self.process_mce_with_context(settings, &context)
+      }
+    }
+  });
+  let mce_methods_tokens = quote! {
+    #[cfg(feature = "mce")]
+    impl #impl_generics #ident #type_generics #where_clause {
+      #public_mce_method_tokens
+
+      #[inline]
+      pub(crate) fn process_mce_with_context(
+        &mut self,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+        context: &crate::sdk::MceContext<'_>,
+      ) -> Result<(), crate::common::SdkError> {
+        self.0.process_mce_with_context(settings, context)
+      }
+    }
+  };
 
   Ok(quote! {
     #as_ref_self_impl_tokens
@@ -1687,16 +1740,7 @@ fn expand_tuple_wrapper(
       #root_methods_tokens
     }
 
-    #[cfg(feature = "mce")]
-    impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {
-      fn process_mce_with_context(
-        &mut self,
-        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &crate::sdk::MceContext<'_>,
-      ) -> Result<(), crate::common::SdkError> {
-        <#inner_ty as crate::sdk::SdkMce>::process_mce_with_context(&mut self.0, settings, context)
-      }
-    }
+    #mce_methods_tokens
 
     impl #impl_generics std::ops::Deref for #ident #type_generics #where_clause {
       type Target = #inner_ty;
@@ -1752,18 +1796,18 @@ fn mce_process_child_field_tokens(field: &SdkChildField) -> proc_macro2::TokenSt
   if field.repeated {
     quote! {
       for child in &mut self.#ident {
-        crate::sdk::SdkMce::process_mce_with_context(child, settings, context)?;
+        child.process_mce_with_context(settings, context)?;
       }
     }
   } else if field.optional {
     quote! {
       if let Some(child) = &mut self.#ident {
-        crate::sdk::SdkMce::process_mce_with_context(child, settings, context)?;
+        child.process_mce_with_context(settings, context)?;
       }
     }
   } else {
     quote! {
-      crate::sdk::SdkMce::process_mce_with_context(&mut self.#ident, settings, context)?;
+      self.#ident.process_mce_with_context(settings, context)?;
     }
   }
 }
@@ -1848,32 +1892,35 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
   let ident = &field.ident;
   let choice_ty = unwrap_option_vec_type(&field.ty);
   let mut choice_arms = Vec::new();
-  let mut any_variants = Vec::new();
+  let mut alternate_content_variant = None;
 
   for item in &field.items {
     match item {
-      SdkTypeChoiceItem::Child { variant, .. } => {
-        choice_arms.push(quote! {
-          #choice_ty::#variant(value) => {
-            crate::sdk::SdkMce::process_mce_with_context(value, settings, context)?;
-          }
-        });
+      SdkTypeChoiceItem::Child { variant, qname, .. } => {
+        if variant == "AlternateContent" && parse_qname_info(qname).local_name == "AlternateContent"
+        {
+          alternate_content_variant = Some(variant.clone());
+        } else {
+          choice_arms.push(quote! {
+            #choice_ty::#variant(value) => {
+              value.process_mce_with_context(settings, context)?;
+            }
+          });
+        }
       }
       SdkTypeChoiceItem::Sequence { variant, children } => {
         let _ = children;
         choice_arms.push(quote! {
           #choice_ty::#variant(value) => {
-            crate::sdk::SdkMce::process_mce_with_context(value, settings, context)?;
+            value.process_mce_with_context(settings, context)?;
           }
         });
       }
       SdkTypeChoiceItem::EmptyChild { .. }
       | SdkTypeChoiceItem::TextChild { .. }
       | SdkTypeChoiceItem::AnyChild { .. }
+      | SdkTypeChoiceItem::Any { .. }
       | SdkTypeChoiceItem::Text { .. } => {}
-      SdkTypeChoiceItem::Any { variant, .. } => {
-        any_variants.push(variant);
-      }
     }
   }
 
@@ -1971,62 +2018,50 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
     }
   }
 
-  let mut mce_any_arms = Vec::new();
   let mut mce_replacement_read_methods = Vec::new();
-  for variant in any_variants {
-    let method_ident = Ident::new(
-      &format!(
-        "__ooxmlsdk_read_mce_replacement_child_{}",
-        variant.to_string().to_ascii_lowercase()
-      ),
-      Span::call_site(),
-    );
+  if alternate_content_variant.is_some() {
     mce_replacement_read_methods.push(quote! {
-      fn #method_ident(
+      fn __ooxmlsdk_read_mce_replacement_child(
         child_xml: std::boxed::Box<[u8]>,
-      ) -> Result<Self, crate::common::SdkError> {
-        let parsed = {
-          let mut child_reader = crate::common::from_bytes_inner(child_xml.as_ref())?;
-          loop {
-            match child_reader.next()? {
-              crate::common::PayloadEvent::Start(e, next_empty) => {
-                let event_name = crate::common::xml_local_name(e.name());
-                break match event_name {
-                  #( #parse_replacement_arms )*
-                  _ => None,
-                };
-              }
-              crate::common::PayloadEvent::Eof => {
-                return Err(crate::common::unexpected_eof(stringify!(#ident)));
-              }
-              _ => {}
+      ) -> Result<Option<Self>, crate::common::SdkError> {
+        let mut child_reader = crate::common::from_bytes_inner(child_xml.as_ref())?;
+        loop {
+          match child_reader.next()? {
+            crate::common::PayloadEvent::Start(e, next_empty) => {
+              let event_name = crate::common::xml_local_name(e.name());
+              return Ok(match event_name {
+                #( #parse_replacement_arms )*
+                _ => None,
+              });
             }
+            crate::common::PayloadEvent::Eof => {
+              return Err(crate::common::unexpected_eof(stringify!(#ident)));
+            }
+            _ => {}
           }
-        };
-        Ok(parsed.unwrap_or_else(|| Self::#variant(child_xml)))
-      }
-    });
-    mce_any_arms.push(quote! {
-      #choice_ty::#variant(xml) => {
-        if let Some(children) = crate::common::mce_choice_replacement_child_bytes(
-          xml.as_ref(),
-          settings,
-          context,
-        )? {
-          for child_xml in children {
-            let mut child = Self::#method_ident(child_xml)?;
-            Self::process_mce_choice_with_context(&mut child, settings, context)?;
-            processed.push(child);
-          }
-        } else {
-          Self::process_mce_choice_with_context(&mut item, settings, context)?;
-          processed.push(item);
         }
       }
     });
   }
-
-  let process_repeated_choices = if mce_any_arms.is_empty() {
+  let mce_alternate_content_arm = alternate_content_variant.as_ref().map(|variant| {
+    quote! {
+      #choice_ty::#variant(alternate_content) => {
+        crate::common::process_alternate_content_children(
+          alternate_content.as_mut(),
+          settings,
+          context,
+          |child_xml, child_context| {
+            if let Some(mut child) = Self::__ooxmlsdk_read_mce_replacement_child(child_xml)? {
+              Self::process_mce_choice_with_context(&mut child, settings, child_context)?;
+              processed.push(child);
+            }
+            Ok(())
+          },
+        )?;
+      }
+    }
+  });
+  let process_repeated_choices = if alternate_content_variant.is_none() {
     quote! {
       for choice in values {
         Self::process_mce_choice_with_context(choice, settings, context)?;
@@ -2037,7 +2072,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
       let mut processed = Vec::with_capacity(values.len());
       for mut item in std::mem::take(values) {
         match &mut item {
-          #( #mce_any_arms )*
+          #mce_alternate_content_arm
           _ => {
             Self::process_mce_choice_with_context(&mut item, settings, context)?;
             processed.push(item);
@@ -2094,55 +2129,10 @@ fn mce_process_choice_field_tokens(field: &SdkTypeChoiceField) -> proc_macro2::T
   }
 }
 
-fn mce_xml_other_children_process_tokens(
-  has_xml_other_children_field: bool,
-  compact_xml_other_children: bool,
-) -> proc_macro2::TokenStream {
-  if !has_xml_other_children_field {
-    return quote! {};
-  }
-
-  if compact_xml_other_children {
-    return quote! {
-      let mut xml_other_children = Vec::with_capacity(self.xml_other_children.len());
-      for xml in std::mem::take(&mut self.xml_other_children) {
-        if let Some(children) = crate::common::mce_choice_replacement_child_bytes(
-          xml.as_ref(),
-          settings,
-          context,
-        )? {
-          xml_other_children.extend(children);
-        } else {
-          xml_other_children.push(xml);
-        }
-      }
-      self.xml_other_children = xml_other_children;
-    };
-  }
-
-  quote! {
-    let mut xml_other_children = Vec::with_capacity(self.xml_other_children.len());
-    for (slot, xml) in std::mem::take(&mut self.xml_other_children) {
-      if let Some(children) = crate::common::mce_choice_replacement_child_bytes(
-        xml.as_ref(),
-        settings,
-        context,
-      )? {
-        xml_other_children.extend(children.into_iter().map(|child| (slot, child)));
-      } else {
-        xml_other_children.push((slot, xml));
-      }
-    }
-    self.xml_other_children = xml_other_children;
-  }
-}
-
 fn mce_context_scope_tokens(
   xmlns_fields: &[Ident],
   mc_ignorable_field: Option<&Ident>,
-  mc_process_content_field: Option<&Ident>,
   mc_preserve_attributes_field: Option<&Ident>,
-  mc_preserve_elements_field: Option<&Ident>,
   mc_must_understand_field: Option<&Ident>,
 ) -> (
   proc_macro2::TokenStream,
@@ -2159,17 +2149,7 @@ fn mce_context_scope_tokens(
   } else {
     quote! { None }
   };
-  let mc_process_content_expr = if let Some(ident) = mc_process_content_field {
-    quote! { self.#ident.as_deref() }
-  } else {
-    quote! { None }
-  };
   let mc_preserve_attributes_expr = if let Some(ident) = mc_preserve_attributes_field {
-    quote! { self.#ident.as_deref() }
-  } else {
-    quote! { None }
-  };
-  let mc_preserve_elements_expr = if let Some(ident) = mc_preserve_elements_field {
     quote! { self.#ident.as_deref() }
   } else {
     quote! { None }
@@ -2182,9 +2162,7 @@ fn mce_context_scope_tokens(
 
   if xmlns_fields.is_empty()
     && mc_ignorable_field.is_none()
-    && mc_process_content_field.is_none()
     && mc_preserve_attributes_field.is_none()
-    && mc_preserve_elements_field.is_none()
     && mc_must_understand_field.is_none()
   {
     (quote! {}, quote! {}, quote! {})
@@ -2196,9 +2174,7 @@ fn mce_context_scope_tokens(
           #xmlns_expr,
           crate::sdk::MceContextAttributes {
             ignorable: #mc_ignorable_expr,
-            process_content: #mc_process_content_expr,
             preserve_attributes: #mc_preserve_attributes_expr,
-            preserve_elements: #mc_preserve_elements_expr,
             must_understand: #mc_must_understand_expr,
           },
           settings,
@@ -3402,6 +3378,12 @@ fn expand_helper_struct(
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
+      Some(SdkTypeFieldKind::Mce { .. }) => {
+        return Err(syn::Error::new_spanned(
+          field,
+          "helper structs do not support #[sdk(mce(...))]",
+        ));
+      }
       Some(SdkTypeFieldKind::EmptyChild { qname }) => empty_child_fields.push(SdkEmptyChildField {
         ident: field_ident.clone(),
         qname,
@@ -3454,7 +3436,6 @@ fn expand_helper_struct(
       }
     }
   }
-
   let mut child_decl_tokens = Vec::new();
   let mut child_match_tokens_borrowed =
     std::collections::BTreeMap::<String, Vec<QNameDispatchArm>>::new();
@@ -3733,7 +3714,7 @@ fn expand_helper_struct(
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
     let parsed_attrs = parse_sdk_type_field_attrs(&field.attrs)?;
     match parsed_attrs.kind {
-      Some(SdkTypeFieldKind::Child { qname, .. }) => {
+      Some(SdkTypeFieldKind::Child { qname, .. }) | Some(SdkTypeFieldKind::Mce { qname, .. }) => {
         let repeated = contains_vec_type(&field.ty);
         let optional = is_option_type(&field.ty);
         let payload_ty = unwrap_option_vec_type(&field.ty);
@@ -3863,6 +3844,26 @@ fn expand_helper_struct(
     quote! { #type_generics },
     quote! { #where_clause },
   );
+  let mce_methods_tokens = quote! {
+    #[cfg(feature = "mce")]
+    impl #impl_generics #ident #type_generics #where_clause {
+      pub(crate) fn process_mce_with_context(
+        &mut self,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+        context: &crate::sdk::MceContext<'_>,
+      ) -> Result<(), crate::common::SdkError> {
+        if matches!(
+          settings.process_mode,
+          crate::sdk::MarkupCompatibilityProcessMode::NoProcess
+        ) {
+          return Ok(());
+        }
+        #( #mce_child_process_tokens )*
+        #( #mce_choice_process_tokens )*
+        Ok(())
+      }
+    }
+  };
 
   Ok(quote! {
     #( #mce_choice_impl_tokens )*
@@ -3889,24 +3890,7 @@ fn expand_helper_struct(
       #validator_methods_tokens
     }
 
-    #[cfg(feature = "mce")]
-    impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {
-      fn process_mce_with_context(
-        &mut self,
-        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &crate::sdk::MceContext<'_>,
-      ) -> Result<(), crate::common::SdkError> {
-        if matches!(
-          settings.process_mode,
-          crate::sdk::MarkupCompatibilityProcessMode::NoProcess
-        ) {
-          return Ok(());
-        }
-        #( #mce_child_process_tokens )*
-        #( #mce_choice_process_tokens )*
-        Ok(())
-      }
-    }
+    #mce_methods_tokens
   })
 }
 
@@ -3938,6 +3922,7 @@ fn expand_named_struct(
   let fixed_namespace_uri = namespaces::uri_by_prefix(&tag_prefix);
   let mut attr_fields = Vec::new();
   let mut child_fields = Vec::new();
+  let mut mce_fields = Vec::new();
   let mut empty_child_fields = Vec::new();
   let mut text_child_fields = Vec::new();
   let mut any_child_fields = Vec::new();
@@ -4028,6 +4013,14 @@ fn expand_named_struct(
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
+      SdkTypeFieldKind::Mce { qname, children } => mce_fields.push(SdkAlternateContentField {
+        ident: field_ident.clone(),
+        qname,
+        children,
+        ty: field.ty.clone(),
+        optional: is_option_type(&field.ty),
+        repeated: contains_vec_type(&field.ty),
+      }),
       SdkTypeFieldKind::EmptyChild { qname } => empty_child_fields.push(SdkEmptyChildField {
         ident: field_ident.clone(),
         qname,
@@ -4094,6 +4087,8 @@ fn expand_named_struct(
     || has_mc_process_content_field
     || has_mc_must_understand_field;
   let has_xml_other_children_field = xml_other_children_field.is_some();
+  let tracks_xml_child_slot =
+    (has_xml_other_children_field && !compact_xml_other_children) || !mce_fields.is_empty();
   let needs_canonical_xmlns_prefix = !canonical_namespace_prefixes.is_empty();
   let end_name_matches = quote! { e.name() == __end_qname };
   let end_qname_decl = quote! { let __end_qname = e.name(); };
@@ -4104,6 +4099,7 @@ fn expand_named_struct(
     if matches!(
       field_kind,
       SdkTypeFieldKind::Child { .. }
+        | SdkTypeFieldKind::Mce { .. }
         | SdkTypeFieldKind::EmptyChild { .. }
         | SdkTypeFieldKind::TextChild { .. }
         | SdkTypeFieldKind::AnyChild { .. }
@@ -4116,7 +4112,7 @@ fn expand_named_struct(
   }
 
   let xml_child_slot_assign_tokens = |xml_child_slot: usize| {
-    if !has_xml_other_children_field || compact_xml_other_children {
+    if !tracks_xml_child_slot {
       quote! {}
     } else {
       quote! {
@@ -4760,6 +4756,87 @@ fn expand_named_struct(
       }
     }
     push_qname_dispatch_arm(&mut child_match_tokens_borrowed, &field.qname, build_body());
+  }
+
+  if let Some(first_mce_field) = mce_fields.first() {
+    let mut mce_slot_parse_tokens = Vec::new();
+    for (index, field) in mce_fields.iter().enumerate() {
+      if field.qname != first_mce_field.qname {
+        return Err(syn::Error::new_spanned(
+          &field.ident,
+          "all static MCE fields must use the same AlternateContent QName",
+        ));
+      }
+      let field_ident = &field.ident;
+      let xml_child_slot = xml_child_slot_by_field
+        .get(&field_ident.to_string())
+        .copied()
+        .unwrap_or_default();
+      let payload_ty = unwrap_option_vec_type(&field.ty);
+      let child_ty = box_inner_type(&payload_ty).unwrap_or_else(|| payload_ty.clone());
+      let parsed_child_expr = if box_inner_type(&payload_ty).is_some() {
+        quote! { std::boxed::Box::new(parsed_child) }
+      } else {
+        quote! { parsed_child }
+      };
+      let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty);
+      let assign = if field.repeated {
+        quote! { #field_ident.push(#parsed_child_expr); }
+      } else {
+        quote! { #field_ident = Some(#parsed_child_expr); }
+      };
+      let condition = if index + 1 == mce_fields.len() {
+        quote! { true }
+      } else {
+        quote! { __xml_child_slot < #xml_child_slot }
+      };
+      mce_slot_parse_tokens.push(quote! {
+        if #condition {
+          let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+          #assign
+          __xml_child_slot = #xml_child_slot;
+        } else
+      });
+
+      let (decl_tokens, init_tokens) =
+        field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+      child_decl_tokens.push(decl_tokens);
+      child_init_tokens.push(init_tokens);
+      let child_write_call =
+        write_typed_child_tokens(&child_ty, quote! { child }, &field.qname, "", false);
+      if field.repeated {
+        child_write_tokens.push(quote! {
+          for child in &self.#field_ident {
+            #child_write_call
+          }
+        });
+        if cfg!(feature = "validators") {
+          child_validate_tokens.push(quote! {
+            for child in &self.#field_ident {
+              child.validate_into(context);
+            }
+          });
+        }
+      } else if field.optional {
+        child_write_tokens.push(quote! {
+          if let Some(child) = &self.#field_ident {
+            #child_write_call
+          }
+        });
+        if cfg!(feature = "validators") {
+          child_validate_tokens.push(quote! {
+            if let Some(child) = &self.#field_ident {
+              child.validate_into(context);
+            }
+          });
+        }
+      }
+    }
+    push_qname_dispatch_arm(
+      &mut child_match_tokens_borrowed,
+      &first_mce_field.qname,
+      quote! { #( #mce_slot_parse_tokens )* {} },
+    );
   }
 
   for field in &empty_child_fields {
@@ -5667,6 +5744,7 @@ fn expand_named_struct(
         && matches!(
           field_kind,
           SdkTypeFieldKind::Child { .. }
+            | SdkTypeFieldKind::Mce { .. }
             | SdkTypeFieldKind::EmptyChild { .. }
             | SdkTypeFieldKind::TextChild { .. }
             | SdkTypeFieldKind::AnyChild { .. }
@@ -5688,7 +5766,7 @@ fn expand_named_struct(
         });
       }
       match field_kind {
-        SdkTypeFieldKind::Child { qname, .. } => {
+        SdkTypeFieldKind::Child { qname, .. } | SdkTypeFieldKind::Mce { qname, .. } => {
           let repeated = contains_vec_type(field_ty);
           let optional = is_option_type(field_ty);
           let payload_ty = unwrap_option_vec_type(field_ty);
@@ -6167,6 +6245,7 @@ fn expand_named_struct(
           ty,
           boxed: _,
           qname,
+          ..
         } = item
         else {
           return Err(syn::Error::new_spanned(
@@ -6367,6 +6446,7 @@ fn expand_named_struct(
             ty,
             boxed: _,
             qname,
+            ..
           } = item
           else {
             return Err(syn::Error::new_spanned(
@@ -6745,12 +6825,16 @@ fn expand_named_struct(
     } else {
       quote! {
         let mut xml_other_children = Vec::<(usize, std::boxed::Box<[u8]>)>::new();
-        let mut __xml_child_slot = 0usize;
       }
     }
   } else {
     quote! {}
   };
+  let xml_child_slot_decl_tokens = tracks_xml_child_slot.then(|| {
+    quote! {
+      let mut __xml_child_slot = 0usize;
+    }
+  });
   let xml_other_children_init_tokens = if has_xml_other_children_field {
     quote! {
       xml_other_children,
@@ -6769,6 +6853,7 @@ fn expand_named_struct(
     root_read_tokens(ident, &local_name_lit, DeserializeMode::Borrowed);
   let root_read_io_tokens = root_read_tokens(ident, &local_name_lit, DeserializeMode::Io);
   let writes_body = !child_fields.is_empty()
+    || !mce_fields.is_empty()
     || !empty_child_fields.is_empty()
     || !text_child_fields.is_empty()
     || !choice_fields.is_empty()
@@ -6800,6 +6885,147 @@ fn expand_named_struct(
     .iter()
     .map(mce_process_child_field_tokens)
     .collect::<Vec<_>>();
+  let mut mce_replacement_parse_arms = std::collections::HashMap::new();
+  for field in &child_fields {
+    let field_ident = &field.ident;
+    let payload_ty = unwrap_option_vec_type(&field.ty);
+    let child_ty = box_inner_type(&payload_ty).unwrap_or_else(|| payload_ty.clone());
+    let parsed_child_expr = if box_inner_type(&payload_ty).is_some() {
+      quote! { std::boxed::Box::new(parsed_child) }
+    } else {
+      quote! { parsed_child }
+    };
+    let assign = if field.repeated {
+      quote! { self.#field_ident.push(#parsed_child_expr); }
+    } else if field.optional {
+      quote! { self.#field_ident = Some(#parsed_child_expr); }
+    } else {
+      quote! { self.#field_ident = #parsed_child_expr; }
+    };
+    let targets = qname_match_targets(std::slice::from_ref(&field.qname));
+    let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty);
+    mce_replacement_parse_arms.insert(
+      field_ident.to_string(),
+      quote! {
+        #( #targets )|* => {
+          let mut parsed_child = #deserialize_call(&mut child_reader, e, next_empty)?;
+          parsed_child.process_mce_with_context(settings, child_context)?;
+          #assign
+        }
+      },
+    );
+  }
+  for field in &empty_child_fields {
+    let field_ident = &field.ident;
+    let assign = if field.repeated {
+      quote! { self.#field_ident.push(()); }
+    } else if field.optional {
+      quote! { self.#field_ident = Some(()); }
+    } else {
+      quote! { self.#field_ident = (); }
+    };
+    let targets = qname_match_targets(std::slice::from_ref(&field.qname));
+    mce_replacement_parse_arms.insert(
+      field_ident.to_string(),
+      quote! {
+        #( #targets )|* => { #assign }
+      },
+    );
+  }
+  for field in &text_child_fields {
+    let field_ident = &field.ident;
+    let field_ty = &field.ty;
+    let targets = qname_match_targets(std::slice::from_ref(&field.qname));
+    let parse_body = build_text_child_parse_body(
+      ident,
+      field_ident,
+      &field.qname,
+      field_ty,
+      quote! {},
+      TextChildParseArmOptions {
+        repeated: field.repeated,
+        as_result: false,
+        list: field.list,
+      },
+    );
+    let merge = if field.repeated {
+      quote! { self.#field_ident.extend(#field_ident); }
+    } else {
+      quote! { self.#field_ident = #field_ident; }
+    };
+    mce_replacement_parse_arms.insert(
+      field_ident.to_string(),
+      quote! {
+        #( #targets )|* => {
+          let mut #field_ident: #field_ty = Default::default();
+          let xml_reader = &mut child_reader;
+          #parse_body
+          #merge
+        }
+      },
+    );
+  }
+  let mce_static_field_select_tokens = mce_fields
+    .iter()
+    .map(|field| {
+      let field_ident = &field.ident;
+      let payload_ty = unwrap_option_vec_type(&field.ty);
+      let alternate_content_expr = if box_inner_type(&payload_ty).is_some() {
+        quote! { alternate_content.as_mut() }
+      } else {
+        quote! { &mut alternate_content }
+      };
+      let parse_arms = field
+        .children
+        .iter()
+        .map(|child| {
+          mce_replacement_parse_arms
+            .get(&child.to_string())
+            .cloned()
+            .ok_or_else(|| {
+              syn::Error::new_spanned(
+                child,
+                "sdk mce child must name a child, empty_child, or text_child field",
+              )
+            })
+        })
+        .collect::<syn::Result<Vec<_>>>()?;
+      Ok(quote! {
+        for mut alternate_content in std::mem::take(&mut self.#field_ident) {
+          crate::common::process_alternate_content_children(
+            #alternate_content_expr,
+            settings,
+            context,
+            |child_xml, child_context| {
+              let mut child_reader = crate::common::from_bytes_inner(child_xml.as_ref())?;
+              loop {
+                match child_reader.next()? {
+                  crate::common::PayloadEvent::Start(e, next_empty) => {
+                    let event_name = crate::common::xml_local_name(e.name());
+                    match event_name {
+                      #( #parse_arms )*
+                      _ => {
+                        return Err(crate::common::unexpected_tag(
+                          stringify!(#ident),
+                          "static MCE child",
+                          event_name,
+                        ));
+                      }
+                    }
+                    return Ok(());
+                  }
+                  crate::common::PayloadEvent::Eof => {
+                    return Err(crate::common::unexpected_eof(stringify!(#ident)));
+                  }
+                  _ => {}
+                }
+              }
+            },
+          )?;
+        }
+      })
+    })
+    .collect::<syn::Result<Vec<_>>>()?;
   let mce_choice_process_tokens = choice_fields
     .iter()
     .map(mce_process_choice_field_tokens)
@@ -6818,13 +7044,58 @@ fn expand_named_struct(
     mce_context_scope_tokens(
       &xmlns_fields,
       mc_ignorable_field.as_ref(),
-      mc_process_content_field.as_ref(),
       mc_preserve_attributes_field.as_ref(),
-      mc_preserve_elements_field.as_ref(),
       mc_must_understand_field.as_ref(),
     );
-  let mce_xml_other_children_process_tokens =
-    mce_xml_other_children_process_tokens(has_xml_other_children_field, compact_xml_other_children);
+  let mce_static_field_process_tokens = if mce_fields.is_empty() {
+    quote! {}
+  } else {
+    quote! {
+      {
+        #mce_context_process_tokens
+        #( #mce_static_field_select_tokens )*
+      }
+    }
+  };
+  let public_mce_method_tokens = has_xml_header.then(|| {
+    quote! {
+      #[inline]
+      pub fn process_mce(
+        &mut self,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+      ) -> Result<(), crate::common::SdkError> {
+        let context = crate::sdk::MceContext::default();
+        self.process_mce_with_context(settings, &context)
+      }
+    }
+  });
+  let mce_methods_tokens = quote! {
+    #[cfg(feature = "mce")]
+    impl #impl_generics #ident #type_generics #where_clause {
+      #public_mce_method_tokens
+
+      pub(crate) fn process_mce_with_context(
+        &mut self,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+        context: &crate::sdk::MceContext<'_>,
+      ) -> Result<(), crate::common::SdkError> {
+        if matches!(
+          settings.process_mode,
+          crate::sdk::MarkupCompatibilityProcessMode::NoProcess
+        ) {
+          return Ok(());
+        }
+        #mce_static_field_process_tokens
+        #mce_context_push_tokens
+        #mce_context_process_tokens
+        #( #mce_static_attr_process_tokens )*
+        #( #mce_child_process_tokens )*
+        #( #mce_choice_process_tokens )*
+        #mce_context_pop_tokens
+        Ok(())
+      }
+    }
+  };
   let public_root_from_str_tokens = if local_name.is_empty() {
     quote! {}
   } else {
@@ -6866,6 +7137,7 @@ fn expand_named_struct(
     #( #choice_decl_tokens )*
     #( #any_decl_tokens )*
     #xml_other_children_decl_tokens
+    #xml_child_slot_decl_tokens
     #text_decl_tokens
 
     #borrowed_children_loop_tokens
@@ -7161,29 +7433,7 @@ fn expand_named_struct(
       #validator_methods_tokens
     }
 
-    #[cfg(feature = "mce")]
-    impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {
-      fn process_mce_with_context(
-        &mut self,
-        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &crate::sdk::MceContext<'_>,
-      ) -> Result<(), crate::common::SdkError> {
-        if matches!(
-          settings.process_mode,
-          crate::sdk::MarkupCompatibilityProcessMode::NoProcess
-        ) {
-          return Ok(());
-        }
-        #mce_context_push_tokens
-        #mce_context_process_tokens
-        #( #mce_static_attr_process_tokens )*
-        #mce_xml_other_children_process_tokens
-        #( #mce_child_process_tokens )*
-        #( #mce_choice_process_tokens )*
-        #mce_context_pop_tokens
-        Ok(())
-      }
-    }
+    #mce_methods_tokens
 
     #public_root_from_str_tokens
 

@@ -36,7 +36,7 @@ pub struct TwoCellAnchor {
             child(variant = ConnectionShape, boxed, qname = "xdr:cxnSp"),
             child(variant = Picture, boxed, qname = "xdr:pic"),
             child(variant = ContentPart, boxed, qname = "xdr:contentPart"),
-            any
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
     )]
   pub two_cell_anchor_choice: Option<TwoCellAnchorChoice>,
@@ -244,7 +244,7 @@ pub struct WorksheetDrawing {
             child(variant = TwoCellAnchor, boxed, qname = "xdr:twoCellAnchor"),
             child(variant = OneCellAnchor, boxed, qname = "xdr:oneCellAnchor"),
             child(variant = AbsoluteAnchor, boxed, qname = "xdr:absoluteAnchor"),
-            any
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
     )]
   pub worksheet_drawing_choice: Vec<WorksheetDrawingChoice>,
@@ -656,8 +656,7 @@ pub enum TwoCellAnchorChoice {
   Picture(std::boxed::Box<Picture>),
   /// Defines the ContentPart Class.
   ContentPart(std::boxed::Box<ContentPart>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum OneCellAnchorChoice {
@@ -711,8 +710,7 @@ pub enum WorksheetDrawingChoice {
   OneCellAnchor(std::boxed::Box<OneCellAnchor>),
   /// Absolute Anchor Shape Size.
   AbsoluteAnchor(std::boxed::Box<AbsoluteAnchor>),
-  /// Unknown XML child.
-  XmlAny(std::boxed::Box<[u8]>),
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {

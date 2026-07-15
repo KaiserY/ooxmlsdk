@@ -579,45 +579,6 @@ impl<T: SdkType> SdkType for Box<T> {
 }
 
 #[cfg(feature = "mce")]
-pub trait SdkMce {
-  fn process_mce(
-    &mut self,
-    settings: &MarkupCompatibilityProcessSettings,
-  ) -> Result<(), crate::common::SdkError> {
-    let context = MceContext::default();
-    self.process_mce_with_context(settings, &context)
-  }
-
-  fn process_mce_with_context(
-    &mut self,
-    _settings: &MarkupCompatibilityProcessSettings,
-    _context: &MceContext<'_>,
-  ) -> Result<(), crate::common::SdkError> {
-    Ok(())
-  }
-}
-
-#[cfg(feature = "mce")]
-impl<T: SdkMce + ?Sized> SdkMce for Box<T> {
-  #[inline]
-  fn process_mce(
-    &mut self,
-    settings: &MarkupCompatibilityProcessSettings,
-  ) -> Result<(), crate::common::SdkError> {
-    self.as_mut().process_mce(settings)
-  }
-
-  #[inline]
-  fn process_mce_with_context(
-    &mut self,
-    settings: &MarkupCompatibilityProcessSettings,
-    context: &MceContext<'_>,
-  ) -> Result<(), crate::common::SdkError> {
-    self.as_mut().process_mce_with_context(settings, context)
-  }
-}
-
-#[cfg(feature = "mce")]
 #[derive(Clone, Debug)]
 struct McePrefixList<'a> {
   value: std::borrow::Cow<'a, [u8]>,
@@ -723,18 +684,14 @@ pub struct MceContext<'a> {
   parent: Option<&'a MceContext<'a>>,
   namespaces: &'a [crate::common::XmlNamespace],
   ignorable_namespaces: Vec<&'a [u8]>,
-  process_content: Option<MceQNameList<'a>>,
   preserve_attributes: Option<MceQNameList<'a>>,
-  preserve_elements: Option<MceQNameList<'a>>,
 }
 
 #[cfg(feature = "mce")]
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct MceContextAttributes<'a> {
   pub(crate) ignorable: Option<&'a [u8]>,
-  pub(crate) process_content: Option<&'a [u8]>,
   pub(crate) preserve_attributes: Option<&'a [u8]>,
-  pub(crate) preserve_elements: Option<&'a [u8]>,
   pub(crate) must_understand: Option<&'a [u8]>,
 }
 
@@ -750,16 +707,8 @@ impl<'a> MceContext<'a> {
       parent: Some(self),
       namespaces,
       ignorable_namespaces: self.current_ignorable_namespaces(namespaces, mce_attrs.ignorable)?,
-      process_content: mce_attrs
-        .process_content
-        .map(|value| MceQNameList::new(self, namespaces, value))
-        .transpose()?,
       preserve_attributes: mce_attrs
         .preserve_attributes
-        .map(|value| MceQNameList::new(self, namespaces, value))
-        .transpose()?,
-      preserve_elements: mce_attrs
-        .preserve_elements
         .map(|value| MceQNameList::new(self, namespaces, value))
         .transpose()?,
     };
@@ -793,42 +742,6 @@ impl<'a> MceContext<'a> {
     }
 
     Ok(())
-  }
-
-  pub(crate) fn is_process_content_qname_with_current_bytes(
-    &self,
-    namespaces: &[crate::common::XmlNamespace],
-    qname: &[u8],
-  ) -> bool {
-    let Some((namespace, local_name)) = self.qname_parts_with_current_bytes(namespaces, qname)
-    else {
-      return false;
-    };
-    self
-      .process_content
-      .as_ref()
-      .is_some_and(|list| list.contains(namespace, local_name))
-      || self
-        .parent
-        .is_some_and(|parent| parent.is_process_content_qname_with_current_bytes(&[], qname))
-  }
-
-  pub(crate) fn is_preserved_element_qname_with_current_bytes(
-    &self,
-    namespaces: &[crate::common::XmlNamespace],
-    qname: &[u8],
-  ) -> bool {
-    let Some((namespace, local_name)) = self.qname_parts_with_current_bytes(namespaces, qname)
-    else {
-      return false;
-    };
-    self
-      .preserve_elements
-      .as_ref()
-      .is_some_and(|list| list.contains(namespace, local_name))
-      || self
-        .parent
-        .is_some_and(|parent| parent.is_preserved_element_qname_with_current_bytes(&[], qname))
   }
 
   pub(crate) fn should_remove_attribute_qname_bytes(&self, qname: &[u8]) -> bool {
@@ -4215,31 +4128,5 @@ mod tests {
       split_mce_prefix_list(b"w14\x0Bwp14"),
       [b"w14\x0Bwp14".to_vec()]
     );
-  }
-
-  #[test]
-  fn mce_qname_lists_match_resolved_namespace() {
-    let settings = super::MarkupCompatibilityProcessSettings {
-      process_mode: super::MarkupCompatibilityProcessMode::ProcessAllParts,
-      target_file_format_version: super::FileFormatVersion::Office2007,
-    };
-    let context = super::MceContext::default();
-    let namespaces = [crate::common::XmlNamespace::raw(b"p", b"urn:one")];
-    let context = context
-      .child_context(
-        &namespaces,
-        super::MceContextAttributes {
-          process_content: Some(b"p:item"),
-          ..Default::default()
-        },
-        &settings,
-      )
-      .expect("valid MCE context");
-
-    let alias_namespaces = [crate::common::XmlNamespace::raw(b"q", b"urn:one")];
-    assert!(context.is_process_content_qname_with_current_bytes(&alias_namespaces, b"q:item"));
-
-    let shadow_namespaces = [crate::common::XmlNamespace::raw(b"p", b"urn:two")];
-    assert!(!context.is_process_content_qname_with_current_bytes(&shadow_namespaces, b"p:item"));
   }
 }

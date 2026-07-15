@@ -9,10 +9,12 @@
 #[sdk(qname = "pic:pic")]
 pub struct Picture {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Non-Visual Picture Properties
   #[sdk(child(qname = "pic:nvPicPr"))]
   pub non_visual_picture_properties: Option<std::boxed::Box<NonVisualPictureProperties>>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [blip_fill]))]
+  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
   /// Picture Fill
   #[sdk(child(qname = "pic:blipFill"))]
   pub blip_fill: Option<std::boxed::Box<BlipFill>>,

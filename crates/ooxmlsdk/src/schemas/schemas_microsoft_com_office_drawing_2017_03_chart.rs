@@ -17,6 +17,6 @@ pub struct DataDisplayOptions16 {
 #[sdk(qname = "c16r3:dispNaAsBlank")]
 pub struct BooleanFalse {
   /// val
-  #[sdk(attr(qname = "c16r3:val"))]
-  pub c16r3_val: Option<crate::simple_type::BooleanValue>,
+  #[sdk(attr(qname = ":val"))]
+  pub val: Option<crate::simple_type::BooleanValue>,
 }

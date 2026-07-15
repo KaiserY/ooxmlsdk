@@ -177,7 +177,10 @@ impl PptShape {
     if !text_body_is_empty(text_body) {
       return;
     }
-    // creates localized prompt text for empty presentation objects.
+    // LibreOffice keeps localized prompt text in the imported model, but its
+    // drawing primitive wraps that text in ExclusiveEditViewPrimitive2D. Keep
+    // the prompt available for placeholder state without lowering it into
+    // printed/slideshow output.
     if text_body.paragraphs.is_empty() {
       text_body.paragraphs.push(TextParagraph::default());
     }
@@ -187,7 +190,7 @@ impl PptShape {
       .expect("placeholder text body has a paragraph");
     paragraph.runs.push(TextRun {
       text: prompt.to_string(),
-      kind: TextRunKind::Run,
+      kind: TextRunKind::Placeholder,
       hyperlink_url: None,
       field_type: None,
       run_properties: None,

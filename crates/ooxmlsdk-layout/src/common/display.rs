@@ -117,6 +117,8 @@ pub struct GlyphRun<'doc> {
 pub struct ImageItem<'doc> {
   pub bounds: Rect,
   pub crop: Option<ImageCrop>,
+  /// Optional page-space vector path used to clip the image before painting.
+  pub clip_path: Vec<PathCommand>,
   pub rotation_degrees: f32,
   pub flip_horizontal: bool,
   pub flip_vertical: bool,
@@ -141,9 +143,22 @@ pub struct ImageCrop {
 pub struct PathItem<'doc> {
   pub bounds: Rect,
   pub points: Vec<Point>,
+  pub commands: Vec<PathCommand>,
   pub closed: bool,
   pub fill: Fill<'doc>,
   pub stroke: Option<Stroke<'doc>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PathCommand {
+  MoveTo(Point),
+  LineTo(Point),
+  CubicTo {
+    control1: Point,
+    control2: Point,
+    end: Point,
+  },
+  Close,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -304,6 +319,9 @@ pub struct TextStyle<'doc> {
   pub complex_font_size: Option<Pt>,
   pub character_spacing: Pt,
   pub baseline_shift: Pt,
+  /// Use legacy Windows/GDI ascent for the first baseline. PowerPoint's PDF
+  /// path follows this metric; Word layout retains typographic metrics.
+  pub use_windows_font_metrics: bool,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,

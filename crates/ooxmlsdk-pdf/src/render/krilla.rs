@@ -11,7 +11,7 @@ use krilla::image::Image;
 use krilla::num::NormalizedF32;
 use krilla::outline::{Outline, OutlineNode};
 use krilla::page::PageSettings;
-use krilla::paint::{Fill, FillRule, LineJoin, Stroke};
+use krilla::paint::{Fill, FillRule, LineJoin, LinearGradient, SpreadMethod, Stop, Stroke};
 use krilla::surface::Surface;
 use krilla::text::{GlyphId, KrillaGlyph, TextDirection};
 use rustc_hash::FxHashMap as HashMap;
@@ -324,6 +324,7 @@ struct ImageItem<'doc> {
   width_pt: f32,
   height_pt: f32,
   crop: ImageCrop,
+  clip_path: &'doc [common::PathCommand],
   rotation_deg: f32,
   flip_horizontal: bool,
   flip_vertical: bool,
@@ -386,8 +387,9 @@ struct PolylineItem<'doc> {
   width_pt: f32,
   height_pt: f32,
   points: &'doc [common::Point],
+  commands: &'doc [common::PathCommand],
   closed: bool,
-  fill_color: Option<RgbColor>,
+  fill: &'doc common::Fill<'static>,
   stroke: Option<BorderStyle>,
 }
 
@@ -414,6 +416,7 @@ struct TextStyle<'doc> {
   complex_font_size_pt: Option<f32>,
   character_spacing_pt: f32,
   baseline_shift_pt: f32,
+  use_windows_font_metrics: bool,
   bold: bool,
   italic: bool,
   underline: bool,
@@ -751,13 +754,25 @@ impl<'doc> PaintDocument<'doc> {
           })
           .collect();
         PaintPage {
-          width_pt: page.setup.size.width.0,
-          height_pt: page.setup.size.height.0,
+          width_pt: pdf_page_dimension(document.engine_kind, page.setup.size.width.0),
+          height_pt: pdf_page_dimension(document.engine_kind, page.setup.size.height.0),
           items,
         }
       })
       .collect();
     Self { pages }
+  }
+}
+
+fn pdf_page_dimension(engine_kind: common::LayoutEngineKind, dimension_pt: f32) -> f32 {
+  if engine_kind == common::LayoutEngineKind::Pptx {
+    // PowerPoint's fixed-format writer quantizes presentation MediaBox
+    // dimensions to its 600 dpi print-device grid. Keep the OOXML/layout
+    // coordinate space exact and apply this only at PDF page creation.
+    const PRINT_DPI: f32 = 600.0;
+    (dimension_pt * PRINT_DPI / 72.0).round_ties_even() * 72.0 / PRINT_DPI
+  } else {
+    dimension_pt
   }
 }
 
@@ -804,6 +819,7 @@ fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> Imag
     width_pt: image.bounds.size.width.0,
     height_pt: image.bounds.size.height.0,
     crop: image.crop.unwrap_or_default().into(),
+    clip_path: &image.clip_path,
     rotation_deg: image.rotation_degrees,
     flip_horizontal: image.flip_horizontal,
     flip_vertical: image.flip_vertical,
@@ -829,8 +845,9 @@ fn polyline_from_common<'doc>(path: &'doc common::PathItem<'static>) -> Polyline
     width_pt: path.bounds.size.width.0,
     height_pt: path.bounds.size.height.0,
     points: &path.points,
+    commands: &path.commands,
     closed: path.closed,
-    fill_color: solid_rgb(&path.fill),
+    fill: &path.fill,
     stroke: path.stroke.as_ref().map(stroke_from_common),
   }
 }
@@ -901,6 +918,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     complex_font_size_pt: style.complex_font_size.map(|size| size.0),
     character_spacing_pt: style.character_spacing.0,
     baseline_shift_pt: style.baseline_shift.0,
+    use_windows_font_metrics: style.use_windows_font_metrics,
     bold: style.bold,
     italic: style.italic,
     underline: style.underline,
@@ -970,10 +988,6 @@ fn stroke_from_common(stroke: &common::Stroke<'static>) -> BorderStyle {
     width_pt: stroke.width.0,
     color: rgb(stroke.color),
   }
-}
-
-fn solid_rgb(fill: &common::Fill<'static>) -> Option<RgbColor> {
-  solid_color(fill).map(rgb)
 }
 
 fn solid_color(fill: &common::Fill<'static>) -> Option<common::Color> {
@@ -1082,8 +1096,13 @@ impl<'doc> PaintText<'doc> {
     let baseline_y = match owner.map(|owner| owner.frame_kind) {
       Some(FollowFrameKind::Table) => text_ref.y_pt - text_ref.style.baseline_shift_pt,
       Some(FollowFrameKind::Paragraph | FollowFrameKind::Notes) | None => {
-        text_ref.y_pt
-          + text_metrics.baseline_offset_in_line(&text_ref.style, text_ref.line_height_pt)
+        let offset = if text_ref.style.use_windows_font_metrics {
+          text_metrics
+            .baseline_offset_in_line_with_windows_metrics(&text_ref.style, text_ref.line_height_pt)
+        } else {
+          text_metrics.baseline_offset_in_line(&text_ref.style, text_ref.line_height_pt)
+        };
+        text_ref.y_pt + offset
       }
     };
     let vertical_metrics = text_metrics.vertical_metrics(&text_ref.style);
@@ -1902,19 +1921,11 @@ fn draw_line_item(surface: &mut Surface<'_>, line: &LineItem) {
 }
 
 fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
-  if polyline.points.len() < 2 {
+  if polyline.points.len() < 2 && polyline.commands.is_empty() {
     return;
   }
 
-  if let Some(fill_color) = polyline.fill_color {
-    surface.set_fill(Some(Fill {
-      paint: rgb::Color::new(fill_color.r, fill_color.g, fill_color.b).into(),
-      opacity: NormalizedF32::ONE,
-      rule: FillRule::EvenOdd,
-    }));
-  } else {
-    surface.set_fill(None);
-  }
+  surface.set_fill(path_fill_from_common(polyline.fill, polyline));
   if let Some(stroke) = polyline.stroke {
     surface.set_stroke(Some(Stroke {
       width: stroke.width_pt,
@@ -1927,17 +1938,117 @@ fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
   }
 
   let mut path = PathBuilder::new();
-  let first = polyline.points[0];
-  path.move_to(first.x.0, first.y.0);
-  for point in &polyline.points[1..] {
-    path.line_to(point.x.0, point.y.0);
-  }
-  if polyline.closed {
-    path.close();
+  if polyline.commands.is_empty() {
+    let first = polyline.points[0];
+    path.move_to(first.x.0, first.y.0);
+    for point in &polyline.points[1..] {
+      path.line_to(point.x.0, point.y.0);
+    }
+    if polyline.closed {
+      path.close();
+    }
+  } else {
+    for command in polyline.commands {
+      match *command {
+        common::PathCommand::MoveTo(point) => path.move_to(point.x.0, point.y.0),
+        common::PathCommand::LineTo(point) => path.line_to(point.x.0, point.y.0),
+        common::PathCommand::CubicTo {
+          control1,
+          control2,
+          end,
+        } => path.cubic_to(
+          control1.x.0,
+          control1.y.0,
+          control2.x.0,
+          control2.y.0,
+          end.x.0,
+          end.y.0,
+        ),
+        common::PathCommand::Close => path.close(),
+      }
+    }
   }
   if let Some(path) = path.finish() {
     surface.draw_path(&path);
   }
+}
+
+fn path_from_commands(commands: &[common::PathCommand]) -> Option<krilla::geom::Path> {
+  if commands.is_empty() {
+    return None;
+  }
+  let mut path = PathBuilder::new();
+  for command in commands {
+    match *command {
+      common::PathCommand::MoveTo(point) => path.move_to(point.x.0, point.y.0),
+      common::PathCommand::LineTo(point) => path.line_to(point.x.0, point.y.0),
+      common::PathCommand::CubicTo {
+        control1,
+        control2,
+        end,
+      } => path.cubic_to(
+        control1.x.0,
+        control1.y.0,
+        control2.x.0,
+        control2.y.0,
+        end.x.0,
+        end.y.0,
+      ),
+      common::PathCommand::Close => path.close(),
+    }
+  }
+  path.finish()
+}
+
+fn path_fill_from_common(fill: &common::Fill<'static>, path: &PolylineItem<'_>) -> Option<Fill> {
+  let paint = match fill {
+    common::Fill::Solid(color) => rgb::Color::new(color.r, color.g, color.b).into(),
+    common::Fill::Gradient(gradient) => {
+      let (start, end) = gradient.line.unwrap_or_else(|| {
+        let bounds = gradient.definition_bounds.unwrap_or(common::Rect {
+          origin: common::Point {
+            x: common::Pt(path.x_pt),
+            y: common::Pt(path.y_pt),
+          },
+          size: common::Size {
+            width: common::Pt(path.width_pt),
+            height: common::Pt(path.height_pt),
+          },
+        });
+        linear_gradient_line(bounds, gradient.angle_degrees, gradient.scaled)
+      });
+      let stops = gradient_stops_for_pdf(gradient);
+      LinearGradient {
+        x1: start.x.0,
+        y1: start.y.0,
+        x2: end.x.0,
+        y2: end.y.0,
+        transform: Transform::default(),
+        spread_method: SpreadMethod::Pad,
+        stops: stops
+          .iter()
+          .filter_map(|stop| {
+            Some(Stop {
+              offset: NormalizedF32::new(stop.position.clamp(0.0, 1.0))?,
+              color: rgb::Color::new(stop.color.r, stop.color.g, stop.color.b).into(),
+              opacity: NormalizedF32::new(f32::from(stop.color.a) / 255.0)?,
+            })
+          })
+          .collect(),
+        anti_alias: true,
+      }
+      .into()
+    }
+    common::Fill::None
+    | common::Fill::Theme(_)
+    | common::Fill::Image { .. }
+    | common::Fill::Pattern { .. } => return None,
+  };
+  Some(Fill {
+    paint,
+    opacity: NormalizedF32::ONE,
+    rule: FillRule::EvenOdd,
+  })
 }
 
 fn draw_rect_item(surface: &mut Surface<'_>, rect: &RectItem) {
@@ -1966,6 +2077,108 @@ fn draw_rect_item(surface: &mut Surface<'_>, rect: &RectItem) {
   }
 }
 
+fn gradient_stops_for_pdf(
+  gradient: &common::GradientFill<'static>,
+) -> Vec<common::GradientStop<'static>> {
+  if gradient.interpolation != common::GradientInterpolation::PowerPointGammaSigma
+    || gradient.stops.len() < 2
+  {
+    return gradient.stops.clone();
+  }
+
+  // Samples of the position-independent blend factor produced by the Windows
+  // GDI+ LinearGradientBrush SetSigmaBellShape(1, 1) path. PowerPoint's
+  // fixed-format PDF writer combines this falloff with gamma-correct color
+  // interpolation for transformed DrawingML gradients.
+  const SIGMA_BLEND_U8: [u8; 33] = [
+    0, 2, 5, 8, 12, 17, 22, 29, 36, 45, 54, 65, 76, 88, 101, 114, 128, 141, 154, 167, 179, 190,
+    201, 210, 219, 226, 233, 238, 243, 247, 250, 253, 255,
+  ];
+  let mut stops = Vec::with_capacity((gradient.stops.len() - 1) * 32 + 1);
+  for pair in gradient.stops.windows(2) {
+    let start = &pair[0];
+    let end = &pair[1];
+    for (step, blend) in SIGMA_BLEND_U8[..32].iter().enumerate() {
+      let position_ratio = step as f32 / 32.0;
+      let blend = f32::from(*blend) / 255.0;
+      stops.push(common::GradientStop {
+        position: start.position + (end.position - start.position) * position_ratio,
+        color: gamma_correct_gradient_color(start.color, end.color, blend),
+        scheme: None,
+      });
+    }
+  }
+  stops.push(
+    gradient
+      .stops
+      .last()
+      .expect("gradient has two stops")
+      .clone(),
+  );
+  stops
+}
+
+fn gamma_correct_gradient_color(
+  start: common::Color,
+  end: common::Color,
+  blend: f32,
+) -> common::Color {
+  let channel = |start: u8, end: u8| {
+    let start = gdiplus_gamma_decode(f32::from(start) / 255.0);
+    let end = gdiplus_gamma_decode(f32::from(end) / 255.0);
+    (gdiplus_gamma_encode(start + (end - start) * blend) * 255.0)
+      .round()
+      .clamp(0.0, 255.0) as u8
+  };
+  common::Color {
+    r: channel(start.r, end.r),
+    g: channel(start.g, end.g),
+    b: channel(start.b, end.b),
+    a: (f32::from(start.a) + (f32::from(end.a) - f32::from(start.a)) * blend)
+      .round()
+      .clamp(0.0, 255.0) as u8,
+  }
+}
+
+fn gdiplus_gamma_decode(value: f32) -> f32 {
+  value.powf(2.2)
+}
+
+fn gdiplus_gamma_encode(value: f32) -> f32 {
+  value.powf(1.0 / 2.2)
+}
+
+fn linear_gradient_line(
+  bounds: common::Rect,
+  angle_degrees: Option<f32>,
+  scaled: bool,
+) -> (common::Point, common::Point) {
+  let angle = angle_degrees.unwrap_or(0.0).to_radians();
+  let mut direction_x = angle.cos();
+  let mut direction_y = angle.sin();
+  if scaled {
+    direction_x *= bounds.size.width.0;
+    direction_y *= bounds.size.height.0;
+  }
+  let length = direction_x.hypot(direction_y).max(f32::EPSILON);
+  direction_x /= length;
+  direction_y /= length;
+  let half_span =
+    (direction_x.abs() * bounds.size.width.0 + direction_y.abs() * bounds.size.height.0) / 2.0;
+  let center_x = bounds.origin.x.0 + bounds.size.width.0 / 2.0;
+  let center_y = bounds.origin.y.0 + bounds.size.height.0 / 2.0;
+  (
+    common::Point {
+      x: common::Pt(center_x - direction_x * half_span),
+      y: common::Pt(center_y - direction_y * half_span),
+    },
+    common::Point {
+      x: common::Pt(center_x + direction_x * half_span),
+      y: common::Pt(center_y + direction_y * half_span),
+    },
+  )
+}
+
 fn draw_rect_path(surface: &mut Surface<'_>, rect: &RectItem) {
   let mut path = PathBuilder::new();
   path.move_to(rect.x_pt, rect.y_pt + rect.height_pt);
@@ -1989,8 +2202,14 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, pdf_image: 
   if visible_width <= f32::EPSILON || visible_height <= f32::EPSILON {
     return;
   }
+  let mut pop_count = 0;
+  if let Some(clip) = path_from_commands(image.clip_path) {
+    surface.push_clip_path(&clip, &krilla::paint::FillRule::NonZero);
+    pop_count += 1;
+  }
+
   surface.push_transform(&Transform::from_translate(image.x_pt, image.y_pt));
-  let mut pop_count = 1;
+  pop_count += 1;
 
   if image.rotation_deg.abs() > f32::EPSILON {
     surface.push_transform(&Transform::from_rotate_at(
@@ -2138,4 +2357,44 @@ fn stroke(style: &TextStyle<'_>) -> Option<Stroke> {
       .unwrap_or(NormalizedF32::ZERO),
     ..Default::default()
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{gamma_correct_gradient_color, pdf_page_dimension};
+  use ooxmlsdk_layout::common::{Color, LayoutEngineKind};
+
+  #[test]
+  fn powerpoint_pdf_page_dimensions_use_the_600_dpi_print_grid() {
+    assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 793.75) - 793.8).abs() < 0.001);
+    assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 595.25) - 595.2).abs() < 0.001);
+    assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 446.5) - 446.52).abs() < 0.001);
+    assert_eq!(pdf_page_dimension(LayoutEngineKind::Docx, 793.75), 793.75);
+  }
+
+  #[test]
+  fn powerpoint_transformed_gradient_uses_gdiplus_gamma_samples() {
+    let black = Color {
+      r: 0,
+      g: 0,
+      b: 0,
+      a: 255,
+    };
+    let red = Color {
+      r: 255,
+      g: 0,
+      b: 0,
+      a: 255,
+    };
+
+    assert_eq!(
+      gamma_correct_gradient_color(black, red, 36.0 / 255.0).r,
+      105
+    );
+    assert_eq!(
+      gamma_correct_gradient_color(black, red, 128.0 / 255.0).r,
+      186
+    );
+    assert_eq!(gamma_correct_gradient_color(black, red, 1.0).r, 255);
+  }
 }

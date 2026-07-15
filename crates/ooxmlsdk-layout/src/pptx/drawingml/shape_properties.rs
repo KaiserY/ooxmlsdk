@@ -7,6 +7,9 @@ use super::color::Color;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct EffectProperties {
+  /// Direct `effectLst`/`effectDag` presence replaces the referenced effect
+  /// style even when the direct list is empty.
+  pub(crate) clears_inherited: bool,
   pub(crate) shadow: Option<EffectShadowProperties>,
   pub(crate) glow: Option<EffectGlowProperties>,
   pub(crate) soft_edge: Option<EffectSoftEdgeProperties>,
@@ -21,6 +24,7 @@ pub(crate) struct EffectShadowProperties {
   pub(crate) blur_radius_emu: Option<i64>,
   pub(crate) scale_x: Option<i32>,
   pub(crate) scale_y: Option<i32>,
+  pub(crate) alignment: Option<a::RectangleAlignmentValues>,
   pub(crate) color: Option<Color>,
 }
 
@@ -58,10 +62,12 @@ impl EffectProperties {
   }
 
   pub(crate) fn from_pml_shape_properties_choice(choice: &p::ShapePropertiesChoice3) -> Self {
-    match choice {
+    let mut properties = match choice {
       p::ShapePropertiesChoice3::EffectList(list) => Self::from_effect_list(list),
       p::ShapePropertiesChoice3::EffectDag(dag) => Self::from_effect_dag(dag),
-    }
+    };
+    properties.clears_inherited = true;
+    properties
   }
 
   pub(crate) fn from_effect_style_choice(choice: &a::EffectStyleChoice) -> Self {
@@ -232,6 +238,7 @@ impl EffectShadowProperties {
       blur_radius_emu: source.blur_radius.map(|value| value.to_emu()),
       scale_x: None,
       scale_y: None,
+      alignment: None,
       color: source
         .inner_shadow_choice
         .as_ref()
@@ -251,6 +258,7 @@ impl EffectShadowProperties {
       scale_y: source
         .vertical_ratio
         .map(|value| value.as_drawingml_percent()),
+      alignment: source.alignment,
       color: source
         .outer_shadow_choice
         .as_ref()

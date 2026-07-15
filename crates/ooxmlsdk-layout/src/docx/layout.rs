@@ -1375,6 +1375,7 @@ fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
       right: item.crop.right,
       bottom: item.crop.bottom,
     }),
+    clip_path: Vec::new(),
     rotation_degrees: item.rotation_deg,
     flip_horizontal: item.flip_horizontal,
     flip_vertical: item.flip_vertical,
@@ -1429,6 +1430,7 @@ fn into_common_path_item(item: PolylineItem) -> common::PathItem<'static> {
       .into_iter()
       .map(|(x, y)| common_point(item.x_pt + x, item.y_pt + y))
       .collect(),
+    commands: Vec::new(),
     closed: item.closed,
     fill: item
       .fill_color

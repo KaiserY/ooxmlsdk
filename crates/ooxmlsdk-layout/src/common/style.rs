@@ -41,7 +41,27 @@ pub enum Fill<'doc> {
 pub struct GradientFill<'doc> {
   pub stops: Vec<GradientStop<'doc>>,
   pub angle_degrees: Option<f32>,
+  /// Coordinate space used to define the gradient. When absent, the painted
+  /// path bounds are used. Slide-background fills set this to the page bounds
+  /// so clipping a shape does not restart the gradient inside that shape.
+  pub definition_bounds: Option<super::Rect>,
+  /// Resolved page-space endpoints for a transformed linear gradient. This
+  /// keeps the gradient in the same local-to-page transform as its shape
+  /// without forcing PDF backends to reconstruct DrawingML shape transforms.
+  pub line: Option<(super::Point, super::Point)>,
+  pub interpolation: GradientInterpolation,
+  pub scaled: bool,
   pub path: Option<Cow<'doc, str>>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum GradientInterpolation {
+  #[default]
+  LinearSrgb,
+  /// PowerPoint's fixed-format path for transformed DrawingML gradients uses
+  /// the same gamma-correct sigma falloff exposed by the Windows GDI+ linear
+  /// gradient brush.
+  PowerPointGammaSigma,
 }
 
 #[derive(Clone, Debug, PartialEq)]

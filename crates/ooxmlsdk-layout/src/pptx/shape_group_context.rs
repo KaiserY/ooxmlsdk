@@ -138,10 +138,10 @@ impl PPTShapeGroupContext {
       .use_background_fill
       .is_some_and(|value| value.as_bool())
     {
-      // imports p:sp@useBgFill as noFill so the style fill reference does not
-      // paint over the slide background.
+      // ECMA-376 Part 1 §19.3.1.43: this is the portion of the slide
+      // background behind the shape, not a transparent/no-fill shape.
       shape.shape.fill_properties = Some(FillProperties {
-        kind: FillKind::None,
+        kind: FillKind::SlideBackground,
         placeholder_color: None,
       });
     }

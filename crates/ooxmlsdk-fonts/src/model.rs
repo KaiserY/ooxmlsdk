@@ -3169,6 +3169,23 @@ fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
     (i32::from(face.units_per_em()) - i32::from(ascent_units) - i32::from(descent_units)).max(0);
   let ascender = to_em(i32::from(ascent_units));
   let descender = to_em(i32::from(descent_units));
+  // Windows Office lays out the baseline from OS/2 Windows metrics unless
+  // the face explicitly opts into typographic metrics. Keep that baseline
+  // separate from the natural line box: usWinAscent was designed as a
+  // clipping extent and can be larger than the typographic ascender.
+  let baseline_offset = face.tables().os2.map_or(ascender, |os2| {
+    let units = if os2.use_typographic_metrics() {
+      os2.typographic_ascender()
+    } else {
+      os2.windows_ascender()
+    };
+    let units = units.max(0);
+    if units == 0 {
+      ascender
+    } else {
+      to_em(i32::from(units))
+    }
+  });
   let line_gap = if line_gap_units > 0 {
     to_em(i32::from(line_gap_units))
   } else {
@@ -3180,6 +3197,7 @@ fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
     vertical: VerticalMetrics {
       ascent_pt: ascender,
       descent_pt: descender,
+      baseline_offset_pt: baseline_offset,
       line_gap_pt: line_gap,
       ink_height_pt: ascender + descender,
       ..VerticalMetrics::default()
@@ -3768,6 +3786,7 @@ mod tests {
       vertical: VerticalMetrics {
         ascent_pt: 1.0,
         descent_pt: 0.25,
+        baseline_offset_pt: 1.125,
         ..VerticalMetrics::default()
       },
       em_size: 1.0,
@@ -3784,6 +3803,7 @@ mod tests {
 
     assert_eq!(metrics.vertical.ascent_pt, 12.0);
     assert_eq!(metrics.vertical.descent_pt, 3.0);
+    assert_eq!(metrics.vertical.baseline_offset_pt, 13.5);
   }
 
   #[test]

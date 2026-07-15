@@ -256,6 +256,24 @@ impl PowerPointImport {
       .and_then(|theme| theme.font_scheme.latin_font(index))
   }
 
+  pub(crate) fn resolve_theme_font(&self, placeholder: &str) -> Option<&str> {
+    self
+      .get_current_theme_ptr()
+      .and_then(|theme| theme.font_scheme.resolve_font(placeholder))
+  }
+
+  pub(crate) fn resolve_theme_font_for_language(
+    &self,
+    placeholder: &str,
+    language: Option<&str>,
+  ) -> Option<&str> {
+    self.get_current_theme_ptr().and_then(|theme| {
+      theme
+        .font_scheme
+        .resolve_font_for_language(placeholder, language)
+    })
+  }
+
   pub(crate) fn get_table_styles(&self) -> Option<&TableStyleList> {
     self.table_style_list.as_ref()
   }

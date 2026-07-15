@@ -27,6 +27,7 @@ pub struct TextVerticalMetrics {
   pub ascent_pt: f32,
   pub descent_pt: f32,
   pub line_gap_pt: f32,
+  pub baseline_offset_pt: f32,
 }
 
 impl TextVerticalMetrics {
@@ -111,6 +112,7 @@ impl TextMetrics {
         ascent_pt: metrics.ascent_pt,
         descent_pt: metrics.descent_pt,
         line_gap_pt: metrics.line_gap_pt,
+        baseline_offset_pt: metrics.baseline_offset_pt,
       })
       .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt()))
   }
@@ -144,6 +146,22 @@ impl TextMetrics {
     let natural_height_pt = metrics.line_height_pt() + style.baseline_shift_pt().abs();
     let extra_leading_pt = (line_height_pt - natural_height_pt).max(0.0) / 2.0;
     extra_leading_pt + metrics.leading_above_pt() + metrics.ascent_pt - style.baseline_shift_pt()
+  }
+
+  pub fn baseline_offset_in_line_with_windows_metrics(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+    line_height_pt: f32,
+  ) -> f32 {
+    let metrics = self.vertical_metrics(style);
+    let natural_height_pt = metrics.line_height_pt() + style.baseline_shift_pt().abs();
+    let extra_leading_pt = (line_height_pt - natural_height_pt).max(0.0) / 2.0;
+    let baseline_offset_pt = if metrics.baseline_offset_pt > 0.0 {
+      metrics.baseline_offset_pt
+    } else {
+      metrics.leading_above_pt() + metrics.ascent_pt
+    };
+    extra_leading_pt + baseline_offset_pt - style.baseline_shift_pt()
   }
 
   pub fn inline_text_box_height(&mut self, style: &(impl FontStyleRef + ?Sized)) -> f32 {
@@ -216,6 +234,7 @@ fn approximate_vertical_metrics(font_size: f32) -> TextVerticalMetrics {
     ascent_pt: font_size * FALLBACK_ASCENT_EM,
     descent_pt: font_size * FALLBACK_DESCENT_EM,
     line_gap_pt: font_size * FALLBACK_LINE_GAP_EM,
+    baseline_offset_pt: font_size * (FALLBACK_ASCENT_EM + FALLBACK_LINE_GAP_EM / 2.0),
   }
 }
 

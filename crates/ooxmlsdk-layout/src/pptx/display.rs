@@ -19,11 +19,14 @@ use crate::units;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::units as sdk_units;
 use ooxmlsdk::units::DrawingmlPercentageValue;
 
+use super::chart::{ChartFrame, ClusteredColumnStyle, lower_clustered_column_chart};
+use super::custom_geometry;
 use super::drawingml::color::{Color, SchemeColor};
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::line::{LineFill, LineProperties};
@@ -42,9 +45,9 @@ use super::drawingml::text_list_style::{
   TextListLevelParagraphProperties, TextListParagraphStyle, TextListStyle,
 };
 use super::import::{PowerPointImport, ThemeFragmentRecord};
-use super::slide::{
-  BackgroundKind, BackgroundProperties, ChartResource, ImageResource, SlidePersist,
-};
+use super::preset_geometry;
+use super::shadow::{ShadowFrame, outer_shadow_image_item};
+use super::slide::{BackgroundKind, ChartResource, ImageResource, SlidePersist};
 use super::{
   PptxBulletParagraphSummary, PptxDrawShapeSummary, PptxLayoutSummary,
   PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
@@ -52,20 +55,7 @@ use super::{
 
 const DEFAULT_TEXT_FONT_SIZE_PT: f32 = 18.0;
 const DEFAULT_TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
-const AUTO_FIT_SCALE_LEVELS: [(f32, f32); 12] = [
-  (1.000, 0.9),
-  (0.925, 0.9),
-  (0.850, 0.9),
-  (0.850, 0.8),
-  (0.775, 0.8),
-  (0.700, 0.8),
-  (0.625, 0.8),
-  (0.550, 0.8),
-  (0.475, 0.8),
-  (0.400, 0.8),
-  (0.325, 0.8),
-  (0.250, 0.8),
-];
+const POWERPOINT_PRINT_DPI: f32 = 600.0;
 const DEFAULT_TABLE_BORDER_PT: f32 = 0.75;
 
 pub(crate) fn lower_to_layout_document(
@@ -79,7 +69,13 @@ pub(crate) fn lower_to_layout_document(
     .map(|(page_index, slide)| {
       (
         slide.size.to_page_setup(),
-        lower_slide_items_with_summary(import, slide, page_index, None),
+        lower_slide_items_with_summary(
+          import,
+          slide,
+          page_index,
+          options.ui_language.as_deref(),
+          None,
+        ),
       )
     })
     .collect();
@@ -133,6 +129,7 @@ fn common_display_item(item: PageItem) -> common::DisplayItem<'static> {
       bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
       target: Cow::Owned(item.hyperlink_url),
     }),
+    PageItem::Path(item) => common::DisplayItem::Path(item),
     PageItem::Rect(item) => common::DisplayItem::Rect(common_rect_item(item)),
     PageItem::Line(item) => common::DisplayItem::Line(common_line_item(item)),
   }
@@ -170,6 +167,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
       right: item.crop.right,
       bottom: item.crop.bottom,
     }),
+    clip_path: item.clip_path,
     rotation_degrees: item.rotation_deg,
     flip_horizontal: item.flip_horizontal,
     flip_vertical: item.flip_vertical,
@@ -239,7 +237,7 @@ pub(crate) fn inspect_layout_summary(import: &PowerPointImport) -> PptxLayoutSum
   collect_draw_shape_summaries(import, &mut summary);
   collect_master_text_shapes(import, &mut summary);
   for (page_index, slide) in import.draw_pages.iter().enumerate() {
-    let _ = lower_slide_items_with_summary(import, slide, page_index, Some(&mut summary));
+    let _ = lower_slide_items_with_summary(import, slide, page_index, None, Some(&mut summary));
   }
   summary
 }
@@ -603,6 +601,7 @@ fn lower_slide_items_with_summary(
   import: &PowerPointImport,
   slide: &SlidePersist,
   page_index: usize,
+  ui_language: Option<&str>,
   summary: Option<&mut PptxLayoutSummary>,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
@@ -612,21 +611,17 @@ fn lower_slide_items_with_summary(
       .iter()
       .any(|author| author.has_payload());
   let _has_header_footer_identity = slide.header_footer.has_visible_slot();
-  let master_page = slide
-    .master_page_index
-    .and_then(|master_page_index| import.master_pages.get(master_page_index));
-  if let Some(background) = slide
-    .background_properties
-    .as_ref()
-    .or_else(|| master_page.and_then(|master_page| master_page.background_properties.as_ref()))
-  {
-    lower_background(import, slide, background, &mut items);
+  if let Some(fill) = resolved_slide_background_fill(import, slide) {
+    lower_background(import, slide, &fill, &mut items);
   }
   lower_shapes(
-    import,
-    slide,
+    PptxLoweringContext {
+      import,
+      slide,
+      page_index,
+      ui_language,
+    },
     &slide.shapes,
-    page_index,
     &mut items,
     summary,
   );
@@ -636,30 +631,10 @@ fn lower_slide_items_with_summary(
 fn lower_background(
   import: &PowerPointImport,
   slide: &SlidePersist,
-  background: &BackgroundProperties,
+  fill_properties: &FillProperties,
   items: &mut Vec<PageItem>,
 ) {
-  let fill_properties = match &background.kind {
-    BackgroundKind::Properties(fill_properties) => Some(
-      fill_properties
-        .clone()
-        .with_placeholder_color(slide.background_color.clone()),
-    ),
-    BackgroundKind::StyleReference {
-      style_index,
-      placeholder_color,
-    } => import.get_theme_fill_style(*style_index).map(|fill| {
-      fill.with_placeholder_color(
-        placeholder_color
-          .clone()
-          .or_else(|| slide.background_color.clone()),
-      )
-    }),
-  };
-  let Some(fill_properties) = fill_properties else {
-    return;
-  };
-  if let Some(fill_paint) = background_fill_paint(import, slide, &fill_properties) {
+  if let Some(fill_paint) = background_fill_paint(import, slide, fill_properties) {
     if is_default_white_page_background(fill_paint) {
       return;
     }
@@ -678,7 +653,7 @@ fn lower_background(
       blip_fill_image_items(
         import,
         slide,
-        &fill_properties,
+        fill_properties,
         ImageFillPlacement {
           frame: TextFrame {
             x_pt: 0.0,
@@ -690,6 +665,7 @@ fn lower_background(
           flip_horizontal: false,
           flip_vertical: false,
           crop_bitmap: false,
+          clip_path: Vec::new(),
           alt_text: None,
           hyperlink_url: None,
         },
@@ -697,6 +673,36 @@ fn lower_background(
       .into_iter()
       .map(PageItem::Image),
     );
+  }
+}
+
+fn resolved_slide_background_fill(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+) -> Option<FillProperties> {
+  let master_page = slide
+    .master_page_index
+    .and_then(|master_page_index| import.master_pages.get(master_page_index));
+  let background = slide
+    .background_properties
+    .as_ref()
+    .or_else(|| master_page.and_then(|master_page| master_page.background_properties.as_ref()))?;
+  match &background.kind {
+    BackgroundKind::Properties(fill_properties) => Some(
+      fill_properties
+        .clone()
+        .with_placeholder_color(slide.background_color.clone()),
+    ),
+    BackgroundKind::StyleReference {
+      style_index,
+      placeholder_color,
+    } => import.get_theme_fill_style(*style_index).map(|fill| {
+      fill.with_placeholder_color(
+        placeholder_color
+          .clone()
+          .or_else(|| slide.background_color.clone()),
+      )
+    }),
   }
 }
 
@@ -714,6 +720,7 @@ fn background_fill_paint(
       display_paint_for_slide(import, slide, color, fill.placeholder_color.as_ref())
     }),
     FillKind::None
+    | FillKind::SlideBackground
     | FillKind::Group
     | FillKind::Gradient(_)
     | FillKind::Blip(_)
@@ -722,20 +729,16 @@ fn background_fill_paint(
 }
 
 fn lower_shapes(
-  import: &PowerPointImport,
-  slide: &SlidePersist,
+  context: PptxLoweringContext<'_>,
   shapes: &[Shape],
-  page_index: usize,
   items: &mut Vec<PageItem>,
   mut summary: Option<&mut PptxLayoutSummary>,
 ) {
   for shape in shapes {
     lower_shape(
-      import,
-      slide,
+      context,
       shape,
       DisplayOffset::default(),
-      page_index,
       items,
       summary.as_deref_mut(),
     );
@@ -749,14 +752,18 @@ struct DisplayOffset {
 }
 
 fn lower_shape(
-  import: &PowerPointImport,
-  slide: &SlidePersist,
+  context: PptxLoweringContext<'_>,
   shape: &Shape,
   offset: DisplayOffset,
-  page_index: usize,
   items: &mut Vec<PageItem>,
   mut summary: Option<&mut PptxLayoutSummary>,
 ) {
+  let PptxLoweringContext {
+    import,
+    slide,
+    ui_language,
+    ..
+  } = context;
   if shape.hidden
     || shape.hidden_master_shape
     || shape.referenced
@@ -799,18 +806,14 @@ fn lower_shape(
   if shape.service_name == ShapeService::Chart
     && let Some(record) = &shape.graphic_data
   {
-    lower_chart(import, slide, shape, offset, record, items);
+    lower_chart(import, slide, shape, offset, record, ui_language, items);
   }
 
   if shape.frame_type == super::drawingml::shape::FrameType::Diagram
     && let Some(record) = &shape.graphic_data
   {
     lower_diagram(
-      PptxLoweringContext {
-        import,
-        slide,
-        page_index,
-      },
+      context,
       shape,
       offset,
       record,
@@ -821,11 +824,7 @@ fn lower_shape(
 
   if let Some(text_body) = &shape.text_body {
     lower_text_body(
-      PptxLoweringContext {
-        import,
-        slide,
-        page_index,
-      },
+      context,
       shape,
       offset,
       text_body,
@@ -836,15 +835,7 @@ fn lower_shape(
 
   let child_offset = child_display_offset(shape, offset);
   for child in &shape.children {
-    lower_shape(
-      import,
-      slide,
-      child,
-      child_offset,
-      page_index,
-      items,
-      summary.as_deref_mut(),
-    );
+    lower_shape(context, child, child_offset, items, summary.as_deref_mut());
   }
 }
 
@@ -912,6 +903,7 @@ fn lower_chart(
   shape: &Shape,
   offset: DisplayOffset,
   record: &GraphicDataRecord,
+  ui_language: Option<&str>,
   items: &mut Vec<PageItem>,
 ) {
   if shape.size.cx <= 0 || shape.size.cy <= 0 {
@@ -920,16 +912,87 @@ fn lower_chart(
   let Some(chart_resource) = &record.chart_resource else {
     return;
   };
+  let x = units::emu_to_points(offset.x_emu + shape.position.x);
+  let y = units::emu_to_points(offset.y_emu + shape.position.y);
+  let width = units::emu_to_points(shape.size.cx);
+  let height = units::emu_to_points(shape.size.cy);
+
+  if let Some(chart) = shared_chart::clustered_column_chart(&chart_resource.chart_space) {
+    let series_colors = chart
+      .series
+      .iter()
+      .enumerate()
+      .filter_map(|(index, series)| {
+        series
+          .solid_fill
+          .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+          .map(|paint| paint.color)
+          .or_else(|| display_color_for_chart_series(import, slide, chart_resource, index))
+      })
+      .collect::<Vec<_>>();
+    if series_colors.len() == chart.series.len() {
+      let title_properties = chart_resource
+        .chart_space
+        .chart
+        .title
+        .as_deref()
+        .and_then(|title| title.text_properties.as_deref());
+      let label_properties = chart
+        .value_axis
+        .and_then(|axis| axis.text_properties.as_deref())
+        .or_else(|| {
+          chart_resource
+            .chart_space
+            .chart
+            .plot_area
+            .plot_area_choice2
+            .iter()
+            .find_map(|choice| match choice {
+              c::PlotAreaChoice2::CategoryAxis(axis) => axis.text_properties.as_deref(),
+              _ => None,
+            })
+        });
+      let gridline_color = chart
+        .value_axis
+        .and_then(|axis| axis.major_gridlines.as_deref())
+        .and_then(|gridlines| gridlines.chart_shape_properties.as_deref())
+        .and_then(shared_chart::chart_shape_solid_fill)
+        .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+        .map(|paint| paint.color)
+        .unwrap_or(RgbColor {
+          r: 217,
+          g: 217,
+          b: 217,
+        });
+      let chart_items = lower_clustered_column_chart(
+        ChartFrame {
+          x_pt: x,
+          y_pt: y,
+          width_pt: width,
+          height_pt: height,
+        },
+        &chart,
+        shared_chart::automatic_chart_title(ui_language),
+        &ClusteredColumnStyle {
+          title: chart_text_style(import, slide, title_properties, ui_language, 18.0),
+          label: chart_text_style(import, slide, label_properties, ui_language, 12.0),
+          gridline_color,
+          series_colors,
+        },
+      );
+      if !chart_items.is_empty() {
+        items.extend(chart_items);
+        return;
+      }
+    }
+  }
+
   let paints = chart_data_point_paints(import, slide, chart_resource);
   let texts = shared_chart::visible_texts(&chart_resource.chart_space);
   if paints.is_empty() && texts.is_empty() {
     return;
   }
 
-  let x = units::emu_to_points(offset.x_emu + shape.position.x);
-  let y = units::emu_to_points(offset.y_emu + shape.position.y);
-  let width = units::emu_to_points(shape.size.cx);
-  let height = units::emu_to_points(shape.size.cy);
   let plot_x = x + width * 0.12;
   let plot_y = y + height * 0.12;
   let plot_width = width * 0.76;
@@ -955,6 +1018,65 @@ fn lower_chart(
   }
 
   lower_chart_texts(x, y, width, height, texts, items);
+}
+
+fn chart_text_style(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  properties: Option<&c::TextProperties>,
+  ui_language: Option<&str>,
+  fallback_size_pt: f32,
+) -> TextStyle {
+  let mut style = TextStyle {
+    font_family: Some(Arc::from("Liberation Sans")),
+    font_size_pt: fallback_size_pt,
+    use_windows_font_metrics: true,
+    ..TextStyle::default()
+  };
+  if let Some(default_run_properties) = properties
+    .into_iter()
+    .flat_map(|properties| &properties.paragraph)
+    .filter_map(|paragraph| paragraph.paragraph_properties.as_deref())
+    .find_map(|paragraph| paragraph.default_run_properties.as_deref())
+  {
+    apply_default_run_properties(import, Some(slide), default_run_properties, &mut style);
+  }
+  if let Some(typeface) = import.resolve_theme_font_for_language("+mn-ea", ui_language) {
+    style.east_asia_font_family = Some(Arc::from(typeface));
+  }
+  style.font_size_pt =
+    (style.font_size_pt * POWERPOINT_PRINT_DPI / 72.0).round() * 72.0 / POWERPOINT_PRINT_DPI;
+  style
+}
+
+fn display_color_for_chart_series(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  series_index: usize,
+) -> Option<RgbColor> {
+  let token = [
+    a::SchemeColorValues::Accent1,
+    a::SchemeColorValues::Accent2,
+    a::SchemeColorValues::Accent3,
+    a::SchemeColorValues::Accent4,
+    a::SchemeColorValues::Accent5,
+    a::SchemeColorValues::Accent6,
+  ][series_index % 6];
+  let theme = chart_theme(import, slide)?;
+  let color_map = chart_resource.chart_space.color_map_override.as_deref();
+  let mapped = shared_chart::scheme_color_token(color_map, token)?;
+  let color = theme.color_scheme.get_color(mapped)?.clone();
+  let mut scheme_resolver = |token| {
+    let mapped = shared_chart::scheme_color_token(color_map, token)?;
+    theme.color_scheme.get_color(mapped).cloned()
+  };
+  let resolved = color.resolve_rgb(&mut scheme_resolver, None)?;
+  Some(RgbColor {
+    r: resolved.r,
+    g: resolved.g,
+    b: resolved.b,
+  })
 }
 
 fn lower_chart_texts(
@@ -1048,6 +1170,7 @@ struct PptxLoweringContext<'a> {
   import: &'a PowerPointImport,
   slide: &'a SlidePersist,
   page_index: usize,
+  ui_language: Option<&'a str>,
 }
 
 fn lower_diagram(
@@ -1220,22 +1343,7 @@ fn lower_diagram(
         )
       });
       let options = TextLoweringOptions::from_text_body(&text_body);
-      let mut text_metrics = TextMetrics::new();
-      let base_style = text_base_style(
-        context.import,
-        &text_body,
-        font_reference.as_ref(),
-        None,
-        diagram_shape.font_size_pt,
-      );
-      let (font_scale, line_scale) = text_auto_fit_scales(
-        context.import,
-        text_frame,
-        &text_body,
-        &base_style,
-        &options,
-        &mut text_metrics,
-      );
+      let (font_scale, line_scale) = text_auto_fit_scales(&options);
       let sync_auto_fit = text_body.display_properties.auto_fit == TextAutoFit::Shape;
       if sync_auto_fit && let Some(group) = diagram_shape.font_sync_group.as_deref() {
         font_sync_scales
@@ -1550,6 +1658,7 @@ fn lower_diagram_text_body_at_with_style_and_scale(
   options.rotation_center_pt = rotated_text_area_center(frame, options.rotation_deg);
   let base_style = text_base_style(
     import,
+    None,
     text_body,
     style_inputs.font_reference,
     style_inputs.table_text_style,
@@ -1558,6 +1667,7 @@ fn lower_diagram_text_body_at_with_style_and_scale(
   let mut text_metrics = TextMetrics::new();
   let estimated_height = estimate_wrapped_text_body_height(
     import,
+    None,
     frame,
     text_body,
     &base_style,
@@ -1582,6 +1692,7 @@ fn lower_diagram_text_body_at_with_style_and_scale(
     lower_paragraph(
       ParagraphLoweringContext {
         import,
+        slide: None,
         base_style: &base_style,
         options: &options,
         frame,
@@ -1652,6 +1763,7 @@ fn diagram_blip_placeholder_image_item(bounds: shared_diagram::DiagramBounds) ->
     width_pt: bounds.width,
     height_pt: bounds.height,
     crop: ImageCrop::default(),
+    clip_path: Vec::new(),
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
@@ -1840,6 +1952,7 @@ fn diagram_model_shape_blip_fill_image_items(
       flip_horizontal,
       flip_vertical,
       crop_bitmap: false,
+      clip_path: Vec::new(),
       alt_text: None,
       hyperlink_url: None,
     },
@@ -2449,6 +2562,7 @@ fn diagram_shape_blip_fill_image_items(
       flip_horizontal,
       flip_vertical,
       crop_bitmap: false,
+      clip_path: Vec::new(),
       alt_text: None,
       hyperlink_url: None,
     },
@@ -2658,6 +2772,7 @@ fn lower_picture(
     width_pt: units::emu_to_points(shape.size.cx),
     height_pt: units::emu_to_points(shape.size.cy),
     crop,
+    clip_path: Vec::new(),
     rotation_deg: shape.rotation,
     flip_horizontal,
     flip_vertical,
@@ -3303,7 +3418,10 @@ fn push_table_border_line(
   y2_pt: f32,
   items: &mut Vec<PageItem>,
 ) {
-  let Some(stroke) = line.as_ref().and_then(|line| line_stroke(import, line)) else {
+  let Some(stroke) = line
+    .as_ref()
+    .and_then(|line| line_stroke(import, None, line))
+  else {
     return;
   };
   items.push(PageItem::Line(LineItem {
@@ -3358,11 +3476,18 @@ fn lower_shape_bounds(
   let fill_paint = shape
     .actual_fill_properties
     .as_ref()
-    .and_then(|fill| fill_paint(import, fill));
+    .and_then(|fill| shape_fill_paint(import, slide, fill));
   let x_pt = units::emu_to_points(offset.x_emu + shape.position.x);
   let y_pt = units::emu_to_points(offset.y_emu + shape.position.y);
   let width_pt = units::emu_to_points(shape.size.cx);
   let height_pt = units::emu_to_points(shape.size.cy);
+  let frame = TextFrame {
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
+  };
+  let shape_path = shape_path_commands(shape, frame);
   let fill_images = shape
     .actual_fill_properties
     .as_ref()
@@ -3372,16 +3497,12 @@ fn lower_shape_bounds(
         slide,
         fill,
         ImageFillPlacement {
-          frame: TextFrame {
-            x_pt,
-            y_pt,
-            width_pt,
-            height_pt,
-          },
+          frame,
           rotation_deg: shape.rotation,
           flip_horizontal: shape.flip_h,
           flip_vertical: shape.flip_v,
           crop_bitmap: shape.custom_shape_properties.geometry.is_some(),
+          clip_path: shape_path.clone(),
           alt_text: shape
             .description
             .clone()
@@ -3395,15 +3516,49 @@ fn lower_shape_bounds(
   let line = shape
     .actual_line_properties
     .as_ref()
-    .and_then(|line| line_stroke(import, line));
+    .and_then(|line| line_stroke(import, Some(slide), line));
+  let gradient_path = shape
+    .actual_fill_properties
+    .as_ref()
+    .and_then(|fill| shape_gradient_path(import, slide, shape, fill, frame, line));
   let has_fill_image = !fill_images.is_empty();
-  if fill_paint.is_none() && !has_fill_image && line.is_none() {
+  if fill_paint.is_none() && !has_fill_image && line.is_none() && gradient_path.is_none() {
     return;
   }
-  items.extend(fill_images.into_iter().map(PageItem::Image));
   let (stroke, stroke_opacity) = line
     .map(|line| (Some(line.style), line.opacity))
     .unwrap_or((None, 1.0));
+
+  if let Some(shadow) = shape
+    .actual_effect_properties
+    .as_ref()
+    .and_then(|effects| effects.shadow.as_ref())
+    && let Some(paint) = shadow
+      .color
+      .as_ref()
+      .and_then(|color| display_paint_for_slide(import, slide, color, None))
+    && let Some(image) = outer_shadow_image_item(
+      shadow,
+      ShadowFrame {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+        stroke_width_pt: stroke.map_or(0.0, |stroke| stroke.width_pt),
+      },
+      &shape_path,
+      paint.color,
+      paint.opacity,
+    )
+  {
+    items.push(PageItem::Image(image));
+  }
+
+  items.extend(fill_images.into_iter().map(PageItem::Image));
+  if let Some(path) = gradient_path {
+    items.push(PageItem::Path(path));
+    return;
+  }
   if fill_paint.is_none() && stroke.is_none() {
     return;
   }
@@ -3420,6 +3575,254 @@ fn lower_shape_bounds(
   }));
 }
 
+fn shape_gradient_path(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  shape: &Shape,
+  fill: &FillProperties,
+  frame: TextFrame,
+  line: Option<DisplayStroke>,
+) -> Option<common::PathItem<'static>> {
+  let resolved_background;
+  let (effective_fill, definition_bounds) = if matches!(fill.kind, FillKind::SlideBackground) {
+    resolved_background = resolved_slide_background_fill(import, slide)?;
+    (
+      &resolved_background,
+      common_rect(0.0, 0.0, slide.size.width_pt, slide.size.height_pt),
+    )
+  } else {
+    (
+      fill,
+      common_rect(frame.x_pt, frame.y_pt, frame.width_pt, frame.height_pt),
+    )
+  };
+  let FillKind::Gradient(gradient) = &effective_fill.kind else {
+    return None;
+  };
+  let linear = match gradient.gradient_fill_choice.as_ref()? {
+    a::GradientFillChoice::LinearGradientFill(linear) => linear,
+    a::GradientFillChoice::PathGradientFill(_) => return None,
+  };
+  let stops = gradient
+    .gradient_stop_list
+    .as_ref()?
+    .gradient_stop
+    .iter()
+    .filter_map(|stop| {
+      let color = stop
+        .gradient_stop_choice
+        .as_ref()
+        .and_then(Color::from_gradient_stop_choice)?;
+      let paint = display_paint_for_slide(
+        import,
+        slide,
+        &color,
+        effective_fill.placeholder_color.as_ref(),
+      )?;
+      Some(common::GradientStop {
+        position: stop.position.as_ratio() as f32,
+        color: common_rgb(paint.color, paint.opacity),
+        scheme: None,
+      })
+    })
+    .collect::<Vec<_>>();
+  let mut stops = stops;
+  super::gradient::normalize_powerpoint_gradient_stops(&mut stops);
+  if stops.is_empty() {
+    return None;
+  }
+  let rotate_with_shape = gradient
+    .rotate_with_shape
+    .as_ref()
+    .is_none_or(|value| value.as_bool());
+  let scaled = linear.scaled.as_ref().is_some_and(|value| value.as_bool());
+  let local_angle_degrees = linear.angle.unwrap_or_default() as f32 / 60_000.0;
+  let has_shape_transform = shape.rotation.abs() > f32::EPSILON || shape.flip_h || shape.flip_v;
+  let follows_shape_transform =
+    rotate_with_shape && has_shape_transform && !matches!(fill.kind, FillKind::SlideBackground);
+  let gradient_line = follows_shape_transform.then(|| {
+    let (start, end) = linear_gradient_line(definition_bounds, local_angle_degrees, scaled);
+    (
+      transform_shape_point(start, frame, shape),
+      transform_shape_point(end, frame, shape),
+    )
+  });
+  let angle_degrees = if follows_shape_transform {
+    transformed_gradient_angle(local_angle_degrees, shape)
+  } else {
+    local_angle_degrees
+  };
+  Some(common::PathItem {
+    bounds: transformed_shape_bounds(frame, shape),
+    points: Vec::new(),
+    commands: shape_path_commands(shape, frame),
+    closed: true,
+    fill: common::Fill::Gradient(common::GradientFill {
+      stops,
+      angle_degrees: Some(angle_degrees),
+      definition_bounds: Some(definition_bounds),
+      line: gradient_line,
+      interpolation: if follows_shape_transform {
+        common::GradientInterpolation::PowerPointGammaSigma
+      } else {
+        common::GradientInterpolation::LinearSrgb
+      },
+      scaled,
+      path: None,
+    }),
+    stroke: line.map(|line| common::Stroke {
+      width: common::Pt(line.style.width_pt),
+      color: common_rgb(line.style.color, line.opacity),
+      dash: None,
+      source_style_id: None,
+    }),
+  })
+}
+
+fn shape_path_commands(shape: &Shape, frame: TextFrame) -> Vec<common::PathCommand> {
+  let commands = match shape.custom_shape_properties.geometry.as_ref() {
+    Some(CustomShapeGeometry::Custom(geometry)) => custom_geometry::path_commands(
+      geometry,
+      frame.x_pt,
+      frame.y_pt,
+      frame.width_pt,
+      frame.height_pt,
+    ),
+    Some(CustomShapeGeometry::Preset(preset)) => Some(preset_geometry::path_commands(
+      Some(preset),
+      frame.x_pt,
+      frame.y_pt,
+      frame.width_pt,
+      frame.height_pt,
+    )),
+    None => None,
+  };
+  let commands = commands.unwrap_or_else(|| {
+    preset_geometry::path_commands(
+      None,
+      frame.x_pt,
+      frame.y_pt,
+      frame.width_pt,
+      frame.height_pt,
+    )
+  });
+  commands
+    .into_iter()
+    .map(|command| transform_shape_path_command(command, frame, shape))
+    .collect()
+}
+
+fn transform_shape_path_command(
+  command: common::PathCommand,
+  frame: TextFrame,
+  shape: &Shape,
+) -> common::PathCommand {
+  match command {
+    common::PathCommand::MoveTo(point) => {
+      common::PathCommand::MoveTo(transform_shape_point(point, frame, shape))
+    }
+    common::PathCommand::LineTo(point) => {
+      common::PathCommand::LineTo(transform_shape_point(point, frame, shape))
+    }
+    common::PathCommand::CubicTo {
+      control1,
+      control2,
+      end,
+    } => common::PathCommand::CubicTo {
+      control1: transform_shape_point(control1, frame, shape),
+      control2: transform_shape_point(control2, frame, shape),
+      end: transform_shape_point(end, frame, shape),
+    },
+    common::PathCommand::Close => common::PathCommand::Close,
+  }
+}
+
+fn transform_shape_point(point: common::Point, frame: TextFrame, shape: &Shape) -> common::Point {
+  let center_x = frame.x_pt + frame.width_pt / 2.0;
+  let center_y = frame.y_pt + frame.height_pt / 2.0;
+  let x = if shape.flip_h {
+    2.0 * center_x - point.x.0
+  } else {
+    point.x.0
+  };
+  let y = if shape.flip_v {
+    2.0 * center_y - point.y.0
+  } else {
+    point.y.0
+  };
+  let (x, y) = rotate_point(x, y, center_x, center_y, shape.rotation.to_radians());
+  common_point(x, y)
+}
+
+fn transformed_shape_bounds(frame: TextFrame, shape: &Shape) -> common::Rect {
+  let corners = [
+    common_point(frame.x_pt, frame.y_pt),
+    common_point(frame.x_pt + frame.width_pt, frame.y_pt),
+    common_point(frame.x_pt + frame.width_pt, frame.y_pt + frame.height_pt),
+    common_point(frame.x_pt, frame.y_pt + frame.height_pt),
+  ]
+  .map(|point| transform_shape_point(point, frame, shape));
+  let left = corners
+    .iter()
+    .map(|point| point.x.0)
+    .fold(f32::INFINITY, f32::min);
+  let top = corners
+    .iter()
+    .map(|point| point.y.0)
+    .fold(f32::INFINITY, f32::min);
+  let right = corners
+    .iter()
+    .map(|point| point.x.0)
+    .fold(f32::NEG_INFINITY, f32::max);
+  let bottom = corners
+    .iter()
+    .map(|point| point.y.0)
+    .fold(f32::NEG_INFINITY, f32::max);
+  common_rect(left, top, right - left, bottom - top)
+}
+
+fn linear_gradient_line(
+  bounds: common::Rect,
+  angle_degrees: f32,
+  scaled: bool,
+) -> (common::Point, common::Point) {
+  let angle = angle_degrees.to_radians();
+  let mut direction_x = angle.cos();
+  let mut direction_y = angle.sin();
+  if scaled {
+    direction_x *= bounds.size.width.0;
+    direction_y *= bounds.size.height.0;
+  }
+  let length = direction_x.hypot(direction_y).max(f32::EPSILON);
+  direction_x /= length;
+  direction_y /= length;
+  let half_span =
+    (direction_x.abs() * bounds.size.width.0 + direction_y.abs() * bounds.size.height.0) / 2.0;
+  let center_x = bounds.origin.x.0 + bounds.size.width.0 / 2.0;
+  let center_y = bounds.origin.y.0 + bounds.size.height.0 / 2.0;
+  (
+    common_point(
+      center_x - direction_x * half_span,
+      center_y - direction_y * half_span,
+    ),
+    common_point(
+      center_x + direction_x * half_span,
+      center_y + direction_y * half_span,
+    ),
+  )
+}
+
+fn transformed_gradient_angle(local_angle_degrees: f32, shape: &Shape) -> f32 {
+  let mut angle = local_angle_degrees;
+  if shape.flip_h {
+    angle = 180.0 - angle;
+  }
+  if shape.flip_v {
+    angle = -angle;
+  }
+  angle + shape.rotation
+}
+
 fn child_display_offset(shape: &Shape, offset: DisplayOffset) -> DisplayOffset {
   DisplayOffset {
     x_emu: offset.x_emu + shape.position.x - shape.child_position.x,
@@ -3434,6 +3837,7 @@ struct ImageFillPlacement {
   flip_horizontal: bool,
   flip_vertical: bool,
   crop_bitmap: bool,
+  clip_path: Vec<common::PathCommand>,
   alt_text: Option<String>,
   hyperlink_url: Option<String>,
 }
@@ -3536,6 +3940,7 @@ fn blip_fill_image_items_from_resource(
     width_pt: placement.frame.width_pt,
     height_pt: placement.frame.height_pt,
     crop,
+    clip_path: placement.clip_path,
     rotation_deg: placement.rotation_deg,
     flip_horizontal,
     flip_vertical,
@@ -3615,6 +4020,7 @@ fn tiled_blip_fill_image_items(
           width_pt: item_right - item_x,
           height_pt: item_bottom - item_y,
           crop,
+          clip_path: placement.clip_path.clone(),
           rotation_deg: placement.rotation_deg,
           flip_horizontal: placement.flip_horizontal ^ tile_flip_h,
           flip_vertical: placement.flip_vertical ^ tile_flip_v,
@@ -3941,7 +4347,11 @@ fn channel_within_tolerance(actual: u8, expected: u8, tolerance: u8) -> bool {
 }
 
 fn image_luminance(r: u8, g: u8, b: u8) -> u8 {
-  ((u16::from(b) * 29 + u16::from(g) * 151 + u16::from(r) * 76) >> 8) as u8
+  // DrawingML gray uses the relative intensities of the sRGB primaries.
+  // Keep the IEC 61966-2-1 / Rec. 709 coefficients in integer form so image
+  // effects are deterministic across platforms.
+  ((u32::from(r) * 2_126 + u32::from(g) * 7_152 + u32::from(b) * 722 + 5_000) / 10_000).min(255)
+    as u8
 }
 
 fn mso_brightness_contrast_component(value: u8, brightness: i32, contrast: i32) -> u8 {
@@ -4067,6 +4477,7 @@ fn lower_text_body(
   lower_text_body_at_with_font_ref(
     TextBodyLoweringContext {
       import: context.import,
+      slide: Some(context.slide),
       image_resources: Some(&context.slide.image_resources),
       page_index: context.page_index,
     },
@@ -4124,6 +4535,7 @@ fn lower_text_body_at_with_font_ref(
     TextLoweringRuntime {
       image_resources: context.image_resources,
       page_index: context.page_index,
+      slide: context.slide,
     },
     summary,
     items,
@@ -4133,6 +4545,7 @@ fn lower_text_body_at_with_font_ref(
 #[derive(Clone, Copy)]
 struct TextBodyLoweringContext<'a> {
   import: &'a PowerPointImport,
+  slide: Option<&'a SlidePersist>,
   image_resources: Option<&'a HashMap<String, ImageResource>>,
   page_index: usize,
 }
@@ -4151,6 +4564,7 @@ struct TextStyleLoweringInputs<'a> {
 struct TextLoweringRuntime<'a> {
   image_resources: Option<&'a HashMap<String, ImageResource>>,
   page_index: usize,
+  slide: Option<&'a SlidePersist>,
 }
 
 fn lower_text_body_at_with_style(
@@ -4188,6 +4602,7 @@ fn lower_text_body_at_with_style_and_scale(
     .or_else(|| rotated_text_area_center(frame, options.rotation_deg));
   let base_style = text_base_style(
     import,
+    runtime.slide,
     text_body,
     style_inputs.font_reference,
     style_inputs.table_text_style,
@@ -4195,16 +4610,7 @@ fn lower_text_body_at_with_style_and_scale(
   );
   let mut text_metrics = TextMetrics::new();
   let (font_scale, line_scale) = style_inputs.auto_fit_font_scale.map_or_else(
-    || {
-      text_auto_fit_scales(
-        import,
-        frame,
-        text_body,
-        &base_style,
-        &options,
-        &mut text_metrics,
-      )
-    },
+    || text_auto_fit_scales(&options),
     |font_scale| (font_scale, options.line_scale),
   );
   options.font_scale = font_scale;
@@ -4212,6 +4618,7 @@ fn lower_text_body_at_with_style_and_scale(
 
   let estimated_height = estimate_wrapped_text_body_height(
     import,
+    runtime.slide,
     frame,
     text_body,
     &base_style,
@@ -4236,6 +4643,7 @@ fn lower_text_body_at_with_style_and_scale(
     lower_paragraph(
       ParagraphLoweringContext {
         import,
+        slide: runtime.slide,
         base_style: &base_style,
         options: &options,
         frame,
@@ -4309,6 +4717,7 @@ fn text_items_bounds(
 
 fn text_base_style(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   text_body: &TextBody,
   font_reference: Option<&FontStyleReference>,
   table_text_style: Option<&TableStyleTextProperties>,
@@ -4318,51 +4727,29 @@ fn text_base_style(
   let mut base_style = TextStyle {
     font_family: Some(Arc::from("Liberation Sans")),
     font_size_pt: base_font_size_pt.unwrap_or(DEFAULT_TEXT_FONT_SIZE_PT),
+    use_windows_font_metrics: true,
     rotation_deg: options.rotation_deg,
     ..TextStyle::default()
   };
   if let Some(font_reference) = font_reference {
-    apply_font_reference_text_style(import, font_reference, &mut base_style);
+    apply_font_reference_text_style(import, slide, font_reference, &mut base_style);
   }
   if let Some(table_text_style) = table_text_style {
-    apply_table_text_style(import, table_text_style, &mut base_style);
+    apply_table_text_style(import, slide, table_text_style, &mut base_style);
   }
   base_style
 }
 
-fn text_auto_fit_scales(
-  import: &PowerPointImport,
-  frame: TextFrame,
-  text_body: &TextBody,
-  base_style: &TextStyle,
-  options: &TextLoweringOptions,
-  text_metrics: &mut TextMetrics,
-) -> (f32, f32) {
-  if text_body.display_properties.auto_fit != TextAutoFit::Shape {
-    return (options.font_scale, options.line_scale);
-  }
-  for (font_scale, line_scale) in AUTO_FIT_SCALE_LEVELS {
-    let mut level_options = *options;
-    level_options.font_scale *= font_scale;
-    level_options.line_scale = line_scale;
-    let text_height = estimate_wrapped_text_body_height(
-      import,
-      frame,
-      text_body,
-      base_style,
-      &level_options,
-      text_metrics,
-    );
-    if text_height <= frame.height_pt {
-      return (level_options.font_scale, level_options.line_scale);
-    }
-  }
-  let (font_scale, line_scale) = AUTO_FIT_SCALE_LEVELS[AUTO_FIT_SCALE_LEVELS.len() - 1];
-  (options.font_scale * font_scale, line_scale)
+fn text_auto_fit_scales(options: &TextLoweringOptions) -> (f32, f32) {
+  // a:spAutoFit grows the containing shape; it does not shrink the text or
+  // reduce its line spacing. a:normAutofit is the text-scaling mode and its
+  // explicit fontScale/lnSpcReduction values are already carried by options.
+  (options.font_scale, options.line_scale)
 }
 
 fn apply_font_reference_text_style(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   reference: &FontStyleReference,
   style: &mut TextStyle,
 ) {
@@ -4372,7 +4759,7 @@ fn apply_font_reference_text_style(
   if let Some(paint) = reference
     .placeholder_color
     .as_ref()
-    .and_then(|color| display_paint(import, color, None))
+    .and_then(|color| display_paint_for_optional_slide(import, slide, color, None))
   {
     style.color = paint.color;
     style.opacity = paint.opacity;
@@ -4381,11 +4768,12 @@ fn apply_font_reference_text_style(
 
 fn apply_table_text_style(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   properties: &TableStyleTextProperties,
   style: &mut TextStyle,
 ) {
   if let Some(font_reference) = &properties.font_reference {
-    apply_font_reference_text_style(import, font_reference, style);
+    apply_font_reference_text_style(import, slide, font_reference, style);
   }
   if let Some(typeface) = properties.fonts.latin.as_deref() {
     style.font_family = Some(Arc::from(typeface));
@@ -4399,7 +4787,7 @@ fn apply_table_text_style(
   if let Some(paint) = properties
     .color
     .as_ref()
-    .and_then(|color| display_paint(import, color, None))
+    .and_then(|color| display_paint_for_optional_slide(import, slide, color, None))
   {
     style.color = paint.color;
     style.opacity = paint.opacity;
@@ -4530,6 +4918,7 @@ fn fill_summary(
 ) -> (String, Option<String>, Option<i16>) {
   match fill.map(|fill| &fill.kind) {
     Some(FillKind::None) => ("None".to_string(), None, None),
+    Some(FillKind::SlideBackground) => ("SlideBackground".to_string(), None, None),
     Some(FillKind::Solid(_)) => ("Solid".to_string(), None, None),
     Some(FillKind::Group) => ("Group".to_string(), None, None),
     Some(FillKind::Blip(_)) => ("Bitmap".to_string(), None, None),
@@ -4841,24 +5230,29 @@ fn text_body_frame_with_distances(
   offsets: TextDistances,
   text_pre_rotation: i32,
 ) -> TextFrame {
+  // ECMA-376, Part 1, 20.1.7.1 defines the DrawingML text-body inset
+  // defaults as 0.1 in horizontally and 0.05 in vertically. LibreOffice
+  // seeds the same values in Shape::setDefaults before applying bodyPr.
+  const DEFAULT_HORIZONTAL_INSET_EMU: i64 = 91_440;
+  const DEFAULT_VERTICAL_INSET_EMU: i64 = 45_720;
   let body_properties = text_body.body_properties.as_deref();
   let insets = [
     body_properties
       .and_then(|properties| properties.left_inset)
       .map(|value| units::emu_to_points(value.to_emu()))
-      .unwrap_or_default(),
+      .unwrap_or_else(|| units::emu_to_points(DEFAULT_HORIZONTAL_INSET_EMU)),
     body_properties
       .and_then(|properties| properties.top_inset)
       .map(|value| units::emu_to_points(value.to_emu()))
-      .unwrap_or_default(),
+      .unwrap_or_else(|| units::emu_to_points(DEFAULT_VERTICAL_INSET_EMU)),
     body_properties
       .and_then(|properties| properties.right_inset)
       .map(|value| units::emu_to_points(value.to_emu()))
-      .unwrap_or_default(),
+      .unwrap_or_else(|| units::emu_to_points(DEFAULT_HORIZONTAL_INSET_EMU)),
     body_properties
       .and_then(|properties| properties.bottom_inset)
       .map(|value| units::emu_to_points(value.to_emu()))
-      .unwrap_or_default(),
+      .unwrap_or_else(|| units::emu_to_points(DEFAULT_VERTICAL_INSET_EMU)),
   ];
   let offset_values = [offsets.left, offsets.top, offsets.right, offsets.bottom];
   let mut distances = [0.0; 4];
@@ -4903,6 +5297,7 @@ fn text_body_frame_with_distances(
 #[derive(Clone, Copy)]
 struct ParagraphLoweringContext<'a> {
   import: &'a PowerPointImport,
+  slide: Option<&'a SlidePersist>,
   base_style: &'a TextStyle,
   options: &'a TextLoweringOptions,
   frame: TextFrame,
@@ -4966,12 +5361,15 @@ fn lower_paragraph(
       .map(|offset| segment_start + offset)
       .unwrap_or(paragraph.runs.len());
     let text_lines = layout_text_lines(
-      context.import,
-      &paragraph_style,
-      context.base_style,
-      context.options,
+      TextLineLayoutContext {
+        import: context.import,
+        slide: context.slide,
+        paragraph_style: &paragraph_style,
+        base_style: context.base_style,
+        options: context.options,
+        column_width,
+      },
       &paragraph.runs[segment_start..segment_end],
-      column_width,
       text_metrics,
     );
     let alignment = if context.options.anchor_center {
@@ -4993,7 +5391,7 @@ fn lower_paragraph(
         && let Some(label) = bullet.label.as_deref()
       {
         let mut bullet_style = context.base_style.clone();
-        paragraph_style.apply_default_run_style(context.import, &mut bullet_style);
+        paragraph_style.apply_default_run_style(context.import, context.slide, &mut bullet_style);
         if let Some(font) = bullet.font.as_deref() {
           bullet_style.font_family = Some(Arc::from(font));
         }
@@ -5071,13 +5469,19 @@ fn lower_paragraph(
   }
 }
 
-fn layout_text_lines<'a>(
-  import: &PowerPointImport,
-  paragraph_style: &ParagraphDisplayStyle,
-  base_style: &TextStyle,
-  options: &TextLoweringOptions,
-  runs: &'a [TextRun],
+#[derive(Clone, Copy)]
+struct TextLineLayoutContext<'a> {
+  import: &'a PowerPointImport,
+  slide: Option<&'a SlidePersist>,
+  paragraph_style: &'a ParagraphDisplayStyle,
+  base_style: &'a TextStyle,
+  options: &'a TextLoweringOptions,
   column_width: f32,
+}
+
+fn layout_text_lines<'a>(
+  context: TextLineLayoutContext<'_>,
+  runs: &'a [TextRun],
   text_metrics: &mut TextMetrics,
 ) -> Vec<TextLine<'a>> {
   let visible_runs = runs
@@ -5096,7 +5500,14 @@ fn layout_text_lines<'a>(
   let mut lines = Vec::new();
   let mut current = TextLine::default();
   for run in visible_runs {
-    let style = styled_text_run(import, paragraph_style, base_style, options, run);
+    let style = styled_text_run(
+      context.import,
+      context.slide,
+      context.paragraph_style,
+      context.base_style,
+      context.options,
+      run,
+    );
     let uppercase_text;
     let text = if style.uppercase {
       uppercase_text = run.text.to_uppercase();
@@ -5110,9 +5521,9 @@ fn layout_text_lines<'a>(
         .map_or((hard_line, false), |text| (text, true));
       for token in text_wrap_tokens(line_text) {
         let width_pt = text_metrics.measure_text(token, &style);
-        if options.word_wrap
+        if context.options.word_wrap
           && current.width_pt > f32::EPSILON
-          && current.width_pt + width_pt > column_width
+          && current.width_pt + width_pt > context.column_width
         {
           trim_text_line_end(&mut current, text_metrics);
           lines.push(current);
@@ -5194,14 +5605,15 @@ fn trim_text_line_end(line: &mut TextLine<'_>, text_metrics: &mut TextMetrics) {
 
 fn styled_text_run(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   paragraph_style: &ParagraphDisplayStyle,
   base_style: &TextStyle,
   options: &TextLoweringOptions,
   run: &TextRun,
 ) -> TextStyle {
   let mut style = base_style.clone();
-  paragraph_style.apply_default_run_style(import, &mut style);
-  apply_run_properties(import, run, &mut style);
+  paragraph_style.apply_default_run_style(import, slide, &mut style);
+  apply_run_properties(import, slide, run, &mut style);
   apply_text_scale(&mut style, options);
   style
 }
@@ -5214,6 +5626,12 @@ fn apply_text_scale(style: &mut TextStyle, options: &TextLoweringOptions) {
   } else {
     style.font_size_pt * options.font_scale
   };
+  // PowerPoint's PDF path lays out type on its 600 dpi print grid. Preserve
+  // that device-space quantization before shaping: e.g. 40 pt becomes
+  // 333/600 in and 20 pt becomes 167/600 in, matching the emitted Office PDF
+  // text matrices without case-specific offsets.
+  style.font_size_pt =
+    (style.font_size_pt * POWERPOINT_PRINT_DPI / 72.0).round() * 72.0 / POWERPOINT_PRINT_DPI;
   style.character_spacing_pt *= options.font_scale;
   style.baseline_shift_pt *= options.font_scale;
 }
@@ -5252,6 +5670,11 @@ fn push_text_item(
   style: TextStyle,
   hyperlink_url: Option<String>,
 ) {
+  // A hyperlink is one semantic PDF link span even when its DrawingML text is
+  // split across several same-style runs. Let the PDF adapter coalesce those
+  // runs; preserving each whitespace-only hyperlink run independently makes
+  // extraction and link text ordering diverge from the visible line.
+  let preserve_text_portion = hyperlink_url.is_none();
   items.push(PageItem::Text(TextItem {
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
@@ -5263,7 +5686,11 @@ fn push_text_item(
     dynamic_field: None,
     form_widget_id: None,
     paragraph_bidi: false,
-    preserve_text_portion: false,
+    // DrawingML run boundaries are layout boundaries in PowerPoint's PDF
+    // output, even when adjacent runs share formatting. Preserve them so the
+    // PDF adapter does not reshape across rPr/field boundaries and introduce
+    // cross-run kerning or cumulative positioning drift.
+    preserve_text_portion,
     decoration_span_start_x_pt: None,
     pdf_text_segmentation: PdfTextSegmentation::Line,
   }));
@@ -5384,6 +5811,7 @@ fn bullet_graphic_item(
     width_pt,
     height_pt,
     crop: ImageCrop::default(),
+    clip_path: Vec::new(),
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
@@ -5402,6 +5830,7 @@ fn line_height(style: &TextStyle, line_scale: f32) -> f32 {
 
 fn estimate_wrapped_text_body_height(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   frame: TextFrame,
   text_body: &TextBody,
   base_style: &TextStyle,
@@ -5413,24 +5842,28 @@ fn estimate_wrapped_text_body_height(
   for paragraph in &text_body.paragraphs {
     let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
     let mut paragraph_base_style = base_style.clone();
-    paragraph_style.apply_default_run_style(import, &mut paragraph_base_style);
+    paragraph_style.apply_default_run_style(import, slide, &mut paragraph_base_style);
     apply_text_scale(&mut paragraph_base_style, options);
     for runs in paragraph.runs.split(|run| run.kind == TextRunKind::Break) {
-      let lines = if options.word_wrap {
-        layout_text_lines(
+      let lines = layout_text_lines(
+        TextLineLayoutContext {
           import,
-          &paragraph_style,
+          slide,
+          paragraph_style: &paragraph_style,
           base_style,
           options,
-          runs,
           column_width,
-          text_metrics,
-        )
-        .len() as f32
-      } else {
-        1.0
-      };
-      height += lines * paragraph_style.line_height(&paragraph_base_style, options);
+        },
+        runs,
+        text_metrics,
+      );
+      for line in lines {
+        let line_height = line.runs.iter().fold(
+          paragraph_style.line_height(&paragraph_base_style, options),
+          |height, run| height.max(paragraph_style.line_height(&run.style, options)),
+        );
+        height += line_height;
+      }
     }
   }
   height
@@ -5470,6 +5903,7 @@ fn push_math_ole_preview_item(
     width_pt,
     height_pt,
     crop: ImageCrop::default(),
+    clip_path: Vec::new(),
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
@@ -5712,9 +6146,14 @@ impl ParagraphDisplayStyle {
     bullet
   }
 
-  fn apply_default_run_style(&self, import: &PowerPointImport, style: &mut TextStyle) {
+  fn apply_default_run_style(
+    &self,
+    import: &PowerPointImport,
+    slide: Option<&SlidePersist>,
+    style: &mut TextStyle,
+  ) {
     if let Some(properties) = &self.default_run_properties {
-      apply_default_run_properties(import, properties, style);
+      apply_default_run_properties(import, slide, properties, style);
     }
   }
 
@@ -6236,7 +6675,12 @@ fn level_bullet_label(choice: &impl BulletChoice) -> Option<BulletKind> {
   }
 }
 
-fn apply_run_properties(import: &PowerPointImport, run: &TextRun, style: &mut TextStyle) {
+fn apply_run_properties(
+  import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
+  run: &TextRun,
+  style: &mut TextStyle,
+) {
   if run.kind == TextRunKind::Math {
     // Math OLE object. Use the Office math face for text extraction/rendering
     // of the flattened math text instead of inheriting the surrounding
@@ -6247,6 +6691,7 @@ fn apply_run_properties(import: &PowerPointImport, run: &TextRun, style: &mut Te
     return;
   };
   apply_run_common(
+    import,
     RunCommon {
       font_size: properties.font_size,
       bold: properties.bold.as_ref().map(|value| value.as_bool()),
@@ -6257,20 +6702,22 @@ fn apply_run_properties(import: &PowerPointImport, run: &TextRun, style: &mut Te
       spacing: properties.spacing,
       baseline: properties.baseline,
       latin_font: properties.latin_font.as_ref(),
+      east_asian_font: properties.east_asian_font.as_ref(),
+      complex_script_font: properties.complex_script_font.as_ref(),
       symbol_font: properties.symbol_font.as_ref(),
     },
     style,
   );
   if let Some(fill) = properties.run_properties_choice1.as_ref() {
-    apply_text_fill(import, fill, style);
+    apply_text_fill(import, slide, fill, style);
   }
   if let Some(fill) = properties.run_properties_choice4.as_ref() {
-    apply_run_underline_fill(import, fill, style);
+    apply_run_underline_fill(import, slide, fill, style);
   }
   if (properties.hyperlink_on_click.is_some() || properties.hyperlink_on_mouse_over.is_some())
     && properties.run_properties_choice1.is_none()
   {
-    apply_hyperlink_text_fill(import, style);
+    apply_hyperlink_text_fill(import, slide, style);
   }
   if (properties.hyperlink_on_click.is_some() || properties.hyperlink_on_mouse_over.is_some())
     && properties.underline.is_none()
@@ -6278,16 +6725,18 @@ fn apply_run_properties(import: &PowerPointImport, run: &TextRun, style: &mut Te
     style.underline = true;
   }
   if let Some(highlight) = properties.highlight.as_deref() {
-    apply_text_highlight(import, highlight, style);
+    apply_text_highlight(import, slide, highlight, style);
   }
 }
 
 fn apply_default_run_properties(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   properties: &a::DefaultRunProperties,
   style: &mut TextStyle,
 ) {
   apply_run_common(
+    import,
     RunCommon {
       font_size: properties.font_size,
       bold: properties.bold.as_ref().map(|value| value.as_bool()),
@@ -6298,18 +6747,20 @@ fn apply_default_run_properties(
       spacing: properties.spacing,
       baseline: properties.baseline,
       latin_font: properties.latin_font.as_ref(),
+      east_asian_font: properties.east_asian_font.as_ref(),
+      complex_script_font: properties.complex_script_font.as_ref(),
       symbol_font: properties.symbol_font.as_ref(),
     },
     style,
   );
   if let Some(fill) = properties.default_run_properties_choice1.as_ref() {
-    apply_default_text_fill(import, fill, style);
+    apply_default_text_fill(import, slide, fill, style);
   }
   if let Some(fill) = properties.default_run_properties_choice4.as_ref() {
-    apply_default_run_underline_fill(import, fill, style);
+    apply_default_run_underline_fill(import, slide, fill, style);
   }
   if let Some(highlight) = properties.highlight.as_deref() {
-    apply_text_highlight(import, highlight, style);
+    apply_text_highlight(import, slide, highlight, style);
   }
 }
 
@@ -6323,10 +6774,12 @@ struct RunCommon<'a> {
   spacing: Option<ooxmlsdk::simple_type::TextPointValue>,
   baseline: Option<ooxmlsdk::simple_type::DrawingmlPercentageValue>,
   latin_font: Option<&'a a::LatinFont>,
+  east_asian_font: Option<&'a a::EastAsianFont>,
+  complex_script_font: Option<&'a a::ComplexScriptFont>,
   symbol_font: Option<&'a a::SymbolFont>,
 }
 
-fn apply_run_common(properties: RunCommon<'_>, style: &mut TextStyle) {
+fn apply_run_common(import: &PowerPointImport, properties: RunCommon<'_>, style: &mut TextStyle) {
   if let Some(font_size) = properties.font_size {
     style.font_size_pt = ooxmlsdk::units::drawingml_text_size_to_points(font_size) as f32;
   }
@@ -6358,19 +6811,38 @@ fn apply_run_common(properties: RunCommon<'_>, style: &mut TextStyle) {
     .and_then(|font| font.typeface.as_ref())
     .filter(|typeface| !typeface.is_empty())
   {
-    style.font_family = Some(Arc::from(typeface.as_str()));
+    style.font_family = Some(Arc::from(resolve_theme_font(import, typeface)));
+  }
+  if let Some(typeface) = properties
+    .east_asian_font
+    .and_then(|font| font.typeface.as_ref())
+    .filter(|typeface| !typeface.is_empty())
+  {
+    style.east_asia_font_family = Some(Arc::from(resolve_theme_font(import, typeface)));
+  }
+  if let Some(typeface) = properties
+    .complex_script_font
+    .and_then(|font| font.typeface.as_ref())
+    .filter(|typeface| !typeface.is_empty())
+  {
+    style.complex_font_family = Some(Arc::from(resolve_theme_font(import, typeface)));
   }
   if let Some(typeface) = properties
     .symbol_font
     .and_then(|font| font.typeface.as_ref())
     .filter(|typeface| !typeface.is_empty())
   {
-    style.symbol_font_family = Some(Arc::from(typeface.as_str()));
+    style.symbol_font_family = Some(Arc::from(resolve_theme_font(import, typeface)));
   }
+}
+
+fn resolve_theme_font<'a>(import: &'a PowerPointImport, typeface: &'a str) -> &'a str {
+  import.resolve_theme_font(typeface).unwrap_or(typeface)
 }
 
 fn apply_text_fill(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   fill: &a::RunPropertiesChoice,
   style: &mut TextStyle,
 ) {
@@ -6385,17 +6857,17 @@ fn apply_text_fill(
         .solid_fill_choice
         .as_ref()
         .and_then(Color::from_solid_fill_choice)
-        .and_then(|color| display_paint(import, &color, None))
+        .and_then(|color| display_paint_for_optional_slide(import, slide, &color, None))
       {
         style.color = color.color;
         style.opacity = color.opacity;
       }
     }
     a::RunPropertiesChoice::GradientFill(fill) => {
-      apply_best_solid_text_fill(import, Color::best_solid_gradient_color(fill), style);
+      apply_best_solid_text_fill(import, slide, Color::best_solid_gradient_color(fill), style);
     }
     a::RunPropertiesChoice::PatternFill(fill) => {
-      apply_best_solid_text_fill(import, Color::best_solid_pattern_color(fill), style);
+      apply_best_solid_text_fill(import, slide, Color::best_solid_pattern_color(fill), style);
     }
     a::RunPropertiesChoice::BlipFill(_) | a::RunPropertiesChoice::GroupFill => {}
   }
@@ -6403,6 +6875,7 @@ fn apply_text_fill(
 
 fn apply_default_text_fill(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   fill: &a::DefaultRunPropertiesChoice,
   style: &mut TextStyle,
 ) {
@@ -6417,17 +6890,17 @@ fn apply_default_text_fill(
         .solid_fill_choice
         .as_ref()
         .and_then(Color::from_solid_fill_choice)
-        .and_then(|color| display_paint(import, &color, None))
+        .and_then(|color| display_paint_for_optional_slide(import, slide, &color, None))
       {
         style.color = color.color;
         style.opacity = color.opacity;
       }
     }
     a::DefaultRunPropertiesChoice::GradientFill(fill) => {
-      apply_best_solid_text_fill(import, Color::best_solid_gradient_color(fill), style);
+      apply_best_solid_text_fill(import, slide, Color::best_solid_gradient_color(fill), style);
     }
     a::DefaultRunPropertiesChoice::PatternFill(fill) => {
-      apply_best_solid_text_fill(import, Color::best_solid_pattern_color(fill), style);
+      apply_best_solid_text_fill(import, slide, Color::best_solid_pattern_color(fill), style);
     }
     a::DefaultRunPropertiesChoice::BlipFill(_) | a::DefaultRunPropertiesChoice::GroupFill => {}
   }
@@ -6435,11 +6908,14 @@ fn apply_default_text_fill(
 
 fn apply_best_solid_text_fill(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   color: Option<Color>,
   style: &mut TextStyle,
 ) {
   // maps DrawingML character fill to CharColor via getBestSolidColor().
-  if let Some(color) = color.and_then(|color| display_paint(import, &color, None)) {
+  if let Some(color) =
+    color.and_then(|color| display_paint_for_optional_slide(import, slide, &color, None))
+  {
     style.color = color.color;
     style.opacity = color.opacity;
   }
@@ -6447,6 +6923,7 @@ fn apply_best_solid_text_fill(
 
 fn apply_text_highlight(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   highlight: &a::Highlight,
   style: &mut TextStyle,
 ) {
@@ -6455,7 +6932,7 @@ fn apply_text_highlight(
     .highlight_choice
     .as_ref()
     .and_then(Color::from_highlight_choice)
-    .and_then(|color| display_paint(import, &color, None))
+    .and_then(|color| display_paint_for_optional_slide(import, slide, &color, None))
   {
     style.highlight = Some(color.color);
   }
@@ -6463,47 +6940,60 @@ fn apply_text_highlight(
 
 fn apply_run_underline_fill(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   fill: &a::RunPropertiesChoice4,
   style: &mut TextStyle,
 ) {
   match fill {
     a::RunPropertiesChoice4::UnderlineFillText => style.underline_color = None,
-    a::RunPropertiesChoice4::UnderlineFill(fill) => apply_underline_fill(import, fill, style),
+    a::RunPropertiesChoice4::UnderlineFill(fill) => {
+      apply_underline_fill(import, slide, fill, style)
+    }
   }
 }
 
 fn apply_default_run_underline_fill(
   import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
   fill: &a::DefaultRunPropertiesChoice4,
   style: &mut TextStyle,
 ) {
   match fill {
     a::DefaultRunPropertiesChoice4::UnderlineFillText => style.underline_color = None,
     a::DefaultRunPropertiesChoice4::UnderlineFill(fill) => {
-      apply_underline_fill(import, fill, style)
+      apply_underline_fill(import, slide, fill, style)
     }
   }
 }
 
-fn apply_underline_fill(import: &PowerPointImport, fill: &a::UnderlineFill, style: &mut TextStyle) {
+fn apply_underline_fill(
+  import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
+  fill: &a::UnderlineFill,
+  style: &mut TextStyle,
+) {
   // parses a:uFill through SimpleFillPropertiesContext into maUnderlineColor.
   if let Some(color) = fill
     .underline_fill_choice
     .as_ref()
     .and_then(Color::from_underline_fill_choice)
-    .and_then(|color| display_paint(import, &color, None))
+    .and_then(|color| display_paint_for_optional_slide(import, slide, &color, None))
   {
     style.underline_color = Some(color.color);
   }
 }
 
-fn apply_hyperlink_text_fill(import: &PowerPointImport, style: &mut TextStyle) {
+fn apply_hyperlink_text_fill(
+  import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
+  style: &mut TextStyle,
+) {
   // color hlink when a hyperlink field has no explicit CharColor.
   let color = Color::Scheme(SchemeColor {
     value: a::SchemeColorValues::Hyperlink,
     transformations: Vec::new(),
   });
-  if let Some(color) = display_paint(import, &color, None) {
+  if let Some(color) = display_paint_for_optional_slide(import, slide, &color, None) {
     style.color = color.color;
     style.opacity = color.opacity;
   }
@@ -6527,6 +7017,7 @@ fn fill_paint(import: &PowerPointImport, fill: &FillProperties) -> Option<Displa
       .as_ref()
       .and_then(|color| display_paint(import, color, fill.placeholder_color.as_ref())),
     FillKind::None
+    | FillKind::SlideBackground
     | FillKind::Group
     | FillKind::Gradient(_)
     | FillKind::Blip(_)
@@ -6534,13 +7025,47 @@ fn fill_paint(import: &PowerPointImport, fill: &FillProperties) -> Option<Displa
   }
 }
 
-fn line_stroke(import: &PowerPointImport, line: &LineProperties) -> Option<DisplayStroke> {
+fn shape_fill_paint(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  fill: &FillProperties,
+) -> Option<DisplayPaint> {
+  if !matches!(fill.kind, FillKind::SlideBackground) {
+    return fill_paint(import, fill);
+  }
+
+  let Some(background) = resolved_slide_background_fill(import, slide) else {
+    return Some(default_page_background_paint());
+  };
+  match background.kind {
+    // A no-fill page still exposes the PDF page's default white surface.
+    FillKind::None => Some(default_page_background_paint()),
+    _ => background_fill_paint(import, slide, &background),
+  }
+}
+
+fn default_page_background_paint() -> DisplayPaint {
+  DisplayPaint {
+    color: RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    },
+    opacity: 1.0,
+  }
+}
+
+fn line_stroke(
+  import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
+  line: &LineProperties,
+) -> Option<DisplayStroke> {
   let LineFill::Solid(color) = &line.fill else {
     return None;
   };
-  let paint = color
-    .as_ref()
-    .and_then(|color| display_paint(import, color, line.placeholder_color.as_ref()))?;
+  let paint = color.as_ref().and_then(|color| {
+    display_paint_for_optional_slide(import, slide, color, line.placeholder_color.as_ref())
+  })?;
   Some(DisplayStroke {
     style: BorderStyle {
       width_pt: line.width_emu.map(units::emu_to_points).unwrap_or(0.75),
@@ -6583,6 +7108,18 @@ fn display_paint_for_slide(
     },
     opacity: color_opacity(color.alpha),
   })
+}
+
+fn display_paint_for_optional_slide(
+  import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
+  color: &Color,
+  placeholder_color: Option<&Color>,
+) -> Option<DisplayPaint> {
+  match slide {
+    Some(slide) => display_paint_for_slide(import, slide, color, placeholder_color),
+    None => display_paint(import, color, placeholder_color),
+  }
 }
 
 fn color_opacity(alpha: i32) -> f32 {

@@ -13,6 +13,9 @@ pub struct PdfOptions {
   /// Input file name used by spreadsheet formulas such as CELL("filename").
   pub source_file_name: Option<String>,
 
+  /// BCP 47 user-interface language for generated document labels.
+  pub ui_language: Option<String>,
+
   pub general: PdfGeneralOptions,
   pub images: PdfImageOptions,
   pub links: PdfLinkOptions,
@@ -30,6 +33,7 @@ impl Default for PdfOptions {
       compress_content_streams: true,
       jpeg_quality: None,
       source_file_name: None,
+      ui_language: None,
       general: PdfGeneralOptions::default(),
       images: PdfImageOptions::default(),
       links: PdfLinkOptions::default(),
@@ -50,6 +54,7 @@ impl PdfOptions {
   pub(crate) fn take_layout_options(&mut self) -> ooxmlsdk_layout::options::LayoutOptions {
     ooxmlsdk_layout::options::LayoutOptions {
       source_file_name: self.source_file_name.take(),
+      ui_language: self.ui_language.take(),
       ..Default::default()
     }
   }

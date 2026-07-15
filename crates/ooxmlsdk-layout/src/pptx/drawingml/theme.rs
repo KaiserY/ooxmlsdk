@@ -37,6 +37,8 @@ pub(crate) struct ThemeFontScheme {
   pub(crate) minor_east_asian: Option<String>,
   pub(crate) major_complex_script: Option<String>,
   pub(crate) minor_complex_script: Option<String>,
+  pub(crate) major_supplemental_fonts: Vec<(String, String)>,
+  pub(crate) minor_supplemental_fonts: Vec<(String, String)>,
 }
 
 impl ThemeColorScheme {
@@ -168,6 +170,8 @@ impl ThemeFontScheme {
       minor_east_asian: text_font_typeface(&scheme.minor_font.east_asian_font.typeface),
       major_complex_script: text_font_typeface(&scheme.major_font.complex_script_font.typeface),
       minor_complex_script: text_font_typeface(&scheme.minor_font.complex_script_font.typeface),
+      major_supplemental_fonts: supplemental_fonts(&scheme.major_font.supplemental_font),
+      minor_supplemental_fonts: supplemental_fonts(&scheme.minor_font.supplemental_font),
     }
   }
 
@@ -177,6 +181,70 @@ impl ThemeFontScheme {
       a::FontCollectionIndexValues::Minor => self.minor_latin.as_deref(),
       a::FontCollectionIndexValues::None => None,
     }
+  }
+
+  pub(crate) fn resolve_font(&self, placeholder: &str) -> Option<&str> {
+    match placeholder {
+      "+mj-lt" | "majorHAnsi" | "majorAscii" => self.major_latin.as_deref(),
+      "+mj-ea" | "majorEastAsia" => self.major_east_asian.as_deref(),
+      "+mj-cs" | "majorBidi" => self.major_complex_script.as_deref(),
+      "+mn-lt" | "minorHAnsi" | "minorAscii" => self.minor_latin.as_deref(),
+      "+mn-ea" | "minorEastAsia" => self.minor_east_asian.as_deref(),
+      "+mn-cs" | "minorBidi" => self.minor_complex_script.as_deref(),
+      _ => None,
+    }
+  }
+
+  pub(crate) fn resolve_font_for_language(
+    &self,
+    placeholder: &str,
+    language: Option<&str>,
+  ) -> Option<&str> {
+    if let Some(font) = self.resolve_font(placeholder) {
+      return Some(font);
+    }
+    let script = language.and_then(language_script)?;
+    let supplemental_fonts = match placeholder {
+      "+mj-ea" | "majorEastAsia" => &self.major_supplemental_fonts,
+      "+mn-ea" | "minorEastAsia" => &self.minor_supplemental_fonts,
+      _ => return None,
+    };
+    supplemental_fonts
+      .iter()
+      .find(|(candidate, _)| candidate.eq_ignore_ascii_case(script))
+      .map(|(_, typeface)| typeface.as_str())
+  }
+}
+
+fn supplemental_fonts(fonts: &[a::SupplementalFont]) -> Vec<(String, String)> {
+  fonts
+    .iter()
+    .filter(|font| !font.script.is_empty() && !font.typeface.is_empty())
+    .map(|font| (font.script.clone(), font.typeface.clone()))
+    .collect()
+}
+
+fn language_script(language: &str) -> Option<&'static str> {
+  let language = language.to_ascii_lowercase();
+  if language == "zh-hant"
+    || language.starts_with("zh-hant-")
+    || language == "zh-tw"
+    || language == "zh-hk"
+    || language == "zh-mo"
+  {
+    Some("Hant")
+  } else if language == "zh"
+    || language.starts_with("zh-hans")
+    || language == "zh-cn"
+    || language == "zh-sg"
+  {
+    Some("Hans")
+  } else if language == "ja" || language.starts_with("ja-") {
+    Some("Jpan")
+  } else if language == "ko" || language.starts_with("ko-") {
+    Some("Hang")
+  } else {
+    None
   }
 }
 
@@ -325,5 +393,62 @@ fn color_from_followed_hyperlink(
     a::FollowedHyperlinkColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::FollowedHyperlinkColorChoice::SystemColor(color) => Some(system_color(color)),
     a::FollowedHyperlinkColorChoice::PresetColor(color) => Some(preset_color(color)),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::ThemeFontScheme;
+
+  #[test]
+  fn resolves_all_drawingml_theme_font_placeholders() {
+    let scheme = ThemeFontScheme {
+      name: "Office".to_string(),
+      major_latin: Some("Major Latin".to_string()),
+      minor_latin: Some("Minor Latin".to_string()),
+      major_east_asian: Some("Major EA".to_string()),
+      minor_east_asian: Some("Minor EA".to_string()),
+      major_complex_script: Some("Major CS".to_string()),
+      minor_complex_script: Some("Minor CS".to_string()),
+      major_supplemental_fonts: Vec::new(),
+      minor_supplemental_fonts: Vec::new(),
+    };
+
+    for (placeholder, expected) in [
+      ("+mj-lt", "Major Latin"),
+      ("+mj-ea", "Major EA"),
+      ("+mj-cs", "Major CS"),
+      ("+mn-lt", "Minor Latin"),
+      ("+mn-ea", "Minor EA"),
+      ("+mn-cs", "Minor CS"),
+    ] {
+      assert_eq!(scheme.resolve_font(placeholder), Some(expected));
+    }
+    assert_eq!(scheme.resolve_font("Calibri"), None);
+  }
+
+  #[test]
+  fn resolves_east_asian_supplemental_font_from_ui_language_script() {
+    let scheme = ThemeFontScheme {
+      minor_supplemental_fonts: vec![
+        ("Hans".to_string(), "SimSun".to_string()),
+        ("Hant".to_string(), "PMingLiU".to_string()),
+        ("Jpan".to_string(), "Yu Gothic".to_string()),
+      ],
+      ..Default::default()
+    };
+
+    assert_eq!(
+      scheme.resolve_font_for_language("+mn-ea", Some("zh-CN")),
+      Some("SimSun")
+    );
+    assert_eq!(
+      scheme.resolve_font_for_language("+mn-ea", Some("zh-TW")),
+      Some("PMingLiU")
+    );
+    assert_eq!(
+      scheme.resolve_font_for_language("+mn-ea", Some("ja-JP")),
+      Some("Yu Gothic")
+    );
   }
 }

@@ -290,6 +290,7 @@ pub fn layout_anchor_pages(
   let document = extract(package, options)?;
   let anchor_options = LayoutOptions {
     source_file_name: None,
+    ui_language: options.ui_language.clone(),
     action: LayoutActionOptions {
       paint: false,
       ..options.action

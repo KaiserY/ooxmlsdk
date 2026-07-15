@@ -22,10 +22,441 @@ pub struct ChartSeriesRef<'a> {
   pub data_labels: Option<&'a c::DataLabels>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ChartDataPointFill<'a> {
   pub index: u32,
   pub fill: &'a a::SolidFill,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ChartTitleText {
+  Explicit(String),
+  Automatic,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ChartLegendPosition {
+  Bottom,
+  Top,
+  Left,
+  Right,
+  TopRight,
+}
+
+#[derive(Clone, Debug)]
+pub struct ClusteredColumnSeries<'a> {
+  pub name: String,
+  pub values: Vec<Option<f64>>,
+  pub solid_fill: Option<&'a a::SolidFill>,
+  pub data_point_fills: Vec<ChartDataPointFill<'a>>,
+  pub data_labels: Vec<ClusteredColumnDataLabel>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClusteredColumnDataLabel {
+  pub point_index: usize,
+  pub text: String,
+  pub position: c::DataLabelPositionValues,
+}
+
+#[derive(Clone, Debug)]
+pub struct ClusteredColumnChart<'a> {
+  pub title: Option<ChartTitleText>,
+  pub categories: Vec<String>,
+  pub series: Vec<ClusteredColumnSeries<'a>>,
+  pub gap_width_percent: f64,
+  pub overlap_percent: f64,
+  pub value_axis: Option<&'a c::ValueAxis>,
+  pub legend_position: Option<ChartLegendPosition>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LinearAxisScale {
+  pub minimum: f64,
+  pub maximum: f64,
+  pub major_unit: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ClusteredColumnSlot {
+  pub center: f64,
+  pub width: f64,
+}
+
+pub fn automatic_chart_title(ui_language: Option<&str>) -> &'static str {
+  let language = ui_language.unwrap_or("en").to_ascii_lowercase();
+  if language == "zh-tw" || language == "zh-hk" || language == "zh-mo" || language == "zh-hant" {
+    "圖表標題"
+  } else if language == "zh" || language == "zh-cn" || language == "zh-sg" || language == "zh-hans"
+  {
+    "图表标题"
+  } else {
+    "Chart Title"
+  }
+}
+
+/// Extracts the first ordinary two-dimensional clustered column chart.
+///
+/// Cached category/value sequences are data sources, not inherently visible
+/// text.  Keeping them in a typed chart model lets each renderer decide which
+/// labels are visible from the chart/axis/data-label settings.
+pub fn clustered_column_chart(chart_space: &c::ChartSpace) -> Option<ClusteredColumnChart<'_>> {
+  let bar_chart = chart_space
+    .chart
+    .plot_area
+    .plot_area_choice1
+    .iter()
+    .find_map(|choice| match choice {
+      c::PlotAreaChoice::BarChart(chart)
+        if chart.bar_direction.val == c::BarDirectionValues::Column
+          && chart
+            .bar_grouping
+            .as_ref()
+            .and_then(|grouping| grouping.val)
+            .unwrap_or(c::BarGroupingValues::Clustered)
+            == c::BarGroupingValues::Clustered =>
+      {
+        Some(chart.as_ref())
+      }
+      _ => None,
+    })?;
+
+  let mut series = Vec::with_capacity(bar_chart.bar_chart_series.len());
+  let mut categories = Vec::new();
+  for (series_index, source) in bar_chart.bar_chart_series.iter().enumerate() {
+    let series_ref = bar_series_ref(source);
+    let name = series_ref
+      .series_text
+      .map(series_text_value)
+      .filter(|value| !value.is_empty())
+      .unwrap_or_else(|| default_series_label(series_ref, series_index + 1));
+    if categories.is_empty() {
+      categories = source
+        .category_axis_data
+        .as_deref()
+        .map(indexed_category_axis_text_values)
+        .unwrap_or_default();
+    }
+    let values = source
+      .values
+      .as_deref()
+      .map(indexed_values)
+      .unwrap_or_default();
+    let solid_fill = source
+      .chart_shape_properties
+      .as_deref()
+      .and_then(chart_shape_solid_fill);
+    let mut data_point_fills = Vec::new();
+    collect_data_point_solid_fills(&source.data_point, &mut data_point_fills);
+    data_point_fills.sort_by_key(|fill| fill.index);
+    let data_labels = clustered_column_data_labels(source, &values);
+    series.push(ClusteredColumnSeries {
+      name,
+      values,
+      solid_fill,
+      data_point_fills,
+      data_labels,
+    });
+  }
+
+  let title = chart_title_text(&chart_space.chart);
+  let value_axis = chart_space
+    .chart
+    .plot_area
+    .plot_area_choice2
+    .iter()
+    .find_map(|choice| match choice {
+      c::PlotAreaChoice2::ValueAxis(axis) => Some(axis.as_ref()),
+      _ => None,
+    });
+  let legend_position = chart_space.chart.legend.as_deref().map(|legend| {
+    match legend
+      .legend_position
+      .as_ref()
+      .and_then(|position| position.val)
+      .unwrap_or(c::LegendPositionValues::Right)
+    {
+      c::LegendPositionValues::Bottom => ChartLegendPosition::Bottom,
+      c::LegendPositionValues::Top => ChartLegendPosition::Top,
+      c::LegendPositionValues::Left => ChartLegendPosition::Left,
+      c::LegendPositionValues::Right => ChartLegendPosition::Right,
+      c::LegendPositionValues::TopRight => ChartLegendPosition::TopRight,
+    }
+  });
+
+  Some(ClusteredColumnChart {
+    title,
+    categories,
+    series,
+    gap_width_percent: f64::from(
+      bar_chart
+        .gap_width
+        .as_ref()
+        .and_then(|gap| gap.val)
+        .unwrap_or(150),
+    ),
+    overlap_percent: f64::from(
+      bar_chart
+        .overlap
+        .as_ref()
+        .and_then(|overlap| overlap.val)
+        .unwrap_or(0),
+    ),
+    value_axis,
+    legend_position,
+  })
+}
+
+fn clustered_column_data_labels(
+  series: &c::BarChartSeries,
+  values: &[Option<f64>],
+) -> Vec<ClusteredColumnDataLabel> {
+  let Some(labels) = series.data_labels.as_deref() else {
+    return Vec::new();
+  };
+  let group = match labels.data_labels_choice.as_ref() {
+    Some(c::DataLabelsChoice::Sequence(sequence)) => Some(sequence.as_ref()),
+    _ => None,
+  };
+  let mut result = Vec::new();
+  for label in &labels.data_label {
+    if label.data_label_choice.iter().any(|choice| {
+      matches!(choice, c::DataLabelChoice::Delete(delete) if delete.val.is_none_or(|value| value.as_bool()))
+    }) {
+      continue;
+    }
+    let sequence = label
+      .data_label_choice
+      .iter()
+      .find_map(|choice| match choice {
+        c::DataLabelChoice::Sequence(sequence) => Some(sequence.as_ref()),
+        _ => None,
+      });
+    let Ok(point_index) = usize::try_from(label.index.val) else {
+      continue;
+    };
+    let Some(value) = values.get(point_index).copied().flatten() else {
+      continue;
+    };
+    let show_value = sequence
+      .and_then(|sequence| sequence.show_value.as_ref())
+      .and_then(|show| show.val)
+      .or_else(|| {
+        group
+          .and_then(|sequence| sequence.show_value.as_ref())
+          .and_then(|show| show.val)
+      })
+      .is_some_and(|value| value.as_bool());
+    let chart_text = sequence.and_then(|sequence| sequence.chart_text.as_deref());
+    let text = chart_text
+      .map(|text| data_label_chart_text(text, value))
+      .filter(|text| !text.is_empty())
+      .or_else(|| show_value.then(|| general_chart_number(value)));
+    let Some(text) = text else {
+      continue;
+    };
+    let position = sequence
+      .and_then(|sequence| sequence.data_label_position.as_ref())
+      .or_else(|| group.and_then(|sequence| sequence.data_label_position.as_ref()))
+      .map(|position| position.val)
+      .unwrap_or(c::DataLabelPositionValues::OutsideEnd);
+    result.push(ClusteredColumnDataLabel {
+      point_index,
+      text,
+      position,
+    });
+  }
+  result.sort_by_key(|label| label.point_index);
+  result
+}
+
+fn data_label_chart_text(chart_text: &c::ChartText, value: f64) -> String {
+  let Some(c::ChartTextChoice::RichText(rich)) = chart_text.chart_text_choice.as_ref() else {
+    let mut values = Vec::new();
+    push_chart_text(&mut values, chart_text);
+    return values.join(" ");
+  };
+  let mut result = String::new();
+  for paragraph in &rich.paragraph {
+    for choice in &paragraph.paragraph_choice {
+      match choice {
+        a::ParagraphChoice::Run(run) => result.push_str(&run.text),
+        a::ParagraphChoice::Field(field)
+          if field
+            .r#type
+            .as_deref()
+            .is_some_and(|field_type| field_type.eq_ignore_ascii_case("VALUE")) =>
+        {
+          result.push_str(&general_chart_number(value));
+        }
+        a::ParagraphChoice::Field(field) => {
+          if let Some(text) = field.text.as_deref() {
+            result.push_str(text);
+          }
+        }
+        a::ParagraphChoice::Break(_) => result.push('\n'),
+        a::ParagraphChoice::TextMath(math) => result.push_str(&text_math_text(math)),
+      }
+    }
+  }
+  result.trim().to_string()
+}
+
+fn general_chart_number(value: f64) -> String {
+  if value.fract().abs() < 1.0e-12 {
+    format!("{value:.0}")
+  } else {
+    let mut result = format!("{value:.15}");
+    while result.ends_with('0') {
+      result.pop();
+    }
+    if result.ends_with('.') {
+      result.pop();
+    }
+    result
+  }
+}
+
+/// LibreOffice's `CategoryPositionHelper` slot calculation translated to a
+/// normalized plot-area coordinate. OOXML gap width becomes its outer distance
+/// and overlap becomes the negated inner distance.
+pub fn clustered_column_slot(
+  category_index: usize,
+  series_index: usize,
+  category_count: usize,
+  series_count: usize,
+  gap_width_percent: f64,
+  overlap_percent: f64,
+) -> Option<ClusteredColumnSlot> {
+  if category_index >= category_count || series_index >= series_count || series_count == 0 {
+    return None;
+  }
+  let category_width = 1.0 / category_count as f64;
+  let outer_distance = (gap_width_percent / 100.0).clamp(0.0, 6.0);
+  let inner_distance = (-overlap_percent / 100.0).clamp(-1.0, 1.0);
+  let slot_width = category_width
+    / (series_count as f64
+      + outer_distance
+      + inner_distance * (series_count.saturating_sub(1)) as f64);
+  let category_center = (category_index as f64 + 0.5) * category_width;
+  let center = category_center - category_width / 2.0
+    + (outer_distance / 2.0 + series_index as f64 * (1.0 + inner_distance)) * slot_width
+    + slot_width / 2.0;
+  Some(ClusteredColumnSlot {
+    center,
+    width: slot_width,
+  })
+}
+
+/// Calculates a linear numeric axis using the same broad rules as
+/// LibreOffice `ScaleAutomatism::calculateExplicitIncrementAndScaleForLinear`:
+/// wide all-positive ranges expand to zero, automatic intervals normalize to
+/// 1/2/5 x 10^n, limits align to the interval rhythm, and a value sitting on
+/// the upper border receives one interval of breathing room.
+pub fn linear_axis_scale(
+  values: impl IntoIterator<Item = f64>,
+  axis: Option<&c::ValueAxis>,
+  maximum_auto_increment_count: usize,
+) -> Option<LinearAxisScale> {
+  let mut source_minimum = f64::INFINITY;
+  let mut source_maximum = f64::NEG_INFINITY;
+  for value in values.into_iter().filter(|value| value.is_finite()) {
+    source_minimum = source_minimum.min(value);
+    source_maximum = source_maximum.max(value);
+  }
+  if !source_minimum.is_finite() || !source_maximum.is_finite() {
+    return None;
+  }
+
+  let explicit_minimum = axis.and_then(|axis| axis.scaling.min_axis_value.as_ref().map(|v| v.val));
+  let explicit_maximum = axis.and_then(|axis| axis.scaling.max_axis_value.as_ref().map(|v| v.val));
+  let explicit_unit = axis.map(|axis| axis.major_unit.as_ref().map(|unit| unit.val));
+  let mut temporary_minimum = explicit_minimum.unwrap_or(source_minimum);
+  let mut temporary_maximum = explicit_maximum.unwrap_or(source_maximum);
+  if temporary_minimum > temporary_maximum {
+    std::mem::swap(&mut temporary_minimum, &mut temporary_maximum);
+  }
+  if explicit_minimum.is_none()
+    && temporary_minimum > 0.0
+    && (temporary_minimum == temporary_maximum || temporary_minimum / temporary_maximum < 5.0 / 6.0)
+  {
+    temporary_minimum = 0.0;
+  }
+  if temporary_minimum == temporary_maximum {
+    if temporary_maximum == 0.0 {
+      temporary_maximum = 1.0;
+    } else {
+      temporary_maximum *= 2.0;
+    }
+  }
+
+  let max_increments = maximum_auto_increment_count.clamp(2, 10);
+  let mut major_unit = explicit_unit
+    .flatten()
+    .filter(|unit| unit.is_finite() && *unit > 0.0)
+    .unwrap_or_else(|| {
+      nice_increment((temporary_maximum - temporary_minimum) / max_increments as f64)
+    });
+  let automatic_unit = explicit_unit.flatten().is_none();
+  loop {
+    let minimum =
+      explicit_minimum.unwrap_or_else(|| increment_floor(temporary_minimum, major_unit));
+    let mut maximum =
+      explicit_maximum.unwrap_or_else(|| increment_ceil(temporary_maximum, major_unit));
+    if explicit_maximum.is_none()
+      && maximum != 0.0
+      && (source_maximum - minimum) / (maximum - minimum) > 20.0 / 21.0
+    {
+      maximum += major_unit;
+    }
+    let increment_count = ((maximum - minimum) / major_unit).floor() as usize;
+    if increment_count <= max_increments || !automatic_unit {
+      return Some(LinearAxisScale {
+        minimum,
+        maximum,
+        major_unit,
+      });
+    }
+    major_unit = next_nice_increment(major_unit);
+  }
+}
+
+fn nice_increment(raw: f64) -> f64 {
+  if !raw.is_finite() || raw <= 1.0e-307 {
+    return 1.0e-307;
+  }
+  let magnitude = 10.0_f64.powf(raw.log10().floor());
+  let normalized = raw / magnitude;
+  let normalized = if normalized <= 1.0 {
+    1.0
+  } else if normalized <= 2.0 {
+    2.0
+  } else if normalized <= 5.0 {
+    5.0
+  } else {
+    10.0
+  };
+  normalized * magnitude
+}
+
+fn next_nice_increment(current: f64) -> f64 {
+  let magnitude = 10.0_f64.powf(current.log10().floor());
+  let normalized = current / magnitude;
+  if normalized < 1.5 {
+    2.0 * magnitude
+  } else if normalized < 3.5 {
+    5.0 * magnitude
+  } else {
+    10.0 * magnitude
+  }
+}
+
+fn increment_floor(value: f64, increment: f64) -> f64 {
+  (value / increment).floor() * increment
+}
+
+fn increment_ceil(value: f64, increment: f64) -> f64 {
+  (value / increment).ceil() * increment
 }
 
 pub fn kind(chart_space: &c::ChartSpace) -> ChartKind {
@@ -381,6 +812,118 @@ fn collect_data_point_solid_fills<'a>(
       fill,
     });
   }
+}
+
+pub fn chart_shape_solid_fill(properties: &c::ChartShapeProperties) -> Option<&a::SolidFill> {
+  match properties.chart_shape_properties_choice2.as_ref()? {
+    c::ChartShapePropertiesChoice2::SolidFill(fill) => Some(fill.as_ref()),
+    _ => None,
+  }
+}
+
+fn chart_title_text(chart: &c::Chart) -> Option<ChartTitleText> {
+  let title = chart.title.as_deref()?;
+  if let Some(chart_text) = title.chart_text.as_deref() {
+    let mut values = Vec::new();
+    push_chart_text(&mut values, chart_text);
+    let value = values.join(" ");
+    if !value.is_empty() {
+      return Some(ChartTitleText::Explicit(value));
+    }
+  }
+  chart
+    .auto_title_deleted
+    .as_ref()
+    .and_then(|value| value.val)
+    .is_none_or(|value| !value.as_bool())
+    .then_some(ChartTitleText::Automatic)
+}
+
+fn series_text_value(series_text: &c::SeriesText) -> String {
+  let mut values = Vec::new();
+  push_series_text(&mut values, series_text);
+  values.join(" ")
+}
+
+fn indexed_category_axis_text_values(data: &c::CategoryAxisData) -> Vec<String> {
+  match data.category_axis_data_choice.as_ref() {
+    Some(c::CategoryAxisDataChoice::StringReference(reference)) => reference
+      .string_cache
+      .as_deref()
+      .map(|cache| indexed_string_points(&cache.string_point))
+      .unwrap_or_default(),
+    Some(c::CategoryAxisDataChoice::StringLiteral(literal)) => {
+      indexed_string_points(&literal.string_point)
+    }
+    Some(c::CategoryAxisDataChoice::NumberReference(reference)) => reference
+      .numbering_cache
+      .as_deref()
+      .map(|cache| indexed_numeric_point_texts(&cache.numeric_point))
+      .unwrap_or_default(),
+    Some(c::CategoryAxisDataChoice::NumberLiteral(literal)) => {
+      indexed_numeric_point_texts(&literal.numeric_point)
+    }
+    _ => Vec::new(),
+  }
+}
+
+fn indexed_values(values: &c::Values) -> Vec<Option<f64>> {
+  let points = match values.values_choice.as_ref() {
+    Some(c::ValuesChoice::NumberReference(reference)) => reference
+      .numbering_cache
+      .as_deref()
+      .map(|cache| cache.numeric_point.as_slice()),
+    Some(c::ValuesChoice::NumberLiteral(literal)) => Some(literal.numeric_point.as_slice()),
+    None => None,
+  };
+  let Some(points) = points else {
+    return Vec::new();
+  };
+  let length = points
+    .iter()
+    .filter_map(|point| usize::try_from(point.index).ok())
+    .max()
+    .map_or(0, |index| index + 1);
+  let mut result = vec![None; length];
+  for point in points {
+    let Ok(index) = usize::try_from(point.index) else {
+      continue;
+    };
+    result[index] = point.numeric_value.trim().parse::<f64>().ok();
+  }
+  result
+}
+
+fn indexed_string_points(points: &[c::StringPoint]) -> Vec<String> {
+  let length = points
+    .iter()
+    .filter_map(|point| usize::try_from(point.index).ok())
+    .max()
+    .map_or(0, |index| index + 1);
+  let mut result = vec![String::new(); length];
+  for point in points {
+    let Ok(index) = usize::try_from(point.index) else {
+      continue;
+    };
+    result[index] = point.numeric_value.trim().to_string();
+  }
+  result
+}
+
+fn indexed_numeric_point_texts(points: &[c::NumericPoint]) -> Vec<String> {
+  let length = points
+    .iter()
+    .filter_map(|point| usize::try_from(point.index).ok())
+    .max()
+    .map_or(0, |index| index + 1);
+  let mut result = vec![String::new(); length];
+  for point in points {
+    let Ok(index) = usize::try_from(point.index) else {
+      continue;
+    };
+    result[index] = point.numeric_value.trim().to_string();
+  }
+  result
 }
 
 pub fn scheme_color_token(
@@ -831,4 +1374,41 @@ fn push_unique_text(texts: &mut Vec<String>, value: &str) {
     return;
   }
   texts.push(trimmed.to_string());
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{automatic_chart_title, clustered_column_slot, linear_axis_scale};
+
+  #[test]
+  fn automatic_title_uses_the_output_ui_language_not_the_chart_editing_language() {
+    assert_eq!(automatic_chart_title(Some("zh-CN")), "图表标题");
+    assert_eq!(automatic_chart_title(Some("zh-TW")), "圖表標題");
+    assert_eq!(automatic_chart_title(Some("en-US")), "Chart Title");
+  }
+
+  #[test]
+  fn linear_scale_expands_a_wide_positive_range_to_zero_and_past_border_value() {
+    let scale = linear_axis_scale(
+      [4.3, 2.5, 3.5, 4.5, 2.4, 4.4, 1.8, 2.8, 2.0, 3.0, 5.0],
+      None,
+      10,
+    )
+    .expect("finite values produce a scale");
+
+    assert_eq!(scale.minimum, 0.0);
+    assert_eq!(scale.maximum, 6.0);
+    assert_eq!(scale.major_unit, 1.0);
+  }
+
+  #[test]
+  fn clustered_column_slots_follow_gap_and_overlap_distances() {
+    let first = clustered_column_slot(0, 0, 4, 3, 219.0, -27.0).expect("valid slot");
+    let second = clustered_column_slot(0, 1, 4, 3, 219.0, -27.0).expect("valid slot");
+    let next_category = clustered_column_slot(1, 0, 4, 3, 219.0, -27.0).expect("valid slot");
+
+    assert!((first.width - 0.25 / 5.73).abs() < 1.0e-12);
+    assert!((second.center - first.center - first.width * 1.27).abs() < 1.0e-12);
+    assert!((next_category.center - first.center - 0.25).abs() < 1.0e-12);
+  }
 }

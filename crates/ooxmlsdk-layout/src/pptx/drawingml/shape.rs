@@ -670,6 +670,9 @@ fn merge_effect_properties(
 ) -> Option<EffectProperties> {
   match (base, direct) {
     (Some(mut base), Some(direct)) => {
+      if direct.clears_inherited {
+        return Some(direct);
+      }
       if direct.has_effect() {
         base.merge_from(&direct);
       }

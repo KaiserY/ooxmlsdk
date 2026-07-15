@@ -1,6 +1,9 @@
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct LayoutOptions {
   pub source_file_name: Option<String>,
+  /// BCP 47 user-interface language used for application-generated labels,
+  /// such as an automatic chart title that is not persisted in the package.
+  pub ui_language: Option<String>,
   pub action: LayoutActionOptions,
   pub diagnostics: LayoutDiagnosticsOptions,
 }

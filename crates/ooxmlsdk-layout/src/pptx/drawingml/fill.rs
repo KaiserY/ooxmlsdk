@@ -11,6 +11,11 @@ pub(crate) struct FillProperties {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum FillKind {
   None,
+  /// Paint the portion of the slide background directly behind the shape.
+  ///
+  /// PresentationML `p:sp/@useBgFill` is not equivalent to `a:noFill`: it
+  /// retains a distinct, page-relative fill mode through layout lowering.
+  SlideBackground,
   Solid(Option<Color>),
   Group,
   Gradient(std::boxed::Box<a::GradientFill>),

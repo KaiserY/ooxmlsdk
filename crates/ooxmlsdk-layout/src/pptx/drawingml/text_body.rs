@@ -76,6 +76,8 @@ pub(crate) enum TextRunKind {
   Break,
   Field,
   Math,
+  /// Editor-only prompt carried by an empty presentation placeholder.
+  Placeholder,
 }
 
 impl TextBody {

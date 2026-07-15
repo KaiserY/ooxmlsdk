@@ -115,7 +115,7 @@ pub enum ContentModelDecl {
 #[serde(default, rename_all = "PascalCase")]
 pub struct SystemSupportDecl {
   pub have_xmlns_fields: bool,
-  pub xml_header: XmlHeaderMode,
+  pub has_xml_header: bool,
   pub have_mc_ignorable: bool,
   pub have_mc_preserve_attributes: bool,
   pub have_mc_preserve_elements: bool,
@@ -145,15 +145,6 @@ impl SystemSupportDecl {
       || !self.extra_xmlns.is_empty()
       || !self.canonical_namespace_prefixes.is_empty()
   }
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "PascalCase")]
-pub enum XmlHeaderMode {
-  #[default]
-  None,
-  Plain,
-  Standalone,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -562,7 +553,7 @@ mod tests {
         xml_content: None,
         support: SystemSupportDecl {
           have_xmlns_fields: true,
-          xml_header: XmlHeaderMode::Standalone,
+          has_xml_header: true,
           have_mc_ignorable: false,
           have_mc_preserve_attributes: false,
           have_mc_preserve_elements: false,

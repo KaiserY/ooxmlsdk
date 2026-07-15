@@ -3,7 +3,6 @@ use crate::sdk_code::codegen_ir::{
   Cardinality, ContentModelDecl, ElementKind, EnumDecl, EnumValueType, EnumVariantDecl, FieldDecl,
   FieldWireDecl, MemberDecl, NumberSignKind, SchemaModuleDecl, StringFormatKind, SystemSupportDecl,
   TypeDecl, TypeKind, TypeRefDecl, ValidatorDecl, ValidatorKind, VariantDecl, VariantWireDecl,
-  XmlHeaderMode,
 };
 use crate::sdk_code::helpers::{
   AttrTypeKind, FlatParticleKind, StructuredParticle, StructuredParticleKind, classify_attr_type,
@@ -27,7 +26,7 @@ use crate::sdk_code::schemas::{
 use crate::sdk_code::versioning::effective_version;
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaType, SchemaTypeApiKind, SchemaTypeAttribute, SchemaTypeAttributeValidator,
-  SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeXmlHeader,
+  SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
 };
 use crate::simple_type::simple_type_mapping;
 use heck::ToUpperCamelCase;
@@ -826,11 +825,7 @@ fn build_type_decl(
       xml_content,
       support: SystemSupportDecl {
         have_xmlns_fields: schema_type.have_xmlns_fields,
-        xml_header: match schema_type.xml_header {
-          SchemaTypeXmlHeader::None => XmlHeaderMode::None,
-          SchemaTypeXmlHeader::Plain => XmlHeaderMode::Plain,
-          SchemaTypeXmlHeader::Standalone => XmlHeaderMode::Standalone,
-        },
+        has_xml_header: schema_type.has_xml_header,
         have_mc_ignorable: schema_type.have_mc_ignorable,
         have_mc_preserve_attributes: schema_type.have_mc_preserve_attributes,
         have_mc_preserve_elements: schema_type.have_mc_preserve_elements,
@@ -1992,9 +1987,7 @@ fn effective_child_kind_from_name(
   child_kind: crate::sdk_data::sdk_data_model::SchemaTypeChildKind,
   context: &CodegenContext<'_>,
 ) -> crate::sdk_data::sdk_data_model::SchemaTypeChildKind {
-  use crate::sdk_data::sdk_data_model::{
-    SchemaTypeApiKind, SchemaTypeChildKind, SchemaTypeXmlHeader,
-  };
+  use crate::sdk_data::sdk_data_model::{SchemaTypeApiKind, SchemaTypeChildKind};
 
   if !matches!(
     child_kind,
@@ -2015,7 +2008,7 @@ fn effective_child_kind_from_name(
     && !child_type.have_mc_preserve_elements
     && !child_type.have_mc_process_content
     && !child_type.have_mc_must_understand
-    && child_type.xml_header == SchemaTypeXmlHeader::None
+    && !child_type.has_xml_header
   {
     SchemaTypeChildKind::TextChild
   } else {
@@ -4336,7 +4329,7 @@ mod tests {
           have_mc_process_content: true,
           have_mc_must_understand: true,
           have_xml_other_children: false,
-          xml_header: SchemaTypeXmlHeader::Standalone,
+          has_xml_header: true,
           ..Default::default()
         },
         SchemaType {
@@ -4358,7 +4351,7 @@ mod tests {
     assert_eq!(ir.types[0].kind, TypeKind::ElementStruct);
     assert_eq!(ir.types[0].xml_qname.as_deref(), Some("t:CT_P/t:p"));
     assert!(ir.types[0].support.have_xmlns_fields);
-    assert_eq!(ir.types[0].support.xml_header, XmlHeaderMode::Standalone);
+    assert!(ir.types[0].support.has_xml_header);
     assert!(ir.types[0].support.have_mc_ignorable);
     assert!(ir.types[0].support.have_mc_preserve_attributes);
     assert!(ir.types[0].support.have_mc_preserve_elements);

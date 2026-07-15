@@ -3,7 +3,7 @@ use crate::sdk_data::{
   sdk_data_model::{
     Namespace, Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeApiKind,
     SchemaTypeAttribute, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
-    SchemaTypeKind, SchemaTypeXmlHeader,
+    SchemaTypeKind,
   },
   xsd::{ParsedParticleKind, ParsedXsd},
 };
@@ -195,11 +195,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             let have_direct_xml_other_children = false;
             assign_particle_ids(&mut children);
 
-            let xml_header = if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement" {
-              SchemaTypeXmlHeader::Standalone
-            } else {
-              SchemaTypeXmlHeader::None
-            };
+            let has_xml_header = !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement";
 
             let mut schema_type = SchemaType {
               name: ty.name.clone(),
@@ -210,7 +206,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               base_class: ty.base_class.clone(),
               kind,
               composite_kind,
-              xml_header,
+              has_xml_header,
               is_abstract: ty.is_abstract,
               have_xmlns_fields,
               have_mc_ignorable,

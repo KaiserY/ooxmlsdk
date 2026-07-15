@@ -56,14 +56,6 @@ pub(crate) use xml::{decode_utf16_xml_bytes, root_element_matches_namespace_loca
 #[cfg(feature = "flat-opc")]
 pub(crate) use xml::{read_outer_xml_borrowed, read_outer_xml_io};
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum XmlHeaderType {
-  #[default]
-  None,
-  Plain,
-  Standalone,
-}
-
 #[cfg(feature = "parts")]
 pub(crate) const REL_OFFICE_DOCUMENT: &[u8] =
   b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";

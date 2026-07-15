@@ -1,7 +1,7 @@
 use crate::sdk_code::versioning::effective_version;
 use crate::sdk_data::sdk_data_model::{
   SchemaType, SchemaTypeApiKind, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
-  SchemaTypeKind, SchemaTypeXmlHeader,
+  SchemaTypeKind,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -34,10 +34,6 @@ pub fn is_leaf_element_type(schema_type: &SchemaType) -> bool {
 
 pub fn is_derived_type(schema_type: &SchemaType) -> bool {
   schema_type.kind == SchemaTypeKind::Derived
-}
-
-pub fn needs_xml_header(schema_type: &SchemaType) -> bool {
-  schema_type.xml_header != SchemaTypeXmlHeader::None
 }
 
 fn supports_extended_sequence_strategy(schema_type: &SchemaType) -> bool {

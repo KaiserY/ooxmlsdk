@@ -96,7 +96,7 @@ pub struct SchemaType {
   pub base_class: String,
   pub kind: SchemaTypeKind,
   pub composite_kind: SchemaTypeCompositeKind,
-  pub xml_header: SchemaTypeXmlHeader,
+  pub has_xml_header: bool,
   pub is_abstract: bool,
   pub have_xmlns_fields: bool,
   pub have_mc_ignorable: bool,
@@ -114,15 +114,6 @@ pub struct SchemaType {
   pub api_kind: SchemaTypeApiKind,
   pub attributes: Vec<SchemaTypeAttribute>,
   pub children: Vec<SchemaTypeChild>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum SchemaTypeXmlHeader {
-  #[default]
-  None,
-  Plain,
-  Standalone,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]

@@ -1794,19 +1794,12 @@ pub(crate) fn read_root_start_borrowed<'de>(
   reader: &mut SliceReader<'de>,
   owner: &'static str,
   local_name: &'static [u8],
-) -> Result<
-  (
-    quick_xml::events::BytesStart<'de>,
-    bool,
-    crate::common::XmlHeaderType,
-  ),
-  SdkError,
-> {
+) -> Result<(quick_xml::events::BytesStart<'de>, bool), SdkError> {
   loop {
     match reader.next_tag_event()? {
       PayloadEvent::Start(e, empty) => {
         if xml_local_name(e.name()) == local_name {
-          return Ok((e, empty, crate::common::XmlHeaderType::None));
+          return Ok((e, empty));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
       }
@@ -1822,19 +1815,12 @@ pub(crate) fn read_root_start_io<R: std::io::BufRead>(
   reader: &mut IoReader<R>,
   owner: &'static str,
   local_name: &'static [u8],
-) -> Result<
-  (
-    quick_xml::events::BytesStart<'static>,
-    bool,
-    crate::common::XmlHeaderType,
-  ),
-  SdkError,
-> {
+) -> Result<(quick_xml::events::BytesStart<'static>, bool), SdkError> {
   loop {
     match reader.next_tag_event()? {
       PayloadEvent::Start(e, empty) => {
         if xml_local_name(e.name()) == local_name {
-          return Ok((e, empty, crate::common::XmlHeaderType::None));
+          return Ok((e, empty));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
       }

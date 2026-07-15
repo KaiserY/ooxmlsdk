@@ -1415,7 +1415,7 @@ fn root_read_tokens(
     DeserializeMode::Io => quote! { <Self as crate::sdk::SdkType>::read_inner },
   };
   quote! {
-    let (start, empty, _) = #read_start(
+    let (start, empty) = #read_start(
       &mut xml_reader,
       stringify!(#ident),
       #local_name_lit,

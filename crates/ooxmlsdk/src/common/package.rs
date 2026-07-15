@@ -415,7 +415,6 @@ impl<'a> From<&'a RelationshipInfo> for RelationshipRef<'a> {
 #[doc(hidden)]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct RelationshipSet {
-  xml_header: super::XmlHeaderType,
   relationships: Vec<RelationshipInfo>,
   by_id: HashMap<Box<str>, usize>,
   raw_bytes: Option<Box<[u8]>>,
@@ -734,7 +733,6 @@ impl RelationshipSet {
 
     let source_parent_path = super::parent_zip_path(source_path);
     let mut set = Self {
-      xml_header: super::XmlHeaderType::default(),
       relationships: Vec::with_capacity(relationships.relationship.len()),
       by_id: HashMap::with_capacity(relationships.relationship.len()),
       raw_bytes: None,
@@ -750,7 +748,6 @@ impl RelationshipSet {
 
   fn from_raw_bytes(bytes: Box<[u8]>) -> Self {
     Self {
-      xml_header: super::XmlHeaderType::default(),
       relationships: Vec::new(),
       by_id: HashMap::new(),
       raw_bytes: Some(bytes),

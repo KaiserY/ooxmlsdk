@@ -9,7 +9,7 @@ use crate::Result;
 use crate::sdk_code::codegen_ir::{
   Cardinality, ContentModelDecl, ElementKind, EnumDecl, FieldDecl, FieldWireDecl, MemberDecl,
   SchemaModuleDecl, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl, ValidatorKind, VariantDecl,
-  VariantWireDecl, XmlHeaderMode,
+  VariantWireDecl,
 };
 use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
 use crate::sdk_code::helpers::{
@@ -1753,10 +1753,10 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           .collect::<Vec<_>>();
         quote! { canonical_namespace_prefix(#(#prefixes),*), }
       };
-      let xml_header = if type_decl.support.xml_header == XmlHeaderMode::None {
-        quote! {}
-      } else {
+      let xml_header = if type_decl.support.has_xml_header {
         quote! { xml_header, }
+      } else {
+        quote! {}
       };
       quote! {
         #[sdk(#(#type_sdk_version_markers,)* #no_prefix #extra_xmlns #canonical_namespace_prefix #xml_header qname = #qname)]
@@ -2625,7 +2625,7 @@ fn is_empty_leaf_marker_type(type_decl: &TypeDecl) -> bool {
     && type_decl.xml_content.is_none()
     && type_decl.members.is_empty()
     && !type_decl.support.have_xmlns_fields
-    && type_decl.support.xml_header == XmlHeaderMode::None
+    && !type_decl.support.has_xml_header
     && !type_decl.support.has_extra_support_fields()
 }
 
@@ -2639,7 +2639,7 @@ fn is_abstract_empty_base_type(type_decl: &TypeDecl) -> bool {
     && type_decl.xml_content.is_none()
     && type_decl.members.is_empty()
     && !type_decl.support.have_xmlns_fields
-    && type_decl.support.xml_header == XmlHeaderMode::None
+    && !type_decl.support.has_xml_header
     && !type_decl.support.has_extra_support_fields()
 }
 
@@ -4419,7 +4419,7 @@ fn can_alias_leaf_text_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&FieldD
     && attr_fields.is_empty()
     && !type_decl.support.have_xmlns_fields
     && !type_decl.support.has_extra_support_fields()
-    && type_decl.support.xml_header == crate::sdk_code::codegen_ir::XmlHeaderMode::None
+    && !type_decl.support.has_xml_header
 }
 
 fn can_alias_any_children_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&FieldDecl]) -> bool {
@@ -4429,7 +4429,7 @@ fn can_alias_any_children_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&Fie
     || type_decl.xml_content.is_some()
     || type_decl.support.have_xmlns_fields
     || type_decl.support.has_extra_support_fields()
-    || type_decl.support.xml_header != crate::sdk_code::codegen_ir::XmlHeaderMode::None
+    || type_decl.support.has_xml_header
   {
     return false;
   }
@@ -4460,7 +4460,7 @@ fn can_alias_raw_children_leaf_decl(type_decl: &TypeDecl, attr_fields: &[&FieldD
     && !type_decl.support.have_xmlns_fields
     && !type_decl.support.has_mce_attributes()
     && type_decl.support.have_xml_other_children
-    && type_decl.support.xml_header == crate::sdk_code::codegen_ir::XmlHeaderMode::None
+    && !type_decl.support.has_xml_header
 }
 
 fn can_wrap_derived_to_base_decl(type_decl: &TypeDecl, base_type_decl: &TypeDecl) -> bool {

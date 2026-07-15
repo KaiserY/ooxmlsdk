@@ -118,10 +118,10 @@
       ]
     },
     {
-      "Name": "w:CT_Empty/w:doNotEmbedSmartTags",
+      "Name": "w:CT_OnOff/w:doNotEmbedSmartTags",
       "ClassName": "DoNotEmbedSmartTags",
       "Summary": "Do Not Embed Smart Tags.",
-      "BaseClass": "EmptyType",
+      "BaseClass": "OnOffType",
       "Kind": "Leaf",
       "ApiKind": "Struct"
     },
@@ -180,9 +180,9 @@
       "ApiKind": "Struct"
     },
     {
-      "Name": "w:CT_TopMarginGutter/w:tmGutter",
-      "ClassName": "TopMarginGutter",
-      "Summary": "Top margin gutter setting.",
+      "Name": "w:CT_TextMakerGutter/w:tmGutter",
+      "ClassName": "TextMakerGutter",
+      "Summary": "TextMaker gutter setting.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -190,15 +190,15 @@
         {
           "QName": "w:val",
           "PropertyName": "Val",
-          "PropertyComments": "Top margin gutter value.",
+          "PropertyComments": "TextMaker gutter value.",
           "OverrideType": "Int32Value"
         }
       ]
     },
     {
-      "Name": "w:CT_TopMarginSection/w:tmSection",
-      "ClassName": "TopMarginSection",
-      "Summary": "Top margin section setting.",
+      "Name": "w:CT_TextMakerSection/w:tmSection",
+      "ClassName": "TextMakerSection",
+      "Summary": "TextMaker section setting.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -206,15 +206,15 @@
         {
           "QName": "w:h",
           "PropertyName": "Height",
-          "PropertyComments": "Top margin section height.",
+          "PropertyComments": "TextMaker section height.",
           "OverrideType": "Int32Value"
         }
       ]
     },
     {
-      "Name": "w:CT_LegacyPreferenceOne/w:tmPrefOne",
-      "ClassName": "LegacyPreferenceOne",
-      "Summary": "Legacy application preference one.",
+      "Name": "w:CT_TextMakerPreferenceOne/w:tmPrefOne",
+      "ClassName": "TextMakerPreferenceOne",
+      "Summary": "TextMaker preference one.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -228,9 +228,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyPreferenceTwo/w:tmPrefTwo",
-      "ClassName": "LegacyPreferenceTwo",
-      "Summary": "Legacy application preference two.",
+      "Name": "w:CT_TextMakerPreferenceTwo/w:tmPrefTwo",
+      "ClassName": "TextMakerPreferenceTwo",
+      "Summary": "TextMaker preference two.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -244,9 +244,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyFormatPreference/w:tmFmtPref",
-      "ClassName": "LegacyFormatPreference",
-      "Summary": "Legacy application format preference.",
+      "Name": "w:CT_TextMakerFormatPreference/w:tmFmtPref",
+      "ClassName": "TextMakerFormatPreference",
+      "Summary": "TextMaker format preference.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -260,9 +260,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmCommentsPlace",
-      "ClassName": "LegacyCommentsPlace",
-      "Summary": "Legacy comment placement.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmCommentsPlace",
+      "ClassName": "TextMakerCommentsPlace",
+      "Summary": "TextMaker comment placement.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -276,9 +276,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmCommentsWidth",
-      "ClassName": "LegacyCommentsWidth",
-      "Summary": "Legacy comment width.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmCommentsWidth",
+      "ClassName": "TextMakerCommentsWidth",
+      "Summary": "TextMaker comment width.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -292,9 +292,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmCommentsColor",
-      "ClassName": "LegacyCommentsColor",
-      "Summary": "Legacy comment color.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmCommentsColor",
+      "ClassName": "TextMakerCommentsColor",
+      "Summary": "TextMaker comment color.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -308,38 +308,38 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyCommentsProperties/w:tmCommentsPr",
-      "ClassName": "LegacyCommentsProperties",
-      "Summary": "Legacy application comment settings.",
+      "Name": "w:CT_TextMakerCommentsProperties/w:tmCommentsPr",
+      "ClassName": "TextMakerCommentsProperties",
+      "Summary": "TextMaker comment settings.",
       "BaseClass": "OpenXmlCompositeElement",
       "Kind": "Composite",
       "CompositeKind": "OneSequence",
       "ApiKind": "Struct",
       "Children": [
         {
-          "Name": "w:CT_LegacyIntegerValue/w:tmCommentsPlace",
+          "Name": "w:CT_TextMakerIntegerValue/w:tmCommentsPlace",
           "PropertyName": "Place",
-          "PropertyComments": "Legacy comment placement.",
+          "PropertyComments": "TextMaker comment placement.",
           "Optional": true
         },
         {
-          "Name": "w:CT_LegacyIntegerValue/w:tmCommentsWidth",
+          "Name": "w:CT_TextMakerIntegerValue/w:tmCommentsWidth",
           "PropertyName": "Width",
-          "PropertyComments": "Legacy comment width.",
+          "PropertyComments": "TextMaker comment width.",
           "Optional": true
         },
         {
-          "Name": "w:CT_LegacyIntegerValue/w:tmCommentsColor",
+          "Name": "w:CT_TextMakerIntegerValue/w:tmCommentsColor",
           "PropertyName": "Color",
-          "PropertyComments": "Legacy comment color.",
+          "PropertyComments": "TextMaker comment color.",
           "Optional": true
         }
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewEnabled",
-      "ClassName": "LegacyReviewEnabled",
-      "Summary": "Legacy review enabled setting.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewEnabled",
+      "ClassName": "TextMakerReviewEnabled",
+      "Summary": "TextMaker review enabled setting.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -353,9 +353,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewShow",
-      "ClassName": "LegacyReviewShow",
-      "Summary": "Legacy review visibility setting.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewShow",
+      "ClassName": "TextMakerReviewShow",
+      "Summary": "TextMaker review visibility setting.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -369,9 +369,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewPrint",
-      "ClassName": "LegacyReviewPrint",
-      "Summary": "Legacy review print setting.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewPrint",
+      "ClassName": "TextMakerReviewPrint",
+      "Summary": "TextMaker review print setting.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -385,9 +385,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmRevisionNum",
-      "ClassName": "LegacyRevisionNumber",
-      "Summary": "Legacy revision number.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmRevisionNum",
+      "ClassName": "TextMakerRevisionNumber",
+      "Summary": "TextMaker revision number.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -401,9 +401,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewMarkIns",
-      "ClassName": "LegacyReviewInsertionMark",
-      "Summary": "Legacy insertion review mark.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewMarkIns",
+      "ClassName": "TextMakerReviewInsertionMark",
+      "Summary": "TextMaker insertion review mark.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -417,9 +417,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewColorIns",
-      "ClassName": "LegacyReviewInsertionColor",
-      "Summary": "Legacy insertion review color.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewColorIns",
+      "ClassName": "TextMakerReviewInsertionColor",
+      "Summary": "TextMaker insertion review color.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -433,9 +433,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewMarkDel",
-      "ClassName": "LegacyReviewDeletionMark",
-      "Summary": "Legacy deletion review mark.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewMarkDel",
+      "ClassName": "TextMakerReviewDeletionMark",
+      "Summary": "TextMaker deletion review mark.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -449,9 +449,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewColorDel",
-      "ClassName": "LegacyReviewDeletionColor",
-      "Summary": "Legacy deletion review color.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewColorDel",
+      "ClassName": "TextMakerReviewDeletionColor",
+      "Summary": "TextMaker deletion review color.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -465,9 +465,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewMarkFmt",
-      "ClassName": "LegacyReviewFormatMark",
-      "Summary": "Legacy formatting review mark.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewMarkFmt",
+      "ClassName": "TextMakerReviewFormatMark",
+      "Summary": "TextMaker formatting review mark.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -481,9 +481,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewColorFmt",
-      "ClassName": "LegacyReviewFormatColor",
-      "Summary": "Legacy formatting review color.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewColorFmt",
+      "ClassName": "TextMakerReviewFormatColor",
+      "Summary": "TextMaker formatting review color.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -497,9 +497,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewMarkLn",
-      "ClassName": "LegacyReviewLineMark",
-      "Summary": "Legacy line review mark.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewMarkLn",
+      "ClassName": "TextMakerReviewLineMark",
+      "Summary": "TextMaker line review mark.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -513,9 +513,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewColorLn",
-      "ClassName": "LegacyReviewLineColor",
-      "Summary": "Legacy line review color.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewColorLn",
+      "ClassName": "TextMakerReviewLineColor",
+      "Summary": "TextMaker line review color.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -529,9 +529,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmReviewToolTip",
-      "ClassName": "LegacyReviewToolTip",
-      "Summary": "Legacy review tooltip setting.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmReviewToolTip",
+      "ClassName": "TextMakerReviewToolTip",
+      "Summary": "TextMaker review tooltip setting.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -545,33 +545,33 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyReviewProperties/w:tmReviewPr",
-      "ClassName": "LegacyReviewProperties",
-      "Summary": "Legacy application review settings.",
+      "Name": "w:CT_TextMakerReviewProperties/w:tmReviewPr",
+      "ClassName": "TextMakerReviewProperties",
+      "Summary": "TextMaker review settings.",
       "BaseClass": "OpenXmlCompositeElement",
       "Kind": "Composite",
       "CompositeKind": "OneSequence",
       "ApiKind": "Struct",
       "Children": [
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewEnabled", "PropertyName": "Enabled", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewShow", "PropertyName": "Show", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewPrint", "PropertyName": "Print", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmRevisionNum", "PropertyName": "RevisionNumber", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewMarkIns", "PropertyName": "InsertionMark", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewColorIns", "PropertyName": "InsertionColor", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewMarkDel", "PropertyName": "DeletionMark", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewColorDel", "PropertyName": "DeletionColor", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewMarkFmt", "PropertyName": "FormatMark", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewColorFmt", "PropertyName": "FormatColor", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewMarkLn", "PropertyName": "LineMark", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewColorLn", "PropertyName": "LineColor", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmReviewToolTip", "PropertyName": "ToolTip", "Optional": true }
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewEnabled", "PropertyName": "Enabled", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewShow", "PropertyName": "Show", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewPrint", "PropertyName": "Print", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmRevisionNum", "PropertyName": "RevisionNumber", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewMarkIns", "PropertyName": "InsertionMark", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewColorIns", "PropertyName": "InsertionColor", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewMarkDel", "PropertyName": "DeletionMark", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewColorDel", "PropertyName": "DeletionColor", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewMarkFmt", "PropertyName": "FormatMark", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewColorFmt", "PropertyName": "FormatColor", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewMarkLn", "PropertyName": "LineMark", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewColorLn", "PropertyName": "LineColor", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmReviewToolTip", "PropertyName": "ToolTip", "Optional": true }
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmLastPosPage",
-      "ClassName": "LegacyLastPositionPage",
-      "Summary": "Legacy last position page.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosPage",
+      "ClassName": "TextMakerLastPositionPage",
+      "Summary": "TextMaker last position page.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -580,9 +580,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmLastPosSelect",
-      "ClassName": "LegacyLastPositionSelection",
-      "Summary": "Legacy last position selection.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosSelect",
+      "ClassName": "TextMakerLastPositionSelection",
+      "Summary": "TextMaker last position selection.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -591,9 +591,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmLastPosFrameIdx",
-      "ClassName": "LegacyLastPositionFrameIndex",
-      "Summary": "Legacy last position frame index.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosFrameIdx",
+      "ClassName": "TextMakerLastPositionFrameIndex",
+      "Summary": "TextMaker last position frame index.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -602,9 +602,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmLastPosPgfIdx",
-      "ClassName": "LegacyLastPositionParagraphIndex",
-      "Summary": "Legacy last position paragraph index.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosPgfIdx",
+      "ClassName": "TextMakerLastPositionParagraphIndex",
+      "Summary": "TextMaker last position paragraph index.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -613,9 +613,9 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyIntegerValue/w:tmLastPosIdx",
-      "ClassName": "LegacyLastPositionIndex",
-      "Summary": "Legacy last position index.",
+      "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosIdx",
+      "ClassName": "TextMakerLastPositionIndex",
+      "Summary": "TextMaker last position index.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -624,35 +624,35 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyLastPositionPoint/w:tmLastPosCaret",
-      "ClassName": "LegacyLastPositionCaret",
-      "Summary": "Legacy last caret position.",
+      "Name": "w:CT_TextMakerLastPositionPoint/w:tmLastPosCaret",
+      "ClassName": "TextMakerLastPositionCaret",
+      "Summary": "TextMaker last caret position.",
       "BaseClass": "OpenXmlCompositeElement",
       "Kind": "Composite",
       "CompositeKind": "OneSequence",
       "ApiKind": "Struct",
       "Children": [
-        { "Name": "w:CT_LegacyIntegerValue/w:tmLastPosPgfIdx", "PropertyName": "ParagraphIndex", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmLastPosIdx", "PropertyName": "Index", "Optional": true }
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosPgfIdx", "PropertyName": "ParagraphIndex", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosIdx", "PropertyName": "Index", "Optional": true }
       ]
     },
     {
-      "Name": "w:CT_LegacyLastPositionPoint/w:tmLastPosAnchor",
-      "ClassName": "LegacyLastPositionAnchor",
-      "Summary": "Legacy last anchor position.",
+      "Name": "w:CT_TextMakerLastPositionPoint/w:tmLastPosAnchor",
+      "ClassName": "TextMakerLastPositionAnchor",
+      "Summary": "TextMaker last anchor position.",
       "BaseClass": "OpenXmlCompositeElement",
       "Kind": "Composite",
       "CompositeKind": "OneSequence",
       "ApiKind": "Struct",
       "Children": [
-        { "Name": "w:CT_LegacyIntegerValue/w:tmLastPosPgfIdx", "PropertyName": "ParagraphIndex", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmLastPosIdx", "PropertyName": "Index", "Optional": true }
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosPgfIdx", "PropertyName": "ParagraphIndex", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosIdx", "PropertyName": "Index", "Optional": true }
       ]
     },
     {
-      "Name": "w:CT_LegacyLastPositionRectangle/w:tmLastPosTblRect",
-      "ClassName": "LegacyLastPositionTableRectangle",
-      "Summary": "Legacy last table rectangle.",
+      "Name": "w:CT_TextMakerLastPositionRectangle/w:tmLastPosTblRect",
+      "ClassName": "TextMakerLastPositionTableRectangle",
+      "Summary": "TextMaker last table rectangle.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -664,26 +664,26 @@
       ]
     },
     {
-      "Name": "w:CT_LegacyLastPosition/w:tmLastPos",
-      "ClassName": "LegacyLastPosition",
-      "Summary": "Legacy application last editing position.",
+      "Name": "w:CT_TextMakerLastPosition/w:tmLastPos",
+      "ClassName": "TextMakerLastPosition",
+      "Summary": "TextMaker last editing position.",
       "BaseClass": "OpenXmlCompositeElement",
       "Kind": "Composite",
       "CompositeKind": "OneSequence",
       "ApiKind": "Struct",
       "Children": [
-        { "Name": "w:CT_LegacyIntegerValue/w:tmLastPosPage", "PropertyName": "Page", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmLastPosSelect", "PropertyName": "Selection", "Optional": true },
-        { "Name": "w:CT_LegacyIntegerValue/w:tmLastPosFrameIdx", "PropertyName": "FrameIndex", "Optional": true },
-        { "Name": "w:CT_LegacyLastPositionPoint/w:tmLastPosCaret", "PropertyName": "Caret", "Optional": true },
-        { "Name": "w:CT_LegacyLastPositionPoint/w:tmLastPosAnchor", "PropertyName": "Anchor", "Optional": true },
-        { "Name": "w:CT_LegacyLastPositionRectangle/w:tmLastPosTblRect", "PropertyName": "TableRectangle", "Optional": true }
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosPage", "PropertyName": "Page", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosSelect", "PropertyName": "Selection", "Optional": true },
+        { "Name": "w:CT_TextMakerIntegerValue/w:tmLastPosFrameIdx", "PropertyName": "FrameIndex", "Optional": true },
+        { "Name": "w:CT_TextMakerLastPositionPoint/w:tmLastPosCaret", "PropertyName": "Caret", "Optional": true },
+        { "Name": "w:CT_TextMakerLastPositionPoint/w:tmLastPosAnchor", "PropertyName": "Anchor", "Optional": true },
+        { "Name": "w:CT_TextMakerLastPositionRectangle/w:tmLastPosTblRect", "PropertyName": "TableRectangle", "Optional": true }
       ]
     },
     {
-      "Name": "w:CT_LegacyApplicationRevision/w:tmAppRevision",
-      "ClassName": "LegacyApplicationRevision",
-      "Summary": "Legacy application revision metadata.",
+      "Name": "w:CT_TextMakerApplicationRevision/w:tmAppRevision",
+      "ClassName": "TextMakerApplicationRevision",
+      "Summary": "TextMaker application revision metadata.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -703,9 +703,9 @@
       ]
     },
     {
-      "Name": "w:CT_HyphenationLines/w:hyphenationLines",
-      "ClassName": "HyphenationLines",
-      "Summary": "Maximum consecutive hyphenated lines.",
+      "Name": "w:CT_TextMakerHyphenationLines/w:hyphenationLines",
+      "ClassName": "TextMakerHyphenationLines",
+      "Summary": "TextMaker hyphenation lines setting.",
       "BaseClass": "OpenXmlLeafElement",
       "Kind": "Leaf",
       "ApiKind": "Struct",
@@ -1014,7 +1014,7 @@
         },
         {
           "Name": "w14:CT_Glow/w14:glow",
-          "PropertyName": "W14Glow",
+          "PropertyName": "Glow",
           "PropertyComments": "Defines the Glow Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
@@ -1022,98 +1022,98 @@
         },
         {
           "Name": "w14:CT_Shadow/w14:shadow",
-          "PropertyName": "W14Shadow",
+          "PropertyName": "Shadow14",
           "PropertyComments": "Defines the Shadow Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Glow"
+          "AfterPropertyName": "Glow"
         },
         {
           "Name": "w14:CT_Reflection/w14:reflection",
-          "PropertyName": "W14Reflection",
+          "PropertyName": "Reflection",
           "PropertyComments": "Defines the Reflection Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Shadow"
+          "AfterPropertyName": "Shadow14"
         },
         {
           "Name": "w14:CT_TextOutlineEffect/w14:textOutline",
-          "PropertyName": "W14TextOutlineEffect",
+          "PropertyName": "TextOutlineEffect",
           "PropertyComments": "Defines the TextOutlineEffect Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Reflection"
+          "AfterPropertyName": "Reflection"
         },
         {
           "Name": "w14:CT_FillTextEffect/w14:textFill",
-          "PropertyName": "W14FillTextEffect",
+          "PropertyName": "FillTextEffect",
           "PropertyComments": "Defines the FillTextEffect Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14TextOutlineEffect"
+          "AfterPropertyName": "TextOutlineEffect"
         },
         {
           "Name": "w14:CT_Scene3D/w14:scene3d",
-          "PropertyName": "W14Scene3D",
+          "PropertyName": "Scene3D",
           "PropertyComments": "Defines the Scene3D Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14FillTextEffect"
+          "AfterPropertyName": "FillTextEffect"
         },
         {
           "Name": "w14:CT_Props3D/w14:props3d",
-          "PropertyName": "W14Properties3D",
+          "PropertyName": "Properties3D",
           "PropertyComments": "Defines the Properties3D Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Scene3D"
+          "AfterPropertyName": "Scene3D"
         },
         {
           "Name": "w14:CT_Ligatures/w14:ligatures",
-          "PropertyName": "W14Ligatures",
+          "PropertyName": "Ligatures",
           "PropertyComments": "Defines the Ligatures Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Properties3D"
+          "AfterPropertyName": "Properties3D"
         },
         {
           "Name": "w14:CT_NumForm/w14:numForm",
-          "PropertyName": "W14NumberingFormat",
+          "PropertyName": "NumberingFormat",
           "PropertyComments": "Defines the NumberingFormat Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Ligatures"
+          "AfterPropertyName": "Ligatures"
         },
         {
           "Name": "w14:CT_NumSpacing/w14:numSpacing",
-          "PropertyName": "W14NumberSpacing",
+          "PropertyName": "NumberSpacing",
           "PropertyComments": "Defines the NumberSpacing Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14NumberingFormat"
+          "AfterPropertyName": "NumberingFormat"
         },
         {
           "Name": "w14:CT_StylisticSets/w14:stylisticSets",
-          "PropertyName": "W14StylisticSets",
+          "PropertyName": "StylisticSets",
           "PropertyComments": "Defines the StylisticSets Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14NumberSpacing"
+          "AfterPropertyName": "NumberSpacing"
         },
         {
           "Name": "w14:CT_OnOff/w14:cntxtAlts",
-          "PropertyName": "W14ContextualAlternatives",
+          "PropertyName": "ContextualAlternatives",
           "PropertyComments": "Defines the ContextualAlternatives Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14StylisticSets"
+          "AfterPropertyName": "StylisticSets"
         },
         {
           "Name": "w:CT_RPr/w:rPr",
           "PropertyName": "RunProperties",
           "PropertyComments": "Nested run properties found in legacy numbering output.",
           "Optional": true,
-          "AfterPropertyName": "W14ContextualAlternatives"
+          "AfterPropertyName": "ContextualAlternatives"
         }
       ]
     },
@@ -1178,9 +1178,9 @@
       "ClassName": "ParagraphPropertiesBaseStyle",
       "AddChildren": [
         {
-          "Name": "w:CT_HyphenationLines/w:hyphenationLines",
-          "PropertyName": "HyphenationLines",
-          "PropertyComments": "Maximum consecutive hyphenated lines.",
+          "Name": "w:CT_TextMakerHyphenationLines/w:hyphenationLines",
+          "PropertyName": "TextMakerHyphenationLines",
+          "PropertyComments": "TextMaker hyphenation lines setting.",
           "Optional": true,
           "AfterPropertyName": "SuppressAutoHyphens"
         }
@@ -1214,25 +1214,25 @@
       "ClassName": "SectionProperties",
       "AddChildren": [
         {
-          "Name": "w:CT_TopMarginGutter/w:tmGutter",
-          "PropertyName": "TopMarginGutter",
-          "PropertyComments": "Top margin gutter setting.",
+          "Name": "w:CT_TextMakerGutter/w:tmGutter",
+          "PropertyName": "TextMakerGutter",
+          "PropertyComments": "TextMaker gutter setting.",
           "Optional": true,
           "AfterName": "w:CT_PaperSource/w:paperSrc"
         },
         {
-          "Name": "w:CT_TopMarginSection/w:tmSection",
-          "PropertyName": "TopMarginSection",
-          "PropertyComments": "Top margin section setting.",
+          "Name": "w:CT_TextMakerSection/w:tmSection",
+          "PropertyName": "TextMakerSection",
+          "PropertyComments": "TextMaker section setting.",
           "Optional": true,
-          "AfterPropertyName": "TopMarginGutter"
+          "AfterPropertyName": "TextMakerGutter"
         },
         {
           "Name": "w:CT_OnOff/w:mirrorMargins",
           "PropertyName": "MirrorMargins",
           "PropertyComments": "Mirror page margins.",
           "Optional": true,
-          "AfterPropertyName": "TopMarginGutter"
+          "AfterPropertyName": "TextMakerGutter"
         }
       ]
     },
@@ -1252,7 +1252,7 @@
       "ClassName": "StyleParagraphProperties",
       "AddChildren": [
         {
-          "Name": "w:CT_OnOff/w:qFormat",
+          "Name": "w:CT_OnOffOnly/w:qFormat",
           "PropertyName": "PrimaryStyle",
           "PropertyComments": "Out-of-place primary style marker.",
           "Optional": true,
@@ -1375,7 +1375,7 @@
       ],
       "AddChildren": [
         {
-          "Name": "w:CT_Empty/w:doNotEmbedSmartTags",
+          "Name": "w:CT_OnOff/w:doNotEmbedSmartTags",
           "PropertyName": "DoNotEmbedSmartTags",
           "PropertyComments": "Do Not Embed Smart Tags.",
           "Optional": true,
@@ -1396,53 +1396,53 @@
           "AfterPropertyName": "DoNotEmbedSmartTags"
         },
         {
-          "Name": "w:CT_LegacyPreferenceOne/w:tmPrefOne",
-          "PropertyName": "LegacyPreferenceOne",
-          "PropertyComments": "Legacy application preference one.",
+          "Name": "w:CT_TextMakerPreferenceOne/w:tmPrefOne",
+          "PropertyName": "TextMakerPreferenceOne",
+          "PropertyComments": "TextMaker preference one.",
           "Optional": true,
           "AfterPropertyName": "SmartTagType"
         },
         {
-          "Name": "w:CT_LegacyPreferenceTwo/w:tmPrefTwo",
-          "PropertyName": "LegacyPreferenceTwo",
-          "PropertyComments": "Legacy application preference two.",
+          "Name": "w:CT_TextMakerPreferenceTwo/w:tmPrefTwo",
+          "PropertyName": "TextMakerPreferenceTwo",
+          "PropertyComments": "TextMaker preference two.",
           "Optional": true,
-          "AfterPropertyName": "LegacyPreferenceOne"
+          "AfterPropertyName": "TextMakerPreferenceOne"
         },
         {
-          "Name": "w:CT_LegacyFormatPreference/w:tmFmtPref",
-          "PropertyName": "LegacyFormatPreference",
-          "PropertyComments": "Legacy application format preference.",
+          "Name": "w:CT_TextMakerFormatPreference/w:tmFmtPref",
+          "PropertyName": "TextMakerFormatPreference",
+          "PropertyComments": "TextMaker format preference.",
           "Optional": true,
-          "AfterPropertyName": "LegacyPreferenceTwo"
+          "AfterPropertyName": "TextMakerPreferenceTwo"
         },
         {
-          "Name": "w:CT_LegacyCommentsProperties/w:tmCommentsPr",
-          "PropertyName": "LegacyCommentsProperties",
-          "PropertyComments": "Legacy application comment settings.",
+          "Name": "w:CT_TextMakerCommentsProperties/w:tmCommentsPr",
+          "PropertyName": "TextMakerCommentsProperties",
+          "PropertyComments": "TextMaker comment settings.",
           "Optional": true,
-          "AfterPropertyName": "LegacyFormatPreference"
+          "AfterPropertyName": "TextMakerFormatPreference"
         },
         {
-          "Name": "w:CT_LegacyReviewProperties/w:tmReviewPr",
-          "PropertyName": "LegacyReviewProperties",
-          "PropertyComments": "Legacy application review settings.",
+          "Name": "w:CT_TextMakerReviewProperties/w:tmReviewPr",
+          "PropertyName": "TextMakerReviewProperties",
+          "PropertyComments": "TextMaker review settings.",
           "Optional": true,
-          "AfterPropertyName": "LegacyCommentsProperties"
+          "AfterPropertyName": "TextMakerCommentsProperties"
         },
         {
-          "Name": "w:CT_LegacyLastPosition/w:tmLastPos",
-          "PropertyName": "LegacyLastPosition",
-          "PropertyComments": "Legacy application last editing position.",
+          "Name": "w:CT_TextMakerLastPosition/w:tmLastPos",
+          "PropertyName": "TextMakerLastPosition",
+          "PropertyComments": "TextMaker last editing position.",
           "Optional": true,
-          "AfterPropertyName": "LegacyReviewProperties"
+          "AfterPropertyName": "TextMakerReviewProperties"
         },
         {
-          "Name": "w:CT_LegacyApplicationRevision/w:tmAppRevision",
-          "PropertyName": "LegacyApplicationRevision",
-          "PropertyComments": "Legacy application revision metadata.",
+          "Name": "w:CT_TextMakerApplicationRevision/w:tmAppRevision",
+          "PropertyName": "TextMakerApplicationRevision",
+          "PropertyComments": "TextMaker application revision metadata.",
           "Optional": true,
-          "AfterPropertyName": "LegacyLastPosition"
+          "AfterPropertyName": "TextMakerLastPosition"
         }
       ]
     },
@@ -1475,7 +1475,7 @@
         },
         {
           "Name": "w14:CT_Glow/w14:glow",
-          "PropertyName": "W14Glow",
+          "PropertyName": "Glow",
           "PropertyComments": "Defines the Glow Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
@@ -1483,91 +1483,91 @@
         },
         {
           "Name": "w14:CT_Shadow/w14:shadow",
-          "PropertyName": "W14Shadow",
+          "PropertyName": "Shadow14",
           "PropertyComments": "Defines the Shadow Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Glow"
+          "AfterPropertyName": "Glow"
         },
         {
           "Name": "w14:CT_Reflection/w14:reflection",
-          "PropertyName": "W14Reflection",
+          "PropertyName": "Reflection",
           "PropertyComments": "Defines the Reflection Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Shadow"
+          "AfterPropertyName": "Shadow14"
         },
         {
           "Name": "w14:CT_TextOutlineEffect/w14:textOutline",
-          "PropertyName": "W14TextOutlineEffect",
+          "PropertyName": "TextOutlineEffect",
           "PropertyComments": "Defines the TextOutlineEffect Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Reflection"
+          "AfterPropertyName": "Reflection"
         },
         {
           "Name": "w14:CT_FillTextEffect/w14:textFill",
-          "PropertyName": "W14FillTextEffect",
+          "PropertyName": "FillTextEffect",
           "PropertyComments": "Defines the FillTextEffect Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14TextOutlineEffect"
+          "AfterPropertyName": "TextOutlineEffect"
         },
         {
           "Name": "w14:CT_Scene3D/w14:scene3d",
-          "PropertyName": "W14Scene3D",
+          "PropertyName": "Scene3D",
           "PropertyComments": "Defines the Scene3D Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14FillTextEffect"
+          "AfterPropertyName": "FillTextEffect"
         },
         {
           "Name": "w14:CT_Props3D/w14:props3d",
-          "PropertyName": "W14Properties3D",
+          "PropertyName": "Properties3D",
           "PropertyComments": "Defines the Properties3D Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Scene3D"
+          "AfterPropertyName": "Scene3D"
         },
         {
           "Name": "w14:CT_Ligatures/w14:ligatures",
-          "PropertyName": "W14Ligatures",
+          "PropertyName": "Ligatures",
           "PropertyComments": "Defines the Ligatures Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Properties3D"
+          "AfterPropertyName": "Properties3D"
         },
         {
           "Name": "w14:CT_NumForm/w14:numForm",
-          "PropertyName": "W14NumberingFormat",
+          "PropertyName": "NumberingFormat",
           "PropertyComments": "Defines the NumberingFormat Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Ligatures"
+          "AfterPropertyName": "Ligatures"
         },
         {
           "Name": "w14:CT_NumSpacing/w14:numSpacing",
-          "PropertyName": "W14NumberSpacing",
+          "PropertyName": "NumberSpacing",
           "PropertyComments": "Defines the NumberSpacing Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14NumberingFormat"
+          "AfterPropertyName": "NumberingFormat"
         },
         {
           "Name": "w14:CT_StylisticSets/w14:stylisticSets",
-          "PropertyName": "W14StylisticSets",
+          "PropertyName": "StylisticSets",
           "PropertyComments": "Defines the StylisticSets Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14NumberSpacing"
+          "AfterPropertyName": "NumberSpacing"
         },
         {
           "Name": "w14:CT_OnOff/w14:cntxtAlts",
-          "PropertyName": "W14ContextualAlternatives",
+          "PropertyName": "ContextualAlternatives",
           "PropertyComments": "Defines the ContextualAlternatives Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14StylisticSets"
+          "AfterPropertyName": "StylisticSets"
         }
       ]
     },
@@ -1583,7 +1583,7 @@
         },
         {
           "Name": "w14:CT_Ligatures/w14:ligatures",
-          "PropertyName": "W14Ligatures",
+          "PropertyName": "Ligatures",
           "PropertyComments": "Defines the Ligatures Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
@@ -1591,35 +1591,35 @@
         },
         {
           "Name": "w14:CT_NumForm/w14:numForm",
-          "PropertyName": "W14NumberingFormat",
+          "PropertyName": "NumberingFormat",
           "PropertyComments": "Defines the NumberingFormat Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14Ligatures"
+          "AfterPropertyName": "Ligatures"
         },
         {
           "Name": "w14:CT_NumSpacing/w14:numSpacing",
-          "PropertyName": "W14NumberSpacing",
+          "PropertyName": "NumberSpacing",
           "PropertyComments": "Defines the NumberSpacing Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14NumberingFormat"
+          "AfterPropertyName": "NumberingFormat"
         },
         {
           "Name": "w14:CT_StylisticSets/w14:stylisticSets",
-          "PropertyName": "W14StylisticSets",
+          "PropertyName": "StylisticSets",
           "PropertyComments": "Defines the StylisticSets Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14NumberSpacing"
+          "AfterPropertyName": "NumberSpacing"
         },
         {
           "Name": "w14:CT_OnOff/w14:cntxtAlts",
-          "PropertyName": "W14ContextualAlternatives",
+          "PropertyName": "ContextualAlternatives",
           "PropertyComments": "Defines the ContextualAlternatives Class.",
           "Optional": true,
           "InitialVersion": "Office2010",
-          "AfterPropertyName": "W14StylisticSets"
+          "AfterPropertyName": "StylisticSets"
         }
       ]
     },

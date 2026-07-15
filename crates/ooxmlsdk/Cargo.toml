@@ -16,7 +16,7 @@ readme.workspace = true
 default = ["parts"]
 parts = ["dep:zip"]
 flat-opc = ["parts", "dep:base64"]
-validators = ["dep:regex"]
+validators = ["dep:regex", "ooxmlsdk-derive/validators"]
 mce = ["parts"]
 
 [dependencies]

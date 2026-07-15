@@ -301,14 +301,29 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       }
     }
   });
-  let root_validate_arms = root_variants.map(|(variant, _)| {
-    let attrs = cfg_attrs(&variant.attrs);
-    let variant_ident = &variant.ident;
+  let root_validate_method_tokens = if cfg!(feature = "validators") {
+    let root_validate_arms = root_variants.map(|(variant, _)| {
+      let attrs = cfg_attrs(&variant.attrs);
+      let variant_ident = &variant.ident;
+      quote! {
+        #( #attrs )*
+        Self::#variant_ident(root) => root.validate_into(context),
+      }
+    });
     quote! {
-      #( #attrs )*
-      Self::#variant_ident(root) => crate::validator::SdkValidator::validate_into(root.as_ref(), context),
+      #[cfg(feature = "validators")]
+      pub(crate) fn validate_into(
+        &self,
+        context: &mut crate::validator::ValidationContext,
+      ) {
+        match self {
+          #( #root_validate_arms )*
+        }
+      }
     }
-  });
+  } else {
+    quote! {}
+  };
 
   Ok(quote! {
     #( #descriptor_impls )*
@@ -368,13 +383,8 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       }
     }
 
-    #[cfg(feature = "validators")]
-    impl crate::validator::SdkValidator for PartRootElement {
-      fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
-        match self {
-          #( #root_validate_arms )*
-        }
-      }
+    impl PartRootElement {
+      #root_validate_method_tokens
     }
 
     impl #ident {

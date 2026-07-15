@@ -346,6 +346,45 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
     }
   };
+  let validate_method_tokens = if cfg!(feature = "validators") {
+    quote! {
+      #[cfg(feature = "validators")]
+      pub fn validate(
+        &mut self,
+      ) -> Result<Vec<crate::validator::ValidationErrorInfo>, crate::common::SdkError> {
+        self.load_all_parts()?;
+        let mut context = crate::validator::ValidationContext::default();
+        let parts: Vec<_> = crate::sdk::SdkPackage::storage(self)
+          .parts()
+          .iter()
+          .enumerate()
+          .filter(|(_, part)| !part.is_deleted())
+          .map(|(index, part)| {
+            (
+              crate::common::PartId::from_index(index),
+              part.path().to_string(),
+            )
+          })
+          .collect();
+
+        for (part_id, part_uri) in parts {
+          let Some(root_element) = crate::sdk::SdkPackage::root_element(self, part_id) else {
+            continue;
+          };
+          context.with_part_uri(part_uri, |context| {
+            root_element.validate_into(context);
+          });
+          if context.should_stop() {
+            break;
+          }
+        }
+
+        Ok(context.into_errors())
+      }
+    }
+  } else {
+    quote! {}
+  };
   Ok(quote! {
     impl crate::sdk::SdkPackage for #ident {
       #[inline]
@@ -524,39 +563,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         crate::sdk::SdkPackage::load_all_parts(self)
       }
 
-      #[cfg(feature = "validators")]
-      pub fn validate(
-        &mut self,
-      ) -> Result<Vec<crate::validator::ValidationErrorInfo>, crate::common::SdkError> {
-        self.load_all_parts()?;
-        let mut context = crate::validator::ValidationContext::default();
-        let parts: Vec<_> = crate::sdk::SdkPackage::storage(self)
-          .parts()
-          .iter()
-          .enumerate()
-          .filter(|(_, part)| !part.is_deleted())
-          .map(|(index, part)| {
-            (
-              crate::common::PartId::from_index(index),
-              part.path().to_string(),
-            )
-          })
-          .collect();
-
-        for (part_id, part_uri) in parts {
-          let Some(root_element) = crate::sdk::SdkPackage::root_element(self, part_id) else {
-            continue;
-          };
-          context.with_part_uri(part_uri, |context| {
-            crate::validator::SdkValidator::validate_into(root_element, context);
-          });
-          if context.should_stop() {
-            break;
-          }
-        }
-
-        Ok(context.into_errors())
-      }
+      #validate_method_tokens
 
       #[inline]
       pub fn add_external_relationship(

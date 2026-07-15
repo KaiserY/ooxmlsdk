@@ -1173,14 +1173,8 @@ fn build_choice_payload_validate_tokens(
     };
   }
 
-  if box_inner_type(ty).is_some() {
-    quote! {
-      crate::validator::SdkValidator::validate_into(#value_expr.as_ref(), context);
-    }
-  } else {
-    quote! {
-      crate::validator::SdkValidator::validate_into(#value_expr, context);
-    }
+  quote! {
+    #value_expr.validate_into(context);
   }
 }
 
@@ -1199,7 +1193,7 @@ fn build_choice_validate_tokens(
           build_choice_payload_validate_tokens(quote! { value }, ty)
         } else {
           quote! {
-            crate::validator::SdkValidator::validate_into(value, context);
+            value.validate_into(context);
           }
         };
         arms.push(quote! {
@@ -1212,7 +1206,7 @@ fn build_choice_validate_tokens(
         let _ = children;
         arms.push(quote! {
           #choice_ty::#variant(value) => {
-            crate::validator::SdkValidator::validate_into(value, context);
+            value.validate_into(context);
           }
         });
       }
@@ -1257,6 +1251,29 @@ fn build_choice_validate_tokens(
   }
 }
 
+fn validator_methods_tokens(
+  validate_into_body: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  if !cfg!(feature = "validators") {
+    return quote! {};
+  }
+
+  quote! {
+    #[cfg(feature = "validators")]
+    #[inline]
+    pub fn validate(&self) -> Vec<crate::validator::ValidationErrorInfo> {
+      let mut context = crate::validator::ValidationContext::default();
+      self.validate_into(&mut context);
+      context.into_errors()
+    }
+
+    #[cfg(feature = "validators")]
+    pub(crate) fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
+      #validate_into_body
+    }
+  }
+}
+
 pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
@@ -1289,14 +1306,18 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
         "tuple wrappers require an #[sdk(qname = \"...\")] attribute",
       ))
     }
-    _ => Ok(quote! {
-      #as_ref_self_impl_tokens
-      impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {}
-      #[cfg(feature = "mce")]
-      impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {}
-      #[cfg(feature = "validators")]
-      impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {}
-    }),
+    _ => {
+      let validator_methods_tokens = validator_methods_tokens(quote! {});
+      Ok(quote! {
+        #as_ref_self_impl_tokens
+        impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {}
+        impl #impl_generics #ident #type_generics #where_clause {
+          #validator_methods_tokens
+        }
+        #[cfg(feature = "mce")]
+        impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {}
+      })
+    }
   }
 }
 
@@ -1647,6 +1668,9 @@ fn expand_tuple_wrapper(
     quote! { #type_generics },
     quote! { #where_clause },
   );
+  let validator_methods_tokens = validator_methods_tokens(quote! {
+    self.0.validate_into(context);
+  });
 
   Ok(quote! {
     #as_ref_self_impl_tokens
@@ -1661,13 +1685,6 @@ fn expand_tuple_wrapper(
       }
 
       #root_methods_tokens
-    }
-
-    #[cfg(feature = "validators")]
-    impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
-      fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
-        <#inner_ty as crate::validator::SdkValidator>::validate_into(&self.0, context);
-      }
     }
 
     #[cfg(feature = "mce")]
@@ -1720,6 +1737,8 @@ fn expand_tuple_wrapper(
       ) -> Result<bool, std::io::Error> {
         self.0.write_inner(writer)
       }
+
+      #validator_methods_tokens
     }
 
     impl #impl_generics ::std::fmt::Display for #ident #type_generics #where_clause {
@@ -3451,16 +3470,6 @@ fn expand_helper_struct(
     } else {
       payload_ty.clone()
     };
-    let validate_child_tokens = if box_inner_type(&payload_ty).is_some() {
-      quote! { child.as_ref() }
-    } else {
-      quote! { child }
-    };
-    let validate_self_tokens = if box_inner_type(&payload_ty).is_some() {
-      quote! { self.#field_ident.as_ref() }
-    } else {
-      quote! { &self.#field_ident }
-    };
     let parsed_child_expr = if box_inner_type(&payload_ty).is_some() {
       quote! { std::boxed::Box::new(parsed_child) }
     } else {
@@ -3495,11 +3504,13 @@ fn expand_helper_struct(
           #child_write_call
         }
       });
-      child_validate_tokens.push(quote! {
-        for child in &self.#field_ident {
-          crate::validator::SdkValidator::validate_into(#validate_child_tokens, context);
-        }
-      });
+      if cfg!(feature = "validators") {
+        child_validate_tokens.push(quote! {
+          for child in &self.#field_ident {
+            child.validate_into(context);
+          }
+        });
+      }
     } else {
       if field.optional {
         let child_write_call =
@@ -3509,11 +3520,13 @@ fn expand_helper_struct(
             #child_write_call
           }
         });
-        child_validate_tokens.push(quote! {
-          if let Some(child) = &self.#field_ident {
-            crate::validator::SdkValidator::validate_into(#validate_child_tokens, context);
-          }
-        });
+        if cfg!(feature = "validators") {
+          child_validate_tokens.push(quote! {
+            if let Some(child) = &self.#field_ident {
+              child.validate_into(context);
+            }
+          });
+        }
       } else {
         let self_write_call = write_typed_child_tokens(
           &child_ty,
@@ -3525,9 +3538,11 @@ fn expand_helper_struct(
         child_write_tokens.push(quote! {
           #self_write_call
         });
-        child_validate_tokens.push(quote! {
-          crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
-        });
+        if cfg!(feature = "validators") {
+          child_validate_tokens.push(quote! {
+            self.#field_ident.validate_into(context);
+          });
+        }
       }
     }
     push_qname_dispatch_arm(&mut child_match_tokens_borrowed, &field.qname, build_body());
@@ -3554,13 +3569,15 @@ fn expand_helper_struct(
         "",
         false,
       )?);
-      choice_validate_tokens.push(build_choice_validate_tokens(
-        &choice_ty,
-        &field.items,
-        field_ident,
-        true,
-        false,
-      ));
+      if cfg!(feature = "validators") {
+        choice_validate_tokens.push(build_choice_validate_tokens(
+          &choice_ty,
+          &field.items,
+          field_ident,
+          true,
+          false,
+        ));
+      }
     } else {
       if field.optional {
         choice_write_tokens.push(build_choice_write_tokens(
@@ -3572,13 +3589,15 @@ fn expand_helper_struct(
           "",
           false,
         )?);
-        choice_validate_tokens.push(build_choice_validate_tokens(
-          &choice_ty,
-          &field.items,
-          field_ident,
-          false,
-          true,
-        ));
+        if cfg!(feature = "validators") {
+          choice_validate_tokens.push(build_choice_validate_tokens(
+            &choice_ty,
+            &field.items,
+            field_ident,
+            false,
+            true,
+          ));
+        }
       } else {
         choice_write_tokens.push(build_choice_write_tokens(
           &choice_ty,
@@ -3589,13 +3608,15 @@ fn expand_helper_struct(
           "",
           false,
         )?);
-        choice_validate_tokens.push(build_choice_validate_tokens(
-          &choice_ty,
-          &field.items,
-          field_ident,
-          false,
-          false,
-        ));
+        if cfg!(feature = "validators") {
+          choice_validate_tokens.push(build_choice_validate_tokens(
+            &choice_ty,
+            &field.items,
+            field_ident,
+            false,
+            false,
+          ));
+        }
       }
     }
   }
@@ -3832,6 +3853,10 @@ fn expand_helper_struct(
     #( #ordered_write_tokens )*
     Ok(false)
   });
+  let validator_methods_tokens = validator_methods_tokens(quote! {
+    #( #child_validate_tokens )*
+    #( #choice_validate_tokens )*
+  });
   let as_ref_self_impl_tokens = as_ref_self_impl_tokens(
     quote! { #impl_generics },
     ident,
@@ -3860,13 +3885,8 @@ fn expand_helper_struct(
       ) -> Result<bool, std::io::Error> {
         #write_inner_body
       }
-    }
-    #[cfg(feature = "validators")]
-    impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
-      fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
-        #( #child_validate_tokens )*
-        #( #choice_validate_tokens )*
-      }
+
+      #validator_methods_tokens
     }
 
     #[cfg(feature = "mce")]
@@ -4311,149 +4331,153 @@ fn expand_named_struct(
       });
     }
 
-    let mut direct_validator_tokens = if simple_union_kind.is_some() {
-      Vec::new()
-    } else if is_hex_binary_effective_type(&value_ty, simple_type) {
-      vec![quote! {
-        crate::validator::validate_binary_format(
-          stringify!(#ident),
-          stringify!(#field_ident),
-          value,
-          crate::validator::BinaryFormatKind::Hex,
-        )?;
-      }]
-    } else if is_base64_binary_effective_type(&value_ty, simple_type) {
-      vec![quote! {
-        crate::validator::validate_binary_format(
-          stringify!(#ident),
-          stringify!(#field_ident),
-          value,
-          crate::validator::BinaryFormatKind::Base64,
-        )?;
-      }]
-    } else if is_decimal_value_effective_type(&value_ty, simple_type) {
-      vec![quote! {
-        crate::validator::validate_decimal_format(
-          stringify!(#ident),
-          stringify!(#field_ident),
-          value,
-        )?;
-      }]
-    } else if is_datetime_value_effective_type(&value_ty, simple_type) {
-      vec![quote! {
-        crate::validator::validate_datetime_format(
-          stringify!(#ident),
-          stringify!(#field_ident),
-          value,
-        )?;
-      }]
-    } else {
-      Vec::new()
-    };
-    let mut union_validator_tokens: std::collections::BTreeMap<u32, Vec<proc_macro2::TokenStream>> =
-      std::collections::BTreeMap::new();
-    if simple_union_kind.is_none() {
-      for validator in &field.validators {
-        let token = validator_token(ident, field_ident, &value_ty, validator);
-        let (source_id, union_id) = validator_source_union(validator);
-        if union_id.is_some() {
-          union_validator_tokens
-            .entry(source_id)
-            .or_default()
-            .push(token);
-        } else {
-          direct_validator_tokens.push(token);
+    if cfg!(feature = "validators") {
+      let mut direct_validator_tokens = if simple_union_kind.is_some() {
+        Vec::new()
+      } else if is_hex_binary_effective_type(&value_ty, simple_type) {
+        vec![quote! {
+          crate::validator::validate_binary_format(
+            stringify!(#ident),
+            stringify!(#field_ident),
+            value,
+            crate::validator::BinaryFormatKind::Hex,
+          )?;
+        }]
+      } else if is_base64_binary_effective_type(&value_ty, simple_type) {
+        vec![quote! {
+          crate::validator::validate_binary_format(
+            stringify!(#ident),
+            stringify!(#field_ident),
+            value,
+            crate::validator::BinaryFormatKind::Base64,
+          )?;
+        }]
+      } else if is_decimal_value_effective_type(&value_ty, simple_type) {
+        vec![quote! {
+          crate::validator::validate_decimal_format(
+            stringify!(#ident),
+            stringify!(#field_ident),
+            value,
+          )?;
+        }]
+      } else if is_datetime_value_effective_type(&value_ty, simple_type) {
+        vec![quote! {
+          crate::validator::validate_datetime_format(
+            stringify!(#ident),
+            stringify!(#field_ident),
+            value,
+          )?;
+        }]
+      } else {
+        Vec::new()
+      };
+      let mut union_validator_tokens: std::collections::BTreeMap<
+        u32,
+        Vec<proc_macro2::TokenStream>,
+      > = std::collections::BTreeMap::new();
+      if simple_union_kind.is_none() {
+        for validator in &field.validators {
+          let token = validator_token(ident, field_ident, &value_ty, validator);
+          let (source_id, union_id) = validator_source_union(validator);
+          if union_id.is_some() {
+            union_validator_tokens
+              .entry(source_id)
+              .or_default()
+              .push(token);
+          } else {
+            direct_validator_tokens.push(token);
+          }
         }
       }
-    }
-    let union_validator_tokens: Vec<_> = if union_validator_tokens.is_empty() {
-      Vec::new()
-    } else {
-      let branch_tokens: Vec<_> = union_validator_tokens
-        .into_values()
-        .map(|tokens| {
-          quote! {
-            (|| -> Result<(), crate::common::SdkError> {
-              #( #tokens )*
-              Ok::<(), crate::common::SdkError>(())
-            })()
-          }
-        })
-        .collect();
-      vec![quote! {
-        {
-          let mut first_error: Option<crate::common::SdkError> = None;
-          let mut matched = false;
-          for branch_result in [#( #branch_tokens ),*] {
-            match branch_result {
-              Ok(()) => {
-                matched = true;
-                break;
-              }
-              Err(err) => {
-                if first_error.is_none() {
-                  first_error = Some(err);
+      let union_validator_tokens: Vec<_> = if union_validator_tokens.is_empty() {
+        Vec::new()
+      } else {
+        let branch_tokens: Vec<_> = union_validator_tokens
+          .into_values()
+          .map(|tokens| {
+            quote! {
+              (|| -> Result<(), crate::common::SdkError> {
+                #( #tokens )*
+                Ok::<(), crate::common::SdkError>(())
+              })()
+            }
+          })
+          .collect();
+        vec![quote! {
+          {
+            let mut first_error: Option<crate::common::SdkError> = None;
+            let mut matched = false;
+            for branch_result in [#( #branch_tokens ),*] {
+              match branch_result {
+                Ok(()) => {
+                  matched = true;
+                  break;
+                }
+                Err(err) => {
+                  if first_error.is_none() {
+                    first_error = Some(err);
+                  }
                 }
               }
             }
+            if !matched {
+              return Err(first_error.unwrap_or_else(|| {
+                crate::common::SdkError::CommonError(format!(
+                  "all union validator branches failed for {}.{}",
+                  stringify!(#ident),
+                  stringify!(#field_ident),
+                ))
+              }));
+            }
           }
-          if !matched {
-            return Err(first_error.unwrap_or_else(|| {
-              crate::common::SdkError::CommonError(format!(
-                "all union validator branches failed for {}.{}",
-                stringify!(#ident),
-                stringify!(#field_ident),
-              ))
-            }));
-          }
+        }]
+      };
+      let mut validator_tokens = direct_validator_tokens;
+      validator_tokens.extend(union_validator_tokens);
+      if !validator_tokens.is_empty() {
+        if field.list && field.optional {
+          attr_validate_tokens.push(quote! {
+            if let Some(values) = &self.#field_ident {
+              context.check(|| -> Result<(), crate::common::SdkError> {
+                for value in values {
+                  #( #validator_tokens )*
+                }
+                Ok(())
+              });
+            }
+          });
+        } else if field.list {
+          attr_validate_tokens.push(quote! {
+            {
+              let values = &self.#field_ident;
+              context.check(|| -> Result<(), crate::common::SdkError> {
+                for value in values {
+                  #( #validator_tokens )*
+                }
+                Ok(())
+              });
+            }
+          });
+        } else if field.optional {
+          attr_validate_tokens.push(quote! {
+            if let Some(value) = &self.#field_ident {
+              context.check(|| -> Result<(), crate::common::SdkError> {
+                #( #validator_tokens )*
+                Ok(())
+              });
+            }
+          });
+        } else {
+          attr_validate_tokens.push(quote! {
+            {
+              let value = &self.#field_ident;
+              context.check(|| -> Result<(), crate::common::SdkError> {
+                #( #validator_tokens )*
+                Ok(())
+              });
+            }
+          });
         }
-      }]
-    };
-    let mut validator_tokens = direct_validator_tokens;
-    validator_tokens.extend(union_validator_tokens);
-    if !validator_tokens.is_empty() {
-      if field.list && field.optional {
-        attr_validate_tokens.push(quote! {
-          if let Some(values) = &self.#field_ident {
-            context.check(|| -> Result<(), crate::common::SdkError> {
-              for value in values {
-                #( #validator_tokens )*
-              }
-              Ok(())
-            });
-          }
-        });
-      } else if field.list {
-        attr_validate_tokens.push(quote! {
-          {
-            let values = &self.#field_ident;
-            context.check(|| -> Result<(), crate::common::SdkError> {
-              for value in values {
-                #( #validator_tokens )*
-              }
-              Ok(())
-            });
-          }
-        });
-      } else if field.optional {
-        attr_validate_tokens.push(quote! {
-          if let Some(value) = &self.#field_ident {
-            context.check(|| -> Result<(), crate::common::SdkError> {
-              #( #validator_tokens )*
-              Ok(())
-            });
-          }
-        });
-      } else {
-        attr_validate_tokens.push(quote! {
-          {
-            let value = &self.#field_ident;
-            context.check(|| -> Result<(), crate::common::SdkError> {
-              #( #validator_tokens )*
-              Ok(())
-            });
-          }
-        });
       }
     }
   }
@@ -4662,16 +4686,6 @@ fn expand_named_struct(
     } else {
       payload_ty.clone()
     };
-    let validate_child_tokens = if box_inner_type(&payload_ty).is_some() {
-      quote! { child.as_ref() }
-    } else {
-      quote! { child }
-    };
-    let validate_self_tokens = if box_inner_type(&payload_ty).is_some() {
-      quote! { self.#field_ident.as_ref() }
-    } else {
-      quote! { &self.#field_ident }
-    };
     let parsed_child_expr = if box_inner_type(&payload_ty).is_some() {
       quote! { std::boxed::Box::new(parsed_child) }
     } else {
@@ -4713,11 +4727,13 @@ fn expand_named_struct(
           #child_write_call
         }
       });
-      child_validate_tokens.push(quote! {
-        for child in &self.#field_ident {
-          crate::validator::SdkValidator::validate_into(#validate_child_tokens, context);
-        }
-      });
+      if cfg!(feature = "validators") {
+        child_validate_tokens.push(quote! {
+          for child in &self.#field_ident {
+            child.validate_into(context);
+          }
+        });
+      }
     } else {
       if field.optional {
         child_write_tokens.push(quote! {
@@ -4725,18 +4741,22 @@ fn expand_named_struct(
             #child_write_call
           }
         });
-        child_validate_tokens.push(quote! {
-          if let Some(child) = &self.#field_ident {
-            crate::validator::SdkValidator::validate_into(#validate_child_tokens, context);
-          }
-        });
+        if cfg!(feature = "validators") {
+          child_validate_tokens.push(quote! {
+            if let Some(child) = &self.#field_ident {
+              child.validate_into(context);
+            }
+          });
+        }
       } else {
         child_write_tokens.push(quote! {
           #self_write_call
         });
-        child_validate_tokens.push(quote! {
-          crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
-        });
+        if cfg!(feature = "validators") {
+          child_validate_tokens.push(quote! {
+            self.#field_ident.validate_into(context);
+          });
+        }
       }
     }
     push_qname_dispatch_arm(&mut child_match_tokens_borrowed, &field.qname, build_body());
@@ -5349,13 +5369,15 @@ fn expand_named_struct(
         "",
         false,
       )?);
-      choice_validate_tokens.push(build_choice_validate_tokens(
-        &choice_ty,
-        &field.items,
-        field_ident,
-        true,
-        false,
-      ));
+      if cfg!(feature = "validators") {
+        choice_validate_tokens.push(build_choice_validate_tokens(
+          &choice_ty,
+          &field.items,
+          field_ident,
+          true,
+          false,
+        ));
+      }
       choice_text_parse_tokens.push(build_text_block(quote! { &text_value }));
     } else {
       if field.optional {
@@ -5368,13 +5390,15 @@ fn expand_named_struct(
           "",
           false,
         )?);
-        choice_validate_tokens.push(build_choice_validate_tokens(
-          &choice_ty,
-          &field.items,
-          field_ident,
-          false,
-          true,
-        ));
+        if cfg!(feature = "validators") {
+          choice_validate_tokens.push(build_choice_validate_tokens(
+            &choice_ty,
+            &field.items,
+            field_ident,
+            false,
+            true,
+          ));
+        }
       } else {
         choice_write_tokens.push(build_choice_write_tokens(
           &choice_ty,
@@ -5385,13 +5409,15 @@ fn expand_named_struct(
           "",
           false,
         )?);
-        choice_validate_tokens.push(build_choice_validate_tokens(
-          &choice_ty,
-          &field.items,
-          field_ident,
-          false,
-          false,
-        ));
+        if cfg!(feature = "validators") {
+          choice_validate_tokens.push(build_choice_validate_tokens(
+            &choice_ty,
+            &field.items,
+            field_ident,
+            false,
+            false,
+          ));
+        }
       }
       choice_text_parse_tokens.push(build_text_block(quote! { &text_value }));
     }
@@ -7067,6 +7093,11 @@ fn expand_named_struct(
     quote! { #type_generics },
     quote! { #where_clause },
   );
+  let validator_methods_tokens = validator_methods_tokens(quote! {
+    #( #attr_validate_tokens )*
+    #( #child_validate_tokens )*
+    #( #choice_validate_tokens )*
+  });
   let write_inner_no_prefix_method_tokens = if prefix_write_mode == PrefixWriteMode::NoPrefixDual {
     let write_inner_no_prefix_body = write_inner_body_tokens(quote! {
       #special_namespace_write_tokens
@@ -7126,14 +7157,8 @@ fn expand_named_struct(
       }
 
       #write_inner_no_prefix_method_tokens
-    }
-    #[cfg(feature = "validators")]
-    impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
-      fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
-        #( #attr_validate_tokens )*
-        #( #child_validate_tokens )*
-        #( #choice_validate_tokens )*
-      }
+
+      #validator_methods_tokens
     }
 
     #[cfg(feature = "mce")]

@@ -173,9 +173,6 @@ impl MediaDataPart {
   }
 }
 
-#[cfg(feature = "validators")]
-impl crate::validator::SdkValidator for MediaDataPart {}
-
 macro_rules! define_media_reference_relationship {
   ($ident:ident, $relationship_type:literal) => {
     #[derive(Clone, Debug, Default)]
@@ -244,9 +241,6 @@ macro_rules! define_media_reference_relationship {
         &mut self.media_data_part
       }
     }
-
-    #[cfg(feature = "validators")]
-    impl crate::validator::SdkValidator for $ident {}
   };
 }
 

@@ -159,8 +159,9 @@ reader shape so recursive types expose reusable private steps:
   `Child::read_*_inner()` call.
 - On an end element, finish the top frame, wrap it in the generated choice
   variant or child field, and attach it to the parent frame.
-- Unknown children, `any`, and `xml_other_children` continue to use the existing
-  raw XML/depth-counting helpers.
+- Schema-declared `any` children continue to use the existing raw
+  XML/depth-counting helpers. Unknown children are skipped as complete
+  subtrees; malformed XML still returns an error.
 
 The SCC loop is therefore only the control stack. Most parsing code remains the
 ordinary per-type generated code, just factored into start/step/finalize pieces
@@ -628,11 +629,10 @@ Default round-trip does not depend on the `mce` feature. MCE replacement and
 compatibility traversal are separate behavior and should not block the first
 fix.
 
-Raw XML paths are already depth-based rather than schema-recursive:
+Schema-declared raw XML paths are already depth-based rather than
+schema-recursive:
 
-- `xml_other_children`
 - `any`
-- unknown subtree preservation
 - MCE raw-element helpers when the feature is enabled
 
 After the default parser fix, MCE should get a focused follow-up audit to ensure

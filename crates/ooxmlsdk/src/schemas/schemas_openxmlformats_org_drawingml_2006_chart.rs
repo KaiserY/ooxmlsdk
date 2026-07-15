@@ -1017,6 +1017,9 @@ pub struct DataLabels {
         )
     )]
   pub data_labels_choice: Option<DataLabelsChoice>,
+  /// Out-of-place layout following deleted data labels.
+  #[sdk(child(qname = "c:layout"))]
+  pub layout: Option<std::boxed::Box<Layout>>,
   /// Defines the DLblsExtensionList Class.
   #[sdk(child(qname = "c:extLst"))]
   pub d_lbls_extension_list: Option<DLblsExtensionList>,

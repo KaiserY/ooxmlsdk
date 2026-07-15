@@ -8,7 +8,7 @@
       "ClassName": "Anchor",
       "AlternateContent": [
         {
-          "AfterField": "simple_position",
+          "AfterField": "horizontal_position",
           "Children": [
             "horizontal_position",
             "vertical_position"

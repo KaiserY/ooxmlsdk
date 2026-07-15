@@ -121,8 +121,6 @@ pub struct SystemSupportDecl {
   pub have_mc_preserve_elements: bool,
   pub have_mc_process_content: bool,
   pub have_mc_must_understand: bool,
-  pub have_xml_other_children: bool,
-  pub compact_xml_other_children: bool,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub extra_xmlns: Vec<String>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -143,7 +141,6 @@ impl SystemSupportDecl {
   pub fn has_extra_support_fields(&self) -> bool {
     self.have_xmlns_fields
       || self.has_mce_attributes()
-      || self.have_xml_other_children
       || !self.extra_xmlns.is_empty()
       || !self.canonical_namespace_prefixes.is_empty()
   }
@@ -364,9 +361,6 @@ fn estimate_support_size(support: &SystemSupportDecl) -> usize {
     .into_iter()
     .filter(|enabled| *enabled)
     .count();
-  if support.have_xml_other_children {
-    size += VEC_SIZE;
-  }
   if !support.extra_xmlns.is_empty() {
     size += VEC_SIZE;
   }
@@ -561,8 +555,6 @@ mod tests {
           have_mc_preserve_elements: false,
           have_mc_process_content: false,
           have_mc_must_understand: false,
-          have_xml_other_children: true,
-          compact_xml_other_children: false,
           extra_xmlns: Vec::new(),
           canonical_namespace_prefixes: Vec::new(),
           alternate_content_children: HashMap::new(),

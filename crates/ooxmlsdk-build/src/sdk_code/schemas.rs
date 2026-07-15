@@ -207,9 +207,7 @@ impl TypeContainmentGraph {
               .insert(generated_rust_name);
           }
         }
-        if can_alias_any_children_wrapper_decl(type_decl, &[])
-          || can_alias_raw_children_leaf_decl(type_decl, &[])
-        {
+        if can_alias_any_children_wrapper_decl(type_decl, &[]) {
           graph.any_children_alias_keys.insert(type_key);
         }
       }
@@ -1829,9 +1827,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       continue;
     }
 
-    if can_alias_any_children_wrapper_decl(type_decl, &attr_fields)
-      || can_alias_raw_children_leaf_decl(type_decl, &attr_fields)
-    {
+    if can_alias_any_children_wrapper_decl(type_decl, &attr_fields) {
       token_stream_list.push(quote! {
         #( #type_attrs )*
         #[doc = #summary_doc]
@@ -3599,12 +3595,17 @@ fn gen_attr_from_decl(
       }
     })
     .collect();
-  let property_comments_doc = format!(" {}", attr.docs);
+  let property_comments_doc = if attr.docs.trim().is_empty() {
+    quote! {}
+  } else {
+    let docs = format!(" {}", attr.docs);
+    quote! { #[doc = #docs] }
+  };
 
   Ok(match attr.cardinality {
     Cardinality::One => quote! {
       #( #attr_attrs )*
-      #[doc = #property_comments_doc]
+      #property_comments_doc
       #sdk_attr_attrs
       #( #validator_attrs )*
       #bit_attrs
@@ -3612,7 +3613,7 @@ fn gen_attr_from_decl(
     },
     Cardinality::Optional => quote! {
       #( #attr_attrs )*
-      #[doc = #property_comments_doc]
+      #property_comments_doc
       #sdk_attr_attrs
       #( #validator_attrs )*
       #bit_attrs
@@ -3882,18 +3883,6 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
     fields.push(quote! {
       pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
     });
-  }
-
-  if support.have_xml_other_children {
-    if support.compact_xml_other_children {
-      fields.push(quote! {
-        pub xml_other_children: Vec<std::boxed::Box<[u8]>>,
-      });
-    } else {
-      fields.push(quote! {
-        pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
-      });
-    }
   }
 
   fields
@@ -4461,25 +4450,6 @@ fn can_alias_any_children_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&Fie
     && field.cardinality == Cardinality::Many
     && field.type_ref.module_path.is_none()
     && field.type_ref.rust_type == "std::boxed::Box<[u8]>"
-}
-
-fn can_alias_raw_children_leaf_decl(type_decl: &TypeDecl, attr_fields: &[&FieldDecl]) -> bool {
-  type_decl.kind == TypeKind::ElementStruct
-    && matches!(
-      type_decl.base_rust_name.as_deref(),
-      Some("OpenXmlLeafElement" | "OpenXmlEmptyElement" | "EmptyType")
-    )
-    && matches!(
-      type_decl.element_kind,
-      Some(ElementKind::Leaf | ElementKind::Composite)
-    )
-    && attr_fields.is_empty()
-    && type_decl.members.is_empty()
-    && type_decl.xml_content.is_none()
-    && !type_decl.support.have_xmlns_fields
-    && !type_decl.support.has_mce_attributes()
-    && type_decl.support.have_xml_other_children
-    && !type_decl.support.has_xml_header
 }
 
 fn can_wrap_derived_to_base_decl(type_decl: &TypeDecl, base_type_decl: &TypeDecl) -> bool {
@@ -7530,6 +7500,7 @@ mod tests {
     .to_string();
 
     assert!(generated.contains("# [sdk (attr (qname = \":creationId\"))]"));
+    assert!(!generated.contains("# [doc"));
     assert!(generated.contains("# [sdk (pattern (regex = \"[A-Z]+\"))]"));
     assert!(generated.contains("# [sdk (string_format (kind = \"token\"))]"));
     assert!(generated.contains("# [sdk (string_length (min = 2u32 , max = 8u32 ,))]"));

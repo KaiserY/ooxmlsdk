@@ -191,7 +191,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             let have_xmlns_fields = ty.has_xmlns_fields
               || !ty.part.is_empty()
               || ty.base_class == "OpenXmlPartRootElement";
-            let have_xml_other_children = false;
             assign_particle_ids(&mut children);
 
             let has_xml_header = !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement";
@@ -213,7 +212,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               have_mc_preserve_elements,
               have_mc_process_content,
               have_mc_must_understand,
-              have_xml_other_children,
               extra_xmlns: Vec::new(),
               canonical_namespace_prefixes: Vec::new(),
               text_value_type: text_value_type_from_sources(ty),

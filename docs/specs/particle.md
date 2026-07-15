@@ -372,8 +372,9 @@ Implemented shape:
   children outside the position's declared set are rejected.
 - Ordered streams use a typed choice containing every known child and
   `AlternateContent`.
-- Extension-added `AddXmlAny` and `HaveDirectXmlOtherChildren` paths were
-  removed. Schema-native wildcard content remains raw by design.
+- Generic extension-added wildcard fallbacks were removed. The only retained
+  extension raw route is the QName-scoped `GraphicData` compatibility case for
+  `wp:wsp`; schema-native wildcard content remains raw by design.
 
 ### 11. Mixed Sequence Direct Children Were Forced Optional
 

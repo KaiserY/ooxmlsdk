@@ -185,6 +185,8 @@ pub trait XmlRead<'xml> {
 
   fn unread(&mut self, event: PayloadEvent<'xml>) -> Result<(), SdkError>;
 
+  fn skip_element(&mut self, end: quick_xml::name::QName<'_>) -> Result<(), SdkError>;
+
   fn decoder(&self) -> Decoder;
 
   #[inline]
@@ -335,6 +337,12 @@ impl<R: BufRead> XmlRead<'static> for IoReader<R> {
   }
 
   #[inline]
+  fn skip_element(&mut self, end: quick_xml::name::QName<'_>) -> Result<(), SdkError> {
+    self.reader.read_to_end_into(end, &mut self.buf)?;
+    Ok(())
+  }
+
+  #[inline]
   fn decoder(&self) -> Decoder {
     IoReader::decoder(self)
   }
@@ -466,6 +474,12 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
   #[inline]
   fn unread(&mut self, event: PayloadEvent<'de>) -> Result<(), SdkError> {
     SliceReader::unread(self, event)
+  }
+
+  #[inline]
+  fn skip_element(&mut self, end: quick_xml::name::QName<'_>) -> Result<(), SdkError> {
+    self.reader.read_to_end(end)?;
+    Ok(())
   }
 
   #[inline]

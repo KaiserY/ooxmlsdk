@@ -132,8 +132,8 @@ Use `AlternateContentChoice` when a repeated direct child and
 `mc:AlternateContent` share one ordered stream. Use `AddChoice` to model a
 previously untyped ordered child stream, and add a typed `AlternateContent`
 variant to an existing choice enum when the wrapper occurs there. Raw
-`xml_other_children` and `XmlAny` remain only where the source schema itself
-declares wildcard content; schema extensions must not add them for MCE.
+`XmlAny` remains only where the source schema itself declares wildcard content;
+schema extensions must not add wildcard fallbacks for MCE.
 
 ## Test Workspace
 

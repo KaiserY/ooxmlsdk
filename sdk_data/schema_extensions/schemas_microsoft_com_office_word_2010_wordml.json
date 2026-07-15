@@ -1,4 +1,15 @@
 {
+  "AddTypes": [
+    {
+      "Name": "w:CT_Empty/w14:enableOpenTypeKerning",
+      "ClassName": "EnableOpenTypeKerning",
+      "Summary": "Enable OpenType kerning.",
+      "BaseClass": "EmptyType",
+      "Kind": "Leaf",
+      "ApiKind": "Struct",
+      "Version": "Office2010"
+    }
+  ],
   "Types": [
     {
       "ClassName": "DocumentId"

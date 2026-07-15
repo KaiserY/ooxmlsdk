@@ -4586,6 +4586,12 @@ pub struct ParagraphBorders {
   /// Paragraph Border Between Identical Paragraphs
   #[sdk(child(qname = "w:between"))]
   pub between_border: Option<BetweenBorder>,
+  /// Out-of-place inside horizontal paragraph border.
+  #[sdk(child(qname = "w:insideH"))]
+  pub inside_horizontal_border: Option<InsideHorizontalBorder>,
+  /// Out-of-place inside vertical paragraph border.
+  #[sdk(child(qname = "w:insideV"))]
+  pub inside_vertical_border: Option<InsideVerticalBorder>,
   /// Paragraph Border Between Facing Pages
   #[sdk(child(qname = "w:bar"))]
   pub bar_border: Option<BarBorder>,
@@ -6307,7 +6313,7 @@ pub struct RunProperties {
             child(variant = Shading, boxed, qname = "w:shd"),
             child(variant = FitText, qname = "w:fitText"),
             child(variant = VerticalTextAlignment, qname = "w:vertAlign"),
-            child(variant = RightToLeftText, boxed, qname = "w:rtl"),
+            child(variant = RightToLeftText, qname = "w:rtl"),
             child(variant = ComplexScript, boxed, qname = "w:cs"),
             child(variant = Emphasis, qname = "w:em"),
             child(variant = Languages, boxed, qname = "w:lang"),
@@ -6885,6 +6891,7 @@ pub struct Run {
                 variant = LastRenderedPageBreak,
                 qname = "w:lastRenderedPageBreak"
             ),
+            child(variant = Run, boxed, qname = "w:r"),
             child(variant = SymbolCharExt, qname = "w16se:sym"),
             child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
@@ -7805,6 +7812,8 @@ pub struct Paragraph {
             child(variant = BidirectionalOverride, qname = "w:bdo"),
             child(variant = BidirectionalEmbedding, qname = "w:dir"),
             child(variant = SubDocumentReference, qname = "w:subDoc"),
+            child(variant = Break, qname = "w:br"),
+            child(variant = Table, boxed, qname = "w:tbl"),
             child(variant = SmartTagRun, boxed, qname = "w:smartTag"),
             child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
@@ -10447,6 +10456,27 @@ pub struct Settings {
   /// Smart Tag Type.
   #[sdk(child(qname = "w:smartTagType"))]
   pub smart_tag_type: Vec<SmartTagType>,
+  /// Legacy application preference one.
+  #[sdk(child(qname = "w:tmPrefOne"))]
+  pub legacy_preference_one: Option<LegacyPreferenceOne>,
+  /// Legacy application preference two.
+  #[sdk(child(qname = "w:tmPrefTwo"))]
+  pub legacy_preference_two: Option<LegacyPreferenceTwo>,
+  /// Legacy application format preference.
+  #[sdk(child(qname = "w:tmFmtPref"))]
+  pub legacy_format_preference: Option<LegacyFormatPreference>,
+  /// Legacy application comment settings.
+  #[sdk(child(qname = "w:tmCommentsPr"))]
+  pub legacy_comments_properties: Option<std::boxed::Box<LegacyCommentsProperties>>,
+  /// Legacy application review settings.
+  #[sdk(child(qname = "w:tmReviewPr"))]
+  pub legacy_review_properties: Option<std::boxed::Box<LegacyReviewProperties>>,
+  /// Legacy application last editing position.
+  #[sdk(child(qname = "w:tmLastPos"))]
+  pub legacy_last_position: Option<std::boxed::Box<LegacyLastPosition>>,
+  /// Legacy application revision metadata.
+  #[sdk(child(qname = "w:tmAppRevision"))]
+  pub legacy_application_revision: Option<LegacyApplicationRevision>,
   /// Radix Point for Field Code Evaluation.
   #[sdk(child(qname = "w:decimalSymbol"))]
   pub decimal_symbol: Option<DecimalSymbol>,
@@ -10991,7 +11021,7 @@ pub struct PreviousRunProperties {
             child(variant = Shading, boxed, qname = "w:shd"),
             child(variant = FitText, qname = "w:fitText"),
             child(variant = VerticalTextAlignment, qname = "w:vertAlign"),
-            child(variant = RightToLeftText, boxed, qname = "w:rtl"),
+            child(variant = RightToLeftText, qname = "w:rtl"),
             child(variant = ComplexScript, boxed, qname = "w:cs"),
             child(variant = Emphasis, qname = "w:em"),
             child(variant = Languages, boxed, qname = "w:lang"),
@@ -11095,7 +11125,7 @@ pub struct PreviousParagraphMarkRunProperties {
             child(variant = Shading, boxed, qname = "w:shd"),
             child(variant = FitText, qname = "w:fitText"),
             child(variant = VerticalTextAlignment, qname = "w:vertAlign"),
-            child(variant = RightToLeftText, boxed, qname = "w:rtl"),
+            child(variant = RightToLeftText, qname = "w:rtl"),
             child(variant = ComplexScript, boxed, qname = "w:cs"),
             child(variant = Emphasis, qname = "w:em"),
             child(variant = Languages, boxed, qname = "w:lang"),
@@ -11288,7 +11318,7 @@ pub struct ParagraphMarkRunProperties {
             child(variant = Shading, boxed, qname = "w:shd"),
             child(variant = FitText, qname = "w:fitText"),
             child(variant = VerticalTextAlignment, qname = "w:vertAlign"),
-            child(variant = RightToLeftText, boxed, qname = "w:rtl"),
+            child(variant = RightToLeftText, qname = "w:rtl"),
             child(variant = ComplexScript, boxed, qname = "w:cs"),
             child(variant = Emphasis, qname = "w:em"),
             child(variant = Languages, boxed, qname = "w:lang"),
@@ -11386,6 +11416,15 @@ pub struct SectionProperties {
   /// Defines the PaperSource Class.
   #[sdk(child(qname = "w:paperSrc"))]
   pub paper_source: Option<PaperSource>,
+  /// Top margin gutter setting.
+  #[sdk(child(qname = "w:tmGutter"))]
+  pub top_margin_gutter: Option<TopMarginGutter>,
+  /// Mirror page margins.
+  #[sdk(child(qname = "w:mirrorMargins"))]
+  pub mirror_margins: Option<MirrorMargins>,
+  /// Top margin section setting.
+  #[sdk(child(qname = "w:tmSection"))]
+  pub top_margin_section: Option<TopMarginSection>,
   /// Defines the PageBorders Class.
   #[sdk(child(qname = "w:pgBorders"))]
   pub page_borders: Option<std::boxed::Box<PageBorders>>,
@@ -12718,6 +12757,9 @@ pub struct TableGrid {
   /// Grid Column Definition.
   #[sdk(child(qname = "w:gridCol"))]
   pub grid_column: Vec<GridColumn>,
+  /// Out-of-place table grid column.
+  #[sdk(empty_child(qname = "w:tblCol"))]
+  pub out_of_place_table_column: Vec<()>,
   /// Revision Information for Table Grid Column Definitions.
   #[sdk(child(qname = "w:tblGridChange"))]
   pub table_grid_change: Option<std::boxed::Box<TableGridChange>>,
@@ -13070,6 +13112,9 @@ pub struct RunPropertiesBaseStyle {
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(qname = "w14:cntxtAlts"))]
   pub w14_contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
+  /// Right-to-left text.
+  #[sdk(child(qname = "w:rtl"))]
+  pub right_to_left_text: Option<RightToLeftText>,
 }
 /// Paragraph Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13108,6 +13153,9 @@ pub struct ParagraphPropertiesBaseStyle {
   /// Defines the SuppressAutoHyphens Class.
   #[sdk(child(qname = "w:suppressAutoHyphens"))]
   pub suppress_auto_hyphens: Option<SuppressAutoHyphens>,
+  /// Maximum consecutive hyphenated lines.
+  #[sdk(child(qname = "w:hyphenationLines"))]
+  pub hyphenation_lines: Option<HyphenationLines>,
   /// Defines the Kinsoku Class.
   #[sdk(child(qname = "w:kinsoku"))]
   pub kinsoku: Option<Kinsoku>,
@@ -13175,6 +13223,9 @@ pub struct RunPropertiesDefault {
   /// Run Properties
   #[sdk(child(qname = "w:rPr"))]
   pub run_properties_base_style: Option<std::boxed::Box<RunPropertiesBaseStyle>>,
+  /// Out-of-place default run color.
+  #[sdk(child(qname = "w:color"))]
+  pub color: Option<Color>,
 }
 /// Default Paragraph Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13183,6 +13234,12 @@ pub struct ParagraphPropertiesDefault {
   /// Paragraph Properties
   #[sdk(child(qname = "w:pPr"))]
   pub paragraph_properties_base_style: Option<std::boxed::Box<ParagraphPropertiesBaseStyle>>,
+  /// Out-of-place default paragraph spacing.
+  #[sdk(child(qname = "w:spacing"))]
+  pub spacing_between_lines: Option<SpacingBetweenLines>,
+  /// Out-of-place default paragraph shading.
+  #[sdk(child(qname = "w:shd"))]
+  pub shading: Option<Shading>,
 }
 /// Left and Right Margin for Frame.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13677,6 +13734,9 @@ pub struct NumberingSymbolRunProperties {
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(qname = "w14:cntxtAlts"))]
   pub w14_contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
+  /// Nested run properties found in legacy numbering output.
+  #[sdk(child(qname = "w:rPr"))]
+  pub run_properties: Option<std::boxed::Box<RunProperties>>,
 }
 /// Abstract Numbering Definition Type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13905,6 +13965,9 @@ pub struct StyleParagraphProperties {
   /// Paragraph Mark Run Properties.
   #[sdk(child(qname = "w:rPr"))]
   pub paragraph_mark_run_properties: Option<std::boxed::Box<ParagraphMarkRunProperties>>,
+  /// Out-of-place primary style marker.
+  #[sdk(child(qname = "w:qFormat"))]
+  pub primary_style: Option<PrimaryStyle>,
   /// Defines the ParagraphPropertiesChange Class.
   #[sdk(child(qname = "w:pPrChange"))]
   pub paragraph_properties_change: Option<std::boxed::Box<ParagraphPropertiesChange>>,
@@ -14138,6 +14201,9 @@ pub struct StyleRunProperties {
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(qname = "w14:cntxtAlts"))]
   pub w14_contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
+  /// Right-to-left text.
+  #[sdk(child(qname = "w:rtl"))]
+  pub right_to_left_text: Option<RightToLeftText>,
   /// Defines the RunPropertiesChange Class.
   #[sdk(child(qname = "w:rPrChange"))]
   pub run_properties_change: Option<std::boxed::Box<RunPropertiesChange>>,
@@ -15076,6 +15142,7 @@ pub struct Body {
             child(variant = ContentPart, qname = "w:contentPart"),
             child(variant = RunConflictInsertion, boxed, qname = "w14:conflictIns"),
             child(variant = RunConflictDeletion, boxed, qname = "w14:conflictDel"),
+            child(variant = Break, qname = "w:br"),
             child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
     )]
@@ -15253,6 +15320,9 @@ pub struct TableRowPropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:pPr")]
 pub struct ParagraphProperties {
+  /// Out-of-place nested paragraph properties.
+  #[sdk(child(qname = "w:pPr"))]
+  pub nested_paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   /// Defines the ParagraphStyleId Class.
   #[sdk(child(qname = "w:pStyle"))]
   pub paragraph_style_id: Option<ParagraphStyleId>,
@@ -15274,6 +15344,9 @@ pub struct ParagraphProperties {
   /// Defines the NumberingProperties Class.
   #[sdk(child(qname = "w:numPr"))]
   pub numbering_properties: Option<std::boxed::Box<NumberingProperties>>,
+  /// Out-of-place numbering identifier.
+  #[sdk(child(qname = "w:numId"))]
+  pub numbering_id: Option<NumberingId>,
   /// Defines the SuppressLineNumbers Class.
   #[sdk(child(qname = "w:suppressLineNumbers"))]
   pub suppress_line_numbers: Option<SuppressLineNumbers>,
@@ -16213,6 +16286,9 @@ pub struct Compatibility {
   /// Do Not Bypass East Asian/Complex Script Layout Code
   #[sdk(child(qname = "w:useFELayout"))]
   pub use_far_east_layout: Option<UseFarEastLayout>,
+  /// Enable OpenType kerning.
+  #[sdk(empty_child(qname = "w14:enableOpenTypeKerning"))]
+  pub enable_open_type_kerning: Option<()>,
   /// Do Not Automatically Apply List Paragraph Style To Bulleted/Numbered Text
   #[sdk(child(qname = "w:useNormalStyleForList"))]
   pub use_normal_style_for_list: Option<UseNormalStyleForList>,
@@ -16545,6 +16621,9 @@ pub struct SmartTagType {
   /// Smart tag name.
   #[sdk(attr(qname = "w:name"))]
   pub name: crate::simple_type::StringValue,
+  /// Smart tag URL.
+  #[sdk(attr(qname = "w:url"))]
+  pub url: Option<crate::simple_type::StringValue>,
 }
 /// Smart Tag Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -16553,6 +16632,322 @@ pub struct SmartTagProperties {
   /// Smart tag attribute.
   #[sdk(child(qname = "w:attr"))]
   pub custom_xml_attribute: Vec<CustomXmlAttribute>,
+}
+/// Top margin gutter setting.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmGutter")]
+pub struct TopMarginGutter {
+  /// Top margin gutter value.
+  #[sdk(attr(qname = "w:val"))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Top margin section setting.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmSection")]
+pub struct TopMarginSection {
+  /// Top margin section height.
+  #[sdk(attr(qname = "w:h"))]
+  pub height: crate::simple_type::Int32Value,
+}
+/// Legacy application preference one.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmPrefOne")]
+pub struct LegacyPreferenceOne {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy application preference two.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmPrefTwo")]
+pub struct LegacyPreferenceTwo {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy application format preference.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmFmtPref")]
+pub struct LegacyFormatPreference {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy comment placement.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmCommentsPlace")]
+pub struct LegacyCommentsPlace {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy comment width.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmCommentsWidth")]
+pub struct LegacyCommentsWidth {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy comment color.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmCommentsColor")]
+pub struct LegacyCommentsColor {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy application comment settings.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmCommentsPr")]
+pub struct LegacyCommentsProperties {
+  /// Legacy comment placement.
+  #[sdk(child(qname = "w:tmCommentsPlace"))]
+  pub place: Option<LegacyCommentsPlace>,
+  /// Legacy comment width.
+  #[sdk(child(qname = "w:tmCommentsWidth"))]
+  pub width: Option<LegacyCommentsWidth>,
+  /// Legacy comment color.
+  #[sdk(child(qname = "w:tmCommentsColor"))]
+  pub color: Option<LegacyCommentsColor>,
+}
+/// Legacy review enabled setting.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewEnabled")]
+pub struct LegacyReviewEnabled {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy review visibility setting.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewShow")]
+pub struct LegacyReviewShow {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy review print setting.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewPrint")]
+pub struct LegacyReviewPrint {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy revision number.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmRevisionNum")]
+pub struct LegacyRevisionNumber {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy insertion review mark.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewMarkIns")]
+pub struct LegacyReviewInsertionMark {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy insertion review color.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewColorIns")]
+pub struct LegacyReviewInsertionColor {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy deletion review mark.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewMarkDel")]
+pub struct LegacyReviewDeletionMark {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy deletion review color.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewColorDel")]
+pub struct LegacyReviewDeletionColor {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy formatting review mark.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewMarkFmt")]
+pub struct LegacyReviewFormatMark {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy formatting review color.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewColorFmt")]
+pub struct LegacyReviewFormatColor {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy line review mark.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewMarkLn")]
+pub struct LegacyReviewLineMark {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy line review color.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewColorLn")]
+pub struct LegacyReviewLineColor {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy review tooltip setting.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewToolTip")]
+pub struct LegacyReviewToolTip {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy application review settings.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmReviewPr")]
+pub struct LegacyReviewProperties {
+  /// _
+  #[sdk(child(qname = "w:tmReviewEnabled"))]
+  pub enabled: Option<LegacyReviewEnabled>,
+  /// _
+  #[sdk(child(qname = "w:tmReviewShow"))]
+  pub show: Option<LegacyReviewShow>,
+  /// _
+  #[sdk(child(qname = "w:tmReviewPrint"))]
+  pub print: Option<LegacyReviewPrint>,
+  /// _
+  #[sdk(child(qname = "w:tmRevisionNum"))]
+  pub revision_number: Option<LegacyRevisionNumber>,
+  /// _
+  #[sdk(child(qname = "w:tmReviewMarkIns"))]
+  pub insertion_mark: Option<LegacyReviewInsertionMark>,
+  /// _
+  #[sdk(child(qname = "w:tmReviewColorIns"))]
+  pub insertion_color: Option<LegacyReviewInsertionColor>,
+  /// _
+  #[sdk(child(qname = "w:tmReviewMarkDel"))]
+  pub deletion_mark: Option<LegacyReviewDeletionMark>,
+  /// _
+  #[sdk(child(qname = "w:tmReviewColorDel"))]
+  pub deletion_color: Option<LegacyReviewDeletionColor>,
+  /// _
+  #[sdk(child(qname = "w:tmReviewMarkFmt"))]
+  pub format_mark: Option<LegacyReviewFormatMark>,
+  /// _
+  #[sdk(child(qname = "w:tmReviewColorFmt"))]
+  pub format_color: Option<LegacyReviewFormatColor>,
+  /// _
+  #[sdk(child(qname = "w:tmReviewMarkLn"))]
+  pub line_mark: Option<LegacyReviewLineMark>,
+  /// _
+  #[sdk(child(qname = "w:tmReviewColorLn"))]
+  pub line_color: Option<LegacyReviewLineColor>,
+  /// _
+  #[sdk(child(qname = "w:tmReviewToolTip"))]
+  pub tool_tip: Option<LegacyReviewToolTip>,
+}
+/// Legacy last position page.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmLastPosPage")]
+pub struct LegacyLastPositionPage {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy last position selection.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmLastPosSelect")]
+pub struct LegacyLastPositionSelection {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy last position frame index.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmLastPosFrameIdx")]
+pub struct LegacyLastPositionFrameIndex {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy last position paragraph index.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmLastPosPgfIdx")]
+pub struct LegacyLastPositionParagraphIndex {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy last position index.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmLastPosIdx")]
+pub struct LegacyLastPositionIndex {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy last caret position.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmLastPosCaret")]
+pub struct LegacyLastPositionCaret {
+  /// _
+  #[sdk(child(qname = "w:tmLastPosPgfIdx"))]
+  pub paragraph_index: Option<LegacyLastPositionParagraphIndex>,
+  /// _
+  #[sdk(child(qname = "w:tmLastPosIdx"))]
+  pub index: Option<LegacyLastPositionIndex>,
+}
+/// Legacy last anchor position.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmLastPosAnchor")]
+pub struct LegacyLastPositionAnchor {
+  /// _
+  #[sdk(child(qname = "w:tmLastPosPgfIdx"))]
+  pub paragraph_index: Option<LegacyLastPositionParagraphIndex>,
+  /// _
+  #[sdk(child(qname = "w:tmLastPosIdx"))]
+  pub index: Option<LegacyLastPositionIndex>,
+}
+/// Legacy last table rectangle.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmLastPosTblRect")]
+pub struct LegacyLastPositionTableRectangle {
+  #[sdk(attr(qname = "w:left"))]
+  pub left: Option<crate::simple_type::Int32Value>,
+  #[sdk(attr(qname = "w:top"))]
+  pub top: Option<crate::simple_type::Int32Value>,
+  #[sdk(attr(qname = "w:right"))]
+  pub right: Option<crate::simple_type::Int32Value>,
+  #[sdk(attr(qname = "w:bottom"))]
+  pub bottom: Option<crate::simple_type::Int32Value>,
+}
+/// Legacy application last editing position.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmLastPos")]
+pub struct LegacyLastPosition {
+  /// _
+  #[sdk(child(qname = "w:tmLastPosPage"))]
+  pub page: Option<LegacyLastPositionPage>,
+  /// _
+  #[sdk(child(qname = "w:tmLastPosSelect"))]
+  pub selection: Option<LegacyLastPositionSelection>,
+  /// _
+  #[sdk(child(qname = "w:tmLastPosFrameIdx"))]
+  pub frame_index: Option<LegacyLastPositionFrameIndex>,
+  /// _
+  #[sdk(child(qname = "w:tmLastPosCaret"))]
+  pub caret: Option<std::boxed::Box<LegacyLastPositionCaret>>,
+  /// _
+  #[sdk(child(qname = "w:tmLastPosAnchor"))]
+  pub anchor: Option<std::boxed::Box<LegacyLastPositionAnchor>>,
+  /// _
+  #[sdk(child(qname = "w:tmLastPosTblRect"))]
+  pub table_rectangle: Option<LegacyLastPositionTableRectangle>,
+}
+/// Legacy application revision metadata.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tmAppRevision")]
+pub struct LegacyApplicationRevision {
+  #[sdk(attr(qname = "w:date"))]
+  pub date: Option<crate::simple_type::Int32Value>,
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
+}
+/// Maximum consecutive hyphenated lines.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:hyphenationLines")]
+pub struct HyphenationLines {
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::Int32Value>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum EmbeddedObjectChoice {
@@ -16700,7 +17095,7 @@ pub enum RunPropertiesChoice {
   /// Defines the VerticalTextAlignment Class.
   VerticalTextAlignment(VerticalTextAlignment),
   /// Defines the RightToLeftText Class.
-  RightToLeftText(std::boxed::Box<RightToLeftText>),
+  RightToLeftText(RightToLeftText),
   /// Defines the ComplexScript Class.
   ComplexScript(std::boxed::Box<ComplexScript>),
   /// Defines the Emphasis Class.
@@ -17123,6 +17518,8 @@ pub enum RunChoice {
   PositionalTab(PositionalTab),
   /// Position of Last Calculated Page Break.
   LastRenderedPageBreak,
+  /// Out-of-place nested run.
+  Run(std::boxed::Box<Run>),
   /// Extended Symbol Character.
   SymbolCharExt(SymbolChar),
   AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
@@ -17909,6 +18306,10 @@ pub enum ParagraphChoice {
   BidirectionalEmbedding(BidirectionalEmbedding),
   /// Anchor for Subdocument Location.
   SubDocumentReference(SubDocumentReference),
+  /// Out-of-place break in a paragraph.
+  Break(Break),
+  /// Out-of-place table in a paragraph.
+  Table(std::boxed::Box<Table>),
   /// Smart tag run content.
   SmartTagRun(std::boxed::Box<CustomXmlRun>),
   AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
@@ -19230,7 +19631,7 @@ pub enum PreviousRunPropertiesChoice {
   /// Defines the VerticalTextAlignment Class.
   VerticalTextAlignment(VerticalTextAlignment),
   /// Defines the RightToLeftText Class.
-  RightToLeftText(std::boxed::Box<RightToLeftText>),
+  RightToLeftText(RightToLeftText),
   /// Defines the ComplexScript Class.
   ComplexScript(std::boxed::Box<ComplexScript>),
   /// Defines the Emphasis Class.
@@ -19316,7 +19717,7 @@ pub enum PreviousParagraphMarkRunPropertiesChoice2 {
   /// Defines the VerticalTextAlignment Class.
   VerticalTextAlignment(VerticalTextAlignment),
   /// Defines the RightToLeftText Class.
-  RightToLeftText(std::boxed::Box<RightToLeftText>),
+  RightToLeftText(RightToLeftText),
   /// Defines the ComplexScript Class.
   ComplexScript(std::boxed::Box<ComplexScript>),
   /// Defines the Emphasis Class.
@@ -19402,7 +19803,7 @@ pub enum ParagraphMarkRunPropertiesChoice2 {
   /// Defines the VerticalTextAlignment Class.
   VerticalTextAlignment(VerticalTextAlignment),
   /// Defines the RightToLeftText Class.
-  RightToLeftText(std::boxed::Box<RightToLeftText>),
+  RightToLeftText(RightToLeftText),
   /// Defines the ComplexScript Class.
   ComplexScript(std::boxed::Box<ComplexScript>),
   /// Defines the Emphasis Class.
@@ -20430,6 +20831,8 @@ pub enum BodyChoice {
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
+  /// Out-of-place break in the document body.
+  Break(Break),
   AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }
 #[derive(Clone, Debug, PartialEq)]

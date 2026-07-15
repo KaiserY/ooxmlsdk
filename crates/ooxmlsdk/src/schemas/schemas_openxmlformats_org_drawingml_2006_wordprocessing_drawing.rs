@@ -248,6 +248,9 @@ pub struct Anchor {
   /// Simple Positioning Coordinates
   #[sdk(child(qname = "wp:simplePos"))]
   pub simple_position: Option<SimplePosition>,
+  /// Horizontal Positioning
+  #[sdk(child(qname = "wp:positionH"))]
+  pub horizontal_position: Option<std::boxed::Box<HorizontalPosition>>,
   /// Markup Compatibility alternate content at this schema position.
   #[sdk(
         mce(
@@ -257,9 +260,6 @@ pub struct Anchor {
         )
     )]
   pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
-  /// Horizontal Positioning
-  #[sdk(child(qname = "wp:positionH"))]
-  pub horizontal_position: Option<std::boxed::Box<HorizontalPosition>>,
   /// Vertical Positioning
   #[sdk(child(qname = "wp:positionV"))]
   pub vertical_position: Option<std::boxed::Box<VerticalPosition>>,

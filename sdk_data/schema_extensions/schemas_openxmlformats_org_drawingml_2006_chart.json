@@ -24,6 +24,18 @@
       ]
     },
     {
+      "ClassName": "DataLabels",
+      "AddChildren": [
+        {
+          "Name": "c:CT_Layout/c:layout",
+          "PropertyName": "Layout",
+          "PropertyComments": "Out-of-place layout following deleted data labels.",
+          "Optional": true,
+          "BeforeName": "c:CT_DLblsExtensionList/c:extLst"
+        }
+      ]
+    },
+    {
       "ClassName": "AxisId",
       "OverrideBaseClass": "OpenXmlLeafElement",
       "Attributes": [

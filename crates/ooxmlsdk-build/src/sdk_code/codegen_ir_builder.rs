@@ -780,12 +780,9 @@ fn build_type_decl(
     }
   };
 
-  let have_xml_other_children = schema_type.have_xml_other_children;
   let xml_content = build_xml_content_type_ref(schema_type, schema, context)?;
   let content_model =
     refine_content_model_decl(source_content_model, &members, xml_content.as_ref());
-  let compact_xml_other_children =
-    have_xml_other_children && xml_content.is_none() && !has_child_like_members(&members);
 
   Ok((
     TypeDecl {
@@ -824,8 +821,6 @@ fn build_type_decl(
         have_mc_preserve_elements: schema_type.have_mc_preserve_elements,
         have_mc_process_content: schema_type.have_mc_process_content,
         have_mc_must_understand: schema_type.have_mc_must_understand,
-        have_xml_other_children,
-        compact_xml_other_children,
         extra_xmlns: schema_type.extra_xmlns.clone(),
         canonical_namespace_prefixes: schema_type.canonical_namespace_prefixes.clone(),
         alternate_content_children: Default::default(),
@@ -835,21 +830,6 @@ fn build_type_decl(
     },
     extra_types,
   ))
-}
-
-fn has_child_like_members(members: &[MemberDecl]) -> bool {
-  members.iter().any(|member| {
-    matches!(
-      member,
-      MemberDecl::Field(FieldDecl {
-        wire: FieldWireDecl::Child { .. }
-          | FieldWireDecl::TextChild { .. }
-          | FieldWireDecl::Any
-          | FieldWireDecl::Choice,
-        ..
-      })
-    )
-  })
 }
 
 fn should_build_recursive_one_sequence_choices(schema_type: &SchemaType) -> bool {
@@ -4225,7 +4205,6 @@ mod tests {
           have_mc_preserve_elements: true,
           have_mc_process_content: true,
           have_mc_must_understand: true,
-          have_xml_other_children: false,
           has_xml_header: true,
           ..Default::default()
         },

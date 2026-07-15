@@ -54,7 +54,6 @@ pub struct SchemaTypeExtension {
   pub have_mc_preserve_elements: Option<bool>,
   pub have_mc_process_content: Option<bool>,
   pub have_mc_must_understand: Option<bool>,
-  pub have_xml_other_children: Option<bool>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub extra_xmlns: Vec<String>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -101,7 +100,6 @@ pub struct SchemaTypeAddTypeExtension {
   pub have_mc_preserve_elements: bool,
   pub have_mc_process_content: bool,
   pub have_mc_must_understand: bool,
-  pub have_xml_other_children: bool,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub text_value_type: String,
   pub attributes: Vec<SchemaTypeAttributeExtension>,
@@ -177,6 +175,8 @@ pub struct SchemaTypeAddChildExtension {
 pub struct SchemaChoiceEnumExtension {
   pub rust_name: String,
   pub repeated: Option<bool>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub add_xml_any: Option<Vec<String>>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub add_variants: Vec<SchemaChoiceVariantExtension>,
 }
@@ -362,9 +362,6 @@ pub fn apply_schema_extensions(
         }
         if let Some(have_mc_must_understand) = extension.have_mc_must_understand {
           schema_type.have_mc_must_understand = have_mc_must_understand;
-        }
-        if let Some(have_xml_other_children) = extension.have_xml_other_children {
-          schema_type.have_xml_other_children = have_xml_other_children;
         }
         for prefix in &extension.extra_xmlns {
           if !schema_type.extra_xmlns.contains(prefix) {
@@ -560,7 +557,6 @@ fn add_schema_type(
       have_mc_preserve_elements: extension.have_mc_preserve_elements,
       have_mc_process_content: extension.have_mc_process_content,
       have_mc_must_understand: extension.have_mc_must_understand,
-      have_xml_other_children: extension.have_xml_other_children,
       text_value_type: extension.text_value_type.clone(),
       api_kind: extension.api_kind.clone(),
       attributes,
@@ -750,9 +746,48 @@ pub fn apply_codegen_ir_schema_extensions(
         }),
       );
     }
+
+    if let Some(qnames) = &choice_extension.add_xml_any {
+      if qnames.is_empty() {
+        return Err(
+          format!(
+            "schema extension choice enum {}.{} AddXmlAny requires at least one QName",
+            module_name, choice_extension.rust_name
+          )
+          .into(),
+        );
+      }
+      add_xml_any_choice_variant(type_decl, qnames.clone());
+    }
   }
 
   Ok(())
+}
+
+fn add_xml_any_choice_variant(
+  type_decl: &mut crate::sdk_code::codegen_ir::TypeDecl,
+  qnames: Vec<String>,
+) {
+  if let Some(existing) = type_decl.members.iter_mut().find_map(|member| {
+    let MemberDecl::Variant(variant) = member else {
+      return None;
+    };
+    (variant.rust_name == "XmlAny").then_some(variant)
+  }) {
+    existing.wire = VariantWireDecl::Any { qnames };
+    return;
+  }
+
+  type_decl.members.push(MemberDecl::Variant(VariantDecl {
+    rust_name: "XmlAny".to_string(),
+    docs: "Unknown XML child.".to_string(),
+    version: String::new(),
+    wire: VariantWireDecl::Any { qnames },
+    payload: TypeRefDecl {
+      rust_type: "std::boxed::Box<[u8]>".to_string(),
+      module_path: None,
+    },
+  }));
 }
 
 fn add_static_choice(
@@ -1871,6 +1906,7 @@ mod tests {
         choice_enums: vec![SchemaChoiceEnumExtension {
           rust_name: "ControlPropertiesChoice".to_string(),
           repeated: None,
+          add_xml_any: None,
           add_variants: vec![SchemaChoiceVariantExtension {
             rust_name: "DrawingRunProperties".to_string(),
             q_name: "a:CT_TextCharacterProperties/a:rPr".to_string(),
@@ -1901,6 +1937,106 @@ mod tests {
     assert_eq!(
       variant.payload.module_path.as_deref(),
       Some("crate::schemas::a")
+    );
+  }
+
+  #[test]
+  fn applies_choice_enum_add_xml_any_extension() {
+    let mut ir = SchemaModuleDecl {
+      module_name: "test_schema".to_string(),
+      types: vec![TypeDecl {
+        rust_name: "RunChoice".to_string(),
+        kind: TypeKind::ChoiceEnum,
+        estimated_size: 0,
+        members: vec![MemberDecl::Variant(VariantDecl {
+          rust_name: "Text".to_string(),
+          wire: VariantWireDecl::Child {
+            qnames: vec!["w:CT_Text/w:t".to_string()],
+          },
+          payload: TypeRefDecl {
+            rust_type: "Text".to_string(),
+            module_path: None,
+          },
+          ..Default::default()
+        })],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        choice_enums: vec![SchemaChoiceEnumExtension {
+          rust_name: "RunChoice".to_string(),
+          add_xml_any: Some(vec!["wp:wsp".to_string()]),
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions).unwrap();
+
+    let choice = &ir.types[0];
+    assert_eq!(choice.members.len(), 2);
+    let MemberDecl::Variant(variant) = &choice.members[1] else {
+      panic!("expected variant");
+    };
+    assert_eq!(variant.rust_name, "XmlAny");
+    assert_eq!(
+      variant.wire,
+      VariantWireDecl::Any {
+        qnames: vec!["wp:wsp".to_string()]
+      }
+    );
+    assert_eq!(variant.payload.rust_type, "std::boxed::Box<[u8]>");
+    assert!(variant.payload.module_path.is_none());
+  }
+
+  #[test]
+  fn narrows_existing_choice_enum_xml_any_extension_to_qnames() {
+    let mut ir = SchemaModuleDecl {
+      module_name: "test_schema".to_string(),
+      types: vec![TypeDecl {
+        rust_name: "GraphicDataChoice".to_string(),
+        kind: TypeKind::ChoiceEnum,
+        estimated_size: 0,
+        members: vec![MemberDecl::Variant(VariantDecl {
+          rust_name: "XmlAny".to_string(),
+          wire: VariantWireDecl::Any { qnames: Vec::new() },
+          payload: TypeRefDecl {
+            rust_type: "std::boxed::Box<[u8]>".to_string(),
+            module_path: None,
+          },
+          ..Default::default()
+        })],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        choice_enums: vec![SchemaChoiceEnumExtension {
+          rust_name: "GraphicDataChoice".to_string(),
+          add_xml_any: Some(vec!["wp:wsp".to_string()]),
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions).unwrap();
+
+    assert_eq!(ir.types[0].members.len(), 1);
+    let MemberDecl::Variant(variant) = &ir.types[0].members[0] else {
+      panic!("expected variant");
+    };
+    assert_eq!(
+      variant.wire,
+      VariantWireDecl::Any {
+        qnames: vec!["wp:wsp".to_string()]
+      }
     );
   }
 

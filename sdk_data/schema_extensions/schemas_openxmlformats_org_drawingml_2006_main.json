@@ -17,6 +17,9 @@
   "ChoiceEnums": [
     {
       "RustName": "GraphicDataChoice",
+      "AddXmlAny": [
+        "wp:wsp"
+      ],
       "AddVariants": [
         {
           "RustName": "AlternateContent",

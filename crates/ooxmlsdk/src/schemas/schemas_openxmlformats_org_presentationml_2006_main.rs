@@ -929,7 +929,7 @@ pub struct BackgroundStyleReference {
 }
 /// Data for the Windows platform..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:ext")]
+#[sdk(version = office2021, qname = "p:ext")]
 pub struct CommentPropertiesExtension {
   /// Defines the TaskDetails Class.
   #[sdk(child(qname = "p228:taskDetails"))]
@@ -1361,7 +1361,7 @@ pub struct ViewProperties {
 }
 /// Defines the ContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:contentPart")]
+#[sdk(version = office2010, qname = "p:contentPart")]
 pub struct ContentPart {
   /// bwMode
   #[sdk(attr(qname = "p14:bwMode"))]
@@ -4841,7 +4841,7 @@ pub struct SoundAction {
 }
 /// Defines the PlaceholderExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:ext")]
+#[sdk(version = microsoft365, qname = "p:ext")]
 pub struct PlaceholderExtension {
   /// Defines the PlaceholderTypeExtension Class.
   #[sdk(child(qname = "p232:phTypeExt"))]

@@ -814,6 +814,10 @@ fn build_type_decl(
       base_module_path: schema_base_module_path(schema_type.base_class.as_str()),
       xml_content,
       support: SystemSupportDecl {
+        element_version_override: (schema_type.api_kind != SchemaTypeApiKind::LeafTextWrapper)
+          .then(|| context.element_version_override(schema_type))
+          .flatten()
+          .map(str::to_string),
         have_xmlns_fields: schema_type.have_xmlns_fields,
         has_xml_header: schema_type.has_xml_header,
         have_mc_ignorable: schema_type.have_mc_ignorable,

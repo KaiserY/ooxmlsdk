@@ -1,6 +1,8 @@
 #![cfg_attr(doc, recursion_limit = "512")]
 
 pub mod common;
+#[cfg(feature = "mce")]
+mod mce;
 pub mod namespaces;
 #[cfg(feature = "parts")]
 pub mod parts;

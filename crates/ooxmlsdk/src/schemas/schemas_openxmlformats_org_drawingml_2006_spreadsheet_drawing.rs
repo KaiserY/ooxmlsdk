@@ -210,7 +210,7 @@ pub struct Picture {
 }
 /// Defines the ContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:contentPart")]
+#[sdk(version = office2010, qname = "xdr:contentPart")]
 pub struct ContentPart {
   /// id
   #[sdk(attr(qname = "r:id"))]

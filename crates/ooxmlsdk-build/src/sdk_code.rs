@@ -14,7 +14,9 @@ use crate::Result;
 use crate::sdk_code::codegen_ir::SchemaModuleDecl;
 use crate::sdk_code::part_codegen_ir::PartModuleDecl;
 use crate::sdk_code::parts::{gen_part_module_with_relationship_type_variants, gen_parts_mod};
-use crate::sdk_code::schemas::{TypeContainmentGraph, gen_schema_from_ir_with_type_graph};
+use crate::sdk_code::schemas::{
+  TypeContainmentGraph, gen_mce_process_content_mapping, gen_schema_from_ir_with_type_graph,
+};
 use crate::sdk_code::versioning::version_cfg_attrs;
 use crate::sdk_data::sdk_data_model::Namespace as SdkDataNamespace;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
@@ -67,6 +69,11 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
 pub fn gen_derive_namespace_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let loaded_schemas = read_schemas(&sdk_data_dir.as_ref().join("schemas"))?;
   let namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
+  let module_refs = loaded_schemas
+    .iter()
+    .map(|loaded| &loaded.ir)
+    .collect::<Vec<_>>();
+  let schema_graph = TypeContainmentGraph::from_modules(&module_refs);
   write_namespaces(NamespacesInput {
     sdk_data_namespaces: &namespaces,
     out_dir_path: out_dir.as_ref(),
@@ -74,7 +81,12 @@ pub fn gen_derive_namespace_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) ->
     include_uri_by_prefix: true,
     include_default_namespace_style: false,
   })?;
-  simple_type_mapping::write_simple_type_mapping(&loaded_schemas, out_dir.as_ref())
+  simple_type_mapping::write_simple_type_mapping(&loaded_schemas, out_dir.as_ref())?;
+  let mce_mapping = gen_mce_process_content_mapping(&module_refs, &schema_graph)?;
+  write_generated_module(
+    &out_dir.as_ref().join("mce_process_content_mapping.rs"),
+    mce_mapping,
+  )
 }
 
 fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<LoadedSchema>> {

@@ -114,6 +114,8 @@ pub enum ContentModelDecl {
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct SystemSupportDecl {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub element_version_override: Option<String>,
   pub have_xmlns_fields: bool,
   pub has_xml_header: bool,
   pub have_mc_ignorable: bool,
@@ -548,6 +550,7 @@ mod tests {
         base_module_path: None,
         xml_content: None,
         support: SystemSupportDecl {
+          element_version_override: None,
           have_xmlns_fields: true,
           has_xml_header: true,
           have_mc_ignorable: false,

@@ -1315,8 +1315,15 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
             &mut self,
             settings: &crate::sdk::MarkupCompatibilityProcessSettings,
           ) -> Result<(), crate::common::SdkError> {
-            let context = crate::sdk::MceContext::default();
-            self.process_mce_with_context(settings, &context)
+            if matches!(
+              settings.process_mode,
+              crate::sdk::MarkupCompatibilityProcessMode::NoProcess
+            ) {
+              return Ok(());
+            }
+            let context = crate::mce::MceContext::default();
+            let _ = self.process_mce_with_context(settings, &context)?;
+            Ok(())
           }
         }
       });
@@ -1329,9 +1336,9 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
           pub(crate) fn process_mce_with_context(
             &mut self,
             _settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-            _context: &crate::sdk::MceContext<'_>,
-          ) -> Result<(), crate::common::SdkError> {
-            Ok(())
+            _context: &crate::mce::MceContext<'_>,
+          ) -> Result<crate::mce::ElementAction, crate::common::SdkError> {
+            Ok(crate::mce::ElementAction::Normal)
           }
         }
       };
@@ -1697,6 +1704,7 @@ fn expand_tuple_wrapper(
   let validator_methods_tokens = validator_methods_tokens(quote! {
     self.0.validate_into(context);
   });
+  let (mce_element_action_tokens, _) = mce_element_action_tokens(&input.attrs, schema_qname)?;
   let public_mce_method_tokens = parse_sdk_xml_header(&input.attrs)?.then(|| {
     quote! {
       #[inline]
@@ -1704,8 +1712,15 @@ fn expand_tuple_wrapper(
         &mut self,
         settings: &crate::sdk::MarkupCompatibilityProcessSettings,
       ) -> Result<(), crate::common::SdkError> {
-        let context = crate::sdk::MceContext::default();
-        self.process_mce_with_context(settings, &context)
+        if matches!(
+          settings.process_mode,
+          crate::sdk::MarkupCompatibilityProcessMode::NoProcess
+        ) {
+          return Ok(());
+        }
+        let context = crate::mce::MceContext::default();
+        let _ = self.process_mce_with_context(settings, &context)?;
+        Ok(())
       }
     }
   });
@@ -1718,9 +1733,10 @@ fn expand_tuple_wrapper(
       pub(crate) fn process_mce_with_context(
         &mut self,
         settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &crate::sdk::MceContext<'_>,
-      ) -> Result<(), crate::common::SdkError> {
-        self.0.process_mce_with_context(settings, context)
+        context: &crate::mce::MceContext<'_>,
+      ) -> Result<crate::mce::ElementAction, crate::common::SdkError> {
+        let _ = (&self.0, settings, context);
+        Ok(#mce_element_action_tokens)
       }
     }
   };
@@ -1791,23 +1807,142 @@ fn expand_tuple_wrapper(
   })
 }
 
+fn parse_sdk_element_version(attrs: &[Attribute]) -> syn::Result<Option<&'static str>> {
+  let mut version = None;
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      let Meta::NameValue(name_value) = meta else {
+        continue;
+      };
+      if !name_value.path.is_ident("version") {
+        continue;
+      }
+      let Expr::Path(value) = name_value.value else {
+        return Err(syn::Error::new_spanned(
+          name_value,
+          "SdkType version expects an availability identifier",
+        ));
+      };
+      let path = value.path;
+      let candidate = if path.is_ident("office2010") {
+        "Office2010"
+      } else if path.is_ident("office2013") {
+        "Office2013"
+      } else if path.is_ident("office2016") {
+        "Office2016"
+      } else if path.is_ident("office2019") {
+        "Office2019"
+      } else if path.is_ident("office2021") {
+        "Office2021"
+      } else if path.is_ident("microsoft365") {
+        "Microsoft365"
+      } else {
+        return Err(syn::Error::new_spanned(
+          path,
+          "unsupported SdkType element availability version",
+        ));
+      };
+      if version.replace(candidate).is_some() {
+        return Err(syn::Error::new_spanned(
+          path,
+          "SdkType accepts only one element availability version",
+        ));
+      }
+    }
+  }
+  Ok(version)
+}
+
+fn mce_version_tokens(version: &str) -> syn::Result<proc_macro2::TokenStream> {
+  let ident = Ident::new(version, Span::call_site());
+  if matches!(
+    version,
+    "Office2007"
+      | "Office2010"
+      | "Office2013"
+      | "Office2016"
+      | "Office2019"
+      | "Office2021"
+      | "Microsoft365"
+  ) {
+    Ok(quote! { crate::sdk::FileFormatVersion::#ident })
+  } else {
+    Err(syn::Error::new(
+      Span::call_site(),
+      format!("unsupported MCE element availability {version}"),
+    ))
+  }
+}
+
+fn mce_element_action_tokens(
+  attrs: &[Attribute],
+  schema_qname: &str,
+) -> syn::Result<(proc_macro2::TokenStream, bool)> {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(schema_qname);
+  let version = parse_sdk_element_version(attrs)?
+    .or_else(|| namespaces::minimum_version_by_prefix(&tag_prefix))
+    .unwrap_or("Office2007");
+  if version == "Office2007" {
+    return Ok((quote! { crate::mce::ElementAction::Normal }, false));
+  }
+  let namespace = namespaces::uri_by_prefix(&tag_prefix).ok_or_else(|| {
+    syn::Error::new(
+      Span::call_site(),
+      format!("missing namespace URI for MCE element prefix {tag_prefix}"),
+    )
+  })?;
+  let namespace = LitByteStr::new(namespace.as_bytes(), Span::call_site());
+  let local_name = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  let version = mce_version_tokens(version)?;
+  Ok((
+    quote! {
+      context.element_action(
+        #namespace,
+        #local_name,
+        #version,
+        settings.target_file_format_version,
+      )
+    },
+    true,
+  ))
+}
+
 fn mce_process_child_field_tokens(field: &SdkChildField) -> proc_macro2::TokenStream {
   let ident = &field.ident;
   if field.repeated {
     quote! {
-      for child in &mut self.#ident {
-        child.process_mce_with_context(settings, context)?;
+      let mut index = 0usize;
+      while index < self.#ident.len() {
+        let action = self.#ident[index].process_mce_with_context(settings, context)?;
+        if matches!(action, crate::mce::ElementAction::Normal) {
+          index += 1;
+        } else {
+          self.#ident.remove(index);
+        }
       }
     }
   } else if field.optional {
     quote! {
-      if let Some(child) = &mut self.#ident {
-        child.process_mce_with_context(settings, context)?;
+      let action = if let Some(child) = &mut self.#ident {
+        Some(child.process_mce_with_context(settings, context)?)
+      } else {
+        None
+      };
+      if action.is_some_and(|action| !matches!(action, crate::mce::ElementAction::Normal)) {
+        self.#ident = None;
       }
     }
   } else {
     quote! {
-      self.#ident.process_mce_with_context(settings, context)?;
+      let _ = self.#ident.process_mce_with_context(settings, context)?;
     }
   }
 }
@@ -1888,7 +2023,153 @@ fn mce_process_static_attr_field_tokens(
   }))
 }
 
-fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStream {
+fn mce_process_content_mapping(
+  owner_qname: &str,
+  owner_type: &Ident,
+  field_name: &Ident,
+  field_type: &Type,
+) -> Option<mce_process_content_mapping::Mapping> {
+  let choice_type = unwrap_option_vec_type(field_type);
+  let choice_type = type_terminal_name(&choice_type)?;
+  mce_process_content_mapping::resolve(
+    owner_qname,
+    &owner_type.to_string(),
+    &field_name.to_string(),
+    &choice_type,
+  )
+}
+
+fn mce_process_content_method_tokens(
+  mapping: &mce_process_content_mapping::Mapping,
+) -> syn::Result<proc_macro2::TokenStream> {
+  use mce_process_content_mapping::{Cardinality, FieldMapping};
+
+  let mut promotion_arms = Vec::new();
+  for wrapper in mapping.wrappers {
+    let wrapper_variant = Ident::new(wrapper.variant, Span::call_site());
+    let unwrap_wrapper = if wrapper.boxed {
+      quote! { *wrapper }
+    } else {
+      quote! { wrapper }
+    };
+    let mut promote_fields = Vec::new();
+    for field in wrapper.fields {
+      let tokens = match field {
+        FieldMapping::Direct {
+          field,
+          target_variant,
+          cardinality,
+        } => {
+          let field = Ident::new(field, Span::call_site());
+          let target_variant = Ident::new(target_variant, Span::call_site());
+          match cardinality {
+            Cardinality::Many => quote! {
+              for value in wrapper.#field {
+                output.push(Self::#target_variant(value));
+              }
+            },
+            Cardinality::Optional => quote! {
+              if let Some(value) = wrapper.#field {
+                output.push(Self::#target_variant(value));
+              }
+            },
+            Cardinality::One => quote! {
+              output.push(Self::#target_variant(wrapper.#field));
+            },
+          }
+        }
+        FieldMapping::Choice {
+          field,
+          source_module,
+          source_choice,
+          cardinality,
+          exhaustive,
+          variants,
+          unit_variants,
+          renamed_variants,
+        } => {
+          let field = Ident::new(field, Span::call_site());
+          let source_module = Ident::new(source_module, Span::call_site());
+          let source_choice = Ident::new(source_choice, Span::call_site());
+          let source_type = quote! {
+            crate::schemas::#source_module::#source_choice
+          };
+          let mut conversion_arms = Vec::new();
+          for &variant in *variants {
+            let target_variant = renamed_variants
+              .iter()
+              .find_map(|(source, target)| (*source == variant).then_some(*target))
+              .unwrap_or(variant);
+            let unit = unit_variants.contains(&variant);
+            let source_variant = Ident::new(variant, Span::call_site());
+            let target_variant = Ident::new(target_variant, Span::call_site());
+            conversion_arms.push(if unit {
+              quote! {
+                #source_type::#source_variant => Self::#target_variant,
+              }
+            } else {
+              quote! {
+                #source_type::#source_variant(value) => Self::#target_variant(value),
+              }
+            });
+          }
+          let convert = if *exhaustive {
+            quote! {
+              match value {
+                #( #conversion_arms )*
+              }
+            }
+          } else {
+            quote! {
+              match value {
+                #( #conversion_arms )*
+                _ => continue,
+              }
+            }
+          };
+          match cardinality {
+            Cardinality::Many => quote! {
+              for value in wrapper.#field {
+                output.push(#convert);
+              }
+            },
+            Cardinality::Optional => quote! {
+              if let Some(value) = wrapper.#field {
+                output.push(#convert);
+              }
+            },
+            Cardinality::One => quote! {
+              let value = wrapper.#field;
+              output.push(#convert);
+            },
+          }
+        }
+      };
+      promote_fields.push(tokens);
+    }
+    promotion_arms.push(quote! {
+      Self::#wrapper_variant(wrapper) => {
+        let wrapper = #unwrap_wrapper;
+        #( #promote_fields )*
+        true
+      }
+    });
+  }
+
+  Ok(quote! {
+    pub(crate) fn __ooxmlsdk_promote_process_content(
+      self,
+      output: &mut Vec<Self>,
+    ) -> bool {
+      match self {
+        #( #promotion_arms, )*
+        _ => false,
+      }
+    }
+  })
+}
+
+fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &field.ident;
   let choice_ty = unwrap_option_vec_type(&field.ty);
   let mut choice_arms = Vec::new();
@@ -1903,7 +2184,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
         } else {
           choice_arms.push(quote! {
             #choice_ty::#variant(value) => {
-              value.process_mce_with_context(settings, context)?;
+              value.process_mce_with_context(settings, context)
             }
           });
         }
@@ -1912,13 +2193,23 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
         let _ = children;
         choice_arms.push(quote! {
           #choice_ty::#variant(value) => {
-            value.process_mce_with_context(settings, context)?;
+            value.process_mce_with_context(settings, context)
           }
         });
       }
-      SdkTypeChoiceItem::EmptyChild { .. }
-      | SdkTypeChoiceItem::TextChild { .. }
-      | SdkTypeChoiceItem::AnyChild { .. }
+      SdkTypeChoiceItem::EmptyChild { variant, qname, .. } => {
+        let (action, _) = mce_element_action_tokens(&[], qname)?;
+        choice_arms.push(quote! {
+          #choice_ty::#variant => Ok(#action),
+        });
+      }
+      SdkTypeChoiceItem::TextChild { variant, qname, .. } => {
+        let (action, _) = mce_element_action_tokens(&[], qname)?;
+        choice_arms.push(quote! {
+          #choice_ty::#variant(_) => Ok(#action),
+        });
+      }
+      SdkTypeChoiceItem::AnyChild { .. }
       | SdkTypeChoiceItem::Any { .. }
       | SdkTypeChoiceItem::Text { .. } => {}
     }
@@ -1928,7 +2219,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
     quote! {
       match #choice_expr {
         #( #choice_arms )*
-        _ => {}
+        _ => Ok(crate::mce::ElementAction::Normal),
       }
     }
   };
@@ -2046,14 +2337,20 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
   let mce_alternate_content_arm = alternate_content_variant.as_ref().map(|variant| {
     quote! {
       #choice_ty::#variant(alternate_content) => {
-        crate::common::process_alternate_content_children(
+        crate::mce::process_alternate_content_children(
           alternate_content.as_mut(),
           settings,
           context,
           |child_xml, child_context| {
             if let Some(mut child) = Self::__ooxmlsdk_read_mce_replacement_child(child_xml)? {
-              Self::process_mce_choice_with_context(&mut child, settings, child_context)?;
-              processed.push(child);
+              let action = Self::process_mce_choice_with_context(
+                &mut child,
+                settings,
+                child_context,
+              )?;
+              if matches!(action, crate::mce::ElementAction::Normal) {
+                processed.push(child);
+              }
             }
             Ok(())
           },
@@ -2061,10 +2358,50 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
       }
     }
   });
-  let process_repeated_choices = if alternate_content_variant.is_none() {
+  let has_process_content = field.process_content_mapping.is_some();
+  let process_content_method = field
+    .process_content_mapping
+    .as_ref()
+    .map(mce_process_content_method_tokens)
+    .transpose()?
+    .unwrap_or_else(|| quote! {});
+  let process_content_action = if has_process_content {
     quote! {
-      for choice in values {
-        Self::process_mce_choice_with_context(choice, settings, context)?;
+      crate::mce::ElementAction::ProcessContent => {
+        item.__ooxmlsdk_promote_process_content(&mut processed);
+      }
+    }
+  } else {
+    quote! {
+      crate::mce::ElementAction::ProcessContent => {}
+    }
+  };
+  let process_repeated_choices = if alternate_content_variant.is_none() && has_process_content {
+    quote! {
+      let mut processed = Vec::with_capacity(values.len());
+      for mut item in std::mem::take(values) {
+        match Self::process_mce_choice_with_context(&mut item, settings, context)? {
+          crate::mce::ElementAction::Normal => processed.push(item),
+          crate::mce::ElementAction::Ignore => {}
+          #process_content_action
+        }
+      }
+      *values = processed;
+    }
+  } else if alternate_content_variant.is_none() {
+    quote! {
+      let mut index = 0usize;
+      while index < values.len() {
+        let action = Self::process_mce_choice_with_context(
+          &mut values[index],
+          settings,
+          context,
+        )?;
+        if matches!(action, crate::mce::ElementAction::Normal) {
+          index += 1;
+        } else {
+          values.remove(index);
+        }
       }
     }
   } else {
@@ -2074,8 +2411,11 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
         match &mut item {
           #mce_alternate_content_arm
           _ => {
-            Self::process_mce_choice_with_context(&mut item, settings, context)?;
-            processed.push(item);
+            match Self::process_mce_choice_with_context(&mut item, settings, context)? {
+              crate::mce::ElementAction::Normal => processed.push(item),
+              crate::mce::ElementAction::Ignore => {}
+              #process_content_action
+            }
           }
         }
       }
@@ -2083,30 +2423,31 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
     }
   };
 
-  quote! {
+  Ok(quote! {
     #[cfg(feature = "mce")]
     impl #choice_ty {
+      #process_content_method
+
       #( #mce_replacement_read_methods )*
 
-      fn process_mce_choice_with_context(
+      pub(crate) fn process_mce_choice_with_context(
         &mut self,
         settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &crate::sdk::MceContext<'_>,
-      ) -> Result<(), crate::common::SdkError> {
+        context: &crate::mce::MceContext<'_>,
+      ) -> Result<crate::mce::ElementAction, crate::common::SdkError> {
         #process_self_choice
-        Ok(())
       }
 
       fn process_mce_choices_with_context(
         values: &mut Vec<Self>,
         settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &crate::sdk::MceContext<'_>,
+        context: &crate::mce::MceContext<'_>,
       ) -> Result<(), crate::common::SdkError> {
         #process_repeated_choices
         Ok(())
       }
     }
-  }
+  })
 }
 
 fn mce_process_choice_field_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStream {
@@ -2118,13 +2459,26 @@ fn mce_process_choice_field_tokens(field: &SdkTypeChoiceField) -> proc_macro2::T
     }
   } else if field.optional {
     quote! {
-      if let Some(choice) = &mut self.#ident {
-        #choice_ty::process_mce_choice_with_context(choice, settings, context)?;
+      let action = if let Some(choice) = &mut self.#ident {
+        Some(#choice_ty::process_mce_choice_with_context(
+          choice,
+          settings,
+          context,
+        )?)
+      } else {
+        None
+      };
+      if action.is_some_and(|action| !matches!(action, crate::mce::ElementAction::Normal)) {
+        self.#ident = None;
       }
     }
   } else {
     quote! {
-      #choice_ty::process_mce_choice_with_context(&mut self.#ident, settings, context)?;
+      let _ = #choice_ty::process_mce_choice_with_context(
+        &mut self.#ident,
+        settings,
+        context,
+      )?;
     }
   }
 }
@@ -2133,6 +2487,8 @@ fn mce_context_scope_tokens(
   xmlns_fields: &[Ident],
   mc_ignorable_field: Option<&Ident>,
   mc_preserve_attributes_field: Option<&Ident>,
+  mc_preserve_elements_field: Option<&Ident>,
+  mc_process_content_field: Option<&Ident>,
   mc_must_understand_field: Option<&Ident>,
 ) -> (
   proc_macro2::TokenStream,
@@ -2154,6 +2510,16 @@ fn mce_context_scope_tokens(
   } else {
     quote! { None }
   };
+  let mc_preserve_elements_expr = if let Some(ident) = mc_preserve_elements_field {
+    quote! { self.#ident.as_deref() }
+  } else {
+    quote! { None }
+  };
+  let mc_process_content_expr = if let Some(ident) = mc_process_content_field {
+    quote! { self.#ident.as_deref() }
+  } else {
+    quote! { None }
+  };
   let mc_must_understand_expr = if let Some(ident) = mc_must_understand_field {
     quote! { self.#ident.as_deref() }
   } else {
@@ -2163,6 +2529,8 @@ fn mce_context_scope_tokens(
   if xmlns_fields.is_empty()
     && mc_ignorable_field.is_none()
     && mc_preserve_attributes_field.is_none()
+    && mc_preserve_elements_field.is_none()
+    && mc_process_content_field.is_none()
     && mc_must_understand_field.is_none()
   {
     (quote! {}, quote! {}, quote! {})
@@ -2172,9 +2540,11 @@ fn mce_context_scope_tokens(
       quote! {
         let __mce_context = context.child_context(
           #xmlns_expr,
-          crate::sdk::MceContextAttributes {
+          crate::mce::MceContextAttributes {
             ignorable: #mc_ignorable_expr,
             preserve_attributes: #mc_preserve_attributes_expr,
+            preserve_elements: #mc_preserve_elements_expr,
+            process_content: #mc_process_content_expr,
             must_understand: #mc_must_understand_expr,
           },
           settings,
@@ -3384,6 +3754,7 @@ fn expand_helper_struct(
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
+        process_content_mapping: None,
         accepts_text: parsed_attrs.choice_accepts_text,
         accepts_any: parsed_attrs.choice_accepts_any,
         specific_qnames: parsed_attrs.choice_qnames,
@@ -3678,7 +4049,7 @@ fn expand_helper_struct(
         .insert(quote! { #choice_ty }.to_string())
         .then(|| mce_choice_impl_tokens(field))
     })
-    .collect::<Vec<_>>();
+    .collect::<syn::Result<Vec<_>>>()?;
   let mut ordered_write_tokens = Vec::new();
   for field in &fields.named {
     let field_ident = field
@@ -3823,17 +4194,11 @@ fn expand_helper_struct(
       pub(crate) fn process_mce_with_context(
         &mut self,
         settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &crate::sdk::MceContext<'_>,
-      ) -> Result<(), crate::common::SdkError> {
-        if matches!(
-          settings.process_mode,
-          crate::sdk::MarkupCompatibilityProcessMode::NoProcess
-        ) {
-          return Ok(());
-        }
+        context: &crate::mce::MceContext<'_>,
+      ) -> Result<crate::mce::ElementAction, crate::common::SdkError> {
         #( #mce_child_process_tokens )*
         #( #mce_choice_process_tokens )*
-        Ok(())
+        Ok(crate::mce::ElementAction::Normal)
       }
     }
   };
@@ -3883,6 +4248,8 @@ fn expand_named_struct(
   let no_prefix = prefix_write_mode.writes_no_prefix();
   let no_prefix_only = prefix_write_mode.writes_no_prefix_only();
   let has_xml_header = parse_sdk_xml_header(&input.attrs)?;
+  let (mce_element_action_tokens, has_mce_element_action) =
+    mce_element_action_tokens(&input.attrs, schema_qname)?;
   let extra_xmlns = parse_sdk_extra_xmlns(&input.attrs)?;
   let (extra_xmlns_init_tokens, extra_xmlns_mark_tokens, extra_xmlns_write_tokens) =
     extra_xmlns_tokens(&extra_xmlns)?;
@@ -4009,6 +4376,12 @@ fn expand_named_struct(
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
+        process_content_mapping: mce_process_content_mapping(
+          schema_qname,
+          ident,
+          field_ident,
+          &field.ty,
+        ),
         accepts_text: parsed_attrs.choice_accepts_text,
         accepts_any: parsed_attrs.choice_accepts_any,
         specific_qnames: parsed_attrs.choice_qnames,
@@ -6772,8 +7145,10 @@ fn expand_named_struct(
       quote! {
         #( #targets )|* => {
           let mut parsed_child = #deserialize_call(&mut child_reader, e, next_empty)?;
-          parsed_child.process_mce_with_context(settings, child_context)?;
-          #assign
+          let action = parsed_child.process_mce_with_context(settings, child_context)?;
+          if matches!(action, crate::mce::ElementAction::Normal) {
+            #assign
+          }
         }
       },
     );
@@ -6855,7 +7230,7 @@ fn expand_named_struct(
         .collect::<syn::Result<Vec<_>>>()?;
       Ok(quote! {
         for mut alternate_content in std::mem::take(&mut self.#field_ident) {
-          crate::common::process_alternate_content_children(
+          crate::mce::process_alternate_content_children(
             #alternate_content_expr,
             settings,
             context,
@@ -6902,12 +7277,14 @@ fn expand_named_struct(
         .insert(quote! { #choice_ty }.to_string())
         .then(|| mce_choice_impl_tokens(field))
     })
-    .collect::<Vec<_>>();
+    .collect::<syn::Result<Vec<_>>>()?;
   let (mce_context_push_tokens, mce_context_process_tokens, mce_context_pop_tokens) =
     mce_context_scope_tokens(
       &xmlns_fields,
       mc_ignorable_field.as_ref(),
       mc_preserve_attributes_field.as_ref(),
+      mc_preserve_elements_field.as_ref(),
+      mc_process_content_field.as_ref(),
       mc_must_understand_field.as_ref(),
     );
   let mce_static_field_process_tokens = if mce_fields.is_empty() {
@@ -6927,35 +7304,46 @@ fn expand_named_struct(
         &mut self,
         settings: &crate::sdk::MarkupCompatibilityProcessSettings,
       ) -> Result<(), crate::common::SdkError> {
-        let context = crate::sdk::MceContext::default();
-        self.process_mce_with_context(settings, &context)
-      }
-    }
-  });
-  let mce_methods_tokens = quote! {
-    #[cfg(feature = "mce")]
-    impl #impl_generics #ident #type_generics #where_clause {
-      #public_mce_method_tokens
-
-      pub(crate) fn process_mce_with_context(
-        &mut self,
-        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
-        context: &crate::sdk::MceContext<'_>,
-      ) -> Result<(), crate::common::SdkError> {
         if matches!(
           settings.process_mode,
           crate::sdk::MarkupCompatibilityProcessMode::NoProcess
         ) {
           return Ok(());
         }
+        let context = crate::mce::MceContext::default();
+        let _ = self.process_mce_with_context(settings, &context)?;
+        Ok(())
+      }
+    }
+  });
+  let mce_method_inline = (!has_mce_element_action
+    && mce_fields.is_empty()
+    && mce_static_attr_process_tokens.is_empty()
+    && child_fields.is_empty()
+    && choice_fields.is_empty()
+    && !has_mc_fields
+    && !has_xmlns_fields)
+    .then(|| quote! { #[inline(always)] });
+  let mce_methods_tokens = quote! {
+    #[cfg(feature = "mce")]
+    impl #impl_generics #ident #type_generics #where_clause {
+      #public_mce_method_tokens
+
+      #mce_method_inline
+      pub(crate) fn process_mce_with_context(
+        &mut self,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+        context: &crate::mce::MceContext<'_>,
+      ) -> Result<crate::mce::ElementAction, crate::common::SdkError> {
         #mce_static_field_process_tokens
         #mce_context_push_tokens
         #mce_context_process_tokens
+        let __mce_element_action = #mce_element_action_tokens;
         #( #mce_static_attr_process_tokens )*
         #( #mce_child_process_tokens )*
         #( #mce_choice_process_tokens )*
         #mce_context_pop_tokens
-        Ok(())
+        Ok(__mce_element_action)
       }
     }
   };

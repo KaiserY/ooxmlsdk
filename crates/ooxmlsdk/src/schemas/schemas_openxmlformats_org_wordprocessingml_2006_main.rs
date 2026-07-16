@@ -2814,7 +2814,7 @@ pub struct CustomXmlPlaceholder {
 }
 /// Defines the TableCaption Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:tblCaption")]
+#[sdk(version = office2010, qname = "w:tblCaption")]
 pub struct TableCaption {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2822,7 +2822,7 @@ pub struct TableCaption {
 }
 /// Defines the TableDescription Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:tblDescription")]
+#[sdk(version = office2010, qname = "w:tblDescription")]
 pub struct TableDescription {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -5890,7 +5890,7 @@ pub struct BarBorder {
 }
 /// Defines the StartBorder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:start")]
+#[sdk(version = office2010, qname = "w:start")]
 pub struct StartBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -5935,7 +5935,7 @@ pub struct StartBorder {
 }
 /// Defines the EndBorder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:end")]
+#[sdk(version = office2010, qname = "w:end")]
 pub struct EndBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -7475,7 +7475,7 @@ pub struct MoveToRun {
 }
 /// Defines the ContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:contentPart")]
+#[sdk(version = office2010, qname = "w:contentPart")]
 pub struct ContentPart {
   /// id
   #[sdk(attr(qname = "r:id"))]
@@ -8724,7 +8724,7 @@ pub struct Hyperlink {
 }
 /// Defines the BidirectionalOverride Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:bdo")]
+#[sdk(version = office2010, qname = "w:bdo")]
 pub struct BidirectionalOverride {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -8821,7 +8821,7 @@ pub struct BidirectionalOverride {
 }
 /// Defines the BidirectionalEmbedding Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:dir")]
+#[sdk(version = office2010, qname = "w:dir")]
 pub struct BidirectionalEmbedding {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -9132,7 +9132,7 @@ pub struct TopMargin {
 }
 /// Defines the StartMargin Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:start")]
+#[sdk(version = office2010, qname = "w:start")]
 pub struct StartMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9164,7 +9164,7 @@ pub struct BottomMargin {
 }
 /// Defines the EndMargin Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:end")]
+#[sdk(version = office2010, qname = "w:end")]
 pub struct EndMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]

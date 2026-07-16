@@ -8151,7 +8151,7 @@ pub struct FunctionGroup {
 }
 /// Defines the ObjectAnchor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix_only, qname = "x:anchor")]
+#[sdk(version = office2010, no_prefix_only, qname = "x:anchor")]
 pub struct ObjectAnchor {
   /// moveWithCells
   #[sdk(attr(qname = ":moveWithCells"))]
@@ -8171,7 +8171,7 @@ pub struct ObjectAnchor {
 }
 /// Defines the FromMarker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix_only, qname = "x:from")]
+#[sdk(version = office2010, no_prefix_only, qname = "x:from")]
 pub struct FromMarker {
   /// Column)
   #[sdk(text_child(qname = "xdr:col"))]
@@ -8188,7 +8188,7 @@ pub struct FromMarker {
 }
 /// Defines the ToMarker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix_only, qname = "x:to")]
+#[sdk(version = office2010, no_prefix_only, qname = "x:to")]
 pub struct ToMarker {
   /// Column)
   #[sdk(text_child(qname = "xdr:col"))]
@@ -8273,7 +8273,7 @@ pub struct OleItem {
 }
 /// Defines the StartBorder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x:start")]
+#[sdk(version = office2010, no_prefix, qname = "x:start")]
 pub struct StartBorder {
   /// Line Style
   #[sdk(attr(qname = ":style"))]
@@ -8284,7 +8284,7 @@ pub struct StartBorder {
 }
 /// Defines the EndBorder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix, qname = "x:end")]
+#[sdk(version = office2010, no_prefix, qname = "x:end")]
 pub struct EndBorder {
   /// Line Style
   #[sdk(attr(qname = ":style"))]
@@ -8372,7 +8372,7 @@ pub struct HorizontalBorder {
 }
 /// Defines the ControlProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix_only, qname = "x:controlPr")]
+#[sdk(version = office2010, no_prefix_only, qname = "x:controlPr")]
 pub struct ControlProperties {
   /// locked
   #[sdk(attr(qname = ":locked"))]
@@ -8425,7 +8425,7 @@ pub struct ControlProperties {
 }
 /// Defines the EmbeddedObjectProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix_only, qname = "x:objectPr")]
+#[sdk(version = office2010, no_prefix_only, qname = "x:objectPr")]
 pub struct EmbeddedObjectProperties {
   /// locked
   #[sdk(attr(qname = ":locked"))]
@@ -9068,7 +9068,7 @@ pub struct CacheSourceExtensionList {
 }
 /// Defines the CommentProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(no_prefix_only, qname = "x:commentPr")]
+#[sdk(version = office2010, no_prefix_only, qname = "x:commentPr")]
 pub struct CommentProperties {
   /// locked
   #[sdk(attr(qname = ":locked"))]

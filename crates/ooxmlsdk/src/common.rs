@@ -26,8 +26,6 @@ pub(crate) use package::{
 pub use package::{
   PartId, ReferenceRelationshipKind, Relationship, RelationshipRef, RelationshipTargetKind,
 };
-#[cfg(feature = "mce")]
-pub(crate) use xml::process_alternate_content_children;
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{

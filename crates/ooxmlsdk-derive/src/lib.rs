@@ -9,6 +9,7 @@ use syn::{
   punctuated::Punctuated,
 };
 
+mod mce_process_content_mapping;
 mod namespaces;
 mod sdk_enum;
 mod sdk_package;
@@ -174,6 +175,7 @@ struct SdkTypeChoiceField {
   ty: Type,
   optional: bool,
   repeated: bool,
+  process_content_mapping: Option<mce_process_content_mapping::Mapping>,
   accepts_text: Option<bool>,
   accepts_any: Option<bool>,
   specific_qnames: Vec<String>,

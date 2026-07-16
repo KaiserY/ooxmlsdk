@@ -18,7 +18,8 @@ use crate::sdk_code::helpers::{
 };
 use crate::sdk_code::versioning::{common_choice_version, version_cfg_attrs};
 use crate::sdk_data::sdk_data_model::{
-  Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeChildKind,
+  Namespace, Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeChild,
+  SchemaTypeChildKind,
 };
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
@@ -30,7 +31,21 @@ pub struct CodegenContext<'a> {
   type_class_name_map: HashMap<&'a str, &'a SchemaType>,
   type_module_map: HashMap<&'a str, &'a str>,
   type_prefix_map: HashMap<&'a str, &'a str>,
+  namespace_version_map: HashMap<&'a str, &'a str>,
   enum_module_by_typed_namespace_and_name: HashMap<(&'a str, &'a str), &'a str>,
+}
+
+fn schema_version_rank(version: &str) -> u8 {
+  match version {
+    "" | "Office2007" => 0,
+    "Office2010" => 1,
+    "Office2013" => 2,
+    "Office2016" => 3,
+    "Office2019" => 4,
+    "Office2021" => 5,
+    "Microsoft365" => 6,
+    _ => 0,
+  }
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -62,6 +77,23 @@ impl VersionCfgContext {
 fn sdk_version_markers(version: &str) -> Vec<TokenStream> {
   let _ = version;
   Vec::new()
+}
+
+fn mce_element_version_markers(type_decl: &TypeDecl) -> Result<Vec<TokenStream>> {
+  let Some(version) = type_decl.support.element_version_override.as_deref() else {
+    return Ok(Vec::new());
+  };
+  if type_decl.version.as_deref() != Some(version) {
+    return Err(
+      format!(
+        "element version override for {} must match its source type version",
+        type_decl.rust_name
+      )
+      .into(),
+    );
+  }
+  let marker = Ident::new(&version.to_snake_case(), Span::call_site());
+  Ok(vec![quote! { version = #marker }])
 }
 
 #[derive(Debug)]
@@ -1011,12 +1043,20 @@ pub(crate) fn schema_mixed_choice_leaf_field_rust_name(
 
 impl<'a> CodegenContext<'a> {
   pub fn new(schemas: &'a [Schema]) -> Self {
+    Self::new_with_namespaces(schemas, &[])
+  }
+
+  pub fn new_with_namespaces(schemas: &'a [Schema], namespaces: &'a [Namespace]) -> Self {
     let mut enum_type_map = HashMap::new();
     let mut enum_type_module_map = HashMap::new();
     let mut type_map = HashMap::new();
     let mut type_class_name_map = HashMap::new();
     let mut type_module_map = HashMap::new();
     let mut type_prefix_map = HashMap::new();
+    let namespace_version_map = namespaces
+      .iter()
+      .map(|namespace| (namespace.prefix.as_str(), namespace.version.as_str()))
+      .collect();
     let mut enum_module_by_typed_namespace_and_name = HashMap::new();
 
     for schema in schemas {
@@ -1044,8 +1084,26 @@ impl<'a> CodegenContext<'a> {
       type_class_name_map,
       type_module_map,
       type_prefix_map,
+      namespace_version_map,
       enum_module_by_typed_namespace_and_name,
     }
+  }
+
+  pub(crate) fn element_version_override(&self, schema_type: &'a SchemaType) -> Option<&'a str> {
+    let qname = schema_type.name.rsplit('/').next()?;
+    let (prefix, local_name) = qname.split_once(':')?;
+    if local_name.is_empty() {
+      return None;
+    }
+    let namespace_version = self
+      .namespace_version_map
+      .get(prefix)
+      .copied()
+      .unwrap_or("");
+    let type_version = schema_type.version.as_deref().unwrap_or("");
+    (schema_version_rank(type_version) > schema_version_rank(namespace_version))
+      .then_some(type_version)
+      .filter(|version| !version.is_empty())
   }
 
   pub fn enum_by_type(&self, ty: &str) -> Option<&'a SchemaEnum> {
@@ -1724,7 +1782,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     } else {
       VersionCfgContext::new(true)
     };
-    let type_sdk_version_markers = sdk_version_markers(schema_type_version);
+    let type_sdk_version_markers = mce_element_version_markers(type_decl)?;
     let sdk_type_attrs = if let Some(raw_qname) = &type_decl.xml_qname {
       let qname = sdk_element_qname(raw_qname);
       let no_prefix = no_prefix_sdk_attr_from_qname(ir, type_decl, type_graph);
@@ -3745,6 +3803,612 @@ fn schema_type_key_from_ref(module: &SchemaModuleDecl, type_ref: &TypeRefDecl) -
   ))
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct MceProcessContentPromotion<'a> {
+  outer_module: &'a SchemaModuleDecl,
+  outer_choice: &'a TypeDecl,
+  wrapper_variant: &'a VariantDecl,
+  wrapper_module: &'a SchemaModuleDecl,
+  wrapper_type: &'a TypeDecl,
+}
+
+fn type_decl_lookup<'a>(
+  modules: &[&'a SchemaModuleDecl],
+) -> HashMap<String, (&'a SchemaModuleDecl, &'a TypeDecl)> {
+  let mut lookup = HashMap::new();
+  for module in modules {
+    for ty in &module.types {
+      lookup.insert(local_type_key(module, &ty.rust_name), (*module, ty));
+      if let Some(alias) = schema_prefix_alias_path(module) {
+        lookup.insert(
+          format!("{alias}::{}", ty.rust_name.to_upper_camel_case()),
+          (*module, ty),
+        );
+      }
+    }
+  }
+  lookup
+}
+
+fn wrapper_promotion_payloads_match(
+  outer_module: &SchemaModuleDecl,
+  outer_choice: &TypeDecl,
+  wrapper_module: &SchemaModuleDecl,
+  wrapper_type: &TypeDecl,
+  lookup: &HashMap<String, (&SchemaModuleDecl, &TypeDecl)>,
+) -> bool {
+  let mut matched = false;
+  for member in &wrapper_type.members {
+    let MemberDecl::Field(field) = member else {
+      continue;
+    };
+    match &field.wire {
+      FieldWireDecl::Child { qname } | FieldWireDecl::TextChild { qname } => {
+        let qname = schema_qname_element_name(qname);
+        let Some(outer_variant) = promotion_outer_variant_by_qname(outer_choice, qname) else {
+          return false;
+        };
+        if schema_type_key_from_ref(wrapper_module, &field.type_ref)
+          != schema_type_key_from_ref(outer_module, &outer_variant.payload)
+        {
+          return false;
+        }
+        matched = true;
+      }
+      FieldWireDecl::Choice => {
+        let Some(inner_key) = schema_type_key_from_ref(wrapper_module, &field.type_ref) else {
+          return false;
+        };
+        let Some((inner_module, inner_choice)) = lookup.get(&inner_key).copied() else {
+          return false;
+        };
+        for inner_member in &inner_choice.members {
+          let MemberDecl::Variant(inner_variant) = inner_member else {
+            continue;
+          };
+          let VariantWireDecl::Child { qnames } = &inner_variant.wire else {
+            continue;
+          };
+          let Some(qname) = qnames.first().map(|qname| schema_qname_element_name(qname)) else {
+            continue;
+          };
+          let Some(outer_variant) = promotion_outer_variant_by_qname(outer_choice, qname) else {
+            return false;
+          };
+          if schema_type_key_from_ref(inner_module, &inner_variant.payload)
+            != schema_type_key_from_ref(outer_module, &outer_variant.payload)
+          {
+            return false;
+          }
+          matched = true;
+        }
+      }
+      FieldWireDecl::Attribute { .. } | FieldWireDecl::Text | FieldWireDecl::Any => {}
+    }
+  }
+  matched
+}
+
+pub(crate) fn collect_mce_process_content_promotions<'a>(
+  modules: &[&'a SchemaModuleDecl],
+) -> Vec<MceProcessContentPromotion<'a>> {
+  let lookup = type_decl_lookup(modules);
+  let repeated_choice_key = |module: &SchemaModuleDecl, field: &FieldDecl| {
+    (field.wire == FieldWireDecl::Choice && field.cardinality == Cardinality::Many)
+      .then(|| schema_type_key_from_ref(module, &field.type_ref))
+      .flatten()
+  };
+  let repeated_choice_keys = modules
+    .iter()
+    .flat_map(|module| {
+      module.types.iter().flat_map(|ty| {
+        ty.members.iter().filter_map(|member| {
+          let MemberDecl::Field(field) = member else {
+            return None;
+          };
+          repeated_choice_key(module, field)
+        })
+      })
+    })
+    .collect::<HashSet<_>>();
+  let mut candidates = Vec::new();
+  for outer_module in modules {
+    for outer_choice in &outer_module.types {
+      if outer_choice.kind != TypeKind::ChoiceEnum {
+        continue;
+      }
+      if !repeated_choice_keys.contains(&local_type_key(outer_module, &outer_choice.rust_name)) {
+        continue;
+      }
+      for member in &outer_choice.members {
+        let MemberDecl::Variant(wrapper_variant) = member else {
+          continue;
+        };
+        if !crate::sdk_code::versioning::is_post_office2007_version(&wrapper_variant.version)
+          || !matches!(wrapper_variant.wire, VariantWireDecl::Child { .. })
+        {
+          continue;
+        }
+        let Some(wrapper_key) = schema_type_key_from_ref(outer_module, &wrapper_variant.payload)
+        else {
+          continue;
+        };
+        let Some((wrapper_module, wrapper_type)) = lookup.get(&wrapper_key).copied() else {
+          continue;
+        };
+        if wrapper_promotion_payloads_match(
+          outer_module,
+          outer_choice,
+          wrapper_module,
+          wrapper_type,
+          &lookup,
+        ) {
+          candidates.push(MceProcessContentPromotion {
+            outer_module,
+            outer_choice,
+            wrapper_variant,
+            wrapper_module,
+            wrapper_type,
+          });
+        }
+      }
+    }
+  }
+
+  let mut eligible_choice_keys = modules
+    .iter()
+    .flat_map(|module| {
+      module
+        .types
+        .iter()
+        .filter(|ty| {
+          ty.kind == TypeKind::ElementStruct
+            && !ty.is_abstract
+            && schema_version_rank(ty.version.as_deref().unwrap_or("")) == 0
+            && ty.xml_qname.as_deref().is_some_and(|qname| {
+              qname
+                .rsplit('/')
+                .next()
+                .is_some_and(|element| element.contains(':') && !element.ends_with(':'))
+            })
+        })
+        .flat_map(|ty| {
+          ty.members.iter().filter_map(|member| {
+            let MemberDecl::Field(field) = member else {
+              return None;
+            };
+            repeated_choice_key(module, field)
+          })
+        })
+    })
+    .collect::<HashSet<_>>();
+  let mut selected = vec![false; candidates.len()];
+  loop {
+    let mut changed = false;
+    for (index, promotion) in candidates.iter().enumerate() {
+      if selected[index]
+        || !eligible_choice_keys.contains(&local_type_key(
+          promotion.outer_module,
+          &promotion.outer_choice.rust_name,
+        ))
+      {
+        continue;
+      }
+      selected[index] = true;
+      changed = true;
+      for member in &promotion.wrapper_type.members {
+        let MemberDecl::Field(field) = member else {
+          continue;
+        };
+        if let Some(choice_key) = repeated_choice_key(promotion.wrapper_module, field) {
+          eligible_choice_keys.insert(choice_key);
+        }
+      }
+    }
+    if !changed {
+      break;
+    }
+  }
+
+  candidates
+    .into_iter()
+    .zip(selected)
+    .filter_map(|(promotion, selected)| selected.then_some(promotion))
+    .collect()
+}
+
+fn promotion_outer_variant_by_qname<'a>(
+  outer_choice: &'a TypeDecl,
+  qname: &str,
+) -> Option<&'a VariantDecl> {
+  outer_choice.members.iter().find_map(|member| {
+    let MemberDecl::Variant(variant) = member else {
+      return None;
+    };
+    let VariantWireDecl::Child { qnames } = &variant.wire else {
+      return None;
+    };
+    qnames
+      .iter()
+      .any(|candidate| schema_qname_element_name(candidate) == qname)
+      .then_some(variant)
+  })
+}
+
+fn promotion_variant_ident(
+  variant: &VariantDecl,
+  owner: &TypeDecl,
+  module: &SchemaModuleDecl,
+) -> Result<Ident> {
+  let rendered = anonymous_variant_render_name_map(owner, module)
+    .get(&variant.rust_name)
+    .cloned()
+    .unwrap_or_else(|| variant.rust_name.clone());
+  Ok(parse_str(&escape_upper_camel_case(rendered))?)
+}
+
+fn promotion_payload_shape_matches(
+  source_module: &SchemaModuleDecl,
+  source: &TypeRefDecl,
+  target_module: &SchemaModuleDecl,
+  target: &TypeRefDecl,
+  type_graph: &TypeContainmentGraph,
+) -> bool {
+  schema_type_key_from_ref(source_module, source) == schema_type_key_from_ref(target_module, target)
+    && choice_child_variant_can_inline(source, source_module, type_graph)
+      == choice_child_variant_can_inline(target, target_module, type_graph)
+}
+
+fn mce_mapping_cardinality_tokens(cardinality: Cardinality) -> TokenStream {
+  match cardinality {
+    Cardinality::One => quote! { Cardinality::One },
+    Cardinality::Optional => quote! { Cardinality::Optional },
+    Cardinality::Many => quote! { Cardinality::Many },
+  }
+}
+
+fn gen_promoted_choice_field_mapping(
+  promotion: MceProcessContentPromotion<'_>,
+  field: &FieldDecl,
+  lookup: &HashMap<String, (&SchemaModuleDecl, &TypeDecl)>,
+  type_graph: &TypeContainmentGraph,
+) -> Result<Option<TokenStream>> {
+  let Some(inner_key) = schema_type_key_from_ref(promotion.wrapper_module, &field.type_ref) else {
+    return Ok(None);
+  };
+  let Some((inner_module, inner_choice)) = lookup.get(&inner_key).copied() else {
+    return Ok(None);
+  };
+  let mut variants = Vec::new();
+  let mut unit_variants = Vec::new();
+  let mut renamed_variants = Vec::new();
+  for member in &inner_choice.members {
+    let MemberDecl::Variant(inner_variant) = member else {
+      continue;
+    };
+    let VariantWireDecl::Child { qnames } = &inner_variant.wire else {
+      continue;
+    };
+    let Some(qname) = qnames.first().map(|qname| schema_qname_element_name(qname)) else {
+      continue;
+    };
+    let outer_variant = promotion_outer_variant_by_qname(promotion.outer_choice, qname)
+      .ok_or_else(|| format!("missing ProcessContent target for {qname}"))?;
+    if !promotion_payload_shape_matches(
+      inner_module,
+      &inner_variant.payload,
+      promotion.outer_module,
+      &outer_variant.payload,
+      type_graph,
+    ) {
+      return Err(
+        format!(
+          "ProcessContent payload mismatch for {} {} -> {}",
+          promotion.outer_choice.rust_name, inner_variant.rust_name, outer_variant.rust_name
+        )
+        .into(),
+      );
+    }
+    let inner_variant_ident = promotion_variant_ident(inner_variant, inner_choice, inner_module)?;
+    let outer_variant_ident = promotion_variant_ident(
+      outer_variant,
+      promotion.outer_choice,
+      promotion.outer_module,
+    )?;
+    let unit =
+      is_empty_leaf_marker_ref_with_graph(inner_module, &inner_variant.payload, type_graph);
+    let inner_variant = inner_variant_ident.to_string();
+    let outer_variant = outer_variant_ident.to_string();
+    if unit {
+      unit_variants.push(inner_variant.clone());
+    }
+    if inner_variant != outer_variant {
+      renamed_variants.push(quote! { (#inner_variant, #outer_variant) });
+    }
+    variants.push(inner_variant);
+  }
+  let field_name = field.rust_name.to_snake_case();
+  let source_module = inner_module.module_name.as_str();
+  let source_choice = inner_choice.rust_name.to_upper_camel_case();
+  let cardinality = mce_mapping_cardinality_tokens(field.cardinality);
+  let exhaustive = inner_choice.members.iter().all(|member| {
+    matches!(
+      member,
+      MemberDecl::Variant(VariantDecl {
+        wire: VariantWireDecl::Child { .. },
+        ..
+      })
+    )
+  });
+  Ok(Some(quote! {
+    FieldMapping::Choice {
+      field: #field_name,
+      source_module: #source_module,
+      source_choice: #source_choice,
+      cardinality: #cardinality,
+      exhaustive: #exhaustive,
+      variants: &[ #( #variants, )* ],
+      unit_variants: &[ #( #unit_variants, )* ],
+      renamed_variants: &[ #( #renamed_variants, )* ],
+    }
+  }))
+}
+
+fn gen_promoted_direct_field_mapping(
+  promotion: MceProcessContentPromotion<'_>,
+  field: &FieldDecl,
+  type_graph: &TypeContainmentGraph,
+) -> Result<Option<TokenStream>> {
+  let qname = match &field.wire {
+    FieldWireDecl::Child { qname } | FieldWireDecl::TextChild { qname } => {
+      schema_qname_element_name(qname)
+    }
+    _ => return Ok(None),
+  };
+  let outer_variant = promotion_outer_variant_by_qname(promotion.outer_choice, qname)
+    .ok_or_else(|| format!("missing ProcessContent target for {qname}"))?;
+  if schema_type_key_from_ref(promotion.wrapper_module, &field.type_ref)
+    != schema_type_key_from_ref(promotion.outer_module, &outer_variant.payload)
+  {
+    return Err(
+      format!(
+        "ProcessContent direct payload mismatch for {} {} -> {}",
+        promotion.outer_choice.rust_name, field.rust_name, outer_variant.rust_name
+      )
+      .into(),
+    );
+  }
+  let field_ident = Ident::new(&field.rust_name.to_snake_case(), Span::call_site());
+  let outer_variant_ident = promotion_variant_ident(
+    outer_variant,
+    promotion.outer_choice,
+    promotion.outer_module,
+  )?;
+  let field_is_boxed = direct_child_field_needs_box(
+    &promotion.wrapper_type.rust_name,
+    field,
+    promotion.wrapper_module,
+    type_graph,
+    false,
+  );
+  let outer_is_boxed =
+    !choice_child_variant_can_inline(&outer_variant.payload, promotion.outer_module, type_graph);
+  if field_is_boxed != outer_is_boxed {
+    return Err(
+      format!(
+        "ProcessContent boxing mismatch for {} {}",
+        promotion.outer_choice.rust_name, field.rust_name
+      )
+      .into(),
+    );
+  }
+  let field_name = field_ident.to_string();
+  let target_variant = outer_variant_ident.to_string();
+  let cardinality = mce_mapping_cardinality_tokens(field.cardinality);
+  Ok(Some(quote! {
+    FieldMapping::Direct {
+      field: #field_name,
+      target_variant: #target_variant,
+      cardinality: #cardinality,
+    }
+  }))
+}
+
+fn gen_mce_process_content_mapping_entry(
+  entries: &[MceProcessContentPromotion<'_>],
+  lookup: &HashMap<String, (&SchemaModuleDecl, &TypeDecl)>,
+  type_graph: &TypeContainmentGraph,
+) -> Result<TokenStream> {
+  let mut wrappers = Vec::new();
+  for promotion in entries {
+    let promotion = *promotion;
+    let wrapper_variant_ident = promotion_variant_ident(
+      promotion.wrapper_variant,
+      promotion.outer_choice,
+      promotion.outer_module,
+    )?;
+    let wrapper_is_inline = choice_child_variant_can_inline(
+      &promotion.wrapper_variant.payload,
+      promotion.outer_module,
+      type_graph,
+    );
+    let wrapper_variant = wrapper_variant_ident.to_string();
+    let boxed = !wrapper_is_inline;
+    let mut fields = Vec::new();
+    for member in &promotion.wrapper_type.members {
+      let MemberDecl::Field(field) = member else {
+        continue;
+      };
+      let mapping = match field.wire {
+        FieldWireDecl::Choice => {
+          gen_promoted_choice_field_mapping(promotion, field, lookup, type_graph)?
+        }
+        FieldWireDecl::Child { .. } | FieldWireDecl::TextChild { .. } => {
+          gen_promoted_direct_field_mapping(promotion, field, type_graph)?
+        }
+        FieldWireDecl::Attribute { .. } | FieldWireDecl::Text | FieldWireDecl::Any => None,
+      };
+      if let Some(mapping) = mapping {
+        fields.push(mapping);
+      }
+    }
+    wrappers.push(quote! {
+      WrapperMapping {
+        variant: #wrapper_variant,
+        boxed: #boxed,
+        fields: &[ #( #fields, )* ],
+      }
+    });
+  }
+
+  Ok(quote! {
+    Mapping {
+      wrappers: &[ #( #wrappers, )* ],
+    }
+  })
+}
+
+pub(crate) fn gen_mce_process_content_mapping(
+  modules: &[&SchemaModuleDecl],
+  type_graph: &TypeContainmentGraph,
+) -> Result<TokenStream> {
+  let lookup = type_decl_lookup(modules);
+  let promotions = collect_mce_process_content_promotions(modules);
+  let mut grouped = std::collections::BTreeMap::<String, Vec<_>>::new();
+  for promotion in promotions {
+    grouped
+      .entry(local_type_key(
+        promotion.outer_module,
+        &promotion.outer_choice.rust_name,
+      ))
+      .or_default()
+      .push(promotion);
+  }
+  let mut mapping_by_choice = std::collections::BTreeMap::new();
+  for (choice_key, entries) in grouped {
+    mapping_by_choice.insert(
+      choice_key,
+      gen_mce_process_content_mapping_entry(&entries, &lookup, type_graph)?,
+    );
+  }
+
+  let mut mapping_arms = Vec::new();
+  let mut mapped_choices = HashSet::new();
+  let mut mapping_keys = HashSet::new();
+  for module in modules {
+    for owner in &module.types {
+      let Some(owner_qname) = owner
+        .xml_qname
+        .as_deref()
+        .map(schema_qname_element_name)
+        .filter(|qname| !qname.is_empty())
+      else {
+        continue;
+      };
+      for member in &owner.members {
+        let MemberDecl::Field(field) = member else {
+          continue;
+        };
+        if field.wire != FieldWireDecl::Choice || field.cardinality != Cardinality::Many {
+          continue;
+        }
+        let Some(choice_key) = schema_type_key_from_ref(module, &field.type_ref) else {
+          continue;
+        };
+        let Some(mapping) = mapping_by_choice.get(&choice_key) else {
+          continue;
+        };
+        if !mapped_choices.insert(choice_key.clone()) {
+          return Err(
+            format!(
+              "ProcessContent choice {choice_key} is referenced by more than one generated field"
+            )
+            .into(),
+          );
+        }
+        let owner_type = owner.rust_name.to_upper_camel_case();
+        let field_name = field.rust_name.to_snake_case();
+        let choice_type = field.type_ref.rust_type.to_upper_camel_case();
+        let key = (
+          owner_qname.to_string(),
+          owner_type.clone(),
+          field_name.clone(),
+          choice_type.clone(),
+        );
+        if !mapping_keys.insert(key.clone()) {
+          return Err(format!("duplicate ProcessContent derive mapping key {key:?}").into());
+        }
+        mapping_arms.push(quote! {
+          (#owner_qname, #owner_type, #field_name, #choice_type) => {
+            Some(#mapping)
+          }
+        });
+      }
+    }
+  }
+
+  if mapped_choices.len() != mapping_by_choice.len() {
+    let missing = mapping_by_choice
+      .keys()
+      .filter(|choice| !mapped_choices.contains(*choice))
+      .cloned()
+      .collect::<Vec<_>>();
+    return Err(format!("ProcessContent choices have no derive owner field: {missing:?}").into());
+  }
+
+  Ok(quote! {
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) enum Cardinality {
+      One,
+      Optional,
+      Many,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) enum FieldMapping {
+      Direct {
+        field: &'static str,
+        target_variant: &'static str,
+        cardinality: Cardinality,
+      },
+      Choice {
+        field: &'static str,
+        source_module: &'static str,
+        source_choice: &'static str,
+        cardinality: Cardinality,
+        exhaustive: bool,
+        variants: &'static [&'static str],
+        unit_variants: &'static [&'static str],
+        renamed_variants: &'static [(&'static str, &'static str)],
+      },
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) struct WrapperMapping {
+      pub(crate) variant: &'static str,
+      pub(crate) boxed: bool,
+      pub(crate) fields: &'static [FieldMapping],
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) struct Mapping {
+      pub(crate) wrappers: &'static [WrapperMapping],
+    }
+
+    pub(crate) fn resolve(
+      owner_qname: &str,
+      owner_type: &str,
+      field_name: &str,
+      choice_type: &str,
+    ) -> Option<Mapping> {
+      match (owner_qname, owner_type, field_name, choice_type) {
+        #( #mapping_arms, )*
+        _ => None,
+      }
+    }
+  })
+}
+
 const DIRECT_CHILD_INLINE_SIZE_LIMIT: usize = 64;
 const DIRECT_CHILD_INLINE_DEPTH_LIMIT: usize = 2;
 const CHOICE_CHILD_INLINE_SIZE_LIMIT: usize = 96;
@@ -4567,7 +5231,7 @@ mod tests {
   use crate::sdk_code::codegen_ir::SchemaModuleDecl;
   use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
   use crate::sdk_data::context::Context;
-  use crate::sdk_data::schemas::gen_schemas;
+  use crate::sdk_data::schemas::{gen_namespaces, gen_schemas};
   use crate::sdk_data::sdk_data_model::{SchemaTypeApiKind, SchemaTypeCompositeKind};
   use serde_json::Value;
   use std::fs;
@@ -4737,10 +5401,108 @@ mod tests {
       .expect("workspace root");
     let context = Context::new(&workspace_root.join("data")).expect("context");
     let schemas = gen_schemas(&context);
+    let namespaces = Box::leak(Box::new(gen_namespaces(&context))).as_slice();
     let leaked_schemas = Box::leak(Box::new(schemas)).as_slice();
-    let codegen_context = CodegenContext::new(leaked_schemas);
+    let codegen_context = CodegenContext::new_with_namespaces(leaked_schemas, namespaces);
 
     (leaked_schemas, codegen_context)
+  }
+
+  #[test]
+  fn mce_element_version_overrides_are_exact_and_source_backed() {
+    let (schemas, context) = load_workspace_codegen_inputs();
+    let mut actual_count = 0usize;
+    let mut expected_count = 0usize;
+    for schema in schemas {
+      let ir = build_codegen_ir(schema, &context).unwrap();
+      let expected = schema
+        .types
+        .iter()
+        .filter(|ty| ty.api_kind != SchemaTypeApiKind::LeafTextWrapper)
+        .filter(|ty| context.element_version_override(ty).is_some())
+        .map(|ty| ty.class_name.as_str())
+        .collect::<HashSet<_>>();
+      let actual = ir
+        .types
+        .iter()
+        .filter(|ty| !mce_element_version_markers(ty).unwrap().is_empty())
+        .map(|ty| {
+          assert_eq!(ty.kind, TypeKind::ElementStruct);
+          ty.rust_name.as_str()
+        })
+        .collect::<HashSet<_>>();
+      assert_eq!(actual, expected, "{}", schema.target_namespace);
+      actual_count += actual.len();
+      expected_count += expected.len();
+      for ty in &ir.types {
+        if let Some(version) = &ty.support.element_version_override {
+          assert_eq!(ty.version.as_deref(), Some(version.as_str()));
+        }
+      }
+    }
+    assert_eq!(actual_count, expected_count);
+    assert_eq!(actual_count, 22);
+  }
+
+  #[test]
+  fn process_content_promotion_set_is_bounded() {
+    let (schemas, context) = load_workspace_codegen_inputs();
+    let modules = schemas
+      .iter()
+      .map(|schema| build_codegen_ir(schema, &context).unwrap())
+      .collect::<Vec<_>>();
+    let module_refs = modules.iter().collect::<Vec<_>>();
+    let promotions = collect_mce_process_content_promotions(&module_refs);
+    let promotion_names = promotions
+      .iter()
+      .map(|promotion| {
+        format!(
+          "{}::{}::{}",
+          promotion.outer_module.module_name,
+          promotion.outer_choice.rust_name,
+          promotion.wrapper_variant.rust_name
+        )
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(promotions.len(), 42, "{promotion_names:#?}");
+    let owners = promotions
+      .iter()
+      .map(|promotion| local_type_key(promotion.outer_module, &promotion.outer_choice.rust_name))
+      .collect::<HashSet<_>>();
+    assert_eq!(owners.len(), 14);
+    let owner_fields = module_refs
+      .iter()
+      .flat_map(|module| {
+        module.types.iter().flat_map(|ty| {
+          ty.members.iter().filter_map(|member| {
+            let MemberDecl::Field(field) = member else {
+              return None;
+            };
+            (field.wire == FieldWireDecl::Choice
+              && field.cardinality == Cardinality::Many
+              && schema_type_key_from_ref(module, &field.type_ref)
+                .is_some_and(|key| owners.contains(&key)))
+            .then_some((ty.rust_name.as_str(), field.rust_name.as_str()))
+          })
+        })
+      })
+      .collect::<HashSet<_>>();
+    assert_eq!(owner_fields.len(), 14);
+    let type_graph = TypeContainmentGraph::from_modules(&module_refs);
+    let mapping = gen_mce_process_content_mapping(&module_refs, &type_graph)
+      .unwrap()
+      .to_string();
+    for forbidden in [
+      "TokenStream",
+      "quote !",
+      "__ooxmlsdk_promote_process_content",
+      "Self ::",
+      "output . push",
+    ] {
+      assert!(!mapping.contains(forbidden), "{forbidden}: {mapping}");
+    }
+    assert!(mapping.contains("struct Mapping"));
+    assert!(mapping.contains("enum FieldMapping"));
   }
 
   fn render_workspace_schema(module_name: &str) -> String {

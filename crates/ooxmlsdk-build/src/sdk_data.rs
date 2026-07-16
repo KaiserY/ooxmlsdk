@@ -54,10 +54,8 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   clear_generated_json_files(&out_parts_dir_path)?;
   clear_generated_json_files(&out_schemas_dir_path)?;
 
-  write_json(
-    out_dir.join("namespaces.json"),
-    &schemas::gen_namespaces(&gen_context),
-  )?;
+  let namespaces = schemas::gen_namespaces(&gen_context);
+  write_json(out_dir.join("namespaces.json"), &namespaces)?;
 
   let mut schemas = gen_schemas(&gen_context);
   schemas.extend(read_opc_schemas(package_schemas_dir.as_ref())?);
@@ -65,7 +63,7 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   let schema_extensions = read_schema_extensions(&out_dir.join("schema_extensions"))?;
   apply_schema_extensions(&mut schemas, &schema_extensions)?;
   assign_schema_particle_ids(&mut schemas);
-  let codegen_context = CodegenContext::new(&schemas);
+  let codegen_context = CodegenContext::new_with_namespaces(&schemas, &namespaces);
 
   for schema in &schemas {
     let mut ir = build_codegen_ir(schema, &codegen_context).map_err(|err| {

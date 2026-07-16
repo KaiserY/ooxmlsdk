@@ -30,7 +30,6 @@ fn gen_package_module(part: &PartModuleDecl) -> Result<TokenStream> {
     pub struct #struct_name_ident {
       pub(crate) storage: crate::common::SdkPackageStorage,
       pub(crate) open_settings: crate::sdk::OpenSettings,
-      pub(crate) main_part_id: Option<crate::common::PartId>,
       pub(crate) root_elements: Vec<Option<crate::parts::PartRootElement>>,
       #( #marker_fields )*
     }
@@ -81,16 +80,6 @@ fn package_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
     });
   }
 
-  fields.push(quote! {
-    pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  });
-  fields.push(quote! {
-    pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  });
-  fields.push(quote! {
-    pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
-  });
-
   Ok(fields)
 }
 
@@ -100,7 +89,6 @@ fn gen_part_handle_module(part: &PartModuleDecl) -> Result<TokenStream> {
   let part_struct: ItemStruct = parse2(quote! {
     #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
     pub struct #struct_name_ident {
-      pub(crate) relationship_id: Option<String>,
       pub(crate) id: crate::common::PartId,
       #( #marker_fields )*
     }
@@ -161,11 +149,10 @@ fn part_handle_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> 
 
 fn part_child_field_type(cardinality: PartChildCardinality, part_ty: &Type) -> TokenStream {
   match cardinality {
-    PartChildCardinality::Optional | PartChildCardinality::Required => {
-      quote! { Option<Box<#part_ty>> }
-    }
+    PartChildCardinality::Optional => quote! { crate::sdk::OptionalPart<#part_ty> },
+    PartChildCardinality::Required => quote! { crate::sdk::RequiredPart<#part_ty> },
     PartChildCardinality::Repeated | PartChildCardinality::RequiredRepeated => {
-      quote! { Vec<#part_ty> }
+      quote! { crate::sdk::RepeatedPart<#part_ty> }
     }
   }
 }
@@ -664,15 +651,17 @@ mod tests {
     let rendered = gen_part_module(&part).unwrap().to_string();
     assert!(rendered.contains("ooxmlsdk_derive :: SdkPackage"));
     assert!(rendered.contains("storage : crate :: common :: SdkPackageStorage"));
-    assert!(rendered.contains("main_part_id : Option < crate :: common :: PartId >"));
+    assert!(!rendered.contains("main_part_id"));
     assert!(
       rendered.contains("root_elements : Vec < Option < crate :: parts :: PartRootElement > >")
     );
     assert!(rendered.contains("package_main"));
-    assert!(
-      rendered
-        .contains("main_document_part : Option < Box < crate :: parts :: main_document_part :: MainDocumentPart > >")
-    );
+    assert!(rendered.contains(
+      "main_document_part : crate :: sdk :: RequiredPart < crate :: parts :: main_document_part :: MainDocumentPart >"
+    ));
+    assert!(!rendered.contains("fallback_parts"));
+    assert!(!rendered.contains("relationship_order"));
+    assert!(!rendered.contains("modeled_relationships"));
     assert!(!rendered.contains("ooxmlsdk_derive :: SdkPart"));
   }
 

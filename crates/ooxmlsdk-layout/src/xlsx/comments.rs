@@ -3,7 +3,6 @@ use ooxmlsdk::parts::worksheet_comments_part::WorksheetCommentsPart;
 use ooxmlsdk::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments as tc;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
-use ooxmlsdk::sdk::SdkPart;
 
 use crate::error::Result;
 
@@ -15,7 +14,6 @@ pub(crate) struct CommentsCatalog {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct LegacyCommentsCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) authors: Vec<String>,
   pub(crate) comments: Vec<LegacyCommentModel>,
   pub(crate) has_extensions: bool,
@@ -36,7 +34,6 @@ pub(crate) struct LegacyCommentModel {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ThreadedCommentsCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) comments: Vec<ThreadedCommentModel>,
   pub(crate) has_extensions: bool,
 }
@@ -85,7 +82,6 @@ impl LegacyCommentsCatalog {
       .map(|author| author.xml_content.clone().unwrap_or_default())
       .collect::<Vec<_>>();
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       comments: comments
         .comment_list
         .comment
@@ -121,7 +117,6 @@ impl ThreadedCommentsCatalog {
   ) -> Result<Self> {
     let comments = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       comments: comments
         .threaded_comment
         .iter()

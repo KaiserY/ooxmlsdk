@@ -1,7 +1,6 @@
 use ooxmlsdk::parts::query_table_part::QueryTablePart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
-use ooxmlsdk::sdk::SdkPart;
 
 use crate::error::Result;
 
@@ -12,7 +11,6 @@ pub(crate) struct QueryTableCatalog {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct QueryTableModel {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) name: String,
   pub(crate) connection_id: u32,
   pub(crate) refresh_fields: usize,
@@ -39,11 +37,9 @@ impl QueryTableCatalog {
 
 impl QueryTableModel {
   fn from_part(package: &mut SpreadsheetDocument, part: &QueryTablePart) -> Result<Self> {
-    let relationship_id = part.relationship_id().map(ToString::to_string);
     let query_table = part.root_element(package)?;
     let refresh = query_table.query_table_refresh.as_deref();
     Ok(Self {
-      relationship_id,
       name: query_table.name.clone(),
       connection_id: query_table.connection_id,
       refresh_fields: refresh.map_or(0, |refresh| {

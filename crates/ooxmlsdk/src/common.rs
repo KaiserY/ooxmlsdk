@@ -74,7 +74,7 @@ pub(crate) const REL_MEDIA: &[u8] = b"http://schemas.microsoft.com/office/2007/r
 #[cfg(feature = "parts")]
 pub(crate) const REL_VIDEO: &[u8] =
   b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/video";
-#[cfg(feature = "parts")]
+#[cfg(all(feature = "parts", feature = "flat-opc"))]
 pub(crate) const REL_AF_CHUNK: &[u8] =
   b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk";
 #[cfg(feature = "parts")]

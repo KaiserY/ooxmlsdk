@@ -175,7 +175,6 @@ pub(crate) struct DiagramDataCatalog {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct DiagramLayoutCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) layout: Option<Box<dgm::LayoutDefinition>>,
   pub(crate) titles: usize,
   pub(crate) descriptions: usize,
@@ -199,7 +198,6 @@ pub(crate) struct DiagramLayoutCatalog {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct DiagramStyleCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) style: Option<Box<dgm::StyleDefinition>>,
   pub(crate) titles: usize,
   pub(crate) descriptions: usize,
@@ -212,7 +210,6 @@ pub(crate) struct DiagramStyleCatalog {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct DiagramColorCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) colors: Option<Box<dgm::ColorsDefinition>>,
   pub(crate) titles: usize,
   pub(crate) descriptions: usize,
@@ -246,8 +243,14 @@ impl DrawingResourceCatalog {
         .map(DrawingAnchorModel::from_choice)
         .collect()
     };
-    let chart_parts = part.chart_parts(package).collect::<Vec<_>>();
-    let extended_chart_parts = part.extended_chart_parts(package).collect::<Vec<_>>();
+    let chart_parts = part
+      .related_parts_of_type::<_, ChartPart>(package)
+      .map(|related| (related.relationship_id().to_string(), related.into_part()))
+      .collect::<Vec<_>>();
+    let extended_chart_parts = part
+      .related_parts_of_type::<_, ExtendedChartPart>(package)
+      .map(|related| (related.relationship_id().to_string(), related.into_part()))
+      .collect::<Vec<_>>();
     let diagrams = DiagramResourceCatalog::from_part(package, part)?;
     let image_resources = collect_image_resources(package, part);
     let hyperlink_targets = collect_hyperlink_targets(package, part);
@@ -256,11 +259,15 @@ impl DrawingResourceCatalog {
       anchors,
       charts: chart_parts
         .iter()
-        .map(|chart| ChartResourceCatalog::from_chart_part(package, chart))
+        .map(|(relationship_id, chart)| {
+          ChartResourceCatalog::from_chart_part(package, relationship_id.clone(), chart)
+        })
         .collect::<Result<Vec<_>>>()?,
       extended_charts: extended_chart_parts
         .iter()
-        .map(|chart| ChartResourceCatalog::from_extended_chart_part(package, chart))
+        .map(|(relationship_id, chart)| {
+          ChartResourceCatalog::from_extended_chart_part(package, relationship_id.clone(), chart)
+        })
         .collect::<Result<Vec<_>>>()?,
       diagrams,
       images,
@@ -934,19 +941,25 @@ fn rgb_hex_color(value: &str) -> Option<RgbColor> {
 
 impl DiagramResourceCatalog {
   fn from_part(package: &mut SpreadsheetDocument, part: &DrawingsPart) -> Result<Self> {
-    let data_parts = part.diagram_data_parts(package).collect::<Vec<_>>();
+    let data_parts = part
+      .related_parts_of_type::<_, DiagramDataPart>(package)
+      .map(|related| (related.relationship_id().to_string(), related.into_part()))
+      .collect::<Vec<_>>();
     let layout_parts = part
       .diagram_layout_definition_parts(package)
       .collect::<Vec<_>>();
     let style_parts = part.diagram_style_parts(package).collect::<Vec<_>>();
     let color_parts = part.diagram_colors_parts(package).collect::<Vec<_>>();
     let drawing_parts = part
-      .diagram_persist_layout_parts(package)
+      .related_parts_of_type::<_, DiagramPersistLayoutPart>(package)
+      .map(|related| (related.relationship_id().to_string(), related.into_part()))
       .collect::<Vec<_>>();
     Ok(Self {
       data_parts: data_parts
         .iter()
-        .map(|part| DiagramDataCatalog::from_part(package, part))
+        .map(|(relationship_id, part)| {
+          DiagramDataCatalog::from_part(package, relationship_id.clone(), part)
+        })
         .collect::<Result<Vec<_>>>()?,
       layout_parts: layout_parts
         .iter()
@@ -962,17 +975,23 @@ impl DiagramResourceCatalog {
         .collect::<Result<Vec<_>>>()?,
       drawing_parts: drawing_parts
         .iter()
-        .map(|part| DiagramDrawingCatalog::from_part(package, part))
+        .map(|(relationship_id, part)| {
+          DiagramDrawingCatalog::from_part(package, relationship_id.clone(), part)
+        })
         .collect::<Result<Vec<_>>>()?,
     })
   }
 }
 
 impl DiagramDataCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &DiagramDataPart) -> Result<Self> {
+  fn from_part(
+    package: &mut SpreadsheetDocument,
+    relationship_id: String,
+    part: &DiagramDataPart,
+  ) -> Result<Self> {
     let model = {
       let data_model = part.root_element(package)?;
-      Self::from_data_model(part.relationship_id().map(ToString::to_string), data_model)
+      Self::from_data_model(Some(relationship_id), data_model)
     };
     Ok(Self {
       images: part.image_parts(package).count(),
@@ -1053,7 +1072,7 @@ impl DiagramLayoutCatalog {
   ) -> Result<Self> {
     let model = {
       let layout = part.root_element(package)?;
-      Self::from_layout(part.relationship_id().map(ToString::to_string), layout)
+      Self::from_layout(layout)
     };
     Ok(Self {
       images: part.image_parts(package).count(),
@@ -1061,9 +1080,8 @@ impl DiagramLayoutCatalog {
     })
   }
 
-  fn from_layout(relationship_id: Option<String>, layout: &dgm::LayoutDefinition) -> Self {
+  fn from_layout(layout: &dgm::LayoutDefinition) -> Self {
     let mut stats = DiagramLayoutCatalog {
-      relationship_id,
       layout: Some(Box::new(layout.clone())),
       titles: layout.title.len(),
       descriptions: layout.description.len(),
@@ -1096,7 +1114,6 @@ impl DiagramStyleCatalog {
   fn from_part(package: &mut SpreadsheetDocument, part: &DiagramStylePart) -> Result<Self> {
     let style = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       style: Some(Box::new(style.clone())),
       titles: style.style_definition_title.len(),
       descriptions: style.style_label_description.len(),
@@ -1129,7 +1146,6 @@ impl DiagramColorCatalog {
   fn from_part(package: &mut SpreadsheetDocument, part: &DiagramColorsPart) -> Result<Self> {
     let colors = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       colors: Some(Box::new(colors.clone())),
       titles: colors.color_definition_title.len(),
       descriptions: colors.color_transform_description.len(),
@@ -1158,10 +1174,14 @@ impl DiagramColorCatalog {
 }
 
 impl DiagramDrawingCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &DiagramPersistLayoutPart) -> Result<Self> {
+  fn from_part(
+    package: &mut SpreadsheetDocument,
+    relationship_id: String,
+    part: &DiagramPersistLayoutPart,
+  ) -> Result<Self> {
     let model = {
       let drawing = part.root_element(package)?;
-      Self::from_drawing(part.relationship_id().map(ToString::to_string), drawing)
+      Self::from_drawing(Some(relationship_id), drawing)
     };
     Ok(Self {
       images: part.image_parts(package).count(),
@@ -1186,11 +1206,12 @@ impl DiagramDrawingCatalog {
 impl ChartResourceCatalog {
   pub(crate) fn from_chart_part(
     package: &mut SpreadsheetDocument,
+    relationship_id: String,
     part: &ChartPart,
   ) -> Result<Self> {
     let model = {
       let chart_space = part.root_element(package)?;
-      Self::from_chart_space(part.relationship_id().map(ToString::to_string), chart_space)
+      Self::from_chart_space(Some(relationship_id), chart_space)
     };
     Ok(Self {
       has_chart_drawing: part.chart_drawing_part(package).is_some(),
@@ -1205,11 +1226,12 @@ impl ChartResourceCatalog {
 
   pub(crate) fn from_extended_chart_part(
     package: &mut SpreadsheetDocument,
+    relationship_id: String,
     part: &ExtendedChartPart,
   ) -> Result<Self> {
     let model = {
       let chart_space = part.root_element(package)?;
-      Self::from_extended_chart_space(part.relationship_id().map(ToString::to_string), chart_space)
+      Self::from_extended_chart_space(Some(relationship_id), chart_space)
     };
     Ok(Self {
       has_chart_drawing: part.chart_drawing_part(package).is_some(),

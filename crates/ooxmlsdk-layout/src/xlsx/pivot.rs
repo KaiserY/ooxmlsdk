@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
+use ooxmlsdk::parts::PartRef;
 use ooxmlsdk::parts::pivot_table_part::PivotTablePart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
-use ooxmlsdk::sdk::SdkPart;
 
 use super::print::rendered_number_text;
 use super::styles::BorderRecord;
@@ -21,7 +21,6 @@ pub(crate) struct PivotTableCatalog {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PivotTableModel {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) name: String,
   pub(crate) cache_id: u32,
   pub(crate) location_reference: String,
@@ -991,7 +990,6 @@ impl PivotTableModel {
       &source_field_number_format_ids,
     );
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       name: definition.name.clone(),
       cache_id: definition.cache_id,
       location_reference: definition.location.reference.clone(),
@@ -1188,9 +1186,8 @@ fn pivot_cache_source_number_format_ids(
   else {
     return Ok(Vec::new());
   };
-  let Some(worksheet_part) = workbook_part
-    .worksheet_parts(package)
-    .find(|part| part.relationship_id() == Some(workbook_sheet.id.as_str()))
+  let Some(PartRef::WorksheetPart(worksheet_part)) =
+    workbook_part.get_part_by_id(package, workbook_sheet.id.as_str())
   else {
     return Ok(Vec::new());
   };
@@ -1236,12 +1233,13 @@ fn pivot_cache_source_field_names(
   else {
     return Ok(Vec::new());
   };
-  let worksheet_parts = workbook_part.worksheet_parts(package).collect::<Vec<_>>();
-  let Some(worksheet_part) = worksheet_parts
-    .iter()
-    .find(|part| part.relationship_id() == Some(workbook_sheet.id.as_str()))
-    .or_else(|| worksheet_parts.get(workbook_sheet_index))
-  else {
+  let worksheet_part = match workbook_part.get_part_by_id(package, workbook_sheet.id.as_str()) {
+    Some(PartRef::WorksheetPart(part)) => Some(part),
+    _ => workbook_part
+      .worksheet_parts(package)
+      .nth(workbook_sheet_index),
+  };
+  let Some(worksheet_part) = worksheet_part else {
     return Ok(Vec::new());
   };
   let worksheet = worksheet_part.root_element(package)?.clone();
@@ -1337,12 +1335,13 @@ fn pivot_source_cache_table(
   else {
     return Ok(None);
   };
-  let worksheet_parts = workbook_part.worksheet_parts(package).collect::<Vec<_>>();
-  let Some(worksheet_part) = worksheet_parts
-    .iter()
-    .find(|part| part.relationship_id() == Some(workbook_sheet.id.as_str()))
-    .or_else(|| worksheet_parts.get(workbook_sheet_index))
-  else {
+  let worksheet_part = match workbook_part.get_part_by_id(package, workbook_sheet.id.as_str()) {
+    Some(PartRef::WorksheetPart(part)) => Some(part),
+    _ => workbook_part
+      .worksheet_parts(package)
+      .nth(workbook_sheet_index),
+  };
+  let Some(worksheet_part) = worksheet_part else {
     return Ok(None);
   };
   let worksheet = worksheet_part.root_element(package)?.clone();

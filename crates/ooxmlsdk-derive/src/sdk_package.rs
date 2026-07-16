@@ -14,79 +14,6 @@ struct PartChildMarkerInfo {
   kind: PartChildKind,
 }
 
-fn package_child_init_tokens(
-  child: &PackageChildInfo,
-  field_index: usize,
-) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
-  let field_ident = &child.field_ident;
-  let part_ty = &child.part_ty;
-  let field_index = field_index as u16;
-  match child.kind {
-    PartChildKind::Repeated | PartChildKind::RequiredRepeated => (
-      quote! {
-        let mut #field_ident: Vec<#part_ty> = Vec::new();
-      },
-      quote! {
-        if let Some(child_part_id) = relationship.target_part_id() {
-          let item_index = #field_ident.len();
-          #field_ident.push(<#part_ty as crate::sdk::SdkPart>::from_relationship_id(
-            relationship.id(),
-            child_part_id,
-          ));
-          relationship_order.push(crate::sdk::RelationshipModelEntry::Child {
-            field_index: #field_index,
-            item_index,
-          });
-          represented_relationship = true;
-        }
-      },
-    ),
-    PartChildKind::Required | PartChildKind::Optional => (
-      quote! {
-        let mut #field_ident: Option<Box<#part_ty>> = None;
-      },
-      quote! {
-        if #field_ident.is_none() {
-          if let Some(child_part_id) = relationship.target_part_id() {
-            #field_ident = Some(Box::new(<#part_ty as crate::sdk::SdkPart>::from_relationship_id(
-              relationship.id(),
-              child_part_id,
-            )));
-            relationship_order.push(crate::sdk::RelationshipModelEntry::Child {
-              field_index: #field_index,
-              item_index: 0,
-            });
-            represented_relationship = true;
-          }
-        }
-      },
-    ),
-  }
-}
-
-fn package_relationship_dispatch_tokens(
-  child_infos: &[PackageChildInfo],
-) -> proc_macro2::TokenStream {
-  let mut branches = Vec::new();
-  for (field_index, child) in child_infos.iter().enumerate() {
-    let (_, load_tokens) = package_child_init_tokens(child, field_index);
-    let part_ty = &child.part_ty;
-    let relationship_matches = relationship_match_condition_tokens(
-      &child.relationship_type,
-      quote! { relationship },
-      quote! { <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE },
-    );
-    branches.push((
-      quote! {
-        #relationship_matches
-      },
-      load_tokens,
-    ));
-  }
-
-  build_conditional_chain(&branches, quote! {})
-}
-
 pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let Data::Struct(data_struct) = &input.data else {
@@ -127,17 +54,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     }
   });
 
-  let main_part_id_field = fields
-    .named
-    .iter()
-    .find(|field| {
-      field
-        .ident
-        .as_ref()
-        .is_some_and(|ident| ident == "main_part_id")
-    })
-    .ok_or_else(|| syn::Error::new_spanned(input, "SdkPackage requires a `main_part_id` field"))?;
-  let main_part_id_ident = main_part_id_field.ident.as_ref().unwrap();
   let root_elements_ident = fields.named.iter().find_map(|field| {
     let ident = field.ident.as_ref()?;
     (ident == "root_elements").then_some(ident)
@@ -157,11 +73,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     let Some(field_ident) = field.ident.as_ref() else {
       continue;
     };
-    if field_ident == "storage"
-      || field_ident == "open_settings"
-      || field_ident == "main_part_id"
-      || field_ident == "root_elements"
-      || is_relationship_model_field(field_ident)
+    if field_ident == "storage" || field_ident == "open_settings" || field_ident == "root_elements"
     {
       continue;
     }
@@ -169,7 +81,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     let Some(marker) = part_child_field_info(&field.ty) else {
       return Err(syn::Error::new_spanned(
         field,
-        "SdkPackage fields require storage, main_part_id, root_elements, or PartChild markers",
+        "SdkPackage fields require storage, open_settings, root_elements, or PartChild markers",
       ));
     };
     let relationship_type = parse_part_child_relationship_type_attr(&field.attrs)?
@@ -198,12 +110,26 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     let field_ident = &child.field_ident;
     let part_ty = &child.part_ty;
     let accessor_ident = child.main_accessor_ident.as_ref().unwrap();
+    let relationship_matches = relationship_match_condition_tokens(
+      &child.relationship_type,
+      quote! { relationship },
+      quote! { <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE },
+    );
     let add_accessor_ident: Ident =
       parse_str(&format!("add_{accessor_ident}")).expect("main part add accessor identifier");
     quote! {
       #( #attrs )*
       pub fn #accessor_ident(&self) -> Result<#part_ty, crate::common::SdkError> {
-        self.#field_ident.as_deref().cloned().ok_or_else(|| {
+        let _ = self.#field_ident;
+        let storage = crate::sdk::SdkPackage::storage(self);
+        crate::sdk::SdkPackage::relationships(self)
+          .part_relationships()
+          .find_map(|relationship| {
+            (#relationship_matches)
+              .then(|| crate::sdk::relationship_target_as_part::<#part_ty>(storage, relationship))
+              .flatten()
+          })
+          .ok_or_else(|| {
             crate::common::SdkError::CommonError(
               concat!("missing main part for ", stringify!(#ident)).to_string(),
             )
@@ -213,7 +139,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       #( #attrs )*
       pub fn #add_accessor_ident(&mut self) -> Result<#part_ty, crate::common::SdkError> {
         let _ = self.#field_ident;
-        if self.#main_part_id_ident.is_some() {
+        if self.#accessor_ident().is_ok() {
           return Err(crate::common::SdkError::CommonError(
             concat!("main part already exists for ", stringify!(#ident)).to_string(),
           ));
@@ -233,21 +159,13 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
             <#part_ty as crate::sdk::SdkPartDescriptor>::EXTENSION,
             crate::common::NewPartTargetMode::Fixed,
           )?;
-        self.#main_part_id_ident = Some(part.part_id());
-        self.#field_ident = Some(Box::new(
-          <#part_ty as crate::sdk::SdkPart>::from_relationship_id(
-            relationship_id,
-            part.part_id(),
-          ),
-        ));
         Ok(part)
       }
     }
   });
   let main_relationship_expr = if main_child.is_some() {
     quote! {
-      storage
-        .package_relationships()
+      crate::sdk::SdkPackage::relationships(self)
         .first_target_part_by_relationship_type(Self::MAIN_PART_RELATIONSHIP_TYPE)
     }
   } else {
@@ -292,60 +210,12 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
     }
   });
-  let child_field_locals: Vec<_> = child_infos
-    .iter()
-    .enumerate()
-    .map(|(field_index, child)| package_child_init_tokens(child, field_index).0)
-    .collect();
   let child_field_inits = child_infos.iter().map(|child| {
     let field_ident = &child.field_ident;
     quote! {
-      #field_ident,
+      #field_ident: Default::default(),
     }
   });
-  let child_field_tuple_values: Vec<_> = child_infos
-    .iter()
-    .map(|child| {
-      let field_ident = &child.field_ident;
-      quote! { #field_ident }
-    })
-    .collect();
-  let child_field_assigns: Vec<_> = child_infos
-    .iter()
-    .map(|child| {
-      let field_ident = &child.field_ident;
-      quote! {
-        self.#field_ident = #field_ident;
-      }
-    })
-    .collect();
-  let relationship_dispatch = package_relationship_dispatch_tokens(&child_infos);
-  let relationship_model_field_locals = quote! {
-    let mut fallback_parts = Vec::new();
-    let mut relationship_order: Vec<crate::sdk::RelationshipModelEntry> = Vec::new();
-    let mut modeled_relationships = Vec::new();
-    for relationship in storage.package_relationships().iter() {
-      let mut represented_relationship = false;
-      #relationship_dispatch
-      if relationship.is_reference_relationship() {
-        let item_index = modeled_relationships.len();
-        modeled_relationships.push(relationship.clone());
-        relationship_order.push(crate::sdk::RelationshipModelEntry::Relationship(item_index));
-      } else if relationship.target_kind() == crate::common::RelationshipTargetKind::InternalPart {
-        if !represented_relationship {
-          if let Some(part) = crate::parts::PartRef::from_relationship_storage(&storage, relationship) {
-            let item_index = fallback_parts.len();
-            fallback_parts.push(part);
-            relationship_order.push(crate::sdk::RelationshipModelEntry::Fallback(item_index));
-          }
-        }
-      } else {
-        let item_index = modeled_relationships.len();
-        modeled_relationships.push(relationship.clone());
-        relationship_order.push(crate::sdk::RelationshipModelEntry::Relationship(item_index));
-      }
-    }
-  };
   let validate_method_tokens = if cfg!(feature = "validators") {
     quote! {
       #[cfg(feature = "validators")]
@@ -399,30 +269,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
 
       #open_settings_method
 
-      fn refresh_relationship_model_from_storage(&mut self) {
-        let (
-          #( #child_field_tuple_values, )*
-          fallback_parts,
-          relationship_order,
-          modeled_relationships,
-        ) = {
-          let storage = &self.#storage_ident;
-          #( #child_field_locals )*
-          #relationship_model_field_locals
-          (
-            #( #child_field_tuple_values, )*
-            fallback_parts,
-            relationship_order,
-            modeled_relationships,
-          )
-        };
-
-        #( #child_field_assigns )*
-        self.fallback_parts = fallback_parts;
-        self.relationship_order = relationship_order;
-        self.modeled_relationships = modeled_relationships;
-      }
-
       #root_cache_methods
     }
 
@@ -454,8 +300,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       pub fn document_type(&self) -> #document_type_ty {
-        let content_type = self
-          .#main_part_id_ident
+        let content_type = #main_relationship_expr
           .and_then(|part_id| crate::sdk::SdkPackage::storage(self).part(part_id))
           .map(|part| part.content_type())
           .or_else(|| {
@@ -472,7 +317,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       ) -> Result<(), crate::common::SdkError> {
         crate::sdk::SdkPackage::storage_mut(self)
           .set_preferred_main_part_content_type(document_type.content_type());
-        if let Some(part_id) = self.#main_part_id_ident {
+        if let Some(part_id) = #main_relationship_expr {
           crate::sdk::SdkPackage::storage_mut(self)
             .set_part_content_type(part_id, document_type.content_type())?;
         }
@@ -967,18 +812,12 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         open_mode: crate::common::PackageOpenMode,
         open_settings: crate::sdk::OpenSettings,
       ) -> Result<Self, crate::common::SdkError> {
-        let main_part_id = #main_relationship_expr;
+        let _ = open_mode;
         #root_elements_local
-        #( #child_field_locals )*
-        #relationship_model_field_locals
 
         Ok(Self {
-          #main_part_id_ident: main_part_id,
           #root_elements_init
-        #( #child_field_inits )*
-          fallback_parts,
-          relationship_order,
-          modeled_relationships,
+          #( #child_field_inits )*
           #storage_ident: storage,
           #open_settings_init
         })
@@ -999,17 +838,38 @@ fn package_relationship_method_tokens(
       let field_ident = &child.field_ident;
       let method_ident = &child.field_ident;
       let part_ty = &child.part_ty;
+      let relationship_matches = relationship_match_condition_tokens(
+        &child.relationship_type,
+        quote! { relationship },
+        quote! { <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE },
+      );
       match child.kind {
         PartChildKind::Repeated | PartChildKind::RequiredRepeated => quote! {
           #( #attrs )*
           pub fn #method_ident(&self) -> impl Iterator<Item = #part_ty> + '_ {
-            self.#field_ident.iter().cloned()
+            let _ = self.#field_ident;
+            let storage = crate::sdk::SdkPackage::storage(self);
+            crate::sdk::SdkPackage::relationships(self)
+              .part_relationships()
+              .filter_map(move |relationship| {
+                (#relationship_matches)
+                  .then(|| crate::sdk::relationship_target_as_part::<#part_ty>(storage, relationship))
+                  .flatten()
+              })
           }
         },
         PartChildKind::Required | PartChildKind::Optional => quote! {
           #( #attrs )*
           pub fn #method_ident(&self) -> Option<#part_ty> {
-            self.#field_ident.as_deref().cloned()
+            let _ = self.#field_ident;
+            let storage = crate::sdk::SdkPackage::storage(self);
+            crate::sdk::SdkPackage::relationships(self)
+              .part_relationships()
+              .find_map(|relationship| {
+                (#relationship_matches)
+                  .then(|| crate::sdk::relationship_target_as_part::<#part_ty>(storage, relationship))
+                  .flatten()
+              })
           }
         },
       }

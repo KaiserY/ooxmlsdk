@@ -6,13 +6,10 @@
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExtendedPart {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
 }
 impl crate::sdk::SdkPartDescriptor for ExtendedPart {
+  const KIND: crate::parts::PartKind = crate::parts::PartKind::ExtendedPart;
   const RELATIONSHIP_TYPE: &'static str = "";
   const PATH_PREFIX: &'static str = "";
   const CONTENT_TYPE: &'static str = "";
@@ -22,84 +19,10 @@ impl crate::sdk::SdkPartDescriptor for ExtendedPart {
 impl crate::sdk::SdkPart for ExtendedPart {
   #[inline]
   fn from_part_id(part_id: crate::common::PartId) -> Self {
-    Self {
-      relationship_id: None,
-      id: part_id,
-      fallback_parts: Vec::new(),
-      relationship_order: Vec::new(),
-      modeled_relationships: Vec::new(),
-    }
-  }
-  #[inline]
-  fn from_relationship_id(
-    relationship_id: impl Into<String>,
-    part_id: crate::common::PartId,
-  ) -> Self {
-    Self {
-      relationship_id: Some(relationship_id.into()),
-      id: part_id,
-      fallback_parts: Vec::new(),
-      relationship_order: Vec::new(),
-      modeled_relationships: Vec::new(),
-    }
+    Self { id: part_id }
   }
   #[inline]
   fn part_id(&self) -> crate::common::PartId {
     self.id
-  }
-  #[inline]
-  fn relationship_id(&self) -> Option<&str> {
-    self.relationship_id.as_deref()
-  }
-  fn set_relationship_id(&mut self, relationship_id: String) {
-    self.relationship_id = Some(relationship_id);
-  }
-}
-impl ExtendedPart {
-  #[inline]
-  pub(crate) fn from_part_id_with_relationships(
-    storage: &crate::common::SdkPackageStorage,
-    part_id: crate::common::PartId,
-  ) -> Self {
-    let mut part = <Self as crate::sdk::SdkPart>::from_part_id(part_id);
-    if let Some(relationships) = storage.relationships(part_id) {
-      for relationship in relationships.iter() {
-        if relationship.is_reference_relationship() {
-          let item_index = part.modeled_relationships.len();
-          part.modeled_relationships.push(relationship.clone());
-          part
-            .relationship_order
-            .push(crate::sdk::RelationshipModelEntry::Relationship(item_index));
-        } else if relationship.target_kind() == crate::common::RelationshipTargetKind::InternalPart
-        {
-          if let Some(child) =
-            crate::parts::PartRef::from_relationship_storage(storage, relationship)
-          {
-            let item_index = part.fallback_parts.len();
-            part.fallback_parts.push(child);
-            part
-              .relationship_order
-              .push(crate::sdk::RelationshipModelEntry::Fallback(item_index));
-          }
-        } else {
-          let item_index = part.modeled_relationships.len();
-          part.modeled_relationships.push(relationship.clone());
-          part
-            .relationship_order
-            .push(crate::sdk::RelationshipModelEntry::Relationship(item_index));
-        }
-      }
-    }
-    part
-  }
-  #[inline]
-  pub(crate) fn from_relationship_id_with_relationships(
-    storage: &crate::common::SdkPackageStorage,
-    relationship_id: impl Into<String>,
-    part_id: crate::common::PartId,
-  ) -> Self {
-    let mut part = Self::from_part_id_with_relationships(storage, part_id);
-    part.relationship_id = Some(relationship_id.into());
-    part
   }
 }

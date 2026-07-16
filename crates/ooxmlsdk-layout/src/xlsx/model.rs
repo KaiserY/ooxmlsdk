@@ -1,8 +1,7 @@
 use std::borrow::Cow;
 
-use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+use ooxmlsdk::parts::{PartRef, spreadsheet_document::SpreadsheetDocument};
 use ooxmlsdk::schemas::x;
-use ooxmlsdk::sdk::SdkPart;
 use ooxmlsdk_formula::{
   BuiltInName, CellValueProvider, QualifiedRange as FormulaQualifiedRange, SheetId,
 };
@@ -43,16 +42,19 @@ impl<'doc> XlsxWorkbook<'doc> {
       return Self::default();
     };
     let sheet_identities = workbook_root.sheets.sheet.clone();
-    let worksheet_parts = workbook_part.worksheet_parts(document).collect::<Vec<_>>();
     let mut sheets = Vec::new();
     for (index, sheet) in sheet_identities.iter().enumerate() {
-      let worksheet_part = worksheet_parts
-        .iter()
-        .find(|part| part.relationship_id() == Some(sheet.id.as_str()));
+      let worksheet_part = match workbook_part.get_part_by_id(document, sheet.id.as_str()) {
+        Some(PartRef::WorksheetPart(part)) => Some(part),
+        _ => None,
+      };
       let tables = worksheet_part
+        .as_ref()
         .map(|part| import_table_parts(document, part))
         .unwrap_or_default();
-      let worksheet = worksheet_part.and_then(|part| part.root_element(document).ok());
+      let worksheet = worksheet_part
+        .as_ref()
+        .and_then(|part| part.root_element(document).ok());
       sheets.push(import_sheet(index, sheet, worksheet, tables, value_model));
     }
     if let Some(value_model) = value_model {

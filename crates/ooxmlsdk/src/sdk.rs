@@ -122,14 +122,6 @@ impl<T, C> PartialEq for PartChild<T, C> {
 pub struct PartRoot<T>(std::marker::PhantomData<T>);
 
 #[cfg(feature = "parts")]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum RelationshipModelEntry {
-  Child { field_index: u16, item_index: usize },
-  Fallback(usize),
-  Relationship(usize),
-}
-
-#[cfg(feature = "parts")]
 impl<T> PartRoot<T> {
   #[inline]
   pub const fn new() -> Self {
@@ -214,48 +206,13 @@ fn collect_all_parts_from_relationships<P: SdkPackage + Sized>(
 }
 
 #[cfg(feature = "parts")]
-fn relationship_target_as_part<T: SdkPart>(
+pub(crate) fn relationship_target_as_part<T: SdkPart>(
   storage: &crate::common::SdkPackageStorage,
   relationship: &crate::common::RelationshipInfo,
 ) -> Option<T> {
   let part_id = relationship.target_part_id()?;
   let part = storage.part(part_id)?;
-
-  if std::any::TypeId::of::<T>()
-    == std::any::TypeId::of::<crate::parts::extended_part::ExtendedPart>()
-  {
-    if let Some(crate::parts::PartRef::ExtendedPart(part)) =
-      crate::parts::PartRef::from_relationship_storage(storage, relationship)
-    {
-      let part: Box<dyn std::any::Any> = Box::new(part);
-      return part.downcast::<T>().ok().map(|part| *part);
-    }
-    return None;
-  }
-
-  let part_relationship_type = part.relationship_type_bytes()?;
-  if !crate::common::relationship_type_matches_bytes(
-    part_relationship_type,
-    T::RELATIONSHIP_TYPE.as_bytes(),
-  ) {
-    return None;
-  }
-  if T::CONTENT_TYPE.is_empty()
-    && T::RELATIONSHIP_TYPE.as_bytes() == crate::common::REL_OFFICE_DOCUMENT
-  {
-    return crate::common::package_main_part_path_matches(
-      part.path(),
-      T::PATH_PREFIX,
-      T::TARGET_NAME,
-    )
-    .then(|| T::from_relationship_id(relationship.id(), part_id));
-  }
-  if T::CONTENT_TYPE.is_empty() || part.content_type().as_bytes() == T::CONTENT_TYPE.as_bytes() {
-    return Some(T::from_relationship_id(relationship.id(), part_id));
-  }
-  (T::RELATIONSHIP_TYPE.as_bytes() == crate::common::REL_OFFICE_DOCUMENT
-    && crate::common::package_main_part_path_matches(part.path(), T::PATH_PREFIX, T::TARGET_NAME))
-  .then(|| T::from_relationship_id(relationship.id(), part_id))
+  (part.kind() == T::KIND).then(|| T::from_part_id(part_id))
 }
 
 #[cfg(feature = "parts")]
@@ -1065,9 +1022,6 @@ pub trait SdkPackage: Clone + Sized + 'static {
   }
 
   #[doc(hidden)]
-  fn refresh_relationship_model_from_storage(&mut self);
-
-  #[doc(hidden)]
   fn root_element(&self, part_id: crate::common::PartId) -> Option<&crate::parts::PartRootElement>;
 
   #[doc(hidden)]
@@ -1148,7 +1102,6 @@ pub trait SdkPackage: Clone + Sized + 'static {
       relationship_type,
       target,
     )?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
     Ok(
       crate::sdk::SdkPackage::relationships(self)
         .get(&relationship_id)
@@ -1176,7 +1129,6 @@ pub trait SdkPackage: Clone + Sized + 'static {
     let relationship_id = relationship_id.into();
     crate::sdk::SdkPackage::relationships_mut(self)
       .add_hyperlink_relationship(relationship_id.clone(), target)?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
     Ok(
       crate::sdk::SdkPackage::relationships(self)
         .get(&relationship_id)
@@ -1198,7 +1150,6 @@ pub trait SdkPackage: Clone + Sized + 'static {
       target,
       target_mode,
     )?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
     Ok(
       crate::sdk::SdkPackage::relationships(self)
         .get(&relationship_id)
@@ -1255,7 +1206,6 @@ pub trait SdkPackage: Clone + Sized + 'static {
   ) -> Result<crate::common::Relationship, crate::common::SdkError> {
     let relationship = crate::sdk::SdkPackage::relationships_mut(self)
       .remove_reference_relationship(relationship_id)?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
     Ok(relationship.into())
   }
 
@@ -1266,7 +1216,6 @@ pub trait SdkPackage: Clone + Sized + 'static {
   ) -> Result<crate::common::Relationship, crate::common::SdkError> {
     let relationship = crate::sdk::SdkPackage::relationships_mut(self)
       .remove_external_relationship(relationship_id)?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
     Ok(relationship.into())
   }
 
@@ -1278,7 +1227,6 @@ pub trait SdkPackage: Clone + Sized + 'static {
   ) -> Result<(), crate::common::SdkError> {
     crate::sdk::SdkPackage::relationships_mut(self)
       .change_relationship_id(relationship_id, new_relationship_id)?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
     Ok(())
   }
 
@@ -1439,9 +1387,6 @@ pub trait SdkPackage: Clone + Sized + 'static {
   #[inline]
   fn delete_part_by_id(&mut self, relationship_id: &str) -> Result<bool, crate::common::SdkError> {
     let deleted = crate::sdk::SdkPackage::storage_mut(self).delete_package_part(relationship_id)?;
-    if deleted {
-      crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
-    }
     Ok(deleted)
   }
 
@@ -1488,8 +1433,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
     let part_id = part.part_id();
     crate::sdk::SdkPackage::storage_mut(self)
       .add_package_relationship_to_part(relationship_id.clone(), part_id)?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
-    Ok(T::from_relationship_id(relationship_id, part_id))
+    Ok(T::from_part_id(part_id))
   }
 
   #[inline]
@@ -1502,10 +1446,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
     P: SdkPackage,
     T: SdkPart,
   {
-    let relationship_id = part
-      .relationship_id()
-      .map(str::to_string)
-      .unwrap_or_else(|| crate::sdk::SdkPackage::relationships(self).next_relationship_id());
+    let relationship_id = crate::sdk::SdkPackage::relationships(self).next_relationship_id();
     self.add_part_from_package_with_id(source_package, part, relationship_id)
   }
 
@@ -1527,8 +1468,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
       let part_id = part.part_id();
       crate::sdk::SdkPackage::storage_mut(self)
         .add_package_relationship_to_part(relationship_id.clone(), part_id)?;
-      crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
-      return Ok(T::from_relationship_id(relationship_id, part_id));
+      return Ok(T::from_part_id(part_id));
     }
 
     let (imported_part_id, added_count) = crate::sdk::SdkPackage::storage_mut(self)
@@ -1542,8 +1482,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
     for _ in 0..added_count {
       crate::sdk::SdkPackage::push_root_element_slot(self);
     }
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
-    Ok(T::from_relationship_id(relationship_id, imported_part_id))
+    Ok(T::from_part_id(imported_part_id))
   }
 
   #[inline]
@@ -1567,7 +1506,6 @@ pub trait SdkPackage: Clone + Sized + 'static {
     let relationship_id = relationship_id.into();
     crate::sdk::SdkPackage::storage_mut(self)
       .add_package_relationship_to_part(relationship_id.clone(), part.part_id())?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
     Ok(relationship_id)
   }
 
@@ -1686,8 +1624,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
       target_mode,
     )?;
     crate::sdk::SdkPackage::push_root_element_slot(self);
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
-    Ok(T::from_relationship_id(relationship_id, part_id))
+    Ok(T::from_part_id(part_id))
   }
 
   #[inline]
@@ -1770,8 +1707,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
       target_mode,
     )?;
     crate::sdk::SdkPackage::push_root_element_slot(self);
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
-    Ok(T::from_relationship_id(relationship_id, part_id))
+    Ok(T::from_part_id(part_id))
   }
 
   #[inline]
@@ -1857,8 +1793,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
       crate::common::NewPartTargetMode::Indexed,
     )?;
     crate::sdk::SdkPackage::push_root_element_slot(self);
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
-    Ok(crate::parts::extended_part::ExtendedPart::from_relationship_id(relationship_id, part_id))
+    Ok(<crate::parts::extended_part::ExtendedPart as SdkPart>::from_part_id(part_id))
   }
 }
 
@@ -1903,7 +1838,19 @@ impl<'a, T> RelatedPart<'a, T> {
 }
 
 #[cfg(feature = "parts")]
+impl<T> std::ops::Deref for RelatedPart<'_, T> {
+  type Target = T;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target {
+    &self.part
+  }
+}
+
+#[cfg(feature = "parts")]
 pub trait SdkPartDescriptor {
+  #[doc(hidden)]
+  const KIND: crate::parts::PartKind;
   const RELATIONSHIP_TYPE: &'static str;
   const PATH_PREFIX: &'static str;
   const CONTENT_TYPE: &'static str;
@@ -1928,16 +1875,7 @@ pub(crate) trait SdkPartRoot: SdkPart {
 pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
   fn from_part_id(part_id: crate::common::PartId) -> Self;
 
-  fn from_relationship_id(
-    relationship_id: impl Into<String>,
-    part_id: crate::common::PartId,
-  ) -> Self;
-
-  fn set_relationship_id(&mut self, relationship_id: String);
-
   fn part_id(&self) -> crate::common::PartId;
-
-  fn relationship_id(&self) -> Option<&str>;
 
   #[inline]
   fn missing_part_storage_error(&self) -> crate::common::SdkError {
@@ -2050,7 +1988,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
             RelatedPart::new(
               relationship.id(),
               relationship.relationship_type(),
-              T::from_relationship_id(relationship.id(), part_id),
+              T::from_part_id(part_id),
             )
           })
       })
@@ -2096,7 +2034,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
           RelatedPart::new(
             relationship.id(),
             relationship.relationship_type(),
-            T::from_relationship_id(relationship.id(), part_id),
+            T::from_part_id(part_id),
           )
         })
       })
@@ -2115,7 +2053,6 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       .relationships_mut(self.part_id())
       .ok_or_else(|| self.missing_part_storage_error())?
       .add_external_relationship(relationship_id.clone(), relationship_type, target)?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
     self.added_relationship_ref(package, &relationship_id)
   }
 
@@ -2142,7 +2079,6 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       .relationships_mut(self.part_id())
       .ok_or_else(|| self.missing_part_storage_error())?
       .add_hyperlink_relationship(relationship_id.clone(), target)?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
     self.added_relationship_ref(package, &relationship_id)
   }
 
@@ -2159,7 +2095,6 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       .relationships_mut(self.part_id())
       .ok_or_else(|| self.missing_part_storage_error())?
       .add_hyperlink_relationship_with_mode(relationship_id.clone(), target, target_mode)?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
     self.added_relationship_ref(package, &relationship_id)
   }
 
@@ -2285,7 +2220,6 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
         relationship.relationship_type(),
         target_part_id,
       )?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
     Ok(relationship_id)
   }
 
@@ -2305,7 +2239,6 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
         relationship_type,
         target_part_id,
       )?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
     Ok(relationship_id)
   }
 
@@ -2332,8 +2265,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       },
     )?;
     crate::sdk::SdkPackage::push_root_element_slot(package);
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
-    Ok(T::from_relationship_id(relationship_id, part_id))
+    Ok(T::from_part_id(part_id))
   }
 
   #[inline]
@@ -2360,8 +2292,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       },
     )?;
     crate::sdk::SdkPackage::push_root_element_slot(package);
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
-    Ok(T::from_relationship_id(relationship_id, part_id))
+    Ok(T::from_part_id(part_id))
   }
 
   #[inline]
@@ -2390,8 +2321,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       part_path,
     )?;
     crate::sdk::SdkPackage::push_root_element_slot(package);
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
-    Ok(T::from_relationship_id(relationship_id, part_id))
+    Ok(T::from_part_id(part_id))
   }
 
   #[inline]
@@ -2443,8 +2373,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       },
     )?;
     crate::sdk::SdkPackage::push_root_element_slot(package);
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
-    Ok(T::from_relationship_id(relationship_id, part_id))
+    Ok(T::from_part_id(part_id))
   }
 
   #[inline]
@@ -2513,8 +2442,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       },
     )?;
     crate::sdk::SdkPackage::push_root_element_slot(package);
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
-    Ok(crate::parts::extended_part::ExtendedPart::from_relationship_id(relationship_id, part_id))
+    Ok(<crate::parts::extended_part::ExtendedPart as SdkPart>::from_part_id(part_id))
   }
 
   #[inline]
@@ -3239,7 +3167,6 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       .relationships_mut(self.part_id())
       .ok_or_else(|| self.missing_part_storage_error())?
       .remove_reference_relationship(relationship_id)?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
     Ok(relationship.into())
   }
 
@@ -3253,7 +3180,6 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       .relationships_mut(self.part_id())
       .ok_or_else(|| self.missing_part_storage_error())?
       .remove_external_relationship(relationship_id)?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
     Ok(relationship.into())
   }
 
@@ -3268,7 +3194,6 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       .relationships_mut(self.part_id())
       .ok_or_else(|| self.missing_part_storage_error())?
       .change_relationship_id(relationship_id, new_relationship_id)?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
     Ok(())
   }
 
@@ -3539,9 +3464,6 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
   ) -> Result<bool, crate::common::SdkError> {
     let deleted = crate::sdk::SdkPackage::storage_mut(package)
       .delete_child_part(self.part_id(), relationship_id)?;
-    if deleted {
-      crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
-    }
     Ok(deleted)
   }
 
@@ -3601,8 +3523,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       relationship_id.clone(),
       part_id,
     )?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
-    Ok(T::from_relationship_id(relationship_id, part_id))
+    Ok(T::from_part_id(part_id))
   }
 
   #[inline]
@@ -3617,15 +3538,10 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
     S: SdkPackage,
     T: SdkPart,
   {
-    let relationship_id = part
-      .relationship_id()
-      .map(str::to_string)
-      .unwrap_or_else(|| {
-        crate::sdk::SdkPackage::storage(package)
-          .relationships(self.part_id())
-          .map(crate::common::RelationshipSet::next_relationship_id)
-          .unwrap_or_else(|| "rId1".to_string())
-      });
+    let relationship_id = crate::sdk::SdkPackage::storage(package)
+      .relationships(self.part_id())
+      .map(crate::common::RelationshipSet::next_relationship_id)
+      .unwrap_or_else(|| "rId1".to_string());
     self.add_part_from_package_with_id(package, source_package, part, relationship_id)
   }
 
@@ -3652,8 +3568,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
         relationship_id.clone(),
         part_id,
       )?;
-      crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
-      return Ok(T::from_relationship_id(relationship_id, part_id));
+      return Ok(T::from_part_id(part_id));
     }
 
     let (imported_part_id, added_count) = crate::sdk::SdkPackage::storage_mut(package)
@@ -3667,8 +3582,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
     for _ in 0..added_count {
       crate::sdk::SdkPackage::push_root_element_slot(package);
     }
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
-    Ok(T::from_relationship_id(relationship_id, imported_part_id))
+    Ok(T::from_part_id(imported_part_id))
   }
 
   #[inline]
@@ -3697,7 +3611,6 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       relationship_id.clone(),
       part.part_id(),
     )?;
-    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
     Ok(relationship_id)
   }
 }

@@ -6,7 +6,6 @@
 
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct VmlDrawingPart {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
   pub(crate) legacy_diagram_text_parts:

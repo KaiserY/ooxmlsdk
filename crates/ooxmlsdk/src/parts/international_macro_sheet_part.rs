@@ -6,7 +6,6 @@
 
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct InternationalMacroSheetPart {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   pub(crate) spreadsheet_printer_settings_parts: crate::sdk::RepeatedPart<
     crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,

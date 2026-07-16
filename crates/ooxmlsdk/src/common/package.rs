@@ -789,6 +789,7 @@ pub(crate) struct StoredPart {
   path: Box<str>,
   content_type: Box<str>,
   relationship_type: Option<super::XmlRelationshipNamespaceUri>,
+  kind: crate::parts::PartKind,
   relationships: RelationshipSet,
   data: StoredPartData,
   deleted: bool,
@@ -824,6 +825,11 @@ impl StoredPart {
       .relationship_type
       .as_ref()
       .map(super::XmlRelationshipNamespaceUri::uri_bytes)
+  }
+
+  #[inline]
+  pub(crate) fn kind(&self) -> crate::parts::PartKind {
+    self.kind
   }
 
   #[inline]
@@ -924,10 +930,19 @@ impl SdkPackageStorage {
     for (index, (raw_part, relationships)) in
       raw_parts.drain(..).zip(part_relationships).enumerate()
     {
+      let relationship_type = relationship_types.get(&PartId::from_index(index)).cloned();
+      let kind = crate::parts::PartKind::classify(
+        relationship_type
+          .as_ref()
+          .map(super::XmlRelationshipNamespaceUri::uri_bytes),
+        raw_part.content_type.as_bytes(),
+        &raw_part.path,
+      );
       parts.push(StoredPart {
         path: raw_part.path,
         content_type: raw_part.content_type,
-        relationship_type: relationship_types.get(&PartId::from_index(index)).cloned(),
+        relationship_type,
+        kind,
         relationships,
         data: StoredPartData::Raw {
           bytes: raw_part.bytes,
@@ -998,10 +1013,19 @@ impl SdkPackageStorage {
     for (index, (raw_part, relationships)) in
       raw_parts.into_iter().zip(part_relationships).enumerate()
     {
+      let relationship_type = relationship_types.get(&PartId::from_index(index)).cloned();
+      let kind = crate::parts::PartKind::classify(
+        relationship_type
+          .as_ref()
+          .map(super::XmlRelationshipNamespaceUri::uri_bytes),
+        raw_part.content_type.as_bytes(),
+        &raw_part.path,
+      );
       parts.push(StoredPart {
         path: raw_part.path,
         content_type: raw_part.content_type,
-        relationship_type: relationship_types.get(&PartId::from_index(index)).cloned(),
+        relationship_type,
+        kind,
         relationships,
         data: StoredPartData::Raw {
           bytes: raw_part.bytes,
@@ -1743,10 +1767,16 @@ impl SdkPackageStorage {
     relationship_type: Option<&str>,
   ) -> PartId {
     let part_id = PartId::from_index(self.parts.len());
+    let kind = crate::parts::PartKind::classify(
+      relationship_type.map(str::as_bytes),
+      content_type.as_bytes(),
+      &path,
+    );
     self.parts.push(StoredPart {
       path: path.clone().into_boxed_str(),
       content_type: content_type.into(),
       relationship_type: relationship_type.map(super::XmlRelationshipNamespaceUri::from_uri),
+      kind,
       relationships: RelationshipSet::default(),
       data: StoredPartData::Raw { bytes: Vec::new() },
       deleted: false,
@@ -1837,6 +1867,11 @@ impl SdkPackageStorage {
         ))
       })?;
       part.content_type = content_type.clone();
+      part.kind = crate::parts::PartKind::classify(
+        part.relationship_type_bytes(),
+        content_type.as_bytes(),
+        part.path(),
+      );
       part.path().to_string()
     };
     self.add_content_type_override(&path, &content_type);

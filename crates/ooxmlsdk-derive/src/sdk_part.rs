@@ -47,9 +47,8 @@ fn is_part_handle_struct(fields: &syn::FieldsNamed) -> bool {
     .iter()
     .any(|field| field.ident.as_ref().is_some_and(|ident| ident == "id"))
     && fields.named.iter().all(|field| {
-      field.ident.as_ref().is_some_and(|ident| {
-        ident == "id" || ident == "relationship_id" || is_relationship_model_field(ident)
-      }) || part_child_field_info(&field.ty).is_some()
+      field.ident.as_ref().is_some_and(|ident| ident == "id")
+        || part_child_field_info(&field.ty).is_some()
         || marker_inner_type(&field.ty, "PartRoot").is_some()
     })
 }
@@ -63,8 +62,6 @@ fn expand_part_handle(
     let field_ident = field.ident.as_ref().unwrap();
     if field_ident == "id" {
       quote! { #field_ident: part_id }
-    } else if field_ident == "relationship_id" {
-      quote! { #field_ident: None }
     } else {
       quote! { #field_ident: Default::default() }
     }
@@ -72,9 +69,7 @@ fn expand_part_handle(
   let mut child_infos = Vec::new();
   let mut root_info = None;
   for field in &fields.named {
-    if field.ident.as_ref().is_some_and(|ident| {
-      ident == "id" || ident == "relationship_id" || is_relationship_model_field(ident)
-    }) {
+    if field.ident.as_ref().is_some_and(|ident| ident == "id") {
       continue;
     }
 
@@ -109,28 +104,8 @@ fn expand_part_handle(
       }
 
       #[inline]
-      fn from_relationship_id(
-        relationship_id: impl Into<String>,
-        part_id: crate::common::PartId,
-      ) -> Self {
-        let mut part = Self::from_part_id(part_id);
-        part.relationship_id = Some(relationship_id.into());
-        part
-      }
-
-      #[inline]
-      fn set_relationship_id(&mut self, relationship_id: String) {
-        self.relationship_id = Some(relationship_id);
-      }
-
-      #[inline]
       fn part_id(&self) -> crate::common::PartId {
         self.id
-      }
-
-      #[inline]
-      fn relationship_id(&self) -> Option<&str> {
-        self.relationship_id.as_deref()
       }
     }
 
@@ -1107,9 +1082,7 @@ fn part_handle_child_methods_tokens(
         if #relationship_matches {
           relationship
             .target_part_id()
-            .map(|part_id| {
-              <#part_ty as crate::sdk::SdkPart>::from_relationship_id(relationship.id(), part_id)
-            })
+            .map(<#part_ty as crate::sdk::SdkPart>::from_part_id)
         } else {
           None
         }

@@ -6,6 +6,5 @@
 
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct SpreadsheetPrinterSettingsPart {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
 }

@@ -23,7 +23,6 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments as tc;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag as xfpb;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
-use ooxmlsdk::sdk::SdkPart;
 
 use crate::error::{LayoutError, Result};
 
@@ -56,7 +55,6 @@ pub(crate) struct ExternalDefinedName {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ExternalLinkModel {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) kind: ExternalLinkKind,
   pub(crate) sheet_names: usize,
   pub(crate) defined_names: usize,
@@ -83,7 +81,6 @@ pub(crate) enum ExternalLinkKind {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct XmlMapsModel {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) selection_namespaces: String,
   pub(crate) schemas: usize,
   pub(crate) maps: usize,
@@ -93,7 +90,6 @@ pub(crate) struct XmlMapsModel {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PersonModel {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) persons: usize,
   pub(crate) id_text_len: usize,
   pub(crate) has_extensions: bool,
@@ -101,7 +97,6 @@ pub(crate) struct PersonModel {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct RevisionHeadersModel {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) guid: String,
   pub(crate) last_guid: Option<String>,
   pub(crate) headers: usize,
@@ -135,7 +130,6 @@ pub(crate) struct WorkbookRelationshipResources {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct CustomXmlResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) has_properties: bool,
   pub(crate) schema_refs: usize,
   pub(crate) text_len: usize,
@@ -143,7 +137,6 @@ pub(crate) struct CustomXmlResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct CustomDataResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) has_custom_data: bool,
   pub(crate) text_len: usize,
   pub(crate) has_extensions: bool,
@@ -151,7 +144,6 @@ pub(crate) struct CustomDataResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SlicerCacheResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) name_len: usize,
   pub(crate) source_name_len: usize,
   pub(crate) pivot_tables: usize,
@@ -161,7 +153,6 @@ pub(crate) struct SlicerCacheResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct TimelineCacheResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) name_len: usize,
   pub(crate) source_name_len: usize,
   pub(crate) pivot_tables: usize,
@@ -172,7 +163,6 @@ pub(crate) struct TimelineCacheResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct RichValueResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) declared_count: u32,
   pub(crate) rich_values: usize,
   pub(crate) values: usize,
@@ -183,7 +173,6 @@ pub(crate) struct RichValueResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct RichValueStructureResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) declared_count: u32,
   pub(crate) structures: usize,
   pub(crate) keys: usize,
@@ -193,7 +182,6 @@ pub(crate) struct RichValueStructureResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ArrayDataResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) declared_count: u32,
   pub(crate) arrays: usize,
   pub(crate) values: usize,
@@ -203,7 +191,6 @@ pub(crate) struct ArrayDataResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct RichStylesResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) has_dxfs: bool,
   pub(crate) has_properties: bool,
   pub(crate) styles: usize,
@@ -213,7 +200,6 @@ pub(crate) struct RichStylesResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SupportingPropertyBagResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) arrays: usize,
   pub(crate) bags: usize,
   pub(crate) values: usize,
@@ -222,7 +208,6 @@ pub(crate) struct SupportingPropertyBagResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SupportingPropertyBagStructureResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) declared_count: u32,
   pub(crate) structures: usize,
   pub(crate) keys: usize,
@@ -232,7 +217,6 @@ pub(crate) struct SupportingPropertyBagStructureResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct RichValueTypesResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) has_global_type: bool,
   pub(crate) types: usize,
   pub(crate) key_flags: usize,
@@ -244,7 +228,6 @@ pub(crate) struct RichValueTypesResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct RichValueWebImageResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) images: usize,
   pub(crate) address_relationships: usize,
   pub(crate) more_images_relationships: usize,
@@ -254,7 +237,6 @@ pub(crate) struct RichValueWebImageResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct FeaturePropertyBagsResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) declared_count: u32,
   pub(crate) bag_extensions: usize,
   pub(crate) bags: usize,
@@ -265,7 +247,6 @@ pub(crate) struct FeaturePropertyBagsResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct WorkbookUserDataResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) declared_count: u32,
   pub(crate) users: usize,
   pub(crate) text_len: usize,
@@ -274,7 +255,6 @@ pub(crate) struct WorkbookUserDataResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct CalculationChainResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) cells: usize,
   pub(crate) flag_count: usize,
   pub(crate) text_len: usize,
@@ -283,7 +263,6 @@ pub(crate) struct CalculationChainResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct CellMetadataResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) metadata_types: usize,
   pub(crate) metadata_strings: usize,
   pub(crate) mdx_records: usize,
@@ -297,7 +276,6 @@ pub(crate) struct CellMetadataResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct VolatileDependenciesResource {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) types: usize,
   pub(crate) has_extensions: bool,
 }
@@ -512,7 +490,6 @@ impl ExternalLinkModel {
   fn from_part(package: &mut SpreadsheetDocument, part: &ExternalWorkbookPart) -> Result<Self> {
     let link = part.root_element(package)?;
     let mut model = Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       kind: ExternalLinkKind::Unknown,
       sheet_names: 0,
       defined_names: 0,
@@ -572,7 +549,6 @@ impl XmlMapsModel {
   ) -> Result<Self> {
     let maps = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       selection_namespaces: maps.selection_namespaces.clone(),
       schemas: maps.schema.len(),
       maps: maps.map.len(),
@@ -599,7 +575,6 @@ impl PersonModel {
   fn from_part(package: &mut SpreadsheetDocument, part: &WorkbookPersonPart) -> Result<Self> {
     let persons = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       persons: persons.person.len(),
       id_text_len: persons.person.iter().map(person_text_len).sum(),
       has_extensions: persons.extension_list.is_some(),
@@ -623,7 +598,6 @@ impl RevisionHeadersModel {
     let revision_logs = part.workbook_revision_log_parts(package).count();
     let headers = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       guid: headers.guid.clone(),
       last_guid: headers.last_guid.clone(),
       headers: headers.header.len(),
@@ -798,7 +772,6 @@ impl CustomXmlResource {
       .transpose()?
       .unwrap_or_default();
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       has_properties: properties.is_some(),
       schema_refs,
       text_len,
@@ -811,7 +784,6 @@ impl CustomDataResource {
     let has_custom_data = part.custom_data_part(package).is_some();
     let item = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       has_custom_data,
       text_len: item.id.len(),
       has_extensions: item.extension_list.is_some(),
@@ -823,7 +795,6 @@ impl SlicerCacheResource {
   fn from_part(package: &mut SpreadsheetDocument, part: &SlicerCachePart) -> Result<Self> {
     let cache = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       name_len: cache.name.len(),
       source_name_len: cache.source_name.len(),
       pivot_tables: cache
@@ -844,7 +815,6 @@ impl TimelineCacheResource {
     let cache = part.root_element(package)?;
     let state = &cache.timeline_state;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       name_len: cache.name.len(),
       source_name_len: cache.source_name.len(),
       pivot_tables: cache
@@ -878,7 +848,6 @@ impl RichValueResource {
   fn from_part(package: &mut SpreadsheetDocument, part: &RdRichValuePart) -> Result<Self> {
     let data = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       declared_count: data.count,
       rich_values: data.rich_value.len(),
       values: data.rich_value.iter().map(|value| value.value.len()).sum(),
@@ -909,7 +878,6 @@ impl RichValueStructureResource {
   fn from_part(package: &mut SpreadsheetDocument, part: &RdRichValueStructurePart) -> Result<Self> {
     let structures = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       declared_count: structures.count,
       structures: structures.rich_value_structure.len(),
       keys: structures
@@ -933,7 +901,6 @@ impl ArrayDataResource {
   fn from_part(package: &mut SpreadsheetDocument, part: &RdArrayPart) -> Result<Self> {
     let arrays = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       declared_count: arrays.count,
       arrays: arrays.array.len(),
       values: arrays
@@ -964,7 +931,6 @@ impl RichStylesResource {
   fn from_part(package: &mut SpreadsheetDocument, part: &RichStylesPart) -> Result<Self> {
     let stylesheet = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       has_dxfs: stylesheet.dxfs.is_some(),
       has_properties: stylesheet.rich_format_properties.is_some(),
       styles: stylesheet
@@ -998,7 +964,6 @@ impl SupportingPropertyBagResource {
       .as_ref()
       .map_or(0, |data| usize::from(data.extension_list.is_some()));
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       arrays,
       bags: bags
         .supporting_property_bag_data
@@ -1033,7 +998,6 @@ impl SupportingPropertyBagStructureResource {
   ) -> Result<Self> {
     let structures = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       declared_count: structures.count,
       structures: structures.supporting_property_bag_structure.len(),
       keys: structures
@@ -1080,7 +1044,6 @@ impl RichValueTypesResource {
         .map(rich_value_reserved_key_flag_count)
         .sum::<usize>();
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       has_global_type: info.rich_value_global_type.is_some(),
       types: type_records.len(),
       key_flags: usize::from(
@@ -1121,7 +1084,6 @@ impl RichValueWebImageResource {
   fn from_part(package: &mut SpreadsheetDocument, part: &RdRichValueWebImagePart) -> Result<Self> {
     let images = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       images: images.web_image_supporting_rich_data.len(),
       address_relationships: images.web_image_supporting_rich_data.len(),
       more_images_relationships: images
@@ -1151,7 +1113,6 @@ impl FeaturePropertyBagsResource {
   fn from_part(package: &mut SpreadsheetDocument, part: &FeaturePropertyBagsPart) -> Result<Self> {
     let bags = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       declared_count: bags.count.unwrap_or_default(),
       bag_extensions: bags.bag_extensions.len(),
       bags: bags.feature_property_bag.len(),
@@ -1179,7 +1140,6 @@ impl WorkbookUserDataResource {
   fn from_part(package: &mut SpreadsheetDocument, part: &WorkbookUserDataPart) -> Result<Self> {
     let users = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       declared_count: users.count.unwrap_or_default(),
       users: users.user_info.len(),
       text_len: users
@@ -1200,7 +1160,6 @@ impl CalculationChainResource {
   fn from_part(package: &mut SpreadsheetDocument, part: &CalculationChainPart) -> Result<Self> {
     let chain = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       cells: chain.calculation_cell.len(),
       flag_count: chain
         .calculation_cell
@@ -1250,7 +1209,6 @@ impl CellMetadataResource {
         .sum()
     });
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       metadata_types: metadata
         .metadata_types
         .as_ref()
@@ -1298,7 +1256,6 @@ impl VolatileDependenciesResource {
   fn from_part(package: &mut SpreadsheetDocument, part: &VolatileDependenciesPart) -> Result<Self> {
     let dependencies = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       types: dependencies.volatile_type.len(),
       has_extensions: dependencies.extension_list.is_some(),
     })

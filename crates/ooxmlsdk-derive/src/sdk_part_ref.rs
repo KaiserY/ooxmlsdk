@@ -40,6 +40,15 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
   let extended_ident = &extended_variant.ident;
   let extended_ty = &extended_variant.ty;
 
+  let part_kind_variants = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    quote! {
+      #( #attrs )*
+      #variant_ident,
+    }
+  });
+
   let part_id_arms = variants.iter().map(|variant| {
     let attrs = cfg_attrs(&variant.attrs);
     let variant_ident = &variant.ident;
@@ -54,6 +63,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
     .filter(|variant| !variant.extended)
     .map(|variant| {
       let attrs = cfg_attrs(&variant.attrs);
+      let variant_ident = &variant.ident;
       let variant_ty = &variant.ty;
       let relationship_type = variant
         .relationship_type
@@ -70,6 +80,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       quote! {
         #( #attrs )*
         impl crate::sdk::SdkPartDescriptor for #variant_ty {
+          const KIND: crate::parts::PartKind = crate::parts::PartKind::#variant_ident;
           const RELATIONSHIP_TYPE: &'static str = #relationship_type;
           const PATH_PREFIX: &'static str = #path_prefix;
           const CONTENT_TYPE: &'static str = #content_type;
@@ -79,83 +90,92 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       }
     });
 
-  let relationship_arms = variants
-    .iter()
-    .filter(|variant| !variant.extended)
-    .map(|variant| {
-      let attrs = cfg_attrs(&variant.attrs);
-      let variant_ident = &variant.ident;
-      let variant_ty = &variant.ty;
-      let relationship_type = variant
-        .relationship_type
-        .as_ref()
-        .expect("non-extended PartRef variants require relationship type");
-      let relationship_type_bytes =
-        LitByteStr::new(relationship_type.as_bytes(), Span::call_site());
-      let construct_part_ref = quote! {
-        let part = if let Some(relationship_id) = relationship_id {
-          <#variant_ty as crate::sdk::SdkPart>::from_relationship_id(relationship_id, part_id)
+  let part_kind_classify_branches =
+    variants
+      .iter()
+      .filter(|variant| !variant.extended)
+      .map(|variant| {
+        let attrs = cfg_attrs(&variant.attrs);
+        let variant_ident = &variant.ident;
+        let relationship_type = variant
+          .relationship_type
+          .as_ref()
+          .expect("non-extended PartRef variants require relationship type");
+        let relationship_type_bytes =
+          LitByteStr::new(relationship_type.as_bytes(), Span::call_site());
+        let descriptor = variant
+          .descriptor
+          .as_ref()
+          .expect("non-extended PartRef variants require descriptor");
+        let content_type = LitByteStr::new(descriptor.content_type.as_bytes(), Span::call_site());
+        let path_prefix = descriptor.path_prefix.as_str();
+        let target_name = descriptor.target_name.as_str();
+        let content_type_match = quote! { content_type == #content_type };
+        let part_ref_guard = if descriptor.content_type.is_empty() {
+          quote! { true }
         } else {
-          <#variant_ty as crate::sdk::SdkPart>::from_part_id(part_id)
+          quote! { #content_type_match }
         };
-        return Some(Self::#variant_ident(part));
-      };
-      let descriptor = variant
-        .descriptor
-        .as_ref()
-        .expect("non-extended PartRef variants require descriptor");
-      let content_type = LitByteStr::new(descriptor.content_type.as_bytes(), Span::call_site());
-      let path_prefix = descriptor.path_prefix.as_str();
-      let target_name = descriptor.target_name.as_str();
-      let content_type_match = quote! { part.content_type().as_bytes() == #content_type };
-      let part_ref_guard = if descriptor.content_type.is_empty() {
-        quote! { true }
-      } else {
-        quote! { #content_type_match }
-      };
-      let office_document_guard = if descriptor.content_type.is_empty() {
-        quote! {
-          crate::common::package_main_part_path_matches(
-            part.path(),
-            #path_prefix,
-            #target_name,
-          )
-        }
-      } else {
-        quote! {
-          #content_type_match
-            || crate::common::package_main_part_path_matches(
-              part.path(),
+        let office_document_guard = if descriptor.content_type.is_empty() {
+          quote! {
+            crate::common::package_main_part_path_matches(
+              path,
               #path_prefix,
               #target_name,
             )
-        }
-      };
+          }
+        } else {
+          quote! {
+            #content_type_match
+              || crate::common::package_main_part_path_matches(
+                path,
+                #path_prefix,
+                #target_name,
+              )
+          }
+        };
 
-      if relationship_type
-        == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
-      {
-        quote! {
-          #( #attrs )*
-          if crate::common::relationship_type_matches_bytes(
-            relationship_type,
-            #relationship_type_bytes,
-          ) && (#office_document_guard) {
-            #construct_part_ref
+        if relationship_type
+          == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+        {
+          quote! {
+            #( #attrs )*
+            if crate::common::relationship_type_matches_bytes(
+              relationship_type,
+              #relationship_type_bytes,
+            ) && (#office_document_guard) {
+              return Self::#variant_ident;
+            }
+          }
+        } else {
+          quote! {
+            #( #attrs )*
+            if crate::common::relationship_type_matches_bytes(
+              relationship_type,
+              #relationship_type_bytes,
+            ) && (#part_ref_guard) {
+              return Self::#variant_ident;
+            }
           }
         }
-      } else {
+      });
+
+  let part_ref_from_kind_arms =
+    variants
+      .iter()
+      .filter(|variant| !variant.extended)
+      .map(|variant| {
+        let attrs = cfg_attrs(&variant.attrs);
+        let variant_ident = &variant.ident;
+        let variant_ty = &variant.ty;
         quote! {
           #( #attrs )*
-          if crate::common::relationship_type_matches_bytes(
-            relationship_type,
-            #relationship_type_bytes,
-          ) && (#part_ref_guard) {
-            #construct_part_ref
-          }
+          PartKind::#variant_ident => {
+            let part = <#variant_ty as crate::sdk::SdkPart>::from_part_id(part_id);
+            Some(Self::#variant_ident(part))
+          },
         }
-      }
-    });
+      });
 
   let root_variants = variants
     .iter()
@@ -259,7 +279,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       Self::#variant_ident(root) => Ok(crate::sdk::SdkType::write_to(root.as_ref(), writer)?),
     }
   });
-  let root_from_part_id_branches = root_variants.clone().map(|(variant, root)| {
+  let root_from_part_id_arms = root_variants.clone().map(|(variant, root)| {
     let attrs = cfg_attrs(&variant.attrs);
     let variant_ident = &variant.ident;
     let root_ty = &root.element_ty;
@@ -279,10 +299,13 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
     };
     quote! {
       #( #attrs )*
-      if crate::sdk::part_root_content_type_matches_bytes(
-        #content_type,
-        part.content_type().as_bytes(),
-      ) {
+      PartKind::#variant_ident => {
+        if !crate::sdk::part_root_content_type_matches_bytes(
+          #content_type,
+          part.content_type().as_bytes(),
+        ) {
+          return Ok(None);
+        }
         let bytes = part.data().bytes();
         #chart_raw_fallback
         let root = if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
@@ -294,8 +317,8 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         let mut root = root;
         #[cfg(feature = "mce")]
         root.process_mce(&open_settings.markup_compatibility_process_settings)?;
-        return Ok(Some(Self::#variant_ident(Box::new(root))));
-      }
+        Ok(Some(Self::#variant_ident(Box::new(root))))
+      },
     }
   });
   let root_validate_method_tokens = if cfg!(feature = "validators") {
@@ -323,6 +346,26 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
   };
 
   Ok(quote! {
+    #[doc(hidden)]
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    pub enum PartKind {
+      #( #part_kind_variants )*
+    }
+
+    impl PartKind {
+      pub(crate) fn classify(
+        relationship_type: Option<&[u8]>,
+        content_type: &[u8],
+        path: &str,
+      ) -> Self {
+        let Some(relationship_type) = relationship_type else {
+          return Self::#extended_ident;
+        };
+        #( #part_kind_classify_branches )*
+        Self::#extended_ident
+      }
+    }
+
     #( #descriptor_impls )*
     #( #root_bridge_impls )*
 
@@ -364,19 +407,12 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         let Some(part) = storage.part(part_id) else {
           return Ok(None);
         };
-        if part.relationship_type_bytes().is_some_and(|relationship_type| {
-          crate::common::relationship_type_matches_bytes(
-            relationship_type,
-            crate::common::REL_AF_CHUNK,
-          )
-        })
-        {
-          return Ok(None);
-        }
         #[cfg(not(feature = "mce"))]
         let _ = open_settings;
-        #( #root_from_part_id_branches )*
-        Ok(None)
+        match part.kind() {
+          #( #root_from_part_id_arms )*
+          _ => Ok(None),
+        }
       }
     }
 
@@ -397,7 +433,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         package: &P,
         part_id: crate::common::PartId,
       ) -> Option<Self> {
-        Self::from_storage(crate::sdk::SdkPackage::storage(package), part_id, None)
+        Self::from_storage(crate::sdk::SdkPackage::storage(package), part_id)
       }
 
       #[inline]
@@ -405,42 +441,25 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         storage: &crate::common::SdkPackageStorage,
         relationship: &crate::common::RelationshipInfo,
       ) -> Option<Self> {
-        Self::from_storage(storage, relationship.target_part_id()?, Some(relationship.id()))
+        Self::from_storage(storage, relationship.target_part_id()?)
       }
 
       fn from_storage(
         storage: &crate::common::SdkPackageStorage,
         part_id: crate::common::PartId,
-        relationship_id: Option<&str>,
       ) -> Option<Self> {
         let part = storage.part(part_id)?;
-        let Some(relationship_type) = part.relationship_type_bytes() else {
-          return Some(Self::extended_part(storage, part_id, relationship_id));
-        };
-
-        #( #relationship_arms )*
-
-        Some(Self::extended_part(storage, part_id, relationship_id))
+        match part.kind() {
+          #( #part_ref_from_kind_arms )*
+          PartKind::#extended_ident => {
+            Some(Self::extended_part(part_id))
+          },
+        }
       }
 
       #[inline]
-      fn extended_part(
-        storage: &crate::common::SdkPackageStorage,
-        part_id: crate::common::PartId,
-        relationship_id: Option<&str>,
-      ) -> Self {
-        let part = if let Some(relationship_id) = relationship_id {
-          <#extended_ty>::from_relationship_id_with_relationships(
-            storage,
-            relationship_id,
-            part_id,
-          )
-        } else {
-          <#extended_ty>::from_part_id_with_relationships(
-            storage,
-            part_id,
-          )
-        };
+      fn extended_part(part_id: crate::common::PartId) -> Self {
+        let part = <#extended_ty as crate::sdk::SdkPart>::from_part_id(part_id);
         Self::#extended_ident(part)
       }
     }

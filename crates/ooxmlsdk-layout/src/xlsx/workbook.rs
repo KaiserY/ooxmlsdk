@@ -1,9 +1,9 @@
+use ooxmlsdk::parts::PartRef;
 use ooxmlsdk::parts::chartsheet_part::ChartsheetPart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::workbook_part::WorkbookPart;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
-use ooxmlsdk::sdk::SdkPart;
 
 use crate::error::Result;
 use crate::model::RgbColor;
@@ -68,14 +68,6 @@ impl WorkbookFragment {
       .and_then(|properties| properties.date1904)
       .is_some_and(|value| value.as_bool());
 
-    let worksheet_parts = self
-      .workbook_part
-      .worksheet_parts(package)
-      .collect::<Vec<_>>();
-    let chartsheet_parts = self
-      .workbook_part
-      .chartsheet_parts(package)
-      .collect::<Vec<_>>();
     let active_workbook_sheet = active_workbook_sheet(&self.workbook);
 
     self
@@ -87,13 +79,12 @@ impl WorkbookFragment {
       .map(|(workbook_index, sheet)| {
         let rel_id = sheet.id.as_str();
         let state = sheet.state;
-        if let Some(part) = worksheet_parts
-          .iter()
-          .find(|part| part.relationship_id() == Some(rel_id))
+        if let Some(PartRef::WorksheetPart(part)) =
+          self.workbook_part.get_part_by_id(package, rel_id)
         {
           return worksheet_sheet(
             package,
-            part,
+            &part,
             sheet,
             WorkbookSheetContext {
               workbook_index,
@@ -107,13 +98,12 @@ impl WorkbookFragment {
           );
         }
 
-        if let Some(part) = chartsheet_parts
-          .iter()
-          .find(|part| part.relationship_id() == Some(rel_id))
+        if let Some(PartRef::ChartsheetPart(part)) =
+          self.workbook_part.get_part_by_id(package, rel_id)
         {
           return chartsheet(
             package,
-            part,
+            &part,
             sheet,
             workbook_index,
             state,

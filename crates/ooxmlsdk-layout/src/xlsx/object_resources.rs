@@ -30,7 +30,6 @@ pub(crate) struct WorksheetObjectResourceCatalog {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct VmlDrawingResourceCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) images: usize,
   pub(crate) image_resources: HashMap<String, ImageResource>,
   pub(crate) legacy_diagram_texts: usize,
@@ -97,13 +96,11 @@ impl Default for VmlShapeModel {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ControlPersistenceResourceCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) binary_data_parts: Vec<BinaryResourceCatalog>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ControlPropertiesResourceCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) has_object_type: bool,
   pub(crate) has_checked: bool,
   pub(crate) boolean_flags: usize,
@@ -116,9 +113,7 @@ pub(crate) struct ControlPropertiesResourceCatalog {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct BinaryResourceCatalog {
-  pub(crate) relationship_id: Option<String>,
-}
+pub(crate) struct BinaryResourceCatalog;
 
 impl WorksheetObjectResourceCatalog {
   pub(crate) fn from_worksheet_part(
@@ -179,7 +174,6 @@ impl VmlDrawingResourceCatalog {
       .map(|data| vml_shapes(&data))
       .unwrap_or_default();
     Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       images: part.image_parts(package).count(),
       image_resources: collect_vml_image_resources(package, part),
       legacy_diagram_texts: part.legacy_diagram_text_parts(package).count(),
@@ -709,7 +703,6 @@ fn vml_object_type_name(value: xvml::ObjectValues) -> &'static str {
 impl ControlPersistenceResourceCatalog {
   fn from_part(package: &mut SpreadsheetDocument, part: &EmbeddedControlPersistencePart) -> Self {
     Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       binary_data_parts: part
         .embedded_control_persistence_binary_data_parts(package)
         .map(|part| BinaryResourceCatalog::from_part(&part))
@@ -721,18 +714,11 @@ impl ControlPersistenceResourceCatalog {
 impl ControlPropertiesResourceCatalog {
   fn from_part(package: &mut SpreadsheetDocument, part: &ControlPropertiesPart) -> Result<Self> {
     let properties = part.root_element(package)?;
-    Ok(Self::from_properties(
-      part.relationship_id().map(ToString::to_string),
-      properties,
-    ))
+    Ok(Self::from_properties(properties))
   }
 
-  fn from_properties(
-    relationship_id: Option<String>,
-    properties: &x14::FormControlProperties,
-  ) -> Self {
+  fn from_properties(properties: &x14::FormControlProperties) -> Self {
     Self {
-      relationship_id,
       has_object_type: properties.object_type.is_some(),
       has_checked: properties.checked.is_some(),
       boolean_flags: bool_attr_count([
@@ -792,10 +778,8 @@ impl ControlPropertiesResourceCatalog {
 }
 
 impl BinaryResourceCatalog {
-  fn from_part(part: &impl SdkPart) -> Self {
-    Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
-    }
+  fn from_part(_part: &impl SdkPart) -> Self {
+    Self
   }
 }
 

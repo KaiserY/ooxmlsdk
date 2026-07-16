@@ -8,7 +8,6 @@ use ooxmlsdk::parts::worksheet_sort_map_part::WorksheetSortMapPart;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main as x14;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main as x15;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2019_namedsheetviews as xnsv;
-use ooxmlsdk::sdk::SdkPart;
 
 use crate::error::Result;
 
@@ -32,7 +31,6 @@ pub(crate) struct SheetRelationshipCatalog {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SingleXmlCellCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) cells: usize,
   pub(crate) extension_cells: usize,
   pub(crate) ref_text_len: usize,
@@ -43,7 +41,6 @@ pub(crate) struct SingleXmlCellCatalog {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct NamedSheetViewCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) views: usize,
   pub(crate) filters: usize,
   pub(crate) column_filters: usize,
@@ -54,7 +51,6 @@ pub(crate) struct NamedSheetViewCatalog {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SlicerCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) slicers: usize,
   pub(crate) extensions: usize,
   pub(crate) flags: usize,
@@ -63,7 +59,6 @@ pub(crate) struct SlicerCatalog {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TimelineCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) timelines: usize,
   pub(crate) extensions: usize,
   pub(crate) flags: usize,
@@ -72,7 +67,6 @@ pub(crate) struct TimelineCatalog {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct WorksheetSortMapCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) row_items: usize,
   pub(crate) column_items: usize,
   pub(crate) ref_text_len: usize,
@@ -141,7 +135,6 @@ impl SingleXmlCellCatalog {
   fn from_part(package: &mut SpreadsheetDocument, part: &SingleCellTablePart) -> Result<Self> {
     let cells = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       cells: cells.single_xml_cell.len(),
       extension_cells: cells
         .single_xml_cell
@@ -189,7 +182,6 @@ impl NamedSheetViewCatalog {
   fn from_part(package: &mut SpreadsheetDocument, part: &NamedSheetViewsPart) -> Result<Self> {
     let views = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       views: views.named_sheet_view.len(),
       filters: views
         .named_sheet_view
@@ -218,7 +210,6 @@ impl SlicerCatalog {
   fn from_part(package: &mut SpreadsheetDocument, part: &SlicersPart) -> Result<Self> {
     let slicers = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       slicers: slicers.slicer.len(),
       extensions: slicers
         .slicer
@@ -235,7 +226,6 @@ impl TimelineCatalog {
   fn from_part(package: &mut SpreadsheetDocument, part: &TimeLinePart) -> Result<Self> {
     let timelines = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       timelines: timelines.timeline.len(),
       extensions: timelines
         .timeline
@@ -252,7 +242,6 @@ impl WorksheetSortMapCatalog {
   fn from_part(package: &mut SpreadsheetDocument, part: &WorksheetSortMapPart) -> Result<Self> {
     let sort_map = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       row_items: sort_map
         .row_sort_map
         .as_ref()

@@ -1,13 +1,11 @@
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::table_definition_part::TableDefinitionPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
-use ooxmlsdk::sdk::SdkPart;
 
 use crate::error::Result;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TableResourceCatalog {
-  pub(crate) relationship_id: Option<String>,
   pub(crate) id: u32,
   pub(crate) name: Option<String>,
   pub(crate) display_name: String,
@@ -53,7 +51,6 @@ impl TableResourceCatalog {
   ) -> Result<Self> {
     let table = part.root_element(package)?;
     Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
       id: table.id,
       name: table.name.clone(),
       display_name: table.display_name.clone(),

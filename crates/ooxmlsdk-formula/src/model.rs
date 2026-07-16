@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
+use ooxmlsdk::parts::PartRef;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::workbook_part::WorkbookPart;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::x;
-use ooxmlsdk::sdk::SdkPart;
 
 use crate::calc::CalcEngine;
 use crate::code::{
@@ -63,8 +63,6 @@ impl<'doc> WorkbookValueModel<'doc> {
     let shared_strings = shared_strings(document, &workbook_part)?;
     let metadata = workbook_metadata(document, &workbook_part)?;
     let styles = workbook_styles(document, &workbook_part)?;
-    let worksheet_parts = workbook_part.worksheet_parts(document).collect::<Vec<_>>();
-
     let identity = workbook_identity(&workbook).into_owned();
     let external_references = external_references(document, &workbook_part, &workbook)?
       .into_iter()
@@ -74,11 +72,13 @@ impl<'doc> WorkbookValueModel<'doc> {
       .sheets
       .iter()
       .map(|sheet_identity| {
-        let worksheet = worksheet_parts
-          .iter()
-          .find(|part| part.relationship_id() == sheet_identity.relationship_id.as_deref())
-          .and_then(|part| part.root_element(document).ok())
-          .cloned();
+        let worksheet = worksheet_part_by_relationship_id(
+          document,
+          &workbook_part,
+          sheet_identity.relationship_id.as_deref(),
+        )
+        .and_then(|part| part.root_element(document).ok())
+        .cloned();
         worksheet_value_model(
           sheet_identity,
           worksheet.as_ref(),
@@ -100,7 +100,7 @@ impl<'doc> WorkbookValueModel<'doc> {
     let shared_formula_groups = shared_formula_groups(&sheets);
     let array_formula_groups = array_formula_groups(&sheets);
     let data_tables = data_tables(&sheets);
-    let tables = workbook_tables(document, &worksheet_parts, &identity)?
+    let tables = workbook_tables(document, &workbook_part, &identity)?
       .into_iter()
       .map(FormulaTable::into_owned)
       .collect();
@@ -3238,14 +3238,13 @@ fn data_tables<'doc>(sheets: &[WorksheetValueModel<'doc>]) -> Vec<DataTableFormu
 
 fn workbook_tables<'doc>(
   document: &mut SpreadsheetDocument,
-  worksheet_parts: &[WorksheetPart],
+  workbook_part: &WorkbookPart,
   identity: &WorkbookIdentity<'_>,
 ) -> Result<Vec<FormulaTable<'doc>>> {
   let mut tables = Vec::new();
   for sheet in &identity.sheets {
-    let Some(worksheet_part) = worksheet_parts
-      .iter()
-      .find(|part| part.relationship_id() == sheet.relationship_id.as_deref())
+    let Some(worksheet_part) =
+      worksheet_part_by_relationship_id(document, workbook_part, sheet.relationship_id.as_deref())
     else {
       continue;
     };
@@ -3284,6 +3283,17 @@ fn workbook_tables<'doc>(
     }
   }
   Ok(tables)
+}
+
+fn worksheet_part_by_relationship_id(
+  document: &SpreadsheetDocument,
+  workbook_part: &WorkbookPart,
+  relationship_id: Option<&str>,
+) -> Option<WorksheetPart> {
+  match workbook_part.get_part_by_id(document, relationship_id?) {
+    Some(PartRef::WorksheetPart(part)) => Some(part),
+    _ => None,
+  }
 }
 
 fn dependency_graph<'doc>(

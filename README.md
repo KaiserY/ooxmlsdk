@@ -56,7 +56,7 @@ The generated runtime includes Office 2010, 2013, 2016, 2019, 2021, Microsoft 36
 
 The `parts` feature exposes package-level APIs for `.docx`, `.xlsx`, and `.pptx` files. The intended public surface follows upstream Open XML SDK concepts:
 
-- open and create packages with constructors such as `new`, `new_with_settings`, `new_from_file`, and `new_from_file_with_settings`
+- open and create packages with constructors such as `new`, `new_from_bytes`, `new_from_file`, and their settings variants
 - save packages with `save`
 - create custom parts with `add_new_part_with_content_type_and_path` when the caller needs an explicit package path and content type
 - inspect package and part relationships with `parts`, `get_all_parts`, `get_part_by_id`, `get_parts_of_type`, and relationship-specific helpers
@@ -67,6 +67,12 @@ The `parts` feature exposes package-level APIs for `.docx`, `.xlsx`, and `.pptx`
 Raw package storage, raw relationship sets, generated factory internals, and unchecked dynamic part plumbing are not part of the public API. Prefer the package and part methods above when writing code that should survive generator updates.
 
 The package API follows Open XML SDK container concepts. When relationship metadata matters, typed traversal helpers return `RelatedPart<T>` so callers can keep the typed part and its `r:id` together.
+
+File-backed packages retain a safe positioned ZIP reader, while `new_from_bytes`
+can retain an `Arc<[u8]>` without another package-sized copy. Package metadata
+is read when opening, but individual Part payloads are decompressed on first
+access. Unmodified saves reuse the original compressed ZIP data; only changed
+Part payloads and relationship metadata are serialized again.
 
 ## Generated Schema API
 

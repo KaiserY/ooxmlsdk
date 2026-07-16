@@ -1,7 +1,9 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::io::{Read, Seek};
+use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock};
 
 use crate::schemas::opc_content_types::{Types, TypesChoice};
 use crate::schemas::opc_relationships::{
@@ -104,22 +106,323 @@ pub enum NewPartTargetMode {
 
 #[derive(Clone, Debug)]
 pub(crate) enum StoredPartData {
-  Raw { bytes: Vec<u8> },
+  Archived {
+    entry_index: usize,
+    bytes: OnceLock<Arc<[u8]>>,
+  },
+  Owned {
+    bytes: Arc<[u8]>,
+    original_entry_index: Option<usize>,
+  },
 }
 
 impl StoredPartData {
   #[inline]
-  pub(crate) fn bytes(&self) -> &[u8] {
+  fn cached_bytes(&self) -> Option<&[u8]> {
     match self {
-      Self::Raw { bytes, .. } => bytes,
+      Self::Archived { bytes, .. } => bytes.get().map(AsRef::as_ref),
+      Self::Owned { bytes, .. } => Some(bytes.as_ref()),
     }
   }
 
   #[inline]
-  pub(crate) fn bytes_mut(&mut self) -> &mut Vec<u8> {
+  fn original_entry_index(&self) -> Option<usize> {
     match self {
-      Self::Raw { bytes, .. } => bytes,
+      Self::Archived { entry_index, .. } => Some(*entry_index),
+      Self::Owned {
+        original_entry_index,
+        ..
+      } => *original_entry_index,
     }
+  }
+
+  #[inline]
+  fn unchanged_archive_entry_index(&self) -> Option<usize> {
+    match self {
+      Self::Archived { entry_index, .. } => Some(*entry_index),
+      Self::Owned { .. } => None,
+    }
+  }
+
+  #[inline]
+  fn set_owned(&mut self, bytes: Vec<u8>) {
+    let original_entry_index = self.original_entry_index();
+    *self = Self::Owned {
+      bytes: bytes.into(),
+      original_entry_index,
+    };
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PackageSaveEntry {
+  ArchivedExtra(usize),
+  ContentTypes,
+  PackageRelationships,
+  Part(PartId),
+  PartRelationships(PartId),
+}
+
+#[derive(Clone, Debug)]
+enum ArchiveReader {
+  #[cfg(any(unix, windows))]
+  File(PositionedFileReader),
+  Memory(Cursor<Arc<[u8]>>),
+}
+
+impl Read for ArchiveReader {
+  fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+    match self {
+      #[cfg(any(unix, windows))]
+      Self::File(reader) => reader.read(buffer),
+      Self::Memory(reader) => reader.read(buffer),
+    }
+  }
+}
+
+impl Seek for ArchiveReader {
+  fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+    match self {
+      #[cfg(any(unix, windows))]
+      Self::File(reader) => reader.seek(position),
+      Self::Memory(reader) => reader.seek(position),
+    }
+  }
+}
+
+#[cfg(any(unix, windows))]
+#[derive(Clone, Debug)]
+struct PositionedFileReader {
+  file: Arc<std::fs::File>,
+  position: u64,
+  length: u64,
+}
+
+#[cfg(any(unix, windows))]
+impl PositionedFileReader {
+  fn new(file: std::fs::File) -> Result<Self, SdkError> {
+    let length = file.metadata()?.len();
+    Ok(Self {
+      file: Arc::new(file),
+      position: 0,
+      length,
+    })
+  }
+}
+
+#[cfg(any(unix, windows))]
+impl Read for PositionedFileReader {
+  fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+    #[cfg(unix)]
+    let read = {
+      use std::os::unix::fs::FileExt as _;
+      self.file.read_at(buffer, self.position)?
+    };
+    #[cfg(windows)]
+    let read = {
+      use std::os::windows::fs::FileExt as _;
+      self.file.seek_read(buffer, self.position)?
+    };
+    self.position = self
+      .position
+      .checked_add(read as u64)
+      .ok_or_else(|| std::io::Error::other("file reader position overflow"))?;
+    Ok(read)
+  }
+}
+
+#[cfg(any(unix, windows))]
+impl Seek for PositionedFileReader {
+  fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+    let next = match position {
+      SeekFrom::Start(position) => i128::from(position),
+      SeekFrom::Current(offset) => i128::from(self.position) + i128::from(offset),
+      SeekFrom::End(offset) => i128::from(self.length) + i128::from(offset),
+    };
+    self.position = u64::try_from(next)
+      .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid seek"))?;
+    Ok(self.position)
+  }
+}
+
+#[derive(Debug)]
+struct ArchiveBacking {
+  archive: zip::ZipArchive<ArchiveReader>,
+  verbatim_merge_safe: OnceLock<bool>,
+}
+
+impl ArchiveBacking {
+  fn read_entry(&self, entry_index: usize) -> Result<Arc<[u8]>, SdkError> {
+    let mut archive = self.archive.clone();
+    let bytes = read_archive_entry_by_index(&mut archive, entry_index)?;
+    Ok(bytes.into())
+  }
+
+  fn raw_copy_entry<W: std::io::Write + std::io::Seek>(
+    &self,
+    entry_index: usize,
+    target_name: &str,
+    writer: &mut zip::ZipWriter<W>,
+  ) -> Result<(), SdkError> {
+    let mut archive = self.archive.clone();
+    let entry = archive.by_index_raw(entry_index)?;
+    writer.raw_copy_file_rename(entry, target_name)?;
+    Ok(())
+  }
+
+  fn raw_copy_entry_with_original_name<W: std::io::Write + std::io::Seek>(
+    &self,
+    entry_index: usize,
+    writer: &mut zip::ZipWriter<W>,
+  ) -> Result<(), SdkError> {
+    let mut archive = self.archive.clone();
+    let entry = archive.by_index_raw(entry_index)?;
+    writer.raw_copy_file(entry)?;
+    Ok(())
+  }
+
+  fn configure_writer<W: std::io::Write + std::io::Seek>(
+    &self,
+    writer: &mut zip::ZipWriter<W>,
+  ) -> Result<(), SdkError> {
+    writer.set_raw_comment(self.archive.comment().into())?;
+    if let Some(data) = self.archive.raw_zip64_extensible_data_sector() {
+      writer.set_raw_zip64_extensible_data_sector(data.into());
+    }
+    Ok(())
+  }
+
+  fn can_merge_verbatim(&self) -> Result<bool, SdkError> {
+    if let Some(&safe) = self.verbatim_merge_safe.get() {
+      return Ok(safe);
+    }
+
+    let mut archive = self.archive.clone();
+    let mut safe = true;
+    for entry_index in 0..archive.len() {
+      let entry = archive.by_index_raw(entry_index)?;
+      if has_unicode_metadata_extra_field(entry.extra_data()) {
+        safe = false;
+        break;
+      }
+    }
+    let _ = self.verbatim_merge_safe.set(safe);
+    Ok(safe)
+  }
+
+  fn merge_into<W: std::io::Write + std::io::Seek>(
+    &self,
+    writer: &mut zip::ZipWriter<W>,
+  ) -> Result<(), SdkError> {
+    writer.merge_archive(self.archive.clone())?;
+    Ok(())
+  }
+}
+
+fn has_unicode_metadata_extra_field(extra_data: Option<&[u8]>) -> bool {
+  const UNICODE_COMMENT: u16 = 0x6375;
+  const UNICODE_PATH: u16 = 0x7075;
+
+  let Some(extra_data) = extra_data else {
+    return false;
+  };
+  let mut offset = 0usize;
+  while let Some(header) = extra_data.get(offset..offset.saturating_add(4)) {
+    let field_id = u16::from_le_bytes([header[0], header[1]]);
+    let field_len = usize::from(u16::from_le_bytes([header[2], header[3]]));
+    if matches!(field_id, UNICODE_COMMENT | UNICODE_PATH) {
+      return true;
+    }
+    let Some(next_offset) = offset
+      .checked_add(4)
+      .and_then(|offset| offset.checked_add(field_len))
+    else {
+      return false;
+    };
+    if next_offset > extra_data.len() {
+      return false;
+    }
+    offset = next_offset;
+  }
+  false
+}
+
+fn open_package_file(path: &Path) -> Result<std::fs::File, SdkError> {
+  let mut options = std::fs::OpenOptions::new();
+  options.read(true);
+  #[cfg(windows)]
+  {
+    use std::os::windows::fs::OpenOptionsExt as _;
+    const FILE_SHARE_READ: u32 = 0x0000_0001;
+    const FILE_SHARE_WRITE: u32 = 0x0000_0002;
+    const FILE_SHARE_DELETE: u32 = 0x0000_0004;
+    options.share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE);
+  }
+  Ok(options.open(path)?)
+}
+
+pub(crate) fn create_package_temp_file(
+  target_path: &Path,
+) -> Result<(PathBuf, std::fs::File), SdkError> {
+  static NEXT_TEMP_FILE_ID: AtomicU64 = AtomicU64::new(1);
+  let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
+  let file_name = target_path
+    .file_name()
+    .and_then(|name| name.to_str())
+    .unwrap_or("package");
+
+  for _ in 0..1024 {
+    let id = NEXT_TEMP_FILE_ID.fetch_add(1, Ordering::Relaxed);
+    let path = parent.join(format!(
+      ".{file_name}.ooxmlsdk-{}-{id}.tmp",
+      std::process::id()
+    ));
+    match std::fs::OpenOptions::new()
+      .write(true)
+      .create_new(true)
+      .open(&path)
+    {
+      Ok(file) => return Ok((path, file)),
+      Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+      Err(error) => return Err(error.into()),
+    }
+  }
+
+  Err(SdkError::CommonError(format!(
+    "could not create a temporary package file beside {}",
+    target_path.display()
+  )))
+}
+
+pub(crate) fn replace_package_file(
+  temporary_path: &Path,
+  target_path: &Path,
+) -> Result<(), SdkError> {
+  #[cfg(unix)]
+  {
+    std::fs::rename(temporary_path, target_path)?;
+    Ok(())
+  }
+
+  #[cfg(not(unix))]
+  {
+    if !target_path.exists() {
+      std::fs::rename(temporary_path, target_path)?;
+      return Ok(());
+    }
+
+    let backup_path = target_path.with_extension(format!(
+      "ooxmlsdk-backup-{}-{}",
+      std::process::id(),
+      PackageId::new().0
+    ));
+    std::fs::rename(target_path, &backup_path)?;
+    if let Err(error) = std::fs::rename(temporary_path, target_path) {
+      let _ = std::fs::rename(&backup_path, target_path);
+      return Err(error.into());
+    }
+    let _ = std::fs::remove_file(backup_path);
+    Ok(())
   }
 }
 
@@ -418,6 +721,8 @@ pub struct RelationshipSet {
   relationships: Vec<RelationshipInfo>,
   by_id: HashMap<Box<str>, usize>,
   raw_bytes: Option<Box<[u8]>>,
+  archive_entry_index: Option<usize>,
+  dirty: bool,
 }
 
 fn next_relationship_id<'a>(relationships: impl Iterator<Item = &'a RelationshipInfo>) -> String {
@@ -532,6 +837,7 @@ impl RelationshipSet {
   pub(crate) fn remove(&mut self, relationship_id: &str) -> Option<RelationshipInfo> {
     let index = *self.by_id.get(relationship_id)?;
     self.raw_bytes = None;
+    self.dirty = true;
     let removed = self.relationships.remove(index);
     self.rebuild_index();
     Some(removed)
@@ -629,6 +935,7 @@ impl RelationshipSet {
 
     self.relationships[index].id = new_relationship_id.into_boxed_str();
     self.raw_bytes = None;
+    self.dirty = true;
     self.rebuild_index();
     Ok(())
   }
@@ -736,6 +1043,8 @@ impl RelationshipSet {
       relationships: Vec::with_capacity(relationships.relationship.len()),
       by_id: HashMap::with_capacity(relationships.relationship.len()),
       raw_bytes: None,
+      archive_entry_index: None,
+      dirty: false,
     };
 
     for relationship in relationships.relationship {
@@ -751,7 +1060,25 @@ impl RelationshipSet {
       relationships: Vec::new(),
       by_id: HashMap::new(),
       raw_bytes: Some(bytes),
+      archive_entry_index: None,
+      dirty: false,
     }
+  }
+
+  #[inline]
+  fn with_archive_entry(mut self, entry_index: usize) -> Self {
+    self.archive_entry_index = Some(entry_index);
+    self
+  }
+
+  #[inline]
+  pub(crate) fn unchanged_archive_entry_index(&self) -> Option<usize> {
+    (!self.dirty).then_some(self.archive_entry_index).flatten()
+  }
+
+  #[inline]
+  fn original_archive_entry_index(&self) -> Option<usize> {
+    self.archive_entry_index
   }
 
   fn push_relationship(
@@ -764,12 +1091,13 @@ impl RelationshipSet {
         relationship.id()
       )));
     }
+    self.raw_bytes = None;
+    self.dirty = true;
     self.push_relationship_unchecked(relationship);
     Ok(self.relationships.last().expect("pushed relationship"))
   }
 
   fn push_relationship_unchecked(&mut self, relationship: RelationshipInfo) {
-    self.raw_bytes = None;
     let index = self.relationships.len();
     self.by_id.insert(relationship.id.clone(), index);
     self.relationships.push(relationship);
@@ -792,6 +1120,7 @@ pub(crate) struct StoredPart {
   kind: crate::parts::PartKind,
   relationships: RelationshipSet,
   data: StoredPartData,
+  root_dirty: bool,
   deleted: bool,
 }
 
@@ -841,23 +1170,17 @@ impl StoredPart {
   pub(crate) fn relationships_mut(&mut self) -> &mut RelationshipSet {
     &mut self.relationships
   }
-
-  #[inline]
-  pub(crate) fn data(&self) -> &StoredPartData {
-    &self.data
-  }
-
-  #[inline]
-  pub(crate) fn data_mut(&mut self) -> &mut StoredPartData {
-    &mut self.data
-  }
 }
 
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct SdkPackageStorage {
   id: PackageId,
+  archive: Option<Arc<ArchiveBacking>>,
+  archived_extra_entry_indices: Box<[usize]>,
   content_types: Types,
+  content_types_archive_entry_index: Option<usize>,
+  content_types_dirty: bool,
   package_relationships: RelationshipSet,
   parts: Vec<StoredPart>,
   by_path: HashMap<Box<str>, PartId>,
@@ -869,7 +1192,11 @@ impl Clone for SdkPackageStorage {
   fn clone(&self) -> Self {
     Self {
       id: PackageId::new(),
+      archive: self.archive.clone(),
+      archived_extra_entry_indices: self.archived_extra_entry_indices.clone(),
       content_types: self.content_types.clone(),
+      content_types_archive_entry_index: self.content_types_archive_entry_index,
+      content_types_dirty: self.content_types_dirty,
       package_relationships: self.package_relationships.clone(),
       parts: self.parts.clone(),
       by_path: self.by_path.clone(),
@@ -886,7 +1213,11 @@ impl SdkPackageStorage {
   ) -> Self {
     Self {
       id: PackageId::new(),
+      archive: None,
+      archived_extra_entry_indices: Box::new([]),
       content_types: empty_content_types(),
+      content_types_archive_entry_index: None,
+      content_types_dirty: true,
       package_relationships: RelationshipSet::default(),
       parts: Vec::new(),
       by_path: HashMap::new(),
@@ -896,32 +1227,106 @@ impl SdkPackageStorage {
   }
 
   pub(crate) fn open<R: Read + Seek>(
-    reader: R,
+    mut reader: R,
     open_mode: PackageOpenMode,
   ) -> Result<Self, SdkError> {
-    let mut archive = zip::ZipArchive::new(reader)?;
-    let content_types = read_content_types(&mut archive)?;
-    let mut raw_parts = read_raw_parts(&mut archive, &content_types)?;
+    let length = reader.seek(SeekFrom::End(0))?;
+    reader.seek(SeekFrom::Start(0))?;
+    let mut bytes = Vec::new();
+    let capacity = usize::try_from(length)
+      .map_err(|_| SdkError::CommonError("package is too large for this platform".to_string()))?;
+    bytes.try_reserve_exact(capacity).map_err(|error| {
+      SdkError::CommonError(format!(
+        "cannot allocate {capacity} bytes for package input: {error}"
+      ))
+    })?;
+    reader.read_to_end(&mut bytes)?;
+    let bytes: Arc<[u8]> = bytes.into();
+    Self::open_memory(bytes, open_mode)
+  }
+
+  pub(crate) fn open_bytes(bytes: Arc<[u8]>, open_mode: PackageOpenMode) -> Result<Self, SdkError> {
+    Self::open_memory(bytes, open_mode)
+  }
+
+  pub(crate) fn open_file(path: &Path, open_mode: PackageOpenMode) -> Result<Self, SdkError> {
+    #[cfg(any(unix, windows))]
+    {
+      let file = open_package_file(path)?;
+      let reader = PositionedFileReader::new(file)?;
+      let archive = zip::ZipArchive::new(ArchiveReader::File(reader))?;
+      Self::open_archive(archive, open_mode)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+      let bytes: Arc<[u8]> = std::fs::read(path)?.into();
+      Self::open_memory(bytes, open_mode)
+    }
+  }
+
+  fn open_memory(bytes: Arc<[u8]>, open_mode: PackageOpenMode) -> Result<Self, SdkError> {
+    let archive = zip::ZipArchive::new(ArchiveReader::Memory(Cursor::new(bytes)))?;
+    Self::open_archive(archive, open_mode)
+  }
+
+  fn open_archive(
+    mut archive: zip::ZipArchive<ArchiveReader>,
+    open_mode: PackageOpenMode,
+  ) -> Result<Self, SdkError> {
+    let opened = read_archive_model(&mut archive)?;
+    let OpenedArchiveModel {
+      content_types,
+      content_types_archive_entry_index,
+      mut raw_parts,
+      package_relationships,
+      part_relationships,
+    } = opened;
+    let mut claimed_entry_indices = HashSet::with_capacity(
+      raw_parts.len() + part_relationships.len() + usize::from(package_relationships.is_some()) + 1,
+    );
+    claimed_entry_indices.insert(content_types_archive_entry_index);
+    claimed_entry_indices.extend(raw_parts.iter().map(|part| part.entry_index));
+    claimed_entry_indices.extend(
+      part_relationships
+        .iter()
+        .filter_map(|entry| entry.as_ref().map(|entry| entry.entry_index)),
+    );
+    if let Some(entry) = &package_relationships {
+      claimed_entry_indices.insert(entry.entry_index);
+    }
+    let archived_extra_entry_indices = (0..archive.len())
+      .filter(|entry_index| !claimed_entry_indices.contains(entry_index))
+      .collect::<Box<[_]>>();
     let mut by_path = HashMap::with_capacity(raw_parts.len());
 
     for (index, raw_part) in raw_parts.iter().enumerate() {
       by_path.insert(raw_part.path.clone(), PartId::from_index(index));
     }
 
-    let package_relationships = read_relationships(&mut archive, "_rels/.rels")?;
-    let package_relationships =
-      RelationshipSet::from_relationships(package_relationships, "", &by_path);
+    let package_relationships = package_relationships
+      .map(|loaded| {
+        RelationshipSet::from_relationships(loaded.relationships, "", &by_path)
+          .with_archive_entry(loaded.entry_index)
+      })
+      .unwrap_or_default();
 
-    let mut part_relationships = Vec::with_capacity(raw_parts.len());
-    for raw_part in &raw_parts {
-      let rels_path = part_relationships_path(&raw_part.path);
-      part_relationships.push(read_part_relationships(
-        &mut archive,
-        &rels_path,
-        &raw_part.path,
-        &by_path,
-      )?);
-    }
+    let part_relationships = part_relationships
+      .into_iter()
+      .zip(&raw_parts)
+      .map(|(loaded, raw_part)| {
+        loaded
+          .map(|loaded| {
+            match loaded.relationships {
+              Some(relationships) => {
+                RelationshipSet::from_relationships(Some(relationships), &raw_part.path, &by_path)
+              }
+              None => RelationshipSet::from_raw_bytes(loaded.bytes.into_boxed_slice()),
+            }
+            .with_archive_entry(loaded.entry_index)
+          })
+          .unwrap_or_default()
+      })
+      .collect::<Vec<_>>();
 
     let relationship_types =
       relationship_types_by_part(&package_relationships, &part_relationships)?;
@@ -944,16 +1349,27 @@ impl SdkPackageStorage {
         relationship_type,
         kind,
         relationships,
-        data: StoredPartData::Raw {
-          bytes: raw_part.bytes,
+        data: StoredPartData::Archived {
+          entry_index: raw_part.entry_index,
+          bytes: OnceLock::new(),
         },
+        root_dirty: false,
         deleted: false,
       });
     }
 
+    let archive = Arc::new(ArchiveBacking {
+      archive,
+      verbatim_merge_safe: OnceLock::new(),
+    });
+
     Ok(Self {
       id: PackageId::new(),
+      archive: Some(archive),
+      archived_extra_entry_indices,
       content_types,
+      content_types_archive_entry_index: Some(content_types_archive_entry_index),
+      content_types_dirty: false,
       package_relationships,
       parts,
       by_path,
@@ -979,6 +1395,7 @@ impl SdkPackageStorage {
         raw_parts.push(RawPart {
           path: flat_part.path.into_boxed_str(),
           content_type: flat_part.content_type.into_boxed_str(),
+          entry_index: usize::MAX,
           bytes: flat_part.bytes,
         });
       }
@@ -1027,16 +1444,22 @@ impl SdkPackageStorage {
         relationship_type,
         kind,
         relationships,
-        data: StoredPartData::Raw {
-          bytes: raw_part.bytes,
+        data: StoredPartData::Owned {
+          bytes: raw_part.bytes.into(),
+          original_entry_index: None,
         },
+        root_dirty: false,
         deleted: false,
       });
     }
 
     Ok(Self {
       id: PackageId::new(),
+      archive: None,
+      archived_extra_entry_indices: Box::new([]),
       content_types,
+      content_types_archive_entry_index: None,
+      content_types_dirty: true,
       package_relationships,
       parts,
       by_path,
@@ -1111,6 +1534,193 @@ impl SdkPackageStorage {
   #[inline]
   pub(crate) fn content_types(&self) -> &Types {
     &self.content_types
+  }
+
+  #[inline]
+  pub(crate) fn unchanged_content_types_archive_entry_index(&self) -> Option<usize> {
+    (!self.content_types_dirty)
+      .then_some(self.content_types_archive_entry_index)
+      .flatten()
+  }
+
+  pub(crate) fn package_save_entries(&self) -> Vec<PackageSaveEntry> {
+    let mut entries = Vec::with_capacity(
+      self.parts.len().saturating_mul(2) + self.archived_extra_entry_indices.len() + 2,
+    );
+    let mut sequence = 0usize;
+    let mut push = |original_entry_index: Option<usize>, entry: PackageSaveEntry| {
+      entries.push((original_entry_index.unwrap_or(usize::MAX), sequence, entry));
+      sequence += 1;
+    };
+
+    push(
+      self.content_types_archive_entry_index,
+      PackageSaveEntry::ContentTypes,
+    );
+    if !self.package_relationships.is_empty() {
+      push(
+        self.package_relationships.original_archive_entry_index(),
+        PackageSaveEntry::PackageRelationships,
+      );
+    }
+    for (index, part) in self.parts.iter().enumerate() {
+      if part.is_deleted() {
+        continue;
+      }
+      let part_id = PartId::from_index(index);
+      if !part.relationships().is_empty() {
+        push(
+          part.relationships().original_archive_entry_index(),
+          PackageSaveEntry::PartRelationships(part_id),
+        );
+      }
+      push(
+        part.data.original_entry_index(),
+        PackageSaveEntry::Part(part_id),
+      );
+    }
+    for &entry_index in &self.archived_extra_entry_indices {
+      push(
+        Some(entry_index),
+        PackageSaveEntry::ArchivedExtra(entry_index),
+      );
+    }
+
+    entries.sort_unstable_by_key(|(entry_index, sequence, _)| (*entry_index, *sequence));
+    entries.into_iter().map(|(_, _, entry)| entry).collect()
+  }
+
+  pub(crate) fn configure_zip_writer<W: std::io::Write + std::io::Seek>(
+    &self,
+    writer: &mut zip::ZipWriter<W>,
+  ) -> Result<(), SdkError> {
+    if let Some(archive) = &self.archive {
+      archive.configure_writer(writer)?;
+    }
+    Ok(())
+  }
+
+  pub(crate) fn merge_original_archive_if_unchanged<W: std::io::Write + std::io::Seek>(
+    &self,
+    writer: &mut zip::ZipWriter<W>,
+  ) -> Result<bool, SdkError> {
+    let Some(archive) = &self.archive else {
+      return Ok(false);
+    };
+    if self.content_types_dirty
+      || self.package_relationships.dirty
+      || self.parts.iter().any(|part| {
+        part.deleted
+          || part.root_dirty
+          || part.relationships.dirty
+          || !matches!(part.data, StoredPartData::Archived { .. })
+      })
+    {
+      return Ok(false);
+    }
+    if !archive.can_merge_verbatim()? {
+      return Ok(false);
+    }
+
+    archive.merge_into(writer)?;
+    Ok(true)
+  }
+
+  pub(crate) fn part_bytes(&self, part_id: PartId) -> Result<&[u8], SdkError> {
+    let part = self.part(part_id).ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "part id {part_id:?} is not present in package storage"
+      ))
+    })?;
+    if let Some(bytes) = part.data.cached_bytes() {
+      return Ok(bytes);
+    }
+
+    let StoredPartData::Archived { entry_index, bytes } = &part.data else {
+      unreachable!("owned part data always has cached bytes")
+    };
+    let archive = self.archive.as_ref().ok_or_else(|| {
+      SdkError::CommonError("archived part has no package archive backing".to_string())
+    })?;
+    let loaded = archive.read_entry(*entry_index)?;
+    let _ = bytes.set(loaded);
+    Ok(
+      bytes
+        .get()
+        .expect("part bytes were initialized or another thread initialized them"),
+    )
+  }
+
+  #[inline]
+  pub(crate) fn discard_cached_part_bytes(&mut self, part_id: PartId) {
+    if let Some(StoredPart {
+      data: StoredPartData::Archived { bytes, .. },
+      ..
+    }) = self.part_mut(part_id)
+    {
+      let _ = bytes.take();
+    }
+  }
+
+  #[inline]
+  pub(crate) fn mark_part_root_dirty(&mut self, part_id: PartId) -> Result<(), SdkError> {
+    let part = self.part_mut(part_id).ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "part id {part_id:?} is not present in package storage"
+      ))
+    })?;
+    part.root_dirty = true;
+    Ok(())
+  }
+
+  #[inline]
+  pub(crate) fn clear_part_root_dirty(&mut self, part_id: PartId) {
+    if let Some(part) = self.part_mut(part_id) {
+      part.root_dirty = false;
+    }
+  }
+
+  #[inline]
+  pub(crate) fn part_root_dirty(&self, part_id: PartId) -> bool {
+    self.part(part_id).is_some_and(|part| part.root_dirty)
+  }
+
+  pub(crate) fn raw_copy_archive_entry<W: std::io::Write + std::io::Seek>(
+    &self,
+    entry_index: usize,
+    target_name: &str,
+    writer: &mut zip::ZipWriter<W>,
+  ) -> Result<bool, SdkError> {
+    let Some(archive) = &self.archive else {
+      return Ok(false);
+    };
+    archive.raw_copy_entry(entry_index, target_name, writer)?;
+    Ok(true)
+  }
+
+  pub(crate) fn raw_copy_archived_extra<W: std::io::Write + std::io::Seek>(
+    &self,
+    entry_index: usize,
+    writer: &mut zip::ZipWriter<W>,
+  ) -> Result<(), SdkError> {
+    let archive = self.archive.as_ref().ok_or_else(|| {
+      SdkError::CommonError("archived ZIP entry has no package archive backing".to_string())
+    })?;
+    archive.raw_copy_entry_with_original_name(entry_index, writer)
+  }
+
+  pub(crate) fn raw_copy_part<W: std::io::Write + std::io::Seek>(
+    &self,
+    part_id: PartId,
+    writer: &mut zip::ZipWriter<W>,
+  ) -> Result<bool, SdkError> {
+    let Some(part) = self.part(part_id) else {
+      return Ok(false);
+    };
+    let Some(entry_index) = part.data.unchanged_archive_entry_index() else {
+      return Ok(false);
+    };
+    self.raw_copy_archive_entry(entry_index, part.path(), writer)
   }
 
   #[inline]
@@ -1760,7 +2370,11 @@ impl SdkPackageStorage {
       relationship_type: relationship_type.map(super::XmlRelationshipNamespaceUri::from_uri),
       kind,
       relationships: RelationshipSet::default(),
-      data: StoredPartData::Raw { bytes: Vec::new() },
+      data: StoredPartData::Owned {
+        bytes: Arc::<[u8]>::from([]),
+        original_entry_index: None,
+      },
+      root_dirty: false,
       deleted: false,
     });
     self.by_path.insert(path.clone().into_boxed_str(), part_id);
@@ -1778,7 +2392,7 @@ impl SdkPackageStorage {
         "part id {part_id:?} is not present in package storage"
       ))
     })?;
-    *part.data.bytes_mut() = data.into();
+    part.data.set_owned(data.into());
     Ok(())
   }
 
@@ -1792,13 +2406,14 @@ impl SdkPackageStorage {
         "part id {part_id:?} is not present in package storage"
       ))
     })?;
-    let bytes = part.data.bytes_mut();
-    bytes.clear();
-    reader.read_to_end(bytes)?;
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes)?;
+    part.data.set_owned(bytes);
     Ok(())
   }
 
   fn add_content_type_override(&mut self, path: &str, content_type: &str) {
+    self.content_types_dirty = true;
     let part_name = format!("/{path}");
     if let Some(existing) = self
       .content_types
@@ -1824,6 +2439,7 @@ impl SdkPackageStorage {
   }
 
   fn remove_content_type_override(&mut self, path: &str) {
+    self.content_types_dirty = true;
     let part_name = format!("/{path}");
     self
       .content_types
@@ -2068,7 +2684,23 @@ impl SdkPackageStorage {
 struct RawPart {
   path: Box<str>,
   content_type: Box<str>,
+  entry_index: usize,
+  #[cfg(feature = "flat-opc")]
   bytes: Vec<u8>,
+}
+
+struct LoadedRelationshipEntry {
+  entry_index: usize,
+  bytes: Vec<u8>,
+  relationships: Option<Relationships>,
+}
+
+struct OpenedArchiveModel {
+  content_types: Types,
+  content_types_archive_entry_index: usize,
+  raw_parts: Vec<RawPart>,
+  package_relationships: Option<LoadedRelationshipEntry>,
+  part_relationships: Vec<Option<LoadedRelationshipEntry>>,
 }
 
 struct ContentTypeResolver<'a> {
@@ -2609,11 +3241,91 @@ fn media_data_part_content_type(content_type: &str) -> bool {
   content_type.starts_with("audio/") || content_type.starts_with("video/")
 }
 
-fn read_content_types<R: Read + Seek>(archive: &mut zip::ZipArchive<R>) -> Result<Types, SdkError> {
-  let mut entry = archive.by_name("[Content_Types].xml")?;
-  let mut bytes = Vec::with_capacity(entry.size() as usize);
-  entry.read_to_end(&mut bytes)?;
-  <Types as crate::sdk::SdkType>::from_bytes(&bytes)
+fn read_archive_model<R: Read + Seek>(
+  archive: &mut zip::ZipArchive<R>,
+) -> Result<OpenedArchiveModel, SdkError> {
+  let (content_types, content_types_archive_entry_index) = read_content_types(archive)?;
+  let raw_parts = read_raw_parts(archive, &content_types)?;
+  let (package_relationships, part_relationships) =
+    read_required_relationship_entries(archive, &raw_parts)?;
+
+  Ok(OpenedArchiveModel {
+    content_types,
+    content_types_archive_entry_index,
+    raw_parts,
+    package_relationships,
+    part_relationships,
+  })
+}
+
+#[derive(Clone, Copy)]
+enum RelationshipEntryTarget {
+  Package,
+  Part(usize),
+}
+
+fn read_required_relationship_entries<R: Read + Seek>(
+  archive: &mut zip::ZipArchive<R>,
+  raw_parts: &[RawPart],
+) -> Result<
+  (
+    Option<LoadedRelationshipEntry>,
+    Vec<Option<LoadedRelationshipEntry>>,
+  ),
+  SdkError,
+> {
+  let mut required = Vec::with_capacity(raw_parts.len() + 1);
+  if let Some(entry_index) = archive.index_for_name("_rels/.rels") {
+    required.push((entry_index, RelationshipEntryTarget::Package));
+  }
+  for (part_index, raw_part) in raw_parts.iter().enumerate() {
+    let path = part_relationships_path(&raw_part.path);
+    let entry_index = archive.index_for_name(&path).or_else(|| {
+      lowercase_zip_filename(&path).and_then(|fallback| archive.index_for_name(&fallback))
+    });
+    if let Some(entry_index) = entry_index {
+      required.push((entry_index, RelationshipEntryTarget::Part(part_index)));
+    }
+  }
+  required.sort_unstable_by_key(|(entry_index, _)| *entry_index);
+
+  let mut package_relationships = None;
+  let mut part_relationships = std::iter::repeat_with(|| None)
+    .take(raw_parts.len())
+    .collect::<Vec<_>>();
+  for (entry_index, target) in required {
+    let bytes = read_archive_entry_by_index(archive, entry_index)?;
+    let relationships = <Relationships as crate::sdk::SdkType>::from_bytes(&bytes);
+    let loaded = LoadedRelationshipEntry {
+      entry_index,
+      bytes,
+      relationships: match target {
+        RelationshipEntryTarget::Package => Some(relationships?),
+        RelationshipEntryTarget::Part(_) => relationships.ok(),
+      },
+    };
+    match target {
+      RelationshipEntryTarget::Package => package_relationships = Some(loaded),
+      RelationshipEntryTarget::Part(part_index) => {
+        part_relationships[part_index] = Some(loaded);
+      }
+    }
+  }
+
+  Ok((package_relationships, part_relationships))
+}
+
+fn read_content_types<R: Read + Seek>(
+  archive: &mut zip::ZipArchive<R>,
+) -> Result<(Types, usize), SdkError> {
+  let entry_index = archive
+    .index_for_name("[Content_Types].xml")
+    .ok_or(zip::result::ZipError::FileNotFound)?;
+  let bytes = read_archive_entry_by_index(archive, entry_index)?;
+  Ok((
+    <Types as crate::sdk::SdkType>::from_bytes(&bytes)?,
+    entry_index,
+  ))
 }
 
 fn read_raw_parts<R: Read + Seek>(
@@ -2623,13 +3335,12 @@ fn read_raw_parts<R: Read + Seek>(
   let mut parts = Vec::new();
   let content_type_resolver = ContentTypeResolver::new(content_types);
 
-  for index in 0..archive.len() {
-    let mut entry = archive.by_index(index)?;
-    if entry.is_dir() {
+  for (index, entry_name) in archive.file_names().enumerate() {
+    if entry_name.ends_with('/') {
       continue;
     }
 
-    let path = resolve_zip_file_path(entry.name());
+    let path = resolve_zip_file_path(entry_name);
     if path == "[Content_Types].xml" || is_relationships_part_path(&path) {
       continue;
     }
@@ -2637,12 +3348,12 @@ fn read_raw_parts<R: Read + Seek>(
     let content_type = content_type_resolver
       .content_type_for_part(&path)
       .unwrap_or_default();
-    let mut bytes = Vec::with_capacity(entry.size() as usize);
-    entry.read_to_end(&mut bytes)?;
     parts.push(RawPart {
       path: path.into_boxed_str(),
       content_type: content_type.into(),
-      bytes,
+      entry_index: index,
+      #[cfg(feature = "flat-opc")]
+      bytes: Vec::new(),
     });
   }
 
@@ -2650,61 +3361,26 @@ fn read_raw_parts<R: Read + Seek>(
   Ok(parts)
 }
 
-fn read_relationships<R: Read + Seek>(
+fn read_archive_entry_by_index<R: Read + Seek>(
   archive: &mut zip::ZipArchive<R>,
-  path: &str,
-) -> Result<Option<Relationships>, SdkError> {
-  let Some(bytes) = read_relationship_bytes(archive, path)? else {
-    return Ok(None);
-  };
-  <Relationships as crate::sdk::SdkType>::from_bytes(&bytes).map(Some)
-}
-
-fn read_part_relationships<R: Read + Seek>(
-  archive: &mut zip::ZipArchive<R>,
-  path: &str,
-  source_path: &str,
-  by_path: &HashMap<Box<str>, PartId>,
-) -> Result<RelationshipSet, SdkError> {
-  let Some(bytes) = read_relationship_bytes_with_lowercase_filename_fallback(archive, path)? else {
-    return Ok(RelationshipSet::default());
-  };
-  Ok(
-    match <Relationships as crate::sdk::SdkType>::from_bytes(&bytes) {
-      Ok(relationships) => {
-        RelationshipSet::from_relationships(Some(relationships), source_path, by_path)
-      }
-      Err(_) => RelationshipSet::from_raw_bytes(bytes.into_boxed_slice()),
-    },
-  )
-}
-
-fn read_relationship_bytes<R: Read + Seek>(
-  archive: &mut zip::ZipArchive<R>,
-  path: &str,
-) -> Result<Option<Vec<u8>>, SdkError> {
-  let Some(index) = archive.index_for_name(path) else {
-    return Ok(None);
-  };
-
-  let mut entry = archive.by_index(index)?;
-  let mut bytes = Vec::with_capacity(entry.size() as usize);
+  entry_index: usize,
+) -> Result<Vec<u8>, SdkError> {
+  let mut entry = archive.by_index(entry_index)?;
+  let capacity = usize::try_from(entry.size()).map_err(|_| {
+    SdkError::CommonError(format!(
+      "ZIP entry {} is too large for this platform",
+      entry.name()
+    ))
+  })?;
+  let mut bytes = Vec::new();
+  bytes.try_reserve_exact(capacity).map_err(|error| {
+    SdkError::CommonError(format!(
+      "cannot allocate {capacity} bytes for ZIP entry {}: {error}",
+      entry.name()
+    ))
+  })?;
   entry.read_to_end(&mut bytes)?;
-  Ok(Some(bytes))
-}
-
-fn read_relationship_bytes_with_lowercase_filename_fallback<R: Read + Seek>(
-  archive: &mut zip::ZipArchive<R>,
-  path: &str,
-) -> Result<Option<Vec<u8>>, SdkError> {
-  if let Some(bytes) = read_relationship_bytes(archive, path)? {
-    return Ok(Some(bytes));
-  }
-
-  let Some(fallback_path) = lowercase_zip_filename(path) else {
-    return Ok(None);
-  };
-  read_relationship_bytes(archive, &fallback_path)
+  Ok(bytes)
 }
 
 fn lowercase_zip_filename(path: &str) -> Option<String> {
@@ -2765,6 +3441,20 @@ mod tests {
   use std::io::{Cursor, Write};
 
   #[test]
+  fn unicode_metadata_extra_fields_disable_verbatim_archive_merge() {
+    let unicode_path_after_timestamp = [0x55, 0x54, 0x01, 0x00, 0x00, 0x75, 0x70, 0x00, 0x00];
+    let unicode_comment = [0x75, 0x63, 0x00, 0x00];
+    let ordinary_timestamp = [0x55, 0x54, 0x01, 0x00, 0x00];
+
+    assert!(has_unicode_metadata_extra_field(Some(
+      &unicode_path_after_timestamp
+    )));
+    assert!(has_unicode_metadata_extra_field(Some(&unicode_comment)));
+    assert!(!has_unicode_metadata_extra_field(Some(&ordinary_timestamp)));
+    assert!(!has_unicode_metadata_extra_field(None));
+  }
+
+  #[test]
   fn storage_resolves_package_relationship_target_part_id() {
     let mut buffer = Cursor::new(Vec::new());
     {
@@ -2812,6 +3502,28 @@ mod tests {
       relationship.target_kind(),
       RelationshipTargetKind::InternalPart
     );
+    assert!(matches!(
+      &storage.parts[part_id.index()].data,
+      StoredPartData::Archived { bytes, .. } if bytes.get().is_none()
+    ));
+    assert_eq!(
+      storage.package_save_entries(),
+      vec![
+        PackageSaveEntry::ContentTypes,
+        PackageSaveEntry::ArchivedExtra(1),
+        PackageSaveEntry::PackageRelationships,
+        PackageSaveEntry::ArchivedExtra(3),
+        PackageSaveEntry::Part(part_id),
+      ]
+    );
+    assert_eq!(
+      storage.part_bytes(part_id).unwrap(),
+      br#"<w:document xmlns:w="w"/>"#
+    );
+    assert!(matches!(
+      &storage.parts[part_id.index()].data,
+      StoredPartData::Archived { bytes, .. } if bytes.get().is_some()
+    ));
   }
 
   #[test]

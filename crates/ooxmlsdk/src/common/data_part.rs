@@ -76,14 +76,21 @@ impl MediaDataPart {
 
   #[inline]
   pub fn data<'a, P: crate::sdk::SdkPackage>(&'a self, package: &'a P) -> Option<&'a [u8]> {
-    let part_id = self.id?;
+    self.try_data(package).ok().flatten()
+  }
+
+  #[inline]
+  pub fn try_data<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> Result<Option<&'a [u8]>, SdkError> {
+    let Some(part_id) = self.id else {
+      return Ok(None);
+    };
     if self.package_id != Some(package.storage().id()) {
-      return None;
+      return Ok(None);
     }
-    package
-      .storage()
-      .part(part_id)
-      .map(|part| part.data().bytes())
+    package.storage().part_bytes(part_id).map(Some)
   }
 
   #[inline]
@@ -117,13 +124,7 @@ impl MediaDataPart {
     data: Vec<u8>,
   ) -> Result<(), SdkError> {
     let part_id = self.part_id_for_package(package)?;
-    let part = package.storage_mut().part_mut(part_id).ok_or_else(|| {
-      SdkError::CommonError(format!(
-        "part id {part_id:?} is not present in package storage"
-      ))
-    })?;
-    *part.data_mut().bytes_mut() = data;
-    Ok(())
+    package.storage_mut().set_part_data(part_id, data)
   }
 
   pub(crate) fn new_from_archive<R: Read + Seek>(

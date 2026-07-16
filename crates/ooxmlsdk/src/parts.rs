@@ -1364,7 +1364,7 @@ impl<'a> IdPartPair<'a> {
   }
 }
 pub(crate) fn initialize_root_elements(
-  storage: &crate::common::SdkPackageStorage,
+  storage: &mut crate::common::SdkPackageStorage,
   open_settings: &crate::sdk::OpenSettings,
 ) -> Result<Vec<Option<crate::parts::PartRootElement>>, crate::common::SdkError> {
   let mut root_elements = vec![None; storage.parts().len()];
@@ -1374,9 +1374,10 @@ pub(crate) fn initialize_root_elements(
   ) {
     for (index, slot) in root_elements.iter_mut().enumerate() {
       let part_id = crate::common::PartId::from_index(index);
-      if let Some(root_element) =
-        crate::parts::PartRootElement::from_part_id(storage, part_id, open_settings)?
-      {
+      let root_element =
+        crate::parts::PartRootElement::from_part_id(storage, part_id, open_settings)?;
+      if let Some(root_element) = root_element {
+        storage.discard_cached_part_bytes(part_id);
         *slot = Some(root_element);
       }
     }
@@ -1403,6 +1404,9 @@ where
       part_id,
       crate::sdk::SdkPackage::open_settings(package),
     )?;
+    if root_element.is_some() {
+      crate::sdk::SdkPackage::storage_mut(package).discard_cached_part_bytes(part_id);
+    }
     if let Some(root_element) = root_element
       && let Some(slot) = crate::sdk::SdkPackage::root_element_slot_mut(package, part_id)
     {
@@ -1462,46 +1466,105 @@ where
   let options = zip::write::SimpleFileOptions::default()
     .compression_method(zip::CompressionMethod::Deflated)
     .unix_permissions(0o755);
-  let mut entry_set = std::collections::HashSet::<String>::new();
   let storage = crate::sdk::SdkPackage::storage(package);
-  zip.start_file("[Content_Types].xml", options)?;
-  crate::sdk::SdkType::write_to(storage.content_types(), &mut zip)?;
-  let package_relationships = storage.package_relationships();
-  if !package_relationships.is_empty() {
-    if entry_set.insert("_rels".to_string()) {
-      zip.add_directory("_rels", options)?;
-    }
-    zip.start_file("_rels/.rels", options)?;
-    package_relationships.write_xml(&mut zip)?;
+  storage.configure_zip_writer(&mut zip)?;
+  let must_serialize_root = storage.parts().iter().enumerate().any(|(index, part)| {
+    !part.is_deleted()
+      && crate::sdk::SdkPackage::should_serialize_root_element(
+        package,
+        crate::common::PartId::from_index(index),
+      )
+  });
+  if !must_serialize_root && storage.merge_original_archive_if_unchanged(&mut zip)? {
+    zip.finish()?;
+    return Ok(());
   }
-  for (index, part) in storage.parts().iter().enumerate() {
-    if part.is_deleted() {
-      continue;
-    }
-    let part_id = crate::common::PartId::from_index(index);
-    let parent_path = crate::common::parent_zip_path(part.path());
-    let directory_path = parent_path.strip_suffix('/').unwrap_or(&parent_path);
-    if !directory_path.is_empty() && entry_set.insert(directory_path.to_string()) {
-      zip.add_directory(directory_path, options)?;
-    }
-    if let Some(relationships) = storage.relationships(part_id)
-      && !relationships.is_empty()
-    {
-      let rels_dir_path = crate::common::part_relationships_directory_path(part.path());
-      if !rels_dir_path.is_empty() && entry_set.insert(rels_dir_path.clone()) {
-        zip.add_directory(&rels_dir_path, options)?;
+  for entry in storage.package_save_entries() {
+    match entry {
+      crate::common::PackageSaveEntry::ArchivedExtra(entry_index) => {
+        storage.raw_copy_archived_extra(entry_index, &mut zip)?;
       }
-      let rels_path = crate::common::part_relationships_path(part.path());
-      zip.start_file(&rels_path, options)?;
-      relationships.write_xml(&mut zip)?;
-    }
-    zip.start_file(part.path(), options)?;
-    if let Some(root_element) = crate::sdk::SdkPackage::root_element(package, part_id) {
-      root_element.write_to(&mut zip)?;
-    } else {
-      zip.write_all(part.data().bytes())?;
+      crate::common::PackageSaveEntry::ContentTypes => {
+        if let Some(entry_index) = storage.unchanged_content_types_archive_entry_index() {
+          storage.raw_copy_archive_entry(entry_index, "[Content_Types].xml", &mut zip)?;
+        } else {
+          zip.start_file("[Content_Types].xml", options)?;
+          crate::sdk::SdkType::write_to(storage.content_types(), &mut zip)?;
+        }
+      }
+      crate::common::PackageSaveEntry::PackageRelationships => {
+        let relationships = storage.package_relationships();
+        if let Some(entry_index) = relationships.unchanged_archive_entry_index() {
+          storage.raw_copy_archive_entry(entry_index, "_rels/.rels", &mut zip)?;
+        } else {
+          zip.start_file("_rels/.rels", options)?;
+          relationships.write_xml(&mut zip)?;
+        }
+      }
+      crate::common::PackageSaveEntry::PartRelationships(part_id) => {
+        let part = storage.part(part_id).ok_or_else(|| {
+          crate::common::SdkError::CommonError(format!(
+            "part id {part_id:?} is not present in package storage"
+          ))
+        })?;
+        let relationships = storage.relationships(part_id).ok_or_else(|| {
+          crate::common::SdkError::CommonError(format!(
+            "part id {part_id:?} has no relationship set"
+          ))
+        })?;
+        let rels_path = crate::common::part_relationships_path(part.path());
+        if let Some(entry_index) = relationships.unchanged_archive_entry_index() {
+          storage.raw_copy_archive_entry(entry_index, &rels_path, &mut zip)?;
+        } else {
+          zip.start_file(&rels_path, options)?;
+          relationships.write_xml(&mut zip)?;
+        }
+      }
+      crate::common::PackageSaveEntry::Part(part_id) => {
+        let part = storage.part(part_id).ok_or_else(|| {
+          crate::common::SdkError::CommonError(format!(
+            "part id {part_id:?} is not present in package storage"
+          ))
+        })?;
+        if crate::sdk::SdkPackage::should_serialize_root_element(package, part_id)
+          && let Some(root_element) = crate::sdk::SdkPackage::root_element(package, part_id)
+        {
+          zip.start_file(part.path(), options)?;
+          root_element.write_to(&mut zip)?;
+        } else if !storage.raw_copy_part(part_id, &mut zip)? {
+          zip.start_file(part.path(), options)?;
+          zip.write_all(storage.part_bytes(part_id)?)?;
+        }
+      }
     }
   }
   zip.finish()?;
+  Ok(())
+}
+pub fn save_package_to_file<P>(
+  package: &P,
+  path: &std::path::Path,
+) -> Result<(), crate::common::SdkError>
+where
+  P: crate::sdk::SdkPackage,
+{
+  use std::io::Write as _;
+  let (temporary_path, mut file) = crate::common::create_package_temp_file(path)?;
+  let write_result = (|| {
+    let mut writer = std::io::BufWriter::new(&mut file);
+    save_package(package, &mut writer)?;
+    writer.flush()?;
+    drop(writer);
+    Ok::<(), crate::common::SdkError>(())
+  })();
+  if let Err(error) = write_result {
+    let _ = std::fs::remove_file(&temporary_path);
+    return Err(error);
+  }
+  drop(file);
+  if let Err(error) = crate::common::replace_package_file(&temporary_path, path) {
+    let _ = std::fs::remove_file(&temporary_path);
+    return Err(error);
+  }
   Ok(())
 }

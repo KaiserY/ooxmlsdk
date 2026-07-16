@@ -325,7 +325,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         ) {
           return Ok(None);
         }
-        let bytes = part.data().bytes();
+        let bytes = storage.part_bytes(part_id)?;
         #chart_raw_fallback
         let root = if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
           <#root_ty as crate::sdk::SdkType>::from_bytes(&bytes)?

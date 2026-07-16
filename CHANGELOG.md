@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added
+
+- Added `new_from_bytes` and `new_from_bytes_with_settings` package constructors backed by `Arc<[u8]>`, plus fallible zero-copy `try_data` access for lazy Part payloads.
+
+### Fixed
+
+- Made `save_as_file` safe when the destination is also the package's source file by writing a sibling temporary file before replacement.
+
+### Performance
+
+- Reworked package ZIP storage around cloneable file/byte readers and lazy `OnceLock<Arc<[u8]>>` Part payloads, without a runtime mutex or unsafe code.
+- Preserved unmodified packages with one sequential ZIP archive merge and used source-order raw compressed entry copies for partially modified packages, while reserializing only dirty roots, relationships, and content types.
+- Avoided scanning local ZIP headers during Part discovery, read required relationship entries in archive order, and released decompressed XML bytes after typed roots are successfully parsed.
+
 ## 0.11.0
 
 ### Breaking Changes

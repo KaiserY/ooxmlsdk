@@ -1096,7 +1096,30 @@ pub trait SdkPackage: Clone + Sized + 'static {
     &mut self,
     part_id: crate::common::PartId,
   ) -> Option<crate::parts::PartRootElement> {
-    self.root_element_slot_mut(part_id)?.take()
+    let root = self.root_element_slot_mut(part_id)?.take();
+    if root.is_some() {
+      Self::storage_mut(self).clear_part_root_dirty(part_id);
+    }
+    root
+  }
+
+  #[inline]
+  #[doc(hidden)]
+  fn should_serialize_root_element(&self, part_id: crate::common::PartId) -> bool {
+    if Self::storage(self).part_root_dirty(part_id) {
+      return true;
+    }
+    #[cfg(feature = "mce")]
+    if !matches!(
+      self
+        .open_settings()
+        .markup_compatibility_process_settings
+        .process_mode,
+      MarkupCompatibilityProcessMode::NoProcess
+    ) {
+      return self.root_element(part_id).is_some();
+    }
+    false
   }
 
   #[inline]
@@ -1105,15 +1128,12 @@ pub trait SdkPackage: Clone + Sized + 'static {
     &self,
     part_id: crate::common::PartId,
   ) -> Result<Vec<u8>, crate::common::SdkError> {
-    if let Some(root_element) = self.root_element(part_id) {
+    if self.should_serialize_root_element(part_id)
+      && let Some(root_element) = self.root_element(part_id)
+    {
       root_element.to_bytes()
     } else {
-      let part = Self::storage(self).part(part_id).ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {part_id:?} is not present in package storage"
-        ))
-      })?;
-      Ok(part.data().bytes().to_vec())
+      Ok(Self::storage(self).part_bytes(part_id)?.to_vec())
     }
   }
 
@@ -1131,11 +1151,17 @@ pub trait SdkPackage: Clone + Sized + 'static {
     &self,
     writer: &mut W,
   ) -> Result<(), crate::common::SdkError> {
-    crate::sdk::SdkPackage::storage(self).write_flat_opc(writer, |part_id, part| {
-      if let Some(root_element) = crate::sdk::SdkPackage::root_element(self, part_id) {
+    crate::sdk::SdkPackage::storage(self).write_flat_opc(writer, |part_id, _part| {
+      if crate::sdk::SdkPackage::should_serialize_root_element(self, part_id)
+        && let Some(root_element) = crate::sdk::SdkPackage::root_element(self, part_id)
+      {
         root_element.to_bytes()
       } else {
-        Ok(part.data().bytes().to_vec())
+        Ok(
+          crate::sdk::SdkPackage::storage(self)
+            .part_bytes(part_id)?
+            .to_vec(),
+        )
       }
     })
   }
@@ -3441,9 +3467,19 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
 
   #[inline]
   fn data<'a, P: SdkPackage>(&self, package: &'a P) -> Option<&'a [u8]> {
-    crate::sdk::SdkPackage::storage(package)
-      .part(self.part_id())
-      .map(|part| part.data().bytes())
+    self.try_data(package).ok().flatten()
+  }
+
+  #[inline]
+  fn try_data<'a, P: SdkPackage>(
+    &self,
+    package: &'a P,
+  ) -> Result<Option<&'a [u8]>, crate::common::SdkError> {
+    let storage = crate::sdk::SdkPackage::storage(package);
+    if storage.part(self.part_id()).is_none() {
+      return Ok(None);
+    }
+    storage.part_bytes(self.part_id()).map(Some)
   }
 
   #[inline]
@@ -3457,7 +3493,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
     package: &'a P,
   ) -> Result<Option<&'a str>, crate::common::SdkError> {
     self
-      .data(package)
+      .try_data(package)?
       .map(std::str::from_utf8)
       .transpose()
       .map_err(|error| crate::common::SdkError::CommonError(error.to_string()))
@@ -3469,7 +3505,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
     package: &P,
     writer: &mut W,
   ) -> Result<bool, crate::common::SdkError> {
-    let Some(data) = self.data(package) else {
+    let Some(data) = self.try_data(package)? else {
       return Ok(false);
     };
     writer.write_all(data)?;
@@ -3482,6 +3518,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
     package: &mut P,
     data: impl Into<Vec<u8>>,
   ) -> Result<(), crate::common::SdkError> {
+    let _ = crate::sdk::SdkPackage::unload_root_element(package, self.part_id());
     crate::sdk::SdkPackage::storage_mut(package).set_part_data(self.part_id(), data)
   }
 
@@ -3491,6 +3528,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
     package: &mut P,
     reader: &mut R,
   ) -> Result<(), crate::common::SdkError> {
+    let _ = crate::sdk::SdkPackage::unload_root_element(package, self.part_id());
     crate::sdk::SdkPackage::storage_mut(package).feed_part_data(self.part_id(), reader)
   }
 

@@ -19,8 +19,9 @@ pub use error::{
 pub(crate) use package::PackageId;
 #[cfg(feature = "parts")]
 pub(crate) use package::{
-  NewPartDescriptor, NewPartTargetMode, RelationshipInfo, RelationshipSet, SdkPackageStorage,
-  StoredPart, default_part_extension_for_content_type,
+  NewPartDescriptor, NewPartTargetMode, PackageSaveEntry, RelationshipInfo, RelationshipSet,
+  SdkPackageStorage, StoredPart, create_package_temp_file, default_part_extension_for_content_type,
+  replace_package_file,
 };
 #[cfg(feature = "parts")]
 pub use package::{
@@ -317,14 +318,6 @@ pub(crate) fn part_relationships_path(path: &str) -> String {
   rels_path.push_str(part_target);
   rels_path.push_str(".rels");
   resolve_zip_file_path(&rels_path)
-}
-
-#[inline]
-#[cfg(feature = "parts")]
-pub(crate) fn part_relationships_directory_path(path: &str) -> String {
-  let mut rels_dir_path = parent_zip_path(path);
-  rels_dir_path.push_str("_rels");
-  resolve_zip_file_path(&rels_dir_path)
 }
 
 #[cfg(test)]

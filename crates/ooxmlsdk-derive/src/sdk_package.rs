@@ -60,7 +60,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
   });
   let root_elements_local = root_elements_ident.map(|_| {
     quote! {
-      let root_elements = crate::parts::initialize_root_elements(&storage, &open_settings)?;
+      let root_elements = crate::parts::initialize_root_elements(&mut storage, &open_settings)?;
     }
   });
   let root_elements_init = root_elements_ident.map(|ident| {
@@ -284,6 +284,23 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         Self::new_with_settings(reader, crate::sdk::OpenSettings::default())
       }
 
+      pub fn new_from_bytes<B: Into<std::sync::Arc<[u8]>>>(
+        bytes: B,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::new_from_bytes_with_settings(bytes, crate::sdk::OpenSettings::default())
+      }
+
+      pub fn new_from_bytes_with_settings<B: Into<std::sync::Arc<[u8]>>>(
+        bytes: B,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
+        let storage = crate::common::SdkPackageStorage::open_bytes(
+          bytes.into(),
+          open_settings.open_mode,
+        )?;
+        Self::from_storage(storage, open_settings.open_mode, open_settings)
+      }
+
       pub fn create(document_type: #document_type_ty) -> Self {
         let open_settings = crate::sdk::OpenSettings::default();
         let storage = crate::common::SdkPackageStorage::create(
@@ -337,17 +354,18 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       pub fn new_from_file<P: AsRef<std::path::Path>>(
         path: P,
       ) -> Result<Self, crate::common::SdkError> {
-        Self::new(std::io::BufReader::new(std::fs::File::open(path)?))
+        Self::new_from_file_with_settings(path, crate::sdk::OpenSettings::default())
       }
 
       pub fn new_from_file_with_settings<P: AsRef<std::path::Path>>(
         path: P,
         open_settings: crate::sdk::OpenSettings,
       ) -> Result<Self, crate::common::SdkError> {
-        Self::new_with_settings(
-          std::io::BufReader::new(std::fs::File::open(path)?),
-          open_settings,
-        )
+        let storage = crate::common::SdkPackageStorage::open_file(
+          path.as_ref(),
+          open_settings.open_mode,
+        )?;
+        Self::from_storage(storage, open_settings.open_mode, open_settings)
       }
 
       #[cfg(feature = "flat-opc")]
@@ -784,7 +802,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         &self,
         path: P,
       ) -> Result<(), crate::common::SdkError> {
-        self.copy_to(std::io::BufWriter::new(std::fs::File::create(path)?))
+        crate::parts::save_package_to_file(self, path.as_ref())
       }
 
       #main_part_method
@@ -811,7 +829,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       fn from_storage(
-        storage: crate::common::SdkPackageStorage,
+        mut storage: crate::common::SdkPackageStorage,
         open_mode: crate::common::PackageOpenMode,
         open_settings: crate::sdk::OpenSettings,
       ) -> Result<Self, crate::common::SdkError> {

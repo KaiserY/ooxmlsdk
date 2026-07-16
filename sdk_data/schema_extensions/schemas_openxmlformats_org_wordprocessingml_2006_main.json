@@ -122,7 +122,7 @@
       "ClassName": "DoNotEmbedSmartTags",
       "Summary": "Do Not Embed Smart Tags.",
       "BaseClass": "OnOffType",
-      "Kind": "Leaf",
+      "Kind": "Derived",
       "ApiKind": "Struct"
     },
     {
@@ -1252,7 +1252,7 @@
       "ClassName": "StyleParagraphProperties",
       "AddChildren": [
         {
-          "Name": "w:CT_OnOffOnly/w:qFormat",
+          "Name": "w:CT_OnOff/w:qFormat",
           "PropertyName": "PrimaryStyle",
           "PropertyComments": "Out-of-place primary style marker.",
           "Optional": true,

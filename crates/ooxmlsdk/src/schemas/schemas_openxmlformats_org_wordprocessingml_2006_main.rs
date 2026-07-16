@@ -10451,32 +10451,32 @@ pub struct Settings {
   #[sdk(child(qname = "w:shapeDefaults"))]
   pub shape_defaults: Option<ShapeDefaults>,
   /// Do Not Embed Smart Tags.
-  #[sdk(empty_child(qname = "w:doNotEmbedSmartTags"))]
-  pub do_not_embed_smart_tags: Option<()>,
+  #[sdk(child(qname = "w:doNotEmbedSmartTags"))]
+  pub do_not_embed_smart_tags: Option<DoNotEmbedSmartTags>,
   /// Smart Tag Type.
   #[sdk(child(qname = "w:smartTagType"))]
   pub smart_tag_type: Vec<SmartTagType>,
-  /// Legacy application preference one.
+  /// TextMaker preference one.
   #[sdk(child(qname = "w:tmPrefOne"))]
-  pub legacy_preference_one: Option<LegacyPreferenceOne>,
-  /// Legacy application preference two.
+  pub text_maker_preference_one: Option<TextMakerPreferenceOne>,
+  /// TextMaker preference two.
   #[sdk(child(qname = "w:tmPrefTwo"))]
-  pub legacy_preference_two: Option<LegacyPreferenceTwo>,
-  /// Legacy application format preference.
+  pub text_maker_preference_two: Option<TextMakerPreferenceTwo>,
+  /// TextMaker format preference.
   #[sdk(child(qname = "w:tmFmtPref"))]
-  pub legacy_format_preference: Option<LegacyFormatPreference>,
-  /// Legacy application comment settings.
+  pub text_maker_format_preference: Option<TextMakerFormatPreference>,
+  /// TextMaker comment settings.
   #[sdk(child(qname = "w:tmCommentsPr"))]
-  pub legacy_comments_properties: Option<std::boxed::Box<LegacyCommentsProperties>>,
-  /// Legacy application review settings.
+  pub text_maker_comments_properties: Option<std::boxed::Box<TextMakerCommentsProperties>>,
+  /// TextMaker review settings.
   #[sdk(child(qname = "w:tmReviewPr"))]
-  pub legacy_review_properties: Option<std::boxed::Box<LegacyReviewProperties>>,
-  /// Legacy application last editing position.
+  pub text_maker_review_properties: Option<std::boxed::Box<TextMakerReviewProperties>>,
+  /// TextMaker last editing position.
   #[sdk(child(qname = "w:tmLastPos"))]
-  pub legacy_last_position: Option<std::boxed::Box<LegacyLastPosition>>,
-  /// Legacy application revision metadata.
+  pub text_maker_last_position: Option<std::boxed::Box<TextMakerLastPosition>>,
+  /// TextMaker application revision metadata.
   #[sdk(child(qname = "w:tmAppRevision"))]
-  pub legacy_application_revision: Option<LegacyApplicationRevision>,
+  pub text_maker_application_revision: Option<TextMakerApplicationRevision>,
   /// Radix Point for Field Code Evaluation.
   #[sdk(child(qname = "w:decimalSymbol"))]
   pub decimal_symbol: Option<DecimalSymbol>,
@@ -11416,15 +11416,15 @@ pub struct SectionProperties {
   /// Defines the PaperSource Class.
   #[sdk(child(qname = "w:paperSrc"))]
   pub paper_source: Option<PaperSource>,
-  /// Top margin gutter setting.
+  /// TextMaker gutter setting.
   #[sdk(child(qname = "w:tmGutter"))]
-  pub top_margin_gutter: Option<TopMarginGutter>,
+  pub text_maker_gutter: Option<TextMakerGutter>,
   /// Mirror page margins.
   #[sdk(child(qname = "w:mirrorMargins"))]
   pub mirror_margins: Option<MirrorMargins>,
-  /// Top margin section setting.
+  /// TextMaker section setting.
   #[sdk(child(qname = "w:tmSection"))]
-  pub top_margin_section: Option<TopMarginSection>,
+  pub text_maker_section: Option<TextMakerSection>,
   /// Defines the PageBorders Class.
   #[sdk(child(qname = "w:pgBorders"))]
   pub page_borders: Option<std::boxed::Box<PageBorders>>,
@@ -13099,19 +13099,19 @@ pub struct RunPropertiesBaseStyle {
   pub spec_vanish: Option<SpecVanish>,
   /// Defines the Ligatures Class.
   #[sdk(child(qname = "w14:ligatures"))]
-  pub w14_ligatures: Option<crate::schemas::w14::Ligatures>,
+  pub ligatures: Option<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
   #[sdk(child(qname = "w14:numForm"))]
-  pub w14_numbering_format: Option<crate::schemas::w14::NumberingFormat>,
+  pub numbering_format: Option<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
   #[sdk(child(qname = "w14:numSpacing"))]
-  pub w14_number_spacing: Option<crate::schemas::w14::NumberSpacing>,
+  pub number_spacing: Option<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
   #[sdk(child(qname = "w14:stylisticSets"))]
-  pub w14_stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
+  pub stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(qname = "w14:cntxtAlts"))]
-  pub w14_contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
+  pub contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
   /// Right-to-left text.
   #[sdk(child(qname = "w:rtl"))]
   pub right_to_left_text: Option<RightToLeftText>,
@@ -13153,9 +13153,9 @@ pub struct ParagraphPropertiesBaseStyle {
   /// Defines the SuppressAutoHyphens Class.
   #[sdk(child(qname = "w:suppressAutoHyphens"))]
   pub suppress_auto_hyphens: Option<SuppressAutoHyphens>,
-  /// Maximum consecutive hyphenated lines.
+  /// TextMaker hyphenation lines setting.
   #[sdk(child(qname = "w:hyphenationLines"))]
-  pub hyphenation_lines: Option<HyphenationLines>,
+  pub text_maker_hyphenation_lines: Option<TextMakerHyphenationLines>,
   /// Defines the Kinsoku Class.
   #[sdk(child(qname = "w:kinsoku"))]
   pub kinsoku: Option<Kinsoku>,
@@ -13700,40 +13700,40 @@ pub struct NumberingSymbolRunProperties {
   pub spec_vanish: Option<SpecVanish>,
   /// Defines the Glow Class.
   #[sdk(child(qname = "w14:glow"))]
-  pub w14_glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
+  pub glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
   /// Defines the Shadow Class.
   #[sdk(child(qname = "w14:shadow"))]
-  pub w14_shadow: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
+  pub shadow14: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
   /// Defines the Reflection Class.
   #[sdk(child(qname = "w14:reflection"))]
-  pub w14_reflection: Option<crate::schemas::w14::Reflection>,
+  pub reflection: Option<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
   #[sdk(child(qname = "w14:textOutline"))]
-  pub w14_text_outline_effect: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
+  pub text_outline_effect: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
   /// Defines the FillTextEffect Class.
   #[sdk(child(qname = "w14:textFill"))]
-  pub w14_fill_text_effect: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
+  pub fill_text_effect: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
   /// Defines the Scene3D Class.
   #[sdk(child(qname = "w14:scene3d"))]
-  pub w14_scene3_d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
+  pub scene3_d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
   /// Defines the Properties3D Class.
   #[sdk(child(qname = "w14:props3d"))]
-  pub w14_properties3_d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
+  pub properties3_d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
   /// Defines the Ligatures Class.
   #[sdk(child(qname = "w14:ligatures"))]
-  pub w14_ligatures: Option<crate::schemas::w14::Ligatures>,
+  pub ligatures: Option<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
   #[sdk(child(qname = "w14:numForm"))]
-  pub w14_numbering_format: Option<crate::schemas::w14::NumberingFormat>,
+  pub numbering_format: Option<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
   #[sdk(child(qname = "w14:numSpacing"))]
-  pub w14_number_spacing: Option<crate::schemas::w14::NumberSpacing>,
+  pub number_spacing: Option<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
   #[sdk(child(qname = "w14:stylisticSets"))]
-  pub w14_stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
+  pub stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(qname = "w14:cntxtAlts"))]
-  pub w14_contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
+  pub contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
   /// Nested run properties found in legacy numbering output.
   #[sdk(child(qname = "w:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
@@ -14167,40 +14167,40 @@ pub struct StyleRunProperties {
   pub spec_vanish: Option<SpecVanish>,
   /// Defines the Glow Class.
   #[sdk(child(qname = "w14:glow"))]
-  pub w14_glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
+  pub glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
   /// Defines the Shadow Class.
   #[sdk(child(qname = "w14:shadow"))]
-  pub w14_shadow: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
+  pub shadow14: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
   /// Defines the Reflection Class.
   #[sdk(child(qname = "w14:reflection"))]
-  pub w14_reflection: Option<crate::schemas::w14::Reflection>,
+  pub reflection: Option<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
   #[sdk(child(qname = "w14:textOutline"))]
-  pub w14_text_outline_effect: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
+  pub text_outline_effect: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
   /// Defines the FillTextEffect Class.
   #[sdk(child(qname = "w14:textFill"))]
-  pub w14_fill_text_effect: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
+  pub fill_text_effect: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
   /// Defines the Scene3D Class.
   #[sdk(child(qname = "w14:scene3d"))]
-  pub w14_scene3_d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
+  pub scene3_d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
   /// Defines the Properties3D Class.
   #[sdk(child(qname = "w14:props3d"))]
-  pub w14_properties3_d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
+  pub properties3_d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
   /// Defines the Ligatures Class.
   #[sdk(child(qname = "w14:ligatures"))]
-  pub w14_ligatures: Option<crate::schemas::w14::Ligatures>,
+  pub ligatures: Option<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
   #[sdk(child(qname = "w14:numForm"))]
-  pub w14_numbering_format: Option<crate::schemas::w14::NumberingFormat>,
+  pub numbering_format: Option<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
   #[sdk(child(qname = "w14:numSpacing"))]
-  pub w14_number_spacing: Option<crate::schemas::w14::NumberSpacing>,
+  pub number_spacing: Option<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
   #[sdk(child(qname = "w14:stylisticSets"))]
-  pub w14_stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
+  pub stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(qname = "w14:cntxtAlts"))]
-  pub w14_contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
+  pub contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
   /// Right-to-left text.
   #[sdk(child(qname = "w:rtl"))]
   pub right_to_left_text: Option<RightToLeftText>,
@@ -16611,6 +16611,14 @@ pub struct TabIndex {
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
+/// Do Not Embed Smart Tags.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:doNotEmbedSmartTags")]
+pub struct DoNotEmbedSmartTags {
+  /// On/Off Value
+  #[sdk(attr(qname = "w:val"))]
+  pub val: Option<crate::simple_type::OnOffValue>,
+}
 /// Smart Tag Type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:smartTagType")]
@@ -16633,274 +16641,274 @@ pub struct SmartTagProperties {
   #[sdk(child(qname = "w:attr"))]
   pub custom_xml_attribute: Vec<CustomXmlAttribute>,
 }
-/// Top margin gutter setting.
+/// TextMaker gutter setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmGutter")]
-pub struct TopMarginGutter {
-  /// Top margin gutter value.
+pub struct TextMakerGutter {
+  /// TextMaker gutter value.
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
-/// Top margin section setting.
+/// TextMaker section setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmSection")]
-pub struct TopMarginSection {
-  /// Top margin section height.
+pub struct TextMakerSection {
+  /// TextMaker section height.
   #[sdk(attr(qname = "w:h"))]
   pub height: crate::simple_type::Int32Value,
 }
-/// Legacy application preference one.
+/// TextMaker preference one.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmPrefOne")]
-pub struct LegacyPreferenceOne {
+pub struct TextMakerPreferenceOne {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy application preference two.
+/// TextMaker preference two.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmPrefTwo")]
-pub struct LegacyPreferenceTwo {
+pub struct TextMakerPreferenceTwo {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy application format preference.
+/// TextMaker format preference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmFmtPref")]
-pub struct LegacyFormatPreference {
+pub struct TextMakerFormatPreference {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy comment placement.
+/// TextMaker comment placement.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmCommentsPlace")]
-pub struct LegacyCommentsPlace {
+pub struct TextMakerCommentsPlace {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy comment width.
+/// TextMaker comment width.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmCommentsWidth")]
-pub struct LegacyCommentsWidth {
+pub struct TextMakerCommentsWidth {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy comment color.
+/// TextMaker comment color.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmCommentsColor")]
-pub struct LegacyCommentsColor {
+pub struct TextMakerCommentsColor {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy application comment settings.
+/// TextMaker comment settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmCommentsPr")]
-pub struct LegacyCommentsProperties {
-  /// Legacy comment placement.
+pub struct TextMakerCommentsProperties {
+  /// TextMaker comment placement.
   #[sdk(child(qname = "w:tmCommentsPlace"))]
-  pub place: Option<LegacyCommentsPlace>,
-  /// Legacy comment width.
+  pub place: Option<TextMakerCommentsPlace>,
+  /// TextMaker comment width.
   #[sdk(child(qname = "w:tmCommentsWidth"))]
-  pub width: Option<LegacyCommentsWidth>,
-  /// Legacy comment color.
+  pub width: Option<TextMakerCommentsWidth>,
+  /// TextMaker comment color.
   #[sdk(child(qname = "w:tmCommentsColor"))]
-  pub color: Option<LegacyCommentsColor>,
+  pub color: Option<TextMakerCommentsColor>,
 }
-/// Legacy review enabled setting.
+/// TextMaker review enabled setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewEnabled")]
-pub struct LegacyReviewEnabled {
+pub struct TextMakerReviewEnabled {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy review visibility setting.
+/// TextMaker review visibility setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewShow")]
-pub struct LegacyReviewShow {
+pub struct TextMakerReviewShow {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy review print setting.
+/// TextMaker review print setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewPrint")]
-pub struct LegacyReviewPrint {
+pub struct TextMakerReviewPrint {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy revision number.
+/// TextMaker revision number.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmRevisionNum")]
-pub struct LegacyRevisionNumber {
+pub struct TextMakerRevisionNumber {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy insertion review mark.
+/// TextMaker insertion review mark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewMarkIns")]
-pub struct LegacyReviewInsertionMark {
+pub struct TextMakerReviewInsertionMark {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy insertion review color.
+/// TextMaker insertion review color.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewColorIns")]
-pub struct LegacyReviewInsertionColor {
+pub struct TextMakerReviewInsertionColor {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy deletion review mark.
+/// TextMaker deletion review mark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewMarkDel")]
-pub struct LegacyReviewDeletionMark {
+pub struct TextMakerReviewDeletionMark {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy deletion review color.
+/// TextMaker deletion review color.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewColorDel")]
-pub struct LegacyReviewDeletionColor {
+pub struct TextMakerReviewDeletionColor {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy formatting review mark.
+/// TextMaker formatting review mark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewMarkFmt")]
-pub struct LegacyReviewFormatMark {
+pub struct TextMakerReviewFormatMark {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy formatting review color.
+/// TextMaker formatting review color.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewColorFmt")]
-pub struct LegacyReviewFormatColor {
+pub struct TextMakerReviewFormatColor {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy line review mark.
+/// TextMaker line review mark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewMarkLn")]
-pub struct LegacyReviewLineMark {
+pub struct TextMakerReviewLineMark {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy line review color.
+/// TextMaker line review color.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewColorLn")]
-pub struct LegacyReviewLineColor {
+pub struct TextMakerReviewLineColor {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy review tooltip setting.
+/// TextMaker review tooltip setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewToolTip")]
-pub struct LegacyReviewToolTip {
+pub struct TextMakerReviewToolTip {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy application review settings.
+/// TextMaker review settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmReviewPr")]
-pub struct LegacyReviewProperties {
+pub struct TextMakerReviewProperties {
   /// _
   #[sdk(child(qname = "w:tmReviewEnabled"))]
-  pub enabled: Option<LegacyReviewEnabled>,
+  pub enabled: Option<TextMakerReviewEnabled>,
   /// _
   #[sdk(child(qname = "w:tmReviewShow"))]
-  pub show: Option<LegacyReviewShow>,
+  pub show: Option<TextMakerReviewShow>,
   /// _
   #[sdk(child(qname = "w:tmReviewPrint"))]
-  pub print: Option<LegacyReviewPrint>,
+  pub print: Option<TextMakerReviewPrint>,
   /// _
   #[sdk(child(qname = "w:tmRevisionNum"))]
-  pub revision_number: Option<LegacyRevisionNumber>,
+  pub revision_number: Option<TextMakerRevisionNumber>,
   /// _
   #[sdk(child(qname = "w:tmReviewMarkIns"))]
-  pub insertion_mark: Option<LegacyReviewInsertionMark>,
+  pub insertion_mark: Option<TextMakerReviewInsertionMark>,
   /// _
   #[sdk(child(qname = "w:tmReviewColorIns"))]
-  pub insertion_color: Option<LegacyReviewInsertionColor>,
+  pub insertion_color: Option<TextMakerReviewInsertionColor>,
   /// _
   #[sdk(child(qname = "w:tmReviewMarkDel"))]
-  pub deletion_mark: Option<LegacyReviewDeletionMark>,
+  pub deletion_mark: Option<TextMakerReviewDeletionMark>,
   /// _
   #[sdk(child(qname = "w:tmReviewColorDel"))]
-  pub deletion_color: Option<LegacyReviewDeletionColor>,
+  pub deletion_color: Option<TextMakerReviewDeletionColor>,
   /// _
   #[sdk(child(qname = "w:tmReviewMarkFmt"))]
-  pub format_mark: Option<LegacyReviewFormatMark>,
+  pub format_mark: Option<TextMakerReviewFormatMark>,
   /// _
   #[sdk(child(qname = "w:tmReviewColorFmt"))]
-  pub format_color: Option<LegacyReviewFormatColor>,
+  pub format_color: Option<TextMakerReviewFormatColor>,
   /// _
   #[sdk(child(qname = "w:tmReviewMarkLn"))]
-  pub line_mark: Option<LegacyReviewLineMark>,
+  pub line_mark: Option<TextMakerReviewLineMark>,
   /// _
   #[sdk(child(qname = "w:tmReviewColorLn"))]
-  pub line_color: Option<LegacyReviewLineColor>,
+  pub line_color: Option<TextMakerReviewLineColor>,
   /// _
   #[sdk(child(qname = "w:tmReviewToolTip"))]
-  pub tool_tip: Option<LegacyReviewToolTip>,
+  pub tool_tip: Option<TextMakerReviewToolTip>,
 }
-/// Legacy last position page.
+/// TextMaker last position page.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmLastPosPage")]
-pub struct LegacyLastPositionPage {
+pub struct TextMakerLastPositionPage {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy last position selection.
+/// TextMaker last position selection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmLastPosSelect")]
-pub struct LegacyLastPositionSelection {
+pub struct TextMakerLastPositionSelection {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy last position frame index.
+/// TextMaker last position frame index.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmLastPosFrameIdx")]
-pub struct LegacyLastPositionFrameIndex {
+pub struct TextMakerLastPositionFrameIndex {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy last position paragraph index.
+/// TextMaker last position paragraph index.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmLastPosPgfIdx")]
-pub struct LegacyLastPositionParagraphIndex {
+pub struct TextMakerLastPositionParagraphIndex {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy last position index.
+/// TextMaker last position index.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmLastPosIdx")]
-pub struct LegacyLastPositionIndex {
+pub struct TextMakerLastPositionIndex {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy last caret position.
+/// TextMaker last caret position.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmLastPosCaret")]
-pub struct LegacyLastPositionCaret {
+pub struct TextMakerLastPositionCaret {
   /// _
   #[sdk(child(qname = "w:tmLastPosPgfIdx"))]
-  pub paragraph_index: Option<LegacyLastPositionParagraphIndex>,
+  pub paragraph_index: Option<TextMakerLastPositionParagraphIndex>,
   /// _
   #[sdk(child(qname = "w:tmLastPosIdx"))]
-  pub index: Option<LegacyLastPositionIndex>,
+  pub index: Option<TextMakerLastPositionIndex>,
 }
-/// Legacy last anchor position.
+/// TextMaker last anchor position.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmLastPosAnchor")]
-pub struct LegacyLastPositionAnchor {
+pub struct TextMakerLastPositionAnchor {
   /// _
   #[sdk(child(qname = "w:tmLastPosPgfIdx"))]
-  pub paragraph_index: Option<LegacyLastPositionParagraphIndex>,
+  pub paragraph_index: Option<TextMakerLastPositionParagraphIndex>,
   /// _
   #[sdk(child(qname = "w:tmLastPosIdx"))]
-  pub index: Option<LegacyLastPositionIndex>,
+  pub index: Option<TextMakerLastPositionIndex>,
 }
-/// Legacy last table rectangle.
+/// TextMaker last table rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmLastPosTblRect")]
-pub struct LegacyLastPositionTableRectangle {
+pub struct TextMakerLastPositionTableRectangle {
   #[sdk(attr(qname = "w:left"))]
   pub left: Option<crate::simple_type::Int32Value>,
   #[sdk(attr(qname = "w:top"))]
@@ -16910,42 +16918,42 @@ pub struct LegacyLastPositionTableRectangle {
   #[sdk(attr(qname = "w:bottom"))]
   pub bottom: Option<crate::simple_type::Int32Value>,
 }
-/// Legacy application last editing position.
+/// TextMaker last editing position.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmLastPos")]
-pub struct LegacyLastPosition {
+pub struct TextMakerLastPosition {
   /// _
   #[sdk(child(qname = "w:tmLastPosPage"))]
-  pub page: Option<LegacyLastPositionPage>,
+  pub page: Option<TextMakerLastPositionPage>,
   /// _
   #[sdk(child(qname = "w:tmLastPosSelect"))]
-  pub selection: Option<LegacyLastPositionSelection>,
+  pub selection: Option<TextMakerLastPositionSelection>,
   /// _
   #[sdk(child(qname = "w:tmLastPosFrameIdx"))]
-  pub frame_index: Option<LegacyLastPositionFrameIndex>,
+  pub frame_index: Option<TextMakerLastPositionFrameIndex>,
   /// _
   #[sdk(child(qname = "w:tmLastPosCaret"))]
-  pub caret: Option<std::boxed::Box<LegacyLastPositionCaret>>,
+  pub caret: Option<std::boxed::Box<TextMakerLastPositionCaret>>,
   /// _
   #[sdk(child(qname = "w:tmLastPosAnchor"))]
-  pub anchor: Option<std::boxed::Box<LegacyLastPositionAnchor>>,
+  pub anchor: Option<std::boxed::Box<TextMakerLastPositionAnchor>>,
   /// _
   #[sdk(child(qname = "w:tmLastPosTblRect"))]
-  pub table_rectangle: Option<LegacyLastPositionTableRectangle>,
+  pub table_rectangle: Option<TextMakerLastPositionTableRectangle>,
 }
-/// Legacy application revision metadata.
+/// TextMaker application revision metadata.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tmAppRevision")]
-pub struct LegacyApplicationRevision {
+pub struct TextMakerApplicationRevision {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::Int32Value>,
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
-/// Maximum consecutive hyphenated lines.
+/// TextMaker hyphenation lines setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:hyphenationLines")]
-pub struct HyphenationLines {
+pub struct TextMakerHyphenationLines {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::Int32Value>,
 }

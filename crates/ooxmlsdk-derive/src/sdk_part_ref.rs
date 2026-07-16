@@ -117,12 +117,31 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
           quote! { #content_type_match }
         };
         let office_document_guard = if descriptor.content_type.is_empty() {
-          quote! {
-            crate::common::package_main_part_path_matches(
-              path,
-              #path_prefix,
-              #target_name,
-            )
+          if let Some(root) = variant
+            .root
+            .as_ref()
+            .filter(|root| !root.content_type.is_empty())
+          {
+            let root_content_type =
+              LitByteStr::new(root.content_type.as_bytes(), Span::call_site());
+            quote! {
+              crate::sdk::part_root_content_type_matches_bytes(
+                #root_content_type,
+                content_type,
+              ) || crate::common::package_main_part_path_matches(
+                path,
+                #path_prefix,
+                #target_name,
+              )
+            }
+          } else {
+            quote! {
+              crate::common::package_main_part_path_matches(
+                path,
+                #path_prefix,
+                #target_name,
+              )
+            }
           }
         } else {
           quote! {

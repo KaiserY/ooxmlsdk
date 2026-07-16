@@ -279,6 +279,16 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
       }
 
       impl crate::sdk::SdkPart for ExtendedPart {
+        const CHILD_PART_CONSTRAINTS: &'static [crate::sdk::PartConstraint] = &[];
+        const ALLOWS_ANY_CHILD_PART: bool = true;
+
+        #[inline]
+        fn child_part_constraint(
+          _kind: crate::parts::PartKind,
+        ) -> Option<crate::sdk::PartConstraint> {
+          None
+        }
+
         #[inline]
         fn from_part_id(part_id: crate::common::PartId) -> Self {
           Self { id: part_id }

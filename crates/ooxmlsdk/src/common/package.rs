@@ -1226,6 +1226,7 @@ impl SdkPackageStorage {
   pub(crate) fn add_package_relationship_to_part(
     &mut self,
     relationship_id: impl Into<String>,
+    relationship_type: &str,
     target_part_id: PartId,
   ) -> Result<String, SdkError> {
     let relationship_id = relationship_id.into();
@@ -1240,21 +1241,13 @@ impl SdkPackageStorage {
       )));
     }
 
-    let (relationship_type, target) = {
+    let target = {
       let target_part = self.part(target_part_id).ok_or_else(|| {
         SdkError::CommonError(format!(
           "part id {target_part_id:?} is not present in package storage"
         ))
       })?;
-      let relationship_type = target_part.relationship_type().ok_or_else(|| {
-        SdkError::CommonError(format!(
-          "part id {target_part_id:?} does not have a relationship type"
-        ))
-      })?;
-      (
-        relationship_type.to_string(),
-        target_part.path().to_string(),
-      )
+      target_part.path().to_string()
     };
 
     self.package_relationships.add_internal_part_relationship(
@@ -1270,6 +1263,7 @@ impl SdkPackageStorage {
     &mut self,
     source_part_id: PartId,
     relationship_id: impl Into<String>,
+    relationship_type: &str,
     target_part_id: PartId,
   ) -> Result<String, SdkError> {
     let relationship_id = relationship_id.into();
@@ -1284,7 +1278,7 @@ impl SdkPackageStorage {
       )));
     }
 
-    let (relationship_type, relationship_target) = {
+    let relationship_target = {
       let source_part_path = self
         .part(source_part_id)
         .ok_or_else(|| {
@@ -1299,15 +1293,7 @@ impl SdkPackageStorage {
           "part id {target_part_id:?} is not present in package storage"
         ))
       })?;
-      let relationship_type = target_part.relationship_type().ok_or_else(|| {
-        SdkError::CommonError(format!(
-          "part id {target_part_id:?} does not have a relationship type"
-        ))
-      })?;
-      (
-        relationship_type.to_string(),
-        relationship_target_from_source(&source_part_path, target_part.path()),
-      )
+      relationship_target_from_source(&source_part_path, target_part.path())
     };
 
     self
@@ -1383,17 +1369,13 @@ impl SdkPackageStorage {
     source_part_id: PartId,
     parent_part_id: Option<PartId>,
     relationship_id: impl Into<String>,
+    relationship_type: &str,
     mut part_data: impl FnMut(PartId, &StoredPart) -> Result<Vec<u8>, SdkError>,
   ) -> Result<(PartId, usize), SdkError> {
     let relationship_id = relationship_id.into();
-    let source_part = source.part(source_part_id).ok_or_else(|| {
+    source.part(source_part_id).ok_or_else(|| {
       SdkError::CommonError(format!(
         "source part id {source_part_id:?} is not present in package storage"
-      ))
-    })?;
-    let relationship_type = source_part.relationship_type().ok_or_else(|| {
-      SdkError::CommonError(format!(
-        "source part id {source_part_id:?} does not have a relationship type"
       ))
     })?;
 

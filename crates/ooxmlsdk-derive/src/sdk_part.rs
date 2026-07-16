@@ -26,6 +26,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
 }
 
 struct PartHandleChildInfo {
+  attrs: Vec<Attribute>,
   field_ident: Ident,
   part_ty: Type,
   kind: PartChildKind,
@@ -78,6 +79,7 @@ fn expand_part_handle(
         .unwrap_or(PartRelationshipTypeSource::TypeConst);
       let field_ident = field.ident.clone().unwrap();
       child_infos.push(PartHandleChildInfo {
+        attrs: cfg_attrs(&field.attrs),
         field_ident,
         part_ty: marker.part_ty,
         kind: parse_part_child_kind_attr(&field.attrs)?.unwrap_or(marker.kind),
@@ -94,8 +96,11 @@ fn expand_part_handle(
 
   let root_method = part_handle_root_method_tokens(ident, root_info.as_ref());
   let child_methods = part_handle_child_methods_tokens(ident, &child_infos);
+  let constraint_impl = part_constraint_impl_tokens(&child_infos);
   Ok(quote! {
     impl crate::sdk::SdkPart for #ident {
+      #constraint_impl
+
       #[inline]
       fn from_part_id(part_id: crate::common::PartId) -> Self {
         Self {
@@ -938,6 +943,95 @@ fn expand_part_handle(
     #root_method
     #child_methods
   })
+}
+
+fn part_constraint_impl_tokens(child_infos: &[PartHandleChildInfo]) -> proc_macro2::TokenStream {
+  let entries = child_infos.iter().map(|child| {
+    let attrs = &child.attrs;
+    let entry = part_constraint_entry_tokens(child);
+    quote! {
+      #( #attrs )*
+      #entry
+    }
+  });
+  let lookup = if child_infos.iter().all(|child| child.attrs.is_empty()) {
+    let arms = child_infos.iter().enumerate().map(|(index, child)| {
+      let variant_ident = part_kind_variant_ident(&child.part_ty);
+      quote! {
+        crate::parts::PartKind::#variant_ident => Some(Self::CHILD_PART_CONSTRAINTS[#index]),
+      }
+    });
+    quote! {
+      match kind {
+        #( #arms )*
+        _ => None,
+      }
+    }
+  } else {
+    quote! {
+      Self::CHILD_PART_CONSTRAINTS
+        .iter()
+        .copied()
+        .find(|constraint| constraint.child_kind == kind)
+    }
+  };
+
+  quote! {
+    const CHILD_PART_CONSTRAINTS: &'static [crate::sdk::PartConstraint] = &[
+      #( #entries, )*
+    ];
+
+    #[inline]
+    fn child_part_constraint(
+      kind: crate::parts::PartKind,
+    ) -> Option<crate::sdk::PartConstraint> {
+      #lookup
+    }
+  }
+}
+
+fn part_constraint_entry_tokens(child: &PartHandleChildInfo) -> proc_macro2::TokenStream {
+  let part_ty = &child.part_ty;
+  let relationship_type = part_relationship_type_tokens(&child.relationship_type, part_ty);
+  let (min_occurs_is_non_zero, max_occurs_great_than_one) = match child.kind {
+    PartChildKind::Optional => (false, false),
+    PartChildKind::Required => (true, false),
+    PartChildKind::Repeated => (false, true),
+    PartChildKind::RequiredRepeated => (true, true),
+  };
+  quote! {
+    crate::sdk::PartConstraint::new(
+      <#part_ty as crate::sdk::SdkPartDescriptor>::KIND,
+      #relationship_type,
+      <#part_ty as crate::sdk::SdkPartDescriptor>::CONTENT_TYPE,
+      #min_occurs_is_non_zero,
+      #max_occurs_great_than_one,
+    )
+  }
+}
+
+fn part_relationship_type_tokens(
+  relationship_type: &PartRelationshipTypeSource,
+  part_ty: &Type,
+) -> proc_macro2::TokenStream {
+  match relationship_type {
+    PartRelationshipTypeSource::Explicit(value) => quote! { #value },
+    PartRelationshipTypeSource::TypeConst => {
+      quote! { <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE }
+    }
+  }
+}
+
+fn part_kind_variant_ident(part_ty: &Type) -> &Ident {
+  let Type::Path(type_path) = part_ty else {
+    panic!("generated child part type must be a path")
+  };
+  &type_path
+    .path
+    .segments
+    .last()
+    .expect("generated child part path must not be empty")
+    .ident
 }
 
 fn part_handle_root_method_tokens(

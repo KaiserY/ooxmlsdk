@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 
+use bytes::Bytes;
+
 use crate::schemas::opc_content_types::{Types, TypesChoice};
 use crate::schemas::opc_relationships::{
   Relationship as OpcRelationship, Relationships, TargetMode,
@@ -108,10 +110,10 @@ pub enum NewPartTargetMode {
 pub(crate) enum StoredPartData {
   Archived {
     entry_index: usize,
-    bytes: OnceLock<Arc<[u8]>>,
+    bytes: OnceLock<Bytes>,
   },
   Owned {
-    bytes: Arc<[u8]>,
+    bytes: Bytes,
     original_entry_index: Option<usize>,
   },
 }
@@ -167,7 +169,7 @@ pub(crate) enum PackageSaveEntry {
 enum ArchiveReader {
   #[cfg(any(unix, windows))]
   File(PositionedFileReader),
-  Memory(Cursor<Arc<[u8]>>),
+  Memory(Cursor<Bytes>),
 }
 
 impl Read for ArchiveReader {
@@ -251,7 +253,7 @@ struct ArchiveBacking {
 }
 
 impl ArchiveBacking {
-  fn read_entry(&self, entry_index: usize) -> Result<Arc<[u8]>, SdkError> {
+  fn read_entry(&self, entry_index: usize) -> Result<Bytes, SdkError> {
     let mut archive = self.archive.clone();
     let bytes = read_archive_entry_by_index(&mut archive, entry_index)?;
     Ok(bytes.into())
@@ -1180,12 +1182,7 @@ impl SdkPackageStorage {
       ))
     })?;
     reader.read_to_end(&mut bytes)?;
-    let bytes: Arc<[u8]> = bytes.into();
-    Self::open_memory(bytes, open_mode)
-  }
-
-  pub(crate) fn open_bytes(bytes: Arc<[u8]>, open_mode: PackageOpenMode) -> Result<Self, SdkError> {
-    Self::open_memory(bytes, open_mode)
+    Self::open_memory(bytes.into(), open_mode)
   }
 
   pub(crate) fn open_file(path: &Path, open_mode: PackageOpenMode) -> Result<Self, SdkError> {
@@ -1198,12 +1195,11 @@ impl SdkPackageStorage {
     }
     #[cfg(not(any(unix, windows)))]
     {
-      let bytes: Arc<[u8]> = std::fs::read(path)?.into();
-      Self::open_memory(bytes, open_mode)
+      Self::open_memory(std::fs::read(path)?.into(), open_mode)
     }
   }
 
-  fn open_memory(bytes: Arc<[u8]>, open_mode: PackageOpenMode) -> Result<Self, SdkError> {
+  fn open_memory(bytes: Bytes, open_mode: PackageOpenMode) -> Result<Self, SdkError> {
     let archive = zip::ZipArchive::new(ArchiveReader::Memory(Cursor::new(bytes)))?;
     Self::open_archive(archive, open_mode)
   }
@@ -1220,21 +1216,19 @@ impl SdkPackageStorage {
       package_relationships,
       part_relationships,
     } = opened;
-    let mut claimed_entry_indices = HashSet::with_capacity(
-      raw_parts.len() + part_relationships.len() + usize::from(package_relationships.is_some()) + 1,
-    );
-    claimed_entry_indices.insert(content_types_archive_entry_index);
-    claimed_entry_indices.extend(raw_parts.iter().map(|part| part.entry_index));
-    claimed_entry_indices.extend(
-      part_relationships
-        .iter()
-        .filter_map(|entry| entry.as_ref().map(|entry| entry.entry_index)),
-    );
+    let mut claimed_entry_indices = vec![false; archive.len()];
+    claimed_entry_indices[content_types_archive_entry_index] = true;
+    for raw_part in &raw_parts {
+      claimed_entry_indices[raw_part.entry_index] = true;
+    }
+    for entry in part_relationships.iter().flatten() {
+      claimed_entry_indices[entry.entry_index] = true;
+    }
     if let Some(entry) = &package_relationships {
-      claimed_entry_indices.insert(entry.entry_index);
+      claimed_entry_indices[entry.entry_index] = true;
     }
     let archived_extra_entry_indices = (0..archive.len())
-      .filter(|entry_index| !claimed_entry_indices.contains(entry_index))
+      .filter(|entry_index| !claimed_entry_indices[*entry_index])
       .collect::<Box<[_]>>();
     let mut by_path = HashMap::with_capacity(raw_parts.len());
 
@@ -1274,7 +1268,7 @@ impl SdkPackageStorage {
     for (index, (raw_part, relationships)) in
       raw_parts.drain(..).zip(part_relationships).enumerate()
     {
-      let relationship_type = relationship_types.get(&PartId::from_index(index)).cloned();
+      let relationship_type = relationship_types[index].clone();
       let kind = crate::parts::PartKind::classify(
         relationship_type
           .as_ref()
@@ -1364,7 +1358,7 @@ impl SdkPackageStorage {
     for (index, (raw_part, relationships)) in
       raw_parts.into_iter().zip(part_relationships).enumerate()
     {
-      let relationship_type = relationship_types.get(&PartId::from_index(index)).cloned();
+      let relationship_type = relationship_types[index].clone();
       let kind = crate::parts::PartKind::classify(
         relationship_type
           .as_ref()
@@ -2247,7 +2241,7 @@ impl SdkPackageStorage {
       kind,
       relationships: RelationshipSet::default(),
       data: StoredPartData::Owned {
-        bytes: Arc::<[u8]>::from([]),
+        bytes: Bytes::new(),
         original_entry_index: None,
       },
       deleted: false,
@@ -3057,15 +3051,21 @@ fn relationship_target_from_source(source_part_path: &str, child_part_path: &str
 fn relationship_types_by_part(
   package_relationships: &RelationshipSet,
   part_relationships: &[RelationshipSet],
-) -> Result<HashMap<PartId, super::XmlRelationshipNamespaceUri>, SdkError> {
-  let mut relationship_types: HashMap<PartId, super::XmlRelationshipNamespaceUri> = HashMap::new();
+) -> Result<Vec<Option<super::XmlRelationshipNamespaceUri>>, SdkError> {
+  let mut relationship_types: Vec<Option<super::XmlRelationshipNamespaceUri>> =
+    vec![None; part_relationships.len()];
 
   for relationship_set in std::iter::once(package_relationships).chain(part_relationships) {
     for relationship in relationship_set.iter() {
       let Some(part_id) = relationship.target_part_id() else {
         continue;
       };
-      if let Some(existing) = relationship_types.get(&part_id) {
+      let slot = relationship_types.get_mut(part_id.index()).ok_or_else(|| {
+        SdkError::CommonError(format!(
+          "relationship target part id {part_id:?} is outside package storage"
+        ))
+      })?;
+      if let Some(existing) = slot {
         if !relationship_types_are_compatible_bytes(
           existing.uri_bytes(),
           relationship.relationship_type_bytes(),
@@ -3078,10 +3078,9 @@ fn relationship_types_by_part(
           )));
         }
       } else {
-        relationship_types.insert(
-          part_id,
-          super::XmlRelationshipNamespaceUri::from_uri(relationship.relationship_type()),
-        );
+        *slot = Some(super::XmlRelationshipNamespaceUri::from_uri(
+          relationship.relationship_type(),
+        ));
       }
     }
   }

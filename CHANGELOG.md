@@ -9,7 +9,7 @@
 
 ### Added
 
-- Added `new_from_bytes` and `new_from_bytes_with_settings` package constructors backed by `Arc<[u8]>`, plus fallible zero-copy `try_data` access for lazy Part payloads.
+- Added fallible `try_data` access for lazy Part payloads.
 
 ### Fixed
 
@@ -17,7 +17,8 @@
 
 ### Performance
 
-- Reworked package ZIP storage around cloneable file/byte readers and lazy `OnceLock<Arc<[u8]>>` Part payloads, without a runtime mutex or unsafe code.
+- Reworked package ZIP storage around cloneable file/byte readers and lazy `Bytes` Part payloads, without a runtime mutex or unsafe code.
+- Reused owned input and decompressed Part allocations through immutable `Bytes` backing instead of copying them into `Arc<[u8]>` allocations.
 - Used source-order raw compressed entry copies for Part payloads that remain unloaded while releasing decompressed XML bytes after typed roots are successfully parsed.
 - Avoided scanning local ZIP headers during Part discovery, read required relationship entries in archive order, and released decompressed XML bytes after typed roots are successfully parsed.
 

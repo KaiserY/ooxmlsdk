@@ -284,23 +284,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         Self::new_with_settings(reader, crate::sdk::OpenSettings::default())
       }
 
-      pub fn new_from_bytes<B: Into<std::sync::Arc<[u8]>>>(
-        bytes: B,
-      ) -> Result<Self, crate::common::SdkError> {
-        Self::new_from_bytes_with_settings(bytes, crate::sdk::OpenSettings::default())
-      }
-
-      pub fn new_from_bytes_with_settings<B: Into<std::sync::Arc<[u8]>>>(
-        bytes: B,
-        open_settings: crate::sdk::OpenSettings,
-      ) -> Result<Self, crate::common::SdkError> {
-        let storage = crate::common::SdkPackageStorage::open_bytes(
-          bytes.into(),
-          open_settings.open_mode,
-        )?;
-        Self::from_storage(storage, open_settings.open_mode, open_settings)
-      }
-
       pub fn create(document_type: #document_type_ty) -> Self {
         let open_settings = crate::sdk::OpenSettings::default();
         let storage = crate::common::SdkPackageStorage::create(

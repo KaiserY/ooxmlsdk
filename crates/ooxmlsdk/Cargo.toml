@@ -14,13 +14,14 @@ readme.workspace = true
 
 [features]
 default = ["parts"]
-parts = ["dep:zip"]
+parts = ["dep:bytes", "dep:zip"]
 flat-opc = ["parts", "dep:base64"]
 validators = ["dep:regex", "ooxmlsdk-derive/validators"]
 mce = ["parts"]
 
 [dependencies]
 base64 = { workspace = true, optional = true }
+bytes = { workspace = true, optional = true }
 itoa = { workspace = true }
 lexical-parse-float = { workspace = true }
 ooxmlsdk-derive = { workspace = true }

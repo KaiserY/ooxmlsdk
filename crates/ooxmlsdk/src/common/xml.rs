@@ -542,17 +542,17 @@ pub fn resolve_relationship_target_path(parent_path: &str, target: &str) -> Stri
 }
 
 #[inline]
-pub(crate) fn from_reader_inner<R: BufRead>(reader: R) -> Result<IoReader<R>, SdkError> {
+pub(crate) fn from_reader_inner<R: BufRead>(reader: R) -> IoReader<R> {
   let mut xml_reader = Reader::from_reader(reader);
   xml_reader.config_mut().check_end_names = false;
-  Ok(IoReader::new(xml_reader))
+  IoReader::new(xml_reader)
 }
 
 #[inline]
-pub(crate) fn from_bytes_inner(bytes: &[u8]) -> Result<SliceReader<'_>, SdkError> {
+pub(crate) fn from_bytes_inner(bytes: &[u8]) -> SliceReader<'_> {
   let mut xml_reader = Reader::from_reader(bytes);
   xml_reader.config_mut().check_end_names = false;
-  Ok(SliceReader::new(xml_reader))
+  SliceReader::new(xml_reader)
 }
 
 #[cfg(feature = "parts")]

@@ -2638,7 +2638,7 @@ fn relationships_from_flat_opc_part(
 
 #[cfg(feature = "flat-opc")]
 fn read_flat_opc_parts<R: std::io::BufRead>(reader: R) -> Result<Vec<FlatOpcPart>, SdkError> {
-  let mut xml_reader = super::from_reader_inner(reader)?;
+  let mut xml_reader = super::from_reader_inner(reader);
   let mut parts = Vec::new();
 
   loop {
@@ -2828,7 +2828,7 @@ fn write_flat_opc_binary_part<W: std::io::Write>(
 
 #[cfg(feature = "flat-opc")]
 fn root_xml_bytes(bytes: &[u8]) -> Result<Vec<u8>, SdkError> {
-  let mut xml_reader = super::from_bytes_inner(bytes)?;
+  let mut xml_reader = super::from_bytes_inner(bytes);
   loop {
     match xml_reader.next_tag_event()? {
       super::PayloadEvent::Start(start, empty_tag) => {

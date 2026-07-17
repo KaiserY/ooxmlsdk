@@ -16,6 +16,7 @@ readme.workspace = true
 proc-macro = true
 
 [features]
+mce = []
 validators = []
 
 [dependencies]

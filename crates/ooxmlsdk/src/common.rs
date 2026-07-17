@@ -331,7 +331,7 @@ mod tests {
     xml: &str,
     f: impl FnOnce(Attribute<'_>, Decoder) -> Result<T, SdkError>,
   ) -> Result<T, SdkError> {
-    let mut reader = from_bytes_inner(xml.as_bytes())?;
+    let mut reader = from_bytes_inner(xml.as_bytes());
     let event = reader.next()?;
     let e = match event {
       PayloadEvent::Start(e, _) => e,

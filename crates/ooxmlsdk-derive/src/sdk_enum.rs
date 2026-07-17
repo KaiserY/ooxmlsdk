@@ -49,6 +49,8 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   Ok(quote! {
     impl crate::sdk::SdkEnum for #ident {
+      const TYPE_NAME: &'static str = #ty_name;
+
       fn as_xml_bytes(&self) -> &[u8] {
         match self {
           #( #as_xml_bytes_arms )*
@@ -61,13 +63,6 @@ pub(crate) fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::T
           #( #from_bytes_arms )*
           _ => None,
         }
-      }
-
-      fn from_xml_bytes(b: &[u8]) -> Result<Self, crate::common::SdkError> {
-        Self::try_from_xml_bytes(b).ok_or_else(|| crate::common::invalid_enum_value(
-            #ty_name,
-            String::from_utf8_lossy(b).into_owned(),
-        ))
       }
     }
 

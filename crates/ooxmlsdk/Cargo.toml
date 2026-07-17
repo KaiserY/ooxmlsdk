@@ -17,7 +17,7 @@ default = ["parts"]
 parts = ["dep:bytes", "dep:zip"]
 flat-opc = ["parts", "dep:base64"]
 validators = ["dep:regex", "ooxmlsdk-derive/validators"]
-mce = ["parts"]
+mce = ["parts", "ooxmlsdk-derive/mce"]
 
 [dependencies]
 base64 = { workspace = true, optional = true }

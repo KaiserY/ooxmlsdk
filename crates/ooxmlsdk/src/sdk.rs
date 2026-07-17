@@ -489,13 +489,23 @@ impl PresentationDocumentType {
 }
 
 pub trait SdkEnum: Sized {
+  #[doc(hidden)]
+  const TYPE_NAME: &'static str = "SdkEnum";
+
   fn as_xml_bytes(&self) -> &[u8];
 
   fn try_from_xml_bytes(value: &[u8]) -> Option<Self> {
     Self::from_xml_bytes(value).ok()
   }
 
-  fn from_xml_bytes(value: &[u8]) -> Result<Self, crate::common::SdkError>;
+  fn from_xml_bytes(value: &[u8]) -> Result<Self, crate::common::SdkError> {
+    Self::try_from_xml_bytes(value).ok_or_else(|| {
+      crate::common::invalid_enum_value(
+        Self::TYPE_NAME,
+        String::from_utf8_lossy(value).into_owned(),
+      )
+    })
+  }
 }
 
 pub trait SdkType: Sized {

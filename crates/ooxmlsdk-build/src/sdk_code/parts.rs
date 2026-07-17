@@ -395,16 +395,19 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
             storage.raw_copy_archived_extra(entry_index, &mut zip)?;
           }
           crate::common::PackageSaveEntry::ContentTypes => {
+            let mut bytes = Vec::with_capacity(32);
+            crate::sdk::SdkType::write_to(storage.content_types(), &mut bytes)?;
             zip.start_file("[Content_Types].xml", options)?;
-            crate::sdk::SdkType::write_to(storage.content_types(), &mut zip)?;
+            zip.write_all(&bytes)?;
           }
           crate::common::PackageSaveEntry::PackageRelationships => {
             let relationships = storage.package_relationships();
             if let Some(entry_index) = relationships.raw_archive_entry_index() {
               storage.raw_copy_archive_entry(entry_index, "_rels/.rels", &mut zip)?;
             } else {
+              let bytes = relationships.to_bytes_cow()?;
               zip.start_file("_rels/.rels", options)?;
-              relationships.write_xml(&mut zip)?;
+              zip.write_all(bytes.as_ref())?;
             }
           }
           crate::common::PackageSaveEntry::PartRelationships(part_id) => {
@@ -422,8 +425,9 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
             if let Some(entry_index) = relationships.raw_archive_entry_index() {
               storage.raw_copy_archive_entry(entry_index, &rels_path, &mut zip)?;
             } else {
+              let bytes = relationships.to_bytes_cow()?;
               zip.start_file(&rels_path, options)?;
-              relationships.write_xml(&mut zip)?;
+              zip.write_all(bytes.as_ref())?;
             }
           }
           crate::common::PackageSaveEntry::Part(part_id) => {
@@ -433,8 +437,9 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
               ))
             })?;
             if let Some(root_element) = crate::sdk::SdkPackage::root_element(package, part_id) {
+              let bytes = root_element.to_bytes()?;
               zip.start_file(part.path(), options)?;
-              root_element.write_to(&mut zip)?;
+              zip.write_all(&bytes)?;
             } else if !storage.raw_copy_part(part_id, &mut zip)? {
               zip.start_file(part.path(), options)?;
               zip.write_all(storage.part_bytes(part_id)?)?;

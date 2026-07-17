@@ -951,7 +951,6 @@ impl RelationshipSet {
     }
   }
 
-  #[cfg(feature = "flat-opc")]
   pub(crate) fn to_bytes_cow(&self) -> Result<Cow<'_, [u8]>, SdkError> {
     if let Some(bytes) = &self.raw_bytes {
       return Ok(Cow::Borrowed(bytes));
@@ -959,16 +958,6 @@ impl RelationshipSet {
     let mut bytes = Vec::with_capacity(32);
     crate::sdk::SdkType::write_to(&self.to_relationships(), &mut bytes)?;
     Ok(Cow::Owned(bytes))
-  }
-
-  #[inline]
-  pub(crate) fn write_xml<W: std::io::Write>(&self, writer: &mut W) -> Result<(), SdkError> {
-    if let Some(bytes) = &self.raw_bytes {
-      writer.write_all(bytes)?;
-    } else {
-      crate::sdk::SdkType::write_to(&self.to_relationships(), writer)?;
-    }
-    Ok(())
   }
 
   fn from_relationships(

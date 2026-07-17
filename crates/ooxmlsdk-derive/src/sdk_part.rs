@@ -1144,7 +1144,6 @@ fn part_handle_root_method_tokens(
           })? = Some(<Self as crate::sdk::SdkPartRoot>::wrap_root_element(root_element));
         }
 
-        crate::sdk::SdkPackage::storage_mut(package).mark_part_root_dirty(self.id)?;
         crate::sdk::SdkPackage::root_element_slot_mut(package, self.id)
           .and_then(Option::as_mut)
           .and_then(<Self as crate::sdk::SdkPartRoot>::root_element_mut)
@@ -1167,8 +1166,6 @@ fn part_handle_root_method_tokens(
             self.id,
           ))
         })? = Some(<Self as crate::sdk::SdkPartRoot>::wrap_root_element(root_element));
-
-        crate::sdk::SdkPackage::storage_mut(package).mark_part_root_dirty(self.id)?;
 
         Ok(())
       }

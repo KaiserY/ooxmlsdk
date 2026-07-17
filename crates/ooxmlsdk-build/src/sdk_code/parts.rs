@@ -387,38 +387,18 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       let storage = crate::sdk::SdkPackage::storage(package);
       storage.configure_zip_writer(&mut zip)?;
 
-      let must_serialize_root = storage.parts().iter().enumerate().any(|(index, part)| {
-        !part.is_deleted()
-          && crate::sdk::SdkPackage::should_serialize_root_element(
-            package,
-            crate::common::PartId::from_index(index),
-          )
-      });
-      if !must_serialize_root && storage.merge_original_archive_if_unchanged(&mut zip)? {
-        zip.finish()?;
-        return Ok(());
-      }
-
       for entry in storage.package_save_entries() {
         match entry {
           crate::common::PackageSaveEntry::ArchivedExtra(entry_index) => {
             storage.raw_copy_archived_extra(entry_index, &mut zip)?;
           }
           crate::common::PackageSaveEntry::ContentTypes => {
-            if let Some(entry_index) = storage.unchanged_content_types_archive_entry_index() {
-              storage.raw_copy_archive_entry(
-                entry_index,
-                "[Content_Types].xml",
-                &mut zip,
-              )?;
-            } else {
-              zip.start_file("[Content_Types].xml", options)?;
-              crate::sdk::SdkType::write_to(storage.content_types(), &mut zip)?;
-            }
+            zip.start_file("[Content_Types].xml", options)?;
+            crate::sdk::SdkType::write_to(storage.content_types(), &mut zip)?;
           }
           crate::common::PackageSaveEntry::PackageRelationships => {
             let relationships = storage.package_relationships();
-            if let Some(entry_index) = relationships.unchanged_archive_entry_index() {
+            if let Some(entry_index) = relationships.raw_archive_entry_index() {
               storage.raw_copy_archive_entry(entry_index, "_rels/.rels", &mut zip)?;
             } else {
               zip.start_file("_rels/.rels", options)?;
@@ -437,7 +417,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
               ))
             })?;
             let rels_path = crate::common::part_relationships_path(part.path());
-            if let Some(entry_index) = relationships.unchanged_archive_entry_index() {
+            if let Some(entry_index) = relationships.raw_archive_entry_index() {
               storage.raw_copy_archive_entry(entry_index, &rels_path, &mut zip)?;
             } else {
               zip.start_file(&rels_path, options)?;
@@ -450,9 +430,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
                 "part id {part_id:?} is not present in package storage"
               ))
             })?;
-            if crate::sdk::SdkPackage::should_serialize_root_element(package, part_id)
-              && let Some(root_element) = crate::sdk::SdkPackage::root_element(package, part_id)
-            {
+            if let Some(root_element) = crate::sdk::SdkPackage::root_element(package, part_id) {
               zip.start_file(part.path(), options)?;
               root_element.write_to(&mut zip)?;
             } else if !storage.raw_copy_part(part_id, &mut zip)? {

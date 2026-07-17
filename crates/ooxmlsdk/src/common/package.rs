@@ -248,7 +248,6 @@ impl Seek for PositionedFileReader {
 #[derive(Debug)]
 struct ArchiveBacking {
   archive: zip::ZipArchive<ArchiveReader>,
-  verbatim_merge_safe: OnceLock<bool>,
 }
 
 impl ArchiveBacking {
@@ -291,60 +290,6 @@ impl ArchiveBacking {
     }
     Ok(())
   }
-
-  fn can_merge_verbatim(&self) -> Result<bool, SdkError> {
-    if let Some(&safe) = self.verbatim_merge_safe.get() {
-      return Ok(safe);
-    }
-
-    let mut archive = self.archive.clone();
-    let mut safe = true;
-    for entry_index in 0..archive.len() {
-      let entry = archive.by_index_raw(entry_index)?;
-      if has_unicode_metadata_extra_field(entry.extra_data()) {
-        safe = false;
-        break;
-      }
-    }
-    let _ = self.verbatim_merge_safe.set(safe);
-    Ok(safe)
-  }
-
-  fn merge_into<W: std::io::Write + std::io::Seek>(
-    &self,
-    writer: &mut zip::ZipWriter<W>,
-  ) -> Result<(), SdkError> {
-    writer.merge_archive(self.archive.clone())?;
-    Ok(())
-  }
-}
-
-fn has_unicode_metadata_extra_field(extra_data: Option<&[u8]>) -> bool {
-  const UNICODE_COMMENT: u16 = 0x6375;
-  const UNICODE_PATH: u16 = 0x7075;
-
-  let Some(extra_data) = extra_data else {
-    return false;
-  };
-  let mut offset = 0usize;
-  while let Some(header) = extra_data.get(offset..offset.saturating_add(4)) {
-    let field_id = u16::from_le_bytes([header[0], header[1]]);
-    let field_len = usize::from(u16::from_le_bytes([header[2], header[3]]));
-    if matches!(field_id, UNICODE_COMMENT | UNICODE_PATH) {
-      return true;
-    }
-    let Some(next_offset) = offset
-      .checked_add(4)
-      .and_then(|offset| offset.checked_add(field_len))
-    else {
-      return false;
-    };
-    if next_offset > extra_data.len() {
-      return false;
-    }
-    offset = next_offset;
-  }
-  false
 }
 
 fn open_package_file(path: &Path) -> Result<std::fs::File, SdkError> {
@@ -722,7 +667,6 @@ pub struct RelationshipSet {
   by_id: HashMap<Box<str>, usize>,
   raw_bytes: Option<Box<[u8]>>,
   archive_entry_index: Option<usize>,
-  dirty: bool,
 }
 
 fn next_relationship_id<'a>(relationships: impl Iterator<Item = &'a RelationshipInfo>) -> String {
@@ -837,7 +781,6 @@ impl RelationshipSet {
   pub(crate) fn remove(&mut self, relationship_id: &str) -> Option<RelationshipInfo> {
     let index = *self.by_id.get(relationship_id)?;
     self.raw_bytes = None;
-    self.dirty = true;
     let removed = self.relationships.remove(index);
     self.rebuild_index();
     Some(removed)
@@ -935,7 +878,6 @@ impl RelationshipSet {
 
     self.relationships[index].id = new_relationship_id.into_boxed_str();
     self.raw_bytes = None;
-    self.dirty = true;
     self.rebuild_index();
     Ok(())
   }
@@ -1044,7 +986,6 @@ impl RelationshipSet {
       by_id: HashMap::with_capacity(relationships.relationship.len()),
       raw_bytes: None,
       archive_entry_index: None,
-      dirty: false,
     };
 
     for relationship in relationships.relationship {
@@ -1061,7 +1002,6 @@ impl RelationshipSet {
       by_id: HashMap::new(),
       raw_bytes: Some(bytes),
       archive_entry_index: None,
-      dirty: false,
     }
   }
 
@@ -1072,8 +1012,12 @@ impl RelationshipSet {
   }
 
   #[inline]
-  pub(crate) fn unchanged_archive_entry_index(&self) -> Option<usize> {
-    (!self.dirty).then_some(self.archive_entry_index).flatten()
+  pub(crate) fn raw_archive_entry_index(&self) -> Option<usize> {
+    self
+      .raw_bytes
+      .is_some()
+      .then_some(self.archive_entry_index)
+      .flatten()
   }
 
   #[inline]
@@ -1092,7 +1036,6 @@ impl RelationshipSet {
       )));
     }
     self.raw_bytes = None;
-    self.dirty = true;
     self.push_relationship_unchecked(relationship);
     Ok(self.relationships.last().expect("pushed relationship"))
   }
@@ -1120,7 +1063,6 @@ pub(crate) struct StoredPart {
   kind: crate::parts::PartKind,
   relationships: RelationshipSet,
   data: StoredPartData,
-  root_dirty: bool,
   deleted: bool,
 }
 
@@ -1180,7 +1122,6 @@ pub struct SdkPackageStorage {
   archived_extra_entry_indices: Box<[usize]>,
   content_types: Types,
   content_types_archive_entry_index: Option<usize>,
-  content_types_dirty: bool,
   package_relationships: RelationshipSet,
   parts: Vec<StoredPart>,
   by_path: HashMap<Box<str>, PartId>,
@@ -1196,7 +1137,6 @@ impl Clone for SdkPackageStorage {
       archived_extra_entry_indices: self.archived_extra_entry_indices.clone(),
       content_types: self.content_types.clone(),
       content_types_archive_entry_index: self.content_types_archive_entry_index,
-      content_types_dirty: self.content_types_dirty,
       package_relationships: self.package_relationships.clone(),
       parts: self.parts.clone(),
       by_path: self.by_path.clone(),
@@ -1217,7 +1157,6 @@ impl SdkPackageStorage {
       archived_extra_entry_indices: Box::new([]),
       content_types: empty_content_types(),
       content_types_archive_entry_index: None,
-      content_types_dirty: true,
       package_relationships: RelationshipSet::default(),
       parts: Vec::new(),
       by_path: HashMap::new(),
@@ -1353,15 +1292,11 @@ impl SdkPackageStorage {
           entry_index: raw_part.entry_index,
           bytes: OnceLock::new(),
         },
-        root_dirty: false,
         deleted: false,
       });
     }
 
-    let archive = Arc::new(ArchiveBacking {
-      archive,
-      verbatim_merge_safe: OnceLock::new(),
-    });
+    let archive = Arc::new(ArchiveBacking { archive });
 
     Ok(Self {
       id: PackageId::new(),
@@ -1369,7 +1304,6 @@ impl SdkPackageStorage {
       archived_extra_entry_indices,
       content_types,
       content_types_archive_entry_index: Some(content_types_archive_entry_index),
-      content_types_dirty: false,
       package_relationships,
       parts,
       by_path,
@@ -1448,7 +1382,6 @@ impl SdkPackageStorage {
           bytes: raw_part.bytes.into(),
           original_entry_index: None,
         },
-        root_dirty: false,
         deleted: false,
       });
     }
@@ -1459,7 +1392,6 @@ impl SdkPackageStorage {
       archived_extra_entry_indices: Box::new([]),
       content_types,
       content_types_archive_entry_index: None,
-      content_types_dirty: true,
       package_relationships,
       parts,
       by_path,
@@ -1536,13 +1468,6 @@ impl SdkPackageStorage {
     &self.content_types
   }
 
-  #[inline]
-  pub(crate) fn unchanged_content_types_archive_entry_index(&self) -> Option<usize> {
-    (!self.content_types_dirty)
-      .then_some(self.content_types_archive_entry_index)
-      .flatten()
-  }
-
   pub(crate) fn package_save_entries(&self) -> Vec<PackageSaveEntry> {
     let mut entries = Vec::with_capacity(
       self.parts.len().saturating_mul(2) + self.archived_extra_entry_indices.len() + 2,
@@ -1600,32 +1525,6 @@ impl SdkPackageStorage {
     Ok(())
   }
 
-  pub(crate) fn merge_original_archive_if_unchanged<W: std::io::Write + std::io::Seek>(
-    &self,
-    writer: &mut zip::ZipWriter<W>,
-  ) -> Result<bool, SdkError> {
-    let Some(archive) = &self.archive else {
-      return Ok(false);
-    };
-    if self.content_types_dirty
-      || self.package_relationships.dirty
-      || self.parts.iter().any(|part| {
-        part.deleted
-          || part.root_dirty
-          || part.relationships.dirty
-          || !matches!(part.data, StoredPartData::Archived { .. })
-      })
-    {
-      return Ok(false);
-    }
-    if !archive.can_merge_verbatim()? {
-      return Ok(false);
-    }
-
-    archive.merge_into(writer)?;
-    Ok(true)
-  }
-
   pub(crate) fn part_bytes(&self, part_id: PartId) -> Result<&[u8], SdkError> {
     let part = self.part(part_id).ok_or_else(|| {
       SdkError::CommonError(format!(
@@ -1660,29 +1559,6 @@ impl SdkPackageStorage {
     {
       let _ = bytes.take();
     }
-  }
-
-  #[inline]
-  pub(crate) fn mark_part_root_dirty(&mut self, part_id: PartId) -> Result<(), SdkError> {
-    let part = self.part_mut(part_id).ok_or_else(|| {
-      SdkError::CommonError(format!(
-        "part id {part_id:?} is not present in package storage"
-      ))
-    })?;
-    part.root_dirty = true;
-    Ok(())
-  }
-
-  #[inline]
-  pub(crate) fn clear_part_root_dirty(&mut self, part_id: PartId) {
-    if let Some(part) = self.part_mut(part_id) {
-      part.root_dirty = false;
-    }
-  }
-
-  #[inline]
-  pub(crate) fn part_root_dirty(&self, part_id: PartId) -> bool {
-    self.part(part_id).is_some_and(|part| part.root_dirty)
   }
 
   pub(crate) fn raw_copy_archive_entry<W: std::io::Write + std::io::Seek>(
@@ -2374,7 +2250,6 @@ impl SdkPackageStorage {
         bytes: Arc::<[u8]>::from([]),
         original_entry_index: None,
       },
-      root_dirty: false,
       deleted: false,
     });
     self.by_path.insert(path.clone().into_boxed_str(), part_id);
@@ -2413,7 +2288,6 @@ impl SdkPackageStorage {
   }
 
   fn add_content_type_override(&mut self, path: &str, content_type: &str) {
-    self.content_types_dirty = true;
     let part_name = format!("/{path}");
     if let Some(existing) = self
       .content_types
@@ -2439,7 +2313,6 @@ impl SdkPackageStorage {
   }
 
   fn remove_content_type_override(&mut self, path: &str) {
-    self.content_types_dirty = true;
     let part_name = format!("/{path}");
     self
       .content_types
@@ -3439,20 +3312,6 @@ fn is_relationships_part_path(path: &str) -> bool {
 mod tests {
   use super::*;
   use std::io::{Cursor, Write};
-
-  #[test]
-  fn unicode_metadata_extra_fields_disable_verbatim_archive_merge() {
-    let unicode_path_after_timestamp = [0x55, 0x54, 0x01, 0x00, 0x00, 0x75, 0x70, 0x00, 0x00];
-    let unicode_comment = [0x75, 0x63, 0x00, 0x00];
-    let ordinary_timestamp = [0x55, 0x54, 0x01, 0x00, 0x00];
-
-    assert!(has_unicode_metadata_extra_field(Some(
-      &unicode_path_after_timestamp
-    )));
-    assert!(has_unicode_metadata_extra_field(Some(&unicode_comment)));
-    assert!(!has_unicode_metadata_extra_field(Some(&ordinary_timestamp)));
-    assert!(!has_unicode_metadata_extra_field(None));
-  }
 
   #[test]
   fn storage_resolves_package_relationship_target_part_id() {

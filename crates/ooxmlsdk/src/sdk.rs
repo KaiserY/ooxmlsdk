@@ -948,8 +948,8 @@ impl MediaDataPartType {
 #[cfg(feature = "parts")]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum PackageOpenMode {
-  #[default]
   Eager,
+  #[default]
   Lazy,
 }
 
@@ -1036,7 +1036,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
   #[inline]
   fn open_settings(&self) -> &OpenSettings {
     static DEFAULT_SETTINGS: OpenSettings = OpenSettings {
-      open_mode: PackageOpenMode::Eager,
+      open_mode: PackageOpenMode::Lazy,
       markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
         process_mode: MarkupCompatibilityProcessMode::NoProcess,
         target_file_format_version: FileFormatVersion::Office2007,
@@ -1096,30 +1096,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
     &mut self,
     part_id: crate::common::PartId,
   ) -> Option<crate::parts::PartRootElement> {
-    let root = self.root_element_slot_mut(part_id)?.take();
-    if root.is_some() {
-      Self::storage_mut(self).clear_part_root_dirty(part_id);
-    }
-    root
-  }
-
-  #[inline]
-  #[doc(hidden)]
-  fn should_serialize_root_element(&self, part_id: crate::common::PartId) -> bool {
-    if Self::storage(self).part_root_dirty(part_id) {
-      return true;
-    }
-    #[cfg(feature = "mce")]
-    if !matches!(
-      self
-        .open_settings()
-        .markup_compatibility_process_settings
-        .process_mode,
-      MarkupCompatibilityProcessMode::NoProcess
-    ) {
-      return self.root_element(part_id).is_some();
-    }
-    false
+    self.root_element_slot_mut(part_id)?.take()
   }
 
   #[inline]
@@ -1128,9 +1105,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
     &self,
     part_id: crate::common::PartId,
   ) -> Result<Vec<u8>, crate::common::SdkError> {
-    if self.should_serialize_root_element(part_id)
-      && let Some(root_element) = self.root_element(part_id)
-    {
+    if let Some(root_element) = self.root_element(part_id) {
       root_element.to_bytes()
     } else {
       Ok(Self::storage(self).part_bytes(part_id)?.to_vec())
@@ -1152,9 +1127,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
     writer: &mut W,
   ) -> Result<(), crate::common::SdkError> {
     crate::sdk::SdkPackage::storage(self).write_flat_opc(writer, |part_id, _part| {
-      if crate::sdk::SdkPackage::should_serialize_root_element(self, part_id)
-        && let Some(root_element) = crate::sdk::SdkPackage::root_element(self, part_id)
-      {
+      if let Some(root_element) = crate::sdk::SdkPackage::root_element(self, part_id) {
         root_element.to_bytes()
       } else {
         Ok(

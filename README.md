@@ -71,8 +71,9 @@ The package API follows Open XML SDK container concepts. When relationship metad
 File-backed packages retain a safe positioned ZIP reader, while `new_from_bytes`
 can retain an `Arc<[u8]>` without another package-sized copy. Package metadata
 is read when opening, but individual Part payloads are decompressed on first
-access. Unmodified saves reuse the original compressed ZIP data; only changed
-Part payloads and relationship metadata are serialized again.
+access. The default open mode keeps typed Part roots lazy. Saving serializes
+package metadata and every loaded typed root, while Part payloads that were
+never loaded as typed roots reuse their original compressed ZIP data.
 
 ## Generated Schema API
 

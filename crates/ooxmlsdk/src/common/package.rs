@@ -7,16 +7,14 @@ use std::sync::{Arc, OnceLock};
 
 use bytes::Bytes;
 
-use crate::schemas::opc_content_types::{Types, TypesChoice};
-use crate::schemas::opc_relationships::{
-  Relationship as OpcRelationship, Relationships, TargetMode,
-};
-use crate::sdk::PackageOpenMode;
-
 #[cfg(feature = "flat-opc")]
 use super::unexpected_eof;
 use super::{
   SdkError, part_relationships_path, resolve_relationship_target_path, resolve_zip_file_path,
+};
+use crate::schemas::opc_content_types::{Types, TypesChoice};
+use crate::schemas::opc_relationships::{
+  Relationship as OpcRelationship, Relationships, TargetMode,
 };
 
 #[cfg(feature = "flat-opc")]
@@ -1127,8 +1125,7 @@ pub struct SdkPackageStorage {
   package_relationships: RelationshipSet,
   parts: Vec<StoredPart>,
   by_path: HashMap<Box<str>, PartId>,
-  preferred_main_part_content_type: Option<Box<str>>,
-  open_mode: PackageOpenMode,
+  preferred_main_part_content_type: Option<&'static str>,
 }
 
 impl Clone for SdkPackageStorage {
@@ -1142,17 +1139,13 @@ impl Clone for SdkPackageStorage {
       package_relationships: self.package_relationships.clone(),
       parts: self.parts.clone(),
       by_path: self.by_path.clone(),
-      preferred_main_part_content_type: self.preferred_main_part_content_type.clone(),
-      open_mode: self.open_mode,
+      preferred_main_part_content_type: self.preferred_main_part_content_type,
     }
   }
 }
 
 impl SdkPackageStorage {
-  pub(crate) fn create(
-    open_mode: PackageOpenMode,
-    preferred_main_part_content_type: Option<&str>,
-  ) -> Self {
+  pub(crate) fn create(preferred_main_part_content_type: Option<&'static str>) -> Self {
     Self {
       id: PackageId::new(),
       archive: None,
@@ -1162,15 +1155,11 @@ impl SdkPackageStorage {
       package_relationships: RelationshipSet::default(),
       parts: Vec::new(),
       by_path: HashMap::new(),
-      preferred_main_part_content_type: preferred_main_part_content_type.map(Into::into),
-      open_mode,
+      preferred_main_part_content_type,
     }
   }
 
-  pub(crate) fn open<R: Read + Seek>(
-    mut reader: R,
-    open_mode: PackageOpenMode,
-  ) -> Result<Self, SdkError> {
+  pub(crate) fn open<R: Read + Seek>(mut reader: R) -> Result<Self, SdkError> {
     let length = reader.seek(SeekFrom::End(0))?;
     reader.seek(SeekFrom::Start(0))?;
     let mut bytes = Vec::new();
@@ -1182,32 +1171,29 @@ impl SdkPackageStorage {
       ))
     })?;
     reader.read_to_end(&mut bytes)?;
-    Self::open_memory(bytes.into(), open_mode)
+    Self::open_memory(bytes.into())
   }
 
-  pub(crate) fn open_file(path: &Path, open_mode: PackageOpenMode) -> Result<Self, SdkError> {
+  pub(crate) fn open_file(path: &Path) -> Result<Self, SdkError> {
     #[cfg(any(unix, windows))]
     {
       let file = open_package_file(path)?;
       let reader = PositionedFileReader::new(file)?;
       let archive = zip::ZipArchive::new(ArchiveReader::File(reader))?;
-      Self::open_archive(archive, open_mode)
+      Self::open_archive(archive)
     }
     #[cfg(not(any(unix, windows)))]
     {
-      Self::open_memory(std::fs::read(path)?.into(), open_mode)
+      Self::open_memory(std::fs::read(path)?.into())
     }
   }
 
-  fn open_memory(bytes: Bytes, open_mode: PackageOpenMode) -> Result<Self, SdkError> {
+  fn open_memory(bytes: Bytes) -> Result<Self, SdkError> {
     let archive = zip::ZipArchive::new(ArchiveReader::Memory(Cursor::new(bytes)))?;
-    Self::open_archive(archive, open_mode)
+    Self::open_archive(archive)
   }
 
-  fn open_archive(
-    mut archive: zip::ZipArchive<ArchiveReader>,
-    open_mode: PackageOpenMode,
-  ) -> Result<Self, SdkError> {
+  fn open_archive(mut archive: zip::ZipArchive<ArchiveReader>) -> Result<Self, SdkError> {
     let opened = read_archive_model(&mut archive)?;
     let OpenedArchiveModel {
       content_types,
@@ -1302,15 +1288,11 @@ impl SdkPackageStorage {
       parts,
       by_path,
       preferred_main_part_content_type: None,
-      open_mode,
     })
   }
 
   #[cfg(feature = "flat-opc")]
-  pub(crate) fn open_flat_opc<R: std::io::BufRead>(
-    reader: R,
-    open_mode: PackageOpenMode,
-  ) -> Result<Self, SdkError> {
+  pub(crate) fn open_flat_opc<R: std::io::BufRead>(reader: R) -> Result<Self, SdkError> {
     let mut flat_parts = read_flat_opc_parts(reader)?;
     flat_parts.sort_by(|left, right| left.path.cmp(&right.path));
 
@@ -1390,7 +1372,6 @@ impl SdkPackageStorage {
       parts,
       by_path,
       preferred_main_part_content_type: None,
-      open_mode,
     })
   }
 
@@ -1626,12 +1607,12 @@ impl SdkPackageStorage {
 
   #[inline]
   pub(crate) fn preferred_main_part_content_type(&self) -> Option<&str> {
-    self.preferred_main_part_content_type.as_deref()
+    self.preferred_main_part_content_type
   }
 
   #[inline]
-  pub(crate) fn set_preferred_main_part_content_type(&mut self, content_type: impl Into<Box<str>>) {
-    self.preferred_main_part_content_type = Some(content_type.into());
+  pub(crate) fn set_preferred_main_part_content_type(&mut self, content_type: &'static str) {
+    self.preferred_main_part_content_type = Some(content_type);
   }
 
   #[inline]
@@ -3346,7 +3327,7 @@ mod tests {
     }
 
     buffer.set_position(0);
-    let storage = SdkPackageStorage::open(buffer, PackageOpenMode::Lazy).unwrap();
+    let storage = SdkPackageStorage::open(buffer).unwrap();
     let relationship = storage.package_relationships().get("rId1").unwrap();
     let part_id = relationship.target_part_id().unwrap();
     let part = storage.part(part_id).unwrap();
@@ -3450,7 +3431,7 @@ mod tests {
     }
 
     buffer.set_position(0);
-    let storage = SdkPackageStorage::open(buffer, PackageOpenMode::Lazy).unwrap();
+    let storage = SdkPackageStorage::open(buffer).unwrap();
     let sheet_part_id = storage
       .package_relationships()
       .get("rId1")

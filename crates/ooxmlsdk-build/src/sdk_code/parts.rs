@@ -266,18 +266,20 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       storage: &mut crate::common::SdkPackageStorage,
       open_settings: &crate::sdk::OpenSettings,
     ) -> Result<Vec<Option<crate::parts::PartRootElement>>, crate::common::SdkError> {
-      let mut root_elements = vec![None; storage.parts().len()];
-      if matches!(
+      if !matches!(
         open_settings.root_element_open_mode(),
         crate::common::PackageOpenMode::Eager
       ) {
-        for (index, slot) in root_elements.iter_mut().enumerate() {
-          let part_id = crate::common::PartId::from_index(index);
-          let root_element = crate::parts::PartRootElement::from_part_id(storage, part_id, open_settings)?;
-          if let Some(root_element) = root_element {
-            storage.discard_cached_part_bytes(part_id);
-            *slot = Some(root_element);
-          }
+        return Ok(Vec::new());
+      }
+
+      let mut root_elements = vec![None; storage.parts().len()];
+      for (index, slot) in root_elements.iter_mut().enumerate() {
+        let part_id = crate::common::PartId::from_index(index);
+        let root_element = crate::parts::PartRootElement::from_part_id(storage, part_id, open_settings)?;
+        if let Some(root_element) = root_element {
+          storage.discard_cached_part_bytes(part_id);
+          *slot = Some(root_element);
         }
       }
       Ok(root_elements)

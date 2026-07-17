@@ -200,24 +200,26 @@ fn collect_all_parts_from_relationships<P: SdkPackage + Sized>(
   relationships: &crate::common::RelationshipSet,
 ) -> Vec<crate::parts::PartRef> {
   let mut parts = Vec::new();
-  let mut visited = std::collections::HashSet::new();
-  let mut queue = std::collections::VecDeque::new();
+  let mut visited = vec![false; crate::sdk::SdkPackage::storage(package).parts().len()];
 
   for relationship in relationships.part_relationships() {
     if is_data_part_reference_relationship(relationship) {
       continue;
     }
     if let Some(part_id) = relationship.target_part_id()
-      && visited.insert(part_id)
+      && let Some(is_visited) = visited.get_mut(part_id.index())
+      && !*is_visited
+      && let Some(part) = crate::parts::PartRef::from_part_id(package, part_id)
     {
-      queue.push_back(part_id);
+      *is_visited = true;
+      parts.push(part);
     }
   }
 
-  while let Some(part_id) = queue.pop_front() {
-    if let Some(part) = crate::parts::PartRef::from_part_id(package, part_id) {
-      parts.push(part);
-    }
+  let mut current_index = 0;
+  while current_index < parts.len() {
+    let part_id = parts[current_index].part_id();
+    current_index += 1;
 
     if let Some(relationships) = crate::sdk::SdkPackage::storage(package).relationships(part_id) {
       for relationship in relationships.part_relationships() {
@@ -225,9 +227,12 @@ fn collect_all_parts_from_relationships<P: SdkPackage + Sized>(
           continue;
         }
         if let Some(child_part_id) = relationship.target_part_id()
-          && visited.insert(child_part_id)
+          && let Some(is_visited) = visited.get_mut(child_part_id.index())
+          && !*is_visited
+          && let Some(part) = crate::parts::PartRef::from_part_id(package, child_part_id)
         {
-          queue.push_back(child_part_id);
+          *is_visited = true;
+          parts.push(part);
         }
       }
     }
@@ -1096,6 +1101,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
     &mut self,
     part_id: crate::common::PartId,
   ) -> Option<crate::parts::PartRootElement> {
+    self.root_element(part_id)?;
     self.root_element_slot_mut(part_id)?.take()
   }
 
@@ -3549,19 +3555,15 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
     package: &'a P,
   ) -> impl Iterator<Item = crate::parts::PartRef> + 'a {
     let target_part_id = self.part_id();
-    package
-      .get_all_parts()
-      .filter(move |part| {
-        crate::sdk::SdkPackage::storage(package)
-          .relationships(part.part_id())
-          .is_some_and(|relationships| {
-            relationships
-              .part_relationships()
-              .any(|relationship| relationship.target_part_id() == Some(target_part_id))
-          })
-      })
-      .collect::<Vec<_>>()
-      .into_iter()
+    package.get_all_parts().filter(move |part| {
+      crate::sdk::SdkPackage::storage(package)
+        .relationships(part.part_id())
+        .is_some_and(|relationships| {
+          relationships
+            .part_relationships()
+            .any(|relationship| relationship.target_part_id() == Some(target_part_id))
+        })
+    })
   }
 
   #[inline]

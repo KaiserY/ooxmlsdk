@@ -1408,11 +1408,7 @@ fn sdk_type_root_methods_tokens(
 fn sdk_type_display_method_tokens() -> proc_macro2::TokenStream {
   quote! {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-      let xml = match <Self as crate::sdk::SdkType>::to_xml(self) {
-        Ok(xml) => xml,
-        Err(_) => return Err(::std::fmt::Error),
-      };
-      f.write_str(&xml)
+      crate::sdk::fmt_sdk_type(self, f)
     }
   }
 }

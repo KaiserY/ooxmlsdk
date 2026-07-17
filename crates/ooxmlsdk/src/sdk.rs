@@ -545,6 +545,30 @@ pub trait SdkType: Sized {
   }
 }
 
+pub(crate) trait SdkTypeDisplayWrite {
+  fn write_xml_to_vec(&self, writer: &mut Vec<u8>) -> Result<(), std::io::Error>;
+}
+
+impl<T: SdkType> SdkTypeDisplayWrite for T {
+  #[inline]
+  fn write_xml_to_vec(&self, writer: &mut Vec<u8>) -> Result<(), std::io::Error> {
+    self.write_to(writer)
+  }
+}
+
+#[inline(never)]
+pub(crate) fn fmt_sdk_type(
+  value: &dyn SdkTypeDisplayWrite,
+  f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+  let mut writer = Vec::with_capacity(32);
+  value
+    .write_xml_to_vec(&mut writer)
+    .map_err(|_| std::fmt::Error)?;
+  let xml = sdk_type_xml_string(writer).map_err(|_| std::fmt::Error)?;
+  f.write_str(&xml)
+}
+
 #[inline(never)]
 fn sdk_type_xml_string(writer: Vec<u8>) -> Result<String, crate::common::SdkError> {
   match String::from_utf8(writer) {

@@ -90,94 +90,94 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       }
     });
 
-  let part_kind_classify_branches =
-    variants
-      .iter()
-      .filter(|variant| !variant.extended)
-      .map(|variant| {
-        let attrs = cfg_attrs(&variant.attrs);
-        let variant_ident = &variant.ident;
-        let relationship_type = variant
-          .relationship_type
+  let mut variants_by_relationship =
+    std::collections::BTreeMap::<&str, Vec<&PartRefVariant>>::new();
+  for variant in variants.iter().filter(|variant| !variant.extended) {
+    let relationship_type = variant
+      .relationship_type
+      .as_deref()
+      .expect("non-extended PartRef variants require relationship type");
+    variants_by_relationship
+      .entry(relationship_type)
+      .or_default()
+      .push(variant);
+  }
+  let mut part_kind_classify_arms = Vec::with_capacity(variants_by_relationship.len());
+  for (relationship_type, variants) in variants_by_relationship {
+    let relationship_type_patterns = relationship_type_match_patterns(relationship_type);
+    let classify_branches = variants.into_iter().map(|variant| {
+      let attrs = cfg_attrs(&variant.attrs);
+      let variant_ident = &variant.ident;
+      let descriptor = variant
+        .descriptor
+        .as_ref()
+        .expect("non-extended PartRef variants require descriptor");
+      let content_type = LitByteStr::new(descriptor.content_type.as_bytes(), Span::call_site());
+      let path_prefix = descriptor.path_prefix.as_str();
+      let target_name = descriptor.target_name.as_str();
+      let content_type_match = quote! { content_type == #content_type };
+      let part_ref_guard = if descriptor.content_type.is_empty() {
+        quote! { true }
+      } else {
+        quote! { #content_type_match }
+      };
+      let office_document_guard = if descriptor.content_type.is_empty() {
+        if let Some(root) = variant
+          .root
           .as_ref()
-          .expect("non-extended PartRef variants require relationship type");
-        let relationship_type_bytes =
-          LitByteStr::new(relationship_type.as_bytes(), Span::call_site());
-        let descriptor = variant
-          .descriptor
-          .as_ref()
-          .expect("non-extended PartRef variants require descriptor");
-        let content_type = LitByteStr::new(descriptor.content_type.as_bytes(), Span::call_site());
-        let path_prefix = descriptor.path_prefix.as_str();
-        let target_name = descriptor.target_name.as_str();
-        let content_type_match = quote! { content_type == #content_type };
-        let part_ref_guard = if descriptor.content_type.is_empty() {
-          quote! { true }
-        } else {
-          quote! { #content_type_match }
-        };
-        let office_document_guard = if descriptor.content_type.is_empty() {
-          if let Some(root) = variant
-            .root
-            .as_ref()
-            .filter(|root| !root.content_type.is_empty())
-          {
-            let root_content_type =
-              LitByteStr::new(root.content_type.as_bytes(), Span::call_site());
-            quote! {
-              crate::sdk::part_root_content_type_matches_bytes(
-                #root_content_type,
-                content_type,
-              ) || crate::common::package_main_part_path_matches(
-                path,
-                #path_prefix,
-                #target_name,
-              )
-            }
-          } else {
-            quote! {
-              crate::common::package_main_part_path_matches(
-                path,
-                #path_prefix,
-                #target_name,
-              )
-            }
-          }
-        } else {
-          quote! {
-            #content_type_match
-              || crate::common::package_main_part_path_matches(
-                path,
-                #path_prefix,
-                #target_name,
-              )
-          }
-        };
-
-        if relationship_type
-          == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+          .filter(|root| !root.content_type.is_empty())
         {
+          let root_content_type = LitByteStr::new(root.content_type.as_bytes(), Span::call_site());
           quote! {
-            #( #attrs )*
-            if crate::common::relationship_type_matches_bytes(
-              relationship_type,
-              #relationship_type_bytes,
-            ) && (#office_document_guard) {
-              return Self::#variant_ident;
-            }
+            crate::sdk::part_root_content_type_matches_bytes(
+              #root_content_type,
+              content_type,
+            ) || crate::common::package_main_part_path_matches(
+              path,
+              #path_prefix,
+              #target_name,
+            )
           }
         } else {
           quote! {
-            #( #attrs )*
-            if crate::common::relationship_type_matches_bytes(
-              relationship_type,
-              #relationship_type_bytes,
-            ) && (#part_ref_guard) {
-              return Self::#variant_ident;
-            }
+            crate::common::package_main_part_path_matches(
+              path,
+              #path_prefix,
+              #target_name,
+            )
           }
         }
-      });
+      } else {
+        quote! {
+          #content_type_match
+            || crate::common::package_main_part_path_matches(
+              path,
+              #path_prefix,
+              #target_name,
+            )
+        }
+      };
+
+      let guard = if relationship_type
+        == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+      {
+        office_document_guard
+      } else {
+        part_ref_guard
+      };
+      quote! {
+        #( #attrs )*
+        if #guard {
+          return Self::#variant_ident;
+        }
+      }
+    });
+    part_kind_classify_arms.push(quote! {
+      #( #relationship_type_patterns )|* => {
+        #( #classify_branches )*
+      }
+    });
+  }
 
   let part_ref_from_kind_arms =
     variants
@@ -284,9 +284,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
     quote! {
       #( #attrs )*
       Self::#variant_ident(root) => {
-        let mut bytes = Vec::with_capacity(32);
         crate::sdk::SdkType::write_to(root.as_ref(), &mut bytes)?;
-        Ok(bytes)
       },
     }
   });
@@ -298,40 +296,23 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       Self::#variant_ident(root) => Ok(crate::sdk::SdkType::write_to(root.as_ref(), writer)?),
     }
   });
+  let root_content_type_arms = root_variants.clone().map(|(variant, root)| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    let content_type = LitByteStr::new(root.content_type.as_bytes(), Span::call_site());
+    quote! {
+      #( #attrs )*
+      PartKind::#variant_ident => #content_type.as_slice(),
+    }
+  });
   let root_from_part_id_arms = root_variants.clone().map(|(variant, root)| {
     let attrs = cfg_attrs(&variant.attrs);
     let variant_ident = &variant.ident;
     let root_ty = &root.element_ty;
-    let content_type = LitByteStr::new(root.content_type.as_bytes(), Span::call_site());
-    let chart_raw_fallback = if variant_ident == "ChartPart" {
-      quote! {
-        if crate::common::root_element_matches_namespace_local(
-          bytes,
-          b"http://schemas.microsoft.com/office/drawing/2014/chartex",
-          b"chartSpace",
-        )? {
-          return Ok(None);
-        }
-      }
-    } else {
-      quote! {}
-    };
     quote! {
       #( #attrs )*
       PartKind::#variant_ident => {
-        if !crate::sdk::part_root_content_type_matches_bytes(
-          #content_type,
-          part.content_type().as_bytes(),
-        ) {
-          return Ok(None);
-        }
-        let bytes = storage.part_bytes(part_id)?;
-        #chart_raw_fallback
-        let root = if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
-          <#root_ty as crate::sdk::SdkType>::from_bytes(&bytes)?
-        } else {
-          <#root_ty as crate::sdk::SdkType>::from_bytes(bytes)?
-        };
+        let root = <#root_ty as crate::sdk::SdkType>::from_bytes(bytes)?;
         #[cfg(feature = "mce")]
         let mut root = root;
         #[cfg(feature = "mce")]
@@ -380,7 +361,10 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         let Some(relationship_type) = relationship_type else {
           return Self::#extended_ident;
         };
-        #( #part_kind_classify_branches )*
+        match relationship_type {
+          #( #part_kind_classify_arms, )*
+          _ => {}
+        }
         Self::#extended_ident
       }
     }
@@ -404,9 +388,11 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       #( #root_accessor_methods )*
 
       pub fn to_bytes(&self) -> Result<Vec<u8>, crate::common::SdkError> {
+        let mut bytes = Vec::with_capacity(32);
         match self {
           #( #root_to_bytes_arms )*
         }
+        Ok(bytes)
       }
 
       pub fn write_to<W: std::io::Write>(
@@ -428,6 +414,28 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         };
         #[cfg(not(feature = "mce"))]
         let _ = open_settings;
+        let expected_content_type = match part.kind() {
+          #( #root_content_type_arms )*
+          _ => return Ok(None),
+        };
+        if !crate::sdk::part_root_content_type_matches_bytes(
+          expected_content_type,
+          part.content_type().as_bytes(),
+        ) {
+          return Ok(None);
+        }
+        let bytes = storage.part_bytes(part_id)?;
+        if matches!(part.kind(), PartKind::ChartPart)
+          && crate::common::root_element_matches_namespace_local(
+            bytes,
+            b"http://schemas.microsoft.com/office/drawing/2014/chartex",
+            b"chartSpace",
+          )?
+        {
+          return Ok(None);
+        }
+        let decoded_bytes = crate::common::decode_utf16_xml_bytes(bytes)?;
+        let bytes = decoded_bytes.as_deref().unwrap_or(bytes);
         match part.kind() {
           #( #root_from_part_id_arms )*
           _ => Ok(None),
@@ -676,6 +684,45 @@ fn simple_snake_case(value: &str) -> String {
     }
   }
   out
+}
+
+fn relationship_type_match_patterns(relationship_type: &str) -> Vec<LitByteStr> {
+  const TRANSITIONAL_PREFIX: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+  const STRICT_PREFIX: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/";
+
+  let mut patterns = vec![LitByteStr::new(
+    relationship_type.as_bytes(),
+    Span::call_site(),
+  )];
+  if let Some(suffix) = relationship_type.strip_prefix(TRANSITIONAL_PREFIX) {
+    patterns.push(LitByteStr::new(
+      format!("{STRICT_PREFIX}{suffix}").as_bytes(),
+      Span::call_site(),
+    ));
+  } else if let Some(suffix) = relationship_type.strip_prefix(STRICT_PREFIX) {
+    patterns.push(LitByteStr::new(
+      format!("{TRANSITIONAL_PREFIX}{suffix}").as_bytes(),
+      Span::call_site(),
+    ));
+  }
+
+  let o12_alias = match relationship_type {
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" => {
+      Some("http://schemas.microsoft.com/office/2006/relationships/officeDocument")
+    }
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" => {
+      Some("http://schemas.microsoft.com/office/2006/relationships/docPropsApp")
+    }
+    "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" => {
+      Some("http://schemas.microsoft.com/package/2005/06/relationships/metadata/core-properties")
+    }
+    _ => None,
+  };
+  if let Some(alias) = o12_alias {
+    patterns.push(LitByteStr::new(alias.as_bytes(), Span::call_site()));
+  }
+  patterns
 }
 
 fn cfg_attrs(attrs: &[Attribute]) -> Vec<Attribute> {

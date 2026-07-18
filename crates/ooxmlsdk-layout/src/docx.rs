@@ -12360,18 +12360,10 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
   let mut setup = PageSetup::default();
 
   if let Some(size) = &section.page_size {
-    if let Some(width) = size
-      .width
-      .as_ref()
-      .and_then(libreoffice_page_size_measure_to_points)
-    {
+    if let Some(width) = size.width.as_ref().and_then(twips_measure_to_points) {
       setup.width_pt = width;
     }
-    if let Some(height) = size
-      .height
-      .as_ref()
-      .and_then(libreoffice_page_size_measure_to_points)
-    {
+    if let Some(height) = size.height.as_ref().and_then(twips_measure_to_points) {
       setup.height_pt = height;
     }
   }
@@ -12435,43 +12427,6 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     .map(|pitch| units::twips_to_points(pitch as f32));
 
   setup
-}
-
-fn libreoffice_page_size_measure_to_points(value: &TwipsMeasureValue) -> Option<f32> {
-  let twips = twips_measure_to_twips(value)?;
-  Some(lo_mm100_to_points(lo_sloppy_fit_page_dimension_mm100(
-    lo_twips_to_mm100(twips),
-  )))
-}
-
-fn lo_twips_to_mm100(twips: f32) -> f32 {
-  // CT_PageSz_w/h via convertTwipToMm100() before PaperInfo sloppy fitting.
-  (twips * 127.0 / 72.0).round()
-}
-
-fn lo_mm100_to_points(mm100: f32) -> f32 {
-  mm100 * units::POINTS_PER_INCH / (units::MILLIMETERS_PER_INCH * 100.0)
-}
-
-fn lo_sloppy_fit_page_dimension_mm100(mm100: f32) -> f32 {
-  // PaperInfo::sloppyFitPageDimension(), using dimensions from aDinTab.
-  const MAX_SLOPPY_MM100: f32 = 44.0;
-  const DIMENSIONS_MM100: &[f32] = &[
-    84100.0, 118900.0, 59400.0, 42000.0, 29700.0, 21000.0, 14800.0, 25000.0, 35300.0, 17600.0,
-    21590.0, 27940.0, 35560.0, 43180.0, 12500.0, 22900.0, 32400.0, 16200.0, 11400.0, 11000.0,
-    22000.0, 18000.0, 27000.0, 28000.0, 55880.0, 86360.0, 72550.0, 26670.0, 9843.0, 19050.0,
-    9208.0, 16510.0, 22543.0, 10478.0, 24130.0, 26353.0, 12065.0, 18400.0, 26000.0, 13000.0,
-    14000.0, 20300.0, 25700.0, 36400.0, 18200.0, 13970.0, 29210.0, 21519.0, 27517.0, 25400.0,
-    13970.0, 29210.0, 30500.0, 48700.0, 32233.0, 33000.0, 20000.0, 10500.0, 7400.0, 5200.0, 3700.0,
-    2600.0, 100000.0, 141400.0, 70700.0, 50000.0, 8800.0, 6200.0, 4400.0, 3100.0, 45800.0, 64800.0,
-    8100.0, 22860.0, 30480.0, 45720.0, 60960.0, 91440.0, 121920.0, 15750.0, 75000.0, 33866.0,
-    19500.0, 19700.0, 27300.0,
-  ];
-  DIMENSIONS_MM100
-    .iter()
-    .copied()
-    .find(|dimension| (mm100 - *dimension).abs() < MAX_SLOPPY_MM100)
-    .unwrap_or(mm100)
 }
 
 fn line_numbering_model(properties: &w::LineNumberType) -> Option<LineNumbering> {
@@ -13922,6 +13877,27 @@ mod tests {
     assert_eq!(sections[1].break_kind, SectionBreakKind::NextPage);
     assert_eq!(sections[1].page.width_pt, 792.0);
     assert_eq!(sections[1].page.height_pt, 612.0);
+  }
+
+  #[test]
+  fn page_setup_preserves_custom_twip_dimensions() {
+    let setup = page_setup(&section(
+      5000,
+      8000,
+      w::PageOrientationValues::Portrait,
+      None,
+    ));
+
+    assert_eq!(setup.width_pt, 250.0);
+    assert_eq!(setup.height_pt, 400.0);
+  }
+
+  #[test]
+  fn default_page_setup_uses_reference_a4_paper() {
+    let setup = PageSetup::default();
+
+    assert!((setup.width_pt - units::millimeters_to_points(210.0)).abs() < 0.001);
+    assert!((setup.height_pt - units::millimeters_to_points(297.0)).abs() < 0.001);
   }
 
   #[test]

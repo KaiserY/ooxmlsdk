@@ -128,8 +128,10 @@ pub struct PageSetup {
 impl Default for PageSetup {
   fn default() -> Self {
     Self {
-      width_pt: 612.0,
-      height_pt: 792.0,
+      // The fixed-output reference environment uses A4 as its default paper.
+      // Explicit w:pgSz and SpreadsheetML paper sizes replace these values.
+      width_pt: 595.2756,
+      height_pt: 841.8898,
       margin_top_pt: 72.0,
       margin_right_pt: 72.0,
       margin_bottom_pt: 72.0,

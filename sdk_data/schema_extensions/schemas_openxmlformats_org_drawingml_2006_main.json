@@ -26,6 +26,12 @@
           "QName": "mc:AlternateContent",
           "PayloadRustType": "AlternateContent",
           "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006"
+        },
+        {
+          "RustName": "ExtendedChartReference",
+          "QName": "cx:chart",
+          "PayloadRustType": "RelId",
+          "PayloadModulePath": "crate::schemas::schemas_microsoft_com_office_drawing_2014_chartex"
         }
       ]
     },

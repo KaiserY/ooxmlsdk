@@ -30,6 +30,7 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_drawingml_2006_main as a,
   schemas_openxmlformats_org_drawingml_2006_picture as pic,
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
+  schemas_openxmlformats_org_markup_compatibility_2006 as mc,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
 use ooxmlsdk::sdk::SdkType;
@@ -37,10 +38,6 @@ use ooxmlsdk::simple_type::{
   DrawingmlPercentageValue, MeasurementOrPercentValue, SignedTwipsMeasureValue, TwipsMeasureValue,
 };
 use ooxmlsdk::units as sdk_units;
-use quick_xml::Reader;
-use quick_xml::Writer;
-use quick_xml::escape::unescape;
-use quick_xml::events::{Event, attributes::Attribute};
 use smallvec::SmallVec;
 
 use crate::error::Result;
@@ -3027,7 +3024,20 @@ fn paragraph_inlines(
         None,
         &mut inline_context,
       ),
-      w::ParagraphChoice::AlternateContent(_) => {}
+      w::ParagraphChoice::AlternateContent(alternate_content) => {
+        push_alternate_content_inlines(
+          alternate_content,
+          &mut inlines,
+          AlternateContentImportContext {
+            base_style: base_style.clone(),
+            style: base_style.clone(),
+            styles,
+            images,
+            hyperlinks,
+            hyperlink_url: None,
+          },
+        );
+      }
       _ => {}
     }
   }
@@ -3929,7 +3939,27 @@ fn push_run(
         }
       }
       w::RunChoice::PositionalTab(_) => text.push('\t'),
-      w::RunChoice::AlternateContent(_) => {}
+      w::RunChoice::AlternateContent(alternate_content) => {
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
+        push_alternate_content_inlines(
+          alternate_content,
+          inlines,
+          AlternateContentImportContext {
+            base_style: base_style.clone(),
+            style: style.clone(),
+            styles,
+            images,
+            hyperlinks,
+            hyperlink_url: hyperlink_url.map(str::to_owned),
+          },
+        );
+      }
       w::RunChoice::Ruby(ruby) => {
         flush_run_text(
           inlines,
@@ -3953,6 +3983,132 @@ fn push_run(
   }
 
   flush_run_text(inlines, &mut text, style, hyperlink_url, &style_ref_keys);
+}
+
+#[derive(Clone)]
+struct AlternateContentImportContext<'a> {
+  base_style: TextStyle,
+  style: TextStyle,
+  styles: &'a StylesCatalog,
+  images: &'a ImageCatalog,
+  hyperlinks: &'a HyperlinkCatalog,
+  hyperlink_url: Option<String>,
+}
+
+fn push_alternate_content_inlines(
+  alternate_content: &mc::AlternateContent,
+  inlines: &mut Vec<InlineItem>,
+  context: AlternateContentImportContext<'_>,
+) {
+  let fallback =
+    alternate_content
+      .alternate_content_choice
+      .iter()
+      .find_map(|branch| match branch {
+        mc::AlternateContentChoice::Fallback(fallback) => Some(fallback.as_ref()),
+        _ => None,
+      });
+
+  for choice in alternate_content
+    .alternate_content_choice
+    .iter()
+    .filter_map(|branch| match branch {
+      mc::AlternateContentChoice::Choice(choice) => Some(choice.as_ref()),
+      _ => None,
+    })
+  {
+    let mut choice_inlines = Vec::new();
+    for child in &choice.xml_children {
+      push_alternate_content_child(child, &mut choice_inlines, &context, true);
+    }
+    if !choice_inlines.is_empty() {
+      inlines.extend(choice_inlines);
+      return;
+    }
+  }
+
+  if let Some(fallback) = fallback {
+    for child in &fallback.xml_children {
+      push_alternate_content_child(child, inlines, &context, false);
+    }
+  }
+}
+
+fn push_alternate_content_child(
+  xml: &[u8],
+  inlines: &mut Vec<InlineItem>,
+  context: &AlternateContentImportContext<'_>,
+  choice_branch: bool,
+) {
+  let Ok(xml_text) = std::str::from_utf8(xml) else {
+    return;
+  };
+  match root_qname(xml_text) {
+    Some("w:r") => {
+      if let Ok(run) = w::Run::from_bytes(xml) {
+        push_run(
+          &run,
+          inlines,
+          context.base_style.clone(),
+          context.styles,
+          context.images,
+          context.hyperlinks,
+          context.hyperlink_url.as_deref(),
+        );
+      }
+    }
+    Some("w:drawing") => {
+      let Ok(drawing) = w::Drawing::from_bytes(xml) else {
+        return;
+      };
+      if choice_branch
+        && drawing_graphic_data(&drawing).is_some_and(|graphic_data| {
+          graphic_data.uri
+            == "http://schemas.microsoft.com/office/word/2008/6/28/wordprocessingShape"
+        })
+      {
+        return;
+      }
+      if let Some(image) =
+        drawing::inline_image(&drawing, context.styles, context.images, context.hyperlinks)
+      {
+        inlines.push(InlineItem::Image(image));
+      }
+      drawing::push_drawing_shapes(
+        &drawing,
+        inlines,
+        context.styles,
+        context.images,
+        context.hyperlinks,
+      );
+      drawing::push_drawing_textboxes(
+        &drawing,
+        inlines,
+        context.style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+      );
+    }
+    Some("w:pict") => {
+      let Ok(picture) = w::Picture::from_bytes(xml) else {
+        return;
+      };
+      if let Some(image) = drawing::pict_image(&picture, context.images) {
+        inlines.push(InlineItem::Image(image));
+      }
+      drawing::push_pict_shapes(&picture, inlines, context.images);
+      drawing::push_pict_textboxes(
+        &picture,
+        inlines,
+        context.base_style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+      );
+    }
+    _ => {}
+  }
 }
 
 fn push_hidden_style_ref_run(
@@ -4304,85 +4460,6 @@ fn sdt_list_item_display_texts(items: &[w::ListItem]) -> Vec<String> {
         .unwrap_or_default()
     })
     .collect()
-}
-
-#[cfg(test)]
-fn push_run_xml_any(
-  xml: &[u8],
-  inlines: &mut Vec<InlineItem>,
-  base_style: TextStyle,
-  style: TextStyle,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-) {
-  if let Ok(drawing) = w::Drawing::from_bytes(xml) {
-    if let Some(image) = drawing::inline_image(&drawing, styles, images, hyperlinks) {
-      inlines.push(InlineItem::Image(image));
-    }
-    drawing::push_drawing_shapes(&drawing, inlines, styles, images, hyperlinks);
-    let textbox_start = inlines.len();
-    drawing::push_drawing_textboxes(&drawing, inlines, style, styles, images, hyperlinks);
-    if inlines.len() == textbox_start {
-      push_alternate_content_pict_textboxes(xml, inlines, base_style, styles, images, hyperlinks);
-    }
-    return;
-  }
-
-  if let Some(drawing_xml) = first_named_xml_fragment_bytes(xml, b"drawing")
-    && let Ok(drawing) = w::Drawing::from_bytes(drawing_xml.as_bytes())
-  {
-    if let Some(image) = drawing::inline_image(&drawing, styles, images, hyperlinks) {
-      inlines.push(InlineItem::Image(image));
-    }
-    drawing::push_drawing_shapes(&drawing, inlines, styles, images, hyperlinks);
-    let textbox_start = inlines.len();
-    drawing::push_drawing_textboxes(&drawing, inlines, style, styles, images, hyperlinks);
-    if inlines.len() == textbox_start {
-      push_alternate_content_pict_textboxes(xml, inlines, base_style, styles, images, hyperlinks);
-    }
-    return;
-  }
-
-  if let Ok(picture) = w::Picture::from_bytes(xml) {
-    if let Some(image) = drawing::pict_image(&picture, images) {
-      inlines.push(InlineItem::Image(image));
-    }
-    drawing::push_pict_shapes(&picture, inlines, images);
-    drawing::push_pict_textboxes(&picture, inlines, base_style, styles, images, hyperlinks);
-    return;
-  }
-
-  if let Some(picture_xml) = first_named_xml_fragment_bytes(xml, b"pict")
-    && let Ok(picture) = w::Picture::from_bytes(picture_xml.as_bytes())
-  {
-    if let Some(image) = drawing::pict_image(&picture, images) {
-      inlines.push(InlineItem::Image(image));
-    }
-    drawing::push_pict_shapes(&picture, inlines, images);
-    drawing::push_pict_textboxes(&picture, inlines, base_style, styles, images, hyperlinks);
-  }
-}
-
-#[cfg(test)]
-fn push_alternate_content_pict_textboxes(
-  xml: &[u8],
-  inlines: &mut Vec<InlineItem>,
-  base_style: TextStyle,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-) {
-  if !(xml_contains(xml, b"AlternateContent") && xml_contains(xml, b"txbxContent")) {
-    return;
-  }
-  let Some(picture_xml) = first_named_xml_fragment_bytes(xml, b"pict") else {
-    return;
-  };
-  let Ok(picture) = w::Picture::from_bytes(picture_xml.as_bytes()) else {
-    return;
-  };
-  drawing::push_pict_textboxes(&picture, inlines, base_style, styles, images, hyperlinks);
 }
 
 fn push_inserted_run(
@@ -5396,161 +5473,6 @@ struct DrawingShapeImportContext<'a> {
   smartart_text_colors_by_model_id: Option<&'a HashMap<String, RgbColor>>,
 }
 
-fn drawingml_textbox_frames_from_xml(
-  xml: &[u8],
-  placement: ImagePlacement,
-  transform: DrawingMlGroupTransform,
-  context: DrawingTextBoxImportContext<'_>,
-  skip_container_root: bool,
-) -> Vec<InlineShape> {
-  let mut frames = Vec::new();
-  let mut reader = Reader::from_reader(xml);
-  reader.config_mut().trim_text(false);
-  let mut skipped_container_root = false;
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) if skip_container_root && !skipped_container_root => {
-        skipped_container_root = true;
-        if qname_ends_with(event.name().as_ref(), b"wgp") {
-          continue;
-        }
-      }
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wgp") => {
-        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event) {
-          let child_transform = drawingml_group_transform_from_fragment(&fragment)
-            .map(|xfrm| transform.child(xfrm))
-            .unwrap_or(transform);
-          frames.extend(drawingml_textbox_frames_from_xml(
-            fragment.as_bytes(),
-            drawingml_group_child_placement(placement),
-            child_transform,
-            context.clone(),
-            true,
-          ));
-        }
-      }
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
-        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
-          && let Some(frame) = drawingml_textbox_frame_from_fragment(
-            &fragment,
-            placement,
-            transform,
-            context.base_style.clone(),
-            context.styles,
-            context.images,
-            context.hyperlinks,
-          )
-        {
-          frames.push(frame);
-        }
-      }
-      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
-        let mut writer = Writer::new(Vec::new());
-        if writer.write_event(Event::Empty(event.into_owned())).is_ok()
-          && let Ok(fragment) = String::from_utf8(writer.into_inner())
-          && let Some(frame) = drawingml_textbox_frame_from_fragment(
-            &fragment,
-            placement,
-            transform,
-            context.base_style.clone(),
-            context.styles,
-            context.images,
-            context.hyperlinks,
-          )
-        {
-          frames.push(frame);
-        }
-      }
-      Ok(Event::Eof) | Err(_) => break,
-      _ => {}
-    }
-  }
-
-  frames
-}
-
-fn drawingml_textbox_frame_from_fragment(
-  xml: &str,
-  placement: ImagePlacement,
-  transform: DrawingMlGroupTransform,
-  base_style: TextStyle,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-) -> Option<InlineShape> {
-  let content = drawing_textbox_content(xml.as_bytes())?;
-  let text_box =
-    text_box_frame_from_drawingml(xml, &content, base_style, styles, images, hyperlinks);
-  let auto_fit = drawingml_textbox_uses_auto_fit(xml);
-  let expands_auto_fit = auto_fit && drawingml_textbox_is_vertical(xml);
-  let frame_stroke = drawingml_textbox_frame_stroke(xml, styles, auto_fit, placement);
-  let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
-    drawingml_shape_geometry_with_transform(xml, transform)?;
-  let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
-    transform.rect(offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt);
-  let width_pt = if expands_auto_fit {
-    shape_width_pt.max(DEFAULT_TEXTBOX_AUTO_FIT_WIDTH_PT)
-  } else {
-    shape_width_pt.max(DEFAULT_TEXTBOX_MIN_WIDTH_PT)
-  };
-  let height_pt = if expands_auto_fit {
-    shape_height_pt.max(300.0)
-  } else {
-    shape_height_pt.max(DEFAULT_TEXTBOX_MIN_HEIGHT_PT)
-  };
-  let mut wordart_fill_colors = if drawingml_textbox_has_fontwork_warp(xml) {
-    drawingml_text_fill_colors(xml, &styles.theme_colors)
-  } else {
-    Vec::new()
-  };
-  if wordart_fill_colors.is_empty()
-    && drawingml_textbox_has_fontwork_warp(xml)
-    && let Some(color) = first_text_color_in_blocks(&text_box.blocks)
-  {
-    wordart_fill_colors.push(color);
-  }
-  let fill_color = wordart_fill_colors.first().copied();
-  let additional_fill_colors = wordart_fill_colors.into_iter().skip(1).collect();
-  let geometry = if drawingml_textbox_has_fontwork_warp(xml) {
-    fontwork_warp_geometry()
-  } else {
-    InlineShapeGeometry::Rectangle
-  };
-  let placement = if auto_fit {
-    autofit_textbox_placement(placement)
-  } else {
-    placement
-  };
-
-  Some(InlineShape {
-    width_pt,
-    height_pt,
-    effect_left_pt: 0.0,
-    effect_top_pt: 0.0,
-    effect_right_pt: 0.0,
-    effect_bottom_pt: 0.0,
-    geometry,
-    offset_x_pt,
-    offset_y_pt,
-    fill_color,
-    additional_fill_colors,
-    fill_image: None,
-    stroke: frame_stroke.or_else(|| expands_auto_fit.then_some(BorderStyle::default())),
-    suppress_zero_relative_background: false,
-    allow_outside_page: false,
-    inline_anchor_after_line: matches!(placement, ImagePlacement::Inline),
-    placement,
-    text_box_blocks: text_box.blocks,
-    text_inset_left_pt: text_box.left_pt,
-    text_inset_top_pt: text_box.top_pt,
-    text_inset_right_pt: text_box.right_pt,
-    text_inset_bottom_pt: text_box.bottom_pt,
-    text_box_auto_fit: auto_fit,
-    text_vertical_alignment: text_box.vertical_alignment,
-  })
-}
-
 fn autofit_textbox_placement(placement: ImagePlacement) -> ImagePlacement {
   match placement {
     ImagePlacement::Floating(mut placement) => {
@@ -5563,10 +5485,6 @@ fn autofit_textbox_placement(placement: ImagePlacement) -> ImagePlacement {
   }
 }
 
-fn drawingml_textbox_uses_auto_fit(xml: &str) -> bool {
-  xml.contains(":spAutoFit") || xml.contains("<spAutoFit")
-}
-
 fn wordprocessing_shape_textbox_uses_auto_fit(shape: &wps::WordprocessingShape) -> bool {
   matches!(
     shape
@@ -5577,10 +5495,6 @@ fn wordprocessing_shape_textbox_uses_auto_fit(shape: &wps::WordprocessingShape) 
   )
 }
 
-fn drawingml_textbox_is_vertical(xml: &str) -> bool {
-  xml.contains("vert=\"vert\"")
-}
-
 fn wordprocessing_shape_textbox_is_vertical(shape: &wps::WordprocessingShape) -> bool {
   matches!(
     shape
@@ -5589,15 +5503,6 @@ fn wordprocessing_shape_textbox_is_vertical(shape: &wps::WordprocessingShape) ->
       .and_then(|properties| properties.vertical),
     Some(a::TextVerticalValues::Vertical)
   )
-}
-
-fn drawingml_textbox_has_fontwork_warp(xml: &str) -> bool {
-  first_named_xml_fragment(xml, b"prstTxWarp").is_some_and(|fragment| {
-    !fragment.contains("prst=\"textPlain\"")
-      && !fragment.contains("prst='textPlain'")
-      && !fragment.contains("prst=\"textNoShape\"")
-      && !fragment.contains("prst='textNoShape'")
-  })
 }
 
 fn wordprocessing_shape_textbox_has_fontwork_warp(shape: &wps::WordprocessingShape) -> bool {
@@ -5633,17 +5538,6 @@ fn fontwork_warp_geometry() -> InlineShapeGeometry {
     points,
     closed: true,
   }
-}
-
-fn drawingml_text_fill_colors(xml: &str, theme_colors: &ThemeColors) -> Vec<RgbColor> {
-  let Some(fragment) = first_named_xml_fragment(xml, b"textFill") else {
-    return Vec::new();
-  };
-  let fragment = textbox_fragment_with_namespaces(fragment);
-  let Ok(fill) = w14::FillTextEffect::from_bytes(fragment.as_bytes()) else {
-    return Vec::new();
-  };
-  drawingml_text_fill_colors_from_effect(&fill, theme_colors)
 }
 
 fn drawingml_text_fill_colors_from_effect(
@@ -5685,6 +5579,61 @@ fn drawingml_w14_gradient_fill_colors(
     .collect()
 }
 
+fn wordprocessing_textbox_fill_colors(
+  content: &w::TextBoxContent,
+  theme_colors: &ThemeColors,
+) -> Vec<RgbColor> {
+  let mut colors = Vec::new();
+  for paragraph in content
+    .text_box_content_choice
+    .iter()
+    .filter_map(|choice| match choice {
+      w::TextBoxContentChoice::Paragraph(paragraph) => Some(paragraph.as_ref()),
+      _ => None,
+    })
+  {
+    if let Some(fill) = paragraph
+      .paragraph_properties
+      .as_deref()
+      .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
+      .and_then(|properties| properties.fill_text_effect.as_deref())
+    {
+      colors.extend(drawingml_text_fill_colors_from_effect(fill, theme_colors));
+    }
+    for run in paragraph
+      .paragraph_choice
+      .iter()
+      .filter_map(|choice| match choice {
+        w::ParagraphChoice::WRun(run) => Some(run.as_ref()),
+        _ => None,
+      })
+    {
+      wordprocessing_run_fill_colors(run, theme_colors, &mut colors);
+    }
+  }
+  colors
+}
+
+fn wordprocessing_run_fill_colors(
+  run: &w::Run,
+  theme_colors: &ThemeColors,
+  colors: &mut Vec<RgbColor>,
+) {
+  if let Some(fill) = run
+    .run_properties
+    .as_deref()
+    .and_then(|properties| properties.fill_text_effect.as_deref())
+  {
+    colors.extend(drawingml_text_fill_colors_from_effect(fill, theme_colors));
+  }
+  for nested in run.run_choice.iter().filter_map(|choice| match choice {
+    w::RunChoice::Run(run) => Some(run.as_ref()),
+    _ => None,
+  }) {
+    wordprocessing_run_fill_colors(nested, theme_colors, colors);
+  }
+}
+
 fn first_text_color_in_blocks(blocks: &[Block]) -> Option<RgbColor> {
   blocks.iter().find_map(first_text_color_in_block)
 }
@@ -5703,27 +5652,6 @@ fn first_text_color_in_block(block: &Block) -> Option<RgbColor> {
       .find_map(|cell| first_text_color_in_blocks(&cell.blocks)),
     Block::Frame(frame) => first_text_color_in_blocks(&frame.blocks),
   }
-}
-
-fn drawingml_textbox_frame_stroke(
-  xml: &str,
-  _styles: &StylesCatalog,
-  auto_fit: bool,
-  placement: ImagePlacement,
-) -> Option<BorderStyle> {
-  let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
-  if drawingml_shape_has_no_line(&sp_pr) {
-    return None;
-  }
-  let suppress_zero_width_relative_frame = matches!(
-    placement,
-    ImagePlacement::Floating(FloatingImagePlacement {
-      relative_width_pct: Some(width_pct),
-      relative_height_pct: Some(height_pct),
-      ..
-    }) if width_pct <= 0.0 && height_pct > 0.0
-  );
-  (auto_fit && !suppress_zero_width_relative_frame).then_some(BorderStyle::default())
 }
 
 fn wordprocessing_shape_textbox_frame_stroke(
@@ -5768,34 +5696,6 @@ impl TextBoxFrameContent {
   }
 }
 
-fn text_box_frame_from_drawingml(
-  xml: &str,
-  content: &w::TextBoxContent,
-  mut base_style: TextStyle,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-) -> TextBoxFrameContent {
-  if drawingml_textbox_uses_auto_light_text(xml, styles) {
-    base_style.color = RgbColor {
-      r: 255,
-      g: 255,
-      b: 255,
-    };
-  }
-  let mut frame = TextBoxFrameContent::new(textbox_blocks_with_base(
-    content, base_style, styles, images, hyperlinks,
-  ));
-  if let Some(body_pr) = first_named_xml_fragment(xml, b"bodyPr") {
-    apply_drawingml_textbox_body_properties(&body_pr, &mut frame);
-  }
-  if let Some(rotation_deg) = drawingml_textbox_text_rotation(xml) {
-    rotate_textbox_blocks(&mut frame.blocks, rotation_deg);
-  }
-  apply_drawingml_textbox_layout_adjustments(&mut frame);
-  frame
-}
-
 fn text_box_frame_from_wordprocessing_shape(
   shape: &wps::WordprocessingShape,
   content: &w::TextBoxContent,
@@ -5822,19 +5722,6 @@ fn text_box_frame_from_wordprocessing_shape(
   }
   apply_drawingml_textbox_layout_adjustments(&mut frame);
   frame
-}
-
-fn drawingml_textbox_text_rotation(xml: &str) -> Option<f32> {
-  let body_pr = first_named_xml_fragment(xml, b"bodyPr")?;
-  match drawingml_body_properties_from_fragment(&body_pr)?.vertical {
-    Some(a::TextVerticalValues::Vertical)
-    | Some(a::TextVerticalValues::WordArtVertical)
-    | Some(a::TextVerticalValues::EastAsianVetical) => Some(-90.0),
-    Some(a::TextVerticalValues::Vertical270) | Some(a::TextVerticalValues::WordArtLeftToRight) => {
-      Some(90.0)
-    }
-    _ => None,
-  }
 }
 
 fn wordprocessing_shape_textbox_text_rotation(shape: &wps::WordprocessingShape) -> Option<f32> {
@@ -5893,13 +5780,6 @@ fn apply_drawingml_textbox_layout_adjustments(frame: &mut TextBoxFrameContent) {
   }
 }
 
-fn drawingml_textbox_uses_auto_light_text(xml: &str, styles: &StylesCatalog) -> bool {
-  let fill_color = first_named_xml_fragment(xml, b"spPr")
-    .and_then(|sp_pr| drawingml_shape_fill_color(&sp_pr, &styles.theme_colors))
-    .or_else(|| drawingml_shape_style_color(xml, b"fillRef", &styles.theme_colors));
-  fill_color.is_some_and(libreoffice_color_is_dark)
-}
-
 fn wordprocessing_shape_textbox_uses_auto_light_text(
   shape: &wps::WordprocessingShape,
   styles: &StylesCatalog,
@@ -5933,33 +5813,6 @@ fn normalized_linear_rgb(component: u8) -> f32 {
   }
 }
 
-fn apply_drawingml_textbox_body_properties(xml: &str, frame: &mut TextBoxFrameContent) {
-  let Some(properties) = drawingml_body_properties_from_fragment(xml) else {
-    return;
-  };
-  frame.left_pt = properties
-    .left_inset_emu
-    .map(units::emu_to_points)
-    .unwrap_or(frame.left_pt);
-  frame.top_pt = properties
-    .top_inset_emu
-    .map(units::emu_to_points)
-    .unwrap_or(frame.top_pt);
-  frame.right_pt = properties
-    .right_inset_emu
-    .map(units::emu_to_points)
-    .unwrap_or(frame.right_pt);
-  frame.bottom_pt = properties
-    .bottom_inset_emu
-    .map(units::emu_to_points)
-    .unwrap_or(frame.bottom_pt);
-  frame.vertical_alignment = match properties.anchor {
-    Some(a::TextAnchoringTypeValues::Center) => TextBoxVerticalAlignment::Center,
-    Some(a::TextAnchoringTypeValues::Bottom) => TextBoxVerticalAlignment::Bottom,
-    _ => frame.vertical_alignment,
-  };
-}
-
 fn apply_wordprocessing_shape_textbox_body_properties(
   properties: &wps::TextBodyProperties,
   frame: &mut TextBoxFrameContent,
@@ -5969,7 +5822,6 @@ fn apply_wordprocessing_shape_textbox_body_properties(
     top_inset_emu: properties.top_inset.map(i64::from),
     right_inset_emu: properties.right_inset.map(i64::from),
     bottom_inset_emu: properties.bottom_inset.map(i64::from),
-    vertical: properties.vertical,
     anchor: properties.anchor,
   };
   apply_drawingml_textbox_body_properties_model(body_properties, frame);
@@ -6008,25 +5860,7 @@ struct DrawingMlBodyProperties {
   top_inset_emu: Option<i64>,
   right_inset_emu: Option<i64>,
   bottom_inset_emu: Option<i64>,
-  vertical: Option<a::TextVerticalValues>,
   anchor: Option<a::TextAnchoringTypeValues>,
-}
-
-fn drawingml_body_properties_from_fragment(xml: &str) -> Option<DrawingMlBodyProperties> {
-  let xml = drawingml_fragment_with_namespaces(xml.to_string());
-  if root_qname(&xml).is_some_and(|name| name.starts_with("wps:")) {
-    let properties = wps::TextBodyProperties::from_bytes(xml.as_bytes()).ok()?;
-    return Some(DrawingMlBodyProperties {
-      left_inset_emu: properties.left_inset.map(i64::from),
-      top_inset_emu: properties.top_inset.map(i64::from),
-      right_inset_emu: properties.right_inset.map(i64::from),
-      bottom_inset_emu: properties.bottom_inset.map(i64::from),
-      vertical: properties.vertical,
-      anchor: properties.anchor,
-    });
-  }
-  let properties = a::BodyProperties::from_bytes(xml.as_bytes()).ok()?;
-  Some(drawingml_body_properties_from_model(&properties))
 }
 
 fn drawingml_body_properties_from_model(properties: &a::BodyProperties) -> DrawingMlBodyProperties {
@@ -6035,7 +5869,6 @@ fn drawingml_body_properties_from_model(properties: &a::BodyProperties) -> Drawi
     top_inset_emu: properties.top_inset.map(|value| value.to_emu()),
     right_inset_emu: properties.right_inset.map(|value| value.to_emu()),
     bottom_inset_emu: properties.bottom_inset.map(|value| value.to_emu()),
-    vertical: properties.vertical,
     anchor: properties.anchor,
   }
 }
@@ -6047,141 +5880,6 @@ fn root_qname(xml: &str) -> Option<&str> {
       character.is_ascii_whitespace() || character == '>' || character == '/'
     })
     .next()
-}
-
-fn drawingml_fragment_with_namespaces(mut xml: String) -> String {
-  let mut namespaces = String::new();
-  if !xml.contains("xmlns:a=") {
-    namespaces.push_str(" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"");
-  }
-  if !xml.contains("xmlns:wps=") {
-    namespaces
-      .push_str(" xmlns:wps=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\"");
-  }
-  if !xml.contains("xmlns:wpg=") {
-    namespaces
-      .push_str(" xmlns:wpg=\"http://schemas.microsoft.com/office/word/2010/wordprocessingGroup\"");
-  }
-  if !xml.contains("xmlns:dsp=") {
-    namespaces.push_str(" xmlns:dsp=\"http://schemas.microsoft.com/office/drawing/2008/diagram\"");
-  }
-  if !xml.contains("xmlns:r=") {
-    namespaces
-      .push_str(" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"");
-  }
-  if namespaces.is_empty() {
-    return xml;
-  }
-
-  if let Some(index) = xml.find('>') {
-    if xml.as_bytes().get(index.saturating_sub(1)) == Some(&b'/') {
-      xml.insert_str(index.saturating_sub(1), &namespaces);
-    } else {
-      xml.insert_str(index, &namespaces);
-    }
-  }
-
-  xml
-}
-
-#[cfg(test)]
-fn apply_text_effect_overrides_from_fragment(
-  style: &mut TextStyle,
-  fragment: &str,
-  styles: &StylesCatalog,
-) {
-  if let Some(fill_fragment) = first_named_xml_fragment(fragment, b"textFill") {
-    let fill_fragment = textbox_fragment_with_namespaces(fill_fragment);
-    if let Ok(fill) = w14::FillTextEffect::from_bytes(fill_fragment.as_bytes())
-      && let Some(resolved) = resolve_text_fill(&fill, &styles.theme_colors)
-    {
-      style.color = resolved.color;
-      style.opacity = resolved.opacity;
-    }
-  }
-
-  if let Some(outline_fragment) = first_named_xml_fragment(fragment, b"textOutline") {
-    let outline_fragment = textbox_fragment_with_namespaces(outline_fragment);
-    if let Ok(outline) = w14::TextOutlineEffect::from_bytes(outline_fragment.as_bytes())
-      && let Some(resolved) = resolve_text_outline(&outline, &styles.theme_colors)
-    {
-      style.outline_color = Some(resolved.color);
-      style.outline_opacity = resolved.opacity;
-      style.outline_width_pt = outline
-        .line_width
-        .map(|width| units::emu_to_points(width as i64))
-        .unwrap_or(style.outline_width_pt);
-    }
-  }
-}
-
-fn read_outer_xml_fragment(
-  reader: &mut Reader<&[u8]>,
-  start: quick_xml::events::BytesStart<'_>,
-) -> Option<String> {
-  let target_name = start.name().as_ref().to_vec();
-  let mut writer = Writer::new(Vec::new());
-  writer.write_event(Event::Start(start.into_owned())).ok()?;
-  let mut depth = 1usize;
-
-  while depth > 0 {
-    let event = reader.read_event().ok()?;
-    match &event {
-      Event::Start(event) if event.name().as_ref() == target_name.as_slice() => depth += 1,
-      Event::End(event) if event.name().as_ref() == target_name.as_slice() => {
-        depth = depth.saturating_sub(1);
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-    writer.write_event(event.into_owned()).ok()?;
-  }
-
-  String::from_utf8(writer.into_inner()).ok()
-}
-
-fn first_named_xml_fragment(xml: &str, local_name: &[u8]) -> Option<String> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) if qname_ends_with(event.name().as_ref(), local_name) => {
-        return read_outer_xml_fragment(&mut reader, event);
-      }
-      Event::Empty(event) if qname_ends_with(event.name().as_ref(), local_name) => {
-        let mut writer = Writer::new(Vec::new());
-        writer.write_event(Event::Empty(event.into_owned())).ok()?;
-        return String::from_utf8(writer.into_inner()).ok();
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
-}
-
-fn first_named_xml_fragment_bytes(xml: &[u8], local_name: &[u8]) -> Option<String> {
-  let mut reader = Reader::from_reader(xml);
-  reader.config_mut().trim_text(false);
-
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) if qname_ends_with(event.name().as_ref(), local_name) => {
-        return read_outer_xml_fragment(&mut reader, event);
-      }
-      Event::Empty(event) if qname_ends_with(event.name().as_ref(), local_name) => {
-        let mut writer = Writer::new(Vec::new());
-        writer.write_event(Event::Empty(event.into_owned())).ok()?;
-        return String::from_utf8(writer.into_inner()).ok();
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
-}
-
-fn xml_contains(xml: &[u8], needle: &[u8]) -> bool {
-  xml.windows(needle.len()).any(|window| window == needle)
 }
 
 fn drawing_graphic_data(drawing: &w::Drawing) -> Option<&ooxmlsdk::schemas::a::GraphicData> {
@@ -6209,11 +5907,20 @@ fn drawing_graphic_data_choice_textbox_frames(
     a::GraphicDataChoice::WordprocessingCanvas(canvas) => {
       wordprocessing_canvas_textbox_frames(canvas, placement, transform, context)
     }
-    a::GraphicDataChoice::XmlAny(xml) => {
-      drawingml_textbox_frames_from_xml(xml, placement, transform, context, false)
-    }
+    a::GraphicDataChoice::XmlAny(xml) => strict_wordprocessing_shape(xml)
+      .and_then(|shape| wordprocessing_shape_textbox_frame(&shape, placement, transform, context))
+      .into_iter()
+      .collect(),
     _ => Vec::new(),
   }
+}
+
+fn strict_wordprocessing_shape(xml: &[u8]) -> Option<wps::WordprocessingShape> {
+  let xml = std::str::from_utf8(xml).ok()?;
+  if root_qname(xml) != Some("wp:wsp") {
+    return None;
+  }
+  wps::WordprocessingShape::from_bytes(xml.as_bytes()).ok()
 }
 
 fn wordprocessing_canvas_textbox_frames(
@@ -6382,11 +6089,7 @@ fn wordprocessing_shape_textbox_frame(
   };
   let has_fontwork_warp = wordprocessing_shape_textbox_has_fontwork_warp(shape);
   let mut wordart_fill_colors = if has_fontwork_warp {
-    shape
-      .to_xml()
-      .ok()
-      .map(|xml| drawingml_text_fill_colors(&xml, &context.styles.theme_colors))
-      .unwrap_or_default()
+    wordprocessing_textbox_fill_colors(content, &context.styles.theme_colors)
   } else {
     Vec::new()
   };
@@ -6450,7 +6153,10 @@ fn drawing_graphic_data_choice_textbox_content(
     a::GraphicDataChoice::WordprocessingCanvas(canvas) => {
       wordprocessing_canvas_textbox_content(canvas).cloned()
     }
-    a::GraphicDataChoice::XmlAny(xml) => drawing_textbox_content(xml),
+    a::GraphicDataChoice::XmlAny(xml) => strict_wordprocessing_shape(xml)
+      .as_ref()
+      .and_then(wordprocessing_shape_textbox_content)
+      .cloned(),
     _ => None,
   }
 }
@@ -6618,9 +6324,12 @@ fn drawing_graphic_data_choice_shapes(
     a::GraphicDataChoice::Drawing(drawing) => {
       drawingml_diagram_drawing_shapes(drawing, placement, transform, context)
     }
-    a::GraphicDataChoice::XmlAny(xml) => {
-      drawingml_shapes_from_xml(xml, placement, transform, context, false)
-    }
+    a::GraphicDataChoice::XmlAny(xml) => strict_wordprocessing_shape(xml)
+      .map(|shape| wordprocessing_shape_shape(&shape, placement, transform, context))
+      .into_iter()
+      .flatten()
+      .map(InlineItem::Shape)
+      .collect(),
     _ => Vec::new(),
   }
 }
@@ -6904,30 +6613,18 @@ fn drawing_diagram_shapes(
       diagram_text_fill_colors_by_model_id(data_xml, colors, &context.styles.theme_colors)
     });
   let drawing_relationship_id = diagram_ext_drawing_relationship_id(data_xml)?;
-  let drawing_xml = context
+  let drawing = context
     .images
     .diagram_drawings_by_relationship_id
     .get(&drawing_relationship_id)?;
-  if let Ok(drawing) = dsp::Drawing::from_bytes(drawing_xml.as_bytes()) {
-    return Some(drawingml_diagram_drawing_shapes(
-      &drawing,
-      placement,
-      transform,
-      DrawingShapeImportContext {
-        smartart_text_colors_by_model_id: text_colors_by_model_id.as_ref(),
-        ..context
-      },
-    ));
-  }
-  Some(drawingml_shapes_from_xml(
-    drawing_xml.as_bytes(),
+  Some(drawingml_diagram_drawing_shapes(
+    drawing,
     placement,
     transform,
     DrawingShapeImportContext {
       smartart_text_colors_by_model_id: text_colors_by_model_id.as_ref(),
       ..context
     },
-    false,
   ))
 }
 
@@ -7462,7 +7159,6 @@ struct DrawingMlGroupXfrm {
 }
 
 enum DrawingMlShapeProperties {
-  Drawing(a::ShapeProperties),
   Diagram(dsp::ShapeProperties),
   Wordprocessing(wps::ShapeProperties),
   Picture(pic::ShapeProperties),
@@ -7475,25 +7171,8 @@ enum DrawingMlFillProperties<'a> {
 }
 
 impl DrawingMlShapeProperties {
-  fn from_fragment(xml: &str) -> Option<Self> {
-    let xml = drawingml_fragment_with_namespaces(xml.to_string());
-    if let Ok(properties) = a::ShapeProperties::from_bytes(xml.as_bytes()) {
-      return Some(Self::Drawing(properties));
-    }
-    if let Ok(properties) = dsp::ShapeProperties::from_bytes(xml.as_bytes()) {
-      return Some(Self::Diagram(properties));
-    }
-    if let Ok(properties) = wps::ShapeProperties::from_bytes(xml.as_bytes()) {
-      return Some(Self::Wordprocessing(properties));
-    }
-    pic::ShapeProperties::from_bytes(xml.as_bytes())
-      .ok()
-      .map(Self::Picture)
-  }
-
   fn transform2_d(&self) -> Option<&a::Transform2D> {
     match self {
-      Self::Drawing(properties) => properties.transform2_d.as_deref(),
       Self::Diagram(properties) => properties.transform2_d.as_deref(),
       Self::Wordprocessing(properties) => properties.transform2_d.as_deref(),
       Self::Picture(properties) => properties.transform2_d.as_deref(),
@@ -7502,11 +7181,6 @@ impl DrawingMlShapeProperties {
 
   fn geometry_kind(&self) -> Option<InlineShapeGeometry> {
     let is_line = match self {
-      Self::Drawing(properties) => matches!(
-        properties.shape_properties_choice1.as_ref(),
-        Some(a::ShapePropertiesChoice::PresetGeometry(geometry))
-          if geometry.preset == a::ShapeTypeValues::Line
-      ),
       Self::Diagram(properties) => matches!(
         properties.shape_properties_choice1.as_ref(),
         Some(dsp::ShapePropertiesChoice::PresetGeometry(geometry))
@@ -7533,10 +7207,6 @@ impl DrawingMlShapeProperties {
 
   fn custom_geometry(&self) -> Option<&a::CustomGeometry> {
     match self {
-      Self::Drawing(properties) => match properties.shape_properties_choice1.as_ref()? {
-        a::ShapePropertiesChoice::CustomGeometry(geometry) => Some(geometry.as_ref()),
-        a::ShapePropertiesChoice::PresetGeometry(_) => None,
-      },
       Self::Diagram(properties) => match properties.shape_properties_choice1.as_ref()? {
         dsp::ShapePropertiesChoice::CustomGeometry(geometry) => Some(geometry.as_ref()),
         dsp::ShapePropertiesChoice::PresetGeometry(_) => None,
@@ -7554,16 +7224,6 @@ impl DrawingMlShapeProperties {
 
   fn fill(&self) -> Option<DrawingMlFillProperties<'_>> {
     match self {
-      Self::Drawing(properties) => match properties.shape_properties_choice2.as_ref()? {
-        a::ShapePropertiesChoice2::NoFill(_) => Some(DrawingMlFillProperties::NoFill),
-        a::ShapePropertiesChoice2::SolidFill(fill) => {
-          Some(DrawingMlFillProperties::Solid(fill.as_ref()))
-        }
-        a::ShapePropertiesChoice2::GradientFill(fill) => {
-          Some(DrawingMlFillProperties::Gradient(fill.as_ref()))
-        }
-        _ => None,
-      },
       Self::Diagram(properties) => match properties.shape_properties_choice2.as_ref()? {
         dsp::ShapePropertiesChoice2::NoFill(_) => Some(DrawingMlFillProperties::NoFill),
         dsp::ShapePropertiesChoice2::SolidFill(fill) => {
@@ -7596,112 +7256,6 @@ impl DrawingMlShapeProperties {
       },
     }
   }
-}
-
-fn drawingml_shape_properties_from_fragment(xml: &str) -> Option<DrawingMlShapeProperties> {
-  DrawingMlShapeProperties::from_fragment(xml)
-}
-
-fn drawingml_shapes_from_xml(
-  xml: &[u8],
-  placement: ImagePlacement,
-  transform: DrawingMlGroupTransform,
-  context: DrawingShapeImportContext<'_>,
-  skip_container_root: bool,
-) -> Vec<InlineItem> {
-  let mut shapes = Vec::new();
-  let mut reader = Reader::from_reader(xml);
-  reader.config_mut().trim_text(false);
-  let mut skipped_container_root = false;
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) if skip_container_root && !skipped_container_root => {
-        skipped_container_root = true;
-        if qname_ends_with(event.name().as_ref(), b"wgp") {
-          continue;
-        }
-      }
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wgp") => {
-        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event) {
-          let child_transform = drawingml_group_transform_from_fragment(&fragment)
-            .map(|xfrm| transform.child(xfrm))
-            .unwrap_or(transform);
-          shapes.extend(drawingml_shapes_from_xml(
-            fragment.as_bytes(),
-            drawingml_group_child_placement(placement),
-            child_transform,
-            DrawingShapeImportContext {
-              effect_extent: DrawingEffectExtent::default(),
-              ..context
-            },
-            true,
-          ));
-        }
-      }
-      Ok(Event::Start(event))
-        if qname_ends_with(event.name().as_ref(), b"wsp")
-          || qname_ends_with(event.name().as_ref(), b"sp") =>
-      {
-        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
-          && let Some(shape) = drawingml_shape_from_fragment(
-            &fragment,
-            placement,
-            transform,
-            context.effect_extent,
-            context.styles,
-            context.images,
-            context.smartart_text_colors_by_model_id,
-          )
-        {
-          shapes.push(InlineItem::Shape(shape));
-        }
-      }
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"pic") => {
-        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event) {
-          if let Some(image) = drawingml_picture_image_from_fragment(
-            &fragment,
-            placement,
-            transform,
-            context.styles,
-            context.images,
-            context.hyperlinks,
-          ) {
-            shapes.push(InlineItem::Image(image));
-          }
-          if let Some(shape) =
-            drawingml_picture_frame_from_fragment(&fragment, placement, transform)
-          {
-            shapes.push(InlineItem::Shape(shape));
-          }
-        }
-      }
-      Ok(Event::Empty(event))
-        if qname_ends_with(event.name().as_ref(), b"wsp")
-          || qname_ends_with(event.name().as_ref(), b"sp") =>
-      {
-        let mut writer = Writer::new(Vec::new());
-        if writer.write_event(Event::Empty(event.into_owned())).is_ok()
-          && let Ok(fragment) = String::from_utf8(writer.into_inner())
-          && let Some(shape) = drawingml_shape_from_fragment(
-            &fragment,
-            placement,
-            transform,
-            context.effect_extent,
-            context.styles,
-            context.images,
-            context.smartart_text_colors_by_model_id,
-          )
-        {
-          shapes.push(InlineItem::Shape(shape));
-        }
-      }
-      Ok(Event::Eof) | Err(_) => break,
-      _ => {}
-    }
-  }
-
-  shapes
 }
 
 fn anchor_wrap_polygon_shape(
@@ -7817,146 +7371,6 @@ fn drawing_is_hidden(drawing: &w::Drawing) -> bool {
   }
 }
 
-fn drawingml_shape_from_fragment(
-  xml: &str,
-  placement: ImagePlacement,
-  transform: DrawingMlGroupTransform,
-  effect_extent: DrawingEffectExtent,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  smartart_text_colors_by_model_id: Option<&HashMap<String, RgbColor>>,
-) -> Option<InlineShape> {
-  let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
-  let explicit_fill_color = drawingml_shape_fill_color(&sp_pr, &styles.theme_colors);
-  let fill_color = if drawingml_shape_has_no_fill(&sp_pr) {
-    None
-  } else {
-    explicit_fill_color
-      .or_else(|| drawingml_shape_style_color(xml, b"fillRef", &styles.theme_colors))
-  };
-  let fill_image = drawingml_shape_image_fill(&sp_pr, images);
-  let stroke = if drawingml_shape_has_no_line(&sp_pr) {
-    None
-  } else {
-    drawingml_shape_stroke(&sp_pr, &styles.theme_colors)
-      .or_else(|| drawingml_shape_style_stroke(xml, &styles.theme_colors, &styles.theme_lines))
-  };
-  if fill_color.is_none() && fill_image.is_none() && stroke.is_none() {
-    return None;
-  }
-
-  let mut geometry = drawingml_shape_geometry_kind(&sp_pr);
-  let has_custom_geometry = drawingml_has_custom_geometry(&sp_pr);
-  if geometry == InlineShapeGeometry::Rectangle && has_custom_geometry {
-    geometry = InlineShapeGeometry::Polyline {
-      points: Vec::new(),
-      closed: false,
-    };
-  }
-  let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_geometry_from_sp_pr(
-    &sp_pr,
-    &geometry,
-    transform.raw_coordinates,
-    transform.fallback_size,
-  )?;
-  if has_custom_geometry
-    && let Some(custom_geometry) = drawingml_custom_geometry(&sp_pr, width_pt, height_pt)
-  {
-    geometry = custom_geometry;
-  }
-  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
-
-  let smartart_text_color = drawingml_model_id(xml).and_then(|model_id| {
-    smartart_text_colors_by_model_id.and_then(|colors| colors.get(model_id.as_str()).copied())
-  });
-  let mut text_box = drawingml_shape_text_box_from_fragment(xml, styles, smartart_text_color);
-  let mut shape = InlineShape {
-    width_pt,
-    height_pt,
-    effect_left_pt: effect_extent.left_pt,
-    effect_top_pt: effect_extent.top_pt,
-    effect_right_pt: effect_extent.right_pt,
-    effect_bottom_pt: effect_extent.bottom_pt,
-    geometry,
-    offset_x_pt,
-    offset_y_pt,
-    fill_color,
-    additional_fill_colors: Vec::new(),
-    fill_image,
-    stroke,
-    suppress_zero_relative_background: explicit_fill_color.is_some(),
-    allow_outside_page: false,
-    inline_anchor_after_line: matches!(placement, ImagePlacement::Inline)
-      && drawing_textbox_content(xml.as_bytes()).is_some(),
-    placement,
-    text_box_blocks: Vec::new(),
-    text_inset_left_pt: 0.0,
-    text_inset_top_pt: 0.0,
-    text_inset_right_pt: 0.0,
-    text_inset_bottom_pt: 0.0,
-    text_box_auto_fit: false,
-    text_vertical_alignment: TextBoxVerticalAlignment::Top,
-  };
-  if let Some(text_box) = text_box.take() {
-    shape.text_box_blocks = text_box.blocks;
-    shape.text_inset_left_pt = text_box.left_pt;
-    shape.text_inset_top_pt = text_box.top_pt;
-    shape.text_inset_right_pt = text_box.right_pt;
-    shape.text_inset_bottom_pt = text_box.bottom_pt;
-    shape.text_vertical_alignment = text_box.vertical_alignment;
-  }
-  Some(shape)
-}
-
-fn drawingml_model_id(xml: &str) -> Option<String> {
-  let xml = drawingml_fragment_with_namespaces(xml.to_string());
-  let shape = dsp::Shape::from_bytes(xml.as_bytes()).ok()?;
-  Some(shape.model_id)
-}
-
-fn drawingml_shape_text_box_from_fragment(
-  xml: &str,
-  styles: &StylesCatalog,
-  smartart_text_color: Option<RgbColor>,
-) -> Option<TextBoxFrameContent> {
-  // persisted dsp:sp text as child shape text, using the a:bodyPr insets.
-  let body_pr = first_named_xml_fragment(xml, b"bodyPr");
-  let texts = drawingml_shape_text_body_texts(xml);
-  if texts.is_empty() {
-    return None;
-  }
-  let color = drawingml_text_fill_colors(xml, &styles.theme_colors)
-    .into_iter()
-    .next()
-    .or(smartart_text_color)
-    .unwrap_or_else(|| TextStyle::default().color);
-  let blocks = texts
-    .into_iter()
-    .map(|text| simple_text_block(text, text_style_with_color(styles, color)))
-    .collect();
-  let mut frame = TextBoxFrameContent::new(blocks);
-  if let Some(body_pr) = body_pr {
-    apply_drawingml_textbox_body_properties(&body_pr, &mut frame);
-  }
-  apply_drawingml_textbox_layout_adjustments(&mut frame);
-  Some(frame)
-}
-
-fn drawingml_shape_text_body_texts(xml: &str) -> Vec<String> {
-  let Some(tx_body) = first_named_xml_fragment(xml, b"txBody") else {
-    return Vec::new();
-  };
-  let tx_body = drawingml_fragment_with_namespaces(tx_body);
-  if let Ok(text_body) = a::TextBody::from_bytes(tx_body.as_bytes()) {
-    return drawingml_text_body_texts(&text_body.paragraph);
-  }
-  if let Ok(text_body) = dsp::TextBody::from_bytes(tx_body.as_bytes()) {
-    return drawingml_text_body_texts(&text_body.paragraph);
-  }
-  Vec::new()
-}
-
 fn drawingml_text_body_texts(paragraphs: &[a::Paragraph]) -> Vec<String> {
   paragraphs
     .iter()
@@ -7978,39 +7392,6 @@ fn drawingml_paragraph_text(paragraph: &a::Paragraph) -> Option<String> {
     }
   }
   (!text.is_empty()).then_some(text)
-}
-
-#[cfg(test)]
-fn drawingml_shape_geometry(xml: &str) -> Option<(f32, f32, f32, f32)> {
-  let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
-  drawingml_geometry_from_sp_pr(&sp_pr, &drawingml_shape_geometry_kind(&sp_pr), false, None)
-}
-
-fn drawingml_shape_geometry_with_transform(
-  xml: &str,
-  transform: DrawingMlGroupTransform,
-) -> Option<(f32, f32, f32, f32)> {
-  let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
-  drawingml_geometry_from_sp_pr(
-    &sp_pr,
-    &drawingml_shape_geometry_kind(&sp_pr),
-    transform.raw_coordinates,
-    None,
-  )
-}
-
-fn drawingml_group_transform_from_fragment(xml: &str) -> Option<DrawingMlGroupXfrm> {
-  let grp_sp_pr = first_named_xml_fragment(xml, b"grpSpPr")?;
-  let grp_sp_pr = drawingml_fragment_with_namespaces(grp_sp_pr);
-  let transform =
-    if let Ok(properties) = wpg::GroupShapeProperties::from_bytes(grp_sp_pr.as_bytes()) {
-      properties.transform_group
-    } else {
-      a::VisualGroupShapeProperties::from_bytes(grp_sp_pr.as_bytes())
-        .ok()?
-        .transform_group
-    }?;
-  Some(drawingml_group_transform_from_model(&transform))
 }
 
 fn drawingml_group_transform_from_properties(
@@ -8052,26 +7433,6 @@ fn drawingml_group_transform_from_model(transform: &a::TransformGroup) -> Drawin
   }
 
   group
-}
-
-fn drawingml_shape_geometry_kind(sp_pr: &str) -> InlineShapeGeometry {
-  drawingml_shape_properties_from_fragment(sp_pr)
-    .and_then(|properties| properties.geometry_kind())
-    .unwrap_or(InlineShapeGeometry::Rectangle)
-}
-
-fn drawingml_has_custom_geometry(sp_pr: &str) -> bool {
-  drawingml_shape_properties_from_fragment(sp_pr)
-    .is_some_and(|properties| properties.custom_geometry().is_some())
-}
-
-fn drawingml_custom_geometry(
-  sp_pr: &str,
-  width_pt: f32,
-  height_pt: f32,
-) -> Option<InlineShapeGeometry> {
-  let properties = drawingml_shape_properties_from_fragment(sp_pr)?;
-  drawingml_custom_geometry_from_properties(&properties, width_pt, height_pt)
 }
 
 fn drawingml_custom_geometry_from_properties(
@@ -8151,21 +7512,6 @@ fn drawingml_custom_geometry_point(
   (scaled_x, scaled_y)
 }
 
-fn drawingml_geometry_from_sp_pr(
-  sp_pr: &str,
-  geometry: &InlineShapeGeometry,
-  raw_coordinates: bool,
-  fallback_size: Option<(f32, f32)>,
-) -> Option<(f32, f32, f32, f32)> {
-  let properties = drawingml_shape_properties_from_fragment(sp_pr);
-  drawingml_geometry_from_shape_properties(
-    properties.as_ref(),
-    geometry,
-    raw_coordinates,
-    fallback_size,
-  )
-}
-
 fn drawingml_geometry_from_shape_properties(
   properties: Option<&DrawingMlShapeProperties>,
   geometry: &InlineShapeGeometry,
@@ -8212,44 +7558,6 @@ fn drawingml_coordinate_to_points(value: i64, raw_coordinates: bool) -> f32 {
   } else {
     units::emu_to_points(value)
   }
-}
-
-fn drawingml_picture_frame_from_fragment(
-  xml: &str,
-  placement: ImagePlacement,
-  transform: DrawingMlGroupTransform,
-) -> Option<InlineShape> {
-  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    drawingml_shape_geometry_with_transform(xml, transform)?;
-  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
-
-  Some(InlineShape {
-    width_pt,
-    height_pt,
-    effect_left_pt: 0.0,
-    effect_top_pt: 0.0,
-    effect_right_pt: 0.0,
-    effect_bottom_pt: 0.0,
-    geometry: InlineShapeGeometry::Rectangle,
-    offset_x_pt,
-    offset_y_pt,
-    fill_color: None,
-    additional_fill_colors: Vec::new(),
-    fill_image: None,
-    stroke: None,
-    suppress_zero_relative_background: false,
-    allow_outside_page: false,
-    inline_anchor_after_line: false,
-    placement,
-    text_box_blocks: Vec::new(),
-    text_inset_left_pt: 0.0,
-    text_inset_top_pt: 0.0,
-    text_inset_right_pt: 0.0,
-    text_inset_bottom_pt: 0.0,
-    text_box_auto_fit: false,
-    text_vertical_alignment: TextBoxVerticalAlignment::Top,
-  })
 }
 
 fn drawingml_picture_frame(
@@ -8304,47 +7612,6 @@ fn drawingml_picture_frame(
   })
 }
 
-fn drawingml_picture_image_from_fragment(
-  xml: &str,
-  placement: ImagePlacement,
-  transform: DrawingMlGroupTransform,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-) -> Option<InlineImage> {
-  let picture = pic::Picture::from_bytes(xml.as_bytes()).ok()?;
-  let properties = drawing_picture_image_properties(&picture, &styles.theme_colors)?;
-  let relationship_id = properties.relationship_id.as_deref()?;
-  let resource = images.by_relationship_id.get(relationship_id)?;
-  let image_data = image_data_with_effects(resource, &properties);
-  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    drawingml_shape_geometry_with_transform(xml, transform)?;
-  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
-  let hyperlink_url = properties
-    .hyperlink_relationship_id
-    .as_deref()
-    .and_then(|relationship_id| hyperlinks.target(relationship_id))
-    .map(ToString::to_string);
-  Some(InlineImage {
-    data: image_data.data,
-    content_type: image_data.content_type,
-    width_pt,
-    height_pt,
-    effect_left_pt: 0.0,
-    effect_top_pt: 0.0,
-    effect_right_pt: 0.0,
-    effect_bottom_pt: 0.0,
-    crop: properties.crop,
-    rotation_deg: properties.rotation_deg,
-    flip_horizontal: properties.flip_horizontal,
-    flip_vertical: properties.flip_vertical,
-    alt_text: drawingml_picture_alt_text(&picture),
-    hyperlink_url,
-    placement: drawingml_child_placement(placement, offset_x_pt, offset_y_pt),
-  })
-}
-
 fn drawingml_picture_image(
   picture: &pic::Picture,
   placement: ImagePlacement,
@@ -8396,22 +7663,6 @@ fn drawingml_picture_image(
     alt_text: drawingml_picture_alt_text(picture),
     hyperlink_url,
     placement: drawingml_child_placement(placement, offset_x_pt, offset_y_pt),
-  })
-}
-
-fn drawingml_shape_image_fill(sp_pr: &str, images: &ImageCatalog) -> Option<InlineShapeImageFill> {
-  let properties = drawing_shape_image_properties_from_fragment(sp_pr, &ThemeColors::default())?;
-  let relationship_id = properties.relationship_id.as_deref()?;
-  let resource = images.by_relationship_id.get(relationship_id)?;
-  let image_data = image_data_with_effects(resource, &properties);
-
-  Some(InlineShapeImageFill {
-    data: image_data.data,
-    content_type: image_data.content_type,
-    crop: properties.crop,
-    rotation_deg: properties.rotation_deg,
-    flip_horizontal: properties.flip_horizontal,
-    flip_vertical: properties.flip_vertical,
   })
 }
 
@@ -8656,11 +7907,6 @@ fn drawingml_child_placement(
   }
 }
 
-fn drawingml_shape_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
-  let properties = drawingml_shape_properties_from_fragment(xml)?;
-  drawingml_shape_properties_fill_color(&properties, theme_colors)
-}
-
 fn wordprocessing_shape_fill_color(
   shape: &wps::WordprocessingShape,
   theme_colors: &ThemeColors,
@@ -8690,51 +7936,10 @@ fn drawingml_shape_properties_fill_color(
   }
 }
 
-fn drawingml_shape_has_no_fill(xml: &str) -> bool {
-  let xml = drawingml_fragment_with_namespaces(xml.to_string());
-  if root_qname(&xml).is_some_and(|name| name.ends_with(":ln") || name == "ln") {
-    return a::Outline::from_bytes(xml.as_bytes())
-      .ok()
-      .and_then(|outline| outline.outline_choice1)
-      .is_some_and(|choice| matches!(choice, a::OutlineChoice::NoFill(_)));
-  }
-
-  let properties = drawingml_shape_properties_from_fragment(&xml);
-  properties
-    .as_ref()
-    .and_then(|properties| properties.fill())
-    .is_some_and(|fill| matches!(fill, DrawingMlFillProperties::NoFill))
-}
-
 fn drawingml_shape_properties_has_no_fill(properties: &DrawingMlShapeProperties) -> bool {
   properties
     .fill()
     .is_some_and(|fill| matches!(fill, DrawingMlFillProperties::NoFill))
-}
-
-fn drawingml_shape_style_color(
-  xml: &str,
-  local_name: &[u8],
-  theme_colors: &ThemeColors,
-) -> Option<RgbColor> {
-  if local_name != b"fillRef" {
-    return None;
-  }
-  let fragment = first_named_xml_fragment(xml, local_name)?;
-  let fragment = drawingml_fragment_with_namespaces(fragment);
-  let reference = a::FillReference::from_bytes(fragment.as_bytes()).ok()?;
-  drawingml_fill_reference_color(&reference, theme_colors)
-}
-
-fn drawingml_shape_style_stroke(
-  xml: &str,
-  theme_colors: &ThemeColors,
-  theme_lines: &ThemeLineStyles,
-) -> Option<BorderStyle> {
-  let fragment = first_named_xml_fragment(xml, b"lnRef")?;
-  let fragment = drawingml_fragment_with_namespaces(fragment);
-  let reference = a::LineReference::from_bytes(fragment.as_bytes()).ok()?;
-  drawingml_line_reference_stroke(&reference, theme_colors, theme_lines)
 }
 
 fn drawingml_line_reference_stroke(
@@ -8785,33 +7990,6 @@ fn drawingml_line_reference_color(
     a::LineReferenceChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
     _ => None,
   }
-}
-
-fn drawingml_shape_stroke(xml: &str, theme_colors: &ThemeColors) -> Option<BorderStyle> {
-  let line_fragment = first_named_xml_fragment(xml, b"ln")?;
-  let line =
-    a::Outline::from_bytes(drawingml_fragment_with_namespaces(line_fragment.clone()).as_bytes())
-      .ok()?;
-  let color = match line.outline_choice1.as_ref()? {
-    a::OutlineChoice::NoFill(_) => return None,
-    a::OutlineChoice::SolidFill(fill) => resolve_drawingml_solid_fill(fill, theme_colors)?.color,
-    a::OutlineChoice::GradientFill(fill) => {
-      drawingml_first_gradient_fill_color(fill, theme_colors)?
-    }
-    a::OutlineChoice::PatternFill(_) => return None,
-  };
-  let width_pt = line
-    .width
-    .map(i64::from)
-    .map(units::emu_to_points)
-    .unwrap_or_else(|| units::emu_to_points(DRAWINGML_DEFAULT_LINE_WIDTH_EMU));
-
-  Some(BorderStyle {
-    width_pt,
-    spacing_pt: 0.0,
-    color,
-    compound: false,
-  })
 }
 
 fn wordprocessing_shape_stroke(
@@ -8868,13 +8046,6 @@ fn drawingml_diagram_shape_stroke(
     color,
     compound: false,
   })
-}
-
-fn drawingml_shape_has_no_line(xml: &str) -> bool {
-  let Some(line_fragment) = first_named_xml_fragment(xml, b"ln") else {
-    return false;
-  };
-  drawingml_shape_has_no_fill(&line_fragment)
 }
 
 fn wordprocessing_shape_has_no_line(shape: &wps::WordprocessingShape) -> bool {
@@ -10521,34 +9692,6 @@ fn drawing_picture_image_properties(
   Some(properties)
 }
 
-fn drawing_shape_image_properties_from_fragment(
-  xml: &str,
-  theme_colors: &ThemeColors,
-) -> Option<DrawingImageProperties> {
-  if let Ok(properties) = a::ShapeProperties::from_bytes(xml.as_bytes())
-    && let Some(a::ShapePropertiesChoice2::BlipFill(blip_fill)) =
-      properties.shape_properties_choice2.as_ref()
-  {
-    return drawing_blip_fill_image_properties(blip_fill, theme_colors);
-  }
-
-  if let Ok(properties) = pic::ShapeProperties::from_bytes(xml.as_bytes())
-    && let Some(pic::ShapePropertiesChoice2::BlipFill(blip_fill)) =
-      properties.shape_properties_choice2.as_ref()
-  {
-    return drawing_blip_fill_image_properties(blip_fill, theme_colors);
-  }
-
-  if let Ok(properties) = wps::ShapeProperties::from_bytes(xml.as_bytes())
-    && let Some(wps::ShapePropertiesChoice2::BlipFill(blip_fill)) =
-      properties.shape_properties_choice2.as_ref()
-  {
-    return drawing_blip_fill_image_properties(blip_fill, theme_colors);
-  }
-
-  None
-}
-
 fn drawing_blip_fill_image_properties(
   blip_fill: &a::BlipFill,
   theme_colors: &ThemeColors,
@@ -10781,50 +9924,6 @@ fn drawingml_preset_color_value(value: a::PresetColorValues) -> Option<RgbColor>
     a::PresetColorValues::Black => Some(RgbColor { r: 0, g: 0, b: 0 }),
     _ => None,
   }
-}
-
-fn decode_xml_attr_value(attr: &Attribute<'_>, decoder: quick_xml::Decoder) -> Option<String> {
-  let decoded = decoder.decode(attr.value.as_ref()).ok()?;
-  Some(unescape(&decoded).ok()?.into_owned())
-}
-
-fn drawing_textbox_content(xml: &[u8]) -> Option<w::TextBoxContent> {
-  if !xml_contains(xml, b"txbxContent") {
-    return None;
-  }
-
-  let xml = textbox_fragment_with_namespaces(first_named_xml_fragment_bytes(xml, b"txbxContent")?);
-  w::TextBoxContent::from_bytes(xml.as_bytes()).ok()
-}
-
-fn textbox_fragment_with_namespaces(mut xml: String) -> String {
-  if xml.contains("xmlns:w=") {
-    return xml;
-  }
-
-  let namespaces = concat!(
-    " xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"",
-    " xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"",
-    " xmlns:w14=\"http://schemas.microsoft.com/office/word/2010/wordml\"",
-    " xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\""
-  );
-
-  if let Some(index) = xml.find('>') {
-    if xml.as_bytes().get(index.saturating_sub(1)) == Some(&b'/') {
-      xml.insert_str(index.saturating_sub(1), namespaces);
-    } else {
-      xml.insert_str(index, namespaces);
-    }
-  }
-
-  xml
-}
-
-fn qname_ends_with(qname: &[u8], local_name: &[u8]) -> bool {
-  qname == local_name
-    || qname
-      .strip_suffix(local_name)
-      .is_some_and(|prefix| prefix.ends_with(b":"))
 }
 
 #[derive(Clone, Debug, Default)]
@@ -13446,17 +12545,33 @@ mod tests {
   fn wps_textbox_fragment_imports_as_positioned_shape_text() {
     // drawing shape, not as fallback body text.
     let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="857250" cy="742950"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>inside shape</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr lIns="91440" tIns="45720" rIns="91440" bIns="45720" anchor="t"/></wps:wsp>"#;
-    assert!(drawing_textbox_content(xml.as_bytes()).is_some());
-    assert!(drawingml_shape_geometry(xml).is_some());
+    let shape = wps::WordprocessingShape::from_bytes(xml.as_bytes()).expect("wordprocessing shape");
+    assert!(wordprocessing_shape_textbox_content(&shape).is_some());
+    let graphic_data = a::GraphicData::from_bytes(
+      format!(
+        r#"<a:graphicData xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">{xml}</a:graphicData>"#
+      )
+      .as_bytes(),
+    )
+    .expect("graphicData");
+    assert!(matches!(
+      graphic_data.graphic_data_choice.as_slice(),
+      [a::GraphicDataChoice::WordprocessingShape(_)]
+    ));
 
-    let frame = drawingml_textbox_frame_from_fragment(
-      xml,
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let frame = wordprocessing_shape_textbox_frame(
+      &shape,
       ImagePlacement::Inline,
       DrawingMlGroupTransform::identity(),
-      TextStyle::default(),
-      &StylesCatalog::default(),
-      &ImageCatalog::default(),
-      &HyperlinkCatalog::default(),
+      DrawingTextBoxImportContext {
+        base_style: TextStyle::default(),
+        styles: &styles,
+        images: &images,
+        hyperlinks: &hyperlinks,
+      },
     )
     .expect("wps textbox frame");
 
@@ -13472,14 +12587,22 @@ mod tests {
   #[test]
   fn wps_custom_geometry_line_imports_as_line_shape() {
     let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5760720" cy="0"/></a:xfrm><a:custGeom><a:pathLst><a:path w="8504" h="0"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="8504" y="0"/></a:lnTo></a:path></a:pathLst></a:custGeom><a:noFill/><a:ln w="6480"><a:solidFill><a:srgbClr val="ff0101"/></a:solidFill></a:ln></wps:spPr></wps:wsp>"#;
-    let shape = drawingml_shape_from_fragment(
-      xml,
+    let wordprocessing_shape =
+      wps::WordprocessingShape::from_bytes(xml.as_bytes()).expect("typed WPS shape");
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let shape = wordprocessing_shape_shape(
+      &wordprocessing_shape,
       ImagePlacement::Inline,
       DrawingMlGroupTransform::identity(),
-      DrawingEffectExtent::default(),
-      &StylesCatalog::default(),
-      &ImageCatalog::default(),
-      None,
+      DrawingShapeImportContext {
+        effect_extent: DrawingEffectExtent::default(),
+        styles: &styles,
+        images: &images,
+        hyperlinks: &hyperlinks,
+        smartart_text_colors_by_model_id: None,
+      },
     )
     .expect("custom geometry shape");
 
@@ -13491,16 +12614,22 @@ mod tests {
   #[test]
   fn alternate_content_drawing_imports_choice_shape() {
     let xml = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><mc:Choice Requires="wps"><w:drawing><wp:anchor behindDoc="1" distT="0" distB="0" distL="114300" distR="114300" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>1080135</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>1260475</wp:posOffset></wp:positionV><wp:extent cx="5760720" cy="0"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="1" name="Freeform 2"/><a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr/><wps:spPr><a:custGeom><a:pathLst><a:path w="8504" h="0"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="8504" y="0"/></a:lnTo></a:path></a:pathLst></a:custGeom><a:noFill/><a:ln w="6480"><a:solidFill><a:srgbClr val="ff0101"/></a:solidFill></a:ln></wps:spPr><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></mc:Choice><mc:Fallback><w:pict/></mc:Fallback></mc:AlternateContent>"#;
+    let alternate_content = mc::AlternateContent::from_bytes(xml.as_bytes()).expect("MCE");
     let mut inlines = Vec::new();
-
-    push_run_xml_any(
-      xml.as_bytes(),
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    push_alternate_content_inlines(
+      &alternate_content,
       &mut inlines,
-      TextStyle::default(),
-      TextStyle::default(),
-      &StylesCatalog::default(),
-      &ImageCatalog::default(),
-      &HyperlinkCatalog::default(),
+      AlternateContentImportContext {
+        base_style: TextStyle::default(),
+        style: TextStyle::default(),
+        styles: &styles,
+        images: &images,
+        hyperlinks: &hyperlinks,
+        hyperlink_url: None,
+      },
     );
 
     assert!(inlines
@@ -14641,6 +13770,7 @@ mod tests {
                xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
                xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <wpg:cNvGrpSpPr/>
         <wpg:grpSpPr>
           <a:xfrm>
             <a:off x="0" y="0"/>
@@ -14656,17 +13786,20 @@ mod tests {
       </wpg:wgp>
     "#;
 
-    let frames = drawingml_textbox_frames_from_xml(
-      xml.as_bytes(),
+    let group = wpg::WordprocessingGroup::from_bytes(xml.as_bytes()).expect("typed WPG group");
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let frames = wordprocessing_group_textbox_frames(
+      &group,
       ImagePlacement::Inline,
       DrawingMlGroupTransform::identity(),
       DrawingTextBoxImportContext {
         base_style: TextStyle::default(),
-        styles: &StylesCatalog::default(),
-        images: &ImageCatalog::default(),
-        hyperlinks: &HyperlinkCatalog::default(),
+        styles: &styles,
+        images: &images,
+        hyperlinks: &hyperlinks,
       },
-      false,
     );
 
     assert_eq!(frames.len(), 1);
@@ -14685,9 +13818,10 @@ mod tests {
   </wps:txbx>
 </wps:wsp>"#;
 
-    let content = drawing_textbox_content(xml.as_bytes()).expect("typed textbox content");
+    let shape = wps::WordprocessingShape::from_bytes(xml.as_bytes()).expect("typed WPS shape");
+    let content = wordprocessing_shape_textbox_content(&shape).expect("typed textbox content");
     let blocks = textbox_blocks(
-      &content,
+      content,
       &StylesCatalog::default(),
       &ImageCatalog::default(),
       &HyperlinkCatalog::default(),
@@ -14919,9 +14053,7 @@ mod tests {
 
   #[test]
   fn wordart_outline_fragment_resolves_expected_color_and_opacity() {
-    let fragment = textbox_fragment_with_namespaces(
-      r#"<w14:textOutline w14:w="228600" w14:cap="rnd" w14:cmpd="sng" w14:algn="ctr"><w14:solidFill><w14:schemeClr w14:val="accent2"><w14:alpha w14:val="20000"/><w14:lumMod w14:val="75000"/></w14:schemeClr></w14:solidFill><w14:prstDash w14:val="sysDot"/><w14:bevel/></w14:textOutline>"#.to_string(),
-    );
+    let fragment = r#"<w14:textOutline xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" w14:w="228600" w14:cap="rnd" w14:cmpd="sng" w14:algn="ctr"><w14:solidFill><w14:schemeClr w14:val="accent2"><w14:alpha w14:val="20000"/><w14:lumMod w14:val="75000"/></w14:schemeClr></w14:solidFill><w14:prstDash w14:val="sysDot"/><w14:bevel/></w14:textOutline>"#;
     let outline = w14::TextOutlineEffect::from_bytes(fragment.as_bytes()).unwrap();
     let theme_colors = ThemeColors {
       accent2: Some(RgbColor {
@@ -14947,9 +14079,7 @@ mod tests {
 
   #[test]
   fn text_effect_overrides_apply_to_style_from_run_properties_fragment() {
-    let fragment = textbox_fragment_with_namespaces(
-      r#"<w:rPr><w:color w:val="D6E3BC" w:themeColor="accent3" w:themeTint="66"/><w14:textOutline w14:w="228600" w14:cap="rnd" w14:cmpd="sng" w14:algn="ctr"><w14:solidFill><w14:schemeClr w14:val="accent2"><w14:alpha w14:val="20000"/><w14:lumMod w14:val="75000"/></w14:schemeClr></w14:solidFill><w14:prstDash w14:val="sysDot"/><w14:bevel/></w14:textOutline></w:rPr>"#.to_string(),
-    );
+    let fragment = r#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:color w:val="D6E3BC" w:themeColor="accent3" w:themeTint="66"/><w14:textOutline w14:w="228600" w14:cap="rnd" w14:cmpd="sng" w14:algn="ctr"><w14:solidFill><w14:schemeClr w14:val="accent2"><w14:alpha w14:val="20000"/><w14:lumMod w14:val="75000"/></w14:schemeClr></w14:solidFill><w14:prstDash w14:val="sysDot"/><w14:bevel/></w14:textOutline></w:rPr>"#;
     let styles = StylesCatalog {
       theme_colors: ThemeColors {
         accent2: Some(RgbColor {
@@ -14968,10 +14098,8 @@ mod tests {
     };
     let mut style = TextStyle::default();
 
-    if let Ok(properties) = w::RunProperties::from_bytes(fragment.as_bytes()) {
-      style = properties::run_style(Some(&properties), style, &styles);
-    }
-    apply_text_effect_overrides_from_fragment(&mut style, &fragment, &styles);
+    let properties = w::RunProperties::from_bytes(fragment.as_bytes()).expect("run properties");
+    style = properties::run_style(Some(&properties), style, &styles);
 
     assert_eq!(
       style.color,

@@ -25,7 +25,6 @@ ooxmlsdk-fonts = { workspace = true }
 ooxmlsdk-formula = { workspace = true }
 ooxmlsdk-layout = { workspace = true }
 png = { workspace = true }
-quick-xml = { workspace = true }
 rustc-hash = { workspace = true }
 rustybuzz = { workspace = true }
 smallvec = { workspace = true }

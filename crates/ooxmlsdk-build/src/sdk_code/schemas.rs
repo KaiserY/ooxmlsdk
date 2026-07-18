@@ -3400,9 +3400,7 @@ fn gen_schema_enum_decl_variants(
       ))?
     };
     let variant_attrs = version_cfg.attrs(&facet.version);
-    let rename_attrs = if facet.xml_value.is_empty() {
-      quote! {}
-    } else {
+    let rename_attrs = {
       let value = &facet.xml_value;
       let aliases = alias_map.get(value);
       if let Some(aliases) = aliases {
@@ -5238,6 +5236,25 @@ mod tests {
   use std::fs::File;
   use std::io::BufReader;
   use std::path::Path;
+
+  #[test]
+  fn schema_enum_empty_xml_value_keeps_explicit_rename() {
+    let facet = crate::sdk_code::codegen_ir::EnumVariantDecl {
+      rust_name: "Empty".to_string(),
+      xml_value: String::new(),
+      ..Default::default()
+    };
+    let variants = gen_schema_enum_decl_variants(
+      &[&facet],
+      &facet,
+      &HashMap::new(),
+      VersionCfgContext::new(true),
+    )
+    .unwrap();
+    let generated = quote! { #(#variants)* }.to_string();
+
+    assert!(generated.contains("sdk (rename = \"\")"), "{generated}");
+  }
 
   fn load_legacy_schema_context(schema_path: &str) -> Vec<Schema> {
     let schema_dir = Path::new(schema_path).parent().unwrap();

@@ -1050,6 +1050,37 @@ fn part_handle_root_method_tokens(
     return quote! {};
   };
   let root_ty = &root_info.root_ty;
+  let load_root_element = quote! {
+    {
+      let root_element = {
+        let storage = crate::sdk::SdkPackage::storage(package);
+        let _part = storage.part(self.id).ok_or_else(|| {
+          crate::common::SdkError::CommonError(format!(
+            "part id {:?} is not present in package storage",
+            self.id,
+          ))
+        })?;
+        let bytes = storage.part_bytes(self.id)?;
+        if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
+          <#root_ty as crate::sdk::SdkType>::from_bytes(&bytes)?
+        } else {
+          <#root_ty as crate::sdk::SdkType>::from_bytes(bytes)?
+        }
+      };
+
+      #[cfg(feature = "mce")]
+      let root_element = {
+        let mut root_element = root_element;
+        root_element.process_mce(
+          &crate::sdk::SdkPackage::open_settings(package)
+            .markup_compatibility_process_settings,
+        )?;
+        root_element
+      };
+
+      root_element
+    }
+  };
 
   quote! {
     impl #part_ident {
@@ -1074,21 +1105,7 @@ fn part_handle_root_method_tokens(
           .and_then(<Self as crate::sdk::SdkPartRoot>::root_element_ref)
           .is_none()
         {
-          let root_element = {
-            let storage = crate::sdk::SdkPackage::storage(package);
-            let _part = storage.part(self.id).ok_or_else(|| {
-              crate::common::SdkError::CommonError(format!(
-                "part id {:?} is not present in package storage",
-                self.id,
-              ))
-            })?;
-            let bytes = storage.part_bytes(self.id)?;
-            if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
-              <#root_ty as crate::sdk::SdkType>::from_bytes(&bytes)?
-            } else {
-              <#root_ty as crate::sdk::SdkType>::from_bytes(bytes)?
-            }
-          };
+          let root_element = #load_root_element;
 
           crate::sdk::SdkPackage::storage_mut(package).discard_cached_part_bytes(self.id);
 
@@ -1118,21 +1135,7 @@ fn part_handle_root_method_tokens(
           .and_then(<Self as crate::sdk::SdkPartRoot>::root_element_ref)
           .is_none()
         {
-          let root_element = {
-            let storage = crate::sdk::SdkPackage::storage(package);
-            let _part = storage.part(self.id).ok_or_else(|| {
-              crate::common::SdkError::CommonError(format!(
-                "part id {:?} is not present in package storage",
-                self.id,
-              ))
-            })?;
-            let bytes = storage.part_bytes(self.id)?;
-            if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
-              <#root_ty as crate::sdk::SdkType>::from_bytes(&bytes)?
-            } else {
-              <#root_ty as crate::sdk::SdkType>::from_bytes(bytes)?
-            }
-          };
+          let root_element = #load_root_element;
 
           crate::sdk::SdkPackage::storage_mut(package).discard_cached_part_bytes(self.id);
 

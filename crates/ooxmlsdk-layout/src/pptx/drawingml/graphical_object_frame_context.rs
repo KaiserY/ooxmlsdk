@@ -90,6 +90,13 @@ fn graphic_data_record(
           .get(&reference.id)
           .cloned();
       }
+      a::GraphicDataChoice::ExtendedChartReference(reference) => {
+        record.chart_relationship_id = Some(reference.r_id.clone());
+        record.extended_chart_resource = slide_persist
+          .extended_chart_resources
+          .get(&reference.r_id)
+          .cloned();
+      }
       a::GraphicDataChoice::ChartSpace(_) => {
         record.has_inline_chart_space = true;
       }

@@ -71,6 +71,7 @@ pub enum BooleanEntryWithBlankValues {
   False,
   #[sdk(rename = "f")]
   F,
+  #[sdk(rename = "")]
   Empty,
 }
 /// Attached Object Data.

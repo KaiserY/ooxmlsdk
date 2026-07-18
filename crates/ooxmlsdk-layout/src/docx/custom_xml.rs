@@ -1,4 +1,6 @@
 use super::*;
+use quick_xml::Reader;
+use quick_xml::events::Event;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CustomXmlBindings {
@@ -155,5 +157,47 @@ fn xml_event_attr_value(
     .with_checks(false)
     .filter_map(|attr| attr.ok())
     .find(|attr| qname_ends_with(attr.key.as_ref(), key))
-    .and_then(|attr| decode_xml_attr_value(&attr, decoder))
+    .and_then(|attr| {
+      attr
+        .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+        .ok()
+    })
+    .map(|value| value.into_owned())
+}
+
+fn qname_ends_with(qname: &[u8], local_name: &[u8]) -> bool {
+  qname == local_name
+    || qname
+      .strip_suffix(local_name)
+      .is_some_and(|prefix| prefix.ends_with(b":"))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn custom_xml_xpath_uses_typed_binding_scope_and_minimal_attribute_scan() {
+    let xml = r#"<root xmlns:a="urn:test">
+      <a:item a:ref="choice-1" a:text="A &amp; B"/>
+      <a:item a:ref="choice-2" a:text="ignored"/>
+    </root>"#;
+
+    assert_eq!(
+      custom_xml_xpath_value(xml, "//*[@ref='choice-1']/@text").as_deref(),
+      Some("A & B")
+    );
+  }
+
+  #[test]
+  fn custom_xml_xpath_rejects_unsupported_attribute_expressions() {
+    assert_eq!(
+      custom_xml_xpath_value("<root text='value'/>", "//root/text()"),
+      None
+    );
+    assert_eq!(
+      custom_xml_xpath_value("<root text='value'/>", "//root/@text]"),
+      None
+    );
+  }
 }

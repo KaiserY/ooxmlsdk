@@ -12,10 +12,11 @@ use ooxmlsdk::parts::{
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::{
+  schemas_microsoft_com_office_drawing_2008_diagram as dsp,
   schemas_openxmlformats_org_drawingml_2006_chart as c,
   schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
 };
-use ooxmlsdk::sdk::{RelatedPart, SdkPart, SdkType};
+use ooxmlsdk::sdk::{RelatedPart, SdkPart};
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct ImageCatalog {
@@ -23,7 +24,7 @@ pub(super) struct ImageCatalog {
   pub(super) charts_by_relationship_id: HashMap<String, c::ChartSpace>,
   pub(super) diagram_colors_by_relationship_id: HashMap<String, dgm::ColorsDefinition>,
   pub(super) diagram_data_by_relationship_id: HashMap<String, dgm::DataModelRoot>,
-  pub(super) diagram_drawings_by_relationship_id: HashMap<String, String>,
+  pub(super) diagram_drawings_by_relationship_id: HashMap<String, dsp::Drawing>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -201,20 +202,13 @@ impl ImageCatalog {
   fn diagram_drawing_parts<'a>(
     package: &mut WordprocessingDocument,
     parts: impl IntoIterator<Item = (String, DiagramPersistLayoutPart)> + 'a,
-  ) -> HashMap<String, String> {
+  ) -> HashMap<String, dsp::Drawing> {
     let mut by_relationship_id = HashMap::new();
     for (relationship_id, part) in parts {
       let Ok(root) = part.root_element(package) else {
         continue;
       };
-      let mut bytes = Vec::new();
-      if SdkType::write_to(root, &mut bytes).is_err() {
-        continue;
-      }
-      let Ok(xml) = String::from_utf8(bytes) else {
-        continue;
-      };
-      by_relationship_id.insert(relationship_id, xml);
+      by_relationship_id.insert(relationship_id, root.clone());
     }
     by_relationship_id
   }

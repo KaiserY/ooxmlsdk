@@ -725,6 +725,7 @@ fn graphic_frame_relationship_id(frame: &xdr::GraphicFrame) -> Option<String> {
     .iter()
     .find_map(|choice| match choice {
       a::GraphicDataChoice::ChartReference(reference) => Some(reference.id.to_string()),
+      a::GraphicDataChoice::ExtendedChartReference(reference) => Some(reference.r_id.to_string()),
       a::GraphicDataChoice::RelationshipIds(relationship_ids) => {
         Some(relationship_ids.data_part.to_string())
       }
@@ -1555,5 +1556,49 @@ fn collect_diagram_group_shape(group: &dsp::GroupShape, catalog: &mut DiagramDra
     );
   for choice in &group.group_shape_choice {
     collect_diagram_group_shape_choice(choice, catalog);
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use ooxmlsdk::sdk::SdkType;
+
+  use super::*;
+
+  fn graphic_frame(xml: &[u8]) -> xdr::GraphicFrame {
+    xdr::GraphicFrame {
+      graphic: Box::new(a::Graphic {
+        graphic_data: a::GraphicData::from_bytes(xml).expect("graphicData"),
+        ..Default::default()
+      }),
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn graphic_frame_relationship_id_distinguishes_chart_reference_qnames() {
+    let extended = graphic_frame(
+      br#"<a:graphicData xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" uri="http://schemas.microsoft.com/office/drawing/2014/chartex"><cx:chart r:id="rId7"/></a:graphicData>"#,
+    );
+    assert!(matches!(
+      extended.graphic.graphic_data.graphic_data_choice.as_slice(),
+      [a::GraphicDataChoice::ExtendedChartReference(_)]
+    ));
+    assert_eq!(
+      graphic_frame_relationship_id(&extended).as_deref(),
+      Some("rId7")
+    );
+
+    let standard = graphic_frame(
+      br#"<a:graphicData xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rId8"/></a:graphicData>"#,
+    );
+    assert!(matches!(
+      standard.graphic.graphic_data.graphic_data_choice.as_slice(),
+      [a::GraphicDataChoice::ChartReference(_)]
+    ));
+    assert_eq!(
+      graphic_frame_relationship_id(&standard).as_deref(),
+      Some("rId8")
+    );
   }
 }

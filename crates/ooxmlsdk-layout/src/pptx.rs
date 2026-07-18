@@ -1,7 +1,7 @@
 mod chart;
 mod custom_geometry;
 mod display;
-mod drawingml;
+pub(crate) mod drawingml;
 mod gradient;
 mod import;
 mod presentation;

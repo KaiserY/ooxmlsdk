@@ -55,10 +55,11 @@ impl WorkbookFragment {
     &mut self,
     package: &mut SpreadsheetDocument,
     mso_document: bool,
+    ui_language: Option<&str>,
   ) -> Result<Vec<CalcSheet>> {
     // WorkbookFragment::finalizeImport imports theme/styles/shared strings
     // before creating all sheet globals/fragments in workbook sheet order.
-    self.styles = StylesCatalog::from_workbook_part(package, &self.workbook_part)?;
+    self.styles = StylesCatalog::from_workbook_part(package, &self.workbook_part, ui_language)?;
     self.shared_strings = shared_strings(package, &self.workbook_part)?;
     self.defined_names = DefinedNamesCatalog::from_workbook(&self.workbook);
     let date_1904 = self

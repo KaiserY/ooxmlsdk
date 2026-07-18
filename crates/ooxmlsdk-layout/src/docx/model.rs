@@ -27,7 +27,6 @@ pub(crate) struct DocxDocument {
   pub footnotes: BTreeMap<i64, Vec<Block>>,
   pub endnote_blocks: Vec<Block>,
   pub endnotes: BTreeMap<i64, Vec<Block>>,
-  pub comment_blocks: Vec<Block>,
   pub title_page: bool,
   pub blocks: Vec<Block>,
 }

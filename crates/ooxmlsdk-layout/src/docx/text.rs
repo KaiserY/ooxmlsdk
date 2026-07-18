@@ -5,7 +5,7 @@ use super::{
   CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog,
   NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphFormat, ParagraphProps,
   RunStyleOverrides, StylesCatalog, TextRun, TextStyle, paragraph_inlines,
-  paragraph_note_reference_ids, properties, redline_author_color,
+  paragraph_note_reference_ids, properties,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -84,12 +84,8 @@ pub(super) fn paragraph_model_with_base<'a>(
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
   format.style_id = style_id.map(Arc::<str>::from);
-  let mut run_style =
+  let run_style =
     properties::paragraph_run_style(styles, style_id, base.run_style.clone(), base.run_overrides);
-  if paragraph_mark_is_deleted(paragraph) {
-    run_style.color = redline_author_color();
-    run_style.strikethrough = !paragraph_contains_drawing(paragraph);
-  }
   let direct_numbering = direct_paragraph_properties
     .as_ref()
     .and_then(|properties| properties.numbering_properties())
@@ -128,7 +124,7 @@ pub(super) fn paragraph_model_with_base<'a>(
       },
     )
   });
-  let (mut list_label, numbering_image, mut list_label_style, numbering_list_tab_stop_pt) =
+  let (mut list_label, numbering_image, list_label_style, numbering_list_tab_stop_pt) =
     numbering_label.map_or_else(
       || (None, None, TextStyle::default(), None),
       |label| (label.text, label.image, label.style, label.list_tab_stop_pt),
@@ -147,14 +143,6 @@ pub(super) fn paragraph_model_with_base<'a>(
     .flatten();
   if list_label.as_deref() == Some("\t") && style_tab_stop_pt.is_some() && !has_direct_indentation {
     list_label = Some(" \t".to_string());
-  }
-  if paragraph_mark_is_inserted(paragraph) && has_numbering_label {
-    list_label_style.color = redline_author_color();
-    list_label_style.underline = true;
-  }
-  if paragraph_mark_is_deleted(paragraph) && has_numbering_label {
-    list_label_style.color = redline_author_color();
-    list_label_style.strikethrough = !paragraph_contains_drawing(paragraph);
   }
   let mut inlines = paragraph_inlines(
     paragraph,
@@ -291,57 +279,6 @@ fn paragraph_mark_is_deleted(paragraph: &w::Paragraph) -> bool {
     .as_deref()
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
     .is_some_and(|properties| properties.deleted.is_some() || properties.move_from.is_some())
-}
-
-fn paragraph_contains_drawing(paragraph: &w::Paragraph) -> bool {
-  paragraph
-    .paragraph_choice
-    .iter()
-    .any(|choice| match choice {
-      w::ParagraphChoice::WRun(run) => run_contains_drawing(run),
-      w::ParagraphChoice::InsertedRun(inserted) => inserted_run_contains_drawing(inserted),
-      w::ParagraphChoice::DeletedRun(deleted) => deleted_run_contains_drawing(deleted),
-      _ => false,
-    })
-}
-
-fn inserted_run_contains_drawing(inserted: &w::InsertedRun) -> bool {
-  inserted
-    .inserted_run_choice
-    .iter()
-    .any(|choice| match choice {
-      w::InsertedRunChoice::WRun(run) => run_contains_drawing(run),
-      w::InsertedRunChoice::InsertedRun(inserted) => inserted_run_contains_drawing(inserted),
-      w::InsertedRunChoice::DeletedRun(deleted) => deleted_run_contains_drawing(deleted),
-      _ => false,
-    })
-}
-
-fn deleted_run_contains_drawing(deleted: &w::DeletedRun) -> bool {
-  deleted
-    .deleted_run_choice
-    .iter()
-    .any(|choice| match choice {
-      w::DeletedRunChoice::WRun(run) => run_contains_drawing(run),
-      w::DeletedRunChoice::InsertedRun(inserted) => inserted_run_contains_drawing(inserted),
-      w::DeletedRunChoice::DeletedRun(deleted) => deleted_run_contains_drawing(deleted),
-      _ => false,
-    })
-}
-
-fn run_contains_drawing(run: &w::Run) -> bool {
-  run
-    .run_choice
-    .iter()
-    .any(|choice| matches!(choice, w::RunChoice::Drawing(_)))
-}
-
-fn paragraph_mark_is_inserted(paragraph: &w::Paragraph) -> bool {
-  paragraph
-    .paragraph_properties
-    .as_deref()
-    .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
-    .is_some_and(|properties| properties.inserted.is_some() || properties.move_to.is_some())
 }
 
 fn paragraph_requires_placeholder_run(paragraph: &w::Paragraph) -> bool {

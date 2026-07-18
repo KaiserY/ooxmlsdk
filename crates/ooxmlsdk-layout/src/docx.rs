@@ -108,7 +108,6 @@ const LO_SUBSCRIPT_BASELINE_SHIFT_SCALE: f32 = -0.08;
 const MIN_ESCAPEMENT_FONT_SIZE_PT: f32 = 1.0;
 const MIN_IMPORTED_LINE_HEIGHT_PT: f32 = 0.1;
 const TAB_STOP_DEDUP_EPSILON_PT: f32 = 0.1;
-const COMMENT_REFERENCE_FONT_SCALE: f32 = 0.75;
 const MAX_WORD_TABLE_MARGIN_TWIPS: f32 = 31_680.0;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -229,13 +228,6 @@ pub(crate) fn extract(
     &mut form_widget_ids,
   )?;
   let endnote_blocks = flatten_note_blocks(&endnotes);
-  let comment_blocks = comment_blocks(
-    package,
-    &main,
-    &styles,
-    &custom_xml_bindings,
-    &mut form_widget_ids,
-  )?;
   let title_page = sections
     .first()
     .map(|section| section.title_page)
@@ -259,7 +251,6 @@ pub(crate) fn extract(
     footnotes,
     endnote_blocks,
     endnotes,
-    comment_blocks,
     title_page,
     blocks,
   })
@@ -1426,48 +1417,6 @@ fn flatten_note_blocks(notes: &BTreeMap<i64, Vec<Block>>) -> Vec<Block> {
     .collect()
 }
 
-fn comment_blocks(
-  package: &mut WordprocessingDocument,
-  main: &MainDocumentPart,
-  styles: &StylesCatalog,
-  custom_xml_bindings: &CustomXmlBindings,
-  form_widget_ids: &mut FormWidgetIdAllocator,
-) -> Result<Vec<Block>> {
-  let Some(part) = main.wordprocessing_comments_part(package) else {
-    return Ok(Vec::new());
-  };
-  let images = ImageCatalog::load_from_comments(package, &part);
-  let hyperlinks = HyperlinkCatalog::load(package, &part);
-  let comments = part.root_element(package)?;
-  let mut numbering = NumberingCatalog::default();
-  let mut context = NoteImportContext {
-    styles,
-    numbering: &mut numbering,
-    images: &images,
-    hyperlinks: &hyperlinks,
-    custom_xml_bindings,
-    form_widget_ids,
-  };
-  let mut blocks = Vec::new();
-
-  for comment in &comments.comment {
-    append_note_blocks(
-      &mut blocks,
-      NoteLabel::new(format!("[{}] ", comment.id), None),
-      comment
-        .comment_choice
-        .iter()
-        .filter_map(|choice| match choice {
-          w::CommentChoice::Paragraph(paragraph) => Some(paragraph.as_ref()),
-          _ => None,
-        }),
-      &mut context,
-    );
-  }
-
-  Ok(blocks)
-}
-
 #[derive(Clone, Debug)]
 struct NoteLabel {
   text: String,
@@ -1574,7 +1523,7 @@ fn table_model(
     .table_choice2
     .iter()
     .filter_map(|choice| match choice {
-      w::TableChoice2::TableRow(row) => Some(row.as_ref()),
+      w::TableChoice2::TableRow(row) if !table_row_is_deleted(row) => Some(row.as_ref()),
       _ => None,
     })
     .collect::<Vec<_>>();
@@ -1857,7 +1806,7 @@ fn table_row_model(
     cell_spacing_pt: row_style.cell_spacing_pt,
     grid_before,
     grid_after,
-    redline_color: table_row_redline_color(row.table_row_properties.as_deref()),
+    redline_color: None,
     cells,
   }
 }
@@ -1875,9 +1824,11 @@ fn table_row_keep_with_next(cells: &[TableCell], nested_table_level: usize) -> b
   paragraph.format.keep_with_next
 }
 
-fn table_row_redline_color(properties: Option<&w::TableRowProperties>) -> Option<RgbColor> {
-  let properties = properties?;
-  (properties.inserted.is_some() || properties.deleted.is_some()).then_some(redline_author_color())
+fn table_row_is_deleted(row: &w::TableRow) -> bool {
+  row
+    .table_row_properties
+    .as_deref()
+    .is_some_and(|properties| properties.deleted.is_some())
 }
 
 fn table_row_style_for(
@@ -3416,12 +3367,7 @@ fn paragraph_note_reference_ids(paragraph: &w::Paragraph) -> (Vec<i64>, Vec<i64>
       w::ParagraphChoice::InsertedRun(inserted) => {
         collect_inserted_run_note_reference_ids(inserted, &mut footnotes, &mut endnotes);
       }
-      w::ParagraphChoice::DeletedRun(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted, &mut footnotes, &mut endnotes);
-      }
-      w::ParagraphChoice::MoveFromRun(moved) => {
-        collect_move_from_run_note_reference_ids(moved, &mut footnotes, &mut endnotes);
-      }
+      w::ParagraphChoice::DeletedRun(_) | w::ParagraphChoice::MoveFromRun(_) => {}
       w::ParagraphChoice::MoveToRun(moved) => {
         collect_move_to_run_note_reference_ids(moved, &mut footnotes, &mut endnotes);
       }
@@ -3498,12 +3444,7 @@ fn collect_hyperlink_note_reference_ids(
       w::HyperlinkChoice::InsertedRun(inserted) => {
         collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
       }
-      w::HyperlinkChoice::DeletedRun(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
-      }
-      w::HyperlinkChoice::MoveFromRun(moved) => {
-        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
-      }
+      w::HyperlinkChoice::DeletedRun(_) | w::HyperlinkChoice::MoveFromRun(_) => {}
       w::HyperlinkChoice::MoveToRun(moved) => {
         collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
@@ -3537,12 +3478,7 @@ fn collect_sdt_run_note_reference_ids(
       w::SdtContentRunChoice::InsertedRun(inserted) => {
         collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
       }
-      w::SdtContentRunChoice::DeletedRun(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
-      }
-      w::SdtContentRunChoice::MoveFromRun(moved) => {
-        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
-      }
+      w::SdtContentRunChoice::DeletedRun(_) | w::SdtContentRunChoice::MoveFromRun(_) => {}
       w::SdtContentRunChoice::MoveToRun(moved) => {
         collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
@@ -3564,67 +3500,8 @@ fn collect_inserted_run_note_reference_ids(
       w::InsertedRunChoice::InsertedRun(inserted) => {
         collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
       }
-      w::InsertedRunChoice::DeletedRun(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
-      }
-      w::InsertedRunChoice::MoveFromRun(moved) => {
-        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
-      }
+      w::InsertedRunChoice::DeletedRun(_) | w::InsertedRunChoice::MoveFromRun(_) => {}
       w::InsertedRunChoice::MoveToRun(moved) => {
-        collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
-      }
-      _ => {}
-    }
-  }
-}
-
-fn collect_deleted_run_note_reference_ids(
-  deleted: &w::DeletedRun,
-  footnotes: &mut Vec<i64>,
-  endnotes: &mut Vec<i64>,
-) {
-  for choice in &deleted.deleted_run_choice {
-    match choice {
-      w::DeletedRunChoice::WRun(run) => {
-        collect_run_note_reference_ids(run.as_ref(), footnotes, endnotes)
-      }
-      w::DeletedRunChoice::InsertedRun(inserted) => {
-        collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
-      }
-      w::DeletedRunChoice::DeletedRun(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
-      }
-      w::DeletedRunChoice::MoveFromRun(moved) => {
-        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
-      }
-      w::DeletedRunChoice::MoveToRun(moved) => {
-        collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
-      }
-      _ => {}
-    }
-  }
-}
-
-fn collect_move_from_run_note_reference_ids(
-  moved: &w::MoveFromRun,
-  footnotes: &mut Vec<i64>,
-  endnotes: &mut Vec<i64>,
-) {
-  for choice in &moved.move_from_run_choice {
-    match choice {
-      w::MoveFromRunChoice::WRun(run) => {
-        collect_run_note_reference_ids(run.as_ref(), footnotes, endnotes)
-      }
-      w::MoveFromRunChoice::InsertedRun(inserted) => {
-        collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
-      }
-      w::MoveFromRunChoice::DeletedRun(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
-      }
-      w::MoveFromRunChoice::MoveFromRun(moved) => {
-        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
-      }
-      w::MoveFromRunChoice::MoveToRun(moved) => {
         collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
       _ => {}
@@ -3645,12 +3522,7 @@ fn collect_move_to_run_note_reference_ids(
       w::MoveToRunChoice::InsertedRun(inserted) => {
         collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
       }
-      w::MoveToRunChoice::DeletedRun(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
-      }
-      w::MoveToRunChoice::MoveFromRun(moved) => {
-        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
-      }
+      w::MoveToRunChoice::DeletedRun(_) | w::MoveToRunChoice::MoveFromRun(_) => {}
       w::MoveToRunChoice::MoveToRun(moved) => {
         collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
@@ -3874,16 +3746,7 @@ fn push_run(
           Some(note_reference_url("endnote", reference.id)),
         );
       }
-      w::RunChoice::CommentReference(reference) => {
-        flush_run_text(
-          inlines,
-          &mut text,
-          style.clone(),
-          hyperlink_url,
-          &style_ref_keys,
-        );
-        push_comment_reference(inlines, &reference.id, style.clone());
-      }
+      w::RunChoice::CommentReference(_) => {}
       w::RunChoice::Drawing(drawing) => {
         flush_run_text(
           inlines,
@@ -4176,32 +4039,6 @@ fn run_properties_style_id(properties: &w::RunProperties) -> Option<&str> {
   run_properties_run_style(properties).map(|run_style| run_style.val.as_str())
 }
 
-fn push_redline_run(
-  run: &w::Run,
-  inlines: &mut Vec<InlineItem>,
-  base_style: TextStyle,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-  hyperlink_url: Option<&str>,
-) {
-  let start = inlines.len();
-  push_run(
-    run,
-    inlines,
-    base_style,
-    styles,
-    images,
-    hyperlinks,
-    hyperlink_url,
-  );
-  for inline in &mut inlines[start..] {
-    if let InlineItem::Text(run) = inline {
-      run.preserve_text_portion = true;
-    }
-  }
-}
-
 fn push_ruby_base(
   ruby: &w::Ruby,
   inlines: &mut Vec<InlineItem>,
@@ -4471,14 +4308,12 @@ fn push_inserted_run(
   hyperlinks: &HyperlinkCatalog,
   hyperlink_url: Option<&str>,
 ) {
-  let mut redline_style = base_style;
-  redline_style.color = redline_author_color();
   for choice in &inserted.inserted_run_choice {
     match choice {
-      w::InsertedRunChoice::WRun(run) => push_redline_run(
+      w::InsertedRunChoice::WRun(run) => push_run(
         run,
         inlines,
-        redline_style.clone(),
+        base_style.clone(),
         styles,
         images,
         hyperlinks,
@@ -4488,40 +4323,19 @@ fn push_inserted_run(
         push_inserted_run(
           nested,
           inlines,
-          redline_style.clone(),
+          base_style.clone(),
           styles,
           images,
           hyperlinks,
           hyperlink_url,
         );
       }
-      w::InsertedRunChoice::DeletedRun(deleted) => {
-        push_deleted_run(
-          deleted,
-          inlines,
-          redline_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        );
-      }
-      w::InsertedRunChoice::MoveFromRun(moved) => {
-        push_move_from_run(
-          moved,
-          inlines,
-          redline_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        );
-      }
+      w::InsertedRunChoice::DeletedRun(_) | w::InsertedRunChoice::MoveFromRun(_) => {}
       w::InsertedRunChoice::MoveToRun(moved) => {
         push_move_to_run(
           moved,
           inlines,
-          redline_style.clone(),
+          base_style.clone(),
           styles,
           images,
           hyperlinks,
@@ -4534,143 +4348,39 @@ fn push_inserted_run(
 }
 
 fn push_deleted_run(
-  deleted: &w::DeletedRun,
-  inlines: &mut Vec<InlineItem>,
-  mut base_style: TextStyle,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-  hyperlink_url: Option<&str>,
+  _deleted: &w::DeletedRun,
+  _inlines: &mut Vec<InlineItem>,
+  _base_style: TextStyle,
+  _styles: &StylesCatalog,
+  _images: &ImageCatalog,
+  _hyperlinks: &HyperlinkCatalog,
+  _hyperlink_url: Option<&str>,
 ) {
-  base_style.color = redline_author_color();
-  for choice in &deleted.deleted_run_choice {
-    match choice {
-      w::DeletedRunChoice::WRun(run) => push_run(
-        run,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
-      w::DeletedRunChoice::InsertedRun(inserted) => push_inserted_run(
-        inserted,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
-      w::DeletedRunChoice::DeletedRun(deleted) => push_deleted_run(
-        deleted,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
-      w::DeletedRunChoice::MoveFromRun(moved) => push_move_from_run(
-        moved,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
-      w::DeletedRunChoice::MoveToRun(moved) => push_move_to_run(
-        moved,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
-      _ => {}
-    }
-  }
 }
 
 fn push_move_from_run(
-  moved: &w::MoveFromRun,
-  inlines: &mut Vec<InlineItem>,
-  mut base_style: TextStyle,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-  hyperlink_url: Option<&str>,
+  _moved: &w::MoveFromRun,
+  _inlines: &mut Vec<InlineItem>,
+  _base_style: TextStyle,
+  _styles: &StylesCatalog,
+  _images: &ImageCatalog,
+  _hyperlinks: &HyperlinkCatalog,
+  _hyperlink_url: Option<&str>,
 ) {
-  base_style.color = moved_redline_color();
-  base_style.strikethrough = true;
-  for choice in &moved.move_from_run_choice {
-    match choice {
-      w::MoveFromRunChoice::WRun(run) => push_redline_run(
-        run,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
-      w::MoveFromRunChoice::InsertedRun(inserted) => push_inserted_run(
-        inserted,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
-      w::MoveFromRunChoice::DeletedRun(deleted) => push_deleted_run(
-        deleted,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
-      w::MoveFromRunChoice::MoveFromRun(moved) => push_move_from_run(
-        moved,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
-      w::MoveFromRunChoice::MoveToRun(moved) => push_move_to_run(
-        moved,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
-      _ => {}
-    }
-  }
 }
 
 fn push_move_to_run(
   moved: &w::MoveToRun,
   inlines: &mut Vec<InlineItem>,
-  mut base_style: TextStyle,
+  base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
   hyperlink_url: Option<&str>,
 ) {
-  base_style.color = moved_redline_color();
   for choice in &moved.move_to_run_choice {
     match choice {
-      w::MoveToRunChoice::WRun(run) => push_redline_run(
+      w::MoveToRunChoice::WRun(run) => push_run(
         run,
         inlines,
         base_style.clone(),
@@ -4688,24 +4398,7 @@ fn push_move_to_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::MoveToRunChoice::DeletedRun(deleted) => push_deleted_run(
-        deleted,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
-      w::MoveToRunChoice::MoveFromRun(moved) => push_move_from_run(
-        moved,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        hyperlink_url,
-      ),
+      w::MoveToRunChoice::DeletedRun(_) | w::MoveToRunChoice::MoveFromRun(_) => {}
       w::MoveToRunChoice::MoveToRun(moved) => push_move_to_run(
         moved,
         inlines,
@@ -4717,22 +4410,6 @@ fn push_move_to_run(
       ),
       _ => {}
     }
-  }
-}
-
-pub(super) fn redline_author_color() -> RgbColor {
-  RgbColor {
-    r: 0xff,
-    g: 0x00,
-    b: 0x00,
-  }
-}
-
-fn moved_redline_color() -> RgbColor {
-  RgbColor {
-    r: 0x00,
-    g: 0x80,
-    b: 0x00,
   }
 }
 
@@ -4773,27 +4450,6 @@ fn note_reference_url(kind: &str, id: i64) -> String {
 
 fn note_backlink_url(kind: &str, id: i64) -> String {
   format!("ooxmlsdk-pdf:{kind}-backlink:{id}")
-}
-
-fn push_comment_reference(inlines: &mut Vec<InlineItem>, id: &str, style: TextStyle) {
-  inlines.push(InlineItem::Text(TextRun {
-    text: format!("[{id}]"),
-    style: TextStyle {
-      font_size_pt: (style.font_size_pt * COMMENT_REFERENCE_FONT_SCALE)
-        .max(MIN_ESCAPEMENT_FONT_SIZE_PT),
-      color: RgbColor {
-        r: 0x80,
-        g: 0x40,
-        b: 0x00,
-      },
-      ..style
-    },
-    hyperlink_url: None,
-    dynamic_field: None,
-    style_ref_keys: Vec::new(),
-    style_ref_text: None,
-    preserve_text_portion: false,
-  }));
 }
 
 fn flush_run_text(
@@ -12357,7 +12013,7 @@ fn drawingml_percent_to_ratio(value: &DrawingmlPercentageValue) -> Option<f32> {
 }
 
 fn page_setup(section: &w::SectionProperties) -> PageSetup {
-  let mut setup = PageSetup::default();
+  let mut setup = default_word_page_setup();
 
   if let Some(size) = &section.page_size {
     if let Some(width) = size.width.as_ref().and_then(twips_measure_to_points) {
@@ -12427,6 +12083,16 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     .map(|pitch| units::twips_to_points(pitch as f32));
 
   setup
+}
+
+fn default_word_page_setup() -> PageSetup {
+  PageSetup {
+    // LibreOffice's OOXML importer initializes an omitted w:pgSz to
+    // PAPER_LETTER, matching Microsoft Office fixed output for such sections.
+    width_pt: 612.0,
+    height_pt: 792.0,
+    ..PageSetup::default()
+  }
 }
 
 fn line_numbering_model(properties: &w::LineNumberType) -> Option<LineNumbering> {
@@ -13898,6 +13564,14 @@ mod tests {
 
     assert!((setup.width_pt - units::millimeters_to_points(210.0)).abs() < 0.001);
     assert!((setup.height_pt - units::millimeters_to_points(297.0)).abs() < 0.001);
+  }
+
+  #[test]
+  fn word_section_without_page_size_uses_letter_paper() {
+    let setup = page_setup(&w::SectionProperties::default());
+
+    assert_eq!(setup.width_pt, 612.0);
+    assert_eq!(setup.height_pt, 792.0);
   }
 
   #[test]

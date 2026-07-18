@@ -653,7 +653,15 @@ pub(crate) struct Page {
   wrap_exclusions: Vec<WrapExclusion>,
   repeating_wrap_exclusion_catalog: RepeatingWrapExclusionCatalog,
   repeating_wrap_exclusions: Vec<WrapExclusion>,
+  repeating_adornment: Option<RepeatingAdornment>,
   pending_floating_table_follows: Vec<PendingFloatingTableFollow>,
+}
+
+#[derive(Clone, Debug)]
+struct RepeatingAdornment {
+  items: Vec<PageItem>,
+  frame_fragments: Vec<FrameFragment>,
+  frame_influences: Vec<FrameInfluence>,
 }
 
 #[derive(Clone, Debug)]
@@ -1870,6 +1878,7 @@ impl<'a> RootFrameLayout<'a> {
     };
 
     materialize_table_frame_fragment_bounds(&mut self.pages, &self.frames);
+    materialize_repeating_adornments(&mut self.pages);
 
     LayoutDocument {
       pages: self.pages,
@@ -2418,15 +2427,6 @@ impl<'a> RootFrameLayout<'a> {
         &mut self.pages,
         &mut self.current,
         endnote_start_page_index,
-      );
-    }
-
-    if !self.document.comment_blocks.is_empty() {
-      self.format_note_block_sequence(
-        NoteSeparatorKind::Endnote,
-        note_setup,
-        note_flow,
-        &self.document.comment_blocks,
       );
     }
   }
@@ -4570,6 +4570,7 @@ fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index
     wrap_exclusions: Vec::new(),
     repeating_wrap_exclusion_catalog: RepeatingWrapExclusionCatalog::default(),
     repeating_wrap_exclusions: Vec::new(),
+    repeating_adornment: None,
     pending_floating_table_follows: Vec::new(),
   }
 }
@@ -6398,12 +6399,36 @@ fn apply_headers_and_footers(
       },
     );
 
-    let item_offset = page.items.len();
-    offset_page_frame_records(&mut adornment, item_offset);
-    page.items.extend(adornment.items);
+    extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &adornment.wrap_exclusions);
+    page.repeating_adornment = Some(RepeatingAdornment {
+      items: adornment.items,
+      frame_fragments: adornment.frame_fragments,
+      frame_influences: adornment.frame_influences,
+    });
+  }
+}
+
+fn materialize_repeating_adornments(pages: &mut [Page]) {
+  for page in pages {
+    let Some(mut adornment) = page.repeating_adornment.take() else {
+      continue;
+    };
+    let insertion_index = usize::from(page.items.first().is_some_and(|item| {
+      matches!(item, PageItem::Fill(fill) if fill.x_pt == 0.0
+        && fill.y_pt == 0.0
+        && fill.width_pt == page.setup.width_pt
+        && fill.height_pt == page.setup.height_pt)
+    }));
+    offset_page_frame_records_raw(
+      &mut adornment.frame_fragments,
+      &mut adornment.frame_influences,
+      insertion_index,
+    );
+    page
+      .items
+      .splice(insertion_index..insertion_index, adornment.items);
     page.frame_fragments.extend(adornment.frame_fragments);
     page.frame_influences.extend(adornment.frame_influences);
-    extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &adornment.wrap_exclusions);
   }
 }
 
@@ -6571,7 +6596,13 @@ fn resolve_dynamic_fields(pages: &mut [Page], anchor_pages: &[AnchorPage]) {
   let style_ref_candidates = style_ref_candidates_by_page(pages);
   for (page_index, page) in pages.iter_mut().enumerate() {
     let page_number = (page_index + 1).to_string();
-    for item in &mut page.items {
+    let items = page.items.iter_mut().chain(
+      page
+        .repeating_adornment
+        .iter_mut()
+        .flat_map(|adornment| adornment.items.iter_mut()),
+    );
+    for item in items {
       let PageItem::Text(text) = item else {
         continue;
       };

@@ -1191,7 +1191,7 @@ fn pivot_cache_source_number_format_ids(
   else {
     return Ok(Vec::new());
   };
-  let styles = StylesCatalog::from_workbook_part(package, &workbook_part)?;
+  let styles = StylesCatalog::from_workbook_part(package, &workbook_part, None)?;
   let worksheet = worksheet_part.root_element(package)?.clone();
   let mut field_formats = Vec::new();
   for column in source_range.start.col..=source_range.end.col {

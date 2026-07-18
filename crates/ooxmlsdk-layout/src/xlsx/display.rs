@@ -230,6 +230,11 @@ fn print_page_items(
     .map(|range| page.sheet.range_rect(range).height_pt * zoom_scale)
     .unwrap_or(0.0);
 
+  // ECMA-376 §18.3.1.46 defines these as the printed page header and
+  // footer. Keep the PDF content stream in the same semantic order exposed
+  // by Microsoft Office fixed output: header, sheet body, then footer.
+  render_header_or_footer(&mut items, page, setup, true);
+
   if let Some(area) = repeat_corner_for_page(page) {
     render_cell_area(
       &mut items,
@@ -335,7 +340,7 @@ fn print_page_items(
     body_origin_y + repeat_height,
     zoom_scale,
   ));
-  render_header_footer(&mut items, page, setup);
+  render_header_or_footer(&mut items, page, setup, false);
   items
 }
 
@@ -2477,29 +2482,21 @@ fn hyperlink_for_cell(
     })
 }
 
-fn render_header_footer(items: &mut Vec<PageItem>, page: &CalcPrintPage<'_>, setup: PageSetup) {
-  let header = header_footer_text(page, true);
-  let footer = header_footer_text(page, false);
-  if let Some(header) = header {
-    render_header_footer_line(
-      items,
-      setup.margin_left_pt,
-      setup.header_distance_pt,
-      page,
-      setup,
-      header,
-    );
-  }
-  if let Some(footer) = footer {
-    render_header_footer_line(
-      items,
-      setup.margin_left_pt,
-      setup.height_pt - setup.footer_distance_pt - XLSX_HEADER_FOOTER_LINE_HEIGHT_PT,
-      page,
-      setup,
-      footer,
-    );
-  }
+fn render_header_or_footer(
+  items: &mut Vec<PageItem>,
+  page: &CalcPrintPage<'_>,
+  setup: PageSetup,
+  header: bool,
+) {
+  let Some(text) = header_footer_text(page, header) else {
+    return;
+  };
+  let y_pt = if header {
+    setup.header_distance_pt
+  } else {
+    setup.height_pt - setup.footer_distance_pt - XLSX_HEADER_FOOTER_LINE_HEIGHT_PT
+  };
+  render_header_footer_line(items, setup.margin_left_pt, y_pt, page, setup, text);
 }
 
 fn header_footer_text<'a>(page: &CalcPrintPage<'a>, header: bool) -> Option<&'a str> {

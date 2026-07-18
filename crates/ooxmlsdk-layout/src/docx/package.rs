@@ -8,7 +8,6 @@ use ooxmlsdk::parts::{
   endnotes_part::EndnotesPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
   header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
   numbering_definitions_part::NumberingDefinitionsPart,
-  wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::{
@@ -112,13 +111,6 @@ impl ImageCatalog {
     endnotes: &EndnotesPart,
   ) -> Self {
     Self::from_image_parts(package, endnotes.related_parts_of_type(package))
-  }
-
-  pub(super) fn load_from_comments(
-    package: &WordprocessingDocument,
-    comments: &WordprocessingCommentsPart,
-  ) -> Self {
-    Self::from_image_parts(package, comments.related_parts_of_type(package))
   }
 
   pub(super) fn load_from_numbering(

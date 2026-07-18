@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use crate::error::Result;
 use crate::model::{BorderStyle, RgbColor, TextStyle};
+use crate::pptx::drawingml::theme::ThemeFontScheme;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct StylesCatalog {
@@ -15,6 +16,8 @@ pub(crate) struct StylesCatalog {
   pub(crate) fill_records: Vec<FillRecord>,
   pub(crate) border_records: Vec<BorderRecord>,
   pub(crate) differential_format_records: Vec<DifferentialFormatRecord>,
+  theme_major_east_asian: Option<Arc<str>>,
+  theme_minor_east_asian: Option<Arc<str>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -51,6 +54,7 @@ pub(crate) struct FontRecord {
   pub(crate) italic: bool,
   pub(crate) underline: bool,
   pub(crate) strikethrough: bool,
+  pub(crate) scheme: x::FontSchemeValues,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -105,16 +109,31 @@ impl StylesCatalog {
   pub(crate) fn from_workbook_part(
     package: &mut SpreadsheetDocument,
     workbook_part: &WorkbookPart,
+    ui_language: Option<&str>,
   ) -> Result<Self> {
+    let theme_fonts = if let Some(theme_part) = workbook_part.theme_part(package) {
+      let theme = theme_part.root_element(package)?;
+      Some(ThemeFontScheme::from_dml(&theme.theme_elements.font_scheme))
+    } else {
+      None
+    };
     let Some(styles_part) = workbook_part.workbook_styles_part(package) else {
       return Ok(Self::default());
     };
 
     let stylesheet = styles_part.root_element(package)?;
-    Ok(Self::from_stylesheet(stylesheet))
+    Ok(Self::from_stylesheet(
+      stylesheet,
+      theme_fonts.as_ref(),
+      ui_language,
+    ))
   }
 
-  fn from_stylesheet(stylesheet: &x::Stylesheet) -> Self {
+  fn from_stylesheet(
+    stylesheet: &x::Stylesheet,
+    theme_fonts: Option<&ThemeFontScheme>,
+    ui_language: Option<&str>,
+  ) -> Self {
     let indexed_colors = stylesheet
       .colors
       .as_ref()
@@ -229,6 +248,12 @@ impl StylesCatalog {
             .collect()
         })
         .unwrap_or_default(),
+      theme_major_east_asian: theme_fonts
+        .and_then(|fonts| fonts.resolve_font_for_language("+mj-ea", ui_language))
+        .map(Arc::from),
+      theme_minor_east_asian: theme_fonts
+        .and_then(|fonts| fonts.resolve_font_for_language("+mn-ea", ui_language))
+        .map(Arc::from),
     }
   }
 
@@ -295,9 +320,7 @@ impl StylesCatalog {
     else {
       return style;
     };
-    if let Some(name) = &font.name {
-      style.font_family = Some(Arc::clone(name));
-    }
+    self.apply_font_family(font, &mut style);
     if let Some(size_pt) = font.size_pt {
       style.font_size_pt = size_pt.get() as f32;
     }
@@ -316,9 +339,7 @@ impl StylesCatalog {
     let Some(font) = self.font_records.first() else {
       return style;
     };
-    if let Some(name) = &font.name {
-      style.font_family = Some(Arc::clone(name));
-    }
+    self.apply_font_family(font, &mut style);
     if let Some(size_pt) = font.size_pt {
       style.font_size_pt = size_pt.get() as f32;
     }
@@ -375,9 +396,7 @@ impl StylesCatalog {
     else {
       return;
     };
-    if let Some(name) = &font.name {
-      style.font_family = Some(Arc::clone(name));
-    }
+    self.apply_font_family(font, style);
     if let Some(size_pt) = font.size_pt {
       style.font_size_pt = size_pt.get() as f32;
     }
@@ -470,6 +489,26 @@ impl StylesCatalog {
     }
     Some(format)
   }
+
+  fn theme_east_asian_font(&self, scheme: x::FontSchemeValues) -> Option<Arc<str>> {
+    match scheme {
+      x::FontSchemeValues::Major => self.theme_major_east_asian.clone(),
+      x::FontSchemeValues::Minor => self.theme_minor_east_asian.clone(),
+      x::FontSchemeValues::None => None,
+    }
+  }
+
+  fn apply_font_family(&self, font: &FontRecord, style: &mut TextStyle) {
+    if let Some(theme_font) = self.theme_east_asian_font(font.scheme) {
+      // SpreadsheetML stores Calibri/Cambria alongside the major/minor
+      // scheme. For a CJK UI, Office resolves that scheme through the theme's
+      // matching supplemental script font for the complete cell run.
+      style.font_family = Some(Arc::clone(&theme_font));
+      style.east_asia_font_family = Some(theme_font);
+    } else if let Some(name) = &font.name {
+      style.font_family = Some(Arc::clone(name));
+    }
+  }
 }
 
 impl CellFormatRecord {
@@ -549,6 +588,9 @@ impl FontRecord {
         }
         x::FontChoice::FontName(value) => {
           record.name = Some(Arc::from(value.val.as_str()));
+        }
+        x::FontChoice::FontScheme(value) => {
+          record.scheme = value.val;
         }
         _ => {}
       }
@@ -952,5 +994,24 @@ mod tests {
       Some(x::HorizontalAlignmentValues::Left)
     );
     assert_eq!(horizontal.horizontal, None);
+  }
+
+  #[test]
+  fn cjk_theme_scheme_replaces_the_stored_latin_snapshot_for_the_cell_run() {
+    let catalog = StylesCatalog {
+      theme_minor_east_asian: Some(Arc::from("SimSun")),
+      ..StylesCatalog::default()
+    };
+    let font = FontRecord {
+      name: Some(Arc::from("Calibri")),
+      scheme: x::FontSchemeValues::Minor,
+      ..FontRecord::default()
+    };
+    let mut style = TextStyle::default();
+
+    catalog.apply_font_family(&font, &mut style);
+
+    assert_eq!(style.font_family.as_deref(), Some("SimSun"));
+    assert_eq!(style.east_asia_font_family.as_deref(), Some("SimSun"));
   }
 }

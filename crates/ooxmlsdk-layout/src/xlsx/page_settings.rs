@@ -213,6 +213,11 @@ impl CalcPageSettings {
       settings.horizontal_dpi = page_setup.horizontal_dpi.unwrap_or(settings.horizontal_dpi);
       settings.vertical_dpi = page_setup.vertical_dpi.unwrap_or(settings.vertical_dpi);
     }
+    // LibreOffice PageSettingsConverter treats a chart sheet with default
+    // orientation (or invalid printer settings) as landscape.
+    if !settings.valid_printer_settings || settings.orientation.is_none() {
+      settings.orientation = Some(x::OrientationValues::Landscape);
+    }
     settings.header_footer = HeaderFooterModel::from_chartsheet(chartsheet);
     settings
   }
@@ -231,9 +236,13 @@ impl CalcPageSettings {
     if let Some(paper_size) = page_setup.paper_size {
       self.paper_size = paper_size;
     }
-    self.valid_printer_settings = page_setup
-      .use_printer_defaults
-      .is_some_and(|value| value.as_bool());
+    // [MS-OE376] specifies that the default paperSize varies by locale and
+    // default printer. Preserve the current document/printer default when the
+    // attribute is omitted; only an explicit paperSize overrides it.
+    self.valid_printer_settings = page_setup.paper_size.is_none()
+      || page_setup
+        .use_printer_defaults
+        .is_some_and(|value| value.as_bool());
     if let Some(scale) = page_setup.scale.filter(|scale| *scale > 0) {
       self.scale = scale;
     }
@@ -299,6 +308,54 @@ impl CalcPageSettings {
       std::mem::swap(&mut size.0, &mut size.1);
     }
     size
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn chartsheet_with_default_orientation_uses_landscape_a4() {
+    let settings = CalcPageSettings::from_chartsheet(&x::Chartsheet::default());
+    let (width, height) = settings.page_size_pt();
+
+    assert!(width > height);
+    assert!((width - units::millimeters_to_points(297.0)).abs() < 0.01);
+    assert!((height - units::millimeters_to_points(210.0)).abs() < 0.01);
+  }
+
+  #[test]
+  fn worksheet_without_explicit_paper_size_keeps_default_a4() {
+    let worksheet = x::Worksheet {
+      page_setup: Some(x::PageSetup {
+        orientation: Some(x::OrientationValues::Portrait),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+
+    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
+
+    assert!((width - units::millimeters_to_points(210.0)).abs() < 0.01);
+    assert!((height - units::millimeters_to_points(297.0)).abs() < 0.01);
+  }
+
+  #[test]
+  fn worksheet_with_explicit_letter_paper_size_uses_letter() {
+    let worksheet = x::Worksheet {
+      page_setup: Some(x::PageSetup {
+        paper_size: Some(1),
+        orientation: Some(x::OrientationValues::Portrait),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+
+    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
+
+    assert!((width - 8.5 * units::POINTS_PER_INCH).abs() < 0.01);
+    assert!((height - 11.0 * units::POINTS_PER_INCH).abs() < 0.01);
   }
 }
 

@@ -33,7 +33,8 @@ impl ExcelImport {
     let mso_document = is_mso_document(package);
 
     let mut fragment = WorkbookFragment::new(workbook_part, workbook.clone());
-    let mut sheets = fragment.finalize_import(package, mso_document)?;
+    let mut sheets =
+      fragment.finalize_import(package, mso_document, options.ui_language.as_deref())?;
     super::formula::recalculate_formula_cells(
       &mut sheets,
       &fragment.defined_names,

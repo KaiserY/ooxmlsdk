@@ -809,6 +809,7 @@ fn text_from_dml_paragraphs(paragraphs: &[a::Paragraph]) -> Option<String> {
           }
         }
         a::ParagraphChoice::TextMath(math) => text.push_str(&text_math_text(math)),
+        a::ParagraphChoice::AlternateContent(_) => {}
       }
     }
   }

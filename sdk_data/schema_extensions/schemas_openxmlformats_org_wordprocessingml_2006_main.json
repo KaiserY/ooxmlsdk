@@ -764,6 +764,15 @@
       ]
     },
     {
+      "ClassName": "LongHexNumberType",
+      "Attributes": [
+        {
+          "PropertyName": "Val",
+          "Optional": true
+        }
+      ]
+    },
+    {
       "ClassName": "Column",
       "Attributes": [
         {
@@ -1460,6 +1469,11 @@
       ]
     },
     {
+      "ClassName": "Style",
+      "HaveXmlnsFields": true,
+      "HaveMcIgnorable": true
+    },
+    {
       "ClassName": "Styles",
       "HaveMcIgnorable": true
     },
@@ -1625,7 +1639,10 @@
     },
     {
       "ClassName": "WebSettings",
-      "HaveMcIgnorable": true
+      "HaveMcIgnorable": true,
+      "CanonicalNamespacePrefixes": [
+        "ns0:w"
+      ]
     },
     {
       "ClassName": "AbstractNum",
@@ -1700,6 +1717,7 @@
     },
     {
       "ClassName": "Table",
+      "HaveXmlnsFields": true,
       "Children": [
         {
           "Name": "w:CT_TblPr/w:tblPr",
@@ -1785,6 +1803,17 @@
           "Docs": "Extended Symbol Character.",
           "PayloadRustType": "SymbolChar"
         },
+        {
+          "RustName": "AlternateContent",
+          "QName": "mc:AlternateContent",
+          "PayloadRustType": "AlternateContent",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006"
+        }
+      ]
+    },
+    {
+      "RustName": "RunPropertiesChoice",
+      "AddVariants": [
         {
           "RustName": "AlternateContent",
           "QName": "mc:AlternateContent",

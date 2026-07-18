@@ -900,7 +900,8 @@ pub struct BackgroundProperties {
   #[sdk(
         choice(
             child(variant = EffectList, boxed, qname = "a:effectLst"),
-            child(variant = EffectDag, boxed, qname = "a:effectDag")
+            child(variant = EffectDag, boxed, qname = "a:effectDag"),
+            child(variant = PandocEffectsList, boxed, qname = "a:effectsLst")
         )
     )]
   pub background_properties_choice2: Option<BackgroundPropertiesChoice2>,
@@ -4874,6 +4875,8 @@ pub enum BackgroundPropertiesChoice2 {
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  /// Pandoc compatibility form of effectLst.
+  PandocEffectsList(std::boxed::Box<crate::schemas::a::EffectList>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundStyleReferenceChoice {

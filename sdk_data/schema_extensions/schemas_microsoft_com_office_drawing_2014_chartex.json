@@ -26,6 +26,30 @@
       ]
     },
     {
+      "ClassName": "Xsddouble",
+      "Attributes": [
+        {
+          "QName": ":val",
+          "PropertyName": "Val",
+          "PropertyComments": "Bin Size Value",
+          "Optional": true,
+          "OverrideType": "DoubleValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "BinCountXsdunsignedInt",
+      "Attributes": [
+        {
+          "QName": ":val",
+          "PropertyName": "Val",
+          "PropertyComments": "Bin Count Value",
+          "Optional": true,
+          "OverrideType": "UInt32Value"
+        }
+      ]
+    },
+    {
       "ClassName": "RelId",
       "HaveXmlnsFields": true
     },

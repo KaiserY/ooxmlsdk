@@ -132,6 +132,18 @@
   ],
   "ChoiceEnums": [
     {
+      "RustName": "BackgroundPropertiesChoice2",
+      "AddVariants": [
+        {
+          "RustName": "PandocEffectsList",
+          "QName": "a:effectsLst",
+          "Docs": "Pandoc compatibility form of effectLst.",
+          "PayloadRustType": "EffectList",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_drawingml_2006_main"
+        }
+      ]
+    },
+    {
       "RustName": "ShapeTreeChoice",
       "AddVariants": [
         {

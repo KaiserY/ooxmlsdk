@@ -32,6 +32,18 @@
       ]
     },
     {
+      "ClassName": "ImageData",
+      "Attributes": [
+        {
+          "QName": ":detectmouseclick",
+          "PropertyName": "VmlDetectMouseClick",
+          "PropertyComments": "VML detect mouse click compatibility attribute.",
+          "Optional": true,
+          "OverrideType": "TrueFalseValue"
+        }
+      ]
+    },
+    {
       "ClassName": "Group",
       "Attributes": [
         {

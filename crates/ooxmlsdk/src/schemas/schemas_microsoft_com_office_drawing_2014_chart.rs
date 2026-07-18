@@ -198,7 +198,7 @@ pub struct CategoryFilterException {
 #[sdk(qname = "c16:numCache")]
 pub struct NumberDataType {
   /// Format Code
-  #[sdk(text_child(qname = "c:formatCode"))]
+  #[sdk(child(qname = "c:formatCode"))]
   pub format_code: Option<crate::schemas::c::FormatCode>,
   /// Point Count
   #[sdk(child(qname = "c:ptCount"))]

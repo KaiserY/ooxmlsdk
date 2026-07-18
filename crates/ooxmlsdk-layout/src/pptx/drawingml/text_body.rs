@@ -354,6 +354,7 @@ impl TextRun {
         run_properties: None,
         field_paragraph_properties: None,
       }),
+      a::ParagraphChoice::AlternateContent(_) => None,
     }
   }
 }

@@ -1023,6 +1023,7 @@ pub struct DataValidationForumla2 {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(no_prefix, qname = "x14:sparklineGroup")]
 pub struct SparklineGroup {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// manualMax
   #[sdk(attr(qname = ":manualMax"))]
   pub manual_max: Option<crate::simple_type::DoubleValue>,

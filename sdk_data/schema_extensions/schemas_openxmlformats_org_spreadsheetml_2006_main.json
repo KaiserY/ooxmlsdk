@@ -53,6 +53,19 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "Chartsheet",
+      "HaveMcIgnorable": true,
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "XrUid",
+          "PropertyComments": "Revision Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
+    },
+    {
       "ClassName": "Controls",
       "AlternateContentChoice": true
     },
@@ -99,6 +112,19 @@
     {
       "ClassName": "DataFieldExtensionList",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "DialogSheet",
+      "HaveMcIgnorable": true,
+      "Attributes": [
+        {
+          "QName": "xr6:uid",
+          "PropertyName": "Xr6Uid",
+          "PropertyComments": "Revision 6 Unique Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "Extension",
@@ -148,6 +174,15 @@
     {
       "ClassName": "OleObjects",
       "AlternateContentChoice": true
+    },
+    {
+      "ClassName": "PageSetup",
+      "Attributes": [
+        {
+          "PropertyName": "FirstPageNumber",
+          "OverrideType": "Int64Value"
+        }
+      ]
     },
     {
       "ClassName": "PivotCacheDefinitionExtension",

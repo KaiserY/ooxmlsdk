@@ -57,6 +57,7 @@
     },
     {
       "ClassName": "SparklineGroup",
+      "HaveXmlnsFields": true,
       "Attributes": [
         {
           "QName": "xr2:uid",

@@ -99,13 +99,15 @@ projects with additional sibling path dependencies.
 5. `cargo test -p ooxmlsdk-test --features validators`: default parts plus
    schema and package validator tests.
 
-After that matrix, package-fidelity changes must run these three generated
+After that matrix, package-fidelity changes must run these five generated
 round-trip lanes, in order. They are ignored by default and each command runs
 one upstream corpus:
 
 1. `cargo test -p ooxmlsdk-roundtrip-tests --test apache_poi_roundtrip -- --ignored`
 2. `cargo test -p ooxmlsdk-roundtrip-tests --test libreoffice_roundtrip -- --ignored`
 3. `cargo test -p ooxmlsdk-roundtrip-tests --test open_xml_sdk_roundtrip -- --ignored`
+4. `cargo test -p ooxmlsdk-roundtrip-tests --test pandoc_roundtrip -- --ignored`
+5. `cargo test -p ooxmlsdk-roundtrip-tests --test closedxml_roundtrip -- --ignored`
 
 Stop at the first failure when the task asks for failure analysis; do not start
 later feature or corpus lanes after a failure.
@@ -126,7 +128,7 @@ Test-suite infrastructure or release-wide work may additionally use
 only when schema float normalization rules change.
 
 Use the smallest relevant suite crate during iteration. Run the complete
-`ooxmlsdk-test` matrix and three round-trip lanes when changing generated
+`ooxmlsdk-test` matrix and five round-trip lanes when changing generated
 schemas, shared runtime XML/package behavior, or package fidelity.
 
 ## Generated Code

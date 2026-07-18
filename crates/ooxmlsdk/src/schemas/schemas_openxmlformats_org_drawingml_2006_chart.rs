@@ -784,7 +784,15 @@ pub type Separator = crate::simple_type::StringValue;
 /// Trendline Name.
 pub type TrendlineName = crate::simple_type::StringValue;
 /// Defines the Formula Class.
-pub type Formula = crate::simple_type::StringValue;
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:f")]
+pub struct Formula {
+  /// Content Contains Significant Whitespace
+  #[sdk(attr(qname = "xml:space"))]
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
+  #[sdk(text)]
+  pub xml_content: Option<crate::simple_type::StringValue>,
+}
 /// Layout.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:layout")]
@@ -1509,7 +1517,15 @@ pub struct Extension {
 /// Numeric Value.
 pub type NumericValue = crate::simple_type::StringValue;
 /// Format Code.
-pub type FormatCode = crate::simple_type::StringValue;
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:formatCode")]
+pub struct FormatCode {
+  /// Content Contains Significant Whitespace
+  #[sdk(attr(qname = "xml:space"))]
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
+  #[sdk(text)]
+  pub xml_content: Option<crate::simple_type::StringValue>,
+}
 /// Odd Header.
 pub type OddHeader = crate::simple_type::StringValue;
 /// Odd Footer.
@@ -1552,7 +1568,7 @@ pub struct ExtensionList {
 #[sdk(qname = "c:numRef")]
 pub struct NumberReference {
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "c:f"))]
+  #[sdk(child(qname = "c:f"))]
   pub formula: Formula,
   /// Defines the NumberingCache Class.
   #[sdk(child(qname = "c:numCache"))]
@@ -1566,7 +1582,7 @@ pub struct NumberReference {
 #[sdk(qname = "c:numLit")]
 pub struct NumberLiteral {
   /// Format Code
-  #[sdk(text_child(qname = "c:formatCode"))]
+  #[sdk(child(qname = "c:formatCode"))]
   pub format_code: Option<FormatCode>,
   /// Point Count
   #[sdk(child(qname = "c:ptCount"))]
@@ -1583,7 +1599,7 @@ pub struct NumberLiteral {
 #[sdk(qname = "c:numCache")]
 pub struct NumberingCache {
   /// Format Code
-  #[sdk(text_child(qname = "c:formatCode"))]
+  #[sdk(child(qname = "c:formatCode"))]
   pub format_code: Option<FormatCode>,
   /// Point Count
   #[sdk(child(qname = "c:ptCount"))]
@@ -1608,7 +1624,7 @@ pub struct Level {
 #[sdk(qname = "c:multiLvlStrRef")]
 pub struct MultiLevelStringReference {
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "c:f"))]
+  #[sdk(child(qname = "c:f"))]
   pub formula: Formula,
   /// Defines the MultiLevelStringCache Class.
   #[sdk(child(qname = "c:multiLvlStrCache"))]
@@ -1622,7 +1638,7 @@ pub struct MultiLevelStringReference {
 #[sdk(qname = "c:strRef")]
 pub struct StringReference {
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "c:f"))]
+  #[sdk(child(qname = "c:f"))]
   pub formula: Formula,
   /// Defines the StringCache Class.
   #[sdk(child(qname = "c:strCache"))]

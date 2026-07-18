@@ -6318,7 +6318,8 @@ pub struct RunProperties {
             child(variant = Emphasis, qname = "w:em"),
             child(variant = Languages, boxed, qname = "w:lang"),
             child(variant = EastAsianLayout, qname = "w:eastAsianLayout"),
-            child(variant = SpecVanish, qname = "w:specVanish")
+            child(variant = SpecVanish, qname = "w:specVanish"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
     )]
   pub run_properties_choice: Vec<RunPropertiesChoice>,
@@ -7824,6 +7825,7 @@ pub struct Paragraph {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tbl")]
 pub struct Table {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(
         choice(
             child(variant = BookmarkStart, qname = "w:bookmarkStart"),
@@ -10507,7 +10509,11 @@ pub struct Settings {
 }
 /// Web Page Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(xml_header, qname = "w:webSettings")]
+#[sdk(
+  canonical_namespace_prefix("ns0:w"),
+  xml_header,
+  qname = "w:webSettings"
+)]
 pub struct WebSettings {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
@@ -12959,7 +12965,7 @@ pub struct RsidRoot {
   /// Long Hexadecimal Number Value
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(min = 4u32, max = 4u32))]
-  pub val: crate::simple_type::HexBinaryValue,
+  pub val: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Single Session Revision Save ID.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12968,7 +12974,7 @@ pub struct Rsid {
   /// Long Hexadecimal Number Value
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(min = 4u32, max = 4u32))]
-  pub val: crate::simple_type::HexBinaryValue,
+  pub val: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Abstract Numbering Definition Identifier.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12977,7 +12983,7 @@ pub struct Nsid {
   /// Long Hexadecimal Number Value
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(min = 4u32, max = 4u32))]
-  pub val: crate::simple_type::HexBinaryValue,
+  pub val: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Numbering Template Code.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12986,7 +12992,7 @@ pub struct TemplateCode {
   /// Long Hexadecimal Number Value
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(min = 4u32, max = 4u32))]
-  pub val: crate::simple_type::HexBinaryValue,
+  pub val: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14350,6 +14356,8 @@ pub struct LatentStyles {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:style")]
 pub struct Style {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
   /// Style Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<StyleValues>,
@@ -17114,6 +17122,7 @@ pub enum RunPropertiesChoice {
   EastAsianLayout(EastAsianLayout),
   /// Defines the SpecVanish Class.
   SpecVanish(SpecVanish),
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum InsertedMathControlChoice {

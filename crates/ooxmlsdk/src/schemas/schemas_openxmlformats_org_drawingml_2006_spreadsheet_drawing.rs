@@ -61,7 +61,8 @@ pub struct OneCellAnchor {
             child(variant = GraphicFrame, boxed, qname = "xdr:graphicFrame"),
             child(variant = ConnectionShape, boxed, qname = "xdr:cxnSp"),
             child(variant = Picture, boxed, qname = "xdr:pic"),
-            child(variant = ContentPart, boxed, qname = "xdr:contentPart")
+            child(variant = ContentPart, boxed, qname = "xdr:contentPart"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
     )]
   pub one_cell_anchor_choice: Option<OneCellAnchorChoice>,
@@ -672,6 +673,7 @@ pub enum OneCellAnchorChoice {
   Picture(std::boxed::Box<Picture>),
   /// Defines the ContentPart Class.
   ContentPart(std::boxed::Box<ContentPart>),
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum AbsoluteAnchorChoice {

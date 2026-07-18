@@ -9008,7 +9008,8 @@ pub struct Paragraph {
             child(variant = Run, boxed, qname = "a:r"),
             child(variant = Break, boxed, qname = "a:br"),
             child(variant = Field, boxed, qname = "a:fld"),
-            child(variant = TextMath, qname = "a14:m")
+            child(variant = TextMath, qname = "a14:m"),
+            child(variant = AlternateContent, boxed, qname = "mc:AlternateContent")
         )
     )]
   pub paragraph_choice: Vec<ParagraphChoice>,
@@ -12204,6 +12205,7 @@ pub enum ParagraphChoice {
   /// Text Field.
   Field(std::boxed::Box<Field>),
   TextMath(crate::schemas::a14::TextMath),
+  AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum LineSpacingChoice {

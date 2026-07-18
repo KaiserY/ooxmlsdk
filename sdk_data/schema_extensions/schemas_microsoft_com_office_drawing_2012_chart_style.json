@@ -1,4 +1,18 @@
 {
+  "ChoiceEnums": [
+    {
+      "RustName": "FontReferenceChoice",
+      "AddVariants": [
+        {
+          "RustName": "ChartStyleSchemeColor",
+          "QName": "cs:schemeClr",
+          "Docs": "LibreOffice compatibility form of schemeClr.",
+          "PayloadRustType": "SchemeColor",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_drawingml_2006_main"
+        }
+      ]
+    }
+  ],
   "Types": [
     {
       "ClassName": "TextCharacterPropertiesType",
@@ -6,6 +20,35 @@
         {
           "PropertyName": "Baseline",
           "OverrideType": "DrawingmlPercentageValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "MarkerLayoutProperties",
+      "AddChoice": [
+        {
+          "RustName": "LineReference",
+          "QName": "cs:lnRef",
+          "Docs": "LibreOffice compatibility line reference.",
+          "PayloadRustType": "LineReference"
+        },
+        {
+          "RustName": "FillReference",
+          "QName": "cs:fillRef",
+          "Docs": "LibreOffice compatibility fill reference.",
+          "PayloadRustType": "FillReference"
+        },
+        {
+          "RustName": "EffectReference",
+          "QName": "cs:effectRef",
+          "Docs": "LibreOffice compatibility effect reference.",
+          "PayloadRustType": "EffectReference"
+        },
+        {
+          "RustName": "FontReference",
+          "QName": "cs:fontRef",
+          "Docs": "LibreOffice compatibility font reference.",
+          "PayloadRustType": "FontReference"
         }
       ]
     }

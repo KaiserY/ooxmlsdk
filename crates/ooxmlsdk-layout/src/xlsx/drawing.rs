@@ -453,6 +453,10 @@ impl DrawingObjectModel {
       xdr::OneCellAnchorChoice::ConnectionShape(shape) => Self::from_connection_shape(shape),
       xdr::OneCellAnchorChoice::Picture(picture) => Self::from_picture(picture),
       xdr::OneCellAnchorChoice::ContentPart(part) => Self::from_content_part(&part.relationship_id),
+      xdr::OneCellAnchorChoice::AlternateContent(_) => Self {
+        text_len: 0,
+        ..Self::unknown()
+      },
     }
   }
 
@@ -815,6 +819,7 @@ fn dml_paragraph_text(paragraph: &a::Paragraph) -> Option<String> {
       }
       a::ParagraphChoice::Break(_) => text.push('\n'),
       a::ParagraphChoice::TextMath(_) => {}
+      a::ParagraphChoice::AlternateContent(_) => {}
     }
   }
   (!text.is_empty()).then_some(text)

@@ -576,6 +576,9 @@ pub struct ImageData {
   /// Explicit Relationship to Hyperlink Target
   #[sdk(attr(qname = "r:href"))]
   pub rel_href: Option<crate::simple_type::StringValue>,
+  /// VML detect mouse click compatibility attribute.
+  #[sdk(attr(qname = ":detectmouseclick"))]
+  pub vml_detect_mouse_click: Option<crate::simple_type::TrueFalseValue>,
 }
 /// Shape Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

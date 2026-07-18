@@ -212,7 +212,7 @@ Commands and Cargo discipline are listed in `AGENTS.md`. The important split is:
 - run focused integration, subsystem, rendering, benchmarks, and corpus lanes
   from `../ooxmlsdk-test-suite`;
 - for core runtime and generated-schema changes, validate the five
-  `ooxmlsdk-test` feature shapes followed by the three
+  `ooxmlsdk-test` feature shapes followed by the five
   `ooxmlsdk-roundtrip-tests` corpus lanes listed in `AGENTS.md`; do not replace
   them with the unrelated test-suite-wide workspace lane;
 - during subsystem iteration, select the affected implementation crate and its

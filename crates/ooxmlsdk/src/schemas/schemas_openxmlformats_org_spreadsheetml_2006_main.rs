@@ -2334,6 +2334,10 @@ pub struct Worksheet {
 #[sdk(no_prefix_only, xml_header, qname = "x:chartsheet")]
 pub struct Chartsheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  /// Revision Unique Identifier
+  #[sdk(attr(qname = "xr:uid"))]
+  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// Chart Sheet Properties
   #[sdk(child(qname = "x:sheetPr"))]
   pub chart_sheet_properties: Option<std::boxed::Box<ChartSheetProperties>>,
@@ -2382,6 +2386,10 @@ pub struct Chartsheet {
 #[sdk(no_prefix_only, xml_header, qname = "x:dialogsheet")]
 pub struct DialogSheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  /// Revision 6 Unique Identifier
+  #[sdk(attr(qname = "xr6:uid"))]
+  pub xr6_uid: Option<crate::simple_type::StringValue>,
   /// Sheet Properties
   #[sdk(child(qname = "x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<SheetProperties>>,
@@ -6116,7 +6124,7 @@ pub struct PageSetup {
   pub scale: Option<crate::simple_type::UInt32Value>,
   /// First Page Number
   #[sdk(attr(qname = ":firstPageNumber"))]
-  pub first_page_number: Option<crate::simple_type::UInt32Value>,
+  pub first_page_number: Option<crate::simple_type::Int64Value>,
   /// Fit To Width
   #[sdk(attr(qname = ":fitToWidth"))]
   pub fit_to_width: Option<crate::simple_type::UInt32Value>,

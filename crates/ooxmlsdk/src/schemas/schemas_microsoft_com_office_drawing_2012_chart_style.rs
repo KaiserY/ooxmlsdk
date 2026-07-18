@@ -469,7 +469,8 @@ pub struct FontReference {
             child(variant = HslColor, qname = "a:hslClr"),
             child(variant = SystemColor, qname = "a:sysClr"),
             child(variant = SchemeColor, qname = "a:schemeClr"),
-            child(variant = PresetColor, qname = "a:prstClr")
+            child(variant = PresetColor, qname = "a:prstClr"),
+            child(variant = ChartStyleSchemeColor, qname = "cs:schemeClr")
         )
     )]
   pub font_reference_choice: Option<FontReferenceChoice>,
@@ -2069,6 +2070,15 @@ pub struct MarkerLayoutProperties {
   #[sdk(attr(qname = ":size"))]
   #[sdk(number_range(range = 2..= 72))]
   pub size: Option<crate::simple_type::ByteValue>,
+  #[sdk(
+        choice(
+            child(variant = LineReference, boxed, qname = "cs:lnRef"),
+            child(variant = FillReference, boxed, qname = "cs:fillRef"),
+            child(variant = EffectReference, boxed, qname = "cs:effectRef"),
+            child(variant = FontReference, boxed, qname = "cs:fontRef")
+        )
+    )]
+  pub marker_layout_properties_choice: Vec<MarkerLayoutPropertiesChoice>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColorStyleChoice {
@@ -2232,6 +2242,8 @@ pub enum FontReferenceChoice {
   SystemColor(crate::schemas::a::SystemColor),
   SchemeColor(crate::schemas::a::SchemeColor),
   PresetColor(crate::schemas::a::PresetColor),
+  /// LibreOffice compatibility form of schemeClr.
+  ChartStyleSchemeColor(crate::schemas::a::SchemeColor),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
@@ -2313,4 +2325,15 @@ pub enum TextBodyPropertiesChoice2 {
   Shape3DType(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
   FlatText(crate::schemas::a::FlatText),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum MarkerLayoutPropertiesChoice {
+  /// LibreOffice compatibility line reference.
+  LineReference(std::boxed::Box<LineReference>),
+  /// LibreOffice compatibility fill reference.
+  FillReference(std::boxed::Box<FillReference>),
+  /// LibreOffice compatibility effect reference.
+  EffectReference(std::boxed::Box<EffectReference>),
+  /// LibreOffice compatibility font reference.
+  FontReference(std::boxed::Box<FontReference>),
 }

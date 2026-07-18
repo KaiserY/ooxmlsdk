@@ -296,6 +296,7 @@ fn data_label_chart_text(chart_text: &c::ChartText, value: f64) -> String {
         }
         a::ParagraphChoice::Break(_) => result.push('\n'),
         a::ParagraphChoice::TextMath(math) => result.push_str(&text_math_text(math)),
+        a::ParagraphChoice::AlternateContent(_) => {}
       }
     }
   }
@@ -598,14 +599,16 @@ fn series_value_formula(series: ChartSeriesRef<'_>) -> Option<&str> {
   series
     .values
     .and_then(|values| match values.values_choice.as_ref() {
-      Some(c::ValuesChoice::NumberReference(reference)) => Some(reference.formula.as_str()),
+      Some(c::ValuesChoice::NumberReference(reference)) => reference.formula.xml_content.as_deref(),
       _ => None,
     })
     .or_else(|| {
       series
         .y_values
         .and_then(|values| match values.y_values_choice.as_ref() {
-          Some(c::YValuesChoice::NumberReference(reference)) => Some(reference.formula.as_str()),
+          Some(c::YValuesChoice::NumberReference(reference)) => {
+            reference.formula.xml_content.as_deref()
+          }
           _ => None,
         })
     })
@@ -1112,6 +1115,7 @@ fn push_rich_texts(texts: &mut Vec<String>, paragraphs: &[a::Paragraph]) {
         }
         a::ParagraphChoice::Break(_) => {}
         a::ParagraphChoice::TextMath(math) => text.push_str(&text_math_text(math)),
+        a::ParagraphChoice::AlternateContent(_) => {}
       }
     }
     push_unique_text(texts, &text);

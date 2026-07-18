@@ -303,7 +303,15 @@ pub struct RelId {
 /// Defines the Openxmlsdk_49BECFFA_3B03_4D13_8272_D6CCB22579E3XsdunsignedInt Class.
 pub type Openxmlsdk49becffa3b034d138272D6ccb22579e3XsdunsignedInt = crate::simple_type::UInt32Value;
 /// Defines the BinCountXsdunsignedInt Class.
-pub type BinCountXsdunsignedInt = crate::simple_type::UInt32Value;
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "cx:binCount")]
+pub struct BinCountXsdunsignedInt {
+  /// Bin Count Value
+  #[sdk(attr(qname = ":val"))]
+  pub val: Option<crate::simple_type::UInt32Value>,
+  #[sdk(text)]
+  pub xml_content: Option<crate::simple_type::UInt32Value>,
+}
 /// Defines the Extension2 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cx:ext")]
@@ -811,7 +819,15 @@ pub struct NumberFormat {
   pub source_linked: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the Xsddouble Class.
-pub type Xsddouble = crate::simple_type::DoubleValue;
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "cx:binSize")]
+pub struct Xsddouble {
+  /// Bin Size Value
+  #[sdk(attr(qname = ":val"))]
+  pub val: Option<crate::simple_type::DoubleValue>,
+  #[sdk(text)]
+  pub xml_content: Option<crate::simple_type::DoubleValue>,
+}
 /// Defines the Address Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cx:address")]
@@ -1241,8 +1257,8 @@ pub struct Binning {
   pub overflow: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            text_child(variant = Xsddouble, qname = "cx:binSize"),
-            text_child(variant = BinCountXsdunsignedInt, qname = "cx:binCount")
+            child(variant = Xsddouble, qname = "cx:binSize"),
+            child(variant = BinCountXsdunsignedInt, qname = "cx:binCount")
         )
     )]
   pub binning_choice: Option<BinningChoice>,

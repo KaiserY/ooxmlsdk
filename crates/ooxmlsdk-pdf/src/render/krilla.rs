@@ -198,7 +198,9 @@ pub(crate) fn render(
             .is_none_or(|index| index < document.frames.len())
             && text.source_line_index.is_none_or(|index| index < 4096)
             && text.baseline_y.is_finite()
-            && text.width_pt >= 0.0
+            // Signed horizontal advance can be negative when DrawingML uses
+            // its permitted negative character spacing.
+            && text.width_pt.is_finite()
             && !text.portions.is_empty()
             && text.portions.iter().all(|portion| {
               match portion.kind {
@@ -208,7 +210,7 @@ pub(crate) fn render(
                 | PaintTextPortionKind::Link => {}
               }
               portion.baseline_y.is_finite()
-                && portion.width_pt >= 0.0
+                && portion.width_pt.is_finite()
                 && portion.text_range.start <= portion.text_range.end
                 && portion.text_range.end <= text.item.text.len()
                 && portion
@@ -219,7 +221,11 @@ pub(crate) fn render(
                   glyphs
                     .iter()
                     .flat_map(|run| run.glyphs.iter())
-                    .all(|glyph| glyph.x_advance >= 0.0)
+                    // ECMA-376 Part 1, 20.1.10.74-75 permits negative
+                    // DrawingML character spacing down to -4000pt. Such
+                    // tracking can legitimately make a glyph advance
+                    // negative; the paint invariant is finiteness.
+                    .all(|glyph| glyph.x_advance.is_finite())
                 })
                 && portion
                   .highlight
@@ -1694,6 +1700,8 @@ fn draw_text_item(
   link_annotations: &mut Vec<Annotation>,
 ) {
   let item = &text.item;
+  let glyph_semantic_text =
+    symbol_font_semantic_text(&item.text, item.style.font_family.as_deref());
   for portion in &text.portions {
     let rotated = item.style.rotation_deg.abs() > f32::EPSILON;
     if rotated {
@@ -1710,7 +1718,6 @@ fn draw_text_item(
     if let Some(highlight) = &portion.highlight {
       draw_paint_rect(surface, highlight);
     }
-    surface.set_stroke(stroke(&item.style));
     surface.set_fill(Some(fill(&item.style)));
     let vertical_scale = if item.text.contains('\t') {
       1.0
@@ -1727,28 +1734,36 @@ fn draw_text_item(
         portion.baseline_y * (1.0 - vertical_scale),
       ));
     }
-    if let Some(glyphs) = &portion.glyphs {
-      for run in glyphs {
-        let font = fonts.select_face(&run.font_face);
-        surface.draw_glyphs(
-          Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
-          &run.glyphs,
-          font,
-          &item.text,
+    // Tabs are layout controls: their measured advance positions subsequent
+    // portions, but emitting the font's glyph 0 leaks a NUL into PDF text.
+    if !matches!(portion.kind, PaintTextPortionKind::Tab)
+      && text_has_visible_glyph_paint(&item.style)
+    {
+      if let Some(glyphs) = &portion.glyphs {
+        for run in glyphs {
+          let selected = fonts.select_face(&run.font_face);
+          surface.set_stroke(text_stroke(&item.style, selected.synthetic_bold));
+          surface.draw_glyphs(
+            Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
+            &run.glyphs,
+            selected.font,
+            &glyph_semantic_text,
+            item.style.font_size_pt,
+            false,
+          );
+        }
+      } else {
+        let selected = fonts.select(&item.style);
+        surface.set_stroke(text_stroke(&item.style, selected.synthetic_bold));
+        surface.draw_text(
+          Point::from_xy(portion.x_pt, portion.baseline_y),
+          selected.font,
           item.style.font_size_pt,
+          &item.text[portion.text_range.start..portion.text_range.end],
           false,
+          TextDirection::Auto,
         );
       }
-    } else {
-      let font = fonts.select(&item.style);
-      surface.draw_text(
-        Point::from_xy(portion.x_pt, portion.baseline_y),
-        font,
-        item.style.font_size_pt,
-        &item.text[portion.text_range.start..portion.text_range.end],
-        false,
-        TextDirection::Auto,
-      );
     }
     if (vertical_scale - 1.0).abs() > f32::EPSILON {
       surface.pop();
@@ -1778,6 +1793,42 @@ fn draw_text_item(
       surface.pop();
     }
   }
+}
+
+fn text_has_visible_glyph_paint(style: &TextStyle<'_>) -> bool {
+  style.opacity > f32::EPSILON
+    || (style.outline_color.is_some()
+      && style.outline_width_pt > f32::EPSILON
+      && style.outline_opacity > f32::EPSILON)
+}
+
+fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Cow<'a, str> {
+  let symbol = font_family.is_some_and(|family| {
+    family.eq_ignore_ascii_case("Symbol") || family.eq_ignore_ascii_case("SymbolMT")
+  });
+  let wingdings = font_family.is_some_and(|family| family.eq_ignore_ascii_case("Wingdings"));
+  if !(symbol && (text.contains('\u{f02d}') || text.contains('\u{f0b7}'))
+    || wingdings && (text.contains('\u{f06c}') || text.contains('\u{f071}')))
+  {
+    return Cow::Borrowed(text);
+  }
+
+  // Keep the legacy symbol-font glyph selected by the shaped run, but expose
+  // its standardized character through the PDF ToUnicode map. Unicode WG2
+  // N4363 maps Wingdings character 108 to U+26AB; LibreOffice's Microsoft
+  // Symbol conversion table maps character 0xB7 to U+2022.
+  Cow::Owned(
+    text
+      .chars()
+      .map(|character| match character {
+        '\u{f02d}' if symbol => '\u{2212}',
+        '\u{f0b7}' if symbol => '\u{2022}',
+        '\u{f06c}' if wingdings => '\u{26ab}',
+        '\u{f071}' if wingdings => '\u{2751}',
+        _ => character,
+      })
+      .collect(),
+  )
 }
 
 fn link_annotation_for_rect(
@@ -2293,24 +2344,12 @@ fn shaped_pdf_glyphs(
 }
 
 fn should_shape_pdf_glyphs(text: &TextItem<'_>) -> bool {
-  // glyphs. This renderer only has text items at PDF time, so keep ordinary
-  // Latin runs on krilla's text path and reserve explicit glyph painting for
-  // cases where we need fallback faces or complex ActualText ranges.
+  // Krilla's simple-text path reconstructs a Rustybuzz face and shapes on
+  // every draw_text call. We already need the same shaped run to obtain exact
+  // layout width, so feed those glyphs to draw_glyphs for ordinary text too.
+  // Small caps keeps its existing simple-text path because its layout shaping
+  // applies run-size substitutions that are not represented by one PDF size.
   !text.style.small_caps
-    && (text.paragraph_bidi
-      || text_has_pdf_significant_spacing(&text.text)
-      || text.preserve_text_portion && text.text.chars().any(requires_shaped_pdf_glyph)
-      || text.text.chars().any(requires_shaped_pdf_glyph))
-}
-
-fn text_has_pdf_significant_spacing(text: &str) -> bool {
-  text.starts_with(char::is_whitespace)
-    || text.ends_with(char::is_whitespace)
-    || text.as_bytes().windows(2).any(|window| window == b"  ")
-}
-
-fn requires_shaped_pdf_glyph(ch: char) -> bool {
-  !ch.is_ascii()
 }
 
 fn text_vertical_scale(style: &TextStyle<'_>) -> f32 {
@@ -2359,10 +2398,27 @@ fn stroke(style: &TextStyle<'_>) -> Option<Stroke> {
   })
 }
 
+fn text_stroke(style: &TextStyle<'_>, synthetic_bold: bool) -> Option<Stroke> {
+  // LibreOffice's PDF writer uses fill-then-stroke for an artificial bold
+  // face, with a stroke width of one thirtieth of the font height. An
+  // explicit text outline wins over artificial bold there as well.
+  stroke(style).or_else(|| {
+    synthetic_bold.then(|| Stroke {
+      width: style.font_size_pt / 30.0,
+      paint: rgb::Color::new(style.color.r, style.color.g, style.color.b).into(),
+      opacity: NormalizedF32::new(style.opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ZERO),
+      ..Default::default()
+    })
+  })
+}
+
 #[cfg(test)]
 mod tests {
-  use super::{gamma_correct_gradient_color, pdf_page_dimension};
-  use ooxmlsdk_layout::common::{Color, LayoutEngineKind};
+  use super::{
+    gamma_correct_gradient_color, pdf_page_dimension, symbol_font_semantic_text, text_stroke,
+    text_style_from_common,
+  };
+  use ooxmlsdk_layout::common::{Color, LayoutEngineKind, Pt, TextStyle};
 
   #[test]
   fn powerpoint_pdf_page_dimensions_use_the_600_dpi_print_grid() {
@@ -2370,6 +2426,50 @@ mod tests {
     assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 595.25) - 595.2).abs() < 0.001);
     assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 446.5) - 446.52).abs() < 0.001);
     assert_eq!(pdf_page_dimension(LayoutEngineKind::Docx, 793.75), 793.75);
+  }
+
+  #[test]
+  fn wingdings_black_circle_uses_standardized_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f06c}", Some("Wingdings")),
+      "\u{26ab}"
+    );
+    assert_eq!(
+      symbol_font_semantic_text("\u{f06c}", Some("Calibri")),
+      "\u{f06c}"
+    );
+  }
+
+  #[test]
+  fn wingdings_white_square_bullet_uses_standardized_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f071}", Some("Wingdings")),
+      "\u{2751}"
+    );
+  }
+
+  #[test]
+  fn symbol_font_bullet_uses_standardized_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f0b7}", Some("Symbol")),
+      "\u{2022}"
+    );
+    assert_eq!(
+      symbol_font_semantic_text("\u{f0b7}", Some("SymbolMT")),
+      "\u{2022}"
+    );
+    assert_eq!(
+      symbol_font_semantic_text("\u{f0b7}", Some("Calibri")),
+      "\u{f0b7}"
+    );
+  }
+
+  #[test]
+  fn symbol_font_minus_uses_standardized_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f02d}", Some("Symbol")),
+      "\u{2212}"
+    );
   }
 
   #[test]
@@ -2396,5 +2496,18 @@ mod tests {
       186
     );
     assert_eq!(gamma_correct_gradient_color(black, red, 1.0).r, 255);
+  }
+
+  #[test]
+  fn synthetic_bold_uses_libreoffice_pdf_stroke_width() {
+    let common_style = TextStyle {
+      font_size: Pt(15.0),
+      ..TextStyle::default()
+    };
+    let style = text_style_from_common(&common_style);
+
+    let stroke = text_stroke(&style, true).expect("synthetic bold stroke");
+
+    assert!((stroke.width - 0.5).abs() < f32::EPSILON);
   }
 }

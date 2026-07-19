@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use super::{
   CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog,
-  NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphFormat, ParagraphProps,
-  RunStyleOverrides, StylesCatalog, TextRun, TextStyle, paragraph_inlines,
-  paragraph_note_reference_ids, properties,
+  NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphAdjust, ParagraphAlignment,
+  ParagraphFormat, ParagraphProps, RunStyleOverrides, StylesCatalog, TextRun, TextStyle,
+  math_paragraph_alignment, paragraph_inlines, paragraph_note_reference_ids, properties,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -84,6 +84,18 @@ pub(super) fn paragraph_model_with_base<'a>(
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
   format.style_id = style_id.map(Arc::<str>::from);
+  if let Some(alignment) = math_paragraph_alignment(paragraph) {
+    format.alignment = alignment;
+    let adjust = match alignment {
+      ParagraphAlignment::Center => ParagraphAdjust::Center,
+      ParagraphAlignment::Right => ParagraphAdjust::Right,
+      ParagraphAlignment::Justify => ParagraphAdjust::Block,
+      ParagraphAlignment::Left => ParagraphAdjust::Left,
+    };
+    format.justification.adjust = adjust;
+    format.justification.one_word_adjust = adjust;
+    format.justification.last_line_adjust = adjust;
+  }
   let run_style =
     properties::paragraph_run_style(styles, style_id, base.run_style.clone(), base.run_overrides);
   let direct_numbering = direct_paragraph_properties
@@ -100,6 +112,12 @@ pub(super) fn paragraph_model_with_base<'a>(
     properties::paragraph_mark_run_style(paragraph_mark_run_properties, run_style.clone(), styles);
   let has_direct_indentation = numbering_format_context.direct_indentation;
   let mut numbering_base_style = styles.doc_default_run.clone();
+  // The paragraph style also formats the paragraph mark, whose size Office
+  // uses for a numbering symbol when w:lvl/w:rPr does not provide w:sz.
+  // Numbering-level run properties are merged afterwards and remain the
+  // authoritative explicit formatting for the symbol itself.
+  numbering_base_style.font_size_pt = paragraph_mark_style.font_size_pt;
+  numbering_base_style.complex_font_size_pt = paragraph_mark_style.complex_font_size_pt;
   numbering_base_style.color = run_style.color;
   numbering_base_style.highlight = run_style.highlight;
   numbering_base_style.bold = false;

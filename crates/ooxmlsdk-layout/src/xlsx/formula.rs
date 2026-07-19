@@ -15,51 +15,99 @@ pub(crate) fn recalculate_formula_cells(
 ) {
   let defined = DefinedNames::from_catalog(defined_names);
   apply_named_array_formulas(sheets, &defined);
+  let formulas = sheets.iter().map(formula_cells).collect::<Vec<_>>();
+  let mut book = FormulaBook::from_sheets(sheets, &defined, workbook_catalog);
+  let mut formula_book = formula_evaluation_book_from_calc_book(&book, source_file_name);
 
   for _ in 0..12 {
-    let book = FormulaBook::from_sheets(sheets, &defined, workbook_catalog);
-    let formula_book = formula_evaluation_book_from_calc_book(&book, source_file_name);
     let mut changed = false;
-    let mut sheet_index = 0;
-    while sheet_index < sheets.len() {
-      let formulas = formula_cells(&sheets[sheet_index]);
-      for formula_cell in formulas {
-        if formula_contains_smart_quote(&formula_cell.formula) {
-          continue;
+    let mut changed_cells = Vec::new();
+    let mut refresh_all_cells = false;
+    formula_book.with_lookup_cache(|| {
+      let mut sheet_index = 0;
+      while sheet_index < sheets.len() {
+        for formula_cell in &formulas[sheet_index] {
+          if formula_contains_smart_quote(&formula_cell.formula) {
+            continue;
+          }
+          let current_sheet = formula_book_sheet_id(&book, sheet_index);
+          let current_cell = formula_address(formula_cell.address);
+          let Some(value) =
+            evaluate_formula_cell(&formula_book, current_sheet, current_cell, formula_cell)
+              .map(|value| calc_value_from_formula_value(&book, value))
+          else {
+            continue;
+          };
+          let value = lo_pdf_formula_value(&formula_cell.formula, value);
+          if let Some(range) = formula_cell
+            .reference
+            .as_deref()
+            .and_then(CellRange::parse_a1_range)
+            && apply_array_formula_result(&book, &mut sheets[sheet_index], range, &value)
+          {
+            changed = true;
+            refresh_all_cells = true;
+            continue;
+          }
+          let old_text = cell_at(&sheets[sheet_index], formula_cell.address)
+            .map(|cell| cell.display_text.as_str())
+            .unwrap_or("");
+          if !should_replace_formula_result(old_text, &value) {
+            continue;
+          }
+          if replace_cell_value(&mut sheets[sheet_index], formula_cell.address, &value) {
+            changed = true;
+            changed_cells.push((sheet_index, formula_cell.address));
+          }
         }
-        let current_sheet = formula_book_sheet_id(&book, sheet_index);
-        let current_cell = formula_address(formula_cell.address);
-        let Some(value) =
-          evaluate_formula_cell(&formula_book, current_sheet, current_cell, &formula_cell)
-            .map(|value| calc_value_from_formula_value(&book, value))
-        else {
-          continue;
-        };
-        let value = lo_pdf_formula_value(&formula_cell.formula, value);
-        if let Some(range) = formula_cell
-          .reference
-          .as_deref()
-          .and_then(CellRange::parse_a1_range)
-          && apply_array_formula_result(&book, &mut sheets[sheet_index], range, &value)
-        {
-          changed = true;
-          continue;
-        }
-        let old_text = cell_at(&sheets[sheet_index], formula_cell.address)
-          .map(|cell| cell.display_text.as_str())
-          .unwrap_or("");
-        if !should_replace_formula_result(old_text, &value) {
-          continue;
-        }
-        if replace_cell_value(&mut sheets[sheet_index], formula_cell.address, &value) {
-          changed = true;
-        }
+        sheet_index += 1;
       }
-      sheet_index += 1;
-    }
+    });
     if !changed {
       break;
     }
+    refresh_formula_book_cells(
+      sheets,
+      &mut book,
+      &mut formula_book,
+      if refresh_all_cells {
+        None
+      } else {
+        Some(&changed_cells)
+      },
+    );
+  }
+}
+
+fn refresh_formula_book_cells(
+  sheets: &[CalcSheet],
+  book: &mut FormulaBook,
+  formula_book: &mut ooxmlsdk_formula::FormulaEvaluationBook<'static>,
+  changed_cells: Option<&[(usize, CellAddress)]>,
+) {
+  let all_cells;
+  let changed_cells = if let Some(changed_cells) = changed_cells {
+    changed_cells
+  } else {
+    all_cells = book.cells.keys().copied().collect::<Vec<_>>();
+    &all_cells
+  };
+  for &(sheet_index, address) in changed_cells {
+    let Some(cell) = sheets
+      .get(sheet_index)
+      .and_then(|sheet| sheet.cell_at(address))
+    else {
+      continue;
+    };
+    let value = formula_cell_value(cell);
+    book.cells.insert((sheet_index, address), value.clone());
+    formula_book.cells.insert(
+      (
+        formula_book_sheet_id(book, sheet_index),
+        formula_address(address),
+      ),
+      formula_value_from_calc_value(&value),
+    );
   }
 }
 
@@ -86,19 +134,18 @@ pub(crate) fn evaluate_relative_formula_as_condition(
   base: CellAddress,
   address: CellAddress,
 ) -> bool {
-  let defined = DefinedNames::from_catalog(&import.defined_names);
-  let book = FormulaBook::from_sheets(&import.sheets, &defined, &import.workbook_catalog);
   let Some(sheet_index) = calc_sheet_index(import, sheet) else {
     return false;
   };
-  let formula_book = formula_evaluation_book_from_calc_book(&book, None);
+  let relative_formula_context = import.relative_formula_context();
+  let formula_book = &relative_formula_context.book;
   match formula_book.evaluate_relative_formula_text(
-    formula_book_sheet_id(&book, sheet_index),
+    relative_formula_context.sheet_id(sheet_index),
     formula,
     formula_address(base),
     formula_address(address),
   ) {
-    Some(value) => formula_value_truthy(&formula_book, &value),
+    Some(value) => formula_value_truthy(formula_book, &value),
     None => false,
   }
 }
@@ -110,18 +157,50 @@ pub(crate) fn evaluate_relative_formula_as_number(
   base: CellAddress,
   address: CellAddress,
 ) -> Option<f64> {
-  let defined = DefinedNames::from_catalog(&import.defined_names);
-  let book = FormulaBook::from_sheets(&import.sheets, &defined, &import.workbook_catalog);
   let sheet_index = calc_sheet_index(import, sheet)?;
-  let formula_book = formula_evaluation_book_from_calc_book(&book, None);
+  let relative_formula_context = import.relative_formula_context();
+  let formula_book = &relative_formula_context.book;
   formula_book
     .evaluate_relative_formula_text(
-      formula_book_sheet_id(&book, sheet_index),
+      relative_formula_context.sheet_id(sheet_index),
       formula,
       formula_address(base),
       formula_address(address),
     )
-    .and_then(|value| formula_value_number(&formula_book, &value))
+    .and_then(|value| formula_value_number(formula_book, &value))
+}
+
+#[derive(Debug)]
+pub(crate) struct RelativeFormulaEvaluationContext {
+  sheet_workbook_indices: Vec<usize>,
+  book: ooxmlsdk_formula::FormulaEvaluationBook<'static>,
+}
+
+impl RelativeFormulaEvaluationContext {
+  pub(crate) fn from_import(
+    sheets: &[CalcSheet],
+    defined_names: &DefinedNamesCatalog,
+    workbook_catalog: &WorkbookCatalog,
+  ) -> Self {
+    let defined = DefinedNames::from_catalog(defined_names);
+    let calc_book = FormulaBook::from_sheets(sheets, &defined, workbook_catalog);
+    let sheet_workbook_indices = calc_book.sheet_workbook_indices.clone();
+    let book = formula_evaluation_book_from_calc_book(&calc_book, None);
+    Self {
+      sheet_workbook_indices,
+      book,
+    }
+  }
+
+  fn sheet_id(&self, sheet_index: usize) -> ooxmlsdk_formula::SheetId {
+    ooxmlsdk_formula::SheetId(
+      self
+        .sheet_workbook_indices
+        .get(sheet_index)
+        .copied()
+        .unwrap_or(sheet_index) as u32,
+    )
+  }
 }
 
 fn calc_sheet_index(import: &super::import::ExcelImport, sheet: &CalcSheet) -> Option<usize> {
@@ -254,21 +333,11 @@ fn cell_formula_and_reference(
 }
 
 fn cell_at(sheet: &CalcSheet, address: CellAddress) -> Option<&CalcCell> {
-  sheet.rows.iter().find_map(|row| {
-    row
-      .cells
-      .iter()
-      .find(|cell| cell.address() == Some(address))
-  })
+  sheet.cell_at(address)
 }
 
 fn cell_at_mut(sheet: &mut CalcSheet, address: CellAddress) -> Option<&mut CalcCell> {
-  sheet.rows.iter_mut().find_map(|row| {
-    row
-      .cells
-      .iter_mut()
-      .find(|cell| cell.address() == Some(address))
-  })
+  sheet.cell_at_mut(address)
 }
 
 fn replace_cell_value(sheet: &mut CalcSheet, address: CellAddress, value: &Value) -> bool {
@@ -372,8 +441,8 @@ fn formula_starts_with_function(formula: &str, name: &str) -> bool {
 struct FormulaBook {
   sheet_names: Vec<String>,
   sheet_workbook_indices: Vec<usize>,
-  cells: HashMap<(usize, CellAddress), Value>,
-  formulas: HashMap<(usize, CellAddress), FormulaText>,
+  cells: BTreeMap<(usize, CellAddress), Value>,
+  formulas: BTreeMap<(usize, CellAddress), FormulaText>,
   hidden_rows: HashSet<(usize, u32)>,
   filtered_rows: HashSet<(usize, u32)>,
   external_cells: HashMap<(usize, String, CellAddress), Value>,
@@ -439,8 +508,8 @@ impl FormulaBook {
     defined: &DefinedNames,
     workbook_catalog: &WorkbookCatalog,
   ) -> Self {
-    let mut cells = HashMap::new();
-    let mut formulas = HashMap::new();
+    let mut cells = BTreeMap::new();
+    let mut formulas = BTreeMap::new();
     let mut hidden_rows = HashSet::new();
     let mut filtered_rows = HashSet::new();
     let mut tables = HashMap::new();

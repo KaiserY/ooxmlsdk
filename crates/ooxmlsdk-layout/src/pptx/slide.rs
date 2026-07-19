@@ -1230,10 +1230,13 @@ impl SlidePersist {
         | p::PlaceholderValues::SlideImage
         | p::PlaceholderValues::Picture,
       )
-      | None => self
-        .other_text_style
-        .as_ref()
-        .or(self.default_text_style.as_ref()),
+      | None => {
+        // LibreOffice PPTShape::addShape uses the presentation default text
+        // style for an ordinary shape that owns a text body. `otherStyle` is
+        // selected only by its no-text-body fallback, so applying it here
+        // would incorrectly override the shape's a:fontRef color.
+        self.default_text_style.as_ref()
+      }
     }
     .or(self.default_text_style.as_ref())
   }
@@ -1365,5 +1368,40 @@ impl ColorMap {
 impl ColorMapEntry {
   fn new(source: a::SchemeColorValues, target: a::ColorSchemeIndexValues) -> Self {
     Self { source, target }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn ordinary_shape_text_uses_presentation_default_style_not_other_style() {
+    let default_style = TextListStyle {
+      default_paragraph_properties: Some(Box::new(a::DefaultParagraphProperties {
+        left_margin: Some(1),
+        ..a::DefaultParagraphProperties::default()
+      })),
+      ..TextListStyle::default()
+    };
+    let other_style = TextListStyle {
+      default_paragraph_properties: Some(Box::new(a::DefaultParagraphProperties {
+        left_margin: Some(2),
+        ..a::DefaultParagraphProperties::default()
+      })),
+      ..TextListStyle::default()
+    };
+    let mut slide = SlidePersist::new_slide(
+      "ppt/slides/slide1.xml".to_string(),
+      "rId1".to_string(),
+      SlideSize::libreoffice_default(),
+    );
+    slide.default_text_style = Some(default_style.clone());
+    slide.other_text_style = Some(other_style);
+
+    assert_eq!(
+      slide.get_sub_type_text_list_style(None),
+      Some(&default_style)
+    );
   }
 }

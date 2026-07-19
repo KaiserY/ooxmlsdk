@@ -151,6 +151,9 @@ impl PPTShapeGroupContext {
     }
     if let Some(text_body) = &source.text_body {
       let mut text_body = TextBody::from_pml(text_body);
+      if let Some(inherited) = shape.shape.text_body.as_ref() {
+        text_body.inherit_placeholder_body_properties(inherited);
+      }
       resolve_text_body_hyperlinks(slide_persist, &mut text_body);
       shape.shape.set_text_body(text_body);
     }

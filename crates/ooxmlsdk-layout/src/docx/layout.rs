@@ -133,11 +133,24 @@ fn paragraph_line_height_for_setup(
 ) -> f32 {
   match paragraph.format.line_height_rule {
     LineHeightRule::Auto => {
+      // ECMA-376 §17.3.1.33 defines an auto `w:line` value in 240ths of
+      // the normal single line height. Use the resolved face metrics for that
+      // single-line basis; 115% of the nominal font size is only Writer's
+      // compatibility approximation and can differ from Word's font height.
+      let single_line_height = paragraph
+        .inlines
+        .iter()
+        .find_map(|inline| match inline {
+          InlineItem::Text(run) if text_run_affects_line_height(&run.text) => Some(
+            inline_text_height_for_text(&run.style, &run.text, text_metrics),
+          ),
+          _ => None,
+        })
+        .unwrap_or_else(|| inline_text_height(base_line_style, text_metrics));
       let line_height = paragraph
         .format
         .line_height_pt
-        .map(|multiple| word_auto_line_height(base_line_style) * multiple)
-        .unwrap_or_else(|| inline_text_height(base_line_style, text_metrics));
+        .map_or(single_line_height, |multiple| single_line_height * multiple);
       // SwTextFormatter::CalcRealHeight() uses the imported document grid
       // base height as the auto line real height in grid layout. In Writer this
       // grid snap happens before proportional line spacing is applied, and the
@@ -7899,13 +7912,14 @@ impl<'a> TableFrameLayout<'a> {
     let repeating_header_count = table_repeating_header_count(table);
     let coalesce_row_shading = table.preferred_width_pct.is_some_and(|pct| pct >= 0.999);
     let split_allowed = table_split_allowed(table);
-    let row_heights = table_row_heights_with_widths(
+    let row_heights: Arc<[f32]> = table_row_heights_with_widths(
       table,
       &column_widths,
       area.setup,
       area.compatibility_mode,
       text_metrics,
-    );
+    )
+    .into();
     let repeating_header_height =
       table_repeating_header_height_from_row_heights(table, repeating_header_count, &row_heights);
     let total_height = table_total_height_from_row_heights(table, &row_heights);
@@ -8677,13 +8691,32 @@ impl<'a> TableFrameLayout<'a> {
     repeating_headers_disabled: bool,
     text_metrics: &mut TextMetrics,
   ) -> Option<Self> {
-    TableFrameLayout::new(self.table, block_area(flow), false, text_metrics).map(|layout| {
-      if repeating_headers_disabled {
-        layout.without_repeating_headers()
-      } else {
-        layout
-      }
-    })
+    let area = block_area(flow);
+    let mut layout = if area.setup == self.frame.block.setup
+      && area.compatibility_mode == self.frame.block.compatibility_mode
+      && f32::abs(area.content_width - self.frame.block.content_width) < LAYOUT_EPSILON_PT
+    {
+      // A Writer table follow keeps the master's column geometry and row
+      // metrics. Only its upper/page frame changes. Re-measuring every row for
+      // every follow page makes long tables quadratic in the number of rows.
+      let mut layout = self.clone();
+      let table_width = layout.frame.right_pt - layout.frame.left_pt;
+      layout.frame.left_pt = table_left_position(
+        layout.table,
+        area.content_left_pt,
+        area.content_width,
+        table_width,
+      );
+      layout.frame.right_pt = layout.frame.left_pt + table_width;
+      layout.frame.block = area;
+      layout
+    } else {
+      TableFrameLayout::new(self.table, area, false, text_metrics)?
+    };
+    if repeating_headers_disabled {
+      layout = layout.without_repeating_headers();
+    }
+    Some(layout)
   }
 
   fn without_repeating_headers(mut self) -> Self {
@@ -9142,7 +9175,7 @@ struct TableFrame {
   full_width_horizontal_borders: bool,
   coalesce_row_shading: bool,
   split_allowed: bool,
-  row_heights: Vec<f32>,
+  row_heights: Arc<[f32]>,
   repeating_header_count: usize,
   repeating_header_height: f32,
   total_height: f32,
@@ -15379,6 +15412,79 @@ mod tests {
       stronger_border(Some(border(1.0, false)), Some(border(1.0, true))).unwrap(),
       border(1.0, false)
     );
+  }
+
+  #[test]
+  fn table_follow_reuses_master_row_metrics_when_page_geometry_is_unchanged() {
+    let table = Table {
+      column_widths_pt: vec![72.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      placement: None,
+      split_allowed: true,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      starts_after_last_rendered_page_break: false,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: vec![TableRow {
+        cells: vec![TableCell {
+          blocks: Vec::new(),
+          shading: None,
+          borders: CellBordersModel::default(),
+          margins: CellMargins::default(),
+          preferred_width_pt: None,
+          preferred_width_pct: None,
+          grid_span: 1,
+          vertical_merge_continue: false,
+          vertical_alignment: TableCellVerticalAlignment::Top,
+        }],
+        height_pt: Some(12.0),
+        exact_height: true,
+        repeat_header: false,
+        keep_with_next: false,
+        cant_split: false,
+        cell_spacing_pt: None,
+        grid_before: 0,
+        grid_after: 0,
+        redline_color: None,
+      }],
+    };
+    let area = BlockArea {
+      setup: PageSetup::default(),
+      section_index: 0,
+      section_page_index: 0,
+      column_index: 0,
+      columns: SectionColumns::default(),
+      content_top_pt: 72.0,
+      content_left_pt: 72.0,
+      content_bottom: 720.0,
+      body_content_bottom_pt: 720.0,
+      content_width: 451.0,
+      default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      compatibility_mode: 12,
+      justify_lines_with_shrinking: false,
+      repeating_slots: RepeatingSlotState::default(),
+    };
+    let mut text_metrics = TextMetrics::new();
+    let master = TableFrameLayout::new(&table, area, false, &mut text_metrics).unwrap();
+    let follow_area = BlockArea {
+      section_page_index: 1,
+      content_left_pt: 80.0,
+      ..area
+    };
+
+    let follow = master
+      .layout_for_flow(flow_from_block_area(follow_area), false, &mut text_metrics)
+      .unwrap();
+
+    assert!(Arc::ptr_eq(
+      &master.frame.row_heights,
+      &follow.frame.row_heights
+    ));
+    assert_eq!(follow.frame.left_pt - master.frame.left_pt, 8.0);
   }
 
   #[test]

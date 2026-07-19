@@ -21,6 +21,7 @@ pub(crate) struct PowerPointImport {
   pub(crate) notes_pages: Vec<SlidePersist>,
   pub(crate) is_endless: bool,
   pub(crate) is_automatic: bool,
+  pub(crate) first_slide_number: i32,
   pub(crate) first_page_name: Option<String>,
   pub(crate) custom_show_name: Option<String>,
   pub(crate) embed_true_type_fonts: bool,
@@ -54,6 +55,7 @@ impl PowerPointImport {
       notes_pages: Vec::new(),
       is_endless: false,
       is_automatic: false,
+      first_slide_number: 1,
       first_page_name: None,
       custom_show_name: None,
       embed_true_type_fonts: false,
@@ -81,6 +83,16 @@ impl PowerPointImport {
 
   pub(crate) fn get_theme(&self, path: &str) -> Option<&ThemeFragmentRecord> {
     self.themes.iter().find(|theme| theme.path == path)
+  }
+
+  pub(crate) fn get_theme_for_slide(
+    &self,
+    slide: Option<&SlidePersist>,
+  ) -> Option<&ThemeFragmentRecord> {
+    slide
+      .and_then(|slide| slide.theme_path.as_deref())
+      .and_then(|path| self.get_theme(path))
+      .or_else(|| self.get_current_theme_ptr())
   }
 
   pub(crate) fn ensure_theme(
@@ -259,6 +271,16 @@ impl PowerPointImport {
   pub(crate) fn resolve_theme_font(&self, placeholder: &str) -> Option<&str> {
     self
       .get_current_theme_ptr()
+      .and_then(|theme| theme.font_scheme.resolve_font(placeholder))
+  }
+
+  pub(crate) fn resolve_theme_font_for_slide(
+    &self,
+    slide: Option<&SlidePersist>,
+    placeholder: &str,
+  ) -> Option<&str> {
+    self
+      .get_theme_for_slide(slide)
       .and_then(|theme| theme.font_scheme.resolve_font(placeholder))
   }
 

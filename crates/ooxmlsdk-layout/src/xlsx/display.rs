@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
@@ -25,28 +26,6 @@ const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
 // margins are 20 twips on each side.
 const XLSX_CELL_TEXT_INSET_PT: f32 = 20.0 / crate::units::TWIPS_PER_POINT;
 const XLSX_GRID_LINE_WIDTH_PT: f32 = 0.25;
-
-#[derive(Clone, Debug)]
-struct CalcCellTextFragment {
-  address: CellAddress,
-  rect: CellRect,
-  text: TextItem,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct CalcCellTextOrigin {
-  address: CellAddress,
-  rect: CellRect,
-}
-
-impl From<&CalcCellTextFragment> for CalcCellTextOrigin {
-  fn from(fragment: &CalcCellTextFragment) -> Self {
-    Self {
-      address: fragment.address,
-      rect: fragment.rect,
-    }
-  }
-}
 
 #[derive(Clone, Copy, Debug)]
 struct CalcCellOutputArea {
@@ -233,7 +212,14 @@ fn print_page_items(
   // ECMA-376 §18.3.1.46 defines these as the printed page header and
   // footer. Keep the PDF content stream in the same semantic order exposed
   // by Microsoft Office fixed output: header, sheet body, then footer.
-  render_header_or_footer(&mut items, page, setup, true);
+  render_header_or_footer(
+    &mut items,
+    page,
+    setup,
+    true,
+    &import.styles,
+    &mut text_metrics,
+  );
 
   if let Some(area) = repeat_corner_for_page(page) {
     render_cell_area(
@@ -340,7 +326,14 @@ fn print_page_items(
     body_origin_y + repeat_height,
     zoom_scale,
   ));
-  render_header_or_footer(&mut items, page, setup, false);
+  render_header_or_footer(
+    &mut items,
+    page,
+    setup,
+    false,
+    &import.styles,
+    &mut text_metrics,
+  );
   items
 }
 
@@ -376,7 +369,6 @@ fn render_cell_area(
 ) {
   let area_rect = page.sheet.range_rect(area);
   let occupied_cells = calc_occupied_text_cells(cells);
-  let mut cell_text_items = Vec::new();
   for cell in cells {
     if page.sheet.is_covered_merged_cell(cell.address) {
       continue;
@@ -389,7 +381,13 @@ fn render_cell_area(
     let y_pt = layout.origin_y_pt + (rect.y_pt - area_rect.y_pt) * layout.zoom_scale;
     let width_pt = rect.width_pt * layout.zoom_scale;
     let height_pt = rect.height_pt * layout.zoom_scale;
+    let table_builtin_style = super::table::builtin_table_style_for_address(
+      &page.sheet.resources.tables,
+      &import.styles,
+      cell.address,
+    );
     if let Some(fill_color) = conditional_fill_color(import, page.sheet, cell)
+      .or(table_builtin_style.fill)
       .or_else(|| pivot_format_fill_color(import, cell))
       .or_else(|| import.styles.fill_color_for_cell(cell.style_index))
     {
@@ -405,6 +403,7 @@ fn render_cell_area(
       }));
     }
     let mut borders = import.styles.borders_for_cell(cell.style_index);
+    merge_cell_borders(&mut borders, table_builtin_style.borders);
     let pivot_builtin_style =
       super::pivot::pivot_builtin_style_for_address(page.sheet, cell.address);
     merge_cell_borders(&mut borders, pivot_builtin_style.borders);
@@ -434,9 +433,10 @@ fn render_cell_area(
       height_pt,
     };
     let mut measurement_style = import.styles.text_style_for_cell(cell.style_index);
+    super::table::apply_builtin_table_text_style(table_builtin_style, &mut measurement_style);
+    apply_conditional_text_style(import, page.sheet, cell, &mut measurement_style);
     // sc/source/ui/view/output2.cxx ScDrawStringsVars::SetPattern(). Calc's
     // print map mode scales cell geometry and the font used for measurement.
-    measurement_style.font_size_pt *= layout.zoom_scale;
     let pivot_builtin_style =
       super::pivot::pivot_builtin_style_for_address(page.sheet, cell.address);
     if pivot_builtin_style.bold {
@@ -447,6 +447,7 @@ fn render_cell_area(
         .styles
         .apply_differential_text_style(format_id, &mut measurement_style);
     }
+    measurement_style.font_size_pt *= layout.zoom_scale;
     let render_style = measurement_style.clone();
     let mut alignment = import.styles.alignment_for_cell(cell.style_index);
     if pivot_builtin_style.left_align {
@@ -505,16 +506,11 @@ fn render_cell_area(
         text_metrics,
       );
     }
-    cell_text_items.extend(rendered_text_items.into_iter().filter_map(|item| {
-      let PageItem::Text(text) = item else {
-        return None;
-      };
-      Some(CalcCellTextFragment {
-        address: cell.address,
-        rect: cell_rect,
-        text,
-      })
-    }));
+    items.extend(
+      rendered_text_items
+        .into_iter()
+        .filter(|item| matches!(item, PageItem::Text(_))),
+    );
     if let Some(hyperlink_url) = hyperlink_url {
       items.push(PageItem::LinkArea(LinkAreaItem {
         x_pt,
@@ -525,7 +521,6 @@ fn render_cell_area(
       }));
     }
   }
-  items.extend(coalesced_calc_row_text_items(cell_text_items, text_metrics));
   if page.page_settings.print_grid_lines {
     render_grid(
       items,
@@ -813,135 +808,6 @@ fn format_general_number_with_significant_digits(value: f64, significant_digits:
   if text == "-0" { "0".to_string() } else { text }
 }
 
-fn coalesced_calc_row_text_items(
-  items: Vec<CalcCellTextFragment>,
-  text_metrics: &mut TextMetrics,
-) -> Vec<PageItem> {
-  let mut output = Vec::with_capacity(items.len());
-  let mut previous_source: Option<CalcCellTextOrigin> = None;
-  let mut items = items.into_iter().peekable();
-  while let Some(item) = items.next() {
-    let next_is_row_end = !matches!(
-      items.peek(),
-      Some(following) if (following.text.y_pt - item.text.y_pt).abs() < 0.01
-    );
-    if let Some(PageItem::Text(previous)) = output.last_mut()
-      && let Some(source) = previous_source
-      && calc_row_text_items_coalesce(previous, &item.text)
-    {
-      let spaces =
-        calc_row_inter_cell_spaces(source, previous, &item, next_is_row_end, text_metrics);
-      previous.text.extend(std::iter::repeat_n(' ', spaces));
-      previous.text.push_str(&item.text.text);
-      previous.line_height_pt = previous.line_height_pt.max(item.text.line_height_pt);
-      previous_source = Some(CalcCellTextOrigin::from(&item));
-      continue;
-    }
-    previous_source = Some(CalcCellTextOrigin::from(&item));
-    output.push(PageItem::Text(item.text));
-  }
-  output
-}
-
-fn calc_row_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
-  if current.form_widget_id.is_some()
-    || next.form_widget_id.is_some()
-    || current.hyperlink_url != next.hyperlink_url
-    || current.dynamic_field != next.dynamic_field
-    || current.paragraph_bidi != next.paragraph_bidi
-    || current.rotation_center_pt.is_some()
-    || next.rotation_center_pt.is_some()
-    || current.decoration_span_start_x_pt != next.decoration_span_start_x_pt
-    || current.pdf_text_segmentation != PdfTextSegmentation::Line
-    || next.pdf_text_segmentation != PdfTextSegmentation::Line
-    || current.preserve_text_portion
-    || next.preserve_text_portion
-    || (current.y_pt - next.y_pt).abs() >= 0.01
-    || (current.line_height_pt - next.line_height_pt).abs() >= 0.01
-  {
-    return false;
-  }
-  next.x_pt > current.x_pt
-}
-
-fn calc_row_inter_cell_spaces(
-  current: CalcCellTextOrigin,
-  current_text: &TextItem,
-  next: &CalcCellTextFragment,
-  next_is_row_end: bool,
-  text_metrics: &mut TextMetrics,
-) -> usize {
-  let next_text = &next.text;
-  if current_text.text.ends_with(char::is_whitespace)
-    || next_text.text.starts_with(char::is_whitespace)
-  {
-    return 0;
-  }
-  if calc_text_number_like(&current_text.text) && calc_text_number_like(&next_text.text) {
-    return 1;
-  }
-  let current_right =
-    current_text.x_pt + text_metrics.measure_text(&current_text.text, &current_text.style);
-  let current_layout_right = current_text.x_pt
-    + approximate_text_width_pt(&current_text.text, current_text.style.font_size_pt);
-  let current_cell_right = current.rect.x_pt + current.rect.width_pt;
-  let gap = next_text.x_pt - current_right;
-  let space_width = text_metrics
-    .measure_text(" ", &current_text.style)
-    .max(current_text.style.font_size_pt * 0.25)
-    .max(1.0);
-  if current.address.row == next.address.row
-    && current.address.col + 1 == next.address.col
-    && gap < space_width * 0.5
-  {
-    return 0;
-  }
-  // replaces clipped numeric output with "###", then SetClipMarks() only
-  // adjusts the clip region. Keep PDF text extraction joined when the actual
-  // glyph positions are closer than a printable word gap.
-  if next_text.text.chars().all(|ch| ch == '#')
-    && current.address.row == next.address.row
-    && current.address.col + 1 == next.address.col
-    && gap < space_width * 1.5
-  {
-    return 0;
-  }
-  if current.address.row == next.address.row
-    && current.address.col != next.address.col
-    && (current_text.text.contains(char::is_whitespace)
-      || next_text.text.contains(char::is_whitespace))
-  {
-    return 1;
-  }
-  if current.address.row == next.address.row
-    && current.address.col != next.address.col
-    && current_layout_right <= current_cell_right + space_width * 0.25
-  {
-    return 1;
-  }
-  if gap <= 0.0 {
-    return usize::from(next_is_row_end);
-  }
-  if gap < space_width * 1.5 {
-    1
-  } else {
-    let spaces = (gap / space_width).round() as usize;
-    if next_is_row_end {
-      spaces.max(1)
-    } else {
-      spaces
-    }
-  }
-}
-
-fn calc_text_number_like(text: &str) -> bool {
-  let trimmed = text.trim();
-  !trimmed.is_empty()
-    && trimmed
-      .chars()
-      .all(|ch| ch.is_ascii_digit() || matches!(ch, '.' | ',' | '-' | '+' | '%' | '/' | ':'))
-}
-
 fn calc_text_can_shape_as_line(text: &str) -> bool {
   text.chars().all(|ch| {
     ch.is_ascii_alphanumeric()
@@ -995,25 +861,15 @@ fn render_cell_rich_text(
     style,
     rotation_center_pt: None,
     hyperlink_url,
-    dynamic_field: None,
     form_widget_id: None,
     paragraph_bidi: false,
     preserve_text_portion,
-    decoration_span_start_x_pt: None,
     pdf_text_segmentation: if preserve_text_portion {
       PdfTextSegmentation::Portion
     } else {
       PdfTextSegmentation::Line
     },
   }));
-}
-
-fn approximate_text_width_pt(text: &str, font_size_pt: f32) -> f32 {
-  text
-    .chars()
-    .map(|ch| if ch.is_ascii_whitespace() { 0.33 } else { 0.55 })
-    .sum::<f32>()
-    * font_size_pt
 }
 
 fn conditional_fill_color(
@@ -1045,6 +901,42 @@ fn conditional_fill_color(
     }
   }
   None
+}
+
+fn apply_conditional_text_style(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  cell: &super::print::CalcPrintCell<'_>,
+  style: &mut TextStyle,
+) {
+  let mut rules = sheet
+    .metrics
+    .conditions
+    .conditional_formats
+    .iter()
+    .filter(|format| conditional_format_contains_cell(format, cell.address))
+    .flat_map(|format| format.rules.iter())
+    .collect::<Vec<_>>();
+  // sc/source/filter/oox/condformatbuffer.cxx sorts imported rules by
+  // priority before applying their differential formats.
+  rules.sort_by_key(|rule| rule.priority);
+  for rule in rules {
+    if !conditional_rule_matches(rule, cell) {
+      continue;
+    }
+    if let Some(format_id) = rule
+      .format_id
+      .filter(|format_id| import.styles.differential_has_font(*format_id))
+    {
+      import
+        .styles
+        .apply_differential_text_style(format_id, style);
+      return;
+    }
+    if rule.stop_if_true {
+      break;
+    }
+  }
 }
 
 fn pivot_format_fill_color(
@@ -1211,11 +1103,9 @@ fn render_cell_text(
         rect.y_pt + rect.height_pt / 2.0,
       )),
       hyperlink_url: options.hyperlink_url.clone(),
-      dynamic_field: None,
       form_widget_id: None,
       paragraph_bidi: false,
       preserve_text_portion,
-      decoration_span_start_x_pt: None,
       pdf_text_segmentation: if preserve_text_portion {
         PdfTextSegmentation::Portion
       } else {
@@ -1412,19 +1302,31 @@ fn render_headings(
 }
 
 fn header_text(x_pt: f32, y_pt: f32, text: String) -> PageItem {
+  styled_header_text(x_pt, y_pt, text, TextStyle::default())
+}
+
+fn styled_header_text(x_pt: f32, y_pt: f32, text: String, style: TextStyle) -> PageItem {
+  styled_header_text_with_line_height(x_pt, y_pt, text, style, XLSX_HEADER_FOOTER_LINE_HEIGHT_PT)
+}
+
+fn styled_header_text_with_line_height(
+  x_pt: f32,
+  y_pt: f32,
+  text: String,
+  style: TextStyle,
+  line_height_pt: f32,
+) -> PageItem {
   PageItem::Text(TextItem {
     x_pt,
     y_pt,
-    line_height_pt: XLSX_HEADER_FOOTER_LINE_HEIGHT_PT,
+    line_height_pt,
     text,
-    style: TextStyle::default(),
+    style,
     rotation_center_pt: None,
     hyperlink_url: None,
-    dynamic_field: None,
     form_widget_id: None,
     paragraph_bidi: false,
     preserve_text_portion: false,
-    decoration_span_start_x_pt: None,
     pdf_text_segmentation: PdfTextSegmentation::Line,
   })
 }
@@ -1450,6 +1352,9 @@ fn print_page_image_items(
   for drawing in &page.sheet.resources.drawings {
     for anchor in &drawing.anchors {
       if anchor.object.hidden || !anchor.print_with_sheet {
+        continue;
+      }
+      if !drawing_anchor_intersects_page(page, anchor) {
         continue;
       }
       if anchor.object.kind != super::drawing::DrawingObjectKind::Picture {
@@ -1505,6 +1410,9 @@ fn print_page_image_items(
   for drawing in &page.sheet.resources.object_resources.vml_drawings {
     for shape in &drawing.shapes {
       if shape.hidden || !shape.print_object {
+        continue;
+      }
+      if !vml_shape_intersects_page(page, shape) {
         continue;
       }
       let Some(relationship_id) = shape.image_relationship_id.as_deref() else {
@@ -1570,6 +1478,9 @@ fn print_page_shape_items(
     if anchor.object.hidden || !anchor.print_with_sheet {
       continue;
     }
+    if !drawing_anchor_intersects_page(page, anchor) {
+      continue;
+    }
     if !matches!(
       anchor.object.kind,
       super::drawing::DrawingObjectKind::Shape
@@ -1614,6 +1525,9 @@ fn print_page_diagram_items(
         || !anchor.print_with_sheet
         || anchor.object.kind != super::drawing::DrawingObjectKind::GraphicFrame
       {
+        continue;
+      }
+      if !drawing_anchor_intersects_page(page, anchor) {
         continue;
       }
       let Some(relationship_id) = anchor.object.relationship_id.as_deref() else {
@@ -2031,6 +1945,9 @@ fn print_page_drawing_text_items(
       if anchor.object.hidden || !anchor.print_with_sheet {
         continue;
       }
+      if !drawing_anchor_intersects_page(page, anchor) {
+        continue;
+      }
       let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
         continue;
       };
@@ -2114,11 +2031,9 @@ fn render_drawing_text(
       style: style.clone(),
       rotation_center_pt: None,
       hyperlink_url: hyperlink_url.map(ToString::to_string),
-      dynamic_field: None,
       form_widget_id: None,
       paragraph_bidi: false,
       preserve_text_portion: false,
-      decoration_span_start_x_pt: None,
       pdf_text_segmentation: PdfTextSegmentation::Line,
     }));
   }
@@ -2165,11 +2080,9 @@ fn render_metafile_texts(
       style,
       rotation_center_pt: None,
       hyperlink_url: hyperlink_url.map(ToString::to_string),
-      dynamic_field: None,
       form_widget_id: None,
       paragraph_bidi: false,
       preserve_text_portion: false,
-      decoration_span_start_x_pt: None,
       pdf_text_segmentation: PdfTextSegmentation::Line,
     }));
   }
@@ -2192,6 +2105,9 @@ fn print_page_vml_text_items(
     .flat_map(|drawing| drawing.shapes.iter())
   {
     if shape.hidden || !shape.print_object {
+      continue;
+    }
+    if !vml_shape_intersects_page(page, shape) {
       continue;
     }
     let text = vml_shape_visible_text(page.sheet, shape);
@@ -2409,6 +2325,46 @@ fn anchor_rect_pt(
   }
 }
 
+fn drawing_anchor_intersects_page(
+  page: &CalcPrintPage<'_>,
+  anchor: &super::drawing::DrawingAnchorModel,
+) -> bool {
+  let Some(area) = page.area else {
+    return true;
+  };
+  let Some(anchor_rect) = anchor_rect_pt(page.sheet, anchor) else {
+    return false;
+  };
+  tuple_rect_intersects_cell_rect(anchor_rect, page.sheet.range_rect(area))
+}
+
+fn vml_shape_intersects_page(
+  page: &CalcPrintPage<'_>,
+  shape: &super::object_resources::VmlShapeModel,
+) -> bool {
+  let Some(area) = page.area else {
+    return true;
+  };
+  let Some(shape_rect) = vml_shape_rect(page.sheet, shape) else {
+    return false;
+  };
+  tuple_rect_intersects_cell_rect(shape_rect, page.sheet.range_rect(area))
+}
+
+fn tuple_rect_intersects_cell_rect(
+  (x, y, width, height): (f32, f32, f32, f32),
+  cell_rect: CellRect,
+) -> bool {
+  width > 0.0
+    && height > 0.0
+    && cell_rect.width_pt > 0.0
+    && cell_rect.height_pt > 0.0
+    && x < cell_rect.x_pt + cell_rect.width_pt
+    && x + width > cell_rect.x_pt
+    && y < cell_rect.y_pt + cell_rect.height_pt
+    && y + height > cell_rect.y_pt
+}
+
 fn repeat_rows_for_page(page: &CalcPrintPage<'_>) -> Option<super::worksheet::CellRange> {
   let area = page.area?;
   let repeat_rows = page.repeated_rows?;
@@ -2487,16 +2443,13 @@ fn render_header_or_footer(
   page: &CalcPrintPage<'_>,
   setup: PageSetup,
   header: bool,
+  styles: &super::styles::StylesCatalog,
+  text_metrics: &mut TextMetrics,
 ) {
   let Some(text) = header_footer_text(page, header) else {
     return;
   };
-  let y_pt = if header {
-    setup.header_distance_pt
-  } else {
-    setup.height_pt - setup.footer_distance_pt - XLSX_HEADER_FOOTER_LINE_HEIGHT_PT
-  };
-  render_header_footer_line(items, setup.margin_left_pt, y_pt, page, setup, text);
+  render_header_footer_line(items, header, page, setup, text, styles, text_metrics);
 }
 
 fn header_footer_text<'a>(page: &CalcPrintPage<'a>, header: bool) -> Option<&'a str> {
@@ -2522,26 +2475,71 @@ fn header_footer_text<'a>(page: &CalcPrintPage<'a>, header: bool) -> Option<&'a 
 
 fn render_header_footer_line(
   items: &mut Vec<PageItem>,
-  x_pt: f32,
-  y_pt: f32,
+  header: bool,
   page: &CalcPrintPage<'_>,
   setup: PageSetup,
   text: &str,
+  styles: &super::styles::StylesCatalog,
+  text_metrics: &mut TextMetrics,
 ) {
   for (align, value) in split_header_footer_sections(text) {
     if value.is_empty() {
       continue;
     }
-    let value = expand_header_footer_tokens(&value, page, align);
-    if value.is_empty() {
+    let mut runs = parse_header_footer_runs(
+      &value,
+      styles.default_font_text_style(),
+      HeaderFooterFieldValues {
+        page_number: page.page_number,
+        total_pages: page.total_pages,
+        sheet_name: &page.sheet.name,
+      },
+    );
+    if runs.is_empty() {
       continue;
     }
-    let x = match align {
-      HeaderFooterAlign::Left => x_pt,
-      HeaderFooterAlign::Center => setup.width_pt / 2.0,
-      HeaderFooterAlign::Right => setup.width_pt - setup.margin_right_pt,
+    if page.page_settings.header_footer.scale_with_doc {
+      let print_scale = page.zoom as f32 / 100.0;
+      for run in &mut runs {
+        run.style.font_size_pt *= print_scale;
+      }
+    }
+    // OOXML pageMargins.header/footer is the distance from the page edge to
+    // the start/end of the header/footer. LibreOffice's HeaderFooterParser
+    // likewise computes each portion's height from its active font runs, and
+    // PageSettingsConverter describes the footer margin as the distance to
+    // the bottom of the footer. A fixed 12pt box misplaces any portion whose
+    // font metrics or explicit &nn size produce a different line height.
+    let line_height_pt = runs
+      .iter()
+      .map(|run| text_metrics.inline_text_box_height(&run.style))
+      .fold(0.0_f32, f32::max)
+      .max(1.0);
+    let y_pt = if header {
+      setup.header_distance_pt
+    } else {
+      setup.height_pt - setup.footer_distance_pt - line_height_pt
     };
-    items.push(header_text(x, y_pt, value));
+    let total_width = runs
+      .iter()
+      .map(|run| text_metrics.measure_text(&run.text, &run.style))
+      .sum::<f32>();
+    let mut x = match align {
+      HeaderFooterAlign::Left => setup.margin_left_pt,
+      HeaderFooterAlign::Center => (setup.width_pt - total_width) / 2.0,
+      HeaderFooterAlign::Right => setup.width_pt - setup.margin_right_pt - total_width,
+    };
+    for run in runs {
+      let width = text_metrics.measure_text(&run.text, &run.style);
+      items.push(styled_header_text_with_line_height(
+        x,
+        y_pt,
+        run.text,
+        run.style,
+        line_height_pt,
+      ));
+      x += width;
+    }
   }
 }
 
@@ -2598,11 +2596,28 @@ fn push_header_footer_section(
   }
 }
 
-fn expand_header_footer_tokens(
+#[derive(Clone, Copy, Debug)]
+struct HeaderFooterFieldValues<'a> {
+  page_number: usize,
+  total_pages: usize,
+  sheet_name: &'a str,
+}
+
+#[derive(Clone, Debug)]
+struct HeaderFooterTextRun {
+  text: String,
+  style: TextStyle,
+}
+
+fn parse_header_footer_runs(
   text: &str,
-  page: &CalcPrintPage<'_>,
-  align: HeaderFooterAlign,
-) -> String {
+  mut style: TextStyle,
+  fields: HeaderFooterFieldValues<'_>,
+) -> Vec<HeaderFooterTextRun> {
+  // ECMA-376 18.3.1.46 stores formatted header/footer text in one control
+  // string. This mirrors LibreOffice HeaderFooterParser: style state changes
+  // flush the current range, while fields inherit the active font model.
+  let mut runs = Vec::new();
   let mut output = String::new();
   let mut chars = text.chars().peekable();
   while let Some(ch) = chars.next() {
@@ -2611,40 +2626,183 @@ fn expand_header_footer_tokens(
       continue;
     }
     match chars.next() {
-      Some('P') => output.push_str(&page.page_number.to_string()),
-      Some('N') => output.push_str(&page.total_pages.to_string()),
-      Some('A') => output.push_str(&page.sheet.name),
+      Some('P' | 'p') => output.push_str(&fields.page_number.to_string()),
+      Some('N' | 'n') => output.push_str(&fields.total_pages.to_string()),
+      Some('A' | 'a') => output.push_str(fields.sheet_name),
       Some('&') => output.push('&'),
-      Some('L' | 'C' | 'R') => {}
+      Some('L' | 'l' | 'C' | 'c' | 'R' | 'r') => {}
       Some('"') => {
+        let mut descriptor = String::new();
         for next in chars.by_ref() {
           if next == '"' {
             break;
           }
+          descriptor.push(next);
         }
-        if align == HeaderFooterAlign::Left && !output.ends_with(' ') && !output.is_empty() {
-          output.push(' ');
+        push_header_footer_run(&mut runs, &mut output, &style);
+        let (font_name, font_style) = descriptor
+          .split_once(',')
+          .unwrap_or((descriptor.as_str(), ""));
+        if !font_name.is_empty() && font_name != "-" {
+          style.font_family = Some(Arc::from(font_name));
+        }
+        style.bold = false;
+        style.italic = false;
+        for name in font_style.split_ascii_whitespace() {
+          if header_footer_bold_style(name) {
+            style.bold = true;
+          } else if header_footer_italic_style(name) {
+            style.italic = true;
+          }
         }
       }
-      Some('K') => {
-        for _ in 0..6 {
-          if !chars.peek().is_some_and(|peek| peek.is_ascii_hexdigit()) {
-            break;
+      Some('K' | 'k') => {
+        let color = chars.by_ref().take(6).collect::<String>();
+        if color.len() == 6 && color.chars().all(|value| value.is_ascii_hexdigit()) {
+          push_header_footer_run(&mut runs, &mut output, &style);
+          if let Ok(rgb) = u32::from_str_radix(&color, 16) {
+            style.color = RgbColor {
+              r: (rgb >> 16) as u8,
+              g: (rgb >> 8) as u8,
+              b: rgb as u8,
+            };
           }
-          chars.next();
         }
       }
       Some(ch) if ch.is_ascii_digit() => {
-        while chars.peek().is_some_and(|peek| peek.is_ascii_digit()) {
+        let mut size = ch.to_digit(10).unwrap_or_default();
+        while let Some(next) = chars.peek().and_then(|next| next.to_digit(10)) {
           chars.next();
+          size = size.saturating_mul(10).saturating_add(next);
         }
-        if align == HeaderFooterAlign::Left && !output.ends_with(' ') && !output.is_empty() {
-          output.push(' ');
+        if size > 0 && size <= 1000 {
+          push_header_footer_run(&mut runs, &mut output, &style);
+          style.font_size_pt = size as f32;
         }
+      }
+      Some('B' | 'b') => {
+        push_header_footer_run(&mut runs, &mut output, &style);
+        style.bold = !style.bold;
+      }
+      Some('I' | 'i') => {
+        push_header_footer_run(&mut runs, &mut output, &style);
+        style.italic = !style.italic;
+      }
+      Some('U' | 'u' | 'E' | 'e') => {
+        push_header_footer_run(&mut runs, &mut output, &style);
+        style.underline = !style.underline;
+      }
+      Some('S' | 's') => {
+        push_header_footer_run(&mut runs, &mut output, &style);
+        style.strikethrough = !style.strikethrough;
       }
       Some(ch) => output.push(ch),
       None => output.push('&'),
     }
   }
-  output
+  push_header_footer_run(&mut runs, &mut output, &style);
+  runs
+}
+
+fn push_header_footer_run(
+  runs: &mut Vec<HeaderFooterTextRun>,
+  output: &mut String,
+  style: &TextStyle,
+) {
+  if output.is_empty() {
+    return;
+  }
+  runs.push(HeaderFooterTextRun {
+    text: std::mem::take(output),
+    style: style.clone(),
+  });
+}
+
+fn header_footer_bold_style(name: &str) -> bool {
+  matches!(
+    name.to_ascii_lowercase().as_str(),
+    "bold" | "fett" | "demibold" | "halbfett" | "black" | "heavy" | "félkövér"
+  )
+}
+
+fn header_footer_italic_style(name: &str) -> bool {
+  matches!(
+    name.to_ascii_lowercase().as_str(),
+    "italic" | "kursiv" | "oblique" | "schräg" | "dőlt"
+  )
+}
+
+#[cfg(test)]
+mod drawing_page_tests {
+  use super::*;
+
+  #[test]
+  fn drawing_page_intersection_requires_positive_area_overlap() {
+    let page = CellRect {
+      x_pt: 100.0,
+      y_pt: 200.0,
+      width_pt: 300.0,
+      height_pt: 400.0,
+    };
+
+    assert!(tuple_rect_intersects_cell_rect(
+      (50.0, 250.0, 100.0, 100.0),
+      page
+    ));
+    assert!(!tuple_rect_intersects_cell_rect(
+      (0.0, 250.0, 100.0, 100.0),
+      page
+    ));
+    assert!(!tuple_rect_intersects_cell_rect(
+      (400.0, 250.0, 100.0, 100.0),
+      page
+    ));
+  }
+}
+
+#[cfg(test)]
+mod header_footer_tests {
+  use super::*;
+
+  #[test]
+  fn header_footer_font_descriptor_and_size_apply_to_fields() {
+    let runs = parse_header_footer_runs(
+      "&\"Times New Roman,Regular\"&12&A",
+      TextStyle::default(),
+      HeaderFooterFieldValues {
+        page_number: 2,
+        total_pages: 3,
+        sheet_name: "Sheet1",
+      },
+    );
+
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].text, "Sheet1");
+    assert_eq!(
+      runs[0].style.font_family.as_deref(),
+      Some("Times New Roman")
+    );
+    assert_eq!(runs[0].style.font_size_pt, 12.0);
+  }
+
+  #[test]
+  fn header_footer_style_changes_create_separate_runs() {
+    let runs = parse_header_footer_runs(
+      "plain&Bbold&B&P/&N",
+      TextStyle::default(),
+      HeaderFooterFieldValues {
+        page_number: 2,
+        total_pages: 3,
+        sheet_name: "Sheet1",
+      },
+    );
+
+    assert_eq!(runs.len(), 3);
+    assert_eq!(runs[0].text, "plain");
+    assert!(!runs[0].style.bold);
+    assert_eq!(runs[1].text, "bold");
+    assert!(runs[1].style.bold);
+    assert_eq!(runs[2].text, "2/3");
+    assert!(!runs[2].style.bold);
+  }
 }

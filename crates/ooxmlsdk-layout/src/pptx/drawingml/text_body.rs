@@ -22,6 +22,7 @@ pub(crate) struct TextBody {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TextBodyDisplayProperties {
   pub(crate) word_wrap: bool,
+  pub(crate) use_first_last_paragraph_spacing: bool,
   pub(crate) horizontal_overflow: Option<a::TextHorizontalOverflowValues>,
   pub(crate) vertical_overflow: Option<a::TextVerticalOverflowValues>,
   pub(crate) clip_vertical_overflow: bool,
@@ -132,12 +133,27 @@ impl TextBody {
       paragraph.apply_text_styles(master_text_list_style, self.list_style.as_ref());
     }
   }
+
+  pub(crate) fn inherit_placeholder_body_properties(&mut self, inherited: &Self) {
+    // LibreOffice PPTShapeContext clones the placeholder TextBody before
+    // parsing the current p:txBody. TextBodyPropertiesContext then replaces
+    // the vertical anchor only when the current a:bodyPr has an anchor
+    // attribute, so an empty bodyPr keeps the layout/master anchor.
+    let has_direct_anchor = self
+      .body_properties
+      .as_deref()
+      .is_some_and(|properties| properties.anchor.is_some());
+    if !has_direct_anchor {
+      self.display_properties.anchor = inherited.display_properties.anchor;
+    }
+  }
 }
 
 impl Default for TextBodyDisplayProperties {
   fn default() -> Self {
     Self {
       word_wrap: true,
+      use_first_last_paragraph_spacing: false,
       horizontal_overflow: None,
       vertical_overflow: None,
       clip_vertical_overflow: false,
@@ -164,6 +180,9 @@ impl TextBodyDisplayProperties {
       word_wrap: properties
         .wrap
         .is_none_or(|wrap| wrap == a::TextWrappingValues::Square),
+      use_first_last_paragraph_spacing: properties
+        .use_paragraph_spacing
+        .is_some_and(|value| value.as_bool()),
       horizontal_overflow: properties.horizontal_overflow,
       vertical_overflow: properties.vertical_overflow,
       clip_vertical_overflow: matches!(
@@ -210,7 +229,10 @@ impl TextBodyDisplayProperties {
           line_space_reduction: auto_fit
             .line_space_reduction
             .map(|scale| scale.as_drawingml_percent())
-            .unwrap_or(100_000),
+            // ECMA-376 dml-main.xsd declares lnSpcReduction with a 0%
+            // default. An empty a:normAutofit therefore keeps normal line
+            // spacing; only an explicit positive value reduces it.
+            .unwrap_or(0),
         };
       }
       Some(a::BodyPropertiesChoice::ShapeAutoFit) => {
@@ -384,4 +406,38 @@ pub(crate) fn has_noninherited_body_properties(properties: &a::BodyProperties) -
     || properties.scene3_d_type.is_some()
     || properties.body_properties_choice2.is_some()
     || properties.extension_list.is_some()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn empty_normal_autofit_keeps_full_line_height() {
+    let properties = a::BodyProperties {
+      body_properties_choice1: Some(a::BodyPropertiesChoice::NormalAutoFit(
+        a::NormalAutoFit::default(),
+      )),
+      ..a::BodyProperties::default()
+    };
+
+    let display = TextBodyDisplayProperties::from_body_properties(&properties);
+
+    assert_eq!(display.font_scale(), 1.0);
+    assert_eq!(display.line_height_scale(), 1.0);
+  }
+
+  #[test]
+  fn empty_placeholder_body_properties_inherit_vertical_anchor() {
+    let mut inherited = TextBody::default();
+    inherited.display_properties.anchor = a::TextAnchoringTypeValues::Center;
+    let mut direct = TextBody::from_parts(&a::BodyProperties::default(), None, &[]);
+
+    direct.inherit_placeholder_body_properties(&inherited);
+
+    assert_eq!(
+      direct.display_properties.anchor,
+      a::TextAnchoringTypeValues::Center
+    );
+  }
 }

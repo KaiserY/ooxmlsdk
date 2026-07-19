@@ -77,6 +77,7 @@ impl<'a> From<Cow<'a, [u8]>> for FontBytes {
 
 struct RuntimeFace {
   faces: Yoke<RuntimeFaces<'static>, Arc<[u8]>>,
+  glyph_bounds: RwLock<HashMap<u16, Option<GlyphBounds>>>,
 }
 
 #[derive(Yokeable)]
@@ -92,7 +93,10 @@ impl RuntimeFace {
       let ttf = TtfFace::parse(slice, face_index).map_err(|_| FontError::InvalidFace)?;
       Ok(RuntimeFaces { buzz, ttf })
     })?;
-    Ok(Self { faces })
+    Ok(Self {
+      faces,
+      glyph_bounds: RwLock::new(HashMap::new()),
+    })
   }
 
   fn buzz(&self) -> &BuzzFace<'_> {
@@ -102,10 +106,34 @@ impl RuntimeFace {
   fn ttf(&self) -> &TtfFace<'_> {
     &self.faces.get().ttf
   }
+
+  fn glyph_bounds(&self, glyph_id: u16) -> Option<GlyphBounds> {
+    if let Some(bounds) = self
+      .glyph_bounds
+      .read()
+      .unwrap_or_else(std::sync::PoisonError::into_inner)
+      .get(&glyph_id)
+    {
+      return *bounds;
+    }
+
+    let face = self.ttf();
+    let bounds = face
+      .glyph_bounding_box(GlyphId(glyph_id))
+      .map(|bounds| glyph_bounds_from_ttf_rect(bounds, f32::from(face.units_per_em())));
+    self
+      .glyph_bounds
+      .write()
+      .unwrap_or_else(std::sync::PoisonError::into_inner)
+      .entry(glyph_id)
+      .or_insert(bounds);
+    bounds
+  }
 }
 
 fn font_timing<T>(label: &str, work: impl FnOnce() -> T) -> T {
-  if std::env::var_os("OOXMLSDK_FONT_TIMING").is_none() {
+  static ENABLED: OnceLock<bool> = OnceLock::new();
+  if !ENABLED.get_or_init(|| std::env::var_os("OOXMLSDK_FONT_TIMING").is_some()) {
     return work();
   }
   let start = Instant::now();
@@ -206,6 +234,14 @@ impl<'a> FontRegistry<'a> {
         .filter(|family| !family.is_empty())
       {
         queries.push(FontDbQueryFamily::Name(family.to_string()));
+        // `fontdb::Family::Name` expects a family name without a style
+        // suffix. Calibri Light is exposed by Office themes as a face name,
+        // while its OpenType WWS family is Calibri and its weight is Light.
+        // Keep the requested name first, then query the WWS family so the
+        // installed Light face can be registered under all of its aliases.
+        if family.eq_ignore_ascii_case("Calibri Light") {
+          queries.push(FontDbQueryFamily::Name("Calibri".to_string()));
+        }
         let aliased = resolve_family_alias(&self.book, Cow::Borrowed(family));
         if aliased.as_ref() != family {
           queries.push(FontDbQueryFamily::Name(aliased.into_owned()));
@@ -578,6 +614,42 @@ impl<'a> FontRegistry<'a> {
     self.shape_text_runs_inner(request, text, options)
   }
 
+  /// Resolves the primary font and the configured fallback families once.
+  ///
+  /// The resulting chain is independent of font size and text content. Glyph
+  /// coverage is still checked for every shaped text cluster.
+  pub fn resolve_font_chain(&self, request: &FontRequest<'_>) -> Result<ResolvedFontChain<'a>> {
+    let primary = self.resolve(request)?;
+    let mut fonts = vec![(primary, None)];
+    for family in self.fallback_families(request) {
+      if let Ok(resolved) = self
+        .book
+        .resolve_matching_family(request, &self.faces, family, false)
+        && !fonts
+          .iter()
+          .any(|(font, _)| font.font_id == resolved.font_id)
+      {
+        let fallback_level = fonts.len().try_into().ok();
+        fonts.push((resolved, fallback_level));
+      }
+    }
+    Ok(ResolvedFontChain { fonts })
+  }
+
+  /// Shapes text with a previously resolved primary/fallback font chain.
+  pub fn shape_text_runs_with_font_chain<'text, 'request>(
+    &self,
+    chain: &ResolvedFontChain<'a>,
+    text: &'text str,
+    options: &ShapeOptions<'request>,
+  ) -> Result<Vec<ShapedRun<'text, 'a>>>
+  where
+    'a: 'request,
+  {
+    let fonts = self.resolved_fonts_from_chain(chain);
+    self.shape_text_runs_with_fonts(fonts, text, options)
+  }
+
   fn shape_text_runs_inner<'text, 'request>(
     &self,
     request: &'request FontRequest<'request>,
@@ -590,6 +662,18 @@ impl<'a> FontRegistry<'a> {
     let fonts = font_timing("resolve fallback fonts", || {
       self.resolve_fallback_fonts(request, text, options)
     })?;
+    self.shape_text_runs_with_fonts(fonts, text, options)
+  }
+
+  fn shape_text_runs_with_fonts<'text, 'request>(
+    &self,
+    fonts: Vec<ResolvedFontWithFace<'_, 'a>>,
+    text: &'text str,
+    options: &ShapeOptions<'request>,
+  ) -> Result<Vec<ShapedRun<'text, 'a>>>
+  where
+    'a: 'request,
+  {
     let runtime_faces = font_timing("prepare runtime faces", || {
       fonts
         .iter()
@@ -664,28 +748,9 @@ impl<'a> FontRegistry<'a> {
     }];
 
     if !options.scan_registered_fallbacks {
-      for family in self.fallback_families(request) {
-        if let Ok(resolved) = self
-          .book
-          .resolve_matching_family(request, &self.faces, family, false)
-          && !fonts
-            .iter()
-            .any(|font| font.resolved.font_id == resolved.font_id)
-          && let Some(face) = self
-            .book
-            .faces
-            .iter()
-            .find(|face| face.font_id == resolved.font_id)
-        {
-          let fallback_level = fonts.len().try_into().ok();
-          fonts.push(ResolvedFontWithFace {
-            resolved,
-            face: Some(face),
-            fallback_level,
-          });
-        }
-      }
-      return Ok(fonts);
+      return self
+        .resolve_font_chain(request)
+        .map(|chain| self.resolved_fonts_from_chain(&chain));
     }
 
     let mut missing_chars = self.missing_chars_for_fonts(&fonts, text);
@@ -743,6 +808,25 @@ impl<'a> FontRegistry<'a> {
     }
 
     Ok(fonts)
+  }
+
+  fn resolved_fonts_from_chain(
+    &self,
+    chain: &ResolvedFontChain<'a>,
+  ) -> Vec<ResolvedFontWithFace<'_, 'a>> {
+    chain
+      .fonts
+      .iter()
+      .map(|(resolved, fallback_level)| ResolvedFontWithFace {
+        face: self
+          .book
+          .faces
+          .iter()
+          .find(|face| face.font_id == resolved.font_id),
+        resolved: resolved.clone(),
+        fallback_level: *fallback_level,
+      })
+      .collect()
   }
 
   fn missing_chars_for_fonts(
@@ -876,9 +960,7 @@ impl<'a> FontRegistry<'a> {
     face: &FontFaceInfo<'a>,
     fallback_level: Option<u8>,
   ) -> ResolvedFont<'a> {
-    let registered = self.faces.iter().find(|registered| {
-      registered.face_index == face.face_index && family_overlaps(registered, face)
-    });
+    let registered = registered_face(face, &self.faces);
     ResolvedFont {
       font_id: face.font_id.clone(),
       resolved_family: primary_family(face),
@@ -991,9 +1073,7 @@ impl<'a> FontBook<'a> {
       return Err(FontError::NoMatch);
     };
     let face: &FontFaceInfo<'a> = &self.faces[winner.face_index];
-    let registered = registered_faces.iter().find(|registered| {
-      registered.face_index == face.face_index && family_overlaps(registered, face)
-    });
+    let registered = registered_face_for_book_index(winner.face_index, face, registered_faces);
 
     let synthetic_bold =
       request.bold && font_weight_number(face.weight) < font_weight_number(FontWeight::Bold);
@@ -1468,6 +1548,17 @@ pub struct ResolvedFont<'book> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ResolvedFontChain<'book> {
+  fonts: Vec<(ResolvedFont<'book>, Option<u8>)>,
+}
+
+impl<'book> ResolvedFontChain<'book> {
+  pub fn resolved_fonts(&self) -> impl Iterator<Item = &ResolvedFont<'book>> {
+    self.fonts.iter().map(|(font, _)| font)
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct FontFaceData<'a> {
   pub font_id: FontId,
   pub source: FontSource<'a>,
@@ -1665,7 +1756,6 @@ impl<'book> ResolvedFont<'book> {
       options.size_pt
     };
     let face = runtime_face.buzz();
-    let ttf_face = runtime_face.ttf();
     let units_per_em = face.units_per_em() as f32;
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(shaped_text.as_ref());
@@ -1709,6 +1799,7 @@ impl<'book> ResolvedFont<'book> {
         if tracking.abs() > f32::EPSILON && index + 1 < infos.len() {
           x_advance_pt += tracking;
         }
+        let justification = source_char.map(glyph_justification).unwrap_or_default();
         ShapedGlyph {
           glyph_id: info.glyph_id,
           cluster: text_range.start as u32,
@@ -1719,11 +1810,14 @@ impl<'book> ResolvedFont<'book> {
           y_offset_pt: position.y_offset as f32 / units_per_em * shape_size.0,
           safe_to_break: !info.unsafe_to_break(),
           source_char,
-          justifiable: source_char.is_some_and(is_justifiable_char),
-          justification: source_char.map(glyph_justification).unwrap_or_default(),
-          bounds: ttf_face
-            .glyph_bounding_box(GlyphId(info.glyph_id as u16))
-            .map(|bounds| glyph_bounds_from_ttf_rect(bounds, units_per_em).scaled(shape_size.0)),
+          justifiable: justification.space
+            || justification.cjk
+            || justification.cjk_punctuation
+            || justification.kashida,
+          justification,
+          bounds: runtime_face
+            .glyph_bounds(info.glyph_id as u16)
+            .map(|bounds| bounds.scaled(shape_size.0)),
         }
       })
       .collect::<Vec<_>>();
@@ -2764,9 +2858,7 @@ fn score_font_match(
     }
   }
 
-  let registered = registered_faces.iter().find(|registered| {
-    registered.face_index == face.face_index && family_overlaps(registered, face)
-  });
+  let registered = registered_face_for_book_index(face_index, face, registered_faces);
   let family_class_mismatch = target_family_names.is_none()
     && request
       .family_class
@@ -2834,24 +2926,49 @@ fn normalize_family(value: &str) -> String {
     .collect()
 }
 
-fn family_matches(face: &FontFaceInfo<'_>, family: &str) -> bool {
-  let target_names = normalized_family_names(family);
-  family_matches_names(face, &target_names)
-}
-
 fn family_matches_names(face: &FontFaceInfo<'_>, target_names: &[String]) -> bool {
   face.family_names.iter().any(|candidate| {
-    normalized_family_names(candidate)
-      .iter()
-      .any(|candidate| target_names.iter().any(|target| candidate == target))
+    candidate.split(';').map(str::trim).any(|candidate| {
+      target_names
+        .iter()
+        .any(|target| normalized_family_eq_normalized(candidate, target))
+    })
   })
 }
 
-fn family_overlaps(registered: &RegisteredFontFace<'_>, face: &FontFaceInfo<'_>) -> bool {
-  registered
-    .family_names
-    .iter()
-    .any(|registered| family_matches(face, registered))
+fn normalized_family_eq_normalized(candidate: &str, normalized: &str) -> bool {
+  normalized_family_chars(candidate).eq(normalized.chars())
+}
+
+fn normalized_family_chars(value: &str) -> impl Iterator<Item = char> + '_ {
+  value
+    .chars()
+    .filter(|ch| !ch.is_ascii_whitespace() && *ch != '-' && *ch != '_')
+    .flat_map(char::to_lowercase)
+}
+
+fn registered_face<'faces, 'book>(
+  face: &FontFaceInfo<'book>,
+  registered_faces: &'faces [RegisteredFontFace<'book>],
+) -> Option<&'faces RegisteredFontFace<'book>> {
+  registered_faces.iter().find(|registered| {
+    registered.face_index == face.face_index
+      && registered.source.id() == Some(face.font_id.0.as_ref())
+  })
+}
+
+fn registered_face_for_book_index<'faces, 'book>(
+  book_index: usize,
+  face: &FontFaceInfo<'book>,
+  registered_faces: &'faces [RegisteredFontFace<'book>],
+) -> Option<&'faces RegisteredFontFace<'book>> {
+  registered_faces
+    .get(book_index)
+    .filter(|registered| {
+      registered.face_index == face.face_index
+        && registered.source.id() == Some(face.font_id.0.as_ref())
+    })
+    .or_else(|| registered_face(face, registered_faces))
 }
 
 fn font_family_class_matches(requested: FontFamilyClass, face: &FontFaceInfo<'_>) -> bool {
@@ -3045,8 +3162,16 @@ fn cached_system_query_font(
     .get_or_init(|| {
       let face = database.with_face_data(id, |data, face_index| {
         debug_assert_eq!(face_index, info.index);
-        FontFaceInfo::from_ttf_bytes(font_id, data, face_index)
-          .unwrap_or_else(|_| FontFaceInfo::from_fontdb_face_info(font_id, info))
+        let mut face = FontFaceInfo::from_ttf_bytes(font_id, data, face_index)
+          .unwrap_or_else(|_| FontFaceInfo::from_fontdb_face_info(font_id, info));
+        // fontdb exposes the family aliases produced by the platform font
+        // matcher. Preserve them alongside the raw name-table families: some
+        // Office faces (notably Calibri Light) use a WWS family alias that is
+        // required to address the face by the name stored in the theme.
+        for (family, _) in &info.families {
+          push_unique_string(&mut face.family_names, family.clone());
+        }
+        face
       })?;
       Some(Arc::new(CachedSystemQueryFont { face }))
     })
@@ -3927,6 +4052,44 @@ mod tests {
   }
 
   #[test]
+  fn system_query_prefers_installed_calibri_light_face() {
+    let path = Path::new("/usr/share/fonts/truetype/Fonts/calibril.ttf");
+    if !path.exists() {
+      return;
+    }
+    let mut registry = FontRegistry::with_default_policy();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Calibri Light")),
+      ..FontRequest::default()
+    };
+
+    registry.register_system_query_fonts(&request).unwrap();
+    let resolved = registry.resolve_with_diagnostics(&request).unwrap();
+    let families = registry
+      .book
+      .faces
+      .iter()
+      .map(|face| {
+        (
+          face.font_id.0.to_string(),
+          face
+            .family_names
+            .iter()
+            .map(|family| family.to_string())
+            .collect::<Vec<_>>(),
+          face.weight,
+        )
+      })
+      .collect::<Vec<_>>();
+
+    assert!(
+      resolved.font_id.0.contains("Calibri-Light"),
+      "resolved={}; faces={families:?}",
+      resolved.font_id.0
+    );
+  }
+
+  #[test]
   fn resolved_font_scales_face_metrics() {
     let mut registry = FontRegistry::new();
     let mut face = FontFaceInfo::synthetic("example", "Example");
@@ -4168,6 +4331,19 @@ mod tests {
       runs[1].diagnostics.fallback_runs[0].reason,
       FontSubstitutionReason::MissingGlyph
     );
+
+    let chain = registry.resolve_font_chain(&request).unwrap();
+    let cached_runs = registry
+      .shape_text_runs_with_font_chain(
+        &chain,
+        "AB",
+        &ShapeOptions {
+          scan_registered_fallbacks: false,
+          ..ShapeOptions::from_request(&request, TextDirection::LeftToRight)
+        },
+      )
+      .unwrap();
+    assert_eq!(cached_runs, runs);
   }
 
   #[test]

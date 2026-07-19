@@ -43,6 +43,8 @@ use smallvec::SmallVec;
 use crate::error::Result;
 use crate::options::{LayoutActionOptions, LayoutDiagnosticsOptions, LayoutOptions};
 use crate::render::chart as shared_chart;
+use crate::render::math as shared_math;
+use crate::render::symbol as shared_symbol;
 use crate::units;
 
 use chart::supplemental_graphic_blocks;
@@ -119,7 +121,7 @@ struct ImportSettings {
 
 pub(crate) fn extract(
   package: &mut WordprocessingDocument,
-  _options: &LayoutOptions,
+  options: &LayoutOptions,
 ) -> Result<DocxDocument> {
   let main = package.main_document_part()?;
   let compatibility_mode = compatibility_mode(package, &main);
@@ -127,7 +129,12 @@ pub(crate) fn extract(
     justify_lines_with_shrinking: compatibility_mode >= 15,
     ..Default::default()
   };
-  let styles = StylesCatalog::load(package, &main, import_settings)?;
+  let styles = StylesCatalog::load(
+    package,
+    &main,
+    import_settings,
+    options.ui_language.as_deref(),
+  )?;
   let mut numbering = NumberingCatalog::load(package, &main, import_settings)?;
   let images = ImageCatalog::load(package, &main);
   let hyperlinks = HyperlinkCatalog::load(package, &main);
@@ -188,6 +195,26 @@ pub(crate) fn extract(
     &mut sections,
     &mut form_widget_ids,
   );
+  let (footnote_labels, endnote_labels) = note_reference_labels(package, &main, &sections);
+  let footnotes = footnotes(
+    package,
+    &main,
+    &styles,
+    &custom_xml_bindings,
+    &mut form_widget_ids,
+    &footnote_labels,
+  )?;
+  let footnote_blocks = flatten_note_blocks(&footnotes);
+  let endnotes = endnotes(
+    package,
+    &main,
+    &styles,
+    &custom_xml_bindings,
+    &mut form_widget_ids,
+    &endnote_labels,
+  )?;
+  let endnote_blocks = flatten_note_blocks(&endnotes);
+  apply_note_reference_labels(&mut sections, &footnote_labels, &endnote_labels);
   let page = sections
     .first()
     .map(|section| section.page)
@@ -212,22 +239,6 @@ pub(crate) fn extract(
     .first()
     .map(|section| section.first_footer_blocks.clone())
     .unwrap_or_default();
-  let footnotes = footnotes(
-    package,
-    &main,
-    &styles,
-    &custom_xml_bindings,
-    &mut form_widget_ids,
-  )?;
-  let footnote_blocks = flatten_note_blocks(&footnotes);
-  let endnotes = endnotes(
-    package,
-    &main,
-    &styles,
-    &custom_xml_bindings,
-    &mut form_widget_ids,
-  )?;
-  let endnote_blocks = flatten_note_blocks(&endnotes);
   let title_page = sections
     .first()
     .map(|section| section.title_page)
@@ -839,7 +850,7 @@ fn close_section(
   let page = section_properties
     .as_ref()
     .map(page_setup)
-    .unwrap_or_default();
+    .unwrap_or_else(|| default_word_page_setup_with_size(PageSetup::default()));
   let columns = section_properties
     .as_ref()
     .map(section_columns)
@@ -874,7 +885,7 @@ fn default_section(blocks: Vec<Block>) -> ImportedSection {
   ImportedSection {
     break_kind: SectionBreakKind::NextPage,
     section_properties: None,
-    page: PageSetup::default(),
+    page: default_word_page_setup_with_size(PageSetup::default()),
     columns: SectionColumns::default(),
     title_page: false,
     header_blocks: Vec::new(),
@@ -1300,12 +1311,299 @@ fn referenced_footer_blocks(
   )
 }
 
+#[derive(Clone, Copy)]
+enum NoteKind {
+  Footnote,
+  Endnote,
+}
+
+#[derive(Clone, Copy)]
+struct NoteNumberingSpec {
+  format: w::NumberFormatValues,
+  start: i32,
+  restart: w::RestartNumberValues,
+}
+
+impl NoteNumberingSpec {
+  fn default_for(kind: NoteKind) -> Self {
+    Self {
+      format: match kind {
+        NoteKind::Footnote => w::NumberFormatValues::Decimal,
+        NoteKind::Endnote => w::NumberFormatValues::LowerRoman,
+      },
+      start: 1,
+      restart: w::RestartNumberValues::Continuous,
+    }
+  }
+
+  fn formatted(self, kind: NoteKind, value: i32) -> String {
+    let format = if matches!(self.format, w::NumberFormatValues::None) {
+      Self::default_for(kind).format
+    } else {
+      self.format
+    };
+    format_numbering_value(value, format, false)
+  }
+}
+
+fn note_reference_labels(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+  sections: &[ImportedSection],
+) -> (HashMap<i64, String>, HashMap<i64, String>) {
+  let settings = main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok());
+  let footnote_default = settings
+    .as_ref()
+    .and_then(|settings| settings.footnote_document_wide_properties.as_deref())
+    .map_or_else(
+      || NoteNumberingSpec::default_for(NoteKind::Footnote),
+      footnote_document_numbering_spec,
+    );
+  let endnote_default = settings
+    .as_ref()
+    .and_then(|settings| settings.endnote_document_wide_properties.as_deref())
+    .map_or_else(
+      || NoteNumberingSpec::default_for(NoteKind::Endnote),
+      endnote_document_numbering_spec,
+    );
+
+  (
+    note_labels_for_sections(sections, NoteKind::Footnote, footnote_default),
+    note_labels_for_sections(sections, NoteKind::Endnote, endnote_default),
+  )
+}
+
+fn footnote_document_numbering_spec(
+  properties: &w::FootnoteDocumentWideProperties,
+) -> NoteNumberingSpec {
+  let mut spec = NoteNumberingSpec::default_for(NoteKind::Footnote);
+  apply_note_numbering_values(
+    &mut spec,
+    properties.numbering_format.as_ref(),
+    properties.numbering_start.as_ref(),
+    properties.numbering_restart.as_ref(),
+  );
+  spec
+}
+
+fn endnote_document_numbering_spec(
+  properties: &w::EndnoteDocumentWideProperties,
+) -> NoteNumberingSpec {
+  let mut spec = NoteNumberingSpec::default_for(NoteKind::Endnote);
+  apply_note_numbering_values(
+    &mut spec,
+    properties.numbering_format.as_ref(),
+    properties.numbering_start.as_ref(),
+    properties.numbering_restart.as_ref(),
+  );
+  spec
+}
+
+fn apply_note_numbering_values(
+  spec: &mut NoteNumberingSpec,
+  format: Option<&w::NumberingFormat>,
+  start: Option<&w::NumberingStart>,
+  restart: Option<&w::NumberingRestart>,
+) {
+  if let Some(format) = format {
+    spec.format = format.val;
+  }
+  if let Some(start) = start {
+    spec.start = i32::from(start.val);
+  }
+  if let Some(restart) = restart {
+    spec.restart = restart.val;
+  }
+}
+
+fn section_note_numbering_spec(
+  section: &ImportedSection,
+  kind: NoteKind,
+  mut spec: NoteNumberingSpec,
+) -> NoteNumberingSpec {
+  let Some(properties) = section.section_properties.as_ref() else {
+    return spec;
+  };
+  match kind {
+    NoteKind::Footnote => {
+      if let Some(properties) = properties.footnote_properties.as_deref() {
+        apply_note_numbering_values(
+          &mut spec,
+          properties.numbering_format.as_ref(),
+          properties.numbering_start.as_ref(),
+          properties.numbering_restart.as_ref(),
+        );
+      }
+    }
+    NoteKind::Endnote => {
+      if let Some(properties) = properties.endnote_properties.as_deref() {
+        apply_note_numbering_values(
+          &mut spec,
+          properties.numbering_format.as_ref(),
+          properties.numbering_start.as_ref(),
+          properties.numbering_restart.as_ref(),
+        );
+      }
+    }
+  }
+  spec
+}
+
+fn note_labels_for_sections(
+  sections: &[ImportedSection],
+  kind: NoteKind,
+  document_spec: NoteNumberingSpec,
+) -> HashMap<i64, String> {
+  let mut labels = HashMap::new();
+  let mut value = document_spec.start;
+  for (section_index, section) in sections.iter().enumerate() {
+    let spec = section_note_numbering_spec(section, kind, document_spec);
+    if section_index == 0 || matches!(spec.restart, w::RestartNumberValues::EachSection) {
+      value = spec.start;
+    }
+    let mut ids = Vec::new();
+    collect_note_reference_ids_from_blocks(&section.blocks, kind, &mut ids);
+    for id in ids {
+      if labels.contains_key(&id) {
+        continue;
+      }
+      labels.insert(id, spec.formatted(kind, value));
+      value = value.saturating_add(1);
+    }
+  }
+  labels
+}
+
+fn collect_note_reference_ids_from_blocks(blocks: &[Block], kind: NoteKind, ids: &mut Vec<i64>) {
+  for block in blocks {
+    match block {
+      Block::Paragraph(paragraph) => {
+        ids.extend(match kind {
+          NoteKind::Footnote => &paragraph.footnote_reference_ids,
+          NoteKind::Endnote => &paragraph.endnote_reference_ids,
+        });
+        for inline in &paragraph.inlines {
+          if let InlineItem::Shape(shape) = inline {
+            collect_note_reference_ids_from_blocks(&shape.text_box_blocks, kind, ids);
+          }
+        }
+      }
+      Block::Table(table) => {
+        for row in &table.rows {
+          for cell in &row.cells {
+            collect_note_reference_ids_from_blocks(&cell.blocks, kind, ids);
+          }
+        }
+      }
+      Block::Frame(frame) => collect_note_reference_ids_from_blocks(&frame.blocks, kind, ids),
+    }
+  }
+}
+
+fn apply_note_reference_labels(
+  sections: &mut [ImportedSection],
+  footnote_labels: &HashMap<i64, String>,
+  endnote_labels: &HashMap<i64, String>,
+) {
+  for section in sections {
+    apply_note_reference_labels_to_blocks(&mut section.blocks, footnote_labels, endnote_labels);
+    apply_note_reference_labels_to_blocks(
+      &mut section.header_blocks,
+      footnote_labels,
+      endnote_labels,
+    );
+    apply_note_reference_labels_to_blocks(
+      &mut section.footer_blocks,
+      footnote_labels,
+      endnote_labels,
+    );
+    apply_note_reference_labels_to_blocks(
+      &mut section.first_header_blocks,
+      footnote_labels,
+      endnote_labels,
+    );
+    apply_note_reference_labels_to_blocks(
+      &mut section.first_footer_blocks,
+      footnote_labels,
+      endnote_labels,
+    );
+    apply_note_reference_labels_to_blocks(
+      &mut section.even_header_blocks,
+      footnote_labels,
+      endnote_labels,
+    );
+    apply_note_reference_labels_to_blocks(
+      &mut section.even_footer_blocks,
+      footnote_labels,
+      endnote_labels,
+    );
+  }
+}
+
+fn apply_note_reference_labels_to_blocks(
+  blocks: &mut [Block],
+  footnote_labels: &HashMap<i64, String>,
+  endnote_labels: &HashMap<i64, String>,
+) {
+  for block in blocks {
+    match block {
+      Block::Paragraph(paragraph) => {
+        for inline in &mut paragraph.inlines {
+          match inline {
+            InlineItem::Text(run) => {
+              let Some(url) = run.hyperlink_url.as_deref() else {
+                continue;
+              };
+              if let Some(id) = url
+                .strip_prefix("ooxmlsdk-pdf:footnote-reference:")
+                .and_then(|id| id.parse::<i64>().ok())
+                && let Some(label) = footnote_labels.get(&id)
+              {
+                run.text.clone_from(label);
+              } else if let Some(id) = url
+                .strip_prefix("ooxmlsdk-pdf:endnote-reference:")
+                .and_then(|id| id.parse::<i64>().ok())
+                && let Some(label) = endnote_labels.get(&id)
+              {
+                run.text.clone_from(label);
+              }
+            }
+            InlineItem::Shape(shape) => apply_note_reference_labels_to_blocks(
+              &mut shape.text_box_blocks,
+              footnote_labels,
+              endnote_labels,
+            ),
+            _ => {}
+          }
+        }
+      }
+      Block::Table(table) => {
+        for row in &mut table.rows {
+          for cell in &mut row.cells {
+            apply_note_reference_labels_to_blocks(
+              &mut cell.blocks,
+              footnote_labels,
+              endnote_labels,
+            );
+          }
+        }
+      }
+      Block::Frame(frame) => {
+        apply_note_reference_labels_to_blocks(&mut frame.blocks, footnote_labels, endnote_labels)
+      }
+    }
+  }
+}
+
 fn footnotes(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
   custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
+  labels: &HashMap<i64, String>,
 ) -> Result<BTreeMap<i64, Vec<Block>>> {
   let Some(part) = main.footnotes_part(package) else {
     return Ok(BTreeMap::new());
@@ -1337,7 +1635,12 @@ fn footnotes(
     append_note_blocks(
       &mut blocks,
       NoteLabel::new(
-        format!("{} ", footnote.id),
+        format!(
+          "{} ",
+          labels
+            .get(&footnote.id)
+            .map_or_else(|| footnote.id.to_string(), Clone::clone)
+        ),
         Some(note_backlink_url("footnote", footnote.id)),
       ),
       footnote
@@ -1361,6 +1664,7 @@ fn endnotes(
   styles: &StylesCatalog,
   custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
+  labels: &HashMap<i64, String>,
 ) -> Result<BTreeMap<i64, Vec<Block>>> {
   let Some(part) = main.endnotes_part(package) else {
     return Ok(BTreeMap::new());
@@ -1392,7 +1696,12 @@ fn endnotes(
     append_note_blocks(
       &mut blocks,
       NoteLabel::new(
-        format!("{} ", endnote.id),
+        format!(
+          "{} ",
+          labels
+            .get(&endnote.id)
+            .map_or_else(|| endnote.id.to_string(), Clone::clone)
+        ),
         Some(note_backlink_url("endnote", endnote.id)),
       ),
       endnote
@@ -1459,7 +1768,8 @@ fn append_note_blocks<'a>(
       context.form_widget_ids,
     );
     if is_first_paragraph {
-      prepend_note_marker(&mut model, &label);
+      let marker_style = note_marker_run_style(paragraph, &model.base_style, context.styles);
+      prepend_note_marker(&mut model, &label, marker_style);
       is_first_paragraph = false;
     }
     preserve_note_text_portions(&mut model);
@@ -1467,15 +1777,43 @@ fn append_note_blocks<'a>(
   }
 }
 
-fn prepend_note_marker(paragraph: &mut Paragraph, label: &NoteLabel) {
-  let base_style = paragraph
-    .inlines
-    .iter()
-    .find_map(|inline| match inline {
-      InlineItem::Text(run) => Some(run.style.clone()),
-      _ => None,
-    })
-    .unwrap_or_default();
+fn note_marker_run_style(
+  paragraph: &w::Paragraph,
+  base_style: &TextStyle,
+  styles: &StylesCatalog,
+) -> Option<TextStyle> {
+  paragraph.paragraph_choice.iter().find_map(|choice| {
+    let w::ParagraphChoice::WRun(run) = choice else {
+      return None;
+    };
+    run
+      .run_choice
+      .iter()
+      .any(|choice| {
+        matches!(
+          choice,
+          w::RunChoice::FootnoteReferenceMark | w::RunChoice::EndnoteReferenceMark
+        )
+      })
+      .then(|| properties::run_style(run.run_properties.as_deref(), base_style.clone(), styles))
+  })
+}
+
+fn prepend_note_marker(
+  paragraph: &mut Paragraph,
+  label: &NoteLabel,
+  marker_style: Option<TextStyle>,
+) {
+  let base_style = marker_style.unwrap_or_else(|| {
+    paragraph
+      .inlines
+      .iter()
+      .find_map(|inline| match inline {
+        InlineItem::Text(run) => Some(run.style.clone()),
+        _ => None,
+      })
+      .unwrap_or_default()
+  });
   paragraph.inlines.insert(
     0,
     InlineItem::Text(TextRun {
@@ -1762,14 +2100,7 @@ fn table_row_model(
     &mut row_style,
     &direct_table_row_style(row.table_row_properties.as_deref()),
   );
-  let cells = row
-    .table_row_choice
-    .iter()
-    .filter_map(|choice| match choice {
-      w::TableRowChoice::TableCell(cell) => Some(cell.as_ref()),
-      _ => None,
-    })
-    .collect::<Vec<_>>();
+  let cells = table_row_cells(row);
   let cell_count = cells.len();
   let cells = cells
     .iter()
@@ -1808,6 +2139,31 @@ fn table_row_model(
     grid_after,
     redline_color: None,
     cells,
+  }
+}
+
+fn table_row_cells(row: &w::TableRow) -> Vec<&w::TableCell> {
+  let mut cells = Vec::new();
+  for choice in &row.table_row_choice {
+    match choice {
+      w::TableRowChoice::TableCell(cell) => cells.push(cell.as_ref()),
+      w::TableRowChoice::SdtCell(sdt) => collect_sdt_cells(sdt, &mut cells),
+      _ => {}
+    }
+  }
+  cells
+}
+
+fn collect_sdt_cells<'a>(sdt: &'a w::SdtCell, cells: &mut Vec<&'a w::TableCell>) {
+  let Some(content) = sdt.sdt_content_cell.as_ref() else {
+    return;
+  };
+  for choice in &content.sdt_content_cell_choice {
+    match choice {
+      w::SdtContentCellChoice::TableCell(cell) => cells.push(cell.as_ref()),
+      w::SdtContentCellChoice::SdtCell(nested) => collect_sdt_cells(nested, cells),
+      _ => {}
+    }
   }
 }
 
@@ -2918,6 +3274,15 @@ fn paragraph_inlines(
           &mut complex_fields,
         );
       }
+      w::ParagraphChoice::CustomXmlRun(custom_xml)
+      | w::ParagraphChoice::SmartTagRun(custom_xml) => push_custom_xml_run(
+        custom_xml,
+        &mut inlines,
+        base_style.clone(),
+        None,
+        &mut inline_context,
+        &mut complex_fields,
+      ),
       w::ParagraphChoice::BookmarkStart(bookmark) => {
         let name = bookmark.name.as_str();
         if !name.is_empty() {
@@ -2989,12 +3354,48 @@ fn paragraph_inlines(
           },
         );
       }
-      _ => {}
+      choice => {
+        if let Some(text) = shared_math::wordprocessing_math_text(choice)
+          && !text.is_empty()
+        {
+          let mut style = base_style.clone();
+          style.font_family = Some(Arc::from("Cambria Math"));
+          inlines.push(InlineItem::Text(TextRun {
+            text,
+            style,
+            hyperlink_url: None,
+            dynamic_field: None,
+            style_ref_keys: Vec::new(),
+            style_ref_text: None,
+            preserve_text_portion: false,
+          }));
+        }
+      }
     }
   }
   flush_unclosed_complex_fields(&mut inlines, &mut complex_fields);
 
   inlines
+}
+
+fn math_paragraph_alignment(paragraph: &w::Paragraph) -> Option<ParagraphAlignment> {
+  paragraph.paragraph_choice.iter().find_map(|choice| {
+    let w::ParagraphChoice::Paragraph(math_paragraph) = choice else {
+      return None;
+    };
+    let justification = math_paragraph
+      .paragraph_properties
+      .as_deref()
+      .and_then(|properties| properties.justification.as_ref())
+      .map(|justification| justification.val)
+      .unwrap_or(ooxmlsdk::schemas::m::JustificationValues::CenterGroup);
+    Some(match justification {
+      ooxmlsdk::schemas::m::JustificationValues::Left => ParagraphAlignment::Left,
+      ooxmlsdk::schemas::m::JustificationValues::Right => ParagraphAlignment::Right,
+      ooxmlsdk::schemas::m::JustificationValues::Center
+      | ooxmlsdk::schemas::m::JustificationValues::CenterGroup => ParagraphAlignment::Center,
+    })
+  })
 }
 
 #[derive(Clone, Debug)]
@@ -3302,6 +3703,14 @@ fn push_hyperlink_content(
         context,
         complex_fields,
       ),
+      w::HyperlinkChoice::CustomXmlRun(custom_xml) => push_custom_xml_run(
+        custom_xml,
+        inlines,
+        base_style.clone(),
+        hyperlink_url.as_deref(),
+        context,
+        complex_fields,
+      ),
       w::HyperlinkChoice::SdtRun(sdt) => push_sdt_run(
         sdt,
         inlines,
@@ -3345,6 +3754,96 @@ fn push_hyperlink_content(
         context.hyperlinks,
         hyperlink_url.as_deref(),
       ),
+      _ => {}
+    }
+  }
+}
+
+fn push_custom_xml_run(
+  custom_xml: &w::CustomXmlRun,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  hyperlink_url: Option<&str>,
+  context: &mut InlineImportContext<'_>,
+  complex_fields: &mut Vec<ComplexFieldState>,
+) {
+  for choice in &custom_xml.custom_xml_run_choice {
+    match choice {
+      w::CustomXmlRunChoice::WRun(run) => push_run_or_complex_field(
+        run,
+        inlines,
+        base_style.clone(),
+        RunImportContext {
+          styles: context.styles,
+          images: context.images,
+          hyperlinks: context.hyperlinks,
+        },
+        hyperlink_url,
+        complex_fields,
+      ),
+      w::CustomXmlRunChoice::SimpleField(field) => {
+        push_simple_field(field, inlines, base_style.clone(), context)
+      }
+      w::CustomXmlRunChoice::Hyperlink(hyperlink) => push_hyperlink_content(
+        hyperlink,
+        inlines,
+        base_style.clone(),
+        hyperlink_url,
+        context,
+        complex_fields,
+      ),
+      w::CustomXmlRunChoice::SdtRun(sdt) => {
+        push_sdt_run(sdt, inlines, base_style.clone(), hyperlink_url, context)
+      }
+      w::CustomXmlRunChoice::CustomXmlRun(nested) | w::CustomXmlRunChoice::SmartTagRun(nested) => {
+        push_custom_xml_run(
+          nested,
+          inlines,
+          base_style.clone(),
+          hyperlink_url,
+          context,
+          complex_fields,
+        )
+      }
+      w::CustomXmlRunChoice::InsertedRun(inserted) => push_inserted_run(
+        inserted,
+        inlines,
+        base_style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+        hyperlink_url,
+      ),
+      w::CustomXmlRunChoice::DeletedRun(deleted) => push_deleted_run(
+        deleted,
+        inlines,
+        base_style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+        hyperlink_url,
+      ),
+      w::CustomXmlRunChoice::MoveFromRun(moved) => push_move_from_run(
+        moved,
+        inlines,
+        base_style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+        hyperlink_url,
+      ),
+      w::CustomXmlRunChoice::MoveToRun(moved) => push_move_to_run(
+        moved,
+        inlines,
+        base_style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+        hyperlink_url,
+      ),
+      w::CustomXmlRunChoice::BookmarkStart(bookmark) if !bookmark.name.is_empty() => {
+        inlines.push(InlineItem::BookmarkStart(bookmark.name.to_string()));
+      }
       _ => {}
     }
   }
@@ -4483,188 +4982,7 @@ fn run_display_text(text: String, style: TextStyle) -> String {
 
 fn symbol_text(symbol: &w::SymbolChar) -> Option<char> {
   let code = u32::from_str_radix(symbol.char.as_deref()?, 16).ok()?;
-  let low_byte = code & 0xFF;
-  let font = symbol.font.as_deref().unwrap_or("").to_ascii_lowercase();
-
-  if font.contains("wingdings") {
-    return wingdings_symbol(low_byte).or_else(|| char::from_u32(code));
-  }
-  if font == "symbol" || font.ends_with(" symbol") {
-    return symbol_font_symbol(low_byte).or_else(|| char::from_u32(code));
-  }
-
-  char::from_u32(code).or_else(|| {
-    if (0xF000..=0xF0FF).contains(&code) {
-      char::from_u32(low_byte)
-    } else {
-      None
-    }
-  })
-}
-
-fn symbol_font_symbol(code: u32) -> Option<char> {
-  Some(match code {
-    0x41 => 'Α',
-    0x42 => 'Β',
-    0x43 => 'Χ',
-    0x44 => 'Δ',
-    0x45 => 'Ε',
-    0x46 => 'Φ',
-    0x47 => 'Γ',
-    0x48 => 'Η',
-    0x49 => 'Ι',
-    0x4A => 'ϑ',
-    0x4B => 'Κ',
-    0x4C => 'Λ',
-    0x4D => 'Μ',
-    0x4E => 'Ν',
-    0x4F => 'Ο',
-    0x50 => 'Π',
-    0x51 => 'Θ',
-    0x52 => 'Ρ',
-    0x53 => 'Σ',
-    0x54 => 'Τ',
-    0x55 => 'Υ',
-    0x56 => 'ς',
-    0x57 => 'Ω',
-    0x58 => 'Ξ',
-    0x59 => 'Ψ',
-    0x5A => 'Ζ',
-    0x61 => 'α',
-    0x62 => 'β',
-    0x63 => 'χ',
-    0x64 => 'δ',
-    0x65 => 'ε',
-    0x66 => 'φ',
-    0x67 => 'γ',
-    0x68 => 'η',
-    0x69 => 'ι',
-    0x6A => 'ϕ',
-    0x6B => 'κ',
-    0x6C => 'λ',
-    0x6D => 'μ',
-    0x6E => 'ν',
-    0x6F => 'ο',
-    0x70 => 'π',
-    0x71 => 'θ',
-    0x72 => 'ρ',
-    0x73 => 'σ',
-    0x74 => 'τ',
-    0x75 => 'υ',
-    0x76 => 'ϖ',
-    0x77 => 'ω',
-    0x78 => 'ξ',
-    0x79 => 'ψ',
-    0x7A => 'ζ',
-    0xA2 => '′',
-    0xA3 => '≤',
-    0xA5 => '∞',
-    0xA7 => '♣',
-    0xA8 => '♦',
-    0xA9 => '♥',
-    0xAA => '♠',
-    0xB1 => '±',
-    0xB4 => '×',
-    0xB5 => '∝',
-    0xB6 => '∂',
-    0xB7 => '•',
-    0xB8 => '÷',
-    0xB9 => '≠',
-    0xBA => '≡',
-    0xBB => '≈',
-    0xBC => '…',
-    0xBD => '⏐',
-    0xBE => '⎯',
-    0xBF => '↵',
-    0xC0 => 'ℵ',
-    0xC1 => 'ℑ',
-    0xC2 => 'ℜ',
-    0xC3 => '℘',
-    0xC4 => '⊗',
-    0xC5 => '⊕',
-    0xC6 => '∅',
-    0xC7 => '∩',
-    0xC8 => '∪',
-    0xC9 => '⊃',
-    0xCA => '⊇',
-    0xCB => '⊄',
-    0xCC => '⊂',
-    0xCD => '⊆',
-    0xCE => '∈',
-    0xCF => '∉',
-    0xD0 => '∠',
-    0xD1 => '∇',
-    0xD2 => '®',
-    0xD3 => '©',
-    0xD4 => '™',
-    0xD5 => '∏',
-    0xD6 => '√',
-    0xD7 => '⋅',
-    0xD8 => '¬',
-    0xD9 => '∧',
-    0xDA => '∨',
-    0xDB => '⇔',
-    0xDC => '⇐',
-    0xDD => '⇑',
-    0xDE => '⇒',
-    0xDF => '⇓',
-    0xE0 => '◊',
-    0xE1 => '〈',
-    0xE2 => '®',
-    0xE3 => '©',
-    0xE4 => '™',
-    0xE5 => '∑',
-    0xE6 => '⎛',
-    0xE7 => '⎜',
-    0xE8 => '⎝',
-    0xE9 => '⎡',
-    0xEA => '⎢',
-    0xEB => '⎣',
-    0xEC => '⎧',
-    0xED => '⎨',
-    0xEE => '⎩',
-    0xEF => '⎪',
-    0xF1 => '〉',
-    0xF2 => '∫',
-    0xF3 => '⌠',
-    0xF4 => '⎮',
-    0xF5 => '⌡',
-    0xF6 => '⎞',
-    0xF7 => '⎟',
-    0xF8 => '⎠',
-    0xF9 => '⎤',
-    0xFA => '⎥',
-    0xFB => '⎦',
-    0xFC => '⎫',
-    0xFD => '⎬',
-    0xFE => '⎭',
-    _ => return char::from_u32(code),
-  })
-}
-
-fn wingdings_symbol(code: u32) -> Option<char> {
-  Some(match code {
-    0x4A => '☺',
-    0x4C => '●',
-    0x6C => '●',
-    0x6D => '■',
-    0x6E => '□',
-    0x71 => '❑',
-    0x72 => '❒',
-    0x73 => '⬧',
-    0x74 => '◆',
-    0x75 => '❖',
-    0x76 => '⬥',
-    0x77 => '⌧',
-    0x78 => '⌦',
-    0x9F => '•',
-    0xA8 => '◻',
-    0xF0 => '➔',
-    0xFC => '✓',
-    0xFD => '☒',
-    0xFE => '☑',
-    _ => return None,
-  })
+  shared_symbol::font_symbol_code(symbol.font.as_deref(), code)
 }
 
 fn inline_image_impl(
@@ -9741,6 +10059,7 @@ impl StylesCatalog {
     package: &mut WordprocessingDocument,
     main: &MainDocumentPart,
     import_settings: ImportSettings,
+    ui_language: Option<&str>,
   ) -> Result<Self> {
     let theme = ThemeData::load(package, main);
     let Some(styles_part) = main.style_definitions_part(package) else {
@@ -9752,7 +10071,7 @@ impl StylesCatalog {
         ..Self::default()
       };
       if catalog.doc_default_run.font_family.is_none() {
-        catalog.doc_default_run.font_family = Some(Arc::<str>::from("Calibri"));
+        catalog.doc_default_run.font_family = Some(office_default_font_family(ui_language));
       }
       return Ok(catalog);
     };
@@ -9847,7 +10166,7 @@ impl StylesCatalog {
         .minor_high_ansi
         .clone()
         .or_else(|| catalog.theme_fonts.minor_ascii.clone())
-        .or_else(|| Some(Arc::<str>::from("Calibri")));
+        .or_else(|| Some(office_default_font_family(ui_language)));
     }
 
     Ok(catalog)
@@ -9959,6 +10278,22 @@ impl StylesCatalog {
       styles: &self.styles,
       ids,
     }
+  }
+}
+
+fn office_default_font_family(ui_language: Option<&str>) -> Arc<str> {
+  let language = ui_language.unwrap_or_default().to_ascii_lowercase();
+  // Microsoft documents DengXian as the Office 2016+ default font for the
+  // Simplified Chinese editions of Word, Excel, and PowerPoint. Keep this
+  // fallback below explicit document styles and theme fonts.
+  if language == "zh-cn"
+    || language == "zh-sg"
+    || language == "zh-hans"
+    || language.starts_with("zh-hans-")
+  {
+    Arc::from("DengXian")
+  } else {
+    Arc::from("Calibri")
   }
 }
 
@@ -11458,8 +11793,38 @@ fn format_numbering_value(
     w::NumberFormatValues::LowerRoman => roman_number(value).to_lowercase(),
     w::NumberFormatValues::UpperRoman => roman_number(value),
     w::NumberFormatValues::DecimalZero => format!("{value:02}"),
+    w::NumberFormatValues::DecimalEnclosedCircle
+    | w::NumberFormatValues::DecimalEnclosedCircleChinese => enclosed_decimal_number(value, 0x2460),
+    w::NumberFormatValues::DecimalEnclosedFullstop => enclosed_decimal_number(value, 0x2488),
+    w::NumberFormatValues::DecimalEnclosedParen => enclosed_decimal_number(value, 0x2474),
+    w::NumberFormatValues::DecimalFullWidth | w::NumberFormatValues::DecimalFullWidth2 => {
+      full_width_decimal_number(value)
+    }
+    w::NumberFormatValues::DecimalHalfWidth => value.to_string(),
+    w::NumberFormatValues::None => String::new(),
     _ => value.to_string(),
   }
+}
+
+fn enclosed_decimal_number(value: i32, first_codepoint: u32) -> String {
+  if !(1..=20).contains(&value) {
+    return value.to_string();
+  }
+  char::from_u32(first_codepoint + value as u32 - 1)
+    .expect("ECMA-376 enclosed decimal ranges are valid Unicode")
+    .to_string()
+}
+
+fn full_width_decimal_number(value: i32) -> String {
+  value
+    .to_string()
+    .chars()
+    .map(|character| match character {
+      '0'..='9' => char::from_u32(0xFF10 + character as u32 - '0' as u32)
+        .expect("full-width decimal range is valid Unicode"),
+      _ => character,
+    })
+    .collect()
 }
 
 fn alpha_number(mut value: i32, upper: bool) -> String {
@@ -12086,13 +12451,22 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
 }
 
 fn default_word_page_setup() -> PageSetup {
-  PageSetup {
+  default_word_page_setup_with_size(PageSetup {
     // LibreOffice's OOXML importer initializes an omitted w:pgSz to
     // PAPER_LETTER, matching Microsoft Office fixed output for such sections.
     width_pt: 612.0,
     height_pt: 792.0,
     ..PageSetup::default()
-  }
+  })
+}
+
+fn default_word_page_setup_with_size(mut setup: PageSetup) -> PageSetup {
+  // Word's default section properties use 1.25-inch horizontal margins and
+  // one-inch vertical margins. Apache POI preserves the same defaults in
+  // SEPAbstractType (dxaLeft/dxaRight=1800, dyaTop/dyaBottom=1440).
+  setup.margin_left_pt = 90.0;
+  setup.margin_right_pt = 90.0;
+  setup
 }
 
 fn line_numbering_model(properties: &w::LineNumberType) -> Option<LineNumbering> {
@@ -12142,6 +12516,99 @@ mod tests {
       xml_content: Some(value.into()),
       ..Default::default()
     })
+  }
+
+  #[test]
+  fn smart_tag_run_preserves_nested_visible_text() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:smartTag w:uri="urn:test" w:element="person"><w:r><w:t>John</w:t></w:r><w:smartTag w:uri="urn:test" w:element="surname"><w:r><w:t> Smith</w:t></w:r></w:smartTag></w:smartTag></w:p>"#,
+    )
+    .expect("smart-tag paragraph");
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &styles,
+      &images,
+      &hyperlinks,
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+    let visible_text = inlines
+      .iter()
+      .filter_map(|inline| match inline {
+        InlineItem::Text(run) => Some(run.text.as_str()),
+        _ => None,
+      })
+      .collect::<String>();
+
+    assert_eq!(visible_text, "John Smith");
+  }
+
+  #[test]
+  fn office_math_paragraph_defaults_to_center_group_alignment() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMathPara><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></m:oMathPara></w:p>"#,
+    )
+    .expect("math paragraph");
+
+    assert_eq!(
+      math_paragraph_alignment(&paragraph),
+      Some(ParagraphAlignment::Center)
+    );
+  }
+
+  #[test]
+  fn table_row_exposes_cells_wrapped_in_content_controls() {
+    let row = w::TableRow::from_bytes(
+      br#"<w:tr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:sdt><w:sdtContent><w:tc><w:p><w:r><w:t>controlled cell</w:t></w:r></w:p></w:tc></w:sdtContent></w:sdt></w:tr>"#,
+    )
+    .expect("row with cell-level content control");
+
+    assert_eq!(table_row_cells(&row).len(), 1);
+  }
+
+  #[test]
+  fn numbering_uses_ecma_enclosed_and_full_width_decimal_sequences() {
+    assert_eq!(
+      format_numbering_value(1, w::NumberFormatValues::DecimalEnclosedCircle, false),
+      "①"
+    );
+    assert_eq!(
+      format_numbering_value(20, w::NumberFormatValues::DecimalEnclosedFullstop, false),
+      "⒛"
+    );
+    assert_eq!(
+      format_numbering_value(21, w::NumberFormatValues::DecimalEnclosedParen, false),
+      "21"
+    );
+    assert_eq!(
+      format_numbering_value(120, w::NumberFormatValues::DecimalFullWidth, false),
+      "１２０"
+    );
+  }
+
+  #[test]
+  fn office_default_font_follows_simplified_chinese_ui_language() {
+    assert_eq!(
+      office_default_font_family(Some("zh-CN")).as_ref(),
+      "DengXian"
+    );
+    assert_eq!(
+      office_default_font_family(Some("zh-Hans-SG")).as_ref(),
+      "DengXian"
+    );
+    assert_eq!(
+      office_default_font_family(Some("zh-TW")).as_ref(),
+      "Calibri"
+    );
+    assert_eq!(
+      office_default_font_family(Some("en-US")).as_ref(),
+      "Calibri"
+    );
   }
 
   #[test]
@@ -13572,6 +14039,15 @@ mod tests {
 
     assert_eq!(setup.width_pt, 612.0);
     assert_eq!(setup.height_pt, 792.0);
+    assert_eq!(setup.margin_left_pt, 90.0);
+    assert_eq!(setup.margin_right_pt, 90.0);
+    assert_eq!(setup.margin_top_pt, 72.0);
+    assert_eq!(setup.margin_bottom_pt, 72.0);
+
+    let document_default = default_section(Vec::new()).page;
+    assert!((document_default.width_pt - units::millimeters_to_points(210.0)).abs() < 0.001);
+    assert_eq!(document_default.margin_left_pt, 90.0);
+    assert_eq!(document_default.margin_right_pt, 90.0);
   }
 
   #[test]

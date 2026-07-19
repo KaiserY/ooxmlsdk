@@ -1,7 +1,10 @@
+use std::sync::OnceLock;
+
 use crate::error::Result;
 use crate::options::LayoutOptions;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 
+use super::formula::RelativeFormulaEvaluationContext;
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
 use super::workbook::WorkbookFragment;
 use super::workbook_catalog::WorkbookCatalog;
@@ -15,6 +18,7 @@ pub(crate) struct ExcelImport {
   pub(crate) styles: StylesCatalog,
   pub(crate) defined_names: DefinedNamesCatalog,
   pub(crate) workbook_catalog: WorkbookCatalog,
+  relative_formula_context: OnceLock<RelativeFormulaEvaluationContext>,
 }
 
 impl ExcelImport {
@@ -41,13 +45,23 @@ impl ExcelImport {
       options.source_file_name.as_deref(),
       &workbook_catalog,
     );
-
     Ok(Self {
       sheets,
       globals,
       styles: fragment.styles,
       defined_names: fragment.defined_names,
       workbook_catalog,
+      relative_formula_context: OnceLock::new(),
+    })
+  }
+
+  pub(crate) fn relative_formula_context(&self) -> &RelativeFormulaEvaluationContext {
+    self.relative_formula_context.get_or_init(|| {
+      RelativeFormulaEvaluationContext::from_import(
+        &self.sheets,
+        &self.defined_names,
+        &self.workbook_catalog,
+      )
     })
   }
 }

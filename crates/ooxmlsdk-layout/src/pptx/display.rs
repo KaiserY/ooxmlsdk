@@ -14,6 +14,7 @@ use crate::options::LayoutOptions;
 use crate::render::chart as shared_chart;
 use crate::render::diagram as shared_diagram;
 use crate::render::emf_wmf;
+use crate::render::symbol as shared_symbol;
 use crate::text_metrics::TextMetrics;
 use crate::units;
 use image::codecs::png::PngEncoder;
@@ -1595,16 +1596,24 @@ fn lower_diagram_drawing_shape(
         - total_rotation,
     );
   }
+  let font_reference = shape
+    .shape_style
+    .as_deref()
+    .map(|style| diagram_font_style_reference(&style.font_reference, None));
   let mut lowered_text_items = Vec::new();
   lower_text_body_at_with_style(
     context.import,
     text_frame.frame,
     &text_body,
     TextStyleLoweringInputs {
+      font_reference: font_reference.as_ref(),
       rotation_center_pt: text_frame.rotation_center_pt,
       ..TextStyleLoweringInputs::default()
     },
-    TextLoweringRuntime::default(),
+    TextLoweringRuntime {
+      slide: Some(context.slide),
+      ..TextLoweringRuntime::default()
+    },
     None,
     &mut lowered_text_items,
   );
@@ -1660,18 +1669,21 @@ fn lower_diagram_text_body_at_with_style_and_scale(
     import,
     None,
     text_body,
-    style_inputs.font_reference,
     style_inputs.table_text_style,
     style_inputs.base_font_size_pt,
   );
   let mut text_metrics = TextMetrics::new();
   let estimated_height = estimate_wrapped_text_body_height(
-    import,
-    None,
-    frame,
+    TextBodyHeightContext {
+      import,
+      slide: None,
+      frame,
+      base_style: &base_style,
+      font_reference: style_inputs.font_reference,
+      options: &options,
+      slide_number: 1,
+    },
     text_body,
-    &base_style,
-    &options,
     &mut text_metrics,
   );
   let y_pt = match text_body.display_properties.anchor {
@@ -1687,6 +1699,7 @@ fn lower_diagram_text_body_at_with_style_and_scale(
     y_pt,
     column_index: 0,
   };
+  let mut auto_numbering = AutoNumberingState::default();
   for (paragraph_index, paragraph) in text_body.paragraphs.iter().enumerate() {
     let mut paragraph_items = Vec::new();
     lower_paragraph(
@@ -1694,18 +1707,24 @@ fn lower_diagram_text_body_at_with_style_and_scale(
         import,
         slide: None,
         base_style: &base_style,
+        font_reference: style_inputs.font_reference,
         options: &options,
         frame,
         shape_hyperlink_url: style_inputs.shape_hyperlink_url,
         image_resources: None,
         page_index: 0,
+        slide_number: 1,
+        paragraph_count: text_body.paragraphs.len(),
       },
       paragraph,
       paragraph_index,
-      None,
-      &mut cursor,
-      &mut paragraph_items,
-      &mut text_metrics,
+      ParagraphLoweringOutput {
+        summary: None,
+        cursor: &mut cursor,
+        items: &mut paragraph_items,
+        text_metrics: &mut text_metrics,
+        auto_numbering: &mut auto_numbering,
+      },
     );
     let order = paragraph
       .diagram_source_order
@@ -4604,7 +4623,6 @@ fn lower_text_body_at_with_style_and_scale(
     import,
     runtime.slide,
     text_body,
-    style_inputs.font_reference,
     style_inputs.table_text_style,
     style_inputs.base_font_size_pt,
   );
@@ -4617,12 +4635,16 @@ fn lower_text_body_at_with_style_and_scale(
   options.line_scale = line_scale;
 
   let estimated_height = estimate_wrapped_text_body_height(
-    import,
-    runtime.slide,
-    frame,
+    TextBodyHeightContext {
+      import,
+      slide: runtime.slide,
+      frame,
+      base_style: &base_style,
+      font_reference: style_inputs.font_reference,
+      options: &options,
+      slide_number: presentation_slide_number(import, runtime.page_index),
+    },
     text_body,
-    &base_style,
-    &options,
     &mut text_metrics,
   );
   let y_pt = match text_body.display_properties.anchor {
@@ -4639,24 +4661,31 @@ fn lower_text_body_at_with_style_and_scale(
     column_index: 0,
   };
   let item_start = items.len();
+  let mut auto_numbering = AutoNumberingState::default();
   for (paragraph_index, paragraph) in text_body.paragraphs.iter().enumerate() {
     lower_paragraph(
       ParagraphLoweringContext {
         import,
         slide: runtime.slide,
         base_style: &base_style,
+        font_reference: style_inputs.font_reference,
         options: &options,
         frame,
         shape_hyperlink_url: style_inputs.shape_hyperlink_url,
         image_resources: runtime.image_resources,
         page_index: runtime.page_index,
+        slide_number: presentation_slide_number(import, runtime.page_index),
+        paragraph_count: text_body.paragraphs.len(),
       },
       paragraph,
       paragraph_index,
-      summary.as_deref_mut(),
-      &mut cursor,
-      items,
-      &mut text_metrics,
+      ParagraphLoweringOutput {
+        summary: summary.as_deref_mut(),
+        cursor: &mut cursor,
+        items,
+        text_metrics: &mut text_metrics,
+        auto_numbering: &mut auto_numbering,
+      },
     );
   }
   apply_text_camera_z_rotation(
@@ -4719,21 +4748,30 @@ fn text_base_style(
   import: &PowerPointImport,
   slide: Option<&SlidePersist>,
   text_body: &TextBody,
-  font_reference: Option<&FontStyleReference>,
   table_text_style: Option<&TableStyleTextProperties>,
   base_font_size_pt: Option<f32>,
 ) -> TextStyle {
   let options = TextLoweringOptions::from_text_body(text_body);
+  // DrawingML shape creation seeds all three script families from the
+  // current theme's minor font collection before paragraph/run formatting is
+  // applied. LibreOffice does this in oox/source/drawingml/shape.cxx; direct
+  // a:latin/a:ea/a:cs values below still override these inherited defaults.
+  let theme_latin = import
+    .resolve_theme_font_for_slide(slide, "+mn-lt")
+    .unwrap_or("Liberation Sans");
   let mut base_style = TextStyle {
-    font_family: Some(Arc::from("Liberation Sans")),
+    font_family: Some(Arc::from(theme_latin)),
     font_size_pt: base_font_size_pt.unwrap_or(DEFAULT_TEXT_FONT_SIZE_PT),
     use_windows_font_metrics: true,
     rotation_deg: options.rotation_deg,
     ..TextStyle::default()
   };
-  if let Some(font_reference) = font_reference {
-    apply_font_reference_text_style(import, slide, font_reference, &mut base_style);
-  }
+  base_style.east_asia_font_family = import
+    .resolve_theme_font_for_slide(slide, "+mn-ea")
+    .map(Arc::from);
+  base_style.complex_font_family = import
+    .resolve_theme_font_for_slide(slide, "+mn-cs")
+    .map(Arc::from);
   if let Some(table_text_style) = table_text_style {
     apply_table_text_style(import, slide, table_text_style, &mut base_style);
   }
@@ -5149,6 +5187,7 @@ struct TextLine<'a> {
 struct TextLoweringOptions {
   font_scale: f32,
   line_scale: f32,
+  use_first_last_paragraph_spacing: bool,
   round_font_size_to_pt: bool,
   rotation_deg: f32,
   rotation_center_pt: Option<(f32, f32)>,
@@ -5164,6 +5203,9 @@ impl TextLoweringOptions {
     Self {
       font_scale: text_body.display_properties.font_scale(),
       line_scale: text_body.display_properties.line_height_scale(),
+      use_first_last_paragraph_spacing: text_body
+        .display_properties
+        .use_first_last_paragraph_spacing,
       round_font_size_to_pt: text_body.display_properties.auto_fit == TextAutoFit::Shape,
       rotation_deg: text_body.display_properties.rotation_degrees(),
       rotation_center_pt: None,
@@ -5299,23 +5341,64 @@ struct ParagraphLoweringContext<'a> {
   import: &'a PowerPointImport,
   slide: Option<&'a SlidePersist>,
   base_style: &'a TextStyle,
+  font_reference: Option<&'a FontStyleReference>,
   options: &'a TextLoweringOptions,
   frame: TextFrame,
   shape_hyperlink_url: Option<&'a str>,
   image_resources: Option<&'a HashMap<String, ImageResource>>,
   page_index: usize,
+  slide_number: i32,
+  paragraph_count: usize,
+}
+
+struct ParagraphLoweringOutput<'a> {
+  summary: Option<&'a mut PptxLayoutSummary>,
+  cursor: &'a mut TextCursor,
+  items: &'a mut Vec<PageItem>,
+  text_metrics: &'a mut TextMetrics,
+  auto_numbering: &'a mut AutoNumberingState,
 }
 
 fn lower_paragraph(
   context: ParagraphLoweringContext<'_>,
   paragraph: &TextParagraph,
   paragraph_index: usize,
-  summary: Option<&mut PptxLayoutSummary>,
-  cursor: &mut TextCursor,
-  items: &mut Vec<PageItem>,
-  text_metrics: &mut TextMetrics,
+  output: ParagraphLoweringOutput<'_>,
 ) {
+  let ParagraphLoweringOutput {
+    summary,
+    cursor,
+    items,
+    text_metrics,
+    auto_numbering,
+  } = output;
   let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
+  let mut paragraph_base_style = context.base_style.clone();
+  paragraph_style.apply_master_default_run_style(
+    context.import,
+    context.slide,
+    &mut paragraph_base_style,
+  );
+  if let Some(font_reference) = context.font_reference {
+    apply_font_reference_text_style(
+      context.import,
+      context.slide,
+      font_reference,
+      &mut paragraph_base_style,
+    );
+  }
+  paragraph_style.apply_local_default_run_style(
+    context.import,
+    context.slide,
+    &mut paragraph_base_style,
+  );
+  apply_text_scale(&mut paragraph_base_style, context.options);
+  if paragraph_index > 0 || context.options.use_first_last_paragraph_spacing {
+    cursor.y_pt += paragraph_style
+      .space_before
+      .points(paragraph_base_style.font_size_pt);
+    advance_text_column_if_needed(cursor, context.frame, *context.options);
+  }
   let column_width = context.options.column_width(context.frame);
   let column_x = context.frame.x_pt
     + cursor.column_index as f32 * (column_width + context.options.column_spacing_pt);
@@ -5326,6 +5409,7 @@ fn lower_paragraph(
     return;
   }
   let mut bullet = paragraph_style.bullet(paragraph);
+  auto_numbering.resolve(paragraph, &mut bullet);
   if let Some((width, height)) = paragraph_graphic_bullet_size_100mm(
     paragraph,
     &paragraph_style,
@@ -5364,10 +5448,10 @@ fn lower_paragraph(
       TextLineLayoutContext {
         import: context.import,
         slide: context.slide,
-        paragraph_style: &paragraph_style,
-        base_style: context.base_style,
+        base_style: &paragraph_base_style,
         options: context.options,
         column_width,
+        slide_number: context.slide_number,
       },
       &paragraph.runs[segment_start..segment_end],
       text_metrics,
@@ -5382,27 +5466,57 @@ fn lower_paragraph(
 
     for (line_index, text_line) in text_lines.iter().enumerate() {
       let mut run_x = aligned_paragraph_x(paragraph_x, column_width, text_line.width_pt, alignment);
-      let mut base_line_style = context.base_style.clone();
-      apply_text_scale(&mut base_line_style, context.options);
+      let base_line_style = paragraph_base_style.clone();
       let mut max_line_height = paragraph_style.line_height(&base_line_style, context.options);
+      for line_run in &text_line.runs {
+        max_line_height =
+          max_line_height.max(paragraph_style.line_height(&line_run.style, context.options));
+      }
 
       if is_first_segment
         && line_index == 0
         && let Some(label) = bullet.label.as_deref()
       {
-        let mut bullet_style = context.base_style.clone();
-        paragraph_style.apply_default_run_style(context.import, context.slide, &mut bullet_style);
+        let label = shared_symbol::font_symbol_transport_text(bullet.font.as_deref(), label);
+        // DrawingML's follow-text bullet properties use the first character
+        // in the paragraph. `line_run.style` already includes inheritance and
+        // auto-fit scaling, so it is also the correct base for explicit bullet
+        // font/color/size overrides.
+        let mut bullet_style = text_line
+          .runs
+          .first()
+          .map(|run| run.style.clone())
+          .unwrap_or_else(|| paragraph_base_style.clone());
         if let Some(font) = bullet.font.as_deref() {
-          bullet_style.font_family = Some(Arc::from(font));
+          bullet_style.font_family = Some(Arc::from(resolve_theme_font(context.import, font)));
         }
-        apply_text_scale(&mut bullet_style, context.options);
+        if let Some(paint) = bullet.color.as_ref().and_then(|color| {
+          display_paint_for_optional_slide(context.import, context.slide, color, None)
+        }) {
+          bullet_style.color = paint.color;
+          bullet_style.opacity = paint.opacity;
+        }
+        apply_character_bullet_size(&mut bullet_style, bullet.size);
         let bullet_line_height = paragraph_style.line_height(&bullet_style, context.options);
         max_line_height = max_line_height.max(bullet_line_height);
+        let text_baseline_offset = if base_line_style.use_windows_font_metrics {
+          text_metrics
+            .baseline_offset_in_line_with_windows_metrics(&base_line_style, max_line_height)
+        } else {
+          text_metrics.baseline_offset_in_line(&base_line_style, max_line_height)
+        };
+        let bullet_baseline_offset = if bullet_style.use_windows_font_metrics {
+          text_metrics
+            .baseline_offset_in_line_with_windows_metrics(&bullet_style, bullet_line_height)
+        } else {
+          text_metrics.baseline_offset_in_line(&bullet_style, bullet_line_height)
+        };
+        let bullet_y_pt = cursor.y_pt + text_baseline_offset - bullet_baseline_offset;
         if let Some(graphic) = bullet_graphic_item(
           &bullet,
           context.image_resources,
           run_x + paragraph_style.indent_pt,
-          cursor.y_pt,
+          bullet_y_pt,
           &bullet_style,
           context.shape_hyperlink_url,
         ) {
@@ -5412,11 +5526,11 @@ fn lower_paragraph(
             items,
             TextItemPlacement {
               x_pt: run_x + paragraph_style.indent_pt,
-              y_pt: cursor.y_pt,
+              y_pt: bullet_y_pt,
               line_height_pt: bullet_line_height,
               rotation_center_pt: context.options.rotation_center_pt,
             },
-            label.to_string(),
+            label.into_owned(),
             bullet_style,
             context.shape_hyperlink_url.map(ToString::to_string),
           );
@@ -5467,16 +5581,24 @@ fn lower_paragraph(
     segment_start = segment_end + 1;
     is_first_segment = false;
   }
+  if paragraph_index + 1 < context.paragraph_count
+    || context.options.use_first_last_paragraph_spacing
+  {
+    cursor.y_pt += paragraph_style
+      .space_after
+      .points(paragraph_base_style.font_size_pt);
+    advance_text_column_if_needed(cursor, context.frame, *context.options);
+  }
 }
 
 #[derive(Clone, Copy)]
 struct TextLineLayoutContext<'a> {
   import: &'a PowerPointImport,
   slide: Option<&'a SlidePersist>,
-  paragraph_style: &'a ParagraphDisplayStyle,
   base_style: &'a TextStyle,
   options: &'a TextLoweringOptions,
   column_width: f32,
+  slide_number: i32,
 }
 
 fn layout_text_lines<'a>(
@@ -5503,17 +5625,17 @@ fn layout_text_lines<'a>(
     let style = styled_text_run(
       context.import,
       context.slide,
-      context.paragraph_style,
       context.base_style,
       context.options,
       run,
     );
+    let field_text = presentation_field_text(run, context.slide_number);
     let uppercase_text;
     let text = if style.uppercase {
-      uppercase_text = run.text.to_uppercase();
+      uppercase_text = field_text.to_uppercase();
       uppercase_text.as_str()
     } else {
-      run.text.as_str()
+      field_text.as_ref()
     };
     for hard_line in text.split_inclusive('\n') {
       let (line_text, has_hard_break) = hard_line
@@ -5606,13 +5728,11 @@ fn trim_text_line_end(line: &mut TextLine<'_>, text_metrics: &mut TextMetrics) {
 fn styled_text_run(
   import: &PowerPointImport,
   slide: Option<&SlidePersist>,
-  paragraph_style: &ParagraphDisplayStyle,
   base_style: &TextStyle,
   options: &TextLoweringOptions,
   run: &TextRun,
 ) -> TextStyle {
   let mut style = base_style.clone();
-  paragraph_style.apply_default_run_style(import, slide, &mut style);
   apply_run_properties(import, slide, run, &mut style);
   apply_text_scale(&mut style, options);
   style
@@ -5683,7 +5803,6 @@ fn push_text_item(
     style,
     rotation_center_pt: placement.rotation_center_pt,
     hyperlink_url,
-    dynamic_field: None,
     form_widget_id: None,
     paragraph_bidi: false,
     // DrawingML run boundaries are layout boundaries in PowerPoint's PDF
@@ -5691,7 +5810,6 @@ fn push_text_item(
     // PDF adapter does not reshape across rPr/field boundaries and introduce
     // cross-run kerning or cumulative positioning drift.
     preserve_text_portion,
-    decoration_span_start_x_pt: None,
     pdf_text_segmentation: PdfTextSegmentation::Line,
   }));
 }
@@ -5828,45 +5946,95 @@ fn line_height(style: &TextStyle, line_scale: f32) -> f32 {
   style.font_size_pt * DEFAULT_TEXT_LINE_HEIGHT_SCALE * line_scale
 }
 
-fn estimate_wrapped_text_body_height(
-  import: &PowerPointImport,
-  slide: Option<&SlidePersist>,
+#[derive(Clone, Copy)]
+struct TextBodyHeightContext<'a> {
+  import: &'a PowerPointImport,
+  slide: Option<&'a SlidePersist>,
   frame: TextFrame,
+  base_style: &'a TextStyle,
+  font_reference: Option<&'a FontStyleReference>,
+  options: &'a TextLoweringOptions,
+  slide_number: i32,
+}
+
+fn estimate_wrapped_text_body_height(
+  context: TextBodyHeightContext<'_>,
   text_body: &TextBody,
-  base_style: &TextStyle,
-  options: &TextLoweringOptions,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
-  let column_width = options.column_width(frame).max(1.0);
+  let column_width = context.options.column_width(context.frame).max(1.0);
   let mut height = 0.0;
-  for paragraph in &text_body.paragraphs {
+  for (paragraph_index, paragraph) in text_body.paragraphs.iter().enumerate() {
     let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
-    let mut paragraph_base_style = base_style.clone();
-    paragraph_style.apply_default_run_style(import, slide, &mut paragraph_base_style);
-    apply_text_scale(&mut paragraph_base_style, options);
+    let mut paragraph_base_style = context.base_style.clone();
+    paragraph_style.apply_master_default_run_style(
+      context.import,
+      context.slide,
+      &mut paragraph_base_style,
+    );
+    if let Some(font_reference) = context.font_reference {
+      apply_font_reference_text_style(
+        context.import,
+        context.slide,
+        font_reference,
+        &mut paragraph_base_style,
+      );
+    }
+    paragraph_style.apply_local_default_run_style(
+      context.import,
+      context.slide,
+      &mut paragraph_base_style,
+    );
+    apply_text_scale(&mut paragraph_base_style, context.options);
+    if paragraph_index > 0 || context.options.use_first_last_paragraph_spacing {
+      height += paragraph_style
+        .space_before
+        .points(paragraph_base_style.font_size_pt);
+    }
     for runs in paragraph.runs.split(|run| run.kind == TextRunKind::Break) {
       let lines = layout_text_lines(
         TextLineLayoutContext {
-          import,
-          slide,
-          paragraph_style: &paragraph_style,
-          base_style,
-          options,
+          import: context.import,
+          slide: context.slide,
+          base_style: &paragraph_base_style,
+          options: context.options,
           column_width,
+          slide_number: context.slide_number,
         },
         runs,
         text_metrics,
       );
       for line in lines {
         let line_height = line.runs.iter().fold(
-          paragraph_style.line_height(&paragraph_base_style, options),
-          |height, run| height.max(paragraph_style.line_height(&run.style, options)),
+          paragraph_style.line_height(&paragraph_base_style, context.options),
+          |height, run| height.max(paragraph_style.line_height(&run.style, context.options)),
         );
         height += line_height;
       }
     }
+    if paragraph_index + 1 < text_body.paragraphs.len()
+      || context.options.use_first_last_paragraph_spacing
+    {
+      height += paragraph_style
+        .space_after
+        .points(paragraph_base_style.font_size_pt);
+    }
   }
   height
+}
+
+fn presentation_slide_number(import: &PowerPointImport, page_index: usize) -> i32 {
+  import
+    .first_slide_number
+    .saturating_add(i32::try_from(page_index).unwrap_or(i32::MAX))
+}
+
+fn presentation_field_text(run: &TextRun, slide_number: i32) -> Cow<'_, str> {
+  if run.kind == TextRunKind::Field && run.field_type.as_deref() == Some("slidenum") {
+    Cow::Owned(slide_number.to_string())
+  } else {
+    Cow::Borrowed(&run.text)
+  }
 }
 
 fn advance_text_column_if_needed(
@@ -5931,18 +6099,196 @@ struct ParagraphDisplayStyle {
   indent_pt: f32,
   alignment: a::TextAlignmentTypeValues,
   line_spacing: ParagraphLineSpacing,
+  space_before: ParagraphSpacing,
+  space_after: ParagraphSpacing,
   bullet: BulletDisplay,
-  default_run_properties: Option<Box<a::DefaultRunProperties>>,
+  master_default_run_properties: Option<Box<a::DefaultRunProperties>>,
+  text_default_run_properties: Option<Box<a::DefaultRunProperties>>,
+  direct_default_run_properties: Option<Box<a::DefaultRunProperties>>,
 }
 
 #[derive(Clone, Debug, Default)]
 struct BulletDisplay {
   label: Option<String>,
+  auto_number: Option<AutoNumberBullet>,
   font: Option<String>,
+  color: Option<Color>,
   picture_relationship_id: Option<String>,
   size: BulletSize,
   graphic_width_100mm: Option<i32>,
   graphic_height_100mm: Option<i32>,
+  disabled: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct AutoNumberBullet {
+  scheme: a::TextAutoNumberSchemeValues,
+  start_at: Option<i32>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct AutoNumberCounter {
+  scheme: a::TextAutoNumberSchemeValues,
+  declared_start: Option<i32>,
+  value: i32,
+}
+
+#[derive(Default)]
+struct AutoNumberingState {
+  levels: [Option<AutoNumberCounter>; 9],
+}
+
+impl AutoNumberingState {
+  fn resolve(&mut self, paragraph: &TextParagraph, bullet: &mut BulletDisplay) {
+    if !paragraph_has_printable_run(paragraph) {
+      return;
+    }
+
+    let level = usize::from(paragraph.level.unwrap_or(0).min(8));
+    let Some(auto_number) = bullet.auto_number else {
+      self.levels[level] = None;
+      return;
+    };
+
+    // ECMA-376 Part 1, 21.1.2.4.1: automatic numbering is based on
+    // buAutoNum attributes and paragraph level. Its level 0/1/0 example
+    // advances as 1, 1, 2, so each level owns an independent sequence.
+    let previous = self.levels[level];
+    let continues_sequence = previous.is_some_and(|counter| {
+      counter.scheme == auto_number.scheme
+        && auto_number
+          .start_at
+          .is_none_or(|start| counter.declared_start == Some(start))
+    });
+    let value = previous.map_or_else(
+      || auto_number.start_at.unwrap_or(1),
+      |counter| {
+        if continues_sequence {
+          counter.value.saturating_add(1)
+        } else {
+          auto_number.start_at.unwrap_or(1)
+        }
+      },
+    );
+    self.levels[level] = Some(AutoNumberCounter {
+      scheme: auto_number.scheme,
+      declared_start: if continues_sequence {
+        previous.and_then(|counter| counter.declared_start)
+      } else {
+        auto_number.start_at
+      },
+      value,
+    });
+    self.levels[level + 1..].fill(None);
+    bullet.label = Some(format_auto_number(auto_number.scheme, value));
+  }
+}
+
+fn paragraph_has_printable_run(paragraph: &TextParagraph) -> bool {
+  paragraph.runs.iter().any(|run| {
+    !run.text.is_empty() && !matches!(run.kind, TextRunKind::Break | TextRunKind::Placeholder)
+  })
+}
+
+fn format_auto_number(scheme: a::TextAutoNumberSchemeValues, value: i32) -> String {
+  use a::TextAutoNumberSchemeValues as Scheme;
+
+  let value = value.max(1);
+  match scheme {
+    Scheme::AlphaLowerCharacterParenBoth => format!("({})", alpha_number(value, false)),
+    Scheme::AlphaUpperCharacterParenBoth => format!("({})", alpha_number(value, true)),
+    Scheme::AlphaLowerCharacterParenR => format!("{})", alpha_number(value, false)),
+    Scheme::AlphaUpperCharacterParenR => format!("{})", alpha_number(value, true)),
+    Scheme::AlphaLowerCharacterPeriod => format!("{}.", alpha_number(value, false)),
+    Scheme::AlphaUpperCharacterPeriod => format!("{}.", alpha_number(value, true)),
+    Scheme::ArabicParenBoth => format!("({value})"),
+    Scheme::ArabicParenR => format!("{value})"),
+    Scheme::ArabicPeriod => format!("{value}."),
+    Scheme::ArabicPlain => value.to_string(),
+    Scheme::RomanLowerCharacterParenBoth => format!("({})", roman_number(value, false)),
+    Scheme::RomanUpperCharacterParenBoth => format!("({})", roman_number(value, true)),
+    Scheme::RomanLowerCharacterParenR => format!("{})", roman_number(value, false)),
+    Scheme::RomanUpperCharacterParenR => format!("{})", roman_number(value, true)),
+    Scheme::RomanLowerCharacterPeriod => format!("{}.", roman_number(value, false)),
+    Scheme::RomanUpperCharacterPeriod => format!("{}.", roman_number(value, true)),
+    Scheme::EastAsianJapaneseKoreanPeriod => format!("{}.", east_asian_number(value)),
+    Scheme::EastAsianJapaneseKoreanPlain => east_asian_number(value),
+    // The remaining schemes require locale-specific numeral systems or
+    // symbol-font mappings. Keep the prior visible fallback until each has
+    // equivalent source evidence and corpus coverage.
+    _ => format!("{value}."),
+  }
+}
+
+fn alpha_number(value: i32, uppercase: bool) -> String {
+  // ECMA-376 Part 1, 21.1.2.4.1 explicitly maps 27 to "aa" and 53 to
+  // "aaa": PowerPoint repeats a letter rather than using spreadsheet-style
+  // base-26 lettering.
+  let zero_based = value.max(1) as usize - 1;
+  let character = if uppercase { b'A' } else { b'a' } + (zero_based % 26) as u8;
+  std::iter::repeat_n(char::from(character), zero_based / 26 + 1).collect()
+}
+
+fn roman_number(value: i32, uppercase: bool) -> String {
+  const TOKENS: &[(i32, &str)] = &[
+    (1000, "M"),
+    (900, "CM"),
+    (500, "D"),
+    (400, "CD"),
+    (100, "C"),
+    (90, "XC"),
+    (50, "L"),
+    (40, "XL"),
+    (10, "X"),
+    (9, "IX"),
+    (5, "V"),
+    (4, "IV"),
+    (1, "I"),
+  ];
+  let mut remainder = value.max(1);
+  let mut result = String::new();
+  for &(unit, token) in TOKENS {
+    while remainder >= unit {
+      result.push_str(token);
+      remainder -= unit;
+    }
+  }
+  if uppercase {
+    result
+  } else {
+    result.to_lowercase()
+  }
+}
+
+fn east_asian_number(value: i32) -> String {
+  const DIGITS: [&str; 10] = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+  const UNITS: [&str; 4] = ["", "十", "百", "千"];
+
+  let value = value.max(1);
+  if value >= 10_000 {
+    return value.to_string();
+  }
+  let mut result = String::new();
+  let mut emitted = false;
+  let mut pending_zero = false;
+  for position in (0..4).rev() {
+    let divisor = 10_i32.pow(position as u32);
+    let digit = (value / divisor) % 10;
+    if digit == 0 {
+      pending_zero = emitted;
+      continue;
+    }
+    if pending_zero {
+      result.push_str(DIGITS[0]);
+      pending_zero = false;
+    }
+    if !(digit == 1 && position == 1 && !emitted) {
+      result.push_str(DIGITS[digit as usize]);
+    }
+    result.push_str(UNITS[position]);
+    emitted = true;
+  }
+  result
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -5953,11 +6299,39 @@ enum BulletSize {
   Points100(i32),
 }
 
+fn apply_character_bullet_size(style: &mut TextStyle, size: BulletSize) {
+  match size {
+    BulletSize::FollowText => {}
+    BulletSize::Percent(percent) => style.font_size_pt *= percent / 100.0,
+    BulletSize::Points100(points100) => {
+      style.font_size_pt = sdk_units::points100_to_points(points100) as f32;
+    }
+  }
+}
+
 #[derive(Clone, Copy, Debug)]
 enum ParagraphLineSpacing {
   Default,
   Percent(f32),
   Points(f32),
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+enum ParagraphSpacing {
+  #[default]
+  Zero,
+  Percent(f32),
+  Points(f32),
+}
+
+impl ParagraphSpacing {
+  fn points(self, font_size_pt: f32) -> f32 {
+    match self {
+      Self::Zero => 0.0,
+      Self::Percent(ratio) => font_size_pt * ratio,
+      Self::Points(points) => points,
+    }
+  }
 }
 
 impl Default for ParagraphDisplayStyle {
@@ -5967,9 +6341,50 @@ impl Default for ParagraphDisplayStyle {
       indent_pt: 0.0,
       alignment: a::TextAlignmentTypeValues::Left,
       line_spacing: ParagraphLineSpacing::Default,
+      space_before: ParagraphSpacing::Zero,
+      space_after: ParagraphSpacing::Zero,
       bullet: BulletDisplay::default(),
-      default_run_properties: None,
+      master_default_run_properties: None,
+      text_default_run_properties: None,
+      direct_default_run_properties: None,
     }
+  }
+}
+
+fn text_list_default_run_properties(
+  style: &TextListParagraphStyle,
+) -> Option<Box<a::DefaultRunProperties>> {
+  match style {
+    TextListParagraphStyle::Default(properties) => properties.default_run_properties.clone(),
+    TextListParagraphStyle::Level(level) => match &level.paragraph_properties {
+      TextListLevelParagraphProperties::Level1(properties) => {
+        properties.default_run_properties.clone()
+      }
+      TextListLevelParagraphProperties::Level2(properties) => {
+        properties.default_run_properties.clone()
+      }
+      TextListLevelParagraphProperties::Level3(properties) => {
+        properties.default_run_properties.clone()
+      }
+      TextListLevelParagraphProperties::Level4(properties) => {
+        properties.default_run_properties.clone()
+      }
+      TextListLevelParagraphProperties::Level5(properties) => {
+        properties.default_run_properties.clone()
+      }
+      TextListLevelParagraphProperties::Level6(properties) => {
+        properties.default_run_properties.clone()
+      }
+      TextListLevelParagraphProperties::Level7(properties) => {
+        properties.default_run_properties.clone()
+      }
+      TextListLevelParagraphProperties::Level8(properties) => {
+        properties.default_run_properties.clone()
+      }
+      TextListLevelParagraphProperties::Level9(properties) => {
+        properties.default_run_properties.clone()
+      }
+    },
   }
 }
 
@@ -5978,9 +6393,11 @@ impl ParagraphDisplayStyle {
     let mut style = Self::default();
     if let Some(master_style) = &paragraph.master_paragraph_style {
       style.apply_text_list_style(master_style);
+      style.master_default_run_properties = text_list_default_run_properties(master_style);
     }
     if let Some(text_style) = &paragraph.text_paragraph_style {
       style.apply_text_list_style(text_style);
+      style.text_default_run_properties = text_list_default_run_properties(text_style);
     }
     if let Some(properties) = paragraph.paragraph_properties.as_deref() {
       if let Some(left_margin) = properties.left_margin {
@@ -5990,7 +6407,7 @@ impl ParagraphDisplayStyle {
         style.indent_pt = units::emu_to_points(i64::from(indent));
       }
       if let Some(default_run_properties) = &properties.default_run_properties {
-        style.default_run_properties = Some(default_run_properties.clone());
+        style.direct_default_run_properties = Some(default_run_properties.clone());
       }
       if let Some(alignment) = properties.alignment {
         style.alignment = alignment;
@@ -5998,9 +6415,19 @@ impl ParagraphDisplayStyle {
       if let Some(line_spacing) = properties.line_spacing.as_deref() {
         style.line_spacing = paragraph_line_spacing(line_spacing);
       }
+      if let Some(space_before) = properties.space_before.as_deref() {
+        style.space_before = paragraph_space_before(space_before);
+      }
+      if let Some(space_after) = properties.space_after.as_deref() {
+        style.space_after = paragraph_space_after(space_after);
+      }
       style.apply_bullet_size(&properties.paragraph_properties_choice2);
-      style.bullet.font =
-        paragraph_properties_bullet_font(&properties.paragraph_properties_choice3);
+      style.bullet.apply_color(paragraph_properties_bullet_color(
+        &properties.paragraph_properties_choice1,
+      ));
+      style.bullet.apply_font(paragraph_properties_bullet_font(
+        &properties.paragraph_properties_choice3,
+      ));
       style.bullet.apply_kind(paragraph_properties_bullet(
         &properties.paragraph_properties_choice4,
       ));
@@ -6023,18 +6450,39 @@ impl ParagraphDisplayStyle {
         if let Some(line_spacing) = properties.line_spacing.as_deref() {
           self.line_spacing = paragraph_line_spacing(line_spacing);
         }
-        self.default_run_properties = properties.default_run_properties.clone();
+        if let Some(space_before) = properties.space_before.as_deref() {
+          self.space_before = paragraph_space_before(space_before);
+        }
+        if let Some(space_after) = properties.space_after.as_deref() {
+          self.space_after = paragraph_space_after(space_after);
+        }
         self.apply_default_bullet_size(&properties.default_paragraph_properties_choice2);
-        self.bullet.font = default_paragraph_properties_bullet_font(
-          &properties.default_paragraph_properties_choice3,
-        );
+        self
+          .bullet
+          .apply_color(default_paragraph_properties_bullet_color(
+            &properties.default_paragraph_properties_choice1,
+          ));
+        self
+          .bullet
+          .apply_font(default_paragraph_properties_bullet_font(
+            &properties.default_paragraph_properties_choice3,
+          ));
         self.bullet.apply_kind(default_paragraph_properties_bullet(
           &properties.default_paragraph_properties_choice4,
         ));
       }
       TextListParagraphStyle::Level(level) => {
         self.apply_level_bullet_size(&level.paragraph_properties);
-        self.bullet.font = level_paragraph_properties_bullet_font(&level.paragraph_properties);
+        self
+          .bullet
+          .apply_color(level_paragraph_properties_bullet_color(
+            &level.paragraph_properties,
+          ));
+        self
+          .bullet
+          .apply_font(level_paragraph_properties_bullet_font(
+            &level.paragraph_properties,
+          ));
         self.apply_level_style(&level.paragraph_properties);
       }
     }
@@ -6055,7 +6503,12 @@ impl ParagraphDisplayStyle {
         if let Some(line_spacing) = $properties.line_spacing.as_deref() {
           self.line_spacing = paragraph_line_spacing(line_spacing);
         }
-        self.default_run_properties = $properties.default_run_properties.clone();
+        if let Some(space_before) = $properties.space_before.as_deref() {
+          self.space_before = paragraph_space_before(space_before);
+        }
+        if let Some(space_after) = $properties.space_after.as_deref() {
+          self.space_after = paragraph_space_after(space_after);
+        }
         self.bullet.apply_kind($bullet_fn(&$properties.$choice));
       }};
     }
@@ -6128,16 +6581,20 @@ impl ParagraphDisplayStyle {
   }
 
   fn bullet(&self, paragraph: &TextParagraph) -> BulletDisplay {
-    if paragraph
-      .paragraph_properties
-      .as_deref()
-      .and_then(|properties| properties.paragraph_properties_choice4.as_ref())
-      .is_some_and(|choice| matches!(choice, a::ParagraphPropertiesChoice4::NoBullet))
-    {
+    // Empty text bodies and placeholder prompts do not produce a bullet in
+    // printed/slideshow output. LibreOffice handles both through its empty
+    // text-body path; placeholder prompts additionally remain edit-view-only.
+    let has_printable_run = paragraph.runs.iter().any(|run| {
+      !run.text.is_empty() && !matches!(run.kind, TextRunKind::Break | TextRunKind::Placeholder)
+    });
+    if !has_printable_run {
       return BulletDisplay::default();
     }
     let mut bullet = self.bullet.clone();
-    if bullet.label.is_none() {
+    if bullet.disabled {
+      return BulletDisplay::default();
+    }
+    if bullet.label.is_none() && bullet.auto_number.is_none() {
       bullet.label = paragraph
         .level
         .filter(|level| *level > 0)
@@ -6146,13 +6603,30 @@ impl ParagraphDisplayStyle {
     bullet
   }
 
-  fn apply_default_run_style(
+  fn apply_master_default_run_style(
     &self,
     import: &PowerPointImport,
     slide: Option<&SlidePersist>,
     style: &mut TextStyle,
   ) {
-    if let Some(properties) = &self.default_run_properties {
+    if let Some(properties) = &self.master_default_run_properties {
+      apply_default_run_properties(import, slide, properties, style);
+    }
+  }
+
+  fn apply_local_default_run_style(
+    &self,
+    import: &PowerPointImport,
+    slide: Option<&SlidePersist>,
+    style: &mut TextStyle,
+  ) {
+    for properties in [
+      self.text_default_run_properties.as_deref(),
+      self.direct_default_run_properties.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
       apply_default_run_properties(import, slide, properties, style);
     }
   }
@@ -6201,6 +6675,30 @@ fn paragraph_line_spacing(line_spacing: &a::LineSpacing) -> ParagraphLineSpacing
   }
 }
 
+fn paragraph_space_before(space: &a::SpaceBefore) -> ParagraphSpacing {
+  match space.space_before_choice.as_ref() {
+    Some(a::SpaceBeforeChoice::SpacingPercent(spacing)) => {
+      ParagraphSpacing::Percent(spacing.val.as_ratio() as f32)
+    }
+    Some(a::SpaceBeforeChoice::SpacingPoints(spacing)) => {
+      ParagraphSpacing::Points(sdk_units::points100_to_points(spacing.val) as f32)
+    }
+    None => ParagraphSpacing::Zero,
+  }
+}
+
+fn paragraph_space_after(space: &a::SpaceAfter) -> ParagraphSpacing {
+  match space.space_after_choice.as_ref() {
+    Some(a::SpaceAfterChoice::SpacingPercent(spacing)) => {
+      ParagraphSpacing::Percent(spacing.val.as_ratio() as f32)
+    }
+    Some(a::SpaceAfterChoice::SpacingPoints(spacing)) => {
+      ParagraphSpacing::Points(sdk_units::points100_to_points(spacing.val) as f32)
+    }
+    None => ParagraphSpacing::Zero,
+  }
+}
+
 fn paragraph_properties_bullet_size(
   choice: &Option<a::ParagraphPropertiesChoice2>,
 ) -> Option<BulletSize> {
@@ -6213,6 +6711,42 @@ fn paragraph_properties_bullet_size(
       Some(BulletSize::Points100(size.val))
     }
     None => None,
+  }
+}
+
+#[derive(Clone, Debug)]
+enum BulletColorOverride {
+  Unspecified,
+  FollowText,
+  Color(Color),
+}
+
+fn bullet_color(color: &a::BulletColor) -> BulletColorOverride {
+  color
+    .bullet_color_choice
+    .as_ref()
+    .and_then(Color::from_bullet_color_choice)
+    .map(BulletColorOverride::Color)
+    .unwrap_or(BulletColorOverride::Unspecified)
+}
+
+fn paragraph_properties_bullet_color(
+  choice: &Option<a::ParagraphPropertiesChoice>,
+) -> BulletColorOverride {
+  match choice {
+    Some(a::ParagraphPropertiesChoice::BulletColorText) => BulletColorOverride::FollowText,
+    Some(a::ParagraphPropertiesChoice::BulletColor(color)) => bullet_color(color),
+    None => BulletColorOverride::Unspecified,
+  }
+}
+
+fn default_paragraph_properties_bullet_color(
+  choice: &Option<a::DefaultParagraphPropertiesChoice>,
+) -> BulletColorOverride {
+  match choice {
+    Some(a::DefaultParagraphPropertiesChoice::BulletColorText) => BulletColorOverride::FollowText,
+    Some(a::DefaultParagraphPropertiesChoice::BulletColor(color)) => bullet_color(color),
+    None => BulletColorOverride::Unspecified,
   }
 }
 
@@ -6233,20 +6767,37 @@ fn default_paragraph_properties_bullet_size(
 
 fn paragraph_properties_bullet_font(
   choice: &Option<a::ParagraphPropertiesChoice3>,
-) -> Option<String> {
+) -> BulletFontOverride {
   match choice {
-    Some(a::ParagraphPropertiesChoice3::BulletFont(font)) => font.typeface.clone(),
-    Some(a::ParagraphPropertiesChoice3::BulletFontText) | None => None,
+    Some(a::ParagraphPropertiesChoice3::BulletFont(font)) => font
+      .typeface
+      .clone()
+      .map(BulletFontOverride::Font)
+      .unwrap_or(BulletFontOverride::Unspecified),
+    Some(a::ParagraphPropertiesChoice3::BulletFontText) => BulletFontOverride::FollowText,
+    None => BulletFontOverride::Unspecified,
   }
 }
 
 fn default_paragraph_properties_bullet_font(
   choice: &Option<a::DefaultParagraphPropertiesChoice3>,
-) -> Option<String> {
+) -> BulletFontOverride {
   match choice {
-    Some(a::DefaultParagraphPropertiesChoice3::BulletFont(font)) => font.typeface.clone(),
-    Some(a::DefaultParagraphPropertiesChoice3::BulletFontText) | None => None,
+    Some(a::DefaultParagraphPropertiesChoice3::BulletFont(font)) => font
+      .typeface
+      .clone()
+      .map(BulletFontOverride::Font)
+      .unwrap_or(BulletFontOverride::Unspecified),
+    Some(a::DefaultParagraphPropertiesChoice3::BulletFontText) => BulletFontOverride::FollowText,
+    None => BulletFontOverride::Unspecified,
   }
+}
+
+#[derive(Clone, Debug)]
+enum BulletFontOverride {
+  Unspecified,
+  FollowText,
+  Font(String),
 }
 
 trait LevelBulletSizeChoice {
@@ -6254,7 +6805,11 @@ trait LevelBulletSizeChoice {
 }
 
 trait LevelBulletFontChoice {
-  fn bullet_font(&self) -> Option<String>;
+  fn bullet_font(&self) -> BulletFontOverride;
+}
+
+trait LevelBulletColorChoice {
+  fn bullet_color(&self) -> BulletColorOverride;
 }
 
 macro_rules! impl_level_bullet_size_choice {
@@ -6276,10 +6831,27 @@ macro_rules! impl_level_bullet_size_choice {
 macro_rules! impl_level_bullet_font_choice {
   ($ty:ty) => {
     impl LevelBulletFontChoice for $ty {
-      fn bullet_font(&self) -> Option<String> {
+      fn bullet_font(&self) -> BulletFontOverride {
         match self {
-          Self::BulletFont(font) => font.typeface.clone(),
-          Self::BulletFontText => None,
+          Self::BulletFont(font) => font
+            .typeface
+            .clone()
+            .map(BulletFontOverride::Font)
+            .unwrap_or(BulletFontOverride::Unspecified),
+          Self::BulletFontText => BulletFontOverride::FollowText,
+        }
+      }
+    }
+  };
+}
+
+macro_rules! impl_level_bullet_color_choice {
+  ($ty:ty) => {
+    impl LevelBulletColorChoice for $ty {
+      fn bullet_color(&self) -> BulletColorOverride {
+        match self {
+          Self::BulletColorText => BulletColorOverride::FollowText,
+          Self::BulletColor(color) => bullet_color(color),
         }
       }
     }
@@ -6305,6 +6877,60 @@ impl_level_bullet_font_choice!(a::Level6ParagraphPropertiesChoice3);
 impl_level_bullet_font_choice!(a::Level7ParagraphPropertiesChoice3);
 impl_level_bullet_font_choice!(a::Level8ParagraphPropertiesChoice3);
 impl_level_bullet_font_choice!(a::Level9ParagraphPropertiesChoice3);
+
+impl_level_bullet_color_choice!(a::Level1ParagraphPropertiesChoice);
+impl_level_bullet_color_choice!(a::Level2ParagraphPropertiesChoice);
+impl_level_bullet_color_choice!(a::Level3ParagraphPropertiesChoice);
+impl_level_bullet_color_choice!(a::Level4ParagraphPropertiesChoice);
+impl_level_bullet_color_choice!(a::Level5ParagraphPropertiesChoice);
+impl_level_bullet_color_choice!(a::Level6ParagraphPropertiesChoice);
+impl_level_bullet_color_choice!(a::Level7ParagraphPropertiesChoice);
+impl_level_bullet_color_choice!(a::Level8ParagraphPropertiesChoice);
+impl_level_bullet_color_choice!(a::Level9ParagraphPropertiesChoice);
+
+fn level_paragraph_properties_bullet_color(
+  properties: &TextListLevelParagraphProperties,
+) -> BulletColorOverride {
+  match properties {
+    TextListLevelParagraphProperties::Level1(properties) => properties
+      .level1_paragraph_properties_choice1
+      .as_ref()
+      .map(LevelBulletColorChoice::bullet_color),
+    TextListLevelParagraphProperties::Level2(properties) => properties
+      .level2_paragraph_properties_choice1
+      .as_ref()
+      .map(LevelBulletColorChoice::bullet_color),
+    TextListLevelParagraphProperties::Level3(properties) => properties
+      .level3_paragraph_properties_choice1
+      .as_ref()
+      .map(LevelBulletColorChoice::bullet_color),
+    TextListLevelParagraphProperties::Level4(properties) => properties
+      .level4_paragraph_properties_choice1
+      .as_ref()
+      .map(LevelBulletColorChoice::bullet_color),
+    TextListLevelParagraphProperties::Level5(properties) => properties
+      .level5_paragraph_properties_choice1
+      .as_ref()
+      .map(LevelBulletColorChoice::bullet_color),
+    TextListLevelParagraphProperties::Level6(properties) => properties
+      .level6_paragraph_properties_choice1
+      .as_ref()
+      .map(LevelBulletColorChoice::bullet_color),
+    TextListLevelParagraphProperties::Level7(properties) => properties
+      .level7_paragraph_properties_choice1
+      .as_ref()
+      .map(LevelBulletColorChoice::bullet_color),
+    TextListLevelParagraphProperties::Level8(properties) => properties
+      .level8_paragraph_properties_choice1
+      .as_ref()
+      .map(LevelBulletColorChoice::bullet_color),
+    TextListLevelParagraphProperties::Level9(properties) => properties
+      .level9_paragraph_properties_choice1
+      .as_ref()
+      .map(LevelBulletColorChoice::bullet_color),
+  }
+  .unwrap_or(BulletColorOverride::Unspecified)
+}
 
 fn level_paragraph_properties_bullet_size(
   properties: &TextListLevelParagraphProperties,
@@ -6351,80 +6977,138 @@ fn level_paragraph_properties_bullet_size(
 
 fn level_paragraph_properties_bullet_font(
   properties: &TextListLevelParagraphProperties,
-) -> Option<String> {
+) -> BulletFontOverride {
   match properties {
     TextListLevelParagraphProperties::Level1(properties) => properties
       .level1_paragraph_properties_choice3
       .as_ref()
-      .and_then(LevelBulletFontChoice::bullet_font),
+      .map(LevelBulletFontChoice::bullet_font),
     TextListLevelParagraphProperties::Level2(properties) => properties
       .level2_paragraph_properties_choice3
       .as_ref()
-      .and_then(LevelBulletFontChoice::bullet_font),
+      .map(LevelBulletFontChoice::bullet_font),
     TextListLevelParagraphProperties::Level3(properties) => properties
       .level3_paragraph_properties_choice3
       .as_ref()
-      .and_then(LevelBulletFontChoice::bullet_font),
+      .map(LevelBulletFontChoice::bullet_font),
     TextListLevelParagraphProperties::Level4(properties) => properties
       .level4_paragraph_properties_choice3
       .as_ref()
-      .and_then(LevelBulletFontChoice::bullet_font),
+      .map(LevelBulletFontChoice::bullet_font),
     TextListLevelParagraphProperties::Level5(properties) => properties
       .level5_paragraph_properties_choice3
       .as_ref()
-      .and_then(LevelBulletFontChoice::bullet_font),
+      .map(LevelBulletFontChoice::bullet_font),
     TextListLevelParagraphProperties::Level6(properties) => properties
       .level6_paragraph_properties_choice3
       .as_ref()
-      .and_then(LevelBulletFontChoice::bullet_font),
+      .map(LevelBulletFontChoice::bullet_font),
     TextListLevelParagraphProperties::Level7(properties) => properties
       .level7_paragraph_properties_choice3
       .as_ref()
-      .and_then(LevelBulletFontChoice::bullet_font),
+      .map(LevelBulletFontChoice::bullet_font),
     TextListLevelParagraphProperties::Level8(properties) => properties
       .level8_paragraph_properties_choice3
       .as_ref()
-      .and_then(LevelBulletFontChoice::bullet_font),
+      .map(LevelBulletFontChoice::bullet_font),
     TextListLevelParagraphProperties::Level9(properties) => properties
       .level9_paragraph_properties_choice3
       .as_ref()
-      .and_then(LevelBulletFontChoice::bullet_font),
+      .map(LevelBulletFontChoice::bullet_font),
   }
+  .unwrap_or(BulletFontOverride::Unspecified)
 }
 
 impl BulletDisplay {
-  fn apply_kind(&mut self, kind: Option<BulletKind>) {
-    if let Some(kind) = kind {
-      self.label = kind.label;
-      self.picture_relationship_id = kind.picture_relationship_id;
+  fn apply_font(&mut self, font: BulletFontOverride) {
+    match font {
+      BulletFontOverride::Unspecified => {}
+      BulletFontOverride::FollowText => self.font = None,
+      BulletFontOverride::Font(font) => self.font = Some(font),
+    }
+  }
+
+  fn apply_color(&mut self, color: BulletColorOverride) {
+    match color {
+      BulletColorOverride::Unspecified => {}
+      BulletColorOverride::FollowText => self.color = None,
+      BulletColorOverride::Color(color) => self.color = Some(color),
+    }
+  }
+
+  fn apply_kind(&mut self, kind: BulletOverride) {
+    match kind {
+      BulletOverride::Unspecified => {}
+      BulletOverride::Disabled => {
+        self.label = None;
+        self.auto_number = None;
+        self.picture_relationship_id = None;
+        self.disabled = true;
+      }
+      BulletOverride::Kind(kind) => {
+        self.label = kind.label;
+        self.auto_number = kind.auto_number;
+        self.picture_relationship_id = kind.picture_relationship_id;
+        self.disabled = false;
+      }
     }
   }
 }
 
 #[derive(Clone, Debug)]
+enum BulletOverride {
+  Unspecified,
+  Disabled,
+  Kind(BulletKind),
+}
+
+#[derive(Clone, Debug)]
 struct BulletKind {
   label: Option<String>,
+  auto_number: Option<AutoNumberBullet>,
   picture_relationship_id: Option<String>,
 }
 
-fn paragraph_properties_bullet(
-  choice: &Option<a::ParagraphPropertiesChoice4>,
-) -> Option<BulletKind> {
+fn auto_number_bullet(bullet: &a::AutoNumberedBullet) -> AutoNumberBullet {
+  AutoNumberBullet {
+    scheme: bullet.r#type,
+    start_at: bullet.start_at,
+  }
+}
+
+fn character_bullet_label(value: &str) -> Option<String> {
+  // DrawingML models this as a character bullet. LibreOffice's UNO bridge
+  // stores only the first Unicode code point in SvxNumberFormat::BulletChar,
+  // which also matches PowerPoint fixed-output behavior for malformed
+  // multi-character values such as "••" in legacy SmartArt drawings.
+  value.chars().next().map(|character| character.to_string())
+}
+
+fn paragraph_properties_bullet(choice: &Option<a::ParagraphPropertiesChoice4>) -> BulletOverride {
   match choice {
-    Some(a::ParagraphPropertiesChoice4::NoBullet) => None,
-    Some(a::ParagraphPropertiesChoice4::CharacterBullet(bullet)) => Some(BulletKind {
-      label: Some(bullet.char.clone()),
-      picture_relationship_id: None,
-    }),
-    Some(a::ParagraphPropertiesChoice4::AutoNumberedBullet(_)) => Some(BulletKind {
-      label: Some("1.".to_string()),
-      picture_relationship_id: None,
-    }),
-    Some(a::ParagraphPropertiesChoice4::PictureBullet(bullet)) => Some(BulletKind {
-      label: Some("\u{2022}".to_string()),
-      picture_relationship_id: bullet.blip.embed.clone(),
-    }),
-    None => None,
+    Some(a::ParagraphPropertiesChoice4::NoBullet) => BulletOverride::Disabled,
+    Some(a::ParagraphPropertiesChoice4::CharacterBullet(bullet)) => {
+      BulletOverride::Kind(BulletKind {
+        label: character_bullet_label(&bullet.char),
+        auto_number: None,
+        picture_relationship_id: None,
+      })
+    }
+    Some(a::ParagraphPropertiesChoice4::AutoNumberedBullet(bullet)) => {
+      BulletOverride::Kind(BulletKind {
+        label: None,
+        auto_number: Some(auto_number_bullet(bullet)),
+        picture_relationship_id: None,
+      })
+    }
+    Some(a::ParagraphPropertiesChoice4::PictureBullet(bullet)) => {
+      BulletOverride::Kind(BulletKind {
+        label: Some("\u{2022}".to_string()),
+        auto_number: None,
+        picture_relationship_id: bullet.blip.embed.clone(),
+      })
+    }
+    None => BulletOverride::Unspecified,
   }
 }
 
@@ -6496,12 +7180,16 @@ fn paragraph_first_char_font_size_points100(
   {
     return (run_font_size as f32 * options.font_scale).round() as i32;
   }
-  paragraph_style
-    .default_run_properties
-    .as_deref()
-    .and_then(|properties| properties.font_size)
-    .map(|font_size| (font_size as f32 * options.font_scale).round() as i32)
-    .unwrap_or_else(|| (base_style.font_size_pt * 100.0 * options.font_scale).round() as i32)
+  [
+    paragraph_style.direct_default_run_properties.as_deref(),
+    paragraph_style.text_default_run_properties.as_deref(),
+    paragraph_style.master_default_run_properties.as_deref(),
+  ]
+  .into_iter()
+  .flatten()
+  .find_map(|properties| properties.font_size)
+  .map(|font_size| (font_size as f32 * options.font_scale).round() as i32)
+  .unwrap_or_else(|| (base_style.font_size_pt * 100.0 * options.font_scale).round() as i32)
 }
 
 fn record_bullet_paragraph(
@@ -6540,10 +7228,10 @@ fn record_bullet_paragraph(
 
 macro_rules! bullet_fn {
   ($name:ident, $choice_ty:ty) => {
-    fn $name(choice: &Option<$choice_ty>) -> Option<BulletKind> {
+    fn $name(choice: &Option<$choice_ty>) -> BulletOverride {
       match choice {
         Some(choice) => level_bullet_label(choice),
-        None => None,
+        None => BulletOverride::Unspecified,
       }
     }
   };
@@ -6551,22 +7239,31 @@ macro_rules! bullet_fn {
 
 fn default_paragraph_properties_bullet(
   choice: &Option<a::DefaultParagraphPropertiesChoice4>,
-) -> Option<BulletKind> {
+) -> BulletOverride {
   match choice {
-    Some(a::DefaultParagraphPropertiesChoice4::NoBullet) => None,
-    Some(a::DefaultParagraphPropertiesChoice4::CharacterBullet(bullet)) => Some(BulletKind {
-      label: Some(bullet.char.clone()),
-      picture_relationship_id: None,
-    }),
-    Some(a::DefaultParagraphPropertiesChoice4::AutoNumberedBullet(_)) => Some(BulletKind {
-      label: Some("1.".to_string()),
-      picture_relationship_id: None,
-    }),
-    Some(a::DefaultParagraphPropertiesChoice4::PictureBullet(bullet)) => Some(BulletKind {
-      label: Some("\u{2022}".to_string()),
-      picture_relationship_id: bullet.blip.embed.clone(),
-    }),
-    None => None,
+    Some(a::DefaultParagraphPropertiesChoice4::NoBullet) => BulletOverride::Disabled,
+    Some(a::DefaultParagraphPropertiesChoice4::CharacterBullet(bullet)) => {
+      BulletOverride::Kind(BulletKind {
+        label: character_bullet_label(&bullet.char),
+        auto_number: None,
+        picture_relationship_id: None,
+      })
+    }
+    Some(a::DefaultParagraphPropertiesChoice4::AutoNumberedBullet(bullet)) => {
+      BulletOverride::Kind(BulletKind {
+        label: None,
+        auto_number: Some(auto_number_bullet(bullet)),
+        picture_relationship_id: None,
+      })
+    }
+    Some(a::DefaultParagraphPropertiesChoice4::PictureBullet(bullet)) => {
+      BulletOverride::Kind(BulletKind {
+        label: Some("\u{2022}".to_string()),
+        auto_number: None,
+        picture_relationship_id: bullet.blip.embed.clone(),
+      })
+    }
+    None => BulletOverride::Unspecified,
   }
 }
 
@@ -6610,7 +7307,7 @@ bullet_fn!(
 trait BulletChoice {
   fn no_bullet(&self) -> bool;
   fn character(&self) -> Option<String>;
-  fn auto_numbered(&self) -> bool;
+  fn auto_number(&self) -> Option<AutoNumberBullet>;
   fn picture_relationship_id(&self) -> Option<String>;
 }
 
@@ -6623,13 +7320,16 @@ macro_rules! impl_bullet_choice {
 
       fn character(&self) -> Option<String> {
         match self {
-          Self::CharacterBullet(bullet) => Some(bullet.char.clone()),
+          Self::CharacterBullet(bullet) => character_bullet_label(&bullet.char),
           _ => None,
         }
       }
 
-      fn auto_numbered(&self) -> bool {
-        matches!(self, Self::AutoNumberedBullet(_))
+      fn auto_number(&self) -> Option<AutoNumberBullet> {
+        match self {
+          Self::AutoNumberedBullet(bullet) => Some(auto_number_bullet(bullet)),
+          _ => None,
+        }
       }
 
       fn picture_relationship_id(&self) -> Option<String> {
@@ -6652,17 +7352,19 @@ impl_bullet_choice!(a::Level7ParagraphPropertiesChoice4);
 impl_bullet_choice!(a::Level8ParagraphPropertiesChoice4);
 impl_bullet_choice!(a::Level9ParagraphPropertiesChoice4);
 
-fn level_bullet_label(choice: &impl BulletChoice) -> Option<BulletKind> {
+fn level_bullet_label(choice: &impl BulletChoice) -> BulletOverride {
   if choice.no_bullet() {
-    None
+    BulletOverride::Disabled
   } else if let Some(character) = choice.character() {
-    Some(BulletKind {
+    BulletOverride::Kind(BulletKind {
       label: Some(character),
+      auto_number: None,
       picture_relationship_id: None,
     })
-  } else if choice.auto_numbered() {
-    Some(BulletKind {
-      label: Some("1.".to_string()),
+  } else if let Some(auto_number) = choice.auto_number() {
+    BulletOverride::Kind(BulletKind {
+      label: None,
+      auto_number: Some(auto_number),
       picture_relationship_id: None,
     })
   } else {
@@ -6670,8 +7372,11 @@ fn level_bullet_label(choice: &impl BulletChoice) -> Option<BulletKind> {
       .picture_relationship_id()
       .map(|relationship_id| BulletKind {
         label: Some("\u{2022}".to_string()),
+        auto_number: None,
         picture_relationship_id: Some(relationship_id),
       })
+      .map(BulletOverride::Kind)
+      .unwrap_or(BulletOverride::Unspecified)
   }
 }
 
@@ -6848,9 +7553,11 @@ fn apply_text_fill(
 ) {
   match fill {
     a::RunPropertiesChoice::NoFill(_) => {
-      // imports text noFill as 99% CharTransparence, not as a dropped run.
+      // ECMA-376 Part 1, 20.1.8.44: noFill applies no fill to its parent.
+      // Keep the run for layout; the PDF renderer can still paint an
+      // independently specified outline.
       style.color = RgbColor { r: 0, g: 0, b: 0 };
-      style.opacity = 0.01;
+      style.opacity = 0.0;
     }
     a::RunPropertiesChoice::SolidFill(fill) => {
       if let Some(color) = fill
@@ -6881,9 +7588,9 @@ fn apply_default_text_fill(
 ) {
   match fill {
     a::DefaultRunPropertiesChoice::NoFill(_) => {
-      // imports text noFill as 99% CharTransparence, not as a dropped run.
+      // ECMA-376 Part 1, 20.1.8.44: noFill applies no fill to its parent.
       style.color = RgbColor { r: 0, g: 0, b: 0 };
-      style.opacity = 0.01;
+      style.opacity = 0.0;
     }
     a::DefaultRunPropertiesChoice::SolidFill(fill) => {
       if let Some(color) = fill
@@ -7025,13 +7732,31 @@ fn fill_paint(import: &PowerPointImport, fill: &FillProperties) -> Option<Displa
   }
 }
 
+fn fill_paint_for_slide(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  fill: &FillProperties,
+) -> Option<DisplayPaint> {
+  match &fill.kind {
+    FillKind::Solid(color) => color.as_ref().and_then(|color| {
+      display_paint_for_slide(import, slide, color, fill.placeholder_color.as_ref())
+    }),
+    FillKind::None
+    | FillKind::SlideBackground
+    | FillKind::Group
+    | FillKind::Gradient(_)
+    | FillKind::Blip(_)
+    | FillKind::Pattern(_) => None,
+  }
+}
+
 fn shape_fill_paint(
   import: &PowerPointImport,
   slide: &SlidePersist,
   fill: &FillProperties,
 ) -> Option<DisplayPaint> {
   if !matches!(fill.kind, FillKind::SlideBackground) {
-    return fill_paint(import, fill);
+    return fill_paint_for_slide(import, slide, fill);
   }
 
   let Some(background) = resolved_slide_background_fill(import, slide) else {
@@ -7124,4 +7849,248 @@ fn display_paint_for_optional_slide(
 
 fn color_opacity(alpha: i32) -> f32 {
   alpha.clamp(0, 100_000) as f32 / 100_000.0
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn slide_number_field_uses_the_current_presentation_number() {
+    let run = TextRun {
+      text: "‹#›".to_string(),
+      kind: TextRunKind::Field,
+      hyperlink_url: None,
+      field_type: Some("slidenum".to_string()),
+      run_properties: None,
+      field_paragraph_properties: None,
+    };
+    assert_eq!(presentation_field_text(&run, 7), "7");
+  }
+
+  #[test]
+  fn unspecified_bullet_font_preserves_inherited_font() {
+    let mut bullet = BulletDisplay {
+      font: Some("Arial".to_string()),
+      ..BulletDisplay::default()
+    };
+    bullet.apply_font(BulletFontOverride::Unspecified);
+    assert_eq!(bullet.font.as_deref(), Some("Arial"));
+    bullet.apply_font(BulletFontOverride::FollowText);
+    assert!(bullet.font.is_none());
+  }
+
+  #[test]
+  fn character_bullet_uses_one_unicode_code_point() {
+    assert_eq!(character_bullet_label("••").as_deref(), Some("•"));
+    assert_eq!(character_bullet_label(""), None);
+  }
+
+  fn numbered_test_paragraph(level: u8) -> TextParagraph {
+    TextParagraph {
+      level: Some(level),
+      runs: vec![TextRun {
+        text: "item".to_string(),
+        kind: TextRunKind::Run,
+        hyperlink_url: None,
+        field_type: None,
+        run_properties: None,
+        field_paragraph_properties: None,
+      }],
+      ..TextParagraph::default()
+    }
+  }
+
+  #[test]
+  fn drawingml_auto_number_sequences_are_independent_by_paragraph_level() {
+    let mut state = AutoNumberingState::default();
+    let base_bullet = BulletDisplay {
+      auto_number: Some(AutoNumberBullet {
+        scheme: a::TextAutoNumberSchemeValues::ArabicPeriod,
+        start_at: None,
+      }),
+      ..BulletDisplay::default()
+    };
+
+    let mut level_zero_first = base_bullet.clone();
+    state.resolve(&numbered_test_paragraph(0), &mut level_zero_first);
+    let mut level_one_first = base_bullet.clone();
+    state.resolve(&numbered_test_paragraph(1), &mut level_one_first);
+    let mut level_zero_second = base_bullet;
+    state.resolve(&numbered_test_paragraph(0), &mut level_zero_second);
+
+    assert_eq!(level_zero_first.label.as_deref(), Some("1."));
+    assert_eq!(level_one_first.label.as_deref(), Some("1."));
+    assert_eq!(level_zero_second.label.as_deref(), Some("2."));
+  }
+
+  #[test]
+  fn drawingml_auto_number_labels_follow_ecma_schemes() {
+    use a::TextAutoNumberSchemeValues as Scheme;
+
+    assert_eq!(
+      format_auto_number(Scheme::AlphaLowerCharacterPeriod, 27),
+      "aa."
+    );
+    assert_eq!(
+      format_auto_number(Scheme::AlphaLowerCharacterPeriod, 53),
+      "aaa."
+    );
+    assert_eq!(
+      format_auto_number(Scheme::RomanUpperCharacterParenBoth, 3),
+      "(III)"
+    );
+    assert_eq!(
+      format_auto_number(Scheme::EastAsianJapaneseKoreanPeriod, 1),
+      "一."
+    );
+  }
+
+  #[test]
+  fn repeated_start_at_describes_one_continuing_sequence() {
+    let mut state = AutoNumberingState::default();
+    let base_bullet = BulletDisplay {
+      auto_number: Some(AutoNumberBullet {
+        scheme: a::TextAutoNumberSchemeValues::ArabicPeriod,
+        start_at: Some(3),
+      }),
+      ..BulletDisplay::default()
+    };
+    let mut first = base_bullet.clone();
+    state.resolve(&numbered_test_paragraph(0), &mut first);
+    let mut second = base_bullet;
+    state.resolve(&numbered_test_paragraph(0), &mut second);
+
+    assert_eq!(first.label.as_deref(), Some("3."));
+    assert_eq!(second.label.as_deref(), Some("4."));
+  }
+
+  #[test]
+  fn paragraph_keeps_master_shape_and_direct_run_style_precedence_layers() {
+    let run_properties = |font_size| {
+      Some(Box::new(a::DefaultRunProperties {
+        font_size: Some(font_size),
+        ..a::DefaultRunProperties::default()
+      }))
+    };
+    let paragraph = TextParagraph {
+      master_paragraph_style: Some(TextListParagraphStyle::Default(Box::new(
+        a::DefaultParagraphProperties {
+          default_run_properties: run_properties(1_000),
+          ..a::DefaultParagraphProperties::default()
+        },
+      ))),
+      text_paragraph_style: Some(TextListParagraphStyle::Default(Box::new(
+        a::DefaultParagraphProperties {
+          default_run_properties: run_properties(2_000),
+          ..a::DefaultParagraphProperties::default()
+        },
+      ))),
+      paragraph_properties: Some(Box::new(a::ParagraphProperties {
+        default_run_properties: run_properties(3_000),
+        ..a::ParagraphProperties::default()
+      })),
+      ..TextParagraph::default()
+    };
+
+    let style = ParagraphDisplayStyle::from_paragraph(&paragraph);
+
+    assert_eq!(
+      style
+        .master_default_run_properties
+        .as_deref()
+        .and_then(|properties| properties.font_size),
+      Some(1_000)
+    );
+    assert_eq!(
+      style
+        .text_default_run_properties
+        .as_deref()
+        .and_then(|properties| properties.font_size),
+      Some(2_000)
+    );
+    assert_eq!(
+      style
+        .direct_default_run_properties
+        .as_deref()
+        .and_then(|properties| properties.font_size),
+      Some(3_000)
+    );
+  }
+
+  #[test]
+  fn editor_only_placeholder_does_not_render_inherited_bullet() {
+    let style = ParagraphDisplayStyle {
+      bullet: BulletDisplay {
+        label: Some("\u{2022}".to_string()),
+        ..BulletDisplay::default()
+      },
+      ..ParagraphDisplayStyle::default()
+    };
+    let paragraph = TextParagraph {
+      runs: vec![TextRun {
+        text: "Click to add text".to_string(),
+        kind: TextRunKind::Placeholder,
+        hyperlink_url: None,
+        field_type: None,
+        run_properties: None,
+        field_paragraph_properties: None,
+      }],
+      ..TextParagraph::default()
+    };
+
+    let bullet = style.bullet(&paragraph);
+
+    assert!(bullet.label.is_none());
+    assert!(bullet.picture_relationship_id.is_none());
+  }
+
+  #[test]
+  fn empty_paragraph_does_not_render_inherited_bullet() {
+    let style = ParagraphDisplayStyle {
+      bullet: BulletDisplay {
+        label: Some("\u{2022}".to_string()),
+        ..BulletDisplay::default()
+      },
+      ..ParagraphDisplayStyle::default()
+    };
+
+    let bullet = style.bullet(&TextParagraph::default());
+
+    assert!(bullet.label.is_none());
+    assert!(bullet.picture_relationship_id.is_none());
+  }
+
+  #[test]
+  fn explicit_level_no_bullet_clears_inherited_bullet() {
+    let mut style = ParagraphDisplayStyle {
+      bullet: BulletDisplay {
+        label: Some("\u{2022}".to_string()),
+        ..BulletDisplay::default()
+      },
+      ..ParagraphDisplayStyle::default()
+    };
+    style
+      .bullet
+      .apply_kind(level2_paragraph_properties_bullet(&Some(
+        a::Level2ParagraphPropertiesChoice4::NoBullet,
+      )));
+    let paragraph = TextParagraph {
+      level: Some(1),
+      runs: vec![TextRun {
+        text: "Visible text".to_string(),
+        kind: TextRunKind::Run,
+        hyperlink_url: None,
+        field_type: None,
+        run_properties: None,
+        field_paragraph_properties: None,
+      }],
+      ..TextParagraph::default()
+    };
+
+    let bullet = style.bullet(&paragraph);
+
+    assert!(bullet.label.is_none());
+    assert!(bullet.picture_relationship_id.is_none());
+  }
 }

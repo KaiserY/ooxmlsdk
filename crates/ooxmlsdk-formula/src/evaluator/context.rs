@@ -472,6 +472,26 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     reference: &QualifiedRange<'doc>,
     sorted: bool,
   ) -> Option<u32> {
+    if self.book.query_cell_values.is_empty() && self.book.query_empty_cells.is_empty() {
+      let sheet = self.range_sheet(reference);
+      if !sorted {
+        let plan = LookupPlan::from_criteria_value(self, lookup);
+        if let Some(lookup) = plan.exact_index_value()
+          && let Some(row) = indexed_vlookup_row(self.book, sheet, reference.range, lookup)
+        {
+          return row;
+        }
+      }
+      let key = vlookup_cache_key(sheet, reference.range, sorted, lookup);
+      if let Some(row) = key.as_ref().and_then(cached_vlookup_row) {
+        return row;
+      }
+      let row = self.vlookup_plain_reference_row_index(lookup, reference, sorted);
+      if let Some(key) = key {
+        cache_vlookup_row(key, row);
+      }
+      return row;
+    }
     let sheet = self.range_sheet(reference);
     let start_row = reference.range.start.row.min(reference.range.end.row);
     let end_row = reference.range.start.row.max(reference.range.end.row);
@@ -521,6 +541,70 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         }
       } else {
         return Some(row);
+      }
+    }
+    found
+  }
+
+  fn vlookup_plain_reference_row_index(
+    &self,
+    lookup: &FormulaValue<'doc>,
+    reference: &QualifiedRange<'doc>,
+    sorted: bool,
+  ) -> Option<u32> {
+    let sheet = self.range_sheet(reference);
+    let start_row = reference.range.start.row.min(reference.range.end.row);
+    let end_row = reference.range.start.row.max(reference.range.end.row);
+    let search_column = reference.range.start.column.min(reference.range.end.column);
+    let plan = LookupPlan::from_criteria_value(self, lookup);
+    let plan = if sorted {
+      plan.with_op(QueryOp::LessOrEqual)
+    } else {
+      plan
+    }
+    .with_range_lookup(sorted);
+    let start = CellAddress {
+      column: search_column,
+      row: start_row,
+    };
+    let end = CellAddress {
+      column: search_column,
+      row: end_row,
+    };
+    let mut cells = self
+      .book
+      .cells
+      .range((sheet, start)..=(sheet, end))
+      .peekable();
+    let blank = FormulaValue::Blank;
+    let mut found = None;
+    let mut found_value = None;
+    for row in start_row..=end_row {
+      let value = if cells
+        .peek()
+        .is_some_and(|((_, address), _)| address.row == row)
+      {
+        cells.next().map_or(&blank, |(_, value)| value)
+      } else {
+        &blank
+      };
+      if !plan.matches(self, value, false) {
+        if sorted
+          && lookup_candidate_type_matches(&plan, value)
+          && lookup_compare_candidate_to_query(self, value, &plan, true) == Some(1)
+        {
+          break;
+        }
+        continue;
+      }
+      if !sorted {
+        return Some(row);
+      }
+      if lookup_candidate_type_matches(&plan, value)
+        && found_value.is_none_or(|previous| lookup_compare_cells(self, value, previous) >= 0)
+      {
+        found = Some(row);
+        found_value = Some(value);
       }
     }
     found
@@ -1265,11 +1349,18 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         return Some(FormulaValue::Error(FormulaErrorValue::Value));
       }
       let criteria_value = args.value(range_index + 1)?;
-      let criteria_matrix = if self.array_context {
-        self.matrix_values(&criteria_value)
-      } else {
-        vec![vec![self.scalar_binary_operand(criteria_value)]]
-      };
+      // Apache POI TestCountifs::testBug70005 and LibreOffice Calc both
+      // evaluate every element of a multi-value COUNTIFS criterion, even
+      // when the containing cell is not itself marked as an array formula.
+      // Keep scalar coercion for ordinary criteria, but preserve an explicit
+      // array constant so an outer aggregate such as SUM can consume every
+      // COUNTIFS result.
+      let criteria_matrix =
+        if self.array_context || matches!(criteria_value, FormulaValue::Matrix(_)) {
+          self.matrix_values(&criteria_value)
+        } else {
+          vec![vec![self.scalar_binary_operand(criteria_value)]]
+        };
       let criteria_rows = criteria_matrix.len();
       let criteria_columns = criteria_matrix.first().map_or(0, Vec::len);
       if criteria_rows == 0 || criteria_columns == 0 {

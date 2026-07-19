@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ooxmlsdk::parts::chartsheet_part::ChartsheetPart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
@@ -24,6 +26,7 @@ use crate::units;
 
 const CALC_DIGIT_WIDTH_MM: f32 = 2.0;
 const CALC_BASE_COLUMN_PADDING_PX: f32 = 5.0;
+const XLSX_MAX_COLUMN: u32 = 16_384;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CalcSheet {
@@ -36,6 +39,24 @@ pub(crate) struct CalcSheet {
   pub(crate) metrics: SheetMetrics,
   pub(crate) resources: SheetResourceCatalog,
   pub(crate) rows: Vec<CalcRow>,
+  geometry: SheetGeometry,
+  cell_positions: HashMap<CellAddress, (usize, usize)>,
+  row_positions: Box<[(u32, usize)]>,
+}
+
+#[derive(Clone, Debug)]
+struct SheetGeometry {
+  column_offsets_pt: Box<[f32]>,
+  row_overrides: Box<[RowGeometry]>,
+  merged_ranges: Box<[CellRange]>,
+  default_row_height_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RowGeometry {
+  index: u32,
+  height_pt: f32,
+  cumulative_delta_pt: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -46,13 +67,13 @@ pub(crate) struct SheetIdentity {
   pub(crate) active: bool,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct CellAddress {
   pub(crate) col: u32,
   pub(crate) row: u32,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub(crate) struct CellRange {
   pub(crate) start: CellAddress,
   pub(crate) end: CellAddress,
@@ -91,6 +112,7 @@ pub(crate) struct SheetMetrics {
   pub(crate) views: SheetViewCatalog,
   pub(crate) format: SheetFormatModel,
   pub(crate) digit_width_pt: f32,
+  pub(crate) default_digit_width_pt: f32,
   pub(crate) columns: Vec<ColumnModel>,
   pub(crate) merged_ranges: Vec<String>,
   pub(crate) hyperlinks: Vec<HyperlinkModel>,
@@ -172,7 +194,7 @@ pub(crate) struct CalcRow {
 
 #[derive(Clone, Debug)]
 pub(crate) struct CalcCell {
-  pub(crate) reference: Option<String>,
+  address: Option<CellAddress>,
   pub(crate) style_index: Option<u32>,
   pub(crate) data_type: Option<x::CellValues>,
   pub(crate) formula: Option<FormulaModel>,
@@ -209,6 +231,10 @@ impl CalcSheet {
   ) -> Self {
     let page_settings = CalcPageSettings::from_worksheet(&worksheet);
     let metrics = SheetMetrics::from_worksheet(&worksheet, styles, mso_document);
+    let rows = worksheet_rows(&worksheet, shared_strings, mso_document);
+    let geometry = SheetGeometry::new(&metrics, &rows);
+    let cell_positions = cell_positions(&rows);
+    let row_positions = row_positions(&rows);
     Self {
       workbook_index: identity.workbook_index,
       name: identity.name,
@@ -218,7 +244,10 @@ impl CalcSheet {
       page_settings,
       metrics,
       resources,
-      rows: worksheet_rows(&worksheet, shared_strings, mso_document),
+      rows,
+      geometry,
+      cell_positions,
+      row_positions,
     }
   }
 
@@ -228,6 +257,9 @@ impl CalcSheet {
     resources: SheetResourceCatalog,
   ) -> Self {
     let page_settings = CalcPageSettings::from_chartsheet(&chartsheet);
+    let metrics = SheetMetrics::default();
+    let rows = Vec::new();
+    let geometry = SheetGeometry::new(&metrics, &rows);
     Self {
       workbook_index: identity.workbook_index,
       name: identity.name,
@@ -235,13 +267,19 @@ impl CalcSheet {
       state: identity.state,
       active: identity.active,
       page_settings,
-      metrics: SheetMetrics::default(),
+      metrics,
       resources,
-      rows: Vec::new(),
+      rows,
+      geometry,
+      cell_positions: HashMap::new(),
+      row_positions: Box::default(),
     }
   }
 
   pub(crate) fn unresolved(identity: SheetIdentity) -> Self {
+    let metrics = SheetMetrics::default();
+    let rows = Vec::new();
+    let geometry = SheetGeometry::new(&metrics, &rows);
     Self {
       workbook_index: identity.workbook_index,
       name: identity.name,
@@ -249,9 +287,12 @@ impl CalcSheet {
       state: identity.state,
       active: identity.active,
       page_settings: CalcPageSettings::default(),
-      metrics: SheetMetrics::default(),
+      metrics,
       resources: SheetResourceCatalog::default(),
-      rows: Vec::new(),
+      rows,
+      geometry,
+      cell_positions: HashMap::new(),
+      row_positions: Box::default(),
     }
   }
 
@@ -288,6 +329,15 @@ impl CalcSheet {
       used = Some(match used {
         Some(used) => used.union(pivot.output_geometry.whole_range),
         None => pivot.output_geometry.whole_range,
+      });
+    }
+    for table in &self.resources.tables {
+      let Some(range) = table.range else {
+        continue;
+      };
+      used = Some(match used {
+        Some(used) => used.union(range),
+        None => range,
       });
     }
     for anchor in self
@@ -354,10 +404,8 @@ impl CalcSheet {
     address: CellAddress,
     include_merged_cell: bool,
   ) -> CellRect {
-    let x_pt = (1..address.col)
-      .map(|column| self.column_width_pt(column))
-      .sum();
-    let y_pt = (1..address.row).map(|row| self.row_height_pt(row)).sum();
+    let x_pt = self.geometry.column_offset_pt(address.col);
+    let y_pt = self.geometry.row_offset_pt(address.row);
     let end = if include_merged_cell {
       self
         .merged_range_for_cell(address)
@@ -369,21 +417,17 @@ impl CalcSheet {
     CellRect {
       x_pt,
       y_pt,
-      width_pt: (address.col..=end.col)
-        .map(|column| self.column_width_pt(column))
-        .sum(),
-      height_pt: (address.row..=end.row)
-        .map(|row| self.row_height_pt(row))
-        .sum(),
+      width_pt: self.geometry.column_range_width_pt(address.col, end.col),
+      height_pt: self.geometry.row_range_height_pt(address.row, end.row),
     }
   }
 
   pub(crate) fn merged_range_for_cell(&self, address: CellAddress) -> Option<CellRange> {
     self
-      .metrics
+      .geometry
       .merged_ranges
       .iter()
-      .filter_map(|reference| CellRange::parse_a1_range(reference))
+      .copied()
       .find(|range| range.contains(address))
   }
 
@@ -395,12 +439,12 @@ impl CalcSheet {
 
   pub(crate) fn range_rect(&self, range: CellRange) -> CellRect {
     let start = self.cell_rect_with_merge(range.start, false);
-    let width_pt = (range.start.col..=range.end.col)
-      .map(|column| self.column_width_pt(column))
-      .sum();
-    let height_pt = (range.start.row..=range.end.row)
-      .map(|row| self.row_height_pt(row))
-      .sum();
+    let width_pt = self
+      .geometry
+      .column_range_width_pt(range.start.col, range.end.col);
+    let height_pt = self
+      .geometry
+      .row_range_height_pt(range.start.row, range.end.row);
     CellRect {
       width_pt,
       height_pt,
@@ -422,50 +466,43 @@ impl CalcSheet {
   }
 
   pub(crate) fn column_width_pt(&self, column: u32) -> f32 {
-    if let Some(model) = self
-      .metrics
-      .columns
-      .iter()
-      .find(|model| column >= model.first && column <= model.last)
-    {
-      if model.hidden {
-        return 0.0;
-      }
-      if let Some(width) = model.width {
-        return digit_width_to_lo_points(width as f32, self.metrics.digit_width_pt);
-      }
-    }
-    if self
-      .metrics
-      .columns
-      .iter()
-      .any(|model| model.hidden && column >= model.first && column <= model.last)
-    {
-      return 0.0;
-    }
-    self
-      .metrics
-      .format
-      .default_column_width_points(self.metrics.digit_width_pt)
+    self.geometry.column_width_pt(column)
   }
 
   pub(crate) fn row_height_pt(&self, row_index: u32) -> f32 {
-    if self.metrics.format.zero_height {
-      return 0.0;
-    }
-    if let Some(row) = self
-      .rows
+    self.geometry.row_height_pt(row_index)
+  }
+
+  pub(crate) fn cell_at(&self, address: CellAddress) -> Option<&CalcCell> {
+    let &(row, cell) = self.cell_positions.get(&address)?;
+    self.rows.get(row)?.cells.get(cell)
+  }
+
+  pub(crate) fn cell_at_mut(&mut self, address: CellAddress) -> Option<&mut CalcCell> {
+    let &(row, cell) = self.cell_positions.get(&address)?;
+    self.rows.get_mut(row)?.cells.get_mut(cell)
+  }
+
+  pub(crate) fn rows_intersecting_print_area(
+    &self,
+    area: CellRange,
+  ) -> impl Iterator<Item = (u32, &CalcRow)> {
+    let first_row = self
+      .geometry
+      .merged_ranges
       .iter()
-      .find(|row| row.row_index.unwrap_or(0) == row_index)
-    {
-      if row.hidden {
-        return 0.0;
-      }
-      if let Some(height) = row.height {
-        return height as f32;
-      }
-    }
-    self.metrics.format.default_row_height as f32
+      .filter(|merged| merged.intersects(area))
+      .map(|merged| merged.start.row)
+      .fold(area.start.row, u32::min);
+    let start = self
+      .row_positions
+      .partition_point(|(row, _)| *row < first_row);
+    let end = self
+      .row_positions
+      .partition_point(|(row, _)| *row <= area.end.row);
+    self.row_positions[start..end]
+      .iter()
+      .filter_map(|(row_index, position)| self.rows.get(*position).map(|row| (*row_index, row)))
   }
 
   pub(crate) fn column_style_index(&self, column: u32) -> Option<u32> {
@@ -488,6 +525,166 @@ impl CalcSheet {
       .or(row.style_index)
       .or_else(|| self.column_style_index(address.col))
   }
+}
+
+impl SheetGeometry {
+  fn new(metrics: &SheetMetrics, rows: &[CalcRow]) -> Self {
+    let default_column_width_pt = metrics
+      .format
+      .default_column_width_points(metrics.default_digit_width_pt);
+    let mut column_offsets_pt = Vec::with_capacity(XLSX_MAX_COLUMN as usize + 1);
+    column_offsets_pt.push(0.0);
+    for column in 1..=XLSX_MAX_COLUMN {
+      let width = column_width_from_metrics(metrics, column, default_column_width_pt);
+      column_offsets_pt.push(column_offsets_pt.last().copied().unwrap_or(0.0) + width);
+    }
+
+    let default_row_height_pt = if metrics.format.zero_height {
+      0.0
+    } else {
+      metrics.format.default_row_height as f32
+    };
+    let mut row_overrides = rows
+      .iter()
+      .filter_map(|row| {
+        let index = row.row_index?;
+        let height_pt = if metrics.format.zero_height || row.hidden {
+          0.0
+        } else {
+          row
+            .height
+            .map_or(default_row_height_pt, |height| height as f32)
+        };
+        Some((index, height_pt))
+      })
+      .collect::<Vec<_>>();
+    row_overrides.sort_by_key(|(index, _)| *index);
+    row_overrides.dedup_by_key(|(index, _)| *index);
+    let mut cumulative_delta_pt = 0.0;
+    let row_overrides = row_overrides
+      .into_iter()
+      .map(|(index, height_pt)| {
+        cumulative_delta_pt += height_pt - default_row_height_pt;
+        RowGeometry {
+          index,
+          height_pt,
+          cumulative_delta_pt,
+        }
+      })
+      .collect();
+
+    Self {
+      column_offsets_pt: column_offsets_pt.into_boxed_slice(),
+      row_overrides,
+      merged_ranges: metrics
+        .merged_ranges
+        .iter()
+        .filter_map(|reference| CellRange::parse_a1_range(reference))
+        .collect(),
+      default_row_height_pt,
+    }
+  }
+
+  fn column_offset_pt(&self, column: u32) -> f32 {
+    let preceding_columns = column.saturating_sub(1) as usize;
+    self
+      .column_offsets_pt
+      .get(preceding_columns)
+      .copied()
+      .unwrap_or_else(|| *self.column_offsets_pt.last().unwrap_or(&0.0))
+  }
+
+  fn column_width_pt(&self, column: u32) -> f32 {
+    self.column_range_width_pt(column, column)
+  }
+
+  fn column_range_width_pt(&self, start: u32, end: u32) -> f32 {
+    if start == 0 || end < start {
+      return 0.0;
+    }
+    let start = start.saturating_sub(1) as usize;
+    let end = end as usize;
+    match (
+      self.column_offsets_pt.get(start),
+      self.column_offsets_pt.get(end),
+    ) {
+      (Some(start), Some(end)) => end - start,
+      _ => 0.0,
+    }
+  }
+
+  fn row_height_pt(&self, row: u32) -> f32 {
+    self
+      .row_overrides
+      .binary_search_by_key(&row, |geometry| geometry.index)
+      .ok()
+      .map_or(self.default_row_height_pt, |index| {
+        self.row_overrides[index].height_pt
+      })
+  }
+
+  fn row_offset_pt(&self, row: u32) -> f32 {
+    let preceding_rows = row.saturating_sub(1);
+    let override_count = self
+      .row_overrides
+      .partition_point(|geometry| geometry.index <= preceding_rows);
+    let override_delta = override_count
+      .checked_sub(1)
+      .map_or(0.0, |index| self.row_overrides[index].cumulative_delta_pt);
+    preceding_rows as f32 * self.default_row_height_pt + override_delta
+  }
+
+  fn row_range_height_pt(&self, start: u32, end: u32) -> f32 {
+    if start == 0 || end < start {
+      return 0.0;
+    }
+    self.row_offset_pt(end.saturating_add(1)) - self.row_offset_pt(start)
+  }
+}
+
+fn column_width_from_metrics(metrics: &SheetMetrics, column: u32, default_width_pt: f32) -> f32 {
+  if let Some(model) = metrics
+    .columns
+    .iter()
+    .find(|model| column >= model.first && column <= model.last)
+  {
+    if model.hidden {
+      return 0.0;
+    }
+    if let Some(width) = model.width {
+      return digit_width_to_lo_points(width as f32, metrics.digit_width_pt);
+    }
+  }
+  if metrics
+    .columns
+    .iter()
+    .any(|model| model.hidden && column >= model.first && column <= model.last)
+  {
+    return 0.0;
+  }
+  default_width_pt
+}
+
+fn cell_positions(rows: &[CalcRow]) -> HashMap<CellAddress, (usize, usize)> {
+  let mut positions = HashMap::with_capacity(rows.iter().map(|row| row.cells.len()).sum());
+  for (row_index, row) in rows.iter().enumerate() {
+    for (cell_index, cell) in row.cells.iter().enumerate() {
+      if let Some(address) = cell.address {
+        positions.entry(address).or_insert((row_index, cell_index));
+      }
+    }
+  }
+  positions
+}
+
+fn row_positions(rows: &[CalcRow]) -> Box<[(u32, usize)]> {
+  let mut positions = rows
+    .iter()
+    .enumerate()
+    .map(|(position, row)| (row.row_index.unwrap_or(position as u32 + 1), position))
+    .collect::<Vec<_>>();
+  positions.sort_unstable();
+  positions.into_boxed_slice()
 }
 
 fn marker_address(marker: &super::drawing::DrawingMarkerModel) -> CellAddress {
@@ -613,6 +810,20 @@ impl SheetMetrics {
   fn from_worksheet(worksheet: &x::Worksheet, styles: &StylesCatalog, mso_document: bool) -> Self {
     // WorksheetFragment imports dimensions, sheetFormatPr, cols,
     // mergeCells, hyperlinks, rowBreaks, and colBreaks before page layout.
+    let digit_width_pt = styles
+      .document_font_text_style_for_column_width()
+      .as_ref()
+      .map(measured_digit_width_pt)
+      // UnitConverter starts with 1 digit = 2mm. finalizeImport() only
+      // replaces it when StylesBuffer::getDefaultFont() finds an XF/font.
+      .unwrap_or_else(|| units::millimeters_to_points(CALC_DIGIT_WIDTH_MM));
+    let default_digit_width_pt = if styles.uses_application_default_minor_theme() {
+      quantize_digit_width_to_screen_pixel(measured_digit_width_pt(
+        &styles.default_font_text_style(),
+      ))
+    } else {
+      digit_width_pt
+    };
     Self {
       dimension: worksheet
         .sheet_dimension
@@ -625,7 +836,8 @@ impl SheetMetrics {
         .as_ref()
         .map(|format| SheetFormatModel::from_sheet_format_properties(format, mso_document))
         .unwrap_or_default(),
-      digit_width_pt: default_digit_width_pt(styles),
+      digit_width_pt,
+      default_digit_width_pt,
       columns: worksheet
         .columns
         .iter()
@@ -915,15 +1127,16 @@ fn digit_width_to_lo_points(value: f32, digit_width_pt: f32) -> f32 {
     / units::TWIPS_PER_POINT
 }
 
-fn default_digit_width_pt(styles: &StylesCatalog) -> f32 {
+fn measured_digit_width_pt(style: &crate::model::TextStyle) -> f32 {
   // Unit::Digit to 2mm, then UnitConverter::finalizeImport() replaces it with
-  // the default font XFont maximum width across '0'..'9'.
-  let style = styles.default_font_text_style();
+  // the default font XFont maximum width across '0'..'9'. Explicit column
+  // widths retain this document-font measure. The caller separately derives
+  // the localized application default width when theme1.xml is absent.
   let mut text_metrics = TextMetrics::new();
   let digit_width = ('0'..='9')
     .map(|ch| {
       let mut encoded = [0; 4];
-      text_metrics.measure_text(ch.encode_utf8(&mut encoded), &style)
+      text_metrics.measure_text(ch.encode_utf8(&mut encoded), style)
     })
     .fold(0.0_f32, f32::max);
   if digit_width > 0.0 {
@@ -931,6 +1144,10 @@ fn default_digit_width_pt(styles: &StylesCatalog) -> f32 {
   } else {
     units::millimeters_to_points(CALC_DIGIT_WIDTH_MM)
   }
+}
+
+fn quantize_digit_width_to_screen_pixel(width_pt: f32) -> f32 {
+  (width_pt / screen_pixel_width_pt()).round().max(1.0) * screen_pixel_width_pt()
 }
 
 fn screen_pixel_width_pt() -> f32 {
@@ -942,7 +1159,7 @@ fn screen_pixel_width_pt() -> f32 {
 
 impl CalcCell {
   pub(crate) fn address(&self) -> Option<CellAddress> {
-    self.reference.as_deref().and_then(CellAddress::parse_a1)
+    self.address
   }
 
   fn from_cell(
@@ -957,9 +1174,12 @@ impl CalcCell {
       .and_then(|value| value.xml_content.as_deref())
       .map(|_| cell_value.clone());
     Self {
-      reference: resolved_address
-        .map(format_cell_address_a1)
-        .or_else(|| cell.cell_reference.as_ref().map(ToString::to_string)),
+      address: resolved_address.or_else(|| {
+        cell
+          .cell_reference
+          .as_deref()
+          .and_then(CellAddress::parse_a1)
+      }),
       style_index: cell.style_index,
       data_type: cell.data_type,
       formula: cell.cell_formula.as_ref().map(FormulaModel::from_formula),
@@ -977,17 +1197,6 @@ fn decoded_cell_value(cell: &x::Cell) -> String {
     .and_then(|value| value.xml_content.as_deref())
     .map(decode_excel_escaped_text)
     .unwrap_or_default()
-}
-
-fn format_cell_address_a1(address: CellAddress) -> String {
-  let mut col = address.col;
-  let mut letters = Vec::new();
-  while col > 0 {
-    col -= 1;
-    letters.push(char::from(b'A' + u8::try_from(col % 26).unwrap_or(0)));
-    col /= 26;
-  }
-  letters.iter().rev().collect::<String>() + &address.row.to_string()
 }
 
 impl FormulaModel {
@@ -1100,5 +1309,37 @@ fn boolean_cell_value(value: &str) -> bool {
     "true" => true,
     "false" | "" => false,
     value => value.parse::<f64>().is_ok_and(|number| number != 0.0),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn empty_row(row_index: Option<u32>) -> CalcRow {
+    CalcRow {
+      row_index,
+      height: None,
+      custom_height: false,
+      style_index: None,
+      hidden: false,
+      cells: Vec::new(),
+    }
+  }
+
+  #[test]
+  fn print_row_index_is_sorted_once_with_implicit_row_fallback() {
+    let rows = vec![empty_row(Some(9)), empty_row(None), empty_row(Some(3))];
+
+    assert_eq!(row_positions(&rows).as_ref(), &[(2, 1), (3, 2), (9, 0)]);
+  }
+
+  #[test]
+  fn application_default_maximum_digit_width_is_quantized_to_a_96_dpi_pixel() {
+    assert_eq!(quantize_digit_width_to_screen_pixel(5.79), 6.0);
+    assert_eq!(
+      SheetFormatModel::default().default_column_width_points(6.0),
+      51.75
+    );
   }
 }

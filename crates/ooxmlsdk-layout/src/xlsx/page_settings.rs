@@ -149,15 +149,18 @@ pub(crate) struct HeaderFooterModel {
 
 impl Default for CalcPageSettings {
   fn default() -> Self {
-    // PageSettingsModel defaults. Keep these in the PageSettings owner.
+    // Excel's application defaults when SpreadsheetML omits pageMargins.
+    // These are the values used by Apache POI's XSSFSheet::newSheet and by
+    // the ECMA-376 §18.3.1.62 example; explicit pageMargins still replace all
+    // six values in apply_margins.
     Self {
       has_margins: false,
-      margin_left_in: 0.748,
-      margin_right_in: 0.748,
-      margin_top_in: 0.984,
-      margin_bottom_in: 0.984,
-      margin_header_in: 0.512,
-      margin_footer_in: 0.512,
+      margin_left_in: 0.7,
+      margin_right_in: 0.7,
+      margin_top_in: 0.75,
+      margin_bottom_in: 0.75,
+      margin_header_in: 0.3,
+      margin_footer_in: 0.3,
       paper_size: 1,
       valid_printer_settings: true,
       fit_to_page: false,
@@ -206,9 +209,10 @@ impl CalcPageSettings {
     }
     if let Some(page_setup) = &chartsheet.chart_sheet_page_setup {
       settings.paper_size = page_setup.paper_size.unwrap_or(settings.paper_size);
-      settings.valid_printer_settings = page_setup
-        .use_printer_defaults
-        .is_some_and(|value| value.as_bool());
+      settings.valid_printer_settings = page_setup.id.is_none() && page_setup.paper_size == Some(1)
+        || page_setup
+          .use_printer_defaults
+          .is_some_and(|value| value.as_bool());
       settings.orientation = page_setup.orientation;
       settings.horizontal_dpi = page_setup.horizontal_dpi.unwrap_or(settings.horizontal_dpi);
       settings.vertical_dpi = page_setup.vertical_dpi.unwrap_or(settings.vertical_dpi);
@@ -236,10 +240,14 @@ impl CalcPageSettings {
     if let Some(paper_size) = page_setup.paper_size {
       self.paper_size = paper_size;
     }
-    // [MS-OE376] specifies that the default paperSize varies by locale and
-    // default printer. Preserve the current document/printer default when the
-    // attribute is omitted; only an explicit paperSize overrides it.
-    self.valid_printer_settings = page_setup.paper_size.is_none()
+    // The Printer Settings part contains the printer initialization and
+    // environment state, and pageSetup's r:id is its explicit relationship.
+    // Office fixed-format export treats the schema/default Letter value as
+    // uncalibrated and falls back to the active default paper when that
+    // relationship is absent. Non-default explicit sizes remain
+    // authoritative without a relationship.
+    self.valid_printer_settings = page_setup.id.is_none() && page_setup.paper_size == Some(1)
+      || page_setup.paper_size.is_none()
       || page_setup
         .use_printer_defaults
         .is_some_and(|value| value.as_bool());
@@ -311,54 +319,6 @@ impl CalcPageSettings {
   }
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn chartsheet_with_default_orientation_uses_landscape_a4() {
-    let settings = CalcPageSettings::from_chartsheet(&x::Chartsheet::default());
-    let (width, height) = settings.page_size_pt();
-
-    assert!(width > height);
-    assert!((width - units::millimeters_to_points(297.0)).abs() < 0.01);
-    assert!((height - units::millimeters_to_points(210.0)).abs() < 0.01);
-  }
-
-  #[test]
-  fn worksheet_without_explicit_paper_size_keeps_default_a4() {
-    let worksheet = x::Worksheet {
-      page_setup: Some(x::PageSetup {
-        orientation: Some(x::OrientationValues::Portrait),
-        ..Default::default()
-      }),
-      ..Default::default()
-    };
-
-    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
-
-    assert!((width - units::millimeters_to_points(210.0)).abs() < 0.01);
-    assert!((height - units::millimeters_to_points(297.0)).abs() < 0.01);
-  }
-
-  #[test]
-  fn worksheet_with_explicit_letter_paper_size_uses_letter() {
-    let worksheet = x::Worksheet {
-      page_setup: Some(x::PageSetup {
-        paper_size: Some(1),
-        orientation: Some(x::OrientationValues::Portrait),
-        ..Default::default()
-      }),
-      ..Default::default()
-    };
-
-    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
-
-    assert!((width - 8.5 * units::POINTS_PER_INCH).abs() < 0.01);
-    assert!((height - 11.0 * units::POINTS_PER_INCH).abs() < 0.01);
-  }
-}
-
 impl HeaderFooterModel {
   fn from_worksheet(worksheet: &x::Worksheet) -> Self {
     let mut model = worksheet
@@ -404,12 +364,13 @@ impl HeaderFooterModel {
       different_first: header_footer
         .different_first
         .is_some_and(|value| value.as_bool()),
+      // sml.xsd CT_HeaderFooter declares both attributes with default=true.
       scale_with_doc: header_footer
         .scale_with_doc
-        .is_some_and(|value| value.as_bool()),
+        .is_none_or(|value| value.as_bool()),
       align_with_margins: header_footer
         .align_with_margins
-        .is_some_and(|value| value.as_bool()),
+        .is_none_or(|value| value.as_bool()),
       odd_header: header_footer
         .odd_header
         .as_ref()
@@ -481,5 +442,109 @@ impl HeaderFooterModel {
       || self.drawing_relationship_id.is_some()
       || self.drawing_slot_count > 0
       || self.background_picture_relationship_id.is_some()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn worksheet_without_page_margins_uses_excel_application_defaults() {
+    let settings = CalcPageSettings::from_worksheet(&x::Worksheet::default());
+
+    assert!(!settings.has_margins);
+    assert_eq!(settings.margin_left_in, 0.7);
+    assert_eq!(settings.margin_right_in, 0.7);
+    assert_eq!(settings.margin_top_in, 0.75);
+    assert_eq!(settings.margin_bottom_in, 0.75);
+    assert_eq!(settings.margin_header_in, 0.3);
+    assert_eq!(settings.margin_footer_in, 0.3);
+  }
+
+  #[test]
+  fn chartsheet_with_default_orientation_uses_landscape_a4() {
+    let settings = CalcPageSettings::from_chartsheet(&x::Chartsheet::default());
+    let (width, height) = settings.page_size_pt();
+
+    assert!(width > height);
+    assert!((width - units::millimeters_to_points(297.0)).abs() < 0.01);
+    assert!((height - units::millimeters_to_points(210.0)).abs() < 0.01);
+  }
+
+  #[test]
+  fn worksheet_without_explicit_paper_size_keeps_default_a4() {
+    let worksheet = x::Worksheet {
+      page_setup: Some(x::PageSetup {
+        orientation: Some(x::OrientationValues::Portrait),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+
+    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
+
+    assert!((width - units::millimeters_to_points(210.0)).abs() < 0.01);
+    assert!((height - units::millimeters_to_points(297.0)).abs() < 0.01);
+  }
+
+  #[test]
+  fn worksheet_with_explicit_letter_paper_size_uses_letter() {
+    let worksheet = x::Worksheet {
+      page_setup: Some(x::PageSetup {
+        paper_size: Some(1),
+        id: Some("rId1".to_string()),
+        orientation: Some(x::OrientationValues::Portrait),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+
+    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
+
+    assert!((width - 8.5 * units::POINTS_PER_INCH).abs() < 0.01);
+    assert!((height - 11.0 * units::POINTS_PER_INCH).abs() < 0.01);
+  }
+
+  #[test]
+  fn worksheet_without_printer_settings_relationship_uses_default_a4() {
+    let worksheet = x::Worksheet {
+      page_setup: Some(x::PageSetup {
+        paper_size: Some(1),
+        orientation: Some(x::OrientationValues::Portrait),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+
+    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
+
+    assert!((width - units::millimeters_to_points(210.0)).abs() < 0.01);
+    assert!((height - units::millimeters_to_points(297.0)).abs() < 0.01);
+  }
+
+  #[test]
+  fn header_footer_schema_defaults_scale_and_align_with_document() {
+    let model = HeaderFooterModel::from_header_footer(&x::HeaderFooter::default());
+
+    assert!(model.scale_with_doc);
+    assert!(model.align_with_margins);
+  }
+
+  #[test]
+  fn worksheet_without_printer_settings_keeps_nondefault_explicit_paper() {
+    let worksheet = x::Worksheet {
+      page_setup: Some(x::PageSetup {
+        paper_size: Some(8),
+        orientation: Some(x::OrientationValues::Portrait),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+
+    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
+
+    assert!((width - units::millimeters_to_points(297.0)).abs() < 0.01);
+    assert!((height - units::millimeters_to_points(420.0)).abs() < 0.01);
   }
 }

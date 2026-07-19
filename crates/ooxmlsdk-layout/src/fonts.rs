@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use ooxmlsdk_fonts::{
-  FontBytes, FontId, FontRegistry, FontRequest, FontSize, ShapeOptions, ShapedRun, TextScript,
-  script_direction_runs,
+  FontBytes, FontId, FontRegistry, FontRequest, FontSize, ResolvedFontChain, ShapeOptions,
+  ShapedRun, TextScript, script_direction_runs,
 };
 use rustc_hash::FxHashMap as HashMap;
 
@@ -13,7 +13,8 @@ use crate::common;
 use crate::docx::TextStyle;
 
 fn font_timing<T>(label: &str, work: impl FnOnce() -> T) -> T {
-  if std::env::var_os("OOXMLSDK_FONT_TIMING").is_none() {
+  static ENABLED: OnceLock<bool> = OnceLock::new();
+  if !ENABLED.get_or_init(|| std::env::var_os("OOXMLSDK_FONT_TIMING").is_some()) {
     return work();
   }
   let start = Instant::now();
@@ -26,6 +27,8 @@ fn font_timing<T>(label: &str, work: impl FnOnce() -> T) -> T {
 pub struct FontFaceData {
   pub data: Arc<FontBytes>,
   pub index: u32,
+  pub synthetic_bold: bool,
+  pub synthetic_italic: bool,
   id: Arc<str>,
 }
 
@@ -176,7 +179,9 @@ pub fn load_text_face(style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceDa
 #[derive(Debug, Default)]
 pub struct FontResolver {
   font_data_cache: HashMap<FontId, FontFaceData>,
+  font_synthesis_cache: HashMap<FontId, (bool, bool)>,
   font_registry_cache: HashMap<FontFaceKey, Arc<FontRegistry<'static>>>,
+  font_selection_cache: HashMap<FontFaceKey, ResolvedFontChain<'static>>,
   font_face_cache: HashMap<FontFaceKey, FontFaceData>,
   font_metrics_cache: HashMap<FontMetricsKey, FontMetrics>,
   last_font_registry: Option<(FontFaceKey, Arc<FontRegistry<'static>>)>,
@@ -189,6 +194,10 @@ impl FontResolver {
     let request = font_request(style, None);
     let registry = self.style_font_registry(style, None);
     let resolved = registry.resolve(&request).ok()?;
+    self.font_synthesis_cache.insert(
+      resolved.font_id.clone(),
+      (resolved.synthetic_bold, resolved.synthetic_italic),
+    );
     self.font_face_data_from_registry(&registry, &resolved.font_id)
   }
 
@@ -226,7 +235,12 @@ impl FontResolver {
   }
 
   pub fn font_face_data(&self, font_id: &FontId) -> Option<FontFaceData> {
-    self.font_data_cache.get(font_id).cloned()
+    let mut face = self.font_data_cache.get(font_id).cloned()?;
+    if let Some((synthetic_bold, synthetic_italic)) = self.font_synthesis_cache.get(font_id) {
+      face.synthetic_bold = *synthetic_bold;
+      face.synthetic_italic = *synthetic_italic;
+    }
+    Some(face)
   }
 
   pub fn vertical_metrics(
@@ -285,6 +299,7 @@ impl FontResolver {
       script_direction_runs(text, FontSize(style.font_size_pt()), style.small_caps());
     let mut output = Vec::with_capacity(script_runs.len());
     for script_run in script_runs {
+      let key = FontFaceKey::from_style(style, Some(script_run.script));
       let registry = self.style_font_registry(style, Some(script_run.script));
       let mut request = font_request(style, Some(script_run.script));
       request.size_pt = script_run.size_pt;
@@ -294,9 +309,32 @@ impl FontResolver {
       options.small_caps = script_run.small_caps;
       options.scan_registered_fallbacks = false;
       let segment_text = &text[script_run.text_range.clone()];
-      let mut runs = registry
-        .shape_text_runs_with_options(&request, segment_text, &options)
-        .ok()?;
+      if !self.font_selection_cache.contains_key(&key) {
+        let selection = registry.resolve_font_chain(&request).ok()?;
+        self.font_selection_cache.insert(key.clone(), selection);
+      }
+      let (mut runs, synthesis) = {
+        let selection = self.font_selection_cache.get(&key)?;
+        let synthesis = selection
+          .resolved_fonts()
+          .map(|font| {
+            (
+              font.font_id.clone(),
+              font.synthetic_bold,
+              font.synthetic_italic,
+            )
+          })
+          .collect::<Vec<_>>();
+        let runs = registry
+          .shape_text_runs_with_font_chain(selection, segment_text, &options)
+          .ok()?;
+        (runs, synthesis)
+      };
+      self.font_synthesis_cache.extend(
+        synthesis
+          .into_iter()
+          .map(|(font_id, bold, italic)| (font_id, (bold, italic))),
+      );
       for run in &runs {
         let _ = self.font_face_data_from_registry(&registry, &run.font_id);
       }
@@ -337,12 +375,12 @@ impl FontResolver {
     registry: &FontRegistry<'static>,
     font_id: &FontId,
   ) -> Option<FontFaceData> {
-    if let Some(face) = self.font_data_cache.get(font_id) {
-      return Some(face.clone());
+    if self.font_data_cache.contains_key(font_id) {
+      return self.font_face_data(font_id);
     }
     let face = font_face_data_from_registry_binary(font_id, registry)?;
     self.font_data_cache.insert(font_id.clone(), face.clone());
-    Some(face)
+    self.font_face_data(font_id)
   }
 }
 
@@ -433,6 +471,8 @@ fn font_face_data_from_registry_binary(
   Some(FontFaceData {
     data: Arc::new(data),
     index,
+    synthetic_bold: false,
+    synthetic_italic: false,
     id: font_id.0.clone(),
   })
 }

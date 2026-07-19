@@ -1,11 +1,13 @@
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::workbook_part::WorkbookPart;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use std::sync::Arc;
 
 use crate::error::Result;
 use crate::model::{BorderStyle, RgbColor, TextStyle};
-use crate::pptx::drawingml::theme::ThemeFontScheme;
+use crate::pptx::drawingml::color::{ResolvedColor, apply_excel_tint};
+use crate::pptx::drawingml::theme::{ThemeColorScheme, ThemeFontScheme};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct StylesCatalog {
@@ -16,8 +18,55 @@ pub(crate) struct StylesCatalog {
   pub(crate) fill_records: Vec<FillRecord>,
   pub(crate) border_records: Vec<BorderRecord>,
   pub(crate) differential_format_records: Vec<DifferentialFormatRecord>,
+  theme_colors: ThemeColorPalette,
   theme_major_east_asian: Option<Arc<str>>,
   theme_minor_east_asian: Option<Arc<str>>,
+  missing_theme_minor_from_ui: bool,
+  builtin_number_format_locale: BuiltinNumberFormatLocale,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ThemeColorPalette {
+  colors: [Option<RgbColor>; 12],
+}
+
+impl ThemeColorPalette {
+  fn from_dml(scheme: &a::ColorScheme) -> Self {
+    let scheme = ThemeColorScheme::from_dml(scheme);
+    let tokens = [
+      a::ColorSchemeIndexValues::Light1,
+      a::ColorSchemeIndexValues::Dark1,
+      a::ColorSchemeIndexValues::Light2,
+      a::ColorSchemeIndexValues::Dark2,
+      a::ColorSchemeIndexValues::Accent1,
+      a::ColorSchemeIndexValues::Accent2,
+      a::ColorSchemeIndexValues::Accent3,
+      a::ColorSchemeIndexValues::Accent4,
+      a::ColorSchemeIndexValues::Accent5,
+      a::ColorSchemeIndexValues::Accent6,
+      a::ColorSchemeIndexValues::Hyperlink,
+      a::ColorSchemeIndexValues::FollowedHyperlink,
+    ];
+    let mut colors = [None; 12];
+    for (index, token) in tokens.into_iter().enumerate() {
+      colors[index] = scheme
+        .get_color(token)
+        .and_then(|color| color.resolve_rgb(&mut |_| None, None))
+        .map(rgb_from_resolved);
+    }
+    Self { colors }
+  }
+
+  fn get(&self, index: u32) -> Option<RgbColor> {
+    self.colors.get(index as usize).copied().flatten()
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum BuiltinNumberFormatLocale {
+  #[default]
+  EnglishUs,
+  ChineseSimplified,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -106,32 +155,54 @@ impl OrderedF64 {
 }
 
 impl StylesCatalog {
+  pub(crate) fn theme_color(&self, index: u32, tint: f64) -> Option<RgbColor> {
+    let base = self.theme_colors.get(index)?;
+    if tint == 0.0 {
+      return Some(base);
+    }
+    Some(rgb_from_resolved(apply_excel_tint(
+      ResolvedColor::new(base.r, base.g, base.b),
+      tint,
+    )))
+  }
+
   pub(crate) fn from_workbook_part(
     package: &mut SpreadsheetDocument,
     workbook_part: &WorkbookPart,
     ui_language: Option<&str>,
   ) -> Result<Self> {
-    let theme_fonts = if let Some(theme_part) = workbook_part.theme_part(package) {
+    let (theme_fonts, theme_colors) = if let Some(theme_part) = workbook_part.theme_part(package) {
       let theme = theme_part.root_element(package)?;
-      Some(ThemeFontScheme::from_dml(&theme.theme_elements.font_scheme))
+      (
+        Some(ThemeFontScheme::from_dml(&theme.theme_elements.font_scheme)),
+        ThemeColorPalette::from_dml(&theme.theme_elements.color_scheme),
+      )
     } else {
-      None
+      (None, ThemeColorPalette::default())
     };
+    let missing_theme_minor = missing_theme_minor_font(theme_fonts.as_ref(), ui_language);
     let Some(styles_part) = workbook_part.workbook_styles_part(package) else {
-      return Ok(Self::default());
+      return Ok(Self {
+        theme_colors,
+        missing_theme_minor_from_ui: missing_theme_minor.is_some(),
+        theme_minor_east_asian: missing_theme_minor,
+        builtin_number_format_locale: builtin_number_format_locale(ui_language),
+        ..Self::default()
+      });
     };
 
     let stylesheet = styles_part.root_element(package)?;
-    Ok(Self::from_stylesheet(
-      stylesheet,
-      theme_fonts.as_ref(),
-      ui_language,
-    ))
+    let mut catalog =
+      Self::from_stylesheet(stylesheet, theme_fonts.as_ref(), theme_colors, ui_language);
+    catalog.missing_theme_minor_from_ui = missing_theme_minor.is_some();
+    catalog.theme_minor_east_asian = catalog.theme_minor_east_asian.or(missing_theme_minor);
+    Ok(catalog)
   }
 
   fn from_stylesheet(
     stylesheet: &x::Stylesheet,
     theme_fonts: Option<&ThemeFontScheme>,
+    theme_colors: ThemeColorPalette,
     ui_language: Option<&str>,
   ) -> Self {
     let indexed_colors = stylesheet
@@ -198,7 +269,7 @@ impl StylesCatalog {
               x::FontsChoice::Font(font) => Some(font),
               x::FontsChoice::AlternateContent(_) => None,
             })
-            .map(|font| FontRecord::from_font_with_colors(font, &indexed_colors))
+            .map(|font| FontRecord::from_font_with_colors(font, &indexed_colors, &theme_colors))
             .collect()
         })
         .unwrap_or_default(),
@@ -213,7 +284,7 @@ impl StylesCatalog {
               x::FillsChoice::Fill(fill) => Some(fill.as_ref()),
               x::FillsChoice::AlternateContent(_) => None,
             })
-            .map(|fill| FillRecord::from_fill_with_colors(fill, &indexed_colors))
+            .map(|fill| FillRecord::from_fill_with_colors(fill, &indexed_colors, &theme_colors))
             .collect()
         })
         .unwrap_or_default(),
@@ -224,7 +295,9 @@ impl StylesCatalog {
           borders
             .border
             .iter()
-            .map(|border| BorderRecord::from_border_with_colors(border, &indexed_colors))
+            .map(|border| {
+              BorderRecord::from_border_with_colors(border, &indexed_colors, &theme_colors)
+            })
             .collect()
         })
         .unwrap_or_default(),
@@ -243,6 +316,7 @@ impl StylesCatalog {
               DifferentialFormatRecord::from_differential_format_with_colors(
                 format,
                 &indexed_colors,
+                &theme_colors,
               )
             })
             .collect()
@@ -254,6 +328,9 @@ impl StylesCatalog {
       theme_minor_east_asian: theme_fonts
         .and_then(|fonts| fonts.resolve_font_for_language("+mn-ea", ui_language))
         .map(Arc::from),
+      missing_theme_minor_from_ui: false,
+      theme_colors,
+      builtin_number_format_locale: builtin_number_format_locale(ui_language),
     }
   }
 
@@ -277,7 +354,12 @@ impl StylesCatalog {
       11 => Some("0.00E+00"),
       12 => Some("# ?/?"),
       13 => Some("# ??/??"),
-      // spBuiltInFormats_ENGLISH_US maps Excel builtin 14 to M/D/YYYY.
+      // Excel built-in date formats are locale-dependent. [MS-OSHARED]
+      // specifies yyyy/M/d for the Chinese short-date format, and Calc keeps
+      // per-locale built-in format tables instead of a single English table.
+      14 if self.builtin_number_format_locale == BuiltinNumberFormatLocale::ChineseSimplified => {
+        Some("YYYY/M/D")
+      }
       14 => Some("M/D/YYYY"),
       15 => Some("d-mmm-yy"),
       16 => Some("d-mmm"),
@@ -286,6 +368,9 @@ impl StylesCatalog {
       19 => Some("h:mm:ss AM/PM"),
       20 => Some("h:mm"),
       21 => Some("h:mm:ss"),
+      22 if self.builtin_number_format_locale == BuiltinNumberFormatLocale::ChineseSimplified => {
+        Some("YYYY/M/D h:mm")
+      }
       22 => Some("M/D/YYYY h:mm"),
       37 => Some("#,##0 ;(#,##0)"),
       38 => Some("#,##0 ;[Red](#,##0)"),
@@ -337,6 +422,12 @@ impl StylesCatalog {
   pub(crate) fn default_font_text_style(&self) -> TextStyle {
     let mut style = TextStyle::default();
     let Some(font) = self.font_records.first() else {
+      if self.missing_theme_minor_from_ui
+        && let Some(font_family) = &self.theme_minor_east_asian
+      {
+        style.font_family = Some(Arc::clone(font_family));
+        style.east_asia_font_family = Some(Arc::clone(font_family));
+      }
       return style;
     };
     self.apply_font_family(font, &mut style);
@@ -351,6 +442,29 @@ impl StylesCatalog {
     style.underline = font.underline;
     style.strikethrough = font.strikethrough;
     style
+  }
+
+  pub(crate) fn document_font_text_style_for_column_width(&self) -> Option<TextStyle> {
+    let mut style = TextStyle::default();
+    let font = self.font_records.first()?;
+    if self.missing_theme_minor_from_ui {
+      if let Some(name) = &font.name {
+        style.font_family = Some(Arc::clone(name));
+      }
+    } else {
+      self.apply_font_family(font, &mut style);
+    }
+    if let Some(size_pt) = font.size_pt {
+      style.font_size_pt = size_pt.get() as f32;
+    }
+    if let Some(color) = font.color {
+      style.color = color;
+    }
+    style.bold = font.bold;
+    style.italic = font.italic;
+    style.underline = font.underline;
+    style.strikethrough = font.strikethrough;
+    Some(style)
   }
 
   pub(crate) fn fill_color_for_cell(&self, style_index: Option<u32>) -> Option<RgbColor> {
@@ -415,6 +529,13 @@ impl StylesCatalog {
     if font.strikethrough {
       style.strikethrough = true;
     }
+  }
+
+  pub(crate) fn differential_has_font(&self, format_id: u32) -> bool {
+    self
+      .differential_format_records
+      .get(format_id as usize)
+      .is_some_and(|format| format.font.is_some())
   }
 
   pub(crate) fn differential_borders(&self, format_id: u32) -> Option<BorderRecord> {
@@ -500,15 +621,43 @@ impl StylesCatalog {
 
   fn apply_font_family(&self, font: &FontRecord, style: &mut TextStyle) {
     if let Some(theme_font) = self.theme_east_asian_font(font.scheme) {
-      // SpreadsheetML stores Calibri/Cambria alongside the major/minor
-      // scheme. For a CJK UI, Office resolves that scheme through the theme's
-      // matching supplemental script font for the complete cell run.
+      // SpreadsheetML stores Calibri/Aptos alongside the major/minor scheme.
+      // Office's CJK output resolves the complete cell run through the
+      // theme's matching supplemental script font.
       style.font_family = Some(Arc::clone(&theme_font));
       style.east_asia_font_family = Some(theme_font);
     } else if let Some(name) = &font.name {
       style.font_family = Some(Arc::clone(name));
     }
   }
+
+  pub(crate) fn uses_application_default_minor_theme(&self) -> bool {
+    self.missing_theme_minor_from_ui
+  }
+}
+
+fn builtin_number_format_locale(ui_language: Option<&str>) -> BuiltinNumberFormatLocale {
+  let language = ui_language.unwrap_or_default().to_ascii_lowercase();
+  if language == "zh-cn" || language == "zh-hans" || language.starts_with("zh-hans-cn-") {
+    BuiltinNumberFormatLocale::ChineseSimplified
+  } else {
+    BuiltinNumberFormatLocale::EnglishUs
+  }
+}
+
+fn missing_theme_minor_font(
+  theme_fonts: Option<&ThemeFontScheme>,
+  ui_language: Option<&str>,
+) -> Option<Arc<str>> {
+  if theme_fonts.is_some() {
+    return None;
+  }
+  // Office's installed editing language supplies the default theme when an
+  // OOXML package omits theme1.xml. Microsoft documents DengXian as the
+  // Simplified Chinese Office default; retain stored Latin names for every
+  // explicit non-theme font and for all other locales.
+  (builtin_number_format_locale(ui_language) == BuiltinNumberFormatLocale::ChineseSimplified)
+    .then(|| Arc::from("DengXian"))
 }
 
 impl CellFormatRecord {
@@ -564,7 +713,11 @@ impl CellFormatRecord {
 }
 
 impl FontRecord {
-  fn from_font_with_colors(font: &x::Font, indexed_colors: &[RgbColor]) -> Self {
+  fn from_font_with_colors(
+    font: &x::Font,
+    indexed_colors: &[RgbColor],
+    theme_colors: &ThemeColorPalette,
+  ) -> Self {
     let mut record = Self::default();
     for choice in &font.font_choice {
       match choice {
@@ -584,7 +737,7 @@ impl FontRecord {
           record.size_pt = Some(OrderedF64::new(value.val));
         }
         x::FontChoice::Color(value) => {
-          record.color = color_from_color(value, indexed_colors);
+          record.color = color_from_color(value, indexed_colors, theme_colors);
         }
         x::FontChoice::FontName(value) => {
           record.name = Some(Arc::from(value.val.as_str()));
@@ -600,11 +753,17 @@ impl FontRecord {
 }
 
 impl FillRecord {
-  fn from_fill_with_colors(fill: &x::Fill, indexed_colors: &[RgbColor]) -> Self {
+  fn from_fill_with_colors(
+    fill: &x::Fill,
+    indexed_colors: &[RgbColor],
+    theme_colors: &ThemeColorPalette,
+  ) -> Self {
     let color = match &fill.fill_choice {
-      Some(x::FillChoice::PatternFill(pattern)) => color_from_pattern_fill(pattern, indexed_colors),
+      Some(x::FillChoice::PatternFill(pattern)) => {
+        color_from_pattern_fill(pattern, indexed_colors, theme_colors)
+      }
       Some(x::FillChoice::GradientFill(gradient)) => {
-        color_from_gradient_fill(gradient, indexed_colors)
+        color_from_gradient_fill(gradient, indexed_colors, theme_colors)
       }
       None => None,
     };
@@ -613,24 +772,44 @@ impl FillRecord {
 }
 
 impl BorderRecord {
-  fn from_border_with_colors(border: &x::Border, indexed_colors: &[RgbColor]) -> Self {
+  fn from_border_with_colors(
+    border: &x::Border,
+    indexed_colors: &[RgbColor],
+    theme_colors: &ThemeColorPalette,
+  ) -> Self {
     Self {
-      left: border
-        .left_border
-        .as_deref()
-        .and_then(|border| border_style(border.style, border.color.as_ref(), indexed_colors)),
-      right: border
-        .right_border
-        .as_deref()
-        .and_then(|border| border_style(border.style, border.color.as_ref(), indexed_colors)),
-      top: border
-        .top_border
-        .as_deref()
-        .and_then(|border| border_style(border.style, border.color.as_ref(), indexed_colors)),
-      bottom: border
-        .bottom_border
-        .as_deref()
-        .and_then(|border| border_style(border.style, border.color.as_ref(), indexed_colors)),
+      left: border.left_border.as_deref().and_then(|border| {
+        border_style(
+          border.style,
+          border.color.as_ref(),
+          indexed_colors,
+          theme_colors,
+        )
+      }),
+      right: border.right_border.as_deref().and_then(|border| {
+        border_style(
+          border.style,
+          border.color.as_ref(),
+          indexed_colors,
+          theme_colors,
+        )
+      }),
+      top: border.top_border.as_deref().and_then(|border| {
+        border_style(
+          border.style,
+          border.color.as_ref(),
+          indexed_colors,
+          theme_colors,
+        )
+      }),
+      bottom: border.bottom_border.as_deref().and_then(|border| {
+        border_style(
+          border.style,
+          border.color.as_ref(),
+          indexed_colors,
+          theme_colors,
+        )
+      }),
     }
   }
 }
@@ -639,20 +818,21 @@ impl DifferentialFormatRecord {
   fn from_differential_format_with_colors(
     format: &x::DifferentialFormat,
     indexed_colors: &[RgbColor],
+    theme_colors: &ThemeColorPalette,
   ) -> Self {
     Self {
       font: format
         .font
         .as_ref()
-        .map(|font| FontRecord::from_font_with_colors(font, indexed_colors)),
+        .map(|font| FontRecord::from_font_with_colors(font, indexed_colors, theme_colors)),
       fill: format
         .fill
         .as_deref()
-        .map(|fill| FillRecord::from_fill_with_colors(fill, indexed_colors)),
+        .map(|fill| FillRecord::from_fill_with_colors(fill, indexed_colors, theme_colors)),
       border: format
         .border
         .as_deref()
-        .map(|border| BorderRecord::from_border_with_colors(border, indexed_colors)),
+        .map(|border| BorderRecord::from_border_with_colors(border, indexed_colors, theme_colors)),
       alignment: format
         .alignment
         .as_ref()
@@ -704,6 +884,7 @@ impl AlignmentRecord {
 fn color_from_pattern_fill(
   pattern: &x::PatternFill,
   indexed_colors: &[RgbColor],
+  theme_colors: &ThemeColorPalette,
 ) -> Option<RgbColor> {
   let pattern_type = pattern.pattern_type.unwrap_or_default();
   if matches!(pattern_type, x::PatternValues::None) {
@@ -712,11 +893,11 @@ fn color_from_pattern_fill(
   let pattern_color = pattern
     .foreground_color
     .as_ref()
-    .and_then(|color| color_from_foreground_color(color, indexed_colors));
+    .and_then(|color| color_from_foreground_color(color, indexed_colors, theme_colors));
   let fill_color = pattern
     .background_color
     .as_ref()
-    .and_then(|color| color_from_background_color(color, indexed_colors));
+    .and_then(|color| color_from_background_color(color, indexed_colors, theme_colors));
   match pattern_type {
     x::PatternValues::Solid => pattern_color.or(fill_color),
     _ => Some(mix_colors(
@@ -734,12 +915,13 @@ fn color_from_pattern_fill(
 fn color_from_gradient_fill(
   gradient: &x::GradientFill,
   indexed_colors: &[RgbColor],
+  theme_colors: &ThemeColorPalette,
 ) -> Option<RgbColor> {
   let mut colors = gradient
     .gradient_stop
     .iter()
     .map(|stop| &stop.color)
-    .filter_map(|color| color_from_color(color, indexed_colors));
+    .filter_map(|color| color_from_color(color, indexed_colors, theme_colors));
   let first = colors.next()?;
   let Some(second) = colors.next() else {
     return Some(first);
@@ -785,6 +967,7 @@ fn border_style(
   style: Option<x::BorderStyleValues>,
   color: Option<&x::Color>,
   indexed_colors: &[RgbColor],
+  theme_colors: &ThemeColorPalette,
 ) -> Option<BorderStyle> {
   let style = style?;
   if matches!(style, x::BorderStyleValues::None) {
@@ -793,7 +976,7 @@ fn border_style(
   Some(BorderStyle {
     width_pt: border_width_pt(style),
     color: color
-      .and_then(|color| color_from_color(color, indexed_colors))
+      .and_then(|color| color_from_color(color, indexed_colors, theme_colors))
       .unwrap_or(RgbColor { r: 0, g: 0, b: 0 }),
     compound: matches!(style, x::BorderStyleValues::Double),
     ..BorderStyle::default()
@@ -820,34 +1003,81 @@ fn border_width_pt(style: x::BorderStyleValues) -> f32 {
   }
 }
 
-fn color_from_color(color: &x::Color, indexed_colors: &[RgbColor]) -> Option<RgbColor> {
-  color_from_ooxml(color.rgb.as_deref()).or_else(|| {
-    color
-      .indexed
-      .and_then(|index| indexed_colors.get(index as usize).copied())
-  })
+fn color_from_color(
+  color: &x::Color,
+  indexed_colors: &[RgbColor],
+  theme_colors: &ThemeColorPalette,
+) -> Option<RgbColor> {
+  color_from_components(
+    color.theme,
+    color.rgb.as_deref(),
+    color.indexed,
+    color.tint,
+    indexed_colors,
+    theme_colors,
+  )
 }
 
 fn color_from_foreground_color(
   color: &x::ForegroundColor,
   indexed_colors: &[RgbColor],
+  theme_colors: &ThemeColorPalette,
 ) -> Option<RgbColor> {
-  color_from_ooxml(color.rgb.as_deref()).or_else(|| {
-    color
-      .indexed
-      .and_then(|index| indexed_colors.get(index as usize).copied())
-  })
+  color_from_components(
+    color.theme,
+    color.rgb.as_deref(),
+    color.indexed,
+    color.tint,
+    indexed_colors,
+    theme_colors,
+  )
 }
 
 fn color_from_background_color(
   color: &x::BackgroundColor,
   indexed_colors: &[RgbColor],
+  theme_colors: &ThemeColorPalette,
 ) -> Option<RgbColor> {
-  color_from_ooxml(color.rgb.as_deref()).or_else(|| {
-    color
-      .indexed
-      .and_then(|index| indexed_colors.get(index as usize).copied())
+  color_from_components(
+    color.theme,
+    color.rgb.as_deref(),
+    color.indexed,
+    color.tint,
+    indexed_colors,
+    theme_colors,
+  )
+}
+
+fn color_from_components(
+  theme: Option<u32>,
+  rgb: Option<&str>,
+  indexed: Option<u32>,
+  tint: Option<f64>,
+  indexed_colors: &[RgbColor],
+  theme_colors: &ThemeColorPalette,
+) -> Option<RgbColor> {
+  // sc/source/filter/oox/stylesbuffer.cxx XlsColor::importColor(). Excel gives
+  // theme precedence over rgb and indexed when malformed input supplies more
+  // than one representation.
+  let base = theme
+    .and_then(|index| theme_colors.get(index))
+    .or_else(|| color_from_ooxml(rgb))
+    .or_else(|| indexed.and_then(|index| indexed_colors.get(index as usize).copied()))?;
+  Some(match tint {
+    Some(tint) if tint != 0.0 => rgb_from_resolved(apply_excel_tint(
+      ResolvedColor::new(base.r, base.g, base.b),
+      tint,
+    )),
+    _ => base,
   })
+}
+
+fn rgb_from_resolved(color: ResolvedColor) -> RgbColor {
+  RgbColor {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+  }
 }
 
 fn color_from_ooxml(rgb: Option<&str>) -> Option<RgbColor> {
@@ -1013,5 +1243,101 @@ mod tests {
 
     assert_eq!(style.font_family.as_deref(), Some("SimSun"));
     assert_eq!(style.east_asia_font_family.as_deref(), Some("SimSun"));
+  }
+
+  #[test]
+  fn builtin_short_date_format_follows_the_output_ui_language() {
+    let simplified_chinese = StylesCatalog {
+      builtin_number_format_locale: builtin_number_format_locale(Some("zh-CN")),
+      ..StylesCatalog::default()
+    };
+    let english = StylesCatalog::default();
+
+    assert_eq!(simplified_chinese.number_format_code(14), Some("YYYY/M/D"));
+    assert_eq!(
+      simplified_chinese.number_format_code(22),
+      Some("YYYY/M/D h:mm")
+    );
+    assert_eq!(english.number_format_code(14), Some("M/D/YYYY"));
+  }
+
+  #[test]
+  fn missing_theme_uses_the_simplified_chinese_office_minor_font() {
+    let catalog = StylesCatalog {
+      theme_minor_east_asian: missing_theme_minor_font(None, Some("zh-CN")),
+      missing_theme_minor_from_ui: true,
+      ..StylesCatalog::default()
+    };
+    let themed_font = FontRecord {
+      name: Some(Arc::from("Calibri")),
+      scheme: x::FontSchemeValues::Minor,
+      ..FontRecord::default()
+    };
+    let explicit_font = FontRecord {
+      name: Some(Arc::from("Calibri")),
+      ..FontRecord::default()
+    };
+
+    let mut themed_style = TextStyle::default();
+    catalog.apply_font_family(&themed_font, &mut themed_style);
+    let mut explicit_style = TextStyle::default();
+    catalog.apply_font_family(&explicit_font, &mut explicit_style);
+
+    assert_eq!(themed_style.font_family.as_deref(), Some("DengXian"));
+    assert_eq!(explicit_style.font_family.as_deref(), Some("Calibri"));
+    assert!(catalog.uses_application_default_minor_theme());
+    assert_eq!(missing_theme_minor_font(None, Some("en-US")), None);
+  }
+
+  #[test]
+  fn workbook_without_a_styles_part_uses_the_application_default_font() {
+    let catalog = StylesCatalog {
+      theme_minor_east_asian: Some(Arc::from("DengXian")),
+      missing_theme_minor_from_ui: true,
+      ..StylesCatalog::default()
+    };
+
+    let style = catalog.default_font_text_style();
+
+    assert_eq!(style.font_family.as_deref(), Some("DengXian"));
+    assert_eq!(style.east_asia_font_family.as_deref(), Some("DengXian"));
+  }
+
+  #[test]
+  fn explicit_column_width_keeps_the_stored_normal_font_snapshot() {
+    let catalog = StylesCatalog {
+      font_records: vec![FontRecord {
+        name: Some(Arc::from("Calibri")),
+        scheme: x::FontSchemeValues::Minor,
+        ..FontRecord::default()
+      }],
+      theme_minor_east_asian: Some(Arc::from("DengXian")),
+      missing_theme_minor_from_ui: true,
+      ..StylesCatalog::default()
+    };
+
+    assert_eq!(
+      catalog.default_font_text_style().font_family.as_deref(),
+      Some("DengXian")
+    );
+    assert_eq!(
+      catalog
+        .document_font_text_style_for_column_width()
+        .unwrap()
+        .font_family
+        .as_deref(),
+      Some("Calibri")
+    );
+  }
+
+  #[test]
+  fn missing_default_font_keeps_unit_converter_digit_fallback() {
+    let catalog = StylesCatalog::default();
+
+    assert!(
+      catalog
+        .document_font_text_style_for_column_width()
+        .is_none()
+    );
   }
 }

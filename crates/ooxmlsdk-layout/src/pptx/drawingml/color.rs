@@ -3,8 +3,6 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
 const COLOR_PERCENT_MAX: i32 = 100_000;
-const DEC_GAMMA: f64 = 2.3;
-const INC_GAMMA: f64 = 1.0 / DEC_GAMMA;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Color {
@@ -36,6 +34,17 @@ impl Color {
       a::HighlightChoice::SchemeColor(color) => Some(scheme_color(color)),
       a::HighlightChoice::PresetColor(color) => Some(preset_color(color)),
       a::HighlightChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_bullet_color_choice(choice: &a::BulletColorChoice) -> Option<Self> {
+    match choice {
+      a::BulletColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::BulletColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::BulletColorChoice::HslColor(color) => Some(hsl_color(color)),
+      a::BulletColorChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::BulletColorChoice::PresetColor(color) => Some(preset_color(color)),
+      a::BulletColorChoice::SystemColor(color) => Some(system_color(color)),
     }
   }
 
@@ -402,6 +411,29 @@ impl ResolvedColor {
       u8::from_str_radix(&hex[4..6], 16).ok()?,
     ))
   }
+}
+
+pub(crate) fn apply_excel_tint(mut color: ResolvedColor, tint: f64) -> ResolvedColor {
+  // oox/source/drawingml/color.cxx Color::addExcelTintTransformation().
+  // SpreadsheetML tint is an HSL luminance transform, not an sRGB blend.
+  let value = (tint.abs() * f64::from(COLOR_PERCENT_MAX))
+    .round()
+    .clamp(0.0, f64::from(COLOR_PERCENT_MAX)) as i32;
+  if tint > 0.0 {
+    apply_hsl_transform(
+      &mut color,
+      ColorTransformationKind::LumMod,
+      COLOR_PERCENT_MAX - value,
+    );
+    apply_hsl_transform(&mut color, ColorTransformationKind::LumOff, value);
+  } else if tint < 0.0 {
+    apply_hsl_transform(
+      &mut color,
+      ColorTransformationKind::LumMod,
+      COLOR_PERCENT_MAX - value,
+    );
+  }
+  color
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -797,8 +829,8 @@ fn apply_transformations(color: &mut ResolvedColor, transformations: &[ColorTran
       ColorTransformationKind::Inv => {
         apply_inverse(color);
       }
-      ColorTransformationKind::Gamma => apply_gamma(color, INC_GAMMA),
-      ColorTransformationKind::InvGamma => apply_gamma(color, DEC_GAMMA),
+      ColorTransformationKind::Gamma => apply_gamma(color, false),
+      ColorTransformationKind::InvGamma => apply_gamma(color, true),
       ColorTransformationKind::Hue
       | ColorTransformationKind::HueMod
       | ColorTransformationKind::HueOff
@@ -866,10 +898,10 @@ fn apply_gray(color: &mut ResolvedColor) {
   color.b = gray as u8;
 }
 
-fn apply_gamma(color: &mut ResolvedColor, gamma: f64) {
-  color.r = gamma_channel(color.r, gamma);
-  color.g = gamma_channel(color.g, gamma);
-  color.b = gamma_channel(color.b, gamma);
+fn apply_gamma(color: &mut ResolvedColor, inverse: bool) {
+  color.r = gamma_channel(color.r, inverse);
+  color.g = gamma_channel(color.g, inverse);
+  color.b = gamma_channel(color.b, inverse);
 }
 
 fn apply_inverse(color: &mut ResolvedColor) {
@@ -884,22 +916,58 @@ fn set_rgb_preserve_alpha(color: &mut ResolvedColor, rgb: ResolvedColor) {
   color.b = rgb.b;
 }
 
-fn gamma_channel(value: u8, gamma: f64) -> u8 {
-  crgb_percent_to_channel(gamma_percent(channel_to_crgb_percent(value), gamma))
+fn gamma_channel(value: u8, inverse: bool) -> u8 {
+  let linear = channel_to_crgb_percent(value);
+  let transformed = if inverse {
+    srgb_to_linear_percent(linear)
+  } else {
+    linear_to_srgb_percent(linear)
+  };
+  crgb_percent_to_channel(transformed)
 }
 
 fn crgb_percent_to_channel(value: i32) -> u8 {
-  let gamma = gamma_percent(clamp_percent(value), INC_GAMMA);
-  ((gamma * 255) / COLOR_PERCENT_MAX).clamp(0, 255) as u8
+  // ECMA-376 Part 1, 20.1.2.3.30 and 20.1.2.3.32 distinguish linear
+  // scRGB from sRGB. Use the sRGB transfer function cited by the standard;
+  // the older 2.2/2.3 power approximation does not preserve Office's 8-bit
+  // color results after DrawingML tint and shade transforms.
+  let linear = f64::from(clamp_percent(value)) / f64::from(COLOR_PERCENT_MAX);
+  let srgb = if linear <= 0.003_130_8 {
+    linear * 12.92
+  } else {
+    1.055 * linear.powf(1.0 / 2.4) - 0.055
+  };
+  (srgb * 255.0).round().clamp(0.0, 255.0) as u8
 }
 
 fn channel_to_crgb_percent(value: u8) -> i32 {
-  gamma_percent((i32::from(value) * COLOR_PERCENT_MAX) / 255, DEC_GAMMA)
+  let srgb = f64::from(value) / 255.0;
+  let linear = if srgb <= 0.040_45 {
+    srgb / 12.92
+  } else {
+    ((srgb + 0.055) / 1.055).powf(2.4)
+  };
+  (linear * f64::from(COLOR_PERCENT_MAX)).round() as i32
 }
 
-fn gamma_percent(value: i32, gamma: f64) -> i32 {
-  ((clamp_percent(value) as f64 / COLOR_PERCENT_MAX as f64).powf(gamma) * COLOR_PERCENT_MAX as f64
-    + 0.5) as i32
+fn linear_to_srgb_percent(value: i32) -> i32 {
+  let linear = f64::from(clamp_percent(value)) / f64::from(COLOR_PERCENT_MAX);
+  let srgb = if linear <= 0.003_130_8 {
+    linear * 12.92
+  } else {
+    1.055 * linear.powf(1.0 / 2.4) - 0.055
+  };
+  (srgb * f64::from(COLOR_PERCENT_MAX)).round() as i32
+}
+
+fn srgb_to_linear_percent(value: i32) -> i32 {
+  let srgb = f64::from(clamp_percent(value)) / f64::from(COLOR_PERCENT_MAX);
+  let linear = if srgb <= 0.040_45 {
+    srgb / 12.92
+  } else {
+    ((srgb + 0.055) / 1.055).powf(2.4)
+  };
+  (linear * f64::from(COLOR_PERCENT_MAX)).round() as i32
 }
 
 fn mod_crgb_channel(channel: u8, value: i32) -> u8 {
@@ -1010,4 +1078,39 @@ fn hue_to_channel(p: f64, q: f64, mut t: f64) -> u8 {
     p
   };
   (value * 255.0).round().clamp(0.0, 255.0) as u8
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn scrgb_conversion_matches_ecma_examples() {
+    assert_eq!(crgb_percent_to_channel(50_000), 0xbc);
+
+    let mut tint = ResolvedColor::new(0, 255, 0);
+    apply_tint(&mut tint, 50_000);
+    assert_eq!(tint, ResolvedColor::new(0xbc, 255, 0xbc));
+
+    let mut shade = ResolvedColor::new(0, 255, 0);
+    apply_shade(&mut shade, 50_000);
+    assert_eq!(shade, ResolvedColor::new(0, 0xbc, 0));
+  }
+
+  #[test]
+  fn srgb_linear_conversion_round_trips_every_channel() {
+    for channel in 0..=u8::MAX {
+      assert_eq!(
+        crgb_percent_to_channel(channel_to_crgb_percent(channel)),
+        channel
+      );
+    }
+  }
+
+  #[test]
+  fn tint_uses_linear_srgb_components() {
+    let mut color = ResolvedColor::new(0, 0, 0);
+    apply_tint(&mut color, 75_000);
+    assert_eq!(color, ResolvedColor::new(0x89, 0x89, 0x89));
+  }
 }

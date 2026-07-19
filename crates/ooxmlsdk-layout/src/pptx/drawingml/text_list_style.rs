@@ -38,6 +38,53 @@ pub(crate) enum TextListLevelParagraphProperties {
   Level9(Box<a::Level9ParagraphProperties>),
 }
 
+macro_rules! inherit_missing {
+  ($merged:ident, $base:expr, $($field:ident),+ $(,)?) => {
+    $(
+      if $merged.$field.is_none() {
+        $merged.$field = $base.$field.clone();
+      }
+    )+
+  };
+}
+
+macro_rules! merge_paragraph_properties {
+  ($source:expr, $base:expr, $choice1:ident, $choice2:ident, $choice3:ident,
+   $choice4:ident) => {{
+    let mut merged = (**$source).clone();
+    inherit_missing!(
+      merged,
+      $base,
+      left_margin,
+      right_margin,
+      level,
+      indent,
+      alignment,
+      default_tab_size,
+      right_to_left,
+      east_asian_line_break,
+      font_alignment,
+      latin_line_break,
+      height,
+      line_spacing,
+      space_before,
+      space_after,
+      $choice1,
+      $choice2,
+      $choice3,
+      $choice4,
+      tab_stop_list,
+      extension_list,
+    );
+    merged.default_run_properties = merge_default_run_properties(
+      $base.default_run_properties.as_deref(),
+      merged.default_run_properties.as_deref(),
+    )
+    .map(Box::new);
+    merged
+  }};
+}
+
 impl TextListParagraphStyleRef<'_> {
   pub(crate) fn to_owned_style(self) -> TextListParagraphStyle {
     match self {
@@ -204,7 +251,10 @@ impl TextListStyle {
 
   pub(crate) fn merge_from(&mut self, source: &Self) {
     if let Some(properties) = &source.default_paragraph_properties {
-      self.default_paragraph_properties = Some(properties.clone());
+      self.default_paragraph_properties = Some(Box::new(merge_default_paragraph_properties(
+        self.default_paragraph_properties.as_deref(),
+        properties,
+      )));
     }
     for level_style in &source.levels {
       if let Some(existing) = self
@@ -212,7 +262,7 @@ impl TextListStyle {
         .iter_mut()
         .find(|existing| existing.level == level_style.level)
       {
-        *existing = level_style.clone_preserving_inherited_alignment(existing);
+        *existing = level_style.clone_merged_over(existing);
       } else {
         self.levels.push(level_style.clone());
       }
@@ -253,55 +303,202 @@ impl TextListLevelStyle {
     }
   }
 
-  fn clone_preserving_inherited_alignment(&self, inherited: &Self) -> Self {
-    let mut merged = self.clone();
-    if merged.paragraph_properties.alignment().is_none() {
-      merged
+  fn clone_merged_over(&self, inherited: &Self) -> Self {
+    Self {
+      level: self.level,
+      paragraph_properties: self
         .paragraph_properties
-        .set_alignment(inherited.paragraph_properties.alignment());
+        .clone_merged_over(&inherited.paragraph_properties),
     }
-    merged
   }
 }
 
 impl TextListLevelParagraphProperties {
-  fn alignment(&self) -> Option<a::TextAlignmentTypeValues> {
-    macro_rules! alignment {
-      ($properties:expr) => {
-        $properties.alignment
+  fn clone_merged_over(&self, inherited: &Self) -> Self {
+    macro_rules! merge_level {
+      ($variant:ident, $source:expr, $base:expr, $choice1:ident, $choice2:ident,
+       $choice3:ident, $choice4:ident) => {
+        Self::$variant(Box::new(merge_paragraph_properties!(
+          $source, $base, $choice1, $choice2, $choice3, $choice4
+        )))
       };
     }
-    match self {
-      Self::Level1(properties) => alignment!(properties),
-      Self::Level2(properties) => alignment!(properties),
-      Self::Level3(properties) => alignment!(properties),
-      Self::Level4(properties) => alignment!(properties),
-      Self::Level5(properties) => alignment!(properties),
-      Self::Level6(properties) => alignment!(properties),
-      Self::Level7(properties) => alignment!(properties),
-      Self::Level8(properties) => alignment!(properties),
-      Self::Level9(properties) => alignment!(properties),
+    match (self, inherited) {
+      (Self::Level1(source), Self::Level1(base)) => merge_level!(
+        Level1,
+        source,
+        base,
+        level1_paragraph_properties_choice1,
+        level1_paragraph_properties_choice2,
+        level1_paragraph_properties_choice3,
+        level1_paragraph_properties_choice4
+      ),
+      (Self::Level2(source), Self::Level2(base)) => merge_level!(
+        Level2,
+        source,
+        base,
+        level2_paragraph_properties_choice1,
+        level2_paragraph_properties_choice2,
+        level2_paragraph_properties_choice3,
+        level2_paragraph_properties_choice4
+      ),
+      (Self::Level3(source), Self::Level3(base)) => merge_level!(
+        Level3,
+        source,
+        base,
+        level3_paragraph_properties_choice1,
+        level3_paragraph_properties_choice2,
+        level3_paragraph_properties_choice3,
+        level3_paragraph_properties_choice4
+      ),
+      (Self::Level4(source), Self::Level4(base)) => merge_level!(
+        Level4,
+        source,
+        base,
+        level4_paragraph_properties_choice1,
+        level4_paragraph_properties_choice2,
+        level4_paragraph_properties_choice3,
+        level4_paragraph_properties_choice4
+      ),
+      (Self::Level5(source), Self::Level5(base)) => merge_level!(
+        Level5,
+        source,
+        base,
+        level5_paragraph_properties_choice1,
+        level5_paragraph_properties_choice2,
+        level5_paragraph_properties_choice3,
+        level5_paragraph_properties_choice4
+      ),
+      (Self::Level6(source), Self::Level6(base)) => merge_level!(
+        Level6,
+        source,
+        base,
+        level6_paragraph_properties_choice1,
+        level6_paragraph_properties_choice2,
+        level6_paragraph_properties_choice3,
+        level6_paragraph_properties_choice4
+      ),
+      (Self::Level7(source), Self::Level7(base)) => merge_level!(
+        Level7,
+        source,
+        base,
+        level7_paragraph_properties_choice1,
+        level7_paragraph_properties_choice2,
+        level7_paragraph_properties_choice3,
+        level7_paragraph_properties_choice4
+      ),
+      (Self::Level8(source), Self::Level8(base)) => merge_level!(
+        Level8,
+        source,
+        base,
+        level8_paragraph_properties_choice1,
+        level8_paragraph_properties_choice2,
+        level8_paragraph_properties_choice3,
+        level8_paragraph_properties_choice4
+      ),
+      (Self::Level9(source), Self::Level9(base)) => merge_level!(
+        Level9,
+        source,
+        base,
+        level9_paragraph_properties_choice1,
+        level9_paragraph_properties_choice2,
+        level9_paragraph_properties_choice3,
+        level9_paragraph_properties_choice4
+      ),
+      _ => self.clone(),
     }
   }
+}
 
-  fn set_alignment(&mut self, alignment: Option<a::TextAlignmentTypeValues>) {
-    macro_rules! set_alignment {
-      ($properties:expr) => {
-        $properties.alignment = alignment
-      };
-    }
-    match self {
-      Self::Level1(properties) => set_alignment!(properties),
-      Self::Level2(properties) => set_alignment!(properties),
-      Self::Level3(properties) => set_alignment!(properties),
-      Self::Level4(properties) => set_alignment!(properties),
-      Self::Level5(properties) => set_alignment!(properties),
-      Self::Level6(properties) => set_alignment!(properties),
-      Self::Level7(properties) => set_alignment!(properties),
-      Self::Level8(properties) => set_alignment!(properties),
-      Self::Level9(properties) => set_alignment!(properties),
-    }
-  }
+fn merge_default_paragraph_properties(
+  inherited: Option<&a::DefaultParagraphProperties>,
+  source: &a::DefaultParagraphProperties,
+) -> a::DefaultParagraphProperties {
+  let Some(inherited) = inherited else {
+    return source.clone();
+  };
+  let mut merged = source.clone();
+  inherit_missing!(
+    merged,
+    inherited,
+    left_margin,
+    right_margin,
+    level,
+    indent,
+    alignment,
+    default_tab_size,
+    right_to_left,
+    east_asian_line_break,
+    font_alignment,
+    latin_line_break,
+    height,
+    line_spacing,
+    space_before,
+    space_after,
+    default_paragraph_properties_choice1,
+    default_paragraph_properties_choice2,
+    default_paragraph_properties_choice3,
+    default_paragraph_properties_choice4,
+    tab_stop_list,
+    extension_list,
+  );
+  merged.default_run_properties = merge_default_run_properties(
+    inherited.default_run_properties.as_deref(),
+    merged.default_run_properties.as_deref(),
+  )
+  .map(Box::new);
+  merged
+}
+
+fn merge_default_run_properties(
+  inherited: Option<&a::DefaultRunProperties>,
+  source: Option<&a::DefaultRunProperties>,
+) -> Option<a::DefaultRunProperties> {
+  let Some(inherited) = inherited else {
+    return source.cloned();
+  };
+  let Some(source) = source else {
+    return Some(inherited.clone());
+  };
+  let mut merged = source.clone();
+  inherit_missing!(
+    merged,
+    inherited,
+    kumimoji,
+    language,
+    alternative_language,
+    font_size,
+    bold,
+    italic,
+    underline,
+    strike,
+    kerning,
+    capital,
+    spacing,
+    normalize_height,
+    baseline,
+    no_proof,
+    dirty,
+    spelling_error,
+    smart_tag_clean,
+    smart_tag_id,
+    bookmark,
+    outline,
+    default_run_properties_choice1,
+    default_run_properties_choice2,
+    highlight,
+    default_run_properties_choice3,
+    default_run_properties_choice4,
+    latin_font,
+    east_asian_font,
+    complex_script_font,
+    symbol_font,
+    hyperlink_on_click,
+    hyperlink_on_mouse_over,
+    right_to_left,
+    extension_list,
+  );
+  Some(merged)
 }
 
 struct TextListStyleParts {
@@ -315,4 +512,71 @@ struct TextListStyleParts {
   level7_paragraph_properties: Option<Box<a::Level7ParagraphProperties>>,
   level8_paragraph_properties: Option<Box<a::Level8ParagraphProperties>>,
   level9_paragraph_properties: Option<Box<a::Level9ParagraphProperties>>,
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn merge_preserves_unspecified_master_run_properties() {
+    let inherited_run = a::DefaultRunProperties {
+      font_size: Some(4400),
+      latin_font: Some(a::LatinFont {
+        typeface: Some("+mj-lt".to_string()),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let mut inherited = TextListStyle {
+      levels: vec![TextListLevelStyle::new(
+        1,
+        TextListLevelParagraphProperties::Level1(Box::new(a::Level1ParagraphProperties {
+          left_margin: Some(342900),
+          default_run_properties: Some(Box::new(inherited_run)),
+          ..Default::default()
+        })),
+      )],
+      ..Default::default()
+    };
+    let source = TextListStyle {
+      levels: vec![TextListLevelStyle::new(
+        1,
+        TextListLevelParagraphProperties::Level1(Box::new(a::Level1ParagraphProperties {
+          alignment: Some(a::TextAlignmentTypeValues::Center),
+          default_run_properties: Some(Box::new(a::DefaultRunProperties {
+            font_size: Some(2400),
+            ..Default::default()
+          })),
+          ..Default::default()
+        })),
+      )],
+      ..Default::default()
+    };
+
+    inherited.merge_from(&source);
+
+    let TextListLevelParagraphProperties::Level1(properties) =
+      &inherited.levels[0].paragraph_properties
+    else {
+      panic!("expected level 1 paragraph properties");
+    };
+    assert_eq!(properties.left_margin, Some(342900));
+    assert_eq!(
+      properties.alignment,
+      Some(a::TextAlignmentTypeValues::Center)
+    );
+    let run = properties
+      .default_run_properties
+      .as_deref()
+      .expect("merged default run properties");
+    assert_eq!(run.font_size, Some(2400));
+    assert_eq!(
+      run
+        .latin_font
+        .as_ref()
+        .and_then(|font| font.typeface.as_deref()),
+      Some("+mj-lt")
+    );
+  }
 }

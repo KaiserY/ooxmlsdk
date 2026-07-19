@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -7,6 +8,7 @@ use icu_collator::options::{CollatorOptions, Strength};
 use icu_collator::{Collator, CollatorBorrowed, CollatorPreferences};
 use icu_locale::Locale;
 use num_complex::Complex;
+use rustc_hash::FxHashMap;
 
 use crate::calc::CalcEngine;
 use crate::calc::datetime::{
@@ -66,3 +68,182 @@ pub(crate) use query::{
   database_criterion_entry_present, query_candidate_number,
 };
 pub(crate) use stack::{EvalArg, EvalArgs, EvalOperand};
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct VlookupCacheKey {
+  sheet: SheetId,
+  range: CellRange,
+  sorted: bool,
+  lookup: VlookupCacheValue,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum VlookupCacheValue {
+  Number(u64),
+  String(String),
+  Boolean(bool),
+  Error(FormulaErrorValue),
+  Blank,
+}
+
+#[derive(Default)]
+struct VlookupCache {
+  depth: usize,
+  rows: FxHashMap<VlookupCacheKey, Option<u32>>,
+  indexes: FxHashMap<VlookupRangeKey, FxHashMap<VlookupIndexValue, u32>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct VlookupRangeKey {
+  sheet: SheetId,
+  start: CellAddress,
+  end: CellAddress,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(super) enum VlookupIndexValue {
+  Number(u64),
+  AsciiText(String),
+}
+
+thread_local! {
+  static VLOOKUP_CACHE: RefCell<VlookupCache> = RefCell::new(VlookupCache::default());
+}
+
+struct VlookupCacheScope;
+
+impl Drop for VlookupCacheScope {
+  fn drop(&mut self) {
+    VLOOKUP_CACHE.with(|cache| {
+      let mut cache = cache.borrow_mut();
+      cache.depth = cache.depth.saturating_sub(1);
+      if cache.depth == 0 {
+        cache.rows.clear();
+        cache.indexes.clear();
+      }
+    });
+  }
+}
+
+pub(crate) fn with_lookup_cache<R>(f: impl FnOnce() -> R) -> R {
+  VLOOKUP_CACHE.with(|cache| {
+    let mut cache = cache.borrow_mut();
+    if cache.depth == 0 {
+      cache.rows.clear();
+      cache.indexes.clear();
+    }
+    cache.depth += 1;
+  });
+  let _scope = VlookupCacheScope;
+  f()
+}
+
+fn vlookup_cache_key(
+  sheet: SheetId,
+  range: CellRange,
+  sorted: bool,
+  lookup: &FormulaValue<'_>,
+) -> Option<VlookupCacheKey> {
+  let lookup = match lookup {
+    FormulaValue::Number(value) if value.is_finite() => {
+      VlookupCacheValue::Number(if *value == 0.0 { 0 } else { value.to_bits() })
+    }
+    FormulaValue::String(value) => VlookupCacheValue::String(value.to_string()),
+    FormulaValue::Boolean(value) => VlookupCacheValue::Boolean(*value),
+    FormulaValue::Error(value) => VlookupCacheValue::Error(*value),
+    FormulaValue::Blank => VlookupCacheValue::Blank,
+    FormulaValue::Number(_)
+    | FormulaValue::Matrix(_)
+    | FormulaValue::Reference(_)
+    | FormulaValue::RefList(_) => return None,
+  };
+  Some(VlookupCacheKey {
+    sheet,
+    range,
+    sorted,
+    lookup,
+  })
+}
+
+fn cached_vlookup_row(key: &VlookupCacheKey) -> Option<Option<u32>> {
+  VLOOKUP_CACHE.with(|cache| {
+    let cache = cache.borrow();
+    (cache.depth > 0)
+      .then(|| cache.rows.get(key).copied())
+      .flatten()
+  })
+}
+
+fn cache_vlookup_row(key: VlookupCacheKey, row: Option<u32>) {
+  VLOOKUP_CACHE.with(|cache| {
+    let mut cache = cache.borrow_mut();
+    if cache.depth > 0 {
+      cache.rows.insert(key, row);
+    }
+  });
+}
+
+fn indexed_vlookup_row(
+  book: &FormulaEvaluationBook<'_>,
+  sheet: SheetId,
+  range: CellRange,
+  lookup: VlookupIndexValue,
+) -> Option<Option<u32>> {
+  VLOOKUP_CACHE.with(|cache| {
+    let mut cache = cache.borrow_mut();
+    if cache.depth == 0 {
+      return None;
+    }
+    let start_row = range.start.row.min(range.end.row);
+    let end_row = range.start.row.max(range.end.row);
+    let column = range.start.column.min(range.end.column);
+    let key = VlookupRangeKey {
+      sheet,
+      start: CellAddress {
+        column,
+        row: start_row,
+      },
+      end: CellAddress {
+        column,
+        row: end_row,
+      },
+    };
+    let index = cache.indexes.entry(key).or_insert_with(|| {
+      let mut index = FxHashMap::default();
+      for ((_, address), value) in book.cells.range((sheet, key.start)..=(sheet, key.end)) {
+        if let Some(value) = vlookup_candidate_index_value(value) {
+          index.entry(value).or_insert(address.row);
+        }
+      }
+      index
+    });
+    Some(index.get(&lookup).copied())
+  })
+}
+
+fn vlookup_candidate_index_value(value: &FormulaValue<'_>) -> Option<VlookupIndexValue> {
+  match value {
+    FormulaValue::Number(value) if value.is_finite() => {
+      Some(VlookupIndexValue::Number(if *value == 0.0 {
+        0
+      } else {
+        value.to_bits()
+      }))
+    }
+    FormulaValue::Boolean(value) => Some(VlookupIndexValue::Number(if *value {
+      1.0f64.to_bits()
+    } else {
+      0
+    })),
+    FormulaValue::String(value) if value.is_ascii() => {
+      Some(VlookupIndexValue::AsciiText(value.to_ascii_lowercase()))
+    }
+    FormulaValue::Number(_)
+    | FormulaValue::String(_)
+    | FormulaValue::Error(_)
+    | FormulaValue::Blank
+    | FormulaValue::Matrix(_)
+    | FormulaValue::Reference(_)
+    | FormulaValue::RefList(_) => None,
+  }
+}

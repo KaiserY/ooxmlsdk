@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use super::import::ExcelImport;
 use super::page_settings::CalcPageSettings;
@@ -90,6 +90,7 @@ impl<'a> CalcPrintDocument<'a> {
       }
     }
     for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
+      let mut conditional_eval_cache = ConditionalFormatEvalCache::default();
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
       let areas = print_areas_for_sheet(import, sheet, &named_ranges, &mut text_metrics);
       let scale = print_scale_state(import, sheet, &areas, &named_ranges, &mut text_metrics);
@@ -108,17 +109,19 @@ impl<'a> CalcPrintDocument<'a> {
       let mut sheet_page_index = 0usize;
       for area in page_areas {
         let cells = area
-          .map(|area| print_cells_for_area(import, sheet, area, true))
+          .map(|area| print_cells_for_area(import, sheet, area, true, &mut conditional_eval_cache))
           .unwrap_or_default();
         let repeated_row_cells = repeat_rows_for_page(area, named_ranges.repeat_rows)
-          .map(|area| print_cells_for_area(import, sheet, area, true))
+          .map(|area| print_cells_for_area(import, sheet, area, true, &mut conditional_eval_cache))
           .unwrap_or_default();
         let repeated_column_cells = repeat_columns_for_page(area, named_ranges.repeat_columns)
-          .map(|area| print_cells_for_area(import, sheet, area, true))
+          .map(|area| print_cells_for_area(import, sheet, area, true, &mut conditional_eval_cache))
           .unwrap_or_default();
         let repeated_corner_cells =
           repeat_corner_for_page(named_ranges.repeat_rows, named_ranges.repeat_columns)
-            .map(|area| print_cells_for_area(import, sheet, area, true))
+            .map(|area| {
+              print_cells_for_area(import, sheet, area, true, &mut conditional_eval_cache)
+            })
             .unwrap_or_default();
         let drawing_summary = drawing_summary_for_area(sheet, area);
         // ScPrintFunc::DoPrint. Empty sheet page ranges are hidden by
@@ -1382,23 +1385,32 @@ fn axis_slice(area: CellRange, by_row: bool, start: u32, end: u32) -> CellRange 
 }
 
 fn sheet_area_has_print_data(sheet: &CalcSheet, area: CellRange) -> bool {
-  sheet.rows.iter().enumerate().any(|(row_position, row)| {
-    let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
-    if row_index < area.start.row || row_index > area.end.row || row.hidden {
-      return false;
-    }
-    row.cells.iter().enumerate().any(|(cell_position, cell)| {
-      let address = cell.address().unwrap_or(CellAddress {
-        col: cell_position as u32 + 1,
-        row: row_index,
-      });
-      area.contains(address) && cell_has_print_data(cell)
+  sheet
+    .resources
+    .tables
+    .iter()
+    .any(|table| table.range.is_some_and(|range| range.intersects(area)))
+    || sheet.rows.iter().enumerate().any(|(row_position, row)| {
+      let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+      if row_index < area.start.row || row_index > area.end.row || row.hidden {
+        return false;
+      }
+      row.cells.iter().enumerate().any(|(cell_position, cell)| {
+        let address = cell.address().unwrap_or(CellAddress {
+          col: cell_position as u32 + 1,
+          row: row_index,
+        });
+        area.contains(address) && cell_has_print_data(cell)
+      })
     })
-  })
 }
 
 fn column_has_print_data(sheet: &CalcSheet, column: u32) -> bool {
-  sheet.rows.iter().enumerate().any(|(row_position, row)| {
+  sheet.resources.tables.iter().any(|table| {
+    table
+      .range
+      .is_some_and(|range| column >= range.start.col && column <= range.end.col)
+  }) || sheet.rows.iter().enumerate().any(|(row_position, row)| {
     let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
     !row.hidden
       && row.cells.iter().enumerate().any(|(cell_position, cell)| {
@@ -1496,11 +1508,11 @@ fn print_cells_for_area<'a>(
   sheet: &'a CalcSheet,
   area: CellRange,
   include_hidden: bool,
+  conditional_eval_cache: &mut ConditionalFormatEvalCache,
 ) -> Vec<CalcPrintCell<'a>> {
   let mut physical_cells = Vec::new();
   let mut occupied = HashSet::new();
-  for (row_position, row) in sheet.rows.iter().enumerate() {
-    let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+  let mut visit_cell = |row_index: u32, row: &'a super::worksheet::CalcRow| {
     for (cell_position, cell) in row.cells.iter().enumerate() {
       let address = cell.address().unwrap_or(CellAddress {
         col: cell_position as u32 + 1,
@@ -1522,8 +1534,13 @@ fn print_cells_for_area<'a>(
         .and_then(|index| import.styles.cell_xfs.get(index as usize))
         .and_then(|format| format.number_format_id);
       let number_format_code = number_format_id.and_then(|id| import.styles.number_format_code(id));
-      let conditional_number_format_code =
-        conditional_number_format_code(import, sheet, address, cell.display_text.as_str());
+      let conditional_number_format_code = conditional_number_format_code(
+        import,
+        sheet,
+        address,
+        cell.display_text.as_str(),
+        conditional_eval_cache,
+      );
       let pivot_format_id = super::pivot::pivot_format_id_for_address(sheet, print_address);
       let pivot_format_number_format_code = pivot_format_id
         .and_then(|format_id| import.styles.differential_number_format_code(format_id));
@@ -1555,8 +1572,22 @@ fn print_cells_for_area<'a>(
         formula: cell.formula.is_some(),
       });
     }
+  };
+  if sheet.resources.pivot_tables.tables.is_empty() {
+    for (row_index, row) in sheet.rows_intersecting_print_area(area) {
+      visit_cell(row_index, row);
+    }
+  } else {
+    // Pivot cache rows may move upward when firstHeaderRow is greater than
+    // one, so their source row can sit outside the output page area.
+    for (row_position, row) in sheet.rows.iter().enumerate() {
+      visit_cell(row.row_index.unwrap_or(row_position as u32 + 1), row);
+    }
   }
-  let virtual_cells = pivot_virtual_print_cells(sheet, area, &occupied);
+  let mut virtual_cells = pivot_virtual_print_cells(sheet, area, &occupied);
+  occupied.extend(virtual_cells.iter().map(|cell| cell.address));
+  virtual_cells.extend(table_virtual_print_cells(sheet, area, &occupied));
+  virtual_cells.sort_unstable_by_key(|cell| (cell.address.row, cell.address.col));
   merge_print_cells_by_scan_order(physical_cells, virtual_cells)
 }
 
@@ -1629,11 +1660,57 @@ fn pivot_virtual_print_cells<'a>(
   cells
 }
 
+fn table_virtual_print_cells<'a>(
+  sheet: &'a CalcSheet,
+  area: CellRange,
+  occupied: &HashSet<CellAddress>,
+) -> Vec<CalcPrintCell<'a>> {
+  let mut cells = Vec::new();
+  for table in &sheet.resources.tables {
+    let Some(range) = table.range else {
+      continue;
+    };
+    let start_row = range.start.row.max(area.start.row);
+    let end_row = range.end.row.min(area.end.row);
+    let start_col = range.start.col.max(area.start.col);
+    let end_col = range.end.col.min(area.end.col);
+    if start_row > end_row || start_col > end_col {
+      continue;
+    }
+    let rows = u64::from(end_row - start_row + 1);
+    let columns = u64::from(end_col - start_col + 1);
+    let additional = usize::try_from(rows.saturating_mul(columns))
+      .unwrap_or(usize::MAX)
+      .saturating_sub(occupied.len());
+    cells.reserve(additional.min(16_384));
+    for row in start_row..=end_row {
+      for col in start_col..=end_col {
+        let address = CellAddress { col, row };
+        if occupied.contains(&address) {
+          continue;
+        }
+        cells.push(CalcPrintCell {
+          address,
+          text: Cow::Borrowed(""),
+          style_index: None,
+          pivot_format_id: None,
+          rendered_text: String::new(),
+          rich_text_runs: &[],
+          number_format_state: NumberFormatRenderState::Raw,
+          formula: false,
+        });
+      }
+    }
+  }
+  cells
+}
+
 fn conditional_number_format_code<'a>(
   import: &'a ExcelImport,
   sheet: &CalcSheet,
   address: CellAddress,
   raw: &str,
+  cache: &mut ConditionalFormatEvalCache,
 ) -> Option<&'a str> {
   let value = raw.parse::<f64>().ok()?;
   let mut rules = sheet
@@ -1651,7 +1728,7 @@ fn conditional_number_format_code<'a>(
     .collect::<Vec<_>>();
   rules.sort_by_key(|(_, rule)| rule.priority);
   for (references, rule) in rules {
-    if !conditional_numeric_rule_matches(import, sheet, references, rule, address, value) {
+    if !conditional_numeric_rule_matches(import, sheet, references, rule, address, value, cache) {
       if rule.stop_if_true {
         break;
       }
@@ -1689,13 +1766,14 @@ fn conditional_numeric_rule_matches(
   rule: &super::sheet_conditions::ConditionalFormatRuleModel,
   address: CellAddress,
   value: f64,
+  cache: &mut ConditionalFormatEvalCache,
 ) -> bool {
   match rule.rule_type {
     x::ConditionalFormatValues::Top10 => {
-      conditional_top10_matches(sheet, references, rule, address, value)
+      conditional_top10_matches(sheet, references, rule, address, value, cache)
     }
     x::ConditionalFormatValues::AboveAverage => {
-      conditional_average_matches(sheet, references, rule, address, value)
+      conditional_average_matches(sheet, references, rule, address, value, cache)
     }
     x::ConditionalFormatValues::CellIs => {
       conditional_cell_is_matches(import, sheet, references, rule, address, value)
@@ -1713,8 +1791,13 @@ fn conditional_top10_matches(
   rule: &super::sheet_conditions::ConditionalFormatRuleModel,
   address: CellAddress,
   value: f64,
+  cache: &mut ConditionalFormatEvalCache,
 ) -> bool {
-  let values = conditional_reference_values(sheet, references, address);
+  let Some(range) = conditional_reference_range(references, address) else {
+    return false;
+  };
+  let stats = cache.stats_for_range(sheet, range);
+  let values = &stats.sorted_values;
   if values.is_empty() {
     return false;
   }
@@ -1723,13 +1806,10 @@ fn conditional_top10_matches(
     rank = ((values.len() as f64 * rank as f64 / 100.0).ceil() as usize).max(1);
   }
   rank = rank.min(values.len());
-  let mut sorted = values;
   if rule.bottom {
-    sorted.sort_by(|a, b| a.total_cmp(b));
-    value <= sorted[rank - 1]
+    value <= values[rank - 1]
   } else {
-    sorted.sort_by(|a, b| b.total_cmp(a));
-    value >= sorted[rank - 1]
+    value >= values[values.len() - rank]
   }
 }
 
@@ -1739,12 +1819,14 @@ fn conditional_average_matches(
   rule: &super::sheet_conditions::ConditionalFormatRuleModel,
   address: CellAddress,
   value: f64,
+  cache: &mut ConditionalFormatEvalCache,
 ) -> bool {
-  let values = conditional_reference_values(sheet, references, address);
-  if values.is_empty() {
+  let Some(range) = conditional_reference_range(references, address) else {
     return false;
-  }
-  let average = values.iter().sum::<f64>() / values.len() as f64;
+  };
+  let Some(average) = cache.stats_for_range(sheet, range).average else {
+    return false;
+  };
   let equal = rule.equal_average;
   if rule.above_average {
     value > average || (equal && (value - average).abs() <= f64::EPSILON)
@@ -1817,31 +1899,53 @@ fn conditional_format_base_address(
     .map(|range| range.start)
 }
 
-fn conditional_reference_values(
-  sheet: &CalcSheet,
-  references: &[String],
-  address: CellAddress,
-) -> Vec<f64> {
+fn conditional_reference_range(references: &[String], address: CellAddress) -> Option<CellRange> {
   references
     .iter()
     .flat_map(|references| references.split_whitespace())
     .filter_map(CellRange::parse_a1_range)
     .find(|range| range.contains(address))
-    .map(|range| {
-      sheet
+}
+
+#[derive(Debug, Default)]
+struct ConditionalFormatEvalCache {
+  ranges: HashMap<CellRange, ConditionalRangeStats>,
+}
+
+#[derive(Debug)]
+struct ConditionalRangeStats {
+  sorted_values: Vec<f64>,
+  average: Option<f64>,
+}
+
+impl ConditionalFormatEvalCache {
+  fn stats_for_range(&mut self, sheet: &CalcSheet, range: CellRange) -> &ConditionalRangeStats {
+    self.ranges.entry(range).or_insert_with(|| {
+      // Above-average and top/bottom rules use one invariant population for
+      // every cell in the same sqref. Calc's conditional format evaluation
+      // likewise evaluates the range aggregate independently of the current
+      // cell; cache that aggregate instead of rescanning and sorting the
+      // worksheet once per formatted cell.
+      let mut values = sheet
         .rows
         .iter()
         .flat_map(|row| row.cells.iter())
         .filter_map(|cell| {
-          let cell_address = cell.address()?;
-          if !range.contains(cell_address) {
-            return None;
-          }
-          cell.display_text.parse::<f64>().ok()
+          let address = cell.address()?;
+          range
+            .contains(address)
+            .then(|| cell.display_text.parse::<f64>().ok())
+            .flatten()
         })
-        .collect()
+        .collect::<Vec<_>>();
+      let average = (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64);
+      values.sort_by(|left, right| left.total_cmp(right));
+      ConditionalRangeStats {
+        sorted_values: values,
+        average,
+      }
     })
-    .unwrap_or_default()
+  }
 }
 
 fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> String {
@@ -2323,6 +2427,7 @@ struct NumberFormatPattern {
   suppress_negative_sign: bool,
   section: String,
   integer_pattern: String,
+  scale_commas: usize,
 }
 
 impl NumberFormatPattern {
@@ -2337,10 +2442,12 @@ impl NumberFormatPattern {
     };
     let cleaned_section =
       strip_number_format_markers(sections.get(section_index).copied().unwrap_or(code));
-    let section = cleaned_section.as_str();
+    let (section, scale_commas) = strip_trailing_scaling_commas(&cleaned_section);
+    let section = section.as_str();
     let mut pattern = Self {
       suppress_negative_sign: section_index == 1,
       section: section.to_string(),
+      scale_commas,
       ..Self::default()
     };
     let mut in_quote = false;
@@ -2450,6 +2557,7 @@ impl NumberFormatPattern {
       }
     }
     pattern.integer_pattern = integer_pattern;
+    pattern.grouping = pattern.integer_pattern.contains(',');
     let trailing_suffix = trailing_integer_format_suffix(section);
     if !trailing_suffix.is_empty() && !pattern.suffix.contains(&trailing_suffix) {
       pattern.suffix.push_str(&trailing_suffix);
@@ -2516,11 +2624,14 @@ fn is_ignored_number_format_marker(marker: &str) -> bool {
 }
 
 fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
-  let value = if pattern.percent {
+  let mut value = if pattern.percent {
     value * 100.0
   } else {
     value
   };
+  if pattern.scale_commas > 0 {
+    value /= 1000_f64.powi(i32::try_from(pattern.scale_commas).unwrap_or(i32::MAX));
+  }
   if let Some(fraction) = format_fraction_value(value, &pattern.section) {
     let mut output = String::new();
     output.push_str(&pattern.prefix);
@@ -2570,6 +2681,36 @@ fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
     output.push_str(&pattern.suffix);
   }
   output.trim().to_string()
+}
+
+fn strip_trailing_scaling_commas(section: &str) -> (String, usize) {
+  let mut last_placeholder_end = None;
+  let mut in_quote = false;
+  let mut escaped = false;
+  for (index, ch) in section.char_indices() {
+    if escaped {
+      escaped = false;
+      continue;
+    }
+    match ch {
+      '\\' => escaped = true,
+      '"' => in_quote = !in_quote,
+      '0' | '#' | '?' if !in_quote => last_placeholder_end = Some(index + ch.len_utf8()),
+      _ => {}
+    }
+  }
+  let Some(start) = last_placeholder_end else {
+    return (section.to_string(), 0);
+  };
+  let count = section[start..].chars().take_while(|ch| *ch == ',').count();
+  if count == 0 {
+    return (section.to_string(), 0);
+  }
+  let end = start + count;
+  let mut normalized = String::with_capacity(section.len() - count);
+  normalized.push_str(&section[..start]);
+  normalized.push_str(&section[end..]);
+  (normalized, count)
 }
 
 fn format_fraction_value(value: f64, section: &str) -> Option<String> {
@@ -3527,6 +3668,24 @@ mod tests {
       )
       .0,
       "2.75 Ft"
+    );
+  }
+
+  #[test]
+  fn trailing_commas_scale_numbers_by_thousands() {
+    // ECMA-376 Part 1's number-format examples define one trailing comma as
+    // division by 1,000 and two as division by 1,000,000.
+    assert_eq!(
+      rendered_number_text("12000", Some("#,"), None, false).0,
+      "12"
+    );
+    assert_eq!(
+      rendered_number_text("12200000", Some("0.0,,"), None, false).0,
+      "12.2"
+    );
+    assert_eq!(
+      rendered_number_text("25396277490", Some("#,##0,,"), None, false).0,
+      "25,396"
     );
   }
 }

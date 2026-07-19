@@ -1,3 +1,7 @@
+use std::sync::Arc;
+
+use rustc_hash::FxHashMap as HashMap;
+
 use crate::fonts::{FontFaceData, FontResolver, FontStyleRef};
 
 // Last-resort vertical metrics when no usable font face can be loaded. Keep
@@ -63,9 +67,50 @@ pub struct ShapedGlyph {
   pub y_advance_em: f32,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct MeasureStyleKey {
+  font_family: Option<Box<str>>,
+  east_asia_font_family: Option<Box<str>>,
+  complex_font_family: Option<Box<str>>,
+  font_size_bits: u32,
+  character_spacing_bits: u32,
+  bold: bool,
+  italic: bool,
+  small_caps: bool,
+}
+
+impl MeasureStyleKey {
+  fn from_style(style: &(impl FontStyleRef + ?Sized)) -> Self {
+    Self {
+      font_family: style.font_family().map(Into::into),
+      east_asia_font_family: style.east_asia_font_family().map(Into::into),
+      complex_font_family: style.complex_font_family().map(Into::into),
+      font_size_bits: style.font_size_pt().to_bits(),
+      character_spacing_bits: style.character_spacing_pt().to_bits(),
+      bold: style.bold(),
+      italic: style.italic(),
+      small_caps: style.small_caps(),
+    }
+  }
+
+  fn matches(&self, style: &(impl FontStyleRef + ?Sized)) -> bool {
+    self.font_family.as_deref() == style.font_family()
+      && self.east_asia_font_family.as_deref() == style.east_asia_font_family()
+      && self.complex_font_family.as_deref() == style.complex_font_family()
+      && self.font_size_bits == style.font_size_pt().to_bits()
+      && self.character_spacing_bits == style.character_spacing_pt().to_bits()
+      && self.bold == style.bold()
+      && self.italic == style.italic()
+      && self.small_caps == style.small_caps()
+  }
+}
+
 #[derive(Debug, Default)]
 pub struct TextMetrics {
   fonts: FontResolver,
+  measure_styles: Vec<MeasureStyleKey>,
+  measure_widths: Vec<HashMap<Arc<str>, f32>>,
+  last_measure_style: Option<usize>,
 }
 
 impl TextMetrics {
@@ -82,9 +127,36 @@ impl TextMetrics {
       return 0.0;
     }
 
-    self
+    let style_index = self.measure_style_index(style);
+    if let Some(width) = self.measure_widths[style_index].get(text) {
+      return *width;
+    }
+    let width = self
       .shape_text(text, style)
-      .map_or(0.0, |shaped| shaped.width_pt)
+      .map_or(0.0, |shaped| shaped.width_pt);
+    self.measure_widths[style_index].insert(Arc::from(text), width);
+    width
+  }
+
+  fn measure_style_index(&mut self, style: &(impl FontStyleRef + ?Sized)) -> usize {
+    if let Some(index) = self.last_measure_style
+      && self.measure_styles[index].matches(style)
+    {
+      return index;
+    }
+    if let Some(index) = self
+      .measure_styles
+      .iter()
+      .position(|key| key.matches(style))
+    {
+      self.last_measure_style = Some(index);
+      return index;
+    }
+    let index = self.measure_styles.len();
+    self.measure_styles.push(MeasureStyleKey::from_style(style));
+    self.measure_widths.push(HashMap::default());
+    self.last_measure_style = Some(index);
+    index
   }
 
   pub fn shape_text(
@@ -295,6 +367,19 @@ mod tests {
         .iter()
         .all(|glyph| glyph.text_range.end <= "office".len())
     );
+  }
+
+  #[test]
+  fn repeated_measurement_reuses_the_shaped_width() {
+    let style = test_style();
+    let mut metrics = TextMetrics::new();
+
+    let first = metrics.measure_text("repeated", &style);
+    let second = metrics.measure_text("repeated", &style);
+
+    assert_eq!(first, second);
+    assert_eq!(metrics.measure_styles.len(), 1);
+    assert_eq!(metrics.measure_widths[0].len(), 1);
   }
 
   fn test_style() -> TextStyle<'static> {

@@ -28,6 +28,7 @@ pub(crate) struct PresentationFragmentHandler {
   embed_true_type_fonts: bool,
   save_subset_fonts: bool,
   embedded_font_typefaces: Vec<String>,
+  first_slide_number: i32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -93,6 +94,7 @@ impl PresentationFragmentHandler {
       .as_ref()
       .is_some_and(|value| value.as_bool());
     let embedded_font_typefaces = embedded_font_typefaces(presentation);
+    let first_slide_number = presentation.first_slide_num.unwrap_or(1);
     let comment_authors = presentation_comment_authors(package, &presentation_part)?;
 
     Ok(Self {
@@ -108,6 +110,7 @@ impl PresentationFragmentHandler {
       embed_true_type_fonts,
       save_subset_fonts,
       embedded_font_typefaces,
+      first_slide_number,
     })
   }
 
@@ -119,6 +122,7 @@ impl PresentationFragmentHandler {
     self.import_master_slides(package, import)?;
     import.embed_true_type_fonts = self.embed_true_type_fonts;
     import.save_subset_fonts = self.save_subset_fonts;
+    import.first_slide_number = self.first_slide_number;
     import.embedded_font_typefaces = self.embedded_font_typefaces();
     self.import_notes_master_slides(package, import)?;
     for (index, slide_ref) in self.slides_vector.clone().into_iter().enumerate() {

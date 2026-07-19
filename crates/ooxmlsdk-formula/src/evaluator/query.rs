@@ -598,6 +598,38 @@ pub(crate) struct LookupPlan<'doc> {
 }
 
 impl<'doc> LookupPlan<'doc> {
+  pub(crate) fn exact_index_value(&self) -> Option<VlookupIndexValue> {
+    if self.op != QueryOp::Equal
+      || self.search_type != QuerySearchType::Normal
+      || self.range_lookup
+      || !self.match_whole_cell
+      || self.key.match_empty
+      || self.key.source_text.is_some()
+    {
+      return None;
+    }
+    match &self.key.value {
+      FormulaValue::Number(value) if value.is_finite() => {
+        Some(VlookupIndexValue::Number(if *value == 0.0 {
+          0
+        } else {
+          value.to_bits()
+        }))
+      }
+      FormulaValue::String(value) if value.is_ascii() => {
+        Some(VlookupIndexValue::AsciiText(value.to_ascii_lowercase()))
+      }
+      FormulaValue::Number(_)
+      | FormulaValue::String(_)
+      | FormulaValue::Boolean(_)
+      | FormulaValue::Error(_)
+      | FormulaValue::Blank
+      | FormulaValue::Matrix(_)
+      | FormulaValue::Reference(_)
+      | FormulaValue::RefList(_) => None,
+    }
+  }
+
   pub(crate) fn new(
     value: &FormulaValue<'doc>,
     op: QueryOp,

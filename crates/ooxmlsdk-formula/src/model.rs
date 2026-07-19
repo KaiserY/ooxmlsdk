@@ -1291,6 +1291,14 @@ impl<'doc> FormulaTable<'doc> {
 }
 
 impl<'doc> FormulaEvaluationBook<'doc> {
+  /// Runs a group of immutable formula evaluations with a range-lookup cache.
+  ///
+  /// This mirrors Calc's interpreter-context lookup cache: results live only
+  /// for the closure and are discarded before the book can be mutated.
+  pub fn with_lookup_cache<R>(&self, f: impl FnOnce() -> R) -> R {
+    evaluator::with_lookup_cache(f)
+  }
+
   pub fn from_workbook_value_model(model: &'doc WorkbookValueModel<'doc>) -> Self {
     let sheet_names = model
       .identity
@@ -8709,6 +8717,48 @@ mod tests {
         "COUNTIFS(AF2:AF7,\"<5\",AG2:AG7,\"<5/3/2011\")",
       ),
       Some(FormulaValue::Number(2.0))
+    );
+  }
+
+  #[test]
+  fn evaluation_book_countifs_preserves_explicit_criteria_arrays() {
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::String(Cow::Borrowed("foo")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 0 },
+        FormulaValue::String(Cow::Borrowed("foo")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 2, row: 0 },
+        FormulaValue::String(Cow::Borrowed("bar")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 3, row: 0 },
+        FormulaValue::String(Cow::Borrowed("baz")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 4, row: 0 },
+        FormulaValue::String(Cow::Borrowed("bar")),
+      )
+      .build();
+
+    // Apache POI bug 70005 records the same Excel/LibreOffice behavior:
+    // COUNTIFS returns {2,1}, and SUM consumes both array elements.
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "SUM(COUNTIFS(A1:F1,{\"bar\",\"baz\"}))",),
+      Some(FormulaValue::Number(3.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "SUM(COUNTIFS(A1:F1,{\"foo\",\"bar\"}))",),
+      Some(FormulaValue::Number(4.0))
     );
   }
 

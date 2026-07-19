@@ -348,11 +348,9 @@ fn push_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String, style: Tex
     style,
     rotation_center_pt: None,
     hyperlink_url: None,
-    dynamic_field: None,
     form_widget_id: None,
     paragraph_bidi: false,
     preserve_text_portion: true,
-    decoration_span_start_x_pt: None,
     pdf_text_segmentation: PdfTextSegmentation::Line,
   }));
 }

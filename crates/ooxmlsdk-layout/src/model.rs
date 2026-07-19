@@ -104,7 +104,7 @@ pub struct ImageCrop {
   pub bottom: f32,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PageSetup {
   pub width_pt: f32,
   pub height_pt: f32,
@@ -205,11 +205,9 @@ pub(crate) struct TextItem {
   pub style: TextStyle,
   pub rotation_center_pt: Option<(f32, f32)>,
   pub hyperlink_url: Option<String>,
-  pub dynamic_field: Option<DynamicFieldKind>,
   pub form_widget_id: Option<u32>,
   pub paragraph_bidi: bool,
   pub preserve_text_portion: bool,
-  pub decoration_span_start_x_pt: Option<f32>,
   pub pdf_text_segmentation: PdfTextSegmentation,
 }
 

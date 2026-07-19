@@ -26,3 +26,4 @@ thiserror = { workspace = true }
 ttf-parser = { workspace = true }
 unicode-bidi = { workspace = true }
 unicode-script = { workspace = true }
+yoke = { workspace = true }

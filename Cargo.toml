@@ -87,6 +87,7 @@ ttf-parser = "0.25.1"
 unicode-bidi = "0.3.18"
 unicode-script = "0.5.8"
 winnow = "1.0.3"
+yoke = { version = "0.8.3", features = ["derive"] }
 
 [profile.dev]
 incremental = false

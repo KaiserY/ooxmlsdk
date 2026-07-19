@@ -1204,6 +1204,7 @@ dependencies = [
  "ttf-parser",
  "unicode-bidi",
  "unicode-script",
+ "yoke",
 ]
 
 [[package]]

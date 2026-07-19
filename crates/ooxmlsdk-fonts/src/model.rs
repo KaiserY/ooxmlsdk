@@ -1,11 +1,11 @@
 use std::borrow::Cow;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::fmt;
 use std::fs;
 use std::ops::{Deref, Range};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::Instant;
 
 use fontdb::{Database as FontDatabase, Source as FontDbSource};
@@ -18,6 +18,7 @@ use smallvec::SmallVec;
 use ttf_parser::{Face as TtfFace, GlyphId, Rect as TtfRect, Tag};
 use unicode_bidi::{Direction as BidiDirection, get_base_direction};
 use unicode_script::{Script as UnicodeScriptValue, UnicodeScript};
+use yoke::{Yoke, Yokeable};
 
 use crate::{FontError, Result};
 
@@ -75,21 +76,31 @@ impl<'a> From<Cow<'a, [u8]>> for FontBytes {
 }
 
 struct RuntimeFace {
-  buzz: BuzzFace<'static>,
-  ttf: TtfFace<'static>,
-  _data: FontBytes,
+  faces: Yoke<RuntimeFaces<'static>, Arc<[u8]>>,
+}
+
+#[derive(Yokeable)]
+struct RuntimeFaces<'a> {
+  buzz: BuzzFace<'a>,
+  ttf: TtfFace<'a>,
 }
 
 impl RuntimeFace {
   fn new(data: FontBytes, face_index: u32) -> Result<Self> {
-    let slice = unsafe { std::slice::from_raw_parts(data.as_ptr(), data.len()) };
-    let buzz = BuzzFace::from_slice(slice, face_index).ok_or(FontError::InvalidFace)?;
-    let ttf = TtfFace::parse(slice, face_index).map_err(|_| FontError::InvalidFace)?;
-    Ok(Self {
-      buzz,
-      ttf,
-      _data: data,
-    })
+    let faces = Yoke::<RuntimeFaces<'static>, Arc<[u8]>>::try_attach_to_cart(data.0, |slice| {
+      let buzz = BuzzFace::from_slice(slice, face_index).ok_or(FontError::InvalidFace)?;
+      let ttf = TtfFace::parse(slice, face_index).map_err(|_| FontError::InvalidFace)?;
+      Ok(RuntimeFaces { buzz, ttf })
+    })?;
+    Ok(Self { faces })
+  }
+
+  fn buzz(&self) -> &BuzzFace<'_> {
+    &self.faces.get().buzz
+  }
+
+  fn ttf(&self) -> &TtfFace<'_> {
+    &self.faces.get().ttf
   }
 }
 
@@ -224,12 +235,7 @@ impl<'a> FontRegistry<'a> {
       let Some(info) = database.face(id) else {
         continue;
       };
-      let Some((data, face_index)) = font_timing("fontdb face data", || {
-        database.with_face_data(id, |data, face_index| (data.to_vec(), face_index))
-      }) else {
-        continue;
-      };
-      let font_id = format!("system-query:{}:{}", info.post_script_name, face_index);
+      let font_id = format!("system-query:{}:{}", info.post_script_name, info.index);
       if self
         .sources
         .iter()
@@ -237,22 +243,27 @@ impl<'a> FontRegistry<'a> {
       {
         continue;
       }
-      let face = font_timing("system query face metadata", || {
-        FontFaceInfo::from_ttf_bytes(&font_id, &data, face_index)
-      })
-      .unwrap_or_else(|_| FontFaceInfo::from_fontdb_face_info(&font_id, info));
+      let Some(system_font) = font_timing("system query font", || {
+        cached_system_query_font(database, id, info, &font_id)
+      }) else {
+        continue;
+      };
+      let Some(data) = font_timing("fontdb face data", || cached_system_font_data(database, id))
+      else {
+        continue;
+      };
       let source = match &info.source {
         FontDbSource::File(path) | FontDbSource::SharedFile(path, _) => FontSource::Path {
           id: Cow::Owned(font_id),
           path: path.clone(),
-          data: Some(data.into()),
+          data: Some(data),
         },
         FontDbSource::Binary(_) => FontSource::Memory {
           id: Cow::Owned(font_id),
-          data: data.into(),
+          data,
         },
       };
-      self.register_face(source, face);
+      self.register_face(source, system_font.face.clone());
       registered += 1;
     }
     Ok(registered)
@@ -596,7 +607,7 @@ impl<'a> FontRegistry<'a> {
         .position(|(index, font)| {
           font_supports_text_cluster(
             font,
-            runtime_faces[index].as_deref().map(|face| &face.ttf),
+            runtime_faces[index].as_deref().map(RuntimeFace::ttf),
             &text[cluster.clone()],
           )
         })
@@ -847,7 +858,7 @@ impl<'a> FontRegistry<'a> {
     }
     self
       .runtime_face_for_font(&face.font_id)
-      .and_then(|parsed| parsed.ttf.glyph_index(ch))
+      .and_then(|parsed| parsed.ttf().glyph_index(ch))
       .is_some()
   }
 
@@ -1653,8 +1664,8 @@ impl<'book> ResolvedFont<'book> {
     } else {
       options.size_pt
     };
-    let face = &runtime_face.buzz;
-    let ttf_face = &runtime_face.ttf;
+    let face = runtime_face.buzz();
+    let ttf_face = runtime_face.ttf();
     let units_per_em = face.units_per_em() as f32;
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(shaped_text.as_ref());
@@ -2936,6 +2947,112 @@ fn system_font_database() -> &'static FontDatabase {
   })
 }
 
+struct CachedSystemQueryFont {
+  face: FontFaceInfo<'static>,
+}
+
+const SYSTEM_FONT_DATA_CACHE_BYTES: usize = 64 * 1024 * 1024;
+
+#[derive(Default)]
+struct SystemFontDataCache {
+  data: HashMap<fontdb::ID, FontBytes>,
+  least_to_most_recent: VecDeque<fontdb::ID>,
+  bytes: usize,
+}
+
+impl SystemFontDataCache {
+  fn get(&mut self, id: fontdb::ID) -> Option<FontBytes> {
+    let data = self.data.get(&id)?.clone();
+    if let Some(index) = self
+      .least_to_most_recent
+      .iter()
+      .position(|cached| *cached == id)
+    {
+      self.least_to_most_recent.remove(index);
+    }
+    self.least_to_most_recent.push_back(id);
+    Some(data)
+  }
+
+  fn insert(&mut self, id: fontdb::ID, data: FontBytes) -> FontBytes {
+    if let Some(cached) = self.get(id) {
+      return cached;
+    }
+    if data.len() > SYSTEM_FONT_DATA_CACHE_BYTES {
+      return data;
+    }
+    while self.bytes + data.len() > SYSTEM_FONT_DATA_CACHE_BYTES {
+      let Some(evicted_id) = self.least_to_most_recent.pop_front() else {
+        break;
+      };
+      if let Some(evicted) = self.data.remove(&evicted_id) {
+        self.bytes -= evicted.len();
+      }
+    }
+    self.bytes += data.len();
+    self.least_to_most_recent.push_back(id);
+    self.data.insert(id, data.clone());
+    data
+  }
+}
+
+fn cached_system_font_data(database: &FontDatabase, id: fontdb::ID) -> Option<FontBytes> {
+  static CACHE: OnceLock<Mutex<SystemFontDataCache>> = OnceLock::new();
+  let cache = CACHE.get_or_init(|| Mutex::new(SystemFontDataCache::default()));
+  if let Some(data) = cache
+    .lock()
+    .unwrap_or_else(std::sync::PoisonError::into_inner)
+    .get(id)
+  {
+    return Some(data);
+  }
+
+  let data = database.with_face_data(id, |data, _| FontBytes::from(Arc::<[u8]>::from(data)))?;
+  Some(
+    cache
+      .lock()
+      .unwrap_or_else(std::sync::PoisonError::into_inner)
+      .insert(id, data),
+  )
+}
+
+fn cached_system_query_font(
+  database: &FontDatabase,
+  id: fontdb::ID,
+  info: &fontdb::FaceInfo,
+  font_id: &str,
+) -> Option<Arc<CachedSystemQueryFont>> {
+  type FontSlot = OnceLock<Option<Arc<CachedSystemQueryFont>>>;
+  static CACHE: OnceLock<RwLock<HashMap<fontdb::ID, Arc<FontSlot>>>> = OnceLock::new();
+
+  let cache = CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+  let cached = {
+    cache
+      .read()
+      .unwrap_or_else(std::sync::PoisonError::into_inner)
+      .get(&id)
+      .cloned()
+  };
+  let slot = cached.unwrap_or_else(|| {
+    cache
+      .write()
+      .unwrap_or_else(std::sync::PoisonError::into_inner)
+      .entry(id)
+      .or_insert_with(|| Arc::new(FontSlot::new()))
+      .clone()
+  });
+  slot
+    .get_or_init(|| {
+      let face = database.with_face_data(id, |data, face_index| {
+        debug_assert_eq!(face_index, info.index);
+        FontFaceInfo::from_ttf_bytes(font_id, data, face_index)
+          .unwrap_or_else(|_| FontFaceInfo::from_fontdb_face_info(font_id, info))
+      })?;
+      Some(Arc::new(CachedSystemQueryFont { face }))
+    })
+    .clone()
+}
+
 fn runtime_face_for_data(data: FontBytes, face_index: u32) -> Option<Arc<RuntimeFace>> {
   RuntimeFace::new(data, face_index).ok().map(Arc::new)
 }
@@ -3227,7 +3344,7 @@ fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
 }
 
 fn font_coverage_from_ttf(face: &TtfFace<'_>) -> FontCoverage {
-  let mut codepoints = Vec::new();
+  let mut ranges = Vec::new();
   for subtable in face
     .tables()
     .cmap
@@ -3235,30 +3352,61 @@ fn font_coverage_from_ttf(face: &TtfFace<'_>) -> FontCoverage {
     .flat_map(|table| table.subtables)
   {
     if subtable.is_unicode() {
-      subtable.codepoints(|codepoint| codepoints.push(codepoint));
+      let mut subtable_ranges = Vec::new();
+      let mut previous = None;
+      subtable.codepoints(|codepoint| {
+        debug_assert!(previous.is_none_or(|previous| previous <= codepoint));
+        previous = Some(codepoint);
+        push_coverage_codepoint(&mut subtable_ranges, codepoint);
+      });
+      merge_coverage_ranges(&mut ranges, subtable_ranges);
     }
-  }
-  codepoints.sort_unstable();
-  codepoints.dedup();
-
-  let mut ranges = Vec::new();
-  let mut iter = codepoints.into_iter();
-  if let Some(mut start) = iter.next() {
-    let mut end = start + 1;
-    for codepoint in iter {
-      if codepoint == end {
-        end += 1;
-      } else {
-        ranges.push(start..end);
-        start = codepoint;
-        end = codepoint + 1;
-      }
-    }
-    ranges.push(start..end);
   }
   FontCoverage {
     unicode_ranges: ranges,
     scripts: BTreeSet::new(),
+  }
+}
+
+fn push_coverage_codepoint(ranges: &mut Vec<Range<u32>>, codepoint: u32) {
+  if let Some(range) = ranges.last_mut()
+    && codepoint <= range.end
+  {
+    range.end = range.end.max(codepoint.saturating_add(1));
+    return;
+  }
+  ranges.push(codepoint..codepoint.saturating_add(1));
+}
+
+fn merge_coverage_ranges(ranges: &mut Vec<Range<u32>>, additions: Vec<Range<u32>>) {
+  if additions.is_empty() {
+    return;
+  }
+  if ranges.is_empty() {
+    *ranges = additions;
+    return;
+  }
+
+  let current = std::mem::take(ranges);
+  let mut current = current.into_iter().peekable();
+  let mut additions = additions.into_iter().peekable();
+  ranges.reserve(current.len() + additions.len());
+  while current.peek().is_some() || additions.peek().is_some() {
+    let next = match (current.peek(), additions.peek()) {
+      (Some(left), Some(right)) if left.start <= right.start => current.next(),
+      (Some(_), Some(_)) => additions.next(),
+      (Some(_), None) => current.next(),
+      (None, Some(_)) => additions.next(),
+      (None, None) => None,
+    }
+    .expect("a non-empty range iterator has a next item");
+    if let Some(previous) = ranges.last_mut()
+      && next.start <= previous.end
+    {
+      previous.end = previous.end.max(next.end);
+    } else {
+      ranges.push(next);
+    }
   }
 }
 
@@ -3873,6 +4021,23 @@ mod tests {
         text_range: 5..6,
       }]
     );
+  }
+
+  #[test]
+  fn coverage_range_merge_coalesces_overlapping_unicode_subtables() {
+    let mut ranges = vec![1..4, 10..12, 20..21];
+    merge_coverage_ranges(&mut ranges, vec![3..6, 8..11, 21..23]);
+
+    assert_eq!(ranges, vec![1..6, 8..12, 20..23]);
+    let coverage = FontCoverage {
+      unicode_ranges: ranges,
+      scripts: BTreeSet::new(),
+    };
+    assert!(coverage.contains_codepoint(1));
+    assert!(coverage.contains_codepoint(11));
+    assert!(coverage.contains_codepoint(22));
+    assert!(!coverage.contains_codepoint(6));
+    assert!(!coverage.contains_codepoint(19));
   }
 
   #[test]

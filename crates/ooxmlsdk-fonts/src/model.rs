@@ -1703,6 +1703,7 @@ impl<'book> ResolvedFont<'book> {
     let advance_pt = glyphs.iter().map(|glyph| glyph.x_advance_pt).sum();
     ShapedRun {
       font_id: self.font_id.clone(),
+      font_size_pt: size,
       text_range: 0..text.len(),
       text,
       glyphs: Cow::Owned(glyphs),
@@ -1829,6 +1830,7 @@ impl<'book> ResolvedFont<'book> {
 
     Ok(ShapedRun {
       font_id: self.font_id.clone(),
+      font_size_pt: shape_size,
       text_range: 0..text.len(),
       text,
       glyphs: Cow::Owned(glyphs),
@@ -2274,6 +2276,9 @@ impl ScriptMetrics {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ShapedRun<'text, 'meta> {
   pub font_id: FontId,
+  /// Point size used to shape and render this run. Synthesized small-caps
+  /// runs can be smaller than the requested text style.
+  pub font_size_pt: FontSize,
   pub text: &'text str,
   pub text_range: Range<usize>,
   pub glyphs: Cow<'text, [ShapedGlyph]>,
@@ -4240,6 +4245,7 @@ mod tests {
   fn font_usage_collector_records_shaped_runs_for_embedding() {
     let run = ShapedRun {
       font_id: FontId(Arc::from("example")),
+      font_size_pt: FontSize(12.0),
       text: "AB",
       text_range: 0..2,
       glyphs: Cow::Owned(vec![

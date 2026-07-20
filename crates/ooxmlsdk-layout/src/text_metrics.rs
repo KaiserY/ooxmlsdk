@@ -59,12 +59,22 @@ pub struct TextDecorationMetrics {
 #[derive(Clone, Debug)]
 pub struct ShapedGlyph {
   pub font_index: usize,
+  pub font_size_pt: f32,
   pub glyph_id: u32,
   pub text_range: std::ops::Range<usize>,
   pub x_advance_em: f32,
   pub x_offset_em: f32,
   pub y_offset_em: f32,
   pub y_advance_em: f32,
+  pub bounds_em: Option<ShapedGlyphBounds>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ShapedGlyphBounds {
+  pub x_min_em: f32,
+  pub y_min_em: f32,
+  pub x_max_em: f32,
+  pub y_max_em: f32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -173,7 +183,7 @@ impl TextMetrics {
     }
 
     let runs = self.fonts.shape_text_runs(text, style)?;
-    shaped_text_from_runs(runs, style, |font_id| self.fonts.font_face_data(font_id))
+    shaped_text_from_runs(runs, |font_id| self.fonts.font_face_data(font_id))
   }
 
   pub fn vertical_metrics(&mut self, style: &(impl FontStyleRef + ?Sized)) -> TextVerticalMetrics {
@@ -251,27 +261,33 @@ pub fn shape_text(text: &str, style: &(impl FontStyleRef + ?Sized)) -> Option<Sh
 
 fn shaped_text_from_runs(
   runs: Vec<ooxmlsdk_fonts::ShapedRun<'_, '_>>,
-  style: &(impl FontStyleRef + ?Sized),
   mut font_face: impl FnMut(&ooxmlsdk_fonts::FontId) -> Option<FontFaceData>,
 ) -> Option<ShapedText> {
   let glyph_count = runs.iter().map(|run| run.glyphs.len()).sum();
   let mut glyphs = Vec::with_capacity(glyph_count);
   let mut font_faces = Vec::with_capacity(runs.len());
   let mut width_pt = 0.0;
-  let em_divisor = style.font_size_pt().max(f32::EPSILON);
-
   for run in runs {
     let font_index = font_faces.len();
     font_faces.push(font_face(&run.font_id)?);
     width_pt += run.advance_pt;
+    let font_size_pt = run.font_size_pt.0;
+    let em_divisor = font_size_pt.max(f32::EPSILON);
     glyphs.extend(run.glyphs.iter().map(|glyph| ShapedGlyph {
       font_index,
+      font_size_pt,
       glyph_id: glyph.glyph_id,
       text_range: glyph.text_range.clone(),
       x_advance_em: glyph.x_advance_pt / em_divisor,
       x_offset_em: glyph.x_offset_pt / em_divisor,
       y_offset_em: glyph.y_offset_pt / em_divisor,
       y_advance_em: glyph.y_advance_pt / em_divisor,
+      bounds_em: glyph.bounds.map(|bounds| ShapedGlyphBounds {
+        x_min_em: bounds.x_min_pt / em_divisor,
+        y_min_em: bounds.y_min_pt / em_divisor,
+        x_max_em: bounds.x_max_pt / em_divisor,
+        y_max_em: bounds.y_max_pt / em_divisor,
+      }),
     }));
   }
 
@@ -366,6 +382,30 @@ mod tests {
         .glyphs
         .iter()
         .all(|glyph| glyph.text_range.end <= "office".len())
+    );
+    assert!(shaped.glyphs.iter().any(|glyph| glyph.bounds_em.is_some()));
+  }
+
+  #[test]
+  fn shaped_text_preserves_synthesized_small_caps_run_sizes() {
+    // LibreOffice sw/source/core/txtnode/fntcap.cxx renders synthesized
+    // small capitals with a reduced font height. PDF must retain the shaped
+    // run size instead of reshaping the original lowercase text.
+    let mut style = test_style();
+    style.small_caps = true;
+    let shaped = shape_text("Aa", &style).expect("small-caps shaped text");
+
+    assert!(
+      shaped
+        .glyphs
+        .iter()
+        .any(|glyph| (glyph.font_size_pt - style.font_size.0).abs() < 0.01)
+    );
+    assert!(
+      shaped
+        .glyphs
+        .iter()
+        .any(|glyph| glyph.font_size_pt < style.font_size.0)
     );
   }
 

@@ -33,6 +33,10 @@ pub struct FontFaceData {
 }
 
 impl FontFaceData {
+  pub fn id(&self) -> &str {
+    &self.id
+  }
+
   pub fn cache_key(&self) -> FontFaceCacheKey {
     FontFaceCacheKey {
       id: self.id.clone(),

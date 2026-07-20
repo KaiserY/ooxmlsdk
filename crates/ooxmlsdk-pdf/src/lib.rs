@@ -5,6 +5,7 @@
 //! 1. `ooxmlsdk-layout` extracts and lays out Office packages.
 //! 2. This crate converts the layout display list to PDF through `krilla`.
 
+mod diagnostics;
 mod error;
 mod options;
 mod render;
@@ -21,6 +22,12 @@ use ooxmlsdk::sdk::{
   OpenSettings,
 };
 
+pub use diagnostics::{
+  PdfConversionDiagnostics, PdfConversionOutput, PdfFontAudit, PdfFontAuditIssue,
+  PdfFontAuditIssueKind, PdfFontAuditOutput, PdfFontFaceDiagnostics, PdfGlyphBoundsDiagnostics,
+  PdfGlyphDiagnostics, PdfGlyphRunDiagnostics, PdfPageDiagnostics, PdfTextPortionDiagnostics,
+  PdfTextPortionKind, PdfTextRunDiagnostics,
+};
 pub use error::{PdfError, Result};
 pub use ooxmlsdk_layout::docx::{DocxLayoutLineSummary, DocxLayoutRowSummary, DocxLayoutSummary};
 pub use ooxmlsdk_layout::pptx::{
@@ -47,6 +54,47 @@ where
   };
   let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
   convert_wordprocessing_document(&mut document, options)
+}
+
+/// Convert a DOCX stream and return the exact font/glyph data passed to PDF serialization.
+pub fn convert_docx_with_diagnostics<R>(
+  reader: R,
+  options: PdfOptions,
+) -> Result<PdfConversionOutput>
+where
+  R: Read + Seek,
+{
+  let settings = OpenSettings {
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    },
+    ..Default::default()
+  };
+  let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
+  let mut options = options;
+  let layout_options = options.take_layout_options();
+  let pages = ooxmlsdk_layout::docx::layout_document(&mut document, &layout_options)?;
+  render::krilla::render_with_diagnostics(&pages, &options)
+}
+
+/// Convert a DOCX stream and return a bounded font-integrity audit.
+pub fn convert_docx_with_font_audit<R>(reader: R, options: PdfOptions) -> Result<PdfFontAuditOutput>
+where
+  R: Read + Seek,
+{
+  let settings = OpenSettings {
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    },
+    ..Default::default()
+  };
+  let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
+  let mut options = options;
+  let layout_options = options.take_layout_options();
+  let pages = ooxmlsdk_layout::docx::layout_document(&mut document, &layout_options)?;
+  render::krilla::render_with_font_audit(&pages, &options)
 }
 
 /// Convert an opened Wordprocessing document into PDF bytes.
@@ -123,6 +171,46 @@ where
   convert_spreadsheet_document(&mut document, options)
 }
 
+/// Convert an XLSX stream and return the exact font/glyph data passed to PDF serialization.
+pub fn convert_xlsx_with_diagnostics<R>(
+  reader: R,
+  mut options: PdfOptions,
+) -> Result<PdfConversionOutput>
+where
+  R: Read + Seek,
+{
+  let settings = OpenSettings {
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    },
+    ..Default::default()
+  };
+  let mut document = SpreadsheetDocument::new_with_settings(reader, settings)?;
+  let pages = xlsx::layout(&mut document, &mut options)?;
+  render::krilla::render_with_diagnostics(&pages, &options)
+}
+
+/// Convert an XLSX stream and return a bounded font-integrity audit.
+pub fn convert_xlsx_with_font_audit<R>(
+  reader: R,
+  mut options: PdfOptions,
+) -> Result<PdfFontAuditOutput>
+where
+  R: Read + Seek,
+{
+  let settings = OpenSettings {
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    },
+    ..Default::default()
+  };
+  let mut document = SpreadsheetDocument::new_with_settings(reader, settings)?;
+  let pages = xlsx::layout(&mut document, &mut options)?;
+  render::krilla::render_with_font_audit(&pages, &options)
+}
+
 /// Convert an opened spreadsheet document into PDF bytes.
 pub fn convert_spreadsheet_document(
   document: &mut SpreadsheetDocument,
@@ -146,6 +234,47 @@ where
   };
   let mut document = PresentationDocument::new_with_settings(reader, settings)?;
   convert_presentation_document(&mut document, options)
+}
+
+/// Convert a PPTX stream and return the exact font/glyph data passed to PDF serialization.
+pub fn convert_pptx_with_diagnostics<R>(
+  reader: R,
+  options: PdfOptions,
+) -> Result<PdfConversionOutput>
+where
+  R: Read + Seek,
+{
+  let settings = OpenSettings {
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    },
+    ..Default::default()
+  };
+  let mut document = PresentationDocument::new_with_settings(reader, settings)?;
+  let mut options = options;
+  let layout_options = options.take_layout_options();
+  let pages = ooxmlsdk_layout::pptx::layout_document(&mut document, &layout_options)?;
+  render::krilla::render_with_diagnostics(&pages, &options)
+}
+
+/// Convert a PPTX stream and return a bounded font-integrity audit.
+pub fn convert_pptx_with_font_audit<R>(reader: R, options: PdfOptions) -> Result<PdfFontAuditOutput>
+where
+  R: Read + Seek,
+{
+  let settings = OpenSettings {
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    },
+    ..Default::default()
+  };
+  let mut document = PresentationDocument::new_with_settings(reader, settings)?;
+  let mut options = options;
+  let layout_options = options.take_layout_options();
+  let pages = ooxmlsdk_layout::pptx::layout_document(&mut document, &layout_options)?;
+  render::krilla::render_with_font_audit(&pages, &options)
 }
 
 /// Convert an opened presentation document into PDF bytes.

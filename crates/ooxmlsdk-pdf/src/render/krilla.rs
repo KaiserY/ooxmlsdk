@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::ops::Range;
+use std::sync::Arc;
 
 use krilla::Document;
 use krilla::action::{Action, LinkAction};
@@ -13,7 +14,7 @@ use krilla::outline::{Outline, OutlineNode};
 use krilla::page::PageSettings;
 use krilla::paint::{Fill, FillRule, LineJoin, LinearGradient, SpreadMethod, Stop, Stroke};
 use krilla::surface::Surface;
-use krilla::text::{GlyphId, KrillaGlyph, TextDirection};
+use krilla::text::{Glyph, GlyphId};
 use rustc_hash::FxHashMap as HashMap;
 use smallvec::SmallVec;
 
@@ -23,6 +24,12 @@ use super::image::decode_image;
 use super::settings::serialize_settings;
 use crate::error::{PdfError, Result};
 use crate::options::PdfOptions;
+use crate::{
+  PdfConversionDiagnostics, PdfConversionOutput, PdfFontAudit, PdfFontAuditIssue,
+  PdfFontAuditIssueKind, PdfFontAuditOutput, PdfFontFaceDiagnostics, PdfGlyphBoundsDiagnostics,
+  PdfGlyphDiagnostics, PdfGlyphRunDiagnostics, PdfPageDiagnostics, PdfTextPortionDiagnostics,
+  PdfTextPortionKind, PdfTextRunDiagnostics,
+};
 use ooxmlsdk_layout::common;
 use ooxmlsdk_layout::fonts::{FontFaceData, FontStyleRef};
 use ooxmlsdk_layout::text_metrics::TextMetrics;
@@ -37,6 +44,49 @@ pub(crate) fn render(
   document: &common::LayoutDocument<'static>,
   options: &PdfOptions,
 ) -> Result<Vec<u8>> {
+  render_inner(document, options, RenderObservation::None).map(|output| output.pdf)
+}
+
+pub(crate) fn render_with_diagnostics(
+  document: &common::LayoutDocument<'static>,
+  options: &PdfOptions,
+) -> Result<PdfConversionOutput> {
+  let output = render_inner(document, options, RenderObservation::Diagnostics)?;
+  Ok(PdfConversionOutput {
+    pdf: output.pdf,
+    diagnostics: output.diagnostics,
+  })
+}
+
+pub(crate) fn render_with_font_audit(
+  document: &common::LayoutDocument<'static>,
+  options: &PdfOptions,
+) -> Result<PdfFontAuditOutput> {
+  let output = render_inner(document, options, RenderObservation::FontAudit)?;
+  Ok(PdfFontAuditOutput {
+    pdf: output.pdf,
+    audit: output.font_audit,
+  })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RenderObservation {
+  None,
+  FontAudit,
+  Diagnostics,
+}
+
+struct RenderOutput {
+  pdf: Vec<u8>,
+  diagnostics: PdfConversionDiagnostics,
+  font_audit: PdfFontAudit,
+}
+
+fn render_inner(
+  document: &common::LayoutDocument<'static>,
+  options: &PdfOptions,
+  observation: RenderObservation,
+) -> Result<RenderOutput> {
   debug_assert!(
     document
       .follows
@@ -185,6 +235,16 @@ pub(crate) fn render(
   }));
   let mut text_metrics = TextMetrics::new();
   let paint = PaintDocument::from_layout(document, &mut text_metrics);
+  let diagnostics = if observation == RenderObservation::Diagnostics {
+    conversion_diagnostics(&paint)
+  } else {
+    PdfConversionDiagnostics::default()
+  };
+  let font_audit = if observation == RenderObservation::FontAudit {
+    conversion_font_audit(&paint)
+  } else {
+    PdfFontAudit::default()
+  };
   let form_widget_annotations = collect_form_widget_annotations(document, &mut text_metrics);
   let internal_links = InternalLinkTargets::from_paint(&paint);
   debug_assert_eq!(paint.pages.len(), document.pages.len());
@@ -245,7 +305,7 @@ pub(crate) fn render(
       })
   }));
   let mut pdf = Document::new_with(serialize_settings(options)?);
-  let mut fonts = FontSet::load(text_metrics.into_font_resolver())?;
+  let mut fonts = FontSet::new();
 
   for page in &paint.pages {
     let settings = PageSettings::from_wh(page.width_pt, page.height_pt)
@@ -266,7 +326,7 @@ pub(crate) fn render(
         &internal_links,
         &mut link_annotations,
         options,
-      );
+      )?;
     }
     surface.finish();
     for annotation in link_annotations {
@@ -281,7 +341,12 @@ pub(crate) fn render(
   let pdf = pdf
     .finish()
     .map_err(|err| PdfError::Krilla(format!("{err:?}")))?;
-  inject_form_widget_annotations(pdf, form_widget_annotations)
+  let pdf = inject_form_widget_annotations(pdf, form_widget_annotations)?;
+  Ok(RenderOutput {
+    pdf,
+    diagnostics,
+    font_audit,
+  })
 }
 
 #[derive(Clone, Debug)]
@@ -549,8 +614,477 @@ struct PaintGlyphRun {
 #[derive(Clone, Debug)]
 struct PaintGlyphFontRun {
   font_face: FontFaceData,
+  font_size_pt: f32,
   x_offset_pt: f32,
-  glyphs: Vec<KrillaGlyph>,
+  glyphs: Vec<PaintGlyph>,
+}
+
+#[derive(Clone, Debug)]
+struct PaintGlyph {
+  // Krilla's public Glyph trait is designed for caller-owned glyph records.
+  // Keep the shaping bounds beside the exact normalized values consumed by
+  // draw_glyphs instead of reconstructing them from the serialized PDF.
+  glyph_id: GlyphId,
+  text_range: Range<usize>,
+  x_advance: f32,
+  x_offset: f32,
+  y_offset: f32,
+  y_advance: f32,
+  bounds_em: Option<PdfGlyphBoundsDiagnostics>,
+}
+
+fn conversion_diagnostics(paint: &PaintDocument<'_>) -> PdfConversionDiagnostics {
+  let mut fonts = Vec::new();
+  let mut font_indices = HashMap::default();
+  let pages = paint
+    .pages
+    .iter()
+    .enumerate()
+    .map(|(page_index, page)| {
+      let text_runs = page
+        .items
+        .iter()
+        .filter_map(|item| match item {
+          PaintItem::Text(text) => Some(text_run_diagnostics(text, &mut fonts, &mut font_indices)),
+          _ => None,
+        })
+        .collect();
+      PdfPageDiagnostics {
+        page_index,
+        width_pt: page.width_pt,
+        height_pt: page.height_pt,
+        text_runs,
+      }
+    })
+    .collect();
+  PdfConversionDiagnostics { fonts, pages }
+}
+
+const MAX_FONT_AUDIT_ISSUES: usize = 64;
+
+fn conversion_font_audit(paint: &PaintDocument<'_>) -> PdfFontAudit {
+  let mut audit = PdfFontAudit::default();
+  let mut font_indices = HashMap::default();
+  for (page_index, page) in paint.pages.iter().enumerate() {
+    let mut text_run_index = 0;
+    for item in &page.items {
+      let PaintItem::Text(text) = item else {
+        continue;
+      };
+      for (portion_index, portion) in text.portions.iter().enumerate() {
+        audit.text_portion_count += 1;
+        let painted = !matches!(portion.kind, PaintTextPortionKind::Tab)
+          && text_has_visible_glyph_paint(&text.item.style);
+        if painted {
+          audit.painted_text_portion_count += 1;
+        }
+        if !valid_text_range(&text.item.text, &portion.text_range) {
+          push_font_audit_issue(
+            &mut audit,
+            PdfFontAuditIssue {
+              page_index,
+              text_run_index,
+              portion_index: Some(portion_index),
+              glyph_run_index: None,
+              glyph_index: None,
+              kind: PdfFontAuditIssueKind::PortionTextRange,
+              detail: format!(
+                "range={:?}, text_len={}",
+                portion.text_range,
+                text.item.text.len()
+              ),
+            },
+          );
+        }
+        let Some(glyph_runs) = &portion.glyphs else {
+          if painted && portion.text_range.start < portion.text_range.end {
+            push_font_audit_issue(
+              &mut audit,
+              PdfFontAuditIssue {
+                page_index,
+                text_run_index,
+                portion_index: Some(portion_index),
+                glyph_run_index: None,
+                glyph_index: None,
+                kind: PdfFontAuditIssueKind::MissingShapedGlyphs,
+                detail: format!("range={:?}", portion.text_range),
+              },
+            );
+          }
+          continue;
+        };
+        audit.explicit_glyph_portion_count += 1;
+        for (glyph_run_index, run) in glyph_runs.iter().enumerate() {
+          audit.glyph_run_count += 1;
+          if painted {
+            let mut in_multi_glyph_cluster = false;
+            for glyphs in run.glyphs.windows(2) {
+              if glyphs[0].text_range == glyphs[1].text_range {
+                if !in_multi_glyph_cluster {
+                  audit.actual_text_cluster_count += 1;
+                }
+                in_multi_glyph_cluster = true;
+              } else {
+                in_multi_glyph_cluster = false;
+              }
+            }
+          }
+          let key = run.font_face.cache_key();
+          let font_index = if let Some(index) = font_indices.get(&key) {
+            *index
+          } else {
+            let index = audit.fonts.len();
+            let font = font_face_diagnostics(&run.font_face);
+            if let Some(error) = &font.parse_error {
+              push_font_audit_issue(
+                &mut audit,
+                PdfFontAuditIssue {
+                  page_index,
+                  text_run_index,
+                  portion_index: Some(portion_index),
+                  glyph_run_index: Some(glyph_run_index),
+                  glyph_index: None,
+                  kind: PdfFontAuditIssueKind::FontParse,
+                  detail: format!("font_id={:?}, error={error}", font.font_id),
+                },
+              );
+            }
+            if !krilla_font_loads(&run.font_face) {
+              push_font_audit_issue(
+                &mut audit,
+                PdfFontAuditIssue {
+                  page_index,
+                  text_run_index,
+                  portion_index: Some(portion_index),
+                  glyph_run_index: Some(glyph_run_index),
+                  glyph_index: None,
+                  kind: PdfFontAuditIssueKind::KrillaFontLoad,
+                  detail: format!("font_id={:?}", font.font_id),
+                },
+              );
+            }
+            audit.fonts.push(font);
+            font_indices.insert(key, index);
+            index
+          };
+          if !run.x_offset_pt.is_finite() {
+            push_font_audit_issue(
+              &mut audit,
+              PdfFontAuditIssue {
+                page_index,
+                text_run_index,
+                portion_index: Some(portion_index),
+                glyph_run_index: Some(glyph_run_index),
+                glyph_index: None,
+                kind: PdfFontAuditIssueKind::NonFiniteGlyphMetric,
+                detail: format!("font_index={font_index}, x_offset_pt={}", run.x_offset_pt),
+              },
+            );
+          }
+          if !run.font_size_pt.is_finite() || run.font_size_pt <= 0.0 {
+            push_font_audit_issue(
+              &mut audit,
+              PdfFontAuditIssue {
+                page_index,
+                text_run_index,
+                portion_index: Some(portion_index),
+                glyph_run_index: Some(glyph_run_index),
+                glyph_index: None,
+                kind: PdfFontAuditIssueKind::NonFiniteGlyphMetric,
+                detail: format!("font_index={font_index}, font_size_pt={}", run.font_size_pt),
+              },
+            );
+          }
+          for (glyph_index, glyph) in run.glyphs.iter().enumerate() {
+            audit.glyph_count += 1;
+            let location = || PdfFontAuditIssue {
+              page_index,
+              text_run_index,
+              portion_index: Some(portion_index),
+              glyph_run_index: Some(glyph_run_index),
+              glyph_index: Some(glyph_index),
+              kind: PdfFontAuditIssueKind::GlyphTextRange,
+              detail: String::new(),
+            };
+            if !valid_text_range(&text.item.text, &glyph.text_range) {
+              let mut issue = location();
+              issue.detail = format!(
+                "font_index={font_index}, range={:?}, text_len={}",
+                glyph.text_range,
+                text.item.text.len()
+              );
+              push_font_audit_issue(&mut audit, issue);
+            }
+            let font = &audit.fonts[font_index];
+            if font.parse_error.is_none() && glyph.glyph_id.to_u32() >= u32::from(font.glyph_count)
+            {
+              let mut issue = location();
+              issue.kind = PdfFontAuditIssueKind::GlyphIdOutOfRange;
+              issue.detail = format!(
+                "font_index={font_index}, glyph_id={}, glyph_count={}",
+                glyph.glyph_id.to_u32(),
+                font.glyph_count
+              );
+              push_font_audit_issue(&mut audit, issue);
+            }
+            if ![
+              glyph.x_advance,
+              glyph.x_offset,
+              glyph.y_offset,
+              glyph.y_advance,
+            ]
+            .into_iter()
+            .all(f32::is_finite)
+            {
+              let mut issue = location();
+              issue.kind = PdfFontAuditIssueKind::NonFiniteGlyphMetric;
+              issue.detail = format!(
+                "font_index={font_index}, advance=({}, {}), offset=({}, {})",
+                glyph.x_advance, glyph.y_advance, glyph.x_offset, glyph.y_offset
+              );
+              push_font_audit_issue(&mut audit, issue);
+            }
+            if let Some(bounds) = glyph.bounds_em
+              && (![
+                bounds.x_min_em,
+                bounds.y_min_em,
+                bounds.x_max_em,
+                bounds.y_max_em,
+              ]
+              .into_iter()
+              .all(f32::is_finite)
+                || bounds.x_min_em > bounds.x_max_em
+                || bounds.y_min_em > bounds.y_max_em)
+            {
+              let mut issue = location();
+              issue.kind = PdfFontAuditIssueKind::InvalidGlyphBounds;
+              issue.detail = format!("font_index={font_index}, bounds={bounds:?}");
+              push_font_audit_issue(&mut audit, issue);
+            }
+          }
+        }
+      }
+      text_run_index += 1;
+    }
+  }
+  audit
+}
+
+fn valid_text_range(text: &str, range: &Range<usize>) -> bool {
+  range.start <= range.end
+    && range.end <= text.len()
+    && text.is_char_boundary(range.start)
+    && text.is_char_boundary(range.end)
+}
+
+fn krilla_font_loads(face: &FontFaceData) -> bool {
+  let data: Arc<dyn AsRef<[u8]> + Send + Sync> = face.data.clone();
+  krilla::text::Font::new(data.into(), face.index).is_some()
+}
+
+fn push_font_audit_issue(audit: &mut PdfFontAudit, issue: PdfFontAuditIssue) {
+  if audit.issues.len() < MAX_FONT_AUDIT_ISSUES {
+    audit.issues.push(issue);
+  }
+}
+
+fn text_run_diagnostics(
+  text: &PaintText<'_>,
+  fonts: &mut Vec<PdfFontFaceDiagnostics>,
+  font_indices: &mut HashMap<ooxmlsdk_layout::fonts::FontFaceCacheKey, usize>,
+) -> PdfTextRunDiagnostics {
+  let portions = text
+    .portions
+    .iter()
+    .map(|portion| {
+      let glyph_runs = portion
+        .glyphs
+        .iter()
+        .flatten()
+        .map(|run| {
+          let key = run.font_face.cache_key();
+          let font_index = *font_indices.entry(key).or_insert_with(|| {
+            let index = fonts.len();
+            fonts.push(font_face_diagnostics(&run.font_face));
+            index
+          });
+          PdfGlyphRunDiagnostics {
+            font_index,
+            font_size_pt: run.font_size_pt,
+            x_offset_pt: run.x_offset_pt,
+            synthetic_bold: run.font_face.synthetic_bold,
+            synthetic_italic: run.font_face.synthetic_italic,
+            glyphs: run
+              .glyphs
+              .iter()
+              .map(|glyph| PdfGlyphDiagnostics {
+                glyph_id: glyph.glyph_id.to_u32(),
+                text_range_start: glyph.text_range.start,
+                text_range_end: glyph.text_range.end,
+                x_advance_em: glyph.x_advance,
+                x_offset_em: glyph.x_offset,
+                y_offset_em: glyph.y_offset,
+                y_advance_em: glyph.y_advance,
+                bounds_em: glyph.bounds_em,
+              })
+              .collect(),
+          }
+        })
+        .collect();
+      PdfTextPortionDiagnostics {
+        kind: match portion.kind {
+          PaintTextPortionKind::Text => PdfTextPortionKind::Text,
+          PaintTextPortionKind::Tab => PdfTextPortionKind::Tab,
+          PaintTextPortionKind::Field => PdfTextPortionKind::Field,
+          PaintTextPortionKind::Link => PdfTextPortionKind::Link,
+        },
+        text_range_start: portion.text_range.start,
+        text_range_end: portion.text_range.end,
+        x_pt: portion.x_pt,
+        baseline_y_pt: portion.baseline_y,
+        width_pt: portion.width_pt,
+        has_explicit_glyphs: portion.glyphs.is_some(),
+        glyph_runs,
+      }
+    })
+    .collect();
+  PdfTextRunDiagnostics {
+    text: text.item.text.to_string(),
+    x_pt: text.item.x_pt,
+    y_pt: text.item.y_pt,
+    baseline_y_pt: text.baseline_y,
+    line_height_pt: text.item.line_height_pt,
+    width_pt: text.width_pt,
+    font_size_pt: text.item.style.font_size_pt,
+    character_spacing_pt: text.item.style.character_spacing_pt,
+    baseline_shift_pt: text.item.style.baseline_shift_pt,
+    requested_font_family: text.item.style.font_family.as_deref().map(str::to_string),
+    requested_east_asia_font_family: text
+      .item
+      .style
+      .east_asia_font_family
+      .as_deref()
+      .map(str::to_string),
+    requested_complex_font_family: text
+      .item
+      .style
+      .complex_font_family
+      .as_deref()
+      .map(str::to_string),
+    bold: text.item.style.bold,
+    italic: text.item.style.italic,
+    small_caps: text.item.style.small_caps,
+    portions,
+  }
+}
+
+fn font_face_diagnostics(face_data: &FontFaceData) -> PdfFontFaceDiagnostics {
+  let data = face_data.data.as_slice();
+  // Mirrors Krilla's FontInfo identity: face index plus OpenType `head`
+  // checksum adjustment and data length distinguish faces without hashing a
+  // multi-megabyte font once per glyph run.
+  let checksum_adjustment = ttf_parser::RawFace::parse(data, face_data.index)
+    .ok()
+    .and_then(|raw| raw.table(ttf_parser::Tag::from_bytes(b"head")))
+    .and_then(|head| head.get(8..12))
+    .map(|bytes| u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]));
+  let face = match ttf_parser::Face::parse(data, face_data.index) {
+    Ok(face) => face,
+    Err(error) => {
+      return PdfFontFaceDiagnostics {
+        font_id: face_data.id().to_string(),
+        face_index: face_data.index,
+        data_len: data.len(),
+        parse_error: Some(error.to_string()),
+        checksum_adjustment,
+        postscript_name: None,
+        family_names: Vec::new(),
+        style_name: None,
+        units_per_em: 0,
+        glyph_count: 0,
+        ascender_em: 0.0,
+        descender_em: 0.0,
+        cap_height_em: None,
+        global_bounds_em: PdfGlyphBoundsDiagnostics::default(),
+        monospaced: false,
+      };
+    }
+  };
+  let units_per_em = face.units_per_em();
+  let em_divisor = f32::from(units_per_em);
+  let mut family_names = Vec::new();
+  let mut postscript_name = None;
+  let mut style_name = None;
+  for name in face.names() {
+    let Some(value) = name.to_string() else {
+      continue;
+    };
+    match name.name_id {
+      ttf_parser::name_id::FAMILY | ttf_parser::name_id::TYPOGRAPHIC_FAMILY => {
+        if !family_names.contains(&value) {
+          family_names.push(value);
+        }
+      }
+      ttf_parser::name_id::POST_SCRIPT_NAME => postscript_name = Some(value),
+      ttf_parser::name_id::SUBFAMILY => style_name = Some(value),
+      _ => {}
+    }
+  }
+  let bounds = face.global_bounding_box();
+  PdfFontFaceDiagnostics {
+    font_id: face_data.id().to_string(),
+    face_index: face_data.index,
+    data_len: data.len(),
+    parse_error: None,
+    checksum_adjustment,
+    postscript_name,
+    family_names,
+    style_name,
+    units_per_em,
+    glyph_count: face.number_of_glyphs(),
+    ascender_em: f32::from(face.ascender()) / em_divisor,
+    descender_em: f32::from(face.descender()) / em_divisor,
+    cap_height_em: face
+      .capital_height()
+      .map(|value| f32::from(value) / em_divisor),
+    global_bounds_em: PdfGlyphBoundsDiagnostics {
+      x_min_em: f32::from(bounds.x_min) / em_divisor,
+      y_min_em: f32::from(bounds.y_min) / em_divisor,
+      x_max_em: f32::from(bounds.x_max) / em_divisor,
+      y_max_em: f32::from(bounds.y_max) / em_divisor,
+    },
+    monospaced: face.is_monospaced(),
+  }
+}
+
+impl Glyph for PaintGlyph {
+  fn glyph_id(&self) -> GlyphId {
+    self.glyph_id
+  }
+
+  fn text_range(&self) -> Range<usize> {
+    self.text_range.clone()
+  }
+
+  fn x_advance(&self, size: f32) -> f32 {
+    self.x_advance * size
+  }
+
+  fn x_offset(&self, size: f32) -> f32 {
+    self.x_offset * size
+  }
+
+  fn y_offset(&self, size: f32) -> f32 {
+    self.y_offset * size
+  }
+
+  fn y_advance(&self, size: f32) -> f32 {
+    self.y_advance * size
+  }
+
+  fn location(&self) -> Option<krilla::surface::Location> {
+    None
+  }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1090,11 +1624,7 @@ impl<'doc> PaintText<'doc> {
     text_metrics: &mut TextMetrics,
   ) -> Self {
     let text_ref = &text;
-    let glyphs = if should_shape_pdf_glyphs(text_ref) {
-      shaped_pdf_glyphs(&text_ref.text, &text_ref.style, text_metrics)
-    } else {
-      None
-    };
+    let glyphs = shaped_pdf_glyphs(&text_ref.text, &text_ref.style, text_metrics);
     let width_pt = glyphs
       .as_ref()
       .map(|run| run.width_pt)
@@ -1221,11 +1751,11 @@ fn text_paint_portions<'doc>(
     } else {
       glyphs
         .as_ref()
-        .map(|glyphs| glyphs_for_text_range(glyphs, &range, text.style.font_size_pt))
+        .map(|glyphs| glyphs_for_text_range(glyphs, &range))
     };
     let portion_width = portion_glyphs
       .as_ref()
-      .map(|glyphs| glyph_runs_width_pt(glyphs, text.style.font_size_pt))
+      .map(|glyphs| glyph_runs_width_pt(glyphs))
       .unwrap_or_else(|| {
         text_metrics.measure_text(&text.text[range.start..range.end], &text.style)
       });
@@ -1360,11 +1890,7 @@ fn edge_whitespace_text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionR
   ranges
 }
 
-fn glyphs_for_text_range(
-  glyphs: &[PaintGlyphFontRun],
-  range: &Range<usize>,
-  font_size_pt: f32,
-) -> PaintGlyphFontRuns {
+fn glyphs_for_text_range(glyphs: &[PaintGlyphFontRun], range: &Range<usize>) -> PaintGlyphFontRuns {
   let mut output = PaintGlyphFontRuns::new();
   let mut range_origin_x_pt = None::<f32>;
   for run in glyphs {
@@ -1377,6 +1903,7 @@ fn glyphs_for_text_range(
         active
           .get_or_insert_with(|| PaintGlyphFontRun {
             font_face: run.font_face.clone(),
+            font_size_pt: run.font_size_pt,
             x_offset_pt: x_pt - origin_x_pt,
             glyphs: Vec::with_capacity(run.glyphs.len().min(range.len())),
           })
@@ -1385,7 +1912,7 @@ fn glyphs_for_text_range(
       } else if let Some(active) = active.take() {
         output.push(active);
       }
-      x_pt += glyph.x_advance * font_size_pt;
+      x_pt += glyph.x_advance * run.font_size_pt;
     }
     if let Some(active) = active {
       output.push(active);
@@ -1394,11 +1921,16 @@ fn glyphs_for_text_range(
   output
 }
 
-fn glyph_runs_width_pt(glyphs: &[PaintGlyphFontRun], font_size_pt: f32) -> f32 {
+fn glyph_runs_width_pt(glyphs: &[PaintGlyphFontRun]) -> f32 {
   glyphs
     .iter()
-    .flat_map(|run| run.glyphs.iter())
-    .map(|glyph| glyph.x_advance * font_size_pt)
+    .map(|run| {
+      run
+        .glyphs
+        .iter()
+        .map(|glyph| glyph.x_advance * run.font_size_pt)
+        .sum::<f32>()
+    })
     .sum()
 }
 
@@ -1489,10 +2021,10 @@ fn draw_paint_item(
   internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
   options: &PdfOptions,
-) {
+) -> Result<()> {
   match item {
     PaintItem::Text(text) if !text.item.text.is_empty() => {
-      draw_text_item(surface, text, fonts, internal_links, link_annotations);
+      draw_text_item(surface, text, fonts, internal_links, link_annotations)?;
     }
     PaintItem::Text(_) => {}
     PaintItem::LinkArea(link_area) => {
@@ -1535,6 +2067,7 @@ fn draw_paint_item(
     PaintItem::Line(line) => draw_line_item(surface, line),
     PaintItem::Polyline(polyline) => draw_polyline_item(surface, polyline),
   }
+  Ok(())
 }
 
 fn metafile_render_options_for_image(
@@ -1698,7 +2231,7 @@ fn draw_text_item(
   fonts: &mut FontSet,
   internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
-) {
+) -> Result<()> {
   let item = &text.item;
   let glyph_semantic_text =
     symbol_font_semantic_text(&item.text, item.style.font_family.as_deref());
@@ -1738,30 +2271,18 @@ fn draw_text_item(
     // portions, but emitting the font's glyph 0 leaks a NUL into PDF text.
     if !matches!(portion.kind, PaintTextPortionKind::Tab)
       && text_has_visible_glyph_paint(&item.style)
+      && let Some(glyphs) = &portion.glyphs
     {
-      if let Some(glyphs) = &portion.glyphs {
-        for run in glyphs {
-          let selected = fonts.select_face(&run.font_face);
-          surface.set_stroke(text_stroke(&item.style, selected.synthetic_bold));
-          surface.draw_glyphs(
-            Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
-            &run.glyphs,
-            selected.font,
-            &glyph_semantic_text,
-            item.style.font_size_pt,
-            false,
-          );
-        }
-      } else {
-        let selected = fonts.select(&item.style);
+      for run in glyphs {
+        let selected = fonts.select_face(&run.font_face)?;
         surface.set_stroke(text_stroke(&item.style, selected.synthetic_bold));
-        surface.draw_text(
-          Point::from_xy(portion.x_pt, portion.baseline_y),
+        surface.draw_glyphs(
+          Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
+          &run.glyphs,
           selected.font,
-          item.style.font_size_pt,
-          &item.text[portion.text_range.start..portion.text_range.end],
+          &glyph_semantic_text,
+          run.font_size_pt,
           false,
-          TextDirection::Auto,
         );
       }
     }
@@ -1793,6 +2314,7 @@ fn draw_text_item(
       surface.pop();
     }
   }
+  Ok(())
 }
 
 fn text_has_visible_glyph_paint(style: &TextStyle<'_>) -> bool {
@@ -2311,45 +2833,43 @@ fn shaped_pdf_glyphs(
   let shaped = text_metrics.shape_text(text, style)?;
   let mut font_runs = PaintGlyphFontRuns::new();
   let mut x_offset_pt = 0.0;
-  let mut last_font_index = None::<usize>;
+  let mut last_run = None::<(usize, u32)>;
   for glyph in shaped.glyphs {
-    if last_font_index != Some(glyph.font_index) {
+    let run_key = (glyph.font_index, glyph.font_size_pt.to_bits());
+    if last_run != Some(run_key) {
       let font_face = shaped.font_faces.get(glyph.font_index)?.clone();
       font_runs.push(PaintGlyphFontRun {
         font_face,
+        font_size_pt: glyph.font_size_pt,
         x_offset_pt,
         glyphs: Vec::new(),
       });
-      last_font_index = Some(glyph.font_index);
+      last_run = Some(run_key);
     }
     font_runs
       .last_mut()
       .expect("font run was just pushed")
       .glyphs
-      .push(KrillaGlyph::new(
-        GlyphId::new(glyph.glyph_id),
-        glyph.x_advance_em,
-        glyph.x_offset_em,
-        glyph.y_offset_em,
-        glyph.y_advance_em,
-        glyph.text_range,
-        None,
-      ));
-    x_offset_pt += glyph.x_advance_em * style.font_size_pt;
+      .push(PaintGlyph {
+        glyph_id: GlyphId::new(glyph.glyph_id),
+        text_range: glyph.text_range,
+        x_advance: glyph.x_advance_em,
+        x_offset: glyph.x_offset_em,
+        y_offset: glyph.y_offset_em,
+        y_advance: glyph.y_advance_em,
+        bounds_em: glyph.bounds_em.map(|bounds| PdfGlyphBoundsDiagnostics {
+          x_min_em: bounds.x_min_em,
+          y_min_em: bounds.y_min_em,
+          x_max_em: bounds.x_max_em,
+          y_max_em: bounds.y_max_em,
+        }),
+      });
+    x_offset_pt += glyph.x_advance_em * glyph.font_size_pt;
   }
   Some(PaintGlyphRun {
     width_pt: shaped.width_pt,
     font_runs,
   })
-}
-
-fn should_shape_pdf_glyphs(text: &TextItem<'_>) -> bool {
-  // Krilla's simple-text path reconstructs a Rustybuzz face and shapes on
-  // every draw_text call. We already need the same shaped run to obtain exact
-  // layout width, so feed those glyphs to draw_glyphs for ordinary text too.
-  // Small caps keeps its existing simple-text path because its layout shaping
-  // applies run-size substitutions that are not represented by one PDF size.
-  !text.style.small_caps
 }
 
 fn text_vertical_scale(style: &TextStyle<'_>) -> f32 {

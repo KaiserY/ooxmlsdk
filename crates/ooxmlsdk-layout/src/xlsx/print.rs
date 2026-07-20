@@ -109,19 +109,17 @@ impl<'a> CalcPrintDocument<'a> {
       let mut sheet_page_index = 0usize;
       for area in page_areas {
         let cells = area
-          .map(|area| print_cells_for_area(import, sheet, area, true, &mut conditional_eval_cache))
+          .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
           .unwrap_or_default();
         let repeated_row_cells = repeat_rows_for_page(area, named_ranges.repeat_rows)
-          .map(|area| print_cells_for_area(import, sheet, area, true, &mut conditional_eval_cache))
+          .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
           .unwrap_or_default();
         let repeated_column_cells = repeat_columns_for_page(area, named_ranges.repeat_columns)
-          .map(|area| print_cells_for_area(import, sheet, area, true, &mut conditional_eval_cache))
+          .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
           .unwrap_or_default();
         let repeated_corner_cells =
           repeat_corner_for_page(named_ranges.repeat_rows, named_ranges.repeat_columns)
-            .map(|area| {
-              print_cells_for_area(import, sheet, area, true, &mut conditional_eval_cache)
-            })
+            .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
             .unwrap_or_default();
         let drawing_summary = drawing_summary_for_area(sheet, area);
         // ScPrintFunc::DoPrint. Empty sheet page ranges are hidden by
@@ -1507,7 +1505,6 @@ fn print_cells_for_area<'a>(
   import: &'a ExcelImport,
   sheet: &'a CalcSheet,
   area: CellRange,
-  include_hidden: bool,
   conditional_eval_cache: &mut ConditionalFormatEvalCache,
 ) -> Vec<CalcPrintCell<'a>> {
   let mut physical_cells = Vec::new();
@@ -1526,7 +1523,7 @@ fn print_cells_for_area<'a>(
       }
       occupied.insert(print_address);
       let hidden_column = column_hidden(sheet, address.col);
-      if !include_hidden && (row.hidden || hidden_column) {
+      if row.hidden || hidden_column {
         continue;
       }
       let style_index = sheet.effective_cell_style_index(row, cell, address);

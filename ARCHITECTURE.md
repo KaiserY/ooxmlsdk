@@ -148,7 +148,7 @@ responsibilities are:
 | `ooxmlsdk-layout-test` | DOCX, PPTX, and XLSX layout parity |
 | `ooxmlsdk-pdf-test` | PDF export, metafile handling, PDF-object checks, and mapped visible-output fixtures |
 | `ooxmlsdk-corpus-test-support` | Shared package round-trip and manifest logic |
-| `ooxmlsdk-roundtrip-tests` | Generated per-file Apache POI, LibreOffice, and Open XML SDK package tests |
+| `ooxmlsdk-roundtrip-tests` | Generated per-file Apache POI, LibreOffice, Open XML SDK, Pandoc, and ClosedXML package tests |
 | `ooxmlsdk-bench` | Package and XML Criterion benchmarks |
 
 The workspace also contains EMF and legacy OLE/CFB test crates because those

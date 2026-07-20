@@ -2,25 +2,33 @@
 
 ## Unreleased
 
+## 0.12.0
+
 ### Changed
 
-- Changed the default package open mode to lazy typed Part roots while continuing to parse package content types and relationships eagerly.
-- Made saves serialize every loaded typed root and successfully parsed package metadata; only unloaded Part payloads and unparsed raw relationship XML can reuse original compressed entries.
-
-### Added
-
-- Added fallible `try_data` access for lazy Part payloads.
-
-### Fixed
-
-- Made `save_as_file` safe when the destination is also the package's source file by writing a sibling temporary file before replacement.
+- **Breaking:** Regenerated schema and package APIs around static attributes,
+  children, MCE positions, and Part constraints. Catch-all `Other` variants,
+  dynamic `other_attributes`, and the generated `SdkValidator` trait were removed;
+  validation code is now gated by the `validators` feature.
+- Made typed Part roots lazy by default and added fallible `try_data` access.
+  Saving serializes loaded roots while unloaded payloads retain their original
+  compressed data.
+- Made `save_as_file` safe when overwriting the package's source file and fixed
+  MCE processing for roots loaded after package open.
+- Corrected WordprocessingML extension metadata and improved DOCX, PPTX, and
+  XLSX fixed-output fidelity, including omission of hidden spreadsheet cells.
 
 ### Performance
 
-- Reworked package ZIP storage around cloneable file/byte readers and lazy `Bytes` Part payloads, without a runtime mutex or unsafe code.
-- Reused owned input and decompressed Part allocations through immutable `Bytes` backing instead of copying them into `Arc<[u8]>` allocations.
-- Used source-order raw compressed entry copies for Part payloads that remain unloaded while releasing decompressed XML bytes after typed roots are successfully parsed.
-- Avoided scanning local ZIP headers during Part discovery, read required relationship entries in archive order, and released decompressed XML bytes after typed roots are successfully parsed.
+- Reworked package storage around cloneable readers and immutable `Bytes`,
+  reducing payload copies, decompression retention, ZIP scans, and XML
+  serialization overhead without a runtime mutex or unsafe code.
+
+### Testing
+
+- Added Pandoc and ClosedXML to the package corpus suite. All 5,477 tests
+  across Apache POI, LibreOffice, Open XML SDK, Pandoc, and ClosedXML pass;
+  workspace tests, feature matrices, and Clippy are also clean.
 
 ## 0.11.0
 

@@ -824,6 +824,14 @@ impl SheetMetrics {
     } else {
       digit_width_pt
     };
+    let mut format = worksheet
+      .sheet_format_properties
+      .as_ref()
+      .map(|format| SheetFormatModel::from_sheet_format_properties(format, mso_document))
+      .unwrap_or_default();
+    if !format.custom_height && styles.default_font_uses_theme() {
+      format.default_row_height = automatic_default_row_height_pt(styles) as f64;
+    }
     Self {
       dimension: worksheet
         .sheet_dimension
@@ -831,11 +839,7 @@ impl SheetMetrics {
         .map(|dimension| dimension.reference.clone()),
       settings: SheetSettingsCatalog::from_worksheet(worksheet),
       views: SheetViewCatalog::from_worksheet(worksheet),
-      format: worksheet
-        .sheet_format_properties
-        .as_ref()
-        .map(|format| SheetFormatModel::from_sheet_format_properties(format, mso_document))
-        .unwrap_or_default(),
+      format,
       digit_width_pt,
       default_digit_width_pt,
       columns: worksheet
@@ -1148,6 +1152,23 @@ fn measured_digit_width_pt(style: &crate::model::TextStyle) -> f32 {
 
 fn quantize_digit_width_to_screen_pixel(width_pt: f32) -> f32 {
   (width_pt / screen_pixel_width_pt()).round().max(1.0) * screen_pixel_width_pt()
+}
+
+fn automatic_default_row_height_pt(styles: &StylesCatalog) -> f32 {
+  // A false sheetFormatPr@customHeight marks the default row height as
+  // automatic. LibreOffice's tdf#124741/tdf#168892 calibration keeps that
+  // distinction because Excel otherwise recalculates the stored height.
+  // Derive the printable height from the resolved Normal font rather than
+  // treating the serialized defaultRowHeight as a manual measurement. Excel
+  // leaves one screen-pixel worth of leading above and below the font box and
+  // stores row heights on the 96 dpi (0.75 pt) grid.
+  let style = styles.default_font_text_style();
+  let mut text_metrics = TextMetrics::new();
+  let natural_height = text_metrics.vertical_metrics(&style).line_height_pt();
+  let padded_height = natural_height + 2.0 * screen_pixel_width_pt();
+  // MSO row measurements are truncated to the device grid; LO mirrors this
+  // for imported OOXML heights in WorksheetFragment::importSheetFormatPr.
+  (padded_height / screen_pixel_width_pt()).floor() * screen_pixel_width_pt()
 }
 
 fn screen_pixel_width_pt() -> f32 {

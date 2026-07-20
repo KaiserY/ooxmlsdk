@@ -234,14 +234,6 @@ impl<'a> FontRegistry<'a> {
         .filter(|family| !family.is_empty())
       {
         queries.push(FontDbQueryFamily::Name(family.to_string()));
-        // `fontdb::Family::Name` expects a family name without a style
-        // suffix. Calibri Light is exposed by Office themes as a face name,
-        // while its OpenType WWS family is Calibri and its weight is Light.
-        // Keep the requested name first, then query the WWS family so the
-        // installed Light face can be registered under all of its aliases.
-        if family.eq_ignore_ascii_case("Calibri Light") {
-          queries.push(FontDbQueryFamily::Name("Calibri".to_string()));
-        }
         let aliased = resolve_family_alias(&self.book, Cow::Borrowed(family));
         if aliased.as_ref() != family {
           queries.push(FontDbQueryFamily::Name(aliased.into_owned()));
@@ -258,14 +250,7 @@ impl<'a> FontRegistry<'a> {
     }
 
     for query_family in queries {
-      let family = query_family.as_fontdb_family();
-      let query = fontdb::Query {
-        families: &[family],
-        weight: fontdb_weight(request),
-        style: fontdb_style(request),
-        ..fontdb::Query::default()
-      };
-      let Some(id) = font_timing("fontdb query", || database.query(&query)) else {
+      let Some(id) = font_timing("fontdb query", || query_family.query(database, request)) else {
         continue;
       };
       let Some(info) = database.face(id) else {
@@ -2003,7 +1988,7 @@ fn script_direction_runs_for_segment_into(
       pending_weak_has_inherited = true;
       continue;
     }
-    let Some(script) = strong_text_script_from_unicode(unicode_script) else {
+    let Some(script) = strong_text_script(ch) else {
       active.get_or_insert(leading_script);
       pending_weak_start.get_or_insert(index);
       pending_weak_has_inherited |= unicode_script == UnicodeScriptValue::Inherited;
@@ -2629,6 +2614,16 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
     },
     FontFallbackChain {
       requested_family: None,
+      script: Some(TextScript::Greek),
+      language: None,
+      // Office uses Cambria Math for the Mathematical Alphanumeric Symbols
+      // Greek block when the requested worksheet face has no glyphs. Keep it
+      // ahead of generic sans-serif fallbacks so coverage, not .notdef, owns
+      // these code points.
+      families: vec![Cow::Borrowed("Cambria Math")],
+    },
+    FontFallbackChain {
+      requested_family: None,
       script: None,
       language: None,
       families: vec![
@@ -3036,6 +3031,71 @@ impl FontDbQueryFamily {
       Self::Serif => fontdb::Family::Serif,
     }
   }
+
+  fn query(&self, database: &FontDatabase, request: &FontRequest<'_>) -> Option<fontdb::ID> {
+    let family = self.as_fontdb_family();
+    let query = fontdb::Query {
+      families: &[family],
+      weight: fontdb_weight(request),
+      style: fontdb_style(request),
+      ..fontdb::Query::default()
+    };
+    database.query(&query).or_else(|| match self {
+      Self::Name(typeface) => query_legacy_system_typeface(database, typeface, request),
+      Self::SansSerif | Self::Serif => None,
+    })
+  }
+}
+
+/// Resolves OpenType legacy family names (name ID 1) that contain a face
+/// style, such as `Poppins Medium` and `Calibri Light`.
+///
+/// `fontdb` indexes the typographic family (name ID 16) when it exists, so a
+/// CSS-like family query cannot find these Office typeface names. LibreOffice
+/// handles the same distinction in
+/// `PhysicalFontCollection::FindFontFaceByLegacyName`: first narrow by the
+/// typographic-family prefix, then inspect the matching faces' legacy names.
+fn query_legacy_system_typeface(
+  database: &FontDatabase,
+  requested_typeface: &str,
+  request: &FontRequest<'_>,
+) -> Option<fontdb::ID> {
+  let requested = normalize_family(requested_typeface);
+  let requested_weight = fontdb_weight(request).0;
+  let requested_style = fontdb_style(request);
+
+  database
+    .faces()
+    .filter(|info| {
+      normalized_family_eq_normalized(&info.post_script_name, &requested)
+        || info.families.iter().any(|(family, _)| {
+          let family = normalize_family(family);
+          !family.is_empty() && requested.starts_with(&family)
+        })
+    })
+    .filter(|info| {
+      normalized_family_eq_normalized(&info.post_script_name, &requested)
+        || database
+          .with_face_data(info.id, |data, face_index| {
+            FontFaceInfo::from_ttf_bytes("system-typeface-probe", data, face_index)
+              .is_ok_and(|face| family_matches_names(&face, std::slice::from_ref(&requested)))
+          })
+          .unwrap_or(false)
+    })
+    .min_by(|left, right| {
+      let left_rank = (
+        left.style != requested_style,
+        left.weight.0.abs_diff(requested_weight),
+        left.post_script_name.as_str(),
+      );
+      let right_rank = (
+        right.style != requested_style,
+        right.weight.0.abs_diff(requested_weight),
+        right.post_script_name.as_str(),
+      );
+      left_rank.cmp(&right_rank)
+    })
+    .map(|info| info.id)
 }
 
 fn fontdb_weight(request: &FontRequest<'_>) -> fontdb::Weight {
@@ -3677,9 +3737,20 @@ fn tag_to_string(tag: Tag) -> String {
 fn first_strong_text_script(text: &str) -> Option<TextScript> {
   text.chars().find_map(|ch| {
     (!is_nonspacing_mark(ch))
-      .then(|| strong_text_script_from_unicode(ch.script()))
+      .then(|| strong_text_script(ch))
       .flatten()
   })
+}
+
+fn strong_text_script(ch: char) -> Option<TextScript> {
+  // Unicode assigns Mathematical Alphanumeric Symbols to Common, but the
+  // styled Greek letters retain their Greek semantic identity through their
+  // compatibility decompositions. Office consequently falls them back to
+  // Cambria Math rather than the application-script face.
+  if matches!(u32::from(ch), 0x1D6A8..=0x1D7CB) {
+    return Some(TextScript::Greek);
+  }
+  strong_text_script_from_unicode(ch.script())
 }
 
 fn strong_text_script_from_unicode(script: UnicodeScriptValue) -> Option<TextScript> {
@@ -4350,6 +4421,35 @@ mod tests {
       )
       .unwrap();
     assert_eq!(cached_runs, runs);
+  }
+
+  #[test]
+  fn office_greek_fallback_prefers_cambria_math_before_generic_faces() {
+    let registry = FontRegistry::with_default_policy();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Calibri")),
+      script: Some(TextScript::Greek),
+      ..FontRequest::default()
+    };
+
+    let families = registry.fallback_families(&request);
+    let math = families
+      .iter()
+      .position(|family| *family == "Cambria Math")
+      .expect("Cambria Math fallback");
+    let generic = families
+      .iter()
+      .position(|family| *family == "DejaVu Sans")
+      .expect("generic fallback");
+    assert!(math < generic);
+  }
+
+  #[test]
+  fn mathematical_greek_compatibility_letters_keep_greek_script() {
+    let runs = script_direction_runs("𝝊𝝋", FontSize(11.0), false);
+
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].script, TextScript::Greek);
   }
 
   #[test]

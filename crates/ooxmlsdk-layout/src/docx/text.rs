@@ -142,11 +142,25 @@ pub(super) fn paragraph_model_with_base<'a>(
       },
     )
   });
-  let (mut list_label, numbering_image, list_label_style, numbering_list_tab_stop_pt) =
-    numbering_label.map_or_else(
-      || (None, None, TextStyle::default(), None),
-      |label| (label.text, label.image, label.style, label.list_tab_stop_pt),
-    );
+  let (
+    mut list_label,
+    numbering_image,
+    list_label_style,
+    numbering_list_tab_stop_pt,
+    list_label_width_aware_tab,
+  ) = numbering_label.map_or_else(
+    || (None, None, TextStyle::default(), None, false),
+    |label| {
+      (
+        label.text,
+        label.image,
+        label.style,
+        label.list_tab_stop_pt,
+        label.width_aware_tab,
+      )
+    },
+  );
+  format.list_label_width_aware_tab = list_label_width_aware_tab;
   let has_numbering_label = list_label.is_some() || numbering_image.is_some();
   let list_label_tab_stop_pt = has_numbering_label
     .then(|| {

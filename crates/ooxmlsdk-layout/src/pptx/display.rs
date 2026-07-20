@@ -5499,18 +5499,10 @@ fn lower_paragraph(
         apply_character_bullet_size(&mut bullet_style, bullet.size);
         let bullet_line_height = paragraph_style.line_height(&bullet_style, context.options);
         max_line_height = max_line_height.max(bullet_line_height);
-        let text_baseline_offset = if base_line_style.use_windows_font_metrics {
-          text_metrics
-            .baseline_offset_in_line_with_windows_metrics(&base_line_style, max_line_height)
-        } else {
-          text_metrics.baseline_offset_in_line(&base_line_style, max_line_height)
-        };
-        let bullet_baseline_offset = if bullet_style.use_windows_font_metrics {
-          text_metrics
-            .baseline_offset_in_line_with_windows_metrics(&bullet_style, bullet_line_height)
-        } else {
-          text_metrics.baseline_offset_in_line(&bullet_style, bullet_line_height)
-        };
+        let text_baseline_offset =
+          paragraph_style.baseline_offset(&base_line_style, max_line_height, text_metrics);
+        let bullet_baseline_offset =
+          raw_baseline_offset(&bullet_style, bullet_line_height, text_metrics);
         let bullet_y_pt = cursor.y_pt + text_baseline_offset - bullet_baseline_offset;
         if let Some(graphic) = bullet_graphic_item(
           &bullet,
@@ -5541,14 +5533,11 @@ fn lower_paragraph(
         let style = &line_run.style;
         let run_line_height = paragraph_style.line_height(style, context.options);
         max_line_height = max_line_height.max(run_line_height);
+        let raw_baseline_offset = raw_baseline_offset(style, run_line_height, text_metrics);
+        let baseline_offset = paragraph_style.baseline_offset(style, run_line_height, text_metrics);
+        let run_y_pt = cursor.y_pt + baseline_offset - raw_baseline_offset;
         if line_run.run.kind == TextRunKind::Math {
-          push_math_ole_preview_item(
-            items,
-            run_x,
-            cursor.y_pt,
-            line_run.width_pt,
-            run_line_height,
-          );
+          push_math_ole_preview_item(items, run_x, run_y_pt, line_run.width_pt, run_line_height);
         }
         let hyperlink_url = line_run
           .run
@@ -5559,7 +5548,7 @@ fn lower_paragraph(
           items,
           TextItemPlacement {
             x_pt: run_x,
-            y_pt: cursor.y_pt,
+            y_pt: run_y_pt,
             line_height_pt: run_line_height,
             rotation_center_pt: context.options.rotation_center_pt,
           },
@@ -6644,6 +6633,26 @@ impl ParagraphDisplayStyle {
     }
   }
 
+  fn baseline_offset(
+    &self,
+    style: &TextStyle,
+    line_height_pt: f32,
+    text_metrics: &mut TextMetrics,
+  ) -> f32 {
+    let offset = raw_baseline_offset(style, line_height_pt, text_metrics);
+    match self.line_spacing {
+      // LibreOffice's EditEngine mirrors the Windows/PPT proportional-line
+      // path by capping ascent at 80% of the reduced text height. Without
+      // this cap an OS/2 usWinAscent can exceed a sub-100% DrawingML line
+      // box and place the glyph baseline outside that box.
+      // See editeng/source/editeng/impedit3.cxx (ImpBreakLine formatting).
+      ParagraphLineSpacing::Percent(ratio) if ratio < 1.0 => offset.min(line_height_pt * 0.8),
+      ParagraphLineSpacing::Default
+      | ParagraphLineSpacing::Percent(_)
+      | ParagraphLineSpacing::Points(_) => offset,
+    }
+  }
+
   fn apply_bullet_size(&mut self, choice: &Option<a::ParagraphPropertiesChoice2>) {
     if let Some(size) = paragraph_properties_bullet_size(choice) {
       self.bullet.size = size;
@@ -6660,6 +6669,18 @@ impl ParagraphDisplayStyle {
     if let Some(size) = level_paragraph_properties_bullet_size(properties) {
       self.bullet.size = size;
     }
+  }
+}
+
+fn raw_baseline_offset(
+  style: &TextStyle,
+  line_height_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  if style.use_windows_font_metrics {
+    text_metrics.baseline_offset_in_line_with_windows_metrics(style, line_height_pt)
+  } else {
+    text_metrics.baseline_offset_in_line(style, line_height_pt)
   }
 }
 

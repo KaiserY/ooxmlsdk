@@ -10255,7 +10255,20 @@ fn table_left_position(
 ) -> f32 {
   let available = (content_width - table_width).max(0.0);
   match table.alignment {
-    TableAlignment::Left => content_left + table.indent_left_pt.min(available),
+    TableAlignment::Left => {
+      let leading_cell_margin = table
+        .align_leading_cell_content
+        .then(|| {
+          table
+            .rows
+            .first()
+            .and_then(|row| row.cells.first())
+            .map(|cell| cell.margins.left_pt)
+            .unwrap_or(0.0)
+        })
+        .unwrap_or(0.0);
+      content_left + table.indent_left_pt.min(available) - leading_cell_margin
+    }
     TableAlignment::Center => content_left + available / 2.0,
     TableAlignment::Right => content_left + available,
   }
@@ -12411,6 +12424,21 @@ impl<'a> TextFrameLayout<'a> {
           .font_size_pt
           .max(base_line_style.font_size_pt);
       }
+      let (visible_label, label_follow) =
+        if blank_list_label || !paragraph.format.list_label_width_aware_tab {
+          (label.as_str(), None)
+        } else if let Some(label) = label.strip_suffix('\t') {
+          (label, Some('\t'))
+        } else if let Some(label) = label.strip_suffix(' ') {
+          (label, Some(' '))
+        } else {
+          (label.as_str(), None)
+        };
+      let label_width = if blank_list_label || !paragraph.format.list_label_width_aware_tab {
+        0.0
+      } else {
+        text_metrics.measure_text(visible_label, &list_label_style)
+      };
       if let Some(highlight) = paragraph.list_label_style.highlight {
         let highlight_left = flow.content_left_pt.min(first_line_left);
         let highlight_right = default_line_left.max(first_line_left);
@@ -12435,8 +12463,8 @@ impl<'a> TextFrameLayout<'a> {
         },
         y_pt: y,
         line_height_pt: line_height,
-        text: label.clone(),
-        style: list_label_style,
+        text: visible_label.to_string(),
+        style: list_label_style.clone(),
         rotation_center_pt: None,
         hyperlink_url: paragraph.list_label_hyperlink_url.clone(),
         dynamic_field: None,
@@ -12449,8 +12477,26 @@ impl<'a> TextFrameLayout<'a> {
         pdf_text_segmentation: PdfTextSegmentation::Line,
       }));
       x = default_line_left;
-      if blank_list_label && let Some(tab_stop_pt) = paragraph.list_label_tab_stop_pt {
-        x = x.max(flow.content_left_pt + tab_stop_pt);
+      if blank_list_label {
+        if let Some(tab_stop_pt) = paragraph.list_label_tab_stop_pt {
+          x = x.max(flow.content_left_pt + tab_stop_pt);
+        }
+      } else if paragraph.format.list_label_width_aware_tab {
+        let label_end = first_line_left + label_width;
+        x = match label_follow {
+          // The imported list-label fallback is only used to place an empty
+          // label. A visible label followed by a tab advances from its actual
+          // painted end to the next document default tab stop; the Office
+          // golden for long text numbering demonstrates the resulting
+          // progression, and SwNumberPortion::Format likewise sizes the
+          // numbering portion from its rendered width.
+          Some('\t') => {
+            next_tab_stop(label_end, first_line_left, &[], flow.default_tab_stop_pt).x_pt
+          }
+          Some(' ') => label_end + text_metrics.measure_text(" ", &paragraph.list_label_style),
+          _ => label_end,
+        }
+        .max(default_line_left);
       }
     }
     let mut line_item_start_index = current.items.len();
@@ -15422,6 +15468,7 @@ mod tests {
       preferred_width_pct: None,
       indent_left_pt: 0.0,
       alignment: TableAlignment::Left,
+      align_leading_cell_content: true,
       placement: None,
       split_allowed: true,
       following_text_flow: false,
@@ -15514,6 +15561,7 @@ mod tests {
       preferred_width_pct: None,
       indent_left_pt: 0.0,
       alignment: TableAlignment::Left,
+      align_leading_cell_content: true,
       placement: None,
       split_allowed: false,
       following_text_flow: false,
@@ -15604,6 +15652,7 @@ mod tests {
       preferred_width_pct: None,
       indent_left_pt: 0.0,
       alignment: TableAlignment::Left,
+      align_leading_cell_content: true,
       placement: None,
       split_allowed: false,
       following_text_flow: false,

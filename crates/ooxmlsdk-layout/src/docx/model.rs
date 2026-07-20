@@ -138,6 +138,7 @@ pub(crate) struct Table {
   pub preferred_width_pct: Option<f32>,
   pub indent_left_pt: f32,
   pub alignment: TableAlignment,
+  pub align_leading_cell_content: bool,
   pub placement: Option<FloatingFramePlacement>,
   pub split_allowed: bool,
   pub following_text_flow: bool,
@@ -191,7 +192,9 @@ pub(crate) struct CellMargins {
   pub left_pt: f32,
 }
 
-const DEFAULT_TABLE_CELL_SIDE_MARGIN_TWIPS: f32 = 108.0;
+// ECMA-376 Part 1, 17.4.11 and 17.4.34 specify 115 twentieths of a
+// point when the style hierarchy supplies no trailing/leading cell margin.
+const DEFAULT_TABLE_CELL_SIDE_MARGIN_TWIPS: f32 = 115.0;
 
 impl Default for CellMargins {
   fn default() -> Self {
@@ -240,6 +243,7 @@ pub(crate) struct ParagraphFormat {
   pub first_line_indent_set: bool,
   pub tab_stops: Vec<TabStop>,
   pub tab_stops_set: bool,
+  pub list_label_width_aware_tab: bool,
   pub alignment: ParagraphAlignment,
   pub justification: ParagraphJustification,
   pub bidi: bool,

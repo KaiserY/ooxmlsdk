@@ -1924,6 +1924,11 @@ fn table_model(
       .map(table_alignment)
       .or(table_style.alignment)
       .unwrap_or_default(),
+    // Office's recovery path for a package without a Styles part aligns the
+    // first cell's edit area to the text margin. Normal styled tables retain
+    // the border-relative tblInd behavior encoded by their table style.
+    align_leading_cell_content: model_context.nested_table_level == 1
+      && !env.styles.has_styles_part,
     placement,
     split_allowed,
     following_text_flow,
@@ -9903,6 +9908,7 @@ fn drawingml_preset_color_value(value: a::PresetColorValues) -> Option<RgbColor>
 #[derive(Clone, Debug, Default)]
 struct StylesCatalog {
   import_settings: ImportSettings,
+  has_styles_part: bool,
   doc_default_paragraph: ParagraphFormat,
   doc_default_run: TextStyle,
   default_paragraph_style_id: Option<String>,
@@ -10078,6 +10084,7 @@ impl StylesCatalog {
     let styles = styles_part.root_element(package)?;
     let mut catalog = Self {
       import_settings,
+      has_styles_part: true,
       theme_fonts: theme.fonts,
       theme_colors: theme.colors,
       theme_lines: theme.lines,
@@ -11489,6 +11496,7 @@ struct NumberingLabel {
   image: Option<InlineImage>,
   style: TextStyle,
   list_tab_stop_pt: Option<f32>,
+  width_aware_tab: bool,
 }
 
 impl NumberingCatalog {
@@ -11629,6 +11637,12 @@ impl NumberingCatalog {
       image,
       style,
       list_tab_stop_pt: level.list_tab_stop_pt,
+      width_aware_tab: matches!(
+        level.format,
+        w::NumberFormatValues::Ordinal
+          | w::NumberFormatValues::CardinalText
+          | w::NumberFormatValues::OrdinalText
+      ),
     })
   }
 }
@@ -11792,6 +11806,9 @@ fn format_numbering_value(
     w::NumberFormatValues::UpperLetter => alpha_number(value, true),
     w::NumberFormatValues::LowerRoman => roman_number(value).to_lowercase(),
     w::NumberFormatValues::UpperRoman => roman_number(value),
+    w::NumberFormatValues::Ordinal => english_ordinal_number(value),
+    w::NumberFormatValues::CardinalText => english_cardinal_number(value),
+    w::NumberFormatValues::OrdinalText => english_ordinal_text(value),
     w::NumberFormatValues::DecimalZero => format!("{value:02}"),
     w::NumberFormatValues::DecimalEnclosedCircle
     | w::NumberFormatValues::DecimalEnclosedCircleChinese => enclosed_decimal_number(value, 0x2460),
@@ -11804,6 +11821,190 @@ fn format_numbering_value(
     w::NumberFormatValues::None => String::new(),
     _ => value.to_string(),
   }
+}
+
+fn english_ordinal_number(value: i32) -> String {
+  if value <= 0 {
+    return value.to_string();
+  }
+  let suffix = match value % 100 {
+    11..=13 => "th",
+    _ => match value % 10 {
+      1 => "st",
+      2 => "nd",
+      3 => "rd",
+      _ => "th",
+    },
+  };
+  format!("{value}{suffix}")
+}
+
+fn english_cardinal_number(value: i32) -> String {
+  capitalize_ascii_initial(&english_cardinal_lower(value))
+}
+
+fn english_ordinal_text(value: i32) -> String {
+  capitalize_ascii_initial(&english_ordinal_lower(value))
+}
+
+fn english_cardinal_lower(value: i32) -> String {
+  if value == 0 {
+    return "zero".to_string();
+  }
+  if value < 0 {
+    return format!("minus {}", english_cardinal_lower(value.saturating_abs()));
+  }
+  let mut remainder = i64::from(value);
+  let mut groups = Vec::new();
+  for (scale, name) in [
+    (1_000_000_000_i64, "billion"),
+    (1_000_000_i64, "million"),
+    (1_000_i64, "thousand"),
+  ] {
+    if remainder >= scale {
+      groups.push(format!(
+        "{} {name}",
+        english_cardinal_below_thousand((remainder / scale) as i32)
+      ));
+      remainder %= scale;
+    }
+  }
+  if remainder > 0 {
+    groups.push(english_cardinal_below_thousand(remainder as i32));
+  }
+  groups.join(" ")
+}
+
+fn english_cardinal_below_thousand(value: i32) -> String {
+  debug_assert!((1..1000).contains(&value));
+  let mut parts = Vec::new();
+  let hundreds = value / 100;
+  let remainder = value % 100;
+  if hundreds > 0 {
+    parts.push(format!(
+      "{} hundred",
+      english_cardinal_below_hundred(hundreds)
+    ));
+  }
+  if remainder > 0 {
+    parts.push(english_cardinal_below_hundred(remainder));
+  }
+  parts.join(" ")
+}
+
+fn english_cardinal_below_hundred(value: i32) -> String {
+  const SMALL: [&str; 20] = [
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+  ];
+  const TENS: [&str; 10] = [
+    "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+  ];
+  if value < 20 {
+    return SMALL[value as usize].to_string();
+  }
+  let tens = TENS[(value / 10) as usize];
+  let ones = value % 10;
+  if ones == 0 {
+    tens.to_string()
+  } else {
+    format!("{tens}-{}", SMALL[ones as usize])
+  }
+}
+
+fn english_ordinal_lower(value: i32) -> String {
+  if value <= 0 {
+    return value.to_string();
+  }
+  for (scale, name) in [
+    (1_000_000_000, "billionth"),
+    (1_000_000, "millionth"),
+    (1_000, "thousandth"),
+    (100, "hundredth"),
+  ] {
+    if value % scale == 0 {
+      return format!("{} {name}", english_cardinal_lower(value / scale));
+    }
+    if value > scale {
+      return format!(
+        "{} {}",
+        english_cardinal_lower(value - value % scale),
+        english_ordinal_lower(value % scale)
+      );
+    }
+  }
+  const SMALL_ORDINALS: [&str; 20] = [
+    "zeroth",
+    "first",
+    "second",
+    "third",
+    "fourth",
+    "fifth",
+    "sixth",
+    "seventh",
+    "eighth",
+    "ninth",
+    "tenth",
+    "eleventh",
+    "twelfth",
+    "thirteenth",
+    "fourteenth",
+    "fifteenth",
+    "sixteenth",
+    "seventeenth",
+    "eighteenth",
+    "nineteenth",
+  ];
+  if value < 20 {
+    return SMALL_ORDINALS[value as usize].to_string();
+  }
+  let tens = value / 10;
+  let ones = value % 10;
+  if ones == 0 {
+    return match tens {
+      2 => "twentieth",
+      3 => "thirtieth",
+      4 => "fortieth",
+      5 => "fiftieth",
+      6 => "sixtieth",
+      7 => "seventieth",
+      8 => "eightieth",
+      9 => "ninetieth",
+      _ => unreachable!("value is below one hundred"),
+    }
+    .to_string();
+  }
+  format!(
+    "{}-{}",
+    english_cardinal_below_hundred(tens * 10),
+    SMALL_ORDINALS[ones as usize]
+  )
+}
+
+fn capitalize_ascii_initial(value: &str) -> String {
+  let mut output = value.to_string();
+  if let Some(first) = output.get_mut(0..1) {
+    first.make_ascii_uppercase();
+  }
+  output
 }
 
 fn enclosed_decimal_number(value: i32, first_codepoint: u32) -> String {
@@ -12592,6 +12793,30 @@ mod tests {
   }
 
   #[test]
+  fn numbering_uses_office_english_text_and_ordinal_sequences() {
+    assert_eq!(
+      format_numbering_value(21, w::NumberFormatValues::Ordinal, false),
+      "21st"
+    );
+    assert_eq!(
+      format_numbering_value(20, w::NumberFormatValues::CardinalText, false),
+      "Twenty"
+    );
+    assert_eq!(
+      format_numbering_value(21, w::NumberFormatValues::CardinalText, false),
+      "Twenty-one"
+    );
+    assert_eq!(
+      format_numbering_value(12, w::NumberFormatValues::OrdinalText, false),
+      "Twelfth"
+    );
+    assert_eq!(
+      format_numbering_value(101, w::NumberFormatValues::OrdinalText, false),
+      "One hundred first"
+    );
+  }
+
+  #[test]
   fn office_default_font_follows_simplified_chinese_ui_language() {
     assert_eq!(
       office_default_font_family(Some("zh-CN")).as_ref(),
@@ -12760,13 +12985,13 @@ mod tests {
   }
 
   #[test]
-  fn table_cell_margins_default_to_word_side_padding() {
+  fn table_cell_margins_use_ecma_default_side_padding() {
     let margins = CellMargins::default();
 
     assert_eq!(margins.top_pt, 0.0);
     assert_eq!(margins.bottom_pt, 0.0);
-    assert!((margins.left_pt - 5.4).abs() < 0.001);
-    assert!((margins.right_pt - 5.4).abs() < 0.001);
+    assert!((margins.left_pt - 5.75).abs() < 0.001);
+    assert!((margins.right_pt - 5.75).abs() < 0.001);
   }
 
   #[test]
@@ -12783,7 +13008,7 @@ mod tests {
     );
 
     assert_eq!(margins.left_pt, 12.0);
-    assert!((margins.right_pt - 5.4).abs() < 0.001);
+    assert!((margins.right_pt - 5.75).abs() < 0.001);
     assert_eq!(margins.top_pt, 0.0);
     assert_eq!(margins.bottom_pt, 0.0);
   }

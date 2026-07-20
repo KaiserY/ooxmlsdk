@@ -634,6 +634,13 @@ impl StylesCatalog {
   pub(crate) fn uses_application_default_minor_theme(&self) -> bool {
     self.missing_theme_minor_from_ui
   }
+
+  pub(crate) fn default_font_uses_theme(&self) -> bool {
+    self
+      .font_records
+      .first()
+      .is_some_and(|font| font.scheme != x::FontSchemeValues::default())
+  }
 }
 
 fn builtin_number_format_locale(ui_language: Option<&str>) -> BuiltinNumberFormatLocale {

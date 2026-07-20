@@ -848,10 +848,13 @@ Current progress:
   and paints internal horizontal edges once from the preceding row, following
   Writer's collapsed table-edge direction and Typst's resolved-grid stroke
   priority model instead of blindly overpainting both neighboring edges.
-- Table cell margins now use the Word/Writer default shape when `tblCellMar`
-  is absent: left/right side padding defaults to `108` twips and top/bottom to
-  zero, while table-level `tblCellMar` and cell-level `tcMar` continue to
-  override only the sides they specify through generated OOXML SDK types.
+- When `tblCellMar` and the table style hierarchy omit a margin, cell margins
+  use the ECMA-376 Part 1 §17.4 defaults: start/end are `115` twips and
+  top/bottom are zero. When recovering a package without a Styles part, Word
+  positions a top-level left-aligned table so the first cell's content begins
+  at the text margin; styled and nested tables retain their border-relative
+  placement. Table-level `tblCellMar` and cell-level `tcMar` override these
+  defaults.
 - Table cell spacing now imports `w:tblCellSpacing` through the generated
   `TableCellSpacing` type and treats it as table gutter. This follows the OOXML
   table-property entry LibreOffice receives and the same separation model Typst
@@ -1202,8 +1205,8 @@ Implement:
   recalculation, and full Word border-style precedence. Cell content now flows
   through the shared paragraph/table layout path instead of clipped single-line
   paint, adjacent internal borders prefer the stronger visible stroke, and
-  missing `tblCellMar` uses the Word/Writer `108` twip left/right default
-  instead of synthetic equal padding. `tblCellSpacing` is present as a gutter
+  missing `tblCellMar` uses the ECMA `115` twip start/end default instead of
+  synthetic equal padding. `tblCellSpacing` is present as a gutter
   between cells/rows, including row-level spacing overrides; remaining work is
   exact compatibility-mode border-distance adjustment. Row `gridBefore/gridAfter`
   skipped columns are included in the table grid and cell placement. Table style

@@ -565,12 +565,13 @@ fn extend_print_area_for_merges(sheet: &CalcSheet, mut range: CellRange) -> Cell
 fn drawing_print_area(sheet: &CalcSheet) -> Option<CellRange> {
   // merges ScDrawLayer::GetPrintArea into the sheet print area, and
   // sc/source/core/data/drwlayer.cxx::ScDrawLayer::GetPrintArea maps object
-  // bounds back to start/end cells.
+  // bounds back to start/end cells while excluding the hidden layer.
   let xdr_ranges = sheet
     .resources
     .drawings
     .iter()
     .flat_map(|drawing| drawing.anchors.iter())
+    .filter(|anchor| !anchor.object.hidden)
     .filter_map(|anchor| drawing_anchor_cell_range(sheet, anchor));
   let vml_ranges = sheet
     .resources

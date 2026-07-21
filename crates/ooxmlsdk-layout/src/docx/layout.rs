@@ -10256,17 +10256,16 @@ fn table_left_position(
   let available = (content_width - table_width).max(0.0);
   match table.alignment {
     TableAlignment::Left => {
-      let leading_cell_margin = table
-        .align_leading_cell_content
-        .then(|| {
-          table
-            .rows
-            .first()
-            .and_then(|row| row.cells.first())
-            .map(|cell| cell.margins.left_pt)
-            .unwrap_or(0.0)
-        })
-        .unwrap_or(0.0);
+      let leading_cell_margin = if table.align_leading_cell_content {
+        table
+          .rows
+          .first()
+          .and_then(|row| row.cells.first())
+          .map(|cell| cell.margins.left_pt)
+          .unwrap_or(0.0)
+      } else {
+        0.0
+      };
       content_left + table.indent_left_pt.min(available) - leading_cell_margin
     }
     TableAlignment::Center => content_left + available / 2.0,

@@ -3040,10 +3040,17 @@ impl FontDbQueryFamily {
       style: fontdb_style(request),
       ..fontdb::Query::default()
     };
-    database.query(&query).or_else(|| match self {
-      Self::Name(typeface) => query_legacy_system_typeface(database, typeface, request),
-      Self::SansSerif | Self::Serif => None,
-    })
+    match self {
+      // A typographic family alias may also appear on a distinct Office face:
+      // Aptos Display, for example, advertises Aptos as an alias. Resolve the
+      // requested concrete/legacy typeface before accepting fontdb's broader
+      // family match so an Aptos request cannot become Aptos Display merely
+      // because that face was indexed first.
+      Self::Name(typeface) => {
+        query_legacy_system_typeface(database, typeface, request).or_else(|| database.query(&query))
+      }
+      Self::SansSerif | Self::Serif => database.query(&query),
+    }
   }
 }
 
@@ -3073,29 +3080,41 @@ fn query_legacy_system_typeface(
           !family.is_empty() && requested.starts_with(&family)
         })
     })
-    .filter(|info| {
-      normalized_family_eq_normalized(&info.post_script_name, &requested)
-        || database
-          .with_face_data(info.id, |data, face_index| {
-            FontFaceInfo::from_ttf_bytes("system-typeface-probe", data, face_index)
-              .is_ok_and(|face| family_matches_names(&face, std::slice::from_ref(&requested)))
+    .filter_map(|info| {
+      database
+        .with_face_data(info.id, |data, face_index| {
+          let face =
+            FontFaceInfo::from_ttf_bytes("system-typeface-probe", data, face_index).ok()?;
+          (normalized_family_eq_normalized(&info.post_script_name, &requested)
+            || family_matches_names(&face, std::slice::from_ref(&requested)))
+          .then(|| {
+            let primary_family_mismatch = face
+              .family_names
+              .first()
+              .is_none_or(|family| !normalized_family_eq_normalized(family, &requested));
+            (info, primary_family_mismatch)
           })
-          .unwrap_or(false)
+        })
+        .flatten()
     })
-    .min_by(|left, right| {
-      let left_rank = (
-        left.style != requested_style,
-        left.weight.0.abs_diff(requested_weight),
-        left.post_script_name.as_str(),
-      );
-      let right_rank = (
-        right.style != requested_style,
-        right.weight.0.abs_diff(requested_weight),
-        right.post_script_name.as_str(),
-      );
-      left_rank.cmp(&right_rank)
-    })
-    .map(|info| info.id)
+    .min_by(
+      |(left, left_primary_mismatch), (right, right_primary_mismatch)| {
+        let left_rank = (
+          left_primary_mismatch,
+          left.style != requested_style,
+          left.weight.0.abs_diff(requested_weight),
+          left.post_script_name.as_str(),
+        );
+        let right_rank = (
+          right_primary_mismatch,
+          right.style != requested_style,
+          right.weight.0.abs_diff(requested_weight),
+          right.post_script_name.as_str(),
+        );
+        left_rank.cmp(&right_rank)
+      },
+    )
+    .map(|(info, _)| info.id)
 }
 
 fn fontdb_weight(request: &FontRequest<'_>) -> fontdb::Weight {
@@ -4161,6 +4180,53 @@ mod tests {
     assert!(
       resolved.font_id.0.contains("Calibri-Light"),
       "resolved={}; faces={families:?}",
+      resolved.font_id.0
+    );
+  }
+
+  #[test]
+  fn system_query_prefers_installed_aptos_face_over_display_alias() {
+    let path = Path::new("/usr/share/fonts/truetype/aptos/Aptos.ttf");
+    if !path.exists() {
+      return;
+    }
+    let mut registry = FontRegistry::with_default_policy();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Aptos")),
+      ..FontRequest::default()
+    };
+
+    registry.register_system_query_fonts(&request).unwrap();
+    let resolved = registry.resolve_with_diagnostics(&request).unwrap();
+
+    assert!(
+      resolved.font_id.0.contains("system-query:Aptos:"),
+      "resolved={}",
+      resolved.font_id.0
+    );
+  }
+
+  #[test]
+  fn system_query_prefers_installed_noto_sans_face_over_condensed_alias() {
+    let path = Path::new("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf");
+    if !path.exists() {
+      return;
+    }
+    let mut registry = FontRegistry::with_default_policy();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Noto Sans")),
+      ..FontRequest::default()
+    };
+
+    registry.register_system_query_fonts(&request).unwrap();
+    let resolved = registry.resolve_with_diagnostics(&request).unwrap();
+
+    assert!(
+      resolved
+        .font_id
+        .0
+        .contains("system-query:NotoSans-Regular:"),
+      "resolved={}",
       resolved.font_id.0
     );
   }

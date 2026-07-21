@@ -571,6 +571,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "harfrust"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c03d949a14aa089bbb282f7dd76a498a7f684428e4257202efc119ec010376f9"
+dependencies = [
+ "bitflags 2.13.1",
+ "bytemuck",
+ "read-fonts 0.41.0",
+ "smallvec",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1239,9 +1251,9 @@ name = "ooxmlsdk-fonts"
 version = "0.12.0"
 dependencies = [
  "fontdb",
+ "harfrust 0.12.0",
  "icu_segmenter",
  "ooxmlsdk",
- "rustybuzz",
  "smallvec",
  "thiserror",
  "ttf-parser",
@@ -1309,7 +1321,6 @@ dependencies = [
  "ooxmlsdk-layout",
  "png",
  "rustc-hash",
- "rustybuzz",
  "smallvec",
  "thiserror",
  "ttf-parser",
@@ -1331,7 +1342,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0478b47dd9885a5e0a4f1c0782ffc42bf6ee8c41dea0917d7a9bcee3e6585fc"
 dependencies = [
  "fontique",
- "harfrust",
+ "harfrust 0.10.0",
  "hashbrown",
  "icu_normalizer",
  "icu_properties",
@@ -1552,6 +1563,17 @@ name = "read-fonts"
 version = "0.40.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "487889119a5f19ff7c0a20637196bdc76b9f54ebec17e3588b5d75e4999f8773"
+dependencies = [
+ "bytemuck",
+ "font-types 0.12.1",
+ "once_cell",
+]
+
+[[package]]
+name = "read-fonts"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "046a7d674daf459825b32f5062056d6882db0d2f5a479fbd76ccfc870ac18709"
 dependencies = [
  "bytemuck",
  "font-types 0.12.1",

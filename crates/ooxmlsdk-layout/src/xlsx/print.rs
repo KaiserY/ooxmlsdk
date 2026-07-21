@@ -579,6 +579,9 @@ fn drawing_print_area(sheet: &CalcSheet) -> Option<CellRange> {
     .vml_drawings
     .iter()
     .flat_map(|drawing| drawing.shapes.iter())
+    // Calc puts hidden note objects on SC_LAYER_HIDDEN and excludes that layer
+    // from ScDrawLayer::GetPrintArea. Other VML objects keep participating.
+    .filter(|shape| !(shape.hidden && shape.object_type.as_deref() == Some("Note")))
     .filter_map(|shape| vml_shape_cell_range(sheet, shape));
   xdr_ranges.chain(vml_ranges).reduce(|acc, range| {
     CellRange::new(

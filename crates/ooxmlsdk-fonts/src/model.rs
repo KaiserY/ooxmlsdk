@@ -9,11 +9,12 @@ use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::Instant;
 
 use fontdb::{Database as FontDatabase, Source as FontDbSource};
-use icu_segmenter::GraphemeClusterSegmenter;
-use rustybuzz::{
-  Direction as BuzzDirection, Face as BuzzFace, Feature as BuzzFeature, Language as BuzzLanguage,
-  Script as BuzzScript, UnicodeBuffer, script,
+use harfrust::{
+  Direction as HarfDirection, Feature as HarfFeature, FontRef as HarfFontRef,
+  Language as HarfLanguage, Script as HarfScript, ShapeOptions as HarfShapeOptions, ShapePlan,
+  ShaperData, Tag as HarfTag, UnicodeBuffer, script,
 };
+use icu_segmenter::GraphemeClusterSegmenter;
 use smallvec::SmallVec;
 use ttf_parser::{Face as TtfFace, GlyphId, Rect as TtfRect, Tag};
 use unicode_bidi::{Direction as BidiDirection, get_base_direction};
@@ -77,34 +78,106 @@ impl<'a> From<Cow<'a, [u8]>> for FontBytes {
 
 struct RuntimeFace {
   faces: Yoke<RuntimeFaces<'static>, Arc<[u8]>>,
+  shaper_data: ShaperData,
   glyph_bounds: RwLock<HashMap<u16, Option<GlyphBounds>>>,
+  shape_plans: RwLock<HashMap<ShapePlanKey, Arc<ShapePlan>>>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct ShapePlanKey {
+  direction: HarfDirection,
+  script: HarfScript,
+  language: Option<HarfLanguage>,
+  features: Vec<ShapeFeatureKey>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct ShapeFeatureKey {
+  tag: [u8; 4],
+  value: u32,
+  start: u32,
+  end: u32,
+}
+
+impl ShapePlanKey {
+  fn new(buffer: &UnicodeBuffer, features: &[HarfFeature]) -> Self {
+    Self {
+      direction: buffer.direction(),
+      script: buffer.script(),
+      language: buffer.language(),
+      features: features
+        .iter()
+        .map(|feature| ShapeFeatureKey {
+          tag: feature.tag.to_be_bytes(),
+          value: feature.value,
+          start: feature.start,
+          end: feature.end,
+        })
+        .collect(),
+    }
+  }
 }
 
 #[derive(Yokeable)]
 struct RuntimeFaces<'a> {
-  buzz: BuzzFace<'a>,
+  harf: HarfFontRef<'a>,
   ttf: TtfFace<'a>,
 }
 
 impl RuntimeFace {
   fn new(data: FontBytes, face_index: u32) -> Result<Self> {
     let faces = Yoke::<RuntimeFaces<'static>, Arc<[u8]>>::try_attach_to_cart(data.0, |slice| {
-      let buzz = BuzzFace::from_slice(slice, face_index).ok_or(FontError::InvalidFace)?;
+      let harf = HarfFontRef::from_index(slice, face_index).map_err(|_| FontError::InvalidFace)?;
       let ttf = TtfFace::parse(slice, face_index).map_err(|_| FontError::InvalidFace)?;
-      Ok(RuntimeFaces { buzz, ttf })
+      Ok(RuntimeFaces { harf, ttf })
     })?;
+    let shaper_data = ShaperData::new(&faces.get().harf);
     Ok(Self {
       faces,
+      shaper_data,
       glyph_bounds: RwLock::new(HashMap::new()),
+      shape_plans: RwLock::new(HashMap::new()),
     })
   }
 
-  fn buzz(&self) -> &BuzzFace<'_> {
-    &self.faces.get().buzz
+  fn harf(&self) -> &HarfFontRef<'_> {
+    &self.faces.get().harf
   }
 
   fn ttf(&self) -> &TtfFace<'_> {
     &self.faces.get().ttf
+  }
+
+  fn shape(&self, buffer: UnicodeBuffer, features: &[HarfFeature]) -> harfrust::GlyphBuffer {
+    let shaper = self.shaper_data.shaper(self.harf()).build();
+    let key = ShapePlanKey::new(&buffer, features);
+    let cached = self
+      .shape_plans
+      .read()
+      .unwrap_or_else(std::sync::PoisonError::into_inner)
+      .get(&key)
+      .cloned();
+    let plan = cached.unwrap_or_else(|| {
+      let language = buffer.language();
+      let candidate = Arc::new(ShapePlan::new(
+        &shaper,
+        buffer.direction(),
+        Some(buffer.script()),
+        language.as_ref(),
+        features,
+      ));
+      self
+        .shape_plans
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .entry(key)
+        .or_insert(candidate)
+        .clone()
+    });
+    shaper.shape(
+      buffer,
+      HarfShapeOptions::new().plan(Some(&plan)).features(features),
+    )
   }
 
   fn glyph_bounds(&self, glyph_id: u16) -> Option<GlyphBounds> {
@@ -1741,28 +1814,25 @@ impl<'book> ResolvedFont<'book> {
     } else {
       options.size_pt
     };
-    let face = runtime_face.buzz();
-    let units_per_em = face.units_per_em() as f32;
+    let units_per_em = f32::from(runtime_face.ttf().units_per_em());
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(shaped_text.as_ref());
     buffer.guess_segment_properties();
-    if let Some(direction) = buzz_direction(options.direction) {
+    if let Some(direction) = harf_direction(options.direction) {
       buffer.set_direction(direction);
     }
-    if let Some(script) = options.script.and_then(buzz_script) {
+    if let Some(script) = options.script.and_then(harf_script) {
       buffer.set_script(script);
     }
     if let Some(language) = options
       .language
       .as_deref()
-      .and_then(|language| BuzzLanguage::from_str(language).ok())
+      .and_then(|language| HarfLanguage::from_str(language).ok())
     {
       buffer.set_language(language);
     }
-    let features = buzz_features(&options.features);
-    let output = font_timing("rustybuzz shape", || {
-      rustybuzz::shape(face, &features, buffer)
-    });
+    let features = harf_features(&options.features);
+    let output = font_timing("harfrust shape", || runtime_face.shape(buffer, &features));
     let infos = output.glyph_infos();
     let positions = output.glyph_positions();
     let safe_breaks = text_safe_breaks(text);
@@ -3350,9 +3420,10 @@ pub fn parse_font_feature_settings<'a>(
       language = Some(Cow::Owned(value.to_string()));
       continue;
     }
-    if let Ok(feature) = BuzzFeature::from_str(token) {
+    if let Ok(feature) = HarfFeature::from_str(token) {
+      let tag = feature.tag.to_be_bytes();
       features.push(FeatureSetting {
-        tag: Cow::Owned(tag_to_string(feature.tag)),
+        tag: Cow::Owned(String::from_utf8_lossy(&tag).trim_end().to_string()),
         value: feature.value,
         start: feature.start,
         end: feature.end,
@@ -3861,7 +3932,7 @@ fn is_cjk_punctuation(ch: char) -> bool {
   )
 }
 
-fn glyph_text_range(text: &str, infos: &[rustybuzz::GlyphInfo], index: usize) -> Range<usize> {
+fn glyph_text_range(text: &str, infos: &[harfrust::GlyphInfo], index: usize) -> Range<usize> {
   let start = infos[index].cluster as usize;
   let end = infos
     .iter()
@@ -3920,14 +3991,14 @@ fn missing_glyphs_from_shaped_glyphs(glyphs: &[ShapedGlyph]) -> Vec<MissingGlyph
     .collect()
 }
 
-fn buzz_features(features: &[FeatureValue<'_>]) -> Vec<BuzzFeature> {
+fn harf_features(features: &[FeatureValue<'_>]) -> Vec<HarfFeature> {
   features
     .iter()
     .filter_map(|feature| {
       let tag = feature.tag.as_ref().as_bytes();
       (tag.len() == 4).then(|| {
-        BuzzFeature::new(
-          Tag::from_bytes(&[tag[0], tag[1], tag[2], tag[3]]),
+        HarfFeature::new(
+          HarfTag::new(&[tag[0], tag[1], tag[2], tag[3]]),
           feature.value,
           ..,
         )
@@ -4046,17 +4117,17 @@ fn font_stretch_from_fontdb(stretch: fontdb::Stretch) -> FontStretch {
   font_stretch_from_ttf(stretch.to_number())
 }
 
-fn buzz_direction(direction: TextDirection) -> Option<BuzzDirection> {
+fn harf_direction(direction: TextDirection) -> Option<HarfDirection> {
   match direction {
-    TextDirection::LeftToRight => Some(BuzzDirection::LeftToRight),
-    TextDirection::RightToLeft => Some(BuzzDirection::RightToLeft),
-    TextDirection::TopToBottom => Some(BuzzDirection::TopToBottom),
-    TextDirection::BottomToTop => Some(BuzzDirection::BottomToTop),
+    TextDirection::LeftToRight => Some(HarfDirection::LeftToRight),
+    TextDirection::RightToLeft => Some(HarfDirection::RightToLeft),
+    TextDirection::TopToBottom => Some(HarfDirection::TopToBottom),
+    TextDirection::BottomToTop => Some(HarfDirection::BottomToTop),
     TextDirection::Mixed => None,
   }
 }
 
-fn buzz_script(script: TextScript) -> Option<BuzzScript> {
+fn harf_script(script: TextScript) -> Option<HarfScript> {
   match script {
     TextScript::Common => Some(script::COMMON),
     TextScript::Latin => Some(script::LATIN),
@@ -4519,12 +4590,12 @@ mod tests {
   }
 
   #[test]
-  fn maps_ooxml_text_context_to_rustybuzz_context() {
+  fn maps_ooxml_text_context_to_harfrust_context() {
     assert_eq!(
-      buzz_direction(TextDirection::RightToLeft),
-      Some(BuzzDirection::RightToLeft)
+      harf_direction(TextDirection::RightToLeft),
+      Some(HarfDirection::RightToLeft)
     );
-    assert_eq!(buzz_script(TextScript::Arabic), Some(script::ARABIC));
-    assert_eq!(buzz_script(TextScript::Other), None);
+    assert_eq!(harf_script(TextScript::Arabic), Some(script::ARABIC));
+    assert_eq!(harf_script(TextScript::Other), None);
   }
 }

@@ -1,6 +1,6 @@
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use image::codecs::jpeg::JpegEncoder;
 use image::metadata::Orientation;
@@ -8,12 +8,88 @@ use image::{
   DynamicImage, GenericImageView, ImageDecoder, ImageFormat as RasterImageFormat, ImageReader, Rgba,
 };
 use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
+use rustc_hash::FxHashMap as HashMap;
 
 use crate::error::{PdfError, Result};
 use crate::options::PdfOptions;
 use ooxmlsdk_layout::render::emf_wmf;
 
-pub(super) fn decode_image(
+#[derive(Default)]
+pub(super) struct ImageSet {
+  rasters: HashMap<(usize, usize), Vec<CachedRaster>>,
+  svgs: HashMap<(usize, usize), Arc<usvg::Tree>>,
+}
+
+struct CachedRaster {
+  content_type: Option<String>,
+  metafile_render_options: Option<emf_wmf::RenderOptions>,
+  image: Image,
+}
+
+impl ImageSet {
+  pub(super) fn raster(
+    &mut self,
+    data: &[u8],
+    content_type: Option<&str>,
+    options: &PdfOptions,
+    metafile_render_options: Option<emf_wmf::RenderOptions>,
+  ) -> Result<Image> {
+    let key = image_data_key(data);
+    if let Some(image) = self.rasters.get(&key).and_then(|images| {
+      images.iter().find(|image| {
+        image.content_type.as_deref() == content_type
+          && image.metafile_render_options == metafile_render_options
+      })
+    }) {
+      return Ok(image.image.clone());
+    }
+    let image = decode_image(data, content_type, options, metafile_render_options)?;
+    self.rasters.entry(key).or_default().push(CachedRaster {
+      content_type: content_type.map(str::to_string),
+      metafile_render_options,
+      image: image.clone(),
+    });
+    Ok(image)
+  }
+
+  pub(super) fn svg(&mut self, data: &[u8]) -> Result<Arc<usvg::Tree>> {
+    let key = image_data_key(data);
+    if let Some(tree) = self.svgs.get(&key) {
+      return Ok(tree.clone());
+    }
+    let tree = Arc::new(
+      usvg::Tree::from_data(
+        data,
+        &usvg::Options {
+          fontdb: svg_font_database(),
+          ..usvg::Options::default()
+        },
+      )
+      .map_err(|err| PdfError::Krilla(format!("failed to decode SVG image: {err}")))?,
+    );
+    self.svgs.insert(key, tree.clone());
+    Ok(tree)
+  }
+}
+
+fn image_data_key(data: &[u8]) -> (usize, usize) {
+  // ImageItem owns its Arc-backed bytes for the whole render. Using that stable
+  // allocation identity avoids hashing large images on every repeated draw.
+  (data.as_ptr() as usize, data.len())
+}
+
+fn svg_font_database() -> Arc<fontdb::Database> {
+  static FONT_DATABASE: OnceLock<Arc<fontdb::Database>> = OnceLock::new();
+  FONT_DATABASE
+    .get_or_init(|| {
+      let mut database = fontdb::Database::new();
+      database.load_system_fonts();
+      Arc::new(database)
+    })
+    .clone()
+}
+
+fn decode_image(
   data: &[u8],
   content_type: Option<&str>,
   options: &PdfOptions,
@@ -285,6 +361,37 @@ mod tests {
       PdfRasterImage::from_dynamic_with_icc(DynamicImage::new_rgb8(1, 1), Some(profile.clone()));
 
     assert_eq!(CustomImage::icc_profile(&image), Some(profile.as_slice()));
+  }
+
+  #[test]
+  fn image_set_reuses_matching_rasters_and_separates_metafile_options() {
+    let mut jpeg = Vec::new();
+    JpegEncoder::new(&mut jpeg)
+      .encode(&[255, 0, 0], 1, 1, image::ExtendedColorType::Rgb8)
+      .unwrap();
+    let options = PdfOptions::default();
+    let first = emf_wmf::RenderOptions {
+      max_pixels: Some(1_000_000),
+      ..emf_wmf::RenderOptions::default()
+    };
+    let second = emf_wmf::RenderOptions {
+      max_pixels: Some(2_000_000),
+      ..emf_wmf::RenderOptions::default()
+    };
+    let mut images = ImageSet::default();
+
+    images
+      .raster(&jpeg, Some("image/jpeg"), &options, Some(first))
+      .unwrap();
+    images
+      .raster(&jpeg, Some("image/jpeg"), &options, Some(first))
+      .unwrap();
+    assert_eq!(images.rasters.values().map(Vec::len).sum::<usize>(), 1);
+
+    images
+      .raster(&jpeg, Some("image/jpeg"), &options, Some(second))
+      .unwrap();
+    assert_eq!(images.rasters.values().map(Vec::len).sum::<usize>(), 2);
   }
 
   #[test]

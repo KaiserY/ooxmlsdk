@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::ops::Range;
 use std::sync::Arc;
@@ -9,8 +10,24 @@ use parley::{
 };
 use rustc_hash::FxHashMap as HashMap;
 
-use crate::fonts::FontStyleRef;
+use crate::fonts::{FontFaceCacheKey, FontStyleRef};
 use crate::text_metrics::TextMetrics;
+
+thread_local! {
+  /// Parley documents `FontContext` as an application- or thread-level
+  /// resource. Keeping both contexts here also lets Fontique retain parsed font
+  /// metadata and Parley retain its shaping scratch buffers across paragraphs.
+  static PARLEY_TEXT_CONTEXT: RefCell<ParleyTextContext> =
+    RefCell::new(ParleyTextContext::default());
+}
+
+#[derive(Default)]
+struct ParleyTextContext {
+  font_context: FontContext,
+  layout_context: LayoutContext<()>,
+  aliases: HashMap<FontFaceCacheKey, Arc<str>>,
+  next_alias: usize,
+}
 
 pub(crate) struct StyledTextSpan<'a, S: ?Sized> {
   pub range: Range<usize>,
@@ -31,23 +48,33 @@ pub(crate) fn break_text_lines<S: FontStyleRef + ?Sized>(
     return Some(std::iter::once(0..0).collect());
   }
 
-  let mut font_context = FontContext::new();
-  let mut aliases = HashMap::<String, Arc<str>>::default();
+  PARLEY_TEXT_CONTEXT.with_borrow_mut(|context| {
+    break_text_lines_with_context(text, spans, max_advance, text_metrics, context)
+  })
+}
+
+fn break_text_lines_with_context<S: FontStyleRef + ?Sized>(
+  text: &str,
+  spans: &[StyledTextSpan<'_, S>],
+  max_advance: Option<f32>,
+  text_metrics: &mut TextMetrics,
+  context: &mut ParleyTextContext,
+) -> Option<Vec<Range<usize>>> {
   let mut span_aliases = Vec::with_capacity(spans.len());
   for span in spans {
     let span_text = text.get(span.range.clone())?;
     let shaped = text_metrics.shape_text(span_text, span.style)?;
     let mut names = Vec::with_capacity(shaped.font_faces.len());
     for face in shaped.font_faces {
-      let key = format!("{}#{}", face.id(), face.index);
-      let alias_index = aliases.len();
-      let alias = match aliases.entry(key) {
+      let key = face.cache_key();
+      let alias = match context.aliases.entry(key) {
         Entry::Occupied(entry) => entry.get().clone(),
         Entry::Vacant(entry) => {
-          let alias: Arc<str> = format!("ooxmlsdk-font-{alias_index}").into();
-          let data = Blob::new(Arc::new(face.data.as_slice().to_vec()));
-          font_context.collection.register_fonts(
-            data,
+          let alias: Arc<str> = format!("ooxmlsdk-font-{}", context.next_alias).into();
+          context.next_alias += 1;
+          let data: Arc<dyn AsRef<[u8]> + Send + Sync> = face.data.clone();
+          context.font_context.collection.register_fonts(
+            Blob::new(data),
             Some(FontInfoOverride {
               family_name: Some(alias.as_ref()),
               ..FontInfoOverride::default()
@@ -67,8 +94,12 @@ pub(crate) fn break_text_lines<S: FontStyleRef + ?Sized>(
     span_aliases.push(names);
   }
 
-  let mut layout_context = LayoutContext::<()>::new();
-  let mut builder = layout_context.style_run_builder(&mut font_context, text, 1.0, false);
+  let ParleyTextContext {
+    font_context,
+    layout_context,
+    ..
+  } = context;
+  let mut builder = layout_context.style_run_builder(font_context, text, 1.0, false);
   builder.reserve(spans.len(), spans.len());
   for (span, aliases) in spans.iter().zip(span_aliases) {
     let mut style = TextStyle::<()>::default();

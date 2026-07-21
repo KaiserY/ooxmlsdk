@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::num::NonZeroU16;
 use std::num::NonZeroU32;
 use std::ops::Range;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use krilla::Document;
 use krilla::action::{Action, LinkAction};
@@ -29,7 +29,7 @@ use smallvec::SmallVec;
 
 use super::fonts::FontSet;
 use super::form_widgets::{collect_form_widget_annotations, inject_form_widget_annotations};
-use super::image::decode_image;
+use super::image::ImageSet;
 use super::settings::serialize_settings;
 use crate::error::{PdfError, Result};
 use crate::options::{PdfAttachmentAssociation, PdfDateTime, PdfOptions};
@@ -324,6 +324,7 @@ fn render_inner(
   embed_attachments(&mut pdf, options)?;
   register_named_destinations(&mut pdf, document, options)?;
   let mut fonts = FontSet::new();
+  let mut images = ImageSet::default();
   let tagging_enabled = options.general.tagged_pdf || options.general.pdf_ua_compliance;
   let mut tag_tree = TagTree::new().with_lang(options.ui_language.clone());
 
@@ -351,6 +352,7 @@ fn render_inner(
         &mut surface,
         item,
         &mut fonts,
+        &mut images,
         &internal_links,
         &mut link_annotations,
         options,
@@ -2425,6 +2427,7 @@ fn draw_paint_item(
   surface: &mut Surface<'_>,
   item: &PaintItem<'_>,
   fonts: &mut FontSet,
+  images: &mut ImageSet,
   internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
   options: &PdfOptions,
@@ -2450,11 +2453,15 @@ fn draw_paint_item(
     PaintItem::Image(image) => {
       let _alt_text = image.alt_text.as_deref();
       if is_svg_image(image) {
-        if draw_svg_item(surface, image).is_err() {
+        if images
+          .svg(&image.data)
+          .map(|tree| draw_svg_item(surface, image, &tree))
+          .is_err()
+        {
           draw_missing_image(surface, image);
         }
       } else {
-        match decode_image(
+        match images.raster(
           &image.data,
           image.content_type.as_deref(),
           options,
@@ -3193,26 +3200,10 @@ fn is_svg_image(image: &ImageItem<'_>) -> bool {
       .is_some_and(|text| text.trim_start().starts_with("<svg"))
 }
 
-fn draw_svg_item(surface: &mut Surface<'_>, image: &ImageItem<'_>) -> Result<()> {
-  static FONT_DATABASE: OnceLock<Arc<fontdb::Database>> = OnceLock::new();
-  let fontdb = FONT_DATABASE
-    .get_or_init(|| {
-      let mut database = fontdb::Database::new();
-      database.load_system_fonts();
-      Arc::new(database)
-    })
-    .clone();
-  let tree = usvg::Tree::from_data(
-    &image.data,
-    &usvg::Options {
-      fontdb,
-      ..usvg::Options::default()
-    },
-  )
-  .map_err(|err| PdfError::Krilla(format!("failed to decode SVG image: {err}")))?;
+fn draw_svg_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, tree: &usvg::Tree) {
   draw_transformed_image_content(surface, image, |surface, size| {
     surface.draw_svg(
-      &tree,
+      tree,
       size,
       SvgSettings {
         // An OOXML picture is one semantic image. Keeping SVG text as paths
@@ -3222,7 +3213,6 @@ fn draw_svg_item(surface: &mut Surface<'_>, image: &ImageItem<'_>) -> Result<()>
       },
     );
   });
-  Ok(())
 }
 
 fn draw_transformed_image_content(

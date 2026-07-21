@@ -1020,10 +1020,10 @@ fn font_face_diagnostics(face_data: &FontFaceData) -> PdfFontFaceDiagnostics {
       continue;
     };
     match name.name_id {
-      ttf_parser::name_id::FAMILY | ttf_parser::name_id::TYPOGRAPHIC_FAMILY => {
-        if !family_names.contains(&value) {
-          family_names.push(value);
-        }
+      ttf_parser::name_id::FAMILY | ttf_parser::name_id::TYPOGRAPHIC_FAMILY
+        if !family_names.contains(&value) =>
+      {
+        family_names.push(value);
       }
       ttf_parser::name_id::POST_SCRIPT_NAME => postscript_name = Some(value),
       ttf_parser::name_id::SUBFAMILY => style_name = Some(value),

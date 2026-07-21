@@ -37,7 +37,8 @@ elements.
 - `validators`: optional schema and package validation APIs
 
 Generated schema and XML APIs remain available with `--no-default-features`.
-The minimum supported Rust version is 1.88. The workspace uses Rust 2024.
+The minimum supported Rust version is 1.88 for the core crates and 1.92 for
+`ooxmlsdk-pdf`. The workspace uses Rust 2024.
 
 ## API and compatibility
 

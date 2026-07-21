@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- Upgraded the PDF backend to `krilla` 0.8.2 and `krilla-svg` 0.8.1. The
+  `ooxmlsdk-pdf` crate now requires Rust 1.92; the core crates retain Rust 1.88
+  as their minimum supported version.
+
 ## 0.12.0
 
 ### Changed

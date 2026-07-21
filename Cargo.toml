@@ -72,12 +72,12 @@ image = { version = "0.25.10", default-features = false, features = [
   "gif",
   "webp",
 ] }
-krilla = { version = "0.6.0", default-features = false, features = [
+krilla = { version = "0.8.2", default-features = false, features = [
   "raster-images",
   "pdf",
   "simple-text",
 ] }
-krilla-svg = "0.3.0"
+krilla-svg = "0.8.1"
 libm = "0.2.16"
 num-complex = "0.4.6"
 num-integer = "0.1.46"

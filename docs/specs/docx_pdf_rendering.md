@@ -427,10 +427,13 @@ closed:
 - **Properties/import:** settings and compatibility flags, theme/default style
   resolution, revision metadata, comments/fields beyond the current dynamic
   subset, complete `PropertyMap` overlay order, and all tracked part metadata.
-- **PDF export:** font embedding and substitution policy, metadata and export
-  options, page labels, internal links/destinations, tagged PDF/PDF-UA/PDF-A
-  where in scope, transparency/export edge cases, and deterministic output
-  comparison.
+- **PDF export:** Krilla now writes metadata, page labels, named bookmark
+  destinations, attachments, native SVG, raster ICC/EXIF data, and tagged
+  paragraph/heading/table/figure/link structure. PDF/UA output is accepted only
+  after Krilla validation; form widgets are rejected in that mode until a
+  tagged form API replaces the lopdf widget post-processor. PDF/A output
+  intents/color policy, richer list and repeating-area semantics, transparency
+  edge cases, and deterministic output comparison remain open.
 - **Calibration harness:** systematic LibreOffice reference rendering,
   extraction of comparable page/text/image/annotation geometry, and golden diff
   reporting for upstream-derived samples.
@@ -681,7 +684,7 @@ estimates, not current test pass rates:
 | Tables | 55% | `SwTabFrame`/row/cell follow behavior covers repeated headers, nested cell flow, border conflict selection, row height, cell spacing, table styles, first-pass floating `tblpPr` placement, and split guards; full rowspan split recalculation, floating-table split behavior, and broader repaint invalidation remain open. |
 | Footnotes/endnotes | 38% | Same-page note reservation, inline note markers, note frame ordering, and trailing fallback exist; true continuation frames, continuation separators, and broader table/column note interaction remain open. |
 | Drawing/floating objects | 48% | Fly-frame import/layout covers inline/floating anchors, paragraph/page reference areas, relative size, `layoutInCell`, wrap distances, z-order direction, textbox block frames, paragraph `framePr`, and basic shape/image paint; page reassignment, contour wrap, linked textboxes, effects, SVG/PDF image details, and table/header/footer interactions remain open. |
-| PDF paint/export quality | 40% | Paint output covers shaped glyph portions, line clipping, decorations, raster images, links, outlines, basic transforms, and page decoration paint; font embedding/substitution policy, metadata/page labels/options, tagging/PDF-UA/PDF-A where in scope, transparency, and LibreOffice-like export edge cases remain open. |
+| PDF paint/export quality | 55% | Paint output covers shaped glyph portions, line clipping, decorations, native raster/SVG images with ICC/EXIF handling, links, outlines, metadata, page labels, named destinations, attachments, transforms, and tagged PDF/PDF-UA structure. Font embedding/substitution policy, tagged form widgets, PDF/A output intents/color policy, richer structure semantics, transparency, and LibreOffice-like export edge cases remain open. |
 
 100% close order:
 
@@ -1362,8 +1365,10 @@ Avoid relying only on "PDF starts with `%PDF-`" once layout behavior exists.
   layout begins to support note areas.
 - Do not extend XLSX/PPTX conversion while DOCX layout is being corrected.
 - Do not bypass generated `ooxmlsdk` types when typed access exists.
-- Do not add PDF/A or PDF/UA public claims until tagging, font embedding, color
-  policy, and metadata are intentionally implemented.
+- Do not claim PDF/A conformance until font embedding, output intents, color
+  policy, and metadata are intentionally implemented. Claim PDF/UA only for
+  output accepted by the Krilla validator and never mutate that output with an
+  untagged post-processor afterward.
 
 ## 8. Immediate Next Step
 

@@ -35,9 +35,10 @@ pub use ooxmlsdk_layout::pptx::{
   PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
 };
 pub use options::{
-  PdfFormOptions, PdfFormSubmitFormat, PdfGeneralOptions, PdfImageOptions, PdfLinkDefaultAction,
-  PdfLinkOptions, PdfMetadataOptions, PdfOptions, PdfPageLayout, PdfSpreadsheetOptions,
-  PdfStandard, PdfViewerMagnification, PdfViewerOptions, PdfViewerPageMode, PdfWatermarkOptions,
+  PdfAttachment, PdfAttachmentAssociation, PdfDateTime, PdfFormOptions, PdfFormSubmitFormat,
+  PdfGeneralOptions, PdfImageOptions, PdfLinkDefaultAction, PdfLinkOptions, PdfMetadataOptions,
+  PdfOptions, PdfPageLayout, PdfSpreadsheetOptions, PdfStandard, PdfViewerMagnification,
+  PdfViewerOptions, PdfViewerPageMode, PdfWatermarkOptions,
 };
 
 /// Convert a DOCX stream into PDF bytes.

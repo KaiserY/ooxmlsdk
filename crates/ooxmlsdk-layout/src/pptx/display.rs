@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Cursor;
+use std::ops::Range;
 use std::sync::Arc;
 
 use crate::common::{self, DebugProperty, DebugRecord, DebugShape, DebugValue, Point, Rect, Size};
@@ -15,6 +16,7 @@ use crate::render::chart as shared_chart;
 use crate::render::diagram as shared_diagram;
 use crate::render::emf_wmf;
 use crate::render::symbol as shared_symbol;
+use crate::text_layout::{StyledTextSpan, break_text_lines};
 use crate::text_metrics::TextMetrics;
 use crate::units;
 use image::codecs::png::PngEncoder;
@@ -25,6 +27,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::units as sdk_units;
 use ooxmlsdk::units::DrawingmlPercentageValue;
+use unicode_script::{Script, UnicodeScript};
 
 use super::chart::{ChartFrame, ClusteredColumnStyle, lower_clustered_column_chart};
 use super::custom_geometry;
@@ -5607,6 +5610,138 @@ fn layout_text_lines<'a>(
   if visible_runs.is_empty() {
     return vec![TextLine::default()];
   }
+
+  let legacy_lines = layout_text_lines_legacy(context, runs, text_metrics);
+  if !context.options.word_wrap {
+    return legacy_lines;
+  }
+
+  let mut prepared_runs = visible_runs
+    .into_iter()
+    .map(|run| {
+      let style = styled_text_run(
+        context.import,
+        context.slide,
+        context.base_style,
+        context.options,
+        run,
+      );
+      let field_text = presentation_field_text(run, context.slide_number);
+      let text = if style.uppercase {
+        field_text.to_uppercase()
+      } else {
+        field_text.into_owned()
+      };
+      PreparedTextRun {
+        run,
+        text,
+        style,
+        range: 0..0,
+      }
+    })
+    .collect::<Vec<_>>();
+  let mut text = String::new();
+  for run in &mut prepared_runs {
+    let start = text.len();
+    text.push_str(&run.text);
+    run.range = start..text.len();
+  }
+  if !text.chars().any(parley_line_break_script)
+    || legacy_lines
+      .iter()
+      .all(|line| line.width_pt <= context.column_width + 0.01)
+  {
+    return legacy_lines;
+  }
+  let spans = prepared_runs
+    .iter()
+    .map(|run| StyledTextSpan {
+      range: run.range.clone(),
+      style: &run.style,
+    })
+    .collect::<Vec<_>>();
+  let max_advance = context
+    .options
+    .word_wrap
+    .then_some(context.column_width.max(0.0));
+  let Some(line_ranges) = break_text_lines(&text, &spans, max_advance, text_metrics) else {
+    return legacy_lines;
+  };
+  if line_ranges.is_empty() {
+    return vec![TextLine::default()];
+  }
+
+  let parley_lines = line_ranges
+    .into_iter()
+    .map(|range| text_line_from_range(&text, range, &prepared_runs, text_metrics))
+    .collect::<Vec<_>>();
+  if parley_lines
+    .iter()
+    .any(|line| line.width_pt > context.column_width + 0.01)
+  {
+    legacy_lines
+  } else {
+    parley_lines
+  }
+}
+
+fn parley_line_break_script(ch: char) -> bool {
+  matches!(
+    ch.script(),
+    Script::Han
+      | Script::Hiragana
+      | Script::Katakana
+      | Script::Thai
+      | Script::Lao
+      | Script::Khmer
+      | Script::Myanmar
+  )
+}
+
+struct PreparedTextRun<'a> {
+  run: &'a TextRun,
+  text: String,
+  style: TextStyle,
+  range: Range<usize>,
+}
+
+fn text_line_from_range<'a>(
+  text: &str,
+  range: Range<usize>,
+  runs: &[PreparedTextRun<'a>],
+  text_metrics: &mut TextMetrics,
+) -> TextLine<'a> {
+  let mut line = TextLine::default();
+  for run in runs {
+    let start = range.start.max(run.range.start);
+    let end = range.end.min(run.range.end);
+    if start >= end {
+      continue;
+    }
+    let Some(run_text) = text.get(start..end) else {
+      continue;
+    };
+    let width_pt = text_metrics.measure_text(run_text, &run.style);
+    push_text_line_token(&mut line, run.run, run_text, width_pt, &run.style);
+  }
+  trim_text_line_end(&mut line, text_metrics);
+  line
+}
+
+fn layout_text_lines_legacy<'a>(
+  context: TextLineLayoutContext<'_>,
+  runs: &'a [TextRun],
+  text_metrics: &mut TextMetrics,
+) -> Vec<TextLine<'a>> {
+  let visible_runs = runs
+    .iter()
+    .filter(|run| {
+      matches!(
+        run.kind,
+        TextRunKind::Run | TextRunKind::Field | TextRunKind::Math
+      ) && !run.text.is_empty()
+    })
+    .collect::<Vec<_>>();
 
   let mut lines = Vec::new();
   let mut current = TextLine::default();

@@ -635,6 +635,7 @@ fn parse_part_ref_root(meta: syn::MetaList, variant_ident: &Ident) -> syn::Resul
         return Err(nested.error("root element must be a type path"));
       };
       element_ty = Some(Type::Path(TypePath {
+        attrs: Vec::new(),
         qself: None,
         path: path.path,
       }));

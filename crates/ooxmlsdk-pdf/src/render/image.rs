@@ -3,7 +3,10 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use image::codecs::jpeg::JpegEncoder;
-use image::{GenericImageView, ImageFormat as RasterImageFormat, Rgba};
+use image::metadata::Orientation;
+use image::{
+  DynamicImage, GenericImageView, ImageDecoder, ImageFormat as RasterImageFormat, ImageReader, Rgba,
+};
 use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
 
 use crate::error::{PdfError, Result};
@@ -52,10 +55,22 @@ pub(super) fn decode_image(
     .and_then(image_format_from_content_type)
     .or_else(|| image::guess_format(data).ok());
 
-  if matches!(format, Some(RasterImageFormat::Jpeg))
-    && let Ok(image) = Image::from_jpeg(data.to_vec().into(), false)
-  {
-    return Ok(image);
+  if let Some(format) = format {
+    if let Some(image) = decode_oriented_image(data, format)? {
+      return Image::from_custom(image, false).map_err(PdfError::Krilla);
+    }
+    if format == RasterImageFormat::Jpeg
+      && let Ok(image) = Image::from_jpeg(data.to_vec().into(), false)
+    {
+      // Krilla reads and embeds the JPEG's native ICC profile while keeping
+      // the compressed image stream intact.
+      return Ok(image);
+    }
+    if format == RasterImageFormat::Png
+      && let Ok(image) = Image::from_png(data.to_vec().into(), false)
+    {
+      return Ok(image);
+    }
   }
   if matches!(format, Some(RasterImageFormat::Png))
     && let Ok(image) = decode_png_relaxed(data)
@@ -63,14 +78,40 @@ pub(super) fn decode_image(
     return Image::from_custom(image, false).map_err(PdfError::Krilla);
   }
 
-  let raster = match format {
-    Some(format) => image::load_from_memory_with_format(data, format),
-    None => image::load_from_memory(data),
-  };
+  let format = format.ok_or_else(|| PdfError::Krilla("unknown raster image format".to_string()))?;
+  let raster = decode_dynamic_image(data, format)?;
+  Image::from_custom(raster, false).map_err(PdfError::Krilla)
+}
 
-  let raster =
-    raster.map_err(|err| PdfError::Krilla(format!("failed to decode raster image: {err}")))?;
-  Image::from_custom(PdfRasterImage::from_dynamic(raster), false).map_err(PdfError::Krilla)
+fn decode_oriented_image(data: &[u8], format: RasterImageFormat) -> Result<Option<PdfRasterImage>> {
+  let mut decoder = match ImageReader::with_format(Cursor::new(data), format).into_decoder() {
+    Ok(decoder) => decoder,
+    Err(_) => return Ok(None),
+  };
+  let orientation = decoder.orientation().unwrap_or(Orientation::NoTransforms);
+  if orientation == Orientation::NoTransforms {
+    return Ok(None);
+  }
+  let icc_profile = decoder.icc_profile().unwrap_or_default();
+  let mut image = DynamicImage::from_decoder(decoder)
+    .map_err(|err| PdfError::Krilla(format!("failed to decode oriented raster image: {err}")))?;
+  image.apply_orientation(orientation);
+  Ok(Some(PdfRasterImage::from_dynamic_with_icc(
+    image,
+    icc_profile,
+  )))
+}
+
+fn decode_dynamic_image(data: &[u8], format: RasterImageFormat) -> Result<PdfRasterImage> {
+  let mut decoder = ImageReader::with_format(Cursor::new(data), format)
+    .into_decoder()
+    .map_err(|err| PdfError::Krilla(format!("failed to open raster image: {err}")))?;
+  let orientation = decoder.orientation().unwrap_or(Orientation::NoTransforms);
+  let icc_profile = decoder.icc_profile().unwrap_or_default();
+  let mut image = DynamicImage::from_decoder(decoder)
+    .map_err(|err| PdfError::Krilla(format!("failed to decode raster image: {err}")))?;
+  image.apply_orientation(orientation);
+  Ok(PdfRasterImage::from_dynamic_with_icc(image, icc_profile))
 }
 
 fn encode_jpeg(image: image::DynamicImage, quality: u8) -> Result<Vec<u8>> {
@@ -125,10 +166,11 @@ struct PdfRasterPixels {
   height: u32,
   rgb: Vec<u8>,
   alpha: Option<Vec<u8>>,
+  icc_profile: Option<Vec<u8>>,
 }
 
 impl PdfRasterImage {
-  fn from_dynamic(image: image::DynamicImage) -> Self {
+  fn from_dynamic_with_icc(image: image::DynamicImage, icc_profile: Option<Vec<u8>>) -> Self {
     let (width, height) = image.dimensions();
     let rgba = image.to_rgba8();
     let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
@@ -147,6 +189,7 @@ impl PdfRasterImage {
         height,
         rgb,
         alpha: (!opaque).then_some(alpha),
+        icc_profile,
       }),
     }
   }
@@ -189,6 +232,7 @@ impl PdfRasterImage {
         height,
         rgb,
         alpha: (!opaque && !alpha.is_empty()).then_some(alpha),
+        icc_profile: None,
       }),
     }
   }
@@ -200,6 +244,7 @@ impl Hash for PdfRasterImage {
     self.pixels.height.hash(state);
     self.pixels.rgb.hash(state);
     self.pixels.alpha.hash(state);
+    self.pixels.icc_profile.hash(state);
   }
 }
 
@@ -221,10 +266,53 @@ impl CustomImage for PdfRasterImage {
   }
 
   fn icc_profile(&self) -> Option<&[u8]> {
-    None
+    self.pixels.icc_profile.as_deref()
   }
 
   fn color_space(&self) -> ImageColorspace {
     ImageColorspace::Rgb
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn custom_raster_preserves_icc_profile() {
+    let profile = vec![0_u8; 128];
+    let image =
+      PdfRasterImage::from_dynamic_with_icc(DynamicImage::new_rgb8(1, 1), Some(profile.clone()));
+
+    assert_eq!(CustomImage::icc_profile(&image), Some(profile.as_slice()));
+  }
+
+  #[test]
+  fn jpeg_exif_orientation_is_applied_before_pdf_embedding() {
+    let mut jpeg = Vec::new();
+    JpegEncoder::new(&mut jpeg)
+      .encode(
+        &[255, 0, 0, 0, 0, 255],
+        2,
+        1,
+        image::ExtendedColorType::Rgb8,
+      )
+      .unwrap();
+    let exif = [
+      b'E', b'x', b'i', b'f', 0, 0, b'I', b'I', 0x2a, 0, 8, 0, 0, 0, 1, 0, 0x12, 1, 3, 0, 1, 0, 0,
+      0, 6, 0, 0, 0, 0, 0, 0, 0,
+    ];
+    let mut oriented = Vec::with_capacity(jpeg.len() + exif.len() + 4);
+    oriented.extend_from_slice(&jpeg[..2]);
+    oriented.extend_from_slice(&[0xff, 0xe1]);
+    oriented.extend_from_slice(&u16::try_from(exif.len() + 2).unwrap().to_be_bytes());
+    oriented.extend_from_slice(&exif);
+    oriented.extend_from_slice(&jpeg[2..]);
+
+    let image = decode_oriented_image(&oriented, RasterImageFormat::Jpeg)
+      .unwrap()
+      .expect("EXIF orientation should require pixel transformation");
+
+    assert_eq!(image.size(), (1, 2));
   }
 }

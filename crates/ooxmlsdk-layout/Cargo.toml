@@ -20,7 +20,9 @@ image = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"] }
 ooxmlsdk-fonts = { workspace = true }
 ooxmlsdk-formula = { workspace = true }
+parley = { workspace = true }
 quick-xml = { workspace = true }
 rustc-hash = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
+unicode-script = { workspace = true }

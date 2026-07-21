@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 /// Options for OOXML to PDF conversion.
 #[derive(Clone, Debug)]
 pub struct PdfOptions {
@@ -22,6 +24,8 @@ pub struct PdfOptions {
   pub forms: PdfFormOptions,
   pub viewer: PdfViewerOptions,
   pub metadata: PdfMetadataOptions,
+  /// Files embedded in the PDF name tree and, where supported, associated with the document.
+  pub attachments: Vec<PdfAttachment>,
   pub watermark: Option<PdfWatermarkOptions>,
   pub spreadsheet: PdfSpreadsheetOptions,
 }
@@ -40,10 +44,47 @@ impl Default for PdfOptions {
       forms: PdfFormOptions::default(),
       viewer: PdfViewerOptions::default(),
       metadata: PdfMetadataOptions::default(),
+      attachments: Vec::new(),
       watermark: None,
       spreadsheet: PdfSpreadsheetOptions::default(),
     }
   }
+}
+
+/// A file to embed in the generated PDF.
+#[derive(Clone, Debug)]
+pub struct PdfAttachment {
+  pub path: String,
+  pub mime_type: String,
+  pub description: String,
+  pub association: PdfAttachmentAssociation,
+  pub data: Arc<[u8]>,
+  pub modification_date: Option<PdfDateTime>,
+  pub compress: Option<bool>,
+}
+
+/// How an attachment relates to the generated PDF.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PdfAttachmentAssociation {
+  Source,
+  Data,
+  Alternative,
+  Supplement,
+  #[default]
+  Unspecified,
+}
+
+/// A deterministic PDF timestamp, including an optional UTC offset.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PdfDateTime {
+  pub year: u16,
+  pub month: Option<u8>,
+  pub day: Option<u8>,
+  pub hour: Option<u8>,
+  pub minute: Option<u8>,
+  pub second: Option<u8>,
+  pub utc_offset_hour: Option<i8>,
+  pub utc_offset_minute: Option<u8>,
 }
 
 impl PdfOptions {
@@ -53,8 +94,8 @@ impl PdfOptions {
 
   pub(crate) fn take_layout_options(&mut self) -> ooxmlsdk_layout::options::LayoutOptions {
     ooxmlsdk_layout::options::LayoutOptions {
-      source_file_name: self.source_file_name.take(),
-      ui_language: self.ui_language.take(),
+      source_file_name: self.source_file_name.clone(),
+      ui_language: self.ui_language.clone(),
       ..Default::default()
     }
   }

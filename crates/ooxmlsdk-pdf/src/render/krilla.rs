@@ -1,20 +1,29 @@
 use std::borrow::Cow;
+use std::num::NonZeroU16;
+use std::num::NonZeroU32;
 use std::ops::Range;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use krilla::Document;
 use krilla::action::{Action, LinkAction};
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::color::rgb;
-use krilla::destination::{Destination, XyzDestination};
+use krilla::destination::{Destination, NamedDestination, XyzDestination};
+use krilla::embed::{AssociationKind, EmbeddedFile, MimeType};
 use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::Image;
+use krilla::metadata::{DateTime, Metadata};
 use krilla::num::NormalizedF32;
 use krilla::outline::{Outline, OutlineNode};
-use krilla::page::PageSettings;
+use krilla::page::{NumberingStyle, PageLabel, PageSettings};
 use krilla::paint::{Fill, FillRule, LineJoin, LinearGradient, SpreadMethod, Stop, Stroke};
 use krilla::surface::Surface;
+use krilla::tagging::{
+  Artifact, ArtifactType, BBox, ContentTag, Identifier, Node, SpanTag, TableHeaderScope, Tag,
+  TagGroup, TagTree,
+};
 use krilla::text::{Glyph, GlyphId};
+use krilla_svg::{SurfaceExt, SvgSettings};
 use rustc_hash::FxHashMap as HashMap;
 use smallvec::SmallVec;
 
@@ -23,7 +32,7 @@ use super::form_widgets::{collect_form_widget_annotations, inject_form_widget_an
 use super::image::decode_image;
 use super::settings::serialize_settings;
 use crate::error::{PdfError, Result};
-use crate::options::PdfOptions;
+use crate::options::{PdfAttachmentAssociation, PdfDateTime, PdfOptions};
 use crate::{
   PdfConversionDiagnostics, PdfConversionOutput, PdfFontAudit, PdfFontAuditIssue,
   PdfFontAuditIssueKind, PdfFontAuditOutput, PdfFontFaceDiagnostics, PdfGlyphBoundsDiagnostics,
@@ -246,6 +255,12 @@ fn render_inner(
     PdfFontAudit::default()
   };
   let form_widget_annotations = collect_form_widget_annotations(document, &mut text_metrics);
+  if options.general.pdf_ua_compliance && !form_widget_annotations.is_empty() {
+    return Err(PdfError::Options(
+      "PDF/UA form widgets require a tagged form API and cannot use the lopdf post-processor"
+        .to_string(),
+    ));
+  }
   let internal_links = InternalLinkTargets::from_paint(&paint);
   debug_assert_eq!(paint.pages.len(), document.pages.len());
   debug_assert!(paint.pages.iter().all(|page| {
@@ -305,37 +320,78 @@ fn render_inner(
       })
   }));
   let mut pdf = Document::new_with(serialize_settings(options)?);
+  pdf.set_metadata(pdf_metadata(options));
+  embed_attachments(&mut pdf, options)?;
+  register_named_destinations(&mut pdf, document, options)?;
   let mut fonts = FontSet::new();
+  let tagging_enabled = options.general.tagged_pdf || options.general.pdf_ua_compliance;
+  let mut tag_tree = TagTree::new().with_lang(options.ui_language.clone());
 
-  for page in &paint.pages {
-    let settings = PageSettings::from_wh(page.width_pt, page.height_pt)
+  for (page_index, page) in paint.pages.iter().enumerate() {
+    let mut settings = PageSettings::from_wh(page.width_pt, page.height_pt)
       .ok_or_else(|| PdfError::Krilla("invalid page size".to_string()))?;
+    if let Some(label) = page_label(document, page_index) {
+      settings = settings.with_page_label(label);
+    }
 
     let mut pdf_page = pdf.start_page_with(settings);
     let mut surface = pdf_page.surface();
     let mut link_annotations = Vec::new();
-    for item in page
+    let mut tagged_items = Vec::new();
+    for (item_index, item) in page
       .items
       .iter()
-      .filter(|item| paint_item_intersects_page(item, page.width_pt, page.height_pt))
+      .enumerate()
+      .filter(|(_, item)| paint_item_intersects_page(item, page.width_pt, page.height_pt))
     {
-      draw_paint_item(
+      let content_tag = tagging_enabled.then(|| tagged_content_tag(item)).flatten();
+      let identifier = content_tag.map(|tag| surface.start_tagged(tag));
+      let annotation_start = link_annotations.len();
+      let draw_result = draw_paint_item(
         &mut surface,
         item,
         &mut fonts,
         &internal_links,
         &mut link_annotations,
         options,
-      )?;
+      );
+      if content_tag.is_some() {
+        surface.end_tagged();
+      }
+      draw_result?;
+      if tagging_enabled && (identifier.is_some() || link_annotations.len() > annotation_start) {
+        tagged_items.push(TaggedPaintRecord {
+          item_index,
+          identifier,
+          annotation_range: annotation_start..link_annotations.len(),
+        });
+      }
     }
     surface.finish();
+    let mut annotation_ids = Vec::with_capacity(link_annotations.len());
     for annotation in link_annotations {
-      pdf_page.add_annotation(annotation);
+      if tagging_enabled {
+        annotation_ids.push(pdf_page.add_tagged_annotation(annotation));
+      } else {
+        pdf_page.add_annotation(annotation);
+      }
+    }
+    if tagging_enabled {
+      tag_tree.push(build_page_tag_group(
+        document,
+        page_index,
+        page,
+        tagged_items,
+        &annotation_ids,
+      ));
     }
   }
 
   if let Some(outline) = pdf_outline_for_entries(&document.outline_entries) {
     pdf.set_outline(outline);
+  }
+  if tagging_enabled {
+    pdf.set_tag_tree(tag_tree);
   }
 
   let pdf = pdf
@@ -386,6 +442,7 @@ struct TextItem<'doc> {
   preserve_text_portion: bool,
   decoration_span_start_x_pt: Option<f32>,
   pdf_text_segmentation: common::PdfTextSegmentation,
+  source_path: Option<&'doc [usize]>,
 }
 
 #[derive(Clone, Debug)]
@@ -1349,6 +1406,7 @@ fn text_item_from_common<'doc>(text: &'doc common::TextRun<'static>) -> TextItem
     preserve_text_portion: text.preserve_text_portion,
     decoration_span_start_x_pt: None,
     pdf_text_segmentation: text.pdf_text_segmentation,
+    source_path: text.source.as_ref().map(|source| source.path.as_slice()),
   }
 }
 
@@ -1606,6 +1664,7 @@ fn writer_text_items_coalesce(
     || current.dynamic_field != next.dynamic_field
     || current.paragraph_bidi != next.paragraph_bidi
     || current.rotation_center_pt != next.rotation_center_pt
+    || current.source_path != next.source_path
     || current.decoration_span_start_x_pt != next.decoration_span_start_x_pt
     || (current.y_pt - next.y_pt).abs() >= 0.01
     || (current.line_height_pt - next.line_height_pt).abs() >= 0.01
@@ -2014,6 +2073,354 @@ fn paint_line_owners(
   owners
 }
 
+#[derive(Debug)]
+struct TaggedPaintRecord {
+  item_index: usize,
+  identifier: Option<Identifier>,
+  annotation_range: Range<usize>,
+}
+
+fn tagged_content_tag(item: &PaintItem<'_>) -> Option<ContentTag<'static>> {
+  match item {
+    PaintItem::Text(text) if !text.item.text.is_empty() => Some(ContentTag::Span(SpanTag::empty())),
+    PaintItem::Image(image)
+      if image
+        .alt_text
+        .as_deref()
+        .is_some_and(|alt| !alt.trim().is_empty()) =>
+    {
+      Some(ContentTag::Other)
+    }
+    PaintItem::Image(_) | PaintItem::Rect(_) | PaintItem::Line(_) | PaintItem::Polyline(_) => Some(
+      ContentTag::Artifact(Artifact::with_kind(ArtifactType::Layout)),
+    ),
+    PaintItem::Text(_) | PaintItem::LinkArea(_) => None,
+  }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum ParagraphTagKey {
+  Frame(usize),
+  Source(Vec<usize>),
+  Loose(usize),
+}
+
+#[derive(Debug)]
+struct ParagraphTagBuilder {
+  key: ParagraphTagKey,
+  is_note: bool,
+  text: String,
+  children: Vec<Node>,
+}
+
+#[derive(Debug)]
+struct TableCellTagBuilder {
+  cell_index: usize,
+  header: bool,
+  children: Vec<Node>,
+}
+
+#[derive(Debug)]
+struct TableRowTagBuilder {
+  row_index: usize,
+  header: bool,
+  cells: Vec<TableCellTagBuilder>,
+}
+
+#[derive(Debug)]
+struct TableTagBuilder {
+  frame_index: usize,
+  rows: Vec<TableRowTagBuilder>,
+}
+
+#[derive(Debug)]
+enum PageTagBlock {
+  Paragraph(ParagraphTagBuilder),
+  Table(TableTagBuilder),
+  Node(Node),
+}
+
+fn build_page_tag_group(
+  document: &common::LayoutDocument<'static>,
+  page_index: usize,
+  page: &PaintPage<'_>,
+  records: Vec<TaggedPaintRecord>,
+  annotation_ids: &[Identifier],
+) -> TagGroup {
+  let mut blocks = Vec::<PageTagBlock>::new();
+  for record in records {
+    let Some(item) = page.items.get(record.item_index) else {
+      continue;
+    };
+    let annotations = record
+      .annotation_range
+      .clone()
+      .filter_map(|index| annotation_ids.get(index).cloned())
+      .collect::<Vec<_>>();
+    match item {
+      PaintItem::Text(text) if !text.item.text.is_empty() => {
+        let Some(mut node) = tagged_leaf_node(record.identifier, annotations) else {
+          continue;
+        };
+        if text.item.style.italic {
+          node = TagGroup::with_children(Tag::Em, vec![node]).into();
+        }
+        if text.item.style.bold {
+          node = TagGroup::with_children(Tag::Strong, vec![node]).into();
+        }
+        if let Some(frame_index) = text.source_frame_index
+          && document
+            .frames
+            .get(frame_index)
+            .is_some_and(|frame| frame.kind == "table")
+        {
+          let (row_index, cell_index, header) = table_cell_position(document, text).unwrap_or((
+            text.source_line_index.unwrap_or(0),
+            0,
+            false,
+          ));
+          push_table_text_node(
+            &mut blocks,
+            frame_index,
+            row_index,
+            cell_index,
+            header,
+            node,
+          );
+          continue;
+        }
+
+        let key = if let Some(frame_index) = text.source_frame_index {
+          ParagraphTagKey::Frame(frame_index)
+        } else if let Some(path) = text.item.source_path {
+          ParagraphTagKey::Source(path.to_vec())
+        } else {
+          ParagraphTagKey::Loose(record.item_index)
+        };
+        let is_note = text
+          .source_frame_index
+          .and_then(|index| document.frames.get(index))
+          .is_some_and(|frame| frame.kind == "notes");
+        push_paragraph_text_node(&mut blocks, key, is_note, text.item.text.as_ref(), node);
+      }
+      PaintItem::Image(image)
+        if image
+          .alt_text
+          .as_deref()
+          .is_some_and(|alt| !alt.trim().is_empty()) =>
+      {
+        let Some(content) = tagged_leaf_node(record.identifier, Vec::new()) else {
+          continue;
+        };
+        let bbox = Rect::from_xywh(image.x_pt, image.y_pt, image.width_pt, image.height_pt)
+          .map(|rect| BBox::new(page_index, rect));
+        let figure = Tag::Figure(image.alt_text.as_deref().map(str::to_string)).with_bbox(bbox);
+        let figure: Node = TagGroup::with_children(figure, vec![content]).into();
+        let node = if annotations.is_empty() {
+          figure
+        } else {
+          let mut link_children = annotations.into_iter().map(Node::Leaf).collect::<Vec<_>>();
+          link_children.push(figure);
+          TagGroup::with_children(Tag::Link, link_children).into()
+        };
+        blocks.push(PageTagBlock::Node(node));
+      }
+      PaintItem::LinkArea(_) if !annotations.is_empty() => {
+        blocks.push(PageTagBlock::Node(
+          TagGroup::with_children(Tag::Link, annotations.into_iter().map(Node::Leaf).collect())
+            .into(),
+        ));
+      }
+      PaintItem::Text(_)
+      | PaintItem::Image(_)
+      | PaintItem::Rect(_)
+      | PaintItem::Line(_)
+      | PaintItem::Polyline(_)
+      | PaintItem::LinkArea(_) => {}
+    }
+  }
+
+  let mut part = TagGroup::new(Tag::Part);
+  for block in blocks {
+    match block {
+      PageTagBlock::Paragraph(paragraph) => {
+        part.push(paragraph_tag_group(document, page_index, paragraph));
+      }
+      PageTagBlock::Table(table) => part.push(table_tag_group(table)),
+      PageTagBlock::Node(node) => part.children.push(node),
+    }
+  }
+  part
+}
+
+fn tagged_leaf_node(identifier: Option<Identifier>, annotations: Vec<Identifier>) -> Option<Node> {
+  let identifier = identifier?;
+  if annotations.is_empty() {
+    Some(identifier.into())
+  } else {
+    let mut children = annotations.into_iter().map(Node::Leaf).collect::<Vec<_>>();
+    children.push(identifier.into());
+    Some(TagGroup::with_children(Tag::Link, children).into())
+  }
+}
+
+fn push_paragraph_text_node(
+  blocks: &mut Vec<PageTagBlock>,
+  key: ParagraphTagKey,
+  is_note: bool,
+  text: &str,
+  node: Node,
+) {
+  if let Some(PageTagBlock::Paragraph(paragraph)) = blocks
+    .iter_mut()
+    .find(|block| matches!(block, PageTagBlock::Paragraph(paragraph) if paragraph.key == key))
+  {
+    paragraph.text.push_str(text);
+    paragraph.children.push(node);
+    return;
+  }
+  blocks.push(PageTagBlock::Paragraph(ParagraphTagBuilder {
+    key,
+    is_note,
+    text: text.to_string(),
+    children: vec![node],
+  }));
+}
+
+fn push_table_text_node(
+  blocks: &mut Vec<PageTagBlock>,
+  frame_index: usize,
+  row_index: usize,
+  cell_index: usize,
+  header: bool,
+  node: Node,
+) {
+  let table_index = blocks
+    .iter()
+    .position(
+      |block| matches!(block, PageTagBlock::Table(table) if table.frame_index == frame_index),
+    )
+    .unwrap_or_else(|| {
+      blocks.push(PageTagBlock::Table(TableTagBuilder {
+        frame_index,
+        rows: Vec::new(),
+      }));
+      blocks.len() - 1
+    });
+  let PageTagBlock::Table(table) = &mut blocks[table_index] else {
+    unreachable!();
+  };
+  let row_index_in_table = table
+    .rows
+    .iter()
+    .position(|row| row.row_index == row_index)
+    .unwrap_or_else(|| {
+      table.rows.push(TableRowTagBuilder {
+        row_index,
+        header,
+        cells: Vec::new(),
+      });
+      table.rows.len() - 1
+    });
+  let row = &mut table.rows[row_index_in_table];
+  row.header |= header;
+  if let Some(cell) = row
+    .cells
+    .iter_mut()
+    .find(|cell| cell.cell_index == cell_index)
+  {
+    cell.header |= header;
+    cell.children.push(node);
+  } else {
+    row.cells.push(TableCellTagBuilder {
+      cell_index,
+      header,
+      children: vec![node],
+    });
+  }
+}
+
+fn table_cell_position(
+  document: &common::LayoutDocument<'static>,
+  text: &PaintText<'_>,
+) -> Option<(usize, usize, bool)> {
+  let frame = document.frames.get(text.source_frame_index?)?;
+  let line = frame.lines.get(text.source_line_index?)?;
+  frame
+    .fragments
+    .iter()
+    .filter(|fragment| fragment.kind == common::FrameFragmentKind::TableCell)
+    .filter(|fragment| {
+      fragment.item_range.start < line.item_range.end
+        && line.item_range.start < fragment.item_range.end
+    })
+    .min_by_key(|fragment| fragment.item_range.end - fragment.item_range.start)
+    .map(|fragment| {
+      (
+        fragment.row_index,
+        fragment.cell_index.unwrap_or(0),
+        fragment.split == common::FragmentSplitKind::RepeatedHeader,
+      )
+    })
+}
+
+fn paragraph_tag_group(
+  document: &common::LayoutDocument<'static>,
+  page_index: usize,
+  paragraph: ParagraphTagBuilder,
+) -> TagGroup {
+  if paragraph.is_note {
+    return TagGroup::with_children(Tag::Note, paragraph.children);
+  }
+  let normalized = normalize_tag_text(&paragraph.text);
+  if let Some(outline) = document.outline_entries.iter().find(|entry| {
+    entry.page_index == page_index && normalize_tag_text(entry.text.as_ref()) == normalized
+  }) {
+    let level =
+      NonZeroU16::new(u16::from(outline.level).saturating_add(1)).unwrap_or(NonZeroU16::MIN);
+    TagGroup::with_children(
+      Tag::Hn(level, Some(outline.text.to_string())),
+      paragraph.children,
+    )
+  } else {
+    TagGroup::with_children(Tag::P, paragraph.children)
+  }
+}
+
+fn normalize_tag_text(text: &str) -> String {
+  text.split_whitespace().collect::<String>()
+}
+
+fn table_tag_group(table: TableTagBuilder) -> TagGroup {
+  let mut head = TagGroup::new(Tag::THead);
+  let mut body = TagGroup::new(Tag::TBody);
+  for row in table.rows {
+    let mut row_group = TagGroup::new(Tag::TR);
+    for cell in row.cells {
+      let paragraph = TagGroup::with_children(Tag::P, cell.children);
+      let cell_group = if cell.header {
+        TagGroup::with_children(Tag::TH(TableHeaderScope::Column), vec![paragraph.into()])
+      } else {
+        TagGroup::with_children(Tag::TD, vec![paragraph.into()])
+      };
+      row_group.push(cell_group);
+    }
+    if row.header {
+      head.push(row_group);
+    } else {
+      body.push(row_group);
+    }
+  }
+  let mut table_group = TagGroup::new(Tag::Table);
+  if !head.children.is_empty() {
+    table_group.push(head);
+  }
+  if !body.children.is_empty() {
+    table_group.push(body);
+  }
+  table_group
+}
+
 fn draw_paint_item(
   surface: &mut Surface<'_>,
   item: &PaintItem<'_>,
@@ -2042,14 +2449,20 @@ fn draw_paint_item(
     PaintItem::Rect(rect) => draw_rect_item(surface, rect),
     PaintItem::Image(image) => {
       let _alt_text = image.alt_text.as_deref();
-      match decode_image(
-        &image.data,
-        image.content_type.as_deref(),
-        options,
-        Some(metafile_render_options_for_image(image, options)),
-      ) {
-        Ok(pdf_image) => draw_image_item(surface, image, pdf_image),
-        Err(_) => draw_missing_image(surface, image),
+      if is_svg_image(image) {
+        if draw_svg_item(surface, image).is_err() {
+          draw_missing_image(surface, image);
+        }
+      } else {
+        match decode_image(
+          &image.data,
+          image.content_type.as_deref(),
+          options,
+          Some(metafile_render_options_for_image(image, options)),
+        ) {
+          Ok(pdf_image) => draw_image_item(surface, image, pdf_image),
+          Err(_) => draw_missing_image(surface, image),
+        }
       }
       if let Some(url) = image.hyperlink_url.as_deref()
         && let Some(annotation) = link_annotation_for_rect(
@@ -2765,6 +3178,58 @@ fn draw_rect_path(surface: &mut Surface<'_>, rect: &RectItem) {
 }
 
 fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, pdf_image: Image) {
+  draw_transformed_image_content(surface, image, |surface, size| {
+    surface.draw_image(pdf_image, size);
+  });
+}
+
+fn is_svg_image(image: &ImageItem<'_>) -> bool {
+  image
+    .content_type
+    .as_deref()
+    .is_some_and(|content_type| content_type.eq_ignore_ascii_case("image/svg+xml"))
+    || std::str::from_utf8(&image.data)
+      .ok()
+      .is_some_and(|text| text.trim_start().starts_with("<svg"))
+}
+
+fn draw_svg_item(surface: &mut Surface<'_>, image: &ImageItem<'_>) -> Result<()> {
+  static FONT_DATABASE: OnceLock<Arc<fontdb::Database>> = OnceLock::new();
+  let fontdb = FONT_DATABASE
+    .get_or_init(|| {
+      let mut database = fontdb::Database::new();
+      database.load_system_fonts();
+      Arc::new(database)
+    })
+    .clone();
+  let tree = usvg::Tree::from_data(
+    &image.data,
+    &usvg::Options {
+      fontdb,
+      ..usvg::Options::default()
+    },
+  )
+  .map_err(|err| PdfError::Krilla(format!("failed to decode SVG image: {err}")))?;
+  draw_transformed_image_content(surface, image, |surface, size| {
+    surface.draw_svg(
+      &tree,
+      size,
+      SvgSettings {
+        // An OOXML picture is one semantic image. Keeping SVG text as paths
+        // avoids leaking decorative image text into PDF text extraction.
+        embed_text: false,
+        ..SvgSettings::default()
+      },
+    );
+  });
+  Ok(())
+}
+
+fn draw_transformed_image_content(
+  surface: &mut Surface<'_>,
+  image: &ImageItem<'_>,
+  draw: impl FnOnce(&mut Surface<'_>, Size),
+) {
   if image.width_pt <= f32::EPSILON || image.height_pt <= f32::EPSILON {
     return;
   }
@@ -2816,13 +3281,168 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, pdf_image: 
       -image.crop.left * draw_width,
       -image.crop.top * draw_height,
     ));
-    surface.draw_image(pdf_image, size);
+    draw(surface, size);
     surface.pop();
   }
 
   for _ in 0..pop_count {
     surface.pop();
   }
+}
+
+fn embed_attachments(pdf: &mut Document, options: &PdfOptions) -> Result<()> {
+  for attachment in &options.attachments {
+    if attachment.path.is_empty() {
+      return Err(PdfError::Options(
+        "attachment path must not be empty".to_string(),
+      ));
+    }
+    if attachment.description.is_empty() {
+      return Err(PdfError::Options(format!(
+        "attachment '{}' must have a description",
+        attachment.path
+      )));
+    }
+    let mime_type = MimeType::new(&attachment.mime_type).ok_or_else(|| {
+      PdfError::Options(format!(
+        "attachment '{}' has invalid MIME type '{}'",
+        attachment.path, attachment.mime_type
+      ))
+    })?;
+    let file = EmbeddedFile {
+      path: attachment.path.clone(),
+      mime_type: Some(mime_type),
+      description: Some(attachment.description.clone()),
+      association_kind: match attachment.association {
+        PdfAttachmentAssociation::Source => AssociationKind::Source,
+        PdfAttachmentAssociation::Data => AssociationKind::Data,
+        PdfAttachmentAssociation::Alternative => AssociationKind::Alternative,
+        PdfAttachmentAssociation::Supplement => AssociationKind::Supplement,
+        PdfAttachmentAssociation::Unspecified => AssociationKind::Unspecified,
+      },
+      data: attachment.data.as_ref().to_vec().into(),
+      modification_date: attachment.modification_date.map(pdf_date_time),
+      compress: attachment.compress,
+      location: None,
+    };
+    pdf.embed_file(file).ok_or_else(|| {
+      PdfError::Options(format!(
+        "attachment path '{}' is present more than once",
+        attachment.path
+      ))
+    })?;
+  }
+  Ok(())
+}
+
+fn pdf_date_time(value: PdfDateTime) -> DateTime {
+  let mut date = DateTime::new(value.year);
+  if let Some(month) = value.month {
+    date = date.month(month);
+  }
+  if let Some(day) = value.day {
+    date = date.day(day);
+  }
+  if let Some(hour) = value.hour {
+    date = date.hour(hour);
+  }
+  if let Some(minute) = value.minute {
+    date = date.minute(minute);
+  }
+  if let Some(second) = value.second {
+    date = date.second(second);
+  }
+  if let Some(offset_hour) = value.utc_offset_hour {
+    date = date.utc_offset_hour(offset_hour);
+  }
+  if let Some(offset_minute) = value.utc_offset_minute {
+    date = date.utc_offset_minute(offset_minute);
+  }
+  date
+}
+
+fn register_named_destinations(
+  pdf: &mut Document,
+  document: &common::LayoutDocument<'static>,
+  options: &PdfOptions,
+) -> Result<()> {
+  if !options.links.export_bookmarks_to_pdf_destinations {
+    return Ok(());
+  }
+  for anchor in &document.anchor_pages {
+    if anchor.name.is_empty() || anchor.page_index >= document.pages.len() {
+      continue;
+    }
+    let destination = NamedDestination::new(
+      anchor.name.to_string(),
+      XyzDestination::new(anchor.page_index, Point::from_xy(0.0, 0.0)),
+    );
+    pdf.register_named_destination(destination).ok_or_else(|| {
+      PdfError::Options(format!(
+        "bookmark '{}' resolves to more than one PDF destination",
+        anchor.name
+      ))
+    })?;
+  }
+  Ok(())
+}
+
+fn page_label(document: &common::LayoutDocument<'static>, page_index: usize) -> Option<PageLabel> {
+  let page = document.pages.get(page_index)?;
+  let physical_page_number = page_index.saturating_add(1);
+  let virtual_page_number = page
+    .setup
+    .page_number_start
+    .and_then(|start| {
+      i64::from(start)
+        .checked_add(i64::try_from(page.section_page_index).ok()?)
+        .and_then(|number| u32::try_from(number).ok())
+    })
+    .or_else(|| {
+      document
+        .anchor_pages
+        .iter()
+        .find(|anchor| anchor.page_index == page_index)
+        .and_then(|anchor| u32::try_from(anchor.virtual_page_number).ok())
+        .filter(|number| usize::try_from(*number).ok() != Some(physical_page_number))
+    })?;
+  Some(PageLabel::new(
+    Some(NumberingStyle::Arabic),
+    None,
+    NonZeroU32::new(virtual_page_number),
+  ))
+}
+
+fn pdf_metadata(options: &PdfOptions) -> Metadata {
+  let mut metadata = Metadata::new();
+  if let Some(title) = &options.metadata.title {
+    metadata = metadata.title(title.clone());
+  }
+  if let Some(author) = &options.metadata.author {
+    metadata = metadata.authors(vec![author.clone()]);
+  }
+  if let Some(subject) = &options.metadata.subject {
+    metadata = metadata.description(subject.clone());
+  }
+  if let Some(keywords) = &options.metadata.keywords {
+    let keywords = keywords
+      .split([',', ';'])
+      .map(str::trim)
+      .filter(|keyword| !keyword.is_empty())
+      .map(str::to_string)
+      .collect::<Vec<_>>();
+    metadata = metadata.keywords(keywords);
+  }
+  if let Some(creator) = &options.metadata.creator {
+    metadata = metadata.creator(creator.clone());
+  }
+  if let Some(producer) = &options.metadata.producer {
+    metadata = metadata.producer(producer.clone());
+  }
+  if let Some(language) = &options.ui_language {
+    metadata = metadata.language(language.clone());
+  }
+  metadata
 }
 
 fn shaped_pdf_glyphs(
@@ -2934,11 +3554,280 @@ fn text_stroke(style: &TextStyle<'_>, synthetic_bold: bool) -> Option<Stroke> {
 
 #[cfg(test)]
 mod tests {
+  use std::sync::Arc;
+
   use super::{
-    gamma_correct_gradient_color, pdf_page_dimension, symbol_font_semantic_text, text_stroke,
-    text_style_from_common,
+    gamma_correct_gradient_color, pdf_metadata, pdf_page_dimension, render,
+    symbol_font_semantic_text, text_stroke, text_style_from_common,
   };
-  use ooxmlsdk_layout::common::{Color, LayoutEngineKind, Pt, TextStyle};
+  use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
+  use krilla::Document;
+  use krilla::geom::Size;
+  use krilla::page::PageSettings;
+  use ooxmlsdk_layout::common::{
+    self, Color, DisplayItem, DisplayPage, LayoutDocument, LayoutEngineKind, Pt, TextRun, TextStyle,
+  };
+
+  fn collect_structure_roles(
+    pdf: &lopdf::Document,
+    object: &lopdf::Object,
+    roles: &mut Vec<Vec<u8>>,
+  ) {
+    let object = match object {
+      lopdf::Object::Reference(id) => pdf.get_object(*id).unwrap(),
+      object => object,
+    };
+    match object {
+      lopdf::Object::Array(children) => {
+        for child in children {
+          collect_structure_roles(pdf, child, roles);
+        }
+      }
+      lopdf::Object::Dictionary(dictionary) => {
+        if let Ok(role) = dictionary.get(b"S").and_then(lopdf::Object::as_name) {
+          roles.push(role.to_vec());
+        }
+        if let Ok(children) = dictionary.get(b"K") {
+          collect_structure_roles(pdf, children, roles);
+        }
+      }
+      _ => {}
+    }
+  }
+
+  fn resolved_dictionary<'a>(
+    pdf: &'a lopdf::Document,
+    object: &'a lopdf::Object,
+  ) -> &'a lopdf::Dictionary {
+    match object {
+      lopdf::Object::Reference(id) => pdf.get_dictionary(*id).unwrap(),
+      lopdf::Object::Dictionary(dictionary) => dictionary,
+      object => panic!("expected PDF dictionary, got {object:?}"),
+    }
+  }
+
+  fn tagged_test_document() -> LayoutDocument<'static> {
+    let text = TextRun {
+      text: "Tagged paragraph".into(),
+      origin: common::Point {
+        x: Pt(12.0),
+        y: Pt(24.0),
+      },
+      line_height: Pt(14.0),
+      style: TextStyle {
+        font_family: Some("Arial".into()),
+        font_size: Pt(11.0),
+        ..TextStyle::default()
+      },
+      font_id: None,
+      color: Color {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 255,
+      },
+      rotation_center: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: false,
+      pdf_text_segmentation: Default::default(),
+      source: None,
+    };
+    let page_size = common::Size {
+      width: Pt(200.0),
+      height: Pt(100.0),
+    };
+    LayoutDocument {
+      pages: vec![DisplayPage {
+        setup: common::PageSetup {
+          size: page_size,
+          ..Default::default()
+        },
+        bounds: common::Rect {
+          origin: Default::default(),
+          size: page_size,
+        },
+        items: vec![DisplayItem::Text(text)],
+        ..Default::default()
+      }],
+      outline_entries: vec![common::OutlineEntry {
+        level: 0,
+        text: "Document".into(),
+        page_index: 0,
+        target: common::Point::default(),
+        merged_hidden_separator: false,
+      }],
+      ..Default::default()
+    }
+  }
+
+  fn pdf_info_text(object: &lopdf::Object) -> String {
+    let bytes = object.as_str().unwrap();
+    if let Some(bytes) = bytes.strip_prefix(&[0xfe, 0xff]) {
+      let units = bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+      String::from_utf16(&units).unwrap()
+    } else {
+      String::from_utf8(bytes.to_vec()).unwrap()
+    }
+  }
+
+  #[test]
+  fn pdf_metadata_options_reach_document_info() {
+    let mut options = PdfOptions {
+      ui_language: Some("zh-CN".to_string()),
+      ..PdfOptions::default()
+    };
+    options.metadata.title = Some("标题".to_string());
+    options.metadata.author = Some("作者".to_string());
+    options.metadata.subject = Some("主题".to_string());
+    options.metadata.keywords = Some("alpha, beta; gamma".to_string());
+    options.metadata.creator = Some("creator".to_string());
+    options.metadata.producer = Some("producer".to_string());
+    let mut document = Document::new();
+    document.set_metadata(pdf_metadata(&options));
+    let settings = PageSettings::new(Size::from_wh(10.0, 10.0).unwrap());
+    document.start_page_with(settings).finish();
+    let bytes = document.finish().unwrap();
+    let parsed = lopdf::Document::load_mem(&bytes).unwrap();
+    let info_id = parsed.trailer.get(b"Info").unwrap().as_reference().unwrap();
+    let info = parsed.get_dictionary(info_id).unwrap();
+
+    assert_eq!(pdf_info_text(info.get(b"Title").unwrap()), "标题");
+    assert_eq!(pdf_info_text(info.get(b"Author").unwrap()), "作者");
+    assert_eq!(pdf_info_text(info.get(b"Subject").unwrap()), "主题");
+    assert_eq!(info.get(b"Creator").unwrap().as_str().unwrap(), b"creator");
+    assert_eq!(
+      info.get(b"Producer").unwrap().as_str().unwrap(),
+      b"producer"
+    );
+  }
+
+  #[test]
+  fn tagged_pdf_emits_language_and_paragraph_structure() {
+    let document = tagged_test_document();
+    let mut options = PdfOptions::default();
+    options.general.tagged_pdf = true;
+    options.ui_language = Some("en-US".to_string());
+
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let catalog_id = pdf.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    let catalog = pdf.get_dictionary(catalog_id).unwrap();
+    assert_eq!(catalog.get(b"Lang").unwrap().as_str().unwrap(), b"en-US");
+    let mark_info = catalog.get(b"MarkInfo").unwrap().as_dict().unwrap();
+    assert!(mark_info.get(b"Marked").unwrap().as_bool().unwrap());
+
+    let structure_root = catalog.get(b"StructTreeRoot").unwrap();
+    let mut roles = Vec::new();
+    collect_structure_roles(&pdf, structure_root, &mut roles);
+    assert!(roles.iter().any(|role| role == b"Document"));
+    assert!(roles.iter().any(|role| role == b"Part"));
+    assert!(roles.iter().any(|role| role == b"P"));
+  }
+
+  #[test]
+  fn pdf_ua_validator_accepts_a_structured_text_document() {
+    let document = tagged_test_document();
+    let mut options = PdfOptions::default();
+    options.general.pdf_ua_compliance = true;
+    options.ui_language = Some("en-US".to_string());
+    options.metadata.title = Some("Tagged test document".to_string());
+
+    let bytes = render(&document, &options).unwrap();
+
+    assert!(bytes.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn pdf_ua_rejects_untagged_lopdf_form_widget_post_processing() {
+    let mut document = tagged_test_document();
+    let DisplayItem::Text(text) = &mut document.pages[0].items[0] else {
+      unreachable!();
+    };
+    text.form_widget_id = Some(1);
+    document.form_widgets.push(common::FormWidget {
+      id: 1,
+      kind: common::FormWidgetKind::Text,
+      entries: Vec::new(),
+    });
+    let mut options = PdfOptions::default();
+    options.general.pdf_ua_compliance = true;
+
+    assert!(matches!(
+      render(&document, &options),
+      Err(crate::PdfError::Options(message)) if message.contains("tagged form API")
+    ));
+  }
+
+  #[test]
+  fn attachment_is_written_to_the_embedded_files_name_tree() {
+    let document = tagged_test_document();
+    let mut options = PdfOptions::default();
+    options.attachments.push(PdfAttachment {
+      path: "source.txt".to_string(),
+      mime_type: "text/plain".to_string(),
+      description: "Source data".to_string(),
+      association: PdfAttachmentAssociation::Source,
+      data: Arc::from(&b"attachment contents"[..]),
+      modification_date: None,
+      compress: Some(false),
+    });
+
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let catalog_id = pdf.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    let catalog = pdf.get_dictionary(catalog_id).unwrap();
+    let names = resolved_dictionary(&pdf, catalog.get(b"Names").unwrap());
+    let embedded_files = resolved_dictionary(&pdf, names.get(b"EmbeddedFiles").unwrap());
+    let entries = embedded_files.get(b"Names").unwrap().as_array().unwrap();
+    assert_eq!(entries[0].as_str().unwrap(), b"source.txt");
+    let file_spec = resolved_dictionary(&pdf, &entries[1]);
+    assert_eq!(
+      file_spec.get(b"Desc").unwrap().as_str().unwrap(),
+      b"Source data"
+    );
+    let embedded_streams = resolved_dictionary(&pdf, file_spec.get(b"EF").unwrap());
+    let stream_id = embedded_streams.get(b"F").unwrap().as_reference().unwrap();
+    let stream = pdf.get_object(stream_id).unwrap().as_stream().unwrap();
+    assert_eq!(stream.content, b"attachment contents");
+  }
+
+  #[test]
+  fn virtual_page_numbers_and_bookmarks_reach_pdf_name_trees() {
+    let mut document = tagged_test_document();
+    document.pages[0].setup.page_number_start = Some(7);
+    document.anchor_pages.push(common::AnchorPage {
+      name: "section-one".into(),
+      page_index: 0,
+      section_index: 0,
+      section_page_index: 0,
+      physical_page_number: 1,
+      virtual_page_number: 7,
+    });
+    let mut options = PdfOptions::default();
+    options.links.export_bookmarks_to_pdf_destinations = true;
+
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let catalog_id = pdf.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    let catalog = pdf.get_dictionary(catalog_id).unwrap();
+    let labels = resolved_dictionary(&pdf, catalog.get(b"PageLabels").unwrap());
+    let label_entries = labels.get(b"Nums").unwrap().as_array().unwrap();
+    assert_eq!(label_entries[0].as_i64().unwrap(), 0);
+    let first_label = resolved_dictionary(&pdf, &label_entries[1]);
+    assert_eq!(first_label.get(b"S").unwrap().as_name().unwrap(), b"D");
+    assert_eq!(first_label.get(b"St").unwrap().as_i64().unwrap(), 7);
+
+    let names = resolved_dictionary(&pdf, catalog.get(b"Names").unwrap());
+    let destinations = resolved_dictionary(&pdf, names.get(b"Dests").unwrap());
+    let destination_entries = destinations.get(b"Names").unwrap().as_array().unwrap();
+    assert_eq!(destination_entries[0].as_str().unwrap(), b"section-one");
+  }
 
   #[test]
   fn powerpoint_pdf_page_dimensions_use_the_600_dpi_print_grid() {

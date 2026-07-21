@@ -6,6 +6,7 @@ mod model;
 pub mod options;
 pub mod pptx;
 pub mod render;
+mod text_layout;
 pub mod text_metrics;
 pub mod units;
 pub mod xlsx;

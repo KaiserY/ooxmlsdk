@@ -37,6 +37,23 @@ pub(super) fn no_column_balance(
     .unwrap_or(false)
 }
 
+pub(super) fn adjust_line_height_in_table(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| {
+      settings
+        .compatibility
+        .iter()
+        .find_map(|compat| compat.adjust_line_height_in_table.as_ref())
+        .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
+    })
+    .unwrap_or(false)
+}
+
 pub(super) fn split_page_break_and_paragraph_mark(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,

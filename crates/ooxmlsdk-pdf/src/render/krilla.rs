@@ -441,6 +441,7 @@ struct TextItem<'doc> {
   dynamic_field: Option<common::DynamicField<'doc>>,
   form_widget_id: Option<u32>,
   paragraph_bidi: bool,
+  word_spacing_pt: f32,
   preserve_text_portion: bool,
   decoration_span_start_x_pt: Option<f32>,
   pdf_text_segmentation: common::PdfTextSegmentation,
@@ -545,6 +546,9 @@ struct TextStyle<'doc> {
   symbol_font_family: Option<Cow<'doc, str>>,
   font_size_pt: f32,
   complex_font_size_pt: Option<f32>,
+  kerning_minimum_size_pt: Option<f32>,
+  ligatures: Option<common::OpenTypeLigatures>,
+  horizontal_scale: Option<f32>,
   character_spacing_pt: f32,
   baseline_shift_pt: f32,
   use_windows_font_metrics: bool,
@@ -610,6 +614,20 @@ impl FontStyleRef for TextStyle<'_> {
 
   fn small_caps(&self) -> bool {
     self.small_caps
+  }
+
+  fn kerning_enabled(&self) -> bool {
+    self
+      .kerning_minimum_size_pt
+      .is_none_or(|minimum| self.font_size_pt + f32::EPSILON >= minimum)
+  }
+
+  fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
+    self.ligatures
+  }
+
+  fn horizontal_scale(&self) -> f32 {
+    self.horizontal_scale.unwrap_or(1.0)
   }
 }
 
@@ -1410,6 +1428,7 @@ fn text_item_from_common<'doc>(text: &'doc common::TextRun<'static>) -> TextItem
     dynamic_field: text.dynamic_field.as_ref().map(dynamic_field_borrowed),
     form_widget_id: text.form_widget_id,
     paragraph_bidi: text.paragraph_bidi,
+    word_spacing_pt: text.word_spacing_pt,
     preserve_text_portion: text.preserve_text_portion,
     decoration_span_start_x_pt: None,
     pdf_text_segmentation: text.pdf_text_segmentation,
@@ -1525,6 +1544,9 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
       .map(|value| Cow::Borrowed(value.as_ref())),
     font_size_pt: style.font_size.0,
     complex_font_size_pt: style.complex_font_size.map(|size| size.0),
+    kerning_minimum_size_pt: style.kerning_minimum_size.map(|size| size.0),
+    ligatures: style.ligatures,
+    horizontal_scale: style.horizontal_scale,
     character_spacing_pt: style.character_spacing.0,
     baseline_shift_pt: style.baseline_shift.0,
     use_windows_font_metrics: style.use_windows_font_metrics,
@@ -1674,6 +1696,7 @@ fn writer_text_items_coalesce(
     || current.hyperlink_url != next.hyperlink_url
     || current.dynamic_field != next.dynamic_field
     || current.paragraph_bidi != next.paragraph_bidi
+    || (current.word_spacing_pt - next.word_spacing_pt).abs() >= 0.001
     || current.rotation_center_pt != next.rotation_center_pt
     || current.source_path != next.source_path
     || current.decoration_span_start_x_pt != next.decoration_span_start_x_pt
@@ -1682,7 +1705,9 @@ fn writer_text_items_coalesce(
   {
     return false;
   }
-  let current_right = current.x_pt + text_metrics.measure_text(&current.text, &current.style);
+  let current_right = current.x_pt
+    + text_metrics.measure_text(&current.text, &current.style)
+    + current.text.matches(' ').count() as f32 * current.word_spacing_pt;
   (current_right - next.x_pt).abs() < 0.25
 }
 
@@ -1694,7 +1719,12 @@ impl<'doc> PaintText<'doc> {
     text_metrics: &mut TextMetrics,
   ) -> Self {
     let text_ref = &text;
-    let glyphs = shaped_pdf_glyphs(&text_ref.text, &text_ref.style, text_metrics);
+    let glyphs = shaped_pdf_glyphs(
+      &text_ref.text,
+      &text_ref.style,
+      text_ref.word_spacing_pt,
+      text_metrics,
+    );
     let width_pt = glyphs
       .as_ref()
       .map(|run| run.width_pt)
@@ -2696,6 +2726,17 @@ fn draw_text_item(
         portion.baseline_y * (1.0 - vertical_scale),
       ));
     }
+    let horizontal_scale = item.style.horizontal_scale.unwrap_or(1.0);
+    if (horizontal_scale - 1.0).abs() > f32::EPSILON {
+      surface.push_transform(&Transform::from_row(
+        horizontal_scale,
+        0.0,
+        0.0,
+        1.0,
+        portion.x_pt * (1.0 - horizontal_scale),
+        0.0,
+      ));
+    }
     // Tabs are layout controls: their measured advance positions subsequent
     // portions, but emitting the font's glyph 0 leaks a NUL into PDF text.
     if !matches!(portion.kind, PaintTextPortionKind::Tab)
@@ -2714,6 +2755,9 @@ fn draw_text_item(
           false,
         );
       }
+    }
+    if (horizontal_scale - 1.0).abs() > f32::EPSILON {
+      surface.pop();
     }
     if (vertical_scale - 1.0).abs() > f32::EPSILON {
       surface.pop();
@@ -3461,9 +3505,11 @@ fn pdf_metadata(options: &PdfOptions) -> Metadata {
 fn shaped_pdf_glyphs(
   text: &str,
   style: &TextStyle<'_>,
+  word_spacing_pt: f32,
   text_metrics: &mut TextMetrics,
 ) -> Option<PaintGlyphRun> {
   let shaped = text_metrics.shape_text(text, style)?;
+  let horizontal_scale = style.horizontal_scale.unwrap_or(1.0).max(f32::EPSILON);
   let mut font_runs = PaintGlyphFontRuns::new();
   let mut x_offset_pt = 0.0;
   let mut last_run = None::<(usize, u32)>;
@@ -3474,11 +3520,22 @@ fn shaped_pdf_glyphs(
       font_runs.push(PaintGlyphFontRun {
         font_face,
         font_size_pt: glyph.font_size_pt,
-        x_offset_pt,
+        // The surface transform scales the glyph outlines and their paint
+        // coordinates. Undo the logical layout scale here so the transform
+        // produces exactly the already-scaled advance once, not twice.
+        x_offset_pt: x_offset_pt / horizontal_scale,
         glyphs: Vec::new(),
       });
       last_run = Some(run_key);
     }
+    let is_word_space = text
+      .get(glyph.text_range.clone())
+      .is_some_and(|cluster| cluster.contains(' '));
+    let word_spacing_em = if is_word_space {
+      word_spacing_pt / glyph.font_size_pt
+    } else {
+      0.0
+    };
     font_runs
       .last_mut()
       .expect("font run was just pushed")
@@ -3486,8 +3543,8 @@ fn shaped_pdf_glyphs(
       .push(PaintGlyph {
         glyph_id: GlyphId::new(glyph.glyph_id),
         text_range: glyph.text_range,
-        x_advance: glyph.x_advance_em,
-        x_offset: glyph.x_offset_em,
+        x_advance: (glyph.x_advance_em + word_spacing_em) / horizontal_scale,
+        x_offset: glyph.x_offset_em / horizontal_scale,
         y_offset: glyph.y_offset_em,
         y_advance: glyph.y_advance_em,
         bounds_em: glyph.bounds_em.map(|bounds| PdfGlyphBoundsDiagnostics {
@@ -3498,9 +3555,12 @@ fn shaped_pdf_glyphs(
         }),
       });
     x_offset_pt += glyph.x_advance_em * glyph.font_size_pt;
+    if is_word_space {
+      x_offset_pt += word_spacing_pt;
+    }
   }
   Some(PaintGlyphRun {
-    width_pt: shaped.width_pt,
+    width_pt: x_offset_pt,
     font_runs,
   })
 }
@@ -3644,6 +3704,7 @@ mod tests {
       dynamic_field: None,
       form_widget_id: None,
       paragraph_bidi: false,
+      word_spacing_pt: 0.0,
       preserve_text_portion: false,
       pdf_text_segmentation: Default::default(),
       source: None,

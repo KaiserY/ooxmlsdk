@@ -154,6 +154,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     dynamic_field: None,
     form_widget_id: item.form_widget_id,
     paragraph_bidi: item.paragraph_bidi,
+    word_spacing_pt: 0.0,
     preserve_text_portion: item.preserve_text_portion,
     pdf_text_segmentation: match item.pdf_text_segmentation {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,

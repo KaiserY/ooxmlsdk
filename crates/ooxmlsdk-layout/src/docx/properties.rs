@@ -4,7 +4,9 @@ use super::{
   ParagraphProps, RunProps, RunStyleOverrides, StylesCatalog, TextStyle, ThemeColors, ThemeFonts,
   merge_paragraph_format, resolve_run_color, resolve_text_fill, resolve_text_outline,
 };
+use crate::common;
 use crate::units;
+use ooxmlsdk::schemas::schemas_microsoft_com_office_word_2010_wordml as w14;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
 pub(super) fn paragraph_format(
@@ -168,6 +170,73 @@ pub(super) fn merge_run_style(
   }
   if let Some(spacing) = properties.spacing() {
     style.character_spacing_pt = units::twips_to_points(spacing.val as f32);
+  }
+  if let Some(scale) = properties.character_scale() {
+    // ECMA-376 Part 1 §17.3.2.43 scales the character outlines and advances,
+    // unlike w:spacing, which only adds pitch. LibreOffice accepts 1..=600
+    // and resets an omitted/out-of-range value to 100%.
+    let percentage = scale.val.unwrap_or(100).clamp(1, 600);
+    style.horizontal_scale = Some(percentage as f32 / 100.0);
+  }
+  if let Some(kern) = properties.kern() {
+    style.kerning_minimum_size_pt = Some(kern.val as f32 / 2.0);
+  }
+  if let Some(ligatures) = properties.ligatures() {
+    use w14::LigaturesValues as Value;
+
+    style.ligatures = Some(common::OpenTypeLigatures {
+      standard: matches!(
+        ligatures.val,
+        Value::Standard
+          | Value::StandardContextual
+          | Value::StandardHistorical
+          | Value::StandardDiscretional
+          | Value::StandardContextualHistorical
+          | Value::StandardContextualDiscretional
+          | Value::StandardHistoricalDiscretional
+          | Value::All
+      ),
+      contextual: matches!(
+        ligatures.val,
+        Value::Contextual
+          | Value::StandardContextual
+          | Value::ContextualHistorical
+          | Value::ContextualDiscretional
+          | Value::StandardContextualHistorical
+          | Value::StandardContextualDiscretional
+          | Value::ContextualHistoricalDiscretional
+          | Value::All
+      ),
+      historical: matches!(
+        ligatures.val,
+        Value::Historical
+          | Value::StandardHistorical
+          | Value::ContextualHistorical
+          | Value::HistoricalDiscretional
+          | Value::StandardContextualHistorical
+          | Value::StandardHistoricalDiscretional
+          | Value::ContextualHistoricalDiscretional
+          | Value::All
+      ),
+      discretionary: matches!(
+        ligatures.val,
+        Value::Discretional
+          | Value::StandardDiscretional
+          | Value::ContextualDiscretional
+          | Value::HistoricalDiscretional
+          | Value::StandardContextualDiscretional
+          | Value::StandardHistoricalDiscretional
+          | Value::ContextualHistoricalDiscretional
+          | Value::All
+      ),
+    });
+  }
+  if let Some(position) = properties.position() {
+    // ECMA-376 Part 1 §17.3.2.24 defines w:position as a signed half-point
+    // displacement from the surrounding text baseline without resizing the
+    // font. LibreOffice defers this property until the final run size is
+    // known, then imports the same physical displacement as CharEscapement.
+    style.baseline_shift_pt = position.val.to_points() as f32;
   }
   if let Some(underline) = properties.underline() {
     style.underline = !matches!(underline.val, Some(w::UnderlineValues::None));

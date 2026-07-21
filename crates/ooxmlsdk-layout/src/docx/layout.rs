@@ -158,7 +158,7 @@ fn paragraph_line_height_for_setup(
       // proportional multiplier before the snap would round 135% of one grid
       // line up to two grid lines.
       if paragraph.format.snap_to_grid.unwrap_or(true)
-        && matches!(text_segmentation, TextSegmentation::Body)
+        && text_segment_uses_document_grid(text_segmentation, setup)
         && setup.doc_grid_line_pitch_pt.is_some()
       {
         let grid_line_height = inline_text_height(base_line_style, text_metrics);
@@ -181,7 +181,7 @@ fn grid_auto_line_spacing_multiplier(
 ) -> Option<f32> {
   if !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
     || !paragraph.format.snap_to_grid.unwrap_or(true)
-    || !matches!(text_segmentation, TextSegmentation::Body)
+    || !text_segment_uses_document_grid(text_segmentation, setup)
     || setup.doc_grid_line_pitch_pt.is_none()
   {
     return None;
@@ -190,6 +190,12 @@ fn grid_auto_line_spacing_multiplier(
     .format
     .line_height_pt
     .map(|multiple| multiple.max(1.0))
+}
+
+fn text_segment_uses_document_grid(text_segmentation: TextSegmentation, setup: PageSetup) -> bool {
+  matches!(text_segmentation, TextSegmentation::Body)
+    || (matches!(text_segmentation, TextSegmentation::TableCell)
+      && setup.adjust_table_line_heights_to_grid)
 }
 
 fn snap_line_height_to_doc_grid(line_height: f32, doc_grid_line_pitch_pt: Option<f32>) -> f32 {
@@ -713,6 +719,7 @@ pub(crate) struct TextItem {
   pub style_ref_text: Option<Arc<str>>,
   pub form_widget_id: Option<u32>,
   pub paragraph_bidi: bool,
+  pub word_spacing_pt: f32,
   pub preserve_text_portion: bool,
   pub decoration_span_start_x_pt: Option<f32>,
   pub pdf_text_segmentation: PdfTextSegmentation,
@@ -1378,6 +1385,7 @@ fn into_common_text_run(item: TextItem) -> common::TextRun<'static> {
     dynamic_field: item.dynamic_field.map(into_common_dynamic_field),
     form_widget_id: item.form_widget_id,
     paragraph_bidi: item.paragraph_bidi,
+    word_spacing_pt: item.word_spacing_pt,
     preserve_text_portion: item.preserve_text_portion,
     pdf_text_segmentation: match item.pdf_text_segmentation {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
@@ -2347,6 +2355,7 @@ impl<'a> RootFrameLayout<'a> {
           preserve_text_portion: false,
           form_widget_id: None,
           paragraph_bidi: false,
+          word_spacing_pt: 0.0,
           decoration_span_start_x_pt: None,
           pdf_text_segmentation: PdfTextSegmentation::Line,
         }),
@@ -5627,7 +5636,7 @@ fn layout_floating_frame(
     .unwrap_or_else(|| default_floating_frame_width(frame.placement, flow))
     .max(DEFAULT_FONT_SIZE_PT);
   let height = estimated_frame_height(frame, flow, text_metrics);
-  let (x, frame_y) = floating_frame_position(frame.placement, flow, y, width, height, true);
+  let (x, frame_y) = paragraph_frame_position(frame.placement, flow, y, width, height);
   let frame_stroke = frame
     .borders
     .top
@@ -6190,8 +6199,10 @@ fn repeating_slot_wrap_exclusions_for_page(
     },
   );
 
-  let footer_top = footer_slot_top(page.setup);
   let footer_repeating_slots = repeating_slot_state(document, page.section_index, text_metrics);
+  let (_, _, _, footer_height, _) =
+    repeating_slots_present_for_page(footer_repeating_slots, page_number, page.section_page_index);
+  let footer_top = footer_content_top(page.setup, footer_height);
   layout_repeating_blocks_into_page(
     footer_blocks,
     &mut adornment,
@@ -6379,8 +6390,10 @@ fn apply_headers_and_footers(
       },
     );
 
-    let footer_top = footer_slot_top(page.setup);
     let footer_repeating_slots = repeating_slot_state(document, page.section_index, text_metrics);
+    let (_, _, _, footer_height, _) =
+      repeating_slots_present_for_page(footer_repeating_slots, index + 1, page.section_page_index);
+    let footer_top = footer_content_top(page.setup, footer_height);
     layout_repeating_blocks_into_page(
       footer_blocks,
       &mut adornment,
@@ -6846,7 +6859,10 @@ fn body_content_limits_for_page(
       .min(setup.height_pt);
     bottom = bottom.min(footer_slot_top(setup).min((footer_bottom - footer_height).max(0.0)));
   }
-  (top, bottom) = body_doc_grid_bounds(top, bottom, setup);
+  // ECMA-376 Part 1 §17.6.5 defines `w:linePitch` as the pitch of each
+  // document-grid line; it does not move the section's text area. LibreOffice
+  // likewise skips body-grid centering when MS_WORD_COMP_GRID_METRICS is set,
+  // which its OOXML importer enables for newly imported Word documents.
   if bottom < top + DEFAULT_LINE_HEIGHT_PT {
     bottom = (top + DEFAULT_LINE_HEIGHT_PT).min(setup.height_pt);
   }
@@ -6868,30 +6884,23 @@ fn footer_slot_top(setup: PageSetup) -> f32 {
     .min(setup.height_pt)
 }
 
+fn footer_content_top(setup: PageSetup, content_height_pt: f32) -> f32 {
+  // ECMA-376 Part 1 §17.6.11 defines `w:footer` as the distance from the
+  // bottom edge of the page to the bottom edge of the footer.  Lay the
+  // measured footer upward from that edge instead of pinning its first block
+  // to the top of the bottom-margin slot.
+  let footer_bottom = (setup.height_pt - setup.footer_distance_pt.max(0.0))
+    .max(0.0)
+    .min(setup.height_pt);
+  (footer_bottom - content_height_pt.max(0.0))
+    .max(0.0)
+    .min(setup.height_pt)
+}
+
 fn header_footer_slot_height(margin_pt: f32, distance_pt: f32) -> f32 {
   // Header/footer slots are imported from the page margin and distance, not
   // from the measured content in the header/footer stream.
   (margin_pt - distance_pt.max(0.0)).max(units::millimeters_to_points(1.0))
-}
-
-fn body_doc_grid_bounds(top: f32, bottom: f32, setup: PageSetup) -> (f32, f32) {
-  let Some(grid_height) = setup.doc_grid_line_pitch_pt else {
-    return (top, bottom);
-  };
-  if grid_height <= LAYOUT_EPSILON_PT || bottom <= top {
-    return (top, bottom);
-  }
-
-  // The body print area is centered to a whole number of document-grid lines
-  // when MS Word compatible grid metrics are not active.
-  let height = bottom - top;
-  let grid_line_count = (height / grid_height).floor();
-  if grid_line_count <= 0.0 {
-    return (top, bottom);
-  }
-  let grid_height_total = grid_line_count * grid_height;
-  let border = (height - grid_height_total) / 2.0;
-  (top + border, bottom - border)
 }
 
 fn repeating_slot_state(
@@ -7221,14 +7230,7 @@ fn layout_floating_table(
     return (flow, y);
   };
   let table_width = (layout.frame.right_pt - layout.frame.left_pt).max(DEFAULT_FONT_SIZE_PT);
-  let (x, frame_y) = floating_frame_position(
-    placement,
-    flow,
-    y,
-    table_width,
-    0.0,
-    !table.following_text_flow,
-  );
+  let (x, frame_y) = floating_table_position(placement, flow, y, table_width);
   let frame_flow = FlowContext {
     content_top_pt: frame_y,
     content_left_pt: x,
@@ -10115,7 +10117,11 @@ fn table_column_widths(
     {
       scale_widths_to_total(&mut widths, preferred);
     }
-    if !allow_width_overflow {
+    // ECMA-376 Part 1 §17.18.87 defines an auto/nil `w:tblW` from the
+    // row and cell widths. In that case an explicit `w:tblGrid` is the table
+    // width, even when it extends beyond the text area. Only an explicit table
+    // preferred width constrains and proportionally scales those columns.
+    if !allow_width_overflow && preferred_width.is_some() {
       clamp_widths_to_content(&mut widths, content_width);
     }
     return widths;
@@ -10125,7 +10131,7 @@ fn table_column_widths(
     if let Some(preferred) = preferred_width {
       scale_widths_to_total(&mut widths, preferred);
     }
-    if !allow_width_overflow {
+    if !allow_width_overflow && preferred_width.is_some() {
       clamp_widths_to_content(&mut widths, content_width);
     }
     return widths;
@@ -10371,7 +10377,15 @@ fn table_row_height_with_widths(
         + row_top_border_space_extent(table, row_index, row)
         + row_bottom_border_spacing_extent(table, row_index, row),
     ),
-    (None, _) => content_height,
+    // A collapsed top/inside border still occupies row geometry. The explicit
+    // at-least-height and first-line paths account for the same extent above;
+    // automatic rows must do so as well or every following row drifts upward
+    // by one border width.
+    (None, _) => {
+      content_height
+        + row_top_border_space_extent(table, row_index, row)
+        + row_bottom_border_spacing_extent(table, row_index, row)
+    }
   }
 }
 
@@ -11561,6 +11575,35 @@ fn floating_frame_position(
   )
 }
 
+fn floating_table_position(
+  placement: FloatingFramePlacement,
+  flow: FlowContext,
+  current_y: f32,
+  table_width: f32,
+) -> (f32, f32) {
+  // ECMA-376 Part 1 §17.4.57 defines tblpX/tblpY as the position of the
+  // floating table's top-left corner. The *FromText values are minimum wrap
+  // distances to surrounding text, not additions to that absolute position.
+  // LibreOffice likewise maps them to frame margins separately from
+  // HoriOrientPosition/VertOrientPosition in TablePositionHandler.
+  floating_frame_position(placement, flow, current_y, table_width, 0.0, false)
+}
+
+fn paragraph_frame_position(
+  placement: FloatingFramePlacement,
+  flow: FlowContext,
+  current_y: f32,
+  frame_width: f32,
+  frame_height: f32,
+) -> (f32, f32) {
+  // ECMA-376 Part 1 §17.3.1.11 defines hSpace/vSpace as the minimum
+  // distance to non-frame text that wraps around the frame. LibreOffice's
+  // DomainMapper_Impl::MakeFrameProperties maps them to frame margins while
+  // keeping x/y in HoriOrientPosition/VertOrientPosition, so they must not
+  // shift the frame's specified position.
+  floating_frame_position(placement, flow, current_y, frame_width, frame_height, false)
+}
+
 fn aligned_frame_horizontal_offset(
   alignment: Option<FrameHorizontalAlignment>,
   reference_width: f32,
@@ -12258,6 +12301,7 @@ impl<'a> TextFrameLayout<'a> {
         y,
         advance.line_left,
         advance.line_right,
+        advance.text_metrics,
       );
     }
     push_page_fragment(
@@ -12472,6 +12516,7 @@ impl<'a> TextFrameLayout<'a> {
         preserve_text_portion: false,
         form_widget_id: None,
         paragraph_bidi: false,
+        word_spacing_pt: 0.0,
         decoration_span_start_x_pt: None,
         pdf_text_segmentation: PdfTextSegmentation::Line,
       }));
@@ -14564,6 +14609,7 @@ fn push_tab_leader(
       style_ref_text: None,
       form_widget_id: None,
       paragraph_bidi: false,
+      word_spacing_pt: 0.0,
       preserve_text_portion: true,
       decoration_span_start_x_pt: None,
       pdf_text_segmentation: PdfTextSegmentation::Portion,
@@ -14596,12 +14642,48 @@ fn justify_line_items(
   y: f32,
   line_left: f32,
   line_right: f32,
+  text_metrics: &mut TextMetrics,
 ) {
-  // writes one PDF text object for a laid-out line and carries justification
-  // through glyph positioning / text arrays. Splitting a justified Writer line
-  // into per-word text objects changes PDFium object counts and does not match
-  // Writer's export model.
-  let _ = (items, start_index, y, line_left, line_right);
+  let mut natural_right = line_left;
+  let mut space_count = 0usize;
+  for item in items.iter().skip(start_index) {
+    if item_y(item).is_none_or(|item_y| (item_y - y).abs() >= 0.01) {
+      continue;
+    }
+    let PageItem::Text(text) = item else {
+      // Writer adjusts text portions between fixed margin portions. Images,
+      // tabs, and drawing-layer objects need that segmented algorithm rather
+      // than treating the whole line as one stretchable text run.
+      return;
+    };
+    natural_right =
+      natural_right.max(text.x_pt + text_metrics.measure_text(&text.text, &text.style));
+    space_count += text.text.matches(' ').count();
+  }
+  if space_count == 0 {
+    return;
+  }
+
+  // SwTextAdjuster::CalcNewBlock() divides the printable glue remaining at
+  // the right margin by the number of U+0020 blanks on the line. Preserve the
+  // line as coalescible text portions and carry the extra advance into glyph
+  // positioning; splitting at every word changes Writer's PDF object model.
+  let extra_per_space = (line_right - natural_right) / space_count as f32;
+  if extra_per_space.abs() < 0.001 {
+    return;
+  }
+  let mut preceding_space_advance = 0.0;
+  for item in items.iter_mut().skip(start_index) {
+    if item_y(item).is_none_or(|item_y| (item_y - y).abs() >= 0.01) {
+      continue;
+    }
+    let PageItem::Text(text) = item else {
+      return;
+    };
+    text.x_pt += preceding_space_advance;
+    text.word_spacing_pt = extra_per_space;
+    preceding_space_advance += text.text.matches(' ').count() as f32 * extra_per_space;
+  }
 }
 
 fn item_y(item: &PageItem) -> Option<f32> {
@@ -14770,6 +14852,7 @@ fn flush_text(
     style_ref_text: meta.style_ref_text.cloned(),
     form_widget_id: meta.form_widget_id,
     paragraph_bidi: meta.paragraph_bidi,
+    word_spacing_pt: 0.0,
     preserve_text_portion: meta.preserve_text_portion,
     decoration_span_start_x_pt: None,
     pdf_text_segmentation: match meta.segmentation {
@@ -14857,6 +14940,53 @@ fn push_line_item(
 mod tests {
   use super::*;
   use crate::docx::{CellBordersModel, CellMargins, Paragraph, ParagraphFormat, TextRun};
+
+  #[test]
+  fn frame_wrap_distances_do_not_shift_the_specified_position() {
+    let setup = PageSetup {
+      width_pt: 612.0,
+      height_pt: 792.0,
+      margin_top_pt: 72.0,
+      margin_right_pt: 72.0,
+      margin_bottom_pt: 72.0,
+      margin_left_pt: 72.0,
+      ..Default::default()
+    };
+    let flow = flow_from_block_area(BlockArea {
+      setup,
+      section_index: 0,
+      section_page_index: 0,
+      column_index: 0,
+      columns: SectionColumns::default(),
+      content_top_pt: 72.0,
+      content_left_pt: 72.0,
+      content_bottom: 720.0,
+      body_content_bottom_pt: 720.0,
+      content_width: 468.0,
+      default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      compatibility_mode: 15,
+      justify_lines_with_shrinking: false,
+      repeating_slots: RepeatingSlotState::default(),
+    });
+    let placement = FloatingFramePlacement {
+      horizontal_anchor: FrameHorizontalAnchor::Page,
+      vertical_anchor: FrameVerticalAnchor::Page,
+      horizontal_offset_pt: 80.0,
+      vertical_offset_pt: 90.0,
+      margin_left_pt: 9.0,
+      margin_top_pt: 11.0,
+      ..Default::default()
+    };
+
+    assert_eq!(
+      floating_table_position(placement, flow, 72.0, 144.0),
+      (80.0, 90.0)
+    );
+    assert_eq!(
+      paragraph_frame_position(placement, flow, 72.0, 144.0, 36.0),
+      (80.0, 90.0)
+    );
+  }
 
   #[test]
   fn compound_horizontal_border_paints_two_parallel_strokes() {
@@ -15303,6 +15433,19 @@ mod tests {
     assert_eq!(line_real_height(&paragraph, 15.6, 0, multiple, false), 15.6);
     assert!((line_real_height(&paragraph, 15.6, 1, multiple, false) - 21.06).abs() < 0.01);
 
+    assert_eq!(
+      grid_auto_line_spacing_multiplier(&paragraph, setup, TextSegmentation::TableCell),
+      None
+    );
+    let table_grid_setup = PageSetup {
+      adjust_table_line_heights_to_grid: true,
+      ..setup
+    };
+    assert_eq!(
+      grid_auto_line_spacing_multiplier(&paragraph, table_grid_setup, TextSegmentation::TableCell),
+      Some(1.35)
+    );
+
     let mut below_single = paragraph;
     below_single.format.line_height_pt = Some(0.75);
     let multiple = grid_auto_line_spacing_multiplier(&below_single, setup, TextSegmentation::Body);
@@ -15337,6 +15480,21 @@ mod tests {
   }
 
   #[test]
+  fn body_limits_do_not_center_the_word_document_grid() {
+    let setup = PageSetup {
+      margin_top_pt: 72.0,
+      margin_bottom_pt: 72.0,
+      doc_grid_line_pitch_pt: Some(15.6),
+      ..Default::default()
+    };
+
+    let (top, bottom) = body_content_limits_for_page(setup, RepeatingSlotState::default(), 1, 0);
+
+    assert_eq!(top, 72.0);
+    assert!((bottom - (setup.height_pt - 72.0)).abs() < 0.01);
+  }
+
+  #[test]
   fn body_limits_grow_for_layout_affecting_repeating_content() {
     let setup = PageSetup {
       margin_top_pt: 56.7,
@@ -15358,6 +15516,19 @@ mod tests {
     assert!((top - (setup.header_distance_pt + 40.0)).abs() < 0.01);
     let footer_bottom = setup.height_pt - setup.footer_distance_pt;
     assert!((bottom - (footer_bottom - 30.0)).abs() < 0.01);
+  }
+
+  #[test]
+  fn footer_content_is_bottom_aligned_to_the_footer_distance() {
+    let setup = PageSetup {
+      height_pt: 792.0,
+      margin_bottom_pt: 72.0,
+      footer_distance_pt: 36.0,
+      ..Default::default()
+    };
+
+    assert!((footer_slot_top(setup) - 720.0).abs() < 0.01);
+    assert!((footer_content_top(setup, 12.0) - 744.0).abs() < 0.01);
   }
 
   #[test]
@@ -15457,6 +15628,28 @@ mod tests {
       stronger_border(Some(border(1.0, false)), Some(border(1.0, true))).unwrap(),
       border(1.0, false)
     );
+  }
+
+  #[test]
+  fn auto_width_table_keeps_explicit_grid_width_beyond_text_area() {
+    let table = Table {
+      column_widths_pt: vec![231.0, 231.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      align_leading_cell_content: true,
+      placement: None,
+      split_allowed: false,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      starts_after_last_rendered_page_break: false,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: Vec::new(),
+    };
+
+    assert_eq!(table_column_widths(&table, 2, 451.0, false), [231.0, 231.0]);
   }
 
   #[test]
@@ -15732,6 +15925,54 @@ mod tests {
   }
 
   #[test]
+  fn justified_line_distributes_right_margin_glue_across_word_spaces() {
+    fn text_item(x_pt: f32, text: &str) -> PageItem {
+      PageItem::Text(TextItem {
+        x_pt,
+        y_pt: 20.0,
+        line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        text: text.to_string(),
+        style: TextStyle::default(),
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        preserve_text_portion: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      })
+    }
+
+    let mut text_metrics = TextMetrics::new();
+    let style = TextStyle::default();
+    let first_width = text_metrics.measure_text("alpha ", &style);
+    let second_width = text_metrics.measure_text("beta gamma", &style);
+    let natural_right = first_width + second_width;
+    let line_right = natural_right + 12.0;
+    let mut items = vec![
+      text_item(0.0, "alpha "),
+      text_item(first_width, "beta gamma"),
+    ];
+
+    justify_line_items(&mut items, 0, 20.0, 0.0, line_right, &mut text_metrics);
+
+    let PageItem::Text(first) = &items[0] else {
+      panic!("expected text item");
+    };
+    let PageItem::Text(second) = &items[1] else {
+      panic!("expected text item");
+    };
+    assert!((first.word_spacing_pt - 6.0).abs() < 0.001);
+    assert!((second.word_spacing_pt - 6.0).abs() < 0.001);
+    assert!((second.x_pt - (first_width + 6.0)).abs() < 0.001);
+    assert!((second.x_pt + second_width + second.word_spacing_pt - line_right).abs() < 0.001);
+  }
+
+  #[test]
   fn pageref_dynamic_field_resolves_anchor_virtual_page_number() {
     let mut page = empty_page(
       PageSetup {
@@ -15755,6 +15996,7 @@ mod tests {
       style_ref_text: None,
       form_widget_id: None,
       paragraph_bidi: false,
+      word_spacing_pt: 0.0,
       preserve_text_portion: false,
       decoration_span_start_x_pt: None,
       pdf_text_segmentation: PdfTextSegmentation::Line,

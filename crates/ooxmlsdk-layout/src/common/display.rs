@@ -92,6 +92,7 @@ pub struct TextRun<'doc> {
   pub dynamic_field: Option<DynamicField<'doc>>,
   pub form_widget_id: Option<u32>,
   pub paragraph_bidi: bool,
+  pub word_spacing_pt: f32,
   pub preserve_text_portion: bool,
   pub pdf_text_segmentation: PdfTextSegmentation,
   pub source: Option<DisplaySource<'doc>>,
@@ -319,6 +320,11 @@ pub struct TextStyle<'doc> {
   pub symbol_font_family: Option<Cow<'doc, str>>,
   pub font_size: Pt,
   pub complex_font_size: Option<Pt>,
+  pub kerning_minimum_size: Option<Pt>,
+  /// OpenType ligature categories selected by WordprocessingML. `None`
+  /// preserves the shaping engine defaults for non-Word document models.
+  pub ligatures: Option<OpenTypeLigatures>,
+  pub horizontal_scale: Option<f32>,
   pub character_spacing: Pt,
   pub baseline_shift: Pt,
   /// Use legacy Windows/GDI ascent for the first baseline. PowerPoint's PDF
@@ -337,6 +343,14 @@ pub struct TextStyle<'doc> {
   pub outline_width: Pt,
   pub highlight: Option<Color>,
   pub underline_color: Option<Color>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct OpenTypeLigatures {
+  pub standard: bool,
+  pub contextual: bool,
+  pub historical: bool,
+  pub discretionary: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

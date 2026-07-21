@@ -84,6 +84,7 @@ struct MeasureStyleKey {
   complex_font_family: Option<Box<str>>,
   font_size_bits: u32,
   character_spacing_bits: u32,
+  horizontal_scale_bits: u32,
   bold: bool,
   italic: bool,
   small_caps: bool,
@@ -97,6 +98,7 @@ impl MeasureStyleKey {
       complex_font_family: style.complex_font_family().map(Into::into),
       font_size_bits: style.font_size_pt().to_bits(),
       character_spacing_bits: style.character_spacing_pt().to_bits(),
+      horizontal_scale_bits: style.horizontal_scale().to_bits(),
       bold: style.bold(),
       italic: style.italic(),
       small_caps: style.small_caps(),
@@ -109,6 +111,7 @@ impl MeasureStyleKey {
       && self.complex_font_family.as_deref() == style.complex_font_family()
       && self.font_size_bits == style.font_size_pt().to_bits()
       && self.character_spacing_bits == style.character_spacing_pt().to_bits()
+      && self.horizontal_scale_bits == style.horizontal_scale().to_bits()
       && self.bold == style.bold()
       && self.italic == style.italic()
       && self.small_caps == style.small_caps()

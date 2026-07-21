@@ -13,6 +13,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::io::Cursor;
 use std::sync::Arc;
 
+use crate::common;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
 use ooxmlsdk::parts::{
@@ -52,7 +53,8 @@ pub(crate) use custom_xml::CustomXmlBindings;
 pub(crate) use model::*;
 use package::{HyperlinkCatalog, ImageCatalog};
 use settings::{
-  compatibility_mode, default_tab_stop_pt, no_column_balance, split_page_break_and_paragraph_mark,
+  adjust_line_height_in_table, compatibility_mode, default_tab_stop_pt, no_column_balance,
+  split_page_break_and_paragraph_mark,
 };
 use table::{TableConditionalStyleMask, TableLookModel};
 use text::{ParagraphImportBase, paragraph_model, paragraph_model_with_base};
@@ -114,6 +116,7 @@ const MAX_WORD_TABLE_MARGIN_TWIPS: f32 = 31_680.0;
 
 #[derive(Clone, Copy, Debug, Default)]
 struct ImportSettings {
+  compatibility_mode: u16,
   justify_lines_with_shrinking: bool,
   exchange_left_right: bool,
   use_literal_direction: bool,
@@ -126,6 +129,7 @@ pub(crate) fn extract(
   let main = package.main_document_part()?;
   let compatibility_mode = compatibility_mode(package, &main);
   let import_settings = ImportSettings {
+    compatibility_mode,
     justify_lines_with_shrinking: compatibility_mode >= 15,
     ..Default::default()
   };
@@ -143,6 +147,7 @@ pub(crate) fn extract(
   let default_tab_stop_pt = default_tab_stop_pt(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
   let no_column_balance = no_column_balance(package, &main);
+  let adjust_line_height_in_table = adjust_line_height_in_table(package, &main);
   let split_page_break_and_paragraph_mark = split_page_break_and_paragraph_mark(package, &main);
   let mirror_margins = mirror_margins(package, &main);
   let document = main.root_element(package)?;
@@ -186,6 +191,7 @@ pub(crate) fn extract(
   for section in &mut sections {
     section.page.background = page_background;
     section.page.mirror_margins = mirror_margins;
+    section.page.adjust_table_line_heights_to_grid = adjust_line_height_in_table;
   }
   resolve_section_repeating_blocks(
     package,
@@ -1924,11 +1930,11 @@ fn table_model(
       .map(table_alignment)
       .or(table_style.alignment)
       .unwrap_or_default(),
-    // Office's recovery path for a package without a Styles part aligns the
-    // first cell's edit area to the text margin. Normal styled tables retain
-    // the border-relative tblInd behavior encoded by their table style.
-    align_leading_cell_content: model_context.nested_table_level == 1
-      && !env.styles.has_styles_part,
+    align_leading_cell_content: should_align_leading_cell_content(
+      model_context,
+      env.styles.import_settings.compatibility_mode,
+      env.styles.has_styles_part,
+    ),
     placement,
     split_allowed,
     following_text_flow,
@@ -1945,6 +1951,23 @@ fn table_model(
       .unwrap_or(0.0),
     rows,
   }
+}
+
+fn should_align_leading_cell_content(
+  context: TableModelContext,
+  compatibility_mode: u16,
+  has_styles_part: bool,
+) -> bool {
+  if context.nested_table_level != 1 {
+    return false;
+  }
+
+  // LibreOffice's OOXML importer documents the Word positioning rule in
+  // DomainMapperTableHandler: before compatibility mode 15, top-level table
+  // placement makes the first cell's text (rather than its border) start at
+  // `w:tblInd`, so the leading cell margin is subtracted from the table origin.
+  // Keep the existing missing-Styles recovery behavior for modern packages.
+  compatibility_mode < 15 || !has_styles_part
 }
 
 fn table_starts_after_last_rendered_page_break(rows: &[TableRow]) -> bool {
@@ -2891,22 +2914,37 @@ fn merge_paragraph_format(
       format.spacing_after_pt = signed_twips_measure_to_points(after).unwrap_or(0.0);
     }
     if let Some(line) = spacing.line.as_ref() {
-      match spacing.line_rule {
-        None | Some(w::LineSpacingRuleValues::Auto) => {
-          format.line_height_rule = LineHeightRule::Auto;
-          if let Some(value) = signed_twips_measure_to_twips(line) {
-            format.line_height_pt = Some(
-              (value / units::WORD_LINE_HEIGHT_UNITS_PER_LINE).max(MIN_IMPORTED_LINE_HEIGHT_PT),
-            );
+      let negative_line = signed_twips_measure_to_twips(line).is_some_and(|value| value < 0.0);
+      if negative_line {
+        // LibreOffice's OOXML DomainMapper_Impl::SetLineSpacing() treats the
+        // sign as a compatibility mode switch, never as a negative physical
+        // height.  An explicit negative `exact` value flips to `atLeast`;
+        // negative auto/atLeast values and a negative value with an inherited
+        // rule become fixed spacing.  See testTdf125469_singleSpacing.
+        format.line_height_rule = if spacing.line_rule == Some(w::LineSpacingRuleValues::Exact) {
+          LineHeightRule::AtLeast
+        } else {
+          LineHeightRule::Exact
+        };
+        format.line_height_pt = signed_twips_measure_to_points(line).map(f32::abs);
+      } else {
+        match spacing.line_rule {
+          None | Some(w::LineSpacingRuleValues::Auto) => {
+            format.line_height_rule = LineHeightRule::Auto;
+            if let Some(value) = signed_twips_measure_to_twips(line) {
+              format.line_height_pt = Some(
+                (value / units::WORD_LINE_HEIGHT_UNITS_PER_LINE).max(MIN_IMPORTED_LINE_HEIGHT_PT),
+              );
+            }
           }
-        }
-        Some(w::LineSpacingRuleValues::AtLeast) => {
-          format.line_height_rule = LineHeightRule::AtLeast;
-          format.line_height_pt = signed_twips_measure_to_points(line);
-        }
-        Some(w::LineSpacingRuleValues::Exact) => {
-          format.line_height_rule = LineHeightRule::Exact;
-          format.line_height_pt = signed_twips_measure_to_points(line);
+          Some(w::LineSpacingRuleValues::AtLeast) => {
+            format.line_height_rule = LineHeightRule::AtLeast;
+            format.line_height_pt = signed_twips_measure_to_points(line);
+          }
+          Some(w::LineSpacingRuleValues::Exact) => {
+            format.line_height_rule = LineHeightRule::Exact;
+            format.line_height_pt = signed_twips_measure_to_points(line);
+          }
         }
       }
     }
@@ -4345,6 +4383,27 @@ fn push_run(
           hyperlink_url,
         );
       }
+      w::RunChoice::Run(nested) => {
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
+        // LibreOffice's writerfilter/ooxml testNestedRuns preserves malformed
+        // nested `w:r` content found in shape text.  Treat the outer run's
+        // resolved style as the inherited base for the nested run.
+        push_run(
+          nested,
+          inlines,
+          style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        );
+      }
       _ => {}
     }
   }
@@ -5754,9 +5813,6 @@ fn rotate_paragraph_text(paragraph: &mut Paragraph, rotation_deg: f32) {
 
 fn apply_drawingml_textbox_layout_adjustments(frame: &mut TextBoxFrameContent) {
   frame.left_pt = (frame.left_pt - 1.67).max(0.0);
-  if frame.top_pt.abs() < f32::EPSILON {
-    frame.top_pt = -14.5;
-  }
 }
 
 fn wordprocessing_shape_textbox_uses_auto_light_text(
@@ -10076,6 +10132,13 @@ impl StylesCatalog {
         theme_lines: theme.lines,
         ..Self::default()
       };
+      // ECMA-376 Part 1 §17.3.2.19: when w:kern is never applied in the
+      // style hierarchy, kerning is disabled for WordprocessingML runs.
+      catalog.doc_default_run.kerning_minimum_size_pt = Some(f32::INFINITY);
+      // [MS-DOCX] §2.3.32: in the absence of w14:ligatures, no ligatures
+      // are used. This overrides HarfRust's native liga/clig defaults only
+      // for WordprocessingML.
+      catalog.doc_default_run.ligatures = Some(common::OpenTypeLigatures::default());
       if catalog.doc_default_run.font_family.is_none() {
         catalog.doc_default_run.font_family = Some(office_default_font_family(ui_language));
       }
@@ -10090,6 +10153,8 @@ impl StylesCatalog {
       theme_lines: theme.lines,
       ..Self::default()
     };
+    catalog.doc_default_run.kerning_minimum_size_pt = Some(f32::INFINITY);
+    catalog.doc_default_run.ligatures = Some(common::OpenTypeLigatures::default());
 
     if let Some(defaults) = styles.doc_defaults.as_deref() {
       merge_paragraph_format(
@@ -11409,6 +11474,15 @@ fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   if values.complex_font_size_pt.is_some() {
     target.complex_font_size_pt = values.complex_font_size_pt;
   }
+  if values.kerning_minimum_size_pt.is_some() {
+    target.kerning_minimum_size_pt = values.kerning_minimum_size_pt;
+  }
+  if values.ligatures.is_some() {
+    target.ligatures = values.ligatures;
+  }
+  if values.horizontal_scale.is_some() {
+    target.horizontal_scale = values.horizontal_scale;
+  }
   if values.character_spacing_pt.abs() > f32::EPSILON {
     target.character_spacing_pt = values.character_spacing_pt;
   }
@@ -12290,6 +12364,13 @@ run_properties_accessor!(
   w::VerticalTextAlignment
 );
 run_properties_accessor!(run_properties_spacing, Spacing, w::Spacing);
+run_properties_accessor!(
+  run_properties_character_scale,
+  CharacterScale,
+  w::CharacterScale
+);
+run_properties_accessor!(run_properties_kern, Kern, w::Kern);
+run_properties_accessor!(run_properties_position, Position, w::Position);
 run_properties_accessor!(run_properties_highlight, Highlight, w::Highlight);
 
 paragraph_mark_run_properties_accessor!(
@@ -12339,6 +12420,17 @@ paragraph_mark_run_properties_accessor!(
   w::VerticalTextAlignment
 );
 paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_spacing, Spacing, w::Spacing);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_character_scale,
+  CharacterScale,
+  w::CharacterScale
+);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_kern, Kern, w::Kern);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_position,
+  Position,
+  w::Position
+);
 paragraph_mark_run_properties_accessor!(
   paragraph_mark_run_properties_highlight,
   Highlight,
@@ -12487,6 +12579,46 @@ impl<'a> RunProps<'a> {
       Self::BaseStyle(properties) => properties.spacing.as_ref(),
       Self::Numbering(properties) => properties.spacing.as_ref(),
       Self::ParagraphMark(properties) => paragraph_mark_run_properties_spacing(properties),
+    }
+  }
+
+  fn kern(&self) -> Option<&'a w::Kern> {
+    match self {
+      Self::Direct(properties) => run_properties_kern(properties),
+      Self::Style(properties) => properties.kern.as_ref(),
+      Self::BaseStyle(properties) => properties.kern.as_ref(),
+      Self::Numbering(properties) => properties.kern.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_kern(properties),
+    }
+  }
+
+  fn character_scale(&self) -> Option<&'a w::CharacterScale> {
+    match self {
+      Self::Direct(properties) => run_properties_character_scale(properties),
+      Self::Style(properties) => properties.character_scale.as_ref(),
+      Self::BaseStyle(properties) => properties.character_scale.as_ref(),
+      Self::Numbering(properties) => properties.character_scale.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_character_scale(properties),
+    }
+  }
+
+  fn position(&self) -> Option<&'a w::Position> {
+    match self {
+      Self::Direct(properties) => run_properties_position(properties),
+      Self::Style(properties) => properties.position.as_ref(),
+      Self::BaseStyle(properties) => properties.position.as_ref(),
+      Self::Numbering(properties) => properties.position.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_position(properties),
+    }
+  }
+
+  fn ligatures(&self) -> Option<&'a w14::Ligatures> {
+    match self {
+      Self::Direct(properties) => properties.ligatures.as_ref(),
+      Self::Style(properties) => properties.ligatures.as_ref(),
+      Self::BaseStyle(properties) => properties.ligatures.as_ref(),
+      Self::Numbering(properties) => properties.ligatures.as_ref(),
+      Self::ParagraphMark(properties) => properties.ligatures.as_ref(),
     }
   }
 
@@ -12985,6 +13117,105 @@ mod tests {
   }
 
   #[test]
+  fn nested_word_runs_preserve_shape_text() {
+    let run = w::Run::from_bytes(
+      br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>Test text box</w:t></w:r></w:r>"#,
+    )
+    .expect("nested run");
+    let mut inlines = Vec::new();
+
+    push_run(
+      &run,
+      &mut inlines,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      None,
+    );
+
+    assert_eq!(inline_text(&inlines), "Test text box");
+  }
+
+  #[test]
+  fn paragraph_relative_word_shape_preserves_position_offset() {
+    let anchor = wp::Anchor::from_bytes(
+      br#"<wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" behindDoc="0" distT="0" distB="0" distL="0" distR="0" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>408305</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>204470</wp:posOffset></wp:positionV><wp:extent cx="4972050" cy="1152525"/><wp:wrapNone/><wp:docPr id="1" name="Text Frame 1"/><a:graphic><a:graphicData uri="urn:unused"/></a:graphic></wp:anchor>"#,
+    )
+    .expect("floating anchor");
+
+    let placement = floating_image_placement(&anchor);
+
+    assert_eq!(
+      placement.horizontal_relative_to,
+      HorizontalImageReference::Column
+    );
+    assert_eq!(
+      placement.vertical_relative_to,
+      VerticalImageReference::Paragraph
+    );
+    assert!((placement.horizontal_offset_pt - 32.15).abs() < 0.001);
+    assert!((placement.vertical_offset_pt - 16.1).abs() < 0.001);
+  }
+
+  #[test]
+  fn paragraph_relative_wps_textbox_keeps_anchor_and_shape_offsets_separate() {
+    let drawing_xml = br#"<w:drawing xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wp:anchor behindDoc="0" distT="0" distB="0" distL="0" distR="0" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>408305</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>204470</wp:posOffset></wp:positionV><wp:extent cx="4972050" cy="1152525"/><wp:wrapNone/><wp:docPr id="1" name="Text Frame 1"/><a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="4971960" cy="1152360"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="0"><a:noFill/></a:ln></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>Test text box</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr wrap="square" lIns="0" rIns="0" tIns="0" bIns="0" anchor="t"><a:noAutofit/></wps:bodyPr></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing>"#;
+    let drawing = w::Drawing::from_bytes(drawing_xml).expect("floating WPS textbox");
+    let mut inlines = Vec::new();
+
+    push_drawing_textboxes_impl(
+      &drawing,
+      &mut inlines,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+    );
+
+    let InlineItem::Shape(shape) = &inlines[0] else {
+      panic!("expected WPS textbox shape");
+    };
+    let ImagePlacement::Floating(placement) = shape.placement else {
+      panic!("expected floating WPS textbox");
+    };
+    assert!((placement.vertical_offset_pt - 16.1).abs() < 0.001);
+    assert!((shape.offset_y_pt - 0.0).abs() < 0.001);
+    assert!((shape.text_inset_top_pt - 0.0).abs() < 0.001);
+
+    let alternate_content = mc::AlternateContent::from_bytes(
+      format!(
+        r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="wps">{}</mc:Choice></mc:AlternateContent>"#,
+        std::str::from_utf8(drawing_xml).expect("drawing XML")
+      )
+      .as_bytes(),
+    )
+    .expect("alternate content");
+    let mut inlines = Vec::new();
+    push_alternate_content_inlines(
+      &alternate_content,
+      &mut inlines,
+      AlternateContentImportContext {
+        base_style: TextStyle::default(),
+        style: TextStyle::default(),
+        styles: &StylesCatalog::default(),
+        images: &ImageCatalog::default(),
+        hyperlinks: &HyperlinkCatalog::default(),
+        hyperlink_url: None,
+      },
+    );
+    let InlineItem::Shape(shape) = &inlines[0] else {
+      panic!("expected alternate-content WPS textbox shape");
+    };
+    let ImagePlacement::Floating(placement) = shape.placement else {
+      panic!("expected alternate-content floating WPS textbox");
+    };
+    assert!((placement.vertical_offset_pt - 16.1).abs() < 0.001);
+    assert!((shape.offset_y_pt - 0.0).abs() < 0.001);
+    assert!((shape.text_inset_top_pt - 0.0).abs() < 0.001);
+  }
+
+  #[test]
   fn table_cell_margins_use_ecma_default_side_padding() {
     let margins = CellMargins::default();
 
@@ -12992,6 +13223,23 @@ mod tests {
     assert_eq!(margins.bottom_pt, 0.0);
     assert!((margins.left_pt - 5.75).abs() < 0.001);
     assert!((margins.right_pt - 5.75).abs() < 0.001);
+  }
+
+  #[test]
+  fn legacy_word_tables_align_first_cell_content_to_table_indent() {
+    let top_level = TableModelContext {
+      nested_table_level: 1,
+      in_header_footer: false,
+    };
+    let nested = TableModelContext {
+      nested_table_level: 2,
+      in_header_footer: false,
+    };
+
+    assert!(should_align_leading_cell_content(top_level, 12, true));
+    assert!(!should_align_leading_cell_content(top_level, 15, true));
+    assert!(should_align_leading_cell_content(top_level, 15, false));
+    assert!(!should_align_leading_cell_content(nested, 12, true));
   }
 
   #[test]
@@ -13476,6 +13724,52 @@ mod tests {
 
     assert_eq!(format.spacing_after_pt, 0.0);
     assert!(format.spacing_after_set);
+  }
+
+  #[test]
+  fn negative_word_line_spacing_uses_positive_writer_compatibility_modes() {
+    fn imported_spacing(
+      inherited_rule: LineHeightRule,
+      line_rule: Option<w::LineSpacingRuleValues>,
+    ) -> ParagraphFormat {
+      let properties = w::ParagraphProperties {
+        spacing_between_lines: Some(w::SpacingBetweenLines {
+          line: Some(signed_twips(-240)),
+          line_rule,
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      let mut format = ParagraphFormat {
+        line_height_rule: inherited_rule,
+        line_height_pt: Some(12.0),
+        ..Default::default()
+      };
+      merge_paragraph_format(
+        &mut format,
+        Some(ParagraphProps::Direct(&properties)),
+        ImportSettings::default(),
+      );
+      format
+    }
+
+    let explicit_exact =
+      imported_spacing(LineHeightRule::Exact, Some(w::LineSpacingRuleValues::Exact));
+    assert_eq!(explicit_exact.line_height_rule, LineHeightRule::AtLeast);
+    assert_eq!(explicit_exact.line_height_pt, Some(12.0));
+
+    for (inherited, rule) in [
+      (
+        LineHeightRule::AtLeast,
+        Some(w::LineSpacingRuleValues::AtLeast),
+      ),
+      (LineHeightRule::Auto, Some(w::LineSpacingRuleValues::Auto)),
+      (LineHeightRule::Exact, None),
+    ] {
+      let format = imported_spacing(inherited, rule);
+      assert_eq!(format.line_height_rule, LineHeightRule::Exact);
+      assert_eq!(format.line_height_pt, Some(12.0));
+    }
   }
 
   #[test]
@@ -14189,6 +14483,91 @@ mod tests {
     assert!(!style.bold);
     assert!(style.italic);
     assert!(!style.underline);
+  }
+
+  #[test]
+  fn run_style_imports_the_wordprocessingml_kerning_threshold() {
+    let properties = w::RunPropertiesBaseStyle {
+      kern: Some(w::Kern { val: 24 }),
+      ..Default::default()
+    };
+    let mut style = TextStyle::default();
+
+    properties::merge_run_style(
+      &mut style,
+      Some(RunProps::BaseStyle(&properties)),
+      &ThemeFonts::default(),
+      &ThemeColors::default(),
+    );
+
+    assert_eq!(style.kerning_minimum_size_pt, Some(12.0));
+  }
+
+  #[test]
+  fn run_style_imports_the_wordprocessingml_ligature_categories() {
+    let properties = w::RunPropertiesBaseStyle {
+      ligatures: Some(w14::Ligatures {
+        val: w14::LigaturesValues::StandardContextualHistorical,
+      }),
+      ..Default::default()
+    };
+    let mut style = TextStyle::default();
+
+    properties::merge_run_style(
+      &mut style,
+      Some(RunProps::BaseStyle(&properties)),
+      &ThemeFonts::default(),
+      &ThemeColors::default(),
+    );
+
+    assert_eq!(
+      style.ligatures,
+      Some(common::OpenTypeLigatures {
+        standard: true,
+        contextual: true,
+        historical: true,
+        discretionary: false,
+      })
+    );
+  }
+
+  #[test]
+  fn run_style_imports_the_wordprocessingml_baseline_position() {
+    let properties = w::RunPropertiesBaseStyle {
+      position: Some(w::Position {
+        val: ooxmlsdk::simple_type::SignedHpsMeasureValue::HalfPoints(-12),
+      }),
+      ..Default::default()
+    };
+    let mut style = TextStyle::default();
+
+    properties::merge_run_style(
+      &mut style,
+      Some(RunProps::BaseStyle(&properties)),
+      &ThemeFonts::default(),
+      &ThemeColors::default(),
+    );
+
+    assert_eq!(style.baseline_shift_pt, -6.0);
+    assert_eq!(style.font_size_pt, TextStyle::default().font_size_pt);
+  }
+
+  #[test]
+  fn run_style_imports_wordprocessingml_character_scale() {
+    let properties = w::RunPropertiesBaseStyle {
+      character_scale: Some(w::CharacterScale { val: Some(33) }),
+      ..Default::default()
+    };
+    let mut style = TextStyle::default();
+
+    properties::merge_run_style(
+      &mut style,
+      Some(RunProps::BaseStyle(&properties)),
+      &ThemeFonts::default(),
+      &ThemeColors::default(),
+    );
+
+    assert_eq!(style.horizontal_scale, Some(0.33));
   }
 
   #[test]

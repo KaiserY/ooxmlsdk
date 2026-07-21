@@ -4,8 +4,8 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use ooxmlsdk_fonts::{
-  FontBytes, FontFallbackChain, FontId, FontRegistry, FontRequest, FontSize, ResolvedFontChain,
-  ShapeOptions, ShapedRun, TextScript, script_direction_runs,
+  FeatureValue, FontBytes, FontFallbackChain, FontId, FontRegistry, FontRequest, FontSize,
+  ResolvedFontChain, ShapeOptions, ShapedRun, TextScript, script_direction_runs,
 };
 use rustc_hash::FxHashMap as HashMap;
 
@@ -89,6 +89,15 @@ pub trait FontStyleRef {
   fn bold(&self) -> bool;
   fn italic(&self) -> bool;
   fn small_caps(&self) -> bool;
+  fn kerning_enabled(&self) -> bool {
+    true
+  }
+  fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
+    None
+  }
+  fn horizontal_scale(&self) -> f32 {
+    1.0
+  }
 }
 
 impl FontStyleRef for TextStyle {
@@ -137,6 +146,20 @@ impl FontStyleRef for TextStyle {
   fn small_caps(&self) -> bool {
     self.small_caps
   }
+
+  fn kerning_enabled(&self) -> bool {
+    self
+      .kerning_minimum_size_pt
+      .is_none_or(|minimum| self.font_size_pt + f32::EPSILON >= minimum)
+  }
+
+  fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
+    self.ligatures
+  }
+
+  fn horizontal_scale(&self) -> f32 {
+    self.horizontal_scale.unwrap_or(1.0)
+  }
 }
 
 impl FontStyleRef for common::TextStyle<'_> {
@@ -184,6 +207,20 @@ impl FontStyleRef for common::TextStyle<'_> {
 
   fn small_caps(&self) -> bool {
     self.small_caps
+  }
+
+  fn kerning_enabled(&self) -> bool {
+    self
+      .kerning_minimum_size
+      .is_none_or(|minimum| self.font_size.0 + f32::EPSILON >= minimum.0)
+  }
+
+  fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
+    self.ligatures
+  }
+
+  fn horizontal_scale(&self) -> f32 {
+    self.horizontal_scale.unwrap_or(1.0)
   }
 }
 
@@ -321,6 +358,7 @@ impl FontResolver {
       request.script = Some(script_run.script);
       let mut options = ShapeOptions::from_request(&request, script_run.direction);
       options.character_spacing_pt = style.character_spacing_pt();
+      options.horizontal_scale = style.horizontal_scale();
       options.small_caps = script_run.small_caps;
       options.scan_registered_fallbacks = false;
       let segment_text = &text[script_run.text_range.clone()];
@@ -422,6 +460,32 @@ fn font_request<'a>(
   style: &'a (impl FontStyleRef + ?Sized),
   script: Option<TextScript>,
 ) -> FontRequest<'a> {
+  let mut features = vec![FeatureValue {
+    tag: Cow::Borrowed("kern"),
+    value: u32::from(style.kerning_enabled()),
+  }];
+  if let Some(ligatures) = style.ligatures() {
+    // [MS-DOCX] 2.3.32 maps the four Word ligature categories to the
+    // corresponding OpenType feature tags defined by ISO/IEC 14496-22.
+    features.extend([
+      FeatureValue {
+        tag: Cow::Borrowed("liga"),
+        value: u32::from(ligatures.standard),
+      },
+      FeatureValue {
+        tag: Cow::Borrowed("clig"),
+        value: u32::from(ligatures.contextual),
+      },
+      FeatureValue {
+        tag: Cow::Borrowed("hlig"),
+        value: u32::from(ligatures.historical),
+      },
+      FeatureValue {
+        tag: Cow::Borrowed("dlig"),
+        value: u32::from(ligatures.discretionary),
+      },
+    ]);
+  }
   FontRequest {
     family: script_font_family(style, script)
       .filter(|family| !family.trim().is_empty())
@@ -430,6 +494,7 @@ fn font_request<'a>(
     italic: style.italic(),
     size_pt: FontSize(style.font_size_pt()),
     script,
+    features,
     ..FontRequest::default()
   }
 }
@@ -607,9 +672,56 @@ pub fn cached_text_face(style: &(impl FontStyleRef + ?Sized)) -> Option<FontFace
 mod tests {
   use std::sync::Arc;
 
+  use crate::common::OpenTypeLigatures;
   use crate::docx::TextStyle;
 
-  use super::load_text_face;
+  use super::{font_request, load_text_face};
+
+  #[test]
+  fn kerning_feature_follows_the_wordprocessingml_size_threshold() {
+    let mut style = TextStyle {
+      font_size_pt: 11.0,
+      kerning_minimum_size_pt: Some(12.0),
+      ..Default::default()
+    };
+
+    let request = font_request(&style, None);
+    assert_eq!(request.features[0].tag, "kern");
+    assert_eq!(request.features[0].value, 0);
+
+    style.font_size_pt = 12.0;
+    assert_eq!(font_request(&style, None).features[0].value, 1);
+  }
+
+  #[test]
+  fn ligature_categories_map_to_opentype_features() {
+    let style = TextStyle {
+      ligatures: Some(OpenTypeLigatures {
+        standard: true,
+        contextual: false,
+        historical: true,
+        discretionary: false,
+      }),
+      ..Default::default()
+    };
+
+    let request = font_request(&style, None);
+    let features = request
+      .features
+      .iter()
+      .map(|feature| (feature.tag.as_ref(), feature.value))
+      .collect::<Vec<_>>();
+    assert_eq!(
+      features,
+      vec![
+        ("kern", 1),
+        ("liga", 1),
+        ("clig", 0),
+        ("hlig", 1),
+        ("dlig", 0)
+      ]
+    );
+  }
 
   #[test]
   fn missing_named_font_uses_system_fallback() {

@@ -39,6 +39,15 @@ pub struct TextStyle {
   pub symbol_font_family: Option<Arc<str>>,
   pub font_size_pt: f32,
   pub complex_font_size_pt: Option<f32>,
+  /// Minimum WordprocessingML font size at which OpenType kerning is active.
+  /// `None` leaves the shaping engine's native default unchanged.
+  pub kerning_minimum_size_pt: Option<f32>,
+  /// OpenType ligature categories selected by the source document. `None`
+  /// leaves the shaping engine's native defaults unchanged.
+  pub ligatures: Option<common::OpenTypeLigatures>,
+  /// Horizontal WordprocessingML character scale. `None` means 100% and
+  /// preserves explicit 100% overrides in style inheritance.
+  pub horizontal_scale: Option<f32>,
   pub character_spacing_pt: f32,
   pub baseline_shift_pt: f32,
   pub use_windows_font_metrics: bool,
@@ -69,6 +78,9 @@ impl Default for TextStyle {
       symbol_font_family: None,
       font_size_pt: 11.0,
       complex_font_size_pt: None,
+      kerning_minimum_size_pt: None,
+      ligatures: None,
+      horizontal_scale: None,
       character_spacing_pt: 0.0,
       baseline_shift_pt: 0.0,
       use_windows_font_metrics: false,
@@ -124,6 +136,7 @@ pub struct PageSetup {
   pub borders_offset_from_text: bool,
   pub line_numbering: Option<LineNumbering>,
   pub doc_grid_line_pitch_pt: Option<f32>,
+  pub adjust_table_line_heights_to_grid: bool,
   pub page_number_start: Option<i32>,
 }
 
@@ -148,6 +161,7 @@ impl Default for PageSetup {
       borders_offset_from_text: false,
       line_numbering: None,
       doc_grid_line_pitch_pt: None,
+      adjust_table_line_heights_to_grid: false,
       page_number_start: None,
     }
   }
@@ -328,6 +342,9 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
       .map(|value| Cow::Owned(value.to_string())),
     font_size: common::Pt(style.font_size_pt),
     complex_font_size: style.complex_font_size_pt.map(common::Pt),
+    kerning_minimum_size: style.kerning_minimum_size_pt.map(common::Pt),
+    ligatures: style.ligatures,
+    horizontal_scale: style.horizontal_scale,
     character_spacing: common::Pt(style.character_spacing_pt),
     baseline_shift: common::Pt(style.baseline_shift_pt),
     use_windows_font_metrics: style.use_windows_font_metrics,

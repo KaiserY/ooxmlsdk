@@ -1706,6 +1706,9 @@ pub struct ShapeOptions<'a> {
   pub script: Option<TextScript>,
   pub language: Option<Cow<'a, str>>,
   pub character_spacing_pt: f32,
+  /// Horizontal glyph scale. Character spacing is added after this scale,
+  /// matching WordprocessingML's distinction between `w:w` and `w:spacing`.
+  pub horizontal_scale: f32,
   pub small_caps: bool,
   pub scan_registered_fallbacks: bool,
   pub features: Vec<FeatureValue<'a>>,
@@ -1720,6 +1723,7 @@ impl Default for ShapeOptions<'_> {
       script: None,
       language: None,
       character_spacing_pt: 0.0,
+      horizontal_scale: 1.0,
       small_caps: false,
       scan_registered_fallbacks: true,
       features: Vec::new(),
@@ -1736,6 +1740,7 @@ impl<'a> ShapeOptions<'a> {
       script: request.script,
       language: request.language.clone(),
       character_spacing_pt: 0.0,
+      horizontal_scale: 1.0,
       small_caps: false,
       scan_registered_fallbacks: true,
       features: request.features.clone(),
@@ -1837,6 +1842,7 @@ impl<'book> ResolvedFont<'book> {
     let positions = output.glyph_positions();
     let safe_breaks = text_safe_breaks(text);
     let tracking = options.character_spacing_pt;
+    let horizontal_scale = options.horizontal_scale.max(f32::EPSILON);
     let glyphs = infos
       .iter()
       .zip(positions.iter())
@@ -1851,7 +1857,8 @@ impl<'book> ResolvedFont<'book> {
         } else {
           source_range_for_shaped_range(&small_caps_ranges, shaped_text_range, text.len())
         };
-        let mut x_advance_pt = position.x_advance as f32 / units_per_em * shape_size.0;
+        let mut x_advance_pt =
+          position.x_advance as f32 / units_per_em * shape_size.0 * horizontal_scale;
         if tracking.abs() > f32::EPSILON && index + 1 < infos.len() {
           x_advance_pt += tracking;
         }
@@ -1862,7 +1869,7 @@ impl<'book> ResolvedFont<'book> {
           text_range,
           x_advance_pt,
           y_advance_pt: position.y_advance as f32 / units_per_em * shape_size.0,
-          x_offset_pt: position.x_offset as f32 / units_per_em * shape_size.0,
+          x_offset_pt: position.x_offset as f32 / units_per_em * shape_size.0 * horizontal_scale,
           y_offset_pt: position.y_offset as f32 / units_per_em * shape_size.0,
           safe_to_break: !info.unsafe_to_break(),
           source_char,
@@ -1873,7 +1880,12 @@ impl<'book> ResolvedFont<'book> {
           justification,
           bounds: runtime_face
             .glyph_bounds(info.glyph_id as u16)
-            .map(|bounds| bounds.scaled(shape_size.0)),
+            .map(|bounds| {
+              let mut bounds = bounds.scaled(shape_size.0);
+              bounds.x_min_pt *= horizontal_scale;
+              bounds.x_max_pt *= horizontal_scale;
+              bounds
+            }),
         }
       })
       .collect::<Vec<_>>();

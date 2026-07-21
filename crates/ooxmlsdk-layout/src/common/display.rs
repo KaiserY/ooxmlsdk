@@ -312,6 +312,8 @@ pub struct LineNumbering {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextStyle<'doc> {
   pub font_family: Option<Cow<'doc, str>>,
+  /// Document-scoped substitute preferred before generic system fallbacks.
+  pub fallback_font_family: Option<Cow<'doc, str>>,
   pub east_asia_font_family: Option<Cow<'doc, str>>,
   pub complex_font_family: Option<Cow<'doc, str>>,
   pub symbol_font_family: Option<Cow<'doc, str>>,

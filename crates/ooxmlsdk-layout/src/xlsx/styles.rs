@@ -18,6 +18,7 @@ pub(crate) struct StylesCatalog {
   pub(crate) fill_records: Vec<FillRecord>,
   pub(crate) border_records: Vec<BorderRecord>,
   pub(crate) differential_format_records: Vec<DifferentialFormatRecord>,
+  theme_fonts: Option<ThemeFontScheme>,
   theme_colors: ThemeColorPalette,
   theme_major_east_asian: Option<Arc<str>>,
   theme_minor_east_asian: Option<Arc<str>>,
@@ -183,6 +184,7 @@ impl StylesCatalog {
     let missing_theme_minor = missing_theme_minor_font(theme_fonts.as_ref(), ui_language);
     let Some(styles_part) = workbook_part.workbook_styles_part(package) else {
       return Ok(Self {
+        theme_fonts,
         theme_colors,
         missing_theme_minor_from_ui: missing_theme_minor.is_some(),
         theme_minor_east_asian: missing_theme_minor,
@@ -322,6 +324,7 @@ impl StylesCatalog {
             .collect()
         })
         .unwrap_or_default(),
+      theme_fonts: theme_fonts.cloned(),
       theme_major_east_asian: theme_fonts
         .and_then(|fonts| fonts.resolve_font_for_language("+mj-ea", ui_language))
         .map(Arc::from),
@@ -389,6 +392,14 @@ impl StylesCatalog {
       49 => Some("@"),
       _ => None,
     }
+  }
+
+  pub(crate) fn resolve_drawingml_theme_font<'a>(&'a self, typeface: &'a str) -> &'a str {
+    self
+      .theme_fonts
+      .as_ref()
+      .and_then(|fonts| fonts.resolve_font(typeface))
+      .unwrap_or(typeface)
   }
 
   pub(crate) fn text_style_for_cell(&self, style_index: Option<u32>) -> TextStyle {
@@ -991,21 +1002,23 @@ fn border_style(
 }
 
 fn border_width_pt(style: x::BorderStyleValues) -> f32 {
-  // into editeng SvxBorderLine widths. Keep the same thin/medium/thick groups.
+  // Excel fixed output emits the named border weights on a one-point grid:
+  // thin is 1pt, medium is 2pt, and thick is 3pt. Keep dashed variants in
+  // the corresponding weight group; hair remains half of thin.
   match style {
-    x::BorderStyleValues::Hair => 0.25,
+    x::BorderStyleValues::Hair => 0.5,
     x::BorderStyleValues::Thin
     | x::BorderStyleValues::Dashed
     | x::BorderStyleValues::Dotted
     | x::BorderStyleValues::DashDot
     | x::BorderStyleValues::DashDotDot
-    | x::BorderStyleValues::SlantDashDot => 0.5,
+    | x::BorderStyleValues::SlantDashDot => 1.0,
     x::BorderStyleValues::Medium
     | x::BorderStyleValues::MediumDashed
     | x::BorderStyleValues::MediumDashDot
     | x::BorderStyleValues::MediumDashDotDot
-    | x::BorderStyleValues::Double => 1.0,
-    x::BorderStyleValues::Thick => 1.5,
+    | x::BorderStyleValues::Double => 2.0,
+    x::BorderStyleValues::Thick => 3.0,
     x::BorderStyleValues::None => 0.0,
   }
 }
@@ -1202,6 +1215,14 @@ fn defined_name_builtin(name: &str) -> Option<DefinedNameBuiltin> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn office_border_weights_follow_fixed_output_point_grid() {
+    assert_eq!(border_width_pt(x::BorderStyleValues::Hair), 0.5);
+    assert_eq!(border_width_pt(x::BorderStyleValues::Thin), 1.0);
+    assert_eq!(border_width_pt(x::BorderStyleValues::Medium), 2.0);
+    assert_eq!(border_width_pt(x::BorderStyleValues::Thick), 3.0);
+  }
 
   #[test]
   fn rotated_alignment_defaults_match_libreoffice_import() {

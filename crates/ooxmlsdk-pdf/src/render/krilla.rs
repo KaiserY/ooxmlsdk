@@ -539,6 +539,7 @@ struct RgbColor {
 #[derive(Clone, Debug, PartialEq)]
 struct TextStyle<'doc> {
   font_family: Option<Cow<'doc, str>>,
+  fallback_font_family: Option<Cow<'doc, str>>,
   east_asia_font_family: Option<Cow<'doc, str>>,
   complex_font_family: Option<Cow<'doc, str>>,
   symbol_font_family: Option<Cow<'doc, str>>,
@@ -567,6 +568,10 @@ struct TextStyle<'doc> {
 impl FontStyleRef for TextStyle<'_> {
   fn font_family(&self) -> Option<&str> {
     self.font_family.as_deref()
+  }
+
+  fn fallback_font_family(&self) -> Option<&str> {
+    self.fallback_font_family.as_deref()
   }
 
   fn east_asia_font_family(&self) -> Option<&str> {
@@ -1500,6 +1505,10 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
   TextStyle {
     font_family: style
       .font_family
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    fallback_font_family: style
+      .fallback_font_family
       .as_ref()
       .map(|value| Cow::Borrowed(value.as_ref())),
     east_asia_font_family: style
@@ -2750,7 +2759,14 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
   });
   let wingdings = font_family.is_some_and(|family| family.eq_ignore_ascii_case("Wingdings"));
   if !(symbol && (text.contains('\u{f02d}') || text.contains('\u{f0b7}'))
-    || wingdings && (text.contains('\u{f06c}') || text.contains('\u{f071}')))
+    || wingdings
+      && (text.contains('\u{f06c}')
+        || text.contains('\u{f06e}')
+        || text.contains('\u{f071}')
+        || text.contains('\u{f076}')
+        || text.contains('\u{f0a7}')
+        || text.contains('\u{f0d8}')
+        || text.contains('\u{f0e0}')))
   {
     return Cow::Borrowed(text);
   }
@@ -2758,7 +2774,9 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
   // Keep the legacy symbol-font glyph selected by the shaped run, but expose
   // its standardized character through the PDF ToUnicode map. Unicode WG2
   // N4363 maps Wingdings character 108 to U+26AB; LibreOffice's Microsoft
-  // Symbol conversion table maps character 0xB7 to U+2022.
+  // symbol conversion tables map character 0xD8 to U+27A2 and Symbol 0xB7
+  // to U+2022. PowerPoint's PDF export maps Wingdings 0x6E to U+25FC,
+  // 0x76 to U+2756, 0xA7 to U+25AA, and 0xE0 to U+2192.
   Cow::Owned(
     text
       .chars()
@@ -2766,7 +2784,12 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
         '\u{f02d}' if symbol => '\u{2212}',
         '\u{f0b7}' if symbol => '\u{2022}',
         '\u{f06c}' if wingdings => '\u{26ab}',
+        '\u{f06e}' if wingdings => '\u{25fc}',
         '\u{f071}' if wingdings => '\u{2751}',
+        '\u{f076}' if wingdings => '\u{2756}',
+        '\u{f0a7}' if wingdings => '\u{25aa}',
+        '\u{f0d8}' if wingdings => '\u{27a2}',
+        '\u{f0e0}' if wingdings => '\u{2192}',
         _ => character,
       })
       .collect(),
@@ -3844,6 +3867,46 @@ mod tests {
     assert_eq!(
       symbol_font_semantic_text("\u{f071}", Some("Wingdings")),
       "\u{2751}"
+    );
+  }
+
+  #[test]
+  fn wingdings_small_black_square_uses_powerpoint_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f06e}", Some("Wingdings")),
+      "\u{25fc}"
+    );
+  }
+
+  #[test]
+  fn wingdings_arrow_uses_libreoffice_conversion_table_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f0d8}", Some("Wingdings")),
+      "\u{27a2}"
+    );
+  }
+
+  #[test]
+  fn wingdings_small_square_uses_powerpoint_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f0a7}", Some("Wingdings")),
+      "\u{25aa}"
+    );
+  }
+
+  #[test]
+  fn wingdings_black_diamond_minus_white_x_uses_powerpoint_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f076}", Some("Wingdings")),
+      "\u{2756}"
+    );
+  }
+
+  #[test]
+  fn wingdings_right_arrow_uses_powerpoint_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f0e0}", Some("Wingdings")),
+      "\u{2192}"
     );
   }
 

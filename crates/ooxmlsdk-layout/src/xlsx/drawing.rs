@@ -88,7 +88,15 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) graphic_uri: Option<String>,
   pub(crate) text: String,
   pub(crate) text_font_size_points100: Option<i32>,
+  pub(crate) text_font_family: Option<String>,
+  pub(crate) text_east_asia_font_family: Option<String>,
+  pub(crate) text_complex_font_family: Option<String>,
   pub(crate) text_color: Option<RgbColor>,
+  pub(crate) text_alignment: Option<a::TextAlignmentTypeValues>,
+  pub(crate) text_left_inset_emu: Option<i64>,
+  pub(crate) text_top_inset_emu: Option<i64>,
+  pub(crate) text_right_inset_emu: Option<i64>,
+  pub(crate) text_bottom_inset_emu: Option<i64>,
   pub(crate) child_objects: usize,
   pub(crate) has_style: bool,
   pub(crate) fill_color: Option<RgbColor>,
@@ -500,10 +508,47 @@ impl DrawingObjectModel {
         .text_body
         .as_deref()
         .and_then(xdr_text_body_first_run_font_size),
+      text_font_family: shape.text_body.as_deref().and_then(|text_body| {
+        xdr_text_body_first_run_font_family(text_body, DrawingTextScript::Latin)
+      }),
+      text_east_asia_font_family: shape.text_body.as_deref().and_then(|text_body| {
+        xdr_text_body_first_run_font_family(text_body, DrawingTextScript::EastAsian)
+      }),
+      text_complex_font_family: shape.text_body.as_deref().and_then(|text_body| {
+        xdr_text_body_first_run_font_family(text_body, DrawingTextScript::ComplexScript)
+      }),
       text_color: shape
         .text_body
         .as_deref()
         .and_then(xdr_text_body_first_run_color),
+      text_alignment: shape
+        .text_body
+        .as_deref()
+        .and_then(xdr_text_body_first_paragraph_alignment),
+      text_left_inset_emu: shape.text_body.as_deref().map(|text_body| {
+        text_body
+          .body_properties
+          .left_inset
+          .map_or(91_440, |value| value.to_emu())
+      }),
+      text_top_inset_emu: shape.text_body.as_deref().map(|text_body| {
+        text_body
+          .body_properties
+          .top_inset
+          .map_or(45_720, |value| value.to_emu())
+      }),
+      text_right_inset_emu: shape.text_body.as_deref().map(|text_body| {
+        text_body
+          .body_properties
+          .right_inset
+          .map_or(91_440, |value| value.to_emu())
+      }),
+      text_bottom_inset_emu: shape.text_body.as_deref().map(|text_body| {
+        text_body
+          .body_properties
+          .bottom_inset
+          .map_or(45_720, |value| value.to_emu())
+      }),
       text_len: shape.text_link.as_ref().map_or(0, |value| value.len())
         + shape.text_body.as_deref().map_or(0, xdr_text_body_text_len),
       child_objects: 0,
@@ -537,7 +582,15 @@ impl DrawingObjectModel {
       graphic_uri: None,
       text: group_shape_text(group),
       text_font_size_points100: None,
+      text_font_family: None,
+      text_east_asia_font_family: None,
+      text_complex_font_family: None,
       text_color: None,
+      text_alignment: None,
+      text_left_inset_emu: None,
+      text_top_inset_emu: None,
+      text_right_inset_emu: None,
+      text_bottom_inset_emu: None,
       text_len: group_shape_text_len(group),
       child_objects: group.group_shape_choice.len(),
       has_style: false,
@@ -569,7 +622,15 @@ impl DrawingObjectModel {
       graphic_uri: Some(frame.graphic.graphic_data.uri.clone()),
       text: String::new(),
       text_font_size_points100: None,
+      text_font_family: None,
+      text_east_asia_font_family: None,
+      text_complex_font_family: None,
       text_color: None,
+      text_alignment: None,
+      text_left_inset_emu: None,
+      text_top_inset_emu: None,
+      text_right_inset_emu: None,
+      text_bottom_inset_emu: None,
       child_objects: frame.graphic.graphic_data.graphic_data_choice.len(),
       has_style: false,
       fill_color: None,
@@ -600,7 +661,15 @@ impl DrawingObjectModel {
       graphic_uri: None,
       text: String::new(),
       text_font_size_points100: None,
+      text_font_family: None,
+      text_east_asia_font_family: None,
+      text_complex_font_family: None,
       text_color: None,
+      text_alignment: None,
+      text_left_inset_emu: None,
+      text_top_inset_emu: None,
+      text_right_inset_emu: None,
+      text_bottom_inset_emu: None,
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
       fill_color: shape_fill_color(&shape.shape_properties)
@@ -637,7 +706,15 @@ impl DrawingObjectModel {
       graphic_uri: None,
       text: String::new(),
       text_font_size_points100: None,
+      text_font_family: None,
+      text_east_asia_font_family: None,
+      text_complex_font_family: None,
       text_color: None,
+      text_alignment: None,
+      text_left_inset_emu: None,
+      text_top_inset_emu: None,
+      text_right_inset_emu: None,
+      text_bottom_inset_emu: None,
       child_objects: 0,
       has_style: picture.shape_style.is_some(),
       fill_color: None,
@@ -656,7 +733,15 @@ impl DrawingObjectModel {
       hyperlink_action: None,
       text: String::new(),
       text_font_size_points100: None,
+      text_font_family: None,
+      text_east_asia_font_family: None,
+      text_complex_font_family: None,
       text_color: None,
+      text_alignment: None,
+      text_left_inset_emu: None,
+      text_top_inset_emu: None,
+      text_right_inset_emu: None,
+      text_bottom_inset_emu: None,
       ..Self::unknown()
     }
   }
@@ -677,7 +762,15 @@ impl DrawingObjectModel {
       graphic_uri: None,
       text: String::new(),
       text_font_size_points100: None,
+      text_font_family: None,
+      text_east_asia_font_family: None,
+      text_complex_font_family: None,
       text_color: None,
+      text_alignment: None,
+      text_left_inset_emu: None,
+      text_top_inset_emu: None,
+      text_right_inset_emu: None,
+      text_bottom_inset_emu: None,
       child_objects: 0,
       has_style: false,
       fill_color: None,
@@ -772,17 +865,208 @@ fn xdr_text_body_text(text_body: &xdr::TextBody) -> String {
 }
 
 fn xdr_text_body_first_run_font_size(text_body: &xdr::TextBody) -> Option<i32> {
-  text_body
+  let properties = xdr_text_body_first_run_properties(text_body)?;
+  properties
+    .run
+    .and_then(|properties| properties.font_size)
+    .or_else(|| {
+      properties
+        .paragraph_default
+        .and_then(|properties| properties.font_size)
+    })
+    .or_else(|| {
+      properties
+        .level_default
+        .and_then(|properties| properties.font_size)
+    })
+    .or_else(|| {
+      properties
+        .list_default
+        .and_then(|properties| properties.font_size)
+    })
+}
+
+#[derive(Clone, Copy)]
+enum DrawingTextScript {
+  Latin,
+  EastAsian,
+  ComplexScript,
+}
+
+fn xdr_text_body_first_run_font_family(
+  text_body: &xdr::TextBody,
+  script: DrawingTextScript,
+) -> Option<String> {
+  let properties = xdr_text_body_first_run_properties(text_body)?;
+  drawingml_run_font_family(properties.run, script)
+    .or_else(|| drawingml_default_run_font_family(properties.paragraph_default, script))
+    .or_else(|| drawingml_default_run_font_family(properties.level_default, script))
+    .or_else(|| drawingml_default_run_font_family(properties.list_default, script))
+    .map(ToString::to_string)
+}
+
+struct DrawingTextRunProperties<'a> {
+  run: Option<&'a a::RunProperties>,
+  paragraph_default: Option<&'a a::DefaultRunProperties>,
+  level_default: Option<&'a a::DefaultRunProperties>,
+  list_default: Option<&'a a::DefaultRunProperties>,
+}
+
+fn xdr_text_body_first_run_properties(
+  text_body: &xdr::TextBody,
+) -> Option<DrawingTextRunProperties<'_>> {
+  text_body.paragraph.iter().find_map(|paragraph| {
+    let run = paragraph
+      .paragraph_choice
+      .iter()
+      .find_map(|choice| match choice {
+        a::ParagraphChoice::Run(run) => Some(run.run_properties.as_deref()),
+        _ => None,
+      })?;
+    let paragraph_default = paragraph
+      .paragraph_properties
+      .as_deref()
+      .and_then(|properties| properties.default_run_properties.as_deref());
+    let level = paragraph
+      .paragraph_properties
+      .as_deref()
+      .and_then(|properties| properties.level)
+      .unwrap_or(0);
+    let list_style = text_body.list_style.as_deref();
+    Some(DrawingTextRunProperties {
+      run,
+      paragraph_default,
+      level_default: list_style.and_then(|style| list_level_default_run_properties(style, level)),
+      list_default: list_style
+        .and_then(|style| style.default_paragraph_properties.as_deref())
+        .and_then(|properties| properties.default_run_properties.as_deref()),
+    })
+  })
+}
+
+fn list_level_default_run_properties(
+  style: &a::ListStyle,
+  level: i32,
+) -> Option<&a::DefaultRunProperties> {
+  match level {
+    0 => style
+      .level1_paragraph_properties
+      .as_deref()?
+      .default_run_properties
+      .as_deref(),
+    1 => style
+      .level2_paragraph_properties
+      .as_deref()?
+      .default_run_properties
+      .as_deref(),
+    2 => style
+      .level3_paragraph_properties
+      .as_deref()?
+      .default_run_properties
+      .as_deref(),
+    3 => style
+      .level4_paragraph_properties
+      .as_deref()?
+      .default_run_properties
+      .as_deref(),
+    4 => style
+      .level5_paragraph_properties
+      .as_deref()?
+      .default_run_properties
+      .as_deref(),
+    5 => style
+      .level6_paragraph_properties
+      .as_deref()?
+      .default_run_properties
+      .as_deref(),
+    6 => style
+      .level7_paragraph_properties
+      .as_deref()?
+      .default_run_properties
+      .as_deref(),
+    7 => style
+      .level8_paragraph_properties
+      .as_deref()?
+      .default_run_properties
+      .as_deref(),
+    8 => style
+      .level9_paragraph_properties
+      .as_deref()?
+      .default_run_properties
+      .as_deref(),
+    _ => None,
+  }
+}
+
+fn xdr_text_body_first_paragraph_alignment(
+  text_body: &xdr::TextBody,
+) -> Option<a::TextAlignmentTypeValues> {
+  let paragraph = text_body
     .paragraph
     .iter()
-    .flat_map(|paragraph| paragraph.paragraph_choice.iter())
-    .find_map(|choice| match choice {
-      a::ParagraphChoice::Run(run) => run
-        .run_properties
+    .find(|paragraph| !paragraph.paragraph_choice.is_empty())?;
+  let direct = paragraph.paragraph_properties.as_deref();
+  let level = direct.and_then(|properties| properties.level).unwrap_or(0);
+  direct
+    .and_then(|properties| properties.alignment)
+    .or_else(|| {
+      text_body
+        .list_style
         .as_deref()
-        .and_then(|properties| properties.font_size),
-      _ => None,
+        .and_then(|style| list_level_alignment(style, level))
     })
+    .or_else(|| {
+      text_body
+        .list_style
+        .as_deref()
+        .and_then(|style| style.default_paragraph_properties.as_deref())
+        .and_then(|properties| properties.alignment)
+    })
+}
+
+fn list_level_alignment(style: &a::ListStyle, level: i32) -> Option<a::TextAlignmentTypeValues> {
+  match level {
+    0 => style.level1_paragraph_properties.as_deref()?.alignment,
+    1 => style.level2_paragraph_properties.as_deref()?.alignment,
+    2 => style.level3_paragraph_properties.as_deref()?.alignment,
+    3 => style.level4_paragraph_properties.as_deref()?.alignment,
+    4 => style.level5_paragraph_properties.as_deref()?.alignment,
+    5 => style.level6_paragraph_properties.as_deref()?.alignment,
+    6 => style.level7_paragraph_properties.as_deref()?.alignment,
+    7 => style.level8_paragraph_properties.as_deref()?.alignment,
+    8 => style.level9_paragraph_properties.as_deref()?.alignment,
+    _ => None,
+  }
+}
+
+fn drawingml_run_font_family(
+  properties: Option<&a::RunProperties>,
+  script: DrawingTextScript,
+) -> Option<&str> {
+  let properties = properties?;
+  match script {
+    DrawingTextScript::Latin => properties.latin_font.as_ref()?.typeface.as_deref(),
+    DrawingTextScript::EastAsian => properties.east_asian_font.as_ref()?.typeface.as_deref(),
+    DrawingTextScript::ComplexScript => {
+      properties.complex_script_font.as_ref()?.typeface.as_deref()
+    }
+  }
+  .filter(|typeface| !typeface.is_empty())
+}
+
+fn drawingml_default_run_font_family(
+  properties: Option<&a::DefaultRunProperties>,
+  script: DrawingTextScript,
+) -> Option<&str> {
+  let properties = properties?;
+  match script {
+    DrawingTextScript::Latin => properties.latin_font.as_ref()?.typeface.as_deref(),
+    DrawingTextScript::EastAsian => properties.east_asian_font.as_ref()?.typeface.as_deref(),
+    DrawingTextScript::ComplexScript => {
+      properties.complex_script_font.as_ref()?.typeface.as_deref()
+    }
+  }
+  .filter(|typeface| !typeface.is_empty())
 }
 
 fn xdr_text_body_first_run_color(text_body: &xdr::TextBody) -> Option<RgbColor> {
@@ -1599,6 +1883,65 @@ mod tests {
     assert_eq!(
       graphic_frame_relationship_id(&standard).as_deref(),
       Some("rId8")
+    );
+  }
+
+  #[test]
+  fn shape_text_run_inherits_missing_font_from_default_run_properties() {
+    let text_body = xdr::TextBody::from_bytes(
+      br#"<xdr:txBody xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1200"><a:latin typeface="Arial"/><a:ea typeface="Meiryo"/></a:defRPr></a:pPr><a:r><a:rPr sz="1600"/><a:t>test ok</a:t></a:r></a:p></xdr:txBody>"#,
+    )
+    .expect("text body");
+
+    assert_eq!(xdr_text_body_first_run_font_size(&text_body), Some(1600));
+    assert_eq!(
+      xdr_text_body_first_run_font_family(&text_body, DrawingTextScript::Latin).as_deref(),
+      Some("Arial")
+    );
+    assert_eq!(
+      xdr_text_body_first_run_font_family(&text_body, DrawingTextScript::EastAsian).as_deref(),
+      Some("Meiryo")
+    );
+  }
+
+  #[test]
+  fn shape_text_run_font_overrides_default_run_font() {
+    let text_body = xdr::TextBody::from_bytes(
+      br#"<xdr:txBody xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:latin typeface="Arial"/></a:defRPr></a:pPr><a:r><a:rPr><a:latin typeface="Calibri"/></a:rPr><a:t>test ok</a:t></a:r></a:p></xdr:txBody>"#,
+    )
+    .expect("text body");
+
+    assert_eq!(
+      xdr_text_body_first_run_font_family(&text_body, DrawingTextScript::Latin).as_deref(),
+      Some("Calibri")
+    );
+  }
+
+  #[test]
+  fn shape_text_run_inherits_level_zero_list_style_when_level_is_omitted() {
+    let text_body = xdr::TextBody::from_bytes(
+      br#"<xdr:txBody xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr/><a:lstStyle><a:lvl1pPr><a:defRPr sz="1200"><a:latin typeface="Arial"/></a:defRPr></a:lvl1pPr></a:lstStyle><a:p><a:r><a:rPr sz="1600"/><a:t>test ok</a:t></a:r></a:p></xdr:txBody>"#,
+    )
+    .expect("text body");
+
+    assert_eq!(xdr_text_body_first_run_font_size(&text_body), Some(1600));
+    assert_eq!(
+      xdr_text_body_first_run_font_family(&text_body, DrawingTextScript::Latin).as_deref(),
+      Some("Arial")
+    );
+    assert_eq!(xdr_text_body_first_paragraph_alignment(&text_body), None);
+  }
+
+  #[test]
+  fn shape_text_paragraph_inherits_list_level_alignment() {
+    let text_body = xdr::TextBody::from_bytes(
+      br#"<xdr:txBody xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr/><a:lstStyle><a:lvl1pPr algn="ctr"/><a:lvl2pPr algn="r"/></a:lstStyle><a:p><a:pPr lvl="1"/><a:r><a:t>test ok</a:t></a:r></a:p></xdr:txBody>"#,
+    )
+    .expect("text body");
+
+    assert_eq!(
+      xdr_text_body_first_paragraph_alignment(&text_body),
+      Some(a::TextAlignmentTypeValues::Right)
     );
   }
 }

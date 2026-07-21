@@ -4,8 +4,8 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use ooxmlsdk_fonts::{
-  FontBytes, FontId, FontRegistry, FontRequest, FontSize, ResolvedFontChain, ShapeOptions,
-  ShapedRun, TextScript, script_direction_runs,
+  FontBytes, FontFallbackChain, FontId, FontRegistry, FontRequest, FontSize, ResolvedFontChain,
+  ShapeOptions, ShapedRun, TextScript, script_direction_runs,
 };
 use rustc_hash::FxHashMap as HashMap;
 
@@ -74,6 +74,9 @@ impl Hash for FontFaceData {
 
 pub trait FontStyleRef {
   fn font_family(&self) -> Option<&str>;
+  fn fallback_font_family(&self) -> Option<&str> {
+    None
+  }
   fn east_asia_font_family(&self) -> Option<&str> {
     self.font_family()
   }
@@ -91,6 +94,10 @@ pub trait FontStyleRef {
 impl FontStyleRef for TextStyle {
   fn font_family(&self) -> Option<&str> {
     self.font_family.as_deref()
+  }
+
+  fn fallback_font_family(&self) -> Option<&str> {
+    self.fallback_font_family.as_deref()
   }
 
   fn east_asia_font_family(&self) -> Option<&str> {
@@ -135,6 +142,10 @@ impl FontStyleRef for TextStyle {
 impl FontStyleRef for common::TextStyle<'_> {
   fn font_family(&self) -> Option<&str> {
     self.font_family.as_deref()
+  }
+
+  fn fallback_font_family(&self) -> Option<&str> {
+    self.fallback_font_family.as_deref()
   }
 
   fn east_asia_font_family(&self) -> Option<&str> {
@@ -438,6 +449,19 @@ fn script_font_family(
   }
 }
 
+fn script_fallback_font_family(
+  style: &(impl FontStyleRef + ?Sized),
+  script: Option<TextScript>,
+) -> Option<&str> {
+  match script {
+    None
+    | Some(TextScript::Common | TextScript::Latin | TextScript::Cyrillic | TextScript::Greek) => {
+      style.fallback_font_family()
+    }
+    _ => None,
+  }
+}
+
 fn build_style_font_registry(
   style: &(impl FontStyleRef + ?Sized),
   script: Option<TextScript>,
@@ -446,6 +470,25 @@ fn build_style_font_registry(
     let mut request = font_request(style, script);
     request.script = script;
     let mut registry = FontRegistry::with_default_policy();
+    if let (Some(requested_family), Some(fallback_family)) = (
+      request.family.as_deref(),
+      script_fallback_font_family(style, script),
+    ) && !requested_family.eq_ignore_ascii_case(fallback_family)
+    {
+      // ECMA-376 Part 1 §21.1.2.5 requires DrawingML font substitution
+      // when the requested typeface is unavailable. Keep the requested face
+      // primary, but place the document-scoped substitute before generic
+      // platform fallbacks.
+      registry.book.fallback_chains.insert(
+        0,
+        FontFallbackChain {
+          requested_family: Some(Cow::Owned(requested_family.to_string())),
+          script,
+          language: None,
+          families: vec![Cow::Owned(fallback_family.to_string())],
+        },
+      );
+    }
     let mut registered = registry
       .register_system_query_fonts(&request)
       .unwrap_or_default();
@@ -484,6 +527,7 @@ fn font_face_data_from_registry_binary(
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct FontFaceKey {
   family: Option<String>,
+  fallback_family: Option<String>,
   bold: bool,
   italic: bool,
   script: Option<TextScript>,
@@ -493,6 +537,7 @@ impl FontFaceKey {
   fn from_style(style: &(impl FontStyleRef + ?Sized), script: Option<TextScript>) -> Self {
     Self {
       family: script_font_family(style, script).map(str::to_string),
+      fallback_family: script_fallback_font_family(style, script).map(str::to_string),
       bold: style.bold(),
       italic: style.italic(),
       script,
@@ -505,6 +550,7 @@ impl FontFaceKey {
     script: Option<TextScript>,
   ) -> bool {
     self.family.as_deref() == script_font_family(style, script)
+      && self.fallback_family.as_deref() == script_fallback_font_family(style, script)
       && self.bold == style.bold()
       && self.italic == style.italic()
       && self.script == script
@@ -520,6 +566,7 @@ struct FontMetrics {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct FontMetricsKey {
   family: Option<String>,
+  fallback_family: Option<String>,
   bold: bool,
   italic: bool,
   script: Option<TextScript>,
@@ -530,6 +577,7 @@ impl FontMetricsKey {
   fn from_style(style: &(impl FontStyleRef + ?Sized), script: Option<TextScript>) -> Self {
     Self {
       family: script_font_family(style, script).map(str::to_string),
+      fallback_family: script_fallback_font_family(style, script).map(str::to_string),
       bold: style.bold(),
       italic: style.italic(),
       script,
@@ -543,6 +591,7 @@ impl FontMetricsKey {
     script: Option<TextScript>,
   ) -> bool {
     self.family.as_deref() == script_font_family(style, script)
+      && self.fallback_family.as_deref() == script_fallback_font_family(style, script)
       && self.bold == style.bold()
       && self.italic == style.italic()
       && self.script == script
@@ -580,5 +629,21 @@ mod tests {
     };
 
     assert!(load_text_face(&style).is_some());
+  }
+
+  #[test]
+  fn document_fallback_precedes_generic_system_fallback() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("CodexDefinitelyMissingFont")),
+      fallback_font_family: Some(Arc::from("DejaVu Serif")),
+      ..Default::default()
+    };
+
+    let face = load_text_face(&style).expect("document fallback font");
+    assert!(
+      face.id().to_ascii_lowercase().contains("dejavuserif"),
+      "unexpected fallback {}",
+      face.id()
+    );
   }
 }

@@ -140,7 +140,13 @@ impl PptShape {
       style.merge_from(master_style);
     }
     if let Some(placeholder) = &self.shape.placeholder {
-      if let Some(placeholder_master_style) = &placeholder.master_text_list_style {
+      // LibreOffice PPTShape::addShape only rebuilds from the resolved
+      // placeholder's cached master style in the indexed-placeholder path.
+      // An unindexed title placeholder keeps the slide master's titleStyle
+      // and overlays only the placeholder's direct txBody/lstStyle.
+      if self.shape.sub_type_index.is_some()
+        && let Some(placeholder_master_style) = &placeholder.master_text_list_style
+      {
         style.merge_from(placeholder_master_style);
       }
       if let Some(placeholder_text_style) = placeholder

@@ -116,20 +116,20 @@ impl PPTShapeGroupContext {
         .non_visual_shape_properties
         .non_visual_drawing_properties,
     );
-    if let Some(placeholder) = &source
+    let application_properties = &source
       .non_visual_shape_properties
-      .application_non_visual_drawing_properties
-      .placeholder_shape
-    {
+      .application_non_visual_drawing_properties;
+    // ECMA-376 Part 1 §19.3.1.33 defines userDrawn as an explicit marker
+    // for objects drawn by the user. Preserve it so an ordinary master text
+    // box is not conflated with master/layout placeholders.
+    shape.shape.user_drawn = application_properties
+      .user_drawn
+      .as_ref()
+      .is_some_and(|value| value.as_bool());
+    if let Some(placeholder) = &application_properties.placeholder_shape {
       PPTShapeContext::new(&mut shape).on_create_context(slide_persist, placeholder);
     }
-    apply_application_media(
-      &mut shape.shape,
-      slide_persist,
-      &source
-        .non_visual_shape_properties
-        .application_non_visual_drawing_properties,
-    );
+    apply_application_media(&mut shape.shape, slide_persist, application_properties);
     apply_transform_2d(
       &mut shape.shape,
       source.shape_properties.transform2_d.as_deref(),

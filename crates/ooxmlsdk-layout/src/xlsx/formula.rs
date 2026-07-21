@@ -35,6 +35,7 @@ pub(crate) fn recalculate_formula_cells(
           let Some(value) =
             evaluate_formula_cell(&formula_book, current_sheet, current_cell, formula_cell)
               .map(|value| calc_value_from_formula_value(&book, value))
+              .or_else(|| unresolved_foreign_addin_value(&formula_cell.formula))
           else {
             continue;
           };
@@ -344,16 +345,47 @@ fn replace_cell_value(sheet: &mut CalcSheet, address: CellAddress, value: &Value
   let Some(cell) = cell_at_mut(sheet, address) else {
     return false;
   };
+  let data_type = formula_value_data_type(value);
   let Some(display_text) = value.clone().display_text() else {
     return false;
   };
   let cached_value = value.cached_text();
-  let changed = cell.display_text != display_text || cell.cached_value != cached_value;
+  let changed = cell.display_text != display_text
+    || cell.cached_value != cached_value
+    || cell.data_type != data_type;
   if changed {
+    // The cached `t` attribute describes the old formula result. Once the
+    // formula is recalculated, alignment and number formatting must follow
+    // the newly evaluated scalar type rather than that stale cache type.
+    cell.data_type = data_type;
     cell.display_text = display_text;
     cell.cached_value = cached_value;
   }
   changed
+}
+
+fn formula_value_data_type(value: &Value) -> Option<x::CellValues> {
+  match value {
+    Value::Number(_) => Some(x::CellValues::Number),
+    Value::Text(_) => Some(x::CellValues::String),
+    Value::Bool(_) => Some(x::CellValues::Boolean),
+    Value::Error(_) => Some(x::CellValues::Error),
+    Value::Blank => None,
+    Value::Range(_) | Value::Matrix(_) => None,
+  }
+}
+
+fn unresolved_foreign_addin_value(formula: &str) -> Option<Value> {
+  let formula = formula.trim().trim_start_matches('=').trim_start();
+  let function_name = formula.split_once('(')?.0.trim();
+  function_name
+    .get(.."com.sun.star.sheet.addin.".len())
+    .filter(|prefix| prefix.eq_ignore_ascii_case("com.sun.star.sheet.addin."))
+    // MS-XLSX permits dots in a user-defined function name. LibreOffice's
+    // service name is therefore syntactically a UDF, but it has no matching
+    // workbook definition or Office add-in and Excel recalculates it as
+    // #NAME?. Keep cached values for every other unparsed formula.
+    .map(|_| Value::Error("#NAME?".to_string()))
 }
 
 fn apply_array_formula_result(
@@ -1156,6 +1188,36 @@ fn parse_array_constant(formula: &str) -> Option<Vec<Vec<Value>>> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn recalculated_formula_type_follows_the_evaluated_scalar() {
+    assert_eq!(
+      formula_value_data_type(&Value::Number(5.0)),
+      Some(x::CellValues::Number)
+    );
+    assert_eq!(
+      formula_value_data_type(&Value::Bool(true)),
+      Some(x::CellValues::Boolean)
+    );
+    assert_eq!(
+      formula_value_data_type(&Value::Error("#NAME?".to_string())),
+      Some(x::CellValues::Error)
+    );
+    assert_eq!(formula_value_data_type(&Value::Blank), None);
+  }
+
+  #[test]
+  fn unresolved_libreoffice_addin_is_an_office_name_error() {
+    assert_eq!(
+      unresolved_foreign_addin_value("com.sun.star.sheet.addin.Analysis.getEomonth(A5,1)"),
+      Some(Value::Error("#NAME?".to_string()))
+    );
+    assert_eq!(unresolved_foreign_addin_value("EOMONTH(A5,1)"), None);
+    assert_eq!(
+      unresolved_foreign_addin_value("_xlfn.XLOOKUP(A1,B:B,C:C)"),
+      None
+    );
+  }
 
   #[test]
   fn lo_pdf_formula_value_maps_legacy_ceiling_floor_num_to_illegal_argument() {

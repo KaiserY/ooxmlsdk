@@ -315,6 +315,7 @@ fn print_page_items(
     zoom_scale,
   ));
   items.extend(print_page_drawing_text_items(
+    import,
     page,
     body_origin_x + repeat_width,
     body_origin_y + repeat_height,
@@ -640,10 +641,13 @@ fn calc_cell_horizontal_alignment(
 ) -> x::HorizontalAlignmentValues {
   match alignment.and_then(|alignment| alignment.horizontal) {
     Some(x::HorizontalAlignmentValues::General) | None => {
-      if calc_cell_is_value(cell) {
-        x::HorizontalAlignmentValues::Right
-      } else {
-        x::HorizontalAlignmentValues::Left
+      match cell.number_format_state {
+        // ECMA-376 Part 1, General Format / Alignment: Boolean and error
+        // values are centered; numbers are right-aligned and strings left.
+        super::print::NumberFormatRenderState::Boolean
+        | super::print::NumberFormatRenderState::Error => x::HorizontalAlignmentValues::Center,
+        _ if calc_cell_is_value(cell) => x::HorizontalAlignmentValues::Right,
+        _ => x::HorizontalAlignmentValues::Left,
       }
     }
     Some(value) => value,
@@ -680,7 +684,11 @@ fn calc_cell_visible_text<'a>(
       return std::borrow::Cow::Owned(text);
     }
     return if calc_cell_value_can_hash(cell) {
-      std::borrow::Cow::Borrowed("###")
+      std::borrow::Cow::Owned(calc_cell_overflow_hash_text(
+        style,
+        output_area.align_rect.width_pt,
+        text_metrics,
+      ))
     } else {
       std::borrow::Cow::Borrowed(&cell.rendered_text)
     };
@@ -695,6 +703,28 @@ fn calc_cell_visible_text<'a>(
   } else {
     std::borrow::Cow::Borrowed(cell.rendered_text.as_str())
   }
+}
+
+fn calc_cell_overflow_hash_text(
+  style: &TextStyle,
+  cell_width_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> String {
+  let hash_width_pt = text_metrics.measure_text("#", style);
+  let available_width_pt = (cell_width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0).max(0.0);
+  let count = calc_cell_overflow_hash_count(available_width_pt, hash_width_pt);
+  "#".repeat(count)
+}
+
+fn calc_cell_overflow_hash_count(available_width_pt: f32, hash_width_pt: f32) -> usize {
+  if !available_width_pt.is_finite()
+    || !hash_width_pt.is_finite()
+    || available_width_pt <= f32::EPSILON
+    || hash_width_pt <= f32::EPSILON
+  {
+    return 1;
+  }
+  (available_width_pt / hash_width_pt).floor().max(1.0) as usize
 }
 
 fn calc_cell_is_value(cell: &super::print::CalcPrintCell<'_>) -> bool {
@@ -1695,6 +1725,7 @@ fn push_persisted_diagram_shape(
     },
     persisted_diagram_text_style(text_body),
     None,
+    None,
   );
 }
 
@@ -1894,6 +1925,7 @@ fn push_diagram_shape_items(items: &mut Vec<PageItem>, shape: &shared_diagram::D
       },
       None,
       None,
+      None,
     );
   }
 }
@@ -1933,6 +1965,7 @@ fn diagram_text_body_text(text_body: &shared_diagram::DiagramTextBody) -> String
 }
 
 fn print_page_drawing_text_items(
+  import: &ExcelImport,
   page: &CalcPrintPage<'_>,
   origin_x_pt: f32,
   origin_y_pt: f32,
@@ -1970,7 +2003,8 @@ fn print_page_drawing_text_items(
           width_pt: width_pt * zoom_scale,
           height_pt: height_pt * zoom_scale,
         },
-        drawing_object_text_style(&anchor.object),
+        drawing_object_text_style(import, &anchor.object),
+        Some(drawing_object_text_layout(&anchor.object)),
         hyperlink_url.as_deref(),
       );
     }
@@ -2014,17 +2048,31 @@ fn render_drawing_text(
   text: &str,
   rect: CellRect,
   style: Option<TextStyle>,
+  layout: Option<DrawingTextLayout>,
   hyperlink_url: Option<&str>,
 ) {
   let style = style.unwrap_or_default();
+  let layout = layout.unwrap_or_default();
   let line_height = (style.font_size_pt * 1.15).max(1.0);
+  let mut text_metrics = TextMetrics::new();
   for (index, line) in text.lines().filter(|line| !line.is_empty()).enumerate() {
-    let y = rect.y_pt + XLSX_CELL_TEXT_INSET_PT + index as f32 * line_height;
-    if y > rect.y_pt + rect.height_pt {
+    let y = rect.y_pt + layout.top_inset_pt + index as f32 * line_height;
+    if y > rect.y_pt + rect.height_pt - layout.bottom_inset_pt {
       break;
     }
+    let available_width = (rect.width_pt - layout.left_inset_pt - layout.right_inset_pt).max(0.0);
+    let text_width = text_metrics.measure_text(line, &style);
+    let x = match layout.alignment {
+      a::TextAlignmentTypeValues::Center => {
+        rect.x_pt + layout.left_inset_pt + (available_width - text_width).max(0.0) / 2.0
+      }
+      a::TextAlignmentTypeValues::Right => {
+        rect.x_pt + layout.left_inset_pt + (available_width - text_width).max(0.0)
+      }
+      _ => rect.x_pt + layout.left_inset_pt,
+    };
     items.push(PageItem::Text(TextItem {
-      x_pt: rect.x_pt + XLSX_CELL_TEXT_INSET_PT,
+      x_pt: x,
       y_pt: y,
       line_height_pt: line_height,
       text: line.to_string(),
@@ -2039,7 +2087,49 @@ fn render_drawing_text(
   }
 }
 
-fn drawing_object_text_style(object: &super::drawing::DrawingObjectModel) -> Option<TextStyle> {
+#[derive(Clone, Copy, Debug)]
+struct DrawingTextLayout {
+  alignment: a::TextAlignmentTypeValues,
+  left_inset_pt: f32,
+  top_inset_pt: f32,
+  right_inset_pt: f32,
+  bottom_inset_pt: f32,
+}
+
+impl Default for DrawingTextLayout {
+  fn default() -> Self {
+    Self {
+      alignment: a::TextAlignmentTypeValues::Left,
+      left_inset_pt: XLSX_CELL_TEXT_INSET_PT,
+      top_inset_pt: XLSX_CELL_TEXT_INSET_PT,
+      right_inset_pt: XLSX_CELL_TEXT_INSET_PT,
+      bottom_inset_pt: XLSX_CELL_TEXT_INSET_PT,
+    }
+  }
+}
+
+fn drawing_object_text_layout(object: &super::drawing::DrawingObjectModel) -> DrawingTextLayout {
+  DrawingTextLayout {
+    alignment: object.text_alignment.unwrap_or_default(),
+    left_inset_pt: object
+      .text_left_inset_emu
+      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points),
+    top_inset_pt: object
+      .text_top_inset_emu
+      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points),
+    right_inset_pt: object
+      .text_right_inset_emu
+      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points),
+    bottom_inset_pt: object
+      .text_bottom_inset_emu
+      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points),
+  }
+}
+
+fn drawing_object_text_style(
+  import: &ExcelImport,
+  object: &super::drawing::DrawingObjectModel,
+) -> Option<TextStyle> {
   let mut style = TextStyle::default();
   let mut changed = false;
   if let Some(font_size) = object.text_font_size_points100 {
@@ -2048,6 +2138,24 @@ fn drawing_object_text_style(object: &super::drawing::DrawingObjectModel) -> Opt
   }
   if let Some(color) = object.text_color {
     style.color = color;
+    changed = true;
+  }
+  if let Some(typeface) = object.text_font_family.as_deref() {
+    style.font_family = Some(Arc::from(
+      import.styles.resolve_drawingml_theme_font(typeface),
+    ));
+    changed = true;
+  }
+  if let Some(typeface) = object.text_east_asia_font_family.as_deref() {
+    style.east_asia_font_family = Some(Arc::from(
+      import.styles.resolve_drawingml_theme_font(typeface),
+    ));
+    changed = true;
+  }
+  if let Some(typeface) = object.text_complex_font_family.as_deref() {
+    style.complex_font_family = Some(Arc::from(
+      import.styles.resolve_drawingml_theme_font(typeface),
+    ));
     changed = true;
   }
   changed.then_some(style)
@@ -2128,6 +2236,7 @@ fn print_page_vml_text_items(
         width_pt: width_pt * zoom_scale,
         height_pt: height_pt * zoom_scale,
       },
+      None,
       None,
       None,
     );
@@ -2757,6 +2866,45 @@ mod drawing_page_tests {
       (400.0, 250.0, 100.0, 100.0),
       page
     ));
+  }
+}
+
+#[cfg(test)]
+mod cell_alignment_tests {
+  use super::*;
+
+  fn print_cell(
+    state: super::super::print::NumberFormatRenderState,
+  ) -> super::super::print::CalcPrintCell<'static> {
+    super::super::print::CalcPrintCell {
+      address: CellAddress { col: 1, row: 1 },
+      text: std::borrow::Cow::Borrowed("value"),
+      style_index: None,
+      pivot_format_id: None,
+      rendered_text: "value".to_string(),
+      rich_text_runs: &[],
+      number_format_state: state,
+      formula: false,
+    }
+  }
+
+  #[test]
+  fn general_alignment_centers_boolean_and_error_values() {
+    for state in [
+      super::super::print::NumberFormatRenderState::Boolean,
+      super::super::print::NumberFormatRenderState::Error,
+    ] {
+      assert_eq!(
+        calc_cell_horizontal_alignment(&print_cell(state), None),
+        x::HorizontalAlignmentValues::Center
+      );
+    }
+  }
+
+  #[test]
+  fn overflow_hashes_fill_the_available_cell_width() {
+    assert_eq!(calc_cell_overflow_hash_count(90.0, 6.0), 15);
+    assert_eq!(calc_cell_overflow_hash_count(5.0, 6.0), 1);
   }
 }
 

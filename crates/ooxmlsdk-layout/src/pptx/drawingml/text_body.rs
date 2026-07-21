@@ -135,10 +135,25 @@ impl TextBody {
   }
 
   pub(crate) fn inherit_placeholder_body_properties(&mut self, inherited: &Self) {
-    // LibreOffice PPTShapeContext clones the placeholder TextBody before
-    // parsing the current p:txBody. TextBodyPropertiesContext then replaces
-    // the vertical anchor only when the current a:bodyPr has an anchor
-    // attribute, so an empty bodyPr keeps the layout/master anchor.
+    // Presentation slides inherit layout information and only local values
+    // override it (ECMA-376 Part 1, Annex L.3.2.3). LibreOffice implements
+    // this by cloning the placeholder TextBody before parsing the local
+    // p:txBody; its TextBodyPropertiesContext replaces insets only when the
+    // corresponding a:bodyPr attribute is present.
+    if let (Some(properties), Some(inherited_properties)) = (
+      self.body_properties.as_deref_mut(),
+      inherited.body_properties.as_deref(),
+    ) {
+      properties.left_inset = properties.left_inset.or(inherited_properties.left_inset);
+      properties.top_inset = properties.top_inset.or(inherited_properties.top_inset);
+      properties.right_inset = properties.right_inset.or(inherited_properties.right_inset);
+      properties.bottom_inset = properties
+        .bottom_inset
+        .or(inherited_properties.bottom_inset);
+    }
+
+    // TextBodyPropertiesContext likewise replaces the vertical anchor only
+    // when the current a:bodyPr has an anchor attribute.
     let has_direct_anchor = self
       .body_properties
       .as_deref()
@@ -439,5 +454,29 @@ mod tests {
       direct.display_properties.anchor,
       a::TextAnchoringTypeValues::Center
     );
+  }
+
+  #[test]
+  fn empty_placeholder_body_properties_inherit_layout_insets() {
+    let inherited_properties = a::BodyProperties {
+      left_inset: Some(ooxmlsdk::simple_type::Coordinate32Value::Emu(0)),
+      top_inset: Some(ooxmlsdk::simple_type::Coordinate32Value::Emu(1)),
+      right_inset: Some(ooxmlsdk::simple_type::Coordinate32Value::Emu(2)),
+      bottom_inset: Some(ooxmlsdk::simple_type::Coordinate32Value::Emu(3)),
+      ..a::BodyProperties::default()
+    };
+    let inherited = TextBody::from_parts(&inherited_properties, None, &[]);
+    let mut direct = TextBody::from_parts(&a::BodyProperties::default(), None, &[]);
+
+    direct.inherit_placeholder_body_properties(&inherited);
+
+    let properties = direct
+      .body_properties
+      .as_deref()
+      .expect("direct text body should retain body properties");
+    assert_eq!(properties.left_inset, inherited_properties.left_inset);
+    assert_eq!(properties.top_inset, inherited_properties.top_inset);
+    assert_eq!(properties.right_inset, inherited_properties.right_inset);
+    assert_eq!(properties.bottom_inset, inherited_properties.bottom_inset);
   }
 }

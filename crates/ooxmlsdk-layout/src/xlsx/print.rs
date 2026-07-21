@@ -65,6 +65,7 @@ pub(crate) enum NumberFormatRenderState {
   General,
   Text,
   Boolean,
+  Error,
   Number,
   Percent,
   DateTime,
@@ -2240,6 +2241,9 @@ pub(crate) fn rendered_number_text(
         NumberFormatRenderState::Boolean,
       );
     }
+    Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::Error) => {
+      return (raw.to_string(), NumberFormatRenderState::Error);
+    }
     Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::String)
     | Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::InlineString)
     | Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::SharedString) => {
@@ -3613,6 +3617,21 @@ mod tests {
       rendered_number_text("4.0999999999999996", Some("General"), None, false).0,
       "4.1"
     );
+  }
+
+  #[test]
+  fn error_cell_preserves_its_type_for_general_alignment() {
+    let (text, state) = rendered_number_text(
+      "#N/A",
+      None,
+      Some(
+        ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::Error,
+      ),
+      false,
+    );
+
+    assert_eq!(text, "#N/A");
+    assert_eq!(state, NumberFormatRenderState::Error);
   }
 
   #[test]

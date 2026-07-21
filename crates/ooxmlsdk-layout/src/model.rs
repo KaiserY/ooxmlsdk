@@ -33,6 +33,7 @@ impl Default for BorderStyle {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
   pub font_family: Option<Arc<str>>,
+  pub fallback_font_family: Option<Arc<str>>,
   pub east_asia_font_family: Option<Arc<str>>,
   pub complex_font_family: Option<Arc<str>>,
   pub symbol_font_family: Option<Arc<str>>,
@@ -62,6 +63,7 @@ impl Default for TextStyle {
   fn default() -> Self {
     Self {
       font_family: None,
+      fallback_font_family: None,
       east_asia_font_family: None,
       complex_font_family: None,
       symbol_font_family: None,
@@ -312,6 +314,9 @@ pub(crate) fn common_page_setup(setup: PageSetup) -> common::PageSetup {
 pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> {
   common::TextStyle {
     font_family: style.font_family.map(|value| Cow::Owned(value.to_string())),
+    fallback_font_family: style
+      .fallback_font_family
+      .map(|value| Cow::Owned(value.to_string())),
     east_asia_font_family: style
       .east_asia_font_family
       .map(|value| Cow::Owned(value.to_string())),

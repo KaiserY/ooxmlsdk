@@ -243,11 +243,34 @@ impl TextMetrics {
     } else {
       metrics.leading_above_pt() + metrics.ascent_pt
     };
-    extra_leading_pt + baseline_offset_pt - style.baseline_shift_pt()
+    let fitted_baseline_pt =
+      fit_windows_baseline_to_line(baseline_offset_pt, metrics.descent_pt, line_height_pt);
+    if fitted_baseline_pt < baseline_offset_pt {
+      fitted_baseline_pt - style.baseline_shift_pt()
+    } else {
+      extra_leading_pt + baseline_offset_pt - style.baseline_shift_pt()
+    }
   }
 
   pub fn inline_text_box_height(&mut self, style: &(impl FontStyleRef + ?Sized)) -> f32 {
     self.vertical_metrics(style).line_height_pt() + style.baseline_shift_pt().abs()
+  }
+}
+
+fn fit_windows_baseline_to_line(
+  baseline_offset_pt: f32,
+  descent_pt: f32,
+  line_height_pt: f32,
+) -> f32 {
+  // OS/2 usWinAscent/usWinDescent are clipping extents and can exceed the
+  // actual PowerPoint line box (Arial Black is a common example). PowerPoint
+  // preserves their ascent/descent ratio while fitting that box, rather than
+  // placing the raw clipping ascent below the next line.
+  let windows_height_pt = baseline_offset_pt + descent_pt;
+  if windows_height_pt > line_height_pt && windows_height_pt > f32::EPSILON {
+    baseline_offset_pt * line_height_pt / windows_height_pt
+  } else {
+    baseline_offset_pt
   }
 }
 
@@ -420,6 +443,20 @@ mod tests {
     assert_eq!(first, second);
     assert_eq!(metrics.measure_styles.len(), 1);
     assert_eq!(metrics.measure_widths[0].len(), 1);
+  }
+
+  #[test]
+  fn oversized_windows_metrics_are_fitted_proportionally_into_the_line_box() {
+    let font_size_pt = 24.0;
+    let line_height_pt = font_size_pt * 1.2;
+    let windows_ascent_pt = 2_254.0 / 2_048.0 * font_size_pt;
+    let windows_descent_pt = 634.0 / 2_048.0 * font_size_pt;
+
+    let baseline =
+      fit_windows_baseline_to_line(windows_ascent_pt, windows_descent_pt, line_height_pt);
+
+    assert!((baseline - 22.48).abs() < 0.01);
+    assert_eq!(fit_windows_baseline_to_line(9.0, 3.0, 14.4), 9.0);
   }
 
   fn test_style() -> TextStyle<'static> {

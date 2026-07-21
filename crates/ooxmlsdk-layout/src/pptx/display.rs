@@ -25,6 +25,7 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 use ooxmlsdk::units as sdk_units;
 use ooxmlsdk::units::DrawingmlPercentageValue;
 use unicode_script::{Script, UnicodeScript};
@@ -768,10 +769,12 @@ fn lower_shape(
     ui_language,
     ..
   } = context;
+  let enabled_slide_number_field = inherited_slide_number_field_is_enabled(slide, shape);
   if shape.hidden
     || shape.hidden_master_shape
-    || shape.referenced
+    || (!enabled_slide_number_field && shape.referenced)
     || is_uninstantiated_placeholder(shape)
+    || is_disabled_header_footer_placeholder(slide, shape)
   {
     return;
   }
@@ -848,6 +851,43 @@ fn is_uninstantiated_placeholder(shape: &Shape) -> bool {
     && shape
       .shape_location
       .is_some_and(|location| location != super::slide::ShapeLocation::Slide)
+}
+
+fn is_disabled_header_footer_placeholder(slide: &SlidePersist, shape: &Shape) -> bool {
+  if shape.shape_location != Some(super::slide::ShapeLocation::Slide) {
+    return false;
+  }
+  match shape.sub_type {
+    Some(p::PlaceholderValues::SlideNumber) => !slide.header_footer.slide_number,
+    Some(p::PlaceholderValues::Header) => !slide.header_footer.header,
+    Some(p::PlaceholderValues::Footer) => !slide.header_footer.footer,
+    Some(p::PlaceholderValues::DateAndTime) => !slide.header_footer.date_time,
+    _ => false,
+  }
+}
+
+fn inherited_slide_number_field_is_enabled(slide: &SlidePersist, shape: &Shape) -> bool {
+  slide.header_footer.slide_number
+    // ECMA-376 Part 1 §19.3.1.33 distinguishes a user-drawn object from a
+    // presentation placeholder. A master placeholder still requires a
+    // matching layout/slide instance; an explicitly user-drawn master text
+    // box remains ordinary inherited slide content.
+    && shape.user_drawn
+    && shape.sub_type.is_none()
+    && shape
+      .shape_location
+      .is_some_and(|location| location != super::slide::ShapeLocation::Slide)
+    && shape.text_body.as_ref().is_some_and(|text_body| {
+      text_body.paragraphs.iter().any(|paragraph| {
+        paragraph.runs.iter().any(|run| {
+          run.kind == TextRunKind::Field
+            && run
+              .field_type
+              .as_deref()
+              .is_some_and(|field_type| field_type.eq_ignore_ascii_case("slidenum"))
+        })
+      })
+    })
 }
 
 fn graphic_data_has_structured_identity(record: &GraphicDataRecord) -> bool {
@@ -4764,6 +4804,7 @@ fn text_base_style(
     .unwrap_or("Liberation Sans");
   let mut base_style = TextStyle {
     font_family: Some(Arc::from(theme_latin)),
+    fallback_font_family: Some(Arc::from(theme_latin)),
     font_size_pt: base_font_size_pt.unwrap_or(DEFAULT_TEXT_FONT_SIZE_PT),
     use_windows_font_metrics: true,
     rotation_deg: options.rotation_deg,
@@ -5431,13 +5472,13 @@ fn lower_paragraph(
     paragraph,
     &bullet,
   );
-  let paragraph_x = cursor.x_pt
-    + paragraph_style.left_margin_pt
-    + if bullet.label.is_some() {
-      0.0
-    } else {
-      paragraph_style.indent_pt
-    };
+  let paragraph_left_offset = paragraph_style.left_offset(bullet.label.is_some());
+  let paragraph_x = cursor.x_pt + paragraph_left_offset;
+  // ECMA-376 Part 1 §21.1.2.2.7 defines marL and marR in addition to the
+  // text-body insets. They therefore reduce the paragraph's line box as well
+  // as moving its origin; using the full column width lets indented text run
+  // past the right edge before wrapping.
+  let paragraph_width = paragraph_style.available_width(column_width, paragraph_left_offset);
   let mut segment_start = 0usize;
   let mut is_first_segment = true;
 
@@ -5453,7 +5494,7 @@ fn lower_paragraph(
         slide: context.slide,
         base_style: &paragraph_base_style,
         options: context.options,
-        column_width,
+        column_width: paragraph_width,
         slide_number: context.slide_number,
       },
       &paragraph.runs[segment_start..segment_end],
@@ -5468,13 +5509,44 @@ fn lower_paragraph(
     };
 
     for (line_index, text_line) in text_lines.iter().enumerate() {
-      let mut run_x = aligned_paragraph_x(paragraph_x, column_width, text_line.width_pt, alignment);
+      let mut run_x =
+        aligned_paragraph_x(paragraph_x, paragraph_width, text_line.width_pt, alignment);
       let base_line_style = paragraph_base_style.clone();
-      let mut max_line_height = paragraph_style.line_height(&base_line_style, context.options);
+      // ECMA-376 Part 1 §21.1.2.2.5: without explicit lnSpc, spacing is
+      // determined by the largest piece of text in the line. The inherited
+      // paragraph default is only a fallback for an empty line; treating it
+      // as a minimum moves explicitly smaller text upward in bottom-anchored
+      // placeholders.
+      let mut max_line_height = if text_line.runs.is_empty() {
+        paragraph_style.line_height(&base_line_style, context.options)
+      } else {
+        0.0
+      };
       for line_run in &text_line.runs {
         max_line_height =
           max_line_height.max(paragraph_style.line_height(&line_run.style, context.options));
       }
+      let common_baseline_offset = if matches!(
+        paragraph_style.font_alignment,
+        a::TextFontAlignmentValues::Automatic | a::TextFontAlignmentValues::Baseline
+      ) && !text_line.runs.is_empty()
+      {
+        Some(text_line.runs.iter().fold(0.0_f32, |offset, line_run| {
+          let run_line_height = paragraph_style.line_height(&line_run.style, context.options);
+          // A run-level baseline shift positions only that run relative to
+          // the line baseline (ECMA-376 §21.1.2.3.9). It must not select a
+          // different common baseline for every other run in the line.
+          let mut unshifted_style = line_run.style.clone();
+          unshifted_style.baseline_shift_pt = 0.0;
+          offset.max(paragraph_style.baseline_offset(
+            &unshifted_style,
+            run_line_height,
+            text_metrics,
+          ))
+        }))
+      } else {
+        None
+      };
 
       if is_first_segment
         && line_index == 0
@@ -5501,9 +5573,13 @@ fn lower_paragraph(
         }
         apply_character_bullet_size(&mut bullet_style, bullet.size);
         let bullet_line_height = paragraph_style.line_height(&bullet_style, context.options);
-        max_line_height = max_line_height.max(bullet_line_height);
-        let text_baseline_offset =
-          paragraph_style.baseline_offset(&base_line_style, max_line_height, text_metrics);
+        // The bullet is positioned relative to the paragraph baseline, but
+        // its buSzPct/buSzPts size does not participate in the line's text
+        // height. PowerPoint keeps the line spacing based on the paragraph
+        // runs even when the bullet is 120% or 130% of the text size.
+        let text_baseline_offset = common_baseline_offset.unwrap_or_else(|| {
+          paragraph_style.baseline_offset(&base_line_style, max_line_height, text_metrics)
+        });
         let bullet_baseline_offset =
           raw_baseline_offset(&bullet_style, bullet_line_height, text_metrics);
         let bullet_y_pt = cursor.y_pt + text_baseline_offset - bullet_baseline_offset;
@@ -5537,7 +5613,8 @@ fn lower_paragraph(
         let run_line_height = paragraph_style.line_height(style, context.options);
         max_line_height = max_line_height.max(run_line_height);
         let raw_baseline_offset = raw_baseline_offset(style, run_line_height, text_metrics);
-        let baseline_offset = paragraph_style.baseline_offset(style, run_line_height, text_metrics);
+        let baseline_offset = common_baseline_offset
+          .unwrap_or_else(|| paragraph_style.baseline_offset(style, run_line_height, text_metrics));
         let run_y_pt = cursor.y_pt + baseline_offset - raw_baseline_offset;
         if line_run.run.kind == TextRunKind::Math {
           push_math_ole_preview_item(items, run_x, run_y_pt, line_run.width_pt, run_line_height);
@@ -5646,11 +5723,15 @@ fn layout_text_lines<'a>(
     text.push_str(&run.text);
     run.range = start..text.len();
   }
-  if !text.chars().any(parley_line_break_script)
-    || legacy_lines
-      .iter()
-      .all(|line| line.width_pt <= context.column_width + 0.01)
-  {
+  let joins_word_across_run = prepared_runs
+    .windows(2)
+    .any(|runs| text_spans_join_without_break(runs[0].text.as_str(), runs[1].text.as_str()));
+  let legacy_overflows = legacy_lines
+    .iter()
+    .any(|line| line.width_pt > context.column_width + 0.01);
+  let needs_span_aware_breaking =
+    joins_word_across_run || (text.chars().any(parley_line_break_script) && legacy_overflows);
+  if !needs_span_aware_breaking {
     return legacy_lines;
   }
   let spans = prepared_runs
@@ -5696,6 +5777,17 @@ fn parley_line_break_script(ch: char) -> bool {
       | Script::Khmer
       | Script::Myanmar
   )
+}
+
+fn text_spans_join_without_break(left: &str, right: &str) -> bool {
+  left
+    .chars()
+    .next_back()
+    .is_some_and(|character| !character.is_whitespace())
+    && right
+      .chars()
+      .next()
+      .is_some_and(|character| !character.is_whitespace())
 }
 
 struct PreparedTextRun<'a> {
@@ -5767,9 +5859,14 @@ fn layout_text_lines_legacy<'a>(
         .map_or((hard_line, false), |text| (text, true));
       for token in text_wrap_tokens(line_text) {
         let width_pt = text_metrics.measure_text(token, &style);
+        // The token's trailing whitespace is discarded if this becomes the
+        // end of the line, so it must not force an otherwise fitting word to
+        // the next line. Whitespace already accumulated after the previous
+        // token remains part of current.width_pt and still separates words.
+        let fit_width_pt = text_metrics.measure_text(token.trim_end(), &style);
         if context.options.word_wrap
           && current.width_pt > f32::EPSILON
-          && current.width_pt + width_pt > context.column_width
+          && current.width_pt + fit_width_pt > context.column_width
         {
           trim_text_line_end(&mut current, text_metrics);
           lines.push(current);
@@ -6129,10 +6226,13 @@ fn estimate_wrapped_text_body_height(
         text_metrics,
       );
       for line in lines {
-        let line_height = line.runs.iter().fold(
-          paragraph_style.line_height(&paragraph_base_style, context.options),
-          |height, run| height.max(paragraph_style.line_height(&run.style, context.options)),
-        );
+        let line_height = if line.runs.is_empty() {
+          paragraph_style.line_height(&paragraph_base_style, context.options)
+        } else {
+          line.runs.iter().fold(0.0_f32, |height, run| {
+            height.max(paragraph_style.line_height(&run.style, context.options))
+          })
+        };
         height += line_height;
       }
     }
@@ -6220,8 +6320,10 @@ fn transparent_png_1x1() -> Option<Arc<[u8]>> {
 #[derive(Clone, Debug)]
 struct ParagraphDisplayStyle {
   left_margin_pt: f32,
+  right_margin_pt: f32,
   indent_pt: f32,
   alignment: a::TextAlignmentTypeValues,
+  font_alignment: a::TextFontAlignmentValues,
   line_spacing: ParagraphLineSpacing,
   space_before: ParagraphSpacing,
   space_after: ParagraphSpacing,
@@ -6462,8 +6564,11 @@ impl Default for ParagraphDisplayStyle {
   fn default() -> Self {
     Self {
       left_margin_pt: 0.0,
+      right_margin_pt: 0.0,
       indent_pt: 0.0,
       alignment: a::TextAlignmentTypeValues::Left,
+      // ECMA-376 Part 1 §21.1.2.2.7: omitted fontAlgn implies base.
+      font_alignment: a::TextFontAlignmentValues::Baseline,
       line_spacing: ParagraphLineSpacing::Default,
       space_before: ParagraphSpacing::Zero,
       space_after: ParagraphSpacing::Zero,
@@ -6527,6 +6632,9 @@ impl ParagraphDisplayStyle {
       if let Some(left_margin) = properties.left_margin {
         style.left_margin_pt = units::emu_to_points(i64::from(left_margin));
       }
+      if let Some(right_margin) = properties.right_margin {
+        style.right_margin_pt = units::emu_to_points(i64::from(right_margin));
+      }
       if let Some(indent) = properties.indent {
         style.indent_pt = units::emu_to_points(i64::from(indent));
       }
@@ -6535,6 +6643,9 @@ impl ParagraphDisplayStyle {
       }
       if let Some(alignment) = properties.alignment {
         style.alignment = alignment;
+      }
+      if let Some(font_alignment) = properties.font_alignment {
+        style.font_alignment = font_alignment;
       }
       if let Some(line_spacing) = properties.line_spacing.as_deref() {
         style.line_spacing = paragraph_line_spacing(line_spacing);
@@ -6566,11 +6677,16 @@ impl ParagraphDisplayStyle {
           .left_margin
           .map(|value| units::emu_to_points(i64::from(value)))
           .unwrap_or(self.left_margin_pt);
+        self.right_margin_pt = properties
+          .right_margin
+          .map(|value| units::emu_to_points(i64::from(value)))
+          .unwrap_or(self.right_margin_pt);
         self.indent_pt = properties
           .indent
           .map(|value| units::emu_to_points(i64::from(value)))
           .unwrap_or(self.indent_pt);
         self.alignment = properties.alignment.unwrap_or(self.alignment);
+        self.font_alignment = properties.font_alignment.unwrap_or(self.font_alignment);
         if let Some(line_spacing) = properties.line_spacing.as_deref() {
           self.line_spacing = paragraph_line_spacing(line_spacing);
         }
@@ -6619,11 +6735,16 @@ impl ParagraphDisplayStyle {
           .left_margin
           .map(|value| units::emu_to_points(i64::from(value)))
           .unwrap_or(self.left_margin_pt);
+        self.right_margin_pt = $properties
+          .right_margin
+          .map(|value| units::emu_to_points(i64::from(value)))
+          .unwrap_or(self.right_margin_pt);
         self.indent_pt = $properties
           .indent
           .map(|value| units::emu_to_points(i64::from(value)))
           .unwrap_or(self.indent_pt);
         self.alignment = $properties.alignment.unwrap_or(self.alignment);
+        self.font_alignment = $properties.font_alignment.unwrap_or(self.font_alignment);
         if let Some(line_spacing) = $properties.line_spacing.as_deref() {
           self.line_spacing = paragraph_line_spacing(line_spacing);
         }
@@ -6702,6 +6823,14 @@ impl ParagraphDisplayStyle {
         )
       }
     }
+  }
+
+  fn left_offset(&self, has_bullet: bool) -> f32 {
+    self.left_margin_pt + if has_bullet { 0.0 } else { self.indent_pt }
+  }
+
+  fn available_width(&self, column_width: f32, left_offset: f32) -> f32 {
+    (column_width - left_offset - self.right_margin_pt).max(0.0)
   }
 
   fn bullet(&self, paragraph: &TextParagraph) -> BulletDisplay {
@@ -8042,6 +8171,14 @@ mod tests {
     assert_eq!(character_bullet_label(""), None);
   }
 
+  #[test]
+  fn formatting_run_boundaries_do_not_create_line_break_opportunities() {
+    assert!(text_spans_join_without_break("keywords (", "endpararpr"));
+    assert!(text_spans_join_without_break("endpararpr", ")."));
+    assert!(!text_spans_join_without_break("keywords ", "next"));
+    assert!(!text_spans_join_without_break("word", " next"));
+  }
+
   fn numbered_test_paragraph(level: u8) -> TextParagraph {
     TextParagraph {
       level: Some(level),
@@ -8172,6 +8309,47 @@ mod tests {
         .and_then(|properties| properties.font_size),
       Some(3_000)
     );
+  }
+
+  #[test]
+  fn paragraph_margins_follow_style_precedence_and_reduce_the_line_box() {
+    let paragraph = TextParagraph {
+      master_paragraph_style: Some(TextListParagraphStyle::Default(Box::new(
+        a::DefaultParagraphProperties {
+          left_margin: Some(457_200),
+          right_margin: Some(91_440),
+          ..a::DefaultParagraphProperties::default()
+        },
+      ))),
+      text_paragraph_style: Some(TextListParagraphStyle::Default(Box::new(
+        a::DefaultParagraphProperties {
+          left_margin: Some(742_950),
+          ..a::DefaultParagraphProperties::default()
+        },
+      ))),
+      paragraph_properties: Some(Box::new(a::ParagraphProperties {
+        right_margin: Some(182_880),
+        ..a::ParagraphProperties::default()
+      })),
+      ..TextParagraph::default()
+    };
+
+    let style = ParagraphDisplayStyle::from_paragraph(&paragraph);
+
+    assert!((style.left_margin_pt - 58.5).abs() < 0.001);
+    assert!((style.right_margin_pt - 14.4).abs() < 0.001);
+    let bullet_left = style.left_offset(true);
+    assert!((style.available_width(633.6, bullet_left) - 560.7).abs() < 0.001);
+    assert_eq!(style.available_width(50.0, bullet_left), 0.0);
+
+    let hanging = ParagraphDisplayStyle {
+      left_margin_pt: 8.781_496,
+      indent_pt: -8.781_496,
+      ..ParagraphDisplayStyle::default()
+    };
+    let unbulleted_left = hanging.left_offset(false);
+    assert!(unbulleted_left.abs() < 0.001);
+    assert!((hanging.available_width(74.192_28, unbulleted_left) - 74.192_28).abs() < 0.001);
   }
 
   #[test]

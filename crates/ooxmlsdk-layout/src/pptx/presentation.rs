@@ -11,7 +11,9 @@ use crate::error::Result;
 use super::drawingml::text_list_style::TextListStyle;
 use super::drawingml::theme::{ThemeColorScheme, ThemeFontScheme, ThemeFormatScheme};
 use super::import::PowerPointImport;
-use super::slide::{ColorMap, ShapeLocation, SlideCommentAuthor, SlidePersist, SlideSize};
+use super::slide::{
+  ColorMap, HeaderFooter, ShapeLocation, SlideCommentAuthor, SlidePersist, SlideSize,
+};
 use super::slide_fragment::SlideFragmentHandler;
 
 #[derive(Debug)]
@@ -167,6 +169,11 @@ impl PresentationFragmentHandler {
       if let Some(text_styles) = &master.text_styles {
         persist.set_text_styles(text_styles);
       }
+      persist.header_footer = master
+        .header_footer
+        .as_deref()
+        .map(HeaderFooter::from_pml)
+        .unwrap_or_default();
       let mut handler = SlideFragmentHandler::new(persist, ShapeLocation::Master);
       handler.import_common_slide_data(&master.common_slide_data);
       let mut persist = handler.finalize_import();
@@ -213,6 +220,7 @@ impl PresentationFragmentHandler {
         persist.body_text_style = layout_persist.body_text_style.clone();
         persist.notes_text_style = layout_persist.notes_text_style.clone();
         persist.other_text_style = layout_persist.other_text_style.clone();
+        persist.header_footer = layout_persist.header_footer.clone();
         persist.theme_path = layout_persist.theme_path.clone();
         persist.inherit_related_part_resources_from(layout_persist);
       }
@@ -323,6 +331,7 @@ impl PresentationFragmentHandler {
       persist.body_text_style = master_persist.body_text_style.clone();
       persist.notes_text_style = master_persist.notes_text_style.clone();
       persist.other_text_style = master_persist.other_text_style.clone();
+      persist.header_footer = master_persist.header_footer.clone();
       persist.theme_path = master_persist.theme_path.clone();
       persist.inherit_related_part_resources_from(master_persist);
     }

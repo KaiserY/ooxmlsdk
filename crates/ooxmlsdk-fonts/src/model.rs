@@ -2627,6 +2627,12 @@ pub enum TextScript {
 const DEFAULT_OFFICE_ALIASES: &[(&str, &str)] = &[
   ("Courier", "Courier New"),
   ("TimesNewRomanPSMT", "Times New Roman"),
+  // Legacy Office workbooks use the old Windows localized family name,
+  // while current Excel substitutes the installed Arial face.
+  ("Arial Cyr", "Arial"),
+  // Office fixed-format output maps this unavailable Swiss-family face to
+  // Arial for legacy SpreadsheetML workbooks.
+  ("Frutiger 45 Light", "Arial"),
   ("DINPro-Medium", "DINPro"),
   ("Univers 45 Light", "Univers Light"),
 ];
@@ -4193,6 +4199,42 @@ mod tests {
 
     assert_eq!(resolved.font_id, FontId(Arc::from("liberation")));
     assert_eq!(resolved.resolved_family, Cow::Borrowed("Liberation Serif"));
+  }
+
+  #[test]
+  fn default_office_policy_maps_legacy_arial_cyr_family() {
+    let mut registry = FontRegistry::with_default_policy();
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("arial", "Arial"),
+    );
+
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Arial Cyr")),
+      ..FontRequest::default()
+    };
+    let resolved = registry.resolve(&request).unwrap();
+
+    assert_eq!(resolved.font_id, FontId(Arc::from("arial")));
+    assert_eq!(resolved.resolved_family, Cow::Borrowed("Arial"));
+  }
+
+  #[test]
+  fn default_office_policy_maps_unavailable_frutiger_spreadsheet_face() {
+    let mut registry = FontRegistry::with_default_policy();
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("arial", "Arial"),
+    );
+
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Frutiger 45 Light")),
+      ..FontRequest::default()
+    };
+    let resolved = registry.resolve(&request).unwrap();
+
+    assert_eq!(resolved.font_id, FontId(Arc::from("arial")));
+    assert_eq!(resolved.resolved_family, Cow::Borrowed("Arial"));
   }
 
   #[test]

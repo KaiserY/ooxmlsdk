@@ -133,6 +133,7 @@ pub(crate) struct SheetFormatModel {
   pub(crate) zero_height: bool,
   pub(crate) thick_top: bool,
   pub(crate) thick_bottom: bool,
+  mso_document: bool,
 }
 
 impl Default for SheetFormatModel {
@@ -146,6 +147,7 @@ impl Default for SheetFormatModel {
       zero_height: false,
       thick_top: false,
       thick_bottom: false,
+      mso_document: false,
     }
   }
 }
@@ -187,6 +189,8 @@ pub(crate) struct CalcRow {
   pub(crate) row_index: Option<u32>,
   pub(crate) height: Option<f64>,
   pub(crate) custom_height: bool,
+  pub(crate) thick_top: bool,
+  pub(crate) thick_bottom: bool,
   pub(crate) style_index: Option<u32>,
   pub(crate) hidden: bool,
   pub(crate) cells: Vec<CalcCell>,
@@ -550,6 +554,15 @@ impl SheetGeometry {
         let index = row.row_index?;
         let height_pt = if metrics.format.zero_height || row.hidden {
           0.0
+        } else if !row.custom_height && (row.thick_top || row.thick_bottom) {
+          // ECMA-376 Part 1 §18.3.1.73: an automatic row gains 0.75pt
+          // for each thickTop/thickBot flag. The serialized ht contains the
+          // producer's cached automatic height; recompute from our resolved
+          // Normal-font default so it stays consistent with the rest of the
+          // imported sheet.
+          default_row_height_pt
+            + if row.thick_top { 0.75 } else { 0.0 }
+            + if row.thick_bottom { 0.75 } else { 0.0 }
         } else {
           row
             .height
@@ -700,6 +713,11 @@ impl CalcCell {
       || self.cached_value.is_some()
       || !self.display_text.is_empty()
       || self.data_type.is_some()
+      // ECMA-376 Part 1 §18.3.1.35 defines a formatted cell as used even
+      // when it has no value. Excel includes those cells in the implicit
+      // print range, so a styled blank tail can legitimately create another
+      // printed page.
+      || self.style_index.is_some()
   }
 }
 
@@ -829,6 +847,7 @@ impl SheetMetrics {
       .as_ref()
       .map(|format| SheetFormatModel::from_sheet_format_properties(format, mso_document))
       .unwrap_or_default();
+    format.mso_document = mso_document;
     if !format.custom_height && styles.default_font_uses_theme() {
       format.default_row_height = automatic_default_row_height_pt(styles) as f64;
     }
@@ -919,6 +938,7 @@ impl SheetFormatModel {
       zero_height: format.zero_height.is_some_and(|value| value.as_bool()),
       thick_top: format.thick_top.is_some_and(|value| value.as_bool()),
       thick_bottom: format.thick_bottom.is_some_and(|value| value.as_bool()),
+      mso_document,
     }
   }
 
@@ -929,7 +949,15 @@ impl SheetFormatModel {
     // setBaseColumnWidth() uses baseColWidth plus 5 screen pixels converted
     // through UnitConverter after UnitConverter::finalizeImport() has replaced
     // Unit::Digit with the default font's maximum digit width.
-    let base = self.base_column_width.unwrap_or(8) as f32;
+    // When neither width attribute is serialized, Excel uses its application
+    // default of 8.43 characters. ECMA-376 Part 1 §18.3.1.13 then adds the
+    // four margin pixels and one gridline pixel using the Normal font's
+    // maximum digit width. Non-Microsoft producers such as Apache POI use the
+    // schema base-column default of 8 instead, so retain the producer branch.
+    let base = self.base_column_width.map_or_else(
+      || if self.mso_document { 8.43 } else { 8.0 },
+      |width| width as f32,
+    );
     digit_width_to_lo_points(
       base + CALC_BASE_COLUMN_PADDING_PX * screen_pixel_width_pt() / digit_width_pt,
       digit_width_pt,
@@ -1104,6 +1132,8 @@ fn worksheet_rows(
           }
         }),
         custom_height: row.custom_height.is_some_and(|value| value.as_bool()),
+        thick_top: row.thick_top.is_some_and(|value| value.as_bool()),
+        thick_bottom: row.thick_bot.is_some_and(|value| value.as_bool()),
         style_index: row.style_index,
         hidden: row.hidden.is_some_and(|value| value.as_bool()),
         cells,
@@ -1342,6 +1372,8 @@ mod tests {
       row_index,
       height: None,
       custom_height: false,
+      thick_top: false,
+      thick_bottom: false,
       style_index: None,
       hidden: false,
       cells: Vec::new(),
@@ -1362,5 +1394,43 @@ mod tests {
       SheetFormatModel::default().default_column_width_points(6.0),
       51.75
     );
+  }
+
+  #[test]
+  fn microsoft_implicit_default_column_width_uses_excel_application_default() {
+    let format = SheetFormatModel {
+      mso_document: true,
+      ..SheetFormatModel::default()
+    };
+
+    assert_eq!(format.default_column_width_points(6.0), 54.35);
+  }
+
+  #[test]
+  fn explicitly_formatted_blank_cell_is_used() {
+    let cell = CalcCell {
+      address: Some(CellAddress { col: 11, row: 20 }),
+      style_index: Some(5),
+      data_type: None,
+      formula: None,
+      cached_value: None,
+      display_text: String::new(),
+      rich_text_runs: Vec::new(),
+    };
+
+    assert!(cell.has_print_data());
+  }
+
+  #[test]
+  fn automatic_thick_border_row_recomputes_height_from_default() {
+    let mut metrics = SheetMetrics::default();
+    metrics.format.default_row_height = 13.5;
+    let mut row = empty_row(Some(3));
+    row.height = Some(15.75);
+    row.thick_bottom = true;
+
+    let geometry = SheetGeometry::new(&metrics, &[row]);
+
+    assert_eq!(geometry.row_height_pt(3), 14.25);
   }
 }

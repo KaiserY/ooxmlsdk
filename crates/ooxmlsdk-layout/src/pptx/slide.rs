@@ -595,7 +595,7 @@ pub(crate) enum BackgroundKind {
   },
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct HeaderFooter {
   pub(crate) slide_number: bool,
   pub(crate) header: bool,
@@ -603,15 +603,32 @@ pub(crate) struct HeaderFooter {
   pub(crate) date_time: bool,
 }
 
+impl Default for HeaderFooter {
+  fn default() -> Self {
+    // CT_HeaderFooter defaults every visibility flag to true. This is also
+    // the effective default when the optional p:hf element is absent: an
+    // existing slide-level placeholder remains enabled unless a declaration
+    // explicitly disables its slot.
+    Self {
+      slide_number: true,
+      header: true,
+      footer: true,
+      date_time: true,
+    }
+  }
+}
+
 impl HeaderFooter {
   pub(crate) fn from_pml(header_footer: &p::HeaderFooter) -> Self {
+    // ECMA-376 Part 1 §19.3.1.25 assigns true to every omitted
+    // CT_HeaderFooter visibility attribute.
     Self {
       slide_number: header_footer
         .slide_number
-        .is_some_and(|value| value.as_bool()),
-      header: header_footer.header.is_some_and(|value| value.as_bool()),
-      footer: header_footer.footer.is_some_and(|value| value.as_bool()),
-      date_time: header_footer.date_time.is_some_and(|value| value.as_bool()),
+        .is_none_or(|value| value.as_bool()),
+      header: header_footer.header.is_none_or(|value| value.as_bool()),
+      footer: header_footer.footer.is_none_or(|value| value.as_bool()),
+      date_time: header_footer.date_time.is_none_or(|value| value.as_bool()),
     }
   }
 
@@ -1374,6 +1391,17 @@ impl ColorMapEntry {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn header_footer_attributes_default_to_enabled_when_element_exists() {
+    let header_footer = HeaderFooter::from_pml(&p::HeaderFooter::default());
+
+    assert!(header_footer.slide_number);
+    assert!(header_footer.header);
+    assert!(header_footer.footer);
+    assert!(header_footer.date_time);
+    assert!(HeaderFooter::default().has_visible_slot());
+  }
 
   #[test]
   fn ordinary_shape_text_uses_presentation_default_style_not_other_style() {

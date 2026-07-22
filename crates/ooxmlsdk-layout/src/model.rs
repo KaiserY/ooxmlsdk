@@ -17,6 +17,7 @@ pub struct BorderStyle {
   pub spacing_pt: f32,
   pub color: RgbColor,
   pub compound: bool,
+  pub shadow: bool,
 }
 
 impl Default for BorderStyle {
@@ -26,6 +27,7 @@ impl Default for BorderStyle {
       spacing_pt: 0.0,
       color: RgbColor { r: 0, g: 0, b: 0 },
       compound: false,
+      shadow: false,
     }
   }
 }

@@ -128,6 +128,8 @@ pub struct ImageItem<'doc> {
   pub relationship_id: Option<Cow<'doc, str>>,
   pub alt_text: Option<Cow<'doc, str>>,
   pub hyperlink_url: Option<Cow<'doc, str>>,
+  /// Whether PDF export should recover semantic text from an EMF/WMF OLE preview.
+  pub semantic_metafile_text: bool,
   pub floating: bool,
   pub behind_text: bool,
 }

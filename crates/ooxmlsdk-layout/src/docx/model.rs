@@ -253,9 +253,13 @@ pub(crate) struct ParagraphFormat {
   pub shading: Option<RgbColor>,
   pub borders: CellBordersModel,
   pub page_break_before: bool,
+  pub page_break_before_set: bool,
   pub keep_with_next: bool,
+  pub keep_with_next_set: bool,
   pub keep_lines: bool,
+  pub keep_lines_set: bool,
   pub contextual_spacing: bool,
+  pub contextual_spacing_set: bool,
   pub hidden_separator: bool,
   pub outline_text_inlines: Option<usize>,
   pub outline_level: Option<u8>,
@@ -530,6 +534,7 @@ pub(crate) struct InlineImage {
   pub flip_vertical: bool,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
+  pub semantic_metafile_text: bool,
   pub placement: ImagePlacement,
 }
 

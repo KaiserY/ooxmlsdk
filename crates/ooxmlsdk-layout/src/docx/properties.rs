@@ -49,6 +49,7 @@ pub(super) fn run_style(
     &styles.theme_fonts,
     &styles.theme_colors,
   );
+  styles.apply_font_substitution(&mut style);
   style
 }
 
@@ -73,6 +74,7 @@ pub(super) fn paragraph_mark_run_style(
     &styles.theme_fonts,
     &styles.theme_colors,
   );
+  styles.apply_font_substitution(&mut style);
   style
 }
 

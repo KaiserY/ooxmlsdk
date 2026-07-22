@@ -10,10 +10,11 @@ use crate::docx::{
   FloatingFramePlacement, FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment,
   FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
   HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
-  InlineChart, InlineItem, InlineShape, InlineShapeGeometry, LineHeightRule, PageSetup,
-  ParagraphAlignment, RgbColor, SectionBreakKind, SectionColumns, TabLeader, TabStop,
-  TabStopAlignment, Table, TableAlignment, TableCell, TableCellVerticalAlignment, TableRow,
-  TextBoxVerticalAlignment, TextStyle, VerticalImageAlignment, VerticalImageReference,
+  InlineChart, InlineItem, InlineShape, InlineShapeGeometry, LineHeightRule,
+  PRESERVED_WORD_TEXT_TAB, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
+  SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
+  TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
+  VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
 use crate::model::{
@@ -32,6 +33,10 @@ use crate::units;
 // 0.5in tab stops, and widow/orphan control of two lines.
 const PARAGRAPH_SPACING_AFTER_PT: f32 = 0.0;
 const DEFAULT_TAB_STOP_PT: f32 = 36.0;
+// Word uses a separate 420-twip grid for literal U+0009 characters preserved
+// inside w:t. This is distinct from w:defaultTabStop, whose default is 720
+// twips and applies to the semantic w:tab element.
+const PRESERVED_WORD_TEXT_TAB_STOP_PT: f32 = 21.0;
 const DEFAULT_FONT_SIZE_PT: f32 = 11.0;
 const DEFAULT_LINE_HEIGHT_PT: f32 = 14.0;
 // Writer frame size, including table rows.
@@ -70,9 +75,9 @@ enum NoteSeparatorKind {
 }
 
 fn inline_text_height(style: &TextStyle, text_metrics: &mut TextMetrics) -> f32 {
-  // maps w:szCs to CharHeightComplex. Writer line formatting carries the
-  // multi-script font heights in the line box, while Western glyph shaping
-  // still uses CharHeight for width.
+  // maps w:szCs to CharHeightComplex. Empty lines do not select a complex
+  // script face, but the larger complex-script size still contributes to the
+  // paragraph-mark line box.
   if let Some(complex_font_size_pt) = style.complex_font_size_pt {
     let mut complex_style = style.clone();
     complex_style.font_size_pt = complex_font_size_pt;
@@ -82,6 +87,33 @@ fn inline_text_height(style: &TextStyle, text_metrics: &mut TextMetrics) -> f32 
   } else {
     text_metrics.inline_text_box_height(style)
   }
+}
+
+fn inline_font_slot_height(
+  style: &TextStyle,
+  family: Option<&Arc<str>>,
+  font_size_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let Some(family) = family else {
+    return 0.0;
+  };
+  if style
+    .font_family
+    .as_deref()
+    .is_some_and(|primary| primary.eq_ignore_ascii_case(family))
+    && (style.font_size_pt - font_size_pt).abs() <= f32::EPSILON
+  {
+    return 0.0;
+  }
+
+  let mut slot_style = style.clone();
+  slot_style.font_family = Some(family.clone());
+  // A w:altName substitution belongs to the font-table entry for the
+  // original primary family. It must not be reused for another rFonts slot.
+  slot_style.fallback_font_family = None;
+  slot_style.font_size_pt = font_size_pt;
+  text_metrics.inline_text_box_height(&slot_style)
 }
 
 fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
@@ -267,11 +299,19 @@ fn inline_text_height_for_text(
   text: &str,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
-  if style.complex_font_size_pt.is_some() && text.chars().any(char_uses_complex_font_size) {
-    inline_text_height(style, text_metrics)
-  } else {
-    text_metrics.inline_text_box_height(style)
+  let mut height = text_metrics.inline_text_box_height(style);
+  if style.wordprocessingml_font_slots && text.chars().any(char_uses_complex_font_size) {
+    // w:szCs and w:cs jointly define the complex-script line metrics. The
+    // previous implementation changed only the size while continuing to
+    // measure the ASCII/HAnsi face, which can produce a different line box.
+    height = height.max(inline_font_slot_height(
+      style,
+      style.complex_font_family.as_ref(),
+      style.complex_font_size_pt.unwrap_or(style.font_size_pt),
+      text_metrics,
+    ));
   }
+  height
 }
 
 fn char_uses_complex_font_size(ch: char) -> bool {
@@ -770,6 +810,7 @@ pub(crate) struct ImageItem {
   pub content_type: Option<String>,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
+  pub semantic_metafile_text: bool,
   pub floating: bool,
   pub behind_text: bool,
 }
@@ -1441,6 +1482,7 @@ fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
+    semantic_metafile_text: item.semantic_metafile_text,
     floating: item.floating,
     behind_text: item.behind_text,
   }
@@ -5183,7 +5225,18 @@ fn estimated_paragraph_content_height(
     match item {
       InlineItem::Text(run) => {
         for segment in text_segments(&run.text) {
-          if segment == "\n" || segment == "\t" {
+          if segment == "\n" {
+            // ECMA-376 Part 1 §17.18.4: textWrapping restarts text on the
+            // next line. Even when the break is the paragraph's only
+            // content, that next (empty) line is part of the paragraph and
+            // must be included in table-row measurement just as it is by
+            // TextFrameLayout::format.
+            finish_line(&mut content_height, &mut line_height, &mut line_index);
+            has_flow_content = true;
+            x = 0.0;
+            continue;
+          }
+          if segment == "\t" {
             finish_line(&mut content_height, &mut line_height, &mut line_index);
             x = 0.0;
             continue;
@@ -5561,6 +5614,7 @@ fn layout_document_block(
       if !ignore_top_margin_after_page_break && !ignore_top_margin_at_page_start {
         y += paragraph_spacing_before(previous, paragraph, flow);
       }
+      y += paragraph_border_layout_extent(paragraph.format.borders.top);
       let (paragraph_flow, y) = layout_paragraph(
         paragraph,
         flow,
@@ -5573,6 +5627,7 @@ fn layout_document_block(
         y,
         paragraph_spacing_after(paragraph, next),
       );
+      let y = y + paragraph_border_layout_extent(paragraph.format.borders.bottom);
       (
         FlowContext {
           content_width: flow.content_width,
@@ -5606,6 +5661,12 @@ fn layout_document_block(
       )
     }
   }
+}
+
+fn paragraph_border_layout_extent(border: Option<BorderStyle>) -> f32 {
+  border.map_or(0.0, |border| {
+    border.spacing_pt + border.width_pt + if border.shadow { border.width_pt } else { 0.0 }
+  })
 }
 
 fn table_has_indirect_previous_frame(page: &Page, flow: FlowContext, y: f32) -> bool {
@@ -6152,14 +6213,14 @@ fn repeating_slot_blocks_for_page<'a>(
   let use_even_slot = document.even_and_odd_headers && page_number.is_multiple_of(2);
   let header_blocks = if first_page_in_section && title_page {
     first_header
-  } else if use_even_slot && !even_header.is_empty() {
+  } else if use_even_slot {
     even_header
   } else {
     default_header
   };
-  let footer_blocks = if first_page_in_section && title_page && !first_footer.is_empty() {
+  let footer_blocks = if first_page_in_section && title_page {
     first_footer
-  } else if use_even_slot && !even_footer.is_empty() {
+  } else if use_even_slot {
     even_footer
   } else {
     default_footer
@@ -7056,7 +7117,7 @@ fn repeating_slots_present_for_page(
   let (footer, footer_height, _) = selected_repeating_slot(
     first_page_in_section,
     use_even_slot,
-    slots.title_page && slots.first_footer,
+    slots.title_page,
     (slots.first_footer, slots.first_footer_height_pt),
     (slots.even_footer, slots.even_footer_height_pt),
     (slots.default_footer, slots.default_footer_height_pt),
@@ -7075,7 +7136,7 @@ fn selected_repeating_slot(
   if first_page_in_section && title_page {
     return (first.0, first.1, true);
   }
-  if use_even_slot && even.0 {
+  if use_even_slot {
     return (even.0, even.1, false);
   }
   if default_.0 {
@@ -10293,25 +10354,34 @@ fn table_cell_preferred_column_widths(
   let mut widths = vec![0.0; column_count];
   let mut saw_preferred_width = false;
 
-  for row in &table.rows {
-    let mut grid_index = row.grid_before;
-    for cell in &row.cells {
-      if grid_index >= column_count {
-        break;
+  // Reconstruct malformed or incomplete tblGrid data from the narrowest
+  // constraints first. A one-column tcW defines that grid column directly;
+  // a later gridSpan cell only constrains the sum. Processing document row
+  // order would let an early spanning cell divide its width equally and then
+  // prevent narrower explicit cells in a later row from recovering the grid.
+  for constraint_span in 1..=column_count {
+    for row in &table.rows {
+      let mut grid_index = row.grid_before;
+      for cell in &row.cells {
+        if grid_index >= column_count {
+          break;
+        }
+        let span = cell
+          .grid_span
+          .max(1)
+          .min(column_count.saturating_sub(grid_index));
+        if span == constraint_span {
+          let width = cell
+            .preferred_width_pt
+            .or_else(|| cell.preferred_width_pct.map(|pct| content_width * pct))
+            .unwrap_or(0.0);
+          if width > 0.0 {
+            saw_preferred_width = true;
+            grow_spanned_columns_to_width(&mut widths[grid_index..grid_index + span], width);
+          }
+        }
+        grid_index += span;
       }
-      let span = cell
-        .grid_span
-        .max(1)
-        .min(column_count.saturating_sub(grid_index));
-      let width = cell
-        .preferred_width_pt
-        .or_else(|| cell.preferred_width_pct.map(|pct| content_width * pct))
-        .unwrap_or(0.0);
-      if width > 0.0 {
-        saw_preferred_width = true;
-        grow_spanned_columns_to_width(&mut widths[grid_index..grid_index + span], width);
-      }
-      grid_index += span;
     }
   }
 
@@ -12621,6 +12691,7 @@ impl<'a> TextFrameLayout<'a> {
     let mut emitted = paragraph.list_label.is_some();
     let mut behind_text_floating_only = false;
     let mut pending_text_page_break = false;
+    let mut ended_with_explicit_page_break = false;
     let mut pending_tab: Option<PendingAlignedTab> = None;
     let mut text_state = TextFrameState::new();
     let line = LineFrame::first(text_frame, y, paragraph.list_label.is_some());
@@ -12781,6 +12852,9 @@ impl<'a> TextFrameLayout<'a> {
           }
         }
         InlineItem::Text(run) => {
+          if !run.text.is_empty() {
+            ended_with_explicit_page_break = false;
+          }
           if pending_text_page_break {
             (flow, text_frame, y, line_left, line_right, line_height) =
               self.force_text_page_break(flow, current, pages, text_metrics, &mut wrap_exclusions);
@@ -12821,7 +12895,7 @@ impl<'a> TextFrameLayout<'a> {
           } else {
             text_segments_with_offsets(&run.text)
           };
-          for segment in segments {
+          for (segment_index, segment) in segments.iter().enumerate() {
             if segment.text == "\n" {
               text_state.set_position(InlineCursor {
                 inline_index,
@@ -12941,9 +13015,53 @@ impl<'a> TextFrameLayout<'a> {
               emitted = true;
               continue;
             }
+            if segment.text.starts_with(PRESERVED_WORD_TEXT_TAB) {
+              text_state.set_position(InlineCursor {
+                inline_index,
+                text_offset: segment.end,
+              });
+              flush_text(
+                current,
+                TextPlacement {
+                  x_pt: chunk_x,
+                  y_pt: y,
+                  line_height_pt: line_height,
+                },
+                &mut chunk,
+                &run.style,
+                &meta,
+              );
+              let relative_x = (x - line_left).max(0.0);
+              x = line_left
+                + ((relative_x / PRESERVED_WORD_TEXT_TAB_STOP_PT).floor() + 1.0)
+                  * PRESERVED_WORD_TEXT_TAB_STOP_PT;
+              if x > line_right {
+                tab_over_margin_active = true;
+              }
+              line_used_shrink_fit = false;
+              line_used_punctuation_fit = false;
+              line_has_tab = true;
+              chunk_x = x;
+              pending_tab = None;
+              emitted = true;
+              continue;
+            }
 
             let width = text_metrics.measure_text(&segment.text, &run.style);
             let fit_width = line_fit_width(&segment.text, &run.style, text_metrics);
+            let continuation_fit_width = if flow.text_segmentation != TextSegmentation::DrawingLayer
+              && segment_index + 1 == segments.len()
+            {
+              cross_run_unbreakable_continuation_width(
+                &paragraph.inlines,
+                inline_index,
+                &segment.text,
+                text_metrics,
+              )
+            } else {
+              0.0
+            };
+            let fit_width_with_continuation = fit_width + continuation_fit_width;
             let line_capacity = (line_right - line_left).max(DEFAULT_FONT_SIZE_PT);
             let whitespace = segment.text.chars().all(char::is_whitespace);
 
@@ -12968,8 +13086,8 @@ impl<'a> TextFrameLayout<'a> {
             let blocks_second_extra_character = natural_overflow
               && line_used_punctuation_fit
               && only_char.is_none_or(|ch| !cjk_cannot_start_line(ch));
-            let overflows_line =
-              text_overflows_line(x, fit_width, line_right) || blocks_second_extra_character;
+            let overflows_line = text_overflows_line(x, fit_width_with_continuation, line_right)
+              || blocks_second_extra_character;
             let fits_with_shrink = overflows_line
               && shrink_justified_lines
               && !line_used_shrink_fit
@@ -12979,7 +13097,7 @@ impl<'a> TextFrameLayout<'a> {
               && line_fits_with_word_space_shrink(
                 LineShrinkFit {
                   x,
-                  width: fit_width,
+                  width: fit_width_with_continuation,
                   line_right,
                   items: &current.items,
                   item_start: line_item_start_index,
@@ -13363,6 +13481,7 @@ impl<'a> TextFrameLayout<'a> {
           pending_tab = None;
         }
         InlineItem::Image(image) => {
+          ended_with_explicit_page_break = false;
           text_state.set_position(InlineCursor::after_inline(inline_index));
           pending_tab = None;
           if let crate::docx::ImagePlacement::Floating(placement) = image.placement {
@@ -13388,6 +13507,7 @@ impl<'a> TextFrameLayout<'a> {
               content_type: image.content_type.clone(),
               alt_text: image.alt_text.clone(),
               hyperlink_url: image.hyperlink_url.clone(),
+              semantic_metafile_text: image.semantic_metafile_text,
               floating: true,
               behind_text: placement.behind_text,
             }));
@@ -13571,6 +13691,7 @@ impl<'a> TextFrameLayout<'a> {
             content_type: image.content_type.clone(),
             alt_text: image.alt_text.clone(),
             hyperlink_url: image.hyperlink_url.clone(),
+            semantic_metafile_text: image.semantic_metafile_text,
             floating: false,
             behind_text: false,
           }));
@@ -13596,6 +13717,7 @@ impl<'a> TextFrameLayout<'a> {
           emitted = true;
         }
         InlineItem::Shape(shape) => {
+          ended_with_explicit_page_break = false;
           text_state.set_position(InlineCursor::after_inline(inline_index));
           pending_tab = None;
           let place_shape = |current: &mut Page,
@@ -13626,6 +13748,7 @@ impl<'a> TextFrameLayout<'a> {
                 content_type: fill_image.content_type.clone(),
                 alt_text: None,
                 hyperlink_url: None,
+                semantic_metafile_text: false,
                 floating: matches!(shape.placement, crate::docx::ImagePlacement::Floating(_)),
                 behind_text: false,
               }));
@@ -14052,6 +14175,7 @@ impl<'a> TextFrameLayout<'a> {
           }
         }
         InlineItem::PageBreak => {
+          ended_with_explicit_page_break = true;
           text_state.set_position(InlineCursor::after_inline(inline_index));
           text_state.finish_line(y, line_height);
           line_has_form_widget = false;
@@ -14078,6 +14202,7 @@ impl<'a> TextFrameLayout<'a> {
           pending_tab = None;
         }
         InlineItem::ColumnBreak => {
+          ended_with_explicit_page_break = false;
           text_state.set_position(InlineCursor::after_inline(inline_index));
           text_state.finish_line(y, line_height);
           let column_emitted;
@@ -14154,6 +14279,12 @@ impl<'a> TextFrameLayout<'a> {
       text_state.finish_paragraph(y, real_height, emitted);
       paragraph_bottom = y + real_height;
       y = paragraph_bottom + self.spacing_after_pt;
+    } else if ended_with_explicit_page_break && !flow.split_page_break_and_paragraph_mark {
+      // By default, a page break at the end of a paragraph does not allocate
+      // an additional empty text line before the following paragraph. The
+      // w:splitPgBreakAndParaMark compatibility switch intentionally retains
+      // that line and therefore stays on the normal empty-paragraph path.
+      paragraph_bottom = y;
     } else if behind_text_floating_only {
       paragraph_bottom = y + base_line_height;
       y = paragraph_bottom + self.spacing_after_pt;
@@ -14265,7 +14396,7 @@ fn text_segments(text: &str) -> Vec<String> {
   let mut start = 0;
 
   for (index, ch) in text.char_indices() {
-    if ch != '\n' && ch != '\t' {
+    if ch != '\n' && ch != '\t' && ch != PRESERVED_WORD_TEXT_TAB {
       continue;
     }
 
@@ -14294,12 +14425,64 @@ fn text_segments_with_offsets(text: &str) -> Vec<TextSegment> {
     .collect()
 }
 
+fn cross_run_unbreakable_continuation_width(
+  inlines: &[InlineItem],
+  inline_index: usize,
+  current_segment: &str,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  if current_segment.is_empty()
+    || current_segment
+      .chars()
+      .last()
+      .is_some_and(char::is_whitespace)
+  {
+    return 0.0;
+  }
+
+  let mut combined = current_segment.to_string();
+  let mut following_text = Vec::new();
+  for inline in &inlines[inline_index.saturating_add(1)..] {
+    let InlineItem::Text(run) = inline else {
+      break;
+    };
+    if run.text.is_empty() {
+      continue;
+    }
+    combined.push_str(&run.text);
+    following_text.push(run);
+    let first_segment_len = text_segments(&combined).first().map_or(0, String::len);
+    if first_segment_len < combined.len() {
+      break;
+    }
+  }
+
+  let first_segment_len = text_segments(&combined).first().map_or(0, String::len);
+  let continuation_len = combined
+    .get(current_segment.len()..first_segment_len)
+    .unwrap_or_default()
+    .trim_end_matches(libreoffice_line_end_elidable_blank)
+    .len();
+  let mut remaining = continuation_len;
+  let mut width = 0.0;
+  for run in following_text {
+    if remaining == 0 {
+      break;
+    }
+    let take = remaining.min(run.text.len());
+    debug_assert!(run.text.is_char_boundary(take));
+    width += text_metrics.measure_text(&run.text[..take], &run.style);
+    remaining -= take;
+  }
+  width
+}
+
 fn drawing_layer_text_segments_with_offsets(text: &str) -> Vec<TextSegment> {
   let mut output = Vec::new();
   let mut start = 0usize;
 
   for (index, ch) in text.char_indices() {
-    if ch == '\n' || ch == '\t' {
+    if ch == '\n' || ch == '\t' || ch == PRESERVED_WORD_TEXT_TAB {
       if start < index {
         output.push(TextSegment {
           text: text[start..index].to_string(),
@@ -14676,6 +14859,11 @@ fn next_tab_stop(
 
   let default_tab_stop_pt = default_tab_stop_pt.max(DEFAULT_FONT_SIZE_PT);
   ResolvedTabStop {
+    // ECMA-376 Part 1 §17.15.1.25 repeats automatic stops across the
+    // displayed paragraph area. Word anchors that grid at the paragraph text
+    // origin: when a long numbering label passes its explicit stop, the next
+    // automatic stop remains a defaultTabStop multiple from line_left rather
+    // than from physical page coordinate zero.
     x_pt: line_left + ((relative_x / default_tab_stop_pt).floor() + 1.0) * default_tab_stop_pt,
     alignment: TabStopAlignment::Left,
     leader: TabLeader::None,
@@ -15520,6 +15708,7 @@ mod tests {
         spacing_pt: 0.0,
         color: RgbColor::default(),
         compound: true,
+        shadow: false,
       },
     );
 
@@ -15552,6 +15741,7 @@ mod tests {
         spacing_pt: 0.0,
         color: RgbColor::default(),
         compound: true,
+        shadow: false,
       },
     );
 
@@ -16174,6 +16364,117 @@ mod tests {
   }
 
   #[test]
+  fn minimal_gridless_table_with_leading_cell_breaks_creates_row_frame() {
+    fn paragraph(text: &str) -> Block {
+      let run = TextRun {
+        text: text.to_string(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        preserve_text_portion: false,
+      };
+      Block::paragraph(Paragraph {
+        inlines: vec![InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: TextStyle::default(),
+        #[cfg(test)]
+        runs: vec![run],
+        format: Box::new(ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        list_label: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      })
+    }
+
+    let table = Table {
+      column_widths_pt: Vec::new(),
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      align_leading_cell_content: true,
+      placement: None,
+      split_allowed: false,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      starts_after_last_rendered_page_break: false,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: vec![TableRow {
+        cells: vec![TableCell {
+          blocks: vec![paragraph("\n"), paragraph("\n"), paragraph("\ncell text")],
+          shading: None,
+          borders: CellBordersModel::default(),
+          margins: CellMargins::default(),
+          preferred_width_pt: None,
+          preferred_width_pct: None,
+          grid_span: 1,
+          vertical_merge_continue: false,
+          vertical_alignment: TableCellVerticalAlignment::Top,
+        }],
+        height_pt: None,
+        exact_height: false,
+        repeat_header: false,
+        keep_with_next: false,
+        cant_split: false,
+        cell_spacing_pt: None,
+        grid_before: 0,
+        grid_after: 0,
+        redline_color: None,
+      }],
+    };
+    let area = BlockArea {
+      setup: PageSetup::default(),
+      section_index: 0,
+      section_page_index: 0,
+      column_index: 0,
+      columns: SectionColumns::default(),
+      content_top_pt: 72.0,
+      content_left_pt: 72.0,
+      content_bottom: 720.0,
+      body_content_bottom_pt: 720.0,
+      content_width: 451.0,
+      default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      compatibility_mode: 12,
+      justify_lines_with_shrinking: false,
+      repeating_slots: RepeatingSlotState::default(),
+    };
+    let mut text_metrics = TextMetrics::new();
+    let layout =
+      TableFrameLayout::new(&table, area, false, &mut text_metrics).expect("gridless table frame");
+    let mut page = empty_page(area.setup, 0);
+    let mut pages = Vec::new();
+    let (_, bottom) = layout.format(
+      &mut page,
+      &mut pages,
+      &mut text_metrics,
+      area.content_top_pt,
+      true,
+    );
+
+    assert!(bottom > area.content_top_pt);
+    assert!(
+      page
+        .frame_fragments
+        .iter()
+        .any(|fragment| fragment.kind == FrameFragmentKind::TableRow)
+    );
+    assert!(
+      page
+        .items
+        .iter()
+        .any(|item| { matches!(item, PageItem::Text(text) if text.text.contains("cell text")) })
+    );
+  }
+
+  #[test]
   fn table_follow_reuses_master_row_metrics_when_page_geometry_is_unchanged() {
     let table = Table {
       column_widths_pt: vec![72.0],
@@ -16538,5 +16839,21 @@ mod tests {
       panic!("expected text item");
     };
     assert_eq!(text.text, "9");
+  }
+
+  #[test]
+  fn empty_even_repeating_slot_does_not_fall_back_to_default() {
+    assert_eq!(
+      selected_repeating_slot(false, true, false, (false, 0.0), (false, 0.0), (true, 12.0),),
+      (false, 0.0, false)
+    );
+  }
+
+  #[test]
+  fn empty_first_repeating_slot_does_not_fall_back_to_default() {
+    assert_eq!(
+      selected_repeating_slot(true, false, true, (false, 0.0), (false, 0.0), (true, 12.0),),
+      (false, 0.0, true)
+    );
   }
 }

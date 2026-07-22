@@ -16,7 +16,7 @@ struct CustomXmlBindingEntry {
 impl CustomXmlBindings {
   pub(super) fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Self {
     let parts = main.custom_xml_parts(package).collect::<Vec<_>>();
-    let entries = parts
+    let mut entries: Vec<CustomXmlBindingEntry> = parts
       .iter()
       .filter_map(|part| {
         let store_item_id = part
@@ -27,6 +27,14 @@ impl CustomXmlBindings {
         Some(CustomXmlBindingEntry { store_item_id, xml })
       })
       .collect();
+    if let Some(part) = package.core_file_properties_part()
+      && let Ok(Some(xml)) = part.data_as_str(package)
+    {
+      entries.push(CustomXmlBindingEntry {
+        store_item_id: Some("{6C3C8BC8-F283-45AE-878A-BAB7291924A1}".to_owned()),
+        xml: xml.to_owned(),
+      });
+    }
     Self { entries }
   }
 
@@ -88,7 +96,9 @@ fn sdt_tag(properties: &w::SdtProperties) -> Option<&str> {
 }
 
 fn custom_xml_xpath_value(xml: &str, xpath: &str) -> Option<String> {
-  let attr_name = xpath.rsplit_once("/@")?.1;
+  let Some((_, attr_name)) = xpath.rsplit_once("/@") else {
+    return custom_xml_xpath_element_text(xml, xpath);
+  };
   if attr_name.is_empty()
     || attr_name
       .bytes()
@@ -120,6 +130,122 @@ fn custom_xml_xpath_value(xml: &str, xpath: &str) -> Option<String> {
     }
   }
   None
+}
+
+fn custom_xml_xpath_element_text(xml: &str, xpath: &str) -> Option<String> {
+  let expected_path = xpath
+    .strip_prefix('/')?
+    .split('/')
+    .map(xpath_local_name)
+    .collect::<Option<Vec<_>>>()?;
+  if expected_path.is_empty() {
+    return None;
+  }
+
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(true);
+  let mut path = Vec::new();
+  let mut child_positions = vec![HashMap::<String, usize>::new()];
+  let mut matched_depth = None;
+  let mut value = String::new();
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) => {
+        let name = xml_local_name(event.name().as_ref())?;
+        let position = child_positions
+          .last_mut()?
+          .entry(name.clone())
+          .and_modify(|position| *position += 1)
+          .or_insert(1);
+        path.push((name, *position));
+        child_positions.push(HashMap::new());
+        if xpath_path_matches(&path, &expected_path) {
+          matched_depth = Some(path.len());
+        }
+      }
+      Ok(Event::Empty(event)) => {
+        let name = xml_local_name(event.name().as_ref())?;
+        let position = child_positions
+          .last_mut()?
+          .entry(name.clone())
+          .and_modify(|position| *position += 1)
+          .or_insert(1);
+        path.push((name, *position));
+        if xpath_path_matches(&path, &expected_path) {
+          return Some(String::new());
+        }
+        path.pop();
+      }
+      Ok(Event::Text(text)) if matched_depth.is_some() => {
+        value.push_str(&text.xml10_content().ok()?);
+      }
+      Ok(Event::CData(text)) if matched_depth.is_some() => {
+        value.push_str(&text.xml10_content().ok()?);
+      }
+      Ok(Event::End(_)) => {
+        if matched_depth == Some(path.len()) {
+          return Some(value);
+        }
+        path.pop();
+        child_positions.pop();
+      }
+      Ok(Event::Eof) => break,
+      Ok(_) => {}
+      Err(_) => break,
+    }
+  }
+  None
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct XPathStep {
+  name: String,
+  position: Option<usize>,
+}
+
+fn xpath_local_name(segment: &str) -> Option<XPathStep> {
+  let (name, position) = if let Some((name, suffix)) = segment.rsplit_once('[') {
+    (name, Some(suffix.strip_suffix(']')?.parse::<usize>().ok()?))
+  } else {
+    (segment, None)
+  };
+  if name.is_empty()
+    || name
+      .bytes()
+      .any(|byte| !(byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b':' | b'.')))
+  {
+    return None;
+  }
+  Some(XPathStep {
+    name: name
+      .rsplit_once(':')
+      .map_or(name, |(_, name)| name)
+      .to_owned(),
+    position,
+  })
+}
+
+fn xpath_path_matches(path: &[(String, usize)], expected: &[XPathStep]) -> bool {
+  path.len() == expected.len()
+    && path
+      .iter()
+      .zip(expected)
+      .all(|((name, position), expected)| {
+        name == &expected.name
+          && expected
+            .position
+            .is_none_or(|expected| expected == *position)
+      })
+}
+
+fn xml_local_name(name: &[u8]) -> Option<String> {
+  let name = std::str::from_utf8(name).ok()?;
+  Some(
+    name
+      .rsplit_once(':')
+      .map_or(name, |(_, name)| name)
+      .to_owned(),
+  )
 }
 
 fn xpath_attr_predicates(xpath: &str) -> Vec<(String, String)> {
@@ -197,6 +323,30 @@ mod tests {
     );
     assert_eq!(
       custom_xml_xpath_value("<root text='value'/>", "//root/@text]"),
+      None
+    );
+  }
+
+  #[test]
+  fn custom_xml_xpath_reads_absolute_element_text() {
+    let xml = r#"<BlogPostInfo xmlns="urn:blog"><PostTitle>ignored</PostTitle><PostTitle>Coquilles saint jacques</PostTitle></BlogPostInfo>"#;
+
+    assert_eq!(
+      custom_xml_xpath_value(xml, "/ns0:BlogPostInfo[1]/ns0:PostTitle[2]").as_deref(),
+      Some("Coquilles saint jacques")
+    );
+  }
+
+  #[test]
+  fn custom_xml_xpath_distinguishes_empty_element_from_no_match() {
+    let xml = r#"<coreProperties><subject/></coreProperties>"#;
+
+    assert_eq!(
+      custom_xml_xpath_value(xml, "/coreProperties[1]/subject[1]").as_deref(),
+      Some("")
+    );
+    assert_eq!(
+      custom_xml_xpath_value(xml, "/coreProperties[1]/title[1]"),
       None
     );
   }

@@ -446,6 +446,7 @@ struct TextItem<'doc> {
   decoration_span_start_x_pt: Option<f32>,
   pdf_text_segmentation: common::PdfTextSegmentation,
   source_path: Option<&'doc [usize]>,
+  semantic_target_width_pt: Option<f32>,
 }
 
 #[derive(Clone, Debug)]
@@ -463,6 +464,7 @@ struct ImageItem<'doc> {
   content_type: Option<Cow<'doc, str>>,
   alt_text: Option<Cow<'doc, str>>,
   hyperlink_url: Option<Cow<'doc, str>>,
+  semantic_metafile_text: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -537,7 +539,7 @@ struct RgbColor {
   b: u8,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 struct TextStyle<'doc> {
   font_family: Option<Cow<'doc, str>>,
   fallback_font_family: Option<Cow<'doc, str>>,
@@ -561,6 +563,7 @@ struct TextStyle<'doc> {
   uppercase: bool,
   small_caps: bool,
   hidden: bool,
+  semantic_only: bool,
   rotation_deg: f32,
   color: RgbColor,
   opacity: f32,
@@ -1365,6 +1368,8 @@ impl<'doc> PaintDocument<'doc> {
             }),
           text_metrics,
         );
+        let (layout_items, line_owners) =
+          expand_metafile_semantic_text_items(layout_items, line_owners, document.engine_kind);
         let decoration_metadata = decoration_render_metadata(&layout_items);
         let items = layout_items
           .into_iter()
@@ -1415,6 +1420,80 @@ fn pdf_page_dimension(engine_kind: common::LayoutEngineKind, dimension_pt: f32) 
   }
 }
 
+fn expand_metafile_semantic_text_items<'doc>(
+  items: Vec<PageItem<'doc>>,
+  owners: Vec<Option<PaintLineOwner>>,
+  engine_kind: common::LayoutEngineKind,
+) -> (Vec<PageItem<'doc>>, Vec<Option<PaintLineOwner>>) {
+  if engine_kind != common::LayoutEngineKind::Docx {
+    return (items, owners);
+  }
+
+  let mut expanded_items = Vec::with_capacity(items.len());
+  let mut expanded_owners = Vec::with_capacity(owners.len());
+  for (item, owner) in items.into_iter().zip(owners) {
+    let semantic_runs = match &item {
+      PageItem::Image(image)
+        if image.semantic_metafile_text
+          && image.rotation_deg.abs() <= f32::EPSILON
+          && !image.flip_horizontal
+          && !image.flip_vertical
+          && image.crop == ImageCrop::default() =>
+      {
+        ooxmlsdk_layout::render::emf_wmf::extract_metafile_text_runs(
+          &image.data,
+          image.content_type.as_deref(),
+        )
+        .into_iter()
+        .map(|run| {
+          let font_size_pt = run
+            .font_size
+            .map(|size| size * image.height_pt)
+            .unwrap_or(11.0)
+            .max(1.0);
+          PageItem::Text(TextItem {
+            x_pt: image.x_pt + run.x * image.width_pt,
+            y_pt: image.y_pt + run.y * image.height_pt,
+            line_height_pt: (font_size_pt * 1.15).max(1.0),
+            text: Cow::Owned(run.text),
+            style: TextStyle {
+              font_family: run.font_family.map(Cow::Owned),
+              font_size_pt,
+              semantic_only: true,
+              ..TextStyle::default()
+            },
+            rotation_center_pt: None,
+            hyperlink_url: None,
+            dynamic_field: None,
+            form_widget_id: None,
+            paragraph_bidi: false,
+            word_spacing_pt: 0.0,
+            preserve_text_portion: false,
+            decoration_span_start_x_pt: None,
+            pdf_text_segmentation: common::PdfTextSegmentation::Line,
+            source_path: None,
+            semantic_target_width_pt: run.width.map(|width| width * image.width_pt),
+          })
+        })
+        .collect::<Vec<_>>()
+      }
+      PageItem::Image(_)
+      | PageItem::Text(_)
+      | PageItem::LinkArea(_)
+      | PageItem::Rect(_)
+      | PageItem::Line(_)
+      | PageItem::Polyline(_) => Vec::new(),
+    };
+    expanded_items.push(item);
+    expanded_owners.push(owner);
+    for semantic_run in semantic_runs {
+      expanded_items.push(semantic_run);
+      expanded_owners.push(None);
+    }
+  }
+  (expanded_items, expanded_owners)
+}
+
 fn page_item_from_common<'doc>(item: &'doc common::DisplayItem<'static>) -> Option<PageItem<'doc>> {
   match item {
     common::DisplayItem::Text(text) => Some(PageItem::Text(text_item_from_common(text))),
@@ -1450,6 +1529,7 @@ fn text_item_from_common<'doc>(text: &'doc common::TextRun<'static>) -> TextItem
     decoration_span_start_x_pt: None,
     pdf_text_segmentation: text.pdf_text_segmentation,
     source_path: text.source.as_ref().map(|source| source.path.as_slice()),
+    semantic_target_width_pt: None,
   }
 }
 
@@ -1474,6 +1554,7 @@ fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> Imag
       .hyperlink_url
       .as_ref()
       .map(|url| Cow::Borrowed(url.as_ref())),
+    semantic_metafile_text: image.semantic_metafile_text,
   }
 }
 
@@ -1576,6 +1657,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     uppercase: style.uppercase,
     small_caps: style.small_caps,
     hidden: style.hidden,
+    semantic_only: false,
     rotation_deg: style.rotation_degrees,
     color: rgb(style.color),
     opacity: opacity(style.color),
@@ -1739,11 +1821,17 @@ fn writer_text_items_coalesce(
 
 impl<'doc> PaintText<'doc> {
   fn from_layout_text(
-    text: TextItem<'doc>,
+    mut text: TextItem<'doc>,
     owner: Option<PaintLineOwner>,
     page_width_pt: f32,
     text_metrics: &mut TextMetrics,
   ) -> Self {
+    if let Some(target_width_pt) = text.semantic_target_width_pt {
+      let measured_width_pt = text_metrics.measure_text(&text.text, &text.style);
+      if measured_width_pt > f32::EPSILON {
+        text.style.horizontal_scale = Some((target_width_pt / measured_width_pt).max(0.01));
+      }
+    }
     let text_ref = &text;
     let glyphs = shaped_pdf_glyphs(
       &text_ref.text,
@@ -1755,19 +1843,28 @@ impl<'doc> PaintText<'doc> {
       .as_ref()
       .map(|run| run.width_pt)
       .unwrap_or_else(|| text_metrics.measure_text(&text_ref.text, &text_ref.style));
-    let baseline_y = match owner.map(|owner| owner.frame_kind) {
-      Some(FollowFrameKind::Table) => text_ref.y_pt - text_ref.style.baseline_shift_pt,
-      Some(FollowFrameKind::Paragraph | FollowFrameKind::Notes) | None => {
-        let offset = if text_ref.style.use_windows_font_metrics {
-          text_metrics
-            .baseline_offset_in_line_with_windows_metrics(&text_ref.style, text_ref.line_height_pt)
-        } else {
-          text_metrics.baseline_offset_in_line(&text_ref.style, text_ref.line_height_pt)
-        };
-        text_ref.y_pt + offset
+    let vertical_metrics = text_metrics.vertical_metrics(&text_ref.style);
+    let baseline_y = if text_ref.style.semantic_only {
+      // EMF text extraction reports the reference point consumed as the
+      // baseline by emfsdk's raster replay. Preserve that exact coordinate
+      // instead of applying the surrounding document line-box metrics.
+      text_ref.y_pt
+    } else {
+      match owner.map(|owner| owner.frame_kind) {
+        Some(FollowFrameKind::Table) => text_ref.y_pt - text_ref.style.baseline_shift_pt,
+        Some(FollowFrameKind::Paragraph | FollowFrameKind::Notes) | None => {
+          let offset = if text_ref.style.use_windows_font_metrics {
+            text_metrics.baseline_offset_in_line_with_windows_metrics(
+              &text_ref.style,
+              text_ref.line_height_pt,
+            )
+          } else {
+            text_metrics.baseline_offset_in_line(&text_ref.style, text_ref.line_height_pt)
+          };
+          text_ref.y_pt + offset
+        }
       }
     };
-    let vertical_metrics = text_metrics.vertical_metrics(&text_ref.style);
     let text_box_y_pt =
       baseline_y - vertical_metrics.ascent_pt - vertical_metrics.leading_above_pt();
     let text_box_height_pt = vertical_metrics.line_height_pt();
@@ -2847,7 +2944,8 @@ fn draw_text_item(
 }
 
 fn text_has_visible_glyph_paint(style: &TextStyle<'_>) -> bool {
-  style.opacity > f32::EPSILON
+  style.semantic_only
+    || style.opacity > f32::EPSILON
     || (style.outline_color.is_some()
       && style.outline_width_pt > f32::EPSILON
       && style.outline_opacity > f32::EPSILON)

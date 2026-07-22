@@ -2747,6 +2747,10 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
       script: None,
       language: None,
       families: vec![
+        // Windows Office routes unsupported Common-script symbols (including
+        // Word 2010 checkbox characters U+2610/U+2612) through Segoe UI
+        // Symbol before generic text faces.
+        Cow::Borrowed("Segoe UI Symbol"),
         Cow::Borrowed("DejaVu Sans"),
         Cow::Borrowed("Liberation Sans"),
         Cow::Borrowed("Noto Sans"),
@@ -4673,6 +4677,26 @@ mod tests {
       .position(|family| *family == "DejaVu Sans")
       .expect("generic fallback");
     assert!(math < generic);
+  }
+
+  #[test]
+  fn office_common_symbol_fallback_precedes_generic_sans() {
+    let registry = FontRegistry::with_default_policy();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Liberation Serif")),
+      ..FontRequest::default()
+    };
+
+    let families = registry.fallback_families(&request);
+    let symbol = families
+      .iter()
+      .position(|family| *family == "Segoe UI Symbol")
+      .expect("Office symbol fallback");
+    let generic = families
+      .iter()
+      .position(|family| *family == "DejaVu Sans")
+      .expect("generic fallback");
+    assert!(symbol < generic);
   }
 
   #[test]

@@ -150,6 +150,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
+    semantic_metafile_text: false,
     floating: item.floating,
     behind_text: item.behind_text,
   }

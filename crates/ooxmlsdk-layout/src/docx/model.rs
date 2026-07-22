@@ -5,14 +5,15 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
 pub(crate) use crate::model::{
-  BorderStyle, CellBordersModel, DynamicFieldKind, FormWidget, FormWidgetKind, ImageCrop,
-  LineNumbering, PageSetup, RgbColor, TextStyle,
+  BorderStyle, CellBordersModel, DynamicFieldKind, FieldNumberFormat, FormWidget, FormWidgetKind,
+  ImageCrop, LineNumbering, PageSetup, RgbColor, TextStyle,
 };
 use crate::units;
 
 #[derive(Clone, Debug)]
 pub(crate) struct DocxDocument {
   pub page: PageSetup,
+  pub has_styles_part: bool,
   pub default_tab_stop_pt: f32,
   pub compatibility_mode: u16,
   pub justify_lines_with_shrinking: bool,

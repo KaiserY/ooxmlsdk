@@ -183,8 +183,12 @@ pub struct LineNumbering {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DynamicFieldKind {
-  Page,
-  NumPages,
+  Page {
+    number_format: FieldNumberFormat,
+  },
+  NumPages {
+    number_format: FieldNumberFormat,
+  },
   PageRef {
     bookmark_name: Arc<str>,
   },
@@ -192,6 +196,16 @@ pub enum DynamicFieldKind {
     style_name: Arc<str>,
     from_bottom: bool,
   },
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum FieldNumberFormat {
+  #[default]
+  Decimal,
+  LowerRoman,
+  UpperRoman,
+  LowerLetter,
+  UpperLetter,
 }
 
 #[derive(Clone, Debug)]

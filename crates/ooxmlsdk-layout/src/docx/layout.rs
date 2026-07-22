@@ -6,14 +6,14 @@ use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 use crate::common;
 use crate::docx::{
-  Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingFrame, FloatingFramePlacement,
-  FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment, FrameHorizontalAnchor,
-  FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode, HorizontalImageAlignment,
-  HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide, InlineChart, InlineItem,
-  InlineShape, InlineShapeGeometry, LineHeightRule, PageSetup, ParagraphAlignment, RgbColor,
-  SectionBreakKind, SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment,
-  TableCell, TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
-  VerticalImageAlignment, VerticalImageReference,
+  Block, BorderStyle, DocxDocument, DynamicFieldKind, FieldNumberFormat, FloatingFrame,
+  FloatingFramePlacement, FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment,
+  FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
+  HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
+  InlineChart, InlineItem, InlineShape, InlineShapeGeometry, LineHeightRule, PageSetup,
+  ParagraphAlignment, RgbColor, SectionBreakKind, SectionColumns, TabLeader, TabStop,
+  TabStopAlignment, Table, TableAlignment, TableCell, TableCellVerticalAlignment, TableRow,
+  TextBoxVerticalAlignment, TextStyle, VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
 use crate::model::{
@@ -1498,8 +1498,12 @@ fn into_common_path_item(item: PolylineItem) -> common::PathItem<'static> {
 
 fn into_common_dynamic_field(field: DynamicFieldKind) -> common::DynamicField<'static> {
   match field {
-    DynamicFieldKind::Page => common::DynamicField::Page,
-    DynamicFieldKind::NumPages => common::DynamicField::NumPages,
+    DynamicFieldKind::Page { number_format } => common::DynamicField::Page {
+      number_format: common_field_number_format(number_format),
+    },
+    DynamicFieldKind::NumPages { number_format } => common::DynamicField::NumPages {
+      number_format: common_field_number_format(number_format),
+    },
     DynamicFieldKind::PageRef { bookmark_name } => common::DynamicField::PageRef {
       bookmark_name: Cow::Owned(bookmark_name.to_string()),
     },
@@ -1510,6 +1514,16 @@ fn into_common_dynamic_field(field: DynamicFieldKind) -> common::DynamicField<'s
       style_name: Cow::Owned(style_name.to_string()),
       from_bottom,
     },
+  }
+}
+
+fn common_field_number_format(format: FieldNumberFormat) -> common::FieldNumberFormat {
+  match format {
+    FieldNumberFormat::Decimal => common::FieldNumberFormat::Decimal,
+    FieldNumberFormat::LowerRoman => common::FieldNumberFormat::LowerRoman,
+    FieldNumberFormat::UpperRoman => common::FieldNumberFormat::UpperRoman,
+    FieldNumberFormat::LowerLetter => common::FieldNumberFormat::LowerLetter,
+    FieldNumberFormat::UpperLetter => common::FieldNumberFormat::UpperLetter,
   }
 }
 
@@ -5250,22 +5264,18 @@ fn estimated_paragraph_content_height(
           floating_bottom = floating_bottom.max(image_y + height + placement.margin_bottom_pt);
           continue;
         }
-        let (width, height) = fit_image_to_line(
-          visible_image_width(image),
-          visible_image_height(image),
-          content_width,
-        );
+        let metrics = inline_image_metrics(image, content_width);
         has_flow_content = true;
-        if x + width > content_width && x > 0.0 {
+        if x + metrics.frame_width_pt > content_width && x > 0.0 {
           finish_line(&mut content_height, &mut line_height, &mut line_index);
         }
         line_height = line_height.max(inline_drawing_line_height(
-          height,
+          metrics.frame_height_pt,
           paragraph,
           text_frame,
           text_metrics,
         ));
-        x = width;
+        x = metrics.frame_width_pt;
       }
       InlineItem::Shape(shape) => {
         if let crate::docx::ImagePlacement::Floating(placement) = shape.placement
@@ -6210,7 +6220,7 @@ fn repeating_slot_wrap_exclusions_for_page(
   let footer_repeating_slots = repeating_slot_state(document, page.section_index, text_metrics);
   let (_, _, _, footer_height, _) =
     repeating_slots_present_for_page(footer_repeating_slots, page_number, page.section_page_index);
-  let footer_top = footer_content_top(page.setup, footer_height);
+  let footer_top = footer_content_top(page.setup, footer_height, !document.has_styles_part);
   layout_repeating_blocks_into_page(
     footer_blocks,
     &mut adornment,
@@ -6401,7 +6411,7 @@ fn apply_headers_and_footers(
     let footer_repeating_slots = repeating_slot_state(document, page.section_index, text_metrics);
     let (_, _, _, footer_height, _) =
       repeating_slots_present_for_page(footer_repeating_slots, index + 1, page.section_page_index);
-    let footer_top = footer_content_top(page.setup, footer_height);
+    let footer_top = footer_content_top(page.setup, footer_height, !document.has_styles_part);
     layout_repeating_blocks_into_page(
       footer_blocks,
       &mut adornment,
@@ -6617,7 +6627,7 @@ fn page_border_reference_rect(setup: PageSetup) -> (f32, f32, f32, f32) {
 }
 
 fn resolve_dynamic_fields(pages: &mut [Page], anchor_pages: &[AnchorPage]) {
-  let total_pages = pages.len().to_string();
+  let total_pages = pages.len();
   let page_refs = anchor_pages
     .iter()
     .map(|anchor| {
@@ -6629,7 +6639,7 @@ fn resolve_dynamic_fields(pages: &mut [Page], anchor_pages: &[AnchorPage]) {
     .collect::<HashMap<_, _>>();
   let style_ref_candidates = style_ref_candidates_by_page(pages);
   for (page_index, page) in pages.iter_mut().enumerate() {
-    let page_number = (page_index + 1).to_string();
+    let page_number = page_index + 1;
     let items = page.items.iter_mut().chain(
       page
         .repeating_adornment
@@ -6641,8 +6651,12 @@ fn resolve_dynamic_fields(pages: &mut [Page], anchor_pages: &[AnchorPage]) {
         continue;
       };
       match &text.dynamic_field {
-        Some(DynamicFieldKind::Page) => text.text.clone_from(&page_number),
-        Some(DynamicFieldKind::NumPages) => text.text.clone_from(&total_pages),
+        Some(DynamicFieldKind::Page { number_format }) => {
+          text.text = super::format_field_number(page_number, *number_format);
+        }
+        Some(DynamicFieldKind::NumPages { number_format }) => {
+          text.text = super::format_field_number(total_pages, *number_format);
+        }
         Some(DynamicFieldKind::PageRef { bookmark_name }) => {
           if let Some(page_number) = page_refs.get(bookmark_name.as_ref()) {
             text.text.clone_from(page_number);
@@ -6892,17 +6906,28 @@ fn footer_slot_top(setup: PageSetup) -> f32 {
     .min(setup.height_pt)
 }
 
-fn footer_content_top(setup: PageSetup, content_height_pt: f32) -> f32 {
+fn footer_content_top(
+  setup: PageSetup,
+  content_height_pt: f32,
+  use_missing_styles_alignment: bool,
+) -> f32 {
   // ECMA-376 Part 1 §17.6.11 defines `w:footer` as the distance from the
-  // bottom edge of the page to the bottom edge of the footer.  Lay the
-  // measured footer upward from that edge instead of pinning its first block
-  // to the top of the bottom-margin slot.
+  // bottom edge of the page to the bottom edge of the footer. Word centers
+  // short footer content in the nominal slot between that edge and the body
+  // bottom margin (observable in the Office fixed output for a style-less,
+  // single-line PAGE field). Content taller than the slot still grows upward
+  // while retaining the specified footer bottom edge.
   let footer_bottom = (setup.height_pt - setup.footer_distance_pt.max(0.0))
     .max(0.0)
     .min(setup.height_pt);
-  (footer_bottom - content_height_pt.max(0.0))
-    .max(0.0)
-    .min(setup.height_pt)
+  let content_height = content_height_pt.max(0.0);
+  let slot_height = header_footer_slot_height(setup.margin_bottom_pt, setup.footer_distance_pt);
+  let top = if use_missing_styles_alignment && content_height <= slot_height {
+    footer_slot_top(setup) + (slot_height - content_height) / 2.0
+  } else {
+    footer_bottom - content_height
+  };
+  top.max(0.0).min(setup.height_pt)
 }
 
 fn header_footer_slot_height(margin_pt: f32, distance_pt: f32) -> f32 {
@@ -10641,8 +10666,13 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
   );
   let first_line_style = table_cell_first_line_style(cell);
   let first_line_height = table_cell_first_inline_text_height(cell, true, text_metrics);
+  // Table text is stored at its resolved baseline because PDF paint owners do
+  // not add a second line offset for table frames. Word's Windows fixed-layout
+  // path uses the Windows ascent here ([MS-DOCX] usePre2018iOSMacLayout); using
+  // only the OS/2 typographic ascent puts Calibri table text above the Office
+  // baseline even though the row box itself is correct.
   let first_line_baseline_offset =
-    text_metrics.baseline_offset_in_line(&first_line_style, first_line_height);
+    text_metrics.baseline_offset_in_line_with_windows_metrics(&first_line_style, first_line_height);
   let split_fragment =
     content_offset > LAYOUT_EPSILON_PT || content_height > height + LAYOUT_EPSILON_PT;
   let top_margin_for_lowers = row_top_margin_pt.max(cell.margins.top_pt);
@@ -13498,12 +13528,8 @@ impl<'a> TextFrameLayout<'a> {
             line_used_punctuation_fit = false;
             line_has_tab = false;
           }
-          let (width, height) = fit_image_to_line(
-            visible_image_width(image),
-            visible_image_height(image),
-            flow.content_width,
-          );
-          if x + width > line_right && x > line_left {
+          let metrics = inline_image_metrics(image, flow.content_width);
+          if x + metrics.frame_width_pt > line_right && x > line_left {
             (flow, text_frame, y, line_left, line_right) = self.advance_line(
               TextLineAdvance {
                 current,
@@ -13533,10 +13559,10 @@ impl<'a> TextFrameLayout<'a> {
             line_has_tab = false;
           }
           current.items.push(PageItem::Image(ImageItem {
-            x_pt: x,
-            y_pt: y,
-            width_pt: width,
-            height_pt: height,
+            x_pt: x + metrics.content_offset_x_pt,
+            y_pt: y + metrics.content_offset_y_pt,
+            width_pt: metrics.content_width_pt,
+            height_pt: metrics.content_height_pt,
             crop: image.crop,
             rotation_deg: image.rotation_deg,
             flip_horizontal: image.flip_horizontal,
@@ -13550,19 +13576,19 @@ impl<'a> TextFrameLayout<'a> {
           }));
           if flow.text_segmentation == TextSegmentation::Notes {
             current.items.push(PageItem::Rect(RectItem {
-              x_pt: x,
-              y_pt: y,
-              width_pt: width,
-              height_pt: height,
+              x_pt: x + metrics.content_offset_x_pt,
+              y_pt: y + metrics.content_offset_y_pt,
+              width_pt: metrics.content_width_pt,
+              height_pt: metrics.content_height_pt,
               fill_color: None,
               fill_opacity: 1.0,
               stroke: Some(BorderStyle::default()),
               stroke_opacity: 0.0,
             }));
           }
-          x += width;
+          x += metrics.frame_width_pt;
           line_height = line_height.max(inline_drawing_line_height(
-            height,
+            metrics.frame_height_pt,
             paragraph,
             text_frame,
             text_metrics,
@@ -15214,6 +15240,36 @@ fn visible_image_height(image: &crate::docx::InlineImage) -> f32 {
   image.height_pt.max(0.0)
 }
 
+#[derive(Clone, Copy, Debug)]
+struct InlineImageMetrics {
+  frame_width_pt: f32,
+  frame_height_pt: f32,
+  content_offset_x_pt: f32,
+  content_offset_y_pt: f32,
+  content_width_pt: f32,
+  content_height_pt: f32,
+}
+
+fn inline_image_metrics(image: &crate::docx::InlineImage, max_width_pt: f32) -> InlineImageMetrics {
+  let frame_width = image_frame_width(image);
+  let frame_height = image_frame_height(image);
+  let (frame_width_pt, frame_height_pt) =
+    fit_image_to_line(frame_width, frame_height, max_width_pt);
+  let scale = if frame_width > f32::EPSILON {
+    frame_width_pt / frame_width
+  } else {
+    0.0
+  };
+  InlineImageMetrics {
+    frame_width_pt,
+    frame_height_pt,
+    content_offset_x_pt: image.effect_left_pt.max(0.0) * scale,
+    content_offset_y_pt: image.effect_top_pt.max(0.0) * scale,
+    content_width_pt: visible_image_width(image) * scale,
+    content_height_pt: visible_image_height(image) * scale,
+  }
+}
+
 fn force_page_break(
   flow: FlowContext,
   current: &mut Page,
@@ -15982,7 +16038,7 @@ mod tests {
   }
 
   #[test]
-  fn footer_content_is_bottom_aligned_to_the_footer_distance() {
+  fn footer_content_is_centered_in_the_nominal_slot_and_overflow_grows_upward() {
     let setup = PageSetup {
       height_pt: 792.0,
       margin_bottom_pt: 72.0,
@@ -15991,7 +16047,9 @@ mod tests {
     };
 
     assert!((footer_slot_top(setup) - 720.0).abs() < 0.01);
-    assert!((footer_content_top(setup, 12.0) - 744.0).abs() < 0.01);
+    assert!((footer_content_top(setup, 12.0, true) - 732.0).abs() < 0.01);
+    assert!((footer_content_top(setup, 12.0, false) - 744.0).abs() < 0.01);
+    assert!((footer_content_top(setup, 48.0, true) - 708.0).abs() < 0.01);
   }
 
   #[test]

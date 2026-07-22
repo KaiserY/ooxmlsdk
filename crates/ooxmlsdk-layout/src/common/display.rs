@@ -359,8 +359,12 @@ pub struct OpenTypeLigatures {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DynamicField<'doc> {
-  Page,
-  NumPages,
+  Page {
+    number_format: FieldNumberFormat,
+  },
+  NumPages {
+    number_format: FieldNumberFormat,
+  },
   PageRef {
     bookmark_name: Cow<'doc, str>,
   },
@@ -368,6 +372,16 @@ pub enum DynamicField<'doc> {
     style_name: Cow<'doc, str>,
     from_bottom: bool,
   },
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum FieldNumberFormat {
+  #[default]
+  Decimal,
+  LowerRoman,
+  UpperRoman,
+  LowerLetter,
+  UpperLetter,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -1591,8 +1591,12 @@ fn dynamic_field_borrowed<'doc>(
   field: &'doc common::DynamicField<'static>,
 ) -> common::DynamicField<'doc> {
   match field {
-    common::DynamicField::Page => common::DynamicField::Page,
-    common::DynamicField::NumPages => common::DynamicField::NumPages,
+    common::DynamicField::Page { number_format } => common::DynamicField::Page {
+      number_format: *number_format,
+    },
+    common::DynamicField::NumPages { number_format } => common::DynamicField::NumPages {
+      number_format: *number_format,
+    },
     common::DynamicField::PageRef { bookmark_name } => common::DynamicField::PageRef {
       bookmark_name: Cow::Borrowed(bookmark_name.as_ref()),
     },
@@ -2555,6 +2559,8 @@ fn draw_paint_item(
           image.content_type.as_deref(),
           options,
           Some(metafile_render_options_for_image(image, options)),
+          image.width_pt,
+          image.height_pt,
         ) {
           Ok(pdf_image) => draw_image_item(surface, image, pdf_image),
           Err(_) => draw_missing_image(surface, image),

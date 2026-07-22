@@ -5,7 +5,8 @@ use std::sync::{Arc, OnceLock};
 use image::codecs::jpeg::JpegEncoder;
 use image::metadata::Orientation;
 use image::{
-  DynamicImage, GenericImageView, ImageDecoder, ImageFormat as RasterImageFormat, ImageReader, Rgba,
+  DynamicImage, GenericImageView, ImageDecoder, ImageFormat as RasterImageFormat, ImageReader,
+  Rgba, imageops::FilterType,
 };
 use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
 use rustc_hash::FxHashMap as HashMap;
@@ -23,7 +24,43 @@ pub(super) struct ImageSet {
 struct CachedRaster {
   content_type: Option<String>,
   metafile_render_options: Option<emf_wmf::RenderOptions>,
+  export_options: RasterExportOptions,
   image: Image,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct RasterExportOptions {
+  use_lossless_compression: bool,
+  jpeg_quality: Option<u8>,
+  max_size_px: Option<(u32, u32)>,
+}
+
+impl RasterExportOptions {
+  fn new(options: &PdfOptions, display_width_pt: f32, display_height_pt: f32) -> Self {
+    let max_size_px = options
+      .images
+      .reduce_resolution
+      .then_some(options.images.max_resolution_dpi)
+      .flatten()
+      .filter(|dpi| *dpi > 50)
+      .and_then(|dpi| {
+        let width = display_pixels(display_width_pt, dpi)?;
+        let height = display_pixels(display_height_pt, dpi)?;
+        Some((width, height))
+      });
+    Self {
+      use_lossless_compression: options.images.use_lossless_compression,
+      jpeg_quality: options.effective_jpeg_quality(),
+      max_size_px,
+    }
+  }
+}
+
+fn display_pixels(points: f32, dpi: u32) -> Option<u32> {
+  if !points.is_finite() || points <= 0.0 {
+    return None;
+  }
+  Some(((f64::from(points) * f64::from(dpi) / 72.0).round() as u32).max(1))
 }
 
 impl ImageSet {
@@ -33,20 +70,25 @@ impl ImageSet {
     content_type: Option<&str>,
     options: &PdfOptions,
     metafile_render_options: Option<emf_wmf::RenderOptions>,
+    display_width_pt: f32,
+    display_height_pt: f32,
   ) -> Result<Image> {
+    let export_options = RasterExportOptions::new(options, display_width_pt, display_height_pt);
     let key = image_data_key(data);
     if let Some(image) = self.rasters.get(&key).and_then(|images| {
       images.iter().find(|image| {
         image.content_type.as_deref() == content_type
           && image.metafile_render_options == metafile_render_options
+          && image.export_options == export_options
       })
     }) {
       return Ok(image.image.clone());
     }
-    let image = decode_image(data, content_type, options, metafile_render_options)?;
+    let image = decode_image(data, content_type, export_options, metafile_render_options)?;
     self.rasters.entry(key).or_default().push(CachedRaster {
       content_type: content_type.map(str::to_string),
       metafile_render_options,
+      export_options,
       image: image.clone(),
     });
     Ok(image)
@@ -92,7 +134,7 @@ fn svg_font_database() -> Arc<fontdb::Database> {
 fn decode_image(
   data: &[u8],
   content_type: Option<&str>,
-  options: &PdfOptions,
+  export_options: RasterExportOptions,
   metafile_render_options: Option<emf_wmf::RenderOptions>,
 ) -> Result<Image> {
   let metafile_raster = match metafile_render_options {
@@ -105,9 +147,21 @@ fn decode_image(
     .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF image: {err}")))?
   {
     return match raster.content_type {
-      "image/jpeg" => Image::from_jpeg(raster.data.into(), false).map_err(PdfError::Krilla),
+      "image/jpeg"
+        if export_options.use_lossless_compression || export_options.jpeg_quality.is_some() =>
+      {
+        export_decoded_image(
+          decode_dynamic_image(&raster.data, RasterImageFormat::Jpeg)?,
+          RasterImageFormat::Jpeg,
+          export_options,
+        )
+      }
+      "image/jpeg" => Image::from_jpeg(raster.data.into(), true).map_err(PdfError::Krilla),
       "image/png" => {
-        if let Some(quality) = options.effective_jpeg_quality() {
+        if let Some(quality) = export_options
+          .jpeg_quality
+          .filter(|_| !export_options.use_lossless_compression)
+        {
           let raster = image::load_from_memory_with_format(&raster.data, RasterImageFormat::Png)
             .map_err(|err| {
               PdfError::Krilla(format!(
@@ -115,7 +169,7 @@ fn decode_image(
               ))
             })?;
           let jpeg = encode_jpeg(raster, quality)?;
-          return Image::from_jpeg(jpeg.into(), false).map_err(PdfError::Krilla);
+          return Image::from_jpeg(jpeg.into(), true).map_err(PdfError::Krilla);
         }
         let image = decode_png_relaxed(&raster.data)
           .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF PNG: {err}")))?;
@@ -132,11 +186,21 @@ fn decode_image(
     .or_else(|| image::guess_format(data).ok());
 
   if let Some(format) = format {
-    if let Some(image) = decode_oriented_image(data, format)? {
-      return Image::from_custom(image, false).map_err(PdfError::Krilla);
+    let metadata = raster_metadata(data, format)?;
+    let needs_orientation =
+      metadata.is_some_and(|metadata| metadata.orientation != Orientation::NoTransforms);
+    let needs_downsampling = metadata.is_some_and(|metadata| {
+      export_options
+        .max_size_px
+        .is_some_and(|max_size| downsample_size(metadata.size, max_size).is_some())
+    });
+    let needs_compression_change = format == RasterImageFormat::Jpeg
+      && (export_options.use_lossless_compression || export_options.jpeg_quality.is_some());
+    if needs_orientation || needs_downsampling || needs_compression_change {
+      return export_decoded_image(decode_dynamic_image(data, format)?, format, export_options);
     }
     if format == RasterImageFormat::Jpeg
-      && let Ok(image) = Image::from_jpeg(data.to_vec().into(), false)
+      && let Ok(image) = Image::from_jpeg(data.to_vec().into(), true)
     {
       // Krilla reads and embeds the JPEG's native ICC profile while keeping
       // the compressed image stream intact.
@@ -156,29 +220,48 @@ fn decode_image(
 
   let format = format.ok_or_else(|| PdfError::Krilla("unknown raster image format".to_string()))?;
   let raster = decode_dynamic_image(data, format)?;
-  Image::from_custom(raster, false).map_err(PdfError::Krilla)
+  export_decoded_image(raster, format, export_options)
 }
 
-fn decode_oriented_image(data: &[u8], format: RasterImageFormat) -> Result<Option<PdfRasterImage>> {
+fn raster_interpolation(format: RasterImageFormat) -> bool {
+  // Word's fixed-format output marks photographic JPEG XObjects for smooth
+  // interpolation while leaving lossless pixel graphics such as PNG
+  // placeholders un-interpolated. Make that choice explicit instead of
+  // inheriting one blanket backend default for every raster format.
+  format == RasterImageFormat::Jpeg
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RasterMetadata {
+  size: (u32, u32),
+  orientation: Orientation,
+}
+
+fn raster_metadata(data: &[u8], format: RasterImageFormat) -> Result<Option<RasterMetadata>> {
   let mut decoder = match ImageReader::with_format(Cursor::new(data), format).into_decoder() {
     Ok(decoder) => decoder,
     Err(_) => return Ok(None),
   };
   let orientation = decoder.orientation().unwrap_or(Orientation::NoTransforms);
-  if orientation == Orientation::NoTransforms {
-    return Ok(None);
+  let mut size = decoder.dimensions();
+  if matches!(
+    orientation,
+    Orientation::Rotate90
+      | Orientation::Rotate270
+      | Orientation::Rotate90FlipH
+      | Orientation::Rotate270FlipH
+  ) {
+    size = (size.1, size.0);
   }
-  let icc_profile = decoder.icc_profile().unwrap_or_default();
-  let mut image = DynamicImage::from_decoder(decoder)
-    .map_err(|err| PdfError::Krilla(format!("failed to decode oriented raster image: {err}")))?;
-  image.apply_orientation(orientation);
-  Ok(Some(PdfRasterImage::from_dynamic_with_icc(
-    image,
-    icc_profile,
-  )))
+  Ok(Some(RasterMetadata { size, orientation }))
 }
 
-fn decode_dynamic_image(data: &[u8], format: RasterImageFormat) -> Result<PdfRasterImage> {
+struct DecodedRasterImage {
+  image: DynamicImage,
+  icc_profile: Option<Vec<u8>>,
+}
+
+fn decode_dynamic_image(data: &[u8], format: RasterImageFormat) -> Result<DecodedRasterImage> {
   let mut decoder = ImageReader::with_format(Cursor::new(data), format)
     .into_decoder()
     .map_err(|err| PdfError::Krilla(format!("failed to open raster image: {err}")))?;
@@ -187,7 +270,57 @@ fn decode_dynamic_image(data: &[u8], format: RasterImageFormat) -> Result<PdfRas
   let mut image = DynamicImage::from_decoder(decoder)
     .map_err(|err| PdfError::Krilla(format!("failed to decode raster image: {err}")))?;
   image.apply_orientation(orientation);
-  Ok(PdfRasterImage::from_dynamic_with_icc(image, icc_profile))
+  Ok(DecodedRasterImage { image, icc_profile })
+}
+
+fn export_decoded_image(
+  mut raster: DecodedRasterImage,
+  format: RasterImageFormat,
+  export_options: RasterExportOptions,
+) -> Result<Image> {
+  let mut resized = false;
+  if let Some(max_size) = export_options.max_size_px
+    && let Some(target_size) = downsample_size(raster.image.dimensions(), max_size)
+  {
+    raster.image = raster
+      .image
+      .resize_exact(target_size.0, target_size.1, FilterType::Lanczos3);
+    resized = true;
+  }
+
+  if format == RasterImageFormat::Jpeg
+    && !export_options.use_lossless_compression
+    && (resized || export_options.jpeg_quality.is_some())
+  {
+    let jpeg = encode_jpeg(raster.image, export_options.jpeg_quality.unwrap_or(90))?;
+    return Image::from_jpeg_with_icc(jpeg.into(), raster.icc_profile.map(Into::into), true)
+      .map_err(PdfError::Krilla);
+  }
+
+  Image::from_custom(
+    PdfRasterImage::from_dynamic_with_icc(raster.image, raster.icc_profile),
+    raster_interpolation(format),
+  )
+  .map_err(PdfError::Krilla)
+}
+
+fn downsample_size(size: (u32, u32), max_size: (u32, u32)) -> Option<(u32, u32)> {
+  let (width, height) = size;
+  let (max_width, max_height) = max_size;
+  if width <= 50
+    || height <= 50
+    || max_width == 0
+    || max_height == 0
+    || (width <= max_width.saturating_add(4) && height <= max_height.saturating_add(4))
+  {
+    return None;
+  }
+
+  let scale =
+    (f64::from(max_width) / f64::from(width)).min(f64::from(max_height) / f64::from(height));
+  let target_width = (f64::from(width) * scale).round() as u32;
+  let target_height = (f64::from(height) * scale).round() as u32;
+  (target_width > 0 && target_height > 0).then_some((target_width, target_height))
 }
 
 fn encode_jpeg(image: image::DynamicImage, quality: u8) -> Result<Vec<u8>> {
@@ -381,17 +514,59 @@ mod tests {
     let mut images = ImageSet::default();
 
     images
-      .raster(&jpeg, Some("image/jpeg"), &options, Some(first))
+      .raster(&jpeg, Some("image/jpeg"), &options, Some(first), 72.0, 72.0)
       .unwrap();
     images
-      .raster(&jpeg, Some("image/jpeg"), &options, Some(first))
+      .raster(&jpeg, Some("image/jpeg"), &options, Some(first), 72.0, 72.0)
       .unwrap();
     assert_eq!(images.rasters.values().map(Vec::len).sum::<usize>(), 1);
 
     images
-      .raster(&jpeg, Some("image/jpeg"), &options, Some(second))
+      .raster(
+        &jpeg,
+        Some("image/jpeg"),
+        &options,
+        Some(second),
+        72.0,
+        72.0,
+      )
       .unwrap();
     assert_eq!(images.rasters.values().map(Vec::len).sum::<usize>(), 2);
+  }
+
+  #[test]
+  fn image_set_separates_resolution_requests() {
+    let mut jpeg = Vec::new();
+    JpegEncoder::new(&mut jpeg)
+      .encode(
+        &vec![127; 60 * 60 * 3],
+        60,
+        60,
+        image::ExtendedColorType::Rgb8,
+      )
+      .unwrap();
+    let mut options = PdfOptions::default();
+    options.images.reduce_resolution = true;
+    options.images.max_resolution_dpi = Some(72);
+    let mut images = ImageSet::default();
+
+    let full = images
+      .raster(&jpeg, Some("image/jpeg"), &options, None, 60.0, 60.0)
+      .unwrap();
+    let reduced = images
+      .raster(&jpeg, Some("image/jpeg"), &options, None, 30.0, 30.0)
+      .unwrap();
+
+    assert_eq!(full.size(), (60, 60));
+    assert_eq!(reduced.size(), (30, 30));
+    assert_eq!(images.rasters.values().map(Vec::len).sum::<usize>(), 2);
+  }
+
+  #[test]
+  fn downsampling_uses_office_small_image_and_rounding_tolerances() {
+    assert_eq!(downsample_size((50, 200), (25, 100)), None);
+    assert_eq!(downsample_size((104, 104), (100, 100)), None);
+    assert_eq!(downsample_size((105, 210), (100, 100)), Some((50, 100)));
   }
 
   #[test]
@@ -416,10 +591,8 @@ mod tests {
     oriented.extend_from_slice(&exif);
     oriented.extend_from_slice(&jpeg[2..]);
 
-    let image = decode_oriented_image(&oriented, RasterImageFormat::Jpeg)
-      .unwrap()
-      .expect("EXIF orientation should require pixel transformation");
+    let image = decode_dynamic_image(&oriented, RasterImageFormat::Jpeg).unwrap();
 
-    assert_eq!(image.size(), (1, 2));
+    assert_eq!(image.image.dimensions(), (1, 2));
   }
 }

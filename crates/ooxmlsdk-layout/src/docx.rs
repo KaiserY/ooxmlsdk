@@ -32,7 +32,7 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_drawingml_2006_picture as pic,
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
   schemas_openxmlformats_org_markup_compatibility_2006 as mc,
-  schemas_openxmlformats_org_wordprocessingml_2006_main as w,
+  schemas_openxmlformats_org_wordprocessingml_2006_main as w, www_w3_org_xml_1998_namespace as xml,
 };
 use ooxmlsdk::sdk::SdkType;
 use ooxmlsdk::simple_type::{
@@ -113,6 +113,13 @@ const MIN_ESCAPEMENT_FONT_SIZE_PT: f32 = 1.0;
 const MIN_IMPORTED_LINE_HEIGHT_PT: f32 = 0.1;
 const TAB_STOP_DEDUP_EPSILON_PT: f32 = 0.1;
 const MAX_WORD_TABLE_MARGIN_TWIPS: f32 = 31_680.0;
+// Word repairs packages without the required main-document Styles part from
+// its application defaults. Office-authored Styles parts materialize these as
+// 160 twips after the paragraph and 259/240 automatic line spacing.
+const OFFICE_RECOVERED_PARAGRAPH_AFTER_PT: f32 = 8.0;
+const OFFICE_RECOVERED_LINE_HEIGHT_MULTIPLE: f32 = 259.0 / 240.0;
+// The same repair path synthesizes the normal 360-twip section line pitch.
+const OFFICE_RECOVERED_DOCUMENT_GRID_LINE_PITCH_PT: f32 = 18.0;
 
 #[derive(Clone, Copy, Debug, Default)]
 struct ImportSettings {
@@ -177,6 +184,17 @@ pub(crate) fn extract(
       )
     })
     .unwrap_or_else(|| vec![default_section(Vec::new())]);
+  if !styles.has_styles_part {
+    for section in &mut sections {
+      if section.section_properties.is_none()
+        && section.blocks.iter().any(|block| {
+          matches!(block, Block::Paragraph(paragraph) if paragraph_has_recoverable_main_story_text(paragraph))
+        })
+      {
+        section.page.doc_grid_line_pitch_pt = Some(OFFICE_RECOVERED_DOCUMENT_GRID_LINE_PITCH_PT);
+      }
+    }
+  }
   let supplemental_graphic_blocks = supplemental_graphic_blocks(package, &main, &styles);
   if let Some(first_section) = sections.first_mut() {
     if let Some(image) = page_background_image {
@@ -253,6 +271,7 @@ pub(crate) fn extract(
 
   Ok(DocxDocument {
     page,
+    has_styles_part: styles.has_styles_part,
     default_tab_stop_pt,
     compatibility_mode,
     justify_lines_with_shrinking: import_settings.justify_lines_with_shrinking,
@@ -618,6 +637,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
           custom_xml_bindings,
           form_widget_ids,
         );
+        apply_recovered_body_paragraph_defaults(paragraph, styles, &mut model);
         model.format.hidden_separator = paragraph_mark_is_hidden(paragraph);
         if paragraph_has_drop_cap_frame(&model) {
           pending_drop_cap_text = paragraph_drop_cap_text(&model);
@@ -678,8 +698,11 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
           numbering,
           images,
           hyperlinks,
-          custom_xml_bindings,
-          form_widget_ids,
+          SdtBlockControls {
+            custom_xml_bindings,
+            form_widget_ids,
+            in_header_footer: false,
+          },
         ));
       }
       _ => {}
@@ -1093,15 +1116,25 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
   }
 }
 
+struct SdtBlockControls<'a> {
+  custom_xml_bindings: &'a CustomXmlBindings,
+  form_widget_ids: &'a mut FormWidgetIdAllocator,
+  in_header_footer: bool,
+}
+
 fn sdt_block_blocks(
   sdt: &w::SdtBlock,
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
-  custom_xml_bindings: &CustomXmlBindings,
-  form_widget_ids: &mut FormWidgetIdAllocator,
+  controls: SdtBlockControls<'_>,
 ) -> Vec<Block> {
+  let SdtBlockControls {
+    custom_xml_bindings,
+    form_widget_ids,
+    in_header_footer,
+  } = controls;
   let Some(content) = sdt.sdt_content_block.as_ref() else {
     return Vec::new();
   };
@@ -1111,7 +1144,7 @@ fn sdt_block_blocks(
     .iter()
     .filter_map(|choice| match choice {
       w::SdtContentBlockChoice::Paragraph(paragraph) => {
-        Some(vec![Block::paragraph(paragraph_model(
+        let mut model = paragraph_model(
           paragraph.as_ref(),
           styles,
           numbering,
@@ -1119,7 +1152,11 @@ fn sdt_block_blocks(
           hyperlinks,
           custom_xml_bindings,
           form_widget_ids,
-        ))])
+        );
+        if !in_header_footer {
+          apply_recovered_body_paragraph_defaults(paragraph, styles, &mut model);
+        }
+        Some(vec![Block::paragraph(model)])
       }
       w::SdtContentBlockChoice::Table(table) => Some(vec![Block::Table(table_model(
         table.as_ref(),
@@ -1133,7 +1170,7 @@ fn sdt_block_blocks(
         },
         TableModelContext {
           nested_table_level: 1,
-          in_header_footer: false,
+          in_header_footer,
         },
       ))]),
       w::SdtContentBlockChoice::SdtBlock(sdt) => Some(sdt_block_blocks(
@@ -1142,13 +1179,54 @@ fn sdt_block_blocks(
         numbering,
         images,
         hyperlinks,
-        custom_xml_bindings,
-        form_widget_ids,
+        SdtBlockControls {
+          custom_xml_bindings,
+          form_widget_ids: &mut *form_widget_ids,
+          in_header_footer,
+        },
       )),
       _ => None,
     })
     .flatten()
     .collect()
+}
+
+fn apply_recovered_body_paragraph_defaults(
+  paragraph: &w::Paragraph,
+  styles: &StylesCatalog,
+  model: &mut Paragraph,
+) {
+  if styles.has_styles_part {
+    return;
+  }
+  if !paragraph_has_recoverable_main_story_text(model) {
+    return;
+  }
+
+  // Word repairs main-story paragraphs from the application Normal style.
+  // Header/footer parts and text boxes have their own built-in style contexts,
+  // so this recovery must not leak into those stories. Direct paragraph
+  // spacing remains authoritative when the source explicitly supplies it.
+  let direct_spacing = paragraph
+    .paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.spacing_between_lines.as_ref());
+  if direct_spacing.is_none_or(|spacing| spacing.after.is_none()) {
+    model.format.spacing_after_pt = OFFICE_RECOVERED_PARAGRAPH_AFTER_PT;
+    model.format.spacing_after_set = true;
+  }
+  if direct_spacing.is_none_or(|spacing| spacing.line.is_none()) {
+    model.format.line_height_pt = Some(OFFICE_RECOVERED_LINE_HEIGHT_MULTIPLE);
+    model.format.line_height_rule = LineHeightRule::Auto;
+  }
+}
+
+fn paragraph_has_recoverable_main_story_text(paragraph: &Paragraph) -> bool {
+  paragraph.list_label.is_some()
+    || paragraph
+      .inlines
+      .iter()
+      .any(|inline| matches!(inline, InlineItem::Text(run) if !run.text.is_empty()))
 }
 
 fn header_blocks(
@@ -1184,16 +1262,19 @@ fn header_blocks(
       .header_choice
       .iter()
       .filter_map(|choice| match choice {
-        w::HeaderChoice::Paragraph(paragraph) => Some(Block::paragraph(paragraph_model(
-          paragraph,
-          styles,
-          &mut numbering,
-          &images,
-          &hyperlinks,
-          custom_xml_bindings,
-          form_widget_ids,
-        ))),
-        w::HeaderChoice::Table(table) => Some(Block::Table(table_model(
+        w::HeaderChoice::Paragraph(paragraph) => {
+          let model = paragraph_model(
+            paragraph,
+            styles,
+            &mut numbering,
+            &images,
+            &hyperlinks,
+            custom_xml_bindings,
+            form_widget_ids,
+          );
+          Some(vec![Block::paragraph(model)])
+        }
+        w::HeaderChoice::Table(table) => Some(vec![Block::Table(table_model(
           table,
           &mut TableModelEnv {
             styles,
@@ -1207,9 +1288,22 @@ fn header_blocks(
             nested_table_level: 1,
             in_header_footer: true,
           },
-        ))),
+        ))]),
+        w::HeaderChoice::SdtBlock(sdt) => Some(sdt_block_blocks(
+          sdt,
+          styles,
+          &mut numbering,
+          &images,
+          &hyperlinks,
+          SdtBlockControls {
+            custom_xml_bindings,
+            form_widget_ids,
+            in_header_footer: true,
+          },
+        )),
         _ => None,
       })
+      .flatten()
       .collect(),
   )
 }
@@ -1267,16 +1361,19 @@ fn footer_blocks(
       .footer_choice
       .iter()
       .filter_map(|choice| match choice {
-        w::FooterChoice::Paragraph(paragraph) => Some(Block::paragraph(paragraph_model(
-          paragraph,
-          styles,
-          &mut numbering,
-          &images,
-          &hyperlinks,
-          custom_xml_bindings,
-          form_widget_ids,
-        ))),
-        w::FooterChoice::Table(table) => Some(Block::Table(table_model(
+        w::FooterChoice::Paragraph(paragraph) => {
+          let model = paragraph_model(
+            paragraph,
+            styles,
+            &mut numbering,
+            &images,
+            &hyperlinks,
+            custom_xml_bindings,
+            form_widget_ids,
+          );
+          Some(vec![Block::paragraph(model)])
+        }
+        w::FooterChoice::Table(table) => Some(vec![Block::Table(table_model(
           table,
           &mut TableModelEnv {
             styles,
@@ -1290,9 +1387,22 @@ fn footer_blocks(
             nested_table_level: 1,
             in_header_footer: true,
           },
-        ))),
+        ))]),
+        w::FooterChoice::SdtBlock(sdt) => Some(sdt_block_blocks(
+          sdt,
+          styles,
+          &mut numbering,
+          &images,
+          &hyperlinks,
+          SdtBlockControls {
+            custom_xml_bindings,
+            form_widget_ids,
+            in_header_footer: true,
+          },
+        )),
         _ => None,
       })
+      .flatten()
       .collect(),
   )
 }
@@ -2344,8 +2454,11 @@ fn table_cell_model(
           context.numbering,
           context.images,
           context.hyperlinks,
-          context.custom_xml_bindings,
-          context.form_widget_ids,
+          SdtBlockControls {
+            custom_xml_bindings: context.custom_xml_bindings,
+            form_widget_ids: context.form_widget_ids,
+            in_header_footer: false,
+          },
         )),
         _ => {}
       }
@@ -3519,7 +3632,7 @@ fn push_run_or_complex_field(
       w::RunChoice::FieldCode(code) => {
         if let Some(field) = fields.last_mut()
           && !field.in_result
-          && let Some(content) = &code.xml_content
+          && let Some(content) = word_text_value(code)
         {
           field.instr.push_str(content);
         }
@@ -3592,12 +3705,55 @@ fn dynamic_field_kind(instr: &str) -> Option<DynamicFieldKind> {
   let tokens = field_instruction_tokens(instr);
   let name = tokens.first()?.to_ascii_uppercase();
   match name.as_str() {
-    "PAGE" => Some(DynamicFieldKind::Page),
-    "NUMPAGES" => Some(DynamicFieldKind::NumPages),
+    "PAGE" => Some(DynamicFieldKind::Page {
+      number_format: field_number_format(&tokens[1..]),
+    }),
+    "NUMPAGES" => Some(DynamicFieldKind::NumPages {
+      number_format: field_number_format(&tokens[1..]),
+    }),
     "PAGEREF" => page_ref_field_kind(&tokens[1..]),
     "STYLEREF" => style_ref_field_kind(&tokens[1..]),
     _ => None,
   }
+}
+
+fn field_number_format(tokens: &[String]) -> FieldNumberFormat {
+  tokens
+    .windows(2)
+    .find_map(|tokens| {
+      tokens[0]
+        .eq_ignore_ascii_case(r"\*")
+        .then(|| match tokens[1].as_str() {
+          value if value.eq_ignore_ascii_case("roman") => {
+            if value == "ROMAN" {
+              FieldNumberFormat::UpperRoman
+            } else {
+              FieldNumberFormat::LowerRoman
+            }
+          }
+          value if value.eq_ignore_ascii_case("alphabetic") => {
+            if value == "ALPHABETIC" {
+              FieldNumberFormat::UpperLetter
+            } else {
+              FieldNumberFormat::LowerLetter
+            }
+          }
+          _ => FieldNumberFormat::Decimal,
+        })
+    })
+    .unwrap_or_default()
+}
+
+fn format_field_number(value: usize, format: FieldNumberFormat) -> String {
+  let value = i32::try_from(value).unwrap_or(i32::MAX);
+  let format = match format {
+    FieldNumberFormat::Decimal => w::NumberFormatValues::Decimal,
+    FieldNumberFormat::LowerRoman => w::NumberFormatValues::LowerRoman,
+    FieldNumberFormat::UpperRoman => w::NumberFormatValues::UpperRoman,
+    FieldNumberFormat::LowerLetter => w::NumberFormatValues::LowerLetter,
+    FieldNumberFormat::UpperLetter => w::NumberFormatValues::UpperLetter,
+  };
+  format_numbering_value(value, format, false)
 }
 
 fn page_ref_field_kind(tokens: &[String]) -> Option<DynamicFieldKind> {
@@ -4190,12 +4346,12 @@ fn push_run(
   for choice in &run.run_choice {
     match choice {
       w::RunChoice::Text(text_node) => {
-        if let Some(content) = &text_node.xml_content {
+        if let Some(content) = word_text_value(text_node) {
           text.push_str(content);
         }
       }
       w::RunChoice::DeletedText(text_node) => {
-        if let Some(content) = &text_node.xml_content {
+        if let Some(content) = word_text_value(text_node) {
           text.push_str(content);
         }
       }
@@ -4250,7 +4406,9 @@ fn push_run(
         );
         push_dynamic_field(
           inlines,
-          DynamicFieldKind::Page,
+          DynamicFieldKind::Page {
+            number_format: FieldNumberFormat::Decimal,
+          },
           style.clone(),
           hyperlink_url,
           None,
@@ -4568,12 +4726,12 @@ fn hidden_run_text(run: &w::Run) -> String {
   for choice in &run.run_choice {
     match choice {
       w::RunChoice::Text(text_node) => {
-        if let Some(content) = &text_node.xml_content {
+        if let Some(content) = word_text_value(text_node) {
           text.push_str(content);
         }
       }
       w::RunChoice::DeletedText(text_node) => {
-        if let Some(content) = &text_node.xml_content {
+        if let Some(content) = word_text_value(text_node) {
           text.push_str(content);
         }
       }
@@ -4596,6 +4754,19 @@ fn hidden_run_text(run: &w::Run) -> String {
     }
   }
   text
+}
+
+fn word_text_value(text: &w::TextType) -> Option<&str> {
+  text.xml_content.as_deref().map(|content| {
+    if text.space == Some(xml::SpaceProcessingModeValues::Preserve) {
+      content
+    } else {
+      // ECMA-376 examples mark runs with significant edge whitespace using
+      // xml:space="preserve"; the default XML whitespace mode discards those
+      // edge characters while retaining whitespace inside the text node.
+      content.trim_matches([' ', '\t', '\r', '\n'])
+    }
+  })
 }
 
 fn run_properties_style_id(properties: &w::RunProperties) -> Option<&str> {
@@ -5481,7 +5652,7 @@ fn push_drawing_textboxes_impl(
       for text_box_frame in text_box_frames {
         if let Err(text_box_frame) = merge_textbox_frame_into_owning_shape(inlines, text_box_frame)
         {
-          inlines.push(InlineItem::Shape(text_box_frame));
+          inlines.push(InlineItem::Shape(*text_box_frame));
         }
       }
       continue;
@@ -5502,7 +5673,7 @@ fn push_drawing_textboxes_impl(
 fn merge_textbox_frame_into_owning_shape(
   inlines: &mut [InlineItem],
   mut text_box_frame: InlineShape,
-) -> std::result::Result<(), InlineShape> {
+) -> std::result::Result<(), Box<InlineShape>> {
   // wps:spPr and wps:txbx are children of the same wps:wsp. A textbox frame
   // without its own visual treatment is therefore content of the preceding
   // geometry, not a second inline object that consumes another line box.
@@ -5513,7 +5684,7 @@ fn merge_textbox_frame_into_owning_shape(
     || text_box_frame.chart.is_some()
     || text_box_frame.placement != ImagePlacement::Inline
   {
-    return Err(text_box_frame);
+    return Err(Box::new(text_box_frame));
   }
   let Some(shape) = inlines.iter_mut().rev().find_map(|inline| {
     let InlineItem::Shape(shape) = inline else {
@@ -5528,7 +5699,7 @@ fn merge_textbox_frame_into_owning_shape(
       && (shape.offset_y_pt - text_box_frame.offset_y_pt).abs() <= 0.01)
       .then_some(shape)
   }) else {
-    return Err(text_box_frame);
+    return Err(Box::new(text_box_frame));
   };
 
   shape.text_box_blocks = std::mem::take(&mut text_box_frame.text_box_blocks);
@@ -13169,15 +13340,30 @@ mod tests {
 
   fn text(value: &str) -> w::Text {
     w::Text(w::TextType {
+      space: Some(xml::SpaceProcessingModeValues::Preserve),
       xml_content: Some(value.into()),
-      ..Default::default()
     })
+  }
+
+  #[test]
+  fn word_text_edge_whitespace_requires_xml_space_preserve() {
+    let default_text = w::TextType {
+      xml_content: Some(" Page ".into()),
+      ..Default::default()
+    };
+    let preserved_text = w::TextType {
+      space: Some(xml::SpaceProcessingModeValues::Preserve),
+      xml_content: Some(" Page ".into()),
+    };
+
+    assert_eq!(word_text_value(&default_text), Some("Page"));
+    assert_eq!(word_text_value(&preserved_text), Some(" Page "));
   }
 
   #[test]
   fn smart_tag_run_preserves_nested_visible_text() {
     let paragraph = w::Paragraph::from_bytes(
-      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:smartTag w:uri="urn:test" w:element="person"><w:r><w:t>John</w:t></w:r><w:smartTag w:uri="urn:test" w:element="surname"><w:r><w:t> Smith</w:t></w:r></w:smartTag></w:smartTag></w:p>"#,
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:smartTag w:uri="urn:test" w:element="person"><w:r><w:t>John</w:t></w:r><w:smartTag w:uri="urn:test" w:element="surname"><w:r><w:t xml:space="preserve"> Smith</w:t></w:r></w:smartTag></w:smartTag></w:p>"#,
     )
     .expect("smart-tag paragraph");
     let styles = StylesCatalog::default();
@@ -14174,6 +14360,35 @@ mod tests {
   }
 
   #[test]
+  fn missing_styles_recovers_main_story_normal_spacing() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>footer</w:t></w:r></w:p>"#,
+    )
+    .expect("footer paragraph");
+    let styles = StylesCatalog::default();
+    let mut numbering = NumberingCatalog::default();
+    let mut model = paragraph_model(
+      &paragraph,
+      &styles,
+      &mut numbering,
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut FormWidgetIdAllocator::default(),
+    );
+
+    assert_eq!(model.format.spacing_after_pt, 0.0);
+    assert_eq!(model.format.line_height_pt, None);
+
+    apply_recovered_body_paragraph_defaults(&paragraph, &styles, &mut model);
+
+    assert_eq!(model.format.spacing_after_pt, 8.0);
+    assert!(model.format.spacing_after_set);
+    assert_eq!(model.format.line_height_pt, Some(259.0 / 240.0));
+    assert_eq!(model.format.line_height_rule, LineHeightRule::Auto);
+  }
+
+  #[test]
   fn negative_word_line_spacing_uses_positive_writer_compatibility_modes() {
     fn imported_spacing(
       inherited_rule: LineHeightRule,
@@ -14437,7 +14652,28 @@ mod tests {
     let InlineItem::Text(run) = &inlines[0] else {
       panic!("expected dynamic field text");
     };
-    assert_eq!(run.dynamic_field, Some(DynamicFieldKind::Page));
+    assert_eq!(
+      run.dynamic_field,
+      Some(DynamicFieldKind::Page {
+        number_format: FieldNumberFormat::Decimal,
+      })
+    );
+  }
+
+  #[test]
+  fn page_field_instruction_preserves_numeric_format_switch() {
+    assert_eq!(
+      dynamic_field_kind(r" PAGE \* roman "),
+      Some(DynamicFieldKind::Page {
+        number_format: FieldNumberFormat::LowerRoman,
+      })
+    );
+    assert_eq!(
+      dynamic_field_kind(r" NUMPAGES \* ALPHABETIC "),
+      Some(DynamicFieldKind::NumPages {
+        number_format: FieldNumberFormat::UpperLetter,
+      })
+    );
   }
 
   #[test]
@@ -14636,7 +14872,12 @@ mod tests {
     let InlineItem::Text(run) = &inlines[0] else {
       panic!("expected dynamic page number text");
     };
-    assert_eq!(run.dynamic_field, Some(DynamicFieldKind::Page));
+    assert_eq!(
+      run.dynamic_field,
+      Some(DynamicFieldKind::Page {
+        number_format: FieldNumberFormat::Decimal,
+      })
+    );
   }
 
   #[test]

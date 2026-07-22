@@ -83,10 +83,15 @@ struct MeasureStyleKey {
   east_asia_font_family: Option<Box<str>>,
   complex_font_family: Option<Box<str>>,
   font_size_bits: u32,
+  complex_font_size_bits: Option<u32>,
+  complex_script_override: Option<bool>,
+  right_to_left: bool,
   character_spacing_bits: u32,
   horizontal_scale_bits: u32,
   bold: bool,
   italic: bool,
+  complex_bold: Option<bool>,
+  complex_italic: Option<bool>,
   small_caps: bool,
   wordprocessingml_font_slots: bool,
   cjk_punctuation_compression_ratio_bits: u32,
@@ -99,10 +104,15 @@ impl MeasureStyleKey {
       east_asia_font_family: style.east_asia_font_family().map(Into::into),
       complex_font_family: style.complex_font_family().map(Into::into),
       font_size_bits: style.font_size_pt().to_bits(),
+      complex_font_size_bits: style.complex_font_size_pt().map(f32::to_bits),
+      complex_script_override: style.complex_script_override(),
+      right_to_left: style.right_to_left(),
       character_spacing_bits: style.character_spacing_pt().to_bits(),
       horizontal_scale_bits: style.horizontal_scale().to_bits(),
       bold: style.bold(),
       italic: style.italic(),
+      complex_bold: style.complex_bold(),
+      complex_italic: style.complex_italic(),
       small_caps: style.small_caps(),
       wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
       cjk_punctuation_compression_ratio_bits: style.cjk_punctuation_compression_ratio().to_bits(),
@@ -114,10 +124,15 @@ impl MeasureStyleKey {
       && self.east_asia_font_family.as_deref() == style.east_asia_font_family()
       && self.complex_font_family.as_deref() == style.complex_font_family()
       && self.font_size_bits == style.font_size_pt().to_bits()
+      && self.complex_font_size_bits == style.complex_font_size_pt().map(f32::to_bits)
+      && self.complex_script_override == style.complex_script_override()
+      && self.right_to_left == style.right_to_left()
       && self.character_spacing_bits == style.character_spacing_pt().to_bits()
       && self.horizontal_scale_bits == style.horizontal_scale().to_bits()
       && self.bold == style.bold()
       && self.italic == style.italic()
+      && self.complex_bold == style.complex_bold()
+      && self.complex_italic == style.complex_italic()
       && self.small_caps == style.small_caps()
       && self.wordprocessingml_font_slots == style.wordprocessingml_font_slots()
       && self.cjk_punctuation_compression_ratio_bits
@@ -209,6 +224,23 @@ impl TextMetrics {
       .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt()))
   }
 
+  pub fn vertical_metrics_for_text(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> TextVerticalMetrics {
+    self
+      .fonts
+      .text_vertical_metrics(text, style)
+      .map(|metrics| TextVerticalMetrics {
+        ascent_pt: metrics.ascent_pt,
+        descent_pt: metrics.descent_pt,
+        line_gap_pt: metrics.line_gap_pt,
+        baseline_offset_pt: metrics.baseline_offset_pt,
+      })
+      .unwrap_or_else(|| self.vertical_metrics(style))
+  }
+
   pub fn text_decoration_metrics(
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
@@ -234,10 +266,20 @@ impl TextMetrics {
     style: &(impl FontStyleRef + ?Sized),
     line_height_pt: f32,
   ) -> f32 {
-    let metrics = self.vertical_metrics(style);
-    let natural_height_pt = metrics.line_height_pt() + style.baseline_shift_pt().abs();
-    let extra_leading_pt = (line_height_pt - natural_height_pt).max(0.0) / 2.0;
-    extra_leading_pt + metrics.leading_above_pt() + metrics.ascent_pt - style.baseline_shift_pt()
+    baseline_offset_in_line_from_metrics(self.vertical_metrics(style), style, line_height_pt)
+  }
+
+  pub fn baseline_offset_in_line_for_text(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    line_height_pt: f32,
+  ) -> f32 {
+    baseline_offset_in_line_from_metrics(
+      self.vertical_metrics_for_text(text, style),
+      style,
+      line_height_pt,
+    )
   }
 
   pub fn baseline_offset_in_line_with_windows_metrics(
@@ -245,25 +287,71 @@ impl TextMetrics {
     style: &(impl FontStyleRef + ?Sized),
     line_height_pt: f32,
   ) -> f32 {
-    let metrics = self.vertical_metrics(style);
-    let natural_height_pt = metrics.line_height_pt() + style.baseline_shift_pt().abs();
-    let extra_leading_pt = (line_height_pt - natural_height_pt).max(0.0) / 2.0;
-    let baseline_offset_pt = if metrics.baseline_offset_pt > 0.0 {
-      metrics.baseline_offset_pt
-    } else {
-      metrics.leading_above_pt() + metrics.ascent_pt
-    };
-    let fitted_baseline_pt =
-      fit_windows_baseline_to_line(baseline_offset_pt, metrics.descent_pt, line_height_pt);
-    if fitted_baseline_pt < baseline_offset_pt {
-      fitted_baseline_pt - style.baseline_shift_pt()
-    } else {
-      extra_leading_pt + baseline_offset_pt - style.baseline_shift_pt()
-    }
+    baseline_offset_in_line_with_windows_metrics_from_metrics(
+      self.vertical_metrics(style),
+      style,
+      line_height_pt,
+    )
+  }
+
+  pub fn baseline_offset_in_line_with_windows_metrics_for_text(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    line_height_pt: f32,
+  ) -> f32 {
+    baseline_offset_in_line_with_windows_metrics_from_metrics(
+      self.vertical_metrics_for_text(text, style),
+      style,
+      line_height_pt,
+    )
   }
 
   pub fn inline_text_box_height(&mut self, style: &(impl FontStyleRef + ?Sized)) -> f32 {
     self.vertical_metrics(style).line_height_pt() + style.baseline_shift_pt().abs()
+  }
+
+  pub fn inline_text_box_height_for_text(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> f32 {
+    self
+      .fonts
+      .max_text_line_height(text, style)
+      .unwrap_or_else(|| self.vertical_metrics(style).line_height_pt())
+      + style.baseline_shift_pt().abs()
+  }
+}
+
+fn baseline_offset_in_line_from_metrics(
+  metrics: TextVerticalMetrics,
+  style: &(impl FontStyleRef + ?Sized),
+  line_height_pt: f32,
+) -> f32 {
+  let natural_height_pt = metrics.line_height_pt() + style.baseline_shift_pt().abs();
+  let extra_leading_pt = (line_height_pt - natural_height_pt).max(0.0) / 2.0;
+  extra_leading_pt + metrics.leading_above_pt() + metrics.ascent_pt - style.baseline_shift_pt()
+}
+
+fn baseline_offset_in_line_with_windows_metrics_from_metrics(
+  metrics: TextVerticalMetrics,
+  style: &(impl FontStyleRef + ?Sized),
+  line_height_pt: f32,
+) -> f32 {
+  let natural_height_pt = metrics.line_height_pt() + style.baseline_shift_pt().abs();
+  let extra_leading_pt = (line_height_pt - natural_height_pt).max(0.0) / 2.0;
+  let baseline_offset_pt = if metrics.baseline_offset_pt > 0.0 {
+    metrics.baseline_offset_pt
+  } else {
+    metrics.leading_above_pt() + metrics.ascent_pt
+  };
+  let fitted_baseline_pt =
+    fit_windows_baseline_to_line(baseline_offset_pt, metrics.descent_pt, line_height_pt);
+  if fitted_baseline_pt < baseline_offset_pt {
+    fitted_baseline_pt - style.baseline_shift_pt()
+  } else {
+    extra_leading_pt + baseline_offset_pt - style.baseline_shift_pt()
   }
 }
 

@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use ooxmlsdk_fonts::{
   FeatureValue, FontBytes, FontFallbackChain, FontId, FontRegistry, FontRequest, FontSize,
-  ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun, TextScript,
+  ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun, TextDirection, TextScript,
   script_direction_runs_with_options,
 };
 use rustc_hash::FxHashMap as HashMap;
@@ -85,6 +85,21 @@ pub trait FontStyleRef {
     self.font_family()
   }
   fn font_size_pt(&self) -> f32;
+  fn complex_font_size_pt(&self) -> Option<f32> {
+    None
+  }
+  fn complex_script_override(&self) -> Option<bool> {
+    None
+  }
+  fn right_to_left(&self) -> bool {
+    false
+  }
+  fn complex_bold(&self) -> Option<bool> {
+    None
+  }
+  fn complex_italic(&self) -> Option<bool> {
+    None
+  }
   fn character_spacing_pt(&self) -> f32;
   fn baseline_shift_pt(&self) -> f32;
   fn bold(&self) -> bool;
@@ -104,6 +119,51 @@ pub trait FontStyleRef {
   }
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     0.0
+  }
+}
+
+fn complex_script_override(
+  complex_script: Option<bool>,
+  right_to_left: Option<bool>,
+) -> Option<bool> {
+  if complex_script == Some(true) || right_to_left == Some(true) {
+    Some(true)
+  } else {
+    None
+  }
+}
+
+fn uses_complex_run_properties(style: &(impl FontStyleRef + ?Sized)) -> bool {
+  // MS-OI29500 §17.3.2.1/.2, §17.3.2.13/.16 and §17.3.2.38/.39:
+  // Word selects b/bCs, i/iCs and sz/szCs from the state of cs and rtl.
+  // Unicode script classification remains relevant to rFonts only.
+  style.complex_script_override() == Some(true)
+}
+
+pub(crate) fn effective_font_size_pt(
+  style: &(impl FontStyleRef + ?Sized),
+  _script: Option<TextScript>,
+) -> f32 {
+  if uses_complex_run_properties(style) {
+    style.complex_font_size_pt().unwrap_or(style.font_size_pt())
+  } else {
+    style.font_size_pt()
+  }
+}
+
+fn effective_bold(style: &(impl FontStyleRef + ?Sized), _script: Option<TextScript>) -> bool {
+  if uses_complex_run_properties(style) {
+    style.complex_bold().unwrap_or(false)
+  } else {
+    style.bold()
+  }
+}
+
+fn effective_italic(style: &(impl FontStyleRef + ?Sized), _script: Option<TextScript>) -> bool {
+  if uses_complex_run_properties(style) {
+    style.complex_italic().unwrap_or(false)
+  } else {
+    style.italic()
   }
 }
 
@@ -134,6 +194,26 @@ impl FontStyleRef for TextStyle {
     self.font_size_pt
   }
 
+  fn complex_font_size_pt(&self) -> Option<f32> {
+    self.complex_font_size_pt
+  }
+
+  fn complex_script_override(&self) -> Option<bool> {
+    complex_script_override(self.complex_script, self.right_to_left)
+  }
+
+  fn right_to_left(&self) -> bool {
+    self.right_to_left == Some(true)
+  }
+
+  fn complex_bold(&self) -> Option<bool> {
+    self.complex_bold
+  }
+
+  fn complex_italic(&self) -> Option<bool> {
+    self.complex_italic
+  }
+
   fn character_spacing_pt(&self) -> f32 {
     self.character_spacing_pt
   }
@@ -157,7 +237,7 @@ impl FontStyleRef for TextStyle {
   fn kerning_enabled(&self) -> bool {
     self
       .kerning_minimum_size_pt
-      .is_none_or(|minimum| self.font_size_pt + f32::EPSILON >= minimum)
+      .is_none_or(|minimum| effective_font_size_pt(self, None) + f32::EPSILON >= minimum)
   }
 
   fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
@@ -204,6 +284,26 @@ impl FontStyleRef for common::TextStyle<'_> {
     self.font_size.0
   }
 
+  fn complex_font_size_pt(&self) -> Option<f32> {
+    self.complex_font_size.map(|size| size.0)
+  }
+
+  fn complex_script_override(&self) -> Option<bool> {
+    complex_script_override(self.complex_script, self.right_to_left)
+  }
+
+  fn right_to_left(&self) -> bool {
+    self.right_to_left == Some(true)
+  }
+
+  fn complex_bold(&self) -> Option<bool> {
+    self.complex_bold
+  }
+
+  fn complex_italic(&self) -> Option<bool> {
+    self.complex_italic
+  }
+
   fn character_spacing_pt(&self) -> f32 {
     self.character_spacing.0
   }
@@ -227,7 +327,7 @@ impl FontStyleRef for common::TextStyle<'_> {
   fn kerning_enabled(&self) -> bool {
     self
       .kerning_minimum_size
-      .is_none_or(|minimum| self.font_size.0 + f32::EPSILON >= minimum.0)
+      .is_none_or(|minimum| effective_font_size_pt(self, None) + f32::EPSILON >= minimum.0)
   }
 
   fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
@@ -387,6 +487,72 @@ impl FontResolver {
       .map(|metrics| metrics.decoration)
   }
 
+  pub(crate) fn max_text_line_height(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<f32> {
+    self
+      .text_vertical_metrics(text, style)
+      .map(|metrics| metrics.ascent_pt + metrics.descent_pt + metrics.line_gap_pt)
+  }
+
+  pub(crate) fn text_vertical_metrics(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<ooxmlsdk_fonts::VerticalMetrics> {
+    let script_runs = script_direction_runs_with_options(
+      text,
+      FontSize(style.font_size_pt()),
+      ScriptScanOptions {
+        small_caps: style.small_caps(),
+        wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
+        ..ScriptScanOptions::default()
+      },
+    );
+    let needs_script_metrics = style.complex_script_override() == Some(true)
+      || script_runs.iter().any(|run| {
+        matches!(
+          run.script,
+          TextScript::Arabic | TextScript::Hebrew | TextScript::Devanagari | TextScript::Thai
+        )
+      });
+    if !needs_script_metrics {
+      return self.vertical_metrics(style);
+    }
+
+    let mut combined: Option<ooxmlsdk_fonts::VerticalMetrics> = None;
+    for run in script_runs {
+      let metrics = self.font_metrics(style, Some(run.script))?.vertical;
+      if let Some(combined) = &mut combined {
+        combined.ascent_pt = combined.ascent_pt.max(metrics.ascent_pt);
+        combined.descent_pt = combined.descent_pt.max(metrics.descent_pt);
+        combined.internal_leading_pt = combined
+          .internal_leading_pt
+          .max(metrics.internal_leading_pt);
+        combined.external_leading_pt = combined
+          .external_leading_pt
+          .max(metrics.external_leading_pt);
+        combined.line_gap_pt = combined.line_gap_pt.max(metrics.line_gap_pt);
+        combined.ink_height_pt = combined.ink_height_pt.max(metrics.ink_height_pt);
+        combined.baseline_offset_pt = combined.baseline_offset_pt.max(metrics.baseline_offset_pt);
+        combined.hanging_baseline_pt = combined
+          .hanging_baseline_pt
+          .max(metrics.hanging_baseline_pt);
+        combined.cjk_horizontal_advance_pt = combined
+          .cjk_horizontal_advance_pt
+          .max(metrics.cjk_horizontal_advance_pt);
+        combined.cjk_vertical_advance_pt = combined
+          .cjk_vertical_advance_pt
+          .max(metrics.cjk_vertical_advance_pt);
+      } else {
+        combined = Some(metrics);
+      }
+    }
+    combined
+  }
+
   fn font_metrics(
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
@@ -406,7 +572,7 @@ impl FontResolver {
     let request = font_request(style, script);
     let registry = self.style_font_registry(style, script);
     let resolved = registry.resolve(&request).ok()?;
-    let metrics_at_size = resolved.metrics_at_size(FontSize(style.font_size_pt()));
+    let metrics_at_size = resolved.metrics_at_size(FontSize(effective_font_size_pt(style, script)));
     let metrics = FontMetrics {
       vertical: metrics_at_size.vertical,
       decoration: metrics_at_size.decoration,
@@ -421,9 +587,10 @@ impl FontResolver {
     text: &'text str,
     style: &(impl FontStyleRef + ?Sized),
   ) -> Option<Vec<ShapedRun<'text, 'static>>> {
+    let base_size = style.font_size_pt();
     let script_runs = script_direction_runs_with_options(
       text,
-      FontSize(style.font_size_pt()),
+      FontSize(base_size),
       ScriptScanOptions {
         small_caps: style.small_caps(),
         wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
@@ -435,9 +602,16 @@ impl FontResolver {
       let key = FontFaceKey::from_style(style, Some(script_run.script));
       let registry = self.style_font_registry(style, Some(script_run.script));
       let mut request = font_request(style, Some(script_run.script));
-      request.size_pt = script_run.size_pt;
+      let small_caps_scale = if base_size > f32::EPSILON {
+        script_run.size_pt.0 / base_size
+      } else {
+        1.0
+      };
+      request.size_pt =
+        FontSize(effective_font_size_pt(style, Some(script_run.script)) * small_caps_scale);
       request.script = Some(script_run.script);
-      let mut options = ShapeOptions::from_request(&request, script_run.direction);
+      let direction = effective_text_direction(style, script_run.direction);
+      let mut options = ShapeOptions::from_request(&request, direction);
       options.character_spacing_pt = style.character_spacing_pt();
       options.horizontal_scale = style.horizontal_scale();
       options.small_caps = script_run.small_caps;
@@ -522,6 +696,17 @@ impl FontResolver {
   }
 }
 
+fn effective_text_direction(
+  style: &(impl FontStyleRef + ?Sized),
+  scanned_direction: TextDirection,
+) -> TextDirection {
+  if style.right_to_left() {
+    TextDirection::RightToLeft
+  } else {
+    scanned_direction
+  }
+}
+
 pub fn shape_text_runs<'text>(
   text: &'text str,
   style: &(impl FontStyleRef + ?Sized),
@@ -575,9 +760,9 @@ fn font_request<'a>(
     family: script_font_family(style, script)
       .filter(|family| !family.trim().is_empty())
       .map(Cow::Borrowed),
-    bold: style.bold(),
-    italic: style.italic(),
-    size_pt: FontSize(style.font_size_pt()),
+    bold: effective_bold(style, script),
+    italic: effective_italic(style, script),
+    size_pt: FontSize(effective_font_size_pt(style, script)),
     script,
     features,
     ..FontRequest::default()
@@ -588,6 +773,13 @@ fn script_font_family(
   style: &(impl FontStyleRef + ?Sized),
   script: Option<TextScript>,
 ) -> Option<&str> {
+  if let Some(force_complex) = style.complex_script_override() {
+    return if force_complex {
+      style.complex_font_family()
+    } else {
+      style.font_family()
+    };
+  }
   match script {
     Some(TextScript::Han | TextScript::Hiragana | TextScript::Katakana | TextScript::Hangul) => {
       style.east_asia_font_family()
@@ -688,8 +880,8 @@ impl FontFaceKey {
     Self {
       family: script_font_family(style, script).map(str::to_string),
       fallback_family: script_fallback_font_family(style, script).map(str::to_string),
-      bold: style.bold(),
-      italic: style.italic(),
+      bold: effective_bold(style, script),
+      italic: effective_italic(style, script),
       script,
     }
   }
@@ -701,8 +893,8 @@ impl FontFaceKey {
   ) -> bool {
     self.family.as_deref() == script_font_family(style, script)
       && self.fallback_family.as_deref() == script_fallback_font_family(style, script)
-      && self.bold == style.bold()
-      && self.italic == style.italic()
+      && self.bold == effective_bold(style, script)
+      && self.italic == effective_italic(style, script)
       && self.script == script
   }
 }
@@ -728,10 +920,10 @@ impl FontMetricsKey {
     Self {
       family: script_font_family(style, script).map(str::to_string),
       fallback_family: script_fallback_font_family(style, script).map(str::to_string),
-      bold: style.bold(),
-      italic: style.italic(),
+      bold: effective_bold(style, script),
+      italic: effective_italic(style, script),
       script,
-      size_pt_bits: style.font_size_pt().to_bits(),
+      size_pt_bits: effective_font_size_pt(style, script).to_bits(),
     }
   }
 
@@ -742,10 +934,10 @@ impl FontMetricsKey {
   ) -> bool {
     self.family.as_deref() == script_font_family(style, script)
       && self.fallback_family.as_deref() == script_fallback_font_family(style, script)
-      && self.bold == style.bold()
-      && self.italic == style.italic()
+      && self.bold == effective_bold(style, script)
+      && self.italic == effective_italic(style, script)
       && self.script == script
-      && self.size_pt_bits == style.font_size_pt().to_bits()
+      && self.size_pt_bits == effective_font_size_pt(style, script).to_bits()
   }
 }
 
@@ -759,8 +951,12 @@ mod tests {
 
   use crate::common::OpenTypeLigatures;
   use crate::docx::TextStyle;
+  use ooxmlsdk_fonts::TextScript;
 
-  use super::{font_request, load_text_face};
+  use super::{
+    effective_font_size_pt, effective_text_direction, font_request, load_text_face,
+    script_font_family,
+  };
 
   #[test]
   fn kerning_feature_follows_the_wordprocessingml_size_threshold() {
@@ -776,6 +972,86 @@ mod tests {
 
     style.font_size_pt = 12.0;
     assert_eq!(font_request(&style, None).features[0].value, 1);
+  }
+
+  #[test]
+  fn wordprocessing_complex_script_override_controls_the_full_font_request() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Latin Face")),
+      complex_font_family: Some(Arc::from("Complex Face")),
+      font_size_pt: 10.0,
+      complex_font_size_pt: Some(20.0),
+      complex_script: Some(true),
+      bold: false,
+      complex_bold: Some(true),
+      italic: true,
+      complex_italic: Some(false),
+      ..Default::default()
+    };
+
+    let request = font_request(&style, Some(TextScript::Latin));
+    assert_eq!(request.family.as_deref(), Some("Complex Face"));
+    assert_eq!(request.size_pt.0, 20.0);
+    assert!(request.bold);
+    assert!(!request.italic);
+  }
+
+  #[test]
+  fn explicit_false_keeps_unicode_font_selection_and_normal_run_properties() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Latin Face")),
+      complex_font_family: Some(Arc::from("Complex Face")),
+      font_size_pt: 10.0,
+      complex_font_size_pt: Some(20.0),
+      complex_script: Some(false),
+      ..Default::default()
+    };
+
+    assert_eq!(
+      script_font_family(&style, Some(TextScript::Arabic)),
+      Some("Complex Face")
+    );
+    assert_eq!(
+      effective_font_size_pt(&style, Some(TextScript::Arabic)),
+      10.0
+    );
+  }
+
+  #[test]
+  fn unicode_script_selects_complex_font_but_not_complex_run_properties() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Latin Face")),
+      complex_font_family: Some(Arc::from("Complex Face")),
+      font_size_pt: 10.0,
+      complex_font_size_pt: Some(20.0),
+      ..Default::default()
+    };
+
+    assert_eq!(
+      script_font_family(&style, Some(TextScript::Arabic)),
+      Some("Complex Face")
+    );
+    assert_eq!(
+      effective_font_size_pt(&style, Some(TextScript::Arabic)),
+      10.0
+    );
+    assert_eq!(
+      effective_font_size_pt(&style, Some(TextScript::Latin)),
+      10.0
+    );
+  }
+
+  #[test]
+  fn explicit_right_to_left_forces_shaping_direction() {
+    let style = TextStyle {
+      right_to_left: Some(true),
+      ..Default::default()
+    };
+
+    assert_eq!(
+      effective_text_direction(&style, ooxmlsdk_fonts::TextDirection::LeftToRight),
+      ooxmlsdk_fonts::TextDirection::RightToLeft
+    );
   }
 
   #[test]

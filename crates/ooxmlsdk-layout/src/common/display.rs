@@ -322,6 +322,10 @@ pub struct TextStyle<'doc> {
   pub symbol_font_family: Option<Cow<'doc, str>>,
   pub font_size: Pt,
   pub complex_font_size: Option<Pt>,
+  pub complex_script: Option<bool>,
+  pub right_to_left: Option<bool>,
+  pub complex_bold: Option<bool>,
+  pub complex_italic: Option<bool>,
   pub kerning_minimum_size: Option<Pt>,
   /// OpenType ligature categories selected by WordprocessingML. `None`
   /// preserves the shaping engine defaults for non-Word document models.

@@ -438,7 +438,11 @@ struct TextItem<'doc> {
   style: TextStyle<'doc>,
   rotation_center_pt: Option<(f32, f32)>,
   hyperlink_url: Option<Cow<'doc, str>>,
-  dynamic_field: Option<common::DynamicField<'doc>>,
+  // Dynamic fields are uncommon, while this item is stored in a mixed page
+  // enum for every text run. Keep the cold payload indirect so ordinary text
+  // does not inflate every non-text enum variant or require boxing the hot
+  // TextItem itself.
+  dynamic_field: Option<Box<common::DynamicField<'doc>>>,
   form_widget_id: Option<u32>,
   paragraph_bidi: bool,
   word_spacing_pt: f32,
@@ -548,6 +552,8 @@ struct TextStyle<'doc> {
   symbol_font_family: Option<Cow<'doc, str>>,
   font_size_pt: f32,
   complex_font_size_pt: Option<f32>,
+  complex_script: Option<bool>,
+  right_to_left: Option<bool>,
   kerning_minimum_size_pt: Option<f32>,
   ligatures: Option<common::OpenTypeLigatures>,
   horizontal_scale: Option<f32>,
@@ -558,6 +564,8 @@ struct TextStyle<'doc> {
   cjk_punctuation_compression_ratio: f32,
   bold: bool,
   italic: bool,
+  complex_bold: Option<bool>,
+  complex_italic: Option<bool>,
   underline: bool,
   strikethrough: bool,
   uppercase: bool,
@@ -601,6 +609,30 @@ impl FontStyleRef for TextStyle<'_> {
     self.font_size_pt
   }
 
+  fn complex_font_size_pt(&self) -> Option<f32> {
+    self.complex_font_size_pt
+  }
+
+  fn complex_script_override(&self) -> Option<bool> {
+    if self.complex_script == Some(true) || self.right_to_left == Some(true) {
+      Some(true)
+    } else {
+      None
+    }
+  }
+
+  fn right_to_left(&self) -> bool {
+    self.right_to_left == Some(true)
+  }
+
+  fn complex_bold(&self) -> Option<bool> {
+    self.complex_bold
+  }
+
+  fn complex_italic(&self) -> Option<bool> {
+    self.complex_italic
+  }
+
   fn character_spacing_pt(&self) -> f32 {
     self.character_spacing_pt
   }
@@ -630,9 +662,14 @@ impl FontStyleRef for TextStyle<'_> {
   }
 
   fn kerning_enabled(&self) -> bool {
+    let font_size_pt = if self.complex_script_override() == Some(true) {
+      self.complex_font_size_pt.unwrap_or(self.font_size_pt)
+    } else {
+      self.font_size_pt
+    };
     self
       .kerning_minimum_size_pt
-      .is_none_or(|minimum| self.font_size_pt + f32::EPSILON >= minimum)
+      .is_none_or(|minimum| font_size_pt + f32::EPSILON >= minimum)
   }
 
   fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
@@ -1325,10 +1362,8 @@ fn reciprocal_internal_link_url(url: &str) -> Option<String> {
   let (kind, id) = internal_link_url_parts(url)?;
   let (note_kind, target_suffix) = if let Some(note_kind) = kind.strip_suffix("-reference") {
     (note_kind, "-backlink")
-  } else if let Some(note_kind) = kind.strip_suffix("-backlink") {
-    (note_kind, "-reference")
   } else {
-    return None;
+    (kind.strip_suffix("-backlink")?, "-reference")
   };
   let mut target_url = String::with_capacity(
     "ooxmlsdk-pdf:".len() + note_kind.len() + target_suffix.len() + id.len() + 1,
@@ -1521,7 +1556,11 @@ fn text_item_from_common<'doc>(text: &'doc common::TextRun<'static>) -> TextItem
       .hyperlink_url
       .as_ref()
       .map(|url| Cow::Borrowed(url.as_ref())),
-    dynamic_field: text.dynamic_field.as_ref().map(dynamic_field_borrowed),
+    dynamic_field: text
+      .dynamic_field
+      .as_ref()
+      .map(dynamic_field_borrowed)
+      .map(Box::new),
     form_widget_id: text.form_widget_id,
     paragraph_bidi: text.paragraph_bidi,
     word_spacing_pt: text.word_spacing_pt,
@@ -1642,6 +1681,8 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
       .map(|value| Cow::Borrowed(value.as_ref())),
     font_size_pt: style.font_size.0,
     complex_font_size_pt: style.complex_font_size.map(|size| size.0),
+    complex_script: style.complex_script,
+    right_to_left: style.right_to_left,
     kerning_minimum_size_pt: style.kerning_minimum_size.map(|size| size.0),
     ligatures: style.ligatures,
     horizontal_scale: style.horizontal_scale,
@@ -1652,6 +1693,8 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
     bold: style.bold,
     italic: style.italic,
+    complex_bold: style.complex_bold,
+    complex_italic: style.complex_italic,
     underline: style.underline,
     strikethrough: style.strikethrough,
     uppercase: style.uppercase,
@@ -1843,7 +1886,7 @@ impl<'doc> PaintText<'doc> {
       .as_ref()
       .map(|run| run.width_pt)
       .unwrap_or_else(|| text_metrics.measure_text(&text_ref.text, &text_ref.style));
-    let vertical_metrics = text_metrics.vertical_metrics(&text_ref.style);
+    let vertical_metrics = text_metrics.vertical_metrics_for_text(&text_ref.text, &text_ref.style);
     let baseline_y = if text_ref.style.semantic_only {
       // EMF text extraction reports the reference point consumed as the
       // baseline by emfsdk's raster replay. Preserve that exact coordinate
@@ -1854,12 +1897,17 @@ impl<'doc> PaintText<'doc> {
         Some(FollowFrameKind::Table) => text_ref.y_pt - text_ref.style.baseline_shift_pt,
         Some(FollowFrameKind::Paragraph | FollowFrameKind::Notes) | None => {
           let offset = if text_ref.style.use_windows_font_metrics {
-            text_metrics.baseline_offset_in_line_with_windows_metrics(
+            text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+              &text_ref.text,
               &text_ref.style,
               text_ref.line_height_pt,
             )
           } else {
-            text_metrics.baseline_offset_in_line(&text_ref.style, text_ref.line_height_pt)
+            text_metrics.baseline_offset_in_line_for_text(
+              &text_ref.text,
+              &text_ref.style,
+              text_ref.line_height_pt,
+            )
           };
           text_ref.y_pt + offset
         }
@@ -2898,7 +2946,11 @@ fn draw_text_item(
     {
       for run in glyphs {
         let selected = fonts.select_face(&run.font_face)?;
-        surface.set_stroke(text_stroke(&item.style, selected.synthetic_bold));
+        surface.set_stroke(text_stroke(
+          &item.style,
+          selected.synthetic_bold,
+          run.font_size_pt,
+        ));
         surface.draw_glyphs(
           Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
           &run.glyphs,
@@ -3765,13 +3817,17 @@ fn stroke(style: &TextStyle<'_>) -> Option<Stroke> {
   })
 }
 
-fn text_stroke(style: &TextStyle<'_>, synthetic_bold: bool) -> Option<Stroke> {
+fn text_stroke(
+  style: &TextStyle<'_>,
+  synthetic_bold: bool,
+  rendered_font_size_pt: f32,
+) -> Option<Stroke> {
   // LibreOffice's PDF writer uses fill-then-stroke for an artificial bold
   // face, with a stroke width of one thirtieth of the font height. An
   // explicit text outline wins over artificial bold there as well.
   stroke(style).or_else(|| {
     synthetic_bold.then(|| Stroke {
-      width: style.font_size_pt / 30.0,
+      width: rendered_font_size_pt / 30.0,
       paint: rgb::Color::new(style.color.r, style.color.g, style.color.b).into(),
       opacity: NormalizedF32::new(style.opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ZERO),
       ..Default::default()
@@ -4183,8 +4239,28 @@ mod tests {
     };
     let style = text_style_from_common(&common_style);
 
-    let stroke = text_stroke(&style, true).expect("synthetic bold stroke");
+    let stroke = text_stroke(&style, true, 18.0).expect("synthetic bold stroke");
 
-    assert!((stroke.width - 0.5).abs() < f32::EPSILON);
+    assert!((stroke.width - 0.6).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn pdf_text_style_preserves_complex_script_formatting() {
+    let common_style = TextStyle {
+      complex_font_size: Some(Pt(18.0)),
+      complex_script: Some(true),
+      right_to_left: Some(true),
+      complex_bold: Some(true),
+      complex_italic: Some(false),
+      ..TextStyle::default()
+    };
+
+    let style = text_style_from_common(&common_style);
+
+    assert_eq!(style.complex_font_size_pt, Some(18.0));
+    assert_eq!(style.complex_script, Some(true));
+    assert_eq!(style.right_to_left, Some(true));
+    assert_eq!(style.complex_bold, Some(true));
+    assert_eq!(style.complex_italic, Some(false));
   }
 }

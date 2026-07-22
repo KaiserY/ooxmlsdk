@@ -3141,10 +3141,46 @@ fn font_charset_matches(
     || (charset == FontCharset::Symbol && face.flags.symbolic)
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum FontDbQueryFamily {
   Name(String),
   SansSerif,
   Serif,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct SystemFontQueryKey {
+  family: FontDbQueryFamily,
+  weight: fontdb::Weight,
+  style: fontdb::Style,
+}
+
+type SystemFontQuerySlot = OnceLock<Option<fontdb::ID>>;
+
+const SYSTEM_FONT_QUERY_CACHE_ENTRIES: usize = 4_096;
+
+#[derive(Default)]
+struct SystemFontQueryCache {
+  slots: HashMap<SystemFontQueryKey, Arc<SystemFontQuerySlot>>,
+  insertion_order: VecDeque<SystemFontQueryKey>,
+}
+
+impl SystemFontQueryCache {
+  fn slot(&mut self, key: SystemFontQueryKey) -> Arc<SystemFontQuerySlot> {
+    if let Some(slot) = self.slots.get(&key) {
+      return slot.clone();
+    }
+    while self.slots.len() >= SYSTEM_FONT_QUERY_CACHE_ENTRIES {
+      let Some(evicted) = self.insertion_order.pop_front() else {
+        break;
+      };
+      self.slots.remove(&evicted);
+    }
+    let slot = Arc::new(SystemFontQuerySlot::new());
+    self.insertion_order.push_back(key.clone());
+    self.slots.insert(key, slot.clone());
+    slot
+  }
 }
 
 impl FontDbQueryFamily {
@@ -3157,24 +3193,37 @@ impl FontDbQueryFamily {
   }
 
   fn query(&self, database: &FontDatabase, request: &FontRequest<'_>) -> Option<fontdb::ID> {
-    let family = self.as_fontdb_family();
-    let query = fontdb::Query {
-      families: &[family],
+    static CACHE: OnceLock<Mutex<SystemFontQueryCache>> = OnceLock::new();
+
+    let key = SystemFontQueryKey {
+      family: self.clone(),
       weight: fontdb_weight(request),
       style: fontdb_style(request),
-      ..fontdb::Query::default()
     };
-    match self {
-      // A typographic family alias may also appear on a distinct Office face:
-      // Aptos Display, for example, advertises Aptos as an alias. Resolve the
-      // requested concrete/legacy typeface before accepting fontdb's broader
-      // family match so an Aptos request cannot become Aptos Display merely
-      // because that face was indexed first.
-      Self::Name(typeface) => {
-        query_legacy_system_typeface(database, typeface, request).or_else(|| database.query(&query))
+    let slot = CACHE
+      .get_or_init(|| Mutex::new(SystemFontQueryCache::default()))
+      .lock()
+      .unwrap_or_else(std::sync::PoisonError::into_inner)
+      .slot(key);
+    *slot.get_or_init(|| {
+      let family = self.as_fontdb_family();
+      let query = fontdb::Query {
+        families: &[family],
+        weight: fontdb_weight(request),
+        style: fontdb_style(request),
+        ..fontdb::Query::default()
+      };
+      match self {
+        // A typographic family alias may also appear on a distinct Office face:
+        // Aptos Display, for example, advertises Aptos as an alias. Resolve the
+        // requested concrete/legacy typeface before accepting fontdb's broader
+        // family match so an Aptos request cannot become Aptos Display merely
+        // because that face was indexed first.
+        Self::Name(typeface) => query_legacy_system_typeface(database, typeface, request)
+          .or_else(|| database.query(&query)),
+        Self::SansSerif | Self::Serif => database.query(&query),
       }
-      Self::SansSerif | Self::Serif => database.query(&query),
-    }
+    })
   }
 }
 
@@ -4210,6 +4259,25 @@ fn harf_script(script: TextScript) -> Option<HarfScript> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn system_font_query_cache_stays_bounded() {
+    let mut cache = SystemFontQueryCache::default();
+    for index in 0..=SYSTEM_FONT_QUERY_CACHE_ENTRIES {
+      cache.slot(SystemFontQueryKey {
+        family: FontDbQueryFamily::Name(format!("Fixture {index}")),
+        weight: fontdb::Weight::NORMAL,
+        style: fontdb::Style::Normal,
+      });
+    }
+
+    assert_eq!(cache.slots.len(), SYSTEM_FONT_QUERY_CACHE_ENTRIES);
+    assert!(!cache.slots.contains_key(&SystemFontQueryKey {
+      family: FontDbQueryFamily::Name("Fixture 0".to_string()),
+      weight: fontdb::Weight::NORMAL,
+      style: fontdb::Style::Normal,
+    }));
+  }
 
   #[test]
   fn resolves_exact_family_and_records_candidates() {

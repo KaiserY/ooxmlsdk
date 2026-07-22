@@ -1479,7 +1479,7 @@ fn lower_diagram(
           .and_then(|properties| {
             diagram_model_shape_outline(context.import, context.slide, properties)
           })
-          .or_else(|| Some(BorderStyle::default()).filter(|_| !suppress_fill)),
+          .or_else(|| (!suppress_fill).then_some(BorderStyle::default())),
         stroke_opacity: 1.0,
       }));
     }

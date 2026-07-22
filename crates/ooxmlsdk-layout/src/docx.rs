@@ -3293,6 +3293,22 @@ fn merge_paragraph_format(
   }
 
   if let Some(indentation) = properties.indentation() {
+    let left_character_units = indentation
+      .start_characters
+      .or(indentation.left_chars)
+      .map(|value| value as f32 / 100.0);
+    let right_character_units = indentation
+      .end_characters
+      .or(indentation.right_chars)
+      .map(|value| value as f32 / 100.0);
+    let first_line_character_units = indentation
+      .hanging_chars
+      .map(|value| -(value as f32) / 100.0)
+      .or_else(|| {
+        indentation
+          .first_line_chars
+          .map(|value| value as f32 / 100.0)
+      });
     if indentation.start.is_some() || indentation.left.is_some() {
       format.indent_left_set = true;
       format.indent_left_pt = indentation
@@ -3301,6 +3317,10 @@ fn merge_paragraph_format(
         .or(indentation.left.as_ref())
         .and_then(signed_twips_measure_to_points)
         .unwrap_or(0.0);
+    }
+    if left_character_units.is_some() {
+      format.indent_left_set = true;
+      format.indent_left_character_units = left_character_units;
     }
     if indentation.end.is_some() || indentation.right.is_some() {
       format.indent_right_set = true;
@@ -3311,19 +3331,26 @@ fn merge_paragraph_format(
         .and_then(signed_twips_measure_to_points)
         .unwrap_or(0.0);
     }
+    if right_character_units.is_some() {
+      format.indent_right_set = true;
+      format.indent_right_character_units = right_character_units;
+    }
     if indentation.first_line.is_some() || indentation.hanging.is_some() {
       format.first_line_indent_set = true;
-      let first_line = indentation
-        .first_line
-        .as_ref()
-        .and_then(twips_measure_to_points)
-        .unwrap_or(0.0);
-      let hanging = indentation
-        .hanging
-        .as_ref()
-        .and_then(signed_twips_measure_to_points)
-        .unwrap_or(0.0);
-      format.first_line_indent_pt = first_line - hanging;
+      format.first_line_indent_pt = indentation.hanging.as_ref().map_or_else(
+        || {
+          indentation
+            .first_line
+            .as_ref()
+            .and_then(twips_measure_to_points)
+            .unwrap_or(0.0)
+        },
+        |hanging| -signed_twips_measure_to_points(hanging).unwrap_or(0.0),
+      );
+    }
+    if first_line_character_units.is_some() {
+      format.first_line_indent_set = true;
+      format.first_line_indent_character_units = first_line_character_units;
     }
   }
 
@@ -5561,9 +5588,13 @@ fn note_reference_style(style: &TextStyle) -> TextStyle {
     return style.clone();
   }
   let mut reference_style = style.clone();
-  reference_style.baseline_shift_pt = style.font_size_pt * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
+  reference_style.baseline_shift_pt =
+    crate::fonts::effective_font_size_pt(style, None) * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
   reference_style.font_size_pt =
     (style.font_size_pt * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
+  reference_style.complex_font_size_pt = style
+    .complex_font_size_pt
+    .map(|size| (size * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
   reference_style
 }
 
@@ -9500,7 +9531,9 @@ fn push_group_textboxes(
         );
       }
       v::GroupChoice::ImageFile(image) => {
-        let style = transform.and_then(|transform| transform.child_style(image.style.as_deref()));
+        let style = transform.and_then(|transform| {
+          transform.child_anchor_style(group.style.as_deref(), image.style.as_deref())
+        });
         push_image_file_textboxes(
           image,
           style.as_deref(),
@@ -9512,8 +9545,9 @@ fn push_group_textboxes(
         );
       }
       v::GroupChoice::Rectangle(rectangle) => {
-        let style =
-          transform.and_then(|transform| transform.child_style(rectangle.style.as_deref()));
+        let style = transform.and_then(|transform| {
+          transform.child_anchor_style(group.style.as_deref(), rectangle.style.as_deref())
+        });
         push_rectangle_textboxes(
           rectangle,
           style.as_deref(),
@@ -9525,8 +9559,9 @@ fn push_group_textboxes(
         );
       }
       v::GroupChoice::RoundRectangle(round_rectangle) => {
-        let style =
-          transform.and_then(|transform| transform.child_style(round_rectangle.style.as_deref()));
+        let style = transform.and_then(|transform| {
+          transform.child_anchor_style(group.style.as_deref(), round_rectangle.style.as_deref())
+        });
         push_round_rectangle_textboxes(
           round_rectangle,
           style.as_deref(),
@@ -9538,7 +9573,9 @@ fn push_group_textboxes(
         );
       }
       v::GroupChoice::Shape(shape) => {
-        let style = transform.and_then(|transform| transform.child_style(shape.style.as_deref()));
+        let style = transform.and_then(|transform| {
+          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
+        });
         push_shape_textboxes(
           shape,
           style.as_deref(),
@@ -12347,14 +12384,23 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   }
   if values.indent_left_set {
     target.indent_left_pt = values.indent_left_pt;
+    if values.indent_left_character_units.is_some() {
+      target.indent_left_character_units = values.indent_left_character_units;
+    }
     target.indent_left_set = true;
   }
   if values.indent_right_set {
     target.indent_right_pt = values.indent_right_pt;
+    if values.indent_right_character_units.is_some() {
+      target.indent_right_character_units = values.indent_right_character_units;
+    }
     target.indent_right_set = true;
   }
   if values.first_line_indent_set {
     target.first_line_indent_pt = values.first_line_indent_pt;
+    if values.first_line_indent_character_units.is_some() {
+      target.first_line_indent_character_units = values.first_line_indent_character_units;
+    }
     target.first_line_indent_set = true;
   }
   if values.tab_stops_set {
@@ -12436,9 +12482,42 @@ impl NumberingReference {
 
 #[derive(Clone, Copy, Debug, Default)]
 struct NumberingFormatMergeContext {
-  direct_indentation: bool,
+  direct_indent_left: bool,
+  direct_indent_right: bool,
+  direct_first_line_indent: bool,
   direct_tab_stops: bool,
   style_numbering: bool,
+}
+
+impl NumberingFormatMergeContext {
+  fn from_direct_properties(properties: Option<ParagraphProps<'_>>) -> Self {
+    let mut context = Self::default();
+    let Some(indentation) = properties.and_then(|properties| properties.indentation()) else {
+      return context;
+    };
+
+    // [MS-OI29500] §2.1.87 (Part 1 §17.3.1.12) says Word ignores a zero
+    // character-unit indent together with the related character-unit value
+    // inherited earlier in the style hierarchy. Such a value therefore does
+    // not protect the corresponding twip indent from the numbering level.
+    context.direct_indent_left = indentation.start.is_some()
+      || indentation.left.is_some()
+      || indentation.start_characters.is_some_and(|value| value != 0)
+      || indentation.left_chars.is_some_and(|value| value != 0);
+    context.direct_indent_right = indentation.end.is_some()
+      || indentation.right.is_some()
+      || indentation.end_characters.is_some_and(|value| value != 0)
+      || indentation.right_chars.is_some_and(|value| value != 0);
+    context.direct_first_line_indent = indentation.first_line.is_some()
+      || indentation.hanging.is_some()
+      || indentation.first_line_chars.is_some_and(|value| value != 0)
+      || indentation.hanging_chars.is_some_and(|value| value != 0);
+    context
+  }
+
+  fn has_direct_indentation(self) -> bool {
+    self.direct_indent_left || self.direct_indent_right || self.direct_first_line_indent
+  }
 }
 
 fn merge_numbering_format_values(
@@ -12462,21 +12541,30 @@ fn merge_numbering_format_values(
     target.snap_to_grid = values.snap_to_grid;
   }
   let protect_indents =
-    (context.direct_indentation || context.style_numbering) && target.indent_left_set;
+    (context.direct_indent_left || context.style_numbering) && target.indent_left_set;
   if values.indent_left_set && !protect_indents {
     target.indent_left_pt = values.indent_left_pt;
+    if values.indent_left_character_units.is_some() {
+      target.indent_left_character_units = values.indent_left_character_units;
+    }
     target.indent_left_set = true;
   }
   let protect_indents =
-    (context.direct_indentation || context.style_numbering) && target.indent_right_set;
+    (context.direct_indent_right || context.style_numbering) && target.indent_right_set;
   if values.indent_right_set && !protect_indents {
     target.indent_right_pt = values.indent_right_pt;
+    if values.indent_right_character_units.is_some() {
+      target.indent_right_character_units = values.indent_right_character_units;
+    }
     target.indent_right_set = true;
   }
   let protect_indents =
-    (context.direct_indentation || context.style_numbering) && target.first_line_indent_set;
+    (context.direct_first_line_indent || context.style_numbering) && target.first_line_indent_set;
   if values.first_line_indent_set && !protect_indents {
     target.first_line_indent_pt = values.first_line_indent_pt;
+    if values.first_line_indent_character_units.is_some() {
+      target.first_line_indent_character_units = values.first_line_indent_character_units;
+    }
     target.first_line_indent_set = true;
   }
   if values.tab_stops_set && !(context.direct_tab_stops && target.tab_stops_set) {
@@ -12528,6 +12616,18 @@ fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   }
   if values.complex_font_size_pt.is_some() {
     target.complex_font_size_pt = values.complex_font_size_pt;
+  }
+  if values.complex_script.is_some() {
+    target.complex_script = values.complex_script;
+  }
+  if values.right_to_left.is_some() {
+    target.right_to_left = values.right_to_left;
+  }
+  if values.complex_bold.is_some() {
+    target.complex_bold = values.complex_bold;
+  }
+  if values.complex_italic.is_some() {
+    target.complex_italic = values.complex_italic;
   }
   if values.kerning_minimum_size_pt.is_some() {
     target.kerning_minimum_size_pt = values.kerning_minimum_size_pt;
@@ -13434,7 +13534,17 @@ macro_rules! paragraph_mark_run_properties_accessor {
 run_properties_accessor!(run_properties_run_style, RunStyle, w::RunStyle);
 run_properties_accessor!(run_properties_run_fonts, RunFonts, w::RunFonts);
 run_properties_accessor!(run_properties_bold, Bold, w::Bold);
+run_properties_accessor!(
+  run_properties_bold_complex_script,
+  BoldComplexScript,
+  w::BoldComplexScript
+);
 run_properties_accessor!(run_properties_italic, Italic, w::Italic);
+run_properties_accessor!(
+  run_properties_italic_complex_script,
+  ItalicComplexScript,
+  w::ItalicComplexScript
+);
 run_properties_accessor!(run_properties_font_size, FontSize, w::FontSize);
 run_properties_accessor!(
   run_properties_complex_script_font_size,
@@ -13462,6 +13572,16 @@ run_properties_accessor!(
 run_properties_accessor!(run_properties_kern, Kern, w::Kern);
 run_properties_accessor!(run_properties_position, Position, w::Position);
 run_properties_accessor!(run_properties_highlight, Highlight, w::Highlight);
+run_properties_accessor!(
+  run_properties_right_to_left_text,
+  RightToLeftText,
+  w::RightToLeftText
+);
+run_properties_accessor!(
+  run_properties_complex_script,
+  ComplexScript,
+  w::ComplexScript
+);
 
 paragraph_mark_run_properties_accessor!(
   paragraph_mark_run_properties_run_style,
@@ -13474,7 +13594,17 @@ paragraph_mark_run_properties_accessor!(
   w::RunFonts
 );
 paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_bold, Bold, w::Bold);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_bold_complex_script,
+  BoldComplexScript,
+  w::BoldComplexScript
+);
 paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_italic, Italic, w::Italic);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_italic_complex_script,
+  ItalicComplexScript,
+  w::ItalicComplexScript
+);
 paragraph_mark_run_properties_accessor!(
   paragraph_mark_run_properties_font_size,
   FontSize,
@@ -13526,6 +13656,16 @@ paragraph_mark_run_properties_accessor!(
   Highlight,
   w::Highlight
 );
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_right_to_left_text,
+  RightToLeftText,
+  w::RightToLeftText
+);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_complex_script,
+  ComplexScript,
+  w::ComplexScript
+);
 
 impl<'a> RunProps<'a> {
   fn run_fonts(&self) -> Option<&'a w::RunFonts> {
@@ -13548,6 +13688,18 @@ impl<'a> RunProps<'a> {
     }
   }
 
+  fn bold_complex_script(&self) -> Option<&'a w::BoldComplexScript> {
+    match self {
+      Self::Direct(properties) => run_properties_bold_complex_script(properties),
+      Self::Style(properties) => properties.bold_complex_script.as_ref(),
+      Self::BaseStyle(properties) => properties.bold_complex_script.as_ref(),
+      Self::Numbering(properties) => properties.bold_complex_script.as_ref(),
+      Self::ParagraphMark(properties) => {
+        paragraph_mark_run_properties_bold_complex_script(properties)
+      }
+    }
+  }
+
   fn italic(&self) -> Option<&'a w::Italic> {
     match self {
       Self::Direct(properties) => run_properties_italic(properties),
@@ -13555,6 +13707,39 @@ impl<'a> RunProps<'a> {
       Self::BaseStyle(properties) => properties.italic.as_ref(),
       Self::Numbering(properties) => properties.italic.as_ref(),
       Self::ParagraphMark(properties) => paragraph_mark_run_properties_italic(properties),
+    }
+  }
+
+  fn italic_complex_script(&self) -> Option<&'a w::ItalicComplexScript> {
+    match self {
+      Self::Direct(properties) => run_properties_italic_complex_script(properties),
+      Self::Style(properties) => properties.italic_complex_script.as_ref(),
+      Self::BaseStyle(properties) => properties.italic_complex_script.as_ref(),
+      Self::Numbering(properties) => properties.italic_complex_script.as_ref(),
+      Self::ParagraphMark(properties) => {
+        paragraph_mark_run_properties_italic_complex_script(properties)
+      }
+    }
+  }
+
+  fn complex_script(&self) -> Option<&'a w::ComplexScript> {
+    match self {
+      Self::Direct(properties) => run_properties_complex_script(properties),
+      Self::Style(_) | Self::BaseStyle(_) => None,
+      Self::Numbering(properties) => properties.complex_script.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_complex_script(properties),
+    }
+  }
+
+  fn right_to_left_text(&self) -> Option<&'a w::RightToLeftText> {
+    match self {
+      Self::Direct(properties) => run_properties_right_to_left_text(properties),
+      Self::Style(properties) => properties.right_to_left_text.as_ref(),
+      Self::BaseStyle(properties) => properties.right_to_left_text.as_ref(),
+      Self::Numbering(properties) => properties.right_to_left_text.as_ref(),
+      Self::ParagraphMark(properties) => {
+        paragraph_mark_run_properties_right_to_left_text(properties)
+      }
     }
   }
 
@@ -13943,6 +14128,139 @@ mod tests {
       space: Some(xml::SpaceProcessingModeValues::Preserve),
       xml_content: Some(value.into()),
     })
+  }
+
+  #[test]
+  fn zero_character_indent_does_not_protect_style_indent_from_numbering() {
+    let properties = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:ind w:firstLineChars="0"/></w:pPr>"#,
+    )
+    .expect("paragraph properties");
+    let context = NumberingFormatMergeContext::from_direct_properties(Some(
+      ParagraphProps::Direct(&properties),
+    ));
+    assert!(!context.has_direct_indentation());
+
+    let mut target = ParagraphFormat {
+      first_line_indent_pt: 21.0,
+      first_line_indent_set: true,
+      ..Default::default()
+    };
+    let level = ParagraphFormat {
+      indent_left_pt: 21.0,
+      indent_left_set: true,
+      first_line_indent_pt: -21.0,
+      first_line_indent_set: true,
+      ..Default::default()
+    };
+
+    merge_numbering_format_values(&mut target, &level, context);
+
+    assert_eq!(target.indent_left_pt, 21.0);
+    assert_eq!(target.first_line_indent_pt, -21.0);
+  }
+
+  #[test]
+  fn direct_numbering_indent_protection_is_attribute_specific() {
+    let properties = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:ind w:left="720"/></w:pPr>"#,
+    )
+    .expect("paragraph properties");
+    let context = NumberingFormatMergeContext::from_direct_properties(Some(
+      ParagraphProps::Direct(&properties),
+    ));
+
+    assert!(context.direct_indent_left);
+    assert!(!context.direct_indent_right);
+    assert!(!context.direct_first_line_indent);
+  }
+
+  #[test]
+  fn character_unit_indents_follow_word_style_hierarchy_rules() {
+    let inherited = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:ind w:leftChars="300" w:rightChars="200" w:firstLineChars="200"/></w:pPr>"#,
+    )
+    .expect("inherited paragraph properties");
+    let physical_overlay = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:ind w:left="1440" w:right="720" w:hangingChars="100" w:firstLineChars="400"/></w:pPr>"#,
+    )
+    .expect("physical paragraph properties");
+    let zero_overlay = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:ind w:leftChars="0" w:rightChars="0" w:firstLineChars="0"/></w:pPr>"#,
+    )
+    .expect("zero paragraph properties");
+
+    let mut inherited_format = ParagraphFormat::default();
+    merge_paragraph_format(
+      &mut inherited_format,
+      Some(ParagraphProps::Direct(&inherited)),
+      ImportSettings::default(),
+    );
+    let mut overlay_format = ParagraphFormat::default();
+    merge_paragraph_format(
+      &mut overlay_format,
+      Some(ParagraphProps::Direct(&physical_overlay)),
+      ImportSettings::default(),
+    );
+    merge_format_values(&mut inherited_format, &overlay_format);
+
+    // [MS-OI29500] §2.1.87 keeps an earlier non-zero character indent
+    // ahead of a later physical indent. ECMA-376 §17.3.1.12 gives hanging
+    // character indentation precedence when both first-line forms are present.
+    assert_eq!(inherited_format.indent_left_pt, 72.0);
+    assert_eq!(inherited_format.indent_left_character_units, Some(3.0));
+    assert_eq!(inherited_format.indent_right_pt, 36.0);
+    assert_eq!(inherited_format.indent_right_character_units, Some(2.0));
+    assert_eq!(
+      inherited_format.first_line_indent_character_units,
+      Some(-1.0)
+    );
+
+    let mut zero_format = ParagraphFormat::default();
+    merge_paragraph_format(
+      &mut zero_format,
+      Some(ParagraphProps::Direct(&zero_overlay)),
+      ImportSettings::default(),
+    );
+    merge_format_values(&mut inherited_format, &zero_format);
+    assert_eq!(inherited_format.indent_left_character_units, Some(0.0));
+    assert_eq!(inherited_format.indent_right_character_units, Some(0.0));
+    assert_eq!(
+      inherited_format.first_line_indent_character_units,
+      Some(0.0)
+    );
+  }
+
+  #[test]
+  fn vml_group_textbox_anchor_includes_parent_absolute_offset() {
+    let transform = VmlGroupTransform {
+      origin_x: 3_165.0,
+      origin_y: 3_599.0,
+      scale_x: 0.05,
+      scale_y: 0.05,
+    };
+    let style = transform
+      .child_anchor_style(
+        Some("position:absolute;margin-left:86.25pt;margin-top:94.9pt"),
+        Some("position:absolute;left:8640;top:3599;width:2259;height:705"),
+      )
+      .expect("transformed child style");
+    let parsed = vml_image_style(Some(&style));
+
+    assert!(parsed.absolute_position);
+    assert_eq!(
+      parsed.horizontal_relative_to,
+      HorizontalImageReference::Column
+    );
+    assert_eq!(
+      parsed.vertical_relative_to,
+      VerticalImageReference::Paragraph
+    );
+    assert!((parsed.horizontal_offset_pt - 360.0).abs() < 0.001);
+    assert!((parsed.vertical_offset_pt - 94.9).abs() < 0.001);
+    let (width, height) = parsed.size_pt.expect("transformed size");
+    assert!((width - 112.95).abs() < 0.001);
+    assert!((height - 35.25).abs() < 0.001);
   }
 
   #[test]
@@ -16019,6 +16337,53 @@ mod tests {
     assert!(!style.bold);
     assert!(style.italic);
     assert!(!style.underline);
+  }
+
+  #[test]
+  fn direct_run_preserves_complex_script_formatting_state() {
+    let properties = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rFonts w:ascii="Latin Face" w:cs="Complex Face"/><w:b/><w:bCs w:val="0"/><w:i w:val="0"/><w:iCs/><w:sz w:val="20"/><w:szCs w:val="40"/><w:cs/><w:rtl/></w:rPr>"#,
+    )
+    .expect("run properties");
+
+    let style = properties::run_style(
+      Some(&properties),
+      TextStyle::default(),
+      &StylesCatalog::default(),
+    );
+
+    assert_eq!(style.font_family.as_deref(), Some("Latin Face"));
+    assert_eq!(style.complex_font_family.as_deref(), Some("Complex Face"));
+    assert_eq!(style.font_size_pt, 10.0);
+    assert_eq!(style.complex_font_size_pt, Some(20.0));
+    assert_eq!(style.complex_script, Some(true));
+    assert_eq!(style.right_to_left, Some(true));
+    assert!(style.bold);
+    assert_eq!(style.complex_bold, Some(false));
+    assert!(!style.italic);
+    assert_eq!(style.complex_italic, Some(true));
+  }
+
+  #[test]
+  fn paragraph_mark_preserves_explicit_non_complex_override() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:rPr><w:sz w:val="20"/><w:szCs w:val="40"/><w:cs w:val="0"/><w:rtl w:val="0"/></w:rPr></w:pPr></w:p>"#,
+    )
+    .expect("paragraph");
+    let model = paragraph_model(
+      &paragraph,
+      &StylesCatalog::default(),
+      &mut NumberingCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut FormWidgetIdAllocator::default(),
+    );
+
+    assert_eq!(model.base_style.font_size_pt, 10.0);
+    assert_eq!(model.base_style.complex_font_size_pt, Some(20.0));
+    assert_eq!(model.base_style.complex_script, Some(false));
+    assert_eq!(model.base_style.right_to_left, Some(false));
   }
 
   #[test]

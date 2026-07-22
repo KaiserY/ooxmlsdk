@@ -41,6 +41,14 @@ pub struct TextStyle {
   pub symbol_font_family: Option<Arc<str>>,
   pub font_size_pt: f32,
   pub complex_font_size_pt: Option<f32>,
+  /// Complex-script formatting selected by WordprocessingML `w:cs`.
+  /// `None` leaves script selection to the Unicode content.
+  pub complex_script: Option<bool>,
+  /// Right-to-left run override selected by WordprocessingML `w:rtl`.
+  /// `None` leaves direction and script selection to the Unicode content.
+  pub right_to_left: Option<bool>,
+  pub complex_bold: Option<bool>,
+  pub complex_italic: Option<bool>,
   /// Minimum WordprocessingML font size at which OpenType kerning is active.
   /// `None` leaves the shaping engine's native default unchanged.
   pub kerning_minimum_size_pt: Option<f32>,
@@ -84,6 +92,10 @@ impl Default for TextStyle {
       symbol_font_family: None,
       font_size_pt: 11.0,
       complex_font_size_pt: None,
+      complex_script: None,
+      right_to_left: None,
+      complex_bold: None,
+      complex_italic: None,
       kerning_minimum_size_pt: None,
       ligatures: None,
       horizontal_scale: None,
@@ -364,6 +376,10 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
       .map(|value| Cow::Owned(value.to_string())),
     font_size: common::Pt(style.font_size_pt),
     complex_font_size: style.complex_font_size_pt.map(common::Pt),
+    complex_script: style.complex_script,
+    right_to_left: style.right_to_left,
+    complex_bold: style.complex_bold,
+    complex_italic: style.complex_italic,
     kerning_minimum_size: style.kerning_minimum_size_pt.map(common::Pt),
     ligatures: style.ligatures,
     horizontal_scale: style.horizontal_scale,

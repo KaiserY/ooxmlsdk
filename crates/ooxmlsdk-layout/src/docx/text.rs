@@ -73,13 +73,10 @@ pub(super) fn paragraph_model_with_base<'a>(
     paragraph_properties.map(ParagraphProps::Direct)
   };
   let numbering_format_context = NumberingFormatMergeContext {
-    direct_indentation: direct_paragraph_properties
-      .as_ref()
-      .is_some_and(|properties| properties.indentation().is_some()),
     direct_tab_stops: direct_paragraph_properties
       .as_ref()
       .is_some_and(|properties| properties.tabs().is_some()),
-    style_numbering: false,
+    ..NumberingFormatMergeContext::from_direct_properties(direct_paragraph_properties)
   };
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
@@ -111,7 +108,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref());
   let paragraph_mark_style =
     properties::paragraph_mark_run_style(paragraph_mark_run_properties, run_style.clone(), styles);
-  let has_direct_indentation = numbering_format_context.direct_indentation;
+  let has_direct_indentation = numbering_format_context.has_direct_indentation();
   // ECMA-376 Part 1 §17.9.24 makes w:lvl/w:rPr an overlay for numbering
   // text. With no explicit overlay, Word/Writer build the number portion from
   // the current paragraph font; this is why a numbered Heading 1 carries its

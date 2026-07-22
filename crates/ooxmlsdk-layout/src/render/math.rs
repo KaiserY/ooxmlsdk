@@ -366,10 +366,9 @@ fn roman_greek_variant_character(character: char, style: m::StyleValues) -> Opti
     capital_base + index as u32
   } else if let Some(index) = SMALLS.chars().position(|value| value == character) {
     small_base + index as u32
-  } else if let Some(index) = VARIANTS.chars().position(|value| value == character) {
-    variant_base + index as u32
   } else {
-    return None;
+    let index = VARIANTS.chars().position(|value| value == character)?;
+    variant_base + index as u32
   };
   char::from_u32(codepoint)
 }

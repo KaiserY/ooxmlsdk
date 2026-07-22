@@ -17,6 +17,7 @@ use crate::docx::{
   VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
+use crate::fonts::effective_font_size_pt;
 use crate::model::{
   common_page_setup, common_point, common_rect, common_rgb, common_stroke_from_border,
   common_text_style,
@@ -75,45 +76,7 @@ enum NoteSeparatorKind {
 }
 
 fn inline_text_height(style: &TextStyle, text_metrics: &mut TextMetrics) -> f32 {
-  // maps w:szCs to CharHeightComplex. Empty lines do not select a complex
-  // script face, but the larger complex-script size still contributes to the
-  // paragraph-mark line box.
-  if let Some(complex_font_size_pt) = style.complex_font_size_pt {
-    let mut complex_style = style.clone();
-    complex_style.font_size_pt = complex_font_size_pt;
-    text_metrics
-      .inline_text_box_height(style)
-      .max(text_metrics.inline_text_box_height(&complex_style))
-  } else {
-    text_metrics.inline_text_box_height(style)
-  }
-}
-
-fn inline_font_slot_height(
-  style: &TextStyle,
-  family: Option<&Arc<str>>,
-  font_size_pt: f32,
-  text_metrics: &mut TextMetrics,
-) -> f32 {
-  let Some(family) = family else {
-    return 0.0;
-  };
-  if style
-    .font_family
-    .as_deref()
-    .is_some_and(|primary| primary.eq_ignore_ascii_case(family))
-    && (style.font_size_pt - font_size_pt).abs() <= f32::EPSILON
-  {
-    return 0.0;
-  }
-
-  let mut slot_style = style.clone();
-  slot_style.font_family = Some(family.clone());
-  // A w:altName substitution belongs to the font-table entry for the
-  // original primary family. It must not be reused for another rFonts slot.
-  slot_style.fallback_font_family = None;
-  slot_style.font_size_pt = font_size_pt;
-  text_metrics.inline_text_box_height(&slot_style)
+  text_metrics.inline_text_box_height(style)
 }
 
 fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
@@ -247,12 +210,12 @@ fn snap_line_height_to_doc_grid(line_height: f32, doc_grid_line_pitch_pt: Option
 }
 
 fn word_auto_line_height(style: &TextStyle) -> f32 {
-  style.font_size_pt * LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT / PERCENT_SCALE
+  effective_font_size_pt(style, None) * LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT / PERCENT_SCALE
 }
 
 fn libreoffice_empty_paragraph_first_line_height(style: &TextStyle) -> f32 {
   // first-line box that is taller than the default 115% auto line height.
-  style.font_size_pt * LO_EMPTY_PARAGRAPH_FIRST_LINE_HEIGHT_PER_FONT_SIZE
+  effective_font_size_pt(style, None) * LO_EMPTY_PARAGRAPH_FIRST_LINE_HEIGHT_PER_FONT_SIZE
 }
 
 fn include_text_height(
@@ -299,37 +262,7 @@ fn inline_text_height_for_text(
   text: &str,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
-  let mut height = text_metrics.inline_text_box_height(style);
-  if style.wordprocessingml_font_slots && text.chars().any(char_uses_complex_font_size) {
-    // w:szCs and w:cs jointly define the complex-script line metrics. The
-    // previous implementation changed only the size while continuing to
-    // measure the ASCII/HAnsi face, which can produce a different line box.
-    height = height.max(inline_font_slot_height(
-      style,
-      style.complex_font_family.as_ref(),
-      style.complex_font_size_pt.unwrap_or(style.font_size_pt),
-      text_metrics,
-    ));
-  }
-  height
-}
-
-fn char_uses_complex_font_size(ch: char) -> bool {
-  matches!(
-    ch as u32,
-    0x0590..=0x08FF
-      | 0x0900..=0x0DFF
-      | 0x0E00..=0x0FFF
-      | 0x1000..=0x109F
-      | 0x1780..=0x18AF
-      | 0x1900..=0x1AFF
-      | 0x1C50..=0x1C7F
-      | 0xA800..=0xA82F
-      | 0xA880..=0xA8DF
-      | 0xA900..=0xA97F
-      | 0xFB50..=0xFDFF
-      | 0xFE70..=0xFEFF
-  )
+  text_metrics.inline_text_box_height_for_text(text, style)
 }
 
 fn line_real_height(
@@ -370,7 +303,7 @@ fn placeholder_floating_line_height(
       return None;
     }
     saw_text = true;
-    max_font_size = max_font_size.max(run.style.font_size_pt);
+    max_font_size = max_font_size.max(effective_font_size_pt(&run.style, None));
   }
   saw_text
     .then(|| (max_font_size * LO_PLACEHOLDER_FLOATING_LINE_HEIGHT_PER_FONT_SIZE).min(line_height))
@@ -1824,6 +1757,27 @@ struct PageCheckpoint {
   pending_floating_table_follows_len: usize,
 }
 
+fn can_reuse_page_for_section(
+  current: &Page,
+  section_index: usize,
+  break_kind: SectionBreakKind,
+  previous_section_is_empty: bool,
+  current_page_has_body_progress: bool,
+) -> bool {
+  let populated_explicit_break_target_precedes_next_page_section = break_kind
+    == SectionBreakKind::NextPage
+    && current.explicit_break_target
+    && current_page_has_body_progress;
+  current.items.is_empty()
+    && (!current.preserve_empty || !previous_section_is_empty)
+    && !populated_explicit_break_target_precedes_next_page_section
+    && (section_index == 0
+      || break_kind == SectionBreakKind::Continuous
+      || (break_kind == SectionBreakKind::NextPage && current.section_page_index > 0)
+      || (starts_new_page(break_kind) && !current_page_has_body_progress)
+      || (!starts_new_page(break_kind) && !current_page_has_body_progress))
+}
+
 impl<'a> RootFrameLayout<'a> {
   fn new(document: &'a DocxDocument, options: &LayoutOptions) -> Self {
     Self {
@@ -2100,14 +2054,13 @@ impl<'a> RootFrameLayout<'a> {
       .0;
       return;
     }
-    let reuse_empty_page = self.current.items.is_empty()
-      && (!self.current.preserve_empty || !previous_section_is_empty)
-      && (section_index == 0
-        || section.break_kind == SectionBreakKind::Continuous
-        || (section.break_kind == SectionBreakKind::NextPage
-          && self.current.section_page_index > 0)
-        || (starts_new_page(section.break_kind) && !current_page_has_body_progress)
-        || (!starts_new_page(section.break_kind) && !current_page_has_body_progress));
+    let reuse_empty_page = can_reuse_page_for_section(
+      &self.current,
+      section_index,
+      section.break_kind,
+      previous_section_is_empty,
+      current_page_has_body_progress,
+    );
     if reuse_empty_page {
       self.current.setup = section.page;
       self.current.section_index = section_index;
@@ -3241,7 +3194,11 @@ fn line_number_text_metrics_for_items(
   items[item_start..item_end]
     .iter()
     .find_map(|item| match item {
-      PageItem::Text(text) => Some((text.y_pt, text.line_height_pt, text.style.font_size_pt)),
+      PageItem::Text(text) => Some((
+        text.y_pt,
+        text.line_height_pt,
+        effective_font_size_pt(&text.style, None),
+      )),
       PageItem::Image(_)
       | PageItem::Rect(_)
       | PageItem::Fill(_)
@@ -5178,9 +5135,10 @@ fn estimated_paragraph_content_height(
   flow: FlowContext,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
+  let (indent_left_pt, indent_right_pt, first_line_indent_pt) =
+    resolved_paragraph_indents(paragraph, text_metrics);
   let content_width =
-    (flow.content_width - paragraph.format.indent_left_pt - paragraph.format.indent_right_pt)
-      .max(DEFAULT_FONT_SIZE_PT);
+    (flow.content_width - indent_left_pt - indent_right_pt).max(DEFAULT_FONT_SIZE_PT);
   let base_line_style = paragraph_base_line_style(paragraph);
   let base_line_height = paragraph_line_height_for_setup(
     paragraph,
@@ -5208,7 +5166,7 @@ fn estimated_paragraph_content_height(
   let mut content_height = 0.0;
   let mut floating_bottom: f32 = 0.0;
   let mut has_flow_content = paragraph.list_label.is_some();
-  let mut x = (paragraph.format.first_line_indent_pt).max(0.0);
+  let mut x = first_line_indent_pt.max(0.0);
   let finish_line = |content_height: &mut f32, line_height: &mut f32, line_index: &mut usize| {
     *content_height += line_real_height(
       paragraph,
@@ -12098,12 +12056,10 @@ fn layout_paragraph(
   y: f32,
   spacing_after_pt: f32,
 ) -> (FlowContext, f32) {
+  let (indent_left_pt, indent_right_pt, _) =
+    resolved_paragraph_indents(paragraph, target.text_metrics);
   let flow = FlowContext {
-    content_width: paragraph_content_width(
-      flow.content_width,
-      paragraph.format.indent_left_pt,
-      paragraph.format.indent_right_pt,
-    ),
+    content_width: paragraph_content_width(flow.content_width, indent_left_pt, indent_right_pt),
     ..flow
   };
   TextFrameLayout::new(paragraph, flow, spacing_after_pt, target.text_metrics).format(
@@ -12164,11 +12120,13 @@ impl TextFrame {
     flow: FlowContext,
     text_metrics: &mut TextMetrics,
   ) -> Self {
+    let (indent_left_pt, _, first_line_indent_pt) =
+      resolved_paragraph_indents(paragraph, text_metrics);
     let (default_line_left, first_line_left, default_line_right) = paragraph_line_bounds(
       flow.content_left_pt,
       flow.content_width,
-      paragraph.format.indent_left_pt,
-      paragraph.format.first_line_indent_pt,
+      indent_left_pt,
+      first_line_indent_pt,
     );
     let base_line_style = paragraph_base_line_style(paragraph);
     Self {
@@ -12192,6 +12150,49 @@ impl TextFrame {
       script_sensitive_line_height: flow.script_sensitive_line_height,
     }
   }
+}
+
+fn resolved_paragraph_indents(
+  paragraph: &crate::docx::Paragraph,
+  text_metrics: &mut TextMetrics,
+) -> (f32, f32, f32) {
+  let format = &paragraph.format;
+  let needs_character_unit = [
+    format.indent_left_character_units,
+    format.indent_right_character_units,
+    format.first_line_indent_character_units,
+  ]
+  .into_iter()
+  .flatten()
+  .any(|value| value != 0.0);
+  let character_unit_pt = needs_character_unit.then(|| {
+    // ECMA-376 Part 1 §17.3.1.12 defines these values in hundredths of a
+    // character unit. Writer represents that unit as FONT_CJK_ADVANCE, so use
+    // the resolved East Asian font's ideographic advance rather than the Latin
+    // average character width. Measuring U+6C34 follows the CSS `ic` reference
+    // glyph and routes shaping through the run's East Asian font slot.
+    let style = paragraph_base_line_style(paragraph);
+    let measured = text_metrics.measure_text("\u{6c34}", &style);
+    if measured > f32::EPSILON {
+      measured
+    } else {
+      effective_font_size_pt(&style, None)
+    }
+  });
+  let resolve = |physical_pt: f32, character_units: Option<f32>| {
+    character_units
+      .filter(|value| *value != 0.0)
+      .zip(character_unit_pt)
+      .map_or(physical_pt, |(units, unit_pt)| units * unit_pt)
+  };
+  (
+    resolve(format.indent_left_pt, format.indent_left_character_units),
+    resolve(format.indent_right_pt, format.indent_right_character_units),
+    resolve(
+      format.first_line_indent_pt,
+      format.first_line_indent_character_units,
+    ),
+  )
 }
 
 fn paragraph_line_bounds(
@@ -12552,6 +12553,12 @@ impl<'a> TextFrameLayout<'a> {
         advance.text_metrics,
       );
     }
+    align_text_baseline_to_inline_object(
+      &mut advance.current.items,
+      *advance.line_item_start_index,
+      y,
+      advance.text_metrics,
+    );
     push_page_fragment(
       advance.current,
       PageFragmentRecord {
@@ -12597,7 +12604,13 @@ impl<'a> TextFrameLayout<'a> {
       advance.state.note_page_follow(advance.pages.len(), next_y);
       reset_wrap_exclusions_for_y(advance.current, next_y, advance.wrap_exclusions);
     }
-    next_y = dodge_text_wrap_exclusions(next_y, *line_height, advance.wrap_exclusions);
+    next_y = dodge_text_wrap_exclusions(
+      next_y,
+      *line_height,
+      next_frame.default_line_left,
+      next_frame.default_line_right,
+      advance.wrap_exclusions,
+    );
     let (line_left, line_right) =
       self.line_bounds(next_frame, next_y, *line_height, advance.wrap_exclusions);
     *advance.line_item_start_index = advance.current.items.len();
@@ -12615,7 +12628,13 @@ impl<'a> TextFrameLayout<'a> {
     let (next_flow, y) = force_page_break(flow, current, pages);
     let next_frame = TextFrame::new(self.paragraph, next_flow, text_metrics);
     reset_wrap_exclusions_for_y(current, y, wrap_exclusions);
-    let y = dodge_text_wrap_exclusions(y, next_frame.base_line_height, wrap_exclusions);
+    let y = dodge_text_wrap_exclusions(
+      y,
+      next_frame.base_line_height,
+      next_frame.default_line_left,
+      next_frame.default_line_right,
+      wrap_exclusions,
+    );
     (
       next_flow,
       next_frame,
@@ -12637,7 +12656,13 @@ impl<'a> TextFrameLayout<'a> {
     let (next_flow, y) = advance_text_frame_flow(flow, current, pages);
     reset_wrap_exclusions_for_y(current, y, wrap_exclusions);
     let next_frame = TextFrame::new(self.paragraph, next_flow, text_metrics);
-    let y = dodge_text_wrap_exclusions(y, next_frame.base_line_height, wrap_exclusions);
+    let y = dodge_text_wrap_exclusions(
+      y,
+      next_frame.base_line_height,
+      next_frame.default_line_left,
+      next_frame.default_line_right,
+      wrap_exclusions,
+    );
     (
       next_flow,
       next_frame,
@@ -12700,7 +12725,13 @@ impl<'a> TextFrameLayout<'a> {
       libreoffice_empty_paragraph_first_line_height(&paragraph_base_line_style(paragraph));
     let mut base_line_height = text_frame.base_line_height;
     let mut line_height = line.height_pt;
-    y = dodge_text_wrap_exclusions(y, line_height, &wrap_exclusions);
+    y = dodge_text_wrap_exclusions(
+      y,
+      line_height,
+      text_frame.default_line_left,
+      text_frame.default_line_right,
+      &wrap_exclusions,
+    );
     let (mut line_left, mut line_right) =
       self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
     if paragraph.list_label.is_some() {
@@ -12712,9 +12743,19 @@ impl<'a> TextFrameLayout<'a> {
       let mut list_label_style = paragraph.list_label_style.clone();
       if blank_list_label && label.starts_with(' ') {
         let base_line_style = paragraph_base_line_style(paragraph);
-        list_label_style.font_size_pt = list_label_style
-          .font_size_pt
-          .max(base_line_style.font_size_pt);
+        let minimum_size = effective_font_size_pt(&base_line_style, None);
+        if list_label_style.complex_script == Some(true)
+          || list_label_style.right_to_left == Some(true)
+        {
+          list_label_style.complex_font_size_pt = Some(
+            list_label_style
+              .complex_font_size_pt
+              .unwrap_or(list_label_style.font_size_pt)
+              .max(minimum_size),
+          );
+        } else {
+          list_label_style.font_size_pt = list_label_style.font_size_pt.max(minimum_size);
+        }
       }
       let (visible_label, label_follow) = if blank_list_label {
         (label.as_str(), None)
@@ -12829,9 +12870,12 @@ impl<'a> TextFrameLayout<'a> {
     }
     let mut line_item_start_index = current.items.len();
     let justification = paragraph.format.justification;
-    let justify_wrapped_lines = (justification.is_block()
-      || paragraph.format.alignment == ParagraphAlignment::Justify)
-      && paragraph.list_label.is_none();
+    // The numbering portion is a fixed margin portion, but it does not turn
+    // off paragraph adjustment. SwTextAdjuster::CalcNewBlock() still expands
+    // the body text of wrapped numbered lines; Office golden output likewise
+    // reaches the right paragraph margin for w:jc="both" list paragraphs.
+    let justify_wrapped_lines =
+      justification.is_block() || paragraph.format.alignment == ParagraphAlignment::Justify;
     let shrink_justified_lines = justify_wrapped_lines
       && flow.justify_lines_with_shrinking
       && justification.can_shrink_word_spacing();
@@ -13098,6 +13142,7 @@ impl<'a> TextFrameLayout<'a> {
                 LineShrinkFit {
                   x,
                   width: fit_width_with_continuation,
+                  text: &segment.text,
                   line_right,
                   items: &current.items,
                   item_start: line_item_start_index,
@@ -14249,6 +14294,12 @@ impl<'a> TextFrameLayout<'a> {
         line_right,
         text_metrics,
       );
+      align_text_baseline_to_inline_object(
+        &mut current.items,
+        line_item_start_index,
+        y,
+        text_metrics,
+      );
       push_page_fragment(
         current,
         PageFragmentRecord {
@@ -14579,7 +14630,7 @@ fn line_natural_overflows_with_cjk_compression(
   capacity += cjk_punctuation_compression_capacity(fit.chunk, fit.style, text_metrics);
   let mut natural_style = fit.style.clone();
   natural_style.cjk_punctuation_compression_ratio = 0.0;
-  natural_style.font_size_pt = word_print_grid_font_size(natural_style.font_size_pt);
+  round_style_to_word_print_grid(&mut natural_style);
   let natural_next_width = text_metrics.measure_text(fit.text, &natural_style);
   fit.x + capacity + natural_next_width > fit.line_right
 }
@@ -14594,7 +14645,7 @@ fn cjk_punctuation_compression_capacity(
   }
   let mut natural_style = style.clone();
   natural_style.cjk_punctuation_compression_ratio = 0.0;
-  natural_style.font_size_pt = word_print_grid_font_size(natural_style.font_size_pt);
+  round_style_to_word_print_grid(&mut natural_style);
   let mut maximum_style = style.clone();
   maximum_style.cjk_punctuation_compression_ratio = 1.0;
   (text_metrics.measure_text(text, &natural_style)
@@ -14605,6 +14656,11 @@ fn cjk_punctuation_compression_capacity(
 fn word_print_grid_font_size(font_size_pt: f32) -> f32 {
   const WORD_PRINT_DPI: f32 = 600.0;
   (font_size_pt * WORD_PRINT_DPI / 72.0).round() * 72.0 / WORD_PRINT_DPI
+}
+
+fn round_style_to_word_print_grid(style: &mut TextStyle) {
+  style.font_size_pt = word_print_grid_font_size(style.font_size_pt);
+  style.complex_font_size_pt = style.complex_font_size_pt.map(word_print_grid_font_size);
 }
 
 fn cjk_cannot_start_line(ch: char) -> bool {
@@ -14660,6 +14716,7 @@ fn text_overflows_line(x: f32, width: f32, line_right: f32) -> bool {
 struct LineShrinkFit<'a> {
   x: f32,
   width: f32,
+  text: &'a str,
   line_right: f32,
   items: &'a [PageItem],
   item_start: usize,
@@ -14684,6 +14741,11 @@ fn line_fits_with_word_space_shrink(
     }
   }
   space_counter.push_text(fit.chunk);
+  // Writer's second line-break guess includes the extra separator that
+  // becomes internal when shrinking admits the next word (tdf#158776).
+  // Without the candidate segment, the existing terminal blank is removed
+  // from the shrink budget even though it will no longer end the line.
+  space_counter.push_text(fit.text);
   let space_count = space_counter.non_terminal_space_count();
   if space_count == 0 {
     return false;
@@ -14877,8 +14939,20 @@ fn line_bounds_for_y(
   line_height: f32,
   exclusions: &[WrapExclusion],
 ) -> (f32, f32) {
+  available_line_bounds_for_y(default_left, default_right, y, line_height, exclusions)
+    .unwrap_or((default_left, default_right))
+}
+
+fn available_line_bounds_for_y(
+  default_left: f32,
+  default_right: f32,
+  y: f32,
+  line_height: f32,
+  exclusions: &[WrapExclusion],
+) -> Option<(f32, f32)> {
   let mut left = default_left;
   let mut right = default_right;
+  let mut obstructed = false;
   for exclusion in exclusions {
     if exclusion.blocks_flow {
       continue;
@@ -14889,6 +14963,7 @@ fn line_bounds_for_y(
     if exclusion.right_pt <= default_left || exclusion.left_pt >= default_right {
       continue;
     }
+    obstructed = true;
 
     let exclude_left = exclusion.left_pt.max(default_left);
     let exclude_right = exclusion.right_pt.min(default_right);
@@ -14917,19 +14992,30 @@ fn line_bounds_for_y(
     }
   }
 
-  if right - left < DEFAULT_FONT_SIZE_PT {
-    (default_left, default_right)
+  if obstructed && right - left < DEFAULT_FONT_SIZE_PT {
+    None
   } else {
-    (left, right)
+    Some((left, right))
   }
 }
 
-fn dodge_text_wrap_exclusions(mut y: f32, line_height: f32, exclusions: &[WrapExclusion]) -> f32 {
+fn dodge_text_wrap_exclusions(
+  mut y: f32,
+  line_height: f32,
+  default_left: f32,
+  default_right: f32,
+  exclusions: &[WrapExclusion],
+) -> f32 {
   loop {
+    let lacks_side_space =
+      available_line_bounds_for_y(default_left, default_right, y, line_height, exclusions)
+        .is_none();
     let Some(exclusion) = exclusions
       .iter()
       .filter(|exclusion| {
-        exclusion.blocks_flow && exclusion.overlaps_vertical_span(y, y + line_height)
+        (exclusion.blocks_flow || lacks_side_space)
+          && exclusion.overlaps_vertical_span(y, y + line_height)
+          && exclusion.overlaps_horizontal_span(default_left, default_right)
       })
       .min_by(|a, b| {
         a.bottom_pt
@@ -15246,21 +15332,40 @@ fn justify_line_items(
   line_right: f32,
   text_metrics: &mut TextMetrics,
 ) {
-  let mut natural_right = line_left;
-  let mut space_count = 0usize;
-  for item in items.iter().skip(start_index) {
+  let mut last_text_index = None;
+  for (index, item) in items.iter().enumerate().skip(start_index) {
     if item_y(item).is_none_or(|item_y| (item_y - y).abs() >= 0.01) {
       continue;
     }
-    let PageItem::Text(text) = item else {
+    if !matches!(item, PageItem::Text(_)) {
       // Writer adjusts text portions between fixed margin portions. Images,
       // tabs, and drawing-layer objects need that segmented algorithm rather
       // than treating the whole line as one stretchable text run.
       return;
+    }
+    last_text_index = Some(index);
+  }
+
+  let mut natural_right = line_left;
+  let mut space_count = 0usize;
+  for (index, item) in items.iter().enumerate().skip(start_index) {
+    if item_y(item).is_none_or(|item_y| (item_y - y).abs() >= 0.01) {
+      continue;
+    }
+    let PageItem::Text(text) = item else {
+      return;
+    };
+    // Writer excludes trailing U+0020 blanks from the printable line width
+    // and from the glue slots used by block adjustment. The preserved blanks
+    // remain in the text portion, but have no following ink to advance.
+    let visible_text = if Some(index) == last_text_index {
+      text.text.trim_end_matches(' ')
+    } else {
+      &text.text
     };
     natural_right =
-      natural_right.max(text.x_pt + text_metrics.measure_text(&text.text, &text.style));
-    space_count += text.text.matches(' ').count();
+      natural_right.max(text.x_pt + text_metrics.measure_text(visible_text, &text.style));
+    space_count += visible_text.matches(' ').count();
   }
   if space_count == 0 {
     return;
@@ -15285,6 +15390,54 @@ fn justify_line_items(
     text.x_pt += preceding_space_advance;
     text.word_spacing_pt = extra_per_space;
     preceding_space_advance += text.text.matches(' ').count() as f32 * extra_per_space;
+  }
+}
+
+fn align_text_baseline_to_inline_object(
+  items: &mut [PageItem],
+  start_index: usize,
+  y: f32,
+  text_metrics: &mut TextMetrics,
+) {
+  let object_baseline = items
+    .iter()
+    .skip(start_index)
+    .filter_map(|item| match item {
+      PageItem::Image(image) if !image.floating && (image.y_pt - y).abs() < 0.01 => {
+        Some(image.y_pt + image.height_pt)
+      }
+      _ => None,
+    })
+    .reduce(f32::max);
+  let Some(object_baseline) = object_baseline else {
+    return;
+  };
+
+  // ECMA-376 Part 1 §20.4.2.3 makes an inline drawing participate in its
+  // line like a character. Writer's MaxAscentDescent() therefore treats the
+  // object height as ascent and keeps the ordinary font descent below it;
+  // text sharing the line is bottom-aligned to the object's baseline rather
+  // than centered in the enlarged line box.
+  for item in items.iter_mut().skip(start_index) {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    if (text.y_pt - y).abs() >= 0.01 {
+      continue;
+    }
+    let baseline_offset = if text.style.use_windows_font_metrics {
+      text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+        &text.text,
+        &text.style,
+        text.line_height_pt,
+      )
+    } else {
+      text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
+    };
+    let current_baseline = text.y_pt + baseline_offset;
+    if object_baseline > current_baseline {
+      text.y_pt += object_baseline - current_baseline;
+    }
   }
 }
 
@@ -15630,6 +15783,60 @@ fn push_line_item(
 mod tests {
   use super::*;
   use crate::docx::{CellBordersModel, CellMargins, Paragraph, ParagraphFormat, TextRun};
+
+  #[test]
+  fn next_page_section_does_not_reuse_explicit_page_break_target() {
+    // ECMA-376 Part 1 sections 17.18.4 and 17.6.22 independently move to the
+    // next page. The Office tdf168980 golden retains both transitions.
+    let mut page = empty_section_page(PageSetup::default(), 0, 3);
+    page.explicit_break_target = true;
+    page.body_content_frames = 1;
+
+    assert!(!can_reuse_page_for_section(
+      &page,
+      1,
+      SectionBreakKind::NextPage,
+      false,
+      true,
+    ));
+    assert!(can_reuse_page_for_section(
+      &page,
+      1,
+      SectionBreakKind::NextPage,
+      false,
+      false,
+    ));
+
+    page.explicit_break_target = false;
+    assert!(can_reuse_page_for_section(
+      &page,
+      1,
+      SectionBreakKind::NextPage,
+      false,
+      true,
+    ));
+  }
+
+  #[test]
+  fn text_moves_below_floating_frame_when_neither_side_can_hold_a_line() {
+    let exclusion = WrapExclusion {
+      left_pt: 40.0,
+      right_pt: 460.0,
+      top_pt: 72.0,
+      bottom_pt: 108.0,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: false,
+    };
+
+    assert_eq!(
+      dodge_text_wrap_exclusions(72.0, 12.0, 36.0, 468.0, &[exclusion]),
+      108.0
+    );
+    assert_eq!(
+      line_bounds_for_y(36.0, 468.0, 108.0, 12.0, &[exclusion]),
+      (36.0, 468.0)
+    );
+  }
 
   #[test]
   fn paragraph_indents_are_measured_from_opposite_text_margins() {
@@ -16747,6 +16954,32 @@ mod tests {
   }
 
   #[test]
+  fn justified_line_shrink_counts_separator_before_candidate_word() {
+    let mut text_metrics = TextMetrics::new();
+    let style = TextStyle::default();
+    let candidate = "gamma ";
+    let candidate_width = line_fit_width(candidate, &style, &mut text_metrics);
+    let space_width = text_metrics.measure_text(" ", &style);
+    let line_right = 100.0;
+    let overflow = space_width * 0.4;
+
+    assert!(line_fits_with_word_space_shrink(
+      LineShrinkFit {
+        x: line_right - candidate_width + overflow,
+        width: candidate_width,
+        text: candidate,
+        line_right,
+        items: &[],
+        item_start: 0,
+        chunk: "alpha beta ",
+        style: &style,
+        minimum_word_spacing_pct: 75,
+      },
+      &mut text_metrics,
+    ));
+  }
+
+  #[test]
   fn justified_line_distributes_right_margin_glue_across_word_spaces() {
     fn text_item(x_pt: f32, text: &str) -> PageItem {
       PageItem::Text(TextItem {
@@ -16777,7 +17010,7 @@ mod tests {
     let line_right = natural_right + 12.0;
     let mut items = vec![
       text_item(0.0, "alpha "),
-      text_item(first_width, "beta gamma"),
+      text_item(first_width, "beta gamma "),
     ];
 
     justify_line_items(&mut items, 0, 20.0, 0.0, line_right, &mut text_metrics);
@@ -16792,6 +17025,58 @@ mod tests {
     assert!((second.word_spacing_pt - 6.0).abs() < 0.001);
     assert!((second.x_pt - (first_width + 6.0)).abs() < 0.001);
     assert!((second.x_pt + second_width + second.word_spacing_pt - line_right).abs() < 0.001);
+  }
+
+  #[test]
+  fn text_on_inline_object_line_uses_object_bottom_as_baseline() {
+    let style = TextStyle::default();
+    let line_height = 124.0;
+    let mut items = vec![
+      PageItem::Image(ImageItem {
+        x_pt: 0.0,
+        y_pt: 0.0,
+        width_pt: 120.0,
+        height_pt: 120.0,
+        crop: ImageCrop::default(),
+        rotation_deg: 0.0,
+        flip_horizontal: false,
+        flip_vertical: false,
+        data: Arc::from([]),
+        content_type: None,
+        alt_text: None,
+        hyperlink_url: None,
+        semantic_metafile_text: false,
+        floating: false,
+        behind_text: false,
+      }),
+      PageItem::Text(TextItem {
+        x_pt: 120.0,
+        y_pt: 0.0,
+        line_height_pt: line_height,
+        text: "label".to_string(),
+        style: style.clone(),
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        preserve_text_portion: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      }),
+    ];
+    let mut text_metrics = TextMetrics::new();
+
+    align_text_baseline_to_inline_object(&mut items, 0, 0.0, &mut text_metrics);
+
+    let PageItem::Text(text) = &items[1] else {
+      panic!("expected text item");
+    };
+    let baseline = text.y_pt + text_metrics.baseline_offset_in_line(&style, line_height);
+    assert!((baseline - 120.0).abs() < 0.001);
   }
 
   #[test]

@@ -2,12 +2,12 @@ use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::sync::{Arc, OnceLock};
 
-use image::codecs::jpeg::JpegEncoder;
 use image::metadata::Orientation;
 use image::{
   DynamicImage, GenericImageView, ImageDecoder, ImageFormat as RasterImageFormat, ImageReader,
   Rgba, imageops::FilterType,
 };
+use jpeg_encoder::{ColorType as JpegColorType, Encoder as JpegEncoder, SamplingFactor};
 use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
 use rustc_hash::FxHashMap as HashMap;
 
@@ -326,9 +326,18 @@ fn downsample_size(size: (u32, u32), max_size: (u32, u32)) -> Option<(u32, u32)>
 fn encode_jpeg(image: image::DynamicImage, quality: u8) -> Result<Vec<u8>> {
   let rgb = image.to_rgb8();
   let (width, height) = rgb.dimensions();
+  let width = u16::try_from(width)
+    .map_err(|_| PdfError::Krilla("JPEG width exceeds 65535 pixels".to_string()))?;
+  let height = u16::try_from(height)
+    .map_err(|_| PdfError::Krilla("JPEG height exceeds 65535 pixels".to_string()))?;
   let mut jpeg = Vec::new();
-  JpegEncoder::new_with_quality(&mut jpeg, quality)
-    .encode(rgb.as_raw(), width, height, image::ExtendedColorType::Rgb8)
+  let mut encoder = JpegEncoder::new(&mut jpeg, quality);
+  // Office fixed-format JPEG XObjects use conventional 4:2:0 chroma
+  // subsampling. `image`'s encoder currently emits 4:4:4 regardless of the
+  // requested quality, so use an encoder with an explicit sampling contract.
+  encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
+  encoder
+    .encode(rgb.as_raw(), width, height, JpegColorType::Rgb)
     .map_err(|err| PdfError::Krilla(format!("failed to encode JPEG image: {err}")))?;
   Ok(jpeg)
 }
@@ -486,6 +495,7 @@ impl CustomImage for PdfRasterImage {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use image::codecs::jpeg::JpegEncoder as ImageJpegEncoder;
 
   #[test]
   fn custom_raster_preserves_icc_profile() {
@@ -499,7 +509,7 @@ mod tests {
   #[test]
   fn image_set_reuses_matching_rasters_and_separates_metafile_options() {
     let mut jpeg = Vec::new();
-    JpegEncoder::new(&mut jpeg)
+    ImageJpegEncoder::new(&mut jpeg)
       .encode(&[255, 0, 0], 1, 1, image::ExtendedColorType::Rgb8)
       .unwrap();
     let options = PdfOptions::default();
@@ -537,7 +547,7 @@ mod tests {
   #[test]
   fn image_set_separates_resolution_requests() {
     let mut jpeg = Vec::new();
-    JpegEncoder::new(&mut jpeg)
+    ImageJpegEncoder::new(&mut jpeg)
       .encode(
         &vec![127; 60 * 60 * 3],
         60,
@@ -572,7 +582,7 @@ mod tests {
   #[test]
   fn jpeg_exif_orientation_is_applied_before_pdf_embedding() {
     let mut jpeg = Vec::new();
-    JpegEncoder::new(&mut jpeg)
+    ImageJpegEncoder::new(&mut jpeg)
       .encode(
         &[255, 0, 0, 0, 0, 255],
         2,
@@ -594,5 +604,18 @@ mod tests {
     let image = decode_dynamic_image(&oriented, RasterImageFormat::Jpeg).unwrap();
 
     assert_eq!(image.image.dimensions(), (1, 2));
+  }
+
+  #[test]
+  fn jpeg_export_uses_office_four_two_zero_sampling() {
+    let jpeg = encode_jpeg(DynamicImage::new_rgb8(16, 16), 75).unwrap();
+    let sof = jpeg
+      .windows(2)
+      .position(|marker| marker == [0xff, 0xc0])
+      .expect("baseline JPEG start-of-frame marker");
+
+    assert_eq!(jpeg[sof + 11], 0x22, "luma sampling factors");
+    assert_eq!(jpeg[sof + 14], 0x11, "Cb sampling factors");
+    assert_eq!(jpeg[sof + 17], 0x11, "Cr sampling factors");
   }
 }

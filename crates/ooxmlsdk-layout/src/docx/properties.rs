@@ -128,8 +128,20 @@ pub(super) fn merge_run_style(
   if let Some(bold) = properties.bold() {
     style.bold = bold.val.is_none_or(|value| value.as_bool());
   }
+  if let Some(bold) = properties.bold_complex_script() {
+    style.complex_bold = Some(bold.val.is_none_or(|value| value.as_bool()));
+  }
   if let Some(italic) = properties.italic() {
     style.italic = italic.val.is_none_or(|value| value.as_bool());
+  }
+  if let Some(italic) = properties.italic_complex_script() {
+    style.complex_italic = Some(italic.val.is_none_or(|value| value.as_bool()));
+  }
+  if let Some(complex_script) = properties.complex_script() {
+    style.complex_script = Some(complex_script.val.is_none_or(|value| value.as_bool()));
+  }
+  if let Some(right_to_left) = properties.right_to_left_text() {
+    style.right_to_left = Some(right_to_left.val.is_none_or(|value| value.as_bool()));
   }
   if let Some(font_size) = properties.font_size() {
     let size = font_size.val;
@@ -265,14 +277,22 @@ pub(super) fn merge_run_style(
   if let Some(vertical_alignment) = properties.vertical_text_alignment() {
     match vertical_alignment.val {
       w::VerticalPositionValues::Superscript => {
-        style.baseline_shift_pt = style.font_size_pt * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
+        style.baseline_shift_pt =
+          crate::fonts::effective_font_size_pt(style, None) * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
         style.font_size_pt = (style.font_size_pt * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
           .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
+        style.complex_font_size_pt = style
+          .complex_font_size_pt
+          .map(|size| (size * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
       }
       w::VerticalPositionValues::Subscript => {
-        style.baseline_shift_pt = style.font_size_pt * LO_SUBSCRIPT_BASELINE_SHIFT_SCALE;
+        style.baseline_shift_pt =
+          crate::fonts::effective_font_size_pt(style, None) * LO_SUBSCRIPT_BASELINE_SHIFT_SCALE;
         style.font_size_pt = (style.font_size_pt * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
           .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
+        style.complex_font_size_pt = style
+          .complex_font_size_pt
+          .map(|size| (size * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
       }
       w::VerticalPositionValues::Baseline => {
         style.baseline_shift_pt = 0.0;

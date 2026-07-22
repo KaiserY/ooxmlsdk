@@ -105,35 +105,34 @@ fn emf_text_run_metadata(data: &[u8]) -> Vec<EmfTextRunMetadata> {
           current_font = None;
         }
       }
-      EmfRecordData::ExtTextOutA(text) | EmfRecordData::ExtTextOutW(text) => {
+      EmfRecordData::ExtTextOutA(text) | EmfRecordData::ExtTextOutW(text)
         if text
           .text
           .text
           .as_str()
-          .is_ok_and(|text| !text.trim_matches('\0').trim().is_empty())
-        {
-          let width = (!transformed && text.text.dx_buffer_present)
-            .then(|| {
-              let stride = if text.text.options.contains(ExtTextOutOptions::PDY) {
-                2
-              } else {
-                1
-              };
-              text
-                .text
-                .dx
-                .iter()
-                .step_by(stride)
-                .map(|advance| *advance as f32)
-                .sum::<f32>()
-            })
-            .filter(|width| *width > 0.0)
-            .and_then(|width| Some(width * viewport_width? / window_width? / canvas_width?));
-          metadata.push(EmfTextRunMetadata {
-            font_family: current_font.and_then(|font| fonts.get(&font).cloned()),
-            width,
-          });
-        }
+          .is_ok_and(|text| !text.trim_matches('\0').trim().is_empty()) =>
+      {
+        let width = (!transformed && text.text.dx_buffer_present)
+          .then(|| {
+            let stride = if text.text.options.contains(ExtTextOutOptions::PDY) {
+              2
+            } else {
+              1
+            };
+            text
+              .text
+              .dx
+              .iter()
+              .step_by(stride)
+              .map(|advance| *advance as f32)
+              .sum::<f32>()
+          })
+          .filter(|width| *width > 0.0)
+          .and_then(|width| Some(width * viewport_width? / window_width? / canvas_width?));
+        metadata.push(EmfTextRunMetadata {
+          font_family: current_font.and_then(|font| fonts.get(&font).cloned()),
+          width,
+        });
       }
       _ => {}
     }

@@ -99,9 +99,14 @@ impl PptShape {
     ) else {
       return;
     };
+    // cNvPr/@hidden belongs to the concrete drawing object (ISO/IEC
+    // 29500-1:2016 §20.1.2.2.8). Placeholder geometry/style inheritance must
+    // not make a directly hidden graphic frame visible again.
+    let directly_hidden = self.shape.hidden;
     self
       .shape
       .apply_shape_reference_with_text(&reference, false);
+    self.shape.hidden |= directly_hidden;
     self.shape.set_placeholder(reference);
     mark_referenced(&mut slide_persist.shapes, &path);
   }

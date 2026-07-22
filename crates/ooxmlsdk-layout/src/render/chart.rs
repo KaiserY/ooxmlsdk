@@ -159,6 +159,21 @@ pub fn clustered_column_chart(chart_space: &c::ChartSpace) -> Option<ClusteredCo
     });
   }
 
+  if categories.is_empty() {
+    let category_count = series
+      .iter()
+      .map(|series| series.values.len())
+      .max()
+      .unwrap_or(0);
+    // LibreOffice VCartesianAxis::getTextLabelString treats a category axis
+    // without an explicit category sequence as a numeric axis. Its first
+    // category is tick value 1.0, so the visible labels are 1, 2, ... rather
+    // than cached series values or an empty label band.
+    categories = (1..=category_count)
+      .map(|index| index.to_string())
+      .collect();
+  }
+
   let title = chart_title_text(&chart_space.chart);
   let value_axis = chart_space
     .chart
@@ -205,6 +220,25 @@ pub fn clustered_column_chart(chart_space: &c::ChartSpace) -> Option<ClusteredCo
     value_axis,
     legend_position,
   })
+}
+
+/// Returns the clustered-column subset whose complete plot and chart-area
+/// semantics are handled by the shared lowerer.
+///
+/// Combination charts, data tables, and chart-area fills require additional
+/// visible objects; selecting only their bar series would silently discard
+/// source content.
+pub fn ordinary_clustered_column_chart(
+  chart_space: &c::ChartSpace,
+) -> Option<ClusteredColumnChart<'_>> {
+  if chart_space.shape_properties.is_some()
+    || chart_space.chart.plot_area.shape_properties.is_some()
+    || chart_space.chart.plot_area.data_table.is_some()
+    || chart_space.chart.plot_area.plot_area_choice1.len() != 1
+  {
+    return None;
+  }
+  clustered_column_chart(chart_space)
 }
 
 fn clustered_column_data_labels(
@@ -820,6 +854,20 @@ fn collect_data_point_solid_fills<'a>(
 pub fn chart_shape_solid_fill(properties: &c::ChartShapeProperties) -> Option<&a::SolidFill> {
   match properties.chart_shape_properties_choice2.as_ref()? {
     c::ChartShapePropertiesChoice2::SolidFill(fill) => Some(fill.as_ref()),
+    _ => None,
+  }
+}
+
+/// Returns the solid fill carried by the outline of `c:spPr`.
+///
+/// Chart gridlines are line objects, so ISO/IEC 29500-1:2016 §21.2.2.90
+/// applies their color through `c:spPr/a:ln/a:solidFill`, not through the
+/// shape fill directly.
+pub fn chart_shape_outline_solid_fill(
+  properties: &c::ChartShapeProperties,
+) -> Option<&a::SolidFill> {
+  match properties.outline.as_deref()?.outline_choice1.as_ref()? {
+    a::OutlineChoice::SolidFill(fill) => Some(fill.as_ref()),
     _ => None,
   }
 }

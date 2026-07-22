@@ -5,7 +5,8 @@ use std::time::Instant;
 
 use ooxmlsdk_fonts::{
   FeatureValue, FontBytes, FontFallbackChain, FontId, FontRegistry, FontRequest, FontSize,
-  ResolvedFontChain, ShapeOptions, ShapedRun, TextScript, script_direction_runs,
+  ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun, TextScript,
+  script_direction_runs_with_options,
 };
 use rustc_hash::FxHashMap as HashMap;
 
@@ -98,6 +99,12 @@ pub trait FontStyleRef {
   fn horizontal_scale(&self) -> f32 {
     1.0
   }
+  fn wordprocessingml_font_slots(&self) -> bool {
+    false
+  }
+  fn cjk_punctuation_compression_ratio(&self) -> f32 {
+    0.0
+  }
 }
 
 impl FontStyleRef for TextStyle {
@@ -159,6 +166,14 @@ impl FontStyleRef for TextStyle {
 
   fn horizontal_scale(&self) -> f32 {
     self.horizontal_scale.unwrap_or(1.0)
+  }
+
+  fn wordprocessingml_font_slots(&self) -> bool {
+    self.wordprocessingml_font_slots
+  }
+
+  fn cjk_punctuation_compression_ratio(&self) -> f32 {
+    self.cjk_punctuation_compression_ratio
   }
 }
 
@@ -222,6 +237,65 @@ impl FontStyleRef for common::TextStyle<'_> {
   fn horizontal_scale(&self) -> f32 {
     self.horizontal_scale.unwrap_or(1.0)
   }
+
+  fn wordprocessingml_font_slots(&self) -> bool {
+    self.wordprocessingml_font_slots
+  }
+
+  fn cjk_punctuation_compression_ratio(&self) -> f32 {
+    self.cjk_punctuation_compression_ratio
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FullWidthPunctuationSide {
+  Left,
+  Right,
+  Middle,
+}
+
+fn full_width_punctuation_side(ch: char) -> Option<FullWidthPunctuationSide> {
+  use FullWidthPunctuationSide::{Left, Middle, Right};
+  match ch {
+    '\u{3008}' | '\u{300A}' | '\u{300C}' | '\u{300E}' | '\u{3010}' | '\u{3014}' | '\u{3016}'
+    | '\u{3018}' | '\u{301A}' | '\u{301D}' | '\u{FF08}' | '\u{FF3B}' | '\u{FF5B}' => Some(Left),
+    '\u{3009}' | '\u{300B}' | '\u{300D}' | '\u{300F}' | '\u{3011}' | '\u{3015}' | '\u{3017}'
+    | '\u{3019}' | '\u{301B}' | '\u{301E}' | '\u{301F}' | '\u{FF09}' | '\u{FF3D}' | '\u{FF5D}' => {
+      Some(Right)
+    }
+    '\u{3001}' | '\u{3002}' | '\u{FF0C}' | '\u{FF0E}' | '\u{FF1A}' | '\u{FF1B}' => Some(Middle),
+    _ => None,
+  }
+}
+
+fn apply_wordprocessingml_punctuation_compression(run: &mut ShapedRun<'_, '_>, ratio: f32) {
+  let ratio = ratio.clamp(0.0, 1.0);
+  if ratio <= f32::EPSILON {
+    return;
+  }
+  let minimum_full_width = run.font_size_pt.0 * 0.75;
+  let mut total_reduction = 0.0;
+  for glyph in run.glyphs.to_mut() {
+    let Some(side) = glyph.source_char.and_then(full_width_punctuation_side) else {
+      continue;
+    };
+    if glyph.x_advance_pt < minimum_full_width {
+      continue;
+    }
+    // ECMA-376 Part 1 §17.15.1.18 limits this setting to full-width
+    // punctuation. A full-width punctuation cell has at most one half-em of
+    // removable side-bearing; the line formatter below returns whatever
+    // fraction is not needed for the selected break.
+    let reduction = glyph.x_advance_pt * 0.5 * ratio;
+    glyph.x_advance_pt -= reduction;
+    match side {
+      FullWidthPunctuationSide::Left => {}
+      FullWidthPunctuationSide::Right => glyph.x_offset_pt -= reduction,
+      FullWidthPunctuationSide::Middle => glyph.x_offset_pt -= reduction * 0.5,
+    }
+    total_reduction += reduction;
+  }
+  run.advance_pt = (run.advance_pt - total_reduction).max(0.0);
 }
 
 pub fn load_text_face(style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
@@ -347,8 +421,15 @@ impl FontResolver {
     text: &'text str,
     style: &(impl FontStyleRef + ?Sized),
   ) -> Option<Vec<ShapedRun<'text, 'static>>> {
-    let script_runs =
-      script_direction_runs(text, FontSize(style.font_size_pt()), style.small_caps());
+    let script_runs = script_direction_runs_with_options(
+      text,
+      FontSize(style.font_size_pt()),
+      ScriptScanOptions {
+        small_caps: style.small_caps(),
+        wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
+        ..ScriptScanOptions::default()
+      },
+    );
     let mut output = Vec::with_capacity(script_runs.len());
     for script_run in script_runs {
       let key = FontFaceKey::from_style(style, Some(script_run.script));
@@ -392,6 +473,10 @@ impl FontResolver {
         let _ = self.font_face_data_from_registry(&registry, &run.font_id);
       }
       for run in &mut runs {
+        apply_wordprocessingml_punctuation_compression(
+          run,
+          style.cjk_punctuation_compression_ratio(),
+        );
         run.offset_text_range(script_run.text_range.start);
       }
       output.extend(runs);

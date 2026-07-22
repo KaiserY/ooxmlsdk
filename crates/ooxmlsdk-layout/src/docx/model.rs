@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
 pub(crate) use crate::model::{
@@ -244,6 +245,7 @@ pub(crate) struct ParagraphFormat {
   pub tab_stops: Vec<TabStop>,
   pub tab_stops_set: bool,
   pub list_label_width_aware_tab: bool,
+  pub list_label_uses_explicit_tab_stop: bool,
   pub alignment: ParagraphAlignment,
   pub justification: ParagraphJustification,
   pub bidi: bool,
@@ -549,6 +551,7 @@ pub(crate) struct InlineShape {
   pub allow_outside_page: bool,
   pub inline_anchor_after_line: bool,
   pub placement: ImagePlacement,
+  pub chart: Option<Box<InlineChart>>,
   pub text_box_blocks: Vec<Block>,
   pub text_inset_left_pt: f32,
   pub text_inset_top_pt: f32,
@@ -556,6 +559,16 @@ pub(crate) struct InlineShape {
   pub text_inset_bottom_pt: f32,
   pub text_box_auto_fit: bool,
   pub text_vertical_alignment: TextBoxVerticalAlignment,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct InlineChart {
+  pub chart_space: Box<c::ChartSpace>,
+  pub automatic_title: String,
+  pub title_style: TextStyle,
+  pub label_style: TextStyle,
+  pub gridline_color: RgbColor,
+  pub series_colors: Vec<RgbColor>,
 }
 
 #[derive(Clone, Debug)]

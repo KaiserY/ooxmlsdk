@@ -30,7 +30,9 @@ use ooxmlsdk::units as sdk_units;
 use ooxmlsdk::units::DrawingmlPercentageValue;
 use unicode_script::{Script, UnicodeScript};
 
-use super::chart::{ChartFrame, ClusteredColumnStyle, lower_clustered_column_chart};
+use super::chart::{
+  ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, lower_clustered_column_chart,
+};
 use super::custom_geometry;
 use super::drawingml::color::{Color, SchemeColor};
 use super::drawingml::fill::{FillKind, FillProperties};
@@ -982,6 +984,27 @@ fn lower_chart(
         .title
         .as_deref()
         .and_then(|title| title.text_properties.as_deref());
+      let title_fill_color = chart_resource
+        .chart_space
+        .chart
+        .title
+        .as_deref()
+        .and_then(|title| title.chart_shape_properties.as_deref())
+        .and_then(shared_chart::chart_shape_solid_fill)
+        .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+        .map(|paint| paint.color);
+      let title_blip_fill = chart_resource
+        .chart_space
+        .chart
+        .title
+        .as_deref()
+        .and_then(|title| title.chart_shape_properties.as_deref())
+        .and_then(
+          |properties| match properties.chart_shape_properties_choice2.as_ref() {
+            Some(c::ChartShapePropertiesChoice2::BlipFill(fill)) => Some(fill.as_ref()),
+            _ => None,
+          },
+        );
       let label_properties = chart
         .value_axis
         .and_then(|axis| axis.text_properties.as_deref())
@@ -997,19 +1020,26 @@ fn lower_chart(
               _ => None,
             })
         });
+      // ECMA-376 Part 1 §21.2.2.216: c:chartSpace/c:txPr supplies
+      // the defaults, while title/axis txPr overlays those defaults.
+      let chart_text_properties = chart_resource.chart_space.text_properties.as_deref();
       let gridline_color = chart
         .value_axis
         .and_then(|axis| axis.major_gridlines.as_deref())
         .and_then(|gridlines| gridlines.chart_shape_properties.as_deref())
-        .and_then(shared_chart::chart_shape_solid_fill)
+        .and_then(shared_chart::chart_shape_outline_solid_fill)
         .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
         .map(|paint| paint.color)
+        // With no explicit c:spPr, Office's automatic chart style emits a
+        // 0.525 neutral-gray, 0.75pt grid stroke (Chart_2D.pptx fixed-format
+        // content stream). Keep that source color; raster antialiasing is
+        // applied later by the PDF consumer.
         .unwrap_or(RgbColor {
-          r: 217,
-          g: 217,
-          b: 217,
+          r: 134,
+          g: 134,
+          b: 134,
         });
-      let chart_items = lower_clustered_column_chart(
+      let mut chart_items = lower_clustered_column_chart(
         ChartFrame {
           x_pt: x,
           y_pt: y,
@@ -1019,13 +1049,45 @@ fn lower_chart(
         &chart,
         shared_chart::automatic_chart_title(ui_language),
         &ClusteredColumnStyle {
-          title: chart_text_style(import, slide, title_properties, ui_language, 18.0),
-          label: chart_text_style(import, slide, label_properties, ui_language, 12.0),
+          layout_profile: ChartLayoutProfile::PowerPoint,
+          has_explicit_title: matches!(
+            chart.title,
+            Some(shared_chart::ChartTitleText::Explicit(_))
+          ),
+          title: chart_text_style(
+            import,
+            slide,
+            chart_text_properties,
+            title_properties,
+            ui_language,
+            18.0,
+          ),
+          title_fill_color,
+          label: chart_text_style(
+            import,
+            slide,
+            chart_text_properties,
+            label_properties,
+            ui_language,
+            12.0,
+          ),
           gridline_color,
           series_colors,
         },
       );
       if !chart_items.is_empty() {
+        if let (Some(fill), Some(shared_chart::ChartTitleText::Explicit(title))) =
+          (title_blip_fill, chart.title.as_ref())
+        {
+          insert_chart_title_blip_fill(
+            import,
+            slide,
+            chart_resource,
+            fill,
+            title,
+            &mut chart_items,
+          );
+        }
         items.extend(chart_items);
         return;
       }
@@ -1065,26 +1127,92 @@ fn lower_chart(
   lower_chart_texts(x, y, width, height, texts, items);
 }
 
+fn insert_chart_title_blip_fill(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  fill: &a::BlipFill,
+  title: &str,
+  items: &mut Vec<PageItem>,
+) {
+  let Some(blip) = fill.blip.as_deref() else {
+    return;
+  };
+  let Some(relationship_id) = blip.embed.as_deref() else {
+    return;
+  };
+  let Some(resource) = chart_resource.image_resources.get(relationship_id) else {
+    return;
+  };
+  let Some((title_index, text)) = items
+    .iter()
+    .enumerate()
+    .find_map(|(index, item)| match item {
+      PageItem::Text(text) if text.text == title => Some((index, text)),
+      _ => None,
+    })
+  else {
+    return;
+  };
+  let mut metrics = TextMetrics::new();
+  let text_width = metrics.measure_text(&text.text, &text.style);
+  let horizontal_padding = text.style.font_size_pt * 0.162;
+  let vertical_padding = text.style.font_size_pt * 0.092;
+  let frame = TextFrame {
+    x_pt: text.x_pt - horizontal_padding,
+    y_pt: text.y_pt - vertical_padding,
+    width_pt: text_width + horizontal_padding * 2.0,
+    height_pt: text.line_height_pt + vertical_padding * 2.0,
+  };
+  let images = blip_fill_image_items_from_resource(
+    import,
+    slide,
+    fill,
+    blip,
+    resource,
+    ImageFillPlacement {
+      frame,
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      crop_bitmap: false,
+      clip_path: Vec::new(),
+      alt_text: None,
+      hyperlink_url: None,
+    },
+  )
+  .into_iter()
+  .map(PageItem::Image);
+  items.splice(title_index..title_index, images);
+}
+
 fn chart_text_style(
   import: &PowerPointImport,
   slide: &SlidePersist,
+  default_properties: Option<&c::TextProperties>,
   properties: Option<&c::TextProperties>,
   ui_language: Option<&str>,
   fallback_size_pt: f32,
 ) -> TextStyle {
   let mut style = TextStyle {
-    font_family: Some(Arc::from("Liberation Sans")),
+    font_family: Some(Arc::from(
+      import
+        .resolve_theme_font_for_language("+mn-lt", ui_language)
+        .unwrap_or("Liberation Sans"),
+    )),
     font_size_pt: fallback_size_pt,
     use_windows_font_metrics: true,
     ..TextStyle::default()
   };
-  if let Some(default_run_properties) = properties
-    .into_iter()
-    .flat_map(|properties| &properties.paragraph)
-    .filter_map(|paragraph| paragraph.paragraph_properties.as_deref())
-    .find_map(|paragraph| paragraph.default_run_properties.as_deref())
-  {
-    apply_default_run_properties(import, Some(slide), default_run_properties, &mut style);
+  for text_properties in [default_properties, properties].into_iter().flatten() {
+    if let Some(default_run_properties) = text_properties
+      .paragraph
+      .iter()
+      .filter_map(|paragraph| paragraph.paragraph_properties.as_deref())
+      .find_map(|paragraph| paragraph.default_run_properties.as_deref())
+    {
+      apply_default_run_properties(import, Some(slide), default_run_properties, &mut style);
+    }
   }
   if let Some(typeface) = import.resolve_theme_font_for_language("+mn-ea", ui_language) {
     style.east_asia_font_family = Some(Arc::from(typeface));
@@ -4106,10 +4234,56 @@ fn tiled_blip_fill_image_items(
 
 fn image_tile_size_pt(data: &[u8]) -> Option<(f32, f32)> {
   let image = image::load_from_memory(data).ok()?;
+  if let Some((horizontal_dpi, vertical_dpi)) = jpeg_density_dpi(data) {
+    return Some((
+      image.width() as f32 * units::POINTS_PER_INCH / horizontal_dpi,
+      image.height() as f32 * units::POINTS_PER_INCH / vertical_dpi,
+    ));
+  }
   Some((
     image.width() as f32 * units::POINTS_PER_CSS_PIXEL,
     image.height() as f32 * units::POINTS_PER_CSS_PIXEL,
   ))
+}
+
+fn jpeg_density_dpi(data: &[u8]) -> Option<(f32, f32)> {
+  if !data.starts_with(&[0xff, 0xd8]) {
+    return None;
+  }
+  let mut offset = 2usize;
+  while offset + 4 <= data.len() {
+    while offset < data.len() && data[offset] == 0xff {
+      offset += 1;
+    }
+    let marker = *data.get(offset)?;
+    offset += 1;
+    if marker == 0xd9 || marker == 0xda {
+      break;
+    }
+    let length = usize::from(u16::from_be_bytes([
+      *data.get(offset)?,
+      *data.get(offset + 1)?,
+    ]));
+    if length < 2 || offset + length > data.len() {
+      return None;
+    }
+    let payload = &data[offset + 2..offset + length];
+    if marker == 0xe0 && payload.len() >= 12 && payload.starts_with(b"JFIF\0") {
+      let unit = payload[7];
+      let horizontal = f32::from(u16::from_be_bytes([payload[8], payload[9]]));
+      let vertical = f32::from(u16::from_be_bytes([payload[10], payload[11]]));
+      if horizontal <= 0.0 || vertical <= 0.0 {
+        return None;
+      }
+      return match unit {
+        1 => Some((horizontal, vertical)),
+        2 => Some((horizontal * 2.54, vertical * 2.54)),
+        _ => None,
+      };
+    }
+    offset += length;
+  }
+  None
 }
 
 fn tile_flip(flip: Option<a::TileFlipValues>, row: usize, column: usize) -> (bool, bool) {
@@ -8140,6 +8314,16 @@ fn color_opacity(alpha: i32) -> f32 {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn jfif_density_reports_physical_image_resolution() {
+    let jpeg = [
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, b'J', b'F', b'I', b'F', 0x00, 0x01, 0x01, 0x01, 0x00,
+      0x4b, 0x00, 0x4b, 0x00, 0x00, 0xff, 0xd9,
+    ];
+
+    assert_eq!(jpeg_density_dpi(&jpeg), Some((75.0, 75.0)));
+  }
 
   #[test]
   fn slide_number_field_uses_the_current_presentation_number() {

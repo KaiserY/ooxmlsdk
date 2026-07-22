@@ -237,7 +237,10 @@ pub(crate) fn predefined_table_style(style_id: Option<&str>) -> Option<TableStyl
 }
 
 fn light_style_1(style_id: &str, style_name: &str, accent: a::SchemeColorValues) -> TableStyle {
-  let accent_fill = solid_scheme_fill(accent, None);
+  // LibreOffice's predefined-table-styles.cxx applies alpha=20000 to the
+  // band1H/band1V accent color for the Office Light Style 1 GUID family.
+  // [MS-OE376] 2.1.168 provides the corresponding GUID/name mapping.
+  let accent_fill = solid_scheme_alpha_fill(accent, 20_000);
   let accent_line = solid_scheme_line(accent);
 
   TableStyle {
@@ -382,6 +385,19 @@ fn medium_style_2(style_id: &str, style_name: &str, accent: a::SchemeColorValues
 fn solid_scheme_fill(value: a::SchemeColorValues, tint: Option<i32>) -> FillProperties {
   FillProperties {
     kind: FillKind::Solid(Some(scheme_color(value, tint))),
+    placeholder_color: None,
+  }
+}
+
+fn solid_scheme_alpha_fill(value: a::SchemeColorValues, alpha: i32) -> FillProperties {
+  FillProperties {
+    kind: FillKind::Solid(Some(Color::Scheme(SchemeColor {
+      value,
+      transformations: vec![ColorTransformation {
+        kind: ColorTransformationKind::Alpha,
+        value: Some(alpha),
+      }],
+    }))),
     placeholder_color: None,
   }
 }
@@ -1241,4 +1257,30 @@ fn coordinate32_to_i32_emu(value: ooxmlsdk::simple_type::Coordinate32Value) -> i
       i32::MAX
     }
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn light_style_one_bands_use_the_office_twenty_percent_alpha() {
+    let style = predefined_table_style(Some("{3B4B98B0-60AC-42C2-AFA5-B58CD77FA1E5}"))
+      .expect("predefined Light Style 1 - Accent 1");
+    let Some(FillProperties {
+      kind: FillKind::Solid(Some(Color::Scheme(color))),
+      ..
+    }) = style.band1_horizontal.fill_properties
+    else {
+      panic!("expected a scheme-color band fill");
+    };
+
+    assert_eq!(
+      color.transformations,
+      vec![ColorTransformation {
+        kind: ColorTransformationKind::Alpha,
+        value: Some(20_000),
+      }]
+    );
+  }
 }

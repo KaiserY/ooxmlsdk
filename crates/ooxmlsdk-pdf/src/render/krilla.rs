@@ -552,6 +552,8 @@ struct TextStyle<'doc> {
   character_spacing_pt: f32,
   baseline_shift_pt: f32,
   use_windows_font_metrics: bool,
+  wordprocessingml_font_slots: bool,
+  cjk_punctuation_compression_ratio: f32,
   bold: bool,
   italic: bool,
   underline: bool,
@@ -614,6 +616,14 @@ impl FontStyleRef for TextStyle<'_> {
 
   fn small_caps(&self) -> bool {
     self.small_caps
+  }
+
+  fn wordprocessingml_font_slots(&self) -> bool {
+    self.wordprocessingml_font_slots
+  }
+
+  fn cjk_punctuation_compression_ratio(&self) -> f32 {
+    self.cjk_punctuation_compression_ratio
   }
 
   fn kerning_enabled(&self) -> bool {
@@ -1343,11 +1353,18 @@ impl<'doc> PaintDocument<'doc> {
       .iter()
       .enumerate()
       .map(|(page_index, page)| {
-        let layout_items = coalesced_writer_text_items(
-          page.items.iter().filter_map(page_item_from_common),
+        let source_line_owners = paint_line_owners(document, page_index, page.items.len());
+        let (layout_items, line_owners) = coalesced_writer_text_items(
+          page
+            .items
+            .iter()
+            .enumerate()
+            .filter_map(|(item_index, item)| {
+              page_item_from_common(item)
+                .map(|item| (item, source_line_owners.get(item_index).copied().flatten()))
+            }),
           text_metrics,
         );
-        let line_owners = paint_line_owners(document, page_index, layout_items.len());
         let decoration_metadata = decoration_render_metadata(&layout_items);
         let items = layout_items
           .into_iter()
@@ -1550,6 +1567,8 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     character_spacing_pt: style.character_spacing.0,
     baseline_shift_pt: style.baseline_shift.0,
     use_windows_font_metrics: style.use_windows_font_metrics,
+    wordprocessingml_font_slots: style.wordprocessingml_font_slots,
+    cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
     bold: style.bold,
     italic: style.italic,
     underline: style.underline,
@@ -1645,15 +1664,17 @@ fn opacity(color: common::Color) -> f32 {
 }
 
 fn coalesced_writer_text_items<'doc>(
-  items: impl IntoIterator<Item = PageItem<'doc>>,
+  items: impl IntoIterator<Item = (PageItem<'doc>, Option<PaintLineOwner>)>,
   text_metrics: &mut TextMetrics,
-) -> Vec<PageItem<'doc>> {
+) -> (Vec<PageItem<'doc>>, Vec<Option<PaintLineOwner>>) {
   let items = items.into_iter();
   let mut output: Vec<PageItem<'doc>> = Vec::with_capacity(items.size_hint().0);
-  for item in items {
+  let mut owners = Vec::with_capacity(items.size_hint().0);
+  for (item, owner) in items {
     match item {
       PageItem::Text(text) => {
         if let Some(PageItem::Text(previous)) = output.last_mut()
+          && same_paint_line_owner(owners.last().copied().flatten(), owner)
           && writer_text_items_coalesce(previous, &text, text_metrics)
         {
           previous.text.to_mut().push_str(&text.text);
@@ -1668,8 +1689,9 @@ fn coalesced_writer_text_items<'doc>(
       PageItem::Line(line) => output.push(PageItem::Line(line)),
       PageItem::Polyline(polyline) => output.push(PageItem::Polyline(polyline)),
     }
+    owners.push(owner);
   }
-  output
+  (output, owners)
 }
 
 fn writer_text_items_coalesce(
@@ -2079,6 +2101,18 @@ struct PaintLineOwner {
   clip: PaintClipRect,
 }
 
+fn same_paint_line_owner(left: Option<PaintLineOwner>, right: Option<PaintLineOwner>) -> bool {
+  match (left, right) {
+    (None, None) => true,
+    (Some(left), Some(right)) => {
+      left.frame_index == right.frame_index
+        && left.line_index == right.line_index
+        && left.frame_kind == right.frame_kind
+    }
+    _ => false,
+  }
+}
+
 fn paint_line_owners(
   document: &common::LayoutDocument<'static>,
   page_index: usize,
@@ -2091,20 +2125,36 @@ fn paint_line_owners(
     .enumerate()
     .filter(|(_, frame)| frame.page_index == page_index)
   {
+    let frame_kind = frame_kind_name_from_common(&frame.kind);
     for (line_index, line) in frame.lines.iter().enumerate() {
       let start = line.item_range.start.min(item_count);
       let end = line.item_range.end.min(item_count);
+      let clip_bounds = if frame_kind == FollowFrameKind::Table {
+        frame
+          .fragments
+          .iter()
+          .filter(|fragment| fragment.kind == common::FrameFragmentKind::TableCell)
+          .filter(|fragment| {
+            fragment.item_range.start < line.item_range.end
+              && line.item_range.start < fragment.item_range.end
+          })
+          .min_by_key(|fragment| fragment.item_range.end - fragment.item_range.start)
+          .and_then(|fragment| fragment.bounds)
+          .unwrap_or(line.bounds)
+      } else {
+        line.bounds
+      };
       for owner in owners.iter_mut().take(end).skip(start) {
         if owner.is_none() {
           *owner = Some(PaintLineOwner {
             frame_index,
             line_index,
-            frame_kind: frame_kind_name_from_common(&frame.kind),
+            frame_kind,
             clip: PaintClipRect {
-              x_pt: line.bounds.origin.x.0,
-              y_pt: line.bounds.origin.y.0,
-              width_pt: line.bounds.size.width.0,
-              height_pt: line.bounds.size.height.0,
+              x_pt: clip_bounds.origin.x.0,
+              y_pt: clip_bounds.origin.y.0,
+              width_pt: clip_bounds.size.width.0,
+              height_pt: clip_bounds.size.height.0,
             },
           });
         }

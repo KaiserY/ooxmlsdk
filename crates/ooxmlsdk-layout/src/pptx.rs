@@ -1,4 +1,4 @@
-mod chart;
+pub(crate) mod chart;
 mod custom_geometry;
 mod display;
 pub(crate) mod drawingml;

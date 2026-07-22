@@ -88,6 +88,8 @@ struct MeasureStyleKey {
   bold: bool,
   italic: bool,
   small_caps: bool,
+  wordprocessingml_font_slots: bool,
+  cjk_punctuation_compression_ratio_bits: u32,
 }
 
 impl MeasureStyleKey {
@@ -102,6 +104,8 @@ impl MeasureStyleKey {
       bold: style.bold(),
       italic: style.italic(),
       small_caps: style.small_caps(),
+      wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
+      cjk_punctuation_compression_ratio_bits: style.cjk_punctuation_compression_ratio().to_bits(),
     }
   }
 
@@ -115,6 +119,9 @@ impl MeasureStyleKey {
       && self.bold == style.bold()
       && self.italic == style.italic()
       && self.small_caps == style.small_caps()
+      && self.wordprocessingml_font_slots == style.wordprocessingml_font_slots()
+      && self.cjk_punctuation_compression_ratio_bits
+        == style.cjk_punctuation_compression_ratio().to_bits()
   }
 }
 

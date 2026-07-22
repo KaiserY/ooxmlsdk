@@ -116,9 +116,10 @@ pub(crate) enum DrawingObjectKind {
   Unknown,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ChartResourceCatalog {
   pub(crate) relationship_id: Option<String>,
+  pub(crate) chart_space: Option<Box<c::ChartSpace>>,
   pub(crate) extended: bool,
   pub(crate) version_len: usize,
   pub(crate) feature_list_len: usize,
@@ -1538,6 +1539,7 @@ impl ChartResourceCatalog {
     let plot_area = &chart.plot_area;
     Self {
       relationship_id,
+      chart_space: Some(Box::new(chart_space.clone())),
       extended: false,
       version_len: chart_space.version.as_ref().map_or(0, |value| value.len()),
       feature_list_len: chart_space

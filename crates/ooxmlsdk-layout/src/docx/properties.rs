@@ -82,6 +82,10 @@ pub(super) fn merge_run_style(
   theme_fonts: &ThemeFonts,
   theme_colors: &ThemeColors,
 ) {
+  // This merger is WordprocessingML-specific. Preserve the rFonts slot
+  // classifier even for styles constructed outside the document-default
+  // style chain (for example cached field-result runs).
+  style.wordprocessingml_font_slots = true;
   let Some(properties) = properties else {
     return;
   };

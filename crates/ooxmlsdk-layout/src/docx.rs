@@ -5478,7 +5478,12 @@ fn push_drawing_textboxes_impl(
       textbox_context,
     );
     if !text_box_frames.is_empty() {
-      inlines.extend(text_box_frames.into_iter().map(InlineItem::Shape));
+      for text_box_frame in text_box_frames {
+        if let Err(text_box_frame) = merge_textbox_frame_into_owning_shape(inlines, text_box_frame)
+        {
+          inlines.push(InlineItem::Shape(text_box_frame));
+        }
+      }
       continue;
     }
     if let Some(content) = drawing_graphic_data_choice_textbox_content(child) {
@@ -5492,6 +5497,48 @@ fn push_drawing_textboxes_impl(
       );
     }
   }
+}
+
+fn merge_textbox_frame_into_owning_shape(
+  inlines: &mut [InlineItem],
+  mut text_box_frame: InlineShape,
+) -> std::result::Result<(), InlineShape> {
+  // wps:spPr and wps:txbx are children of the same wps:wsp. A textbox frame
+  // without its own visual treatment is therefore content of the preceding
+  // geometry, not a second inline object that consumes another line box.
+  if text_box_frame.fill_color.is_some()
+    || text_box_frame.fill_image.is_some()
+    || text_box_frame.stroke.is_some()
+    || !text_box_frame.additional_fill_colors.is_empty()
+    || text_box_frame.chart.is_some()
+    || text_box_frame.placement != ImagePlacement::Inline
+  {
+    return Err(text_box_frame);
+  }
+  let Some(shape) = inlines.iter_mut().rev().find_map(|inline| {
+    let InlineItem::Shape(shape) = inline else {
+      return None;
+    };
+    (shape.text_box_blocks.is_empty()
+      && shape.chart.is_none()
+      && shape.placement == text_box_frame.placement
+      && (shape.width_pt - text_box_frame.width_pt).abs() <= 0.01
+      && (shape.height_pt - text_box_frame.height_pt).abs() <= 0.01
+      && (shape.offset_x_pt - text_box_frame.offset_x_pt).abs() <= 0.01
+      && (shape.offset_y_pt - text_box_frame.offset_y_pt).abs() <= 0.01)
+      .then_some(shape)
+  }) else {
+    return Err(text_box_frame);
+  };
+
+  shape.text_box_blocks = std::mem::take(&mut text_box_frame.text_box_blocks);
+  shape.text_inset_left_pt = text_box_frame.text_inset_left_pt;
+  shape.text_inset_top_pt = text_box_frame.text_inset_top_pt;
+  shape.text_inset_right_pt = text_box_frame.text_inset_right_pt;
+  shape.text_inset_bottom_pt = text_box_frame.text_inset_bottom_pt;
+  shape.text_box_auto_fit = text_box_frame.text_box_auto_fit;
+  shape.text_vertical_alignment = text_box_frame.text_vertical_alignment;
+  Ok(())
 }
 
 #[derive(Clone)]
@@ -5742,12 +5789,20 @@ fn text_box_frame_from_wordprocessing_shape(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> TextBoxFrameContent {
-  if wordprocessing_shape_textbox_uses_auto_light_text(shape, styles) {
-    base_style.color = RgbColor {
-      r: 255,
-      g: 255,
-      b: 255,
-    };
+  // ECMA-376 Part 1 §20.1.4.1.17 carries an explicit shape-style text
+  // color through a:fontRef, while §17.3.2.6 lets an automatic run color
+  // adapt to its background. [MS-OI29500] §20.1.2.2.37 gives textbox
+  // content precedence over the shape style.
+  if let Some(color) = shape
+    .shape_style
+    .as_ref()
+    .and_then(|style| drawingml_font_reference_color(&style.font_reference, &styles.theme_colors))
+    .or_else(|| {
+      wordprocessing_shape_fill_color(shape, &styles.theme_colors)
+        .map(automatic_text_color_for_background)
+    })
+  {
+    base_style.color = color;
   }
   let mut frame = TextBoxFrameContent::new(textbox_blocks_with_base(
     content, base_style, styles, images, hyperlinks,
@@ -5815,28 +5870,25 @@ fn apply_drawingml_textbox_layout_adjustments(frame: &mut TextBoxFrameContent) {
   frame.left_pt = (frame.left_pt - 1.67).max(0.0);
 }
 
-fn wordprocessing_shape_textbox_uses_auto_light_text(
-  shape: &wps::WordprocessingShape,
-  styles: &StylesCatalog,
-) -> bool {
-  let fill_color = wordprocessing_shape_fill_color(shape, &styles.theme_colors).or_else(|| {
-    shape
-      .shape_style
-      .as_ref()
-      .and_then(|style| drawingml_fill_reference_color(&style.fill_reference, &styles.theme_colors))
-  });
-  fill_color.is_some_and(libreoffice_color_is_dark)
+fn automatic_text_color_for_background(color: RgbColor) -> RgbColor {
+  // Black and white have equal WCAG contrast against a background at
+  // sqrt(1.05 * 0.05) - 0.05 = 0.1791 relative luminance.
+  if color_wcag_relative_luminance(color) <= 0.179_129 {
+    RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    }
+  } else {
+    RgbColor { r: 0, g: 0, b: 0 }
+  }
 }
 
-fn libreoffice_color_is_dark(color: RgbColor) -> bool {
-  color_wcag_luminance(color) <= 87
-}
-
-fn color_wcag_luminance(color: RgbColor) -> u8 {
+fn color_wcag_relative_luminance(color: RgbColor) -> f32 {
   let red = normalized_linear_rgb(color.r);
   let green = normalized_linear_rgb(color.g);
   let blue = normalized_linear_rgb(color.b);
-  (255.0 * (red * 0.2126 + green * 0.7152 + blue * 0.0722)).round() as u8
+  red * 0.2126 + green * 0.7152 + blue * 0.0722
 }
 
 fn normalized_linear_rgb(component: u8) -> f32 {
@@ -6165,6 +6217,7 @@ fn wordprocessing_shape_textbox_frame(
     allow_outside_page: false,
     inline_anchor_after_line: matches!(placement, ImagePlacement::Inline),
     placement,
+    chart: None,
     text_box_blocks: text_box.blocks,
     text_inset_left_pt: text_box.left_pt,
     text_inset_top_pt: text_box.top_pt,
@@ -6294,9 +6347,12 @@ fn push_drawing_shapes_impl(
   for choice in &graphic_data.graphic_data_choice {
     match choice {
       a::GraphicDataChoice::ChartReference(reference) => {
-        if let Some(chart_shapes) =
-          drawing_chart_shapes(drawing, reference, &images.charts_by_relationship_id)
-        {
+        if let Some(chart_shapes) = drawing_chart_shapes(
+          drawing,
+          reference,
+          &images.charts_by_relationship_id,
+          styles,
+        ) {
           inlines.extend(chart_shapes.into_iter().map(InlineItem::Shape));
         }
       }
@@ -6587,9 +6643,9 @@ fn wordprocessing_shape_shape(
     stroke,
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
-    inline_anchor_after_line: matches!(placement, ImagePlacement::Inline)
-      && wordprocessing_shape_textbox_content(shape).is_some(),
+    inline_anchor_after_line: false,
     placement,
+    chart: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -6833,6 +6889,7 @@ fn drawingml_diagram_shape_shape(
     inline_anchor_after_line: matches!(placement, ImagePlacement::Inline)
       && shape.text_body.is_some(),
     placement,
+    chart: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -6963,9 +7020,102 @@ fn drawing_chart_shapes(
   drawing: &w::Drawing,
   reference: &c::ChartReference,
   charts_by_relationship_id: &HashMap<String, c::ChartSpace>,
+  styles: &StylesCatalog,
 ) -> Option<Vec<InlineShape>> {
   let chart_space = charts_by_relationship_id.get(reference.id.as_str())?;
   let (width_pt, height_pt, placement) = drawing_chart_extent_and_placement(drawing)?;
+  if let Some(chart) = shared_chart::ordinary_clustered_column_chart(chart_space) {
+    let theme_series_colors = [
+      styles.theme_colors.accent1,
+      styles.theme_colors.accent2,
+      styles.theme_colors.accent3,
+      styles.theme_colors.accent4,
+      styles.theme_colors.accent5,
+      styles.theme_colors.accent6,
+    ];
+    let fallback_series_colors = [
+      RgbColor {
+        r: 79,
+        g: 129,
+        b: 189,
+      },
+      RgbColor {
+        r: 192,
+        g: 80,
+        b: 77,
+      },
+      RgbColor {
+        r: 155,
+        g: 187,
+        b: 89,
+      },
+      RgbColor {
+        r: 128,
+        g: 100,
+        b: 162,
+      },
+      RgbColor {
+        r: 75,
+        g: 172,
+        b: 198,
+      },
+      RgbColor {
+        r: 247,
+        g: 150,
+        b: 70,
+      },
+    ];
+    let series_colors = chart
+      .series
+      .iter()
+      .enumerate()
+      .map(|(index, series)| {
+        series
+          .solid_fill
+          .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
+          .map(|fill| fill.color)
+          .or(theme_series_colors[index % theme_series_colors.len()])
+          .unwrap_or(fallback_series_colors[index % fallback_series_colors.len()])
+      })
+      .collect();
+    let chart_font = styles
+      .theme_fonts
+      .minor_high_ansi
+      .clone()
+      .or_else(|| styles.theme_fonts.minor_ascii.clone());
+    let mut title_style = TextStyle {
+      font_family: chart_font.clone(),
+      font_size_pt: 18.0,
+      bold: true,
+      ..TextStyle::default()
+    };
+    let label_style = TextStyle {
+      font_family: chart_font,
+      font_size_pt: 10.0,
+      ..TextStyle::default()
+    };
+    title_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
+    let automatic_title = chart_space
+      .editing_language
+      .as_ref()
+      .map(|language| shared_chart::automatic_chart_title(Some(language.val.as_str())))
+      .unwrap_or_else(|| shared_chart::automatic_chart_title(None))
+      .to_string();
+    let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
+    shape.chart = Some(Box::new(InlineChart {
+      chart_space: Box::new(chart_space.clone()),
+      automatic_title,
+      title_style,
+      label_style,
+      gridline_color: RgbColor {
+        r: 134,
+        g: 134,
+        b: 134,
+      },
+      series_colors,
+    }));
+    return Some(vec![shape]);
+  }
   let stroke = Some(BorderStyle::default());
 
   Some(match shared_chart::kind(chart_space) {
@@ -7087,6 +7237,7 @@ fn chart_shape(
     allow_outside_page: false,
     inline_anchor_after_line: false,
     placement,
+    chart: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -7320,6 +7471,7 @@ fn anchor_wrap_polygon_shape(
     allow_outside_page: false,
     inline_anchor_after_line: false,
     placement,
+    chart: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -7637,6 +7789,7 @@ fn drawingml_picture_frame(
     allow_outside_page: false,
     inline_anchor_after_line: false,
     placement,
+    chart: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -8010,6 +8163,23 @@ fn drawingml_fill_reference_color(
   }
 }
 
+fn drawingml_font_reference_color(
+  reference: &a::FontReference,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  match reference.font_reference_choice.as_ref()? {
+    a::FontReferenceChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
+    a::FontReferenceChoice::SystemColor(color) => {
+      color.last_color.as_deref().and_then(parse_hex_color)
+    }
+    a::FontReferenceChoice::SchemeColor(color) => {
+      resolve_drawingml_scheme_color(color, theme_colors)
+    }
+    a::FontReferenceChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
+    _ => None,
+  }
+}
+
 fn drawingml_line_reference_color(
   reference: &a::LineReference,
   theme_colors: &ThemeColors,
@@ -8345,6 +8515,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
     allow_outside_page: style.absolute_position,
     inline_anchor_after_line: false,
     placement: style.placement(),
+    chart: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -8443,6 +8614,7 @@ fn vml_inline_shape(
     allow_outside_page: style.absolute_position,
     inline_anchor_after_line: false,
     placement: style.placement(),
+    chart: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -8502,6 +8674,7 @@ fn vml_textbox_frame(
     allow_outside_page: style.absolute_position,
     inline_anchor_after_line: false,
     placement: style.placement(),
+    chart: None,
     text_box_blocks: frame.blocks,
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -9979,6 +10152,7 @@ struct ThemeData {
   fonts: ThemeFonts,
   colors: ThemeColors,
   lines: ThemeLineStyles,
+  cjk_punctuation_compression: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -9991,7 +10165,14 @@ struct ThemeFonts {
   minor_high_ansi: Option<Arc<str>>,
   minor_east_asia: Option<Arc<str>>,
   minor_bidi: Option<Arc<str>>,
+  major_supplemental: Vec<(Arc<str>, Arc<str>)>,
+  minor_supplemental: Vec<(Arc<str>, Arc<str>)>,
+  latin_language: Option<Arc<str>>,
+  east_asia_language: Option<Arc<str>>,
+  bidi_language: Option<Arc<str>>,
 }
+
+type ThemeFontLanguages = (Option<Arc<str>>, Option<Arc<str>>, Option<Arc<str>>);
 
 #[derive(Clone, Debug, Default)]
 struct ThemeLineStyles {
@@ -10124,6 +10305,7 @@ impl StylesCatalog {
     ui_language: Option<&str>,
   ) -> Result<Self> {
     let theme = ThemeData::load(package, main);
+    let cjk_punctuation_compression = theme.cjk_punctuation_compression;
     let Some(styles_part) = main.style_definitions_part(package) else {
       let mut catalog = Self {
         import_settings,
@@ -10131,6 +10313,12 @@ impl StylesCatalog {
         theme_colors: theme.colors,
         theme_lines: theme.lines,
         ..Self::default()
+      };
+      catalog.doc_default_run.wordprocessingml_font_slots = true;
+      catalog.doc_default_run.cjk_punctuation_compression_ratio = if cjk_punctuation_compression {
+        1.0
+      } else {
+        0.0
       };
       // ECMA-376 Part 1 §17.3.2.19: when w:kern is never applied in the
       // style hierarchy, kerning is disabled for WordprocessingML runs.
@@ -10154,6 +10342,12 @@ impl StylesCatalog {
       ..Self::default()
     };
     catalog.doc_default_run.kerning_minimum_size_pt = Some(f32::INFINITY);
+    catalog.doc_default_run.wordprocessingml_font_slots = true;
+    catalog.doc_default_run.cjk_punctuation_compression_ratio = if cjk_punctuation_compression {
+      1.0
+    } else {
+      0.0
+    };
     catalog.doc_default_run.ligatures = Some(common::OpenTypeLigatures::default());
 
     if let Some(defaults) = styles.doc_defaults.as_deref() {
@@ -10406,23 +10600,60 @@ impl<'a> Iterator for StyleChainIter<'a> {
 
 impl ThemeData {
   fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Self {
-    let Some(theme_part) = main.theme_part(package) else {
-      return Self::default();
-    };
-    let Ok(theme) = theme_part.root_element(package) else {
-      return Self::default();
+    let settings = main
+      .document_settings_part(package)
+      .and_then(|part| part.root_element(package).ok());
+    let theme_font_languages = settings
+      .as_ref()
+      .and_then(|settings| settings.theme_font_languages.as_ref())
+      .map(|languages| {
+        (
+          languages
+            .val
+            .as_ref()
+            .map(|value| Arc::<str>::from(value.to_string())),
+          languages
+            .east_asia
+            .as_ref()
+            .map(|value| Arc::<str>::from(value.to_string())),
+          languages
+            .bidi
+            .as_ref()
+            .map(|value| Arc::<str>::from(value.to_string())),
+        )
+      });
+    let cjk_punctuation_compression = settings
+      .as_ref()
+      .and_then(|settings| settings.character_spacing_control.as_ref())
+      .is_some_and(|control| {
+        matches!(
+          control.val,
+          w::CharacterSpacingValues::CompressPunctuation
+            | w::CharacterSpacingValues::CompressPunctuationAndJapaneseKana
+        )
+      });
+    let Some(theme) = main
+      .theme_part(package)
+      .and_then(|part| part.root_element(package).ok())
+    else {
+      return Self {
+        cjk_punctuation_compression,
+        ..Self::default()
+      };
     };
     Self {
-      fonts: ThemeFonts::from_theme(theme),
+      fonts: ThemeFonts::from_theme(theme, theme_font_languages),
       colors: ThemeColors::from_theme(theme),
       lines: ThemeLineStyles::from_theme(theme),
+      cjk_punctuation_compression,
     }
   }
 }
 
 impl ThemeFonts {
-  fn from_theme(theme: &a::Theme) -> Self {
+  fn from_theme(theme: &a::Theme, languages: Option<ThemeFontLanguages>) -> Self {
     let scheme = &theme.theme_elements.font_scheme;
+    let (latin_language, east_asia_language, bidi_language) = languages.unwrap_or_default();
     Self {
       major_ascii: major_font_family(&scheme.major_font.latin_font.typeface),
       major_high_ansi: major_font_family(&scheme.major_font.latin_font.typeface),
@@ -10432,20 +10663,99 @@ impl ThemeFonts {
       minor_high_ansi: major_font_family(&scheme.minor_font.latin_font.typeface),
       minor_east_asia: major_font_family(&scheme.minor_font.east_asian_font.typeface),
       minor_bidi: major_font_family(&scheme.minor_font.complex_script_font.typeface),
+      major_supplemental: theme_supplemental_fonts(&scheme.major_font.supplemental_font),
+      minor_supplemental: theme_supplemental_fonts(&scheme.minor_font.supplemental_font),
+      latin_language,
+      east_asia_language,
+      bidi_language,
     }
   }
 
   fn resolve(&self, value: Option<w::ThemeFontValues>) -> Option<Arc<str>> {
+    // ECMA-376 Part 1 §17.15.1.88 maps Word's major/minor theme tokens
+    // through w:themeFontLang, and §§20.1.4.1.16/L.4.3.2.6 define the
+    // script-specific supplemental faces in the DrawingML theme.
     match value? {
-      w::ThemeFontValues::MajorAscii => self.major_ascii.clone(),
-      w::ThemeFontValues::MajorHighAnsi => self.major_high_ansi.clone(),
-      w::ThemeFontValues::MajorEastAsia => self.major_east_asia.clone(),
-      w::ThemeFontValues::MajorBidi => self.major_bidi.clone(),
-      w::ThemeFontValues::MinorAscii => self.minor_ascii.clone(),
-      w::ThemeFontValues::MinorHighAnsi => self.minor_high_ansi.clone(),
-      w::ThemeFontValues::MinorEastAsia => self.minor_east_asia.clone(),
-      w::ThemeFontValues::MinorBidi => self.minor_bidi.clone(),
+      w::ThemeFontValues::MajorAscii => self
+        .supplemental(&self.major_supplemental, self.latin_language.as_deref())
+        .or_else(|| self.major_ascii.clone()),
+      w::ThemeFontValues::MajorHighAnsi => self
+        .supplemental(&self.major_supplemental, self.latin_language.as_deref())
+        .or_else(|| self.major_high_ansi.clone()),
+      w::ThemeFontValues::MajorEastAsia => self
+        .supplemental(&self.major_supplemental, self.east_asia_language.as_deref())
+        .or_else(|| self.major_east_asia.clone()),
+      w::ThemeFontValues::MajorBidi => self
+        .supplemental(&self.major_supplemental, self.bidi_language.as_deref())
+        .or_else(|| self.major_bidi.clone()),
+      w::ThemeFontValues::MinorAscii => self
+        .supplemental(&self.minor_supplemental, self.latin_language.as_deref())
+        .or_else(|| self.minor_ascii.clone()),
+      w::ThemeFontValues::MinorHighAnsi => self
+        .supplemental(&self.minor_supplemental, self.latin_language.as_deref())
+        .or_else(|| self.minor_high_ansi.clone()),
+      w::ThemeFontValues::MinorEastAsia => self
+        .supplemental(&self.minor_supplemental, self.east_asia_language.as_deref())
+        .or_else(|| self.minor_east_asia.clone()),
+      w::ThemeFontValues::MinorBidi => self
+        .supplemental(&self.minor_supplemental, self.bidi_language.as_deref())
+        .or_else(|| self.minor_bidi.clone()),
     }
+  }
+
+  fn supplemental(
+    &self,
+    fonts: &[(Arc<str>, Arc<str>)],
+    language: Option<&str>,
+  ) -> Option<Arc<str>> {
+    let script = language.and_then(theme_language_script)?;
+    fonts
+      .iter()
+      .find(|(candidate, _)| candidate.eq_ignore_ascii_case(script))
+      .map(|(_, typeface)| Arc::clone(typeface))
+  }
+}
+
+fn theme_supplemental_fonts(fonts: &[a::SupplementalFont]) -> Vec<(Arc<str>, Arc<str>)> {
+  fonts
+    .iter()
+    .filter(|font| !font.script.is_empty() && !font.typeface.is_empty())
+    .map(|font| {
+      (
+        Arc::<str>::from(font.script.as_str()),
+        Arc::<str>::from(font.typeface.as_str()),
+      )
+    })
+    .collect()
+}
+
+fn theme_language_script(language: &str) -> Option<&'static str> {
+  let language = language.to_ascii_lowercase();
+  if language == "zh-hant"
+    || language.starts_with("zh-hant-")
+    || language == "zh-tw"
+    || language == "zh-hk"
+    || language == "zh-mo"
+  {
+    Some("Hant")
+  } else if language == "zh"
+    || language.starts_with("zh-hans")
+    || language == "zh-cn"
+    || language == "zh-sg"
+  {
+    Some("Hans")
+  } else if language == "ja" || language.starts_with("ja-") {
+    Some("Jpan")
+  } else if language == "ko" || language.starts_with("ko-") {
+    Some("Hang")
+  } else if language == "ar" || language.starts_with("ar-") {
+    Some("Arab")
+  } else if language == "he" || language.starts_with("he-") {
+    Some("Hebr")
+  } else if language == "th" || language.starts_with("th-") {
+    Some("Thai")
+  } else {
+    None
   }
 }
 
@@ -11682,6 +11992,15 @@ impl NumberingCatalog {
       &self.counters,
     );
     let mut style = base_style;
+    // LibreOffice's NewNumberPortion starts ordinary numbering from the
+    // paragraph font and clears underline/overline only. Character bullets
+    // additionally clear paragraph bold/italic before their explicit
+    // numbering-level run properties are applied.
+    style.underline = false;
+    if matches!(level.format, w::NumberFormatValues::Bullet) {
+      style.bold = false;
+      style.italic = false;
+    }
     properties::merge_run_style(
       &mut style,
       level
@@ -12711,14 +13030,18 @@ fn drawingml_percent_to_ratio(value: &DrawingmlPercentageValue) -> Option<f32> {
 }
 
 fn page_setup(section: &w::SectionProperties) -> PageSetup {
+  // [MS-OI29500] 2.1.220 (ECMA-376 Part 1 §17.6.13) requires Word's
+  // w:pgSz width and height to be no greater than 31680 twips (22 inches).
+  const WORD_MAX_PAGE_SIZE_PT: f32 = 1_584.0;
+
   let mut setup = default_word_page_setup();
 
   if let Some(size) = &section.page_size {
     if let Some(width) = size.width.as_ref().and_then(twips_measure_to_points) {
-      setup.width_pt = width;
+      setup.width_pt = width.min(WORD_MAX_PAGE_SIZE_PT);
     }
     if let Some(height) = size.height.as_ref().and_then(twips_measure_to_points) {
-      setup.height_pt = height;
+      setup.height_pt = height.min(WORD_MAX_PAGE_SIZE_PT);
     }
   }
 
@@ -12969,6 +13292,29 @@ mod tests {
   }
 
   #[test]
+  fn word_theme_font_language_selects_supplemental_east_asian_face() {
+    let fonts = ThemeFonts {
+      major_ascii: Some(Arc::from("Cambria")),
+      major_supplemental: vec![
+        (Arc::from("Hans"), Arc::from("SimSun")),
+        (Arc::from("Jpan"), Arc::from("MS Gothic")),
+      ],
+      latin_language: Some(Arc::from("en-US")),
+      east_asia_language: Some(Arc::from("zh-CN")),
+      ..ThemeFonts::default()
+    };
+
+    assert_eq!(
+      fonts.resolve(Some(w::ThemeFontValues::MajorAscii)),
+      Some(Arc::from("Cambria"))
+    );
+    assert_eq!(
+      fonts.resolve(Some(w::ThemeFontValues::MajorEastAsia)),
+      Some(Arc::from("SimSun"))
+    );
+  }
+
+  #[test]
   fn drawing_image_properties_preserve_crop_and_transform() {
     let xml = r#"<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><pic:nvPicPr><pic:cNvPr id="1" name="Picture 1"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId7"/><a:srcRect l="10000" t="20000" r="30000" b="40000"/></pic:blipFill><pic:spPr><a:xfrm rot="5400000" flipH="1" flipV="true"/></pic:spPr></pic:pic>"#;
 
@@ -12984,6 +13330,64 @@ mod tests {
     assert!((properties.rotation_deg - 90.0).abs() < 0.001);
     assert!(properties.flip_horizontal);
     assert!(properties.flip_vertical);
+  }
+
+  #[test]
+  fn drawingml_font_reference_color_requires_an_explicit_color_choice() {
+    let without_color = a::FontReference::from_bytes(
+      br#"<a:fontRef xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" idx="minor"/>"#,
+    )
+    .expect("font reference without color");
+    assert_eq!(
+      drawingml_font_reference_color(&without_color, &ThemeColors::default()),
+      None
+    );
+
+    let with_color = a::FontReference::from_bytes(
+      br#"<a:fontRef xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" idx="minor"><a:srgbClr val="FFFFFF"/></a:fontRef>"#,
+    )
+    .expect("font reference with color");
+    assert_eq!(
+      drawingml_font_reference_color(&with_color, &ThemeColors::default()),
+      Some(RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      })
+    );
+  }
+
+  #[test]
+  fn automatic_shape_text_color_uses_the_higher_contrast_neutral() {
+    assert_eq!(
+      automatic_text_color_for_background(RgbColor {
+        r: 0x0d,
+        g: 0x2c,
+        b: 0x40,
+      }),
+      RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      }
+    );
+    for background in [
+      RgbColor {
+        r: 0xef,
+        g: 0x29,
+        b: 0x29,
+      },
+      RgbColor {
+        r: 0x72,
+        g: 0x9f,
+        b: 0xcf,
+      },
+    ] {
+      assert_eq!(
+        automatic_text_color_for_background(background),
+        RgbColor { r: 0, g: 0, b: 0 }
+      );
+    }
   }
 
   #[test]
@@ -13027,6 +13431,49 @@ mod tests {
     assert!((frame.text_inset_left_pt - 5.53).abs() < 0.001);
     assert!((frame.text_inset_top_pt - 3.6).abs() < 0.001);
     assert_eq!(frame.text_box_blocks.len(), 1);
+  }
+
+  #[test]
+  fn wps_inline_shape_and_textbox_share_one_layout_object() {
+    let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wps:cNvSpPr/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="857250" cy="742950"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="0D2C40"/></a:solidFill></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>inside shape</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp>"#;
+    let source = wps::WordprocessingShape::from_bytes(xml.as_bytes()).expect("WPS shape");
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let shape = wordprocessing_shape_shape(
+      &source,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      DrawingShapeImportContext {
+        effect_extent: DrawingEffectExtent::default(),
+        styles: &styles,
+        images: &images,
+        hyperlinks: &hyperlinks,
+        smartart_text_colors_by_model_id: None,
+      },
+    )
+    .expect("visual shape");
+    let text_box = wordprocessing_shape_textbox_frame(
+      &source,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      DrawingTextBoxImportContext {
+        base_style: TextStyle::default(),
+        styles: &styles,
+        images: &images,
+        hyperlinks: &hyperlinks,
+      },
+    )
+    .expect("textbox frame");
+    let mut inlines = vec![InlineItem::Shape(shape)];
+
+    merge_textbox_frame_into_owning_shape(&mut inlines, text_box).expect("merged textbox");
+
+    assert_eq!(inlines.len(), 1);
+    let InlineItem::Shape(shape) = &inlines[0] else {
+      panic!("merged item is not a shape");
+    };
+    assert_eq!(shape.text_box_blocks.len(), 1);
   }
 
   #[test]
@@ -14627,6 +15074,19 @@ mod tests {
 
     assert_eq!(setup.width_pt, 250.0);
     assert_eq!(setup.height_pt, 400.0);
+  }
+
+  #[test]
+  fn word_page_size_is_limited_to_twenty_two_inches() {
+    let setup = page_setup(&section(
+      65_534,
+      65_534,
+      w::PageOrientationValues::Portrait,
+      None,
+    ));
+
+    assert_eq!(setup.width_pt, 1_584.0);
+    assert_eq!(setup.height_pt, 1_584.0);
   }
 
   #[test]

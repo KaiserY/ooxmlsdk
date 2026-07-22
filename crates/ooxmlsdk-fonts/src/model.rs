@@ -1940,6 +1940,9 @@ pub struct FontScriptRun {
 pub struct ScriptScanOptions {
   pub app_script: TextScript,
   pub small_caps: bool,
+  /// Apply the explicit WordprocessingML rFonts slot classification before
+  /// falling back to Unicode Script for Common characters.
+  pub wordprocessingml_font_slots: bool,
 }
 
 impl Default for ScriptScanOptions {
@@ -1947,6 +1950,7 @@ impl Default for ScriptScanOptions {
     Self {
       app_script: TextScript::Common,
       small_caps: false,
+      wordprocessingml_font_slots: false,
     }
   }
 }
@@ -1972,9 +1976,21 @@ pub fn script_direction_runs_with_options(
   options: ScriptScanOptions,
 ) -> Vec<FontScriptRun> {
   if options.small_caps {
-    small_caps_script_direction_runs(text, size_pt, options.app_script)
+    small_caps_script_direction_runs(
+      text,
+      size_pt,
+      options.app_script,
+      options.wordprocessingml_font_slots,
+    )
   } else {
-    script_direction_runs_for_segment(text, 0, size_pt, false, options.app_script)
+    script_direction_runs_for_segment(
+      text,
+      0,
+      size_pt,
+      false,
+      options.app_script,
+      options.wordprocessingml_font_slots,
+    )
   }
 }
 
@@ -1982,6 +1998,7 @@ fn small_caps_script_direction_runs(
   text: &str,
   size_pt: FontSize,
   app_script: TextScript,
+  wordprocessingml_font_slots: bool,
 ) -> Vec<FontScriptRun> {
   let mut runs = Vec::new();
   let mut start = 0usize;
@@ -1991,7 +2008,15 @@ fn small_caps_script_direction_runs(
     if let Some(active) = active_upper
       && active != is_upper
     {
-      push_small_caps_case_run(text, start..index, active, size_pt, app_script, &mut runs);
+      push_small_caps_case_run(
+        text,
+        start..index,
+        active,
+        size_pt,
+        app_script,
+        wordprocessingml_font_slots,
+        &mut runs,
+      );
       start = index;
     }
     active_upper = Some(is_upper);
@@ -2003,6 +2028,7 @@ fn small_caps_script_direction_runs(
       active_upper.unwrap_or(false),
       size_pt,
       app_script,
+      wordprocessingml_font_slots,
       &mut runs,
     );
   }
@@ -2015,6 +2041,7 @@ fn push_small_caps_case_run(
   upper_run: bool,
   size_pt: FontSize,
   app_script: TextScript,
+  wordprocessingml_font_slots: bool,
   runs: &mut Vec<FontScriptRun>,
 ) {
   let mut segment_runs = script_direction_runs_for_segment(
@@ -2023,6 +2050,7 @@ fn push_small_caps_case_run(
     size_pt,
     !upper_run,
     app_script,
+    wordprocessingml_font_slots,
   );
   runs.append(&mut segment_runs);
 }
@@ -2033,6 +2061,7 @@ fn script_direction_runs_for_segment(
   size_pt: FontSize,
   small_caps: bool,
   app_script: TextScript,
+  wordprocessingml_font_slots: bool,
 ) -> Vec<FontScriptRun> {
   let mut runs = Vec::new();
   script_direction_runs_for_segment_into(
@@ -2041,6 +2070,7 @@ fn script_direction_runs_for_segment(
     size_pt,
     small_caps,
     app_script,
+    wordprocessingml_font_slots,
     &mut runs,
   );
   runs
@@ -2052,12 +2082,14 @@ fn script_direction_runs_for_segment_into(
   size_pt: FontSize,
   small_caps: bool,
   app_script: TextScript,
+  wordprocessingml_font_slots: bool,
   runs: &mut Vec<FontScriptRun>,
 ) {
   if text.is_empty() {
     return;
   }
-  let leading_script = first_strong_text_script(text).unwrap_or(app_script);
+  let leading_script =
+    first_strong_text_script(text, wordprocessingml_font_slots).unwrap_or(app_script);
   let mut start = 0usize;
   let mut active = None::<TextScript>;
   let mut pending_weak_start = None::<usize>;
@@ -2070,7 +2102,7 @@ fn script_direction_runs_for_segment_into(
       pending_weak_has_inherited = true;
       continue;
     }
-    let Some(script) = strong_text_script(ch) else {
+    let Some(script) = strong_text_script(ch, wordprocessingml_font_slots) else {
       active.get_or_insert(leading_script);
       pending_weak_start.get_or_insert(index);
       pending_weak_has_inherited |= unicode_script == UnicodeScriptValue::Inherited;
@@ -3842,15 +3874,23 @@ fn tag_to_string(tag: Tag) -> String {
   tag.to_string().trim_end().to_string()
 }
 
-fn first_strong_text_script(text: &str) -> Option<TextScript> {
+fn first_strong_text_script(text: &str, wordprocessingml_font_slots: bool) -> Option<TextScript> {
   text.chars().find_map(|ch| {
     (!is_nonspacing_mark(ch))
-      .then(|| strong_text_script(ch))
+      .then(|| strong_text_script(ch, wordprocessingml_font_slots))
       .flatten()
   })
 }
 
-fn strong_text_script(ch: char) -> Option<TextScript> {
+fn strong_text_script(ch: char, wordprocessingml_font_slots: bool) -> Option<TextScript> {
+  // ECMA-376 Part 1 §17.3.2.26 assigns the Latin-1 Supplement to the High
+  // ANSI font slot unless w:hint=eastAsia activates one of its enumerated
+  // exceptions. Treat its Common punctuation as Latin for the default case;
+  // Unicode Script alone would incorrectly attach a trailing guillemet to a
+  // preceding Han run.
+  if wordprocessingml_font_slots && matches!(ch as u32, 0x00A0..=0x00FF) {
+    return Some(TextScript::Latin);
+  }
   // Unicode assigns Mathematical Alphanumeric Symbols to Common, but the
   // styled Greek letters retain their Greek semantic identity through their
   // compatibility decompositions. Office consequently falls them back to
@@ -4641,6 +4681,26 @@ mod tests {
 
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].script, TextScript::Greek);
+  }
+
+  #[test]
+  fn wordprocessingml_latin1_punctuation_uses_high_ansi_slot() {
+    let runs = script_direction_runs_with_options(
+      "Junzha«问候语»",
+      FontSize(11.0),
+      ScriptScanOptions {
+        wordprocessingml_font_slots: true,
+        ..ScriptScanOptions::default()
+      },
+    );
+
+    assert_eq!(runs.len(), 3);
+    assert_eq!(runs[0].script, TextScript::Latin);
+    assert_eq!(&"Junzha«问候语»"[runs[0].text_range.clone()], "Junzha«");
+    assert_eq!(runs[1].script, TextScript::Han);
+    assert_eq!(&"Junzha«问候语»"[runs[1].text_range.clone()], "问候语");
+    assert_eq!(runs[2].script, TextScript::Latin);
+    assert_eq!(&"Junzha«问候语»"[runs[2].text_range.clone()], "»");
   }
 
   #[test]

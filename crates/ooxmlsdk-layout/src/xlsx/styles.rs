@@ -455,6 +455,23 @@ impl StylesCatalog {
     style
   }
 
+  pub(crate) fn default_chart_text_style(&self) -> TextStyle {
+    TextStyle {
+      font_family: Some(Arc::from(
+        self
+          .theme_fonts
+          .as_ref()
+          .and_then(|fonts| fonts.minor_latin.as_deref())
+          // A chart without theme1.xml still uses the current Office
+          // application theme. Microsoft 365 fixed output resolves that chart
+          // default independently from the worksheet Normal style.
+          .unwrap_or("Aptos Narrow"),
+      )),
+      east_asia_font_family: self.theme_minor_east_asian.clone(),
+      ..TextStyle::default()
+    }
+  }
+
   pub(crate) fn document_font_text_style_for_column_width(&self) -> Option<TextStyle> {
     let mut style = TextStyle::default();
     let font = self.font_records.first()?;

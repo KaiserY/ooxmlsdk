@@ -51,6 +51,10 @@ pub struct TextStyle {
   pub character_spacing_pt: f32,
   pub baseline_shift_pt: f32,
   pub use_windows_font_metrics: bool,
+  /// Select Common characters using the WordprocessingML rFonts slot table.
+  pub wordprocessingml_font_slots: bool,
+  /// Fraction of Word's maximum full-width punctuation compression to apply.
+  pub cjk_punctuation_compression_ratio: f32,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,
@@ -84,6 +88,8 @@ impl Default for TextStyle {
       character_spacing_pt: 0.0,
       baseline_shift_pt: 0.0,
       use_windows_font_metrics: false,
+      wordprocessingml_font_slots: false,
+      cjk_punctuation_compression_ratio: 0.0,
       bold: false,
       italic: false,
       underline: false,
@@ -348,6 +354,8 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     character_spacing: common::Pt(style.character_spacing_pt),
     baseline_shift: common::Pt(style.baseline_shift_pt),
     use_windows_font_metrics: style.use_windows_font_metrics,
+    wordprocessingml_font_slots: style.wordprocessingml_font_slots,
+    cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
     bold: style.bold,
     italic: style.italic,
     underline: style.underline,

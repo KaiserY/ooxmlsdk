@@ -20,6 +20,11 @@ fn chart_text_blocks(
     let Ok(chart_space) = chart_part.root_element(package) else {
       continue;
     };
+    // Ordinary two-dimensional clustered-column charts are laid out at their
+    // drawing anchor. Cached series data is not separate document body text.
+    if shared_chart::ordinary_clustered_column_chart(chart_space).is_some() {
+      continue;
+    }
     let color = chart_label_color(chart_space, &styles.theme_colors).unwrap_or_default();
     let vertical_axis_labels = chart_vertical_multilevel_axis_labels(chart_space);
     let mut texts = shared_chart::visible_texts_with_uncached_series_labels(chart_space);

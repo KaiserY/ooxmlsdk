@@ -384,6 +384,15 @@ impl Shape {
   }
 
   pub(crate) fn finalize_service_name(&mut self) {
+    // A p:ph describes the placeholder occupied by a graphic frame; it does
+    // not change the kind of graphical object stored in a:graphicData.
+    // ECMA-376 Part 1 §19.3.1.21 keeps graphicFrame content separate from
+    // the non-visual placeholder metadata, and LibreOffice's PPTShape::addShape
+    // likewise preserves the frame service selected by setChartType(),
+    // setTableType(), setDiagramType(), or media/OLE import.
+    if self.frame_type != FrameType::Generic {
+      return;
+    }
     if let Some(service_name) = self.placeholder_service_name() {
       self.service_name = service_name;
     }

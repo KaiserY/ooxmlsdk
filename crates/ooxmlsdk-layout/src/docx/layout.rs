@@ -9,10 +9,10 @@ use crate::docx::{
   Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingFrame, FloatingFramePlacement,
   FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment, FrameHorizontalAnchor,
   FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode, HorizontalImageAlignment,
-  HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide, InlineItem, InlineShape,
-  InlineShapeGeometry, LineHeightRule, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
-  SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
-  TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
+  HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide, InlineChart, InlineItem,
+  InlineShape, InlineShapeGeometry, LineHeightRule, PageSetup, ParagraphAlignment, RgbColor,
+  SectionBreakKind, SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment,
+  TableCell, TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
   VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
@@ -21,6 +21,10 @@ use crate::model::{
   common_text_style,
 };
 use crate::options::{LayoutActionOptions, LayoutOptions};
+use crate::pptx::chart::{
+  ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, lower_clustered_column_chart,
+};
+use crate::render::chart as shared_chart;
 use crate::text_metrics::TextMetrics;
 use crate::units;
 
@@ -235,6 +239,27 @@ fn include_text_height(
     LineHeightRule::Exact => line_height,
     LineHeightRule::Auto | LineHeightRule::AtLeast => line_height.max(text_height),
   }
+}
+
+fn inline_drawing_line_height(
+  object_height_pt: f32,
+  paragraph: &crate::docx::Paragraph,
+  text_frame: TextFrame,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  if matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
+    return object_height_pt;
+  }
+  // ECMA-376 Part 1 §20.4.2.3 defines an inline drawing as affecting its
+  // line like a character glyph of similar size. The object's height is the
+  // ascent above the baseline; the paragraph mark still supplies the normal
+  // font descent below it. Writer models the same split in
+  // SwLineLayout::MaxAscentDescent(), keeping fly-content ascent/descent and
+  // ordinary text descent as independent maxima.
+  object_height_pt
+    + text_metrics
+      .vertical_metrics(&paragraph_base_line_style(paragraph))
+      .descent_pt
 }
 
 fn inline_text_height_for_text(
@@ -1512,7 +1537,6 @@ fn into_common_outline_entry(entry: OutlineEntry) -> common::OutlineEntry<'stati
 
 fn into_common_layout_frame(index: usize, frame: LayoutFrame) -> common::FrameRecord<'static> {
   let item_offset = frame.item_start;
-  let item_count = frame.item_count;
   common::FrameRecord {
     id: common::FrameId(index as u32),
     parent: None,
@@ -1522,27 +1546,25 @@ fn into_common_layout_frame(index: usize, frame: LayoutFrame) -> common::FrameRe
     section_index: frame.section_index,
     section_page_index: frame.section_page_index,
     column_index: frame.column_index,
-    item_range: common_item_range(0, item_count),
+    // Frame and line ranges address the owning page display list. Keeping
+    // them page-relative is required by PDF line ownership: otherwise every
+    // later frame starts again at item zero and can assign its baseline and
+    // clip to an earlier paragraph's text.
+    item_range: common_item_range(frame.item_start, frame.item_end),
     split_start: into_common_frame_cursor(localize_frame_cursor(frame.split_start, item_offset)),
     split_end: into_common_frame_cursor(localize_frame_cursor(frame.split_end, item_offset)),
     bounds: frame.bounds.map(common_rect_from_frame_bounds),
     print_bounds: frame.bounds.map(common_rect_from_frame_bounds),
-    lines: frame
-      .lines
-      .into_iter()
-      .map(|line| into_common_line_box(localize_line_box(line, item_offset)))
-      .collect(),
+    lines: frame.lines.into_iter().map(into_common_line_box).collect(),
     fragments: frame
       .fragments
       .into_iter()
-      .map(|fragment| into_common_frame_fragment(localize_frame_fragment(fragment, item_offset)))
+      .map(into_common_frame_fragment)
       .collect(),
     influences: frame
       .influences
       .into_iter()
-      .map(|influence| {
-        into_common_frame_influence(localize_frame_influence(influence, item_offset))
-      })
+      .map(into_common_frame_influence)
       .collect(),
     invalidation: into_common_frame_invalidation(frame.invalidation),
   }
@@ -1691,18 +1713,6 @@ fn localize_line_box(mut line: LineBox, item_offset: usize) -> LineBox {
   line.item_start = line.item_start.saturating_sub(item_offset);
   line.item_end = line.item_end.saturating_sub(item_offset);
   line
-}
-
-fn localize_frame_fragment(mut fragment: FrameFragment, item_offset: usize) -> FrameFragment {
-  fragment.item_start = fragment.item_start.saturating_sub(item_offset);
-  fragment.item_end = fragment.item_end.saturating_sub(item_offset);
-  fragment
-}
-
-fn localize_frame_influence(mut influence: FrameInfluence, item_offset: usize) -> FrameInfluence {
-  influence.item_start = influence.item_start.saturating_sub(item_offset);
-  influence.item_end = influence.item_end.saturating_sub(item_offset);
-  influence
 }
 
 struct RootFrameLayout<'a> {
@@ -5249,7 +5259,12 @@ fn estimated_paragraph_content_height(
         if x + width > content_width && x > 0.0 {
           finish_line(&mut content_height, &mut line_height, &mut line_index);
         }
-        line_height = line_height.max(height.min(base_line_height));
+        line_height = line_height.max(inline_drawing_line_height(
+          height,
+          paragraph,
+          text_frame,
+          text_metrics,
+        ));
         x = width;
       }
       InlineItem::Shape(shape) => {
@@ -5536,16 +5551,9 @@ fn layout_document_block(
       if !ignore_top_margin_after_page_break && !ignore_top_margin_at_page_start {
         y += paragraph_spacing_before(previous, paragraph, flow);
       }
-      let paragraph_flow = FlowContext {
-        content_width: (flow.content_width
-          - paragraph.format.indent_left_pt
-          - paragraph.format.indent_right_pt)
-          .max(DEFAULT_FONT_SIZE_PT),
-        ..flow
-      };
       let (paragraph_flow, y) = layout_paragraph(
         paragraph,
-        paragraph_flow,
+        flow,
         ParagraphLayoutTarget {
           current: target.current,
           pages: target.pages,
@@ -7780,6 +7788,105 @@ fn translate_page_item(mut item: PageItem, dx_pt: f32, dy_pt: f32) -> PageItem {
   item
 }
 
+fn lower_inline_chart(
+  chart: &InlineChart,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+) -> Vec<PageItem> {
+  let Some(model) = shared_chart::ordinary_clustered_column_chart(&chart.chart_space) else {
+    return Vec::new();
+  };
+  let frame_stroke = BorderStyle {
+    width_pt: 0.14,
+    color: RgbColor { r: 0, g: 0, b: 0 },
+    ..BorderStyle::default()
+  };
+  let mut items = vec![PageItem::Rect(RectItem {
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
+    fill_color: None,
+    fill_opacity: 1.0,
+    stroke: Some(frame_stroke),
+    stroke_opacity: 1.0,
+  })];
+  items.extend(
+    lower_clustered_column_chart(
+      ChartFrame {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+      },
+      &model,
+      &chart.automatic_title,
+      &ClusteredColumnStyle {
+        layout_profile: ChartLayoutProfile::Word,
+        has_explicit_title: false,
+        title: chart.title_style.clone(),
+        title_fill_color: None,
+        label: chart.label_style.clone(),
+        gridline_color: chart.gridline_color,
+        series_colors: chart.series_colors.clone(),
+      },
+    )
+    .into_iter()
+    .filter_map(docx_chart_page_item),
+  );
+  items
+}
+
+fn docx_chart_page_item(item: crate::model::PageItem) -> Option<PageItem> {
+  match item {
+    crate::model::PageItem::Text(text) => Some(PageItem::Text(TextItem {
+      x_pt: text.x_pt,
+      y_pt: text.y_pt,
+      line_height_pt: text.line_height_pt,
+      text: text.text,
+      style: text.style,
+      rotation_center_pt: text.rotation_center_pt,
+      hyperlink_url: text.hyperlink_url,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      form_widget_id: text.form_widget_id,
+      paragraph_bidi: text.paragraph_bidi,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: text.preserve_text_portion,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: match text.pdf_text_segmentation {
+        crate::model::PdfTextSegmentation::Line => PdfTextSegmentation::Line,
+        crate::model::PdfTextSegmentation::Portion => PdfTextSegmentation::Portion,
+      },
+    })),
+    crate::model::PageItem::Rect(rect) => Some(PageItem::Rect(RectItem {
+      x_pt: rect.x_pt,
+      y_pt: rect.y_pt,
+      width_pt: rect.width_pt,
+      height_pt: rect.height_pt,
+      fill_color: rect.fill_color,
+      fill_opacity: rect.fill_opacity,
+      stroke: rect.stroke,
+      stroke_opacity: rect.stroke_opacity,
+    })),
+    crate::model::PageItem::Line(line) => Some(PageItem::Line(LineItem {
+      x1_pt: line.x1_pt,
+      y1_pt: line.y1_pt,
+      x2_pt: line.x2_pt,
+      y2_pt: line.y2_pt,
+      width_pt: line.width_pt,
+      color: line.color,
+      kind: LineItemKind::Stroke,
+    })),
+    crate::model::PageItem::Image(_)
+    | crate::model::PageItem::LinkArea(_)
+    | crate::model::PageItem::Path(_) => None,
+  }
+}
+
 fn translate_frame_bounds(mut bounds: FrameBounds, dx_pt: f32, dy_pt: f32) -> FrameBounds {
   bounds.x_pt += dx_pt;
   bounds.y_pt += dy_pt;
@@ -9330,7 +9437,15 @@ impl RowFrame<'_, '_> {
           cell_index: Some(cell_index),
           item_start: cell_item_start,
           item_end: current.items.len(),
-          bounds: None,
+          // A table-cell fragment owns the cell box, not the ink bounds of
+          // whichever text item happens to be first. PDF painting uses this
+          // box to clip inline cell content at the row edges.
+          bounds: Some(FrameBounds {
+            x_pt: cell_frame.left_pt,
+            y_pt: row_top,
+            width_pt: cell_frame.width_pt,
+            height_pt: (row_bottom - row_top).max(0.0),
+          }),
         },
         text_metrics,
       );
@@ -11883,6 +11998,14 @@ fn layout_paragraph(
   y: f32,
   spacing_after_pt: f32,
 ) -> (FlowContext, f32) {
+  let flow = FlowContext {
+    content_width: paragraph_content_width(
+      flow.content_width,
+      paragraph.format.indent_left_pt,
+      paragraph.format.indent_right_pt,
+    ),
+    ..flow
+  };
   TextFrameLayout::new(paragraph, flow, spacing_after_pt, target.text_metrics).format(
     target.current,
     target.pages,
@@ -11941,18 +12064,12 @@ impl TextFrame {
     flow: FlowContext,
     text_metrics: &mut TextMetrics,
   ) -> Self {
-    let default_line_left = flow.content_left_pt + paragraph.format.indent_left_pt;
-    // SwTextMargin::CtorInitTextMargin() allows a negative left indent to move
-    // mnFirst/mnLeft before the frame print-area left edge without moving
-    // mnRight left with it. Keep the existing local width model for
-    // non-negative indents; its list/table branches are represented elsewhere
-    // in this importer.
-    let first_line_left = default_line_left + paragraph.format.first_line_indent_pt;
-    let default_line_right = if paragraph.format.indent_left_pt < 0.0 {
-      flow.content_left_pt + flow.content_width - paragraph.format.indent_right_pt
-    } else {
-      default_line_left + flow.content_width - paragraph.format.indent_right_pt
-    };
+    let (default_line_left, first_line_left, default_line_right) = paragraph_line_bounds(
+      flow.content_left_pt,
+      flow.content_width,
+      paragraph.format.indent_left_pt,
+      paragraph.format.first_line_indent_pt,
+    );
     let base_line_style = paragraph_base_line_style(paragraph);
     Self {
       default_line_left,
@@ -11975,6 +12092,30 @@ impl TextFrame {
       script_sensitive_line_height: flow.script_sensitive_line_height,
     }
   }
+}
+
+fn paragraph_line_bounds(
+  content_left_pt: f32,
+  content_width: f32,
+  indent_left_pt: f32,
+  first_line_indent_pt: f32,
+) -> (f32, f32, f32) {
+  // ECMA-376 Part 1 §17.3.1.12 defines start and end as independent
+  // distances from the leading and trailing text margins. Moving the leading
+  // edge must therefore reduce the line width, not translate the trailing
+  // edge. Writer's SwTextMargin::CtorInitTextMargin likewise derives mnRight
+  // from the frame print-area end and only subtracts the right margin.
+  let default_line_left = content_left_pt + indent_left_pt;
+  let first_line_left = default_line_left + first_line_indent_pt;
+  // `layout_paragraph` has already removed both paragraph indents from
+  // `content_width`. Add the leading indent back only as an origin offset;
+  // the trailing indent remains encoded in the reduced width.
+  let default_line_right = content_left_pt + content_width + indent_left_pt;
+  (default_line_left, first_line_left, default_line_right)
+}
+
+fn paragraph_content_width(content_width: f32, indent_left_pt: f32, indent_right_pt: f32) -> f32 {
+  (content_width - indent_left_pt - indent_right_pt).max(DEFAULT_FONT_SIZE_PT)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -12294,6 +12435,13 @@ impl<'a> TextFrameLayout<'a> {
     y: f32,
     line_height: &mut f32,
   ) -> (FlowContext, TextFrame, f32, f32, f32) {
+    finalize_cjk_punctuation_compression(
+      &mut advance.current.items,
+      *advance.line_item_start_index,
+      y,
+      advance.line_right,
+      advance.text_metrics,
+    );
     if advance.justify {
       justify_line_items(
         &mut advance.current.items,
@@ -12467,17 +12615,16 @@ impl<'a> TextFrameLayout<'a> {
           .font_size_pt
           .max(base_line_style.font_size_pt);
       }
-      let (visible_label, label_follow) =
-        if blank_list_label || !paragraph.format.list_label_width_aware_tab {
-          (label.as_str(), None)
-        } else if let Some(label) = label.strip_suffix('\t') {
-          (label, Some('\t'))
-        } else if let Some(label) = label.strip_suffix(' ') {
-          (label, Some(' '))
-        } else {
-          (label.as_str(), None)
-        };
-      let label_width = if blank_list_label || !paragraph.format.list_label_width_aware_tab {
+      let (visible_label, label_follow) = if blank_list_label {
+        (label.as_str(), None)
+      } else if let Some(label) = label.strip_suffix('\t') {
+        (label, Some('\t'))
+      } else if let Some(label) = label.strip_suffix(' ') {
+        (label, Some(' '))
+      } else {
+        (label.as_str(), None)
+      };
+      let label_width = if blank_list_label {
         0.0
       } else {
         text_metrics.measure_text(visible_label, &list_label_style)
@@ -12525,22 +12672,58 @@ impl<'a> TextFrameLayout<'a> {
         if let Some(tab_stop_pt) = paragraph.list_label_tab_stop_pt {
           x = x.max(flow.content_left_pt + tab_stop_pt);
         }
-      } else if paragraph.format.list_label_width_aware_tab {
+      } else {
         let label_end = first_line_left + label_width;
-        x = match label_follow {
-          // The imported list-label fallback is only used to place an empty
-          // label. A visible label followed by a tab advances from its actual
-          // painted end to the next document default tab stop; the Office
-          // golden for long text numbering demonstrates the resulting
-          // progression, and SwNumberPortion::Format likewise sizes the
-          // numbering portion from its rendered width.
-          Some('\t') => {
-            next_tab_stop(label_end, first_line_left, &[], flow.default_tab_stop_pt).x_pt
+        let label_overflows_reserved_hanging_space = label_end > default_line_left;
+        let explicit_list_tab = (paragraph.format.list_label_uses_explicit_tab_stop
+          && label_follow == Some('\t'))
+        .then_some(paragraph.list_label_tab_stop_pt)
+        .flatten()
+        .map(|stop| flow.content_left_pt + stop)
+        .filter(|stop| *stop > label_end + LAYOUT_EPSILON_PT);
+        x = if let Some(tab_stop) = explicit_list_tab {
+          // ECMA-376 Part 1 §17.9.29 makes tab the default numbering
+          // suffix. A w:lvl/w:pPr number tab is the first stop for that
+          // suffix even when a paragraph style overrides the hanging indent.
+          tab_stop.max(default_line_left)
+        } else if paragraph.format.list_label_width_aware_tab {
+          match label_follow {
+            // The imported list-label fallback is only used to place an empty
+            // label. A visible label followed by a tab advances from its actual
+            // painted end to the next document default tab stop; the Office
+            // golden for long text numbering demonstrates the resulting
+            // progression, and SwNumberPortion::Format likewise sizes the
+            // numbering portion from its rendered width.
+            Some('\t') => {
+              next_tab_stop(label_end, first_line_left, &[], flow.default_tab_stop_pt).x_pt
+            }
+            Some(' ') => label_end + text_metrics.measure_text(" ", &paragraph.list_label_style),
+            _ => label_end,
           }
-          Some(' ') => label_end + text_metrics.measure_text(" ", &paragraph.list_label_style),
-          _ => label_end,
-        }
-        .max(default_line_left);
+          .max(default_line_left)
+        } else if label_overflows_reserved_hanging_space {
+          // ECMA-376 Part 1 §17.9.29 makes the default numbering suffix a tab.
+          // The hanging indent is its first implicit stop; when a long label
+          // (for example "Article 1.") crosses that stop, Word advances to the
+          // next document tab instead of painting paragraph text over the
+          // label. This is observable when §17.3.2.36 style separators merge
+          // the numbered heading with the following paragraph.
+          match label_follow {
+            Some('\t') => {
+              next_tab_stop(
+                label_end,
+                flow.content_left_pt,
+                &paragraph.format.tab_stops,
+                flow.default_tab_stop_pt,
+              )
+              .x_pt
+            }
+            Some(' ') => label_end + text_metrics.measure_text(" ", &paragraph.list_label_style),
+            _ => label_end,
+          }
+        } else {
+          default_line_left
+        };
       }
     }
     let mut line_item_start_index = current.items.len();
@@ -12552,6 +12735,7 @@ impl<'a> TextFrameLayout<'a> {
       && flow.justify_lines_with_shrinking
       && justification.can_shrink_word_spacing();
     let mut line_used_shrink_fit = false;
+    let mut line_used_punctuation_fit = false;
     let mut line_has_tab = false;
     let mut active_form_widget_ids = Vec::new();
     let mut line_has_form_widget = false;
@@ -12578,6 +12762,7 @@ impl<'a> TextFrameLayout<'a> {
             line_has_form_widget = false;
             pending_text_page_break = false;
             line_used_shrink_fit = false;
+            line_used_punctuation_fit = false;
             line_has_tab = false;
           }
           let mut chunk = String::new();
@@ -12657,6 +12842,7 @@ impl<'a> TextFrameLayout<'a> {
               x = line_left;
               chunk_x = x;
               line_used_shrink_fit = false;
+              line_used_punctuation_fit = false;
               line_has_tab = false;
               pending_tab = None;
               tab_over_margin_active = false;
@@ -12691,6 +12877,7 @@ impl<'a> TextFrameLayout<'a> {
                 tab_over_margin_active = true;
               }
               line_used_shrink_fit = false;
+              line_used_punctuation_fit = false;
               line_has_tab = true;
               chunk_x = x;
               if matches!(
@@ -12730,7 +12917,29 @@ impl<'a> TextFrameLayout<'a> {
             let line_capacity = (line_right - line_left).max(DEFAULT_FONT_SIZE_PT);
             let whitespace = segment.text.chars().all(char::is_whitespace);
 
-            let overflows_line = text_overflows_line(x, fit_width, line_right);
+            let only_char = segment
+              .text
+              .chars()
+              .next()
+              .filter(|_| segment.text.chars().count() == 1);
+            let natural_overflow = only_char.is_some_and(cjk_line_character)
+              && line_natural_overflows_with_cjk_compression(
+                CjkLineFit {
+                  x,
+                  line_right,
+                  items: &current.items,
+                  item_start: line_item_start_index,
+                  chunk: &chunk,
+                  text: &segment.text,
+                  style: &run.style,
+                },
+                text_metrics,
+              );
+            let blocks_second_extra_character = natural_overflow
+              && line_used_punctuation_fit
+              && only_char.is_none_or(|ch| !cjk_cannot_start_line(ch));
+            let overflows_line =
+              text_overflows_line(x, fit_width, line_right) || blocks_second_extra_character;
             let fits_with_shrink = overflows_line
               && shrink_justified_lines
               && !line_used_shrink_fit
@@ -12754,6 +12963,7 @@ impl<'a> TextFrameLayout<'a> {
               line_used_shrink_fit = true;
             }
 
+            let mut started_new_line = false;
             if overflows_line
               && !fits_with_shrink
               && x > line_left
@@ -12805,9 +13015,11 @@ impl<'a> TextFrameLayout<'a> {
               x = line_left;
               chunk_x = x;
               line_used_shrink_fit = false;
+              line_used_punctuation_fit = false;
               line_has_tab = false;
               pending_tab = None;
               tab_over_margin_active = false;
+              started_new_line = true;
               if whitespace {
                 emitted = true;
                 continue;
@@ -12825,9 +13037,27 @@ impl<'a> TextFrameLayout<'a> {
                     let text = ch.encode_utf8(&mut encoded);
                     let width = text_metrics.measure_text(text, &run.style);
                     let fit_width = line_fit_width(text, &run.style, text_metrics);
+                    let natural_overflow = cjk_line_character(ch)
+                      && line_natural_overflows_with_cjk_compression(
+                        CjkLineFit {
+                          x,
+                          line_right,
+                          items: &current.items,
+                          item_start: line_item_start_index,
+                          chunk: &chunk,
+                          text,
+                          style: &run.style,
+                        },
+                        text_metrics,
+                      );
+                    let blocks_second_extra_character =
+                      natural_overflow && line_used_punctuation_fit && !cjk_cannot_start_line(ch);
                     text_offset += text.len();
 
-                    if text_overflows_line(x, fit_width, line_right) && x > line_left {
+                    let starts_new_line = (text_overflows_line(x, fit_width, line_right)
+                      || blocks_second_extra_character)
+                      && x > line_left;
+                    if starts_new_line {
                       flush_text(
                         current,
                         TextPlacement {
@@ -12873,6 +13103,7 @@ impl<'a> TextFrameLayout<'a> {
                       x = line_left;
                       chunk_x = x;
                       line_used_shrink_fit = false;
+                      line_used_punctuation_fit = false;
                       line_has_tab = false;
                       pending_tab = None;
                     }
@@ -12882,6 +13113,9 @@ impl<'a> TextFrameLayout<'a> {
                     }
                     chunk.push_str(text);
                     x += width;
+                    if natural_overflow && !starts_new_line {
+                      line_used_punctuation_fit = true;
+                    }
                     text_state.set_position(InlineCursor {
                       inline_index,
                       text_offset,
@@ -12900,9 +13134,29 @@ impl<'a> TextFrameLayout<'a> {
                   }
                   continue;
                 }
+                let only_char = text.chars().next().filter(|_| text.chars().count() == 1);
+                let natural_overflow = only_char.is_some_and(cjk_line_character)
+                  && line_natural_overflows_with_cjk_compression(
+                    CjkLineFit {
+                      x,
+                      line_right,
+                      items: &current.items,
+                      item_start: line_item_start_index,
+                      chunk: &chunk,
+                      text: &text,
+                      style: &run.style,
+                    },
+                    text_metrics,
+                  );
+                let blocks_second_extra_character = natural_overflow
+                  && line_used_punctuation_fit
+                  && only_char.is_none_or(|ch| !cjk_cannot_start_line(ch));
                 text_offset += text.len();
 
-                if text_overflows_line(x, fit_width, line_right) && x > line_left {
+                let starts_new_line = (text_overflows_line(x, fit_width, line_right)
+                  || blocks_second_extra_character)
+                  && x > line_left;
+                if starts_new_line {
                   flush_text(
                     current,
                     TextPlacement {
@@ -12948,6 +13202,7 @@ impl<'a> TextFrameLayout<'a> {
                   x = line_left;
                   chunk_x = x;
                   line_used_shrink_fit = false;
+                  line_used_punctuation_fit = false;
                   line_has_tab = false;
                   pending_tab = None;
                 }
@@ -12957,6 +13212,9 @@ impl<'a> TextFrameLayout<'a> {
                 }
                 chunk.push_str(&text);
                 x += width;
+                if natural_overflow && !starts_new_line {
+                  line_used_punctuation_fit = true;
+                }
                 text_state.set_position(InlineCursor {
                   inline_index,
                   text_offset,
@@ -12976,6 +13234,9 @@ impl<'a> TextFrameLayout<'a> {
             }
             chunk.push_str(&segment.text);
             x += width;
+            if natural_overflow && !started_new_line {
+              line_used_punctuation_fit = true;
+            }
             text_state.set_position(InlineCursor {
               inline_index,
               text_offset: segment.end,
@@ -13065,6 +13326,7 @@ impl<'a> TextFrameLayout<'a> {
             x = line_left;
             line_item_start_index = current.items.len();
             line_used_shrink_fit = false;
+            line_used_punctuation_fit = false;
             line_has_tab = false;
             emitted = false;
           }
@@ -13156,6 +13418,7 @@ impl<'a> TextFrameLayout<'a> {
                 x = line_left;
                 line_height = base_line_height;
                 line_used_shrink_fit = false;
+                line_used_punctuation_fit = false;
                 line_has_tab = false;
               }
               ImageWrapMode::Square | ImageWrapMode::Tight if !placement.behind_text => {
@@ -13205,6 +13468,7 @@ impl<'a> TextFrameLayout<'a> {
                   x = line_left;
                   line_height = base_line_height;
                   line_used_shrink_fit = false;
+                  line_used_punctuation_fit = false;
                   line_has_tab = false;
                 }
               }
@@ -13231,6 +13495,7 @@ impl<'a> TextFrameLayout<'a> {
             line_has_form_widget = false;
             pending_text_page_break = false;
             line_used_shrink_fit = false;
+            line_used_punctuation_fit = false;
             line_has_tab = false;
           }
           let (width, height) = fit_image_to_line(
@@ -13264,6 +13529,7 @@ impl<'a> TextFrameLayout<'a> {
             base_line_height = text_frame.base_line_height;
             x = line_left;
             line_used_shrink_fit = false;
+            line_used_punctuation_fit = false;
             line_has_tab = false;
           }
           current.items.push(PageItem::Image(ImageItem {
@@ -13295,7 +13561,12 @@ impl<'a> TextFrameLayout<'a> {
             }));
           }
           x += width;
-          line_height = line_height.max(height);
+          line_height = line_height.max(inline_drawing_line_height(
+            height,
+            paragraph,
+            text_frame,
+            text_metrics,
+          ));
           emitted = true;
         }
         InlineItem::Shape(shape) => {
@@ -13309,6 +13580,12 @@ impl<'a> TextFrameLayout<'a> {
                              width_pt: f32,
                              height_pt: f32| {
             let item_start = current.items.len();
+            if let Some(chart) = &shape.chart {
+              current
+                .items
+                .extend(lower_inline_chart(chart, x_pt, y_pt, width_pt, height_pt));
+              return (item_start, current.items.len());
+            }
             if let Some(fill_image) = &shape.fill_image {
               current.items.push(PageItem::Image(ImageItem {
                 x_pt,
@@ -13713,6 +13990,7 @@ impl<'a> TextFrameLayout<'a> {
                 x = line_left;
                 compatibility_forced_shape_line = true;
                 line_used_shrink_fit = false;
+                line_used_punctuation_fit = false;
                 line_has_tab = false;
               }
               let _ = place_shape(
@@ -13768,6 +14046,7 @@ impl<'a> TextFrameLayout<'a> {
             line_item_start_index = current.items.len();
             emitted = false;
             line_used_shrink_fit = false;
+            line_used_punctuation_fit = false;
             line_has_tab = false;
           }
           pending_tab = None;
@@ -13793,6 +14072,7 @@ impl<'a> TextFrameLayout<'a> {
           line_has_form_widget = false;
           emitted = column_emitted;
           line_used_shrink_fit = false;
+          line_used_punctuation_fit = false;
           line_has_tab = false;
           pending_tab = None;
         }
@@ -13811,6 +14091,13 @@ impl<'a> TextFrameLayout<'a> {
 
     let paragraph_bottom;
     if emitted {
+      finalize_cjk_punctuation_compression(
+        &mut current.items,
+        line_item_start_index,
+        y,
+        line_right,
+        text_metrics,
+      );
       push_page_fragment(
         current,
         PageFragmentRecord {
@@ -14054,6 +14341,107 @@ fn line_fit_width(text: &str, style: &TextStyle, text_metrics: &mut TextMetrics)
   } else {
     text_metrics.measure_text(fit_text, style)
   }
+}
+
+struct CjkLineFit<'a> {
+  x: f32,
+  line_right: f32,
+  items: &'a [PageItem],
+  item_start: usize,
+  chunk: &'a str,
+  text: &'a str,
+  style: &'a TextStyle,
+}
+
+fn line_natural_overflows_with_cjk_compression(
+  fit: CjkLineFit<'_>,
+  text_metrics: &mut TextMetrics,
+) -> bool {
+  if fit.style.cjk_punctuation_compression_ratio <= 0.0 {
+    return false;
+  }
+  let mut capacity = 0.0;
+  for item in fit.items.iter().skip(fit.item_start) {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    capacity += cjk_punctuation_compression_capacity(&text.text, &text.style, text_metrics);
+  }
+  capacity += cjk_punctuation_compression_capacity(fit.chunk, fit.style, text_metrics);
+  let mut natural_style = fit.style.clone();
+  natural_style.cjk_punctuation_compression_ratio = 0.0;
+  natural_style.font_size_pt = word_print_grid_font_size(natural_style.font_size_pt);
+  let natural_next_width = text_metrics.measure_text(fit.text, &natural_style);
+  fit.x + capacity + natural_next_width > fit.line_right
+}
+
+fn cjk_punctuation_compression_capacity(
+  text: &str,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  if text.is_empty() || style.cjk_punctuation_compression_ratio <= 0.0 {
+    return 0.0;
+  }
+  let mut natural_style = style.clone();
+  natural_style.cjk_punctuation_compression_ratio = 0.0;
+  natural_style.font_size_pt = word_print_grid_font_size(natural_style.font_size_pt);
+  let mut maximum_style = style.clone();
+  maximum_style.cjk_punctuation_compression_ratio = 1.0;
+  (text_metrics.measure_text(text, &natural_style)
+    - text_metrics.measure_text(text, &maximum_style))
+  .max(0.0)
+}
+
+fn word_print_grid_font_size(font_size_pt: f32) -> f32 {
+  const WORD_PRINT_DPI: f32 = 600.0;
+  (font_size_pt * WORD_PRINT_DPI / 72.0).round() * 72.0 / WORD_PRINT_DPI
+}
+
+fn cjk_cannot_start_line(ch: char) -> bool {
+  matches!(
+    ch,
+    '\u{3001}'
+      | '\u{3002}'
+      | '\u{3009}'
+      | '\u{300B}'
+      | '\u{300D}'
+      | '\u{300F}'
+      | '\u{3011}'
+      | '\u{3015}'
+      | '\u{3017}'
+      | '\u{3019}'
+      | '\u{301B}'
+      | '\u{301E}'
+      | '\u{301F}'
+      | '\u{FF01}'
+      | '\u{FF09}'
+      | '\u{FF0C}'
+      | '\u{FF0E}'
+      | '\u{FF1A}'
+      | '\u{FF1B}'
+      | '\u{FF1F}'
+      | '\u{FF3D}'
+      | '\u{FF5D}'
+  )
+}
+
+fn cjk_line_character(ch: char) -> bool {
+  matches!(
+    ch as u32,
+    0x2E80..=0x2FFF
+      | 0x3000..=0x30FF
+      | 0x3100..=0x312F
+      | 0x31A0..=0x31BF
+      | 0x31F0..=0x31FF
+      | 0x3400..=0x4DBF
+      | 0x4E00..=0x9FFF
+      | 0xAC00..=0xD7AF
+      | 0xF900..=0xFAFF
+      | 0xFE30..=0xFE4F
+      | 0xFF00..=0xFFEF
+      | 0x20000..=0x323AF
+  )
 }
 
 fn text_overflows_line(x: f32, width: f32, line_right: f32) -> bool {
@@ -14637,7 +15025,7 @@ fn tab_leader_fill_char(leader: TabLeader) -> Option<&'static str> {
 }
 
 fn justify_line_items(
-  items: &mut Vec<PageItem>,
+  items: &mut [PageItem],
   start_index: usize,
   y: f32,
   line_left: f32,
@@ -14683,6 +15071,64 @@ fn justify_line_items(
     text.x_pt += preceding_space_advance;
     text.word_spacing_pt = extra_per_space;
     preceding_space_advance += text.text.matches(' ').count() as f32 * extra_per_space;
+  }
+}
+
+fn finalize_cjk_punctuation_compression(
+  items: &mut [PageItem],
+  start_index: usize,
+  y: f32,
+  line_right: f32,
+  text_metrics: &mut TextMetrics,
+) {
+  let mut compressed_right = f32::NEG_INFINITY;
+  let mut total_capacity = 0.0;
+  for item in items.iter().skip(start_index) {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    if (text.y_pt - y).abs() >= 0.01 || text.style.cjk_punctuation_compression_ratio <= 0.0 {
+      continue;
+    }
+    let mut natural_style = text.style.clone();
+    natural_style.cjk_punctuation_compression_ratio = 0.0;
+    let mut maximum_style = text.style.clone();
+    maximum_style.cjk_punctuation_compression_ratio = 1.0;
+    let natural_width = text_metrics.measure_text(&text.text, &natural_style);
+    let maximum_width = text_metrics.measure_text(&text.text, &maximum_style);
+    total_capacity += (natural_width - maximum_width).max(0.0);
+    compressed_right = compressed_right.max(text.x_pt + maximum_width);
+  }
+  if total_capacity <= 0.001 || !compressed_right.is_finite() {
+    return;
+  }
+
+  // Word exposes the maximum removable punctuation side-bearing while it
+  // chooses a line break, then gives unused capacity back to the line. This
+  // is the same fit/decompress sequence described by the Office
+  // lineWrapLikeWord6 note and implemented by Writer's CalcKanaAdj.
+  let natural_right = compressed_right + total_capacity;
+  let required_compression = (natural_right - line_right).clamp(0.0, total_capacity);
+  let ratio = required_compression / total_capacity;
+  let expansion_ratio = 1.0 - ratio;
+  let mut preceding_expansion = 0.0;
+  for item in items.iter_mut().skip(start_index) {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    if (text.y_pt - y).abs() >= 0.01 || text.style.cjk_punctuation_compression_ratio <= 0.0 {
+      continue;
+    }
+    let mut natural_style = text.style.clone();
+    natural_style.cjk_punctuation_compression_ratio = 0.0;
+    let mut maximum_style = text.style.clone();
+    maximum_style.cjk_punctuation_compression_ratio = 1.0;
+    let capacity = (text_metrics.measure_text(&text.text, &natural_style)
+      - text_metrics.measure_text(&text.text, &maximum_style))
+    .max(0.0);
+    text.x_pt += preceding_expansion;
+    text.style.cjk_punctuation_compression_ratio = ratio;
+    preceding_expansion += capacity * expansion_ratio;
   }
 }
 
@@ -14940,6 +15386,22 @@ fn push_line_item(
 mod tests {
   use super::*;
   use crate::docx::{CellBordersModel, CellMargins, Paragraph, ParagraphFormat, TextRun};
+
+  #[test]
+  fn paragraph_indents_are_measured_from_opposite_text_margins() {
+    let width = paragraph_content_width(468.0, 36.0, 18.0);
+    assert_eq!(width, 414.0);
+    assert_eq!(
+      paragraph_line_bounds(72.0, width, 36.0, -12.0),
+      (108.0, 96.0, 522.0)
+    );
+    let width = paragraph_content_width(468.0, -18.0, 0.0);
+    assert_eq!(width, 486.0);
+    assert_eq!(
+      paragraph_line_bounds(72.0, width, -18.0, 0.0),
+      (54.0, 54.0, 540.0)
+    );
+  }
 
   #[test]
   fn frame_wrap_distances_do_not_shift_the_specified_position() {
@@ -15365,6 +15827,7 @@ mod tests {
         margin_bottom_pt: 0.0,
         margin_left_pt: 0.0,
       }),
+      chart: None,
       text_box_blocks: Vec::new(),
       text_inset_left_pt: 0.0,
       text_inset_top_pt: 0.0,

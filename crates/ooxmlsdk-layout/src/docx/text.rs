@@ -104,6 +104,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     .and_then(NumberingReference::from_properties);
   let style_numbering = styles.paragraph_numbering_reference(style_id);
   let style_numbering_applies = direct_numbering.is_none() && style_numbering.is_some();
+  let style_indent_overrides_numbering = style_numbering_applies && format.indent_left_set;
   let paragraph_mark_run_properties = paragraph
     .paragraph_properties
     .as_deref()
@@ -111,23 +112,12 @@ pub(super) fn paragraph_model_with_base<'a>(
   let paragraph_mark_style =
     properties::paragraph_mark_run_style(paragraph_mark_run_properties, run_style.clone(), styles);
   let has_direct_indentation = numbering_format_context.direct_indentation;
-  let mut numbering_base_style = styles.doc_default_run.clone();
-  // The paragraph style also formats the paragraph mark, whose size Office
-  // uses for a numbering symbol when w:lvl/w:rPr does not provide w:sz.
-  // Numbering-level run properties are merged afterwards and remain the
-  // authoritative explicit formatting for the symbol itself.
-  numbering_base_style.font_size_pt = paragraph_mark_style.font_size_pt;
-  numbering_base_style.complex_font_size_pt = paragraph_mark_style.complex_font_size_pt;
-  numbering_base_style.color = run_style.color;
-  numbering_base_style.highlight = run_style.highlight;
-  numbering_base_style.bold = false;
-  numbering_base_style.italic = false;
-  numbering_base_style.underline = false;
-  numbering_base_style = properties::paragraph_mark_run_style(
-    paragraph_mark_run_properties,
-    numbering_base_style,
-    styles,
-  );
+  // ECMA-376 Part 1 §17.9.24 makes w:lvl/w:rPr an overlay for numbering
+  // text. With no explicit overlay, Word/Writer build the number portion from
+  // the current paragraph font; this is why a numbered Heading 1 carries its
+  // Times New Roman bold style into "Article 1.". LibreOffice implements the
+  // same precedence in SwTextFormatter::NewNumberPortion.
+  let numbering_base_style = paragraph_mark_style.clone();
   let style_tab_stop_pt = format.tab_stops.last().map(|stop| stop.position_pt);
   let numbering_label = direct_numbering.or(style_numbering).and_then(|reference| {
     numbering.next_label(
@@ -161,6 +151,8 @@ pub(super) fn paragraph_model_with_base<'a>(
     },
   );
   format.list_label_width_aware_tab = list_label_width_aware_tab;
+  format.list_label_uses_explicit_tab_stop =
+    style_indent_overrides_numbering && numbering_list_tab_stop_pt.is_some();
   let has_numbering_label = list_label.is_some() || numbering_image.is_some();
   let list_label_tab_stop_pt = has_numbering_label
     .then(|| {

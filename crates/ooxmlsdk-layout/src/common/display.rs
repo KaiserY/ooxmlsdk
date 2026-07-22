@@ -330,6 +330,10 @@ pub struct TextStyle<'doc> {
   /// Use legacy Windows/GDI ascent for the first baseline. PowerPoint's PDF
   /// path follows this metric; Word layout retains typographic metrics.
   pub use_windows_font_metrics: bool,
+  /// Select Common characters using the WordprocessingML rFonts slot table.
+  pub wordprocessingml_font_slots: bool,
+  /// Enable Word's document-level East Asian punctuation compression.
+  pub cjk_punctuation_compression_ratio: f32,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,

@@ -363,11 +363,11 @@ pub fn floor_excel_legacy(value: f64, significance: f64) -> Result<f64, NumericE
   if value == 0.0 {
     return Ok(0.0);
   }
+  if significance == 0.0 {
+    return Err(NumericError::Div0);
+  }
   if value * significance > 0.0 {
     return Ok(approx_floor(value / significance) * significance);
-  }
-  if significance == 0.0 {
-    return Err(NumericError::IllegalArgument);
   }
   if value < 0.0 {
     return Ok(approx_ceil(value / -significance) * -significance);
@@ -616,6 +616,8 @@ mod tests {
       Ok(-4.0)
     );
     assert_eq!(ceiling_excel_legacy(-2.5, 2.0), Ok(-2.0));
+    assert_eq!(ceiling_excel_legacy(2.5, 0.0), Ok(0.0));
+    assert_eq!(floor_excel_legacy(2.5, 0.0), Err(NumericError::Div0));
     assert_eq!(
       floor_excel_legacy(2.5, -2.0),
       Err(NumericError::IllegalArgument)

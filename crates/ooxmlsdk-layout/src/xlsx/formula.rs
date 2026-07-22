@@ -39,7 +39,6 @@ pub(crate) fn recalculate_formula_cells(
           else {
             continue;
           };
-          let value = lo_pdf_formula_value(&formula_cell.formula, value);
           if let Some(range) = formula_cell
             .reference
             .as_deref()
@@ -443,30 +442,6 @@ fn formula_contains_smart_quote(formula: &str) -> bool {
   formula
     .chars()
     .any(|ch| matches!(ch, '\u{2018}' | '\u{2019}' | '\u{201c}' | '\u{201d}'))
-}
-
-fn lo_pdf_formula_value(formula: &str, value: Value) -> Value {
-  if matches!(value, Value::Error(ref error) if error == "#NUM!")
-    && is_legacy_ceiling_floor_formula(formula)
-  {
-    return Value::Error("Err:502".to_string());
-  }
-  value
-}
-
-fn is_legacy_ceiling_floor_formula(formula: &str) -> bool {
-  let trimmed = formula.trim().trim_start_matches('=').trim_start();
-  formula_starts_with_function(trimmed, "CEILING") || formula_starts_with_function(trimmed, "FLOOR")
-}
-
-fn formula_starts_with_function(formula: &str, name: &str) -> bool {
-  let Some(prefix) = formula.get(..name.len()) else {
-    return false;
-  };
-  prefix.eq_ignore_ascii_case(name)
-    && formula
-      .get(name.len()..)
-      .is_some_and(|rest| rest.trim_start().starts_with('('))
 }
 
 #[derive(Clone, Debug)]
@@ -1216,22 +1191,6 @@ mod tests {
     assert_eq!(
       unresolved_foreign_addin_value("_xlfn.XLOOKUP(A1,B:B,C:C)"),
       None
-    );
-  }
-
-  #[test]
-  fn lo_pdf_formula_value_maps_legacy_ceiling_floor_num_to_illegal_argument() {
-    assert_eq!(
-      lo_pdf_formula_value("CEILING(C$1,$A5)", Value::Error("#NUM!".to_string())),
-      Value::Error("Err:502".to_string())
-    );
-    assert_eq!(
-      lo_pdf_formula_value("FLOOR(C$1,$A5)", Value::Error("#NUM!".to_string())),
-      Value::Error("Err:502".to_string())
-    );
-    assert_eq!(
-      lo_pdf_formula_value("FLOOR.MATH(C$1,$A5)", Value::Error("#NUM!".to_string())),
-      Value::Error("#NUM!".to_string())
     );
   }
 }

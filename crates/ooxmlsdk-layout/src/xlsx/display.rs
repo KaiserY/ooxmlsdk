@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
@@ -14,13 +15,16 @@ use crate::model::{
   common_rect, common_rgb, common_stroke_from_border, common_text_style,
 };
 use crate::options::LayoutOptions;
-use crate::render::{diagram as shared_diagram, emf_wmf};
+use crate::render::{chart as shared_chart, diagram as shared_diagram, emf_wmf};
 use crate::text_metrics::TextMetrics;
 use crate::units;
 
 use super::import::ExcelImport;
 use super::print::{CalcPrintDocument, CalcPrintPage};
 use super::worksheet::{CalcSheet, CellAddress, CellRange, CellRect};
+use crate::pptx::chart::{
+  ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, lower_clustered_column_chart,
+};
 
 const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
 // margins are 20 twips on each side.
@@ -318,6 +322,7 @@ fn print_page_items(
   items.extend(print_page_drawing_text_items(
     import,
     page,
+    setup,
     body_origin_x + repeat_width,
     body_origin_y + repeat_height,
     zoom_scale,
@@ -1968,12 +1973,27 @@ fn diagram_text_body_text(text_body: &shared_diagram::DiagramTextBody) -> String
 fn print_page_drawing_text_items(
   import: &ExcelImport,
   page: &CalcPrintPage<'_>,
+  setup: PageSetup,
   origin_x_pt: f32,
   origin_y_pt: f32,
   zoom_scale: f32,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
   let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  let page_clip_rect = page_area_rect.map_or(
+    CellRect {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: setup.width_pt,
+      height_pt: setup.height_pt,
+    },
+    |rect| CellRect {
+      x_pt: origin_x_pt,
+      y_pt: origin_y_pt,
+      width_pt: rect.width_pt * zoom_scale,
+      height_pt: rect.height_pt * zoom_scale,
+    },
+  );
   for drawing in &page.sheet.resources.drawings {
     for anchor in &drawing.anchors {
       if anchor.object.hidden || !anchor.print_with_sheet {
@@ -1994,16 +2014,24 @@ fn print_page_drawing_text_items(
       }
       let (x_pt, y_pt) =
         page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+      let drawing_rect = CellRect {
+        x_pt: origin_x_pt + x_pt * zoom_scale,
+        y_pt: origin_y_pt + y_pt * zoom_scale,
+        width_pt: width_pt * zoom_scale,
+        height_pt: height_pt * zoom_scale,
+      };
+      if let Some(chart_items) =
+        lower_drawing_chart(import, drawing, anchor, drawing_rect, page_clip_rect)
+        && !chart_items.is_empty()
+      {
+        items.extend(chart_items);
+        continue;
+      }
       let hyperlink_url = drawing_object_hyperlink_url(drawing, &anchor.object);
       render_drawing_text(
         &mut items,
         &text,
-        CellRect {
-          x_pt: origin_x_pt + x_pt * zoom_scale,
-          y_pt: origin_y_pt + y_pt * zoom_scale,
-          width_pt: width_pt * zoom_scale,
-          height_pt: height_pt * zoom_scale,
-        },
+        drawing_rect,
         drawing_object_text_style(import, &anchor.object),
         Some(drawing_object_text_layout(&anchor.object)),
         hyperlink_url.as_deref(),
@@ -2011,6 +2039,251 @@ fn print_page_drawing_text_items(
     }
   }
   items
+}
+
+fn lower_drawing_chart(
+  import: &ExcelImport,
+  drawing: &super::drawing::DrawingResourceCatalog,
+  anchor: &super::drawing::DrawingAnchorModel,
+  rect: CellRect,
+  page_clip_rect: CellRect,
+) -> Option<Vec<PageItem>> {
+  if anchor.object.kind != super::drawing::DrawingObjectKind::GraphicFrame {
+    return None;
+  }
+  let relationship_id = anchor.object.relationship_id.as_deref()?;
+  let resource = drawing
+    .charts
+    .iter()
+    .chain(drawing.extended_charts.iter())
+    .find(|chart| chart.relationship_id.as_deref() == Some(relationship_id))?;
+  let chart_space = resource.chart_space.as_deref()?;
+  let chart = shared_chart::clustered_column_chart(chart_space)?;
+  let series_colors = chart
+    .series
+    .iter()
+    .enumerate()
+    .map(|(index, series)| {
+      series
+        .solid_fill
+        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+        .or_else(|| import.styles.theme_color(4 + index as u32 % 6, 0.0))
+        .unwrap_or(XLSX_DEFAULT_CHART_SERIES_COLORS[index % 6])
+    })
+    .collect();
+  let mut title_style = import.styles.default_chart_text_style();
+  title_style.font_size_pt = 14.0;
+  title_style.bold = true;
+  let mut label_style = import.styles.default_chart_text_style();
+  label_style.font_size_pt = 10.0;
+  if let Some(typeface) = xlsx_chart_latin_typeface(chart_space) {
+    let typeface = Arc::from(typeface);
+    title_style.font_family = Some(Arc::clone(&typeface));
+    label_style.font_family = Some(typeface);
+  }
+  let mut items = lower_clustered_column_chart(
+    ChartFrame {
+      x_pt: rect.x_pt,
+      y_pt: rect.y_pt,
+      width_pt: rect.width_pt,
+      height_pt: rect.height_pt,
+    },
+    &chart,
+    shared_chart::automatic_chart_title(None),
+    &ClusteredColumnStyle {
+      layout_profile: ChartLayoutProfile::Excel,
+      has_explicit_title: false,
+      title: title_style,
+      title_fill_color: None,
+      label: label_style,
+      gridline_color: RgbColor {
+        r: 0xd9,
+        g: 0xd9,
+        b: 0xd9,
+      },
+      series_colors,
+    },
+  );
+  let mut metrics = TextMetrics::new();
+  items.retain_mut(|item| clip_chart_item_to_rect(item, page_clip_rect, &mut metrics));
+  Some(items)
+}
+
+fn xlsx_chart_latin_typeface(chart_space: &c::ChartSpace) -> Option<&str> {
+  for properties in [
+    chart_space.text_properties.as_deref(),
+    chart_space
+      .chart
+      .title
+      .as_deref()
+      .and_then(|title| title.text_properties.as_deref()),
+    chart_space
+      .chart
+      .legend
+      .as_deref()
+      .and_then(|legend| legend.text_properties.as_deref()),
+  ]
+  .into_iter()
+  .flatten()
+  {
+    if let Some(typeface) = chart_text_properties_latin_typeface(properties) {
+      return Some(typeface);
+    }
+  }
+  chart_space
+    .chart
+    .plot_area
+    .plot_area_choice2
+    .iter()
+    .find_map(|axis| {
+      let properties = match axis {
+        c::PlotAreaChoice2::ValueAxis(axis) => axis.text_properties.as_deref(),
+        c::PlotAreaChoice2::CategoryAxis(axis) => axis.text_properties.as_deref(),
+        c::PlotAreaChoice2::DateAxis(axis) => axis.text_properties.as_deref(),
+        c::PlotAreaChoice2::SeriesAxis(axis) => axis.text_properties.as_deref(),
+      }?;
+      chart_text_properties_latin_typeface(properties)
+    })
+}
+
+fn chart_text_properties_latin_typeface(properties: &c::TextProperties) -> Option<&str> {
+  properties
+    .paragraph
+    .iter()
+    .filter_map(|paragraph| paragraph.paragraph_properties.as_deref())
+    .filter_map(|paragraph| paragraph.default_run_properties.as_deref())
+    .find_map(|properties| properties.latin_font.as_ref()?.typeface.as_deref())
+    .or_else(|| {
+      properties
+        .list_style
+        .as_deref()
+        .and_then(|style| style.default_paragraph_properties.as_deref())
+        .and_then(|paragraph| paragraph.default_run_properties.as_deref())
+        .and_then(|properties| properties.latin_font.as_ref()?.typeface.as_deref())
+    })
+}
+
+fn clip_chart_item_to_rect(item: &mut PageItem, clip: CellRect, metrics: &mut TextMetrics) -> bool {
+  match item {
+    PageItem::Text(text) => rect_intersects_clip(
+      text.x_pt,
+      text.y_pt,
+      text.x_pt + metrics.measure_text(&text.text, &text.style),
+      text.y_pt + text.line_height_pt,
+      clip,
+    ),
+    PageItem::Rect(rect) => {
+      let left = rect.x_pt.max(clip.x_pt);
+      let top = rect.y_pt.max(clip.y_pt);
+      let right = (rect.x_pt + rect.width_pt).min(clip.x_pt + clip.width_pt);
+      let bottom = (rect.y_pt + rect.height_pt).min(clip.y_pt + clip.height_pt);
+      if right <= left || bottom <= top {
+        return false;
+      }
+      rect.x_pt = left;
+      rect.y_pt = top;
+      rect.width_pt = right - left;
+      rect.height_pt = bottom - top;
+      true
+    }
+    PageItem::Line(line) if line.y1_pt == line.y2_pt => {
+      if line.y1_pt < clip.y_pt || line.y1_pt > clip.y_pt + clip.height_pt {
+        return false;
+      }
+      line.x1_pt = line.x1_pt.clamp(clip.x_pt, clip.x_pt + clip.width_pt);
+      line.x2_pt = line.x2_pt.clamp(clip.x_pt, clip.x_pt + clip.width_pt);
+      line.x1_pt != line.x2_pt
+    }
+    PageItem::Line(line) if line.x1_pt == line.x2_pt => {
+      if line.x1_pt < clip.x_pt || line.x1_pt > clip.x_pt + clip.width_pt {
+        return false;
+      }
+      line.y1_pt = line.y1_pt.clamp(clip.y_pt, clip.y_pt + clip.height_pt);
+      line.y2_pt = line.y2_pt.clamp(clip.y_pt, clip.y_pt + clip.height_pt);
+      line.y1_pt != line.y2_pt
+    }
+    PageItem::Line(line) => rect_intersects_clip(
+      line.x1_pt.min(line.x2_pt),
+      line.y1_pt.min(line.y2_pt),
+      line.x1_pt.max(line.x2_pt),
+      line.y1_pt.max(line.y2_pt),
+      clip,
+    ),
+    PageItem::Image(_) | PageItem::LinkArea(_) | PageItem::Path(_) => true,
+  }
+}
+
+fn rect_intersects_clip(left: f32, top: f32, right: f32, bottom: f32, clip: CellRect) -> bool {
+  right > clip.x_pt
+    && bottom > clip.y_pt
+    && left < clip.x_pt + clip.width_pt
+    && top < clip.y_pt + clip.height_pt
+}
+
+const XLSX_DEFAULT_CHART_SERIES_COLORS: [RgbColor; 6] = [
+  RgbColor {
+    r: 0x44,
+    g: 0x72,
+    b: 0xc4,
+  },
+  RgbColor {
+    r: 0xed,
+    g: 0x7d,
+    b: 0x31,
+  },
+  RgbColor {
+    r: 0xa5,
+    g: 0xa5,
+    b: 0xa5,
+  },
+  RgbColor {
+    r: 0xff,
+    g: 0xc0,
+    b: 0x00,
+  },
+  RgbColor {
+    r: 0x5b,
+    g: 0x9b,
+    b: 0xd5,
+  },
+  RgbColor {
+    r: 0x70,
+    g: 0xad,
+    b: 0x47,
+  },
+];
+
+fn xlsx_chart_solid_fill_color(fill: &a::SolidFill, import: &ExcelImport) -> Option<RgbColor> {
+  match fill.solid_fill_choice.as_ref()? {
+    a::SolidFillChoice::RgbColorModelHex(color) => {
+      let bytes = color.val.as_bytes();
+      if bytes.len() != 6 {
+        return None;
+      }
+      Some(RgbColor {
+        r: u8::from_str_radix(std::str::from_utf8(&bytes[0..2]).ok()?, 16).ok()?,
+        g: u8::from_str_radix(std::str::from_utf8(&bytes[2..4]).ok()?, 16).ok()?,
+        b: u8::from_str_radix(std::str::from_utf8(&bytes[4..6]).ok()?, 16).ok()?,
+      })
+    }
+    a::SolidFillChoice::SchemeColor(color) => {
+      let index = match color.val {
+        a::SchemeColorValues::Light1 => 0,
+        a::SchemeColorValues::Dark1 => 1,
+        a::SchemeColorValues::Light2 => 2,
+        a::SchemeColorValues::Dark2 => 3,
+        a::SchemeColorValues::Accent1 => 4,
+        a::SchemeColorValues::Accent2 => 5,
+        a::SchemeColorValues::Accent3 => 6,
+        a::SchemeColorValues::Accent4 => 7,
+        a::SchemeColorValues::Accent5 => 8,
+        a::SchemeColorValues::Accent6 => 9,
+        _ => return None,
+      };
+      import.styles.theme_color(index, 0.0)
+    }
+    _ => None,
+  }
 }
 
 fn drawing_anchor_text<'a>(

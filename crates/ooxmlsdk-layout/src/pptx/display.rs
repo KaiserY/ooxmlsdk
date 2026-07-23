@@ -165,7 +165,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
       PdfTextSegmentation::Portion => common::PdfTextSegmentation::Portion,
     },
-    source: (!item.source_path.is_empty()).then(|| common::DisplaySource {
+    source: (!item.source_path.is_empty()).then_some(common::DisplaySource {
       engine: common::LayoutEngineKind::Pptx,
       path: item.source_path,
       relationship_id: None,

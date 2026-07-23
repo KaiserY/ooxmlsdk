@@ -285,10 +285,12 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       &label_categories,
       &values,
       None,
-      series_number_format_code(series_ref),
-      c::DataLabelPositionValues::OutsideEnd,
-      false,
-      "; ",
+      DataLabelDefaults {
+        value_format_code: series_number_format_code(series_ref),
+        position: c::DataLabelPositionValues::OutsideEnd,
+        supports_percent: false,
+        separator: "; ",
+      },
     );
     series.push(ClusteredColumnSeries {
       name,
@@ -457,9 +459,11 @@ pub fn cartesian_chart_for_ui_language<'a>(
         &mut categories,
         chart.area_chart_series.iter().map(area_series_ref),
         chart.data_labels.as_deref(),
-        ChartSeriesKind::Area,
-        grouping(chart.grouping.as_ref()),
-        false,
+        (
+          ChartSeriesKind::Area,
+          grouping(chart.grouping.as_ref()),
+          false,
+        ),
         ui_language,
       ),
       c::PlotAreaChoice::Area3DChart(chart) => append_cartesian_series(
@@ -467,9 +471,11 @@ pub fn cartesian_chart_for_ui_language<'a>(
         &mut categories,
         chart.area_chart_series.iter().map(area_series_ref),
         chart.data_labels.as_deref(),
-        ChartSeriesKind::Area,
-        grouping(chart.grouping.as_ref()),
-        true,
+        (
+          ChartSeriesKind::Area,
+          grouping(chart.grouping.as_ref()),
+          true,
+        ),
         ui_language,
       ),
       c::PlotAreaChoice::LineChart(chart) => {
@@ -480,9 +486,11 @@ pub fn cartesian_chart_for_ui_language<'a>(
           &mut categories,
           chart.line_chart_series.iter().map(line_series_ref),
           chart.data_labels.as_deref(),
-          ChartSeriesKind::Line,
-          grouping(chart.grouping.as_ref()),
-          false,
+          (
+            ChartSeriesKind::Line,
+            grouping(chart.grouping.as_ref()),
+            false,
+          ),
           ui_language,
         );
       }
@@ -491,9 +499,7 @@ pub fn cartesian_chart_for_ui_language<'a>(
         &mut categories,
         chart.line_chart_series.iter().map(line_series_ref),
         chart.data_labels.as_deref(),
-        ChartSeriesKind::Line,
-        grouping(Some(&chart.grouping)),
-        true,
+        (ChartSeriesKind::Line, grouping(Some(&chart.grouping)), true),
         ui_language,
       ),
       c::PlotAreaChoice::StockChart(chart) => {
@@ -504,9 +510,7 @@ pub fn cartesian_chart_for_ui_language<'a>(
           &mut categories,
           chart.line_chart_series.iter().map(line_series_ref),
           chart.data_labels.as_deref(),
-          ChartSeriesKind::Stock,
-          ChartSeriesGrouping::Standard,
-          false,
+          (ChartSeriesKind::Stock, ChartSeriesGrouping::Standard, false),
           ui_language,
         );
       }
@@ -517,9 +521,7 @@ pub fn cartesian_chart_for_ui_language<'a>(
           &mut categories,
           chart.radar_chart_series.iter().map(radar_series_ref),
           chart.data_labels.as_deref(),
-          ChartSeriesKind::Radar,
-          ChartSeriesGrouping::Standard,
-          false,
+          (ChartSeriesKind::Radar, ChartSeriesGrouping::Standard, false),
           ui_language,
         );
         if chart.radar_style.val == c::RadarStyleValues::Filled {
@@ -533,9 +535,11 @@ pub fn cartesian_chart_for_ui_language<'a>(
         &mut categories,
         chart.scatter_chart_series.iter().map(scatter_series_ref),
         chart.data_labels.as_deref(),
-        ChartSeriesKind::Scatter,
-        ChartSeriesGrouping::Standard,
-        false,
+        (
+          ChartSeriesKind::Scatter,
+          ChartSeriesGrouping::Standard,
+          false,
+        ),
         ui_language,
       ),
       c::PlotAreaChoice::BarChart(chart) => {
@@ -558,13 +562,15 @@ pub fn cartesian_chart_for_ui_language<'a>(
           &mut categories,
           chart.bar_chart_series.iter().map(bar_series_ref),
           chart.data_labels.as_deref(),
-          if chart.bar_direction.val == c::BarDirectionValues::Bar {
-            ChartSeriesKind::Bar
-          } else {
-            ChartSeriesKind::Column
-          },
-          bar_grouping(chart.bar_grouping.as_ref()),
-          false,
+          (
+            if chart.bar_direction.val == c::BarDirectionValues::Bar {
+              ChartSeriesKind::Bar
+            } else {
+              ChartSeriesKind::Column
+            },
+            bar_grouping(chart.bar_grouping.as_ref()),
+            false,
+          ),
           ui_language,
         );
       }
@@ -581,13 +587,15 @@ pub fn cartesian_chart_for_ui_language<'a>(
           &mut categories,
           chart.bar_chart_series.iter().map(bar_series_ref),
           chart.data_labels.as_deref(),
-          if chart.bar_direction.val == c::BarDirectionValues::Bar {
-            ChartSeriesKind::Bar
-          } else {
-            ChartSeriesKind::Column
-          },
-          bar_grouping(chart.bar_grouping.as_ref()),
-          true,
+          (
+            if chart.bar_direction.val == c::BarDirectionValues::Bar {
+              ChartSeriesKind::Bar
+            } else {
+              ChartSeriesKind::Column
+            },
+            bar_grouping(chart.bar_grouping.as_ref()),
+            true,
+          ),
           ui_language,
         );
       }
@@ -596,9 +604,11 @@ pub fn cartesian_chart_for_ui_language<'a>(
         &mut categories,
         chart.surface_chart_series.iter().map(surface_series_ref),
         None,
-        ChartSeriesKind::Surface,
-        ChartSeriesGrouping::Standard,
-        false,
+        (
+          ChartSeriesKind::Surface,
+          ChartSeriesGrouping::Standard,
+          false,
+        ),
         ui_language,
       ),
       c::PlotAreaChoice::Surface3DChart(chart) => append_cartesian_series(
@@ -606,9 +616,11 @@ pub fn cartesian_chart_for_ui_language<'a>(
         &mut categories,
         chart.surface_chart_series.iter().map(surface_series_ref),
         None,
-        ChartSeriesKind::Surface,
-        ChartSeriesGrouping::Standard,
-        true,
+        (
+          ChartSeriesKind::Surface,
+          ChartSeriesGrouping::Standard,
+          true,
+        ),
         ui_language,
       ),
       c::PlotAreaChoice::BubbleChart(chart) => append_cartesian_series(
@@ -616,9 +628,11 @@ pub fn cartesian_chart_for_ui_language<'a>(
         &mut categories,
         chart.bubble_chart_series.iter().map(bubble_series_ref),
         chart.data_labels.as_deref(),
-        ChartSeriesKind::Bubble,
-        ChartSeriesGrouping::Standard,
-        false,
+        (
+          ChartSeriesKind::Bubble,
+          ChartSeriesGrouping::Standard,
+          false,
+        ),
         ui_language,
       ),
       c::PlotAreaChoice::PieChart(_)
@@ -771,11 +785,10 @@ fn append_cartesian_series<'a>(
   categories: &mut Vec<String>,
   sources: impl Iterator<Item = ChartSeriesRef<'a>>,
   chart_group_labels: Option<&'a c::DataLabels>,
-  kind: ChartSeriesKind,
-  grouping: ChartSeriesGrouping,
-  is_3d: bool,
+  series_spec: (ChartSeriesKind, ChartSeriesGrouping, bool),
   ui_language: Option<&str>,
 ) {
+  let (kind, grouping, is_3d) = series_spec;
   for source in sources {
     let series_index = target.len() + 1;
     let name = source
@@ -819,10 +832,12 @@ fn append_cartesian_series<'a>(
         &label_categories,
         &values,
         (!bubble_sizes.is_empty()).then_some(bubble_sizes.as_slice()),
-        series_number_format_code(source),
-        default_data_label_position(kind),
-        false,
-        "; ",
+        DataLabelDefaults {
+          value_format_code: series_number_format_code(source),
+          position: default_data_label_position(kind),
+          supports_percent: false,
+          separator: "; ",
+        },
       ),
       values,
       number_format_code: series_number_format_code(source),
@@ -1031,6 +1046,25 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
     .map(series_text_value)
     .filter(|value| !value.is_empty())
     .unwrap_or_else(|| default_series_label(series_ref, 1, None));
+  let title = match chart_title_text(&chart_space.chart) {
+    None
+      if chart_space
+        .chart
+        .title
+        .as_deref()
+        .is_some_and(|title| explicit_title_text(title).is_none())
+        && chart_automatic_title_is_visible(&chart_space.chart)
+        && pie_series.len() == 1
+        && !series_name.is_empty() =>
+    {
+      // LibreOffice ChartSpaceConverter::convertFromModel derives the
+      // automatic chart title from the series title when the plot contains
+      // exactly one series. Office fixed output follows the same rule for an
+      // empty c:title with c:autoTitleDeleted=false.
+      Some(ChartTitleText::Explicit(series_name.clone()))
+    }
+    title => title,
+  };
   let series_labels_deleted = series.data_labels.as_deref().is_some_and(|labels| {
     matches!(
       labels.data_labels_choice.as_ref(),
@@ -1049,14 +1083,16 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
     &categories,
     &values,
     None,
-    series_number_format_code(series_ref),
-    if radial_kind == RadialChartKind::Doughnut {
-      c::DataLabelPositionValues::Center
-    } else {
-      c::DataLabelPositionValues::BestFit
+    DataLabelDefaults {
+      value_format_code: series_number_format_code(series_ref),
+      position: if radial_kind == RadialChartKind::Doughnut {
+        c::DataLabelPositionValues::Center
+      } else {
+        c::DataLabelPositionValues::BestFit
+      },
+      supports_percent: true,
+      separator: " ",
     },
-    true,
-    " ",
   );
   // LibreOffice writes a series-level delete marker for doughnut remainder
   // points while retaining chart-group percentage labels. Office applies the
@@ -1120,7 +1156,7 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
 
   Some(PieChartModel {
     kind: radial_kind,
-    title: chart_title_text(&chart_space.chart),
+    title,
     series_name,
     categories,
     values,
@@ -1260,6 +1296,13 @@ fn shape_properties_are_visible(properties: &c::ShapeProperties) -> bool {
     || properties.shape_properties_extension_list.is_some()
 }
 
+struct DataLabelDefaults<'a> {
+  value_format_code: Option<&'a str>,
+  position: c::DataLabelPositionValues,
+  supports_percent: bool,
+  separator: &'a str,
+}
+
 fn resolved_data_labels<'a>(
   series_labels: Option<&'a c::DataLabels>,
   chart_group_labels: Option<&'a c::DataLabels>,
@@ -1267,24 +1310,21 @@ fn resolved_data_labels<'a>(
   categories: &[String],
   values: &[Option<f64>],
   bubble_sizes: Option<&[Option<f64>]>,
-  value_format_code: Option<&'a str>,
-  default_position: c::DataLabelPositionValues,
-  supports_percent: bool,
-  default_separator: &'a str,
+  defaults: DataLabelDefaults<'a>,
 ) -> Vec<ClusteredColumnDataLabel> {
   // ECMA-376 Part 1 §21.2.2.49 defines c:dLbls as the settings for an
   // entire series or chart. MS-OI29500 §21.2.2.49 adds the Office override
   // hierarchy: chart-group dLbls < series dLbls < individual dLbl. Expand the
   // resolved series settings across every point, then apply point overrides.
   let mut settings = ClusteredColumnDataLabelSettings {
-    separator: default_separator,
-    position: default_position,
-    value_format_code,
+    separator: defaults.separator,
+    position: defaults.position,
+    value_format_code: defaults.value_format_code,
     ..ClusteredColumnDataLabelSettings::default()
   };
   apply_data_labels_settings(&mut settings, chart_group_labels);
   apply_data_labels_settings(&mut settings, series_labels);
-  if !supports_percent {
+  if !defaults.supports_percent {
     settings.show_percent = false;
   }
   if bubble_sizes.is_none() {
@@ -1827,22 +1867,23 @@ pub fn kind(chart_space: &c::ChartSpace) -> ChartKind {
     .plot_area
     .plot_area_choice1
     .iter()
-    .find_map(|choice| match choice {
+    .map(|choice| match choice {
       c::PlotAreaChoice::PieChart(_)
       | c::PlotAreaChoice::Pie3DChart(_)
       | c::PlotAreaChoice::DoughnutChart(_)
-      | c::PlotAreaChoice::OfPieChart(_) => Some(ChartKind::Pie),
-      c::PlotAreaChoice::BarChart(_) | c::PlotAreaChoice::Bar3DChart(_) => Some(ChartKind::Bar),
-      c::PlotAreaChoice::AreaChart(_) | c::PlotAreaChoice::Area3DChart(_) => Some(ChartKind::Area),
-      c::PlotAreaChoice::LineChart(_) | c::PlotAreaChoice::Line3DChart(_) => Some(ChartKind::Line),
-      c::PlotAreaChoice::ScatterChart(_) => Some(ChartKind::Scatter),
-      c::PlotAreaChoice::BubbleChart(_) => Some(ChartKind::Bubble),
-      c::PlotAreaChoice::RadarChart(_) => Some(ChartKind::Radar),
-      c::PlotAreaChoice::StockChart(_) => Some(ChartKind::Stock),
+      | c::PlotAreaChoice::OfPieChart(_) => ChartKind::Pie,
+      c::PlotAreaChoice::BarChart(_) | c::PlotAreaChoice::Bar3DChart(_) => ChartKind::Bar,
+      c::PlotAreaChoice::AreaChart(_) | c::PlotAreaChoice::Area3DChart(_) => ChartKind::Area,
+      c::PlotAreaChoice::LineChart(_) | c::PlotAreaChoice::Line3DChart(_) => ChartKind::Line,
+      c::PlotAreaChoice::ScatterChart(_) => ChartKind::Scatter,
+      c::PlotAreaChoice::BubbleChart(_) => ChartKind::Bubble,
+      c::PlotAreaChoice::RadarChart(_) => ChartKind::Radar,
+      c::PlotAreaChoice::StockChart(_) => ChartKind::Stock,
       c::PlotAreaChoice::SurfaceChart(_) | c::PlotAreaChoice::Surface3DChart(_) => {
-        Some(ChartKind::Surface)
+        ChartKind::Surface
       }
     })
+    .next()
     .unwrap_or(ChartKind::Other)
 }
 
@@ -2215,17 +2256,6 @@ pub fn fixed_chart_title_for_ui_language(
   match chart_title_text(&chart_space.chart) {
     Some(ChartTitleText::Explicit(title)) => Some(normalize_fixed_chart_title(&title)),
     Some(ChartTitleText::Automatic) => Some(automatic_chart_title(ui_language).to_string()),
-    None
-      if kind(chart_space) != ChartKind::Pie
-        && chart_space
-          .chart
-          .title
-          .as_deref()
-          .is_some_and(|title| title.chart_text.is_none())
-        && chart_automatic_title_is_visible(&chart_space.chart) =>
-    {
-      Some(automatic_chart_title(ui_language).to_string())
-    }
     None => None,
   }
 }
@@ -3296,15 +3326,7 @@ pub fn chart_shape_outline_solid_fill(
 
 fn chart_title_text(chart: &c::Chart) -> Option<ChartTitleText> {
   if let Some(title) = chart.title.as_deref() {
-    if let Some(chart_text) = title.chart_text.as_deref() {
-      let mut values = Vec::new();
-      push_chart_text(&mut values, chart_text);
-      let value = values.join(" ");
-      if !value.is_empty() {
-        return Some(ChartTitleText::Explicit(value));
-      }
-    }
-    return Some(ChartTitleText::Automatic);
+    return explicit_title_text(title).map(ChartTitleText::Explicit);
   }
 
   chart_automatic_title_is_visible(chart).then_some(ChartTitleText::Automatic)
@@ -3331,16 +3353,22 @@ pub fn has_powerpoint_automatic_title_placeholder(chart: &c::Chart) -> bool {
   }) && chart_automatic_title_is_visible(chart)
 }
 
-pub fn has_excel_automatic_title_placeholder(chart: &c::Chart) -> bool {
-  // Excel's generated title slot may omit c:layout but still carries the
-  // empty title text properties and an explicit autoTitleDeleted=false.
-  // The spreadsheet host applies this only after selecting a supported chart
-  // renderer; generic fallback text must not expose an editor placeholder.
+pub fn has_word_automatic_title_placeholder(chart: &c::Chart) -> bool {
+  // Word fixed output materializes its automatic chart title for an authored
+  // empty c:title with autoTitleDeleted=false. Keep this host policy outside
+  // the shared title parser because Excel preserves the same markup as empty.
   chart
     .title
     .as_deref()
-    .is_some_and(|title| title.chart_text.is_none() && title.text_properties.is_some())
+    .is_some_and(|title| explicit_title_text(title).is_none())
     && chart_automatic_title_is_visible(chart)
+}
+
+pub fn has_excel_automatic_title_placeholder(chart: &c::Chart) -> bool {
+  // MS-OI29500 §2.1.1431: Office applies autoTitleDeleted only when c:title is
+  // absent. An empty c:title is an authored, empty title in Excel fixed
+  // output, even when it retains editing text properties.
+  chart.title.is_none() && chart_automatic_title_is_visible(chart)
 }
 
 fn chart_automatic_title_is_visible(chart: &c::Chart) -> bool {
@@ -4010,11 +4038,8 @@ mod tests {
 
   #[test]
   fn general_number_format_uses_short_decimal_output_not_scientific_notation() {
-    assert_eq!(format_chart_number(30.800000000000_001, None), "30.8");
-    assert_eq!(
-      format_chart_number(66.790000000000_006, Some("General")),
-      "66.79"
-    );
+    assert_eq!(format_chart_number(30.8, None), "30.8");
+    assert_eq!(format_chart_number(66.79, Some("General")), "66.79");
     assert_eq!(format_chart_number(2.0e-9, Some("0.0E+00")), "2.0E-09");
   }
 
@@ -4038,6 +4063,20 @@ mod tests {
     assert_eq!(
       fixed_output_texts_for_ui_language(&chart_space, None),
       ["A 34%", "B 33%", "C 33%"]
+    );
+  }
+
+  #[test]
+  fn single_series_pie_uses_its_series_name_as_the_automatic_title() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:title/><c:autoTitleDeleted val="0"/><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Sales</c:v></c:tx><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+
+    let pie = pie_chart_model(&chart_space).expect("pie chart");
+    assert_eq!(
+      pie.title,
+      Some(ChartTitleText::Explicit("Sales".to_string()))
     );
   }
 
@@ -4123,23 +4162,20 @@ mod tests {
       br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:title/><c:autoTitleDeleted val="0"/><c:plotArea/></c:chart></c:chartSpace>"#,
     )
     .expect("chart space");
-    assert_eq!(
-      chart_title_text(&empty_title.chart),
-      Some(ChartTitleText::Automatic)
-    );
+    assert_eq!(chart_title_text(&empty_title.chart), None);
 
     let placeholder_title = c::ChartSpace::from_bytes(
       br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:title><c:layout/><c:txPr><a:bodyPr/><a:lstStyle/><a:p/></c:txPr></c:title><c:autoTitleDeleted val="0"/><c:plotArea/></c:chart></c:chartSpace>"#,
     )
     .expect("chart space");
-    assert_eq!(
-      chart_title_text(&placeholder_title.chart),
-      Some(ChartTitleText::Automatic)
-    );
+    assert_eq!(chart_title_text(&placeholder_title.chart), None);
     assert!(super::has_powerpoint_automatic_title_placeholder(
       &placeholder_title.chart
     ));
-    assert!(super::has_excel_automatic_title_placeholder(
+    assert!(super::has_word_automatic_title_placeholder(
+      &placeholder_title.chart
+    ));
+    assert!(!super::has_excel_automatic_title_placeholder(
       &placeholder_title.chart
     ));
 

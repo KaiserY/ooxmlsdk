@@ -831,22 +831,16 @@ fn build_style_font_registry(
         },
       );
     }
-    let mut registered = registry
+    let registered = registry
       .register_system_query_fonts(&request)
       .unwrap_or_default();
-    if registered == 0 {
-      registered += registry.register_office_fallback_path_font(&request);
-    }
     if registered == 0 {
       let mut fallback_request = font_request(style, script);
       fallback_request.script = script;
       fallback_request.family = None;
-      registered += registry
+      registry
         .register_system_query_fonts(&fallback_request)
         .unwrap_or_default();
-      if registered == 0 {
-        registry.register_office_fallback_path_font(&fallback_request);
-      }
     }
     registry
   })

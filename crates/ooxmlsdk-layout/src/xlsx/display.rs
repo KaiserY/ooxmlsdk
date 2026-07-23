@@ -191,7 +191,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
       PdfTextSegmentation::Portion => common::PdfTextSegmentation::Portion,
     },
-    source: (!item.source_path.is_empty()).then(|| common::DisplaySource {
+    source: (!item.source_path.is_empty()).then_some(common::DisplaySource {
       engine: common::LayoutEngineKind::Xlsx,
       path: item.source_path,
       relationship_id: None,
@@ -2180,10 +2180,6 @@ fn print_page_drawing_text_items(
       if width_pt <= 0.0 || height_pt <= 0.0 {
         continue;
       }
-      let text = drawing_anchor_text(drawing, anchor);
-      if text.trim().is_empty() {
-        continue;
-      }
       let (x_pt, y_pt) =
         page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
       let drawing_rect = CellRect {
@@ -2197,6 +2193,10 @@ fn print_page_drawing_text_items(
         && !chart_items.is_empty()
       {
         items.extend(chart_items);
+        continue;
+      }
+      let text = drawing_anchor_text(drawing, anchor);
+      if text.trim().is_empty() {
         continue;
       }
       let hyperlink_url = drawing_object_hyperlink_url(drawing, &anchor.object);

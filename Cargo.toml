@@ -61,6 +61,7 @@ pprof = { version = "0.15", features = ["criterion", "flamegraph"] }
 png = "0.18.1"
 toml = "1.1.3"
 fontdb = "0.23.0"
+fontique = { version = "0.11.0", features = ["fontconfig-dlopen", "system"] }
 harfrust = { version = "0.12.0", default-features = false, features = ["std"] }
 hypher = "0.1.7"
 icu_collator = { version = "2.2.1", features = ["compiled_data"] }

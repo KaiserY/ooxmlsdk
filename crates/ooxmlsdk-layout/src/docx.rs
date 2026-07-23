@@ -210,12 +210,12 @@ pub(crate) fn extract(
       }
     }
   }
-  if let Some(first_section) = sections.first_mut() {
-    if let Some(image) = page_background_image {
-      first_section
-        .blocks
-        .insert(0, page_background_image_block(image, first_section.page));
-    }
+  if let Some(first_section) = sections.first_mut()
+    && let Some(image) = page_background_image
+  {
+    first_section
+      .blocks
+      .insert(0, page_background_image_block(image, first_section.page));
   }
   for section in &mut sections {
     section.page.background = page_background;
@@ -1791,16 +1791,18 @@ impl NoteNumberingSpec {
   }
 }
 
+type NoteReferenceLabels = (
+  HashMap<i64, String>,
+  HashMap<i64, String>,
+  Vec<NoteNumberingSpec>,
+  Vec<NoteNumberingSpec>,
+);
+
 fn note_reference_labels(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   sections: &[ImportedSection],
-) -> (
-  HashMap<i64, String>,
-  HashMap<i64, String>,
-  Vec<NoteNumberingSpec>,
-  Vec<NoteNumberingSpec>,
-) {
+) -> NoteReferenceLabels {
   let settings = main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok());
@@ -8016,6 +8018,17 @@ fn drawing_chart_shapes(
   };
   title_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
   label_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
+  let chart_east_asia_font = if styles.simplified_chinese_ui {
+    Some(
+      styles
+        .theme_fonts
+        .resolve_drawingml_typeface_for_language("+mn-ea", Some("zh-CN")),
+    )
+  } else {
+    styles.doc_default_run.east_asia_font_family.clone()
+  };
+  title_style.east_asia_font_family = chart_east_asia_font.clone();
+  label_style.east_asia_font_family = chart_east_asia_font;
   let mut data_label_style = label_style.clone();
   if let Some(properties) = chart_space.text_properties.as_deref() {
     apply_chart_text_properties(&mut title_style, properties, styles);
@@ -8182,7 +8195,10 @@ fn apply_chart_text_properties(
     .and_then(|font| font.typeface.as_deref())
     .filter(|typeface| !typeface.trim().is_empty())
   {
-    style.fallback_font_family = Some(styles.theme_fonts.resolve_drawingml_typeface(typeface));
+    style.east_asia_font_family = Some(styles.theme_fonts.resolve_drawingml_typeface_for_language(
+      typeface,
+      styles.simplified_chinese_ui.then_some("zh-CN"),
+    ));
   }
   if let Some(a::DefaultRunPropertiesChoice::SolidFill(fill)) =
     properties.default_run_properties_choice1.as_ref()
@@ -11916,6 +11932,14 @@ impl ThemeFonts {
   }
 
   fn resolve_drawingml_typeface(&self, typeface: &str) -> Arc<str> {
+    self.resolve_drawingml_typeface_for_language(typeface, None)
+  }
+
+  fn resolve_drawingml_typeface_for_language(
+    &self,
+    typeface: &str,
+    fallback_east_asia_language: Option<&str>,
+  ) -> Arc<str> {
     match typeface {
       "+mj-lt" | "majorHAnsi" | "majorAscii" => self
         .supplemental(&self.major_supplemental, self.latin_language.as_deref())
@@ -11926,10 +11950,22 @@ impl ThemeFonts {
         .or_else(|| self.minor_high_ansi.clone())
         .or_else(|| self.minor_ascii.clone()),
       "+mj-ea" | "majorEastAsia" => self
-        .supplemental(&self.major_supplemental, self.east_asia_language.as_deref())
+        .supplemental(
+          &self.major_supplemental,
+          self
+            .east_asia_language
+            .as_deref()
+            .or(fallback_east_asia_language),
+        )
         .or_else(|| self.major_east_asia.clone()),
       "+mn-ea" | "minorEastAsia" => self
-        .supplemental(&self.minor_supplemental, self.east_asia_language.as_deref())
+        .supplemental(
+          &self.minor_supplemental,
+          self
+            .east_asia_language
+            .as_deref()
+            .or(fallback_east_asia_language),
+        )
         .or_else(|| self.minor_east_asia.clone()),
       "+mj-cs" | "majorBidi" => self
         .supplemental(&self.major_supplemental, self.bidi_language.as_deref())
@@ -15133,6 +15169,44 @@ mod tests {
       fonts.resolve(Some(w::ThemeFontValues::MajorEastAsia)),
       Some(Arc::from("SimSun"))
     );
+  }
+
+  #[test]
+  fn drawingml_east_asian_theme_font_uses_the_output_ui_language_as_fallback() {
+    let fonts = ThemeFonts {
+      minor_supplemental: vec![
+        (Arc::from("Hans"), Arc::from("DengXian")),
+        (Arc::from("Jpan"), Arc::from("Yu Mincho")),
+      ],
+      ..ThemeFonts::default()
+    };
+
+    assert_eq!(
+      fonts.resolve_drawingml_typeface_for_language("+mn-ea", Some("zh-CN")),
+      Arc::from("DengXian")
+    );
+  }
+
+  #[test]
+  fn chart_east_asian_typeface_populates_the_script_specific_font_slot() {
+    let properties = c::TextProperties::from_bytes(
+      br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:ea typeface="+mn-ea"/></a:defRPr></a:pPr></a:p></c:txPr>"#,
+    )
+    .expect("chart text properties");
+    let styles = StylesCatalog {
+      simplified_chinese_ui: true,
+      theme_fonts: ThemeFonts {
+        minor_supplemental: vec![(Arc::from("Hans"), Arc::from("DengXian"))],
+        ..ThemeFonts::default()
+      },
+      ..StylesCatalog::default()
+    };
+    let mut style = TextStyle::default();
+
+    apply_chart_text_properties(&mut style, &properties, &styles);
+
+    assert_eq!(style.east_asia_font_family, Some(Arc::from("DengXian")));
+    assert_eq!(style.fallback_font_family, None);
   }
 
   #[test]

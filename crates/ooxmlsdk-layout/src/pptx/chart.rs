@@ -956,27 +956,19 @@ pub(crate) fn lower_radial_chart(
       let color = style.point_colors[index % style.point_colors.len()];
       if depth > 0.0 {
         items.push(radial_segment_path(
-          center_x + offset_x,
-          center_y + offset_y + depth,
-          radius_x,
-          radius_y,
+          (center_x + offset_x, center_y + offset_y + depth),
+          (radius_x, radius_y),
           hole_ratio,
-          start_angle,
-          sweep,
-          color,
-          0.58,
+          (start_angle, sweep),
+          (color, 0.58),
         ));
       }
       items.push(radial_segment_path(
-        center_x + offset_x,
-        center_y + offset_y,
-        radius_x,
-        radius_y,
+        (center_x + offset_x, center_y + offset_y),
+        (radius_x, radius_y),
         hole_ratio,
-        start_angle,
-        sweep,
-        color,
-        1.0,
+        (start_angle, sweep),
+        (color, 1.0),
       ));
       start_angle += sweep;
     }
@@ -1098,15 +1090,11 @@ fn lower_of_pie_geometry(
   for (index, value) in primary {
     let sweep = (value / primary_total * std::f64::consts::TAU) as f32;
     items.push(radial_segment_path(
-      primary_center.0,
-      primary_center.1,
-      primary_radius,
-      primary_radius,
+      primary_center,
+      (primary_radius, primary_radius),
       0.0,
-      angle,
-      sweep,
-      style.point_colors[index % style.point_colors.len()],
-      1.0,
+      (angle, sweep),
+      (style.point_colors[index % style.point_colors.len()], 1.0),
     ));
     angle += sweep;
   }
@@ -1125,15 +1113,11 @@ fn lower_of_pie_geometry(
       };
       let sweep = (value / secondary * std::f64::consts::TAU) as f32;
       items.push(radial_segment_path(
-        secondary_center.0,
-        secondary_center.1,
-        secondary_radius,
-        secondary_radius,
+        secondary_center,
+        (secondary_radius, secondary_radius),
         0.0,
-        angle,
-        sweep,
-        style.point_colors[index % style.point_colors.len()],
-        1.0,
+        (angle, sweep),
+        (style.point_colors[index % style.point_colors.len()], 1.0),
       ));
       angle += sweep;
     }
@@ -1181,16 +1165,16 @@ fn lower_of_pie_geometry(
 }
 
 fn radial_segment_path(
-  center_x: f32,
-  center_y: f32,
-  radius_x: f32,
-  radius_y: f32,
+  center: (f32, f32),
+  radii: (f32, f32),
   hole_ratio: f32,
-  start_angle: f32,
-  sweep: f32,
-  color: RgbColor,
-  opacity: f32,
+  angles: (f32, f32),
+  paint: (RgbColor, f32),
 ) -> PageItem {
+  let (center_x, center_y) = center;
+  let (radius_x, radius_y) = radii;
+  let (start_angle, sweep) = angles;
+  let (color, opacity) = paint;
   let segment_count = ((sweep.to_degrees().abs() / 2.0).ceil() as usize).max(2);
   let mut points = Vec::with_capacity(segment_count * 2 + 3);
   if hole_ratio <= f32::EPSILON {
@@ -1482,30 +1466,10 @@ fn lower_series_geometry(
         lower_bar_series(items, &context, style, series_index, color);
       }
       ChartSeriesKind::Line | ChartSeriesKind::Stock => {
-        lower_line_series(
-          items,
-          chart,
-          series_index,
-          color,
-          plot,
-          scale,
-          category_count,
-          false,
-          style,
-        );
+        lower_line_series(items, &context, series_index, color, false, style);
       }
       ChartSeriesKind::Area | ChartSeriesKind::Surface => {
-        lower_line_series(
-          items,
-          chart,
-          series_index,
-          color,
-          plot,
-          scale,
-          category_count,
-          true,
-          style,
-        );
+        lower_line_series(items, &context, series_index, color, true, style);
       }
       ChartSeriesKind::Scatter => {
         lower_scatter_series(
@@ -1530,16 +1494,7 @@ fn lower_series_geometry(
         );
       }
       ChartSeriesKind::Radar => {
-        lower_radar_series(
-          items,
-          series,
-          series_index,
-          color,
-          plot,
-          scale,
-          style,
-          chart.category_axis_reversed,
-        );
+        lower_radar_series(items, &context, series, series_index, color, style);
       }
     }
     if !series.trendlines.is_empty() {
@@ -1905,15 +1860,16 @@ fn lower_bar_series(
 
 fn lower_line_series(
   items: &mut Vec<PageItem>,
-  chart: &ClusteredColumnChart<'_>,
+  context: &SeriesGeometryContext<'_, '_>,
   series_index: usize,
   color: RgbColor,
-  plot: PlotRect,
-  scale: crate::render::chart::LinearAxisScale,
-  category_count: usize,
   fill_to_axis: bool,
   style: &ClusteredColumnStyle,
 ) {
+  let chart = context.chart;
+  let plot = context.plot;
+  let scale = context.scale;
+  let category_count = context.category_count;
   let series = &chart.series[series_index];
   let mut previous = None;
   if fill_to_axis {
@@ -2281,14 +2237,15 @@ fn chart_point_color(
 
 fn lower_radar_series(
   items: &mut Vec<PageItem>,
+  context: &SeriesGeometryContext<'_, '_>,
   series: &crate::render::chart::ClusteredColumnSeries<'_>,
   series_index: usize,
   color: RgbColor,
-  plot: PlotRect,
-  scale: crate::render::chart::LinearAxisScale,
   style: &ClusteredColumnStyle,
-  category_reversed: bool,
 ) {
+  let plot = context.plot;
+  let scale = context.scale;
+  let category_reversed = context.chart.category_axis_reversed;
   let count = series.values.len();
   if count < 2 {
     return;

@@ -9,6 +9,13 @@ use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::Instant;
 
 use fontdb::{Database as FontDatabase, Source as FontDbSource};
+use fontique::{
+  Attributes as PlatformFontAttributes, Collection as PlatformFontCollection,
+  CollectionOptions as PlatformFontCollectionOptions, FontStyle as PlatformFontStyle,
+  FontWeight as PlatformFontWeight, FontWidth as PlatformFontWidth,
+  GenericFamily as PlatformGenericFamily, QueryFamily as PlatformQueryFamily,
+  QueryStatus as PlatformQueryStatus, SourceCache as PlatformSourceCache,
+};
 use harfrust::{
   Direction as HarfDirection, Feature as HarfFeature, FontRef as HarfFontRef,
   Language as HarfLanguage, Script as HarfScript, ShapeOptions as HarfShapeOptions, ShapePlan,
@@ -318,11 +325,98 @@ impl<'a> FontRegistry<'a> {
       queries.push(FontDbQueryFamily::SansSerif);
       queries.push(FontDbQueryFamily::Serif);
     } else {
+      // `fontdb` scans platform font sources but does not guarantee that its
+      // CSS generic-family names are configured on every backend. Resolve the
+      // Office/script fallback chain by family name before asking for the
+      // generic aliases, so an unspecified OOXML typeface still produces a
+      // portable, shapeable system face.
+      for family in self.fallback_families(request) {
+        queries.push(FontDbQueryFamily::Name(family.to_owned()));
+      }
       queries.push(FontDbQueryFamily::SansSerif);
       queries.push(FontDbQueryFamily::Serif);
     }
 
     for query_family in queries {
+      let platform_fonts = font_timing("platform font query", || {
+        platform_system_query_fonts(&query_family, request)
+      });
+      let mut platform_matched = false;
+      for platform_font in platform_fonts {
+        let Ok(mut face) = FontFaceInfo::from_ttf_bytes(
+          "platform-system-query",
+          &platform_font.data,
+          platform_font.face_index,
+        ) else {
+          continue;
+        };
+        let matched_legacy_postscript_name = if let FontDbQueryFamily::Name(family) = &query_family
+        {
+          let normalized = normalize_family(family);
+          if !family_matches_names(&face, std::slice::from_ref(&normalized))
+            && !face
+              .postscript_name
+              .as_deref()
+              .is_some_and(|name| normalized_family_eq_normalized(name, &normalized))
+          {
+            continue;
+          }
+          face
+            .postscript_name
+            .as_deref()
+            .is_some_and(|name| normalized_family_eq_normalized(name, &normalized))
+        } else {
+          false
+        };
+        platform_matched = true;
+        if matched_legacy_postscript_name && let FontDbQueryFamily::Name(family) = &query_family {
+          // Fontique matched this platform family name even when it is a
+          // legacy name that is not the face's preferred OpenType family.
+          // Preserve that evidence so the Office resolver can still select
+          // the requested family instead of falling through to a later
+          // Office/script fallback.
+          push_unique_string(&mut face.family_names, family.clone());
+        }
+        let postscript_name = face
+          .postscript_name
+          .as_deref()
+          .or_else(|| face.family_names.first().map(Cow::as_ref))
+          .unwrap_or("unknown");
+        let font_id = format!(
+          "system-query:{}:{}",
+          postscript_name, platform_font.face_index
+        );
+        if self
+          .sources
+          .iter()
+          .any(|source| source.id() == Some(font_id.as_str()))
+        {
+          if let Some(existing) = self
+            .book
+            .faces
+            .iter_mut()
+            .find(|existing| existing.font_id.0.as_ref() == font_id)
+            && matched_legacy_postscript_name
+            && let FontDbQueryFamily::Name(family) = &query_family
+          {
+            push_unique_string(&mut existing.family_names, family.clone());
+          }
+          continue;
+        }
+        face.font_id = FontId(Arc::from(font_id.as_str()));
+        self.register_face(
+          FontSource::Memory {
+            id: Cow::Owned(font_id),
+            data: platform_font.data.into(),
+          },
+          face,
+        );
+        registered += 1;
+      }
+      if platform_matched {
+        continue;
+      }
+
       let Some(id) = font_timing("fontdb query", || query_family.query(database, request)) else {
         continue;
       };
@@ -422,67 +516,6 @@ impl<'a> FontRegistry<'a> {
       face,
     );
     Ok(font_id)
-  }
-
-  pub fn register_office_fallback_path_fonts(&mut self, request: &FontRequest<'_>) -> usize {
-    let mut paths: Vec<&'static str> = Vec::new();
-    if let Some(family) = request.family.as_deref() {
-      paths.extend(office_fallback_font_paths(
-        family,
-        request.bold,
-        request.italic,
-      ));
-      paths.extend(generic_fallback_font_paths(request.bold, request.italic));
-    } else {
-      paths.extend(generic_fallback_font_paths(request.bold, request.italic));
-    }
-    let mut registered = 0usize;
-    for path in paths {
-      let path = Path::new(path);
-      if !path.exists() {
-        continue;
-      }
-      let id = format!("fallback-path:{}", path.display());
-      if self.register_path_font(id, path).is_ok() {
-        registered += 1;
-      }
-    }
-    registered
-  }
-
-  pub fn register_office_fallback_path_font(&mut self, request: &FontRequest<'_>) -> usize {
-    let mut paths: Vec<&'static str> = Vec::new();
-    if let Some(family) = request.family.as_deref() {
-      paths.extend(office_fallback_font_paths(
-        family,
-        request.bold,
-        request.italic,
-      ));
-    }
-    paths.extend(generic_fallback_font_paths(request.bold, request.italic));
-
-    let cjk_first = request.script.is_some_and(|script| {
-      matches!(
-        script,
-        TextScript::Han | TextScript::Hiragana | TextScript::Katakana | TextScript::Hangul
-      )
-    });
-    paths.sort_by_key(|path| {
-      let is_cjk = path.contains("CJK");
-      if cjk_first { !is_cjk } else { is_cjk }
-    });
-
-    for path in paths {
-      let path = Path::new(path);
-      if !path.exists() {
-        continue;
-      }
-      let id = format!("fallback-path:{}", path.display());
-      if self.register_path_font(id, path).is_ok() {
-        return 1;
-      }
-    }
-    0
   }
 
   fn register_ttf_source(&mut self, source: FontSource<'a>) -> Result<FontId> {
@@ -2668,6 +2701,10 @@ pub enum TextScript {
 const DEFAULT_OFFICE_ALIASES: &[(&str, &str)] = &[
   ("Courier", "Courier New"),
   ("TimesNewRomanPSMT", "Times New Roman"),
+  // Office documents can store the Simplified Chinese localized family name,
+  // while the same installed face is commonly exposed to fontdb under its
+  // English family name.
+  ("等线", "DengXian"),
   // Legacy Office workbooks use the old Windows localized family name,
   // while current Excel substitutes the installed Arial face.
   ("Arial Cyr", "Arial"),
@@ -2810,169 +2847,6 @@ fn office_family_fallback<'a>(
       .iter()
       .map(|family| Cow::Borrowed(*family))
       .collect(),
-  }
-}
-
-pub fn office_fallback_font_paths(
-  family: &str,
-  bold: bool,
-  italic: bool,
-) -> &'static [&'static str] {
-  if family.eq_ignore_ascii_case("Calibri") {
-    return match (bold, italic) {
-      (true, true) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/calibriz.ttf",
-        "/usr/share/fonts/truetype/crosextra/Carlito-BoldItalic.ttf",
-      ],
-      (true, false) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/calibrib.ttf",
-        "/usr/share/fonts/truetype/crosextra/Carlito-Bold.ttf",
-      ],
-      (false, true) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/calibrii.ttf",
-        "/usr/share/fonts/truetype/crosextra/Carlito-Italic.ttf",
-      ],
-      (false, false) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/calibri.ttf",
-        "/usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf",
-      ],
-    };
-  }
-  if family.eq_ignore_ascii_case("Calibri Light") {
-    return match (bold, italic) {
-      (true, true) => &[
-        "/usr/share/fonts/truetype/Fonts/calibriz.ttf",
-        "/usr/share/fonts/truetype/Fonts/calibrib.ttf",
-      ],
-      (true, false) => &[
-        "/usr/share/fonts/truetype/Fonts/calibrib.ttf",
-        "/usr/share/fonts/truetype/Fonts/calibril.ttf",
-      ],
-      (false, true) => &[
-        "/usr/share/fonts/truetype/Fonts/calibrili.ttf",
-        "/usr/share/fonts/truetype/Fonts/calibril.ttf",
-      ],
-      (false, false) => &["/usr/share/fonts/truetype/Fonts/calibril.ttf"],
-    };
-  }
-  if family.eq_ignore_ascii_case("Times New Roman") {
-    return match (bold, italic) {
-      (true, true) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/timesbi.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSerif-BoldItalic.ttf",
-      ],
-      (true, false) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/timesbd.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSerif-Bold.ttf",
-      ],
-      (false, true) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/timesi.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSerif-Italic.ttf",
-      ],
-      (false, false) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/times.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSerif-Regular.ttf",
-      ],
-    };
-  }
-  if family.eq_ignore_ascii_case("TimesNewRomanPSMT") {
-    return match italic {
-      true => &[
-        "/usr/share/fonts/truetype/msttcorefonts/timesi.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Italic.ttf",
-      ],
-      false => &[
-        "/usr/share/fonts/truetype/msttcorefonts/times.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf",
-      ],
-    };
-  }
-  if family.eq_ignore_ascii_case("Courier") {
-    return match (bold, italic) {
-      (true, true) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/courbi.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Courier_New_Bold_Italic.ttf",
-      ],
-      (true, false) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/courbd.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Courier_New_Bold.ttf",
-      ],
-      (false, true) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/couri.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Courier_New_Italic.ttf",
-      ],
-      (false, false) => &[
-        "/usr/share/fonts/truetype/msttcorefonts/cour.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Courier_New.ttf",
-      ],
-    };
-  }
-  if family.eq_ignore_ascii_case("Arial Black") {
-    return match italic {
-      true => &[
-        "/usr/share/fonts/truetype/msttcorefonts/ariblk.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSans-BoldItalic.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
-      ],
-      false => &[
-        "/usr/share/fonts/truetype/msttcorefonts/ariblk.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
-      ],
-    };
-  }
-  if family.eq_ignore_ascii_case("Yu Gothic") || family.eq_ignore_ascii_case("游ゴシック") {
-    return match (bold, italic) {
-      (true, true) | (true, false) => &[
-        "/usr/share/fonts/truetype/Fonts/YuGothB.ttc",
-        "/usr/share/fonts/truetype/Fonts/YuGothR.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-      ],
-      (false, true) | (false, false) => &[
-        "/usr/share/fonts/truetype/Fonts/YuGothR.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-      ],
-    };
-  }
-  if family.eq_ignore_ascii_case("BIZ UD明朝 Medium")
-    || family.eq_ignore_ascii_case("BIZ UD明朝")
-    || family.eq_ignore_ascii_case("BIZ UDMincho Medium")
-    || family.eq_ignore_ascii_case("BIZ UDMincho")
-  {
-    return &[
-      "/usr/share/fonts/truetype/Fonts/BIZ-UDMinchoM.ttc",
-      "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
-    ];
-  }
-  &[]
-}
-
-pub fn generic_fallback_font_paths(bold: bool, italic: bool) -> &'static [&'static str] {
-  match (bold, italic) {
-    (true, true) => &[
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf",
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-      "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    ],
-    (true, false) => &[
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-      "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    ],
-    (false, true) => &[
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    ],
-    (false, false) => &[
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-      "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-      "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
-      "/usr/share/fonts/truetype/ubuntu/Ubuntu[wdth,wght].ttf",
-    ],
   }
 }
 
@@ -3185,6 +3059,106 @@ enum FontDbQueryFamily {
   Name(String),
   SansSerif,
   Serif,
+}
+
+struct PlatformFontSystem {
+  collection: PlatformFontCollection,
+  source_cache: PlatformSourceCache,
+}
+
+impl PlatformFontSystem {
+  fn new() -> Self {
+    Self {
+      collection: PlatformFontCollection::new(PlatformFontCollectionOptions {
+        shared: false,
+        system_fonts: true,
+      }),
+      source_cache: PlatformSourceCache::default(),
+    }
+  }
+}
+
+struct PlatformFontCandidate {
+  data: Vec<u8>,
+  face_index: u32,
+}
+
+fn platform_system_query_fonts(
+  query_family: &FontDbQueryFamily,
+  request: &FontRequest<'_>,
+) -> Vec<PlatformFontCandidate> {
+  static SYSTEM: OnceLock<Mutex<PlatformFontSystem>> = OnceLock::new();
+
+  let mut system = SYSTEM
+    .get_or_init(|| Mutex::new(PlatformFontSystem::new()))
+    .lock()
+    .unwrap_or_else(std::sync::PoisonError::into_inner);
+  let PlatformFontSystem {
+    collection,
+    source_cache,
+  } = &mut *system;
+  let family = match query_family {
+    FontDbQueryFamily::Name(name) => PlatformQueryFamily::Named(name),
+    FontDbQueryFamily::SansSerif => PlatformQueryFamily::Generic(PlatformGenericFamily::SansSerif),
+    FontDbQueryFamily::Serif => PlatformQueryFamily::Generic(PlatformGenericFamily::Serif),
+  };
+  let mut query = collection.query(source_cache);
+  query.set_families([family]);
+  query.set_attributes(PlatformFontAttributes::new(
+    platform_font_width(request),
+    platform_font_style(request),
+    platform_font_weight(request),
+  ));
+
+  let mut candidates = Vec::new();
+  query.matches_with(|font| {
+    candidates.push(PlatformFontCandidate {
+      data: font.blob.as_ref().to_vec(),
+      face_index: font.index,
+    });
+    if candidates.len() >= 32 {
+      PlatformQueryStatus::Stop
+    } else {
+      PlatformQueryStatus::Continue
+    }
+  });
+  candidates
+}
+
+fn platform_font_weight(request: &FontRequest<'_>) -> PlatformFontWeight {
+  match requested_weight(request) {
+    FontWeight::Thin => PlatformFontWeight::THIN,
+    FontWeight::ExtraLight => PlatformFontWeight::EXTRA_LIGHT,
+    FontWeight::Light => PlatformFontWeight::LIGHT,
+    FontWeight::Normal => PlatformFontWeight::NORMAL,
+    FontWeight::Medium => PlatformFontWeight::MEDIUM,
+    FontWeight::SemiBold => PlatformFontWeight::SEMI_BOLD,
+    FontWeight::Bold => PlatformFontWeight::BOLD,
+    FontWeight::ExtraBold => PlatformFontWeight::EXTRA_BOLD,
+    FontWeight::Black => PlatformFontWeight::BLACK,
+  }
+}
+
+fn platform_font_style(request: &FontRequest<'_>) -> PlatformFontStyle {
+  match requested_slant(request) {
+    FontSlant::Italic => PlatformFontStyle::Italic,
+    FontSlant::Oblique => PlatformFontStyle::Oblique(None),
+    FontSlant::Upright => PlatformFontStyle::Normal,
+  }
+}
+
+fn platform_font_width(request: &FontRequest<'_>) -> PlatformFontWidth {
+  match request.stretch.unwrap_or_default() {
+    FontStretch::UltraCondensed => PlatformFontWidth::ULTRA_CONDENSED,
+    FontStretch::ExtraCondensed => PlatformFontWidth::EXTRA_CONDENSED,
+    FontStretch::Condensed => PlatformFontWidth::CONDENSED,
+    FontStretch::SemiCondensed => PlatformFontWidth::SEMI_CONDENSED,
+    FontStretch::Normal => PlatformFontWidth::NORMAL,
+    FontStretch::SemiExpanded => PlatformFontWidth::SEMI_EXPANDED,
+    FontStretch::Expanded => PlatformFontWidth::EXPANDED,
+    FontStretch::ExtraExpanded => PlatformFontWidth::EXTRA_EXPANDED,
+    FontStretch::UltraExpanded => PlatformFontWidth::ULTRA_EXPANDED,
+  }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -4317,6 +4291,41 @@ mod tests {
   use super::*;
 
   #[test]
+  fn default_office_policy_maps_localized_dengxian_family() {
+    let mut registry = FontRegistry::with_default_policy();
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("dengxian", "DengXian"),
+    );
+
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("等线")),
+      ..FontRequest::default()
+    };
+    let resolved = registry.resolve(&request).unwrap();
+
+    assert_eq!(resolved.font_id, FontId(Arc::from("dengxian")));
+    assert_eq!(resolved.resolved_family, Cow::Borrowed("DengXian"));
+  }
+
+  #[test]
+  fn unspecified_family_registers_a_shapeable_database_fallback() {
+    let mut registry = FontRegistry::with_default_policy();
+    let request = FontRequest::default();
+
+    let registered = registry.register_system_query_fonts(&request).unwrap();
+    let resolved = registry.resolve(&request).unwrap();
+
+    assert!(registered > 0);
+    assert!(registry.sources.iter().all(|source| {
+      !source
+        .id()
+        .is_some_and(|id| id.starts_with("fallback-path:"))
+    }));
+    assert!(registry.font_face_binary(&resolved.font_id).is_some());
+  }
+
+  #[test]
   fn system_font_query_cache_stays_bounded() {
     let mut cache = SystemFontQueryCache::default();
     for index in 0..=SYSTEM_FONT_QUERY_CACHE_ENTRIES {
@@ -4495,8 +4504,10 @@ mod tests {
 
   #[test]
   fn system_query_prefers_installed_calibri_light_face() {
-    let path = Path::new("/usr/share/fonts/truetype/Fonts/calibril.ttf");
-    if !path.exists() {
+    if !system_font_database()
+      .faces()
+      .any(|face| face.post_script_name.contains("Calibri-Light"))
+    {
       return;
     }
     let mut registry = FontRegistry::with_default_policy();
@@ -4533,8 +4544,10 @@ mod tests {
 
   #[test]
   fn system_query_prefers_installed_aptos_face_over_display_alias() {
-    let path = Path::new("/usr/share/fonts/truetype/aptos/Aptos.ttf");
-    if !path.exists() {
+    if !system_font_database()
+      .faces()
+      .any(|face| face.post_script_name == "Aptos")
+    {
       return;
     }
     let mut registry = FontRegistry::with_default_policy();
@@ -4555,8 +4568,10 @@ mod tests {
 
   #[test]
   fn system_query_prefers_installed_noto_sans_face_over_condensed_alias() {
-    let path = Path::new("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf");
-    if !path.exists() {
+    if !system_font_database()
+      .faces()
+      .any(|face| face.post_script_name == "NotoSans-Regular")
+    {
       return;
     }
     let mut registry = FontRegistry::with_default_policy();

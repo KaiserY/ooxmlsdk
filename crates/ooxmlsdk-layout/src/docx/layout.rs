@@ -8258,6 +8258,10 @@ fn lower_inline_chart(
   else {
     return lower_generic_inline_chart(chart, x_pt, y_pt, width_pt, height_pt);
   };
+  if model.title.is_none() && shared_chart::has_word_automatic_title_placeholder(&chart_space.chart)
+  {
+    model.title = Some(shared_chart::ChartTitleText::Automatic);
+  }
   if matches!(model.title, Some(shared_chart::ChartTitleText::Automatic))
     && chart_space.chart.title.is_none()
   {

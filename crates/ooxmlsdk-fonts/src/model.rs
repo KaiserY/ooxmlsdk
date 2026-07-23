@@ -995,13 +995,10 @@ impl<'a> FontRegistry<'a> {
   }
 
   fn face_info_supports_char(&self, face: &FontFaceInfo<'a>, ch: char) -> bool {
-    if face.coverage.contains_char(ch) {
-      return true;
+    if let Some(parsed) = self.runtime_face_for_font(&face.font_id) {
+      return ttf_face_supports_char(parsed.ttf(), ch);
     }
-    self
-      .runtime_face_for_font(&face.font_id)
-      .and_then(|parsed| parsed.ttf().glyph_index(ch))
-      .is_some()
+    face.coverage.contains_char(ch)
   }
 
   fn runtime_face_for_font(&self, font_id: &FontId) -> Option<Arc<RuntimeFace>> {
@@ -2741,6 +2738,18 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
     },
     FontFallbackChain {
       requested_family: None,
+      script: Some(TextScript::Hangul),
+      language: None,
+      // Current Windows Office uses Malgun Gothic as its Korean UI/body
+      // fallback. Noto Sans CJK KR is the metrically stable open fallback in
+      // the checked-in Linux golden environment.
+      families: vec![
+        Cow::Borrowed("Malgun Gothic"),
+        Cow::Borrowed("Noto Sans CJK KR"),
+      ],
+    },
+    FontFallbackChain {
+      requested_family: None,
       script: Some(TextScript::Arabic),
       language: None,
       families: vec![Cow::Borrowed("Amiri"), Cow::Borrowed("Noto Naskh Arabic")],
@@ -2757,6 +2766,19 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
     },
     FontFallbackChain {
       requested_family: None,
+      script: Some(TextScript::Other),
+      language: None,
+      // Windows routes historic scripts such as Gothic through Segoe UI
+      // Historic. Noto Sans Gothic preserves that coverage on systems where
+      // the Office face is unavailable; coverage checks reject either face
+      // for unrelated `Other` scripts.
+      families: vec![
+        Cow::Borrowed("Segoe UI Historic"),
+        Cow::Borrowed("Noto Sans Gothic"),
+      ],
+    },
+    FontFallbackChain {
+      requested_family: None,
       script: None,
       language: None,
       families: vec![
@@ -2767,6 +2789,10 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
         Cow::Borrowed("DejaVu Sans"),
         Cow::Borrowed("Liberation Sans"),
         Cow::Borrowed("Noto Sans"),
+        // Keep a pan-CJK face in the cached chain for Japanese kana and
+        // fullwidth Latin forms. Those runs are not classified as Han, so
+        // the Han-specific chain above cannot supply their glyphs.
+        Cow::Borrowed("Noto Sans CJK JP"),
       ],
     },
   ]
@@ -3457,10 +3483,16 @@ fn font_supports_char(
   parsed_face: Option<&TtfFace<'_>>,
   ch: char,
 ) -> bool {
+  if let Some(face) = parsed_face {
+    return ttf_face_supports_char(face, ch);
+  }
   font
     .face
     .is_some_and(|face| face.coverage.contains_char(ch))
-    || parsed_face.and_then(|face| face.glyph_index(ch)).is_some()
+}
+
+fn ttf_face_supports_char(face: &TtfFace<'_>, ch: char) -> bool {
+  face.glyph_index(ch).is_some_and(|glyph_id| glyph_id.0 != 0)
 }
 
 fn font_supports_text_cluster(
@@ -3753,7 +3785,9 @@ fn font_coverage_from_ttf(face: &TtfFace<'_>) -> FontCoverage {
       subtable.codepoints(|codepoint| {
         debug_assert!(previous.is_none_or(|previous| previous <= codepoint));
         previous = Some(codepoint);
-        push_coverage_codepoint(&mut subtable_ranges, codepoint);
+        if char::from_u32(codepoint).is_some_and(|ch| ttf_face_supports_char(face, ch)) {
+          push_coverage_codepoint(&mut subtable_ranges, codepoint);
+        }
       });
       merge_coverage_ranges(&mut ranges, subtable_ranges);
     }
@@ -4824,10 +4858,63 @@ mod tests {
   }
 
   #[test]
+  fn office_hangul_fallback_prefers_korean_faces_before_generic_faces() {
+    let registry = FontRegistry::with_default_policy();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Calibri")),
+      script: Some(TextScript::Hangul),
+      ..FontRequest::default()
+    };
+
+    let families = registry.fallback_families(&request);
+    let malgun = families
+      .iter()
+      .position(|family| *family == "Malgun Gothic")
+      .expect("Office Korean fallback");
+    let noto_kr = families
+      .iter()
+      .position(|family| *family == "Noto Sans CJK KR")
+      .expect("open Korean fallback");
+    let generic = families
+      .iter()
+      .position(|family| *family == "DejaVu Sans")
+      .expect("generic fallback");
+    assert!(malgun < noto_kr);
+    assert!(noto_kr < generic);
+  }
+
+  #[test]
+  fn office_historic_script_fallback_precedes_generic_faces() {
+    let registry = FontRegistry::with_default_policy();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Arial")),
+      script: Some(TextScript::Other),
+      ..FontRequest::default()
+    };
+
+    let families = registry.fallback_families(&request);
+    let historic = families
+      .iter()
+      .position(|family| *family == "Segoe UI Historic")
+      .expect("Office historic-script fallback");
+    let noto_gothic = families
+      .iter()
+      .position(|family| *family == "Noto Sans Gothic")
+      .expect("open Gothic fallback");
+    let generic = families
+      .iter()
+      .position(|family| *family == "DejaVu Sans")
+      .expect("generic fallback");
+    assert!(historic < noto_gothic);
+    assert!(noto_gothic < generic);
+  }
+
+  #[test]
   fn office_common_symbol_fallback_precedes_generic_sans() {
     let registry = FontRegistry::with_default_policy();
     let request = FontRequest {
       family: Some(Cow::Borrowed("Liberation Serif")),
+      script: Some(TextScript::Common),
       ..FontRequest::default()
     };
 
@@ -4840,7 +4927,12 @@ mod tests {
       .iter()
       .position(|family| *family == "DejaVu Sans")
       .expect("generic fallback");
+    let cjk = families
+      .iter()
+      .position(|family| *family == "Noto Sans CJK JP")
+      .expect("pan-CJK fallback");
     assert!(symbol < generic);
+    assert!(generic < cjk);
   }
 
   #[test]

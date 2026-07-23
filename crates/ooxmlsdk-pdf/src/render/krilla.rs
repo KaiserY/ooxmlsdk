@@ -950,15 +950,35 @@ fn conversion_font_audit(paint: &PaintDocument<'_>) -> PdfFontAudit {
               );
               push_font_audit_issue(&mut audit, issue);
             }
-            let font = &audit.fonts[font_index];
-            if font.parse_error.is_none() && glyph.glyph_id.to_u32() >= u32::from(font.glyph_count)
-            {
+            let (font_parsed, font_glyph_count, resolved_family) = {
+              let font = &audit.fonts[font_index];
+              (
+                font.parse_error.is_none(),
+                font.glyph_count,
+                font.family_names.first().cloned(),
+              )
+            };
+            if font_parsed && glyph.glyph_id.to_u32() >= u32::from(font_glyph_count) {
               let mut issue = location();
               issue.kind = PdfFontAuditIssueKind::GlyphIdOutOfRange;
               issue.detail = format!(
                 "font_index={font_index}, glyph_id={}, glyph_count={}",
                 glyph.glyph_id.to_u32(),
-                font.glyph_count
+                font_glyph_count
+              );
+              push_font_audit_issue(&mut audit, issue);
+            }
+            if visible && glyph.glyph_id.to_u32() == 0 {
+              let mut issue = location();
+              issue.kind = PdfFontAuditIssueKind::MissingGlyph;
+              let source_text = text
+                .item
+                .text
+                .get(glyph.text_range.clone())
+                .unwrap_or("<invalid-range>");
+              issue.detail = format!(
+                "font_index={font_index}, requested_family={:?}, resolved_family={:?}, text={source_text:?}, range={:?}",
+                text.item.style.font_family, resolved_family, glyph.text_range
               );
               push_font_audit_issue(&mut audit, issue);
             }
@@ -3939,8 +3959,9 @@ mod tests {
   use std::sync::Arc;
 
   use super::{
-    PaintTextPortionKind, TextItem, TextStyle as PaintTextStyle, gamma_correct_gradient_color,
-    pdf_metadata, pdf_page_dimension, render, symbol_font_semantic_text, text_portion_ranges,
+    GlyphId, PaintDocument, PaintItem, PaintTextPortionKind, TextItem, TextMetrics,
+    TextStyle as PaintTextStyle, conversion_font_audit, gamma_correct_gradient_color, pdf_metadata,
+    pdf_page_dimension, render, symbol_font_semantic_text, text_portion_ranges,
     text_requires_glyph_outlines, text_stroke, text_style_from_common,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
@@ -4119,6 +4140,43 @@ mod tests {
       }],
       ..Default::default()
     }
+  }
+
+  #[test]
+  fn font_audit_reports_notdef_glyph_with_requested_family_and_text() {
+    let mut document = tagged_test_document();
+    let DisplayItem::Text(text) = &mut document.pages[0].items[0] else {
+      unreachable!();
+    };
+    text.style.color = Color {
+      r: 0,
+      g: 0,
+      b: 0,
+      a: 255,
+    };
+
+    let mut text_metrics = TextMetrics::new();
+    let mut paint = PaintDocument::from_layout(&document, &mut text_metrics);
+    let PaintItem::Text(text) = &mut paint.pages[0].items[0] else {
+      unreachable!();
+    };
+    text.portions[0].glyphs.as_mut().expect("shaped test text")[0].glyphs[0].glyph_id =
+      GlyphId::new(0);
+
+    let audit = conversion_font_audit(&paint);
+    let issue = audit
+      .issues
+      .iter()
+      .find(|issue| issue.kind == crate::PdfFontAuditIssueKind::MissingGlyph)
+      .unwrap_or_else(|| {
+        panic!(
+          "glyph zero must be reported at the layout-to-PDF boundary: {:#?}",
+          audit
+        )
+      });
+
+    assert!(issue.detail.contains("requested_family=Some(\"Arial\")"));
+    assert!(issue.detail.contains("text=\"T\""));
   }
 
   fn pdf_info_text(object: &lopdf::Object) -> String {

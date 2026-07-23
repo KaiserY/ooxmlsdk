@@ -1019,7 +1019,13 @@ impl SheetResourceCatalog {
   ) -> Result<Self> {
     let drawings = part
       .drawings_part(package)
-      .map(|drawing| DrawingResourceCatalog::from_part(package, &drawing))
+      .map(|drawing| {
+        DrawingResourceCatalog::from_part(
+          package,
+          &drawing,
+          Some(context.styles.output_ui_language()),
+        )
+      })
       .transpose()?
       .map(|drawing| vec![drawing])
       .unwrap_or_default();
@@ -1064,10 +1070,13 @@ impl SheetResourceCatalog {
   pub(crate) fn from_chartsheet_part(
     package: &mut SpreadsheetDocument,
     part: &ChartsheetPart,
+    styles: &StylesCatalog,
   ) -> Result<Self> {
     let drawings = part
       .drawings_part(package)
-      .map(|drawing| DrawingResourceCatalog::from_part(package, &drawing))
+      .map(|drawing| {
+        DrawingResourceCatalog::from_part(package, &drawing, Some(styles.output_ui_language()))
+      })
       .transpose()?
       .map(|drawing| vec![drawing])
       .unwrap_or_default();

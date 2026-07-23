@@ -92,7 +92,10 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) text_east_asia_font_family: Option<String>,
   pub(crate) text_complex_font_family: Option<String>,
   pub(crate) text_color: Option<RgbColor>,
+  pub(crate) text_bold: Option<bool>,
+  pub(crate) text_italic: Option<bool>,
   pub(crate) text_alignment: Option<a::TextAlignmentTypeValues>,
+  pub(crate) text_vertical: Option<a::TextVerticalValues>,
   pub(crate) text_left_inset_emu: Option<i64>,
   pub(crate) text_top_inset_emu: Option<i64>,
   pub(crate) text_right_inset_emu: Option<i64>,
@@ -243,7 +246,11 @@ pub(crate) struct DiagramDrawingCatalog {
 }
 
 impl DrawingResourceCatalog {
-  pub(crate) fn from_part(package: &mut SpreadsheetDocument, part: &DrawingsPart) -> Result<Self> {
+  pub(crate) fn from_part(
+    package: &mut SpreadsheetDocument,
+    part: &DrawingsPart,
+    ui_language: Option<&str>,
+  ) -> Result<Self> {
     let anchors = {
       let root = part.root_element(package)?;
       root
@@ -269,7 +276,12 @@ impl DrawingResourceCatalog {
       charts: chart_parts
         .iter()
         .map(|(relationship_id, chart)| {
-          ChartResourceCatalog::from_chart_part(package, relationship_id.clone(), chart)
+          ChartResourceCatalog::from_chart_part(
+            package,
+            relationship_id.clone(),
+            chart,
+            ui_language,
+          )
         })
         .collect::<Result<Vec<_>>>()?,
       extended_charts: extended_chart_parts
@@ -522,10 +534,22 @@ impl DrawingObjectModel {
         .text_body
         .as_deref()
         .and_then(xdr_text_body_first_run_color),
+      text_bold: shape
+        .text_body
+        .as_deref()
+        .and_then(xdr_text_body_first_run_bold),
+      text_italic: shape
+        .text_body
+        .as_deref()
+        .and_then(xdr_text_body_first_run_italic),
       text_alignment: shape
         .text_body
         .as_deref()
         .and_then(xdr_text_body_first_paragraph_alignment),
+      text_vertical: shape
+        .text_body
+        .as_deref()
+        .and_then(|text_body| text_body.body_properties.vertical),
       text_left_inset_emu: shape.text_body.as_deref().map(|text_body| {
         text_body
           .body_properties
@@ -587,11 +611,14 @@ impl DrawingObjectModel {
       text_east_asia_font_family: None,
       text_complex_font_family: None,
       text_color: None,
+      text_bold: None,
+      text_italic: None,
       text_alignment: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
+      text_vertical: None,
       text_len: group_shape_text_len(group),
       child_objects: group.group_shape_choice.len(),
       has_style: false,
@@ -627,11 +654,14 @@ impl DrawingObjectModel {
       text_east_asia_font_family: None,
       text_complex_font_family: None,
       text_color: None,
+      text_bold: None,
+      text_italic: None,
       text_alignment: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
+      text_vertical: None,
       child_objects: frame.graphic.graphic_data.graphic_data_choice.len(),
       has_style: false,
       fill_color: None,
@@ -666,11 +696,14 @@ impl DrawingObjectModel {
       text_east_asia_font_family: None,
       text_complex_font_family: None,
       text_color: None,
+      text_bold: None,
+      text_italic: None,
       text_alignment: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
+      text_vertical: None,
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
       fill_color: shape_fill_color(&shape.shape_properties)
@@ -711,11 +744,14 @@ impl DrawingObjectModel {
       text_east_asia_font_family: None,
       text_complex_font_family: None,
       text_color: None,
+      text_bold: None,
+      text_italic: None,
       text_alignment: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
+      text_vertical: None,
       child_objects: 0,
       has_style: picture.shape_style.is_some(),
       fill_color: None,
@@ -738,11 +774,14 @@ impl DrawingObjectModel {
       text_east_asia_font_family: None,
       text_complex_font_family: None,
       text_color: None,
+      text_bold: None,
+      text_italic: None,
       text_alignment: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
+      text_vertical: None,
       ..Self::unknown()
     }
   }
@@ -767,11 +806,14 @@ impl DrawingObjectModel {
       text_east_asia_font_family: None,
       text_complex_font_family: None,
       text_color: None,
+      text_bold: None,
+      text_italic: None,
       text_alignment: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
+      text_vertical: None,
       child_objects: 0,
       has_style: false,
       fill_color: None,
@@ -1078,6 +1120,58 @@ fn xdr_text_body_first_run_color(text_body: &xdr::TextBody) -> Option<RgbColor> 
     .find_map(|choice| match choice {
       a::ParagraphChoice::Run(run) => run.run_properties.as_deref().and_then(drawingml_run_color),
       _ => None,
+    })
+}
+
+fn xdr_text_body_first_run_bold(text_body: &xdr::TextBody) -> Option<bool> {
+  let properties = xdr_text_body_first_run_properties(text_body)?;
+  properties
+    .run
+    .and_then(|properties| properties.bold.as_ref())
+    .map(|value| value.as_bool())
+    .or_else(|| {
+      properties
+        .paragraph_default
+        .and_then(|properties| properties.bold.as_ref())
+        .map(|value| value.as_bool())
+    })
+    .or_else(|| {
+      properties
+        .level_default
+        .and_then(|properties| properties.bold.as_ref())
+        .map(|value| value.as_bool())
+    })
+    .or_else(|| {
+      properties
+        .list_default
+        .and_then(|properties| properties.bold.as_ref())
+        .map(|value| value.as_bool())
+    })
+}
+
+fn xdr_text_body_first_run_italic(text_body: &xdr::TextBody) -> Option<bool> {
+  let properties = xdr_text_body_first_run_properties(text_body)?;
+  properties
+    .run
+    .and_then(|properties| properties.italic.as_ref())
+    .map(|value| value.as_bool())
+    .or_else(|| {
+      properties
+        .paragraph_default
+        .and_then(|properties| properties.italic.as_ref())
+        .map(|value| value.as_bool())
+    })
+    .or_else(|| {
+      properties
+        .level_default
+        .and_then(|properties| properties.italic.as_ref())
+        .map(|value| value.as_bool())
+    })
+    .or_else(|| {
+      properties
+        .list_default
+        .and_then(|properties| properties.italic.as_ref())
+        .map(|value| value.as_bool())
     })
 }
 
@@ -1499,10 +1593,11 @@ impl ChartResourceCatalog {
     package: &mut SpreadsheetDocument,
     relationship_id: String,
     part: &ChartPart,
+    ui_language: Option<&str>,
   ) -> Result<Self> {
     let model = {
       let chart_space = part.root_element(package)?;
-      Self::from_chart_space(Some(relationship_id), chart_space)
+      Self::from_chart_space(Some(relationship_id), chart_space, ui_language)
     };
     Ok(Self {
       has_chart_drawing: part.chart_drawing_part(package).is_some(),
@@ -1534,7 +1629,11 @@ impl ChartResourceCatalog {
       ..model
     })
   }
-  fn from_chart_space(relationship_id: Option<String>, chart_space: &c::ChartSpace) -> Self {
+  fn from_chart_space(
+    relationship_id: Option<String>,
+    chart_space: &c::ChartSpace,
+    ui_language: Option<&str>,
+  ) -> Self {
     let chart = &chart_space.chart;
     let plot_area = &chart.plot_area;
     Self {
@@ -1608,7 +1707,7 @@ impl ChartResourceCatalog {
         }),
       has_print_settings: chart_space.print_settings.is_some(),
       has_user_shapes_reference: chart_space.user_shapes_reference.is_some(),
-      visible_texts: shared_chart::visible_texts(chart_space),
+      visible_texts: shared_chart::visible_texts_for_ui_language(chart_space, ui_language),
       extension_markers: usize::from(chart_space.chart_space_extension_list.is_some())
         + usize::from(chart.chart_extension_list.is_some())
         + usize::from(plot_area.extension_list.is_some()),
@@ -1917,6 +2016,17 @@ mod tests {
       xdr_text_body_first_run_font_family(&text_body, DrawingTextScript::Latin).as_deref(),
       Some("Calibri")
     );
+  }
+
+  #[test]
+  fn shape_text_run_inherits_bold_and_overrides_inherited_italic() {
+    let text_body = xdr::TextBody::from_bytes(
+      br#"<xdr:txBody xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr/><a:lstStyle><a:lvl1pPr><a:defRPr b="1" i="1"/></a:lvl1pPr></a:lstStyle><a:p><a:r><a:rPr i="0"/><a:t>test ok</a:t></a:r></a:p></xdr:txBody>"#,
+    )
+    .expect("text body");
+
+    assert_eq!(xdr_text_body_first_run_bold(&text_body), Some(true));
+    assert_eq!(xdr_text_body_first_run_italic(&text_body), Some(false));
   }
 
   #[test]

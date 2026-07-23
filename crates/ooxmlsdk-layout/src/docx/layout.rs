@@ -10,7 +10,7 @@ use crate::docx::{
   FloatingFramePlacement, FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment,
   FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
   HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
-  InlineChart, InlineItem, InlineShape, InlineShapeGeometry, LineHeightRule,
+  InlineChart, InlineItem, InlineShape, InlineShapeGeometry, LineHeightRule, LineNumbering,
   PRESERVED_WORD_TEXT_TAB, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
   SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
   TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
@@ -647,12 +647,11 @@ pub(crate) struct LineBox {
   pub item_end: usize,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct LineNumberBox {
   item_start: usize,
   y_pt: f32,
   height_pt: f32,
-  font_size_pt: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -695,7 +694,7 @@ struct PendingFloatingTableFollow {
 
 #[derive(Clone, Debug)]
 pub(crate) enum PageItem {
-  Text(TextItem),
+  Text(Box<TextItem>),
   Image(ImageItem),
   Rect(RectItem),
   Fill(FillItem),
@@ -726,6 +725,7 @@ pub(crate) struct TextItem {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum PdfTextSegmentation {
   Line,
+  WordLine,
   Portion,
 }
 
@@ -1357,7 +1357,7 @@ fn into_common_page(page: Page) -> common::DisplayPage<'static> {
 
 fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
   match item {
-    PageItem::Text(item) => common::DisplayItem::Text(into_common_text_run(item)),
+    PageItem::Text(item) => common::DisplayItem::Text(into_common_text_run(*item)),
     PageItem::Image(item) => common::DisplayItem::Image(into_common_image_item(item)),
     PageItem::Rect(item) => common::DisplayItem::Rect(into_common_rect_item(item)),
     PageItem::Fill(item) => common::DisplayItem::Rect(common::RectItem {
@@ -1388,6 +1388,7 @@ fn into_common_text_run(item: TextItem) -> common::TextRun<'static> {
     preserve_text_portion: item.preserve_text_portion,
     pdf_text_segmentation: match item.pdf_text_segmentation {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
+      PdfTextSegmentation::WordLine => common::PdfTextSegmentation::WordLine,
       PdfTextSegmentation::Portion => common::PdfTextSegmentation::Portion,
     },
     source: None,
@@ -1919,7 +1920,7 @@ impl<'a> RootFrameLayout<'a> {
     };
 
     materialize_table_frame_fragment_bounds(&mut self.pages, &self.frames);
-    materialize_repeating_adornments(&mut self.pages);
+    materialize_repeating_adornments(&mut self.pages, &mut self.frames);
 
     LayoutDocument {
       pages: self.pages,
@@ -2246,7 +2247,13 @@ impl<'a> RootFrameLayout<'a> {
       self.y,
     );
     self.materialize_pending_floating_table_follow_chain(flow);
-    self.add_line_numbers_for_block(block, *flow, line_number_start, line_number_fragment_start);
+    self.add_line_numbers_for_block(
+      block,
+      *flow,
+      frame_start,
+      line_number_start,
+      line_number_fragment_start,
+    );
     self.record_layout_frame_segments(
       frame_start,
       *flow,
@@ -2309,10 +2316,24 @@ impl<'a> RootFrameLayout<'a> {
         self.pages.len() + 1,
       );
       *flow = next_flow;
-      self.y = page_items_vertical_bounds(&self.current.items)
-        .map_or(next_flow.content_top_pt, |(_, bottom)| {
-          bottom.max(next_flow.content_top_pt)
-        });
+      self.y = if self
+        .current
+        .wrap_exclusions
+        .iter()
+        .any(|exclusion| !exclusion.blocks_flow)
+      {
+        // A split fly with side wrapping creates its follow before the body
+        // text frame on that page. Writer keeps the body cursor at the page
+        // top and lets CalcFlyOffsets constrain each line beside the follow;
+        // advancing to the fly's painted bottom would turn Around wrapping
+        // into an implicit top-and-bottom wrap.
+        next_flow.content_top_pt
+      } else {
+        page_items_vertical_bounds(&self.current.items)
+          .map_or(next_flow.content_top_pt, |(_, bottom)| {
+            bottom.max(next_flow.content_top_pt)
+          })
+      };
     }
   }
 
@@ -2320,6 +2341,7 @@ impl<'a> RootFrameLayout<'a> {
     &mut self,
     block: &Block,
     flow: FlowContext,
+    frame_start: FrameSegmentStart,
     start_index: usize,
     fragment_start: usize,
   ) {
@@ -2332,57 +2354,51 @@ impl<'a> RootFrameLayout<'a> {
     let Some(line_numbering) = flow.setup.line_numbering else {
       return;
     };
-    let line_boxes = line_number_boxes_for_block(
-      &self.current,
-      start_index,
-      fragment_start,
-      &mut self.text_metrics,
-    );
-    if line_boxes.is_empty() {
-      return;
-    }
+    let line_number_style = self.document.line_number_style.clone();
 
-    let mut items = Vec::new();
-    for line_box in line_boxes {
-      let number = self.next_line_number;
-      self.next_line_number = self.next_line_number.saturating_add(1);
-      if number < line_numbering.start
-        || (number - line_numbering.start) % line_numbering.count_by != 0
-      {
-        continue;
-      }
-
-      let style = TextStyle {
-        font_size_pt: line_box.font_size_pt,
-        ..Default::default()
+    // A paragraph is one Word line-numbering scope even when its text frame
+    // has master/follow fragments on several pages. Add the numbers in page
+    // order before advancing to the next block; looking only at `current`
+    // loses every line already moved into `pages` by a paragraph split.
+    let completed_end = self.pages.len();
+    let mut line_number_context = LineNumberPageContext {
+      numbering: line_numbering,
+      style: &line_number_style,
+      content_left_pt: flow.content_left_pt,
+      next_number: &mut self.next_line_number,
+      text_metrics: &mut self.text_metrics,
+    };
+    for page_index in frame_start.page_index..completed_end {
+      let page = &mut self.pages[page_index];
+      let item_start = if page_index == frame_start.page_index {
+        start_index
+      } else {
+        0
       };
-      let text = number.to_string();
-      let width = self.text_metrics.measure_text(&text, &style);
-      items.push((
-        line_box.item_start,
-        PageItem::Text(TextItem {
-          x_pt: (flow.content_left_pt - line_numbering.distance_pt - width).max(0.0),
-          y_pt: line_box.y_pt,
-          line_height_pt: line_box.height_pt,
-          text,
-          style,
-          rotation_center_pt: None,
-          hyperlink_url: None,
-          dynamic_field: None,
-          style_ref_keys: Vec::new(),
-          style_ref_text: None,
-          preserve_text_portion: false,
-          form_widget_id: None,
-          paragraph_bidi: false,
-          word_spacing_pt: 0.0,
-          decoration_span_start_x_pt: None,
-          pdf_text_segmentation: PdfTextSegmentation::Line,
-        }),
-      ));
+      let page_fragment_start = if page_index == frame_start.page_index {
+        fragment_start
+      } else {
+        0
+      };
+      add_line_numbers_to_page(
+        page,
+        item_start,
+        page_fragment_start,
+        &mut line_number_context,
+      );
     }
-    for (offset, (item_start, item)) in items.into_iter().enumerate() {
-      insert_line_number_item(&mut self.current, item_start + offset, item);
-    }
+
+    let current_starts_frame = completed_end == frame_start.page_index;
+    add_line_numbers_to_page(
+      &mut self.current,
+      if current_starts_frame { start_index } else { 0 },
+      if current_starts_frame {
+        fragment_start
+      } else {
+        0
+      },
+      &mut line_number_context,
+    );
   }
 
   fn advance_if_past_body(&mut self, flow: FlowContext) -> FlowContext {
@@ -2911,7 +2927,7 @@ fn first_text_item_from(
       if let PageItem::Text(text) = item
         && !text.text.trim().is_empty()
       {
-        return Some((page_index, text.clone()));
+        return Some((page_index, *text.clone()));
       }
     }
   }
@@ -3119,21 +3135,19 @@ fn line_number_boxes_for_block(
     })
     .filter_map(|fragment| {
       let bounds = fragment.bounds?;
-      if let Some((y_pt, height_pt, font_size_pt)) =
+      if let Some((y_pt, height_pt)) =
         line_number_text_metrics_for_items(&page.items, fragment.item_start, fragment.item_end)
       {
         return Some(LineNumberBox {
           item_start: fragment.item_start,
           y_pt,
           height_pt,
-          font_size_pt,
         });
       }
       Some(LineNumberBox {
         item_start: fragment.item_start,
         y_pt: bounds.y_pt,
         height_pt: bounds.height_pt,
-        font_size_pt: DEFAULT_FONT_SIZE_PT,
       })
     })
     .collect::<Vec<_>>();
@@ -3146,11 +3160,6 @@ fn line_number_boxes_for_block(
           item_start: line.item_start,
           y_pt: line.y_pt,
           height_pt: line.height_pt,
-          font_size_pt: line_number_font_size_for_items(
-            &page.items,
-            line.item_start,
-            line.item_end,
-          ),
         }),
     );
   }
@@ -3158,10 +3167,60 @@ fn line_number_boxes_for_block(
   boxes
 }
 
-fn line_number_font_size_for_items(items: &[PageItem], item_start: usize, item_end: usize) -> f32 {
-  line_number_text_metrics_for_items(items, item_start, item_end)
-    .map(|(_, _, font_size_pt)| font_size_pt)
-    .unwrap_or(DEFAULT_FONT_SIZE_PT)
+struct LineNumberPageContext<'a> {
+  numbering: LineNumbering,
+  style: &'a TextStyle,
+  content_left_pt: f32,
+  next_number: &'a mut i16,
+  text_metrics: &'a mut TextMetrics,
+}
+
+fn add_line_numbers_to_page(
+  page: &mut Page,
+  item_start: usize,
+  fragment_start: usize,
+  context: &mut LineNumberPageContext<'_>,
+) {
+  let line_boxes =
+    line_number_boxes_for_block(page, item_start, fragment_start, context.text_metrics);
+  let mut items = Vec::new();
+  for line_box in line_boxes {
+    let number = *context.next_number;
+    *context.next_number = context.next_number.saturating_add(1);
+    if number < context.numbering.start
+      || (number - context.numbering.start) % context.numbering.count_by != 0
+    {
+      continue;
+    }
+
+    let style = context.style.clone();
+    let text = number.to_string();
+    let width = context.text_metrics.measure_text(&text, &style);
+    items.push((
+      line_box.item_start,
+      PageItem::Text(Box::new(TextItem {
+        x_pt: (context.content_left_pt - context.numbering.distance_pt - width).max(0.0),
+        y_pt: line_box.y_pt,
+        line_height_pt: line_box.height_pt,
+        text,
+        style,
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        preserve_text_portion: false,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      })),
+    ));
+  }
+  for (offset, (item_start, item)) in items.into_iter().enumerate() {
+    insert_line_number_item(page, item_start + offset, item);
+  }
 }
 
 fn insert_line_number_item(page: &mut Page, index: usize, item: PageItem) {
@@ -3190,15 +3249,11 @@ fn line_number_text_metrics_for_items(
   items: &[PageItem],
   item_start: usize,
   item_end: usize,
-) -> Option<(f32, f32, f32)> {
+) -> Option<(f32, f32)> {
   items[item_start..item_end]
     .iter()
     .find_map(|item| match item {
-      PageItem::Text(text) => Some((
-        text.y_pt,
-        text.line_height_pt,
-        effective_font_size_pt(&text.style, None),
-      )),
+      PageItem::Text(text) => Some((text.y_pt, text.line_height_pt)),
       PageItem::Image(_)
       | PageItem::Rect(_)
       | PageItem::Fill(_)
@@ -4662,6 +4717,47 @@ fn restore_page_checkpoint(page: &mut Page, checkpoint: PageCheckpoint) {
   page
     .pending_floating_table_follows
     .truncate(checkpoint.pending_floating_table_follows_len);
+}
+
+fn restore_text_frame_start_page(
+  current: &mut Page,
+  pages: &mut Vec<Page>,
+  start_pages_len: usize,
+  checkpoint: PageCheckpoint,
+  page_snapshot: Option<&Page>,
+  pending_snapshot: Option<&TextFramePendingSnapshot>,
+) {
+  // Once a paragraph creates a follow, its original current page lives at
+  // `pages[start_pages_len]` and `current` is the last follow page. Restoring
+  // only the item counts on that last follow drops pre-existing content from
+  // the master page and can duplicate later paragraphs during the retry.
+  if let Some(snapshot) = page_snapshot {
+    pages.truncate(start_pages_len);
+    current.clone_from(snapshot);
+  } else if pages.len() > start_pages_len {
+    pages.truncate(start_pages_len + 1);
+    *current = pages
+      .pop()
+      .expect("text-frame master page exists after a follow transition");
+    restore_page_checkpoint(current, checkpoint);
+  } else {
+    pages.truncate(start_pages_len);
+    restore_page_checkpoint(current, checkpoint);
+  }
+  if let Some(snapshot) = pending_snapshot {
+    current
+      .pending_floating_table_follows
+      .clone_from(&snapshot.current);
+    for (page, pending) in pages.iter_mut().zip(&snapshot.pages) {
+      page.pending_floating_table_follows.clone_from(pending);
+    }
+  }
+}
+
+#[derive(Clone, Debug)]
+struct TextFramePendingSnapshot {
+  current: Vec<PendingFloatingTableFollow>,
+  pages: Vec<Vec<PendingFloatingTableFollow>>,
 }
 
 #[derive(Clone)]
@@ -6471,17 +6567,25 @@ fn apply_headers_and_footers(
   }
 }
 
-fn materialize_repeating_adornments(pages: &mut [Page]) {
-  for page in pages {
-    let Some(mut adornment) = page.repeating_adornment.take() else {
-      continue;
-    };
+fn materialize_repeating_adornments(pages: &mut [Page], frames: &mut [LayoutFrame]) {
+  for (page_index, page) in pages.iter_mut().enumerate() {
     let insertion_index = usize::from(page.items.first().is_some_and(|item| {
       matches!(item, PageItem::Fill(fill) if fill.x_pt == 0.0
         && fill.y_pt == 0.0
         && fill.width_pt == page.setup.width_pt
         && fill.height_pt == page.setup.height_pt)
     }));
+    let Some(mut adornment) = page.repeating_adornment.take() else {
+      offset_body_frame_records_for_prefix(page, frames, page_index, insertion_index);
+      continue;
+    };
+    let adornment_item_count = adornment.items.len();
+    offset_body_frame_records_for_prefix(
+      page,
+      frames,
+      page_index,
+      insertion_index + adornment_item_count,
+    );
     offset_page_frame_records_raw(
       &mut adornment.frame_fragments,
       &mut adornment.frame_influences,
@@ -6492,6 +6596,37 @@ fn materialize_repeating_adornments(pages: &mut [Page]) {
       .splice(insertion_index..insertion_index, adornment.items);
     page.frame_fragments.extend(adornment.frame_fragments);
     page.frame_influences.extend(adornment.frame_influences);
+  }
+}
+
+fn offset_body_frame_records_for_prefix(
+  page: &mut Page,
+  frames: &mut [LayoutFrame],
+  page_index: usize,
+  item_offset: usize,
+) {
+  if item_offset == 0 {
+    return;
+  }
+  offset_page_frame_records(page, item_offset);
+  for frame in frames
+    .iter_mut()
+    .filter(|frame| frame.page_index == page_index)
+  {
+    frame.item_start = frame.item_start.saturating_add(item_offset);
+    frame.item_end = frame.item_end.saturating_add(item_offset);
+    for line in &mut frame.lines {
+      line.item_start = line.item_start.saturating_add(item_offset);
+      line.item_end = line.item_end.saturating_add(item_offset);
+    }
+    for fragment in &mut frame.fragments {
+      fragment.item_start = fragment.item_start.saturating_add(item_offset);
+      fragment.item_end = fragment.item_end.saturating_add(item_offset);
+    }
+    for influence in &mut frame.influences {
+      influence.item_start = influence.item_start.saturating_add(item_offset);
+      influence.item_end = influence.item_end.saturating_add(item_offset);
+    }
   }
 }
 
@@ -7740,7 +7875,34 @@ fn append_floating_table_wrap_exclusion(
   placement: FloatingFramePlacement,
   text_metrics: &mut TextMetrics,
 ) {
-  let Some((left_pt, top_pt, right_pt, bottom_pt)) = page_items_bounds(&page.items, text_metrics)
+  // Writer derives the fly exclusion from the table frame, not from the
+  // union of everything painted on its page. In particular, a split follow
+  // page can already contain non-table adornments whose ink would otherwise
+  // widen the exclusion to the whole body and force following text below the
+  // table instead of wrapping beside it.
+  let table_bounds = page
+    .frame_fragments
+    .iter()
+    .filter(|fragment| matches!(fragment.kind, FrameFragmentKind::TableRow))
+    .filter_map(|fragment| fragment.bounds)
+    .fold(None::<(f32, f32, f32, f32)>, |bounds, row| {
+      Some(match bounds {
+        None => (
+          row.x_pt,
+          row.y_pt,
+          row.x_pt + row.width_pt,
+          row.y_pt + row.height_pt,
+        ),
+        Some((left, top, right, bottom)) => (
+          left.min(row.x_pt),
+          top.min(row.y_pt),
+          right.max(row.x_pt + row.width_pt),
+          bottom.max(row.y_pt + row.height_pt),
+        ),
+      })
+    });
+  let Some((left_pt, top_pt, right_pt, bottom_pt)) =
+    table_bounds.or_else(|| page_items_bounds(&page.items, text_metrics))
   else {
     return;
   };
@@ -7839,9 +8001,16 @@ fn lower_inline_chart(
   width_pt: f32,
   height_pt: f32,
 ) -> Vec<PageItem> {
-  let Some(model) = shared_chart::ordinary_clustered_column_chart(&chart.chart_space) else {
+  let Some(mut model) = shared_chart::ordinary_clustered_column_chart(&chart.chart_space) else {
     return Vec::new();
   };
+  // Word fixed output does not paint the chart insertion placeholder for an
+  // absent title, even when c:autoTitleDeleted is explicitly false. That
+  // placeholder is a PowerPoint host behavior; explicit c:title text remains
+  // visible in Word.
+  if matches!(model.title, Some(shared_chart::ChartTitleText::Automatic)) {
+    model.title = None;
+  }
   let frame_stroke = BorderStyle {
     width_pt: 0.14,
     color: RgbColor { r: 0, g: 0, b: 0 },
@@ -7869,7 +8038,7 @@ fn lower_inline_chart(
       &chart.automatic_title,
       &ClusteredColumnStyle {
         layout_profile: ChartLayoutProfile::Word,
-        has_explicit_title: false,
+        has_explicit_title: matches!(model.title, Some(shared_chart::ChartTitleText::Explicit(_))),
         title: chart.title_style.clone(),
         title_fill_color: None,
         label: chart.label_style.clone(),
@@ -7885,7 +8054,7 @@ fn lower_inline_chart(
 
 fn docx_chart_page_item(item: crate::model::PageItem) -> Option<PageItem> {
   match item {
-    crate::model::PageItem::Text(text) => Some(PageItem::Text(TextItem {
+    crate::model::PageItem::Text(text) => Some(PageItem::Text(Box::new(TextItem {
       x_pt: text.x_pt,
       y_pt: text.y_pt,
       line_height_pt: text.line_height_pt,
@@ -7905,7 +8074,7 @@ fn docx_chart_page_item(item: crate::model::PageItem) -> Option<PageItem> {
         crate::model::PdfTextSegmentation::Line => PdfTextSegmentation::Line,
         crate::model::PdfTextSegmentation::Portion => PdfTextSegmentation::Portion,
       },
-    })),
+    }))),
     crate::model::PageItem::Rect(rect) => Some(PageItem::Rect(RectItem {
       x_pt: rect.x_pt,
       y_pt: rect.y_pt,
@@ -9044,6 +9213,9 @@ impl<'a> TableFrameLayout<'a> {
     row: &TableRow,
     text_metrics: &mut TextMetrics,
   ) -> Option<f32> {
+    if !row_uses_cached_vertical_merge_split(self.table, row_index, row) {
+      return None;
+    }
     // SwTextFrame follow from the cursor after a page break. The follow row
     // must therefore reserve the height of the remaining lower content, not
     // only the leftover twips of the original row frame.
@@ -9056,7 +9228,7 @@ impl<'a> TableFrameLayout<'a> {
       if cell.vertical_merge_continue {
         continue;
       }
-      let Some(blocks) = table_cell_blocks_for_split_fragment(cell, true) else {
+      let Some(blocks) = table_cell_blocks_for_split_fragment(cell, true, true) else {
         continue;
       };
       if blocks.is_empty() {
@@ -9109,12 +9281,14 @@ impl<'a> TableFrameLayout<'a> {
   ) -> bool {
     let available_height = self.frame.block.content_bottom - row.y;
     let row_split_allowed = !row.row.cant_split || !row.fits_empty_body_region();
+    let cached_vertical_merge_split =
+      row_uses_cached_vertical_merge_split(self.table, row.row_index, row.row);
     row_split_allowed
       && available_height > LAYOUT_EPSILON_PT
-      && !row.row.exact_height
+      && (!row.row.exact_height || cached_vertical_merge_split)
       && !row_contains_following_text_flow_cell_floating(row.row)
       && !row_repeat_header_effective(self.table, row.row_index)
-      && !row_has_vertical_merge_context(self.table, row.row_index)
+      && (!row_has_vertical_merge_context(self.table, row.row_index) || cached_vertical_merge_split)
       && (!table_row_keep || !row.row.keep_with_next || allow_split_of_keep_row)
       && Self::row_minimum_split_fragment_height(self.table, row.row_index, row.row)
         < available_height - LAYOUT_EPSILON_PT
@@ -9796,6 +9970,11 @@ impl CellFrame<'_, '_> {
       row_top_margin_pt: row_top_cell_margin_extent(self.row),
       row_bottom_margin_pt: row_bottom_cell_margin_extent(self.row),
       content_offset,
+      use_cached_break_inside_block: row_uses_cached_vertical_merge_split(
+        self.table,
+        self.row_index,
+        self.row,
+      ),
     });
   }
 
@@ -10022,6 +10201,18 @@ fn row_has_vertical_merge_context(table: &Table, row_index: usize) -> bool {
     }
   }
   false
+}
+
+fn row_uses_cached_vertical_merge_split(table: &Table, row_index: usize, row: &TableRow) -> bool {
+  // Writer normally clips an exact-height row. The fixed-layout cursor in
+  // tdf#128959 is the exceptional case: an exact row starts a vertically
+  // merged cell whose SwTextFrame already has a page follow. Preserve that
+  // source-backed master/follow split without making exact rows generally
+  // grow or split. Floating tables own a separate split-fly follow chain.
+  table.placement.is_none()
+    && row.exact_height
+    && row_has_vertical_merge_context(table, row_index)
+    && row_contains_last_rendered_page_break(row)
 }
 
 fn row_contains_following_text_flow_cell_floating(row: &TableRow) -> bool {
@@ -10533,6 +10724,11 @@ fn table_row_height_with_widths(
     }
   }
   match (row.height_pt, row.exact_height) {
+    (Some(_), true) if row_uses_cached_vertical_merge_split(table, row_index, row) => {
+      content_height
+        + row_top_border_space_extent(table, row_index, row)
+        + row_bottom_border_spacing_extent(table, row_index, row)
+    }
     (Some(height), true) => {
       height
         + row_bottom_cell_margin_extent(row)
@@ -10662,6 +10858,7 @@ struct TableCellLayout<'a> {
   row_top_margin_pt: f32,
   row_bottom_margin_pt: f32,
   content_offset: f32,
+  use_cached_break_inside_block: bool,
 }
 
 fn layout_table_cell(fragment: TableCellLayout<'_>) {
@@ -10681,9 +10878,18 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     row_top_margin_pt,
     row_bottom_margin_pt,
     content_offset,
+    use_cached_break_inside_block,
   } = fragment;
-  let content_width =
-    (width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT);
+  let vertical_text = cell.text_rotation_deg.is_some();
+  // ECMA-376 Part 1 §17.18.93 defines btLr/tbRl as vertical writing
+  // modes. At final cell layout the physical inner height is therefore the
+  // logical line width; rotating a line measured against the table column
+  // width makes it overflow instead of forming vertical columns.
+  let content_width = if vertical_text {
+    (height - cell.margins.top_pt - cell.margins.bottom_pt).max(DEFAULT_FONT_SIZE_PT)
+  } else {
+    (width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT)
+  };
   let content_height = table_cell_content_height_for_table(
     cell,
     width,
@@ -10705,7 +10911,9 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     content_offset > LAYOUT_EPSILON_PT || content_height > height + LAYOUT_EPSILON_PT;
   let top_margin_for_lowers = row_top_margin_pt.max(cell.margins.top_pt);
   let bottom_margin_for_lowers = row_bottom_margin_pt.max(cell.margins.bottom_pt);
-  let aligned_content_top = if split_fragment {
+  let aligned_content_top = if vertical_text {
+    y + height - bottom_margin_for_lowers
+  } else if split_fragment {
     y + top_margin_for_lowers
   } else {
     match cell.vertical_alignment {
@@ -10719,9 +10927,9 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     }
   };
   let split_blocks = if content_offset > LAYOUT_EPSILON_PT {
-    table_cell_blocks_for_split_fragment(cell, true)
+    table_cell_blocks_for_split_fragment(cell, true, use_cached_break_inside_block)
   } else if split_fragment && !table_following_text_flow {
-    table_cell_blocks_for_split_fragment(cell, false)
+    table_cell_blocks_for_split_fragment(cell, false, use_cached_break_inside_block)
   } else {
     None
   };
@@ -10741,11 +10949,14 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
   let text_left = x + cell.margins.left_pt;
   let text_bottom = y + height - bottom_margin_for_lowers;
   let following_text_flow_bottom = following_text_flow_cell_bottom(current, text_bottom);
-  let flow_bottom = if split_fragment {
+  let flow_bottom = if vertical_text {
+    UNBOUNDED_LAYOUT_EXTENT_PT
+  } else if split_fragment {
     text_bottom
   } else {
     UNBOUNDED_LAYOUT_EXTENT_PT
   };
+  let rotation_center = vertical_text.then_some((text_left, aligned_content_top));
   let flow = FlowContext {
     setup,
     section_index: current.section_index,
@@ -10832,7 +11043,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
   }
 
   for (index, block) in blocks_to_layout.iter().enumerate() {
-    if text_y > text_bottom {
+    if !vertical_text && text_y > text_bottom {
       break;
     }
     let previous = index
@@ -10929,14 +11140,21 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     return;
   }
 
-  let (nested_items, nested_fragments) =
+  let (mut nested_items, nested_fragments) =
     flatten_nested_pages_with_fragments(nested_page, discarded_pages, content_start_y, text_bottom);
+  if let Some(rotation_center) = rotation_center {
+    for item in &mut nested_items {
+      if let PageItem::Text(text) = item {
+        text.rotation_center_pt = Some(rotation_center);
+      }
+    }
+  }
   let item_start = current.items.len();
-  current.items.extend(
-    nested_items
-      .into_iter()
-      .filter(|item| table_cell_item_intersects_vertical_bounds(item, y, text_bottom)),
-  );
+  current
+    .items
+    .extend(nested_items.into_iter().filter(|item| {
+      vertical_text || table_cell_item_intersects_vertical_bounds(item, y, text_bottom)
+    }));
   let item_end = current.items.len();
   current
     .frame_fragments
@@ -11003,15 +11221,19 @@ fn table_cell_first_inline_text_height(
 fn table_cell_blocks_for_split_fragment(
   cell: &TableCell,
   follow_fragment: bool,
+  include_contained_break: bool,
 ) -> Option<Vec<Block>> {
   // evidence on the following text portion. When a table row is already split,
   // SwTextFrame follows are laid out from the text cursor after the break, not
   // from the whole paragraph again; split the imported block stream at that
   // cursor before formatting the master/follow cell fragments.
-  let split_index = cell
-    .blocks
-    .iter()
-    .position(block_starts_after_last_rendered_page_break)?;
+  let split_index = cell.blocks.iter().position(|block| {
+    if include_contained_break {
+      block_contains_last_rendered_page_break(block)
+    } else {
+      block_starts_after_last_rendered_page_break(block)
+    }
+  })?;
 
   let mut blocks = Vec::new();
   if !follow_fragment {
@@ -11044,6 +11266,17 @@ fn block_starts_after_last_rendered_page_break(block: &Block) -> bool {
       .blocks
       .first()
       .is_some_and(block_starts_after_last_rendered_page_break),
+  }
+}
+
+fn block_contains_last_rendered_page_break(block: &Block) -> bool {
+  match block {
+    Block::Paragraph(paragraph) => paragraph
+      .inlines
+      .iter()
+      .any(|inline| matches!(inline, InlineItem::LastRenderedPageBreak)),
+    Block::Table(table) => table.rows.iter().any(row_contains_last_rendered_page_break),
+    Block::Frame(frame) => blocks_contain_last_rendered_page_break(&frame.blocks),
   }
 }
 
@@ -11689,13 +11922,35 @@ fn floating_image_position(
 fn floating_anchor_reference_y(
   placement: FloatingImagePlacement,
   paragraph_top: f32,
-  line_y: f32,
+  line_top: f32,
 ) -> f32 {
   match placement.vertical_relative_to {
     // paragraph frame, not to the line where the anchor run is encountered.
     crate::docx::VerticalImageReference::Paragraph => paragraph_top,
-    _ => line_y,
+    _ => line_top,
   }
+}
+
+fn floating_anchor_line_top(
+  flow: FlowContext,
+  paragraph: &crate::docx::Paragraph,
+  line_y: f32,
+  line_height: f32,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  if flow.text_segmentation != TextSegmentation::TableCell {
+    return line_y;
+  }
+  // Table-cell text items carry a resolved baseline as their layout origin so
+  // the PDF table owner can paint them without applying a second baseline
+  // offset. Floating anchors still use the SwTextFrame/SwLineLayout top:
+  // testTdf162551 requires a compat15 line-relative image to start at that
+  // paragraph line top, not at the stored text baseline.
+  line_y
+    - text_metrics.baseline_offset_in_line_with_windows_metrics(
+      &paragraph_base_line_style(paragraph),
+      line_height,
+    )
 }
 
 fn floating_frame_position(
@@ -12279,6 +12534,7 @@ enum TextSplitDecision {
   Forced,
   Allowed,
   Rejected,
+  RebalanceWidow { page_index: usize },
 }
 
 #[derive(Clone, Debug)]
@@ -12375,10 +12631,8 @@ impl TextFrameState {
         // WidowsAndOrphans::FindWidows() asks the master of this follow to
         // give lines to the follow. That is a local master/follow adjustment,
         // not a request to move the whole paragraph from the first page.
-        return if index == 0 {
-          TextSplitDecision::Rejected
-        } else {
-          TextSplitDecision::Allowed
+        return TextSplitDecision::RebalanceWidow {
+          page_index: follow.page_index.saturating_sub(1),
         };
       }
       previous_start = follow.start;
@@ -12437,6 +12691,7 @@ struct TextFrameLayout<'a> {
   flow: FlowContext,
   frame: TextFrame,
   spacing_after_pt: f32,
+  widow_rebalance_page_index: Option<usize>,
 }
 
 fn can_defer_page_break_for_following_floating_anchor(
@@ -12511,7 +12766,13 @@ impl<'a> TextFrameLayout<'a> {
       flow,
       frame: TextFrame::new(paragraph, flow, text_metrics),
       spacing_after_pt,
+      widow_rebalance_page_index: None,
     }
+  }
+
+  fn with_widow_rebalance_page(mut self, page_index: usize) -> Self {
+    self.widow_rebalance_page_index = Some(page_index);
+    self
   }
 
   fn line_bounds(
@@ -12594,7 +12855,12 @@ impl<'a> TextFrameLayout<'a> {
     *line_height = advance.active.frame.base_line_height;
     let mut next_flow = advance.active.flow;
     let mut next_frame = advance.active.frame;
-    if next_y + *line_height > advance.active.flow.content_bottom
+    let content_bottom = if self.widow_rebalance_page_index == Some(advance.pages.len()) {
+      advance.active.flow.content_bottom - *line_height
+    } else {
+      advance.active.flow.content_bottom
+    };
+    if next_y + *line_height > content_bottom
       && page_has_body_region_items(advance.current, advance.active.flow)
     {
       (next_flow, next_y) =
@@ -12700,9 +12966,32 @@ impl<'a> TextFrameLayout<'a> {
     let start_item_index = current.items.len();
     let start_pages_len = pages.len();
     let start_current = page_checkpoint(current);
+    // WidowsAndOrphans::WouldFit() deliberately skips widow prediction when
+    // the master and follow can have different line widths. A floating-object
+    // exclusion has the same property: reserving one nominal line at the
+    // bottom can rewrap the entire follow around a different fly contour.
+    let has_pending_floating_table_follows = has_pending_floating_table_follows(current, pages);
+    let can_rebalance_widow_by_reserving_line =
+      current.wrap_exclusions.is_empty() && !has_pending_floating_table_follows;
+    let start_page_snapshot = (!current.wrap_exclusions.is_empty()
+      || has_pending_floating_table_follows)
+      .then(|| current.clone());
+    let start_pending_snapshot =
+      has_pending_floating_table_follows.then(|| TextFramePendingSnapshot {
+        current: current.pending_floating_table_follows.clone(),
+        pages: pages
+          .iter()
+          .map(|page| page.pending_floating_table_follows.clone())
+          .collect(),
+      });
     let start_anchor_pages_len = anchor_pages.as_ref().map(|anchors| anchors.len());
     let start_flow = flow;
     let paragraph_top = y;
+    // Paragraph-relative drawings use the table paragraph frame origin. Only
+    // line-relative drawings need the table-cell baseline translated back to
+    // a SwLineLayout top (see `floating_anchor_line_top`). In particular,
+    // bottom-aligned table paragraphs keep their aligned frame origin here.
+    let paragraph_anchor_top = y;
     let default_line_left = text_frame.default_line_left;
     let first_line_left = text_frame.first_line_left;
     let mut default_line_right = text_frame.default_line_right;
@@ -12787,7 +13076,7 @@ impl<'a> TextFrameLayout<'a> {
           }));
         }
       }
-      current.items.push(PageItem::Text(TextItem {
+      current.items.push(PageItem::Text(Box::new(TextItem {
         x_pt: if blank_list_label {
           default_line_left
         } else {
@@ -12808,7 +13097,7 @@ impl<'a> TextFrameLayout<'a> {
         word_spacing_pt: 0.0,
         decoration_span_start_x_pt: None,
         pdf_text_segmentation: PdfTextSegmentation::Line,
-      }));
+      })));
       x = default_line_left;
       if blank_list_label {
         if let Some(tab_stop_pt) = paragraph.list_label_tab_stop_pt {
@@ -13535,7 +13824,10 @@ impl<'a> TextFrameLayout<'a> {
             let frame_height = relative_floating_height(placement, flow)
               .unwrap_or_else(|| image_frame_height(image));
             let (width, height) = fit_image_to_line(frame_width, frame_height, flow.content_width);
-            let anchor_y = floating_anchor_reference_y(placement, paragraph_top, y);
+            let line_anchor_top =
+              floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics);
+            let anchor_y =
+              floating_anchor_reference_y(placement, paragraph_anchor_top, line_anchor_top);
             let (image_x, image_y) =
               floating_image_position(placement, flow, x, anchor_y, width, height);
             let image_item_start = current.items.len();
@@ -13909,7 +14201,10 @@ impl<'a> TextFrameLayout<'a> {
               }
               let width = relative_floating_width(placement, flow).unwrap_or(shape.width_pt);
               let height = relative_floating_height(placement, flow).unwrap_or(shape.height_pt);
-              let anchor_y = floating_anchor_reference_y(placement, paragraph_top, y);
+              let line_anchor_top =
+                floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics);
+              let anchor_y =
+                floating_anchor_reference_y(placement, paragraph_anchor_top, line_anchor_top);
               let (shape_x, shape_y) =
                 floating_image_position(placement, flow, x, anchor_y, width, height);
               let shape_x = shape_x + shape.offset_x_pt;
@@ -14374,15 +14669,61 @@ impl<'a> TextFrameLayout<'a> {
     debug_assert!(
       !matches!(split_decision, TextSplitDecision::Rejected) || !text_state.page_follows.is_empty()
     );
-    if allow_reflow && matches!(split_decision, TextSplitDecision::Rejected) {
-      pages.truncate(start_pages_len);
-      restore_page_checkpoint(current, start_current);
-      if let (Some(anchors), Some(len)) = (anchor_pages.as_deref_mut(), start_anchor_pages_len) {
-        anchors.truncate(len);
+    let widow_rebalance_has_variable_line_widths = !current.wrap_exclusions.is_empty()
+      || pages
+        .iter()
+        .skip(start_pages_len)
+        .any(|page| !page.wrap_exclusions.is_empty());
+    if allow_reflow {
+      match split_decision {
+        TextSplitDecision::Rejected => {
+          restore_text_frame_start_page(
+            current,
+            pages,
+            start_pages_len,
+            start_current,
+            start_page_snapshot.as_ref(),
+            start_pending_snapshot.as_ref(),
+          );
+          if let (Some(anchors), Some(len)) = (anchor_pages.as_deref_mut(), start_anchor_pages_len)
+          {
+            anchors.truncate(len);
+          }
+          let (follow_flow, follow_y) = advance_text_frame_flow(start_flow, current, pages);
+          return TextFrameLayout::new(paragraph, follow_flow, self.spacing_after_pt, text_metrics)
+            .format_with_reflow(current, pages, anchor_pages, text_metrics, follow_y, false);
+        }
+        TextSplitDecision::RebalanceWidow { page_index }
+          if can_rebalance_widow_by_reserving_line && !widow_rebalance_has_variable_line_widths =>
+        {
+          restore_text_frame_start_page(
+            current,
+            pages,
+            start_pages_len,
+            start_current,
+            start_page_snapshot.as_ref(),
+            start_pending_snapshot.as_ref(),
+          );
+          if let (Some(anchors), Some(len)) = (anchor_pages.as_deref_mut(), start_anchor_pages_len)
+          {
+            anchors.truncate(len);
+          }
+          return TextFrameLayout::new(paragraph, start_flow, self.spacing_after_pt, text_metrics)
+            .with_widow_rebalance_page(page_index)
+            .format_with_reflow(
+              current,
+              pages,
+              anchor_pages,
+              text_metrics,
+              paragraph_top,
+              false,
+            );
+        }
+        TextSplitDecision::NoSplit
+        | TextSplitDecision::Forced
+        | TextSplitDecision::Allowed
+        | TextSplitDecision::RebalanceWidow { .. } => {}
       }
-      let (follow_flow, follow_y) = advance_text_frame_flow(start_flow, current, pages);
-      return TextFrameLayout::new(paragraph, follow_flow, self.spacing_after_pt, text_metrics)
-        .format_with_reflow(current, pages, anchor_pages, text_metrics, follow_y, false);
     }
 
     if paragraph.list_label.is_none() && start_item_index <= current.items.len() {
@@ -15284,7 +15625,7 @@ fn push_tab_leader(
     return;
   }
   let items = (0..count).map(|index| {
-    PageItem::Text(TextItem {
+    PageItem::Text(Box::new(TextItem {
       x_pt: placement.start_x + char_width * index as f32,
       y_pt: placement.y,
       line_height_pt: placement.line_height,
@@ -15301,7 +15642,7 @@ fn push_tab_leader(
       preserve_text_portion: true,
       decoration_span_start_x_pt: None,
       pdf_text_segmentation: PdfTextSegmentation::Portion,
-    })
+    }))
   });
   if let Some(index) = placement
     .insert_index
@@ -15682,7 +16023,7 @@ fn flush_text(
     return;
   }
 
-  page.items.push(PageItem::Text(TextItem {
+  page.items.push(PageItem::Text(Box::new(TextItem {
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
@@ -15699,13 +16040,13 @@ fn flush_text(
     preserve_text_portion: meta.preserve_text_portion,
     decoration_span_start_x_pt: None,
     pdf_text_segmentation: match meta.segmentation {
-      TextSegmentation::Body => PdfTextSegmentation::Line,
-      TextSegmentation::RepeatingSlot => PdfTextSegmentation::Line,
-      TextSegmentation::TableCell => PdfTextSegmentation::Line,
+      TextSegmentation::Body => PdfTextSegmentation::WordLine,
+      TextSegmentation::RepeatingSlot => PdfTextSegmentation::WordLine,
+      TextSegmentation::TableCell => PdfTextSegmentation::WordLine,
       TextSegmentation::DrawingLayer => PdfTextSegmentation::Portion,
-      TextSegmentation::Notes => PdfTextSegmentation::Line,
+      TextSegmentation::Notes => PdfTextSegmentation::WordLine,
     },
-  }));
+  })));
 }
 
 fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border: BorderStyle) {
@@ -16625,6 +16966,7 @@ mod tests {
           grid_span: 1,
           vertical_merge_continue: false,
           vertical_alignment: TableCellVerticalAlignment::Top,
+          text_rotation_deg: None,
         }],
         height_pt: None,
         exact_height: false,
@@ -16708,6 +17050,7 @@ mod tests {
           grid_span: 1,
           vertical_merge_continue: false,
           vertical_alignment: TableCellVerticalAlignment::Top,
+          text_rotation_deg: None,
         }],
         height_pt: Some(12.0),
         exact_height: true,
@@ -16768,6 +17111,7 @@ mod tests {
         grid_span: 1,
         vertical_merge_continue: continue_merge,
         vertical_alignment: TableCellVerticalAlignment::Top,
+        text_rotation_deg: None,
       }
     }
 
@@ -16849,6 +17193,7 @@ mod tests {
         grid_span: 1,
         vertical_merge_continue: continue_merge,
         vertical_alignment: TableCellVerticalAlignment::Top,
+        text_rotation_deg: None,
       }
     }
 
@@ -16949,7 +17294,7 @@ mod tests {
 
     assert_eq!(
       state.page_split_decision(false, DEFAULT_ORPHAN_LINES, DEFAULT_WIDOW_LINES),
-      TextSplitDecision::Rejected
+      TextSplitDecision::RebalanceWidow { page_index: 0 }
     );
   }
 
@@ -16982,7 +17327,7 @@ mod tests {
   #[test]
   fn justified_line_distributes_right_margin_glue_across_word_spaces() {
     fn text_item(x_pt: f32, text: &str) -> PageItem {
-      PageItem::Text(TextItem {
+      PageItem::Text(Box::new(TextItem {
         x_pt,
         y_pt: 20.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
@@ -16999,7 +17344,7 @@ mod tests {
         preserve_text_portion: false,
         decoration_span_start_x_pt: None,
         pdf_text_segmentation: PdfTextSegmentation::Line,
-      })
+      }))
     }
 
     let mut text_metrics = TextMetrics::new();
@@ -17049,7 +17394,7 @@ mod tests {
         floating: false,
         behind_text: false,
       }),
-      PageItem::Text(TextItem {
+      PageItem::Text(Box::new(TextItem {
         x_pt: 120.0,
         y_pt: 0.0,
         line_height_pt: line_height,
@@ -17066,7 +17411,7 @@ mod tests {
         preserve_text_portion: false,
         decoration_span_start_x_pt: None,
         pdf_text_segmentation: PdfTextSegmentation::Line,
-      }),
+      })),
     ];
     let mut text_metrics = TextMetrics::new();
 
@@ -17088,7 +17433,7 @@ mod tests {
       },
       0,
     );
-    page.items.push(PageItem::Text(TextItem {
+    page.items.push(PageItem::Text(Box::new(TextItem {
       x_pt: 0.0,
       y_pt: 0.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
@@ -17107,7 +17452,7 @@ mod tests {
       preserve_text_portion: false,
       decoration_span_start_x_pt: None,
       pdf_text_segmentation: PdfTextSegmentation::Line,
-    }));
+    })));
     let anchors = vec![AnchorPage {
       name: "_Toc123".to_string(),
       page_index: 2,

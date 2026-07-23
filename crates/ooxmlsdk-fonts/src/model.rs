@@ -2674,9 +2674,22 @@ const DEFAULT_OFFICE_ALIASES: &[(&str, &str)] = &[
   // Legacy Office workbooks use the old Windows localized family name,
   // while current Excel substitutes the installed Arial face.
   ("Arial Cyr", "Arial"),
+  // Office's fixed-format writer uses Arial for Latin text when the legacy
+  // Arial Unicode MS face is unavailable; script fallback still owns glyphs
+  // outside Arial's coverage.
+  ("Arial Unicode MS", "Arial"),
   // Office fixed-format output maps this unavailable Swiss-family face to
   // Arial for legacy SpreadsheetML workbooks.
   ("Frutiger 45 Light", "Arial"),
+  // Apache POI 47862.xlsx requests this unavailable legacy Helvetica Neue
+  // face; Office fixed-format output substitutes the installed Arial face.
+  ("HelveticaNeue LightExt", "Arial"),
+  ("Helvetica Neue", "Arial"),
+  ("Helvetica Neue Light", "Arial"),
+  ("Helvetica Neue Medium", "Arial"),
+  // Apache POI bug65228.pptx carries a macOS Graphik theme, while Office's
+  // fixed PDF substitutes Calibri for the unavailable family.
+  ("Graphik", "Calibri"),
   ("DINPro-Medium", "DINPro"),
   ("Univers 45 Light", "Univers Light"),
 ];
@@ -3936,6 +3949,15 @@ fn first_strong_text_script(text: &str, wordprocessingml_font_slots: bool) -> Op
 }
 
 fn strong_text_script(ch: char, wordprocessingml_font_slots: bool) -> Option<TextScript> {
+  // ECMA-376 Part 1 §17.3.2.26 assigns Basic Latin text to the ASCII font
+  // slot. Unicode Script marks digits and punctuation as Common; leaving
+  // printable characters weak would incorrectly attach a trailing
+  // chart/shape number to a preceding East Asian run instead of selecting the
+  // Latin face. Layout controls and spaces remain weak so they stay with an
+  // adjacent painted run and do not create empty PDF font subsets.
+  if wordprocessingml_font_slots && matches!(ch as u32, 0x0021..=0x007E) {
+    return Some(TextScript::Latin);
+  }
   // ECMA-376 Part 1 §17.3.2.26 assigns the Latin-1 Supplement to the High
   // ANSI font slot unless w:hint=eastAsia activates one of its enumerated
   // exceptions. Treat its Common punctuation as Latin for the default case;
@@ -4359,6 +4381,60 @@ mod tests {
 
     assert_eq!(resolved.font_id, FontId(Arc::from("arial")));
     assert_eq!(resolved.resolved_family, Cow::Borrowed("Arial"));
+  }
+
+  #[test]
+  fn default_office_policy_maps_unavailable_helvetica_neue_spreadsheet_face() {
+    let mut registry = FontRegistry::with_default_policy();
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("arial", "Arial"),
+    );
+
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("HelveticaNeue LightExt")),
+      ..FontRequest::default()
+    };
+    let resolved = registry.resolve(&request).unwrap();
+
+    assert_eq!(resolved.font_id, FontId(Arc::from("arial")));
+    assert_eq!(resolved.resolved_family, Cow::Borrowed("Arial"));
+  }
+
+  #[test]
+  fn default_office_policy_maps_unavailable_legacy_office_families() {
+    let mut registry = FontRegistry::with_default_policy();
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("arial", "Arial"),
+    );
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("calibri", "Calibri"),
+    );
+
+    for family in [
+      "Arial Unicode MS",
+      "Helvetica Neue",
+      "Helvetica Neue Light",
+      "Helvetica Neue Medium",
+    ] {
+      let resolved = registry
+        .resolve(&FontRequest {
+          family: Some(Cow::Borrowed(family)),
+          ..FontRequest::default()
+        })
+        .unwrap();
+      assert_eq!(resolved.resolved_family, Cow::Borrowed("Arial"));
+    }
+
+    let graphik = registry
+      .resolve(&FontRequest {
+        family: Some(Cow::Borrowed("Graphik")),
+        ..FontRequest::default()
+      })
+      .unwrap();
+    assert_eq!(graphik.resolved_family, Cow::Borrowed("Calibri"));
   }
 
   #[test]
@@ -4793,6 +4869,24 @@ mod tests {
     assert_eq!(&"Junzha«问候语»"[runs[1].text_range.clone()], "问候语");
     assert_eq!(runs[2].script, TextScript::Latin);
     assert_eq!(&"Junzha«问候语»"[runs[2].text_range.clone()], "»");
+  }
+
+  #[test]
+  fn office_font_slots_keep_ascii_digits_in_the_latin_run() {
+    let runs = script_direction_runs_with_options(
+      "系列1",
+      FontSize(11.0),
+      ScriptScanOptions {
+        wordprocessingml_font_slots: true,
+        ..ScriptScanOptions::default()
+      },
+    );
+
+    assert_eq!(runs.len(), 2);
+    assert_eq!(runs[0].script, TextScript::Han);
+    assert_eq!(&"系列1"[runs[0].text_range.clone()], "系列");
+    assert_eq!(runs[1].script, TextScript::Latin);
+    assert_eq!(&"系列1"[runs[1].text_range.clone()], "1");
   }
 
   #[test]

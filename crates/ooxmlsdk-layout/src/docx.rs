@@ -127,6 +127,11 @@ const OFFICE_RECOVERED_LINE_HEIGHT_MULTIPLE: f32 = 276.0 / 240.0;
 const OFFICE_RECOVERED_ZH_HANS_TABLE_LINE_HEIGHT_MULTIPLE: f32 = 360.0 / 240.0;
 // The same repair path synthesizes the normal 360-twip section line pitch.
 const OFFICE_RECOVERED_DOCUMENT_GRID_LINE_PITCH_PT: f32 = 18.0;
+// ECMA-376 Part 1 §17.6.8 deliberately leaves an omitted w:distance
+// implementation-defined. Current Word fixed-format output places the right
+// edge of an automatic line number 18pt from the text margin; both Open XML
+// SDK Line numbers-Continuous fixtures exercise that omitted-attribute path.
+const OFFICE_AUTOMATIC_LINE_NUMBER_DISTANCE_PT: f32 = 18.0;
 
 #[derive(Clone, Copy, Debug, Default)]
 struct ImportSettings {
@@ -281,6 +286,8 @@ pub(crate) fn extract(
 
   Ok(DocxDocument {
     page,
+    line_number_style: styles
+      .character_run_style(Some("LineNumber"), styles.doc_default_run.clone()),
     has_styles_part: styles.has_styles_part,
     default_tab_stop_pt,
     compatibility_mode,
@@ -1161,9 +1168,9 @@ fn table_cell_text_rotation_degrees(properties: &w::TableCellProperties) -> Opti
     w::TextDirectionValues::TopToBottomRightToLeft
     | w::TextDirectionValues::TopToBottomRightToLeft2010
     | w::TextDirectionValues::TopToBottomRightToLeftRotated
-    | w::TextDirectionValues::TopToBottomRightToLeftRotated2010 => Some(-90.0),
+    | w::TextDirectionValues::TopToBottomRightToLeftRotated2010 => Some(90.0),
     w::TextDirectionValues::BottomToTopLeftToRight
-    | w::TextDirectionValues::BottomToTopLeftToRight2010 => Some(90.0),
+    | w::TextDirectionValues::BottomToTopLeftToRight2010 => Some(-90.0),
     w::TextDirectionValues::LefToRightTopToBottom
     | w::TextDirectionValues::LeftToRightTopToBottom2010
     | w::TextDirectionValues::LefttoRightTopToBottomRotated
@@ -2682,7 +2689,8 @@ fn table_cell_model(
       pending_out_of_place_breaks.clear();
     }
   }
-  if let Some(rotation_deg) = properties.and_then(table_cell_text_rotation_degrees) {
+  let text_rotation_deg = properties.and_then(table_cell_text_rotation_degrees);
+  if let Some(rotation_deg) = text_rotation_deg {
     rotate_blocks_text(&mut blocks, rotation_deg);
   }
   TableCell {
@@ -2718,6 +2726,7 @@ fn table_cell_model(
       .map(table_cell_vertical_alignment)
       .or(style.vertical_alignment)
       .unwrap_or_default(),
+    text_rotation_deg,
   }
 }
 
@@ -4717,8 +4726,34 @@ fn push_run(
         inlines.push(InlineItem::LastRenderedPageBreak);
       }
       w::RunChoice::SymbolChar(symbol) => {
-        if let Some(symbol) = symbol_text(symbol) {
-          text.push(symbol);
+        if let Some(symbol_char) = symbol_transport_char(symbol) {
+          flush_run_text(
+            inlines,
+            &mut text,
+            style.clone(),
+            hyperlink_url,
+            &style_ref_keys,
+          );
+          let mut symbol_style = style.clone();
+          let uses_declared_font_transport = symbol
+            .char
+            .as_deref()
+            .and_then(|code| u32::from_str_radix(code, 16).ok())
+            == Some(symbol_char as u32);
+          if uses_declared_font_transport
+            && let Some(font) = symbol.font.as_deref().filter(|font| !font.is_empty())
+          {
+            symbol_style.font_family = Some(Arc::from(font));
+            symbol_style.symbol_font_family = Some(Arc::from(font));
+          }
+          let mut symbol_text = symbol_char.to_string();
+          flush_run_text(
+            inlines,
+            &mut symbol_text,
+            symbol_style,
+            hyperlink_url,
+            &style_ref_keys,
+          );
         }
       }
       w::RunChoice::PageNumber => {
@@ -5638,6 +5673,22 @@ fn run_display_text(text: String, style: TextStyle) -> String {
 fn symbol_text(symbol: &w::SymbolChar) -> Option<char> {
   let code = u32::from_str_radix(symbol.char.as_deref()?, 16).ok()?;
   shared_symbol::font_symbol_code(symbol.font.as_deref(), code)
+}
+
+fn symbol_transport_char(symbol: &w::SymbolChar) -> Option<char> {
+  let code = u32::from_str_radix(symbol.char.as_deref()?, 16).ok()?;
+  let font = symbol.font.as_deref().unwrap_or("");
+  let is_wingdings = font.to_ascii_lowercase().contains("wingdings");
+  let is_symbol_font = font.eq_ignore_ascii_case("Symbol")
+    || font
+      .get(font.len().saturating_sub(" symbol".len())..)
+      .is_some_and(|suffix| suffix.eq_ignore_ascii_case(" symbol"))
+    || is_wingdings;
+  if is_symbol_font && (!is_wingdings || code & 0xFF >= 0x80) {
+    char::from_u32(code)
+  } else {
+    shared_symbol::font_symbol_code(symbol.font.as_deref(), code)
+  }
 }
 
 fn inline_image_impl(
@@ -14093,7 +14144,7 @@ fn line_numbering_model(properties: &w::LineNumberType) -> Option<LineNumbering>
       .distance
       .as_ref()
       .and_then(twips_measure_to_points)
-      .unwrap_or(14.0),
+      .unwrap_or(OFFICE_AUTOMATIC_LINE_NUMBER_DISTANCE_PT),
     restart_each_page: matches!(
       properties.restart,
       None | Some(w::LineNumberRestartValues::NewPage)
@@ -14107,6 +14158,24 @@ mod tests {
 
   fn twips(value: u32) -> TwipsMeasureValue {
     TwipsMeasureValue::Twips(value as u64)
+  }
+
+  #[test]
+  fn table_cell_writing_modes_rotate_in_the_declared_flow_direction() {
+    let bottom_to_top = w::TableCellProperties::from_bytes(
+      br#"<w:tcPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:textDirection w:val="btLr"/></w:tcPr>"#,
+    )
+    .expect("bottom-to-top table-cell properties");
+    let top_to_bottom = w::TableCellProperties::from_bytes(
+      br#"<w:tcPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:textDirection w:val="tbRl"/></w:tcPr>"#,
+    )
+    .expect("top-to-bottom table-cell properties");
+
+    assert_eq!(
+      table_cell_text_rotation_degrees(&bottom_to_top),
+      Some(-90.0)
+    );
+    assert_eq!(table_cell_text_rotation_degrees(&top_to_bottom), Some(90.0));
   }
 
   fn signed_twips(value: i64) -> SignedTwipsMeasureValue {
@@ -14128,6 +14197,31 @@ mod tests {
       space: Some(xml::SpaceProcessingModeValues::Preserve),
       xml_content: Some(value.into()),
     })
+  }
+
+  #[test]
+  fn word_automatic_line_number_distance_is_eighteen_points() {
+    let automatic = w::LineNumberType::from_bytes(
+      br#"<w:lnNumType xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:countBy="1"/>"#,
+    )
+    .expect("automatic line numbering");
+    let explicit = w::LineNumberType::from_bytes(
+      br#"<w:lnNumType xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:countBy="1" w:distance="720"/>"#,
+    )
+    .expect("explicit line-number distance");
+
+    assert_eq!(
+      line_numbering_model(&automatic)
+        .expect("line numbering")
+        .distance_pt,
+      18.0
+    );
+    assert_eq!(
+      line_numbering_model(&explicit)
+        .expect("line numbering")
+        .distance_pt,
+      36.0
+    );
   }
 
   #[test]
@@ -14677,7 +14771,7 @@ mod tests {
   }
 
   #[test]
-  fn symbol_runs_emit_unicode_text() {
+  fn symbol_runs_preserve_declared_symbol_font_transport_codes() {
     let mut inlines = Vec::new();
     let run = w::Run {
       run_choice: vec![
@@ -14688,6 +14782,10 @@ mod tests {
         w::RunChoice::SymbolChar(w::SymbolChar {
           font: Some("Wingdings".into()),
           char: Some("F0FC".into()),
+        }),
+        w::RunChoice::SymbolChar(w::SymbolChar {
+          font: Some("Wingdings".into()),
+          char: Some("F04C".into()),
         }),
         w::RunChoice::SymbolChar(w::SymbolChar {
           font: None,
@@ -14707,7 +14805,15 @@ mod tests {
       None,
     );
 
-    assert_eq!(inline_text(&inlines), "•✓©");
+    assert_eq!(inline_text(&inlines), "\u{f0b7}\u{f0fc}●©");
+    let symbol_fonts = inlines
+      .iter()
+      .filter_map(|inline| match inline {
+        InlineItem::Text(run) => run.style.font_family.as_deref(),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(symbol_fonts, ["Symbol", "Wingdings"]);
   }
 
   #[test]

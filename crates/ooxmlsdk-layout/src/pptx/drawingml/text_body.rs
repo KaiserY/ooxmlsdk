@@ -34,6 +34,7 @@ pub(crate) struct TextBodyDisplayProperties {
   pub(crate) anchor: a::TextAnchoringTypeValues,
   pub(crate) anchor_center: bool,
   pub(crate) from_word_art: bool,
+  pub(crate) preset_text_warp: Option<a::TextShapeValues>,
   pub(crate) upright: bool,
   pub(crate) auto_fit: TextAutoFit,
 }
@@ -180,6 +181,7 @@ impl Default for TextBodyDisplayProperties {
       anchor: a::TextAnchoringTypeValues::Top,
       anchor_center: false,
       from_word_art: false,
+      preset_text_warp: None,
       upright: false,
       auto_fit: TextAutoFit::None,
     }
@@ -226,7 +228,12 @@ impl TextBodyDisplayProperties {
         .is_some_and(|value| value.as_bool()),
       from_word_art: properties
         .from_word_art
-        .is_some_and(|value| value.as_bool()),
+        .is_some_and(|value| value.as_bool())
+        || properties.preset_text_warp.is_some(),
+      preset_text_warp: properties
+        .preset_text_warp
+        .as_deref()
+        .map(|warp| warp.preset),
       upright: properties.up_right.is_some_and(|value| value.as_bool()),
       auto_fit: TextAutoFit::None,
     };
@@ -294,8 +301,12 @@ impl TextBodyDisplayProperties {
       Some(a::TextVerticalValues::Vertical270) => 270.0,
       _ => 0.0,
     };
+    // ECMA-376 Part 1 §20.1.10.83 defines vert/vert270 as the text flow
+    // direction. bodyPr@upright keeps text upright against transforms applied
+    // to the text body and its shape; it does not turn vertical text back into
+    // horizontal text.
     if self.upright {
-      body_rotation
+      vertical_rotation
     } else {
       body_rotation + vertical_rotation
     }
@@ -443,6 +454,25 @@ mod tests {
   }
 
   #[test]
+  fn preset_text_warp_marks_word_art_and_preserves_its_kind() {
+    let properties = a::BodyProperties {
+      preset_text_warp: Some(Box::new(a::PresetTextWarp {
+        preset: a::TextShapeValues::TextPlain,
+        ..a::PresetTextWarp::default()
+      })),
+      ..a::BodyProperties::default()
+    };
+
+    let display = TextBodyDisplayProperties::from_body_properties(&properties);
+
+    assert!(display.from_word_art);
+    assert_eq!(
+      display.preset_text_warp,
+      Some(a::TextShapeValues::TextPlain)
+    );
+  }
+
+  #[test]
   fn empty_placeholder_body_properties_inherit_vertical_anchor() {
     let mut inherited = TextBody::default();
     inherited.display_properties.anchor = a::TextAnchoringTypeValues::Center;
@@ -478,5 +508,17 @@ mod tests {
     assert_eq!(properties.top_inset, inherited_properties.top_inset);
     assert_eq!(properties.right_inset, inherited_properties.right_inset);
     assert_eq!(properties.bottom_inset, inherited_properties.bottom_inset);
+  }
+
+  #[test]
+  fn upright_vertical_text_retains_its_vertical_flow_rotation() {
+    let display = TextBodyDisplayProperties {
+      upright: true,
+      vertical: Some(a::TextVerticalValues::Vertical270),
+      text_area_rotation: Some(600_000),
+      ..TextBodyDisplayProperties::default()
+    };
+
+    assert_eq!(display.rotation_degrees(), 270.0);
   }
 }

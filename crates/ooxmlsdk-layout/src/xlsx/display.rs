@@ -25,6 +25,7 @@ use super::worksheet::{CalcSheet, CellAddress, CellRange, CellRect};
 use crate::pptx::chart::{
   ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, lower_clustered_column_chart,
 };
+use crate::pptx::drawingml::color::{Color, RgbHexColor};
 
 const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
 // margins are 20 twips on each side.
@@ -1098,20 +1099,32 @@ fn render_cell_text(
     text
   };
   let rendered_text;
-  let lines = if text.contains('\n') || text.contains('\r') {
-    rendered_text = if wrap_text || options.formula {
+  let wrapped_lines;
+  let lines = if wrap_text && !options.formula {
+    // ECMA-376 Part 1 §18.8.1 defines wrapText as line-wrapping the cell
+    // contents within the cell. Explicit line breaks remain hard paragraph
+    // boundaries; Calc's EditEngine then wraps each paragraph to the output
+    // width (ScOutputData::DrawEdit in sc/source/ui/view/output2.cxx).
+    wrapped_lines = wrap_cell_text(
+      text,
+      (rect.width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0).max(1.0),
+      &style,
+      text_metrics,
+    );
+    wrapped_lines.iter().map(String::as_str).collect::<Vec<_>>()
+  } else if text.contains('\n') || text.contains('\r') {
+    rendered_text = if options.formula {
       text.lines().collect::<Vec<_>>().join(" ")
     } else {
       text.lines().collect::<String>()
     };
     vec![rendered_text.as_str()]
-  } else if wrap_text {
-    text.lines().collect::<Vec<_>>()
   } else {
     vec![text.lines().next().unwrap_or(text)]
   };
   let text_height = line_height * lines.len().max(1) as f32;
-  let mut y_pt = match alignment.and_then(|alignment| alignment.vertical) {
+  let vertical_alignment = alignment.and_then(|alignment| alignment.vertical);
+  let mut y_pt = match vertical_alignment {
     Some(x::VerticalAlignmentValues::Center) => {
       rect.y_pt + ((rect.height_pt - text_height) / 2.0).max(0.0)
     }
@@ -1151,6 +1164,46 @@ fn render_cell_text(
     }));
     y_pt += line_height;
   }
+}
+
+fn wrap_cell_text(
+  text: &str,
+  available_width_pt: f32,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> Vec<String> {
+  let mut lines = Vec::new();
+  for paragraph in text
+    .split('\n')
+    .map(|line| line.strip_suffix('\r').unwrap_or(line))
+  {
+    if paragraph.is_empty() || text_metrics.measure_text(paragraph, style) <= available_width_pt {
+      lines.push(paragraph.to_string());
+      continue;
+    }
+
+    let mut current = String::new();
+    for word in paragraph.split_whitespace() {
+      let candidate = if current.is_empty() {
+        word.to_string()
+      } else {
+        format!("{current} {word}")
+      };
+      if current.is_empty() || text_metrics.measure_text(&candidate, style) <= available_width_pt {
+        current = candidate;
+      } else {
+        lines.push(std::mem::take(&mut current));
+        current.push_str(word);
+      }
+    }
+    if !current.is_empty() {
+      lines.push(current);
+    }
+  }
+  if lines.is_empty() {
+    lines.push(String::new());
+  }
+  lines
 }
 
 fn repeat_cell_text_to_fill(
@@ -1905,19 +1958,21 @@ fn collect_persisted_group_bounds(
 }
 
 fn push_diagram_shape_items(items: &mut Vec<PageItem>, shape: &shared_diagram::DiagramShape) {
-  if shape.is_connector {
-    items.push(PageItem::Line(diagram_connector_line_item(shape)));
-  } else {
-    items.push(PageItem::Rect(RectItem {
-      x_pt: shape.x,
-      y_pt: shape.y,
-      width_pt: shape.width,
-      height_pt: shape.height,
-      fill_color: Some(shape.fill),
-      fill_opacity: 1.0,
-      stroke: Some(BorderStyle::default()),
-      stroke_opacity: 1.0,
-    }));
+  if shape.draw_geometry {
+    if shape.is_connector {
+      items.push(PageItem::Line(diagram_connector_line_item(shape)));
+    } else {
+      items.push(PageItem::Rect(RectItem {
+        x_pt: shape.x,
+        y_pt: shape.y,
+        width_pt: shape.width,
+        height_pt: shape.height,
+        fill_color: Some(shape.fill),
+        fill_opacity: 1.0,
+        stroke: Some(BorderStyle::default()),
+        stroke_opacity: 1.0,
+      }));
+    }
   }
   let text = diagram_text_body_text(&shape.text_body);
   if !text.trim().is_empty() {
@@ -2059,7 +2114,10 @@ fn lower_drawing_chart(
     .chain(drawing.extended_charts.iter())
     .find(|chart| chart.relationship_id.as_deref() == Some(relationship_id))?;
   let chart_space = resource.chart_space.as_deref()?;
-  let chart = shared_chart::clustered_column_chart(chart_space)?;
+  let chart = shared_chart::clustered_column_chart_for_ui_language(
+    chart_space,
+    Some(import.styles.output_ui_language()),
+  )?;
   let series_colors = chart
     .series
     .iter()
@@ -2077,10 +2135,61 @@ fn lower_drawing_chart(
   title_style.bold = true;
   let mut label_style = import.styles.default_chart_text_style();
   label_style.font_size_pt = 10.0;
+  if resource.styles > 0 {
+    // The checked-in Office ChartStyle 201 family uses tx1 with lumMod=65%
+    // and lumOff=35% for title/axis/legend font references. Legacy charts
+    // without a ChartStyle relationship retain untransformed black tx1.
+    let transformed_text = RgbColor {
+      r: 0x59,
+      g: 0x59,
+      b: 0x59,
+    };
+    title_style.color = transformed_text;
+    label_style.color = transformed_text;
+  }
   if let Some(typeface) = xlsx_chart_latin_typeface(chart_space) {
-    let typeface = Arc::from(typeface);
+    // ECMA-376 DrawingML chart text commonly stores a theme placeholder such
+    // as `+mn-lt`, not a physical family. Resolve it through the workbook
+    // theme before shaping; passing the token to the system font query loses
+    // the chart's Calibri minor-font contract and selects an unrelated generic
+    // fallback.
+    let typeface = Arc::from(import.styles.resolve_drawingml_theme_font(typeface));
     title_style.font_family = Some(Arc::clone(&typeface));
     label_style.font_family = Some(typeface);
+  }
+  if let Some(properties) = chart_space.text_properties.as_deref() {
+    apply_xlsx_chart_text_properties(&mut title_style, properties, import);
+    apply_xlsx_chart_text_properties(&mut label_style, properties, import);
+  }
+  if let Some(properties) = chart_space
+    .chart
+    .title
+    .as_deref()
+    .and_then(|title| title.text_properties.as_deref())
+  {
+    apply_xlsx_chart_text_properties(&mut title_style, properties, import);
+  }
+  if let Some(properties) = chart_space
+    .chart
+    .legend
+    .as_deref()
+    .and_then(|legend| legend.text_properties.as_deref())
+  {
+    apply_xlsx_chart_text_properties(&mut label_style, properties, import);
+  }
+  for properties in chart_space
+    .chart
+    .plot_area
+    .plot_area_choice2
+    .iter()
+    .filter_map(|axis| match axis {
+      c::PlotAreaChoice2::ValueAxis(axis) => axis.text_properties.as_deref(),
+      c::PlotAreaChoice2::CategoryAxis(axis) => axis.text_properties.as_deref(),
+      c::PlotAreaChoice2::DateAxis(axis) => axis.text_properties.as_deref(),
+      c::PlotAreaChoice2::SeriesAxis(axis) => axis.text_properties.as_deref(),
+    })
+  {
+    apply_xlsx_chart_text_properties(&mut label_style, properties, import);
   }
   let mut items = lower_clustered_column_chart(
     ChartFrame {
@@ -2090,7 +2199,7 @@ fn lower_drawing_chart(
       height_pt: rect.height_pt,
     },
     &chart,
-    shared_chart::automatic_chart_title(None),
+    shared_chart::automatic_chart_title(Some(import.styles.output_ui_language())),
     &ClusteredColumnStyle {
       layout_profile: ChartLayoutProfile::Excel,
       has_explicit_title: false,
@@ -2148,20 +2257,110 @@ fn xlsx_chart_latin_typeface(chart_space: &c::ChartSpace) -> Option<&str> {
 }
 
 fn chart_text_properties_latin_typeface(properties: &c::TextProperties) -> Option<&str> {
+  chart_default_run_properties(properties).find_map(|properties| {
+    properties
+      .latin_font
+      .as_ref()?
+      .typeface
+      .as_deref()
+      .filter(|typeface| !typeface.trim().is_empty())
+  })
+}
+
+fn chart_default_run_properties(
+  properties: &c::TextProperties,
+) -> impl Iterator<Item = &a::DefaultRunProperties> {
   properties
     .paragraph
     .iter()
     .filter_map(|paragraph| paragraph.paragraph_properties.as_deref())
     .filter_map(|paragraph| paragraph.default_run_properties.as_deref())
-    .find_map(|properties| properties.latin_font.as_ref()?.typeface.as_deref())
-    .or_else(|| {
+    .chain(
       properties
         .list_style
         .as_deref()
         .and_then(|style| style.default_paragraph_properties.as_deref())
-        .and_then(|paragraph| paragraph.default_run_properties.as_deref())
-        .and_then(|properties| properties.latin_font.as_ref()?.typeface.as_deref())
-    })
+        .and_then(|paragraph| paragraph.default_run_properties.as_deref()),
+    )
+}
+
+fn apply_xlsx_chart_text_properties(
+  style: &mut TextStyle,
+  properties: &c::TextProperties,
+  import: &ExcelImport,
+) {
+  let Some(properties) = chart_default_run_properties(properties).next() else {
+    return;
+  };
+  if let Some(size) = properties.font_size.filter(|size| *size > 0) {
+    style.font_size_pt = size as f32 / 100.0;
+  }
+  if let Some(bold) = properties.bold.as_ref() {
+    style.bold = bold.as_bool();
+  }
+  if let Some(italic) = properties.italic.as_ref() {
+    style.italic = italic.as_bool();
+  }
+  if let Some(typeface) = properties
+    .latin_font
+    .as_ref()
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.trim().is_empty())
+  {
+    style.font_family = Some(Arc::from(
+      import.styles.resolve_drawingml_theme_font(typeface),
+    ));
+  }
+  if let Some(color) = default_run_properties_color(properties, import) {
+    style.color = color;
+  }
+}
+
+fn default_run_properties_color(
+  properties: &a::DefaultRunProperties,
+  import: &ExcelImport,
+) -> Option<RgbColor> {
+  let a::DefaultRunPropertiesChoice::SolidFill(fill) =
+    properties.default_run_properties_choice1.as_ref()?
+  else {
+    return None;
+  };
+  let color = fill
+    .solid_fill_choice
+    .as_ref()
+    .and_then(Color::from_solid_fill_choice)?;
+  let mut scheme_resolver = |value| {
+    let index = xlsx_scheme_color_index(value)?;
+    let color = import.styles.theme_color(index, 0.0)?;
+    Some(Color::RgbHex(RgbHexColor {
+      value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+      transformations: Vec::new(),
+    }))
+  };
+  let color = color.resolve_rgb(&mut scheme_resolver, None)?;
+  Some(RgbColor {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+  })
+}
+
+fn xlsx_scheme_color_index(value: a::SchemeColorValues) -> Option<u32> {
+  match value {
+    a::SchemeColorValues::Light1 | a::SchemeColorValues::Background1 => Some(0),
+    a::SchemeColorValues::Dark1 | a::SchemeColorValues::Text1 => Some(1),
+    a::SchemeColorValues::Light2 | a::SchemeColorValues::Background2 => Some(2),
+    a::SchemeColorValues::Dark2 | a::SchemeColorValues::Text2 => Some(3),
+    a::SchemeColorValues::Accent1 => Some(4),
+    a::SchemeColorValues::Accent2 => Some(5),
+    a::SchemeColorValues::Accent3 => Some(6),
+    a::SchemeColorValues::Accent4 => Some(7),
+    a::SchemeColorValues::Accent5 => Some(8),
+    a::SchemeColorValues::Accent6 => Some(9),
+    a::SchemeColorValues::Hyperlink => Some(10),
+    a::SchemeColorValues::FollowedHyperlink => Some(11),
+    _ => None,
+  }
 }
 
 fn clip_chart_item_to_rect(item: &mut PageItem, clip: CellRect, metrics: &mut TextMetrics) -> bool {
@@ -2268,19 +2467,7 @@ fn xlsx_chart_solid_fill_color(fill: &a::SolidFill, import: &ExcelImport) -> Opt
       })
     }
     a::SolidFillChoice::SchemeColor(color) => {
-      let index = match color.val {
-        a::SchemeColorValues::Light1 => 0,
-        a::SchemeColorValues::Dark1 => 1,
-        a::SchemeColorValues::Light2 => 2,
-        a::SchemeColorValues::Dark2 => 3,
-        a::SchemeColorValues::Accent1 => 4,
-        a::SchemeColorValues::Accent2 => 5,
-        a::SchemeColorValues::Accent3 => 6,
-        a::SchemeColorValues::Accent4 => 7,
-        a::SchemeColorValues::Accent5 => 8,
-        a::SchemeColorValues::Accent6 => 9,
-        _ => return None,
-      };
+      let index = xlsx_scheme_color_index(color.val)?;
       import.styles.theme_color(index, 0.0)
     }
     _ => None,
@@ -2326,25 +2513,44 @@ fn render_drawing_text(
   layout: Option<DrawingTextLayout>,
   hyperlink_url: Option<&str>,
 ) {
-  let style = style.unwrap_or_default();
+  let mut style = style.unwrap_or_default();
   let layout = layout.unwrap_or_default();
+  style.rotation_deg = match layout.vertical {
+    Some(a::TextVerticalValues::Vertical | a::TextVerticalValues::EastAsianVetical) => 90.0,
+    Some(a::TextVerticalValues::Vertical270) => 270.0,
+    _ => 0.0,
+  };
   let line_height = (style.font_size_pt * 1.15).max(1.0);
   let mut text_metrics = TextMetrics::new();
   for (index, line) in text.lines().filter(|line| !line.is_empty()).enumerate() {
-    let y = rect.y_pt + layout.top_inset_pt + index as f32 * line_height;
-    if y > rect.y_pt + rect.height_pt - layout.bottom_inset_pt {
+    let vertical_text = style.rotation_deg != 0.0;
+    let y = if vertical_text {
+      rect.y_pt + (rect.height_pt - line_height) / 2.0
+    } else {
+      rect.y_pt + layout.top_inset_pt + index as f32 * line_height
+    };
+    if !vertical_text && y > rect.y_pt + rect.height_pt - layout.bottom_inset_pt {
       break;
     }
-    let available_width = (rect.width_pt - layout.left_inset_pt - layout.right_inset_pt).max(0.0);
+    let available_width = if vertical_text {
+      (rect.height_pt - layout.top_inset_pt - layout.bottom_inset_pt).max(0.0)
+    } else {
+      (rect.width_pt - layout.left_inset_pt - layout.right_inset_pt).max(0.0)
+    };
     let text_width = text_metrics.measure_text(line, &style);
-    let x = match layout.alignment {
+    let aligned_offset = match layout.alignment {
       a::TextAlignmentTypeValues::Center => {
-        rect.x_pt + layout.left_inset_pt + (available_width - text_width).max(0.0) / 2.0
+        layout.left_inset_pt + (available_width - text_width).max(0.0) / 2.0
       }
       a::TextAlignmentTypeValues::Right => {
-        rect.x_pt + layout.left_inset_pt + (available_width - text_width).max(0.0)
+        layout.left_inset_pt + (available_width - text_width).max(0.0)
       }
-      _ => rect.x_pt + layout.left_inset_pt,
+      _ => layout.left_inset_pt,
+    };
+    let x = if vertical_text {
+      rect.x_pt + (rect.width_pt - text_width) / 2.0 + index as f32 * line_height
+    } else {
+      rect.x_pt + aligned_offset
     };
     items.push(PageItem::Text(TextItem {
       x_pt: x,
@@ -2352,7 +2558,10 @@ fn render_drawing_text(
       line_height_pt: line_height,
       text: line.to_string(),
       style: style.clone(),
-      rotation_center_pt: None,
+      rotation_center_pt: vertical_text.then_some((
+        rect.x_pt + rect.width_pt / 2.0,
+        rect.y_pt + rect.height_pt / 2.0,
+      )),
       hyperlink_url: hyperlink_url.map(ToString::to_string),
       form_widget_id: None,
       paragraph_bidi: false,
@@ -2365,6 +2574,7 @@ fn render_drawing_text(
 #[derive(Clone, Copy, Debug)]
 struct DrawingTextLayout {
   alignment: a::TextAlignmentTypeValues,
+  vertical: Option<a::TextVerticalValues>,
   left_inset_pt: f32,
   top_inset_pt: f32,
   right_inset_pt: f32,
@@ -2375,6 +2585,7 @@ impl Default for DrawingTextLayout {
   fn default() -> Self {
     Self {
       alignment: a::TextAlignmentTypeValues::Left,
+      vertical: None,
       left_inset_pt: XLSX_CELL_TEXT_INSET_PT,
       top_inset_pt: XLSX_CELL_TEXT_INSET_PT,
       right_inset_pt: XLSX_CELL_TEXT_INSET_PT,
@@ -2386,6 +2597,7 @@ impl Default for DrawingTextLayout {
 fn drawing_object_text_layout(object: &super::drawing::DrawingObjectModel) -> DrawingTextLayout {
   DrawingTextLayout {
     alignment: object.text_alignment.unwrap_or_default(),
+    vertical: object.text_vertical,
     left_inset_pt: object
       .text_left_inset_emu
       .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points),
@@ -2405,35 +2617,35 @@ fn drawing_object_text_style(
   import: &ExcelImport,
   object: &super::drawing::DrawingObjectModel,
 ) -> Option<TextStyle> {
-  let mut style = TextStyle::default();
-  let mut changed = false;
+  let mut style = import.styles.default_drawing_text_style();
   if let Some(font_size) = object.text_font_size_points100 {
     style.font_size_pt = font_size as f32 / 100.0;
-    changed = true;
   }
   if let Some(color) = object.text_color {
     style.color = color;
-    changed = true;
+  }
+  if let Some(bold) = object.text_bold {
+    style.bold = bold;
+  }
+  if let Some(italic) = object.text_italic {
+    style.italic = italic;
   }
   if let Some(typeface) = object.text_font_family.as_deref() {
     style.font_family = Some(Arc::from(
       import.styles.resolve_drawingml_theme_font(typeface),
     ));
-    changed = true;
   }
   if let Some(typeface) = object.text_east_asia_font_family.as_deref() {
     style.east_asia_font_family = Some(Arc::from(
       import.styles.resolve_drawingml_theme_font(typeface),
     ));
-    changed = true;
   }
   if let Some(typeface) = object.text_complex_font_family.as_deref() {
     style.complex_font_family = Some(Arc::from(
       import.styles.resolve_drawingml_theme_font(typeface),
     ));
-    changed = true;
   }
-  changed.then_some(style)
+  Some(style)
 }
 
 fn render_metafile_texts(
@@ -3180,6 +3392,29 @@ mod cell_alignment_tests {
   fn overflow_hashes_fill_the_available_cell_width() {
     assert_eq!(calc_cell_overflow_hash_count(90.0, 6.0), 15);
     assert_eq!(calc_cell_overflow_hash_count(5.0, 6.0), 1);
+  }
+
+  #[test]
+  fn wrapped_cell_text_preserves_explicit_line_breaks() {
+    let mut metrics = TextMetrics::new();
+    let lines = wrap_cell_text(
+      "Line1\r\nLine2\nLine3",
+      1_000.0,
+      &TextStyle::default(),
+      &mut metrics,
+    );
+
+    assert_eq!(lines, ["Line1", "Line2", "Line3"]);
+  }
+
+  #[test]
+  fn wrapped_cell_text_wraps_paragraphs_to_the_cell_width() {
+    let style = TextStyle::default();
+    let mut metrics = TextMetrics::new();
+    let one_word_width = metrics.measure_text("one", &style);
+    let lines = wrap_cell_text("one two three", one_word_width + 0.1, &style, &mut metrics);
+
+    assert_eq!(lines, ["one", "two", "three"]);
   }
 }
 

@@ -153,13 +153,22 @@ pub(super) fn paragraph_model_with_base<'a>(
   let has_numbering_label = list_label.is_some() || numbering_image.is_some();
   let list_label_tab_stop_pt = has_numbering_label
     .then(|| {
-      style_tab_stop_pt
-        .or(numbering_list_tab_stop_pt)
-        .or_else(|| {
-          (!has_direct_indentation && format.indent_left_pt > 0.0).then_some(
-            format.indent_left_pt + format.first_line_indent_pt.max(format.indent_left_pt) * 4.0,
-          )
-        })
+      // A direct paragraph indent is Word's persisted result of opening and
+      // accepting the paragraph dialog for pseudo-numbering. In that state
+      // the numbering-level num tab remains authoritative and the paragraph
+      // style's ordinary tab must not revive the old large pseudo-numbering
+      // gap (tdf153042_noTab). Without direct indentation, the style tab is
+      // the legacy large-tab behavior retained by Word 2019.
+      (if has_direct_indentation {
+        numbering_list_tab_stop_pt
+      } else {
+        style_tab_stop_pt.or(numbering_list_tab_stop_pt)
+      })
+      .or_else(|| {
+        (!has_direct_indentation && format.indent_left_pt > 0.0).then_some(
+          format.indent_left_pt + format.first_line_indent_pt.max(format.indent_left_pt) * 4.0,
+        )
+      })
     })
     .flatten();
   if list_label.as_deref() == Some("\t") && style_tab_stop_pt.is_some() && !has_direct_indentation {

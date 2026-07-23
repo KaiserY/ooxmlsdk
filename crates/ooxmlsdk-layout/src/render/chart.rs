@@ -66,6 +66,7 @@ pub struct ClusteredColumnChart<'a> {
   pub series: Vec<ClusteredColumnSeries<'a>>,
   pub gap_width_percent: f64,
   pub overlap_percent: f64,
+  pub category_axis: Option<&'a c::CategoryAxis>,
   pub value_axis: Option<&'a c::ValueAxis>,
   pub legend_position: Option<ChartLegendPosition>,
 }
@@ -95,12 +96,31 @@ pub fn automatic_chart_title(ui_language: Option<&str>) -> &'static str {
   }
 }
 
+pub fn automatic_series_title(ui_language: Option<&str>, series_index: usize) -> String {
+  let language = ui_language.unwrap_or("en").to_ascii_lowercase();
+  if language == "zh-tw" || language == "zh-hk" || language == "zh-mo" || language == "zh-hant" {
+    format!("數列 {series_index}")
+  } else if language == "zh" || language == "zh-cn" || language == "zh-sg" || language == "zh-hans"
+  {
+    format!("系列 {series_index}")
+  } else {
+    format!("Series {series_index}")
+  }
+}
+
 /// Extracts the first ordinary two-dimensional clustered column chart.
 ///
 /// Cached category/value sequences are data sources, not inherently visible
 /// text.  Keeping them in a typed chart model lets each renderer decide which
 /// labels are visible from the chart/axis/data-label settings.
 pub fn clustered_column_chart(chart_space: &c::ChartSpace) -> Option<ClusteredColumnChart<'_>> {
+  clustered_column_chart_for_ui_language(chart_space, None)
+}
+
+pub fn clustered_column_chart_for_ui_language<'a>(
+  chart_space: &'a c::ChartSpace,
+  ui_language: Option<&str>,
+) -> Option<ClusteredColumnChart<'a>> {
   let bar_chart = chart_space
     .chart
     .plot_area
@@ -129,13 +149,14 @@ pub fn clustered_column_chart(chart_space: &c::ChartSpace) -> Option<ClusteredCo
       .series_text
       .map(series_text_value)
       .filter(|value| !value.is_empty())
-      .unwrap_or_else(|| default_series_label(series_ref, series_index + 1));
-    if categories.is_empty() {
-      categories = source
-        .category_axis_data
-        .as_deref()
-        .map(indexed_category_axis_text_values)
-        .unwrap_or_default();
+      .unwrap_or_else(|| default_series_label(series_ref, series_index + 1, ui_language));
+    let source_categories = source
+      .category_axis_data
+      .as_deref()
+      .map(indexed_category_axis_text_values)
+      .unwrap_or_default();
+    if categories.is_empty() && !source_categories.is_empty() {
+      categories.clone_from(&source_categories);
     }
     let values = source
       .values
@@ -149,7 +170,18 @@ pub fn clustered_column_chart(chart_space: &c::ChartSpace) -> Option<ClusteredCo
     let mut data_point_fills = Vec::new();
     collect_data_point_solid_fills(&source.data_point, &mut data_point_fills);
     data_point_fills.sort_by_key(|fill| fill.index);
-    let data_labels = clustered_column_data_labels(source, &values);
+    let label_categories = if source_categories.is_empty() {
+      (1..=values.len()).map(|index| index.to_string()).collect()
+    } else {
+      source_categories
+    };
+    let data_labels = clustered_column_data_labels(
+      source,
+      bar_chart.data_labels.as_deref(),
+      &name,
+      &label_categories,
+      &values,
+    );
     series.push(ClusteredColumnSeries {
       name,
       values,
@@ -182,6 +214,15 @@ pub fn clustered_column_chart(chart_space: &c::ChartSpace) -> Option<ClusteredCo
     .iter()
     .find_map(|choice| match choice {
       c::PlotAreaChoice2::ValueAxis(axis) => Some(axis.as_ref()),
+      _ => None,
+    });
+  let category_axis = chart_space
+    .chart
+    .plot_area
+    .plot_area_choice2
+    .iter()
+    .find_map(|choice| match choice {
+      c::PlotAreaChoice2::CategoryAxis(axis) => Some(axis.as_ref()),
       _ => None,
     });
   let legend_position = chart_space.chart.legend.as_deref().map(|legend| {
@@ -217,6 +258,7 @@ pub fn clustered_column_chart(chart_space: &c::ChartSpace) -> Option<ClusteredCo
         .and_then(|overlap| overlap.val)
         .unwrap_or(0),
     ),
+    category_axis,
     value_axis,
     legend_position,
   })
@@ -231,8 +273,16 @@ pub fn clustered_column_chart(chart_space: &c::ChartSpace) -> Option<ClusteredCo
 pub fn ordinary_clustered_column_chart(
   chart_space: &c::ChartSpace,
 ) -> Option<ClusteredColumnChart<'_>> {
-  if chart_space.shape_properties.is_some()
-    || chart_space.chart.plot_area.shape_properties.is_some()
+  if chart_space
+    .shape_properties
+    .as_deref()
+    .is_some_and(shape_properties_are_visible)
+    || chart_space
+      .chart
+      .plot_area
+      .shape_properties
+      .as_deref()
+      .is_some_and(shape_properties_are_visible)
     || chart_space.chart.plot_area.data_table.is_some()
     || chart_space.chart.plot_area.plot_area_choice1.len() != 1
   {
@@ -241,67 +291,221 @@ pub fn ordinary_clustered_column_chart(
   clustered_column_chart(chart_space)
 }
 
+/// Returns whether `c:spPr` contributes visible chart- or plot-area paint.
+///
+/// ISO/IEC 29500-1:2016 §21.2.2.197 delegates chart shape properties to
+/// DrawingML.  An explicit `a:noFill` together with `a:ln/a:noFill` is the
+/// same non-painting state as omitted properties.  LibreOffice writes that
+/// pair on many otherwise ordinary charts, so treating mere element presence
+/// as unsupported incorrectly bypasses the complete chart lowerer.
+fn shape_properties_are_visible(properties: &c::ShapeProperties) -> bool {
+  let fill_is_inert = matches!(
+    properties.shape_properties_choice2.as_ref(),
+    None | Some(c::ShapePropertiesChoice2::NoFill(_))
+  );
+  let outline_is_inert = properties.outline.as_deref().is_none_or(|outline| {
+    matches!(
+      outline.outline_choice1.as_ref(),
+      None | Some(a::OutlineChoice::NoFill(_))
+    )
+  });
+
+  !fill_is_inert
+    || !outline_is_inert
+    || properties.black_white_mode.is_some()
+    || properties.transform2_d.is_some()
+    || properties.shape_properties_choice1.is_some()
+    || properties.shape_properties_choice3.is_some()
+    || properties.scene3_d_type.is_some()
+    || properties.shape3_d_type.is_some()
+    || properties.shape_properties_extension_list.is_some()
+}
+
 fn clustered_column_data_labels(
   series: &c::BarChartSeries,
+  chart_group_labels: Option<&c::DataLabels>,
+  series_name: &str,
+  categories: &[String],
   values: &[Option<f64>],
 ) -> Vec<ClusteredColumnDataLabel> {
-  let Some(labels) = series.data_labels.as_deref() else {
-    return Vec::new();
-  };
-  let group = match labels.data_labels_choice.as_ref() {
-    Some(c::DataLabelsChoice::Sequence(sequence)) => Some(sequence.as_ref()),
-    _ => None,
-  };
-  let mut result = Vec::new();
-  for label in &labels.data_label {
-    if label.data_label_choice.iter().any(|choice| {
-      matches!(choice, c::DataLabelChoice::Delete(delete) if delete.val.is_none_or(|value| value.as_bool()))
-    }) {
-      continue;
+  // ECMA-376 Part 1 §21.2.2.49 defines c:dLbls as the settings for an
+  // entire series or chart. MS-OI29500 §21.2.2.49 adds the Office override
+  // hierarchy: chart-group dLbls < series dLbls < individual dLbl. Expand the
+  // resolved series settings across every point, then apply point overrides.
+  let mut settings = ClusteredColumnDataLabelSettings::default();
+  apply_data_labels_settings(&mut settings, chart_group_labels);
+  apply_data_labels_settings(&mut settings, series.data_labels.as_deref());
+
+  let mut point_labels = vec![None; values.len()];
+  if let Some(labels) = series.data_labels.as_deref() {
+    for label in &labels.data_label {
+      let Ok(point_index) = usize::try_from(label.index.val) else {
+        continue;
+      };
+      if point_index < point_labels.len() {
+        point_labels[point_index] = Some(label);
+      }
     }
-    let sequence = label
-      .data_label_choice
-      .iter()
-      .find_map(|choice| match choice {
-        c::DataLabelChoice::Sequence(sequence) => Some(sequence.as_ref()),
-        _ => None,
-      });
-    let Ok(point_index) = usize::try_from(label.index.val) else {
-      continue;
-    };
-    let Some(value) = values.get(point_index).copied().flatten() else {
-      continue;
-    };
-    let show_value = sequence
-      .and_then(|sequence| sequence.show_value.as_ref())
-      .and_then(|show| show.val)
-      .or_else(|| {
-        group
-          .and_then(|sequence| sequence.show_value.as_ref())
-          .and_then(|show| show.val)
-      })
-      .is_some_and(|value| value.as_bool());
-    let chart_text = sequence.and_then(|sequence| sequence.chart_text.as_deref());
-    let text = chart_text
-      .map(|text| data_label_chart_text(text, value))
-      .filter(|text| !text.is_empty())
-      .or_else(|| show_value.then(|| general_chart_number(value)));
-    let Some(text) = text else {
-      continue;
-    };
-    let position = sequence
-      .and_then(|sequence| sequence.data_label_position.as_ref())
-      .or_else(|| group.and_then(|sequence| sequence.data_label_position.as_ref()))
-      .map(|position| position.val)
-      .unwrap_or(c::DataLabelPositionValues::OutsideEnd);
-    result.push(ClusteredColumnDataLabel {
-      point_index,
-      text,
-      position,
-    });
   }
-  result.sort_by_key(|label| label.point_index);
-  result
+
+  values
+    .iter()
+    .enumerate()
+    .filter_map(|(point_index, value)| {
+      let value = value.as_ref().copied()?;
+      let mut point_settings = settings;
+      let mut custom_text = None;
+      if let Some(label) = point_labels[point_index] {
+        if label.data_label_choice.iter().any(|choice| {
+          matches!(choice, c::DataLabelChoice::Delete(delete) if delete.val.is_none_or(|value| value.as_bool()))
+        }) {
+          return None;
+        }
+        if let Some(sequence) = label
+          .data_label_choice
+          .iter()
+          .find_map(|choice| match choice {
+            c::DataLabelChoice::Sequence(sequence) => Some(sequence.as_ref()),
+            _ => None,
+          })
+        {
+          if let Some(chart_text) = sequence.chart_text.as_deref() {
+            // MS-OI29500 §21.2.2.47: when c:tx is present Office ignores
+            // the component-selection fields on the same individual label.
+            custom_text = Some(data_label_chart_text(chart_text, value));
+          } else {
+            apply_data_label_sequence_settings(&mut point_settings, sequence);
+          }
+        }
+      }
+
+      if point_settings.deleted {
+        return None;
+      }
+      let text = match custom_text {
+        Some(text) if !text.is_empty() => text,
+        Some(_) => return None,
+        None => compose_clustered_column_data_label(
+          point_settings,
+          series_name,
+          categories.get(point_index).map(String::as_str),
+          value,
+        )?,
+      };
+      Some(ClusteredColumnDataLabel {
+        point_index,
+        text,
+        position: point_settings.position,
+      })
+    })
+    .collect()
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ClusteredColumnDataLabelSettings<'a> {
+  deleted: bool,
+  show_value: bool,
+  show_category_name: bool,
+  show_series_name: bool,
+  separator: &'a str,
+  position: c::DataLabelPositionValues,
+}
+
+impl Default for ClusteredColumnDataLabelSettings<'_> {
+  fn default() -> Self {
+    Self {
+      deleted: false,
+      show_value: false,
+      show_category_name: false,
+      show_series_name: false,
+      separator: "; ",
+      // MS-OI29500 §21.2.2.48 specifies OutsideEnd as the Office default
+      // for a clustered bar/column chart when c:dLblPos is omitted.
+      position: c::DataLabelPositionValues::OutsideEnd,
+    }
+  }
+}
+
+fn apply_data_labels_settings<'a>(
+  settings: &mut ClusteredColumnDataLabelSettings<'a>,
+  labels: Option<&'a c::DataLabels>,
+) {
+  let Some(labels) = labels else {
+    return;
+  };
+  match labels.data_labels_choice.as_ref() {
+    Some(c::DataLabelsChoice::Delete(delete)) => {
+      settings.deleted = delete.val.is_none_or(|value| value.as_bool());
+    }
+    Some(c::DataLabelsChoice::Sequence(sequence)) => {
+      settings.deleted = false;
+      apply_data_labels_sequence_settings(settings, sequence);
+    }
+    None => {}
+  }
+}
+
+fn apply_data_labels_sequence_settings<'a>(
+  settings: &mut ClusteredColumnDataLabelSettings<'a>,
+  sequence: &'a c::DataLabelsChoiceSequence,
+) {
+  if let Some(show) = sequence.show_value.as_ref() {
+    settings.show_value = show.val.is_none_or(|value| value.as_bool());
+  }
+  if let Some(show) = sequence.show_category_name.as_ref() {
+    settings.show_category_name = show.val.is_none_or(|value| value.as_bool());
+  }
+  if let Some(show) = sequence.show_series_name.as_ref() {
+    settings.show_series_name = show.val.is_none_or(|value| value.as_bool());
+  }
+  if let Some(separator) = sequence.separator.as_deref() {
+    settings.separator = separator;
+  }
+  if let Some(position) = sequence.data_label_position.as_ref() {
+    settings.position = position.val;
+  }
+}
+
+fn apply_data_label_sequence_settings<'a>(
+  settings: &mut ClusteredColumnDataLabelSettings<'a>,
+  sequence: &'a c::DataLabelChoiceSequence,
+) {
+  if let Some(show) = sequence.show_value.as_ref() {
+    settings.show_value = show.val.is_none_or(|value| value.as_bool());
+  }
+  if let Some(show) = sequence.show_category_name.as_ref() {
+    settings.show_category_name = show.val.is_none_or(|value| value.as_bool());
+  }
+  if let Some(show) = sequence.show_series_name.as_ref() {
+    settings.show_series_name = show.val.is_none_or(|value| value.as_bool());
+  }
+  if let Some(separator) = sequence.separator.as_deref() {
+    settings.separator = separator;
+  }
+  if let Some(position) = sequence.data_label_position.as_ref() {
+    settings.position = position.val;
+  }
+}
+
+fn compose_clustered_column_data_label(
+  settings: ClusteredColumnDataLabelSettings<'_>,
+  series_name: &str,
+  category: Option<&str>,
+  value: f64,
+) -> Option<String> {
+  let mut components = Vec::with_capacity(3);
+  if settings.show_series_name && !series_name.is_empty() {
+    components.push(series_name.to_string());
+  }
+  if settings.show_category_name
+    && let Some(category) = category.filter(|category| !category.is_empty())
+  {
+    components.push(category.to_string());
+  }
+  if settings.show_value {
+    components.push(general_chart_number(value));
+  }
+  (!components.is_empty()).then(|| components.join(settings.separator))
 }
 
 fn data_label_chart_text(chart_text: &c::ChartText, value: f64) -> String {
@@ -544,32 +748,34 @@ pub fn has_vertical_multilevel_category_axis(chart_space: &c::ChartSpace) -> boo
 }
 
 pub fn visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
-  visible_texts_with_default_series_label(chart_space, default_series_label)
+  visible_texts_for_ui_language(chart_space, None)
+}
+
+pub fn visible_texts_for_ui_language(
+  chart_space: &c::ChartSpace,
+  ui_language: Option<&str>,
+) -> Vec<String> {
+  visible_texts_with_default_series_label(chart_space, ui_language, |series, series_index| {
+    default_series_label(series, series_index, ui_language)
+  })
 }
 
 pub fn visible_texts_with_uncached_series_labels(chart_space: &c::ChartSpace) -> Vec<String> {
-  visible_texts_with_default_series_label(chart_space, uncached_series_label)
+  visible_texts_with_default_series_label(chart_space, None, uncached_series_label)
 }
 
 fn visible_texts_with_default_series_label(
   chart_space: &c::ChartSpace,
-  default_label: fn(ChartSeriesRef<'_>, usize) -> String,
+  ui_language: Option<&str>,
+  default_label: impl Fn(ChartSeriesRef<'_>, usize) -> String,
 ) -> Vec<String> {
   let mut texts = Vec::new();
   let mut series_index = 0usize;
 
   if let Some(title) = chart_space.chart.title.as_deref() {
     push_title_texts(&mut texts, title);
-    if title.chart_text.is_none()
-      && chart_space
-        .chart
-        .auto_title_deleted
-        .as_ref()
-        .and_then(|value| value.val)
-        .is_none_or(|value| !value.as_bool())
-    {
-      push_unique_text(&mut texts, "Chart Title");
-    }
+  } else if chart_automatic_title_is_visible(&chart_space.chart) {
+    push_unique_text(&mut texts, automatic_chart_title(ui_language));
   }
   for title in axis_titles(chart_space) {
     push_title_texts(&mut texts, title);
@@ -615,10 +821,17 @@ fn uncached_series_label(_series: ChartSeriesRef<'_>, series_index: usize) -> St
   format!("Series{series_index}")
 }
 
-fn default_series_label(series: ChartSeriesRef<'_>, series_index: usize) -> String {
+fn default_series_label(
+  series: ChartSeriesRef<'_>,
+  series_index: usize,
+  ui_language: Option<&str>,
+) -> String {
   // uses the localized STR_ROW_LABEL/STR_COLUMN_LABEL defaults when imported
   // chart data has no explicit series label. OOXML bar charts with a horizontal
   // value range map each series to a data row.
+  if ui_language.is_some_and(is_chinese_ui_language) {
+    return automatic_series_title(ui_language, series_index);
+  }
   if let Some(formula) = series_value_formula(series)
     && let Some(range) = parse_chart_a1_range(formula)
     && range.start_col == range.end_col
@@ -627,6 +840,18 @@ fn default_series_label(series: ChartSeriesRef<'_>, series_index: usize) -> Stri
     return format!("Column {series_index}");
   }
   format!("Row {series_index}")
+}
+
+fn is_chinese_ui_language(language: &str) -> bool {
+  let language = language.to_ascii_lowercase();
+  language == "zh"
+    || language == "zh-cn"
+    || language == "zh-sg"
+    || language == "zh-hans"
+    || language == "zh-tw"
+    || language == "zh-hk"
+    || language == "zh-mo"
+    || language == "zh-hant"
 }
 
 fn series_value_formula(series: ChartSeriesRef<'_>) -> Option<&str> {
@@ -873,21 +1098,42 @@ pub fn chart_shape_outline_solid_fill(
 }
 
 fn chart_title_text(chart: &c::Chart) -> Option<ChartTitleText> {
-  let title = chart.title.as_deref()?;
-  if let Some(chart_text) = title.chart_text.as_deref() {
-    let mut values = Vec::new();
-    push_chart_text(&mut values, chart_text);
-    let value = values.join(" ");
-    if !value.is_empty() {
-      return Some(ChartTitleText::Explicit(value));
+  if let Some(title) = chart.title.as_deref() {
+    if let Some(chart_text) = title.chart_text.as_deref() {
+      let mut values = Vec::new();
+      push_chart_text(&mut values, chart_text);
+      let value = values.join(" ");
+      if !value.is_empty() {
+        return Some(ChartTitleText::Explicit(value));
+      }
     }
+    return None;
   }
+
+  chart_automatic_title_is_visible(chart).then_some(ChartTitleText::Automatic)
+}
+
+pub fn has_powerpoint_automatic_title_placeholder(chart: &c::Chart) -> bool {
+  // PowerPoint distinguishes a bare empty title from its generated insertion
+  // placeholder. The latter carries both its layout slot and text properties
+  // even though c:tx has not been populated yet. Word does not paint that
+  // placeholder in fixed output, so this host-specific signal is exposed to
+  // the presentation lowerer instead of being applied in the shared model.
+  chart.title.as_deref().is_some_and(|title| {
+    title.chart_text.is_none() && title.layout.is_some() && title.text_properties.is_some()
+  }) && chart_automatic_title_is_visible(chart)
+}
+
+fn chart_automatic_title_is_visible(chart: &c::Chart) -> bool {
+  // ECMA-376 Part 1 §21.2.2.7: autoTitleDeleted suppresses the automatic
+  // title, and an omitted val on a present element defaults to true. Office
+  // serializes val="0" when an automatic title is intentionally visible; an
+  // absent element does not create a placeholder title.
   chart
     .auto_title_deleted
     .as_ref()
     .and_then(|value| value.val)
-    .is_none_or(|value| !value.as_bool())
-    .then_some(ChartTitleText::Automatic)
+    .is_some_and(|value| !value.as_bool())
 }
 
 fn series_text_value(series_text: &c::SeriesText) -> String {
@@ -1430,13 +1676,87 @@ fn push_unique_text(texts: &mut Vec<String>, value: &str) {
 
 #[cfg(test)]
 mod tests {
-  use super::{automatic_chart_title, clustered_column_slot, linear_axis_scale};
+  use super::{
+    ChartTitleText, automatic_chart_title, automatic_series_title, chart_title_text,
+    clustered_column_chart, clustered_column_slot, linear_axis_scale,
+    ordinary_clustered_column_chart,
+  };
+  use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
+  use ooxmlsdk::sdk::SdkType;
 
   #[test]
   fn automatic_title_uses_the_output_ui_language_not_the_chart_editing_language() {
     assert_eq!(automatic_chart_title(Some("zh-CN")), "图表标题");
     assert_eq!(automatic_chart_title(Some("zh-TW")), "圖表標題");
     assert_eq!(automatic_chart_title(Some("en-US")), "Chart Title");
+  }
+
+  #[test]
+  fn automatic_series_title_uses_the_output_ui_language() {
+    assert_eq!(automatic_series_title(Some("zh-CN"), 1), "系列 1");
+    assert_eq!(automatic_series_title(Some("zh-TW"), 2), "數列 2");
+    assert_eq!(automatic_series_title(Some("en-US"), 3), "Series 3");
+  }
+
+  #[test]
+  fn automatic_title_requires_an_explicit_not_deleted_marker_and_no_title_object() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:autoTitleDeleted val="0"/><c:plotArea/></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+    assert_eq!(
+      chart_title_text(&chart_space.chart),
+      Some(ChartTitleText::Automatic)
+    );
+
+    let empty_title = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:title/><c:autoTitleDeleted val="0"/><c:plotArea/></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+    assert_eq!(chart_title_text(&empty_title.chart), None);
+
+    let placeholder_title = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:title><c:layout/><c:txPr><a:bodyPr/><a:lstStyle/><a:p/></c:txPr></c:title><c:autoTitleDeleted val="0"/><c:plotArea/></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+    assert_eq!(chart_title_text(&placeholder_title.chart), None);
+    assert!(super::has_powerpoint_automatic_title_placeholder(
+      &placeholder_title.chart
+    ));
+
+    let omitted_marker = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea/></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+    assert_eq!(chart_title_text(&omitted_marker.chart), None);
+  }
+
+  #[test]
+  fn ordinary_chart_accepts_only_non_painting_chart_and_plot_area_properties() {
+    let inert = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:plotArea><c:barChart><c:barDir val="col"/><c:ser><c:idx val="0"/><c:order val="0"/><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:barChart><c:spPr><a:noFill/><a:ln w="12700"><a:noFill/></a:ln></c:spPr></c:plotArea></c:chart><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:chartSpace>"#,
+    )
+    .expect("chart space");
+    assert!(ordinary_clustered_column_chart(&inert).is_some());
+
+    let painted = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:plotArea><c:barChart><c:barDir val="col"/><c:ser><c:idx val="0"/><c:order val="0"/><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:barChart></c:plotArea></c:chart><c:spPr><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></c:spPr></c:chartSpace>"#,
+    )
+    .expect("chart space");
+    assert!(ordinary_clustered_column_chart(&painted).is_none());
+  }
+
+  #[test]
+  fn series_data_label_settings_expand_to_points_before_point_deletes() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:barChart><c:barDir val="col"/><c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Revenue</c:v></c:tx><c:dLbls><c:dLbl><c:idx val="1"/><c:delete val="1"/></c:dLbl><c:dLblPos val="outEnd"/><c:showVal val="1"/><c:showCatName val="1"/><c:separator>, </c:separator></c:dLbls><c:cat><c:strLit><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser></c:barChart></c:plotArea></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+
+    let chart = clustered_column_chart(&chart_space).expect("clustered chart");
+    assert_eq!(chart.series[0].data_labels.len(), 1);
+    assert_eq!(chart.series[0].data_labels[0].point_index, 0);
+    assert_eq!(chart.series[0].data_labels[0].text, "A, 1");
   }
 
   #[test]

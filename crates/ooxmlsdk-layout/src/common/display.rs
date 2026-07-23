@@ -102,6 +102,7 @@ pub struct TextRun<'doc> {
 pub enum PdfTextSegmentation {
   #[default]
   Line,
+  WordLine,
   Portion,
 }
 
@@ -340,6 +341,10 @@ pub struct TextStyle<'doc> {
   pub wordprocessingml_font_slots: bool,
   /// Enable Word's document-level East Asian punctuation compression.
   pub cjk_punctuation_compression_ratio: f32,
+  /// Paint glyph outlines instead of searchable PDF text. Office uses this
+  /// for DrawingML text transforms that its fixed-format writer vectorizes.
+  pub pdf_glyph_outlines: bool,
+  pub pdf_glyph_outline_options: Option<Arc<PdfGlyphOutlineOptions>>,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,
@@ -353,6 +358,13 @@ pub struct TextStyle<'doc> {
   pub outline_width: Pt,
   pub highlight: Option<Color>,
   pub underline_color: Option<Color>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PdfGlyphOutlineOptions {
+  pub semantic_text_overlay: bool,
+  /// Page-space transform applied only to visible vector glyphs.
+  pub transform: Option<crate::common::Transform>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

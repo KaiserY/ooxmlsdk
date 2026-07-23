@@ -20,6 +20,7 @@ pub struct DiagramShape {
   pub style: Option<Box<dgm::Style>>,
   pub text_fill: Option<RgbColor>,
   pub text_rotation_deg: f32,
+  pub draw_geometry: bool,
   pub is_connector: bool,
   pub connector_angle_deg: f32,
   pub is_blip_placeholder: bool,
@@ -114,10 +115,15 @@ impl DiagramTextBody {
       })
   }
 
-  fn apply_text_margins(&mut self, shape_width_pt: f32, constraints: &[DiagramConstraint]) {
+  fn apply_text_margins(
+    &mut self,
+    shape_width_pt: f32,
+    shape_height_pt: f32,
+    primary_font_size_pt: Option<f32>,
+    constraints: &[DiagramConstraint],
+  ) {
     for constraint in constraints {
-      if constraint.reference != dgm::ConstraintValues::Width
-        || (!constraint.for_name.is_empty())
+      if !constraint.for_name.is_empty()
         || !matches!(
           constraint.target,
           dgm::ConstraintValues::LeftMargin
@@ -128,7 +134,21 @@ impl DiagramTextBody {
       {
         continue;
       }
-      let margin = Coordinate32Value::Emu(points_to_emu(shape_width_pt * constraint.factor));
+      let referenced_value = match constraint.reference {
+        dgm::ConstraintValues::Width => Some(shape_width_pt),
+        dgm::ConstraintValues::Height => Some(shape_height_pt),
+        dgm::ConstraintValues::PrimaryFontSize | dgm::ConstraintValues::SecondaryFontSize => {
+          primary_font_size_pt
+        }
+        dgm::ConstraintValues::None if constraint.value != 0.0 => {
+          Some(constraint_value_points(constraint))
+        }
+        _ => None,
+      };
+      let Some(margin_pt) = referenced_value.map(|value| value * constraint.factor) else {
+        continue;
+      };
+      let margin = Coordinate32Value::Emu(points_to_emu(margin_pt));
       let mut body_properties = self.body_properties.clone().unwrap_or_default();
       match constraint.target {
         dgm::ConstraintValues::LeftMargin => body_properties.left_inset = Some(margin),
@@ -2013,23 +2033,14 @@ fn layout_shape_children(
     dgm::AlgorithmValues::Snake => snake_layout_tree(node, algorithm, constraints),
     dgm::AlgorithmValues::Text => apply_text_algorithm(node, constraints),
     dgm::AlgorithmValues::Space => {
-      if has_text_algorithm_descendant(node) {
-        node.text_body = DiagramTextBody::default();
-      }
+      // ECMA-376 §21.4.7.1 assigns `sp` only spacing/no-op layout duties;
+      // text layout belongs to `tx`. LibreOffice's DiagramLayoutAtom::layoutShape
+      // likewise clears the `sp` shape text before the `tx` atom lays it out.
+      node.text_body = DiagramTextBody::default();
     }
     dgm::AlgorithmValues::Connector => connector_layout_tree(node),
     dgm::AlgorithmValues::Pyramid => pyramid_layout_tree(node),
   }
-}
-
-fn has_text_algorithm_descendant(node: &DiagramShapeNode) -> bool {
-  node.children.iter().any(|child| {
-    child
-      .algorithms
-      .iter()
-      .any(|algorithm| algorithm.kind == dgm::AlgorithmValues::Text)
-      || has_text_algorithm_descendant(child)
-  })
 }
 
 fn apply_text_algorithm(node: &mut DiagramShapeNode, constraints: &[DiagramConstraint]) {
@@ -2047,7 +2058,12 @@ fn apply_text_algorithm(node: &mut DiagramShapeNode, constraints: &[DiagramConst
     node.font_size_pt = Some(font_size);
     node.text_body.apply_primary_font_size(font_size);
   }
-  node.text_body.apply_text_margins(node.width, constraints);
+  node.text_body.apply_text_margins(
+    node.width,
+    node.height,
+    font_size.or(node.font_size_pt),
+    constraints,
+  );
   node
     .text_body
     .enable_auto_fit_if_default_text(has_direct_font_size);
@@ -3075,7 +3091,8 @@ fn flatten_diagram_shape_tree(
 ) {
   let x = offset_x + node.x;
   let y = offset_y + node.y;
-  if !node.hidden_geometry && (node.has_geometry || !node.text_body.is_empty()) {
+  let draw_geometry = node.has_geometry && !node.hidden_geometry;
+  if draw_geometry || !node.text_body.is_empty() {
     shapes.push(DiagramShape {
       x,
       y,
@@ -3086,6 +3103,7 @@ fn flatten_diagram_shape_tree(
       style: node.style.clone(),
       text_fill: node.text_fill,
       text_rotation_deg: node.text_rotation_deg,
+      draw_geometry,
       is_connector: node.is_connector,
       connector_angle_deg: node.connector_angle_deg,
       is_blip_placeholder: node.is_blip_placeholder,

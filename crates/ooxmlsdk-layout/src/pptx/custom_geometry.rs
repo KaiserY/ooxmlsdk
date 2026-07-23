@@ -36,29 +36,35 @@ pub(super) fn path_commands(
       return None;
     }
     let guides = evaluate_guides(geometry, viewport_width, viewport_height)?;
-    let map_point = |point: &a::Point| -> Option<Point> {
-      let x = coordinate(&point.x, &guides, viewport_width, viewport_height)?;
-      let y = coordinate(&point.y, &guides, viewport_width, viewport_height)?;
-      Some(Point {
+    let map_coordinates = |x: f64, y: f64| -> Point {
+      Point {
         x: Pt(left + (x / viewport_width) as f32 * width),
         y: Pt(top + (y / viewport_height) as f32 * height),
-      })
+      }
     };
-    let mut current = None;
+    let point_coordinates = |point: &a::Point| -> Option<(f64, f64)> {
+      Some((
+        coordinate(&point.x, &guides, viewport_width, viewport_height)?,
+        coordinate(&point.y, &guides, viewport_width, viewport_height)?,
+      ))
+    };
+    let mut current = None::<(f64, f64)>;
+    let mut subpath_start = None::<(f64, f64)>;
     for choice in &path.path_choice {
       match choice {
         a::PathChoice::CloseShapePath => {
           commands.push(PathCommand::Close);
-          current = None;
+          current = subpath_start;
         }
         a::PathChoice::MoveTo(move_to) => {
-          let point = map_point(&move_to.point)?;
-          commands.push(PathCommand::MoveTo(point));
+          let point = point_coordinates(&move_to.point)?;
+          commands.push(PathCommand::MoveTo(map_coordinates(point.0, point.1)));
           current = Some(point);
+          subpath_start = Some(point);
         }
         a::PathChoice::LineTo(line_to) => {
-          let point = map_point(&line_to.point)?;
-          commands.push(PathCommand::LineTo(point));
+          let point = point_coordinates(&line_to.point)?;
+          commands.push(PathCommand::LineTo(map_coordinates(point.0, point.1)));
           current = Some(point);
         }
         a::PathChoice::QuadraticBezierCurveTo(curve) => {
@@ -66,12 +72,15 @@ pub(super) fn path_commands(
             return None;
           };
           let start = current?;
-          let control = map_point(control)?;
-          let end = map_point(end)?;
+          let control = point_coordinates(control)?;
+          let end = point_coordinates(end)?;
+          let start = map_coordinates(start.0, start.1);
+          let control = map_coordinates(control.0, control.1);
+          let mapped_end = map_coordinates(end.0, end.1);
           commands.push(PathCommand::CubicTo {
             control1: interpolate(start, control, 2.0 / 3.0),
-            control2: interpolate(end, control, 2.0 / 3.0),
-            end,
+            control2: interpolate(mapped_end, control, 2.0 / 3.0),
+            end: mapped_end,
           });
           current = Some(end);
         }
@@ -79,21 +88,101 @@ pub(super) fn path_commands(
           let [control1, control2, end] = curve.point.as_slice() else {
             return None;
           };
-          let control1 = map_point(control1)?;
-          let control2 = map_point(control2)?;
-          let end = map_point(end)?;
+          let control1 = point_coordinates(control1)?;
+          let control2 = point_coordinates(control2)?;
+          let end = point_coordinates(end)?;
           commands.push(PathCommand::CubicTo {
-            control1,
-            control2,
-            end,
+            control1: map_coordinates(control1.0, control1.1),
+            control2: map_coordinates(control2.0, control2.1),
+            end: map_coordinates(end.0, end.1),
           });
           current = Some(end);
         }
-        a::PathChoice::ArcTo(_) => return None,
+        a::PathChoice::ArcTo(arc) => {
+          let start = current?;
+          let radius_x = coordinate(&arc.width_radius, &guides, viewport_width, viewport_height)?;
+          let radius_y = coordinate(&arc.height_radius, &guides, viewport_width, viewport_height)?;
+          let start_angle = coordinate(&arc.start_angle, &guides, viewport_width, viewport_height)?;
+          let sweep_angle = coordinate(&arc.swing_angle, &guides, viewport_width, viewport_height)?;
+          let arc_commands = elliptical_arc_commands(
+            start,
+            radius_x,
+            radius_y,
+            start_angle,
+            sweep_angle,
+            &map_coordinates,
+          )?;
+          if let Some(last) = arc_commands.last() {
+            current = Some(last.end_coordinates);
+          }
+          commands.extend(arc_commands.into_iter().map(|command| command.path_command));
+        }
       }
     }
   }
   (!commands.is_empty()).then_some(commands)
+}
+
+struct ArcCommand {
+  path_command: PathCommand,
+  end_coordinates: (f64, f64),
+}
+
+/// ECMA-376 Part 1 §20.1.9.4 anchors the ellipse at the current pen position
+/// and measures both angles clockwise in 60,000ths of a degree. PDF paths do
+/// not have an elliptical-arc primitive, so each at-most-quarter turn is
+/// represented by its standard cubic Bézier equivalent.
+fn elliptical_arc_commands(
+  start: (f64, f64),
+  radius_x: f64,
+  radius_y: f64,
+  start_angle: f64,
+  sweep_angle: f64,
+  map_coordinates: &impl Fn(f64, f64) -> Point,
+) -> Option<Vec<ArcCommand>> {
+  if radius_x <= 0.0 || radius_y <= 0.0 || !sweep_angle.is_finite() {
+    return None;
+  }
+  if sweep_angle == 0.0 {
+    return Some(Vec::new());
+  }
+
+  let start_radians = angle_radians(start_angle);
+  let sweep_radians = angle_radians(sweep_angle);
+  let center = (
+    start.0 - radius_x * start_radians.cos(),
+    start.1 - radius_y * start_radians.sin(),
+  );
+  let segment_count = (sweep_radians.abs() / (std::f64::consts::PI / 2.0)).ceil() as usize;
+  let segment_sweep = sweep_radians / segment_count as f64;
+  let mut commands = Vec::with_capacity(segment_count);
+  let mut angle = start_radians;
+  for _ in 0..segment_count {
+    let end_angle = angle + segment_sweep;
+    let tangent = 4.0 / 3.0 * (segment_sweep / 4.0).tan();
+    let control1 = (
+      center.0 + radius_x * (angle.cos() - tangent * angle.sin()),
+      center.1 + radius_y * (angle.sin() + tangent * angle.cos()),
+    );
+    let control2 = (
+      center.0 + radius_x * (end_angle.cos() + tangent * end_angle.sin()),
+      center.1 + radius_y * (end_angle.sin() - tangent * end_angle.cos()),
+    );
+    let end = (
+      center.0 + radius_x * end_angle.cos(),
+      center.1 + radius_y * end_angle.sin(),
+    );
+    commands.push(ArcCommand {
+      path_command: PathCommand::CubicTo {
+        control1: map_coordinates(control1.0, control1.1),
+        control2: map_coordinates(control2.0, control2.1),
+        end: map_coordinates(end.0, end.1),
+      },
+      end_coordinates: end,
+    });
+    angle = end_angle;
+  }
+  Some(commands)
 }
 
 fn interpolate(from: Point, to: Point, amount: f32) -> Point {
@@ -262,5 +351,43 @@ mod tests {
     assert_eq!(formula("*/ w 1 2", &guides, 200.0, 100.0), Some(100.0));
     assert_eq!(formula("+- h 30 10", &guides, 200.0, 100.0), Some(120.0));
     assert_eq!(formula("pin 10 25 20", &guides, 200.0, 100.0), Some(20.0));
+  }
+
+  #[test]
+  fn converts_clockwise_drawingml_arcs_from_the_current_pen_position() {
+    let geometry = a::CustomGeometry {
+      path_list: a::PathList {
+        path: vec![a::Path {
+          width: Some("200".parse().unwrap()),
+          height: Some("100".parse().unwrap()),
+          path_choice: vec![
+            a::PathChoice::MoveTo(Box::new(a::MoveTo {
+              point: a::Point {
+                x: "200".into(),
+                y: "50".into(),
+              },
+            })),
+            a::PathChoice::ArcTo(Box::new(a::ArcTo {
+              width_radius: "100".into(),
+              height_radius: "50".into(),
+              start_angle: "0".into(),
+              swing_angle: "cd2".into(),
+            })),
+            a::PathChoice::CloseShapePath,
+          ],
+          ..Default::default()
+        }],
+      },
+      ..Default::default()
+    };
+
+    let commands = path_commands(&geometry, 10.0, 20.0, 100.0, 200.0).unwrap();
+    assert_eq!(commands.len(), 4);
+    let PathCommand::CubicTo { end, .. } = commands[2] else {
+      panic!("a half turn must end with a cubic segment");
+    };
+    assert!((end.x.0 - 10.0).abs() < 0.001);
+    assert!((end.y.0 - 120.0).abs() < 0.001);
+    assert_eq!(commands[3], PathCommand::Close);
   }
 }

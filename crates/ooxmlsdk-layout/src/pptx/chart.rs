@@ -78,6 +78,39 @@ pub(crate) fn lower_clustered_column_chart(
   };
   let title_line_height = line_height(&style.title);
   let label_line_height = line_height(&style.label);
+  let value_axis_visible = chart.value_axis.is_none_or(value_axis_is_visible);
+  let value_tick_labels_visible = value_axis_visible
+    && chart.value_axis.is_none_or(|axis| {
+      axis
+        .tick_label_position
+        .as_ref()
+        .is_none_or(|position| position.val != Some(c::TickLabelPositionValues::None))
+    });
+  let value_gridlines_visible = value_axis_visible
+    && chart
+      .value_axis
+      .is_none_or(|axis| axis.major_gridlines.is_some());
+  let category_axis_visible = chart.category_axis.is_none_or(category_axis_is_visible);
+  let category_tick_labels_visible = category_axis_visible
+    && chart.category_axis.is_none_or(|axis| {
+      axis
+        .tick_label_position
+        .as_ref()
+        .is_none_or(|position| position.val != Some(c::TickLabelPositionValues::None))
+    });
+  let category_label_lines: Vec<Vec<String>> = if category_tick_labels_visible {
+    let slot_width = frame.width_pt / category_count as f32 * 0.9;
+    chart
+      .categories
+      .iter()
+      .map(|category| wrap_chart_label(category, slot_width, &style.label, &mut metrics))
+      .collect()
+  } else {
+    Vec::new()
+  };
+  let category_label_line_count =
+    category_label_lines.iter().map(Vec::len).max().unwrap_or(1) as f32;
+  let category_label_height = label_line_height * category_label_line_count;
   let legend_position = chart.legend_position;
   let has_bottom_legend = legend_position == Some(ChartLegendPosition::Bottom);
   let has_explicit_powerpoint_title =
@@ -91,7 +124,13 @@ pub(crate) fn lower_clustered_column_chart(
   // Office's automatic chart layout reserves semantic bands around the plot:
   // title, value labels, category labels, and legend. The distances scale with
   // chart height, while actual label widths determine the left plot inset.
-  let title_top = frame.y_pt + frame.height_pt * 0.024;
+  let title_top = frame.y_pt
+    + frame.height_pt
+      * if style.layout_profile == ChartLayoutProfile::Word {
+        0.0365
+      } else {
+        0.024
+      };
   let legend_bottom_margin = style.label.font_size_pt * 0.81;
   let legend_top = frame.y_pt + frame.height_pt - legend_bottom_margin - label_line_height;
   let category_bottom_ratio = match style.layout_profile {
@@ -99,9 +138,11 @@ pub(crate) fn lower_clustered_column_chart(
     ChartLayoutProfile::Word => 0.022_87,
     ChartLayoutProfile::PowerPoint => 0.018,
   };
-  let category_top = if has_bottom_legend {
+  let category_top = if !category_tick_labels_visible {
+    frame.y_pt + frame.height_pt * (1.0 - category_bottom_ratio)
+  } else if has_bottom_legend {
     legend_top
-      - label_line_height
+      - category_label_height
       - frame.height_pt
         * if has_explicit_powerpoint_title {
           0.026_1
@@ -109,7 +150,7 @@ pub(crate) fn lower_clustered_column_chart(
           0.021
         }
   } else {
-    frame.y_pt + frame.height_pt - label_line_height - frame.height_pt * category_bottom_ratio
+    frame.y_pt + frame.height_pt - category_label_height - frame.height_pt * category_bottom_ratio
   };
   let untitled_plot_top_ratio = if style.layout_profile == ChartLayoutProfile::Excel {
     if has_side_legend { 0.032 } else { 0.025 }
@@ -124,13 +165,25 @@ pub(crate) fn lower_clustered_column_chart(
     frame.y_pt + frame.height_pt * untitled_plot_top_ratio
   };
   if has_top_legend {
-    plot_top += label_line_height + frame.height_pt * 0.018;
+    plot_top += label_line_height
+      + frame.height_pt
+        * if style.layout_profile == ChartLayoutProfile::Word {
+          0.031
+        } else {
+          0.018
+        };
   }
   let side_category_gap_ratio = match style.layout_profile {
     ChartLayoutProfile::Excel => 0.025,
     ChartLayoutProfile::Word => 0.027_75,
     ChartLayoutProfile::PowerPoint => 0.033_35,
   };
+  let category_plot_gap_ratio =
+    if style.layout_profile == ChartLayoutProfile::Word && category_label_line_count > 1.0 {
+      0.039
+    } else {
+      0.018
+    };
   let plot_bottom = category_top
     - frame.height_pt
       * if has_side_legend {
@@ -138,17 +191,21 @@ pub(crate) fn lower_clustered_column_chart(
       } else if has_bottom_legend && has_explicit_powerpoint_title {
         0.0225
       } else {
-        0.018
+        category_plot_gap_ratio
       };
   if plot_bottom <= plot_top {
     return Vec::new();
   }
 
   let tick_labels = scale_tick_labels(scale.minimum, scale.maximum, scale.major_unit);
-  let maximum_tick_width = tick_labels
-    .iter()
-    .map(|(_, label)| metrics.measure_text(label, &style.label))
-    .fold(0.0_f32, f32::max);
+  let maximum_tick_width = if value_tick_labels_visible {
+    tick_labels
+      .iter()
+      .map(|(_, label)| metrics.measure_text(label, &style.label))
+      .fold(0.0_f32, f32::max)
+  } else {
+    0.0
+  };
   let side_legend_width = if has_side_legend {
     vertical_legend_width(chart, style, &mut metrics)
   } else {
@@ -167,18 +224,21 @@ pub(crate) fn lower_clustered_column_chart(
       ChartLayoutProfile::Word => 0.070_91,
       ChartLayoutProfile::PowerPoint => 0.048,
     };
-  let tick_left_ratio = if has_side_legend {
-    match style.layout_profile {
-      ChartLayoutProfile::Word => 0.025_81,
-      ChartLayoutProfile::PowerPoint | ChartLayoutProfile::Excel => 0.018_25,
-    }
-  } else {
-    if has_bottom_legend && has_explicit_powerpoint_title {
-      0.019
+  let tick_left_ratio =
+    if !value_tick_labels_visible && style.layout_profile == ChartLayoutProfile::Word {
+      0.0455
+    } else if has_side_legend {
+      match style.layout_profile {
+        ChartLayoutProfile::Word => 0.025_81,
+        ChartLayoutProfile::PowerPoint | ChartLayoutProfile::Excel => 0.018_25,
+      }
     } else {
-      0.015
-    }
-  };
+      if has_bottom_legend && has_explicit_powerpoint_title {
+        0.019
+      } else {
+        0.015
+      }
+    };
   let tick_left = frame.x_pt
     + frame.height_pt * tick_left_ratio
     + if legend_position == Some(ChartLegendPosition::Left) {
@@ -186,20 +246,24 @@ pub(crate) fn lower_clustered_column_chart(
     } else {
       0.0
     };
-  let tick_gap = frame.height_pt
-    * if has_side_legend {
-      if style.layout_profile == ChartLayoutProfile::Word {
-        0.0367
+  let tick_gap = if value_tick_labels_visible {
+    frame.height_pt
+      * if has_side_legend {
+        if style.layout_profile == ChartLayoutProfile::Word {
+          0.0367
+        } else {
+          0.046_85
+        }
       } else {
-        0.046_85
+        if has_bottom_legend && has_explicit_powerpoint_title {
+          0.0323
+        } else {
+          0.026
+        }
       }
-    } else {
-      if has_bottom_legend && has_explicit_powerpoint_title {
-        0.0323
-      } else {
-        0.026
-      }
-    };
+  } else {
+    0.0
+  };
   let plot_left = tick_left + maximum_tick_width + tick_gap;
   let plot_right = frame.x_pt + frame.width_pt
     - if matches!(
@@ -211,6 +275,8 @@ pub(crate) fn lower_clustered_column_chart(
       frame.height_pt
         * if has_bottom_legend && has_explicit_powerpoint_title {
           0.0301
+        } else if !value_tick_labels_visible && style.layout_profile == ChartLayoutProfile::Word {
+          0.041
         } else {
           0.026
         }
@@ -228,20 +294,22 @@ pub(crate) fn lower_clustered_column_chart(
   );
 
   let mut items = Vec::new();
-  for (value, _) in &tick_labels {
-    if style.layout_profile == ChartLayoutProfile::Word && value.abs() < f64::EPSILON {
-      continue;
+  if value_gridlines_visible {
+    for (value, _) in &tick_labels {
+      if style.layout_profile == ChartLayoutProfile::Word && value.abs() < f64::EPSILON {
+        continue;
+      }
+      let y = value_y(*value, scale, plot_top, plot_height);
+      items.push(PageItem::Line(LineItem {
+        x1_pt: plot_left,
+        y1_pt: y,
+        x2_pt: plot_right,
+        y2_pt: y,
+        width_pt: 0.75,
+        color: style.gridline_color,
+        kind: LineItemKind::Stroke,
+      }));
     }
-    let y = value_y(*value, scale, plot_top, plot_height);
-    items.push(PageItem::Line(LineItem {
-      x1_pt: plot_left,
-      y1_pt: y,
-      x2_pt: plot_right,
-      y2_pt: y,
-      width_pt: 0.75,
-      color: style.gridline_color,
-      kind: LineItemKind::Stroke,
-    }));
   }
 
   for (series_index, series) in chart.series.iter().enumerate() {
@@ -277,49 +345,61 @@ pub(crate) fn lower_clustered_column_chart(
     }
   }
 
-  items.push(PageItem::Line(LineItem {
-    x1_pt: plot_left,
-    y1_pt: zero_y,
-    x2_pt: plot_right,
-    y2_pt: zero_y,
-    width_pt: 0.75,
-    color: style.gridline_color,
-    kind: LineItemKind::Stroke,
-  }));
-  if style.layout_profile == ChartLayoutProfile::Word {
-    let tick_length = frame.height_pt * 0.012_59;
+  if category_axis_visible {
     items.push(PageItem::Line(LineItem {
       x1_pt: plot_left,
-      y1_pt: plot_top,
-      x2_pt: plot_left,
+      y1_pt: zero_y,
+      x2_pt: plot_right,
       y2_pt: zero_y,
       width_pt: 0.75,
       color: style.gridline_color,
       kind: LineItemKind::Stroke,
     }));
-    for (value, _) in &tick_labels {
-      let y = value_y(*value, scale, plot_top, plot_height);
+  }
+  if style.layout_profile == ChartLayoutProfile::Word {
+    let tick_length = frame.height_pt * 0.012_59;
+    if value_axis_visible {
       items.push(PageItem::Line(LineItem {
-        x1_pt: plot_left - tick_length,
-        y1_pt: y,
+        x1_pt: plot_left,
+        y1_pt: plot_top,
         x2_pt: plot_left,
-        y2_pt: y,
+        y2_pt: zero_y,
         width_pt: 0.75,
         color: style.gridline_color,
         kind: LineItemKind::Stroke,
       }));
+      if chart.value_axis.is_none_or(value_axis_has_major_ticks) {
+        for (value, _) in &tick_labels {
+          let y = value_y(*value, scale, plot_top, plot_height);
+          items.push(PageItem::Line(LineItem {
+            x1_pt: plot_left - tick_length,
+            y1_pt: y,
+            x2_pt: plot_left,
+            y2_pt: y,
+            width_pt: 0.75,
+            color: style.gridline_color,
+            kind: LineItemKind::Stroke,
+          }));
+        }
+      }
     }
-    for boundary in 0..=category_count {
-      let x = plot_left + boundary as f32 / category_count as f32 * plot_width;
-      items.push(PageItem::Line(LineItem {
-        x1_pt: x,
-        y1_pt: zero_y,
-        x2_pt: x,
-        y2_pt: zero_y + tick_length,
-        width_pt: 0.75,
-        color: style.gridline_color,
-        kind: LineItemKind::Stroke,
-      }));
+    if category_axis_visible
+      && chart
+        .category_axis
+        .is_none_or(category_axis_has_major_ticks)
+    {
+      for boundary in 0..=category_count {
+        let x = plot_left + boundary as f32 / category_count as f32 * plot_width;
+        items.push(PageItem::Line(LineItem {
+          x1_pt: x,
+          y1_pt: zero_y,
+          x2_pt: x,
+          y2_pt: zero_y + tick_length,
+          width_pt: 0.75,
+          color: style.gridline_color,
+          kind: LineItemKind::Stroke,
+        }));
+      }
     }
   }
 
@@ -366,26 +446,32 @@ pub(crate) fn lower_clustered_column_chart(
   // Preserve Office's content-stream ordering: value ticks from minimum to
   // maximum, then categories, title, and legend. This is also the reading order
   // exposed by tagged fixed-format output.
-  for (value, label) in &tick_labels {
-    let width = metrics.measure_text(label, &style.label);
-    push_text(
-      &mut items,
-      tick_left + maximum_tick_width - width,
-      value_y(*value, scale, plot_top, plot_height) - label_line_height / 2.0,
-      label.clone(),
-      style.label.clone(),
-    );
+  if value_tick_labels_visible {
+    for (value, label) in &tick_labels {
+      let width = metrics.measure_text(label, &style.label);
+      push_text(
+        &mut items,
+        tick_left + maximum_tick_width - width,
+        value_y(*value, scale, plot_top, plot_height) - label_line_height / 2.0,
+        label.clone(),
+        style.label.clone(),
+      );
+    }
   }
-  for (category_index, category) in chart.categories.iter().enumerate() {
-    let width = metrics.measure_text(category, &style.label);
-    let center = plot_left + (category_index as f32 + 0.5) / category_count as f32 * plot_width;
-    push_text(
-      &mut items,
-      center - width / 2.0,
-      category_top,
-      category.clone(),
-      style.label.clone(),
-    );
+  if category_tick_labels_visible {
+    for (category_index, lines) in category_label_lines.iter().enumerate() {
+      let center = plot_left + (category_index as f32 + 0.5) / category_count as f32 * plot_width;
+      for (line_index, line) in lines.iter().enumerate() {
+        let width = metrics.measure_text(line, &style.label);
+        push_text(
+          &mut items,
+          center - width / 2.0,
+          category_top + line_index as f32 * label_line_height,
+          line.clone(),
+          style.label.clone(),
+        );
+      }
+    }
   }
   if let Some(title) = title_text {
     let width = metrics.measure_text(title, &style.title);
@@ -425,9 +511,16 @@ pub(crate) fn lower_clustered_column_chart(
     Some(ChartLegendPosition::Top) => lower_horizontal_legend(
       &mut items,
       frame,
-      tick_left,
+      frame.x_pt + frame.height_pt * 0.004,
       if title_text.is_some() {
-        title_top + title_line_height + frame.height_pt * 0.009
+        title_top
+          + title_line_height
+          + frame.height_pt
+            * if style.layout_profile == ChartLayoutProfile::Word {
+              0.0375
+            } else {
+              0.009
+            }
       } else {
         frame.y_pt + frame.height_pt * 0.018
       },
@@ -454,6 +547,65 @@ pub(crate) fn lower_clustered_column_chart(
     None => {}
   }
   items
+}
+
+fn value_axis_is_visible(axis: &c::ValueAxis) -> bool {
+  axis
+    .delete
+    .as_ref()
+    .is_none_or(|delete| delete.val.is_some_and(|value| !value.as_bool()))
+}
+
+fn category_axis_is_visible(axis: &c::CategoryAxis) -> bool {
+  axis
+    .delete
+    .as_ref()
+    .is_none_or(|delete| delete.val.is_some_and(|value| !value.as_bool()))
+}
+
+fn value_axis_has_major_ticks(axis: &c::ValueAxis) -> bool {
+  axis
+    .major_tick_mark
+    .as_ref()
+    .is_none_or(|tick| tick.val != Some(c::TickMarkValues::None))
+}
+
+fn category_axis_has_major_ticks(axis: &c::CategoryAxis) -> bool {
+  axis
+    .major_tick_mark
+    .as_ref()
+    .is_none_or(|tick| tick.val != Some(c::TickMarkValues::None))
+}
+
+fn wrap_chart_label(
+  text: &str,
+  maximum_width: f32,
+  style: &TextStyle,
+  metrics: &mut TextMetrics,
+) -> Vec<String> {
+  let words: Vec<&str> = text.split_whitespace().collect();
+  if words.len() <= 1 || maximum_width <= 0.0 {
+    return vec![text.to_string()];
+  }
+  let mut lines = Vec::new();
+  let mut current = String::new();
+  for word in words {
+    let candidate = if current.is_empty() {
+      word.to_string()
+    } else {
+      format!("{current} {word}")
+    };
+    if current.is_empty() || metrics.measure_text(&candidate, style) <= maximum_width {
+      current = candidate;
+    } else {
+      lines.push(std::mem::take(&mut current));
+      current.push_str(word);
+    }
+  }
+  if !current.is_empty() {
+    lines.push(current);
+  }
+  lines
 }
 
 fn lower_horizontal_legend(

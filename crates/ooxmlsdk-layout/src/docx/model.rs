@@ -13,6 +13,7 @@ use crate::units;
 #[derive(Clone, Debug)]
 pub(crate) struct DocxDocument {
   pub page: PageSetup,
+  pub line_number_style: TextStyle,
   pub has_styles_part: bool,
   pub default_tab_stop_pt: f32,
   pub compatibility_mode: u16,
@@ -184,6 +185,7 @@ pub(crate) struct TableCell {
   pub grid_span: usize,
   pub vertical_merge_continue: bool,
   pub vertical_alignment: TableCellVerticalAlignment,
+  pub text_rotation_deg: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

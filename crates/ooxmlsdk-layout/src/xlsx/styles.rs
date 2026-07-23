@@ -156,6 +156,13 @@ impl OrderedF64 {
 }
 
 impl StylesCatalog {
+  pub(crate) fn output_ui_language(&self) -> &'static str {
+    match self.builtin_number_format_locale {
+      BuiltinNumberFormatLocale::EnglishUs => "en-US",
+      BuiltinNumberFormatLocale::ChineseSimplified => "zh-CN",
+    }
+  }
+
   pub(crate) fn theme_color(&self, index: u32, tint: f64) -> Option<RgbColor> {
     let base = self.theme_colors.get(index)?;
     if tint == 0.0 {
@@ -468,6 +475,33 @@ impl StylesCatalog {
           .unwrap_or("Aptos Narrow"),
       )),
       east_asia_font_family: self.theme_minor_east_asian.clone(),
+      // DrawingML's latin/eastAsian/complex-script faces are font slots just
+      // like WordprocessingML rFonts. In particular, ASCII digits following
+      // Han text remain on the latin face.
+      wordprocessingml_font_slots: true,
+      // Legacy c:chart without a related ChartStyle part inherits plain tx1.
+      // A related Office 2013+ ChartStyle supplies its own transformed font
+      // reference and is layered by the drawing chart lowerer.
+      color: RgbColor::default(),
+      ..TextStyle::default()
+    }
+  }
+
+  pub(crate) fn default_drawing_text_style(&self) -> TextStyle {
+    // ECMA-376 Part 1 §20.1.4.1.26: an omitted DrawingML latin face inherits
+    // the theme minor font. Spreadsheet shapes use the workbook theme rather
+    // than the worksheet cell-XF font; Office's pre-Aptos built-in theme is
+    // Calibri when the package has no theme part.
+    TextStyle {
+      font_family: Some(Arc::from(
+        self
+          .theme_fonts
+          .as_ref()
+          .and_then(|fonts| fonts.minor_latin.as_deref())
+          .unwrap_or("Calibri"),
+      )),
+      east_asia_font_family: self.theme_minor_east_asian.clone(),
+      wordprocessingml_font_slots: true,
       ..TextStyle::default()
     }
   }
@@ -1304,6 +1338,15 @@ mod tests {
       Some("YYYY/M/D h:mm")
     );
     assert_eq!(english.number_format_code(14), Some("M/D/YYYY"));
+  }
+
+  #[test]
+  fn drawing_text_inherits_the_workbook_minor_latin_theme_font() {
+    let catalog = StylesCatalog::default();
+
+    let style = catalog.default_drawing_text_style();
+
+    assert_eq!(style.font_family.as_deref(), Some("Calibri"));
   }
 
   #[test]

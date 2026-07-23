@@ -10,13 +10,36 @@ pub(crate) fn serialize_settings(options: &PdfOptions) -> Result<SerializeSettin
   Ok(SerializeSettings {
     pretty: false,
     compress_content_streams: options.compress_content_streams,
-    no_device_cs: true,
+    // Word's ordinary fixed-format PDF output uses DeviceRGB for unprofiled
+    // RGB images. Keep device-independent color for explicitly requested
+    // archival profiles, where the conformance contract is stronger than
+    // Office's default PDF behavior.
+    no_device_cs: requests_archival_standard(options),
     ascii_compatible: false,
     xmp_metadata: true,
     cmyk_profile: None,
     configuration: pdf_configuration(options)?,
     enable_tagging: options.general.tagged_pdf || options.general.pdf_ua_compliance,
     render_svg_glyph_fn: krilla_svg::render_svg_glyph,
+  })
+}
+
+fn requests_archival_standard(options: &PdfOptions) -> bool {
+  options.standards.iter().any(|standard| {
+    matches!(
+      standard,
+      PdfStandard::PdfA1a
+        | PdfStandard::PdfA1b
+        | PdfStandard::PdfA2a
+        | PdfStandard::PdfA2b
+        | PdfStandard::PdfA2u
+        | PdfStandard::PdfA3a
+        | PdfStandard::PdfA3b
+        | PdfStandard::PdfA3u
+        | PdfStandard::PdfA4
+        | PdfStandard::PdfA4f
+        | PdfStandard::PdfA4e
+    )
   })
 }
 
@@ -102,6 +125,19 @@ mod tests {
 
     assert_eq!(configuration.version(), PdfVersion::Pdf17);
     assert!(configuration.validators().is_empty());
+  }
+
+  #[test]
+  fn ordinary_pdf_uses_device_color_but_pdf_a_does_not() {
+    let ordinary = serialize_settings(&PdfOptions::default()).unwrap();
+    let archival_options = PdfOptions {
+      standards: vec![PdfStandard::PdfA2b],
+      ..PdfOptions::default()
+    };
+    let archival = serialize_settings(&archival_options).unwrap();
+
+    assert!(!ordinary.no_device_cs);
+    assert!(archival.no_device_cs);
   }
 
   #[test]

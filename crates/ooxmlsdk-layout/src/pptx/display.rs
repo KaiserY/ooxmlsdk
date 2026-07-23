@@ -73,6 +73,7 @@ pub(crate) fn lower_to_layout_document(
     .draw_pages
     .iter()
     .enumerate()
+    .filter(|(_, slide)| slide.visible)
     .map(|(page_index, slide)| {
       (
         slide.size.to_page_setup(),
@@ -965,7 +966,14 @@ fn lower_chart(
   let width = units::emu_to_points(shape.size.cx);
   let height = units::emu_to_points(shape.size.cy);
 
-  if let Some(chart) = shared_chart::clustered_column_chart(&chart_resource.chart_space) {
+  if let Some(mut chart) =
+    shared_chart::clustered_column_chart_for_ui_language(&chart_resource.chart_space, ui_language)
+  {
+    if chart.title.is_none()
+      && shared_chart::has_powerpoint_automatic_title_placeholder(&chart_resource.chart_space.chart)
+    {
+      chart.title = Some(shared_chart::ChartTitleText::Automatic);
+    }
     let series_colors = chart
       .series
       .iter()
@@ -1096,7 +1104,7 @@ fn lower_chart(
   }
 
   let paints = chart_data_point_paints(import, slide, chart_resource);
-  let texts = shared_chart::visible_texts(&chart_resource.chart_space);
+  let texts = shared_chart::visible_texts_for_ui_language(&chart_resource.chart_space, ui_language);
   if paints.is_empty() && texts.is_empty() {
     return;
   }
@@ -1417,71 +1425,73 @@ fn lower_diagram(
   let mut pending_text_items = Vec::new();
   let mut font_sync_scales: HashMap<String, (f32, f32)> = HashMap::new();
   for diagram_shape in shapes {
-    let fill_images = diagram_shape
-      .shape_properties
-      .as_deref()
-      .map(|properties| {
-        diagram_model_shape_blip_fill_image_items(
-          context.import,
-          context.slide,
-          data_resource,
-          properties,
-          shared_diagram::DiagramBounds {
-            x: diagram_shape.x,
-            y: diagram_shape.y,
-            width: diagram_shape.width,
-            height: diagram_shape.height,
-          },
-        )
-      })
-      .unwrap_or_default();
-    if fill_images.is_empty()
-      && diagram_shape.is_blip_placeholder
-      && let Some(item) = diagram_blip_placeholder_image_item(shared_diagram::DiagramBounds {
-        x: diagram_shape.x,
-        y: diagram_shape.y,
-        width: diagram_shape.width,
-        height: diagram_shape.height,
-      })
-    {
-      drawing_items.push(PageItem::Image(item));
-    }
-    drawing_items.extend(fill_images.into_iter().map(PageItem::Image));
-    let fill_color = diagram_shape
-      .shape_properties
-      .as_deref()
-      .and_then(|properties| {
-        diagram_model_shape_fill_color(context.import, context.slide, properties)
-      })
-      .unwrap_or_else(|| pdf_rgb_color(diagram_shape.fill));
-    let suppress_fill = diagram_shape
-      .shape_properties
-      .as_deref()
-      .is_some_and(diagram_model_shape_suppresses_fill);
-    if diagram_shape.is_connector {
-      drawing_items.push(PageItem::Line(diagram_connector_line_item(&diagram_shape)));
-    } else {
-      drawing_items.push(PageItem::Rect(RectItem {
-        x_pt: diagram_shape.x,
-        y_pt: diagram_shape.y,
-        width_pt: diagram_shape.width,
-        height_pt: diagram_shape.height,
-        fill_color: diagram_shape
-          .shape_properties
-          .as_deref()
-          .is_none_or(|properties| !diagram_model_shape_has_blip_fill(properties))
-          .then_some(fill_color)
-          .filter(|_| !suppress_fill),
-        fill_opacity: 1.0,
-        stroke: diagram_shape
-          .shape_properties
-          .as_deref()
-          .and_then(|properties| {
-            diagram_model_shape_outline(context.import, context.slide, properties)
-          })
-          .or_else(|| (!suppress_fill).then_some(BorderStyle::default())),
-        stroke_opacity: 1.0,
-      }));
+    if diagram_shape.draw_geometry {
+      let fill_images = diagram_shape
+        .shape_properties
+        .as_deref()
+        .map(|properties| {
+          diagram_model_shape_blip_fill_image_items(
+            context.import,
+            context.slide,
+            data_resource,
+            properties,
+            shared_diagram::DiagramBounds {
+              x: diagram_shape.x,
+              y: diagram_shape.y,
+              width: diagram_shape.width,
+              height: diagram_shape.height,
+            },
+          )
+        })
+        .unwrap_or_default();
+      if fill_images.is_empty()
+        && diagram_shape.is_blip_placeholder
+        && let Some(item) = diagram_blip_placeholder_image_item(shared_diagram::DiagramBounds {
+          x: diagram_shape.x,
+          y: diagram_shape.y,
+          width: diagram_shape.width,
+          height: diagram_shape.height,
+        })
+      {
+        drawing_items.push(PageItem::Image(item));
+      }
+      drawing_items.extend(fill_images.into_iter().map(PageItem::Image));
+      let fill_color = diagram_shape
+        .shape_properties
+        .as_deref()
+        .and_then(|properties| {
+          diagram_model_shape_fill_color(context.import, context.slide, properties)
+        })
+        .unwrap_or_else(|| pdf_rgb_color(diagram_shape.fill));
+      let suppress_fill = diagram_shape
+        .shape_properties
+        .as_deref()
+        .is_some_and(diagram_model_shape_suppresses_fill);
+      if diagram_shape.is_connector {
+        drawing_items.push(PageItem::Line(diagram_connector_line_item(&diagram_shape)));
+      } else {
+        drawing_items.push(PageItem::Rect(RectItem {
+          x_pt: diagram_shape.x,
+          y_pt: diagram_shape.y,
+          width_pt: diagram_shape.width,
+          height_pt: diagram_shape.height,
+          fill_color: diagram_shape
+            .shape_properties
+            .as_deref()
+            .is_none_or(|properties| !diagram_model_shape_has_blip_fill(properties))
+            .then_some(fill_color)
+            .filter(|_| !suppress_fill),
+          fill_opacity: 1.0,
+          stroke: diagram_shape
+            .shape_properties
+            .as_deref()
+            .and_then(|properties| {
+              diagram_model_shape_outline(context.import, context.slide, properties)
+            })
+            .or_else(|| (!suppress_fill).then_some(BorderStyle::default())),
+          stroke_opacity: 1.0,
+        }));
+      }
     }
     if !diagram_shape.text_body.is_empty() {
       let mut text_body = diagram_text_body(&diagram_shape.text_body);
@@ -3756,6 +3766,67 @@ fn lower_shape_bounds(
     return;
   }
 
+  if shape.service_name == ShapeService::Connector {
+    items.push(PageItem::Path(common::PathItem {
+      bounds: transformed_shape_bounds(frame, shape),
+      points: Vec::new(),
+      commands: shape_path,
+      closed: false,
+      fill: common::Fill::None,
+      stroke: stroke.map(|stroke| common::Stroke {
+        width: common::Pt(stroke.width_pt),
+        color: common_rgb(stroke.color, stroke_opacity),
+        dash: None,
+        source_style_id: None,
+      }),
+    }));
+    return;
+  }
+
+  if let Some(path_kind) = supported_shape_vector_path_kind(shape) {
+    items.push(PageItem::Path(common::PathItem {
+      bounds: transformed_shape_bounds(frame, shape),
+      points: Vec::new(),
+      commands: shape_path,
+      closed: path_kind == SupportedVectorPathKind::Closed,
+      fill: if path_kind == SupportedVectorPathKind::Closed {
+        fill_paint
+          .map(|paint| common::Fill::Solid(common_rgb(paint.color, paint.opacity)))
+          .unwrap_or(common::Fill::None)
+      } else {
+        common::Fill::None
+      },
+      stroke: stroke.map(|stroke| common::Stroke {
+        width: common::Pt(stroke.width_pt),
+        color: common_rgb(stroke.color, stroke_opacity),
+        dash: None,
+        source_style_id: None,
+      }),
+    }));
+    return;
+  }
+  if let Some(path_stroke_enabled) = supported_single_custom_path(shape, frame) {
+    items.push(PageItem::Path(common::PathItem {
+      bounds: transformed_shape_bounds(frame, shape),
+      points: Vec::new(),
+      commands: shape_path,
+      closed: true,
+      fill: fill_paint
+        .map(|paint| common::Fill::Solid(common_rgb(paint.color, paint.opacity)))
+        .unwrap_or(common::Fill::None),
+      stroke: path_stroke_enabled
+        .then_some(stroke)
+        .flatten()
+        .map(|stroke| common::Stroke {
+          width: common::Pt(stroke.width_pt),
+          color: common_rgb(stroke.color, stroke_opacity),
+          dash: None,
+          source_style_id: None,
+        }),
+    }));
+    return;
+  }
+
   items.push(PageItem::Rect(RectItem {
     x_pt,
     y_pt,
@@ -3766,6 +3837,76 @@ fn lower_shape_bounds(
     stroke,
     stroke_opacity,
   }));
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SupportedVectorPathKind {
+  Open,
+  Closed,
+}
+
+fn supported_shape_vector_path_kind(shape: &Shape) -> Option<SupportedVectorPathKind> {
+  let Some(CustomShapeGeometry::Preset(preset)) = shape.custom_shape_properties.geometry.as_ref()
+  else {
+    return None;
+  };
+  supported_preset_vector_path_kind(preset.preset)
+}
+
+fn supported_single_custom_path(shape: &Shape, frame: TextFrame) -> Option<bool> {
+  let Some(CustomShapeGeometry::Custom(geometry)) = shape.custom_shape_properties.geometry.as_ref()
+  else {
+    return None;
+  };
+  let [path] = geometry.path_list.path.as_slice() else {
+    return None;
+  };
+  if !matches!(path.fill, None | Some(a::PathFillModeValues::Norm))
+    || !path
+      .path_choice
+      .iter()
+      .any(|choice| matches!(choice, a::PathChoice::CloseShapePath))
+    || custom_geometry::path_commands(
+      geometry,
+      frame.x_pt,
+      frame.y_pt,
+      frame.width_pt,
+      frame.height_pt,
+    )
+    .is_none()
+  {
+    return None;
+  }
+  Some(path.stroke.as_ref().is_none_or(|value| value.as_bool()))
+}
+
+fn supported_preset_vector_path_kind(
+  preset: a::ShapeTypeValues,
+) -> Option<SupportedVectorPathKind> {
+  match preset {
+    a::ShapeTypeValues::RoundRectangle
+    | a::ShapeTypeValues::RightArrow
+    | a::ShapeTypeValues::DownArrow
+    | a::ShapeTypeValues::Ellipse
+    | a::ShapeTypeValues::Triangle
+    | a::ShapeTypeValues::RightTriangle
+    | a::ShapeTypeValues::Diamond
+    | a::ShapeTypeValues::FlowChartExtract
+    | a::ShapeTypeValues::Hexagon
+    | a::ShapeTypeValues::LeftArrow
+    | a::ShapeTypeValues::UpArrow
+    | a::ShapeTypeValues::Parallelogram
+    | a::ShapeTypeValues::Trapezoid
+    | a::ShapeTypeValues::Plus
+    | a::ShapeTypeValues::Star5
+    | a::ShapeTypeValues::Donut
+    | a::ShapeTypeValues::FlowChartDelay
+    | a::ShapeTypeValues::Frame => Some(SupportedVectorPathKind::Closed),
+    a::ShapeTypeValues::Line | a::ShapeTypeValues::LineInverse => {
+      Some(SupportedVectorPathKind::Open)
+    }
+    _ => None,
+  }
 }
 
 fn shape_gradient_path(
@@ -4908,11 +5049,109 @@ fn lower_text_body_at_with_style_and_scale(
       },
     );
   }
+  apply_plain_word_art_transform(
+    &mut items[item_start..],
+    frame,
+    text_body,
+    &mut text_metrics,
+  );
   apply_text_camera_z_rotation(
     &mut items[item_start..],
     text_body.display_properties.camera_z_rotation_degrees(),
     &mut text_metrics,
   );
+}
+
+fn apply_plain_word_art_transform(
+  items: &mut [PageItem],
+  frame: TextFrame,
+  text_body: &TextBody,
+  text_metrics: &mut TextMetrics,
+) {
+  if text_body.display_properties.preset_text_warp != Some(a::TextShapeValues::TextPlain) {
+    return;
+  }
+  let Some((left, top, right, bottom)) = text_items_ink_bounds(items, text_metrics) else {
+    return;
+  };
+  let source_width = right - left;
+  let source_height = bottom - top;
+  if source_width <= f32::EPSILON || source_height <= f32::EPSILON {
+    return;
+  }
+  // ECMA-376 Part 1, 20.1.10.76 identifies textPlain as the rectangular
+  // preset text warp. PowerPoint retains the natural text as an invisible
+  // semantic layer, while the visible glyph paths are independently scaled
+  // from the laid-out text bounds to the complete text frame.
+  let scale_x = frame.width_pt / source_width;
+  let scale_y = frame.height_pt / source_height;
+  let transform = common::Transform {
+    m11: scale_x,
+    m12: 0.0,
+    m21: 0.0,
+    m22: scale_y,
+    dx: common::Pt(frame.x_pt - left * scale_x),
+    dy: common::Pt(frame.y_pt - top * scale_y),
+  };
+  for item in items {
+    if let PageItem::Text(text) = item {
+      let semantic_text_overlay = text
+        .style
+        .pdf_glyph_outline_options
+        .as_deref()
+        .is_some_and(|options| options.semantic_text_overlay);
+      text.style.pdf_glyph_outline_options = Some(Arc::new(common::PdfGlyphOutlineOptions {
+        semantic_text_overlay,
+        transform: Some(transform),
+      }));
+    }
+  }
+}
+
+fn text_items_ink_bounds(
+  items: &[PageItem],
+  text_metrics: &mut TextMetrics,
+) -> Option<(f32, f32, f32, f32)> {
+  let mut bounds: Option<(f32, f32, f32, f32)> = None;
+  for item in items {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    let baseline_offset = if text.style.use_windows_font_metrics {
+      text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+        &text.text,
+        &text.style,
+        text.line_height_pt,
+      )
+    } else {
+      text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
+    };
+    let baseline = text.y_pt + baseline_offset;
+    let mut glyph_x = text.x_pt;
+    let Some(shaped) = text_metrics.shape_text(&text.text, &text.style) else {
+      continue;
+    };
+    for glyph in shaped.glyphs {
+      let font_size = glyph.font_size_pt;
+      if let Some(glyph_bounds) = glyph.bounds_em {
+        let left = glyph_x + (glyph.x_offset_em + glyph_bounds.x_min_em) * font_size;
+        let right = glyph_x + (glyph.x_offset_em + glyph_bounds.x_max_em) * font_size;
+        let top = baseline - (glyph.y_offset_em + glyph_bounds.y_max_em) * font_size;
+        let bottom = baseline - (glyph.y_offset_em + glyph_bounds.y_min_em) * font_size;
+        bounds = Some(match bounds {
+          Some((old_left, old_top, old_right, old_bottom)) => (
+            old_left.min(left),
+            old_top.min(top),
+            old_right.max(right),
+            old_bottom.max(bottom),
+          ),
+          None => (left, top, right, bottom),
+        });
+      }
+      glyph_x += glyph.x_advance_em * font_size;
+    }
+  }
+  bounds
 }
 
 fn apply_text_camera_z_rotation(
@@ -4985,6 +5224,30 @@ fn text_base_style(
     font_size_pt: base_font_size_pt.unwrap_or(DEFAULT_TEXT_FONT_SIZE_PT),
     use_windows_font_metrics: true,
     rotation_deg: options.rotation_deg,
+    // PowerPoint's fixed-format writer emits bodyPr text-area rotation and
+    // scene3d text as vector glyph outlines, while ordinary shape rotation
+    // remains searchable PDF text. Keep that distinction before both are
+    // lowered into the same final rotation angle.
+    pdf_glyph_outlines: text_body
+      .display_properties
+      .text_area_rotation
+      .is_some_and(|rotation| rotation != 0)
+      || text_body.display_properties.from_word_art
+      || text_body
+        .body_properties
+        .as_deref()
+        .is_some_and(|properties| properties.scene3_d_type.is_some()),
+    pdf_glyph_outline_options: (text_body.display_properties.from_word_art
+      && text_body
+        .body_properties
+        .as_deref()
+        .is_none_or(|properties| properties.scene3_d_type.is_none()))
+    .then(|| {
+      Arc::new(common::PdfGlyphOutlineOptions {
+        semantic_text_overlay: true,
+        transform: None,
+      })
+    }),
     ..TextStyle::default()
   };
   base_style.east_asia_font_family = import
@@ -5677,6 +5940,8 @@ fn lower_paragraph(
       &paragraph.runs[segment_start..segment_end],
       text_metrics,
     );
+    let is_soft_break_empty_line =
+      segment_start == segment_end && (segment_start > 0 || segment_end < paragraph.runs.len());
     let alignment = if context.options.anchor_center {
       // maps horizontal text with anchorCtr=1 to TextHorizontalAdjust_CENTER,
       // so the shape-level adjustment overrides paragraph alignment.
@@ -5695,7 +5960,11 @@ fn lower_paragraph(
       // as a minimum moves explicitly smaller text upward in bottom-anchored
       // placeholders.
       let mut max_line_height = if text_line.runs.is_empty() {
-        paragraph_style.line_height(&base_line_style, context.options)
+        if is_soft_break_empty_line {
+          paragraph_style.soft_break_empty_line_height(&base_line_style, context.options)
+        } else {
+          paragraph_style.line_height(&base_line_style, context.options)
+        }
       } else {
         0.0
       };
@@ -6342,6 +6611,10 @@ fn bullet_graphic_item(
 
 fn line_height(style: &TextStyle, line_scale: f32) -> f32 {
   style.font_size_pt * DEFAULT_TEXT_LINE_HEIGHT_SCALE * line_scale
+}
+
+fn automatic_soft_break_empty_line_height(style: &TextStyle, line_scale: f32) -> f32 {
+  style.font_size_pt * line_scale
 }
 
 #[derive(Clone, Copy)]
@@ -7063,6 +7336,19 @@ impl ParagraphDisplayStyle {
 
   fn line_height(&self, style: &TextStyle, options: &TextLoweringOptions) -> f32 {
     self.line_height_with_scale(style, options.line_scale)
+  }
+
+  fn soft_break_empty_line_height(&self, style: &TextStyle, options: &TextLoweringOptions) -> f32 {
+    match self.line_spacing {
+      // PowerPoint's fixed-output path advances an empty line introduced by
+      // a:br by one em under automatic spacing. The br/rPr is insertion-point
+      // formatting (ECMA-376 Part 1, 21.1.2.2.1), not the current empty line's
+      // layout style. Explicit paragraph line spacing remains authoritative.
+      ParagraphLineSpacing::Default => {
+        automatic_soft_break_empty_line_height(style, options.line_scale)
+      }
+      _ => self.line_height(style, options),
+    }
   }
 
   fn line_height_with_scale(&self, style: &TextStyle, line_scale: f32) -> f32 {
@@ -7878,6 +8164,16 @@ fn apply_run_properties(
   if let Some(fill) = properties.run_properties_choice1.as_ref() {
     apply_text_fill(import, slide, fill, style);
   }
+  if let Some(outline) = properties.outline.as_deref() {
+    apply_text_outline(import, slide, outline, style);
+    if properties.run_properties_choice2.is_none() && style.outline_width_pt > f32::EPSILON {
+      style.pdf_glyph_outlines = true;
+      style.pdf_glyph_outline_options = Some(Arc::new(common::PdfGlyphOutlineOptions {
+        semantic_text_overlay: true,
+        transform: None,
+      }));
+    }
+  }
   if let Some(fill) = properties.run_properties_choice4.as_ref() {
     apply_run_underline_fill(import, slide, fill, style);
   }
@@ -7922,6 +8218,17 @@ fn apply_default_run_properties(
   );
   if let Some(fill) = properties.default_run_properties_choice1.as_ref() {
     apply_default_text_fill(import, slide, fill, style);
+  }
+  if let Some(outline) = properties.outline.as_deref() {
+    apply_text_outline(import, slide, outline, style);
+    if properties.default_run_properties_choice2.is_none() && style.outline_width_pt > f32::EPSILON
+    {
+      style.pdf_glyph_outlines = true;
+      style.pdf_glyph_outline_options = Some(Arc::new(common::PdfGlyphOutlineOptions {
+        semantic_text_overlay: true,
+        transform: None,
+      }));
+    }
   }
   if let Some(fill) = properties.default_run_properties_choice4.as_ref() {
     apply_default_run_underline_fill(import, slide, fill, style);
@@ -8087,6 +8394,40 @@ fn apply_best_solid_text_fill(
   {
     style.color = color.color;
     style.opacity = color.opacity;
+  }
+}
+
+fn apply_text_outline(
+  import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
+  outline: &a::Outline,
+  style: &mut TextStyle,
+) {
+  // ECMA-376 Part 1, 20.1.2.2.24 defines a:ln as the outline style for both
+  // shapes and text. Character outlines participate in the same run-property
+  // inheritance as the adjacent fill: an omitted a:ln keeps the inherited
+  // value, while an explicit noFill removes it.
+  let Some(line) = LineProperties::from_dml_outline(outline) else {
+    return;
+  };
+  if matches!(line.fill, LineFill::None) {
+    style.outline_color = None;
+    style.outline_opacity = 1.0;
+    style.outline_width_pt = 0.0;
+    return;
+  }
+  // Unlike a shape outline, the DrawingML line definition specifies zero as
+  // the omitted text-outline width. Do not inherit the shape renderer's
+  // 0.75pt convenience default here.
+  style.outline_width_pt = outline
+    .width
+    .map(|width| units::emu_to_points(i64::from(width)))
+    .unwrap_or(0.0);
+  // A width-only line changes the inherited outline width without replacing
+  // its inherited paint. A solid fill replaces both color and opacity.
+  if let Some(stroke) = line_stroke(import, slide, &line) {
+    style.outline_color = Some(stroke.style.color);
+    style.outline_opacity = stroke.opacity;
   }
 }
 
@@ -8351,6 +8692,58 @@ mod tests {
     assert_eq!(bullet.font.as_deref(), Some("Arial"));
     bullet.apply_font(BulletFontOverride::FollowText);
     assert!(bullet.font.is_none());
+  }
+
+  #[test]
+  fn automatic_soft_break_empty_line_advances_one_em() {
+    let style = TextStyle {
+      font_size_pt: 24.0,
+      ..TextStyle::default()
+    };
+
+    assert_eq!(automatic_soft_break_empty_line_height(&style, 1.0), 24.0);
+    assert_eq!(automatic_soft_break_empty_line_height(&style, 0.8), 19.2);
+  }
+
+  #[test]
+  fn only_presets_with_exact_solid_paths_bypass_the_rect_fallback() {
+    for preset in [
+      a::ShapeTypeValues::RoundRectangle,
+      a::ShapeTypeValues::RightArrow,
+      a::ShapeTypeValues::DownArrow,
+      a::ShapeTypeValues::Ellipse,
+      a::ShapeTypeValues::Triangle,
+      a::ShapeTypeValues::RightTriangle,
+      a::ShapeTypeValues::Diamond,
+      a::ShapeTypeValues::FlowChartExtract,
+      a::ShapeTypeValues::Hexagon,
+      a::ShapeTypeValues::LeftArrow,
+      a::ShapeTypeValues::UpArrow,
+      a::ShapeTypeValues::Parallelogram,
+      a::ShapeTypeValues::Trapezoid,
+      a::ShapeTypeValues::Plus,
+      a::ShapeTypeValues::Star5,
+      a::ShapeTypeValues::Donut,
+      a::ShapeTypeValues::FlowChartDelay,
+      a::ShapeTypeValues::Frame,
+    ] {
+      assert_eq!(
+        supported_preset_vector_path_kind(preset),
+        Some(SupportedVectorPathKind::Closed)
+      );
+    }
+    assert_eq!(
+      supported_preset_vector_path_kind(a::ShapeTypeValues::Line),
+      Some(SupportedVectorPathKind::Open)
+    );
+    assert_eq!(
+      supported_preset_vector_path_kind(a::ShapeTypeValues::LineInverse),
+      Some(SupportedVectorPathKind::Open)
+    );
+    assert_eq!(
+      supported_preset_vector_path_kind(a::ShapeTypeValues::Heart),
+      None
+    );
   }
 
   #[test]

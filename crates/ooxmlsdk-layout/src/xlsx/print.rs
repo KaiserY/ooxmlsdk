@@ -2223,15 +2223,9 @@ pub(crate) fn rendered_number_text(
 ) -> (String, NumberFormatRenderState) {
   match data_type {
     Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::Boolean) => {
-      if let Some(format_code) = format_code
-        && !format_code.eq_ignore_ascii_case("General")
-        && format_code != "@"
-      {
-        let value = if boolean_raw_value(raw) { 1.0 } else { 0.0 };
-        if let Some(text) = render_literal_section_number_format(format_code, value) {
-          return (text, NumberFormatRenderState::Boolean);
-        }
-      }
+      // Boolean cells use Excel's Standard/General representation regardless
+      // of the cell XF's number format. LibreOffice's OOXML importer enforces
+      // the same rule in SheetDataBuffer::setBooleanCell (#108770).
       return (
         if boolean_raw_value(raw) {
           "TRUE".to_string()
@@ -3632,6 +3626,33 @@ mod tests {
 
     assert_eq!(text, "#N/A");
     assert_eq!(state, NumberFormatRenderState::Error);
+  }
+
+  #[test]
+  fn boolean_cell_ignores_custom_number_format_literals() {
+    let boolean =
+      ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::Boolean;
+
+    assert_eq!(
+      rendered_number_text(
+        "1",
+        Some("\"IGAZ\";\"IGAZ\";\"HAMIS\""),
+        Some(boolean),
+        false
+      )
+      .0,
+      "TRUE"
+    );
+    assert_eq!(
+      rendered_number_text(
+        "0",
+        Some("\"IGAZ\";\"IGAZ\";\"HAMIS\""),
+        Some(boolean),
+        false
+      )
+      .0,
+      "FALSE"
+    );
   }
 
   #[test]

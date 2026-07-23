@@ -109,6 +109,7 @@ impl WorkbookFragment {
             workbook_index,
             state,
             active_workbook_sheet == Some(workbook_index),
+            &self.styles,
           );
         }
 
@@ -174,9 +175,10 @@ fn chartsheet(
   workbook_index: usize,
   state: Option<x::SheetStateValues>,
   active: bool,
+  styles: &StylesCatalog,
 ) -> Result<CalcSheet> {
   let chartsheet = part.root_element(package)?.clone();
-  let resources = SheetResourceCatalog::from_chartsheet_part(package, part)?;
+  let resources = SheetResourceCatalog::from_chartsheet_part(package, part, styles)?;
   Ok(CalcSheet::from_chartsheet(
     SheetIdentity {
       workbook_index,

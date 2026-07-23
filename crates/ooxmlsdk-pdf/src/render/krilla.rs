@@ -421,7 +421,7 @@ struct PaintPage<'doc> {
 
 #[derive(Clone, Debug)]
 enum PageItem<'doc> {
-  Text(TextItem<'doc>),
+  Text(Box<TextItem<'doc>>),
   Image(ImageItem<'doc>),
   LinkArea(LinkAreaItem<'doc>),
   Rect(RectItem),
@@ -562,6 +562,8 @@ struct TextStyle<'doc> {
   use_windows_font_metrics: bool,
   wordprocessingml_font_slots: bool,
   cjk_punctuation_compression_ratio: f32,
+  pdf_glyph_outlines: bool,
+  pdf_glyph_outline_options: Option<common::PdfGlyphOutlineOptions>,
   bold: bool,
   italic: bool,
   complex_bold: Option<bool>,
@@ -729,7 +731,7 @@ struct PaintTextPortion {
   link: Option<PaintLink>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PaintTextPortionKind {
   Text,
   Tab,
@@ -805,9 +807,10 @@ fn conversion_font_audit(paint: &PaintDocument<'_>) -> PdfFontAudit {
       };
       for (portion_index, portion) in text.portions.iter().enumerate() {
         audit.text_portion_count += 1;
-        let painted = !matches!(portion.kind, PaintTextPortionKind::Tab)
+        let visible = !matches!(portion.kind, PaintTextPortionKind::Tab)
           && text_has_visible_glyph_paint(&text.item.style);
-        if painted {
+        let painted_as_text = visible && !text_requires_glyph_outlines(&text.item.style);
+        if painted_as_text {
           audit.painted_text_portion_count += 1;
         }
         if !valid_text_range(&text.item.text, &portion.text_range) {
@@ -829,7 +832,7 @@ fn conversion_font_audit(paint: &PaintDocument<'_>) -> PdfFontAudit {
           );
         }
         let Some(glyph_runs) = &portion.glyphs else {
-          if painted && portion.text_range.start < portion.text_range.end {
+          if visible && portion.text_range.start < portion.text_range.end {
             push_font_audit_issue(
               &mut audit,
               PdfFontAuditIssue {
@@ -848,7 +851,7 @@ fn conversion_font_audit(paint: &PaintDocument<'_>) -> PdfFontAudit {
         audit.explicit_glyph_portion_count += 1;
         for (glyph_run_index, run) in glyph_runs.iter().enumerate() {
           audit.glyph_run_count += 1;
-          if painted {
+          if painted_as_text {
             let mut in_multi_glyph_cluster = false;
             for glyphs in run.glyphs.windows(2) {
               if glyphs[0].text_range == glyphs[1].text_range {
@@ -1419,7 +1422,7 @@ impl<'doc> PaintDocument<'doc> {
               }
               text.decoration_span_start_x_pt = metadata.span_start_x_pt;
               PaintItem::Text(Box::new(PaintText::from_layout_text(
-                text,
+                *text,
                 owner,
                 page.setup.size.width.0,
                 text_metrics,
@@ -1446,10 +1449,11 @@ impl<'doc> PaintDocument<'doc> {
 fn pdf_page_dimension(engine_kind: common::LayoutEngineKind, dimension_pt: f32) -> f32 {
   if engine_kind == common::LayoutEngineKind::Pptx {
     // PowerPoint's fixed-format writer quantizes presentation MediaBox
-    // dimensions to its 600 dpi print-device grid. Keep the OOXML/layout
-    // coordinate space exact and apply this only at PDF page creation.
+    // dimensions to its 600 dpi print-device grid, with positive half-grid
+    // dimensions rounded upward. Keep the OOXML/layout coordinate space exact
+    // and apply this only at PDF page creation.
     const PRINT_DPI: f32 = 600.0;
-    (dimension_pt * PRINT_DPI / 72.0).round_ties_even() * 72.0 / PRINT_DPI
+    (dimension_pt * PRINT_DPI / 72.0).round() * 72.0 / PRINT_DPI
   } else {
     dimension_pt
   }
@@ -1486,7 +1490,7 @@ fn expand_metafile_semantic_text_items<'doc>(
             .map(|size| size * image.height_pt)
             .unwrap_or(11.0)
             .max(1.0);
-          PageItem::Text(TextItem {
+          PageItem::Text(Box::new(TextItem {
             x_pt: image.x_pt + run.x * image.width_pt,
             y_pt: image.y_pt + run.y * image.height_pt,
             line_height_pt: (font_size_pt * 1.15).max(1.0),
@@ -1508,7 +1512,7 @@ fn expand_metafile_semantic_text_items<'doc>(
             pdf_text_segmentation: common::PdfTextSegmentation::Line,
             source_path: None,
             semantic_target_width_pt: run.width.map(|width| width * image.width_pt),
-          })
+          }))
         })
         .collect::<Vec<_>>()
       }
@@ -1531,7 +1535,7 @@ fn expand_metafile_semantic_text_items<'doc>(
 
 fn page_item_from_common<'doc>(item: &'doc common::DisplayItem<'static>) -> Option<PageItem<'doc>> {
   match item {
-    common::DisplayItem::Text(text) => Some(PageItem::Text(text_item_from_common(text))),
+    common::DisplayItem::Text(text) => Some(PageItem::Text(Box::new(text_item_from_common(text)))),
     common::DisplayItem::Image(image) => Some(PageItem::Image(image_item_from_common(image))),
     common::DisplayItem::Path(path) => Some(PageItem::Polyline(polyline_from_common(path))),
     common::DisplayItem::Rect(rect) => Some(PageItem::Rect(rect_item_from_common(rect))),
@@ -1691,6 +1695,8 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     use_windows_font_metrics: style.use_windows_font_metrics,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
+    pdf_glyph_outlines: style.pdf_glyph_outlines,
+    pdf_glyph_outline_options: style.pdf_glyph_outline_options.as_deref().copied(),
     bold: style.bold,
     italic: style.italic,
     complex_bold: style.complex_bold,
@@ -1959,7 +1965,7 @@ impl<'doc> PaintText<'doc> {
         baseline_y,
         width_pt,
         page_width_pt,
-        clip: owner.map(|owner| owner.clip),
+        clip: owner.and_then(|owner| owner.clip),
         glyphs: glyphs.map(|run| run.font_runs),
         highlight,
         underline,
@@ -2086,6 +2092,7 @@ fn text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionRanges {
   let split_decorated_portions =
     text.preserve_text_portion && (text.style.underline || text.style.strikethrough);
   if decorated_edge_space
+    && !text.text.contains('\t')
     && text.pdf_text_segmentation != common::PdfTextSegmentation::Portion
     && !split_decorated_portions
   {
@@ -2093,7 +2100,11 @@ fn text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionRanges {
   }
   let split_portions =
     text.pdf_text_segmentation == common::PdfTextSegmentation::Portion || split_decorated_portions;
-  if !split_portions && text.hyperlink_url.is_some() && !text.text.contains('\t') {
+  if text.pdf_text_segmentation == common::PdfTextSegmentation::Line
+    && !split_decorated_portions
+    && text.hyperlink_url.is_some()
+    && !text.text.contains('\t')
+  {
     let mut ranges = PaintTextPortionRanges::new();
     ranges.push((PaintTextPortionKind::Link, 0..text.text.len()));
     return ranges;
@@ -2102,6 +2113,24 @@ fn text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionRanges {
   let mut ranges = PaintTextPortionRanges::new();
   let mut start = 0usize;
   for (index, ch) in text.text.char_indices() {
+    if text.pdf_text_segmentation == common::PdfTextSegmentation::WordLine && ch == '-' {
+      if start < index {
+        let kind = if text.hyperlink_url.is_some() {
+          PaintTextPortionKind::Link
+        } else {
+          PaintTextPortionKind::Text
+        };
+        ranges.push((kind, start..index));
+      }
+      let kind = if text.hyperlink_url.is_some() {
+        PaintTextPortionKind::Link
+      } else {
+        PaintTextPortionKind::Text
+      };
+      ranges.push((kind, index..index + ch.len_utf8()));
+      start = index + ch.len_utf8();
+      continue;
+    }
     if ch != '\t' && !(split_portions && ch.is_whitespace()) {
       continue;
     }
@@ -2247,7 +2276,7 @@ struct PaintLineOwner {
   frame_index: usize,
   line_index: usize,
   frame_kind: FollowFrameKind,
-  clip: PaintClipRect,
+  clip: Option<PaintClipRect>,
 }
 
 fn same_paint_line_owner(left: Option<PaintLineOwner>, right: Option<PaintLineOwner>) -> bool {
@@ -2278,7 +2307,12 @@ fn paint_line_owners(
     for (line_index, line) in frame.lines.iter().enumerate() {
       let start = line.item_range.start.min(item_count);
       let end = line.item_range.end.min(item_count);
-      let clip_bounds = if frame_kind == FollowFrameKind::Table {
+      // Writer's normal PDF paint path does not clip paragraph text to the
+      // line rectangle. Glyph ink and justified terminal blanks may extend
+      // into the paragraph margin; SwTextPainter only installs a line clip
+      // for an undersized/clipping frame. Table cells are the exception: the
+      // cell fragment owns a real print rectangle and clips its inline text.
+      let clip_bounds = (frame_kind == FollowFrameKind::Table).then(|| {
         frame
           .fragments
           .iter()
@@ -2290,21 +2324,19 @@ fn paint_line_owners(
           .min_by_key(|fragment| fragment.item_range.end - fragment.item_range.start)
           .and_then(|fragment| fragment.bounds)
           .unwrap_or(line.bounds)
-      } else {
-        line.bounds
-      };
+      });
       for owner in owners.iter_mut().take(end).skip(start) {
         if owner.is_none() {
           *owner = Some(PaintLineOwner {
             frame_index,
             line_index,
             frame_kind,
-            clip: PaintClipRect {
-              x_pt: clip_bounds.origin.x.0,
-              y_pt: clip_bounds.origin.y.0,
-              width_pt: clip_bounds.size.width.0,
-              height_pt: clip_bounds.size.height.0,
-            },
+            clip: clip_bounds.map(|bounds| PaintClipRect {
+              x_pt: bounds.origin.x.0,
+              y_pt: bounds.origin.y.0,
+              width_pt: bounds.size.width.0,
+              height_pt: bounds.size.height.0,
+            }),
           });
         }
       }
@@ -2946,19 +2978,69 @@ fn draw_text_item(
     {
       for run in glyphs {
         let selected = fonts.select_face(&run.font_face)?;
+        let glyph_outlines = text_requires_glyph_outlines(&item.style);
         surface.set_stroke(text_stroke(
           &item.style,
           selected.synthetic_bold,
           run.font_size_pt,
         ));
+        if glyph_outlines
+          && let Some(transform) = item
+            .style
+            .pdf_glyph_outline_options
+            .and_then(|options| options.transform)
+        {
+          surface.push_transform(&Transform::from_row(
+            transform.m11,
+            transform.m12,
+            transform.m21,
+            transform.m22,
+            transform.dx.0,
+            transform.dy.0,
+          ));
+        }
         surface.draw_glyphs(
           Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
           &run.glyphs,
-          selected.font,
+          selected.font.clone(),
           &glyph_semantic_text,
           run.font_size_pt,
-          false,
+          glyph_outlines,
         );
+        if glyph_outlines
+          && item
+            .style
+            .pdf_glyph_outline_options
+            .is_some_and(|options| options.transform.is_some())
+        {
+          surface.pop();
+        }
+        if glyph_outlines
+          && item
+            .style
+            .pdf_glyph_outline_options
+            .is_some_and(|options| options.semantic_text_overlay)
+        {
+          // PowerPoint fixed output paints WordArt and ordinary explicitly
+          // outlined DrawingML text as glyph paths, then overlays invisible
+          // text for search and accessibility. Keep that semantic layer
+          // separate from the visible path paint.
+          surface.set_fill(Some(Fill {
+            paint: rgb::Color::new(0, 0, 0).into(),
+            opacity: NormalizedF32::ZERO,
+            rule: Default::default(),
+          }));
+          surface.set_stroke(None);
+          surface.draw_glyphs(
+            Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
+            &run.glyphs,
+            selected.font,
+            &glyph_semantic_text,
+            run.font_size_pt,
+            false,
+          );
+          surface.set_fill(Some(fill(&item.style)));
+        }
       }
     }
     if (horizontal_scale - 1.0).abs() > f32::EPSILON {
@@ -3003,6 +3085,16 @@ fn text_has_visible_glyph_paint(style: &TextStyle<'_>) -> bool {
       && style.outline_opacity > f32::EPSILON)
 }
 
+fn text_requires_glyph_outlines(style: &TextStyle<'_>) -> bool {
+  // Office's fixed-format writers convert translucent glyphs to paths. This
+  // preserves the alpha compositing result without exposing those glyphs as
+  // PDF text; both Word's w14:textFill alpha and PowerPoint's DrawingML alpha
+  // use that path. Opaque text remains real PDF text for search/accessibility.
+  !style.semantic_only
+    && style.opacity > f32::EPSILON
+    && (style.opacity < 1.0 - f32::EPSILON || style.pdf_glyph_outlines)
+}
+
 fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Cow<'a, str> {
   let symbol = font_family.is_some_and(|family| {
     family.eq_ignore_ascii_case("Symbol") || family.eq_ignore_ascii_case("SymbolMT")
@@ -3016,7 +3108,9 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
         || text.contains('\u{f076}')
         || text.contains('\u{f0a7}')
         || text.contains('\u{f0d8}')
-        || text.contains('\u{f0e0}')))
+        || text.contains('\u{f0e0}')
+        || text.contains('\u{f020}')
+        || text.contains('\u{f0fc}')))
   {
     return Cow::Borrowed(text);
   }
@@ -3027,6 +3121,9 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
   // symbol conversion tables map character 0xD8 to U+27A2 and Symbol 0xB7
   // to U+2022. PowerPoint's PDF export maps Wingdings 0x6E to U+25FC,
   // 0x76 to U+2756, 0xA7 to U+25AA, and 0xE0 to U+2192.
+  // Word's w:sym fixed output keeps the declared Wingdings glyph but maps
+  // 0x20 to a space-equivalent en space and 0xFC to U+2713 in ToUnicode.
+  // Keeping a three-byte scalar preserves shaped cluster byte offsets.
   Cow::Owned(
     text
       .chars()
@@ -3040,6 +3137,8 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
         '\u{f0a7}' if wingdings => '\u{25aa}',
         '\u{f0d8}' if wingdings => '\u{27a2}',
         '\u{f0e0}' if wingdings => '\u{2192}',
+        '\u{f020}' if wingdings => '\u{2002}',
+        '\u{f0fc}' if wingdings => '\u{2713}',
         _ => character,
       })
       .collect(),
@@ -3840,8 +3939,9 @@ mod tests {
   use std::sync::Arc;
 
   use super::{
-    gamma_correct_gradient_color, pdf_metadata, pdf_page_dimension, render,
-    symbol_font_semantic_text, text_stroke, text_style_from_common,
+    PaintTextPortionKind, TextItem, TextStyle as PaintTextStyle, gamma_correct_gradient_color,
+    pdf_metadata, pdf_page_dimension, render, symbol_font_semantic_text, text_portion_ranges,
+    text_requires_glyph_outlines, text_stroke, text_style_from_common,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -3850,6 +3950,80 @@ mod tests {
   use ooxmlsdk_layout::common::{
     self, Color, DisplayItem, DisplayPage, LayoutDocument, LayoutEngineKind, Pt, TextRun, TextStyle,
   };
+
+  #[test]
+  fn word_line_segmentation_isolates_breakable_hyphens() {
+    let item = TextItem {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      line_height_pt: 12.0,
+      text: "non-business".into(),
+      style: PaintTextStyle::default(),
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: common::PdfTextSegmentation::WordLine,
+      source_path: None,
+      semantic_target_width_pt: None,
+    };
+
+    let ranges = text_portion_ranges(&item)
+      .into_iter()
+      .map(|(_, range)| range)
+      .collect::<Vec<_>>();
+    assert_eq!(ranges, vec![0..3, 3..4, 4..12]);
+  }
+
+  #[test]
+  fn decorated_tab_remains_a_non_painting_tab_portion() {
+    let item = TextItem {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      line_height_pt: 12.0,
+      text: "\t".into(),
+      style: PaintTextStyle {
+        underline: true,
+        ..PaintTextStyle::default()
+      },
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: common::PdfTextSegmentation::Line,
+      source_path: None,
+      semantic_target_width_pt: None,
+    };
+
+    assert_eq!(
+      text_portion_ranges(&item).as_slice(),
+      [(PaintTextPortionKind::Tab, 0..1)]
+    );
+  }
+
+  #[test]
+  fn translucent_office_text_is_painted_as_glyph_outlines() {
+    let mut style = PaintTextStyle::default();
+    assert!(!text_requires_glyph_outlines(&style));
+
+    style.opacity = 0.74;
+    assert!(text_requires_glyph_outlines(&style));
+
+    style.opacity = 0.0;
+    assert!(!text_requires_glyph_outlines(&style));
+
+    style.opacity = 0.74;
+    style.semantic_only = true;
+    assert!(!text_requires_glyph_outlines(&style));
+  }
 
   fn collect_structure_roles(
     pdf: &lopdf::Document,
@@ -4118,6 +4292,8 @@ mod tests {
     assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 793.75) - 793.8).abs() < 0.001);
     assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 595.25) - 595.2).abs() < 0.001);
     assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 446.5) - 446.52).abs() < 0.001);
+    assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 793.5) - 793.56).abs() < 0.001);
+    assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 595.5) - 595.56).abs() < 0.001);
     assert_eq!(pdf_page_dimension(LayoutEngineKind::Docx, 793.75), 793.75);
   }
 
@@ -4178,6 +4354,14 @@ mod tests {
     assert_eq!(
       symbol_font_semantic_text("\u{f0e0}", Some("Wingdings")),
       "\u{2192}"
+    );
+  }
+
+  #[test]
+  fn wordprocessingml_wingdings_space_and_checkmark_use_office_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f020}\u{f0fc}", Some("Wingdings")),
+      "\u{2002}✓"
     );
   }
 

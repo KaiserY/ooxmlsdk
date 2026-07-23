@@ -545,14 +545,7 @@ fn general_chart_number(value: f64) -> String {
   if value.fract().abs() < 1.0e-12 {
     format!("{value:.0}")
   } else {
-    let mut result = format!("{value:.15}");
-    while result.ends_with('0') {
-      result.pop();
-    }
-    if result.ends_with('.') {
-      result.pop();
-    }
-    result
+    value.to_string()
   }
 }
 
@@ -762,6 +755,949 @@ pub fn visible_texts_for_ui_language(
 
 pub fn visible_texts_with_uncached_series_labels(chart_space: &c::ChartSpace) -> Vec<String> {
   visible_texts_with_default_series_label(chart_space, None, uncached_series_label)
+}
+
+/// Returns the first explicit Latin typeface applied to fixed-output chart
+/// text. Chart-local text properties take precedence over the host theme.
+pub fn fixed_output_latin_font_family(chart_space: &c::ChartSpace) -> Option<&str> {
+  chart_space
+    .text_properties
+    .as_deref()
+    .and_then(text_properties_latin_font_family)
+    .or_else(|| {
+      chart_space
+        .chart
+        .title
+        .as_deref()
+        .and_then(|title| title.text_properties.as_deref())
+        .and_then(text_properties_latin_font_family)
+    })
+    .or_else(|| {
+      chart_space
+        .chart
+        .title
+        .as_deref()
+        .and_then(|title| title.chart_text.as_deref())
+        .and_then(|text| match text.chart_text_choice.as_ref() {
+          Some(c::ChartTextChoice::RichText(rich)) => paragraphs_latin_font_family(&rich.paragraph),
+          _ => None,
+        })
+    })
+    .or_else(|| {
+      chart_space
+        .chart
+        .plot_area
+        .plot_area_choice2
+        .iter()
+        .find_map(|choice| match choice {
+          c::PlotAreaChoice2::CategoryAxis(axis) => axis
+            .text_properties
+            .as_deref()
+            .and_then(text_properties_latin_font_family),
+          c::PlotAreaChoice2::DateAxis(axis) => axis
+            .text_properties
+            .as_deref()
+            .and_then(text_properties_latin_font_family),
+          c::PlotAreaChoice2::SeriesAxis(axis) => axis
+            .text_properties
+            .as_deref()
+            .and_then(text_properties_latin_font_family),
+          c::PlotAreaChoice2::ValueAxis(axis) => axis
+            .text_properties
+            .as_deref()
+            .and_then(text_properties_latin_font_family),
+        })
+    })
+    .or_else(|| {
+      chart_space
+        .chart
+        .legend
+        .as_deref()
+        .and_then(|legend| legend.text_properties.as_deref())
+        .and_then(text_properties_latin_font_family)
+    })
+}
+
+fn text_properties_latin_font_family(properties: &c::TextProperties) -> Option<&str> {
+  paragraphs_latin_font_family(&properties.paragraph)
+}
+
+fn paragraphs_latin_font_family(paragraphs: &[a::Paragraph]) -> Option<&str> {
+  paragraphs.iter().find_map(|paragraph| {
+    paragraph
+      .paragraph_properties
+      .as_deref()
+      .and_then(|properties| properties.default_run_properties.as_deref())
+      .and_then(|properties| properties.latin_font.as_ref())
+      .and_then(|font| font.typeface.as_deref())
+      .or_else(|| {
+        paragraph
+          .paragraph_choice
+          .iter()
+          .find_map(|choice| match choice {
+            a::ParagraphChoice::Run(run) => run
+              .run_properties
+              .as_deref()
+              .and_then(|properties| properties.latin_font.as_ref())
+              .and_then(|font| font.typeface.as_deref()),
+            a::ParagraphChoice::Field(field) => field
+              .run_properties
+              .as_deref()
+              .and_then(|properties| properties.latin_font.as_ref())
+              .and_then(|font| font.typeface.as_deref()),
+            _ => None,
+          })
+      })
+      .or_else(|| {
+        paragraph
+          .end_paragraph_run_properties
+          .as_deref()
+          .and_then(|properties| properties.latin_font.as_ref())
+          .and_then(|font| font.typeface.as_deref())
+      })
+  })
+}
+
+/// Returns chart text that is present in fixed output, in the order used by
+/// Office's chart object stream.
+///
+/// Cached source values are deliberately excluded unless they become data
+/// labels or data-table cells. Axis ticks are derived from the resolved scale,
+/// categories come from the first visible category sequence, and legend text
+/// comes from the series names. This keeps chart data attached to its drawing
+/// anchor instead of leaking the entire cache into the document body.
+pub fn fixed_output_texts_for_ui_language(
+  chart_space: &c::ChartSpace,
+  ui_language: Option<&str>,
+) -> Vec<String> {
+  let mut texts = Vec::new();
+  let chart_series = series(chart_space);
+
+  if kind(chart_space) == ChartKind::Pie {
+    if chart_space.chart.legend.is_some() {
+      if chart_space
+        .chart
+        .title
+        .as_deref()
+        .is_some_and(|title| title.chart_text.is_none())
+      {
+        for (series_index, series) in chart_series.iter().copied().enumerate() {
+          push_fixed_series_name(&mut texts, series, series_index + 1, ui_language);
+        }
+      }
+      if let Some(categories) = chart_series
+        .iter()
+        .find_map(|series| series.category_axis_data)
+      {
+        push_fixed_category_texts(&mut texts, categories, chart_space);
+      }
+    }
+    push_fixed_data_labels(&mut texts, &chart_series, 1.0);
+    push_fixed_chart_title(&mut texts, chart_space, ui_language);
+    return texts;
+  }
+
+  let value_axes = chart_space
+    .chart
+    .plot_area
+    .plot_area_choice2
+    .iter()
+    .filter_map(|choice| match choice {
+      c::PlotAreaChoice2::ValueAxis(axis) if axis_is_visible(axis) => Some(axis.as_ref()),
+      _ => None,
+    })
+    .collect::<Vec<_>>();
+  for axis in &value_axes {
+    if axis
+      .tick_label_position
+      .as_ref()
+      .is_some_and(|position| position.val == Some(c::TickLabelPositionValues::None))
+    {
+      continue;
+    }
+    let axis_series = series_for_value_axis(chart_space, axis.axis_id.val);
+    let axis_series = if axis_series.is_empty() {
+      chart_series.clone()
+    } else {
+      axis_series
+    };
+    let mode = value_mode_for_axis(chart_space, axis.axis_id.val);
+    let scale_values = scale_values(&axis_series, mode);
+    let scale = if mode == ChartValueMode::PercentStacked {
+      Some(LinearAxisScale {
+        minimum: axis
+          .scaling
+          .min_axis_value
+          .as_ref()
+          .map_or(0.0, |value| value.val),
+        maximum: axis
+          .scaling
+          .max_axis_value
+          .as_ref()
+          .map_or(1.0, |value| value.val),
+        major_unit: axis.major_unit.as_ref().map_or(0.1, |unit| unit.val),
+      })
+    } else {
+      linear_axis_scale(scale_values, Some(axis), 10)
+    };
+    let Some(scale) = scale else {
+      continue;
+    };
+    let display_unit = value_axis_display_unit(axis);
+    let format_code = axis
+      .numbering_format
+      .as_ref()
+      .map(|format| format.format_code.as_str());
+    for value in axis_tick_values(scale) {
+      push_unique_text(
+        &mut texts,
+        &format_chart_number(value / display_unit, format_code),
+      );
+    }
+  }
+
+  if let Some(categories) = chart_series
+    .iter()
+    .find_map(|series| series.category_axis_data)
+  {
+    push_fixed_category_texts(&mut texts, categories, chart_space);
+  }
+
+  let display_unit = value_axes
+    .first()
+    .copied()
+    .map(value_axis_display_unit)
+    .unwrap_or(1.0);
+  push_fixed_data_labels(&mut texts, &chart_series, display_unit);
+
+  push_fixed_axis_titles(&mut texts, chart_space, ui_language);
+
+  if chart_space.chart.plot_area.data_table.is_some() {
+    if let Some(categories) = chart_series
+      .iter()
+      .find_map(|series| series.category_axis_data)
+    {
+      push_fixed_category_texts(&mut texts, categories, chart_space);
+    }
+    for (series_index, series) in chart_series.iter().enumerate().rev() {
+      push_fixed_series_name(&mut texts, *series, series_index + 1, ui_language);
+      for value in chart_series_numeric_values(*series).into_iter().flatten() {
+        push_unique_text(&mut texts, &format_chart_number(value / display_unit, None));
+      }
+    }
+  }
+
+  for axis in &value_axes {
+    if axis.display_units.is_some() {
+      push_fixed_display_unit_label(&mut texts, axis, ui_language);
+    }
+  }
+  push_fixed_chart_title(&mut texts, chart_space, ui_language);
+
+  if chart_space.chart.legend.is_some() {
+    let reverse = chart_space.chart.view3_d.is_some();
+    if reverse {
+      for (series_index, series) in chart_series.iter().enumerate().rev() {
+        push_fixed_series_name(&mut texts, *series, series_index + 1, ui_language);
+      }
+    } else {
+      for (series_index, series) in chart_series.iter().enumerate() {
+        push_fixed_series_name(&mut texts, *series, series_index + 1, ui_language);
+      }
+    }
+  }
+  texts
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ChartValueMode {
+  Standard,
+  Stacked,
+  PercentStacked,
+}
+
+fn push_fixed_chart_title(
+  texts: &mut Vec<String>,
+  chart_space: &c::ChartSpace,
+  ui_language: Option<&str>,
+) {
+  if let Some(title) = fixed_chart_title_for_ui_language(chart_space, ui_language) {
+    push_unique_text(texts, &title);
+  }
+}
+
+pub fn fixed_chart_title_for_ui_language(
+  chart_space: &c::ChartSpace,
+  ui_language: Option<&str>,
+) -> Option<String> {
+  match chart_title_text(&chart_space.chart) {
+    Some(ChartTitleText::Explicit(title)) => Some(normalize_fixed_chart_title(&title)),
+    Some(ChartTitleText::Automatic) => None,
+    None
+      if kind(chart_space) != ChartKind::Pie
+        && chart_space
+          .chart
+          .title
+          .as_deref()
+          .is_some_and(|title| title.chart_text.is_none())
+        && chart_automatic_title_is_visible(&chart_space.chart) =>
+    {
+      Some(automatic_chart_title(ui_language).to_string())
+    }
+    None => None,
+  }
+}
+
+fn normalize_fixed_chart_title(title: &str) -> String {
+  let chars = title.chars().collect::<Vec<_>>();
+  let mut normalized = String::with_capacity(title.len() + 4);
+  for (index, ch) in chars.iter().copied().enumerate() {
+    if ch == '-'
+      && index > 0
+      && index + 1 < chars.len()
+      && chars[index - 1].is_ascii_digit()
+      && chars[index + 1].is_ascii_digit()
+    {
+      normalized.push_str(" - ");
+    } else {
+      normalized.push(ch);
+    }
+  }
+  normalized
+}
+
+fn push_fixed_axis_titles(
+  texts: &mut Vec<String>,
+  chart_space: &c::ChartSpace,
+  ui_language: Option<&str>,
+) {
+  for choice in &chart_space.chart.plot_area.plot_area_choice2 {
+    let title = match choice {
+      c::PlotAreaChoice2::ValueAxis(axis) => axis.title.as_deref(),
+      _ => None,
+    };
+    push_fixed_axis_title(texts, title, chart_space, ui_language);
+  }
+  for choice in &chart_space.chart.plot_area.plot_area_choice2 {
+    let title = match choice {
+      c::PlotAreaChoice2::CategoryAxis(axis) => axis.title.as_deref(),
+      c::PlotAreaChoice2::DateAxis(axis) => axis.title.as_deref(),
+      c::PlotAreaChoice2::SeriesAxis(axis) => axis.title.as_deref(),
+      c::PlotAreaChoice2::ValueAxis(_) => None,
+    };
+    push_fixed_axis_title(texts, title, chart_space, ui_language);
+  }
+}
+
+fn push_fixed_axis_title(
+  texts: &mut Vec<String>,
+  title: Option<&c::Title>,
+  chart_space: &c::ChartSpace,
+  ui_language: Option<&str>,
+) {
+  let Some(title) = title else {
+    return;
+  };
+  let before = texts.len();
+  push_title_texts(texts, title);
+  if texts.len() == before && chart_space.chart.view3_d.is_some() {
+    push_unique_text(texts, automatic_axis_title(ui_language));
+  }
+}
+
+fn automatic_axis_title(ui_language: Option<&str>) -> &'static str {
+  if ui_language.is_some_and(is_chinese_ui_language) {
+    "坐标轴标题"
+  } else {
+    "Axis Title"
+  }
+}
+
+fn push_fixed_category_texts(
+  texts: &mut Vec<String>,
+  data: &c::CategoryAxisData,
+  chart_space: &c::ChartSpace,
+) {
+  match data.category_axis_data_choice.as_ref() {
+    Some(c::CategoryAxisDataChoice::MultiLevelStringReference(reference)) => {
+      if let Some(cache) = reference.multi_level_string_cache.as_deref() {
+        for level in &cache.level {
+          for point in &level.string_point {
+            push_unique_text(texts, &point.numeric_value);
+          }
+        }
+      }
+    }
+    Some(c::CategoryAxisDataChoice::NumberReference(reference)) => {
+      if let Some(cache) = reference.numbering_cache.as_deref() {
+        let format_code = cache
+          .format_code
+          .as_ref()
+          .and_then(|format| format.xml_content.as_deref());
+        for point in &cache.numeric_point {
+          let text = point
+            .numeric_value
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .map(|value| {
+              format_chart_category_number(
+                value,
+                format_code,
+                chart_space
+                  .date1904
+                  .as_ref()
+                  .and_then(|date| date.val)
+                  .is_some_and(|value| value.as_bool()),
+              )
+            })
+            .unwrap_or_else(|| point.numeric_value.trim().to_string());
+          push_unique_text(texts, &text);
+        }
+      }
+    }
+    Some(c::CategoryAxisDataChoice::NumberLiteral(literal)) => {
+      let format_code = literal
+        .format_code
+        .as_ref()
+        .and_then(|format| format.xml_content.as_deref());
+      for point in &literal.numeric_point {
+        let text = point
+          .numeric_value
+          .trim()
+          .parse::<f64>()
+          .ok()
+          .map(|value| format_chart_category_number(value, format_code, false))
+          .unwrap_or_else(|| point.numeric_value.trim().to_string());
+        push_unique_text(texts, &text);
+      }
+    }
+    Some(c::CategoryAxisDataChoice::StringReference(reference)) => {
+      if let Some(cache) = reference.string_cache.as_deref() {
+        for point in &cache.string_point {
+          push_unique_text(texts, &point.numeric_value);
+        }
+      }
+    }
+    Some(c::CategoryAxisDataChoice::StringLiteral(literal)) => {
+      for point in &literal.string_point {
+        push_unique_text(texts, &point.numeric_value);
+      }
+    }
+    None => {}
+  }
+}
+
+fn push_fixed_series_name(
+  texts: &mut Vec<String>,
+  series: ChartSeriesRef<'_>,
+  series_index: usize,
+  ui_language: Option<&str>,
+) {
+  if let Some(series_text) = series.series_text {
+    push_series_text(texts, series_text);
+  } else {
+    push_unique_text(
+      texts,
+      &default_series_label(series, series_index, ui_language),
+    );
+  }
+}
+
+fn push_fixed_data_labels(
+  texts: &mut Vec<String>,
+  chart_series: &[ChartSeriesRef<'_>],
+  display_unit: f64,
+) {
+  for (series_index, series) in chart_series.iter().copied().enumerate() {
+    let Some(labels) = series.data_labels else {
+      continue;
+    };
+    let Some(c::DataLabelsChoice::Sequence(settings)) = labels.data_labels_choice.as_ref() else {
+      push_data_label_texts(texts, labels);
+      continue;
+    };
+    let show_value = settings
+      .show_value
+      .as_ref()
+      .and_then(|show| show.val)
+      .is_some_and(|value| value.as_bool());
+    let show_category = settings
+      .show_category_name
+      .as_ref()
+      .and_then(|show| show.val)
+      .is_some_and(|value| value.as_bool());
+    let show_percent = settings
+      .show_percent
+      .as_ref()
+      .and_then(|show| show.val)
+      .is_some_and(|value| value.as_bool());
+    let categories = series
+      .category_axis_data
+      .map(indexed_category_axis_text_values)
+      .unwrap_or_default();
+    let values = chart_series_numeric_values(series);
+    let value_format =
+      data_labels_format_code(labels).or_else(|| series_number_format_code(series));
+    let percentage_total = values.iter().flatten().sum::<f64>();
+    let whole_percentages = if show_percent
+      && data_labels_format_code(labels).is_none()
+      && percentage_total > f64::EPSILON
+    {
+      let mut percentages = values
+        .iter()
+        .map(|value| {
+          value
+            .map(|value| value / percentage_total * 100.0)
+            .unwrap_or(0.0)
+        })
+        .collect::<Vec<_>>();
+      let mut remaining = 100_i32
+        - percentages
+          .iter()
+          .map(|value| value.floor() as i32)
+          .sum::<i32>();
+      let mut order = (0..percentages.len()).collect::<Vec<_>>();
+      order.sort_by(|left, right| {
+        percentages[*right]
+          .fract()
+          .total_cmp(&percentages[*left].fract())
+          .then_with(|| left.cmp(right))
+      });
+      for index in order {
+        let floor = percentages[index].floor();
+        percentages[index] = floor + f64::from(remaining > 0);
+        remaining -= i32::from(remaining > 0);
+      }
+      Some(percentages)
+    } else {
+      None
+    };
+    let point_count = values.len().max(categories.len());
+    let separator = settings.separator.as_deref().unwrap_or(" ");
+    for point_index in 0..point_count {
+      let mut components = Vec::new();
+      if show_category && let Some(category) = categories.get(point_index) {
+        components.push(category.clone());
+      }
+      if show_value && let Some(value) = values.get(point_index).copied().flatten() {
+        components.push(format_chart_number(value / display_unit, value_format));
+      }
+      if show_percent
+        && percentage_total.abs() > f64::EPSILON
+        && let Some(value) = values.get(point_index).copied().flatten()
+      {
+        components.push(if let Some(percentages) = &whole_percentages {
+          format!("{}%", percentages[point_index] as i32)
+        } else {
+          format_chart_number(
+            value / percentage_total,
+            data_labels_format_code(labels).or(Some("0%")),
+          )
+        });
+      }
+      if !components.is_empty() {
+        push_unique_text(texts, &components.join(separator));
+      }
+    }
+    if settings
+      .show_series_name
+      .as_ref()
+      .and_then(|show| show.val)
+      .is_some_and(|value| value.as_bool())
+    {
+      push_fixed_series_name(texts, series, series_index + 1, None);
+    }
+    push_data_label_texts(texts, labels);
+  }
+}
+
+fn series_number_format_code(series: ChartSeriesRef<'_>) -> Option<&str> {
+  if let Some(values) = series.values {
+    return match values.values_choice.as_ref() {
+      Some(c::ValuesChoice::NumberReference(reference)) => reference
+        .numbering_cache
+        .as_deref()
+        .and_then(|cache| cache.format_code.as_ref())
+        .and_then(|format| format.xml_content.as_deref()),
+      Some(c::ValuesChoice::NumberLiteral(literal)) => literal
+        .format_code
+        .as_ref()
+        .and_then(|format| format.xml_content.as_deref()),
+      None => None,
+    };
+  }
+  if let Some(values) = series.y_values {
+    return match values.y_values_choice.as_ref() {
+      Some(c::YValuesChoice::NumberReference(reference)) => reference
+        .numbering_cache
+        .as_deref()
+        .and_then(|cache| cache.format_code.as_ref())
+        .and_then(|format| format.xml_content.as_deref()),
+      Some(c::YValuesChoice::NumberLiteral(literal)) => literal
+        .format_code
+        .as_ref()
+        .and_then(|format| format.xml_content.as_deref()),
+      _ => None,
+    };
+  }
+  None
+}
+
+fn data_labels_format_code(labels: &c::DataLabels) -> Option<&str> {
+  match labels.data_labels_choice.as_ref() {
+    Some(c::DataLabelsChoice::Sequence(sequence)) => sequence
+      .numbering_format
+      .as_ref()
+      .map(|format| format.format_code.as_str()),
+    _ => None,
+  }
+}
+
+fn axis_is_visible(axis: &c::ValueAxis) -> bool {
+  axis
+    .delete
+    .as_ref()
+    .is_none_or(|delete| delete.val.is_none_or(|value| !value.as_bool()))
+}
+
+fn axis_tick_values(scale: LinearAxisScale) -> Vec<f64> {
+  if !scale.minimum.is_finite()
+    || !scale.maximum.is_finite()
+    || !scale.major_unit.is_finite()
+    || scale.major_unit <= 0.0
+  {
+    return Vec::new();
+  }
+  let count = ((scale.maximum - scale.minimum) / scale.major_unit)
+    .floor()
+    .clamp(0.0, 1_000.0) as usize;
+  (0..=count)
+    .map(|index| scale.minimum + scale.major_unit * index as f64)
+    .collect()
+}
+
+fn value_axis_display_unit(axis: &c::ValueAxis) -> f64 {
+  let Some(units) = axis.display_units.as_deref() else {
+    return 1.0;
+  };
+  match units.display_units_choice.as_ref() {
+    Some(c::DisplayUnitsChoice::CustomDisplayUnit(unit))
+      if unit.val.is_finite() && unit.val > 0.0 =>
+    {
+      unit.val
+    }
+    Some(c::DisplayUnitsChoice::BuiltInUnit(unit)) => match unit.val.unwrap_or_default() {
+      c::BuiltInUnitValues::Hundreds => 1.0e2,
+      c::BuiltInUnitValues::Thousands => 1.0e3,
+      c::BuiltInUnitValues::TenThousands => 1.0e4,
+      c::BuiltInUnitValues::HundredThousands => 1.0e5,
+      c::BuiltInUnitValues::Millions => 1.0e6,
+      c::BuiltInUnitValues::TenMillions => 1.0e7,
+      c::BuiltInUnitValues::HundredMillions => 1.0e8,
+      c::BuiltInUnitValues::Billions => 1.0e9,
+      c::BuiltInUnitValues::Trillions => 1.0e12,
+    },
+    _ => 1.0,
+  }
+}
+
+fn push_fixed_display_unit_label(
+  texts: &mut Vec<String>,
+  axis: &c::ValueAxis,
+  ui_language: Option<&str>,
+) {
+  let Some(units) = axis.display_units.as_deref() else {
+    return;
+  };
+  if let Some(label) = units.display_units_label.as_deref()
+    && let Some(text) = label.chart_text.as_deref()
+  {
+    push_chart_text(texts, text);
+    return;
+  }
+  let Some(c::DisplayUnitsChoice::BuiltInUnit(unit)) = units.display_units_choice.as_ref() else {
+    return;
+  };
+  let chinese = ui_language.is_some_and(is_chinese_ui_language);
+  let label = match (unit.val.unwrap_or_default(), chinese) {
+    (c::BuiltInUnitValues::Hundreds, true) => "百",
+    (c::BuiltInUnitValues::Thousands, true) => "千",
+    (c::BuiltInUnitValues::TenThousands, true) => "万",
+    (c::BuiltInUnitValues::HundredThousands, true) => "十万",
+    (c::BuiltInUnitValues::Millions, true) => "百万",
+    (c::BuiltInUnitValues::TenMillions, true) => "千万",
+    (c::BuiltInUnitValues::HundredMillions, true) => "亿",
+    (c::BuiltInUnitValues::Billions, true) => "十亿",
+    (c::BuiltInUnitValues::Trillions, true) => "万亿",
+    (c::BuiltInUnitValues::Hundreds, false) => "Hundreds",
+    (c::BuiltInUnitValues::Thousands, false) => "Thousands",
+    (c::BuiltInUnitValues::TenThousands, false) => "Ten Thousands",
+    (c::BuiltInUnitValues::HundredThousands, false) => "Hundred Thousands",
+    (c::BuiltInUnitValues::Millions, false) => "Millions",
+    (c::BuiltInUnitValues::TenMillions, false) => "Ten Millions",
+    (c::BuiltInUnitValues::HundredMillions, false) => "Hundred Millions",
+    (c::BuiltInUnitValues::Billions, false) => "Billions",
+    (c::BuiltInUnitValues::Trillions, false) => "Trillions",
+  };
+  push_unique_text(texts, label);
+}
+
+fn series_for_value_axis(chart_space: &c::ChartSpace, axis_id: i32) -> Vec<ChartSeriesRef<'_>> {
+  let mut result = Vec::new();
+  for choice in &chart_space.chart.plot_area.plot_area_choice1 {
+    match choice {
+      c::PlotAreaChoice::AreaChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.area_chart_series.iter().map(area_series_ref));
+      }
+      c::PlotAreaChoice::Area3DChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.area_chart_series.iter().map(area_series_ref));
+      }
+      c::PlotAreaChoice::LineChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.line_chart_series.iter().map(line_series_ref));
+      }
+      c::PlotAreaChoice::Line3DChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.line_chart_series.iter().map(line_series_ref));
+      }
+      c::PlotAreaChoice::StockChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.line_chart_series.iter().map(line_series_ref));
+      }
+      c::PlotAreaChoice::RadarChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.radar_chart_series.iter().map(radar_series_ref));
+      }
+      c::PlotAreaChoice::ScatterChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.scatter_chart_series.iter().map(scatter_series_ref));
+      }
+      c::PlotAreaChoice::BarChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.bar_chart_series.iter().map(bar_series_ref));
+      }
+      c::PlotAreaChoice::Bar3DChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.bar_chart_series.iter().map(bar_series_ref));
+      }
+      c::PlotAreaChoice::SurfaceChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.surface_chart_series.iter().map(surface_series_ref));
+      }
+      c::PlotAreaChoice::Surface3DChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.surface_chart_series.iter().map(surface_series_ref));
+      }
+      c::PlotAreaChoice::BubbleChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        result.extend(chart.bubble_chart_series.iter().map(bubble_series_ref));
+      }
+      _ => {}
+    }
+  }
+  result
+}
+
+fn has_axis(axis_ids: &[c::AxisId], axis_id: i32) -> bool {
+  axis_ids.iter().any(|candidate| candidate.val == axis_id)
+}
+
+fn value_mode_for_axis(chart_space: &c::ChartSpace, axis_id: i32) -> ChartValueMode {
+  let mut mode = ChartValueMode::Standard;
+  for choice in &chart_space.chart.plot_area.plot_area_choice1 {
+    let candidate = match choice {
+      c::PlotAreaChoice::AreaChart(chart) if has_axis(&chart.axis_id, axis_id) => chart
+        .grouping
+        .as_ref()
+        .and_then(|grouping| grouping.val)
+        .map(grouping_value_mode),
+      c::PlotAreaChoice::Area3DChart(chart) if has_axis(&chart.axis_id, axis_id) => chart
+        .grouping
+        .as_ref()
+        .and_then(|grouping| grouping.val)
+        .map(grouping_value_mode),
+      c::PlotAreaChoice::LineChart(chart) if has_axis(&chart.axis_id, axis_id) => chart
+        .grouping
+        .as_ref()
+        .and_then(|grouping| grouping.val)
+        .map(grouping_value_mode),
+      c::PlotAreaChoice::Line3DChart(chart) if has_axis(&chart.axis_id, axis_id) => {
+        chart.grouping.val.map(grouping_value_mode)
+      }
+      c::PlotAreaChoice::BarChart(chart) if has_axis(&chart.axis_id, axis_id) => chart
+        .bar_grouping
+        .as_ref()
+        .and_then(|grouping| grouping.val)
+        .map(bar_grouping_value_mode),
+      c::PlotAreaChoice::Bar3DChart(chart) if has_axis(&chart.axis_id, axis_id) => chart
+        .bar_grouping
+        .as_ref()
+        .and_then(|grouping| grouping.val)
+        .map(bar_grouping_value_mode),
+      _ => None,
+    };
+    if candidate == Some(ChartValueMode::PercentStacked) {
+      return ChartValueMode::PercentStacked;
+    }
+    if candidate == Some(ChartValueMode::Stacked) {
+      mode = ChartValueMode::Stacked;
+    }
+  }
+  mode
+}
+
+fn grouping_value_mode(grouping: c::GroupingValues) -> ChartValueMode {
+  match grouping {
+    c::GroupingValues::PercentStacked => ChartValueMode::PercentStacked,
+    c::GroupingValues::Stacked => ChartValueMode::Stacked,
+    c::GroupingValues::Standard => ChartValueMode::Standard,
+  }
+}
+
+fn bar_grouping_value_mode(grouping: c::BarGroupingValues) -> ChartValueMode {
+  match grouping {
+    c::BarGroupingValues::PercentStacked => ChartValueMode::PercentStacked,
+    c::BarGroupingValues::Stacked => ChartValueMode::Stacked,
+    c::BarGroupingValues::Clustered | c::BarGroupingValues::Standard => ChartValueMode::Standard,
+  }
+}
+
+fn scale_values(series: &[ChartSeriesRef<'_>], mode: ChartValueMode) -> Vec<f64> {
+  if mode == ChartValueMode::PercentStacked {
+    return vec![0.0, 1.0];
+  }
+  let values = series
+    .iter()
+    .copied()
+    .map(chart_series_numeric_values)
+    .collect::<Vec<_>>();
+  if mode == ChartValueMode::Standard {
+    return values.into_iter().flatten().flatten().collect();
+  }
+  let point_count = values.iter().map(Vec::len).max().unwrap_or(0);
+  let mut result = Vec::with_capacity(point_count * 2);
+  for point_index in 0..point_count {
+    let mut positive = 0.0;
+    let mut negative = 0.0;
+    for value in values
+      .iter()
+      .filter_map(|values| values.get(point_index).copied().flatten())
+    {
+      if value >= 0.0 {
+        positive += value;
+      } else {
+        negative += value;
+      }
+    }
+    result.push(positive);
+    if negative < 0.0 {
+      result.push(negative);
+    }
+  }
+  result
+}
+
+fn chart_series_numeric_values(series: ChartSeriesRef<'_>) -> Vec<Option<f64>> {
+  if let Some(values) = series.values {
+    return indexed_values(values);
+  }
+  if let Some(values) = series.y_values {
+    let points = match values.y_values_choice.as_ref() {
+      Some(c::YValuesChoice::NumberReference(reference)) => reference
+        .numbering_cache
+        .as_deref()
+        .map(|cache| cache.numeric_point.as_slice()),
+      Some(c::YValuesChoice::NumberLiteral(literal)) => Some(literal.numeric_point.as_slice()),
+      _ => None,
+    };
+    return points.map(indexed_numeric_values).unwrap_or_default();
+  }
+  Vec::new()
+}
+
+fn indexed_numeric_values(points: &[c::NumericPoint]) -> Vec<Option<f64>> {
+  let length = points
+    .iter()
+    .filter_map(|point| usize::try_from(point.index).ok())
+    .max()
+    .map_or(0, |index| index + 1);
+  let mut result = vec![None; length];
+  for point in points {
+    let Ok(index) = usize::try_from(point.index) else {
+      continue;
+    };
+    result[index] = point.numeric_value.trim().parse::<f64>().ok();
+  }
+  result
+}
+
+fn format_chart_number(value: f64, format_code: Option<&str>) -> String {
+  let value = if value.abs() < 1.0e-15 { 0.0 } else { value };
+  let code = format_code.unwrap_or("General");
+  if code.contains('%') {
+    let decimals = format_decimal_places(code.split('%').next().unwrap_or(code));
+    return format!("{:.*}%", decimals, value * 100.0);
+  }
+  let uppercase_code = code.to_ascii_uppercase();
+  if uppercase_code.contains("E+")
+    || uppercase_code.contains("E-")
+    || (value != 0.0 && value.abs() < 1.0e-4)
+  {
+    return format_chart_scientific(value, format_decimal_places(code));
+  }
+  if code != "General" && code.contains('.') {
+    return format!("{:.*}", format_decimal_places(code), value);
+  }
+  general_chart_number(value)
+}
+
+fn format_decimal_places(code: &str) -> usize {
+  code
+    .split_once('.')
+    .map(|(_, fraction)| {
+      fraction
+        .chars()
+        .take_while(|ch| matches!(ch, '0' | '#'))
+        .count()
+    })
+    .unwrap_or(0)
+}
+
+fn format_chart_scientific(value: f64, requested_decimals: usize) -> String {
+  if value == 0.0 {
+    return "0".to_string();
+  }
+  let exponent = value.abs().log10().floor() as i32;
+  let mantissa = value / 10.0_f64.powi(exponent);
+  let mantissa = if requested_decimals == 0 {
+    general_chart_number(mantissa)
+  } else {
+    format!("{mantissa:.requested_decimals$}")
+  };
+  format!(
+    "{mantissa}E{}{absolute:02}",
+    if exponent < 0 { '-' } else { '+' },
+    absolute = exponent.unsigned_abs()
+  )
+}
+
+fn format_chart_category_number(value: f64, format_code: Option<&str>, date_1904: bool) -> String {
+  let is_date = format_code.is_some_and(|code| {
+    let code = code.to_ascii_lowercase();
+    code.contains('y') && code.contains('m') && code.contains('d')
+  });
+  if !is_date {
+    return format_chart_number(value, format_code);
+  }
+  let days_since_unix = value.floor() as i64 - if date_1904 { 24_107 } else { 25_569 };
+  let (year, month, day) = civil_from_days(days_since_unix);
+  format!("{year}/{month}/{day}")
+}
+
+fn civil_from_days(days_since_unix_epoch: i64) -> (i64, u32, u32) {
+  let z = days_since_unix_epoch + 719_468;
+  let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+  let day_of_era = z - era * 146_097;
+  let year_of_era =
+    (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+  let mut year = year_of_era + era * 400;
+  let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+  let month_prime = (5 * day_of_year + 2) / 153;
+  let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+  let month = month_prime + if month_prime < 10 { 3 } else { -9 };
+  year += i64::from(month <= 2);
+  (year, month as u32, day as u32)
 }
 
 fn visible_texts_with_default_series_label(
@@ -1521,15 +2457,6 @@ fn push_data_label_texts(texts: &mut Vec<String>, data_labels: &c::DataLabels) {
       push_chart_text(texts, chart_text);
     }
   }
-  if let Some(c::DataLabelsChoice::Sequence(sequence)) = data_labels.data_labels_choice.as_ref()
-    && sequence
-      .show_percent
-      .as_ref()
-      .and_then(|show| show.val)
-      .is_some_and(|value| value.as_bool())
-  {
-    push_unique_text(texts, "100%");
-  }
 }
 
 fn push_series_data_label_value_texts(
@@ -1689,7 +2616,8 @@ fn push_unique_text(texts: &mut Vec<String>, value: &str) {
 mod tests {
   use super::{
     ChartTitleText, automatic_chart_title, automatic_series_title, chart_title_text,
-    clustered_column_chart, clustered_column_slot, linear_axis_scale,
+    clustered_column_chart, clustered_column_slot, fixed_output_latin_font_family,
+    fixed_output_texts_for_ui_language, format_chart_number, linear_axis_scale,
     ordinary_clustered_column_chart,
   };
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
@@ -1707,6 +2635,39 @@ mod tests {
     assert_eq!(automatic_series_title(Some("zh-CN"), 1), "系列 1");
     assert_eq!(automatic_series_title(Some("zh-TW"), 2), "數列 2");
     assert_eq!(automatic_series_title(Some("en-US"), 3), "Series 3");
+  }
+
+  #[test]
+  fn general_number_format_uses_short_decimal_output_not_scientific_notation() {
+    assert_eq!(format_chart_number(30.800000000000_001, None), "30.8");
+    assert_eq!(
+      format_chart_number(66.790000000000_006, Some("General")),
+      "66.79"
+    );
+    assert_eq!(format_chart_number(2.0e-9, Some("0.0E+00")), "2.0E-09");
+  }
+
+  #[test]
+  fn fixed_output_prefers_chart_local_latin_typeface() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:plotArea/></c:chart><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:latin typeface="Arial"/></a:defRPr></a:pPr></a:p></c:txPr></c:chartSpace>"#,
+    )
+    .expect("chart space");
+
+    assert_eq!(fixed_output_latin_font_family(&chart_space), Some("Arial"));
+  }
+
+  #[test]
+  fn pie_percent_labels_use_largest_remainder_rounding() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:dLbls><c:showVal val="0"/><c:showCatName val="1"/><c:showPercent val="1"/></c:dLbls><c:cat><c:strLit><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt><c:pt idx="2"><c:v>C</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>1</c:v></c:pt><c:pt idx="2"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+
+    assert_eq!(
+      fixed_output_texts_for_ui_language(&chart_space, None),
+      ["A 34%", "B 33%", "C 33%"]
+    );
   }
 
   #[test]

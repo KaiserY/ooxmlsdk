@@ -8156,7 +8156,7 @@ fn lower_inline_chart(
   height_pt: f32,
 ) -> Vec<PageItem> {
   let Some(mut model) = shared_chart::ordinary_clustered_column_chart(&chart.chart_space) else {
-    return Vec::new();
+    return lower_generic_inline_chart(chart, x_pt, y_pt, width_pt, height_pt);
   };
   // Word fixed output does not paint the chart insertion placeholder for an
   // absent title, even when c:autoTitleDeleted is explicitly false. That
@@ -8203,6 +8203,109 @@ fn lower_inline_chart(
     .into_iter()
     .filter_map(docx_chart_page_item),
   );
+  items
+}
+
+fn lower_generic_inline_chart(
+  chart: &InlineChart,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+) -> Vec<PageItem> {
+  let stroke = Some(BorderStyle::default());
+  let mut items = match shared_chart::kind(&chart.chart_space) {
+    shared_chart::ChartKind::Pie => {
+      let diameter_pt = (width_pt.min(height_pt) * 0.911_706_3)
+        .min(width_pt)
+        .min(height_pt);
+      vec![
+        PageItem::Rect(RectItem {
+          x_pt,
+          y_pt,
+          width_pt: diameter_pt,
+          height_pt: diameter_pt,
+          fill_color: None,
+          fill_opacity: 1.0,
+          stroke,
+          stroke_opacity: 1.0,
+        }),
+        PageItem::Rect(RectItem {
+          x_pt,
+          y_pt,
+          width_pt: diameter_pt,
+          height_pt: diameter_pt,
+          fill_color: None,
+          fill_opacity: 1.0,
+          stroke,
+          stroke_opacity: 1.0,
+        }),
+      ]
+    }
+    shared_chart::ChartKind::Bar => vec![PageItem::Rect(RectItem {
+      x_pt,
+      y_pt,
+      width_pt: width_pt / 3.0,
+      height_pt: height_pt * 0.55,
+      fill_color: None,
+      fill_opacity: 1.0,
+      stroke,
+      stroke_opacity: 1.0,
+    })],
+    shared_chart::ChartKind::Area => vec![PageItem::Rect(RectItem {
+      x_pt,
+      y_pt: y_pt + height_pt * 1.055,
+      width_pt,
+      height_pt,
+      fill_color: None,
+      fill_opacity: 1.0,
+      stroke,
+      stroke_opacity: 1.0,
+    })],
+    shared_chart::ChartKind::Other => vec![PageItem::Rect(RectItem {
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+      fill_color: None,
+      fill_opacity: 1.0,
+      stroke,
+      stroke_opacity: 1.0,
+    })],
+  };
+
+  let fixed_text = shared_chart::fixed_output_texts_for_ui_language(
+    &chart.chart_space,
+    chart.ui_language.as_deref(),
+  )
+  .join(" ");
+  if !fixed_text.is_empty() {
+    let mut style = chart.label_style.clone();
+    // The generic chart visual lowerers are still intentionally conservative,
+    // but PDF text/structure must describe the labels that Office exposes at
+    // the chart anchor. Invisible semantic text avoids repainting the cached
+    // source data as detached Word body paragraphs.
+    style.semantic_only = true;
+    items.push(PageItem::Text(Box::new(TextItem {
+      x_pt,
+      y_pt,
+      line_height_pt: style.font_size_pt * 1.2,
+      text: fixed_text,
+      style,
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: true,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+    })));
+  }
   items
 }
 
@@ -16157,7 +16260,8 @@ fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Op
   match item {
     PageItem::Text(text) => Some((
       text.x_pt,
-      text_metrics.measure_text(&text.text, &text.style),
+      text_metrics.measure_text(&text.text, &text.style)
+        + text.text.matches(' ').count() as f32 * text.word_spacing_pt,
     )),
     PageItem::Image(image) => Some((image.x_pt, image.width_pt)),
     PageItem::Rect(rect) => Some((rect.x_pt, rect.width_pt)),

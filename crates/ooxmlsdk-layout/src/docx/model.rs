@@ -8,7 +8,7 @@ pub(crate) use crate::model::{
   BorderStyle, CellBordersModel, DynamicFieldKind, FieldNumberFormat, FormWidget, FormWidgetKind,
   ImageCrop, LineNumbering, PageSetup, RgbColor, TextStyle,
 };
-use crate::units;
+use crate::{common, units};
 
 #[derive(Clone, Debug)]
 pub(crate) struct DocxDocument {
@@ -249,6 +249,7 @@ pub(crate) struct ParagraphFormat {
   pub line_height_pt: Option<f32>,
   pub line_height_rule: LineHeightRule,
   pub snap_to_grid: Option<bool>,
+  pub line_vertical_alignment: Option<common::LineVerticalAlignment>,
   pub indent_left_pt: f32,
   pub indent_right_pt: f32,
   pub first_line_indent_pt: f32,
@@ -586,6 +587,7 @@ pub(crate) struct InlineShape {
 #[derive(Clone, Debug)]
 pub(crate) struct InlineChart {
   pub chart_space: Box<c::ChartSpace>,
+  pub ui_language: Option<String>,
   pub automatic_title: String,
   pub title_style: TextStyle,
   pub label_style: TextStyle,

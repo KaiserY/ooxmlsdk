@@ -313,6 +313,17 @@ pub struct LineNumbering {
   pub restart_each_page: bool,
 }
 
+/// WordprocessingML vertical character alignment within a paragraph line.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum LineVerticalAlignment {
+  #[default]
+  Auto,
+  Top,
+  Center,
+  Baseline,
+  Bottom,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextStyle<'doc> {
   pub font_family: Option<Cow<'doc, str>>,
@@ -334,6 +345,9 @@ pub struct TextStyle<'doc> {
   pub horizontal_scale: Option<f32>,
   pub character_spacing: Pt,
   pub baseline_shift: Pt,
+  pub line_vertical_alignment: LineVerticalAlignment,
+  /// Retain searchable/taggable text without painting visible glyphs.
+  pub semantic_only: bool,
   /// Use legacy Windows/GDI ascent for the first baseline. PowerPoint's PDF
   /// path follows this metric; Word layout retains typographic metrics.
   pub use_windows_font_metrics: bool,

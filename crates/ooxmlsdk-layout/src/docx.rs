@@ -1,4 +1,3 @@
-mod chart;
 mod custom_xml;
 mod drawing;
 mod layout;
@@ -48,7 +47,6 @@ use crate::render::math as shared_math;
 use crate::render::symbol as shared_symbol;
 use crate::units;
 
-use chart::supplemental_graphic_blocks;
 pub(crate) use custom_xml::CustomXmlBindings;
 pub(crate) use model::*;
 use package::{AltChunkCatalog, AltChunkResource, HyperlinkCatalog, ImageCatalog};
@@ -212,16 +210,12 @@ pub(crate) fn extract(
       }
     }
   }
-  let supplemental_graphic_blocks = supplemental_graphic_blocks(package, &main, &body_styles);
   if let Some(first_section) = sections.first_mut() {
     if let Some(image) = page_background_image {
       first_section
         .blocks
         .insert(0, page_background_image_block(image, first_section.page));
     }
-    first_section
-      .blocks
-      .extend(supplemental_graphic_blocks.iter().cloned());
   }
   for section in &mut sections {
     section.page.background = page_background;
@@ -3399,6 +3393,15 @@ fn merge_paragraph_format(
   }
   if let Some(snap_to_grid) = properties.snap_to_grid() {
     format.snap_to_grid = Some(snap_to_grid.val.is_none_or(|value| value.as_bool()));
+  }
+  if let Some(text_alignment) = properties.text_alignment() {
+    format.line_vertical_alignment = Some(match text_alignment.val {
+      w::VerticalTextAlignmentValues::Top => common::LineVerticalAlignment::Top,
+      w::VerticalTextAlignmentValues::Center => common::LineVerticalAlignment::Center,
+      w::VerticalTextAlignmentValues::Baseline => common::LineVerticalAlignment::Baseline,
+      w::VerticalTextAlignmentValues::Bottom => common::LineVerticalAlignment::Bottom,
+      w::VerticalTextAlignmentValues::Auto => common::LineVerticalAlignment::Auto,
+    });
   }
 
   if let Some(spacing) = properties.spacing_between_lines() {
@@ -7841,144 +7844,100 @@ fn drawing_chart_shapes(
 ) -> Option<Vec<InlineShape>> {
   let chart_space = charts_by_relationship_id.get(reference.id.as_str())?;
   let (width_pt, height_pt, placement) = drawing_chart_extent_and_placement(drawing)?;
-  if let Some(chart) = shared_chart::ordinary_clustered_column_chart(chart_space) {
-    let theme_series_colors = [
-      styles.theme_colors.accent1,
-      styles.theme_colors.accent2,
-      styles.theme_colors.accent3,
-      styles.theme_colors.accent4,
-      styles.theme_colors.accent5,
-      styles.theme_colors.accent6,
-    ];
-    let fallback_series_colors = [
-      RgbColor {
-        r: 79,
-        g: 129,
-        b: 189,
-      },
-      RgbColor {
-        r: 192,
-        g: 80,
-        b: 77,
-      },
-      RgbColor {
-        r: 155,
-        g: 187,
-        b: 89,
-      },
-      RgbColor {
-        r: 128,
-        g: 100,
-        b: 162,
-      },
-      RgbColor {
-        r: 75,
-        g: 172,
-        b: 198,
-      },
-      RgbColor {
-        r: 247,
-        g: 150,
-        b: 70,
-      },
-    ];
-    let series_colors = chart
-      .series
-      .iter()
-      .enumerate()
-      .map(|(index, series)| {
-        series
-          .solid_fill
-          .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
-          .map(|fill| fill.color)
-          .or(theme_series_colors[index % theme_series_colors.len()])
-          .unwrap_or(fallback_series_colors[index % fallback_series_colors.len()])
-      })
-      .collect();
-    let chart_font = styles
-      .theme_fonts
-      .minor_high_ansi
-      .clone()
-      .or_else(|| styles.theme_fonts.minor_ascii.clone());
-    let mut title_style = TextStyle {
-      font_family: chart_font.clone(),
-      font_size_pt: 18.0,
-      bold: true,
-      ..TextStyle::default()
-    };
-    let label_style = TextStyle {
-      font_family: chart_font,
-      font_size_pt: 10.0,
-      ..TextStyle::default()
-    };
-    title_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
-    let automatic_title = chart_space
+  let theme_series_colors = [
+    styles.theme_colors.accent1,
+    styles.theme_colors.accent2,
+    styles.theme_colors.accent3,
+    styles.theme_colors.accent4,
+    styles.theme_colors.accent5,
+    styles.theme_colors.accent6,
+  ];
+  let fallback_series_colors = [
+    RgbColor {
+      r: 79,
+      g: 129,
+      b: 189,
+    },
+    RgbColor {
+      r: 192,
+      g: 80,
+      b: 77,
+    },
+    RgbColor {
+      r: 155,
+      g: 187,
+      b: 89,
+    },
+    RgbColor {
+      r: 128,
+      g: 100,
+      b: 162,
+    },
+    RgbColor {
+      r: 75,
+      g: 172,
+      b: 198,
+    },
+    RgbColor {
+      r: 247,
+      g: 150,
+      b: 70,
+    },
+  ];
+  let clustered = shared_chart::clustered_column_chart(chart_space);
+  let series_count = shared_chart::series(chart_space).len();
+  let series_colors = (0..series_count)
+    .map(|index| {
+      clustered
+        .as_ref()
+        .and_then(|chart| chart.series.get(index))
+        .and_then(|series| series.solid_fill)
+        .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
+        .map(|fill| fill.color)
+        .or(theme_series_colors[index % theme_series_colors.len()])
+        .unwrap_or(fallback_series_colors[index % fallback_series_colors.len()])
+    })
+    .collect();
+  let chart_font = shared_chart::fixed_output_latin_font_family(chart_space)
+    .map(Arc::<str>::from)
+    .or_else(|| styles.theme_fonts.minor_high_ansi.clone())
+    .or_else(|| styles.theme_fonts.minor_ascii.clone());
+  let mut title_style = TextStyle {
+    font_family: chart_font.clone(),
+    font_size_pt: 18.0,
+    bold: true,
+    ..TextStyle::default()
+  };
+  let label_style = TextStyle {
+    font_family: chart_font,
+    font_size_pt: 10.0,
+    ..TextStyle::default()
+  };
+  title_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
+  let ui_language = if styles.simplified_chinese_ui {
+    Some("zh-CN".to_string())
+  } else {
+    chart_space
       .editing_language
       .as_ref()
-      .map(|language| shared_chart::automatic_chart_title(Some(language.val.as_str())))
-      .unwrap_or_else(|| shared_chart::automatic_chart_title(None))
-      .to_string();
-    let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
-    shape.chart = Some(Box::new(InlineChart {
-      chart_space: Box::new(chart_space.clone()),
-      automatic_title,
-      title_style,
-      label_style,
-      gridline_color: RgbColor {
-        r: 134,
-        g: 134,
-        b: 134,
-      },
-      series_colors,
-    }));
-    return Some(vec![shape]);
-  }
-  let stroke = Some(BorderStyle::default());
-
-  Some(match shared_chart::kind(chart_space) {
-    shared_chart::ChartKind::Pie => {
-      let diameter_pt = (width_pt.min(height_pt) * 0.911_706_3)
-        .min(width_pt)
-        .min(height_pt);
-      vec![
-        chart_shape(diameter_pt, diameter_pt, 0.0, placement, stroke),
-        chart_shape(diameter_pt, diameter_pt, 0.0, placement, stroke),
-      ]
-    }
-    shared_chart::ChartKind::Bar => vec![chart_shape(
-      width_pt / 3.0,
-      height_pt * 0.55,
-      0.0,
-      placement,
-      stroke,
-    )],
-    shared_chart::ChartKind::Area => {
-      let mut shapes = vec![chart_shape(
-        width_pt,
-        height_pt,
-        height_pt * 1.055,
-        placement,
-        stroke,
-      )];
-      if chart_has_values(chart_space, &["37261", "23"]) {
-        shapes.push(chart_text_shape(
-          "23",
-          30.0,
-          12.0,
-          -height_pt * 0.365,
-          placement,
-        ));
-      }
-      shapes
-    }
-    shared_chart::ChartKind::Other => {
-      vec![chart_shape(width_pt, height_pt, 0.0, placement, stroke)]
-    }
-  })
-}
-
-fn chart_has_values(chart_space: &c::ChartSpace, expected: &[&str]) -> bool {
-  shared_chart::has_values(chart_space, expected)
+      .map(|language| language.val.to_string())
+  };
+  let automatic_title = shared_chart::automatic_chart_title(ui_language.as_deref()).to_string();
+  let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
+  shape.chart = Some(Box::new(InlineChart {
+    chart_space: Box::new(chart_space.clone()),
+    ui_language,
+    automatic_title,
+    title_style,
+    label_style,
+    gridline_color: RgbColor {
+      r: 134,
+      g: 134,
+      b: 134,
+    },
+    series_colors,
+  }));
+  Some(vec![shape])
 }
 
 fn drawing_chart_extent_and_placement(drawing: &w::Drawing) -> Option<(f32, f32, ImagePlacement)> {
@@ -8063,18 +8022,6 @@ fn chart_shape(
     text_box_auto_fit: false,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   }
-}
-
-fn chart_text_shape(
-  text: &str,
-  width_pt: f32,
-  height_pt: f32,
-  offset_y_pt: f32,
-  placement: ImagePlacement,
-) -> InlineShape {
-  let mut shape = chart_shape(width_pt, height_pt, offset_y_pt, placement, None);
-  shape.text_box_blocks = vec![simple_text_block(text.to_string(), TextStyle::default())];
-  shape
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -12620,6 +12567,9 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   if values.snap_to_grid.is_some() {
     target.snap_to_grid = values.snap_to_grid;
   }
+  if values.line_vertical_alignment.is_some() {
+    target.line_vertical_alignment = values.line_vertical_alignment;
+  }
   if values.indent_left_set {
     target.indent_left_pt = values.indent_left_pt;
     if values.indent_left_character_units.is_some() {
@@ -12777,6 +12727,9 @@ fn merge_numbering_format_values(
   }
   if values.snap_to_grid.is_some() {
     target.snap_to_grid = values.snap_to_grid;
+  }
+  if values.line_vertical_alignment.is_some() {
+    target.line_vertical_alignment = values.line_vertical_alignment;
   }
   let protect_indents =
     (context.direct_indent_left || context.style_numbering) && target.indent_left_set;
@@ -13703,6 +13656,16 @@ impl<'a> ParagraphProps<'a> {
       Self::Style(properties) => properties.snap_to_grid.as_ref(),
       Self::BaseStyle(properties) => properties.snap_to_grid.as_ref(),
       Self::Previous(properties) => properties.snap_to_grid.as_ref(),
+    }
+  }
+
+  fn text_alignment(&self) -> Option<&'a w::TextAlignment> {
+    match self {
+      Self::Direct(properties) => properties.text_alignment.as_ref(),
+      Self::Extended(properties) => properties.text_alignment.as_ref(),
+      Self::Style(properties) => properties.text_alignment.as_ref(),
+      Self::BaseStyle(properties) => properties.text_alignment.as_ref(),
+      Self::Previous(properties) => properties.text_alignment.as_ref(),
     }
   }
 

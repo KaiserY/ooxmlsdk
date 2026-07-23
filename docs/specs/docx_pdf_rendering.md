@@ -146,6 +146,9 @@ This now supports more than smoke-level PDF generation:
   DrawingML/VML textbox frames with block content, crop/transform state, wrap
   distances, behind/in-front ordering, relative size, `layoutInCell` placement,
   and retained page fly exclusions
+- typed embedded-chart anchors with detailed clustered-column lowering and a
+  generic fixed-output semantic path for other chart families; chart caches
+  remain chart data and are not emitted as detached document paragraphs
 - typed first-pass `w:framePr` paragraph frames and `w:tblpPr` floating tables
   using a shared `FloatingFramePlacement` model
 - table/row/cell frame ownership, grid/span/merge, row follows, repeated
@@ -655,6 +658,14 @@ exported as a hierarchical PDF outline/bookmark tree through Krilla
 destinations, matching Writer's PDF navigation export shape for outline-level
 paragraphs.
 
+Writer-owned paragraph and notes lines now compute one common baseline from
+their baseline/automatic portions before PDF paint. Explicit paragraph
+`w:textAlignment` is retained through style resolution and selects Writer's
+top, center, baseline, bottom, or automatic portion placement; table text keeps
+its separate table-cell baseline path. Horizontal paint diagnostics include
+the same per-space justification expansion used by shaping, so reported bounds
+match the emitted glyph positions.
+
 The import architecture is no longer only a plan. `docx/text.rs` owns paragraph
 model assembly and the paragraph/run import boundary; `docx/drawing.rs` owns the
 DrawingML/VML entry points consumed by text import; `docx/package.rs` owns image
@@ -1153,6 +1164,10 @@ Implement:
 - Include run baseline shifts in line advance so superscript/subscript text
   expands the inline line extent before PDF painting, matching Writer's line
   portion sizing and Typst's inline box behavior.
+- Align ordinary mixed-font portions to one Writer line ascent. Preserve
+  `w:textAlignment` through paragraph style inheritance and apply top, center,
+  baseline, bottom, and automatic placement using the portion height/ascent
+  rules in `SwTextCursor::AdjustBaseLine`.
 - Preserve text shaping and bidi measurement through `rustybuzz` or equivalent.
 - Extend justification beyond simple word spaces to CJK/kana compression and
   shaped glyph adjustability.

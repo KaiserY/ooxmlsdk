@@ -559,6 +559,7 @@ struct TextStyle<'doc> {
   horizontal_scale: Option<f32>,
   character_spacing_pt: f32,
   baseline_shift_pt: f32,
+  line_vertical_alignment: common::LineVerticalAlignment,
   use_windows_font_metrics: bool,
   wordprocessingml_font_slots: bool,
   cjk_punctuation_compression_ratio: f32,
@@ -809,6 +810,8 @@ fn conversion_font_audit(paint: &PaintDocument<'_>) -> PdfFontAudit {
         audit.text_portion_count += 1;
         let visible = !matches!(portion.kind, PaintTextPortionKind::Tab)
           && text_has_visible_glyph_paint(&text.item.style);
+        let source_requires_visible_glyph =
+          source_range_requires_visible_glyph(&text.item.text, &portion.text_range);
         let painted_as_text = visible && !text_requires_glyph_outlines(&text.item.style);
         if painted_as_text {
           audit.painted_text_portion_count += 1;
@@ -832,7 +835,7 @@ fn conversion_font_audit(paint: &PaintDocument<'_>) -> PdfFontAudit {
           );
         }
         let Some(glyph_runs) = &portion.glyphs else {
-          if visible && portion.text_range.start < portion.text_range.end {
+          if visible && source_requires_visible_glyph {
             push_font_audit_issue(
               &mut audit,
               PdfFontAuditIssue {
@@ -968,7 +971,10 @@ fn conversion_font_audit(paint: &PaintDocument<'_>) -> PdfFontAudit {
               );
               push_font_audit_issue(&mut audit, issue);
             }
-            if visible && glyph.glyph_id.to_u32() == 0 {
+            if visible
+              && glyph.glyph_id.to_u32() == 0
+              && source_range_requires_visible_glyph(&text.item.text, &glyph.text_range)
+            {
               let mut issue = location();
               issue.kind = PdfFontAuditIssueKind::MissingGlyph;
               let source_text = text
@@ -1030,6 +1036,12 @@ fn valid_text_range(text: &str, range: &Range<usize>) -> bool {
     && range.end <= text.len()
     && text.is_char_boundary(range.start)
     && text.is_char_boundary(range.end)
+}
+
+fn source_range_requires_visible_glyph(text: &str, range: &Range<usize>) -> bool {
+  text
+    .get(range.clone())
+    .is_some_and(|source| source.chars().any(|ch| !ch.is_control()))
 }
 
 fn krilla_font_loads(face: &FontFaceData) -> bool {
@@ -1434,6 +1446,8 @@ impl<'doc> PaintDocument<'doc> {
         );
         let (layout_items, line_owners) =
           expand_metafile_semantic_text_items(layout_items, line_owners);
+        let common_line_baselines =
+          common_writer_line_baselines(&layout_items, &line_owners, text_metrics);
         let decoration_metadata = decoration_render_metadata(&layout_items);
         let items = layout_items
           .into_iter()
@@ -1450,6 +1464,7 @@ impl<'doc> PaintDocument<'doc> {
               PaintItem::Text(Box::new(PaintText::from_layout_text(
                 *text,
                 owner,
+                common_line_baselines.get(item_index).copied().flatten(),
                 page.setup.size.width.0,
                 text_metrics,
               )))
@@ -1713,6 +1728,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     horizontal_scale: style.horizontal_scale,
     character_spacing_pt: style.character_spacing.0,
     baseline_shift_pt: style.baseline_shift.0,
+    line_vertical_alignment: style.line_vertical_alignment,
     use_windows_font_metrics: style.use_windows_font_metrics,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
@@ -1727,7 +1743,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     uppercase: style.uppercase,
     small_caps: style.small_caps,
     hidden: style.hidden,
-    semantic_only: false,
+    semantic_only: style.semantic_only,
     rotation_deg: style.rotation_degrees,
     color: rgb(style.color),
     opacity: opacity(style.color),
@@ -1889,10 +1905,57 @@ fn writer_text_items_coalesce(
   (current_right - next.x_pt).abs() < 0.25
 }
 
+fn common_writer_line_baselines(
+  items: &[PageItem<'_>],
+  owners: &[Option<PaintLineOwner>],
+  text_metrics: &mut TextMetrics,
+) -> Vec<Option<f32>> {
+  let mut baselines = HashMap::<(usize, usize), f32>::default();
+  for (item, owner) in items.iter().zip(owners) {
+    let (PageItem::Text(text), Some(owner)) = (item, owner) else {
+      continue;
+    };
+    if !matches!(
+      owner.frame_kind,
+      FollowFrameKind::Paragraph | FollowFrameKind::Notes
+    ) || text.style.semantic_only
+      || !matches!(
+        text.style.line_vertical_alignment,
+        common::LineVerticalAlignment::Auto | common::LineVerticalAlignment::Baseline
+      )
+    {
+      continue;
+    }
+    let offset = if text.style.use_windows_font_metrics {
+      text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+        &text.text,
+        &text.style,
+        text.line_height_pt,
+      )
+    } else {
+      text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
+    } + text.style.baseline_shift_pt;
+    baselines
+      .entry((owner.frame_index, owner.line_index))
+      .and_modify(|baseline| *baseline = baseline.max(offset))
+      .or_insert(offset);
+  }
+  owners
+    .iter()
+    .map(|owner| {
+      let owner = owner.as_ref()?;
+      baselines
+        .get(&(owner.frame_index, owner.line_index))
+        .copied()
+    })
+    .collect()
+}
+
 impl<'doc> PaintText<'doc> {
   fn from_layout_text(
     mut text: TextItem<'doc>,
     owner: Option<PaintLineOwner>,
+    common_line_baseline: Option<f32>,
     page_width_pt: f32,
     text_metrics: &mut TextMetrics,
   ) -> Self {
@@ -1923,18 +1986,44 @@ impl<'doc> PaintText<'doc> {
       match owner.map(|owner| owner.frame_kind) {
         Some(FollowFrameKind::Table) => text_ref.y_pt - text_ref.style.baseline_shift_pt,
         Some(FollowFrameKind::Paragraph | FollowFrameKind::Notes) | None => {
-          let offset = if text_ref.style.use_windows_font_metrics {
-            text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
-              &text_ref.text,
-              &text_ref.style,
-              text_ref.line_height_pt,
-            )
+          let mut centered_offset = || {
+            if text_ref.style.use_windows_font_metrics {
+              text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+                &text_ref.text,
+                &text_ref.style,
+                text_ref.line_height_pt,
+              )
+            } else {
+              text_metrics.baseline_offset_in_line_for_text(
+                &text_ref.text,
+                &text_ref.style,
+                text_ref.line_height_pt,
+              )
+            }
+          };
+          let natural_baseline = if text_ref.style.use_windows_font_metrics
+            && vertical_metrics.baseline_offset_pt > 0.0
+          {
+            vertical_metrics.baseline_offset_pt
           } else {
-            text_metrics.baseline_offset_in_line_for_text(
-              &text_ref.text,
-              &text_ref.style,
-              text_ref.line_height_pt,
-            )
+            vertical_metrics.leading_above_pt() + vertical_metrics.ascent_pt
+          };
+          let natural_height =
+            vertical_metrics.line_height_pt() + text_ref.style.baseline_shift_pt.abs();
+          let offset = match text_ref.style.line_vertical_alignment {
+            common::LineVerticalAlignment::Auto | common::LineVerticalAlignment::Baseline => {
+              common_line_baseline
+                .map(|baseline| baseline - text_ref.style.baseline_shift_pt)
+                .unwrap_or_else(centered_offset)
+            }
+            common::LineVerticalAlignment::Top => {
+              natural_baseline - text_ref.style.baseline_shift_pt
+            }
+            common::LineVerticalAlignment::Center => centered_offset(),
+            common::LineVerticalAlignment::Bottom => {
+              (text_ref.line_height_pt - natural_height).max(0.0) + natural_baseline
+                - text_ref.style.baseline_shift_pt
+            }
           };
           text_ref.y_pt + offset
         }
@@ -2949,6 +3038,19 @@ fn draw_text_item(
   let glyph_semantic_text =
     symbol_font_semantic_text(&item.text, item.style.font_family.as_deref());
   for portion in &text.portions {
+    let semantic_clipped = if item.style.semantic_only {
+      push_paint_clip(
+        surface,
+        Some(&PaintClipRect {
+          x_pt: -10_000.0,
+          y_pt: -10_000.0,
+          width_pt: 0.001,
+          height_pt: 0.001,
+        }),
+      )
+    } else {
+      false
+    };
     let rotated = item.style.rotation_deg.abs() > f32::EPSILON;
     if rotated {
       let (rotation_x, rotation_y) = item
@@ -3092,6 +3194,9 @@ fn draw_text_item(
       surface.pop();
     }
     if rotated {
+      surface.pop();
+    }
+    if semantic_clipped {
       surface.pop();
     }
   }
@@ -3962,8 +4067,8 @@ mod tests {
   use super::{
     GlyphId, PaintDocument, PaintItem, PaintTextPortionKind, TextItem, TextMetrics,
     TextStyle as PaintTextStyle, conversion_font_audit, gamma_correct_gradient_color, pdf_metadata,
-    pdf_page_dimension, render, symbol_font_semantic_text, text_portion_ranges,
-    text_requires_glyph_outlines, text_stroke, text_style_from_common,
+    pdf_page_dimension, render, source_range_requires_visible_glyph, symbol_font_semantic_text,
+    text_portion_ranges, text_requires_glyph_outlines, text_stroke, text_style_from_common,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -4178,6 +4283,14 @@ mod tests {
 
     assert!(issue.detail.contains("requested_family=Some(\"Arial\")"));
     assert!(issue.detail.contains("text=\"T\""));
+  }
+
+  #[test]
+  fn font_audit_ignores_notdef_for_non_rendering_control_clusters() {
+    assert!(!source_range_requires_visible_glyph("\n", &(0..1)));
+    assert!(!source_range_requires_visible_glyph("\t\r", &(0..2)));
+    assert!(source_range_requires_visible_glyph("\nT", &(0..2)));
+    assert!(source_range_requires_visible_glyph("\u{e000}", &(0..3)));
   }
 
   fn pdf_info_text(object: &lopdf::Object) -> String {

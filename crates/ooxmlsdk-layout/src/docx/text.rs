@@ -106,7 +106,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     .paragraph_properties
     .as_deref()
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref());
-  let paragraph_mark_style =
+  let mut paragraph_mark_style =
     properties::paragraph_mark_run_style(paragraph_mark_run_properties, run_style.clone(), styles);
   let has_direct_indentation = numbering_format_context.has_direct_indentation();
   // ECMA-376 Part 1 §17.9.24 makes w:lvl/w:rPr an overlay for numbering
@@ -133,7 +133,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     mut list_label,
     style_ref_numbering_text,
     numbering_image,
-    list_label_style,
+    mut list_label_style,
     numbering_list_tab_stop_pt,
     list_label_width_aware_tab,
   ) = numbering_label.map_or_else(
@@ -204,6 +204,14 @@ pub(super) fn paragraph_model_with_base<'a>(
       style_ref_numbering_text: None,
       preserve_text_portion: false,
     }));
+  }
+  let line_vertical_alignment = format.line_vertical_alignment.unwrap_or_default();
+  paragraph_mark_style.line_vertical_alignment = line_vertical_alignment;
+  list_label_style.line_vertical_alignment = line_vertical_alignment;
+  for inline in &mut inlines {
+    if let super::InlineItem::Text(run) = inline {
+      run.style.line_vertical_alignment = line_vertical_alignment;
+    }
   }
   let (footnote_reference_ids, endnote_reference_ids) = paragraph_note_reference_ids(paragraph);
   let starts_after_last_rendered_page_break =

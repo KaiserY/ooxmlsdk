@@ -86,6 +86,8 @@ pub struct PptxBulletParagraphSummary {
   pub text: String,
   pub character: Option<String>,
   pub font: Option<String>,
+  pub left_margin_100mm: i32,
+  pub indent_100mm: i32,
   pub graphic_width_100mm: Option<i32>,
   pub graphic_height_100mm: Option<i32>,
 }

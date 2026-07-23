@@ -118,6 +118,12 @@ pub struct PdfPageDiagnostics {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PdfTextRunDiagnostics {
   pub text: String,
+  /// Layout frame that owns this PDF text run, when the engine exposes one.
+  pub source_frame_index: Option<usize>,
+  /// Line within `source_frame_index` that owns this run.
+  pub source_line_index: Option<usize>,
+  /// Stable engine-local source path carried by `LayoutDocument`.
+  pub source_path: Vec<usize>,
   pub x_pt: f32,
   pub y_pt: f32,
   pub baseline_y_pt: f32,

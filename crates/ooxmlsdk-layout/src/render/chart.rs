@@ -1116,12 +1116,23 @@ fn chart_title_text(chart: &c::Chart) -> Option<ChartTitleText> {
 pub fn has_powerpoint_automatic_title_placeholder(chart: &c::Chart) -> bool {
   // PowerPoint distinguishes a bare empty title from its generated insertion
   // placeholder. The latter carries both its layout slot and text properties
-  // even though c:tx has not been populated yet. Word does not paint that
-  // placeholder in fixed output, so this host-specific signal is exposed to
-  // the presentation lowerer instead of being applied in the shared model.
+  // even though c:tx has not been populated yet. Word and Excel do not paint
+  // that editing placeholder in fixed output, so this remains host-specific.
   chart.title.as_deref().is_some_and(|title| {
     title.chart_text.is_none() && title.layout.is_some() && title.text_properties.is_some()
   }) && chart_automatic_title_is_visible(chart)
+}
+
+pub fn has_excel_automatic_title_placeholder(chart: &c::Chart) -> bool {
+  // Excel's generated title slot may omit c:layout but still carries the
+  // empty title text properties and an explicit autoTitleDeleted=false.
+  // The spreadsheet host applies this only after selecting a supported chart
+  // renderer; generic fallback text must not expose an editor placeholder.
+  chart
+    .title
+    .as_deref()
+    .is_some_and(|title| title.chart_text.is_none() && title.text_properties.is_some())
+    && chart_automatic_title_is_visible(chart)
 }
 
 fn chart_automatic_title_is_visible(chart: &c::Chart) -> bool {
@@ -1721,6 +1732,9 @@ mod tests {
     .expect("chart space");
     assert_eq!(chart_title_text(&placeholder_title.chart), None);
     assert!(super::has_powerpoint_automatic_title_placeholder(
+      &placeholder_title.chart
+    ));
+    assert!(super::has_excel_automatic_title_placeholder(
       &placeholder_title.chart
     ));
 

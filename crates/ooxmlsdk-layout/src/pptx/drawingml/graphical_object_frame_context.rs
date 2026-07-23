@@ -1,9 +1,11 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
 use super::shape::{
-  DiagramRelationshipIds, GraphicDataKind, GraphicDataRecord, OleObjectRecord, Shape,
+  DiagramRelationshipIds, GraphicDataKind, GraphicDataRecord, OleObjectRecord, PictureRecord, Shape,
 };
 use super::table::TableProperties;
+use crate::docx::ImageCrop;
 use crate::pptx::slide::SlidePersist;
 
 const PML_OLE_URI: &str = "http://schemas.openxmlformats.org/presentationml/2006/ole";
@@ -39,6 +41,12 @@ impl GraphicalObjectFrameContext {
     };
     let record = graphic_data_record(graphic_data, kind, slide_persist);
     shape.set_graphic_data_record(record);
+    if kind == GraphicDataKind::Ole
+      && shape.picture.is_none()
+      && let Some(preview) = ole_preview_picture(graphic_data, slide_persist)
+    {
+      shape.picture = Some(preview);
+    }
     match kind {
       GraphicDataKind::Ole => shape.set_ole_object_type(),
       GraphicDataKind::Diagram => shape.set_diagram_type(),
@@ -149,4 +157,74 @@ fn graphic_data_record(
     }
   }
   record
+}
+
+fn ole_preview_picture(
+  graphic_data: &a::GraphicData,
+  slide_persist: &SlidePersist,
+) -> Option<PictureRecord> {
+  let picture = graphic_data
+    .graphic_data_choice
+    .iter()
+    .find_map(|choice| match choice {
+      a::GraphicDataChoice::POleObject(ole_object) => ole_object.picture.as_deref(),
+      _ => None,
+    })?;
+  picture_record(picture, slide_persist)
+}
+
+fn picture_record(picture: &p::Picture, slide_persist: &SlidePersist) -> Option<PictureRecord> {
+  let blip_fill = picture.blip_fill.as_deref()?;
+  let blip = blip_fill.blip.as_ref()?;
+  let image_resource = blip
+    .embed
+    .as_deref()
+    .and_then(|relationship_id| slide_persist.image_resources.get(relationship_id))
+    .cloned();
+  Some(PictureRecord {
+    embed_relationship_id: blip.embed.clone(),
+    link_relationship_id: blip.link.clone(),
+    crop: image_crop_from_source_rectangle(blip_fill.source_rectangle.as_ref()),
+    blip_choices: blip.blip_choice.clone(),
+    image_resource,
+  })
+}
+
+fn image_crop_from_source_rectangle(rect: Option<&a::SourceRectangle>) -> ImageCrop {
+  let Some(rect) = rect else {
+    return ImageCrop::default();
+  };
+  let left = rect
+    .left
+    .as_ref()
+    .map(|value| value.as_ratio() as f32)
+    .unwrap_or(0.0)
+    .max(0.0);
+  let top = rect
+    .top
+    .as_ref()
+    .map(|value| value.as_ratio() as f32)
+    .unwrap_or(0.0)
+    .max(0.0);
+  let right = rect
+    .right
+    .as_ref()
+    .map(|value| value.as_ratio() as f32)
+    .unwrap_or(0.0)
+    .max(0.0);
+  let bottom = rect
+    .bottom
+    .as_ref()
+    .map(|value| value.as_ratio() as f32)
+    .unwrap_or(0.0)
+    .max(0.0);
+  if left + right >= 1.0 || top + bottom >= 1.0 {
+    return ImageCrop::default();
+  }
+  ImageCrop {
+    left,
+    top,
+    right,
+    bottom,
+  }
 }

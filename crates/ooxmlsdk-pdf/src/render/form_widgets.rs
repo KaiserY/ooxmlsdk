@@ -32,7 +32,6 @@ struct WidgetBounds {
   top: f32,
   right: f32,
   bottom: f32,
-  paragraph_bidi: bool,
   text: String,
 }
 
@@ -131,7 +130,6 @@ pub(super) fn collect_form_widget_annotations(
         top: text.origin.y.0,
         right: text.origin.x.0 + width,
         bottom: text.origin.y.0 + text.line_height.0,
-        paragraph_bidi: text.paragraph_bidi,
         text: text.text.to_string(),
       };
       widgets
@@ -141,14 +139,11 @@ pub(super) fn collect_form_widget_annotations(
           current.top = current.top.min(bounds.top);
           current.right = current.right.max(bounds.right);
           current.bottom = current.bottom.max(bounds.bottom);
-          current.paragraph_bidi |= bounds.paragraph_bidi;
           current.text.push_str(&bounds.text);
         })
         .or_insert(bounds);
     }
     let page_height = page.setup.size.height.0;
-    let content_left = page.setup.margins.left.0;
-    let content_right = page.setup.size.width.0 - page.setup.margins.right.0;
     let mut page_annotations = widgets
       .into_iter()
       .filter_map(|(widget_id, bounds)| {
@@ -156,16 +151,13 @@ pub(super) fn collect_form_widget_annotations(
           .form_widgets
           .iter()
           .find(|widget| widget.id == widget_id)?;
-        let (left, right) = if bounds.paragraph_bidi {
-          let mirrored_left = content_left + content_right - bounds.right;
-          let mirrored_right = content_left + content_right - bounds.left;
-          (mirrored_left, mirrored_right)
-        } else {
-          (bounds.left, bounds.right)
-        };
-        let left = lo_swrect_leading_edge(left) - LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT;
+        // DOCX layout has already applied paragraph alignment and UAX #9 run
+        // ordering, so these are physical page coordinates for both LTR and
+        // RTL text. Mirroring RTL bounds here would apply bidi placement twice.
+        let left = lo_swrect_leading_edge(bounds.left) - LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT;
         let top = lo_swrect_leading_edge(bounds.top) - LO_CONTENT_CONTROL_WIDGET_VERTICAL_OFFSET_PT;
-        let right = lo_swrect_trailing_x_edge(right) + LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT;
+        let right =
+          lo_swrect_trailing_x_edge(bounds.right) + LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT;
         let bottom = lo_swrect_leading_edge(bounds.bottom)
           + LO_CONTENT_CONTROL_WIDGET_BLOCK_EXPANSION_PT
           - LO_CONTENT_CONTROL_WIDGET_VERTICAL_OFFSET_PT;

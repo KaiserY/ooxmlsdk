@@ -131,15 +131,17 @@ pub(super) fn paragraph_model_with_base<'a>(
   });
   let (
     mut list_label,
+    style_ref_numbering_text,
     numbering_image,
     list_label_style,
     numbering_list_tab_stop_pt,
     list_label_width_aware_tab,
   ) = numbering_label.map_or_else(
-    || (None, None, TextStyle::default(), None, false),
+    || (None, None, None, TextStyle::default(), None, false),
     |label| {
       (
         label.text,
+        label.suppressed_non_numerical_text,
         label.image,
         label.style,
         label.list_tab_stop_pt,
@@ -199,6 +201,7 @@ pub(super) fn paragraph_model_with_base<'a>(
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       preserve_text_portion: false,
     }));
   }
@@ -230,6 +233,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     format: Box::new(format),
     style_ref_keys,
     style_ref_text,
+    style_ref_numbering_text: style_ref_numbering_text.map(Arc::<str>::from),
     list_label,
     list_label_style,
     list_label_hyperlink_url: None,

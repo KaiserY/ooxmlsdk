@@ -213,6 +213,7 @@ pub enum DynamicFieldKind {
   StyleRef {
     style_name: Arc<str>,
     from_bottom: bool,
+    suppress_non_numerical: bool,
   },
 }
 
@@ -263,6 +264,7 @@ pub(crate) struct TextItem {
   pub paragraph_bidi: bool,
   pub preserve_text_portion: bool,
   pub pdf_text_segmentation: PdfTextSegmentation,
+  pub source_path: Vec<usize>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

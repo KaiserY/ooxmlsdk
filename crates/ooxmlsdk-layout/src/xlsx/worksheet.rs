@@ -533,9 +533,22 @@ impl CalcSheet {
 
 impl SheetGeometry {
   fn new(metrics: &SheetMetrics, rows: &[CalcRow]) -> Self {
-    let default_column_width_pt = metrics
-      .format
-      .default_column_width_points(metrics.default_digit_width_pt);
+    let default_column_width_pt = if metrics
+      .columns
+      .iter()
+      .any(|column| column.best_fit && column.width.is_some())
+      && metrics.format.mso_document
+      && metrics.format.default_column_width.is_none()
+      && metrics.format.base_column_width.is_none()
+    {
+      metrics
+        .format
+        .font_dependent_default_column_width_points(metrics.default_digit_width_pt)
+    } else {
+      metrics
+        .format
+        .default_column_width_points(metrics.default_digit_width_pt)
+    };
     let mut column_offsets_pt = Vec::with_capacity(XLSX_MAX_COLUMN as usize + 1);
     column_offsets_pt.push(0.0);
     for column in 1..=XLSX_MAX_COLUMN {
@@ -925,6 +938,13 @@ impl SheetMetrics {
 }
 
 impl SheetFormatModel {
+  fn font_dependent_default_column_width_points(&self, digit_width_pt: f32) -> f32 {
+    digit_width_to_lo_points(
+      8.43 + CALC_BASE_COLUMN_PADDING_PX * screen_pixel_width_pt() / digit_width_pt,
+      digit_width_pt,
+    )
+  }
+
   fn from_sheet_format_properties(format: &x::SheetFormatProperties, mso_document: bool) -> Self {
     Self {
       base_column_width: format.base_column_width,

@@ -51,7 +51,7 @@ use crate::units;
 use chart::supplemental_graphic_blocks;
 pub(crate) use custom_xml::CustomXmlBindings;
 pub(crate) use model::*;
-use package::{HyperlinkCatalog, ImageCatalog};
+use package::{AltChunkCatalog, AltChunkResource, HyperlinkCatalog, ImageCatalog};
 use settings::{
   adjust_line_height_in_table, compatibility_mode, default_tab_stop_pt, no_column_balance,
   split_page_break_and_paragraph_mark,
@@ -160,6 +160,7 @@ pub(crate) fn extract(
   )?;
   let mut numbering = NumberingCatalog::load(package, &main, import_settings)?;
   let images = ImageCatalog::load(package, &main);
+  let alt_chunks = AltChunkCatalog::load(package, &main);
   let hyperlinks = HyperlinkCatalog::load(package, &main);
   let custom_xml_bindings = CustomXmlBindings::load(package, &main);
   let mut form_widget_ids = FormWidgetIdAllocator::default();
@@ -191,6 +192,7 @@ pub(crate) fn extract(
           styles: &body_styles,
           numbering: &mut numbering,
           images: &images,
+          alt_chunks: &alt_chunks,
           hyperlinks: &hyperlinks,
           custom_xml_bindings: &custom_xml_bindings,
           form_widget_ids: &mut form_widget_ids,
@@ -234,7 +236,8 @@ pub(crate) fn extract(
     &mut sections,
     &mut form_widget_ids,
   );
-  let (footnote_labels, endnote_labels) = note_reference_labels(package, &main, &sections);
+  let (footnote_labels, endnote_labels, footnote_numbering, endnote_numbering) =
+    note_reference_labels(package, &main, &sections);
   let footnotes = footnotes(
     package,
     &main,
@@ -302,8 +305,10 @@ pub(crate) fn extract(
     first_footer_blocks,
     footnote_blocks,
     footnotes,
+    footnote_numbering,
     endnote_blocks,
     endnotes,
+    endnote_numbering,
     title_page,
     blocks,
   })
@@ -373,6 +378,7 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       preserve_text_portion: false,
     })],
     footnote_reference_ids: Vec::new(),
@@ -384,6 +390,7 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
     format: Box::new(ParagraphFormat::default()),
     style_ref_keys: Vec::new(),
     style_ref_text: None,
+    style_ref_numbering_text: None,
     list_label: None,
     list_label_style: TextStyle::default(),
     list_label_hyperlink_url: None,
@@ -441,6 +448,7 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
     format: Box::new(ParagraphFormat::default()),
     style_ref_keys: Vec::new(),
     style_ref_text: None,
+    style_ref_numbering_text: None,
     list_label: None,
     list_label_style: TextStyle::default(),
     list_label_hyperlink_url: None,
@@ -622,6 +630,7 @@ struct BodySectionEnv<'a> {
   styles: &'a StylesCatalog,
   numbering: &'a mut NumberingCatalog,
   images: &'a ImageCatalog,
+  alt_chunks: &'a AltChunkCatalog,
   hyperlinks: &'a HyperlinkCatalog,
   custom_xml_bindings: &'a CustomXmlBindings,
   form_widget_ids: &'a mut FormWidgetIdAllocator,
@@ -638,6 +647,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
     styles,
     numbering,
     images,
+    alt_chunks,
     hyperlinks,
     custom_xml_bindings,
     form_widget_ids,
@@ -725,6 +735,15 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
         }
         current_blocks.push(block);
       }
+      w::BodyChoice::AltChunk(alt_chunk) => {
+        let Some(relationship_id) = alt_chunk.id.as_deref() else {
+          continue;
+        };
+        let Some(resource) = alt_chunks.by_relationship_id.get(relationship_id) else {
+          continue;
+        };
+        current_blocks.extend(alt_chunk_blocks(resource, styles.doc_default_run.clone()));
+      }
       w::BodyChoice::SdtBlock(sdt) => {
         let mut blocks = sdt_block_blocks(
           sdt,
@@ -782,6 +801,112 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
   }
 
   sections
+}
+
+fn alt_chunk_blocks(resource: &AltChunkResource, style: TextStyle) -> Vec<Block> {
+  let content_type = resource
+    .content_type
+    .as_deref()
+    .unwrap_or_default()
+    .split(';')
+    .next()
+    .unwrap_or_default()
+    .trim()
+    .to_ascii_lowercase();
+  let paragraphs = match content_type.as_str() {
+    "text/html" | "application/xhtml+xml" => html_alt_chunk_paragraphs(&resource.data),
+    "text/plain" => String::from_utf8_lossy(&resource.data)
+      .lines()
+      .map(str::trim)
+      .filter(|line| !line.is_empty())
+      .map(str::to_string)
+      .collect(),
+    _ => Vec::new(),
+  };
+  paragraphs
+    .into_iter()
+    .map(|text| simple_text_block(text, style.clone()))
+    .collect()
+}
+
+fn html_alt_chunk_paragraphs(data: &[u8]) -> Vec<String> {
+  use quick_xml::events::Event;
+
+  let mut reader = quick_xml::Reader::from_reader(data);
+  reader.config_mut().trim_text(false);
+  let mut paragraphs = Vec::new();
+  let mut text = String::new();
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) => {
+        let name = event.local_name();
+        if html_block_tag(name.as_ref()) {
+          push_alt_chunk_paragraph(&mut paragraphs, &mut text);
+        } else if name.as_ref().eq_ignore_ascii_case(b"br") {
+          text.push('\n');
+        }
+      }
+      Ok(Event::Empty(event)) => {
+        let name = event.local_name();
+        if name.as_ref().eq_ignore_ascii_case(b"br") {
+          text.push('\n');
+        } else if html_block_tag(name.as_ref()) {
+          push_alt_chunk_paragraph(&mut paragraphs, &mut text);
+        }
+      }
+      Ok(Event::End(event)) => {
+        if html_block_tag(event.local_name().as_ref()) {
+          push_alt_chunk_paragraph(&mut paragraphs, &mut text);
+        }
+      }
+      Ok(Event::Text(value)) => {
+        if let Ok(value) = value.xml10_content() {
+          text.push_str(&value);
+        }
+      }
+      Ok(Event::CData(value)) => {
+        if let Ok(value) = value.xml10_content() {
+          text.push_str(&value);
+        }
+      }
+      Ok(Event::GeneralRef(value)) => {
+        if let Ok(value) = value.decode() {
+          let reference = format!("&{value};");
+          if let Ok(value) = quick_xml::escape::unescape(&reference) {
+            text.push_str(&value);
+          }
+        }
+      }
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
+    }
+  }
+  push_alt_chunk_paragraph(&mut paragraphs, &mut text);
+  paragraphs
+}
+
+fn html_block_tag(name: &[u8]) -> bool {
+  [
+    b"p".as_slice(),
+    b"div".as_slice(),
+    b"li".as_slice(),
+    b"h1".as_slice(),
+    b"h2".as_slice(),
+    b"h3".as_slice(),
+    b"h4".as_slice(),
+    b"h5".as_slice(),
+    b"h6".as_slice(),
+  ]
+  .iter()
+  .any(|tag| name.eq_ignore_ascii_case(tag))
+}
+
+fn push_alt_chunk_paragraph(paragraphs: &mut Vec<String>, text: &mut String) {
+  let normalized = text.split_whitespace().collect::<Vec<_>>().join(" ");
+  text.clear();
+  if !normalized.is_empty() {
+    paragraphs.push(normalized);
+  }
 }
 
 fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
@@ -853,6 +978,7 @@ fn prepend_out_of_place_breaks_to_paragraph(
         dynamic_field: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
+        style_ref_numbering_text: None,
         preserve_text_portion: false,
       }),
     })
@@ -1004,6 +1130,7 @@ fn prepend_drop_cap_text(paragraph: &mut Paragraph, text: String) {
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       preserve_text_portion: false,
     }),
   );
@@ -1648,13 +1775,6 @@ enum NoteKind {
   Endnote,
 }
 
-#[derive(Clone, Copy)]
-struct NoteNumberingSpec {
-  format: w::NumberFormatValues,
-  start: i32,
-  restart: w::RestartNumberValues,
-}
-
 impl NoteNumberingSpec {
   fn default_for(kind: NoteKind) -> Self {
     Self {
@@ -1681,7 +1801,12 @@ fn note_reference_labels(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   sections: &[ImportedSection],
-) -> (HashMap<i64, String>, HashMap<i64, String>) {
+) -> (
+  HashMap<i64, String>,
+  HashMap<i64, String>,
+  Vec<NoteNumberingSpec>,
+  Vec<NoteNumberingSpec>,
+) {
   let settings = main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok());
@@ -1700,9 +1825,22 @@ fn note_reference_labels(
       endnote_document_numbering_spec,
     );
 
+  let footnote_numbering = sections
+    .iter()
+    .map(|section| section_note_numbering_spec(section, NoteKind::Footnote, footnote_default))
+    .collect::<Vec<_>>();
+  let endnote_numbering = sections
+    .iter()
+    .map(|section| section_note_numbering_spec(section, NoteKind::Endnote, endnote_default))
+    .collect::<Vec<_>>();
+  let footnote_labels = note_labels_for_sections(sections, NoteKind::Footnote, &footnote_numbering);
+  let endnote_labels = note_labels_for_sections(sections, NoteKind::Endnote, &endnote_numbering);
+
   (
-    note_labels_for_sections(sections, NoteKind::Footnote, footnote_default),
-    note_labels_for_sections(sections, NoteKind::Endnote, endnote_default),
+    footnote_labels,
+    endnote_labels,
+    footnote_numbering,
+    endnote_numbering,
   )
 }
 
@@ -1785,12 +1923,19 @@ fn section_note_numbering_spec(
 fn note_labels_for_sections(
   sections: &[ImportedSection],
   kind: NoteKind,
-  document_spec: NoteNumberingSpec,
+  specs: &[NoteNumberingSpec],
 ) -> HashMap<i64, String> {
   let mut labels = HashMap::new();
-  let mut value = document_spec.start;
+  let mut value = specs
+    .first()
+    .copied()
+    .unwrap_or_else(|| NoteNumberingSpec::default_for(kind))
+    .start;
   for (section_index, section) in sections.iter().enumerate() {
-    let spec = section_note_numbering_spec(section, kind, document_spec);
+    let spec = specs
+      .get(section_index)
+      .copied()
+      .unwrap_or_else(|| NoteNumberingSpec::default_for(kind));
     if section_index == 0 || matches!(spec.restart, w::RestartNumberValues::EachSection) {
       value = spec.start;
     }
@@ -2154,6 +2299,7 @@ fn prepend_note_marker(
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       preserve_text_portion: false,
     }),
   );
@@ -3803,6 +3949,7 @@ fn paragraph_inlines(
             dynamic_field: None,
             style_ref_keys: Vec::new(),
             style_ref_text: None,
+            style_ref_numbering_text: None,
             preserve_text_portion: false,
           }));
         }
@@ -3973,6 +4120,7 @@ fn flush_closed_complex_field(inlines: &mut Vec<InlineItem>, fields: &mut Vec<Co
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       preserve_text_portion: false,
     }));
   } else {
@@ -4102,6 +4250,7 @@ fn page_ref_field_kind(tokens: &[String]) -> Option<DynamicFieldKind> {
 fn style_ref_field_kind(tokens: &[String]) -> Option<DynamicFieldKind> {
   let mut style_name = None;
   let mut from_bottom = false;
+  let mut suppress_non_numerical = false;
   let mut skip_switch_arg = false;
   for token in tokens {
     if skip_switch_arg {
@@ -4111,6 +4260,8 @@ fn style_ref_field_kind(tokens: &[String]) -> Option<DynamicFieldKind> {
     if let Some(switch) = token.strip_prefix('\\') {
       if switch.eq_ignore_ascii_case("l") {
         from_bottom = true;
+      } else if switch.eq_ignore_ascii_case("t") {
+        suppress_non_numerical = true;
       } else if switch.len() > 1 && switch.chars().all(|ch| ch.is_ascii_alphabetic()) {
         skip_switch_arg = true;
       } else if style_name.is_none() && switch.len() == 1 && switch.as_bytes()[0].is_ascii_digit() {
@@ -4125,6 +4276,7 @@ fn style_ref_field_kind(tokens: &[String]) -> Option<DynamicFieldKind> {
   style_name.map(|style_name| DynamicFieldKind::StyleRef {
     style_name: Arc::<str>::from(style_name),
     from_bottom,
+    suppress_non_numerical,
   })
 }
 
@@ -4170,6 +4322,7 @@ fn push_dynamic_field(
     dynamic_field: Some(kind),
     style_ref_keys: Vec::new(),
     style_ref_text: None,
+    style_ref_numbering_text: None,
     preserve_text_portion: false,
   }));
 }
@@ -5078,6 +5231,7 @@ fn push_hidden_style_ref_run(
     dynamic_field: None,
     style_ref_keys: style_ref_keys.to_vec(),
     style_ref_text: Some(Arc::<str>::from(text)),
+    style_ref_numbering_text: None,
     preserve_text_portion: false,
   }));
 }
@@ -5132,7 +5286,8 @@ fn append_word_text(output: &mut String, text: &w::TextType, inherited_space_pre
   };
   let preserve =
     inherited_space_preserve || text.space == Some(xml::SpaceProcessingModeValues::Preserve);
-  for ch in content.chars() {
+  let mut chars = content.chars().peekable();
+  while let Some(ch) = chars.next() {
     if ch == '\t' {
       // A U+0009 inside w:t is text, not the semantic tab represented by
       // w:tab (§17.3.3.32). Word places a preserved literal tab on its own
@@ -5144,6 +5299,21 @@ fn append_word_text(output: &mut String, text: &w::TextType, inherited_space_pre
       } else {
         ' '
       });
+    } else if ch == '\r' {
+      // XML 1.0 normally normalizes CRLF to LF before schema deserialization,
+      // but package producers and alternate readers can still expose CR here.
+      // Writer's OOXML import treats line endings inside w:t as one ordinary
+      // text space (tdf#108806), never as a manual line break. Consume a
+      // following LF so an unnormalized CRLF pair still becomes one space.
+      if chars.peek() == Some(&'\n') {
+        chars.next();
+      }
+      output.push(' ');
+    } else if ch == '\n' {
+      // A visible line break is represented by w:br. Literal XML line endings
+      // in CT_Text are whitespace and must not enter TextFrameLayout as hard
+      // line-break markers.
+      output.push(' ');
     } else {
       output.push(ch);
     }
@@ -5267,6 +5437,7 @@ fn push_sdt_run(
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       preserve_text_portion: false,
     }));
     if let Some(widget_id) = widget_id {
@@ -5614,6 +5785,7 @@ fn push_note_reference(
     dynamic_field: None,
     style_ref_keys: Vec::new(),
     style_ref_text: None,
+    style_ref_numbering_text: None,
     preserve_text_portion: false,
   }));
 }
@@ -5657,6 +5829,7 @@ fn flush_run_text(
       dynamic_field: None,
       style_ref_keys: style_ref_keys.to_vec(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       preserve_text_portion: false,
     }));
   }
@@ -6058,7 +6231,7 @@ fn image_wrap_mode(choice: &wp::AnchorChoice) -> ImageWrapMode {
     wp::AnchorChoice::WrapNone => ImageWrapMode::Through,
     wp::AnchorChoice::WrapSquare(_) => ImageWrapMode::Square,
     wp::AnchorChoice::WrapTight(_) => ImageWrapMode::Tight,
-    wp::AnchorChoice::WrapThrough(_) => ImageWrapMode::Square,
+    wp::AnchorChoice::WrapThrough(_) => ImageWrapMode::Through,
     wp::AnchorChoice::WrapTopBottom(_) => ImageWrapMode::TopBottom,
   }
 }
@@ -9900,6 +10073,7 @@ fn push_textbox_content(
           dynamic_field: None,
           style_ref_keys: Vec::new(),
           style_ref_text: None,
+          style_ref_numbering_text: None,
           preserve_text_portion: false,
         }));
       }
@@ -10012,6 +10186,7 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
           dynamic_field: None,
           style_ref_keys: Vec::new(),
           style_ref_text: None,
+          style_ref_numbering_text: None,
           preserve_text_portion: false,
         }));
       }
@@ -10040,6 +10215,7 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       preserve_text_portion: false,
     }));
   }
@@ -10321,6 +10497,7 @@ fn vml_crop_fraction(value: Option<&str>) -> f32 {
 fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
   let mut width = None;
   let mut height = None;
+  let mut wrap_set = false;
   let mut output = VmlImageStyle::default();
 
   let Some(style) = style else {
@@ -10361,7 +10538,10 @@ fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
         output.vertical_alignment = vml_vertical_alignment(value);
         output.absolute_position = true;
       }
-      "mso-wrap-style" => output.wrap = vml_wrap_mode(value),
+      "mso-wrap-style" => {
+        output.wrap = vml_wrap_mode(value);
+        wrap_set = true;
+      }
       "mso-wrap-distance-left" => {
         output.margin_left_pt = vml_measure_to_points(value).unwrap_or(0.0);
       }
@@ -10384,6 +10564,13 @@ fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
     }
   }
 
+  // A negative VML z-index without an authored mso-wrap-style is a
+  // behind-text object, not an implicit square-wrap object. DrawingML carries
+  // wrapping independently in wp:wrap*, while legacy VML omits the style for
+  // the through-text default used by Word.
+  if output.behind_text && !wrap_set {
+    output.wrap = ImageWrapMode::Through;
+  }
   output.size_pt = width.zip(height);
   output
 }
@@ -12774,6 +12961,7 @@ enum NumberingSuffix {
 #[derive(Clone, Debug)]
 struct NumberingLabel {
   text: Option<String>,
+  suppressed_non_numerical_text: Option<String>,
   image: Option<InlineImage>,
   style: TextStyle,
   list_tab_stop_pt: Option<f32>,
@@ -12888,6 +13076,14 @@ impl NumberingCatalog {
       abstract_num,
       &self.counters,
     );
+    let suppressed_non_numerical_text = format_numbering_label_suppressing_non_numerical(
+      level,
+      num_id,
+      level_index,
+      counter,
+      abstract_num,
+      &self.counters,
+    );
     let mut style = base_style;
     // LibreOffice's NewNumberPortion starts ordinary numbering from the
     // paragraph font and clears underline/overline only. Character bullets
@@ -12924,6 +13120,7 @@ impl NumberingCatalog {
       .and_then(|id| self.picture_bullets.get(&id).cloned());
     Some(NumberingLabel {
       text: if image.is_some() { None } else { Some(text) },
+      suppressed_non_numerical_text: image.is_none().then_some(suppressed_non_numerical_text),
       image,
       style,
       list_tab_stop_pt: level.list_tab_stop_pt,
@@ -13083,6 +13280,70 @@ fn format_numbering_label(
     );
   }
   format!("{text}{}", numbering_suffix_text(level.suffix))
+}
+
+fn format_numbering_label_suppressing_non_numerical(
+  level: &NumberingLevel,
+  num_id: i32,
+  level_index: i32,
+  value: i32,
+  abstract_num: &AbstractNumbering,
+  counters: &HashMap<(i32, i32), i32>,
+) -> String {
+  if matches!(level.format, w::NumberFormatValues::Bullet) {
+    return level
+      .text
+      .chars()
+      .filter(|ch| is_word_numbering_delimiter(*ch))
+      .collect();
+  }
+
+  let mut output = String::new();
+  let mut chars = level.text.chars().peekable();
+  while let Some(ch) = chars.next() {
+    if ch == '%'
+      && let Some(index) = chars.peek().and_then(|ch| ch.to_digit(10))
+      && index > 0
+    {
+      chars.next();
+      let referenced_index = i32::try_from(index - 1).unwrap_or_default();
+      let referenced_value = if referenced_index == level_index {
+        value
+      } else {
+        counters
+          .get(&(num_id, referenced_index))
+          .copied()
+          .unwrap_or_else(|| {
+            abstract_num
+              .levels
+              .get(&referenced_index)
+              .map(|level| level.start)
+              .unwrap_or(1)
+          })
+      };
+      let referenced_level = abstract_num.levels.get(&referenced_index);
+      output.push_str(&referenced_level.map_or_else(
+        || referenced_value.to_string(),
+        |referenced_level| {
+          format_numbering_level_value(
+            referenced_value,
+            referenced_level,
+            level.is_legal && referenced_index < level_index,
+          )
+        },
+      ));
+    } else if is_word_numbering_delimiter(ch) {
+      output.push(ch);
+    }
+  }
+  output
+}
+
+fn is_word_numbering_delimiter(ch: char) -> bool {
+  matches!(
+    ch,
+    '.' | ',' | ':' | ';' | '-' | '(' | ')' | '[' | ']' | '{' | '}' | '/' | '\\' | '|'
+  )
 }
 
 fn format_numbering_level_value(value: i32, level: &NumberingLevel, force_decimal: bool) -> String {
@@ -14200,6 +14461,27 @@ mod tests {
   }
 
   #[test]
+  fn drawingml_wrap_through_remains_distinct_from_square_wrap() {
+    let through = wp::WrapThrough::from_bytes(
+      br#"<wp:wrapThrough xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" wrapText="bothSides"><wp:wrapPolygon edited="0"><wp:start x="0" y="0"/><wp:lineTo x="0" y="0"/></wp:wrapPolygon></wp:wrapThrough>"#,
+    )
+    .expect("through wrap");
+    let square = wp::WrapSquare::from_bytes(
+      br#"<wp:wrapSquare xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" wrapText="bothSides"/>"#,
+    )
+    .expect("square wrap");
+
+    assert_eq!(
+      image_wrap_mode(&wp::AnchorChoice::WrapThrough(Box::new(through))),
+      ImageWrapMode::Through
+    );
+    assert_eq!(
+      image_wrap_mode(&wp::AnchorChoice::WrapSquare(Box::new(square))),
+      ImageWrapMode::Square
+    );
+  }
+
+  #[test]
   fn word_automatic_line_number_distance_is_eighteen_points() {
     let automatic = w::LineNumberType::from_bytes(
       br#"<w:lnNumType xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:countBy="1"/>"#,
@@ -14396,6 +14678,27 @@ mod tests {
   }
 
   #[test]
+  fn word_text_line_endings_are_imported_as_spaces() {
+    let preserved_text = w::TextType {
+      xml_content: Some("before\r\nafter\nlast".to_string()),
+      space: Some(xml::SpaceProcessingModeValues::Preserve),
+    };
+    let mut output = String::new();
+    append_word_text(&mut output, &preserved_text, false);
+    assert_eq!(output, "before after last");
+  }
+
+  #[test]
+  fn html_alt_chunk_imports_block_text_and_inline_breaks() {
+    assert_eq!(
+      html_alt_chunk_paragraphs(
+        b"<html><body><p>first &amp; second<br/>line</p><div>third</div></body></html>",
+      ),
+      vec!["first & second line", "third"]
+    );
+  }
+
+  #[test]
   fn smart_tag_run_preserves_nested_visible_text() {
     let paragraph = w::Paragraph::from_bytes(
       br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:smartTag w:uri="urn:test" w:element="person"><w:r><w:t>John</w:t></w:r><w:smartTag w:uri="urn:test" w:element="surname"><w:r><w:t xml:space="preserve"> Smith</w:t></w:r></w:smartTag></w:smartTag></w:p>"#,
@@ -14486,6 +14789,40 @@ mod tests {
 
       assert_eq!(format_numbering_level_value(1, &level, false), expected);
     }
+  }
+
+  #[test]
+  fn styleref_t_switch_preserves_only_number_values_and_delimiters() {
+    let first = w::Level::from_bytes(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="Chapter %1.!"/></w:lvl>"#,
+    )
+    .expect("first numbering level");
+    let second = w::Level::from_bytes(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="lowerLetter"/><w:lvlText w:val=".%1\@123^&amp;~|%2......"/></w:lvl>"#,
+    )
+    .expect("second numbering level");
+    let first = numbering_level_model(&first, ImportSettings::default());
+    let second = numbering_level_model(&second, ImportSettings::default());
+    let abstract_num = AbstractNumbering {
+      levels: HashMap::from([(0, first), (1, second.clone())]),
+    };
+    let counters = HashMap::from([((7, 0), 2), ((7, 1), 1)]);
+
+    assert_eq!(
+      format_numbering_label_suppressing_non_numerical(&second, 7, 1, 1, &abstract_num, &counters,),
+      ".2\\|a......"
+    );
+    assert!(matches!(
+      style_ref_field_kind(&[
+        "Heading 2".to_string(),
+        "\\t".to_string(),
+        "\\w".to_string(),
+      ]),
+      Some(DynamicFieldKind::StyleRef {
+        suppress_non_numerical: true,
+        ..
+      })
+    ));
   }
 
   #[test]
@@ -16291,6 +16628,20 @@ mod tests {
   }
 
   #[test]
+  fn vml_negative_z_index_without_wrap_style_does_not_exclude_body_text() {
+    let style = vml_image_style(Some(
+      "position:absolute;margin-left:71.75pt;margin-top:13.45pt;\
+       width:124.8pt;height:12.95pt;z-index:-251945472",
+    ));
+
+    let ImagePlacement::Floating(placement) = style.placement() else {
+      panic!("floating placement");
+    };
+    assert!(placement.behind_text);
+    assert_eq!(placement.wrap, ImageWrapMode::Through);
+  }
+
+  #[test]
   fn vml_textboxes_emit_text_content() {
     let run = w::Run {
       run_choice: vec![w::RunChoice::Picture(Box::new(w::Picture {
@@ -16605,6 +16956,7 @@ mod tests {
         styles: &StylesCatalog::default(),
         numbering: &mut numbering,
         images: &ImageCatalog::default(),
+        alt_chunks: &AltChunkCatalog::default(),
         hyperlinks: &HyperlinkCatalog::default(),
         custom_xml_bindings: &CustomXmlBindings::default(),
         form_widget_ids: &mut FormWidgetIdAllocator::default(),
@@ -16908,6 +17260,7 @@ mod tests {
     let styles = StylesCatalog::default();
     let mut numbering = NumberingCatalog::default();
     let images = ImageCatalog::default();
+    let alt_chunks = AltChunkCatalog::default();
     let hyperlinks = HyperlinkCatalog::default();
     let bindings = CustomXmlBindings::default();
     let mut form_widget_ids = FormWidgetIdAllocator::default();
@@ -16917,6 +17270,7 @@ mod tests {
         styles: &styles,
         numbering: &mut numbering,
         images: &images,
+        alt_chunks: &alt_chunks,
         hyperlinks: &hyperlinks,
         custom_xml_bindings: &bindings,
         form_widget_ids: &mut form_widget_ids,
@@ -16954,6 +17308,7 @@ mod tests {
     let styles = StylesCatalog::default();
     let mut numbering = NumberingCatalog::default();
     let images = ImageCatalog::default();
+    let alt_chunks = AltChunkCatalog::default();
     let hyperlinks = HyperlinkCatalog::default();
     let bindings = CustomXmlBindings::default();
     let mut form_widget_ids = FormWidgetIdAllocator::default();
@@ -16963,6 +17318,7 @@ mod tests {
         styles: &styles,
         numbering: &mut numbering,
         images: &images,
+        alt_chunks: &alt_chunks,
         hyperlinks: &hyperlinks,
         custom_xml_bindings: &bindings,
         form_widget_ids: &mut form_widget_ids,

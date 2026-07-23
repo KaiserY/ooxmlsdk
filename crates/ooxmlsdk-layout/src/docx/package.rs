@@ -3,10 +3,11 @@ use std::sync::Arc;
 
 use ooxmlsdk::common::RelationshipTargetKind;
 use ooxmlsdk::parts::{
-  chart_part::ChartPart, diagram_colors_part::DiagramColorsPart,
-  diagram_data_part::DiagramDataPart, diagram_persist_layout_part::DiagramPersistLayoutPart,
-  endnotes_part::EndnotesPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
-  header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
+  alternative_format_import_part::AlternativeFormatImportPart, chart_part::ChartPart,
+  diagram_colors_part::DiagramColorsPart, diagram_data_part::DiagramDataPart,
+  diagram_persist_layout_part::DiagramPersistLayoutPart, endnotes_part::EndnotesPart,
+  footer_part::FooterPart, footnotes_part::FootnotesPart, header_part::HeaderPart,
+  image_part::ImagePart, main_document_part::MainDocumentPart,
   numbering_definitions_part::NumberingDefinitionsPart,
   wordprocessing_document::WordprocessingDocument,
 };
@@ -29,6 +30,38 @@ pub(super) struct ImageCatalog {
 #[derive(Clone, Debug, Default)]
 pub(super) struct HyperlinkCatalog {
   by_relationship_id: HashMap<String, String>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(super) struct AltChunkCatalog {
+  pub(super) by_relationship_id: HashMap<String, AltChunkResource>,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct AltChunkResource {
+  pub(super) data: Arc<[u8]>,
+  pub(super) content_type: Option<String>,
+}
+
+impl AltChunkCatalog {
+  pub(super) fn load(package: &WordprocessingDocument, main: &MainDocumentPart) -> Self {
+    let by_relationship_id = main
+      .related_parts_of_type::<_, AlternativeFormatImportPart>(package)
+      .filter_map(|related| {
+        let relationship_id = related.relationship_id().to_string();
+        let part = related.part();
+        let data = part.data_to_vec(package)?;
+        Some((
+          relationship_id,
+          AltChunkResource {
+            data: data.into(),
+            content_type: part.content_type(package).map(str::to_string),
+          },
+        ))
+      })
+      .collect();
+    Self { by_relationship_id }
+  }
 }
 
 impl HyperlinkCatalog {

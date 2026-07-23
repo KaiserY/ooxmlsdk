@@ -615,10 +615,13 @@ master/layout graphicFrames can collide with slide relationship IDs after
 cloning.
 
 Current PPTX PDF lowering preserves structured graphicFrame identity and target
-payloads for chart, diagram, OLE object, and embedded package records. Visible
-chart/SmartArt/OLE rendering is still a conversion gap; the preserved payloads
-are the handoff point for the renderer, not an excuse to parse package
-relationships from display code.
+payloads for chart, diagram, OLE object, and embedded package records. For OLE
+frames, the nested relationship-scoped `p:pic` preview is lowered at the frame
+bounds; EMF/WMF previews also contribute an invisible semantic text layer while
+the metafile remains the visible paint source. Native re-layout of the embedded
+package and OLE objects without a preview remain conversion gaps. The preserved
+payloads are the handoff point for those renderers, not an excuse to parse
+package relationships from display code.
 
 Chart resources are not just `c:chartSpace`. LibreOffice's chart path carries
 the chart drawing fragment, embedded workbook/package, chart-local images,

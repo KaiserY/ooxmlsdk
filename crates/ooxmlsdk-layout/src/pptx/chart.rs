@@ -776,6 +776,7 @@ fn push_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String, style: Tex
     paragraph_bidi: false,
     preserve_text_portion: true,
     pdf_text_segmentation: PdfTextSegmentation::Line,
+    source_path: Vec::new(),
   }));
 }
 

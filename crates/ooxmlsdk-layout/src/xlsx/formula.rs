@@ -35,6 +35,7 @@ pub(crate) fn recalculate_formula_cells(
           let Some(value) =
             evaluate_formula_cell(&formula_book, current_sheet, current_cell, formula_cell)
               .map(|value| calc_value_from_formula_value(&book, value))
+              .or_else(|| unresolved_external_reference_value(&formula_cell.formula))
               .or_else(|| unresolved_foreign_addin_value(&formula_cell.formula))
           else {
             continue;
@@ -269,7 +270,7 @@ fn formula_cells(sheet: &CalcSheet) -> Vec<FormulaCell> {
       };
       (!text.trim().is_empty()).then(|| FormulaCell {
         address,
-        formula: text,
+        formula: normalize_legacy_addin_formula(&text).into_owned(),
         reference: formula.reference.clone(),
         is_array: formula.formula_type == x::CellFormulaValues::Array,
       })
@@ -372,6 +373,28 @@ fn formula_value_data_type(value: &Value) -> Option<x::CellValues> {
     Value::Blank => None,
     Value::Range(_) | Value::Matrix(_) => None,
   }
+}
+
+fn normalize_legacy_addin_formula(formula: &str) -> Cow<'_, str> {
+  let Some((function, arguments)) = formula.split_once('(') else {
+    return Cow::Borrowed(formula);
+  };
+  if function
+    .trim()
+    .eq_ignore_ascii_case("com.sun.star.sheet.addin.Analysis.getEomonth")
+  {
+    return Cow::Owned(format!("EOMONTH({arguments}"));
+  }
+  Cow::Borrowed(formula)
+}
+
+fn unresolved_external_reference_value(formula: &str) -> Option<Value> {
+  let formula = formula.trim().trim_start_matches('=').trim_start();
+  let bang = formula.find('!')?;
+  let qualifier = &formula[..bang];
+  let open = qualifier.rfind('[')?;
+  let close = qualifier[open + 1..].find(']')? + open + 1;
+  (close > open + 1).then(|| Value::Error("#REF!".to_string()))
 }
 
 fn unresolved_foreign_addin_value(formula: &str) -> Option<Value> {
@@ -780,13 +803,13 @@ fn formula_row_states(
   let mut states = BTreeMap::new();
   for (sheet, row) in &book.hidden_rows {
     states
-      .entry((formula_book_sheet_id(book, *sheet), *row))
+      .entry((formula_book_sheet_id(book, *sheet), row.saturating_sub(1)))
       .or_insert_with(ooxmlsdk_formula::FormulaRowState::default)
       .hidden = true;
   }
   for (sheet, row) in &book.filtered_rows {
     states
-      .entry((formula_book_sheet_id(book, *sheet), *row))
+      .entry((formula_book_sheet_id(book, *sheet), row.saturating_sub(1)))
       .or_insert_with(ooxmlsdk_formula::FormulaRowState::default)
       .filtered = true;
   }
@@ -1192,5 +1215,49 @@ mod tests {
       unresolved_foreign_addin_value("_xlfn.XLOOKUP(A1,B:B,C:C)"),
       None
     );
+  }
+
+  #[test]
+  fn legacy_analysis_eomonth_is_normalized_to_the_excel_function() {
+    assert_eq!(
+      normalize_legacy_addin_formula("com.sun.star.sheet.addin.Analysis.getEomonth(A5,1)"),
+      "EOMONTH(A5,1)"
+    );
+    assert_eq!(
+      normalize_legacy_addin_formula("com.sun.star.sheet.addin.Unknown(A1)"),
+      "com.sun.star.sheet.addin.Unknown(A1)"
+    );
+  }
+
+  #[test]
+  fn unresolved_external_workbook_reference_is_an_office_ref_error() {
+    assert_eq!(
+      unresolved_external_reference_value("SUM('[missing.xlsx]Sheet0'!A1:B1)"),
+      Some(Value::Error("#REF!".to_string()))
+    );
+    assert_eq!(
+      unresolved_external_reference_value("SUM(Table1[Amount])"),
+      None
+    );
+  }
+
+  #[test]
+  fn worksheet_row_states_are_lowered_to_zero_based_formula_rows() {
+    let book = FormulaBook {
+      sheet_names: vec!["Sheet1".to_string()],
+      sheet_workbook_indices: vec![4],
+      cells: BTreeMap::new(),
+      formulas: BTreeMap::new(),
+      hidden_rows: HashSet::from([(0, 7)]),
+      filtered_rows: HashSet::from([(0, 5)]),
+      external_cells: HashMap::new(),
+      external_defined_names: HashMap::new(),
+      tables: HashMap::new(),
+      defined: DefinedNames::default(),
+    };
+
+    let states = formula_row_states(&book);
+    assert!(states[&(ooxmlsdk_formula::SheetId(4), 6)].hidden);
+    assert!(states[&(ooxmlsdk_formula::SheetId(4), 4)].filtered);
   }
 }

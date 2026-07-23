@@ -2,7 +2,9 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
+use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use unicode_bidi::{BidiInfo, Level};
 
 use crate::common;
 use crate::docx::{
@@ -11,9 +13,9 @@ use crate::docx::{
   FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
   HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
   InlineChart, InlineItem, InlineShape, InlineShapeGeometry, LineHeightRule, LineNumbering,
-  PRESERVED_WORD_TEXT_TAB, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
-  SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
-  TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
+  NoteNumberingSpec, PRESERVED_WORD_TEXT_TAB, PageSetup, ParagraphAlignment, RgbColor,
+  SectionBreakKind, SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment,
+  TableCell, TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
   VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
@@ -714,6 +716,7 @@ pub(crate) struct TextItem {
   pub dynamic_field: Option<DynamicFieldKind>,
   pub style_ref_keys: Vec<Arc<str>>,
   pub style_ref_text: Option<Arc<str>>,
+  pub style_ref_numbering_text: Option<Arc<str>>,
   pub form_widget_id: Option<u32>,
   pub paragraph_bidi: bool,
   pub word_spacing_pt: f32,
@@ -1486,6 +1489,7 @@ fn into_common_dynamic_field(field: DynamicFieldKind) -> common::DynamicField<'s
     DynamicFieldKind::StyleRef {
       style_name,
       from_bottom,
+      ..
     } => common::DynamicField::StyleRef {
       style_name: Cow::Owned(style_name.to_string()),
       from_bottom,
@@ -1866,7 +1870,12 @@ impl<'a> RootFrameLayout<'a> {
       apply_column_separators(self.document, &mut self.pages, &self.frames);
       apply_headers_and_footers(self.document, &mut self.pages, &mut self.text_metrics);
       apply_page_borders(&mut self.pages);
-      resolve_dynamic_fields(&mut self.pages, &self.anchor_pages);
+      resolve_dynamic_fields(
+        &mut self.pages,
+        &self.anchor_pages,
+        &self.document.footnote_numbering,
+        &self.document.endnote_numbering,
+      );
       mark_decorated_frame_invalidations(
         &mut self.frames,
         &self.pages,
@@ -3209,6 +3218,7 @@ fn add_line_numbers_to_page(
         dynamic_field: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
+        style_ref_numbering_text: None,
         preserve_text_portion: false,
         form_widget_id: None,
         paragraph_bidi: false,
@@ -6780,7 +6790,12 @@ fn page_border_reference_rect(setup: PageSetup) -> (f32, f32, f32, f32) {
   }
 }
 
-fn resolve_dynamic_fields(pages: &mut [Page], anchor_pages: &[AnchorPage]) {
+fn resolve_dynamic_fields(
+  pages: &mut [Page],
+  anchor_pages: &[AnchorPage],
+  footnote_numbering: &[NoteNumberingSpec],
+  endnote_numbering: &[NoteNumberingSpec],
+) {
   let total_pages = pages.len();
   let page_refs = anchor_pages
     .iter()
@@ -6792,6 +6807,7 @@ fn resolve_dynamic_fields(pages: &mut [Page], anchor_pages: &[AnchorPage]) {
     })
     .collect::<HashMap<_, _>>();
   let style_ref_candidates = style_ref_candidates_by_page(pages);
+  resolve_page_note_numbering(pages, footnote_numbering, endnote_numbering);
   for (page_index, page) in pages.iter_mut().enumerate() {
     let page_number = page_index + 1;
     let items = page.items.iter_mut().chain(
@@ -6819,10 +6835,15 @@ fn resolve_dynamic_fields(pages: &mut [Page], anchor_pages: &[AnchorPage]) {
         Some(DynamicFieldKind::StyleRef {
           style_name,
           from_bottom,
+          suppress_non_numerical,
         }) => {
-          if let Some(value) =
-            resolve_style_ref(&style_ref_candidates, page_index, style_name, *from_bottom)
-          {
+          if let Some(value) = resolve_style_ref(
+            &style_ref_candidates,
+            page_index,
+            style_name,
+            *from_bottom,
+            *suppress_non_numerical,
+          ) {
             text.text = value;
           }
         }
@@ -6832,11 +6853,118 @@ fn resolve_dynamic_fields(pages: &mut [Page], anchor_pages: &[AnchorPage]) {
   }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum PageNoteKind {
+  Footnote,
+  Endnote,
+}
+
+fn resolve_page_note_numbering(
+  pages: &mut [Page],
+  footnote_numbering: &[NoteNumberingSpec],
+  endnote_numbering: &[NoteNumberingSpec],
+) {
+  for page in pages {
+    let footnote_spec = footnote_numbering.get(page.section_index).copied();
+    let endnote_spec = endnote_numbering.get(page.section_index).copied();
+    if !footnote_spec.is_some_and(note_numbering_restarts_each_page)
+      && !endnote_spec.is_some_and(note_numbering_restarts_each_page)
+    {
+      continue;
+    }
+
+    let mut labels = HashMap::default();
+    let mut next_footnote = footnote_spec.map_or(1, |spec| spec.start);
+    let mut next_endnote = endnote_spec.map_or(1, |spec| spec.start);
+    for item in page.items.iter().chain(
+      page
+        .repeating_adornment
+        .iter()
+        .flat_map(|adornment| adornment.items.iter()),
+    ) {
+      let PageItem::Text(text) = item else {
+        continue;
+      };
+      let Some((kind, false, id)) = text.hyperlink_url.as_deref().and_then(page_note_link_parts)
+      else {
+        continue;
+      };
+      let (spec, next) = match kind {
+        PageNoteKind::Footnote => (footnote_spec, &mut next_footnote),
+        PageNoteKind::Endnote => (endnote_spec, &mut next_endnote),
+      };
+      let Some(spec) = spec.filter(|spec| note_numbering_restarts_each_page(*spec)) else {
+        continue;
+      };
+      labels.entry((kind, id)).or_insert_with(|| {
+        let label = format_page_note_number(kind, spec, *next);
+        *next = next.saturating_add(1);
+        label
+      });
+    }
+
+    let items = page.items.iter_mut().chain(
+      page
+        .repeating_adornment
+        .iter_mut()
+        .flat_map(|adornment| adornment.items.iter_mut()),
+    );
+    for item in items {
+      let PageItem::Text(text) = item else {
+        continue;
+      };
+      let Some((kind, backlink, id)) = text.hyperlink_url.as_deref().and_then(page_note_link_parts)
+      else {
+        continue;
+      };
+      let Some(label) = labels.get(&(kind, id)) else {
+        continue;
+      };
+      if backlink {
+        text.text = format!("{label} ");
+      } else {
+        text.text.clone_from(label);
+      }
+    }
+  }
+}
+
+fn note_numbering_restarts_each_page(spec: NoteNumberingSpec) -> bool {
+  matches!(spec.restart, w::RestartNumberValues::EachPage)
+}
+
+fn format_page_note_number(kind: PageNoteKind, spec: NoteNumberingSpec, value: i32) -> String {
+  let default_format = match kind {
+    PageNoteKind::Footnote => w::NumberFormatValues::Decimal,
+    PageNoteKind::Endnote => w::NumberFormatValues::LowerRoman,
+  };
+  let format = if matches!(spec.format, w::NumberFormatValues::None) {
+    default_format
+  } else {
+    spec.format
+  };
+  super::format_numbering_value(value, format, false)
+}
+
+fn page_note_link_parts(url: &str) -> Option<(PageNoteKind, bool, i64)> {
+  let rest = url.strip_prefix("ooxmlsdk-pdf:")?;
+  let (kind, id) = rest.rsplit_once(':')?;
+  let (kind, backlink) = match kind {
+    "footnote-reference" => (PageNoteKind::Footnote, false),
+    "footnote-backlink" => (PageNoteKind::Footnote, true),
+    "endnote-reference" => (PageNoteKind::Endnote, false),
+    "endnote-backlink" => (PageNoteKind::Endnote, true),
+    _ => return None,
+  };
+  Some((kind, backlink, id.parse().ok()?))
+}
+
 #[derive(Clone, Debug)]
 struct StyleRefCandidate {
   y_pt: f32,
   keys: Vec<Arc<str>>,
   text: Arc<str>,
+  numbering_text: Option<Arc<str>>,
 }
 
 fn style_ref_candidates_by_page(pages: &[Page]) -> Vec<Vec<StyleRefCandidate>> {
@@ -6858,6 +6986,7 @@ fn style_ref_candidates_by_page(pages: &[Page]) -> Vec<Vec<StyleRefCandidate>> {
           f32::abs(candidate.y_pt - text.y_pt) < 0.01
             && candidate.keys == text.style_ref_keys
             && candidate.text == *style_ref_text
+            && candidate.numbering_text.as_deref() == text.style_ref_numbering_text.as_deref()
         }) {
           continue;
         }
@@ -6865,6 +6994,7 @@ fn style_ref_candidates_by_page(pages: &[Page]) -> Vec<Vec<StyleRefCandidate>> {
           y_pt: text.y_pt,
           keys: text.style_ref_keys.clone(),
           text: style_ref_text.clone(),
+          numbering_text: text.style_ref_numbering_text.clone(),
         });
       }
       candidates.sort_by(|a, b| a.y_pt.total_cmp(&b.y_pt));
@@ -6878,17 +7008,30 @@ fn resolve_style_ref(
   page_index: usize,
   style_name: &str,
   from_bottom: bool,
+  suppress_non_numerical: bool,
 ) -> Option<String> {
-  if let Some(text) = resolve_style_ref_on_page(&pages[page_index], style_name, from_bottom) {
+  if let Some(text) = resolve_style_ref_on_page(
+    &pages[page_index],
+    style_name,
+    from_bottom,
+    suppress_non_numerical,
+  ) {
     return Some(text);
   }
   for previous_index in (0..page_index).rev() {
-    if let Some(text) = resolve_style_ref_on_page(&pages[previous_index], style_name, true) {
+    if let Some(text) = resolve_style_ref_on_page(
+      &pages[previous_index],
+      style_name,
+      true,
+      suppress_non_numerical,
+    ) {
       return Some(text);
     }
   }
   for next_page in pages.iter().skip(page_index + 1) {
-    if let Some(text) = resolve_style_ref_on_page(next_page, style_name, false) {
+    if let Some(text) =
+      resolve_style_ref_on_page(next_page, style_name, false, suppress_non_numerical)
+    {
       return Some(text);
     }
   }
@@ -6899,6 +7042,7 @@ fn resolve_style_ref_on_page(
   candidates: &[StyleRefCandidate],
   style_name: &str,
   from_bottom: bool,
+  suppress_non_numerical: bool,
 ) -> Option<String> {
   let iter: Box<dyn Iterator<Item = &StyleRefCandidate> + '_> = if from_bottom {
     Box::new(candidates.iter().rev())
@@ -6907,7 +7051,17 @@ fn resolve_style_ref_on_page(
   };
   iter
     .filter(|candidate| style_ref_candidate_matches(candidate, style_name))
-    .map(|candidate| candidate.text.to_string())
+    .map(|candidate| {
+      if suppress_non_numerical {
+        candidate
+          .numbering_text
+          .as_deref()
+          .unwrap_or_default()
+          .to_string()
+      } else {
+        candidate.text.to_string()
+      }
+    })
     .next()
 }
 
@@ -8065,6 +8219,7 @@ fn docx_chart_page_item(item: crate::model::PageItem) -> Option<PageItem> {
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       form_widget_id: text.form_widget_id,
       paragraph_bidi: text.paragraph_bidi,
       word_spacing_pt: 0.0,
@@ -12797,6 +12952,14 @@ impl<'a> TextFrameLayout<'a> {
     y: f32,
     line_height: &mut f32,
   ) -> (FlowContext, TextFrame, f32, f32, f32) {
+    if self.paragraph.format.bidi {
+      reorder_bidi_line_items(
+        &mut advance.current.items,
+        *advance.line_item_start_index,
+        y,
+        advance.text_metrics,
+      );
+    }
     finalize_cjk_punctuation_compression(
       &mut advance.current.items,
       *advance.line_item_start_index,
@@ -13021,6 +13184,22 @@ impl<'a> TextFrameLayout<'a> {
       text_frame.default_line_right,
       &wrap_exclusions,
     );
+    // Writer's Word-compatibility `ADD_VERTICAL_FLY_OFFSETS` behavior treats
+    // the current paragraph's own upper margin as part of its first-line
+    // collision strip. When a side-wrapped fly crosses that margin and also
+    // reaches the printable line, move the whole paragraph below the fly.
+    //
+    // This is deliberately separate from ordinary side wrapping: if the fly
+    // ends inside the upper margin, the printable line does not intersect it
+    // and no width is reserved (tdf#124600). The rule applies only while
+    // placing the first line; subsequent lines continue to wrap normally.
+    y = shift_first_line_below_upper_margin_exclusions(
+      y,
+      paragraph.format.spacing_before_pt,
+      text_frame.default_line_left,
+      text_frame.default_line_right,
+      &wrap_exclusions,
+    );
     let (mut line_left, mut line_right) =
       self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
     if paragraph.list_label.is_some() {
@@ -13091,6 +13270,7 @@ impl<'a> TextFrameLayout<'a> {
         dynamic_field: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
+        style_ref_numbering_text: None,
         preserve_text_portion: false,
         form_widget_id: None,
         paragraph_bidi: false,
@@ -13212,11 +13392,17 @@ impl<'a> TextFrameLayout<'a> {
           } else {
             (run.style_ref_keys.as_slice(), run.style_ref_text.as_ref())
           };
+          let style_ref_numbering_text = if run.style_ref_keys.is_empty() {
+            paragraph.style_ref_numbering_text.as_ref()
+          } else {
+            run.style_ref_numbering_text.as_ref()
+          };
           let meta = TextChunkMeta {
             hyperlink_url: run.hyperlink_url.as_deref(),
             dynamic_field: run.dynamic_field.as_ref(),
             style_ref_keys,
             style_ref_text,
+            style_ref_numbering_text,
             form_widget_id: active_form_widget_ids.last().copied(),
             paragraph_bidi: paragraph.format.bidi,
             preserve_text_portion: run.preserve_text_portion,
@@ -13908,7 +14094,11 @@ impl<'a> TextFrameLayout<'a> {
                 line_used_punctuation_fit = false;
                 line_has_tab = false;
               }
-              ImageWrapMode::Square | ImageWrapMode::Tight if !placement.behind_text => {
+              ImageWrapMode::Square | ImageWrapMode::Tight => {
+                // wp:behindDoc controls z-order, not the wrapping contract.
+                // Writer still creates a contour/square text exclusion for a
+                // behind-document object when wp:wrapTight/wp:wrapSquare is
+                // present (tdf#128198).
                 let exclusion = WrapExclusion {
                   left_pt: image_x - placement.margin_left_pt,
                   right_pt: image_x + width + placement.margin_right_pt,
@@ -13959,10 +14149,7 @@ impl<'a> TextFrameLayout<'a> {
                   line_has_tab = false;
                 }
               }
-              ImageWrapMode::Through
-              | ImageWrapMode::Inline
-              | ImageWrapMode::Square
-              | ImageWrapMode::Tight => {}
+              ImageWrapMode::Through | ImageWrapMode::Inline => {}
             }
             if placement.behind_text {
               behind_text_floating_only = true;
@@ -14371,7 +14558,9 @@ impl<'a> TextFrameLayout<'a> {
                   x = line_left;
                   line_height = base_line_height;
                 }
-                ImageWrapMode::Square | ImageWrapMode::Tight if !placement.behind_text => {
+                ImageWrapMode::Square | ImageWrapMode::Tight => {
+                  // A behind-document shape remains a wrap object. The z-order
+                  // bit only decides whether its paint is below document text.
                   let exclusion = WrapExclusion {
                     left_pt: shape_x - placement.margin_left_pt,
                     right_pt: shape_x + width + placement.margin_right_pt,
@@ -14432,10 +14621,7 @@ impl<'a> TextFrameLayout<'a> {
                   x = line_left;
                   line_height = base_line_height;
                 }
-                ImageWrapMode::Through
-                | ImageWrapMode::Inline
-                | ImageWrapMode::Square
-                | ImageWrapMode::Tight => {}
+                ImageWrapMode::Through | ImageWrapMode::Inline => {}
               }
             }
             crate::docx::ImagePlacement::Inline => {
@@ -14582,6 +14768,9 @@ impl<'a> TextFrameLayout<'a> {
 
     let paragraph_bottom;
     if emitted {
+      if paragraph.format.bidi {
+        reorder_bidi_line_items(&mut current.items, line_item_start_index, y, text_metrics);
+      }
       finalize_cjk_punctuation_compression(
         &mut current.items,
         line_item_start_index,
@@ -14729,7 +14918,7 @@ impl<'a> TextFrameLayout<'a> {
     if paragraph.list_label.is_none() && start_item_index <= current.items.len() {
       align_paragraph_items(
         &mut current.items[start_item_index..],
-        paragraph.format.alignment,
+        effective_paragraph_alignment(paragraph),
         text_metrics,
         default_line_right,
       );
@@ -15373,6 +15562,40 @@ fn dodge_text_wrap_exclusions(
   }
 }
 
+fn shift_first_line_below_upper_margin_exclusions(
+  mut y: f32,
+  upper_margin_pt: f32,
+  default_left: f32,
+  default_right: f32,
+  exclusions: &[WrapExclusion],
+) -> f32 {
+  if upper_margin_pt <= LAYOUT_EPSILON_PT {
+    return y;
+  }
+
+  loop {
+    let margin_top = y - upper_margin_pt;
+    let Some(exclusion) = exclusions
+      .iter()
+      .filter(|exclusion| {
+        !exclusion.blocks_flow
+          && exclusion.overlaps_horizontal_span(default_left, default_right)
+          && exclusion.top_pt < y - LAYOUT_EPSILON_PT
+          && exclusion.bottom_pt > y + LAYOUT_EPSILON_PT
+          && exclusion.bottom_pt > margin_top
+      })
+      .min_by(|a, b| {
+        a.bottom_pt
+          .partial_cmp(&b.bottom_pt)
+          .unwrap_or(std::cmp::Ordering::Equal)
+      })
+    else {
+      return y;
+    };
+    y = exclusion.bottom_pt;
+  }
+}
+
 struct ParagraphDecoration<'a> {
   start_item_index: usize,
   paragraph: &'a crate::docx::Paragraph,
@@ -15499,6 +15722,84 @@ fn align_paragraph_items(
         shift_item_x(item, offset);
       }
     }
+  }
+}
+
+fn effective_paragraph_alignment(paragraph: &crate::docx::Paragraph) -> ParagraphAlignment {
+  match (paragraph.format.justification.adjust, paragraph.format.bidi) {
+    (crate::docx::ParagraphAdjust::Start, true) => ParagraphAlignment::Right,
+    (crate::docx::ParagraphAdjust::End, true) => ParagraphAlignment::Left,
+    _ => paragraph.format.alignment,
+  }
+}
+
+fn reorder_bidi_line_items(
+  items: &mut [PageItem],
+  item_start: usize,
+  y: f32,
+  text_metrics: &mut TextMetrics,
+) {
+  let logical_indices = items
+    .iter()
+    .enumerate()
+    .skip(item_start)
+    .filter_map(|(index, item)| match item {
+      PageItem::Text(text)
+        if text.paragraph_bidi && (text.y_pt - y).abs() < 0.01 && !text.text.is_empty() =>
+      {
+        Some(index)
+      }
+      _ => None,
+    })
+    .collect::<Vec<_>>();
+  if logical_indices.len() < 2 {
+    return;
+  }
+
+  let mut logical_text = String::new();
+  let mut byte_starts = Vec::with_capacity(logical_indices.len());
+  for &index in &logical_indices {
+    let PageItem::Text(text) = &items[index] else {
+      continue;
+    };
+    byte_starts.push(logical_text.len());
+    logical_text.push_str(&text.text);
+  }
+  if logical_text.is_empty() {
+    return;
+  }
+
+  let bidi = BidiInfo::new(&logical_text, Some(Level::rtl()));
+  let item_levels = byte_starts
+    .iter()
+    .map(|&start| bidi.levels[start])
+    .collect::<Vec<_>>();
+  let visual_order = BidiInfo::reorder_visual(&item_levels);
+  if visual_order.iter().copied().eq(0..logical_indices.len()) {
+    return;
+  }
+
+  let mut left = f32::MAX;
+  let mut widths = Vec::with_capacity(logical_indices.len());
+  for &index in &logical_indices {
+    let Some((x, width)) = item_horizontal_bounds(&items[index], text_metrics) else {
+      return;
+    };
+    left = left.min(x);
+    widths.push(width);
+  }
+  if left == f32::MAX {
+    return;
+  }
+
+  let mut x = left;
+  for logical_index in visual_order {
+    let item_index = logical_indices[logical_index];
+    let Some((old_x, _)) = item_horizontal_bounds(&items[item_index], text_metrics) else {
+      return;
+    };
+    shift_item_x(&mut items[item_index], x - old_x);
+    x += widths[logical_index];
   }
 }
 
@@ -15636,6 +15937,7 @@ fn push_tab_leader(
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       form_widget_id: None,
       paragraph_bidi: false,
       word_spacing_pt: 0.0,
@@ -16006,6 +16308,7 @@ struct TextChunkMeta<'a> {
   dynamic_field: Option<&'a DynamicFieldKind>,
   style_ref_keys: &'a [Arc<str>],
   style_ref_text: Option<&'a Arc<str>>,
+  style_ref_numbering_text: Option<&'a Arc<str>>,
   form_widget_id: Option<u32>,
   paragraph_bidi: bool,
   preserve_text_portion: bool,
@@ -16034,6 +16337,7 @@ fn flush_text(
     dynamic_field: meta.dynamic_field.cloned(),
     style_ref_keys: meta.style_ref_keys.to_vec(),
     style_ref_text: meta.style_ref_text.cloned(),
+    style_ref_numbering_text: meta.style_ref_numbering_text.cloned(),
     form_widget_id: meta.form_widget_id,
     paragraph_bidi: meta.paragraph_bidi,
     word_spacing_pt: 0.0,
@@ -16180,6 +16484,31 @@ mod tests {
   }
 
   #[test]
+  fn word_upper_margin_moves_first_line_only_when_fly_reaches_print_area() {
+    let crossing = WrapExclusion {
+      left_pt: 300.0,
+      right_pt: 420.0,
+      top_pt: 96.0,
+      bottom_pt: 112.0,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: false,
+    };
+    assert_eq!(
+      shift_first_line_below_upper_margin_exclusions(100.0, 6.0, 72.0, 540.0, &[crossing]),
+      112.0
+    );
+
+    let margin_only = WrapExclusion {
+      bottom_pt: 99.0,
+      ..crossing
+    };
+    assert_eq!(
+      shift_first_line_below_upper_margin_exclusions(100.0, 6.0, 72.0, 540.0, &[margin_only]),
+      100.0
+    );
+  }
+
+  #[test]
   fn paragraph_indents_are_measured_from_opposite_text_margins() {
     let width = paragraph_content_width(468.0, 36.0, 18.0);
     assert_eq!(width, 414.0);
@@ -16318,6 +16647,7 @@ mod tests {
         dynamic_field: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
+        style_ref_numbering_text: None,
         preserve_text_portion: false,
       })],
       footnote_reference_ids: Vec::new(),
@@ -16333,6 +16663,7 @@ mod tests {
       }),
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
@@ -16381,6 +16712,7 @@ mod tests {
           dynamic_field: None,
           style_ref_keys: Vec::new(),
           style_ref_text: None,
+          style_ref_numbering_text: None,
           preserve_text_portion: false,
         })],
         footnote_reference_ids: Vec::new(),
@@ -16397,6 +16729,7 @@ mod tests {
         }),
         style_ref_keys: Vec::new(),
         style_ref_text: None,
+        style_ref_numbering_text: None,
         list_label: None,
         list_label_style: TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -16461,6 +16794,7 @@ mod tests {
         dynamic_field: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
+        style_ref_numbering_text: None,
         preserve_text_portion: false,
       })],
       footnote_reference_ids: Vec::new(),
@@ -16476,6 +16810,7 @@ mod tests {
       }),
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
@@ -16543,6 +16878,7 @@ mod tests {
       }),
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
@@ -16580,6 +16916,7 @@ mod tests {
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       preserve_text_portion: true,
     };
     let floating_shape = InlineShape {
@@ -16644,6 +16981,7 @@ mod tests {
       format: Box::new(ParagraphFormat::default()),
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
@@ -16675,6 +17013,7 @@ mod tests {
       }),
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
@@ -16835,6 +17174,7 @@ mod tests {
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       preserve_text_portion: false,
     };
     let blocks = vec![Block::paragraph(Paragraph {
@@ -16848,6 +17188,7 @@ mod tests {
       format: Box::new(ParagraphFormat::default()),
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
@@ -16921,6 +17262,7 @@ mod tests {
         dynamic_field: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
+        style_ref_numbering_text: None,
         preserve_text_portion: false,
       };
       Block::paragraph(Paragraph {
@@ -16934,6 +17276,7 @@ mod tests {
         format: Box::new(ParagraphFormat::default()),
         style_ref_keys: Vec::new(),
         style_ref_text: None,
+        style_ref_numbering_text: None,
         list_label: None,
         list_label_style: TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -17338,6 +17681,7 @@ mod tests {
         dynamic_field: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
+        style_ref_numbering_text: None,
         form_widget_id: None,
         paragraph_bidi: false,
         word_spacing_pt: 0.0,
@@ -17405,6 +17749,7 @@ mod tests {
         dynamic_field: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
+        style_ref_numbering_text: None,
         form_widget_id: None,
         paragraph_bidi: false,
         word_spacing_pt: 0.0,
@@ -17446,6 +17791,7 @@ mod tests {
       }),
       style_ref_keys: Vec::new(),
       style_ref_text: None,
+      style_ref_numbering_text: None,
       form_widget_id: None,
       paragraph_bidi: false,
       word_spacing_pt: 0.0,
@@ -17463,12 +17809,120 @@ mod tests {
     }];
     let mut pages = vec![page];
 
-    resolve_dynamic_fields(&mut pages, &anchors);
+    resolve_dynamic_fields(&mut pages, &anchors, &[], &[]);
 
     let PageItem::Text(text) = &pages[0].items[0] else {
       panic!("expected text item");
     };
     assert_eq!(text.text, "9");
+  }
+
+  #[test]
+  fn bidi_line_items_follow_visual_run_order_without_reversing_source_text() {
+    let mut text_metrics = TextMetrics::new();
+    let style = TextStyle::default();
+    let mut x = 0.0;
+    let mut items = ["ارمان", "(", "ArmanAg", ")"]
+      .into_iter()
+      .map(|value| {
+        let item = PageItem::Text(Box::new(TextItem {
+          x_pt: x,
+          y_pt: 20.0,
+          line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+          text: value.to_string(),
+          style: style.clone(),
+          rotation_center_pt: None,
+          hyperlink_url: None,
+          dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
+          style_ref_numbering_text: None,
+          form_widget_id: None,
+          paragraph_bidi: true,
+          word_spacing_pt: 0.0,
+          preserve_text_portion: false,
+          decoration_span_start_x_pt: None,
+          pdf_text_segmentation: PdfTextSegmentation::Line,
+        }));
+        x += text_metrics.measure_text(value, &style);
+        item
+      })
+      .collect::<Vec<_>>();
+
+    reorder_bidi_line_items(&mut items, 0, 20.0, &mut text_metrics);
+
+    let x = |index: usize| {
+      let PageItem::Text(text) = &items[index] else {
+        panic!("expected text");
+      };
+      text.x_pt
+    };
+    assert!(x(3) < x(2));
+    assert!(x(2) < x(1));
+    assert!(x(1) < x(0));
+    let PageItem::Text(arabic) = &items[0] else {
+      panic!("expected Arabic text");
+    };
+    assert_eq!(arabic.text, "ارمان");
+  }
+
+  #[test]
+  fn footnote_numbering_restarts_on_each_laid_out_page() {
+    fn note_text(url: &str, text: &str) -> PageItem {
+      PageItem::Text(Box::new(TextItem {
+        x_pt: 0.0,
+        y_pt: 0.0,
+        line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        text: text.to_string(),
+        style: TextStyle::default(),
+        rotation_center_pt: None,
+        hyperlink_url: Some(url.to_string()),
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        preserve_text_portion: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      }))
+    }
+
+    let mut first = empty_page(PageSetup::default(), 0);
+    first.items = vec![
+      note_text("ooxmlsdk-pdf:footnote-reference:11", "8"),
+      note_text("ooxmlsdk-pdf:footnote-reference:12", "9"),
+      note_text("ooxmlsdk-pdf:footnote-backlink:11", "8 "),
+      note_text("ooxmlsdk-pdf:footnote-backlink:12", "9 "),
+    ];
+    let mut second = empty_page(PageSetup::default(), 0);
+    second.items = vec![
+      note_text("ooxmlsdk-pdf:footnote-reference:13", "10"),
+      note_text("ooxmlsdk-pdf:footnote-backlink:13", "10 "),
+    ];
+    let mut pages = vec![first, second];
+    let numbering = [NoteNumberingSpec {
+      format: w::NumberFormatValues::Decimal,
+      start: 1,
+      restart: w::RestartNumberValues::EachPage,
+    }];
+
+    resolve_page_note_numbering(&mut pages, &numbering, &[]);
+
+    let text = |page_index: usize, item_index: usize| {
+      let PageItem::Text(text) = &pages[page_index].items[item_index] else {
+        panic!("expected note text");
+      };
+      text.text.as_str()
+    };
+    assert_eq!(text(0, 0), "1");
+    assert_eq!(text(0, 1), "2");
+    assert_eq!(text(0, 2), "1 ");
+    assert_eq!(text(0, 3), "2 ");
+    assert_eq!(text(1, 0), "1");
+    assert_eq!(text(1, 1), "1 ");
   }
 
   #[test]

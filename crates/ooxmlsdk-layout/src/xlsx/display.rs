@@ -46,15 +46,26 @@ pub(crate) fn lower_to_layout_document(
 ) -> common::LayoutDocument<'static> {
   let mut pages = Vec::new();
   let print_document = CalcPrintDocument::from_import(import);
+  let debug_records = if options.diagnostics.collect_debug_records {
+    print_document
+      .pages
+      .iter()
+      .enumerate()
+      .map(|(page_index, page)| xlsx_print_page_debug_record(page_index, page))
+      .collect()
+  } else {
+    Vec::new()
+  };
   pages.extend(print_document.pages.iter().map(|page| {
     let setup = page_setup_from_calc(page);
     (setup, print_page_items(import, page, setup))
   }));
-  common_fixed_pages_with_items(pages, options)
+  common_fixed_pages_with_items(pages, debug_records, options)
 }
 
 fn common_fixed_pages_with_items(
   pages: Vec<(PageSetup, Vec<PageItem>)>,
+  debug_records: Vec<common::DebugRecord<'static>>,
   options: &LayoutOptions,
 ) -> common::LayoutDocument<'static> {
   let pages = if pages.is_empty() {
@@ -73,8 +84,61 @@ fn common_fixed_pages_with_items(
       .into_iter()
       .map(|(setup, items)| common_display_page(setup, items))
       .collect(),
+    debug_records,
     ..Default::default()
   }
+}
+
+fn xlsx_print_page_debug_record(
+  page_index: usize,
+  page: &CalcPrintPage<'_>,
+) -> common::DebugRecord<'static> {
+  let mut metadata = vec![
+    common::DebugProperty {
+      name: "sheet".into(),
+      value: common::DebugValue::Text(page.sheet.name.clone().into()),
+    },
+    common::DebugProperty {
+      name: "sheet_page_index".into(),
+      value: common::DebugValue::Integer(page.sheet_page_index as i64),
+    },
+    common::DebugProperty {
+      name: "page_number".into(),
+      value: common::DebugValue::Integer(page.page_number as i64),
+    },
+    common::DebugProperty {
+      name: "zoom".into(),
+      value: common::DebugValue::Integer(i64::from(page.zoom)),
+    },
+    common::DebugProperty {
+      name: "drawing_anchors".into(),
+      value: common::DebugValue::Integer(page.drawing_anchor_count as i64),
+    },
+    common::DebugProperty {
+      name: "charts".into(),
+      value: common::DebugValue::Integer(page.chart_count as i64),
+    },
+  ];
+  if let Some(area) = page.area {
+    for (name, value) in [
+      ("start_column", area.start.col),
+      ("start_row", area.start.row),
+      ("end_column", area.end.col),
+      ("end_row", area.end.row),
+    ] {
+      metadata.push(common::DebugProperty {
+        name: name.into(),
+        value: common::DebugValue::Integer(i64::from(value)),
+      });
+    }
+  }
+  common::DebugRecord::Shape(common::DebugShape {
+    page_index,
+    path: Vec::new(),
+    kind: "xlsx_print_page".into(),
+    bounds: common::Rect::default(),
+    metadata,
+  })
 }
 
 fn common_display_page(setup: PageSetup, items: Vec<PageItem>) -> common::DisplayPage<'static> {
@@ -126,7 +190,11 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
       PdfTextSegmentation::Portion => common::PdfTextSegmentation::Portion,
     },
-    source: None,
+    source: (!item.source_path.is_empty()).then(|| common::DisplaySource {
+      engine: common::LayoutEngineKind::Xlsx,
+      path: item.source_path,
+      relationship_id: None,
+    }),
   }
 }
 
@@ -192,7 +260,6 @@ fn print_page_items(
   setup: PageSetup,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let body_origin_y = setup.margin_top_pt;
   let zoom_scale = page.zoom as f32 / 100.0;
   let heading_width = if page.page_settings.print_headings {
     page.sheet.column_width_pt(1) * zoom_scale
@@ -204,17 +271,31 @@ fn print_page_items(
   } else {
     0.0
   };
-  let body_origin_x = setup.margin_left_pt + heading_width;
-  let body_origin_y = body_origin_y + heading_height;
-  let mut text_metrics = TextMetrics::new();
-  let repeat_width = page
-    .repeated_columns
+  let repeat_width = effective_repeated_columns(page)
     .map(|range| page.sheet.range_rect(range).width_pt * zoom_scale)
     .unwrap_or(0.0);
-  let repeat_height = page
-    .repeated_rows
+  let repeat_height = effective_repeated_rows(page)
     .map(|range| page.sheet.range_rect(range).height_pt * zoom_scale)
     .unwrap_or(0.0);
+  let area_size = page
+    .area
+    .map(|area| page.sheet.range_rect(area))
+    .map_or((0.0, 0.0), |rect| {
+      (rect.width_pt * zoom_scale, rect.height_pt * zoom_scale)
+    });
+  let horizontal_centering = calc_axis_centering_offset(
+    page.page_settings.horizontal_centered,
+    setup.width_pt - setup.margin_left_pt - setup.margin_right_pt,
+    heading_width + repeat_width + area_size.0,
+  );
+  let vertical_centering = calc_axis_centering_offset(
+    page.page_settings.vertical_centered,
+    setup.height_pt - setup.margin_top_pt - setup.margin_bottom_pt,
+    heading_height + repeat_height + area_size.1,
+  );
+  let body_origin_x = setup.margin_left_pt + horizontal_centering + heading_width;
+  let body_origin_y = setup.margin_top_pt + vertical_centering + heading_height;
+  let mut text_metrics = TextMetrics::new();
 
   // ECMA-376 §18.3.1.46 defines these as the printed page header and
   // footer. Keep the PDF content stream in the same semantic order exposed
@@ -344,6 +425,13 @@ fn print_page_items(
     &mut text_metrics,
   );
   items
+}
+
+fn calc_axis_centering_offset(enabled: bool, available_pt: f32, content_pt: f32) -> f32 {
+  if !enabled {
+    return 0.0;
+  }
+  ((available_pt - content_pt) / 2.0).max(0.0)
 }
 
 fn page_setup_from_calc(page: &CalcPrintPage<'_>) -> PageSetup {
@@ -515,6 +603,14 @@ fn render_cell_area(
         text_metrics,
       );
     }
+    for item in &mut rendered_text_items {
+      if let PageItem::Text(text) = item {
+        text.source_path = vec![
+          cell.address.row.saturating_sub(1) as usize,
+          cell.address.col.saturating_sub(1) as usize,
+        ];
+      }
+    }
     items.extend(
       rendered_text_items
         .into_iter()
@@ -681,6 +777,13 @@ fn calc_cell_visible_text<'a>(
   output_area: CalcCellOutputArea,
   text_metrics: &mut TextMetrics,
 ) -> std::borrow::Cow<'a, str> {
+  if calc_cell_requires_date_hashes(cell) {
+    return std::borrow::Cow::Owned(calc_cell_overflow_hash_text(
+      style,
+      output_area.align_rect.width_pt,
+      text_metrics,
+    ));
+  }
   if output_area.left_clip_pt <= f32::EPSILON && output_area.right_clip_pt <= f32::EPSILON {
     return std::borrow::Cow::Borrowed(&cell.rendered_text);
   }
@@ -711,6 +814,15 @@ fn calc_cell_visible_text<'a>(
   } else {
     std::borrow::Cow::Borrowed(cell.rendered_text.as_str())
   }
+}
+
+fn calc_cell_requires_date_hashes(cell: &super::print::CalcPrintCell<'_>) -> bool {
+  cell.number_format_state == super::print::NumberFormatRenderState::DateTime
+    && cell
+      .text
+      .trim()
+      .parse::<f64>()
+      .is_ok_and(|value| value < 0.0)
 }
 
 fn calc_cell_overflow_hash_text(
@@ -907,6 +1019,7 @@ fn render_cell_rich_text(
     } else {
       PdfTextSegmentation::Line
     },
+    source_path: Vec::new(),
   }));
 }
 
@@ -1161,6 +1274,7 @@ fn render_cell_text(
       } else {
         PdfTextSegmentation::Line
       },
+      source_path: Vec::new(),
     }));
     y_pt += line_height;
   }
@@ -1418,6 +1532,7 @@ fn styled_header_text_with_line_height(
     paragraph_bidi: false,
     preserve_text_portion: false,
     pdf_text_segmentation: PdfTextSegmentation::Line,
+    source_path: Vec::new(),
   })
 }
 
@@ -2114,10 +2229,15 @@ fn lower_drawing_chart(
     .chain(drawing.extended_charts.iter())
     .find(|chart| chart.relationship_id.as_deref() == Some(relationship_id))?;
   let chart_space = resource.chart_space.as_deref()?;
-  let chart = shared_chart::clustered_column_chart_for_ui_language(
+  let mut chart = shared_chart::clustered_column_chart_for_ui_language(
     chart_space,
     Some(import.styles.output_ui_language()),
   )?;
+  if chart.title.is_none()
+    && shared_chart::has_excel_automatic_title_placeholder(&chart_space.chart)
+  {
+    chart.title = Some(shared_chart::ChartTitleText::Automatic);
+  }
   let series_colors = chart
     .series
     .iter()
@@ -2202,7 +2322,10 @@ fn lower_drawing_chart(
     shared_chart::automatic_chart_title(Some(import.styles.output_ui_language())),
     &ClusteredColumnStyle {
       layout_profile: ChartLayoutProfile::Excel,
-      has_explicit_title: false,
+      has_explicit_title: matches!(
+        chart.title.as_ref(),
+        Some(shared_chart::ChartTitleText::Explicit(_))
+      ),
       title: title_style,
       title_fill_color: None,
       label: label_style,
@@ -2216,6 +2339,21 @@ fn lower_drawing_chart(
   );
   let mut metrics = TextMetrics::new();
   items.retain_mut(|item| clip_chart_item_to_rect(item, page_clip_rect, &mut metrics));
+  if let Some(hyperlink_url) = drawing_object_hyperlink_url(drawing, &anchor.object) {
+    let left = rect.x_pt.max(page_clip_rect.x_pt);
+    let top = rect.y_pt.max(page_clip_rect.y_pt);
+    let right = (rect.x_pt + rect.width_pt).min(page_clip_rect.x_pt + page_clip_rect.width_pt);
+    let bottom = (rect.y_pt + rect.height_pt).min(page_clip_rect.y_pt + page_clip_rect.height_pt);
+    if right > left && bottom > top {
+      items.push(PageItem::LinkArea(LinkAreaItem {
+        x_pt: left,
+        y_pt: top,
+        width_pt: right - left,
+        height_pt: bottom - top,
+        hyperlink_url: hyperlink_url.into_owned(),
+      }));
+    }
+  }
   Some(items)
 }
 
@@ -2567,6 +2705,7 @@ fn render_drawing_text(
       paragraph_bidi: false,
       preserve_text_portion: false,
       pdf_text_segmentation: PdfTextSegmentation::Line,
+      source_path: Vec::new(),
     }));
   }
 }
@@ -2679,6 +2818,7 @@ fn render_metafile_texts(
       paragraph_bidi: false,
       preserve_text_portion: false,
       pdf_text_segmentation: PdfTextSegmentation::Line,
+      source_path: Vec::new(),
     }));
   }
 }
@@ -2794,10 +2934,11 @@ fn vml_shape_rect(
   sheet: &CalcSheet,
   shape: &super::object_resources::VmlShapeModel,
 ) -> Option<(f32, f32, f32, f32)> {
-  shape
-    .anchor
-    .and_then(|anchor| vml_anchor_rect(sheet, anchor))
-    .or_else(|| shape.style.as_deref().and_then(vml_style_rect))
+  shape.style.as_deref().and_then(vml_style_rect).or_else(|| {
+    shape
+      .anchor
+      .and_then(|anchor| vml_anchor_rect(sheet, anchor))
+  })
 }
 
 fn vml_anchor_rect(
@@ -2963,7 +3104,7 @@ fn tuple_rect_intersects_cell_rect(
 
 fn repeat_rows_for_page(page: &CalcPrintPage<'_>) -> Option<super::worksheet::CellRange> {
   let area = page.area?;
-  let repeat_rows = page.repeated_rows?;
+  let repeat_rows = effective_repeated_rows(page)?;
   Some(super::worksheet::CellRange::new(
     super::worksheet::CellAddress {
       col: area.start.col,
@@ -2978,7 +3119,7 @@ fn repeat_rows_for_page(page: &CalcPrintPage<'_>) -> Option<super::worksheet::Ce
 
 fn repeat_columns_for_page(page: &CalcPrintPage<'_>) -> Option<super::worksheet::CellRange> {
   let area = page.area?;
-  let repeat_columns = page.repeated_columns?;
+  let repeat_columns = effective_repeated_columns(page)?;
   Some(super::worksheet::CellRange::new(
     super::worksheet::CellAddress {
       col: repeat_columns.start.col,
@@ -2992,8 +3133,8 @@ fn repeat_columns_for_page(page: &CalcPrintPage<'_>) -> Option<super::worksheet:
 }
 
 fn repeat_corner_for_page(page: &CalcPrintPage<'_>) -> Option<super::worksheet::CellRange> {
-  let repeat_rows = page.repeated_rows?;
-  let repeat_columns = page.repeated_columns?;
+  let repeat_rows = effective_repeated_rows(page)?;
+  let repeat_columns = effective_repeated_columns(page)?;
   Some(super::worksheet::CellRange::new(
     super::worksheet::CellAddress {
       col: repeat_columns.start.col,
@@ -3004,6 +3145,20 @@ fn repeat_corner_for_page(page: &CalcPrintPage<'_>) -> Option<super::worksheet::
       row: repeat_rows.end.row,
     },
   ))
+}
+
+fn effective_repeated_rows(page: &CalcPrintPage<'_>) -> Option<super::worksheet::CellRange> {
+  let area = page.area?;
+  page
+    .repeated_rows
+    .filter(|repeat| area.start.row > repeat.end.row)
+}
+
+fn effective_repeated_columns(page: &CalcPrintPage<'_>) -> Option<super::worksheet::CellRange> {
+  let area = page.area?;
+  page
+    .repeated_columns
+    .filter(|repeat| area.start.col > repeat.end.col)
 }
 
 fn hyperlink_for_cell(
@@ -3392,6 +3547,22 @@ mod cell_alignment_tests {
   fn overflow_hashes_fill_the_available_cell_width() {
     assert_eq!(calc_cell_overflow_hash_count(90.0, 6.0), 15);
     assert_eq!(calc_cell_overflow_hash_count(5.0, 6.0), 1);
+  }
+
+  #[test]
+  fn print_centering_uses_half_of_the_remaining_axis_space() {
+    assert_eq!(calc_axis_centering_offset(true, 500.0, 300.0), 100.0);
+    assert_eq!(calc_axis_centering_offset(false, 500.0, 300.0), 0.0);
+    assert_eq!(calc_axis_centering_offset(true, 300.0, 500.0), 0.0);
+  }
+
+  #[test]
+  fn negative_date_serials_render_as_hashes_even_when_the_date_text_fits() {
+    let mut cell = print_cell(super::super::print::NumberFormatRenderState::DateTime);
+    cell.text = std::borrow::Cow::Borrowed("-1");
+    assert!(calc_cell_requires_date_hashes(&cell));
+    cell.text = std::borrow::Cow::Borrowed("1");
+    assert!(!calc_cell_requires_date_hashes(&cell));
   }
 
   #[test]

@@ -2067,15 +2067,17 @@ fn apply_text_algorithm(node: &mut DiagramShapeNode, constraints: &[DiagramConst
   node
     .text_body
     .enable_auto_fit_if_default_text(has_direct_font_size);
-  node.text_rotation_deg = text_pre_rotation_degrees(
-    node
-      .algorithms
-      .iter()
-      .rev()
-      .find_map(|algorithm| algorithm.auto_text_rotation)
-      .unwrap_or(dgm::AutoTextRotationValues::Upright),
-    shape_rotation_degrees(node),
-  );
+  let shape_rotation = shape_rotation_degrees(node);
+  node.text_rotation_deg = shape_rotation
+    + text_pre_rotation_degrees(
+      node
+        .algorithms
+        .iter()
+        .rev()
+        .find_map(|algorithm| algorithm.auto_text_rotation)
+        .unwrap_or(dgm::AutoTextRotationValues::Upright),
+      shape_rotation,
+    );
   node.text_body.set_vertical_anchor(
     match node
       .algorithms

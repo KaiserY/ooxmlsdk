@@ -1105,6 +1105,12 @@ fn text_run_diagnostics(
     .collect();
   PdfTextRunDiagnostics {
     text: text.item.text.to_string(),
+    source_frame_index: text.source_frame_index,
+    source_line_index: text.source_line_index,
+    source_path: text
+      .item
+      .source_path
+      .map_or_else(Vec::new, |path| path.to_vec()),
     x_pt: text.item.x_pt,
     y_pt: text.item.y_pt,
     baseline_y_pt: text.baseline_y,
@@ -1427,7 +1433,7 @@ impl<'doc> PaintDocument<'doc> {
           text_metrics,
         );
         let (layout_items, line_owners) =
-          expand_metafile_semantic_text_items(layout_items, line_owners, document.engine_kind);
+          expand_metafile_semantic_text_items(layout_items, line_owners);
         let decoration_metadata = decoration_render_metadata(&layout_items);
         let items = layout_items
           .into_iter()
@@ -1482,12 +1488,7 @@ fn pdf_page_dimension(engine_kind: common::LayoutEngineKind, dimension_pt: f32) 
 fn expand_metafile_semantic_text_items<'doc>(
   items: Vec<PageItem<'doc>>,
   owners: Vec<Option<PaintLineOwner>>,
-  engine_kind: common::LayoutEngineKind,
 ) -> (Vec<PageItem<'doc>>, Vec<Option<PaintLineOwner>>) {
-  if engine_kind != common::LayoutEngineKind::Docx {
-    return (items, owners);
-  }
-
   let mut expanded_items = Vec::with_capacity(items.len());
   let mut expanded_owners = Vec::with_capacity(owners.len());
   for (item, owner) in items.into_iter().zip(owners) {

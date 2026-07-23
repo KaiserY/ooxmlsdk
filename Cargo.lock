@@ -1307,6 +1307,7 @@ dependencies = [
  "rustc-hash",
  "smallvec",
  "thiserror",
+ "unicode-bidi",
  "unicode-script",
 ]
 

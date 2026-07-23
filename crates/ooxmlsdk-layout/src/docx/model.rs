@@ -28,10 +28,19 @@ pub(crate) struct DocxDocument {
   pub first_footer_blocks: Vec<Block>,
   pub footnote_blocks: Vec<Block>,
   pub footnotes: BTreeMap<i64, Vec<Block>>,
+  pub footnote_numbering: Vec<NoteNumberingSpec>,
   pub endnote_blocks: Vec<Block>,
   pub endnotes: BTreeMap<i64, Vec<Block>>,
+  pub endnote_numbering: Vec<NoteNumberingSpec>,
   pub title_page: bool,
   pub blocks: Vec<Block>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct NoteNumberingSpec {
+  pub format: w::NumberFormatValues,
+  pub start: i32,
+  pub restart: w::RestartNumberValues,
 }
 
 #[derive(Clone, Debug)]
@@ -128,6 +137,7 @@ pub(crate) struct Paragraph {
   pub format: Box<ParagraphFormat>,
   pub style_ref_keys: Vec<Arc<str>>,
   pub style_ref_text: Option<Arc<str>>,
+  pub style_ref_numbering_text: Option<Arc<str>>,
   pub list_label: Option<String>,
   pub list_label_style: TextStyle,
   pub list_label_hyperlink_url: Option<String>,
@@ -488,6 +498,7 @@ pub(crate) struct TextRun {
   pub dynamic_field: Option<DynamicFieldKind>,
   pub style_ref_keys: Vec<Arc<str>>,
   pub style_ref_text: Option<Arc<str>>,
+  pub style_ref_numbering_text: Option<Arc<str>>,
   pub preserve_text_portion: bool,
 }
 

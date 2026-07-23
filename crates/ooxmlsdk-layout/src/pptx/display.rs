@@ -163,11 +163,16 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
       PdfTextSegmentation::Portion => common::PdfTextSegmentation::Portion,
     },
-    source: None,
+    source: (!item.source_path.is_empty()).then(|| common::DisplaySource {
+      engine: common::LayoutEngineKind::Pptx,
+      path: item.source_path,
+      relationship_id: None,
+    }),
   }
 }
 
 fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
+  let semantic_metafile_text = supports_semantic_metafile_text(item.content_type.as_deref());
   common::ImageItem {
     bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
     crop: Some(common::ImageCrop {
@@ -188,10 +193,26 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
-    semantic_metafile_text: false,
+    semantic_metafile_text,
     floating: item.floating,
     behind_text: item.behind_text,
   }
+}
+
+fn supports_semantic_metafile_text(content_type: Option<&str>) -> bool {
+  content_type.is_some_and(|content_type| {
+    matches!(
+      content_type.to_ascii_lowercase().as_str(),
+      "image/emf"
+        | "image/x-emf"
+        | "application/emf"
+        | "application/x-emf"
+        | "image/wmf"
+        | "image/x-wmf"
+        | "application/wmf"
+        | "application/x-wmf"
+    )
+  })
 }
 
 fn common_rect_item(item: RectItem) -> common::RectItem<'static> {
@@ -320,6 +341,8 @@ pub(crate) fn debug_records(import: &PowerPointImport) -> Vec<DebugRecord<'stati
     if let Some(font) = paragraph.font {
       metadata.push(debug_text("font", font));
     }
+    metadata.push(debug_i32("left_margin_100mm", paragraph.left_margin_100mm));
+    metadata.push(debug_i32("indent_100mm", paragraph.indent_100mm));
     if let Some(width) = paragraph.graphic_width_100mm {
       metadata.push(debug_i32("graphic_width_100mm", width));
     }
@@ -744,27 +767,60 @@ fn lower_shapes(
   items: &mut Vec<PageItem>,
   mut summary: Option<&mut PptxLayoutSummary>,
 ) {
-  for shape in shapes {
+  for (shape_index, shape) in shapes.iter().enumerate() {
     lower_shape(
       context,
       shape,
       DisplayOffset::default(),
+      &[shape_index],
       items,
       summary.as_deref_mut(),
     );
   }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 struct DisplayOffset {
-  x_emu: i64,
-  y_emu: i64,
+  x_emu: f32,
+  y_emu: f32,
+  scale_x: f32,
+  scale_y: f32,
+}
+
+impl Default for DisplayOffset {
+  fn default() -> Self {
+    Self {
+      x_emu: 0.0,
+      y_emu: 0.0,
+      scale_x: 1.0,
+      scale_y: 1.0,
+    }
+  }
+}
+
+impl DisplayOffset {
+  fn x_pt(self, x_emu: i64) -> f32 {
+    units::emu_to_points_f32(self.x_emu + x_emu as f32 * self.scale_x)
+  }
+
+  fn y_pt(self, y_emu: i64) -> f32 {
+    units::emu_to_points_f32(self.y_emu + y_emu as f32 * self.scale_y)
+  }
+
+  fn width_pt(self, width_emu: i64) -> f32 {
+    units::emu_to_points_f32(width_emu as f32 * self.scale_x)
+  }
+
+  fn height_pt(self, height_emu: i64) -> f32 {
+    units::emu_to_points_f32(height_emu as f32 * self.scale_y)
+  }
 }
 
 fn lower_shape(
   context: PptxLoweringContext<'_>,
   shape: &Shape,
   offset: DisplayOffset,
+  source_path: &[usize],
   items: &mut Vec<PageItem>,
   mut summary: Option<&mut PptxLayoutSummary>,
 ) {
@@ -784,6 +840,7 @@ fn lower_shape(
     return;
   }
 
+  let own_item_start = items.len();
   lower_shape_bounds(import, slide, shape, offset, items);
   lower_picture(import, slide, shape, offset, items);
   lower_shape_hyperlink(shape, offset, items);
@@ -839,15 +896,32 @@ fn lower_shape(
       context,
       shape,
       offset,
+      source_path,
       text_body,
       items,
       summary.as_deref_mut(),
     );
   }
+  for item in &mut items[own_item_start..] {
+    if let PageItem::Text(text) = item
+      && text.source_path.is_empty()
+    {
+      text.source_path = source_path.to_vec();
+    }
+  }
 
   let child_offset = child_display_offset(shape, offset);
-  for child in &shape.children {
-    lower_shape(context, child, child_offset, items, summary.as_deref_mut());
+  for (child_index, child) in shape.children.iter().enumerate() {
+    let mut child_source_path = source_path.to_vec();
+    child_source_path.push(child_index);
+    lower_shape(
+      context,
+      child,
+      child_offset,
+      &child_source_path,
+      items,
+      summary.as_deref_mut(),
+    );
   }
 }
 
@@ -961,10 +1035,10 @@ fn lower_chart(
   let Some(chart_resource) = &record.chart_resource else {
     return;
   };
-  let x = units::emu_to_points(offset.x_emu + shape.position.x);
-  let y = units::emu_to_points(offset.y_emu + shape.position.y);
-  let width = units::emu_to_points(shape.size.cx);
-  let height = units::emu_to_points(shape.size.cy);
+  let x = offset.x_pt(shape.position.x);
+  let y = offset.y_pt(shape.position.y);
+  let width = offset.width_pt(shape.size.cx);
+  let height = offset.height_pt(shape.size.cy);
 
   if let Some(mut chart) =
     shared_chart::clustered_column_chart_for_ui_language(&chart_resource.chart_space, ui_language)
@@ -1366,10 +1440,10 @@ fn lower_diagram(
   let Some(data_resource) = record.diagram_data_resource.as_ref() else {
     return;
   };
-  let x_pt = units::emu_to_points(offset.x_emu + shape.position.x);
-  let y_pt = units::emu_to_points(offset.y_emu + shape.position.y);
-  let width_pt = units::emu_to_points(shape.size.cx);
-  let height_pt = units::emu_to_points(shape.size.cy);
+  let x_pt = offset.x_pt(shape.position.x);
+  let y_pt = offset.y_pt(shape.position.y);
+  let width_pt = offset.width_pt(shape.size.cx);
+  let height_pt = offset.height_pt(shape.size.cy);
   if let Some(background_fill) =
     diagram_background_fill(context.import, context.slide, &data_resource.model)
   {
@@ -1561,6 +1635,7 @@ fn lower_diagram(
       .unwrap_or((pending.font_scale, pending.line_scale));
     lower_diagram_text_body_at_with_style_and_scale(
       context.import,
+      context.page_index,
       pending.frame,
       &pending.text_body,
       DiagramTextLoweringStyle {
@@ -1572,6 +1647,7 @@ fn lower_diagram(
         line_scale,
         shape_order: pending.order,
       },
+      summary.as_deref_mut(),
       &mut text_items,
     );
   }
@@ -1839,9 +1915,11 @@ struct DiagramTextLoweringStyle<'a> {
 
 fn lower_diagram_text_body_at_with_style_and_scale(
   import: &PowerPointImport,
+  page_index: usize,
   frame: TextFrame,
   text_body: &TextBody,
   style_inputs: DiagramTextLoweringStyle<'_>,
+  mut summary: Option<&mut PptxLayoutSummary>,
   items: &mut Vec<DiagramDrawingTextItem>,
 ) {
   let mut options = TextLoweringOptions::from_text_body(text_body);
@@ -1895,14 +1973,14 @@ fn lower_diagram_text_body_at_with_style_and_scale(
         frame,
         shape_hyperlink_url: style_inputs.shape_hyperlink_url,
         image_resources: None,
-        page_index: 0,
+        page_index,
         slide_number: 1,
         paragraph_count: text_body.paragraphs.len(),
       },
       paragraph,
       paragraph_index,
       ParagraphLoweringOutput {
-        summary: None,
+        summary: summary.as_deref_mut(),
         cursor: &mut cursor,
         items: &mut paragraph_items,
         text_metrics: &mut text_metrics,
@@ -2970,10 +3048,10 @@ fn lower_picture(
       )
     };
   items.push(PageItem::Image(ImageItem {
-    x_pt: units::emu_to_points(offset.x_emu + shape.position.x),
-    y_pt: units::emu_to_points(offset.y_emu + shape.position.y),
-    width_pt: units::emu_to_points(shape.size.cx),
-    height_pt: units::emu_to_points(shape.size.cy),
+    x_pt: offset.x_pt(shape.position.x),
+    y_pt: offset.y_pt(shape.position.y),
+    width_pt: offset.width_pt(shape.size.cx),
+    height_pt: offset.height_pt(shape.size.cy),
     crop,
     clip_path: Vec::new(),
     rotation_deg: shape.rotation,
@@ -3000,10 +3078,10 @@ fn lower_shape_hyperlink(shape: &Shape, offset: DisplayOffset, items: &mut Vec<P
     return;
   }
   items.push(PageItem::LinkArea(LinkAreaItem {
-    x_pt: units::emu_to_points(offset.x_emu + shape.position.x),
-    y_pt: units::emu_to_points(offset.y_emu + shape.position.y),
-    width_pt: units::emu_to_points(shape.size.cx),
-    height_pt: units::emu_to_points(shape.size.cy),
+    x_pt: offset.x_pt(shape.position.x),
+    y_pt: offset.y_pt(shape.position.y),
+    width_pt: offset.width_pt(shape.size.cx),
+    height_pt: offset.height_pt(shape.size.cy),
     hyperlink_url: hyperlink_url.clone(),
   }));
 }
@@ -3016,11 +3094,11 @@ fn lower_table(
   items: &mut Vec<PageItem>,
 ) {
   // table grid and row heights as the visible TableShape size.
-  let x0 = units::emu_to_points(offset.x_emu + shape.position.x);
-  let y0 = units::emu_to_points(offset.y_emu + shape.position.y);
-  let table_width = units::emu_to_points(table.grid.iter().copied().sum::<i64>());
+  let x0 = offset.x_pt(shape.position.x);
+  let y0 = offset.y_pt(shape.position.y);
+  let table_width = offset.width_pt(table.grid.iter().copied().sum::<i64>());
   let row_height_sum = table.rows.iter().map(|row| row.height).sum::<i64>();
-  let table_height = units::emu_to_points(row_height_sum.max(shape.size.cy));
+  let table_height = offset.height_pt(row_height_sum.max(shape.size.cy));
   if table_width <= 0.0 || table_height <= 0.0 {
     return;
   }
@@ -3034,7 +3112,14 @@ fn lower_table(
   } else {
     None
   };
-  let table_style = package_table_style.or(predefined_table_style.as_ref());
+  let table_style = package_table_style
+    .or(predefined_table_style.as_ref())
+    .or_else(|| {
+      import
+        .table_style_list
+        .as_ref()
+        .and_then(|styles| styles.default_style())
+    });
   let table_background = table_style.and_then(|style| {
     table_style_part_fill(import, &style.table_background)
       .and_then(|fill| fill_paint(import, &fill))
@@ -3054,11 +3139,12 @@ fn lower_table(
   let max_row = table.rows.len().saturating_sub(1);
   let max_column = table.grid.len().saturating_sub(1);
   for (row_index, row) in table.rows.iter().enumerate() {
-    let row_height = table_row_display_height(row.height, row_height_sum, shape.size.cy);
+    let row_height =
+      table_row_display_height(row.height, row_height_sum, shape.size.cy, offset.scale_y);
     let mut x = x0;
     let mut grid_index = 0usize;
     for cell in &row.cells {
-      let span = table_cell_grid_span(cell);
+      let span = table_cell_grid_advance(cell);
       let width_emu = if grid_index < table.grid.len() {
         table.grid[grid_index..table.grid.len().min(grid_index + span)]
           .iter()
@@ -3067,7 +3153,7 @@ fn lower_table(
       } else {
         0
       };
-      let cell_width = units::emu_to_points(width_emu);
+      let cell_width = offset.width_pt(width_emu);
       if !cell.horizontal_merge && !cell.vertical_merge {
         let style_part = table_style.map(|style| {
           table_cell_style_part(
@@ -3100,7 +3186,7 @@ fn lower_table(
   if draw_fallback_grid {
     let mut x = x0;
     for width in &table.grid {
-      x += units::emu_to_points(*width);
+      x += offset.width_pt(*width);
       push_table_line(items, x, y0, x, y0 + table_height, border_color);
     }
   }
@@ -3154,8 +3240,13 @@ fn lower_table_style_outer_borders(
   );
 }
 
-fn table_row_display_height(row_height: i64, row_height_sum: i64, shape_height: i64) -> f32 {
-  let row_height = units::emu_to_points(row_height);
+fn table_row_display_height(
+  row_height: i64,
+  row_height_sum: i64,
+  shape_height: i64,
+  scale_y: f32,
+) -> f32 {
+  let row_height = units::emu_to_points_f32(row_height as f32 * scale_y);
   if row_height_sum <= 0 || shape_height <= row_height_sum {
     return row_height;
   }
@@ -3646,6 +3737,22 @@ fn table_cell_grid_span(cell: &TableCell) -> usize {
     .unwrap_or(1)
 }
 
+fn table_cell_grid_advance(cell: &TableCell) -> usize {
+  table_grid_advance(cell.horizontal_merge, table_cell_grid_span(cell))
+}
+
+fn table_grid_advance(horizontal_merge: bool, span: usize) -> usize {
+  if horizontal_merge {
+    // DrawingML producers may emit both gridSpan on the merge origin and an
+    // explicit hMerge continuation cell. The origin has already consumed
+    // those grid columns; advancing again would push the following real cell
+    // outside the table grid (tdf#119015).
+    0
+  } else {
+    span
+  }
+}
+
 fn push_table_line(
   items: &mut Vec<PageItem>,
   x1_pt: f32,
@@ -3680,10 +3787,10 @@ fn lower_shape_bounds(
     .actual_fill_properties
     .as_ref()
     .and_then(|fill| shape_fill_paint(import, slide, fill));
-  let x_pt = units::emu_to_points(offset.x_emu + shape.position.x);
-  let y_pt = units::emu_to_points(offset.y_emu + shape.position.y);
-  let width_pt = units::emu_to_points(shape.size.cx);
-  let height_pt = units::emu_to_points(shape.size.cy);
+  let x_pt = offset.x_pt(shape.position.x);
+  let y_pt = offset.y_pt(shape.position.y);
+  let width_pt = offset.width_pt(shape.size.cx);
+  let height_pt = offset.height_pt(shape.size.cy);
   let frame = TextFrame {
     x_pt,
     y_pt,
@@ -4158,9 +4265,23 @@ fn transformed_gradient_angle(local_angle_degrees: f32, shape: &Shape) -> f32 {
 }
 
 fn child_display_offset(shape: &Shape, offset: DisplayOffset) -> DisplayOffset {
+  let scale_x = if shape.child_size.cx != 0 {
+    offset.scale_x * shape.size.cx as f32 / shape.child_size.cx as f32
+  } else {
+    offset.scale_x
+  };
+  let scale_y = if shape.child_size.cy != 0 {
+    offset.scale_y * shape.size.cy as f32 / shape.child_size.cy as f32
+  } else {
+    offset.scale_y
+  };
+  let parent_x = offset.x_emu + shape.position.x as f32 * offset.scale_x;
+  let parent_y = offset.y_emu + shape.position.y as f32 * offset.scale_y;
   DisplayOffset {
-    x_emu: offset.x_emu + shape.position.x - shape.child_position.x,
-    y_emu: offset.y_emu + shape.position.y - shape.child_position.y,
+    x_emu: parent_x - shape.child_position.x as f32 * scale_x,
+    y_emu: parent_y - shape.child_position.y as f32 * scale_y,
+    scale_x,
+    scale_y,
   }
 }
 
@@ -4826,10 +4947,12 @@ fn lower_text_body(
   context: PptxLoweringContext<'_>,
   shape: &Shape,
   offset: DisplayOffset,
+  source_path: &[usize],
   text_body: &TextBody,
   items: &mut Vec<PageItem>,
   summary: Option<&mut PptxLayoutSummary>,
 ) {
+  let item_start = items.len();
   let adjusted_text_body;
   let text_body = if shape.rotation.abs() > f32::EPSILON
     && text_body
@@ -4871,6 +4994,11 @@ fn lower_text_body(
     summary,
     items,
   );
+  for item in &mut items[item_start..] {
+    if let PageItem::Text(text) = item {
+      text.source_path = source_path.to_vec();
+    }
+  }
 }
 
 fn lower_text_body_at_with_table_style(
@@ -5211,6 +5339,16 @@ fn text_base_style(
   base_font_size_pt: Option<f32>,
 ) -> TextStyle {
   let options = TextLoweringOptions::from_text_body(text_body);
+  let vectorize_without_semantic_overlay = text_body
+    .display_properties
+    .text_area_rotation
+    .is_some_and(|rotation| rotation != 0)
+    || text_body
+      .body_properties
+      .as_deref()
+      .is_some_and(|properties| properties.scene3_d_type.is_some());
+  let pdf_glyph_outlines =
+    vectorize_without_semantic_overlay || text_body.display_properties.from_word_art;
   // DrawingML shape creation seeds all three script families from the
   // current theme's minor font collection before paragraph/run formatting is
   // applied. LibreOffice does this in oox/source/drawingml/shape.cxx; direct
@@ -5228,23 +5366,10 @@ fn text_base_style(
     // scene3d text as vector glyph outlines, while ordinary shape rotation
     // remains searchable PDF text. Keep that distinction before both are
     // lowered into the same final rotation angle.
-    pdf_glyph_outlines: text_body
-      .display_properties
-      .text_area_rotation
-      .is_some_and(|rotation| rotation != 0)
-      || text_body.display_properties.from_word_art
-      || text_body
-        .body_properties
-        .as_deref()
-        .is_some_and(|properties| properties.scene3_d_type.is_some()),
-    pdf_glyph_outline_options: (text_body.display_properties.from_word_art
-      && text_body
-        .body_properties
-        .as_deref()
-        .is_none_or(|properties| properties.scene3_d_type.is_none()))
-    .then(|| {
+    pdf_glyph_outlines,
+    pdf_glyph_outline_options: pdf_glyph_outlines.then(|| {
       Arc::new(common::PdfGlyphOutlineOptions {
-        semantic_text_overlay: true,
+        semantic_text_overlay: !vectorize_without_semantic_overlay,
         transform: None,
       })
     }),
@@ -5679,11 +5804,19 @@ struct TextLoweringOptions {
   column_spacing_pt: f32,
   word_wrap: bool,
   clip_vertical_overflow: bool,
+  clip_bottom_extension_pt: f32,
   anchor_center: bool,
 }
 
 impl TextLoweringOptions {
   fn from_text_body(text_body: &TextBody) -> Self {
+    const DEFAULT_VERTICAL_INSET_EMU: i64 = 45_720;
+    let bottom_inset_pt = text_body
+      .body_properties
+      .as_deref()
+      .and_then(|properties| properties.bottom_inset)
+      .map(|value| units::emu_to_points(value.to_emu()))
+      .unwrap_or_else(|| units::emu_to_points(DEFAULT_VERTICAL_INSET_EMU));
     Self {
       font_scale: text_body.display_properties.font_scale(),
       line_scale: text_body.display_properties.line_height_scale(),
@@ -5696,8 +5829,15 @@ impl TextLoweringOptions {
       column_count: text_body.display_properties.column_count.max(1),
       column_spacing_pt: units::emu_to_points(text_body.display_properties.column_spacing_emu),
       word_wrap: text_body.display_properties.word_wrap,
-      clip_vertical_overflow: text_body.display_properties.clip_vertical_overflow
-        && text_body.display_properties.auto_fit != TextAutoFit::Shape,
+      // PowerPoint's fixed-output path clips a no-autofit text frame at the
+      // shape edge even when bodyPr leaves vertOverflow at its schema default.
+      // Shape autofit is the exception because it grows the shape instead.
+      clip_vertical_overflow: text_body.display_properties.auto_fit == TextAutoFit::None
+        || (text_body.display_properties.clip_vertical_overflow
+          && text_body.display_properties.auto_fit != TextAutoFit::Shape),
+      // TextBodyFrame excludes the bottom inset, while PowerPoint clips fixed
+      // output at the outer shape edge. Add that inset back to the clip bound.
+      clip_bottom_extension_pt: bottom_inset_pt,
       anchor_center: text_body.display_properties.anchor_center,
     }
   }
@@ -5721,10 +5861,10 @@ fn rotated_text_area_center(frame: TextFrame, rotation_deg: f32) -> Option<(f32,
 
 fn text_box_metrics(shape: &Shape, offset: DisplayOffset, text_body: &TextBody) -> TextFrame {
   text_body_frame(
-    units::emu_to_points(offset.x_emu + shape.position.x),
-    units::emu_to_points(offset.y_emu + shape.position.y),
-    units::emu_to_points(shape.size.cx),
-    units::emu_to_points(shape.size.cy),
+    offset.x_pt(shape.position.x),
+    offset.y_pt(shape.position.y),
+    offset.width_pt(shape.size.cx),
+    offset.height_pt(shape.size.cy),
     text_body,
   )
 }
@@ -5888,7 +6028,8 @@ fn lower_paragraph(
     + cursor.column_index as f32 * (column_width + context.options.column_spacing_pt);
   cursor.x_pt = column_x;
   if context.options.clip_vertical_overflow
-    && cursor.y_pt > context.frame.y_pt + context.frame.height_pt
+    && cursor.y_pt
+      > context.frame.y_pt + context.frame.height_pt + context.options.clip_bottom_extension_pt
   {
     return;
   }
@@ -5910,6 +6051,7 @@ fn lower_paragraph(
     context.page_index,
     paragraph_index,
     paragraph,
+    &paragraph_style,
     &bullet,
   );
   let paragraph_left_offset = paragraph_style.left_offset(bullet.label.is_some());
@@ -6478,6 +6620,7 @@ fn push_text_item(
     // cross-run kerning or cumulative positioning drift.
     preserve_text_portion,
     pdf_text_segmentation: PdfTextSegmentation::Line,
+    source_path: Vec::new(),
   }));
 }
 
@@ -7945,6 +8088,7 @@ fn record_bullet_paragraph(
   page_index: usize,
   paragraph_index: usize,
   paragraph: &TextParagraph,
+  paragraph_style: &ParagraphDisplayStyle,
   bullet: &BulletDisplay,
 ) {
   let Some(summary) = summary else {
@@ -7969,6 +8113,8 @@ fn record_bullet_paragraph(
       .collect(),
     character: bullet.label.clone(),
     font: bullet.font.clone(),
+    left_margin_100mm: points_to_100mm(paragraph_style.left_margin_pt),
+    indent_100mm: points_to_100mm(paragraph_style.indent_pt),
     graphic_width_100mm: bullet.graphic_width_100mm,
     graphic_height_100mm: bullet.graphic_height_100mm,
   });
@@ -8658,6 +8804,46 @@ fn color_opacity(alpha: i32) -> f32 {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn metafile_images_enable_a_searchable_text_overlay() {
+    assert!(supports_semantic_metafile_text(Some("image/x-emf")));
+    assert!(supports_semantic_metafile_text(Some("IMAGE/WMF")));
+    assert!(!supports_semantic_metafile_text(Some("image/png")));
+    assert!(!supports_semantic_metafile_text(None));
+  }
+
+  #[test]
+  fn group_child_coordinates_apply_child_extents_scaling() {
+    let shape = Shape {
+      position: crate::pptx::drawingml::shape::Point { x: 1_000, y: 2_000 },
+      size: crate::pptx::drawingml::shape::Size {
+        cx: 4_000,
+        cy: 6_000,
+      },
+      child_position: crate::pptx::drawingml::shape::Point { x: 100, y: 200 },
+      child_size: crate::pptx::drawingml::shape::Size {
+        cx: 2_000,
+        cy: 3_000,
+      },
+      ..Shape::new(ShapeService::Group)
+    };
+
+    let child = child_display_offset(&shape, DisplayOffset::default());
+
+    assert_eq!(child.scale_x, 2.0);
+    assert_eq!(child.scale_y, 2.0);
+    assert_eq!(child.x_emu, 800.0);
+    assert_eq!(child.y_emu, 1_600.0);
+    assert_eq!(child.x_pt(100), units::emu_to_points_f32(1_000.0));
+    assert_eq!(child.y_pt(200), units::emu_to_points_f32(2_000.0));
+  }
+
+  #[test]
+  fn horizontal_merge_continuation_does_not_consume_a_second_grid_column() {
+    assert_eq!(table_grid_advance(false, 2), 2);
+    assert_eq!(table_grid_advance(true, 1), 0);
+  }
 
   #[test]
   fn jfif_density_reports_physical_image_resolution() {

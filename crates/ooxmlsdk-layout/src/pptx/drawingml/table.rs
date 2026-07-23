@@ -199,13 +199,22 @@ impl TableStyleList {
   }
 
   pub(crate) fn style(&self, style_id: Option<&str>) -> Option<&TableStyle> {
-    let style_id = style_id
-      .filter(|style_id| !style_id.is_empty())
-      .or(self.default_style_id.as_deref())?;
-    self
-      .styles
-      .iter()
-      .find(|style| style.style_id.as_deref() == Some(style_id))
+    if let Some(style_id) = style_id.filter(|style_id| !style_id.is_empty()) {
+      return self
+        .styles
+        .iter()
+        .find(|style| style.style_id.as_deref() == Some(style_id));
+    }
+    self.default_style()
+  }
+
+  pub(crate) fn default_style(&self) -> Option<&TableStyle> {
+    self.default_style_id.as_deref().and_then(|style_id| {
+      self
+        .styles
+        .iter()
+        .find(|style| style.style_id.as_deref() == Some(style_id))
+    })
   }
 }
 
@@ -1282,5 +1291,47 @@ mod tests {
         value: Some(20_000),
       }]
     );
+  }
+
+  #[test]
+  fn package_default_is_separate_from_an_explicit_missing_reference() {
+    let default_style = TableStyle {
+      style_id: Some("package-default".to_string()),
+      style_name: Some("Package Default".to_string()),
+      ..TableStyle::default()
+    };
+    let styles = TableStyleList {
+      default_style_id: Some("package-default".to_string()),
+      styles: vec![default_style],
+      ..TableStyleList::default()
+    };
+
+    assert!(styles.style(Some("missing-reference")).is_none());
+    assert_eq!(
+      styles
+        .default_style()
+        .and_then(|style| style.style_name.as_deref()),
+      Some("Package Default")
+    );
+  }
+
+  #[test]
+  fn ambiguous_missing_referenced_style_does_not_guess_the_default() {
+    let styles = TableStyleList {
+      default_style_id: Some("package-default".to_string()),
+      styles: vec![
+        TableStyle {
+          style_id: Some("package-default".to_string()),
+          ..TableStyle::default()
+        },
+        TableStyle {
+          style_id: Some("another-style".to_string()),
+          ..TableStyle::default()
+        },
+      ],
+      ..TableStyleList::default()
+    };
+
+    assert!(styles.style(Some("missing-reference")).is_none());
   }
 }

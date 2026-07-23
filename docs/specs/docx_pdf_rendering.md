@@ -803,7 +803,10 @@ Current progress:
   in single-column or final-column contexts it follows the LibreOffice/Typst
   fallback shape and behaves like a page break.
 - Footnotes/endnotes are now imported as typed id-to-block maps, and paragraphs
-  retain generated-type-derived footnote/endnote reference ids.
+  retain generated-type-derived footnote/endnote reference ids. Document and
+  section numbering format/start/restart settings are resolved in section
+  order; `eachPage` labels are reassigned from the final page ownership of the
+  reference and backlink runs instead of trusting a pre-pagination counter.
 - Footnote content now uses a page footnote boss area. Referenced footnotes are
   measured through the shared paragraph/table layout path before laying out the
   referencing paragraph, the body frame bottom is reduced for that page, and the

@@ -946,7 +946,8 @@ LibreOffice page-range behavior to preserve:
 - skip-empty mode hides empty horizontal page slices
 - page order is `downThenOver` or `overThenDown`
 - repeated rows/columns are inserted into every page before the page-local
-  content range
+  content range, except when that page already contains the source title rows
+  or columns; the source page must not paint a title range twice
 - grid lines and row/column headings are print options, not worksheet view flags
 - page scaling feeds both page breaks and painting transforms
 
@@ -1057,6 +1058,8 @@ behavior before broad fit/skip-empty assertions should be treated as final.
 The current paint bridge records the `PrintArea` operation order (back drawing
 layer, repeated columns/rows, cell area, grid, front drawing layer), lowers
 page-local and repeated-title cell text through Calc row/column metrics,
+applies horizontal/vertical print centering after scaled title and heading
+extents are known,
 expands merged master-cell rectangles and suppresses covered merged cells,
 paints resolved font/fill/outer-border state from the stylesheet catalog,
 paints grid lines and row/column headings when print options request them,

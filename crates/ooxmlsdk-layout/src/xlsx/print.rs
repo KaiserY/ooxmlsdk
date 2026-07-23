@@ -38,6 +38,8 @@ pub(crate) struct CalcPrintPage<'a> {
   pub(crate) repeated_row_cells: Vec<CalcPrintCell<'a>>,
   pub(crate) repeated_column_cells: Vec<CalcPrintCell<'a>>,
   pub(crate) repeated_corner_cells: Vec<CalcPrintCell<'a>>,
+  pub(crate) drawing_anchor_count: usize,
+  pub(crate) chart_count: usize,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -119,7 +121,7 @@ impl<'a> CalcPrintDocument<'a> {
           .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
           .unwrap_or_default();
         let repeated_corner_cells =
-          repeat_corner_for_page(named_ranges.repeat_rows, named_ranges.repeat_columns)
+          repeat_corner_for_page(area, named_ranges.repeat_rows, named_ranges.repeat_columns)
             .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
             .unwrap_or_default();
         let drawing_summary = drawing_summary_for_area(sheet, area);
@@ -149,6 +151,8 @@ impl<'a> CalcPrintDocument<'a> {
           repeated_row_cells,
           repeated_column_cells,
           repeated_corner_cells,
+          drawing_anchor_count: drawing_summary.anchors,
+          chart_count: drawing_summary.charts,
         });
         sheet_page_index += 1;
       }
@@ -376,16 +380,16 @@ fn print_content_size_pt(sheet: &CalcSheet) -> (f32, f32) {
 
 fn drawing_summary_for_area(sheet: &CalcSheet, area: Option<CellRange>) -> CalcPrintDrawingSummary {
   let mut summary = CalcPrintDrawingSummary::default();
-  for anchor in sheet
-    .resources
-    .drawings
-    .iter()
-    .flat_map(|drawing| drawing.anchors.iter())
-  {
-    if !anchor_intersects_area(sheet, anchor, area) {
-      continue;
+  for drawing in &sheet.resources.drawings {
+    for anchor in &drawing.anchors {
+      if !anchor_intersects_area(sheet, anchor, area) {
+        continue;
+      }
+      summary.anchors += 1;
+      if anchor.object.kind == super::drawing::DrawingObjectKind::GraphicFrame {
+        summary.charts += 1;
+      }
     }
-    summary.anchors += 1;
   }
   // client shapes into the sheet draw layer; sc/source/core/data/documen9.cxx
   // then treats that draw layer uniformly for print area and page visibility.
@@ -401,12 +405,6 @@ fn drawing_summary_for_area(sheet: &CalcSheet, area: Option<CellRange>) -> CalcP
     }
     summary.anchors += 1;
   }
-  summary.charts = sheet
-    .resources
-    .drawings
-    .iter()
-    .map(|drawing| drawing.chart_count())
-    .sum();
   summary
 }
 
@@ -416,7 +414,7 @@ fn anchor_belongs_to_area(
 ) -> bool {
   match (marker, area) {
     (_, None) => true,
-    (None, Some(_)) => true,
+    (None, Some(_)) => false,
     (Some(marker), Some(area)) => {
       let col = u32::try_from(marker.column)
         .ok()
@@ -619,6 +617,20 @@ fn drawing_anchor_rect_pt(
   sheet: &CalcSheet,
   anchor: &super::drawing::DrawingAnchorModel,
 ) -> Option<(f32, f32, f32, f32)> {
+  // Calc's draw layer uses the shape transform when extending the printable
+  // content range. Rendering still resolves xdr:from/to against sheet
+  // geometry; the two coordinate sets can legitimately differ in imported
+  // files whose cached transform has not been rewritten.
+  if let Some(((x, y), (width, height))) = anchor.object_transform
+    && (width != 0 || height != 0)
+  {
+    return Some((
+      units::emu_to_points(x),
+      units::emu_to_points(y),
+      units::emu_to_points(width),
+      units::emu_to_points(height),
+    ));
+  }
   match anchor.kind {
     super::drawing::DrawingAnchorKind::TwoCell => {
       let from = anchor.from.as_ref()?;
@@ -661,7 +673,7 @@ fn vml_shape_intersects_area(
   };
   vml_shape_cell_range(sheet, shape)
     .map(|range| range.intersects(area))
-    .unwrap_or(true)
+    .unwrap_or(false)
 }
 
 fn vml_shape_cell_range(
@@ -686,9 +698,14 @@ fn vml_shape_rect_pt(
   shape: &super::object_resources::VmlShapeModel,
 ) -> Option<(f32, f32, f32, f32)> {
   shape
-    .anchor
-    .and_then(|anchor| vml_anchor_rect_pt(sheet, anchor))
-    .or_else(|| shape.style.as_deref().and_then(vml_style_rect_pt))
+    .style
+    .as_deref()
+    .and_then(vml_style_rect_pt)
+    .or_else(|| {
+      shape
+        .anchor
+        .and_then(|anchor| vml_anchor_rect_pt(sheet, anchor))
+    })
 }
 
 fn vml_anchor_rect_pt(
@@ -958,9 +975,6 @@ fn print_area_is_empty(
         || borders.top.is_some()
         || borders.bottom.is_some()
       {
-        return false;
-      }
-      if import.styles.fill_for_cell(style_index).color.is_some() {
         return false;
       }
     }
@@ -1458,6 +1472,9 @@ fn repeat_rows_for_page(
 ) -> Option<CellRange> {
   let area = area?;
   let repeat_rows = repeat_rows?;
+  if area.start.row <= repeat_rows.end.row {
+    return None;
+  }
   Some(CellRange::new(
     CellAddress {
       col: area.start.col,
@@ -1476,6 +1493,9 @@ fn repeat_columns_for_page(
 ) -> Option<CellRange> {
   let area = area?;
   let repeat_columns = repeat_columns?;
+  if area.start.col <= repeat_columns.end.col {
+    return None;
+  }
   Some(CellRange::new(
     CellAddress {
       col: repeat_columns.start.col,
@@ -1489,11 +1509,16 @@ fn repeat_columns_for_page(
 }
 
 fn repeat_corner_for_page(
+  area: Option<CellRange>,
   repeat_rows: Option<CellRange>,
   repeat_columns: Option<CellRange>,
 ) -> Option<CellRange> {
+  let area = area?;
   let repeat_rows = repeat_rows?;
   let repeat_columns = repeat_columns?;
+  if area.start.row <= repeat_rows.end.row || area.start.col <= repeat_columns.end.col {
+    return None;
+  }
   Some(CellRange::new(
     CellAddress {
       col: repeat_columns.start.col,
@@ -2223,9 +2248,10 @@ pub(crate) fn rendered_number_text(
 ) -> (String, NumberFormatRenderState) {
   match data_type {
     Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::Boolean) => {
-      // Boolean cells use Excel's Standard/General representation regardless
-      // of the cell XF's number format. LibreOffice's OOXML importer enforces
-      // the same rule in SheetDataBuffer::setBooleanCell (#108770).
+      // A SpreadsheetML boolean is a logical value, not a numeric value to
+      // which the cell XF's number format is applied. Excel fixed output
+      // therefore keeps TRUE/FALSE even when a producer stored localized
+      // literal sections such as `"IGAZ";"IGAZ";"HAMIS"` (tdf#122191).
       return (
         if boolean_raw_value(raw) {
           "TRUE".to_string()
@@ -3600,6 +3626,31 @@ fn column_name_to_index(value: &str) -> Option<u32> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn print_titles_start_repeating_only_after_their_source_page() {
+    let titles = CellRange::new(
+      CellAddress { col: 1, row: 1 },
+      CellAddress { col: 1, row: 2 },
+    );
+    let first_page = CellRange::new(
+      CellAddress { col: 1, row: 1 },
+      CellAddress { col: 8, row: 20 },
+    );
+    let later_page = CellRange::new(
+      CellAddress { col: 1, row: 21 },
+      CellAddress { col: 8, row: 40 },
+    );
+
+    assert_eq!(repeat_rows_for_page(Some(first_page), Some(titles)), None);
+    assert_eq!(
+      repeat_rows_for_page(Some(later_page), Some(titles)),
+      Some(CellRange::new(
+        CellAddress { col: 1, row: 1 },
+        CellAddress { col: 8, row: 2 },
+      ))
+    );
+  }
 
   #[test]
   fn general_number_format_uses_calc_significant_digits() {

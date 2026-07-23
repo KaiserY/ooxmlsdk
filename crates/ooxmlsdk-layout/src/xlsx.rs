@@ -1,3 +1,4 @@
+pub(crate) mod chartex;
 mod comments;
 mod display;
 mod drawing;

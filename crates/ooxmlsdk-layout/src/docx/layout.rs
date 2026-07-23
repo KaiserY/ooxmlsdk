@@ -26,7 +26,8 @@ use crate::model::{
 };
 use crate::options::{LayoutActionOptions, LayoutOptions};
 use crate::pptx::chart::{
-  ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, lower_clustered_column_chart,
+  ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, RadialChartStyle,
+  lower_clustered_column_chart, lower_radial_chart,
 };
 use crate::render::chart as shared_chart;
 use crate::text_metrics::TextMetrics;
@@ -8165,14 +8166,35 @@ fn lower_inline_chart(
   height_pt: f32,
   text_metrics: &mut TextMetrics,
 ) -> Vec<PageItem> {
-  if let Some(model) = shared_chart::pie_chart_model(&chart.chart_space)
+  if let Some(chart_space) = chart.extended_chart_space.as_deref() {
+    return crate::xlsx::chartex::lower_extended_chart_cached(
+      chart_space,
+      ChartFrame {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+      },
+      chart.title_style.clone(),
+      chart.label_style.clone(),
+    )
+    .into_iter()
+    .filter_map(docx_chart_page_item)
+    .collect();
+  }
+  let Some(chart_space) = chart.chart_space.as_deref() else {
+    return Vec::new();
+  };
+  if let Some(model) = shared_chart::pie_chart_model(chart_space)
+    && model.kind == shared_chart::RadialChartKind::Pie
     && model.legend_position.is_none_or(|position| {
       matches!(
         position,
         shared_chart::ChartLegendPosition::Right | shared_chart::ChartLegendPosition::Bottom
       )
     })
-    && !model.has_manual_legend_layout
+    && model.legend_layout.is_none()
+    && !model.legend_overlay
     && model
       .values
       .iter()
@@ -8189,24 +8211,65 @@ fn lower_inline_chart(
     };
     let mut expected_texts = expected_texts;
     expected_texts.extend(model.data_labels.iter().map(|label| label.text.clone()));
-    if shared_chart::fixed_output_texts_for_ui_language(
-      &chart.chart_space,
-      chart.ui_language.as_deref(),
-    ) == expected_texts
+    if shared_chart::fixed_output_texts_for_ui_language(chart_space, chart.ui_language.as_deref())
+      == expected_texts
     {
       return lower_word_pie_chart(chart, &model, x_pt, y_pt, width_pt, height_pt, text_metrics);
     }
   }
 
-  let Some(mut model) = shared_chart::ordinary_clustered_column_chart(&chart.chart_space) else {
+  if let Some(mut model) = shared_chart::pie_chart_model(chart_space) {
+    if matches!(model.title, Some(shared_chart::ChartTitleText::Automatic))
+      && chart_space.chart.title.is_none()
+    {
+      model.title = None;
+    }
+    let lowered = lower_radial_chart(
+      ChartFrame {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+      },
+      &model,
+      &chart.automatic_title,
+      &RadialChartStyle {
+        layout_profile: ChartLayoutProfile::Word,
+        title: chart.title_style.clone(),
+        label: chart.label_style.clone(),
+        data_label: chart.data_label_style.clone(),
+        point_colors: chart.pie_point_colors.clone(),
+        chart_area_fill_color: chart.chart_area_fill_color,
+        plot_area_fill_color: chart.plot_area_fill_color,
+        chart_area_stroke_color: chart.chart_area_stroke_color,
+        plot_area_stroke_color: chart.plot_area_stroke_color,
+      },
+    )
+    .into_iter()
+    .filter_map(docx_chart_page_item)
+    .collect::<Vec<_>>();
+    if !lowered.is_empty() {
+      return lowered;
+    }
+  }
+
+  let Some(mut model) =
+    shared_chart::cartesian_chart_for_ui_language(chart_space, chart.ui_language.as_deref())
+  else {
     return lower_generic_inline_chart(chart, x_pt, y_pt, width_pt, height_pt);
   };
-  // Word fixed output does not paint the chart insertion placeholder for an
-  // absent title, even when c:autoTitleDeleted is explicitly false. That
-  // placeholder is a PowerPoint host behavior; explicit c:title text remains
-  // visible in Word.
-  if matches!(model.title, Some(shared_chart::ChartTitleText::Automatic)) {
+  if matches!(model.title, Some(shared_chart::ChartTitleText::Automatic))
+    && chart_space.chart.title.is_none()
+  {
     model.title = None;
+  }
+  let word_series_names = shared_chart::series_identity_texts_with_uncached_labels(chart_space);
+  for (index, series) in model.series.iter_mut().enumerate() {
+    if !series.has_explicit_name
+      && let Some(name) = word_series_names.get(index)
+    {
+      series.name.clone_from(name);
+    }
   }
   let frame_stroke = BorderStyle {
     width_pt: 0.14,
@@ -8239,8 +8302,14 @@ fn lower_inline_chart(
         title: chart.title_style.clone(),
         title_fill_color: None,
         label: chart.label_style.clone(),
+        data_label: chart.data_label_style.clone(),
         gridline_color: chart.gridline_color,
         series_colors: chart.series_colors.clone(),
+        series_point_colors: chart.series_point_colors.clone(),
+        chart_area_fill_color: chart.chart_area_fill_color,
+        plot_area_fill_color: chart.plot_area_fill_color,
+        chart_area_stroke_color: chart.chart_area_stroke_color,
+        plot_area_stroke_color: chart.plot_area_stroke_color,
       },
     )
     .into_iter()
@@ -8524,8 +8593,11 @@ fn lower_generic_inline_chart(
   width_pt: f32,
   height_pt: f32,
 ) -> Vec<PageItem> {
+  let Some(chart_space) = chart.chart_space.as_deref() else {
+    return Vec::new();
+  };
   let stroke = Some(BorderStyle::default());
-  let mut items = match shared_chart::kind(&chart.chart_space) {
+  let mut items = match shared_chart::kind(chart_space) {
     shared_chart::ChartKind::Pie => {
       let diameter_pt = (width_pt.min(height_pt) * 0.911_706_3)
         .min(width_pt)
@@ -8573,7 +8645,13 @@ fn lower_generic_inline_chart(
       stroke,
       stroke_opacity: 1.0,
     })],
-    shared_chart::ChartKind::Other => vec![PageItem::Rect(RectItem {
+    shared_chart::ChartKind::Line
+    | shared_chart::ChartKind::Scatter
+    | shared_chart::ChartKind::Bubble
+    | shared_chart::ChartKind::Radar
+    | shared_chart::ChartKind::Stock
+    | shared_chart::ChartKind::Surface
+    | shared_chart::ChartKind::Other => vec![PageItem::Rect(RectItem {
       x_pt,
       y_pt,
       width_pt,
@@ -8585,11 +8663,9 @@ fn lower_generic_inline_chart(
     })],
   };
 
-  let fixed_text = shared_chart::fixed_output_texts_for_ui_language(
-    &chart.chart_space,
-    chart.ui_language.as_deref(),
-  )
-  .join(" ");
+  let fixed_text =
+    shared_chart::fixed_output_texts_for_ui_language(chart_space, chart.ui_language.as_deref())
+      .join(" ");
   if !fixed_text.is_empty() {
     let mut style = chart.label_style.clone();
     // The generic chart visual lowerers are still intentionally conservative,
@@ -8663,6 +8739,39 @@ fn docx_chart_page_item(item: crate::model::PageItem) -> Option<PageItem> {
       color: line.color,
       kind: LineItemKind::Stroke,
     })),
+    crate::model::PageItem::Path(path) if !path.points.is_empty() => {
+      let fill_color = match path.fill {
+        crate::common::Fill::Solid(color) => Some(RgbColor {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+        }),
+        _ => None,
+      };
+      let stroke = path.stroke.map(|stroke| BorderStyle {
+        width_pt: stroke.width.0,
+        color: RgbColor {
+          r: stroke.color.r,
+          g: stroke.color.g,
+          b: stroke.color.b,
+        },
+        ..BorderStyle::default()
+      });
+      Some(PageItem::Polyline(PolylineItem {
+        x_pt: 0.0,
+        y_pt: 0.0,
+        width_pt: path.bounds.size.width.0,
+        height_pt: path.bounds.size.height.0,
+        points: path
+          .points
+          .into_iter()
+          .map(|point| (point.x.0, point.y.0))
+          .collect(),
+        closed: path.closed,
+        fill_color,
+        stroke,
+      }))
+    }
     crate::model::PageItem::Image(_)
     | crate::model::PageItem::LinkArea(_)
     | crate::model::PageItem::Path(_) => None,

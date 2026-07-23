@@ -23,7 +23,8 @@ use super::import::ExcelImport;
 use super::print::{CalcPrintDocument, CalcPrintPage};
 use super::worksheet::{CalcSheet, CellAddress, CellRange, CellRect};
 use crate::pptx::chart::{
-  ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, lower_clustered_column_chart,
+  ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, RadialChartStyle,
+  lower_clustered_column_chart, lower_radial_chart,
 };
 use crate::pptx::drawingml::color::{Color, RgbHexColor};
 
@@ -2228,8 +2229,132 @@ fn lower_drawing_chart(
     .iter()
     .chain(drawing.extended_charts.iter())
     .find(|chart| chart.relationship_id.as_deref() == Some(relationship_id))?;
+  if let Some(chart_space) = resource.extended_chart_space.as_deref() {
+    let mut items = super::chartex::lower_extended_chart(import, chart_space, rect);
+    let mut metrics = TextMetrics::new();
+    items.retain_mut(|item| clip_chart_item_to_rect(item, page_clip_rect, &mut metrics));
+    return (!items.is_empty()).then_some(items);
+  }
   let chart_space = resource.chart_space.as_deref()?;
-  let mut chart = shared_chart::clustered_column_chart_for_ui_language(
+
+  if let Some(mut chart) = shared_chart::pie_chart_model(chart_space) {
+    if chart.title.is_none()
+      && shared_chart::has_excel_automatic_title_placeholder(&chart_space.chart)
+    {
+      chart.title = Some(shared_chart::ChartTitleText::Automatic);
+    }
+    let mut title_style = import.styles.default_chart_text_style();
+    title_style.font_size_pt = 14.0;
+    title_style.bold = true;
+    let mut label_style = import.styles.default_chart_text_style();
+    label_style.font_size_pt = 10.0;
+    if let Some(typeface) = xlsx_chart_latin_typeface(chart_space) {
+      let typeface = Arc::from(import.styles.resolve_drawingml_theme_font(typeface));
+      title_style.font_family = Some(Arc::clone(&typeface));
+      label_style.font_family = Some(typeface);
+    }
+    if let Some(properties) = chart_space.text_properties.as_deref() {
+      apply_xlsx_chart_text_properties(&mut title_style, properties, import);
+      apply_xlsx_chart_text_properties(&mut label_style, properties, import);
+    }
+    if let Some(properties) = chart_space
+      .chart
+      .title
+      .as_deref()
+      .and_then(|title| title.text_properties.as_deref())
+    {
+      apply_xlsx_chart_text_properties(&mut title_style, properties, import);
+    }
+    if let Some(properties) = chart.data_label_text_properties.or_else(|| {
+      chart_space
+        .chart
+        .legend
+        .as_deref()
+        .and_then(|legend| legend.text_properties.as_deref())
+    }) {
+      apply_xlsx_chart_text_properties(&mut label_style, properties, import);
+    }
+    let point_colors = (0..chart.values.len())
+      .map(|index| {
+        chart
+          .data_point_fills
+          .iter()
+          .find(|fill| fill.index as usize == index)
+          .and_then(|fill| xlsx_chart_solid_fill_color(fill.fill, import))
+          .or_else(|| {
+            chart
+              .series_solid_fill
+              .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+          })
+          .or_else(|| import.styles.theme_color(4 + index as u32 % 6, 0.0))
+          .unwrap_or(XLSX_DEFAULT_CHART_SERIES_COLORS[index % 6])
+      })
+      .collect();
+    let mut items = lower_radial_chart(
+      ChartFrame {
+        x_pt: rect.x_pt,
+        y_pt: rect.y_pt,
+        width_pt: rect.width_pt,
+        height_pt: rect.height_pt,
+      },
+      &chart,
+      shared_chart::automatic_chart_title(Some(import.styles.output_ui_language())),
+      &RadialChartStyle {
+        layout_profile: ChartLayoutProfile::Excel,
+        title: title_style,
+        label: label_style.clone(),
+        data_label: label_style,
+        point_colors,
+        chart_area_fill_color: chart_space
+          .shape_properties
+          .as_deref()
+          .and_then(shared_chart::shape_properties_solid_fill)
+          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+        plot_area_fill_color: chart_space
+          .chart
+          .plot_area
+          .shape_properties
+          .as_deref()
+          .and_then(shared_chart::shape_properties_solid_fill)
+          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+        chart_area_stroke_color: chart_space
+          .shape_properties
+          .as_deref()
+          .and_then(shared_chart::shape_properties_outline_solid_fill)
+          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+        plot_area_stroke_color: chart_space
+          .chart
+          .plot_area
+          .shape_properties
+          .as_deref()
+          .and_then(shared_chart::shape_properties_outline_solid_fill)
+          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+      },
+    );
+    if !items.is_empty() {
+      let mut metrics = TextMetrics::new();
+      items.retain_mut(|item| clip_chart_item_to_rect(item, page_clip_rect, &mut metrics));
+      if let Some(hyperlink_url) = drawing_object_hyperlink_url(drawing, &anchor.object) {
+        let left = rect.x_pt.max(page_clip_rect.x_pt);
+        let top = rect.y_pt.max(page_clip_rect.y_pt);
+        let right = (rect.x_pt + rect.width_pt).min(page_clip_rect.x_pt + page_clip_rect.width_pt);
+        let bottom =
+          (rect.y_pt + rect.height_pt).min(page_clip_rect.y_pt + page_clip_rect.height_pt);
+        if right > left && bottom > top {
+          items.push(PageItem::LinkArea(LinkAreaItem {
+            x_pt: left,
+            y_pt: top,
+            width_pt: right - left,
+            height_pt: bottom - top,
+            hyperlink_url: hyperlink_url.into_owned(),
+          }));
+        }
+      }
+      return Some(items);
+    }
+  }
+
+  let mut chart = shared_chart::cartesian_chart_for_ui_language(
     chart_space,
     Some(import.styles.output_ui_language()),
   )?;
@@ -2248,6 +2373,21 @@ fn lower_drawing_chart(
         .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
         .or_else(|| import.styles.theme_color(4 + index as u32 % 6, 0.0))
         .unwrap_or(XLSX_DEFAULT_CHART_SERIES_COLORS[index % 6])
+    })
+    .collect();
+  let series_point_colors = chart
+    .series
+    .iter()
+    .map(|series| {
+      (0..series.values.len())
+        .map(|point_index| {
+          series
+            .data_point_fills
+            .iter()
+            .find(|fill| fill.index as usize == point_index)
+            .and_then(|fill| xlsx_chart_solid_fill_color(fill.fill, import))
+        })
+        .collect()
     })
     .collect();
   let mut title_style = import.styles.default_chart_text_style();
@@ -2311,6 +2451,10 @@ fn lower_drawing_chart(
   {
     apply_xlsx_chart_text_properties(&mut label_style, properties, import);
   }
+  let mut data_label_style = label_style.clone();
+  if let Some(properties) = chart.data_label_text_properties {
+    apply_xlsx_chart_text_properties(&mut data_label_style, properties, import);
+  }
   let mut items = lower_clustered_column_chart(
     ChartFrame {
       x_pt: rect.x_pt,
@@ -2329,12 +2473,38 @@ fn lower_drawing_chart(
       title: title_style,
       title_fill_color: None,
       label: label_style,
+      data_label: data_label_style,
       gridline_color: RgbColor {
         r: 0xd9,
         g: 0xd9,
         b: 0xd9,
       },
       series_colors,
+      series_point_colors,
+      chart_area_fill_color: chart_space
+        .shape_properties
+        .as_deref()
+        .and_then(shared_chart::shape_properties_solid_fill)
+        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+      plot_area_fill_color: chart_space
+        .chart
+        .plot_area
+        .shape_properties
+        .as_deref()
+        .and_then(shared_chart::shape_properties_solid_fill)
+        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+      chart_area_stroke_color: chart_space
+        .shape_properties
+        .as_deref()
+        .and_then(shared_chart::shape_properties_outline_solid_fill)
+        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+      plot_area_stroke_color: chart_space
+        .chart
+        .plot_area
+        .shape_properties
+        .as_deref()
+        .and_then(shared_chart::shape_properties_outline_solid_fill)
+        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
     },
   );
   let mut metrics = TextMetrics::new();

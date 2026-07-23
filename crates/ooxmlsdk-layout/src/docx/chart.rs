@@ -20,15 +20,27 @@ fn chart_text_blocks(
     let Ok(chart_space) = chart_part.root_element(package) else {
       continue;
     };
-    // Ordinary two-dimensional clustered-column charts are laid out at their
-    // drawing anchor. Cached series data is not separate document body text.
-    if shared_chart::ordinary_clustered_column_chart(chart_space).is_some() {
+    // Typed radial and cartesian charts are laid out at their drawing anchor.
+    // Cached series data is not separate document body text.
+    let typed_chart = shared_chart::pie_chart_model(chart_space).is_some()
+      || shared_chart::cartesian_chart_for_ui_language(
+        chart_space,
+        styles.simplified_chinese_ui.then_some("zh-CN"),
+      )
+      .is_some();
+    let vertical_axis_labels = chart_vertical_multilevel_axis_labels(chart_space);
+    if typed_chart && vertical_axis_labels.is_empty() {
       continue;
     }
     let color = chart_label_color(chart_space, &styles.theme_colors).unwrap_or_default();
-    let vertical_axis_labels = chart_vertical_multilevel_axis_labels(chart_space);
-    let mut texts = shared_chart::visible_texts_with_uncached_series_labels(chart_space);
-    texts.extend(chart_derived_axis_labels(&texts));
+    let texts = if typed_chart {
+      vertical_axis_labels.clone()
+    } else {
+      shared_chart::fixed_output_texts_for_ui_language(
+        chart_space,
+        styles.simplified_chinese_ui.then_some("zh-CN"),
+      )
+    };
     for text in texts {
       for segment in chart_visible_text_segments(text) {
         let mut style = text_style_with_color(styles, color);
@@ -81,29 +93,6 @@ fn chart_word_segments(text: String, segment_count: usize) -> Vec<String> {
     .collect::<Vec<_>>();
   segments.push(words[(segment_count - 1)..].join(" "));
   segments
-}
-
-fn chart_derived_axis_labels(texts: &[String]) -> Vec<String> {
-  let values = texts
-    .iter()
-    .filter_map(|text| text.parse::<f64>().ok())
-    .filter(|value| value.is_finite() && *value > 0.0 && *value < 1.0)
-    .collect::<Vec<_>>();
-  if values.len() < 4 {
-    return Vec::new();
-  }
-  let minimum = values.iter().copied().fold(f64::INFINITY, f64::min);
-  let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-  if maximum - minimum > 0.001 {
-    return Vec::new();
-  }
-
-  let axis_minimum = (minimum * 100_000.0).floor() / 100_000.0 - 0.000_03;
-  let label = format!("{axis_minimum:.5}");
-  (!texts.iter().any(|text| text == &label))
-    .then_some(label)
-    .into_iter()
-    .collect()
 }
 
 fn chart_vertical_multilevel_axis_labels(chart_space: &c::ChartSpace) -> Vec<String> {

@@ -22,6 +22,7 @@ use crate::units;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
+use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex as cx;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
@@ -31,7 +32,8 @@ use ooxmlsdk::units::DrawingmlPercentageValue;
 use unicode_script::{Script, UnicodeScript};
 
 use super::chart::{
-  ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, lower_clustered_column_chart,
+  ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, RadialChartStyle,
+  lower_clustered_column_chart, lower_radial_chart,
 };
 use super::custom_geometry;
 use super::drawingml::color::{Color, SchemeColor};
@@ -1032,6 +1034,10 @@ fn lower_chart(
   if shape.size.cx <= 0 || shape.size.cy <= 0 {
     return;
   }
+  if let Some(chart_resource) = &record.extended_chart_resource {
+    lower_extended_chart(chart_resource, shape, offset, items);
+    return;
+  }
   let Some(chart_resource) = &record.chart_resource else {
     return;
   };
@@ -1040,8 +1046,144 @@ fn lower_chart(
   let width = offset.width_pt(shape.size.cx);
   let height = offset.height_pt(shape.size.cy);
 
+  if let Some(mut chart) = shared_chart::pie_chart_model(&chart_resource.chart_space) {
+    if chart.title.is_none()
+      && shared_chart::has_powerpoint_automatic_title_placeholder(&chart_resource.chart_space.chart)
+    {
+      chart.title = Some(shared_chart::ChartTitleText::Automatic);
+    }
+    let chart_text_properties = chart_resource.chart_space.text_properties.as_deref();
+    let title_properties = chart_resource
+      .chart_space
+      .chart
+      .title
+      .as_deref()
+      .and_then(|title| title.text_properties.as_deref());
+    let label_properties = chart.data_label_text_properties.or_else(|| {
+      chart_resource
+        .chart_space
+        .chart
+        .legend
+        .as_deref()
+        .and_then(|legend| legend.text_properties.as_deref())
+    });
+    let point_colors = (0..chart.values.len())
+      .map(|index| {
+        chart
+          .data_point_fills
+          .iter()
+          .find(|fill| fill.index as usize == index)
+          .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill.fill))
+          .map(|paint| paint.color)
+          .or_else(|| {
+            chart
+              .series_solid_fill
+              .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+              .map(|paint| paint.color)
+          })
+          .or_else(|| display_color_for_chart_series(import, slide, chart_resource, index))
+          .unwrap_or(RgbColor {
+            r: 68,
+            g: 114,
+            b: 196,
+          })
+      })
+      .collect();
+    let mut chart_items = lower_radial_chart(
+      ChartFrame {
+        x_pt: x,
+        y_pt: y,
+        width_pt: width,
+        height_pt: height,
+      },
+      &chart,
+      shared_chart::automatic_chart_title(ui_language),
+      &RadialChartStyle {
+        layout_profile: ChartLayoutProfile::PowerPoint,
+        title: chart_text_style(
+          import,
+          slide,
+          chart_text_properties,
+          title_properties,
+          ui_language,
+          18.0,
+        ),
+        label: chart_text_style(
+          import,
+          slide,
+          chart_text_properties,
+          label_properties,
+          ui_language,
+          12.0,
+        ),
+        data_label: chart_text_style(
+          import,
+          slide,
+          chart_text_properties,
+          label_properties,
+          ui_language,
+          12.0,
+        ),
+        point_colors,
+        chart_area_fill_color: chart_resource
+          .chart_space
+          .shape_properties
+          .as_deref()
+          .and_then(shared_chart::shape_properties_solid_fill)
+          .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+          .map(|paint| paint.color),
+        plot_area_fill_color: chart_resource
+          .chart_space
+          .chart
+          .plot_area
+          .shape_properties
+          .as_deref()
+          .and_then(shared_chart::shape_properties_solid_fill)
+          .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+          .map(|paint| paint.color),
+        chart_area_stroke_color: chart_resource
+          .chart_space
+          .shape_properties
+          .as_deref()
+          .and_then(shared_chart::shape_properties_outline_solid_fill)
+          .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+          .map(|paint| paint.color),
+        plot_area_stroke_color: chart_resource
+          .chart_space
+          .chart
+          .plot_area
+          .shape_properties
+          .as_deref()
+          .and_then(shared_chart::shape_properties_outline_solid_fill)
+          .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+          .map(|paint| paint.color),
+      },
+    );
+    if !chart_items.is_empty() {
+      if let (Some(fill), Some(shared_chart::ChartTitleText::Explicit(title))) = (
+        chart_resource
+          .chart_space
+          .chart
+          .title
+          .as_deref()
+          .and_then(|title| title.chart_shape_properties.as_deref())
+          .and_then(
+            |properties| match properties.chart_shape_properties_choice2.as_ref() {
+              Some(c::ChartShapePropertiesChoice2::BlipFill(fill)) => Some(fill.as_ref()),
+              _ => None,
+            },
+          ),
+        chart.title.as_ref(),
+      ) {
+        insert_chart_title_blip_fill(import, slide, chart_resource, fill, title, &mut chart_items);
+      }
+      items.extend(chart_items);
+      return;
+    }
+  }
+
   if let Some(mut chart) =
-    shared_chart::clustered_column_chart_for_ui_language(&chart_resource.chart_space, ui_language)
+    shared_chart::cartesian_chart_for_ui_language(&chart_resource.chart_space, ui_language)
   {
     if chart.title.is_none()
       && shared_chart::has_powerpoint_automatic_title_placeholder(&chart_resource.chart_space.chart)
@@ -1052,14 +1194,64 @@ fn lower_chart(
       .series
       .iter()
       .enumerate()
-      .filter_map(|(index, series)| {
+      .map(|(index, series)| {
         series
           .solid_fill
           .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
           .map(|paint| paint.color)
           .or_else(|| display_color_for_chart_series(import, slide, chart_resource, index))
+          .unwrap_or(
+            [
+              RgbColor {
+                r: 68,
+                g: 114,
+                b: 196,
+              },
+              RgbColor {
+                r: 237,
+                g: 125,
+                b: 49,
+              },
+              RgbColor {
+                r: 165,
+                g: 165,
+                b: 165,
+              },
+              RgbColor {
+                r: 255,
+                g: 192,
+                b: 0,
+              },
+              RgbColor {
+                r: 91,
+                g: 155,
+                b: 213,
+              },
+              RgbColor {
+                r: 112,
+                g: 173,
+                b: 71,
+              },
+            ][index % 6],
+          )
       })
       .collect::<Vec<_>>();
+    let series_point_colors = chart
+      .series
+      .iter()
+      .map(|series| {
+        (0..series.values.len())
+          .map(|point_index| {
+            series
+              .data_point_fills
+              .iter()
+              .find(|fill| fill.index as usize == point_index)
+              .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill.fill))
+              .map(|paint| paint.color)
+          })
+          .collect()
+      })
+      .collect();
     if series_colors.len() == chart.series.len() {
       let title_properties = chart_resource
         .chart_space
@@ -1103,6 +1295,7 @@ fn lower_chart(
               _ => None,
             })
         });
+      let data_label_properties = chart.data_label_text_properties.or(label_properties);
       // ECMA-376 Part 1 §21.2.2.216: c:chartSpace/c:txPr supplies
       // the defaults, while title/axis txPr overlays those defaults.
       let chart_text_properties = chart_resource.chart_space.text_properties.as_deref();
@@ -1154,8 +1347,49 @@ fn lower_chart(
             ui_language,
             12.0,
           ),
+          data_label: chart_text_style(
+            import,
+            slide,
+            chart_text_properties,
+            data_label_properties,
+            ui_language,
+            12.0,
+          ),
           gridline_color,
           series_colors,
+          series_point_colors,
+          chart_area_fill_color: chart_resource
+            .chart_space
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_solid_fill)
+            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+            .map(|paint| paint.color),
+          plot_area_fill_color: chart_resource
+            .chart_space
+            .chart
+            .plot_area
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_solid_fill)
+            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+            .map(|paint| paint.color),
+          chart_area_stroke_color: chart_resource
+            .chart_space
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_outline_solid_fill)
+            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+            .map(|paint| paint.color),
+          plot_area_stroke_color: chart_resource
+            .chart_space
+            .chart
+            .plot_area
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_outline_solid_fill)
+            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+            .map(|paint| paint.color),
         },
       );
       if !chart_items.is_empty() {
@@ -1178,7 +1412,8 @@ fn lower_chart(
   }
 
   let paints = chart_data_point_paints(import, slide, chart_resource);
-  let texts = shared_chart::visible_texts_for_ui_language(&chart_resource.chart_space, ui_language);
+  let texts =
+    shared_chart::fixed_output_texts_for_ui_language(&chart_resource.chart_space, ui_language);
   if paints.is_empty() && texts.is_empty() {
     return;
   }
@@ -1208,6 +1443,137 @@ fn lower_chart(
   }
 
   lower_chart_texts(x, y, width, height, texts, items);
+}
+
+fn lower_extended_chart(
+  resource: &super::slide::ExtendedChartResource,
+  shape: &Shape,
+  offset: DisplayOffset,
+  items: &mut Vec<PageItem>,
+) {
+  let x = offset.x_pt(shape.position.x);
+  let y = offset.y_pt(shape.position.y);
+  let width = offset.width_pt(shape.size.cx);
+  let height = offset.height_pt(shape.size.cy);
+  items.push(PageItem::Rect(RectItem {
+    x_pt: x,
+    y_pt: y,
+    width_pt: width,
+    height_pt: height,
+    fill_color: Some(RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    }),
+    fill_opacity: 1.0,
+    stroke: None,
+    stroke_opacity: 1.0,
+  }));
+  let title = resource
+    .chart_space
+    .chart
+    .chart_title
+    .as_deref()
+    .and_then(|title| title.tx_pr_text_body.as_deref())
+    .map(|body| {
+      body
+        .paragraph
+        .iter()
+        .flat_map(|paragraph| &paragraph.paragraph_choice)
+        .filter_map(|choice| match choice {
+          a::ParagraphChoice::Run(run) => Some(run.text.as_str()),
+          a::ParagraphChoice::Field(field) => field.text.as_deref(),
+          _ => None,
+        })
+        .collect::<String>()
+    })
+    .unwrap_or_default();
+  let values = resource
+    .chart_space
+    .chart_data
+    .as_deref()
+    .into_iter()
+    .flat_map(|data| &data.data)
+    .flat_map(|data| &data.data_choice)
+    .filter_map(|choice| match choice {
+      cx::DataChoice::NumericDimension(dimension)
+        if dimension.r#type == cx::NumericDimensionType::Val =>
+      {
+        Some(dimension.as_ref())
+      }
+      _ => None,
+    })
+    .flat_map(|dimension| {
+      let levels = match dimension.numeric_dimension_choice.as_ref() {
+        Some(cx::NumericDimensionChoice::Sequence(sequence)) => sequence.numeric_level.as_slice(),
+        Some(cx::NumericDimensionChoice::NumericLevel(level)) => {
+          std::slice::from_ref(level.as_ref())
+        }
+        None => &[],
+      };
+      levels
+        .iter()
+        .flat_map(|level| &level.numeric_value)
+        .filter_map(|point| point.xml_content)
+        .collect::<Vec<_>>()
+    })
+    .collect::<Vec<_>>();
+  if !values.is_empty() {
+    let palette = [
+      RgbColor {
+        r: 68,
+        g: 114,
+        b: 196,
+      },
+      RgbColor {
+        r: 237,
+        g: 125,
+        b: 49,
+      },
+      RgbColor {
+        r: 165,
+        g: 165,
+        b: 165,
+      },
+      RgbColor {
+        r: 255,
+        g: 192,
+        b: 0,
+      },
+      RgbColor {
+        r: 91,
+        g: 155,
+        b: 213,
+      },
+      RgbColor {
+        r: 112,
+        g: 173,
+        b: 71,
+      },
+    ];
+    let maximum = values.iter().copied().fold(0.0_f64, f64::max).max(1.0);
+    let plot_x = x + width * 0.1;
+    let plot_y = y + height * 0.18;
+    let plot_width = width * 0.8;
+    let plot_height = height * 0.68;
+    let slot = plot_width / values.len() as f32;
+    for (index, value) in values.iter().copied().enumerate() {
+      let bar_height = plot_height * (value.max(0.0) / maximum) as f32;
+      items.push(PageItem::Rect(RectItem {
+        x_pt: plot_x + slot * (index as f32 + 0.15),
+        y_pt: plot_y + plot_height - bar_height,
+        width_pt: slot * 0.7,
+        height_pt: bar_height.max(0.5),
+        fill_color: Some(palette[index % palette.len()]),
+        fill_opacity: 1.0,
+        stroke: None,
+        stroke_opacity: 1.0,
+      }));
+    }
+  }
+  if !title.is_empty() {
+    lower_chart_texts(x, y, width, height, vec![title], items);
+  }
 }
 
 fn insert_chart_title_blip_fill(

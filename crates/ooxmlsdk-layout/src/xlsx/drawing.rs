@@ -124,6 +124,7 @@ pub(crate) enum DrawingObjectKind {
 pub(crate) struct ChartResourceCatalog {
   pub(crate) relationship_id: Option<String>,
   pub(crate) chart_space: Option<Box<c::ChartSpace>>,
+  pub(crate) extended_chart_space: Option<Box<cx::ChartSpace>>,
   pub(crate) extended: bool,
   pub(crate) version_len: usize,
   pub(crate) feature_list_len: usize,
@@ -1711,6 +1712,7 @@ impl ChartResourceCatalog {
     Self {
       relationship_id,
       chart_space: Some(Box::new(chart_space.clone())),
+      extended_chart_space: None,
       extended: false,
       version_len: chart_space.version.as_ref().map_or(0, |value| value.len()),
       feature_list_len: chart_space
@@ -1779,7 +1781,7 @@ impl ChartResourceCatalog {
         }),
       has_print_settings: chart_space.print_settings.is_some(),
       has_user_shapes_reference: chart_space.user_shapes_reference.is_some(),
-      visible_texts: shared_chart::visible_texts_for_ui_language(chart_space, ui_language),
+      visible_texts: shared_chart::fixed_output_texts_for_ui_language(chart_space, ui_language),
       extension_markers: usize::from(chart_space.chart_space_extension_list.is_some())
         + usize::from(chart.chart_extension_list.is_some())
         + usize::from(plot_area.extension_list.is_some()),
@@ -1798,6 +1800,7 @@ impl ChartResourceCatalog {
     let chart_data = chart_space.chart_data.as_ref();
     Self {
       relationship_id,
+      extended_chart_space: Some(Box::new(chart_space.clone())),
       extended: true,
       version_len: chart_space.version.as_ref().map_or(0, |value| value.len()),
       feature_list_len: chart_space

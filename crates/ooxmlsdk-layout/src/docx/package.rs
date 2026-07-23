@@ -6,22 +6,24 @@ use ooxmlsdk::parts::{
   alternative_format_import_part::AlternativeFormatImportPart, chart_part::ChartPart,
   diagram_colors_part::DiagramColorsPart, diagram_data_part::DiagramDataPart,
   diagram_persist_layout_part::DiagramPersistLayoutPart, endnotes_part::EndnotesPart,
-  footer_part::FooterPart, footnotes_part::FootnotesPart, header_part::HeaderPart,
-  image_part::ImagePart, main_document_part::MainDocumentPart,
+  extended_chart_part::ExtendedChartPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
+  header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
   numbering_definitions_part::NumberingDefinitionsPart,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_drawing_2008_diagram as dsp,
+  schemas_microsoft_com_office_drawing_2014_chartex as cx,
   schemas_openxmlformats_org_drawingml_2006_chart as c,
   schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
 };
-use ooxmlsdk::sdk::{RelatedPart, SdkPart};
+use ooxmlsdk::sdk::{RelatedPart, SdkPart, SdkType};
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct ImageCatalog {
   pub(super) by_relationship_id: HashMap<String, ImageResource>,
   pub(super) charts_by_relationship_id: HashMap<String, c::ChartSpace>,
+  pub(super) extended_charts_by_relationship_id: HashMap<String, cx::ChartSpace>,
   pub(super) diagram_colors_by_relationship_id: HashMap<String, dgm::ColorsDefinition>,
   pub(super) diagram_data_by_relationship_id: HashMap<String, dgm::DataModelRoot>,
   pub(super) diagram_drawings_by_relationship_id: HashMap<String, dsp::Drawing>,
@@ -103,7 +105,16 @@ impl ImageCatalog {
       .related_parts_of_type::<_, ChartPart>(package)
       .map(|part| (part.relationship_id().to_string(), part.into_part()))
       .collect::<Vec<_>>();
-    catalog.charts_by_relationship_id = Self::chart_parts(package, chart_parts);
+    let (charts, extended_charts) = Self::chart_parts(package, chart_parts);
+    catalog.charts_by_relationship_id = charts;
+    catalog.extended_charts_by_relationship_id = extended_charts;
+    let extended_chart_parts = main
+      .related_parts_of_type::<_, ExtendedChartPart>(package)
+      .map(|part| (part.relationship_id().to_string(), part.into_part()))
+      .collect::<Vec<_>>();
+    catalog
+      .extended_charts_by_relationship_id
+      .extend(Self::extended_chart_parts(package, extended_chart_parts));
     let diagram_color_parts = main
       .related_parts_of_type::<_, DiagramColorsPart>(package)
       .map(|part| (part.relationship_id().to_string(), part.into_part()))
@@ -176,6 +187,7 @@ impl ImageCatalog {
     Self {
       by_relationship_id,
       charts_by_relationship_id: HashMap::new(),
+      extended_charts_by_relationship_id: HashMap::new(),
       diagram_colors_by_relationship_id: HashMap::new(),
       diagram_data_by_relationship_id: HashMap::new(),
       diagram_drawings_by_relationship_id: HashMap::new(),
@@ -185,7 +197,31 @@ impl ImageCatalog {
   fn chart_parts<'a>(
     package: &mut WordprocessingDocument,
     chart_parts: impl IntoIterator<Item = (String, ChartPart)> + 'a,
-  ) -> HashMap<String, c::ChartSpace> {
+  ) -> (
+    HashMap<String, c::ChartSpace>,
+    HashMap<String, cx::ChartSpace>,
+  ) {
+    let mut classic_by_relationship_id = HashMap::new();
+    let mut extended_by_relationship_id = HashMap::new();
+    for (relationship_id, chart_part) in chart_parts {
+      if let Ok(chart_space) = chart_part.root_element(package) {
+        classic_by_relationship_id.insert(relationship_id, chart_space.clone());
+      } else if let Some(data) = chart_part.data_to_vec(package)
+        && let Ok(chart_space) = cx::ChartSpace::from_bytes(&data)
+      {
+        // Some Office producers keep the legacy chart relationship/content
+        // type while storing a ChartEx root. Resolve by the typed root after
+        // package/MCE selection instead of falling back to the sibling chart.
+        extended_by_relationship_id.insert(relationship_id, chart_space);
+      }
+    }
+    (classic_by_relationship_id, extended_by_relationship_id)
+  }
+
+  fn extended_chart_parts<'a>(
+    package: &mut WordprocessingDocument,
+    chart_parts: impl IntoIterator<Item = (String, ExtendedChartPart)> + 'a,
+  ) -> HashMap<String, cx::ChartSpace> {
     let mut by_relationship_id = HashMap::new();
     for (relationship_id, chart_part) in chart_parts {
       let Ok(chart_space) = chart_part.root_element(package) else {

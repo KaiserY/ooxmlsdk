@@ -586,7 +586,9 @@ pub(crate) struct InlineShape {
 
 #[derive(Clone, Debug)]
 pub(crate) struct InlineChart {
-  pub chart_space: Box<c::ChartSpace>,
+  pub chart_space: Option<Box<c::ChartSpace>>,
+  pub extended_chart_space:
+    Option<Box<ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex::ChartSpace>>,
   pub ui_language: Option<String>,
   pub automatic_title: String,
   pub title_style: TextStyle,
@@ -594,7 +596,12 @@ pub(crate) struct InlineChart {
   pub data_label_style: TextStyle,
   pub gridline_color: RgbColor,
   pub series_colors: Vec<RgbColor>,
+  pub series_point_colors: Vec<Vec<Option<RgbColor>>>,
   pub pie_point_colors: Vec<RgbColor>,
+  pub chart_area_fill_color: Option<RgbColor>,
+  pub plot_area_fill_color: Option<RgbColor>,
+  pub chart_area_stroke_color: Option<RgbColor>,
+  pub plot_area_stroke_color: Option<RgbColor>,
 }
 
 #[derive(Clone, Debug)]

@@ -7171,6 +7171,17 @@ fn push_drawing_shapes_impl(
           drawing,
           reference,
           &images.charts_by_relationship_id,
+          &images.extended_charts_by_relationship_id,
+          styles,
+        ) {
+          inlines.extend(chart_shapes.into_iter().map(InlineItem::Shape));
+        }
+      }
+      a::GraphicDataChoice::ExtendedChartReference(reference) => {
+        if let Some(chart_shapes) = drawing_extended_chart_shapes(
+          drawing,
+          reference.r_id.as_str(),
+          &images.extended_charts_by_relationship_id,
           styles,
         ) {
           inlines.extend(chart_shapes.into_iter().map(InlineItem::Shape));
@@ -7840,9 +7851,20 @@ fn drawing_chart_shapes(
   drawing: &w::Drawing,
   reference: &c::ChartReference,
   charts_by_relationship_id: &HashMap<String, c::ChartSpace>,
+  extended_charts_by_relationship_id: &HashMap<
+    String,
+    ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex::ChartSpace,
+  >,
   styles: &StylesCatalog,
 ) -> Option<Vec<InlineShape>> {
-  let chart_space = charts_by_relationship_id.get(reference.id.as_str())?;
+  let Some(chart_space) = charts_by_relationship_id.get(reference.id.as_str()) else {
+    return drawing_extended_chart_shapes(
+      drawing,
+      reference.id.as_str(),
+      extended_charts_by_relationship_id,
+      styles,
+    );
+  };
   let (width_pt, height_pt, placement) = drawing_chart_extent_and_placement(drawing)?;
   let theme_series_colors = [
     styles.theme_colors.accent1,
@@ -7884,11 +7906,14 @@ fn drawing_chart_shapes(
       b: 70,
     },
   ];
-  let clustered = shared_chart::clustered_column_chart(chart_space);
+  let cartesian = shared_chart::cartesian_chart_for_ui_language(
+    chart_space,
+    styles.simplified_chinese_ui.then_some("zh-CN"),
+  );
   let series_count = shared_chart::series(chart_space).len();
   let series_colors = (0..series_count)
     .map(|index| {
-      clustered
+      cartesian
         .as_ref()
         .and_then(|chart| chart.series.get(index))
         .and_then(|series| series.solid_fill)
@@ -7898,6 +7923,27 @@ fn drawing_chart_shapes(
         .unwrap_or(fallback_series_colors[index % fallback_series_colors.len()])
     })
     .collect();
+  let series_point_colors = cartesian
+    .as_ref()
+    .map(|chart| {
+      chart
+        .series
+        .iter()
+        .map(|series| {
+          (0..series.values.len())
+            .map(|point_index| {
+              series
+                .data_point_fills
+                .iter()
+                .find(|fill| fill.index as usize == point_index)
+                .and_then(|fill| resolve_drawingml_solid_fill(fill.fill, &styles.theme_colors))
+                .map(|fill| fill.color)
+            })
+            .collect()
+        })
+        .collect()
+    })
+    .unwrap_or_default();
   let pie_point_colors = shared_chart::pie_chart_model(chart_space)
     .map(|pie| {
       (0..pie.values.len())
@@ -7925,6 +7971,34 @@ fn drawing_chart_shapes(
         .collect()
     })
     .unwrap_or_default();
+  let chart_area_fill_color = chart_space
+    .shape_properties
+    .as_deref()
+    .and_then(shared_chart::shape_properties_solid_fill)
+    .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
+    .map(|fill| fill.color);
+  let plot_area_fill_color = chart_space
+    .chart
+    .plot_area
+    .shape_properties
+    .as_deref()
+    .and_then(shared_chart::shape_properties_solid_fill)
+    .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
+    .map(|fill| fill.color);
+  let chart_area_stroke_color = chart_space
+    .shape_properties
+    .as_deref()
+    .and_then(shared_chart::shape_properties_outline_solid_fill)
+    .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
+    .map(|fill| fill.color);
+  let plot_area_stroke_color = chart_space
+    .chart
+    .plot_area
+    .shape_properties
+    .as_deref()
+    .and_then(shared_chart::shape_properties_outline_solid_fill)
+    .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
+    .map(|fill| fill.color);
   let chart_font = shared_chart::fixed_output_latin_font_family(chart_space)
     .map(|typeface| styles.theme_fonts.resolve_drawingml_typeface(typeface))
     .or_else(|| styles.theme_fonts.minor_high_ansi.clone())
@@ -7943,6 +8017,19 @@ fn drawing_chart_shapes(
   title_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
   label_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
   let mut data_label_style = label_style.clone();
+  if let Some(properties) = chart_space.text_properties.as_deref() {
+    apply_chart_text_properties(&mut title_style, properties, styles);
+    apply_chart_text_properties(&mut label_style, properties, styles);
+    apply_chart_text_properties(&mut data_label_style, properties, styles);
+  }
+  if let Some(properties) = chart_space
+    .chart
+    .title
+    .as_deref()
+    .and_then(|title| title.text_properties.as_deref())
+  {
+    apply_chart_text_properties(&mut title_style, properties, styles);
+  }
   if let Some(properties) = chart_space
     .chart
     .legend
@@ -7951,8 +8038,13 @@ fn drawing_chart_shapes(
   {
     apply_chart_text_properties(&mut label_style, properties, styles);
   }
-  if let Some(properties) =
-    shared_chart::pie_chart_model(chart_space).and_then(|model| model.data_label_text_properties)
+  if let Some(properties) = shared_chart::pie_chart_model(chart_space)
+    .and_then(|model| model.data_label_text_properties)
+    .or_else(|| {
+      cartesian
+        .as_ref()
+        .and_then(|model| model.data_label_text_properties)
+    })
   {
     apply_chart_text_properties(&mut data_label_style, properties, styles);
   }
@@ -7967,7 +8059,8 @@ fn drawing_chart_shapes(
   let automatic_title = shared_chart::automatic_chart_title(ui_language.as_deref()).to_string();
   let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
   shape.chart = Some(Box::new(InlineChart {
-    chart_space: Box::new(chart_space.clone()),
+    chart_space: Some(Box::new(chart_space.clone())),
+    extended_chart_space: None,
     ui_language,
     automatic_title,
     title_style,
@@ -7979,7 +8072,69 @@ fn drawing_chart_shapes(
       b: 134,
     },
     series_colors,
+    series_point_colors,
     pie_point_colors,
+    chart_area_fill_color,
+    plot_area_fill_color,
+    chart_area_stroke_color,
+    plot_area_stroke_color,
+  }));
+  Some(vec![shape])
+}
+
+fn drawing_extended_chart_shapes(
+  drawing: &w::Drawing,
+  relationship_id: &str,
+  charts_by_relationship_id: &HashMap<
+    String,
+    ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex::ChartSpace,
+  >,
+  styles: &StylesCatalog,
+) -> Option<Vec<InlineShape>> {
+  let chart_space = charts_by_relationship_id.get(relationship_id)?;
+  let (width_pt, height_pt, placement) = drawing_chart_extent_and_placement(drawing)?;
+  let chart_font = styles
+    .theme_fonts
+    .minor_high_ansi
+    .clone()
+    .or_else(|| styles.theme_fonts.minor_ascii.clone());
+  let mut title_style = TextStyle {
+    font_family: chart_font.clone(),
+    font_size_pt: 14.0,
+    bold: true,
+    ..TextStyle::default()
+  };
+  let mut label_style = TextStyle {
+    font_family: chart_font,
+    font_size_pt: 9.0,
+    ..TextStyle::default()
+  };
+  title_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
+  label_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
+  let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
+  shape.chart = Some(Box::new(InlineChart {
+    chart_space: None,
+    extended_chart_space: Some(Box::new(chart_space.clone())),
+    ui_language: styles.simplified_chinese_ui.then(|| "zh-CN".to_string()),
+    automatic_title: shared_chart::automatic_chart_title(
+      styles.simplified_chinese_ui.then_some("zh-CN"),
+    )
+    .to_string(),
+    title_style,
+    label_style: label_style.clone(),
+    data_label_style: label_style,
+    gridline_color: RgbColor {
+      r: 134,
+      g: 134,
+      b: 134,
+    },
+    series_colors: Vec::new(),
+    series_point_colors: Vec::new(),
+    pie_point_colors: Vec::new(),
+    chart_area_fill_color: None,
+    plot_area_fill_color: None,
+    chart_area_stroke_color: None,
+    plot_area_stroke_color: None,
   }));
   Some(vec![shape])
 }
@@ -8020,6 +8175,14 @@ fn apply_chart_text_properties(
     .filter(|typeface| !typeface.trim().is_empty())
   {
     style.font_family = Some(styles.theme_fonts.resolve_drawingml_typeface(typeface));
+  }
+  if let Some(typeface) = properties
+    .east_asian_font
+    .as_ref()
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.trim().is_empty())
+  {
+    style.fallback_font_family = Some(styles.theme_fonts.resolve_drawingml_typeface(typeface));
   }
   if let Some(a::DefaultRunPropertiesChoice::SolidFill(fill)) =
     properties.default_run_properties_choice1.as_ref()

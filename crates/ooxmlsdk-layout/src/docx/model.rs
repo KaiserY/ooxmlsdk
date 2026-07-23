@@ -591,8 +591,10 @@ pub(crate) struct InlineChart {
   pub automatic_title: String,
   pub title_style: TextStyle,
   pub label_style: TextStyle,
+  pub data_label_style: TextStyle,
   pub gridline_color: RgbColor,
   pub series_colors: Vec<RgbColor>,
+  pub pie_point_colors: Vec<RgbColor>,
 }
 
 #[derive(Clone, Debug)]

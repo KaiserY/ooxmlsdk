@@ -71,6 +71,21 @@ pub struct ClusteredColumnChart<'a> {
   pub legend_position: Option<ChartLegendPosition>,
 }
 
+#[derive(Clone, Debug)]
+pub struct PieChartModel<'a> {
+  pub categories: Vec<String>,
+  pub values: Vec<Option<f64>>,
+  pub series_solid_fill: Option<&'a a::SolidFill>,
+  pub data_point_fills: Vec<ChartDataPointFill<'a>>,
+  pub first_slice_angle_deg: f64,
+  pub vary_colors: bool,
+  pub legend_position: Option<ChartLegendPosition>,
+  pub visible_legend_indices: Vec<usize>,
+  pub has_manual_legend_layout: bool,
+  pub data_labels: Vec<ClusteredColumnDataLabel>,
+  pub data_label_text_properties: Option<&'a c::TextProperties>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LinearAxisScale {
   pub minimum: f64,
@@ -175,12 +190,13 @@ pub fn clustered_column_chart_for_ui_language<'a>(
     } else {
       source_categories
     };
-    let data_labels = clustered_column_data_labels(
-      source,
+    let data_labels = resolved_data_labels(
+      source.data_labels.as_deref(),
       bar_chart.data_labels.as_deref(),
       &name,
       &label_categories,
       &values,
+      "; ",
     );
     series.push(ClusteredColumnSeries {
       name,
@@ -291,6 +307,126 @@ pub fn ordinary_clustered_column_chart(
   clustered_column_chart(chart_space)
 }
 
+/// Extracts the ordinary two-dimensional pie semantics displayed by Office.
+///
+/// ECMA-376 permits more than one `c:ser` in `c:pieChart`, but MS-OI29500
+/// §21.2.2.141 specifies that Office displays only the first series. The same
+/// implementation note specifies that `c:varyColors` is ignored when multiple
+/// series are present. Keeping those Office rules here prevents fixed-output
+/// renderers from merging cached series that are not visible.
+pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>> {
+  let pie_chart = chart_space
+    .chart
+    .plot_area
+    .plot_area_choice1
+    .iter()
+    .find_map(|choice| match choice {
+      c::PlotAreaChoice::PieChart(chart) => Some(chart.as_ref()),
+      _ => None,
+    })?;
+  let series = pie_chart.pie_chart_series.first()?;
+  let values = series
+    .values
+    .as_deref()
+    .map(indexed_values)
+    .unwrap_or_default();
+  let mut categories = series
+    .category_axis_data
+    .as_deref()
+    .map(indexed_category_axis_text_values)
+    .unwrap_or_default();
+  if categories.len() < values.len() {
+    categories.extend((categories.len() + 1..=values.len()).map(|index| index.to_string()));
+  }
+  categories.truncate(values.len());
+  let series_ref = pie_series_ref(series);
+  let series_name = series_ref
+    .series_text
+    .map(series_text_value)
+    .filter(|value| !value.is_empty())
+    .unwrap_or_else(|| default_series_label(series_ref, 1, None));
+  let data_labels = resolved_data_labels(
+    series.data_labels.as_deref(),
+    pie_chart.data_labels.as_deref(),
+    &series_name,
+    &categories,
+    &values,
+    " ",
+  );
+  let data_label_text_properties = series
+    .data_labels
+    .as_deref()
+    .and_then(data_labels_text_properties)
+    .or_else(|| {
+      pie_chart
+        .data_labels
+        .as_deref()
+        .and_then(data_labels_text_properties)
+    });
+
+  let mut data_point_fills = Vec::new();
+  collect_data_point_solid_fills(&series.data_point, &mut data_point_fills);
+  data_point_fills.sort_by_key(|fill| fill.index);
+
+  let legend = chart_space.chart.legend.as_deref();
+  let legend_position = legend.map(|legend| {
+    match legend
+      .legend_position
+      .as_ref()
+      .and_then(|position| position.val)
+      // ECMA-376 Part 1, CT_LegendPos defaults an omitted value to right.
+      .unwrap_or(c::LegendPositionValues::Right)
+    {
+      c::LegendPositionValues::Bottom => ChartLegendPosition::Bottom,
+      c::LegendPositionValues::Top => ChartLegendPosition::Top,
+      c::LegendPositionValues::Left => ChartLegendPosition::Left,
+      c::LegendPositionValues::Right => ChartLegendPosition::Right,
+      c::LegendPositionValues::TopRight => ChartLegendPosition::TopRight,
+    }
+  });
+  let mut visible_legend_indices = (0..categories.len()).collect::<Vec<_>>();
+  if let Some(legend) = legend {
+    visible_legend_indices.retain(|index| {
+      !legend.legend_entry.iter().any(|entry| {
+        entry.index.val as usize == *index
+          && matches!(
+            entry.legend_entry_choice.as_ref(),
+            Some(c::LegendEntryChoice::Delete(delete))
+              if delete.val.is_none_or(|value| value.as_bool())
+          )
+      })
+    });
+  }
+
+  Some(PieChartModel {
+    categories,
+    values,
+    series_solid_fill: series
+      .chart_shape_properties
+      .as_deref()
+      .and_then(chart_shape_solid_fill),
+    data_point_fills,
+    // ECMA-376 Part 1, CT_FirstSliceAng defaults an omitted value to zero.
+    first_slice_angle_deg: pie_chart
+      .first_slice_angle
+      .as_ref()
+      .and_then(|angle| angle.val)
+      .map_or(0.0, f64::from),
+    vary_colors: pie_chart.pie_chart_series.len() == 1
+      && pie_chart
+        .vary_colors
+        .as_ref()
+        .is_some_and(|vary| vary.val.is_none_or(|value| value.as_bool())),
+    legend_position,
+    visible_legend_indices,
+    has_manual_legend_layout: legend
+      .and_then(|legend| legend.layout.as_deref())
+      .is_some_and(|layout| layout.manual_layout.is_some()),
+    data_labels,
+    data_label_text_properties,
+  })
+}
+
 /// Returns whether `c:spPr` contributes visible chart- or plot-area paint.
 ///
 /// ISO/IEC 29500-1:2016 §21.2.2.197 delegates chart shape properties to
@@ -321,23 +457,35 @@ fn shape_properties_are_visible(properties: &c::ShapeProperties) -> bool {
     || properties.shape_properties_extension_list.is_some()
 }
 
-fn clustered_column_data_labels(
-  series: &c::BarChartSeries,
-  chart_group_labels: Option<&c::DataLabels>,
+fn resolved_data_labels<'a>(
+  series_labels: Option<&'a c::DataLabels>,
+  chart_group_labels: Option<&'a c::DataLabels>,
   series_name: &str,
   categories: &[String],
   values: &[Option<f64>],
+  default_separator: &'a str,
 ) -> Vec<ClusteredColumnDataLabel> {
   // ECMA-376 Part 1 §21.2.2.49 defines c:dLbls as the settings for an
   // entire series or chart. MS-OI29500 §21.2.2.49 adds the Office override
   // hierarchy: chart-group dLbls < series dLbls < individual dLbl. Expand the
   // resolved series settings across every point, then apply point overrides.
-  let mut settings = ClusteredColumnDataLabelSettings::default();
+  let mut settings = ClusteredColumnDataLabelSettings {
+    separator: default_separator,
+    ..ClusteredColumnDataLabelSettings::default()
+  };
   apply_data_labels_settings(&mut settings, chart_group_labels);
-  apply_data_labels_settings(&mut settings, series.data_labels.as_deref());
+  apply_data_labels_settings(&mut settings, series_labels);
+  let percentage_total = values.iter().flatten().sum::<f64>();
+  let whole_percentages = (settings.show_percent
+    && series_labels
+      .or(chart_group_labels)
+      .and_then(data_labels_format_code)
+      .is_none()
+    && percentage_total > f64::EPSILON)
+    .then(|| largest_remainder_percentages(values, percentage_total));
 
   let mut point_labels = vec![None; values.len()];
-  if let Some(labels) = series.data_labels.as_deref() {
+  if let Some(labels) = series_labels {
     for label in &labels.data_label {
       let Ok(point_index) = usize::try_from(label.index.val) else {
         continue;
@@ -390,6 +538,20 @@ fn clustered_column_data_labels(
           series_name,
           categories.get(point_index).map(String::as_str),
           value,
+          (point_settings.show_percent && percentage_total.abs() > f64::EPSILON).then(|| {
+            whole_percentages.as_ref().map_or_else(
+              || {
+                format_chart_number(
+                  value / percentage_total,
+                  series_labels
+                    .or(chart_group_labels)
+                    .and_then(data_labels_format_code)
+                    .or(Some("0%")),
+                )
+              },
+              |percentages| format!("{}%", percentages[point_index] as i32),
+            )
+          }),
         )?,
       };
       Some(ClusteredColumnDataLabel {
@@ -407,6 +569,7 @@ struct ClusteredColumnDataLabelSettings<'a> {
   show_value: bool,
   show_category_name: bool,
   show_series_name: bool,
+  show_percent: bool,
   separator: &'a str,
   position: c::DataLabelPositionValues,
 }
@@ -418,6 +581,7 @@ impl Default for ClusteredColumnDataLabelSettings<'_> {
       show_value: false,
       show_category_name: false,
       show_series_name: false,
+      show_percent: false,
       separator: "; ",
       // MS-OI29500 §21.2.2.48 specifies OutsideEnd as the Office default
       // for a clustered bar/column chart when c:dLblPos is omitted.
@@ -458,11 +622,21 @@ fn apply_data_labels_sequence_settings<'a>(
   if let Some(show) = sequence.show_series_name.as_ref() {
     settings.show_series_name = show.val.is_none_or(|value| value.as_bool());
   }
+  if let Some(show) = sequence.show_percent.as_ref() {
+    settings.show_percent = show.val.is_none_or(|value| value.as_bool());
+  }
   if let Some(separator) = sequence.separator.as_deref() {
     settings.separator = separator;
   }
   if let Some(position) = sequence.data_label_position.as_ref() {
     settings.position = position.val;
+  }
+}
+
+fn data_labels_text_properties(labels: &c::DataLabels) -> Option<&c::TextProperties> {
+  match labels.data_labels_choice.as_ref() {
+    Some(c::DataLabelsChoice::Sequence(sequence)) => sequence.text_properties.as_deref(),
+    _ => None,
   }
 }
 
@@ -479,6 +653,9 @@ fn apply_data_label_sequence_settings<'a>(
   if let Some(show) = sequence.show_series_name.as_ref() {
     settings.show_series_name = show.val.is_none_or(|value| value.as_bool());
   }
+  if let Some(show) = sequence.show_percent.as_ref() {
+    settings.show_percent = show.val.is_none_or(|value| value.as_bool());
+  }
   if let Some(separator) = sequence.separator.as_deref() {
     settings.separator = separator;
   }
@@ -492,8 +669,9 @@ fn compose_clustered_column_data_label(
   series_name: &str,
   category: Option<&str>,
   value: f64,
+  percentage: Option<String>,
 ) -> Option<String> {
-  let mut components = Vec::with_capacity(3);
+  let mut components = Vec::with_capacity(4);
   if settings.show_series_name && !series_name.is_empty() {
     components.push(series_name.to_string());
   }
@@ -505,7 +683,35 @@ fn compose_clustered_column_data_label(
   if settings.show_value {
     components.push(general_chart_number(value));
   }
+  if let Some(percentage) = percentage {
+    components.push(percentage);
+  }
   (!components.is_empty()).then(|| components.join(settings.separator))
+}
+
+fn largest_remainder_percentages(values: &[Option<f64>], total: f64) -> Vec<f64> {
+  let mut percentages = values
+    .iter()
+    .map(|value| value.map(|value| value / total * 100.0).unwrap_or(0.0))
+    .collect::<Vec<_>>();
+  let mut remaining = 100_i32
+    - percentages
+      .iter()
+      .map(|value| value.floor() as i32)
+      .sum::<i32>();
+  let mut order = (0..percentages.len()).collect::<Vec<_>>();
+  order.sort_by(|left, right| {
+    percentages[*right]
+      .fract()
+      .total_cmp(&percentages[*left].fract())
+      .then_with(|| left.cmp(right))
+  });
+  for index in order {
+    let floor = percentages[index].floor();
+    percentages[index] = floor + f64::from(remaining > 0);
+    remaining -= i32::from(remaining > 0);
+  }
+  percentages
 }
 
 fn data_label_chart_text(chart_text: &c::ChartText, value: f64) -> String {
@@ -874,6 +1080,14 @@ pub fn fixed_output_texts_for_ui_language(
   let chart_series = series(chart_space);
 
   if kind(chart_space) == ChartKind::Pie {
+    // MS-OI29500 §21.2.2.141: Office displays only the first pie series even
+    // though the ECMA schema permits multiple c:ser children.
+    let displayed_series = chart_series
+      .first()
+      .copied()
+      .into_iter()
+      .collect::<Vec<_>>();
+    let pie_model = pie_chart_model(chart_space);
     if chart_space.chart.legend.is_some() {
       if chart_space
         .chart
@@ -881,18 +1095,29 @@ pub fn fixed_output_texts_for_ui_language(
         .as_deref()
         .is_some_and(|title| title.chart_text.is_none())
       {
-        for (series_index, series) in chart_series.iter().copied().enumerate() {
+        for (series_index, series) in displayed_series.iter().copied().enumerate() {
           push_fixed_series_name(&mut texts, series, series_index + 1, ui_language);
         }
       }
-      if let Some(categories) = chart_series
+      if let Some(model) = pie_model.as_ref() {
+        texts.extend(
+          model
+            .visible_legend_indices
+            .iter()
+            .filter_map(|index| model.categories.get(*index).cloned()),
+        );
+      } else if let Some(categories) = displayed_series
         .iter()
         .find_map(|series| series.category_axis_data)
       {
         push_fixed_category_texts(&mut texts, categories, chart_space);
       }
     }
-    push_fixed_data_labels(&mut texts, &chart_series, 1.0);
+    if let Some(model) = pie_model {
+      texts.extend(model.data_labels.into_iter().map(|label| label.text));
+    } else {
+      push_fixed_data_labels(&mut texts, &displayed_series, 1.0);
+    }
     push_fixed_chart_title(&mut texts, chart_space, ui_language);
     return texts;
   }
@@ -2618,7 +2843,7 @@ mod tests {
     ChartTitleText, automatic_chart_title, automatic_series_title, chart_title_text,
     clustered_column_chart, clustered_column_slot, fixed_output_latin_font_family,
     fixed_output_texts_for_ui_language, format_chart_number, linear_axis_scale,
-    ordinary_clustered_column_chart,
+    ordinary_clustered_column_chart, pie_chart_model,
   };
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
   use ooxmlsdk::sdk::SdkType;
@@ -2667,6 +2892,62 @@ mod tests {
     assert_eq!(
       fixed_output_texts_for_ui_language(&chart_space, None),
       ["A 34%", "B 33%", "C 33%"]
+    );
+  }
+
+  #[test]
+  fn office_pie_model_uses_only_the_first_series_and_schema_defaults() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:plotArea><c:pieChart><c:varyColors/><c:ser><c:idx val="0"/><c:order val="0"/><c:spPr><a:solidFill><a:srgbClr val="FFFF00"/></a:solidFill></c:spPr><c:dPt><c:idx val="1"/><c:spPr><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></c:spPr></c:dPt><c:cat><c:strLit><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>3</c:v></c:pt><c:pt idx="1"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser><c:ser><c:idx val="1"/><c:order val="1"/><c:cat><c:strLit><c:pt idx="0"><c:v>Hidden</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>99</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea><c:legend><c:legendEntry><c:idx val="1"/><c:delete/></c:legendEntry></c:legend></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+
+    let pie = pie_chart_model(&chart_space).expect("pie chart");
+    assert_eq!(pie.categories, ["A", "B"]);
+    assert_eq!(pie.values, [Some(3.0), Some(1.0)]);
+    assert_eq!(pie.first_slice_angle_deg, 0.0);
+    assert_eq!(pie.legend_position, Some(super::ChartLegendPosition::Right));
+    assert_eq!(pie.visible_legend_indices, [0]);
+    assert_eq!(
+      fixed_output_texts_for_ui_language(&chart_space, None),
+      ["A"]
+    );
+    assert!(!pie.vary_colors);
+    assert_eq!(pie.data_point_fills.len(), 1);
+  }
+
+  #[test]
+  fn pie_point_custom_text_replaces_the_inherited_value_label() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:dLbls><c:dLbl><c:idx val="1"/><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>custom</a:t></a:r></a:p></c:rich></c:tx><c:showVal val="1"/></c:dLbl><c:showVal val="1"/></c:dLbls><c:cat><c:strLit><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+
+    let pie = pie_chart_model(&chart_space).expect("pie chart");
+    assert_eq!(
+      pie
+        .data_labels
+        .iter()
+        .map(|label| (label.point_index, label.text.as_str()))
+        .collect::<Vec<_>>(),
+      [(0, "1"), (1, "custom")]
+    );
+    assert_eq!(
+      fixed_output_texts_for_ui_language(&chart_space, None),
+      ["1", "custom"]
+    );
+  }
+
+  #[test]
+  fn fixed_output_ignores_later_pie_series_like_office() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:cat><c:strLit><c:pt idx="0"><c:v>Visible</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser><c:ser><c:idx val="1"/><c:order val="1"/><c:dLbls><c:showSerName val="1"/></c:dLbls><c:tx><c:v>Hidden series</c:v></c:tx><c:cat><c:strLit><c:pt idx="0"><c:v>Hidden category</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea><c:legend/></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+
+    assert_eq!(
+      fixed_output_texts_for_ui_language(&chart_space, None),
+      ["Visible"]
     );
   }
 

@@ -7898,8 +7898,35 @@ fn drawing_chart_shapes(
         .unwrap_or(fallback_series_colors[index % fallback_series_colors.len()])
     })
     .collect();
+  let pie_point_colors = shared_chart::pie_chart_model(chart_space)
+    .map(|pie| {
+      (0..pie.values.len())
+        .map(|index| {
+          pie
+            .data_point_fills
+            .iter()
+            .find(|fill| fill.index as usize == index)
+            .and_then(|fill| resolve_drawingml_solid_fill(fill.fill, &styles.theme_colors))
+            .or_else(|| {
+              pie
+                .series_solid_fill
+                .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
+            })
+            .map(|fill| fill.color)
+            .or_else(|| {
+              let color_index = if pie.vary_colors { index } else { 0 };
+              theme_series_colors[color_index % theme_series_colors.len()]
+            })
+            .unwrap_or_else(|| {
+              let color_index = if pie.vary_colors { index } else { 0 };
+              fallback_series_colors[color_index % fallback_series_colors.len()]
+            })
+        })
+        .collect()
+    })
+    .unwrap_or_default();
   let chart_font = shared_chart::fixed_output_latin_font_family(chart_space)
-    .map(Arc::<str>::from)
+    .map(|typeface| styles.theme_fonts.resolve_drawingml_typeface(typeface))
     .or_else(|| styles.theme_fonts.minor_high_ansi.clone())
     .or_else(|| styles.theme_fonts.minor_ascii.clone());
   let mut title_style = TextStyle {
@@ -7908,12 +7935,27 @@ fn drawing_chart_shapes(
     bold: true,
     ..TextStyle::default()
   };
-  let label_style = TextStyle {
+  let mut label_style = TextStyle {
     font_family: chart_font,
     font_size_pt: 10.0,
     ..TextStyle::default()
   };
   title_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
+  label_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
+  let mut data_label_style = label_style.clone();
+  if let Some(properties) = chart_space
+    .chart
+    .legend
+    .as_deref()
+    .and_then(|legend| legend.text_properties.as_deref())
+  {
+    apply_chart_text_properties(&mut label_style, properties, styles);
+  }
+  if let Some(properties) =
+    shared_chart::pie_chart_model(chart_space).and_then(|model| model.data_label_text_properties)
+  {
+    apply_chart_text_properties(&mut data_label_style, properties, styles);
+  }
   let ui_language = if styles.simplified_chinese_ui {
     Some("zh-CN".to_string())
   } else {
@@ -7930,14 +7972,62 @@ fn drawing_chart_shapes(
     automatic_title,
     title_style,
     label_style,
+    data_label_style,
     gridline_color: RgbColor {
       r: 134,
       g: 134,
       b: 134,
     },
     series_colors,
+    pie_point_colors,
   }));
   Some(vec![shape])
+}
+
+fn apply_chart_text_properties(
+  style: &mut TextStyle,
+  properties: &c::TextProperties,
+  styles: &StylesCatalog,
+) {
+  let Some(properties) = properties
+    .paragraph
+    .iter()
+    .filter_map(|paragraph| paragraph.paragraph_properties.as_deref())
+    .find_map(|paragraph| paragraph.default_run_properties.as_deref())
+    .or_else(|| {
+      properties
+        .list_style
+        .as_deref()
+        .and_then(|style| style.default_paragraph_properties.as_deref())
+        .and_then(|paragraph| paragraph.default_run_properties.as_deref())
+    })
+  else {
+    return;
+  };
+  if let Some(size) = properties.font_size.filter(|size| *size > 0) {
+    style.font_size_pt = size as f32 / 100.0;
+  }
+  if let Some(bold) = properties.bold.as_ref() {
+    style.bold = bold.as_bool();
+  }
+  if let Some(italic) = properties.italic.as_ref() {
+    style.italic = italic.as_bool();
+  }
+  if let Some(typeface) = properties
+    .latin_font
+    .as_ref()
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.trim().is_empty())
+  {
+    style.font_family = Some(styles.theme_fonts.resolve_drawingml_typeface(typeface));
+  }
+  if let Some(a::DefaultRunPropertiesChoice::SolidFill(fill)) =
+    properties.default_run_properties_choice1.as_ref()
+    && let Some(color) = resolve_drawingml_solid_fill(fill, &styles.theme_colors)
+  {
+    style.color = color.color;
+    style.opacity = color.opacity;
+  }
 }
 
 fn drawing_chart_extent_and_placement(drawing: &w::Drawing) -> Option<(f32, f32, ImagePlacement)> {
@@ -11660,6 +11750,33 @@ impl ThemeFonts {
         .supplemental(&self.minor_supplemental, self.bidi_language.as_deref())
         .or_else(|| self.minor_bidi.clone()),
     }
+  }
+
+  fn resolve_drawingml_typeface(&self, typeface: &str) -> Arc<str> {
+    match typeface {
+      "+mj-lt" | "majorHAnsi" | "majorAscii" => self
+        .supplemental(&self.major_supplemental, self.latin_language.as_deref())
+        .or_else(|| self.major_high_ansi.clone())
+        .or_else(|| self.major_ascii.clone()),
+      "+mn-lt" | "minorHAnsi" | "minorAscii" => self
+        .supplemental(&self.minor_supplemental, self.latin_language.as_deref())
+        .or_else(|| self.minor_high_ansi.clone())
+        .or_else(|| self.minor_ascii.clone()),
+      "+mj-ea" | "majorEastAsia" => self
+        .supplemental(&self.major_supplemental, self.east_asia_language.as_deref())
+        .or_else(|| self.major_east_asia.clone()),
+      "+mn-ea" | "minorEastAsia" => self
+        .supplemental(&self.minor_supplemental, self.east_asia_language.as_deref())
+        .or_else(|| self.minor_east_asia.clone()),
+      "+mj-cs" | "majorBidi" => self
+        .supplemental(&self.major_supplemental, self.bidi_language.as_deref())
+        .or_else(|| self.major_bidi.clone()),
+      "+mn-cs" | "minorBidi" => self
+        .supplemental(&self.minor_supplemental, self.bidi_language.as_deref())
+        .or_else(|| self.minor_bidi.clone()),
+      _ => None,
+    }
+    .unwrap_or_else(|| Arc::from(typeface))
   }
 
   fn supplemental(

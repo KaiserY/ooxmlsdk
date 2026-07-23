@@ -259,6 +259,15 @@ fn inline_drawing_line_height(
       .descent_pt
 }
 
+fn inline_object_requires_flow_advance(
+  y_pt: f32,
+  object_line_height_pt: f32,
+  content_bottom_pt: f32,
+  page_has_body_content: bool,
+) -> bool {
+  page_has_body_content && y_pt + object_line_height_pt > content_bottom_pt + LAYOUT_EPSILON_PT
+}
+
 fn inline_text_height_for_text(
   style: &TextStyle,
   text: &str,
@@ -8154,7 +8163,41 @@ fn lower_inline_chart(
   y_pt: f32,
   width_pt: f32,
   height_pt: f32,
+  text_metrics: &mut TextMetrics,
 ) -> Vec<PageItem> {
+  if let Some(model) = shared_chart::pie_chart_model(&chart.chart_space)
+    && model.legend_position.is_none_or(|position| {
+      matches!(
+        position,
+        shared_chart::ChartLegendPosition::Right | shared_chart::ChartLegendPosition::Bottom
+      )
+    })
+    && !model.has_manual_legend_layout
+    && model
+      .values
+      .iter()
+      .all(|value| value.is_none_or(|value| value.is_finite() && value >= 0.0))
+  {
+    let expected_texts = if model.legend_position.is_some() {
+      model
+        .visible_legend_indices
+        .iter()
+        .filter_map(|index| model.categories.get(*index).cloned())
+        .collect::<Vec<_>>()
+    } else {
+      Vec::new()
+    };
+    let mut expected_texts = expected_texts;
+    expected_texts.extend(model.data_labels.iter().map(|label| label.text.clone()));
+    if shared_chart::fixed_output_texts_for_ui_language(
+      &chart.chart_space,
+      chart.ui_language.as_deref(),
+    ) == expected_texts
+    {
+      return lower_word_pie_chart(chart, &model, x_pt, y_pt, width_pt, height_pt, text_metrics);
+    }
+  }
+
   let Some(mut model) = shared_chart::ordinary_clustered_column_chart(&chart.chart_space) else {
     return lower_generic_inline_chart(chart, x_pt, y_pt, width_pt, height_pt);
   };
@@ -8203,6 +8246,274 @@ fn lower_inline_chart(
     .into_iter()
     .filter_map(docx_chart_page_item),
   );
+  items
+}
+
+fn lower_word_pie_chart(
+  chart: &InlineChart,
+  model: &shared_chart::PieChartModel<'_>,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> Vec<PageItem> {
+  let bottom_legend = model.legend_position == Some(shared_chart::ChartLegendPosition::Bottom);
+  let no_legend = model.legend_position.is_none();
+  // Word positions this chart frame below the inline drawing's flow origin.
+  // Keep the host offset separate from the chart-space ratios below.
+  let chart_y_pt = if bottom_legend || no_legend {
+    y_pt
+  } else {
+    y_pt + height_pt * 0.013_606_33
+  };
+  let frame_stroke = if bottom_legend || no_legend {
+    BorderStyle {
+      width_pt: 0.75,
+      color: RgbColor {
+        r: 217,
+        g: 217,
+        b: 217,
+      },
+      ..BorderStyle::default()
+    }
+  } else {
+    BorderStyle {
+      width_pt: 0.14,
+      color: RgbColor { r: 0, g: 0, b: 0 },
+      ..BorderStyle::default()
+    }
+  };
+  let mut items = vec![PageItem::Rect(RectItem {
+    x_pt,
+    y_pt: chart_y_pt,
+    width_pt,
+    height_pt,
+    fill_color: None,
+    fill_opacity: 1.0,
+    stroke: Some(frame_stroke),
+    stroke_opacity: 1.0,
+  })];
+
+  let total = model.values.iter().flatten().sum::<f64>();
+  if total > 0.0 {
+    // Word's automatic right-legend layout reserves the right side of the
+    // chart frame and centers the pie in the remaining plot region. These
+    // ratios are calibrated against Office fixed output after applying the
+    // ECMA/MS-OI29500 data-selection and angle rules above.
+    let (center_x, center_y, radius_x, radius_y) = if bottom_legend {
+      (
+        width_pt * 0.5,
+        height_pt * 0.454_6,
+        height_pt * 0.410_5,
+        height_pt * 0.410_5,
+      )
+    } else if no_legend {
+      (
+        width_pt * 0.5,
+        height_pt * 0.5,
+        height_pt * 0.394_355_15,
+        height_pt * 0.394_355_15,
+      )
+    } else {
+      (
+        width_pt * 0.444_498_36,
+        height_pt * 0.5,
+        height_pt * 0.394_355_15,
+        height_pt * 0.394_355_15,
+      )
+    };
+    let mut start_angle = model.first_slice_angle_deg.to_radians() as f32;
+    for (index, value) in model.values.iter().enumerate() {
+      let sweep = value.unwrap_or(0.0) / total * std::f64::consts::TAU;
+      if sweep <= 0.0 {
+        continue;
+      }
+      let sweep = sweep as f32;
+      let segment_count = ((sweep.to_degrees() / 1.0).ceil() as usize).max(1);
+      let mut points = Vec::with_capacity(segment_count + 3);
+      points.push((center_x, center_y));
+      for segment in 0..=segment_count {
+        let angle = start_angle + sweep * segment as f32 / segment_count as f32;
+        points.push((
+          center_x + angle.sin() * radius_x,
+          center_y - angle.cos() * radius_y,
+        ));
+      }
+      items.push(PageItem::Polyline(PolylineItem {
+        x_pt,
+        y_pt: chart_y_pt,
+        width_pt,
+        height_pt,
+        points,
+        closed: true,
+        fill_color: chart.pie_point_colors.get(index).copied(),
+        stroke: (bottom_legend || no_legend).then_some(BorderStyle {
+          width_pt: 1.5,
+          color: RgbColor {
+            r: 255,
+            g: 255,
+            b: 255,
+          },
+          ..BorderStyle::default()
+        }),
+      }));
+      start_angle += sweep;
+    }
+  }
+
+  if no_legend && !model.data_labels.is_empty() {
+    let total = model.values.iter().flatten().sum::<f64>();
+    if total > 0.0 {
+      let center_x = width_pt * 0.5;
+      // Word's automatic pie-label placement is slightly taller than the pie
+      // centroid ring: the two-thirds lower slice in tdf123206 is pushed
+      // farther down while the upper slice remains above center. Keep the
+      // horizontal ring circular enough to preserve centered label origins,
+      // but use Office's vertically expanded label ring and center.
+      let center_y = height_pt * 0.504_26;
+      let label_radius_x = height_pt * 0.394_355_15 * 0.84;
+      let label_radius_y = height_pt * 0.348_384;
+      let start_angle = model.first_slice_angle_deg.to_radians() as f32;
+      for label in &model.data_labels {
+        let before = model
+          .values
+          .iter()
+          .take(label.point_index)
+          .flatten()
+          .sum::<f64>();
+        let Some(value) = model.values.get(label.point_index).copied().flatten() else {
+          continue;
+        };
+        let mid_angle =
+          start_angle + ((before + value * 0.5) / total * std::f64::consts::TAU) as f32;
+        let text_width = text_metrics.measure_text(&label.text, &chart.data_label_style);
+        items.push(PageItem::Text(Box::new(TextItem {
+          x_pt: x_pt + center_x + mid_angle.sin() * label_radius_x - text_width * 0.5,
+          y_pt: chart_y_pt + center_y
+            - mid_angle.cos() * label_radius_y
+            - chart.data_label_style.font_size_pt * 0.99,
+          line_height_pt: chart.data_label_style.font_size_pt * 1.2,
+          text: label.text.clone(),
+          style: chart.data_label_style.clone(),
+          rotation_center_pt: None,
+          hyperlink_url: None,
+          dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
+          style_ref_numbering_text: None,
+          form_widget_id: None,
+          paragraph_bidi: false,
+          word_spacing_pt: 0.0,
+          preserve_text_portion: true,
+          decoration_span_start_x_pt: None,
+          pdf_text_segmentation: PdfTextSegmentation::Line,
+        })));
+      }
+    }
+  }
+
+  if bottom_legend {
+    let marker_size = chart.label_style.font_size_pt * 0.55;
+    let marker_text_gap = chart.label_style.font_size_pt * 0.275;
+    let item_gap = chart.label_style.font_size_pt * 0.515;
+    let entries = model
+      .visible_legend_indices
+      .iter()
+      .filter_map(|point_index| {
+        let text = model.categories.get(*point_index)?;
+        let text_width = text_metrics.measure_text(text, &chart.label_style);
+        Some((*point_index, text, text_width))
+      })
+      .collect::<Vec<_>>();
+    let content_width = entries
+      .iter()
+      .map(|(_, _, text_width)| marker_size + marker_text_gap + text_width)
+      .sum::<f32>()
+      + item_gap * entries.len().saturating_sub(1) as f32;
+    let mut item_x = x_pt + (width_pt - content_width) * 0.5 + width_pt * 0.004_6;
+    let marker_y = chart_y_pt + height_pt * 0.932_9;
+    let text_y = chart_y_pt + height_pt * 0.924_0;
+    for (point_index, text, text_width) in entries {
+      if let Some(color) = chart.pie_point_colors.get(point_index).copied() {
+        items.push(PageItem::Rect(RectItem {
+          x_pt: item_x,
+          y_pt: marker_y,
+          width_pt: marker_size,
+          height_pt: marker_size,
+          fill_color: Some(color),
+          fill_opacity: 1.0,
+          stroke: None,
+          stroke_opacity: 1.0,
+        }));
+      }
+      items.push(PageItem::Text(Box::new(TextItem {
+        x_pt: item_x + marker_size + marker_text_gap,
+        y_pt: text_y,
+        line_height_pt: chart.label_style.font_size_pt * 1.2,
+        text: text.clone(),
+        style: chart.label_style.clone(),
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        preserve_text_portion: true,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      })));
+      item_x += marker_size + marker_text_gap + text_width + item_gap;
+    }
+  } else if model.legend_position.is_some() {
+    let marker_size = chart.label_style.font_size_pt * 0.502_87;
+    let marker_x = x_pt + width_pt * 0.899_492_86;
+    let text_x = x_pt + width_pt * 0.915_457_55;
+    let first_marker_y = chart_y_pt + height_pt * 0.389_812;
+    // TextItem's visible-text path adds the font ascent before emitting the
+    // PDF text matrix; this is the text-box top, not the final PDF baseline.
+    let first_text_y = chart_y_pt + height_pt * 0.376_303_4;
+    let row_step = height_pt * 0.066_914_94;
+    for (row, point_index) in model.visible_legend_indices.iter().copied().enumerate() {
+      let row_offset = row as f32 * row_step;
+      if let Some(color) = chart.pie_point_colors.get(point_index).copied() {
+        items.push(PageItem::Rect(RectItem {
+          x_pt: marker_x,
+          y_pt: first_marker_y + row_offset,
+          width_pt: marker_size,
+          height_pt: marker_size,
+          fill_color: Some(color),
+          fill_opacity: 1.0,
+          stroke: None,
+          stroke_opacity: 1.0,
+        }));
+      }
+      if let Some(text) = model.categories.get(point_index) {
+        items.push(PageItem::Text(Box::new(TextItem {
+          x_pt: text_x,
+          y_pt: first_text_y + row_offset,
+          line_height_pt: chart.label_style.font_size_pt * 1.2,
+          text: text.clone(),
+          style: chart.label_style.clone(),
+          rotation_center_pt: None,
+          hyperlink_url: None,
+          dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
+          style_ref_numbering_text: None,
+          form_widget_id: None,
+          paragraph_bidi: false,
+          word_spacing_pt: 0.0,
+          preserve_text_portion: true,
+          decoration_span_start_x_pt: None,
+          pdf_text_segmentation: PdfTextSegmentation::Line,
+        })));
+      }
+    }
+  }
   items
 }
 
@@ -12944,6 +13255,17 @@ struct TextLineAdvance<'a> {
   line_has_form_widget: &'a mut bool,
 }
 
+struct InlineObjectAdvance<'a> {
+  current: &'a mut Page,
+  pages: &'a mut Vec<Page>,
+  text_metrics: &'a mut TextMetrics,
+  wrap_exclusions: &'a mut Vec<WrapExclusion>,
+  state: &'a mut TextFrameState,
+  flow: FlowContext,
+  y: f32,
+  object_line_height: f32,
+}
+
 struct TextFrameLayout<'a> {
   paragraph: &'a crate::docx::Paragraph,
   flow: FlowContext,
@@ -13175,6 +13497,39 @@ impl<'a> TextFrameLayout<'a> {
       next_frame.default_line_right,
       next_frame.base_line_height,
     )
+  }
+
+  fn advance_for_inline_object(
+    &self,
+    advance: InlineObjectAdvance<'_>,
+  ) -> Option<(FlowContext, TextFrame, f32, f32, f32, f32)> {
+    if !inline_object_requires_flow_advance(
+      advance.y,
+      advance.object_line_height,
+      advance.flow.content_bottom,
+      page_has_body_region_items(advance.current, advance.flow),
+    ) {
+      return None;
+    }
+    let (next_flow, y) = advance_text_frame_flow(advance.flow, advance.current, advance.pages);
+    let next_frame = TextFrame::new(self.paragraph, next_flow, advance.text_metrics);
+    advance.state.note_page_follow(advance.pages.len(), y);
+    reset_wrap_exclusions_for_y(advance.current, y, advance.wrap_exclusions);
+    let y = dodge_text_wrap_exclusions(
+      y,
+      next_frame.base_line_height,
+      next_frame.default_line_left,
+      next_frame.default_line_right,
+      advance.wrap_exclusions,
+    );
+    Some((
+      next_flow,
+      next_frame,
+      y,
+      next_frame.first_line_left,
+      next_frame.default_line_right,
+      next_frame.base_line_height,
+    ))
   }
 
   fn apply_column_break(
@@ -14305,6 +14660,35 @@ impl<'a> TextFrameLayout<'a> {
             line_used_punctuation_fit = false;
             line_has_tab = false;
           }
+          let object_line_height = inline_drawing_line_height(
+            metrics.frame_height_pt,
+            paragraph,
+            text_frame,
+            text_metrics,
+          );
+          if line_item_start_index == current.items.len()
+            && let Some(next) = self.advance_for_inline_object(InlineObjectAdvance {
+              current,
+              pages,
+              text_metrics,
+              wrap_exclusions: &mut wrap_exclusions,
+              state: &mut text_state,
+              flow,
+              y,
+              object_line_height,
+            })
+          {
+            (flow, text_frame, y, line_left, line_right, line_height) = next;
+            default_line_right = text_frame.default_line_right;
+            paragraph_left = text_frame.paragraph_left;
+            base_line_height = text_frame.base_line_height;
+            x = line_left;
+            line_item_start_index = current.items.len();
+            line_has_form_widget = false;
+            line_used_shrink_fit = false;
+            line_used_punctuation_fit = false;
+            line_has_tab = false;
+          }
           current.items.push(PageItem::Image(ImageItem {
             x_pt: x + metrics.content_offset_x_pt,
             y_pt: y + metrics.content_offset_y_pt,
@@ -14335,12 +14719,7 @@ impl<'a> TextFrameLayout<'a> {
             }));
           }
           x += metrics.frame_width_pt;
-          line_height = line_height.max(inline_drawing_line_height(
-            metrics.frame_height_pt,
-            paragraph,
-            text_frame,
-            text_metrics,
-          ));
+          line_height = line_height.max(object_line_height);
           emitted = true;
         }
         InlineItem::Shape(shape) => {
@@ -14356,9 +14735,14 @@ impl<'a> TextFrameLayout<'a> {
                              height_pt: f32| {
             let item_start = current.items.len();
             if let Some(chart) = &shape.chart {
-              current
-                .items
-                .extend(lower_inline_chart(chart, x_pt, y_pt, width_pt, height_pt));
+              current.items.extend(lower_inline_chart(
+                chart,
+                x_pt,
+                y_pt,
+                width_pt,
+                height_pt,
+                text_metrics,
+              ));
               return (item_start, current.items.len());
             }
             if let Some(fill_image) = &shape.fill_image {
@@ -14771,6 +15155,31 @@ impl<'a> TextFrameLayout<'a> {
                 line_used_punctuation_fit = false;
                 line_has_tab = false;
               }
+              let object_line_height =
+                inline_drawing_line_height(shape.height_pt, paragraph, text_frame, text_metrics);
+              if line_item_start_index == current.items.len()
+                && let Some(next) = self.advance_for_inline_object(InlineObjectAdvance {
+                  current,
+                  pages,
+                  text_metrics,
+                  wrap_exclusions: &mut wrap_exclusions,
+                  state: &mut text_state,
+                  flow,
+                  y,
+                  object_line_height,
+                })
+              {
+                (flow, text_frame, y, line_left, line_right, line_height) = next;
+                default_line_right = text_frame.default_line_right;
+                paragraph_left = text_frame.paragraph_left;
+                base_line_height = text_frame.base_line_height;
+                x = line_left;
+                line_item_start_index = current.items.len();
+                line_has_form_widget = false;
+                line_used_shrink_fit = false;
+                line_used_punctuation_fit = false;
+                line_has_tab = false;
+              }
               let _ = place_shape(
                 current,
                 flow,
@@ -14790,7 +15199,7 @@ impl<'a> TextFrameLayout<'a> {
               line_height = if flow.compatibility_mode < 15 && compatibility_forced_shape_line {
                 shape.height_pt.max(LAYOUT_EPSILON_PT)
               } else {
-                line_height.max(shape.height_pt)
+                line_height.max(object_line_height)
               };
             }
           }
@@ -17871,6 +18280,19 @@ mod tests {
     };
     let baseline = text.y_pt + text_metrics.baseline_offset_in_line(&style, line_height);
     assert!((baseline - 120.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn inline_object_advances_only_from_an_occupied_overflowing_frame() {
+    assert!(inline_object_requires_flow_advance(
+      600.0, 160.0, 720.0, true
+    ));
+    assert!(!inline_object_requires_flow_advance(
+      600.0, 120.0, 720.0, true
+    ));
+    assert!(!inline_object_requires_flow_advance(
+      72.0, 700.0, 720.0, false
+    ));
   }
 
   #[test]

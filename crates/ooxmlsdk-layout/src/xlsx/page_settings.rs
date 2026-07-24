@@ -342,8 +342,8 @@ impl CalcPageSettings {
     let mut requested = self.clone();
     requested.valid_printer_settings = false;
     let (_, requested_height) = requested.page_size_pt();
-    let vertical_margins = (self.margin_top_in + self.margin_bottom_in) as f32
-      * units::POINTS_PER_INCH;
+    let vertical_margins =
+      (self.margin_top_in + self.margin_bottom_in) as f32 * units::POINTS_PER_INCH;
     let output_body = (output_height - vertical_margins).max(0.0);
     let requested_body = (requested_height - vertical_margins).max(0.0) * scale;
     ((output_body - requested_body) / 2.0).max(0.0)

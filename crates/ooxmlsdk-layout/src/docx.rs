@@ -8006,15 +8006,17 @@ fn drawing_chart_shapes(
     .title
     .as_deref()
     .and_then(|title| title.chart_shape_properties.as_deref())
-    .and_then(|properties| match properties.chart_shape_properties_choice2.as_ref()? {
-      c::ChartShapePropertiesChoice2::SolidFill(fill) => {
-        resolve_drawingml_solid_fill(fill, &styles.theme_colors).map(|fill| fill.color)
-      }
-      c::ChartShapePropertiesChoice2::GradientFill(fill) => {
-        drawingml_first_gradient_fill_color(fill, &styles.theme_colors)
-      }
-      _ => None,
-    });
+    .and_then(
+      |properties| match properties.chart_shape_properties_choice2.as_ref()? {
+        c::ChartShapePropertiesChoice2::SolidFill(fill) => {
+          resolve_drawingml_solid_fill(fill, &styles.theme_colors).map(|fill| fill.color)
+        }
+        c::ChartShapePropertiesChoice2::GradientFill(fill) => {
+          drawingml_first_gradient_fill_color(fill, &styles.theme_colors)
+        }
+        _ => None,
+      },
+    );
   let chart_font = shared_chart::fixed_output_latin_font_family(chart_space)
     .map(|typeface| styles.theme_fonts.resolve_drawingml_typeface(typeface))
     .or_else(|| styles.theme_fonts.minor_high_ansi.clone())
@@ -8225,13 +8227,17 @@ fn apply_chart_rich_title_properties(
   {
     apply_chart_default_run_properties(style, properties, styles);
   }
-  if let Some(properties) = paragraph.paragraph_choice.iter().find_map(|choice| match choice {
-    a::ParagraphChoice::Run(run) => run.run_properties.as_deref(),
-    a::ParagraphChoice::Field(field) => field.run_properties.as_deref(),
-    a::ParagraphChoice::Break(_)
-    | a::ParagraphChoice::TextMath(_)
-    | a::ParagraphChoice::AlternateContent(_) => None,
-  }) {
+  if let Some(properties) = paragraph
+    .paragraph_choice
+    .iter()
+    .find_map(|choice| match choice {
+      a::ParagraphChoice::Run(run) => run.run_properties.as_deref(),
+      a::ParagraphChoice::Field(field) => field.run_properties.as_deref(),
+      a::ParagraphChoice::Break(_)
+      | a::ParagraphChoice::TextMath(_)
+      | a::ParagraphChoice::AlternateContent(_) => None,
+    })
+  {
     apply_chart_run_properties(style, properties, styles);
   }
 }
@@ -8311,8 +8317,7 @@ fn apply_chart_run_properties(
       styles.simplified_chinese_ui.then_some("zh-CN"),
     ));
   }
-  if let Some(a::RunPropertiesChoice::SolidFill(fill)) =
-    properties.run_properties_choice1.as_ref()
+  if let Some(a::RunPropertiesChoice::SolidFill(fill)) = properties.run_properties_choice1.as_ref()
     && let Some(color) = resolve_drawingml_solid_fill(fill, &styles.theme_colors)
   {
     style.color = color.color;

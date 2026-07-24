@@ -8281,10 +8281,10 @@ fn lower_inline_chart(
     .as_deref()
     .is_some_and(shared_chart::shape_properties_has_no_outline))
   .then_some(BorderStyle {
-      width_pt: 0.14,
-      color: RgbColor { r: 0, g: 0, b: 0 },
-      ..BorderStyle::default()
-    });
+    width_pt: 0.14,
+    color: RgbColor { r: 0, g: 0, b: 0 },
+    ..BorderStyle::default()
+  });
   let mut items = vec![PageItem::Rect(RectItem {
     x_pt,
     y_pt,
@@ -8307,6 +8307,7 @@ fn lower_inline_chart(
       &chart.automatic_title,
       &ClusteredColumnStyle {
         layout_profile: ChartLayoutProfile::Word,
+        modern_excel_profile: false,
         stroke_scale: 1.0,
         has_explicit_title: matches!(model.title, Some(shared_chart::ChartTitleText::Explicit(_))),
         title: chart.title_style.clone(),

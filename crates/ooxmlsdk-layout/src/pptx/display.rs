@@ -1342,6 +1342,7 @@ fn lower_chart(
         shared_chart::automatic_chart_title(ui_language),
         &ClusteredColumnStyle {
           layout_profile: ChartLayoutProfile::PowerPoint,
+          modern_excel_profile: false,
           stroke_scale: 1.0,
           has_explicit_title: matches!(
             chart.title,
@@ -1727,17 +1728,20 @@ fn chart_text_style(
         .as_deref()
         .and_then(|properties| properties.default_run_properties.as_deref())
         .is_some_and(|properties| properties.font_size.is_some())
-        || paragraph.paragraph_choice.iter().any(|choice| match choice {
-          a::ParagraphChoice::Run(run) => run
-            .run_properties
-            .as_deref()
-            .is_some_and(|properties| properties.font_size.is_some()),
-          a::ParagraphChoice::Field(field) => field
-            .run_properties
-            .as_deref()
-            .is_some_and(|properties| properties.font_size.is_some()),
-          _ => false,
-        })
+        || paragraph
+          .paragraph_choice
+          .iter()
+          .any(|choice| match choice {
+            a::ParagraphChoice::Run(run) => run
+              .run_properties
+              .as_deref()
+              .is_some_and(|properties| properties.font_size.is_some()),
+            a::ParagraphChoice::Field(field) => field
+              .run_properties
+              .as_deref()
+              .is_some_and(|properties| properties.font_size.is_some()),
+            _ => false,
+          })
     });
   let mut style = TextStyle {
     font_family: Some(Arc::from(
@@ -1772,13 +1776,17 @@ fn chart_text_style(
     {
       apply_default_run_properties(import, Some(slide), properties, &mut style);
     }
-    if let Some(properties) = paragraph.paragraph_choice.iter().find_map(|choice| match choice {
-      a::ParagraphChoice::Run(run) => run.run_properties.as_deref(),
-      a::ParagraphChoice::Field(field) => field.run_properties.as_deref(),
-      a::ParagraphChoice::Break(_)
-      | a::ParagraphChoice::TextMath(_)
-      | a::ParagraphChoice::AlternateContent(_) => None,
-    }) {
+    if let Some(properties) = paragraph
+      .paragraph_choice
+      .iter()
+      .find_map(|choice| match choice {
+        a::ParagraphChoice::Run(run) => run.run_properties.as_deref(),
+        a::ParagraphChoice::Field(field) => field.run_properties.as_deref(),
+        a::ParagraphChoice::Break(_)
+        | a::ParagraphChoice::TextMath(_)
+        | a::ParagraphChoice::AlternateContent(_) => None,
+      })
+    {
       apply_run_common(
         import,
         RunCommon {

@@ -111,7 +111,10 @@ pub struct ClusteredColumnSeries<'a> {
   pub kind: ChartSeriesKind,
   pub grouping: ChartSeriesGrouping,
   pub is_3d: bool,
-  pub smooth: bool,
+  /// Per-series line smoothing. `None` preserves the OOXML omission so hosts
+  /// can apply the document-version default instead of collapsing it to
+  /// `false` during shared chart import.
+  pub smooth: Option<bool>,
   pub marker: Option<&'a c::Marker>,
   /// Whether the series explicitly suppresses its connecting line with
   /// `c:spPr/a:ln/a:noFill`. An omitted outline keeps the chart-style default.
@@ -140,6 +143,11 @@ pub struct ClusteredColumnDataLabel<'a> {
 pub struct ClusteredColumnChart<'a> {
   pub title: Option<ChartTitleText>,
   pub title_overlay: bool,
+  /// Vertical anchoring authored on a rich chart title's `a:bodyPr`.
+  ///
+  /// Keeping this separate from the extracted title string lets host
+  /// renderers reproduce Office's automatic title-slot placement.
+  pub title_vertical_anchor: Option<a::TextAnchoringTypeValues>,
   pub has_automatic_title_marker: bool,
   /// Number of category slots represented by the embedded chart cache before
   /// a spreadsheet host resolves live worksheet references.
@@ -333,7 +341,7 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       kind: ChartSeriesKind::Column,
       grouping: ChartSeriesGrouping::Clustered,
       is_3d: false,
-      smooth: false,
+      smooth: None,
       marker: None,
       line_hidden: false,
       line_width_pt: series_ref
@@ -428,6 +436,7 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       .as_deref()
       .and_then(|title| title.overlay.as_ref())
       .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool())),
+    title_vertical_anchor: chart_title_vertical_anchor(&chart_space.chart),
     has_automatic_title_marker: chart_space.chart.auto_title_deleted.is_some(),
     cached_category_count,
     has_explicit_categories,
@@ -783,6 +792,7 @@ pub fn cartesian_chart_for_ui_language<'a>(
       .as_deref()
       .and_then(|title| title.overlay.as_ref())
       .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool())),
+    title_vertical_anchor: chart_title_vertical_anchor(&chart_space.chart),
     has_automatic_title_marker: chart_space.chart.auto_title_deleted.is_some(),
     cached_category_count,
     has_explicit_categories,
@@ -919,7 +929,7 @@ fn append_cartesian_series<'a>(
       is_3d,
       smooth: source
         .smooth
-        .is_some_and(|smooth| smooth.val.is_none_or(|value| value.as_bool())),
+        .map(|smooth| smooth.val.is_none_or(|value| value.as_bool())),
       marker: source.marker,
       line_hidden: source
         .chart_shape_properties
@@ -1297,17 +1307,14 @@ fn of_pie_secondary_indices(chart: &c::OfPieChart, values: &[Option<f64>]) -> Ve
     .split_type
     .as_ref()
     .map_or(c::SplitValues::Position, |split| split.val);
-  let split_position = chart
-    .split_position
-    .as_ref()
-    .map_or(
-      if automatic_split {
-        values.len().div_ceil(3) as f64
-      } else {
-        2.0
-      },
-      |position| position.val,
-    );
+  let split_position = chart.split_position.as_ref().map_or(
+    if automatic_split {
+      values.len().div_ceil(3) as f64
+    } else {
+      2.0
+    },
+    |position| position.val,
+  );
   let mut indices: Vec<usize> = match split_type {
     c::SplitValues::Custom => chart
       .custom_split
@@ -1587,9 +1594,7 @@ fn apply_data_labels_settings<'a>(
   }
 }
 
-pub(crate) fn has_indexed_scatter_multicomponent_data_labels(
-  chart_space: &c::ChartSpace,
-) -> bool {
+pub(crate) fn has_indexed_scatter_multicomponent_data_labels(chart_space: &c::ChartSpace) -> bool {
   chart_space
     .chart
     .plot_area
@@ -3521,6 +3526,14 @@ fn chart_title_text(chart: &c::Chart) -> Option<ChartTitleText> {
   chart_automatic_title_is_visible(chart).then_some(ChartTitleText::Automatic)
 }
 
+fn chart_title_vertical_anchor(chart: &c::Chart) -> Option<a::TextAnchoringTypeValues> {
+  let chart_text = chart.title.as_deref()?.chart_text.as_deref()?;
+  let c::ChartTextChoice::RichText(rich) = chart_text.chart_text_choice.as_ref()? else {
+    return None;
+  };
+  rich.body_properties.anchor
+}
+
 fn explicit_title_text(title: &c::Title) -> Option<String> {
   let mut values = Vec::new();
   push_chart_text(&mut values, title.chart_text.as_deref()?);
@@ -4240,9 +4253,7 @@ mod tests {
     )
     .expect("chart space");
 
-    assert!(has_indexed_scatter_multicomponent_data_labels(
-      &chart_space
-    ));
+    assert!(has_indexed_scatter_multicomponent_data_labels(&chart_space));
   }
 
   #[test]

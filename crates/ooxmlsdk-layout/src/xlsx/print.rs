@@ -278,8 +278,7 @@ fn print_scale_state(
     .iter()
     .any(|drawing| !drawing.charts.is_empty() || !drawing.extended_charts.is_empty());
   if has_chart {
-    zoom = (zoom * sheet.page_settings.printer_default_paper_scale_percent() / 100)
-      .max(ZOOM_MIN);
+    zoom = (zoom * sheet.page_settings.printer_default_paper_scale_percent() / 100).max(ZOOM_MIN);
   }
 
   CalcPrintScaleState {

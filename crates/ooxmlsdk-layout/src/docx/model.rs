@@ -598,6 +598,7 @@ pub(crate) struct InlineChart {
   pub series_colors: Vec<RgbColor>,
   pub series_point_colors: Vec<Vec<Option<RgbColor>>>,
   pub pie_point_colors: Vec<RgbColor>,
+  pub title_fill_color: Option<RgbColor>,
   pub chart_area_fill_color: Option<RgbColor>,
   pub plot_area_fill_color: Option<RgbColor>,
   pub chart_area_stroke_color: Option<RgbColor>,

@@ -8239,6 +8239,7 @@ fn lower_inline_chart(
         label: chart.label_style.clone(),
         data_label: chart.data_label_style.clone(),
         point_colors: chart.pie_point_colors.clone(),
+        data_label_fill_colors: vec![None; model.data_labels.len()],
         chart_area_fill_color: chart.chart_area_fill_color,
         plot_area_fill_color: chart.plot_area_fill_color,
         chart_area_stroke_color: chart.chart_area_stroke_color,
@@ -8275,11 +8276,15 @@ fn lower_inline_chart(
       series.name.clone_from(name);
     }
   }
-  let frame_stroke = BorderStyle {
-    width_pt: 0.14,
-    color: RgbColor { r: 0, g: 0, b: 0 },
-    ..BorderStyle::default()
-  };
+  let frame_stroke = (!chart_space
+    .shape_properties
+    .as_deref()
+    .is_some_and(shared_chart::shape_properties_has_no_outline))
+  .then_some(BorderStyle {
+      width_pt: 0.14,
+      color: RgbColor { r: 0, g: 0, b: 0 },
+      ..BorderStyle::default()
+    });
   let mut items = vec![PageItem::Rect(RectItem {
     x_pt,
     y_pt,
@@ -8287,7 +8292,7 @@ fn lower_inline_chart(
     height_pt,
     fill_color: None,
     fill_opacity: 1.0,
-    stroke: Some(frame_stroke),
+    stroke: frame_stroke,
     stroke_opacity: 1.0,
   })];
   items.extend(
@@ -8302,14 +8307,22 @@ fn lower_inline_chart(
       &chart.automatic_title,
       &ClusteredColumnStyle {
         layout_profile: ChartLayoutProfile::Word,
+        stroke_scale: 1.0,
         has_explicit_title: matches!(model.title, Some(shared_chart::ChartTitleText::Explicit(_))),
         title: chart.title_style.clone(),
-        title_fill_color: None,
+        title_fill_color: chart.title_fill_color,
         label: chart.label_style.clone(),
+        category_label: chart.label_style.clone(),
+        value_label: chart.label_style.clone(),
         data_label: chart.data_label_style.clone(),
         gridline_color: chart.gridline_color,
         series_colors: chart.series_colors.clone(),
         series_point_colors: chart.series_point_colors.clone(),
+        data_label_fill_colors: model
+          .series
+          .iter()
+          .map(|series| vec![None; series.data_labels.len()])
+          .collect(),
         chart_area_fill_color: chart.chart_area_fill_color,
         plot_area_fill_color: chart.plot_area_fill_color,
         chart_area_stroke_color: chart.chart_area_stroke_color,

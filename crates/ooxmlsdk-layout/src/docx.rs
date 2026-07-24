@@ -8001,6 +8001,20 @@ fn drawing_chart_shapes(
     .and_then(shared_chart::shape_properties_outline_solid_fill)
     .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
     .map(|fill| fill.color);
+  let title_fill_color = chart_space
+    .chart
+    .title
+    .as_deref()
+    .and_then(|title| title.chart_shape_properties.as_deref())
+    .and_then(|properties| match properties.chart_shape_properties_choice2.as_ref()? {
+      c::ChartShapePropertiesChoice2::SolidFill(fill) => {
+        resolve_drawingml_solid_fill(fill, &styles.theme_colors).map(|fill| fill.color)
+      }
+      c::ChartShapePropertiesChoice2::GradientFill(fill) => {
+        drawingml_first_gradient_fill_color(fill, &styles.theme_colors)
+      }
+      _ => None,
+    });
   let chart_font = shared_chart::fixed_output_latin_font_family(chart_space)
     .map(|typeface| styles.theme_fonts.resolve_drawingml_typeface(typeface))
     .or_else(|| styles.theme_fonts.minor_high_ansi.clone())
@@ -8043,6 +8057,9 @@ fn drawing_chart_shapes(
   {
     apply_chart_text_properties(&mut title_style, properties, styles);
   }
+  if let Some(title) = chart_space.chart.title.as_deref() {
+    apply_chart_rich_title_properties(&mut title_style, title, styles);
+  }
   if let Some(properties) = chart_space
     .chart
     .legend
@@ -8070,6 +8087,19 @@ fn drawing_chart_shapes(
       .map(|language| language.val.to_string())
   };
   let automatic_title = shared_chart::automatic_chart_title(ui_language.as_deref()).to_string();
+  let gridline_color = cartesian
+    .as_ref()
+    .and_then(|chart| chart.value_axis)
+    .and_then(|axis| axis.major_gridlines.as_deref())
+    .and_then(|gridlines| gridlines.chart_shape_properties.as_deref())
+    .and_then(shared_chart::chart_shape_outline_solid_fill)
+    .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
+    .map(|fill| fill.color)
+    .unwrap_or(RgbColor {
+      r: 134,
+      g: 134,
+      b: 134,
+    });
   let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
   shape.chart = Some(Box::new(InlineChart {
     chart_space: Some(Box::new(chart_space.clone())),
@@ -8079,14 +8109,11 @@ fn drawing_chart_shapes(
     title_style,
     label_style,
     data_label_style,
-    gridline_color: RgbColor {
-      r: 134,
-      g: 134,
-      b: 134,
-    },
+    gridline_color,
     series_colors,
     series_point_colors,
     pie_point_colors,
+    title_fill_color,
     chart_area_fill_color,
     plot_area_fill_color,
     chart_area_stroke_color,
@@ -8144,6 +8171,7 @@ fn drawing_extended_chart_shapes(
     series_colors: Vec::new(),
     series_point_colors: Vec::new(),
     pie_point_colors: Vec::new(),
+    title_fill_color: None,
     chart_area_fill_color: None,
     plot_area_fill_color: None,
     chart_area_stroke_color: None,
@@ -8172,6 +8200,47 @@ fn apply_chart_text_properties(
   else {
     return;
   };
+  apply_chart_default_run_properties(style, properties, styles);
+}
+
+fn apply_chart_rich_title_properties(
+  style: &mut TextStyle,
+  title: &c::Title,
+  styles: &StylesCatalog,
+) {
+  let Some(c::ChartTextChoice::RichText(rich)) = title
+    .chart_text
+    .as_deref()
+    .and_then(|text| text.chart_text_choice.as_ref())
+  else {
+    return;
+  };
+  let Some(paragraph) = rich.paragraph.first() else {
+    return;
+  };
+  if let Some(properties) = paragraph
+    .paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.default_run_properties.as_deref())
+  {
+    apply_chart_default_run_properties(style, properties, styles);
+  }
+  if let Some(properties) = paragraph.paragraph_choice.iter().find_map(|choice| match choice {
+    a::ParagraphChoice::Run(run) => run.run_properties.as_deref(),
+    a::ParagraphChoice::Field(field) => field.run_properties.as_deref(),
+    a::ParagraphChoice::Break(_)
+    | a::ParagraphChoice::TextMath(_)
+    | a::ParagraphChoice::AlternateContent(_) => None,
+  }) {
+    apply_chart_run_properties(style, properties, styles);
+  }
+}
+
+fn apply_chart_default_run_properties(
+  style: &mut TextStyle,
+  properties: &a::DefaultRunProperties,
+  styles: &StylesCatalog,
+) {
   if let Some(size) = properties.font_size.filter(|size| *size > 0) {
     style.font_size_pt = size as f32 / 100.0;
   }
@@ -8202,6 +8271,48 @@ fn apply_chart_text_properties(
   }
   if let Some(a::DefaultRunPropertiesChoice::SolidFill(fill)) =
     properties.default_run_properties_choice1.as_ref()
+    && let Some(color) = resolve_drawingml_solid_fill(fill, &styles.theme_colors)
+  {
+    style.color = color.color;
+    style.opacity = color.opacity;
+  }
+}
+
+fn apply_chart_run_properties(
+  style: &mut TextStyle,
+  properties: &a::RunProperties,
+  styles: &StylesCatalog,
+) {
+  if let Some(size) = properties.font_size.filter(|size| *size > 0) {
+    style.font_size_pt = size as f32 / 100.0;
+  }
+  if let Some(bold) = properties.bold.as_ref() {
+    style.bold = bold.as_bool();
+  }
+  if let Some(italic) = properties.italic.as_ref() {
+    style.italic = italic.as_bool();
+  }
+  if let Some(typeface) = properties
+    .latin_font
+    .as_ref()
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.trim().is_empty())
+  {
+    style.font_family = Some(styles.theme_fonts.resolve_drawingml_typeface(typeface));
+  }
+  if let Some(typeface) = properties
+    .east_asian_font
+    .as_ref()
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.trim().is_empty())
+  {
+    style.east_asia_font_family = Some(styles.theme_fonts.resolve_drawingml_typeface_for_language(
+      typeface,
+      styles.simplified_chinese_ui.then_some("zh-CN"),
+    ));
+  }
+  if let Some(a::RunPropertiesChoice::SolidFill(fill)) =
+    properties.run_properties_choice1.as_ref()
     && let Some(color) = resolve_drawingml_solid_fill(fill, &styles.theme_colors)
   {
     style.color = color.color;

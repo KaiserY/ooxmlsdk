@@ -113,6 +113,7 @@ pub(crate) struct CalcPageSettings {
   pub(crate) margin_header_in: f64,
   pub(crate) margin_footer_in: f64,
   pub(crate) paper_size: u32,
+  pub(crate) explicit_paper_size: bool,
   pub(crate) valid_printer_settings: bool,
   pub(crate) fit_to_page: bool,
   pub(crate) scale: u32,
@@ -162,6 +163,7 @@ impl Default for CalcPageSettings {
       margin_header_in: 0.3,
       margin_footer_in: 0.3,
       paper_size: 1,
+      explicit_paper_size: false,
       valid_printer_settings: true,
       fit_to_page: false,
       scale: 100,
@@ -208,6 +210,7 @@ impl CalcPageSettings {
       settings.apply_margins(margins);
     }
     if let Some(page_setup) = &chartsheet.chart_sheet_page_setup {
+      settings.explicit_paper_size = page_setup.paper_size.is_some();
       settings.paper_size = page_setup.paper_size.unwrap_or(settings.paper_size);
       settings.valid_printer_settings = page_setup.id.is_none() && page_setup.paper_size == Some(1)
         || page_setup
@@ -239,6 +242,7 @@ impl CalcPageSettings {
   fn apply_page_setup(&mut self, page_setup: &x::PageSetup) {
     if let Some(paper_size) = page_setup.paper_size {
       self.paper_size = paper_size;
+      self.explicit_paper_size = true;
     }
     // The Printer Settings part contains the printer initialization and
     // environment state, and pageSetup's r:id is its explicit relationship.
@@ -316,6 +320,33 @@ impl CalcPageSettings {
       std::mem::swap(&mut size.0, &mut size.1);
     }
     size
+  }
+
+  pub(crate) fn printer_default_paper_scale_percent(&self) -> u32 {
+    // Office fixed-format export keeps the active default A4 page when an
+    // explicit Letter setup has no printer-settings relationship. Excel maps
+    // the Letter worksheet canvas onto that default page at 95%; documents
+    // without an explicit paper request remain native A4 at 100%.
+    if self.explicit_paper_size && self.paper_size == 1 && self.valid_printer_settings {
+      95
+    } else {
+      100
+    }
+  }
+
+  pub(crate) fn printer_default_paper_body_offset_y_pt(&self, scale: f32) -> f32 {
+    if self.printer_default_paper_scale_percent() == 100 {
+      return 0.0;
+    }
+    let (_, output_height) = self.page_size_pt();
+    let mut requested = self.clone();
+    requested.valid_printer_settings = false;
+    let (_, requested_height) = requested.page_size_pt();
+    let vertical_margins = (self.margin_top_in + self.margin_bottom_in) as f32
+      * units::POINTS_PER_INCH;
+    let output_body = (output_height - vertical_margins).max(0.0);
+    let requested_body = (requested_height - vertical_margins).max(0.0) * scale;
+    ((output_body - requested_body) / 2.0).max(0.0)
   }
 }
 

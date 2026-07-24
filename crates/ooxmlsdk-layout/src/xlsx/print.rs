@@ -269,6 +269,18 @@ fn print_scale_state(
   } else if sheet.page_settings.scale > 0 {
     zoom = sheet.page_settings.scale.max(ZOOM_MIN);
   }
+  // Excel's fixed output applies the observed Letter-to-default-A4 canvas
+  // scale to sheets with chart drawings. Ordinary cell-only sheets retain
+  // their native column and row geometry on the same A4 fallback page.
+  let has_chart = sheet
+    .resources
+    .drawings
+    .iter()
+    .any(|drawing| !drawing.charts.is_empty() || !drawing.extended_charts.is_empty());
+  if has_chart {
+    zoom = (zoom * sheet.page_settings.printer_default_paper_scale_percent() / 100)
+      .max(ZOOM_MIN);
+  }
 
   CalcPrintScaleState {
     zoom,

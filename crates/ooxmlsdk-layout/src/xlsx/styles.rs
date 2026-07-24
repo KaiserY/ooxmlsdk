@@ -703,6 +703,7 @@ impl StylesCatalog {
       .first()
       .is_some_and(|font| font.scheme != x::FontSchemeValues::default())
   }
+
 }
 
 fn builtin_number_format_locale(ui_language: Option<&str>) -> BuiltinNumberFormatLocale {

@@ -295,7 +295,28 @@ fn print_page_items(
     heading_height + repeat_height + area_size.1,
   );
   let body_origin_x = setup.margin_left_pt + horizontal_centering + heading_width;
-  let body_origin_y = setup.margin_top_pt + vertical_centering + heading_height;
+  let paper_fallback_scale = if page.chart_count > 0 {
+    page.page_settings.printer_default_paper_scale_percent()
+  } else {
+    100
+  };
+  let body_margin_top = if paper_fallback_scale < 100
+    && page.page_settings.header_footer.has_print_content()
+  {
+    setup.margin_top_pt * zoom_scale
+  } else {
+    setup.margin_top_pt
+  };
+  let body_origin_y = body_margin_top
+    + if paper_fallback_scale < 100 {
+      page
+        .page_settings
+        .printer_default_paper_body_offset_y_pt(zoom_scale)
+    } else {
+      0.0
+    }
+    + vertical_centering
+    + heading_height;
   let mut text_metrics = TextMetrics::new();
 
   // ECMA-376 §18.3.1.46 defines these as the printed page header and
@@ -2166,6 +2187,11 @@ fn print_page_drawing_text_items(
       height_pt: rect.height_pt * zoom_scale,
     },
   );
+  let horizontal_page_overlap_pt = page
+    .area
+    .filter(|area| area.start.col > 1)
+    .filter(|_| page.sheet.uses_indexed_multicomponent_print_grid())
+    .map_or(0.0, |_| 0.96);
   for drawing in &page.sheet.resources.drawings {
     for anchor in &drawing.anchors {
       if anchor.object.hidden || !anchor.print_with_sheet {
@@ -2183,13 +2209,24 @@ fn print_page_drawing_text_items(
       let (x_pt, y_pt) =
         page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
       let drawing_rect = CellRect {
-        x_pt: origin_x_pt + x_pt * zoom_scale,
+        // Excel's fixed-output printer device overlaps adjacent horizontal
+        // worksheet pages by 0.96pt while retaining the unshifted page clip.
+        // Apply that overlap to drawings on continuation pages; ordinary
+        // sheet cells and explicit-width compatibility paths remain unchanged.
+        x_pt: origin_x_pt + x_pt * zoom_scale + horizontal_page_overlap_pt,
         y_pt: origin_y_pt + y_pt * zoom_scale,
         width_pt: width_pt * zoom_scale,
         height_pt: height_pt * zoom_scale,
       };
       if let Some(chart_items) =
-        lower_drawing_chart(import, drawing, anchor, drawing_rect, page_clip_rect)
+        lower_drawing_chart(
+          import,
+          drawing,
+          anchor,
+          drawing_rect,
+          page_clip_rect,
+          zoom_scale,
+        )
         && !chart_items.is_empty()
       {
         items.extend(chart_items);
@@ -2219,6 +2256,7 @@ fn lower_drawing_chart(
   anchor: &super::drawing::DrawingAnchorModel,
   rect: CellRect,
   page_clip_rect: CellRect,
+  drawing_scale: f32,
 ) -> Option<Vec<PageItem>> {
   if anchor.object.kind != super::drawing::DrawingObjectKind::GraphicFrame {
     return None;
@@ -2232,16 +2270,18 @@ fn lower_drawing_chart(
   if let Some(chart_space) = resource.extended_chart_space.as_deref() {
     let mut items = super::chartex::lower_extended_chart(import, chart_space, rect);
     let mut metrics = TextMetrics::new();
-    items.retain_mut(|item| clip_chart_item_to_rect(item, page_clip_rect, &mut metrics));
+    items.retain_mut(|item| {
+      clip_chart_item_to_rect(item, page_clip_rect, &mut metrics, 0.5, 0.5)
+    });
     return (!items.is_empty()).then_some(items);
   }
   let chart_space = resource.chart_space.as_deref()?;
 
   if let Some(mut chart) = shared_chart::pie_chart_model(chart_space) {
-    if chart.title.is_none()
-      && shared_chart::has_excel_automatic_title_placeholder(&chart_space.chart)
+    if chart_space.chart.title.is_none()
+      && matches!(chart.title, Some(shared_chart::ChartTitleText::Automatic))
     {
-      chart.title = Some(shared_chart::ChartTitleText::Automatic);
+      chart.title = None;
     }
     let mut title_style = import.styles.default_chart_text_style();
     title_style.font_size_pt = 14.0;
@@ -2264,6 +2304,9 @@ fn lower_drawing_chart(
       .and_then(|title| title.text_properties.as_deref())
     {
       apply_xlsx_chart_text_properties(&mut title_style, properties, import);
+    }
+    if let Some(title) = chart_space.chart.title.as_deref() {
+      apply_xlsx_chart_rich_title_properties(&mut title_style, title, import);
     }
     if let Some(properties) = chart.data_label_text_properties.or_else(|| {
       chart_space
@@ -2290,6 +2333,16 @@ fn lower_drawing_chart(
           .unwrap_or(XLSX_DEFAULT_CHART_SERIES_COLORS[index % 6])
       })
       .collect();
+    let data_label_fill_colors = chart
+      .data_labels
+      .iter()
+      .map(|label| {
+        label
+          .shape_properties
+          .and_then(shared_chart::chart_shape_solid_fill)
+          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+      })
+      .collect();
     let mut items = lower_radial_chart(
       ChartFrame {
         x_pt: rect.x_pt,
@@ -2305,6 +2358,7 @@ fn lower_drawing_chart(
         label: label_style.clone(),
         data_label: label_style,
         point_colors,
+        data_label_fill_colors,
         chart_area_fill_color: chart_space
           .shape_properties
           .as_deref()
@@ -2333,7 +2387,9 @@ fn lower_drawing_chart(
     );
     if !items.is_empty() {
       let mut metrics = TextMetrics::new();
-      items.retain_mut(|item| clip_chart_item_to_rect(item, page_clip_rect, &mut metrics));
+      items.retain_mut(|item| {
+        clip_chart_item_to_rect(item, page_clip_rect, &mut metrics, 0.5, 0.5)
+      });
       if let Some(hyperlink_url) = drawing_object_hyperlink_url(drawing, &anchor.object) {
         let left = rect.x_pt.max(page_clip_rect.x_pt);
         let top = rect.y_pt.max(page_clip_rect.y_pt);
@@ -2358,11 +2414,49 @@ fn lower_drawing_chart(
     chart_space,
     Some(import.styles.output_ui_language()),
   )?;
-  if chart.title.is_none()
-    && shared_chart::has_excel_automatic_title_placeholder(&chart_space.chart)
+  let chart_style = xlsx_chart_style_id(chart_space);
+  let has_visible_empty_automatic_title = excel_empty_automatic_title_is_visible(chart_space);
+  if chart_space.chart.title.is_none()
+    && matches!(chart.title, Some(shared_chart::ChartTitleText::Automatic))
   {
+    chart.title = None;
+  } else if chart.title.is_none()
+    && chart_space
+      .chart
+      .title
+      .as_deref()
+      .is_some_and(|title| title.chart_text.is_none())
+    && chart.series.len() == 1
+  {
+    chart.title = chart
+      .series
+      .first()
+      .map(|series| shared_chart::ChartTitleText::Explicit(series.name.clone()));
+  } else if has_visible_empty_automatic_title && chart.title.is_none() {
     chart.title = Some(shared_chart::ChartTitleText::Automatic);
   }
+  let has_explicit_single_series_compact_label_profile = matches!(
+    chart.title.as_ref(),
+    Some(shared_chart::ChartTitleText::Explicit(_))
+  ) && chart.series.len() == 1
+    && (chart.gap_width_percent - 219.0).abs() < f64::EPSILON
+    && (chart.overlap_percent + 27.0).abs() < f64::EPSILON;
+  if (chart.title.is_none()
+    && chart.has_automatic_title_marker
+    && chart.has_explicit_categories)
+    || has_explicit_single_series_compact_label_profile
+  {
+    // Excel's synthesized legend labels are compact (`Series1` / `系列1`)
+    // in the established automatic-title family and in the matching
+    // explicitly titled legacy layout. Other compatibility profiles retain
+    // their existing host spelling until fixture evidence says otherwise.
+    apply_excel_automatic_series_names(
+      &mut chart,
+      Some(import.styles.output_ui_language()),
+    );
+  }
+  resolve_hidden_chart_values(import, chart_space, &mut chart);
+  apply_excel_chart_missing_value_treatment(chart_space, chart_style.is_some(), &mut chart);
   let series_colors = chart
     .series
     .iter()
@@ -2391,7 +2485,11 @@ fn lower_drawing_chart(
     })
     .collect();
   let mut title_style = import.styles.default_chart_text_style();
-  title_style.font_size_pt = 14.0;
+  title_style.font_size_pt = if has_visible_empty_automatic_title {
+    18.0
+  } else {
+    14.0
+  };
   title_style.bold = true;
   let mut label_style = import.styles.default_chart_text_style();
   label_style.font_size_pt = 10.0;
@@ -2429,32 +2527,115 @@ fn lower_drawing_chart(
   {
     apply_xlsx_chart_text_properties(&mut title_style, properties, import);
   }
+  if let Some(title) = chart_space.chart.title.as_deref() {
+    apply_xlsx_chart_rich_title_properties(&mut title_style, title, import);
+  }
+  let mut legend_label_style = label_style.clone();
   if let Some(properties) = chart_space
     .chart
     .legend
     .as_deref()
     .and_then(|legend| legend.text_properties.as_deref())
   {
-    apply_xlsx_chart_text_properties(&mut label_style, properties, import);
+    apply_xlsx_chart_text_properties(&mut legend_label_style, properties, import);
   }
-  for properties in chart_space
-    .chart
-    .plot_area
-    .plot_area_choice2
-    .iter()
-    .filter_map(|axis| match axis {
-      c::PlotAreaChoice2::ValueAxis(axis) => axis.text_properties.as_deref(),
-      c::PlotAreaChoice2::CategoryAxis(axis) => axis.text_properties.as_deref(),
-      c::PlotAreaChoice2::DateAxis(axis) => axis.text_properties.as_deref(),
-      c::PlotAreaChoice2::SeriesAxis(axis) => axis.text_properties.as_deref(),
+  let mut category_label_style = label_style.clone();
+  if let Some(properties) = chart
+    .category_axis
+    .and_then(|axis| axis.text_properties.as_deref())
+    .or_else(|| {
+      chart
+        .date_axis
+        .and_then(|axis| axis.text_properties.as_deref())
+    })
+    .or_else(|| {
+      chart
+        .series
+        .iter()
+        .all(|series| {
+          matches!(
+            series.kind,
+            shared_chart::ChartSeriesKind::Scatter | shared_chart::ChartSeriesKind::Bubble
+          )
+        })
+        .then(|| {
+          chart
+            .value_axis
+            .and_then(|axis| axis.text_properties.as_deref())
+        })
+        .flatten()
     })
   {
-    apply_xlsx_chart_text_properties(&mut label_style, properties, import);
+    apply_xlsx_chart_text_properties(&mut category_label_style, properties, import);
+  }
+  let mut value_label_style = label_style.clone();
+  if let Some(properties) = chart
+    .value_axis
+    .and_then(|axis| axis.text_properties.as_deref())
+  {
+    apply_xlsx_chart_text_properties(&mut value_label_style, properties, import);
   }
   let mut data_label_style = label_style.clone();
   if let Some(properties) = chart.data_label_text_properties {
     apply_xlsx_chart_text_properties(&mut data_label_style, properties, import);
   }
+  let title_fill_color = chart_space
+    .chart
+    .title
+    .as_deref()
+    .and_then(|title| title.chart_shape_properties.as_deref())
+    .and_then(|properties| match properties.chart_shape_properties_choice2.as_ref()? {
+      c::ChartShapePropertiesChoice2::SolidFill(fill) => {
+        xlsx_chart_solid_fill_color(fill, import)
+      }
+      c::ChartShapePropertiesChoice2::GradientFill(fill) => {
+        xlsx_chart_first_gradient_fill_color(fill, import)
+      }
+      _ => None,
+    });
+  let gridline_color = chart
+    .value_axis
+    .and_then(|axis| axis.major_gridlines.as_deref())
+    .and_then(|gridlines| gridlines.chart_shape_properties.as_deref())
+    .and_then(shared_chart::chart_shape_outline_solid_fill)
+    .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+    .unwrap_or_else(|| {
+      if chart_style == Some(2) {
+        RgbColor {
+          r: 0x86,
+          g: 0x86,
+          b: 0x86,
+        }
+      } else {
+        RgbColor {
+          r: 0xd9,
+          g: 0xd9,
+          b: 0xd9,
+        }
+      }
+    });
+  let chart_area_stroke_color = chart_space
+    .shape_properties
+    .as_deref()
+    .and_then(shared_chart::shape_properties_outline_solid_fill)
+    .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+    .or_else(|| {
+      (chart_style == Some(2)).then_some(if chart.title.is_none()
+        && chart.has_automatic_title_marker
+        && chart.has_explicit_categories
+      {
+        // LibreOffice Chart2ImportTest::testAutoChartAreaBorderPropXLSX
+        // records Excel's automatic 0.75pt chart-area border as light gray.
+        RgbColor {
+          r: 0xd9,
+          g: 0xd9,
+          b: 0xd9,
+        }
+      } else {
+        // Preserve the existing explicit-title style-2 profile.
+        RgbColor { r: 0, g: 0, b: 0 }
+      })
+    });
   let mut items = lower_clustered_column_chart(
     ChartFrame {
       x_pt: rect.x_pt,
@@ -2466,21 +2647,37 @@ fn lower_drawing_chart(
     shared_chart::automatic_chart_title(Some(import.styles.output_ui_language())),
     &ClusteredColumnStyle {
       layout_profile: ChartLayoutProfile::Excel,
-      has_explicit_title: matches!(
-        chart.title.as_ref(),
-        Some(shared_chart::ChartTitleText::Explicit(_))
-      ),
+      stroke_scale: drawing_scale,
+      has_explicit_title: chart_space
+        .chart
+        .title
+        .as_deref()
+        .is_some_and(|title| title.chart_text.is_some()),
       title: title_style,
-      title_fill_color: None,
-      label: label_style,
+      title_fill_color,
+      label: legend_label_style,
+      category_label: category_label_style,
+      value_label: value_label_style,
       data_label: data_label_style,
-      gridline_color: RgbColor {
-        r: 0xd9,
-        g: 0xd9,
-        b: 0xd9,
-      },
+      gridline_color,
       series_colors,
       series_point_colors,
+      data_label_fill_colors: chart
+        .series
+        .iter()
+        .map(|series| {
+          series
+            .data_labels
+            .iter()
+            .map(|label| {
+              label
+                .shape_properties
+                .and_then(shared_chart::chart_shape_solid_fill)
+                .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+            })
+            .collect()
+        })
+        .collect(),
       chart_area_fill_color: chart_space
         .shape_properties
         .as_deref()
@@ -2493,11 +2690,7 @@ fn lower_drawing_chart(
         .as_deref()
         .and_then(shared_chart::shape_properties_solid_fill)
         .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
-      chart_area_stroke_color: chart_space
-        .shape_properties
-        .as_deref()
-        .and_then(shared_chart::shape_properties_outline_solid_fill)
-        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+      chart_area_stroke_color,
       plot_area_stroke_color: chart_space
         .chart
         .plot_area
@@ -2507,8 +2700,49 @@ fn lower_drawing_chart(
         .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
     },
   );
+  let indexed_scatter_text = chart.series.iter().all(|series| {
+    matches!(
+      series.kind,
+      shared_chart::ChartSeriesKind::Scatter | shared_chart::ChartSeriesKind::Bubble
+    )
+  }) && chart.series.iter().any(|series| !series.x_values.is_empty())
+    && chart
+      .series
+      .iter()
+      .flat_map(|series| &series.x_values)
+      .all(Option::is_none);
+  let multicomponent_data_labels = chart.series.iter().any(|series| {
+    series
+      .data_labels
+      .iter()
+      .any(|label| label.text_components.len() > 1)
+  });
+  let text_boundary_slack_em = if matches!(
+    chart.title.as_ref(),
+    Some(shared_chart::ChartTitleText::Automatic)
+  ) && !chart.title_overlay
+    && indexed_scatter_text
+  {
+    (0.5, 0.0)
+  } else if indexed_scatter_text && multicomponent_data_labels {
+    // Excel retains a boundary tick in the PDF text layer when its origin is
+    // up to 0.6em beyond a horizontal worksheet clip; the clip still hides
+    // the glyph ink. The ser_labels.xlsx split keeps x=2 on both horizontal
+    // pages at a 5.26pt offset for 9pt axis text.
+    (0.5, 0.6)
+  } else {
+    (0.5, 0.5)
+  };
   let mut metrics = TextMetrics::new();
-  items.retain_mut(|item| clip_chart_item_to_rect(item, page_clip_rect, &mut metrics));
+  items.retain_mut(|item| {
+    clip_chart_item_to_rect(
+      item,
+      page_clip_rect,
+      &mut metrics,
+      text_boundary_slack_em.0,
+      text_boundary_slack_em.1,
+    )
+  });
   if let Some(hyperlink_url) = drawing_object_hyperlink_url(drawing, &anchor.object) {
     let left = rect.x_pt.max(page_clip_rect.x_pt);
     let top = rect.y_pt.max(page_clip_rect.y_pt);
@@ -2525,6 +2759,155 @@ fn lower_drawing_chart(
     }
   }
   Some(items)
+}
+
+fn excel_empty_automatic_title_is_visible(chart_space: &c::ChartSpace) -> bool {
+  let Some(title) = chart_space.chart.title.as_deref() else {
+    return false;
+  };
+  if title.chart_text.is_some() {
+    return false;
+  }
+  let explicitly_retained = chart_space
+    .chart
+    .auto_title_deleted
+    .as_ref()
+    .is_some_and(|deleted| deleted.val.is_some_and(|value| !value.as_bool()));
+  let overlay_placeholder = title
+    .overlay
+    .as_ref()
+    .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool()))
+    && chart_space
+      .chart
+      .auto_title_deleted
+      .as_ref()
+      .is_none_or(|deleted| deleted.val.is_some_and(|value| !value.as_bool()));
+  explicitly_retained || overlay_placeholder
+}
+
+fn apply_excel_chart_missing_value_treatment(
+  chart_space: &c::ChartSpace,
+  has_explicit_modern_style: bool,
+  chart: &mut shared_chart::ClusteredColumnChart<'_>,
+) {
+  let treatment = chart_space
+    .chart
+    .display_blanks_as
+    .as_ref()
+    .map(|treatment| treatment.val.unwrap_or(c::DisplayBlanksAsValues::Zero))
+    .unwrap_or(if has_explicit_modern_style {
+      // LibreOffice Chart2ImportTest distinguishes the Office 2013 OOXML
+      // default (USE_ZERO) from the Office 2007 compatibility default
+      // (LEAVE_GAP). An explicit modern c:style/c14:style is the package-local
+      // evidence available here for that versioned default.
+      c::DisplayBlanksAsValues::Zero
+    } else {
+      c::DisplayBlanksAsValues::Gap
+    });
+  if treatment == c::DisplayBlanksAsValues::Zero {
+    for series in &mut chart.series {
+      for value in &mut series.values {
+        if value.is_none() {
+          *value = Some(0.0);
+        }
+      }
+    }
+  }
+}
+
+fn apply_excel_automatic_series_names(
+  chart: &mut shared_chart::ClusteredColumnChart<'_>,
+  ui_language: Option<&str>,
+) {
+  for (index, series) in chart.series.iter_mut().enumerate() {
+    if series.has_explicit_name {
+      continue;
+    }
+    let shared_name = shared_chart::automatic_series_title(ui_language, index + 1);
+    if series.name != shared_name {
+      continue;
+    }
+    // Excel's synthesized legend labels are `Series1` / `系列1`; Word and
+    // PowerPoint retain their host-specific spaced labels in the shared model.
+    let excel_name = shared_name.replace(' ', "");
+    series.name.clone_from(&excel_name);
+    for label in &mut series.data_labels {
+      label.text = label.text.replace(&shared_name, &excel_name);
+    }
+  }
+}
+
+fn resolve_hidden_chart_values(
+  import: &ExcelImport,
+  chart_space: &c::ChartSpace,
+  chart: &mut shared_chart::ClusteredColumnChart<'_>,
+) {
+  // ECMA-376 21.2.2.146: false means the chart is not restricted to visible
+  // cells. Excel/LibreOffice caches may contain only visible points even when
+  // the backing range includes hidden rows, so the workbook is authoritative
+  // for this explicit mode. Missing/invalid references retain the cache.
+  let include_hidden_cells = chart_space
+    .chart
+    .plot_visible_only
+    .as_ref()
+    .and_then(|value| value.val)
+    .is_some_and(|value| !value.as_bool());
+  if !include_hidden_cells {
+    return;
+  }
+
+  let mut resolved_any = false;
+  for series in &mut chart.series {
+    let Some(formula) = series.value_formula else {
+      continue;
+    };
+    let Some(values) = chart_reference_numeric_values(import, formula) else {
+      continue;
+    };
+    series.values = values;
+    resolved_any = true;
+  }
+  if resolved_any && chart.categories.iter().all(|value| value.parse::<usize>().is_ok()) {
+    let category_count = chart
+      .series
+      .iter()
+      .map(|series| series.values.len())
+      .max()
+      .unwrap_or(0);
+    chart.categories = (1..=category_count)
+      .map(|index| index.to_string())
+      .collect();
+  }
+}
+
+fn chart_reference_numeric_values(
+  import: &ExcelImport,
+  formula: &str,
+) -> Option<Vec<Option<f64>>> {
+  let (sheet_name, _) = formula.rsplit_once('!')?;
+  // External workbook references require link resolution and must keep using
+  // the embedded chart cache until that ownership is modeled.
+  if sheet_name.contains('[') || sheet_name.contains(']') {
+    return None;
+  }
+  let sheet_name = sheet_name
+    .trim()
+    .trim_matches('\'')
+    .replace("''", "'");
+  let sheet = import.sheets.iter().find(|sheet| sheet.name == sheet_name)?;
+  let range = CellRange::parse_a1_range(formula)?;
+  let mut values = Vec::new();
+  for row in range.start.row..=range.end.row {
+    for col in range.start.col..=range.end.col {
+      values.push(
+        sheet
+          .cell_at(CellAddress { col, row })
+          .and_then(|cell| cell.cached_value.as_deref())
+          .and_then(|value| value.parse::<f64>().ok()),
+      );
+    }
+  }
+  Some(values)
 }
 
 fn xlsx_chart_latin_typeface(chart_space: &c::ChartSpace) -> Option<&str> {
@@ -2600,6 +2983,47 @@ fn apply_xlsx_chart_text_properties(
   let Some(properties) = chart_default_run_properties(properties).next() else {
     return;
   };
+  apply_xlsx_default_run_properties(style, properties, import);
+}
+
+fn apply_xlsx_chart_rich_title_properties(
+  style: &mut TextStyle,
+  title: &c::Title,
+  import: &ExcelImport,
+) {
+  let Some(c::ChartTextChoice::RichText(rich)) = title
+    .chart_text
+    .as_deref()
+    .and_then(|text| text.chart_text_choice.as_ref())
+  else {
+    return;
+  };
+  let Some(paragraph) = rich.paragraph.first() else {
+    return;
+  };
+  if let Some(properties) = paragraph
+    .paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.default_run_properties.as_deref())
+  {
+    apply_xlsx_default_run_properties(style, properties, import);
+  }
+  if let Some(properties) = paragraph.paragraph_choice.iter().find_map(|choice| match choice {
+    a::ParagraphChoice::Run(run) => run.run_properties.as_deref(),
+    a::ParagraphChoice::Field(field) => field.run_properties.as_deref(),
+    a::ParagraphChoice::Break(_)
+    | a::ParagraphChoice::TextMath(_)
+    | a::ParagraphChoice::AlternateContent(_) => None,
+  }) {
+    apply_xlsx_run_properties(style, properties, import);
+  }
+}
+
+fn apply_xlsx_default_run_properties(
+  style: &mut TextStyle,
+  properties: &a::DefaultRunProperties,
+  import: &ExcelImport,
+) {
   if let Some(size) = properties.font_size.filter(|size| *size > 0) {
     style.font_size_pt = size as f32 / 100.0;
   }
@@ -2624,6 +3048,35 @@ fn apply_xlsx_chart_text_properties(
   }
 }
 
+fn apply_xlsx_run_properties(
+  style: &mut TextStyle,
+  properties: &a::RunProperties,
+  import: &ExcelImport,
+) {
+  if let Some(size) = properties.font_size.filter(|size| *size > 0) {
+    style.font_size_pt = size as f32 / 100.0;
+  }
+  if let Some(bold) = properties.bold.as_ref() {
+    style.bold = bold.as_bool();
+  }
+  if let Some(italic) = properties.italic.as_ref() {
+    style.italic = italic.as_bool();
+  }
+  if let Some(typeface) = properties
+    .latin_font
+    .as_ref()
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.trim().is_empty())
+  {
+    style.font_family = Some(Arc::from(
+      import.styles.resolve_drawingml_theme_font(typeface),
+    ));
+  }
+  if let Some(color) = run_properties_color(properties, import) {
+    style.color = color;
+  }
+}
+
 fn default_run_properties_color(
   properties: &a::DefaultRunProperties,
   import: &ExcelImport,
@@ -2633,6 +3086,23 @@ fn default_run_properties_color(
   else {
     return None;
   };
+  xlsx_chart_text_solid_fill_color(fill, import)
+}
+
+fn run_properties_color(
+  properties: &a::RunProperties,
+  import: &ExcelImport,
+) -> Option<RgbColor> {
+  let a::RunPropertiesChoice::SolidFill(fill) = properties.run_properties_choice1.as_ref()? else {
+    return None;
+  };
+  xlsx_chart_text_solid_fill_color(fill, import)
+}
+
+fn xlsx_chart_text_solid_fill_color(
+  fill: &a::SolidFill,
+  import: &ExcelImport,
+) -> Option<RgbColor> {
   let color = fill
     .solid_fill_choice
     .as_ref()
@@ -2671,15 +3141,38 @@ fn xlsx_scheme_color_index(value: a::SchemeColorValues) -> Option<u32> {
   }
 }
 
-fn clip_chart_item_to_rect(item: &mut PageItem, clip: CellRect, metrics: &mut TextMetrics) -> bool {
+fn clip_chart_item_to_rect(
+  item: &mut PageItem,
+  clip: CellRect,
+  metrics: &mut TextMetrics,
+  text_left_boundary_slack_em: f32,
+  text_right_boundary_slack_em: f32,
+) -> bool {
   match item {
-    PageItem::Text(text) => rect_intersects_clip(
-      text.x_pt,
-      text.y_pt,
-      text.x_pt + metrics.measure_text(&text.text, &text.style),
-      text.y_pt + text.line_height_pt,
-      clip,
-    ),
+    // Excel clips chart text at horizontal worksheet page boundaries, while
+    // retaining text objects that only extend beyond the vertical printable
+    // area in the PDF text layer.
+    PageItem::Text(text) => {
+      let clip_right = clip.x_pt + clip.width_pt;
+      let mut right = text.x_pt + metrics.measure_text(&text.text, &text.style);
+      if right > clip_right
+        && matches!(text.text.chars().last(), Some(',' | ';'))
+      {
+        // Office writes data-label fields as separate runs. At a worksheet
+        // page boundary the separator glyph can be outside the clip even
+        // though the preceding series-name run still intersects it.
+        text.text.pop();
+        right = text.x_pt + metrics.measure_text(&text.text, &text.style);
+      }
+      // Office retains a text object whose final glyph reaches the printable
+      // boundary even when fixed-output clipping hides its ink. Half an em
+      // covers the pre-shaping/final-glyph-box difference without duplicating
+      // a category label whose complete glyph box belongs to the prior page.
+      let left_boundary_slack = text.style.font_size_pt * text_left_boundary_slack_em;
+      let right_boundary_slack = text.style.font_size_pt * text_right_boundary_slack_em;
+      right + left_boundary_slack >= clip.x_pt
+        && text.x_pt <= clip_right + right_boundary_slack
+    }
     PageItem::Rect(rect) => {
       let left = rect.x_pt.max(clip.x_pt);
       let top = rect.y_pt.max(clip.y_pt);
@@ -2717,7 +3210,112 @@ fn clip_chart_item_to_rect(item: &mut PageItem, clip: CellRect, metrics: &mut Te
       line.y1_pt.max(line.y2_pt),
       clip,
     ),
-    PageItem::Image(_) | PageItem::LinkArea(_) | PageItem::Path(_) => true,
+    PageItem::Path(path) if path.closed && path.commands.is_empty() => {
+      clip_closed_polygon_to_rect(path, clip)
+    }
+    PageItem::Path(path) => rect_intersects_clip(
+      path.bounds.origin.x.0,
+      path.bounds.origin.y.0,
+      path.bounds.origin.x.0 + path.bounds.size.width.0,
+      path.bounds.origin.y.0 + path.bounds.size.height.0,
+      clip,
+    ),
+    PageItem::Image(_) | PageItem::LinkArea(_) => true,
+  }
+}
+
+#[derive(Clone, Copy)]
+enum PolygonClipEdge {
+  Left,
+  Right,
+  Top,
+  Bottom,
+}
+
+fn clip_closed_polygon_to_rect(
+  path: &mut common::PathItem<'static>,
+  clip: CellRect,
+) -> bool {
+  let mut points = path.points.clone();
+  for (edge, boundary) in [
+    (PolygonClipEdge::Left, clip.x_pt),
+    (PolygonClipEdge::Right, clip.x_pt + clip.width_pt),
+    (PolygonClipEdge::Top, clip.y_pt),
+    (PolygonClipEdge::Bottom, clip.y_pt + clip.height_pt),
+  ] {
+    points = clip_polygon_edge(&points, edge, boundary);
+    if points.len() < 3 {
+      return false;
+    }
+  }
+
+  let left = points.iter().map(|point| point.x.0).fold(f32::MAX, f32::min);
+  let top = points.iter().map(|point| point.y.0).fold(f32::MAX, f32::min);
+  let right = points.iter().map(|point| point.x.0).fold(f32::MIN, f32::max);
+  let bottom = points.iter().map(|point| point.y.0).fold(f32::MIN, f32::max);
+  path.points = points;
+  path.bounds = common_rect(left, top, right - left, bottom - top);
+  true
+}
+
+fn clip_polygon_edge(
+  points: &[common::Point],
+  edge: PolygonClipEdge,
+  boundary: f32,
+) -> Vec<common::Point> {
+  let Some(mut previous) = points.last().copied() else {
+    return Vec::new();
+  };
+  let mut previous_inside = polygon_point_inside(previous, edge, boundary);
+  let mut output = Vec::with_capacity(points.len() + 2);
+  for current in points.iter().copied() {
+    let current_inside = polygon_point_inside(current, edge, boundary);
+    if current_inside != previous_inside {
+      output.push(polygon_edge_intersection(previous, current, edge, boundary));
+    }
+    if current_inside {
+      output.push(current);
+    }
+    previous = current;
+    previous_inside = current_inside;
+  }
+  output
+}
+
+fn polygon_point_inside(point: common::Point, edge: PolygonClipEdge, boundary: f32) -> bool {
+  match edge {
+    PolygonClipEdge::Left => point.x.0 >= boundary,
+    PolygonClipEdge::Right => point.x.0 <= boundary,
+    PolygonClipEdge::Top => point.y.0 >= boundary,
+    PolygonClipEdge::Bottom => point.y.0 <= boundary,
+  }
+}
+
+fn polygon_edge_intersection(
+  start: common::Point,
+  end: common::Point,
+  edge: PolygonClipEdge,
+  boundary: f32,
+) -> common::Point {
+  match edge {
+    PolygonClipEdge::Left | PolygonClipEdge::Right => {
+      let delta = end.x.0 - start.x.0;
+      let ratio = if delta.abs() <= f32::EPSILON {
+        0.0
+      } else {
+        (boundary - start.x.0) / delta
+      };
+      common_point(boundary, start.y.0 + (end.y.0 - start.y.0) * ratio)
+    }
+    PolygonClipEdge::Top | PolygonClipEdge::Bottom => {
+      let delta = end.y.0 - start.y.0;
+      let ratio = if delta.abs() <= f32::EPSILON {
+        0.0
+      } else {
+        (boundary - start.y.0) / delta
+      };
+      common_point(start.x.0 + (end.x.0 - start.x.0) * ratio, boundary)
+    }
   }
 }
 
@@ -2762,22 +3360,112 @@ const XLSX_DEFAULT_CHART_SERIES_COLORS: [RgbColor; 6] = [
 ];
 
 fn xlsx_chart_solid_fill_color(fill: &a::SolidFill, import: &ExcelImport) -> Option<RgbColor> {
-  match fill.solid_fill_choice.as_ref()? {
-    a::SolidFillChoice::RgbColorModelHex(color) => {
-      let bytes = color.val.as_bytes();
-      if bytes.len() != 6 {
-        return None;
-      }
-      Some(RgbColor {
-        r: u8::from_str_radix(std::str::from_utf8(&bytes[0..2]).ok()?, 16).ok()?,
-        g: u8::from_str_radix(std::str::from_utf8(&bytes[2..4]).ok()?, 16).ok()?,
-        b: u8::from_str_radix(std::str::from_utf8(&bytes[4..6]).ok()?, 16).ok()?,
+  let color = fill
+    .solid_fill_choice
+    .as_ref()
+    .and_then(Color::from_solid_fill_choice)?;
+  xlsx_chart_color(color, import)
+}
+
+fn xlsx_chart_first_gradient_fill_color(
+  fill: &a::GradientFill,
+  import: &ExcelImport,
+) -> Option<RgbColor> {
+  let color = fill
+    .gradient_stop_list
+    .as_ref()?
+    .gradient_stop
+    .first()?
+    .gradient_stop_choice
+    .as_ref()
+    .and_then(Color::from_gradient_stop_choice)?;
+  xlsx_chart_color(color, import)
+}
+
+fn xlsx_chart_color(color: Color, import: &ExcelImport) -> Option<RgbColor> {
+  let mut scheme_resolver = |value| {
+    let index = xlsx_scheme_color_index(value)?;
+    let color = import.styles.theme_color(index, 0.0)?;
+    Some(Color::RgbHex(RgbHexColor {
+      value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+      transformations: Vec::new(),
+    }))
+  };
+  let color = color.resolve_rgb(&mut scheme_resolver, None)?;
+  Some(RgbColor {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+  })
+}
+
+fn xlsx_chart_style_id(chart_space: &c::ChartSpace) -> Option<u8> {
+  match chart_space.chart_space_choice.as_ref()? {
+    c::ChartSpaceChoice::C14Style(style) => normalize_xlsx_chart_style(u16::from(style.val)),
+    c::ChartSpaceChoice::CStyle(style) => {
+      normalize_xlsx_chart_style(u16::from(style.val.unwrap_or(2)))
+    }
+    c::ChartSpaceChoice::AlternateContent(content) => {
+      let preferred = content
+        .alternate_content_choice
+        .iter()
+        .filter_map(|branch| match branch {
+          ooxmlsdk::schemas::mc::AlternateContentChoice::Choice(choice) => Some(choice.as_ref()),
+          _ => None,
+        })
+        .flat_map(|choice| choice.xml_children.iter())
+        .find_map(|xml| xlsx_chart_style_from_xml(xml));
+      preferred.or_else(|| {
+        content
+          .alternate_content_choice
+          .iter()
+          .filter_map(|branch| match branch {
+            ooxmlsdk::schemas::mc::AlternateContentChoice::Fallback(fallback) => {
+              Some(fallback.as_ref())
+            }
+            _ => None,
+          })
+          .flat_map(|fallback| fallback.xml_children.iter())
+          .find_map(|xml| xlsx_chart_style_from_xml(xml))
       })
     }
-    a::SolidFillChoice::SchemeColor(color) => {
-      let index = xlsx_scheme_color_index(color.val)?;
-      import.styles.theme_color(index, 0.0)
+  }
+}
+
+fn xlsx_chart_style_from_xml(xml: &[u8]) -> Option<u8> {
+  use quick_xml::events::Event;
+
+  let mut reader = quick_xml::Reader::from_reader(xml);
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event) | Event::Empty(event)) if event.local_name().as_ref() == b"style" => {
+        let value = event.attributes().flatten().find_map(|attribute| {
+          (attribute.key.local_name().as_ref() == b"val")
+            .then(|| {
+              attribute
+                .decoded_and_normalized_value(
+                  quick_xml::XmlVersion::Implicit1_0,
+                  reader.decoder(),
+                )
+                .ok()
+            })
+            .flatten()
+        })?;
+        return value
+          .parse::<u16>()
+          .ok()
+          .and_then(normalize_xlsx_chart_style);
+      }
+      Ok(Event::Eof) | Err(_) => return None,
+      _ => {}
     }
+  }
+}
+
+fn normalize_xlsx_chart_style(value: u16) -> Option<u8> {
+  match value {
+    1..=48 => Some(value as u8),
+    101..=148 => Some((value - 100) as u8),
     _ => None,
   }
 }

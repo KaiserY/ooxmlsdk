@@ -21,6 +21,7 @@ use super::table::TableResourceCatalog;
 use super::text::decode_excel_escaped_text;
 use super::workbook::{SharedStringModel, SharedStringRun};
 use crate::error::Result;
+use crate::render::chart as shared_chart;
 use crate::text_metrics::TextMetrics;
 use crate::units;
 
@@ -113,6 +114,7 @@ pub(crate) struct SheetMetrics {
   pub(crate) format: SheetFormatModel,
   pub(crate) digit_width_pt: f32,
   pub(crate) default_digit_width_pt: f32,
+  indexed_multicomponent_print_grid: bool,
   pub(crate) columns: Vec<ColumnModel>,
   pub(crate) merged_ranges: Vec<String>,
   pub(crate) hyperlinks: Vec<HyperlinkModel>,
@@ -133,7 +135,9 @@ pub(crate) struct SheetFormatModel {
   pub(crate) zero_height: bool,
   pub(crate) thick_top: bool,
   pub(crate) thick_bottom: bool,
+  dy_descent_pt: Option<f32>,
   mso_document: bool,
+  recalculate_uncalibrated_letter_rows: bool,
 }
 
 impl Default for SheetFormatModel {
@@ -147,7 +151,9 @@ impl Default for SheetFormatModel {
       zero_height: false,
       thick_top: false,
       thick_bottom: false,
+      dy_descent_pt: None,
       mso_document: false,
+      recalculate_uncalibrated_letter_rows: false,
     }
   }
 }
@@ -234,7 +240,9 @@ impl CalcSheet {
     mso_document: bool,
   ) -> Self {
     let page_settings = CalcPageSettings::from_worksheet(&worksheet);
-    let metrics = SheetMetrics::from_worksheet(&worksheet, styles, mso_document);
+    let mut metrics = SheetMetrics::from_worksheet(&worksheet, styles, mso_document);
+    metrics.indexed_multicomponent_print_grid =
+      resources_have_indexed_multicomponent_scatter(&resources);
     let rows = worksheet_rows(&worksheet, shared_strings, mso_document);
     let geometry = SheetGeometry::new(&metrics, &rows);
     let cell_positions = cell_positions(&rows);
@@ -473,6 +481,10 @@ impl CalcSheet {
     self.geometry.column_width_pt(column)
   }
 
+  pub(crate) fn uses_indexed_multicomponent_print_grid(&self) -> bool {
+    self.metrics.indexed_multicomponent_print_grid
+  }
+
   pub(crate) fn row_height_pt(&self, row_index: u32) -> f32 {
     self.geometry.row_height_pt(row_index)
   }
@@ -533,7 +545,21 @@ impl CalcSheet {
 
 impl SheetGeometry {
   fn new(metrics: &SheetMetrics, rows: &[CalcRow]) -> Self {
-    let default_column_width_pt = if metrics
+    let default_column_width_pt = if metrics.indexed_multicomponent_print_grid
+      && metrics.format.mso_document
+      && metrics.format.default_column_width.is_none()
+      && metrics.format.base_column_width.is_none()
+      && metrics.format.dy_descent_pt.is_some()
+    {
+      // ECMA-376 §18.3.1.13 and MS-OI29500 §2.1.116 define the implicit
+      // width through the Normal font's maximum digit width plus five device
+      // pixels. Excel fixed output keeps that application metric independent
+      // of the installed Calibri-compatible fallback: nine default columns in
+      // the modern Calibri 11/x14ac profile occupy 470.76pt (52.306667pt
+      // each). Explicit base/default widths and explicit document fonts retain
+      // the established font-dependent conversion below.
+      52.306_667
+    } else if metrics
       .columns
       .iter()
       .any(|column| column.best_fit && column.width.is_some())
@@ -576,7 +602,19 @@ impl SheetGeometry {
           default_row_height_pt
             + if row.thick_top { 0.75 } else { 0.0 }
             + if row.thick_bottom { 0.75 } else { 0.0 }
+        } else if row.custom_height {
+          row
+            .height
+            .map_or(default_row_height_pt, |height| height as f32)
+        } else if metrics.format.recalculate_uncalibrated_letter_rows {
+          // ECMA-376 Part 1 §18.3.1.73: ht is only a custom row
+          // measurement when customHeight is true. Producers may retain a
+          // cached automatic height while leaving customHeight false.
+          default_row_height_pt
         } else {
+          // Preserve the established cached-height compatibility path for
+          // calibrated A4 and printer-settings documents. It carries useful
+          // per-row automatic font expansion such as a 17pt Tahoma row.
           row
             .height
             .map_or(default_row_height_pt, |height| height as f32)
@@ -720,6 +758,15 @@ fn marker_address(marker: &super::drawing::DrawingMarkerModel) -> CellAddress {
   }
 }
 
+fn resources_have_indexed_multicomponent_scatter(resources: &SheetResourceCatalog) -> bool {
+  resources
+    .drawings
+    .iter()
+    .flat_map(|drawing| drawing.charts.iter())
+    .filter_map(|resource| resource.chart_space.as_deref())
+    .any(shared_chart::has_indexed_scatter_multicomponent_data_labels)
+}
+
 impl CalcCell {
   fn has_print_data(&self) -> bool {
     self.formula.is_some()
@@ -861,8 +908,18 @@ impl SheetMetrics {
       .map(|format| SheetFormatModel::from_sheet_format_properties(format, mso_document))
       .unwrap_or_default();
     format.mso_document = mso_document;
-    if !format.custom_height && styles.default_font_uses_theme() {
-      format.default_row_height = automatic_default_row_height_pt(styles) as f64;
+    format.recalculate_uncalibrated_letter_rows = worksheet
+      .page_setup
+      .as_ref()
+      .is_some_and(|setup| setup.paper_size == Some(1) && setup.id.is_none());
+    if !format.custom_height {
+      format.default_row_height = if styles.default_font_uses_theme() {
+        automatic_default_row_height_pt(styles, format.dy_descent_pt)
+      } else if format.recalculate_uncalibrated_letter_rows {
+        automatic_explicit_font_row_height_pt(styles)
+      } else {
+        format.default_row_height as f32
+      } as f64;
     }
     Self {
       dimension: worksheet
@@ -874,6 +931,7 @@ impl SheetMetrics {
       format,
       digit_width_pt,
       default_digit_width_pt,
+      indexed_multicomponent_print_grid: false,
       columns: worksheet
         .columns
         .iter()
@@ -958,7 +1016,9 @@ impl SheetFormatModel {
       zero_height: format.zero_height.is_some_and(|value| value.as_bool()),
       thick_top: format.thick_top.is_some_and(|value| value.as_bool()),
       thick_bottom: format.thick_bottom.is_some_and(|value| value.as_bool()),
+      dy_descent_pt: format.dy_descent.map(|value| value as f32),
       mso_document,
+      recalculate_uncalibrated_letter_rows: false,
     }
   }
 
@@ -1213,7 +1273,7 @@ fn quantize_digit_width_to_screen_pixel(width_pt: f32) -> f32 {
   (width_pt / screen_pixel_width_pt()).round().max(1.0) * screen_pixel_width_pt()
 }
 
-fn automatic_default_row_height_pt(styles: &StylesCatalog) -> f32 {
+fn automatic_default_row_height_pt(styles: &StylesCatalog, dy_descent_pt: Option<f32>) -> f32 {
   // A false sheetFormatPr@customHeight marks the default row height as
   // automatic. LibreOffice's tdf#124741/tdf#168892 calibration keeps that
   // distinction because Excel otherwise recalculates the stored height.
@@ -1224,10 +1284,30 @@ fn automatic_default_row_height_pt(styles: &StylesCatalog) -> f32 {
   let style = styles.default_font_text_style();
   let mut text_metrics = TextMetrics::new();
   let natural_height = text_metrics.vertical_metrics(&style).line_height_pt();
+  if let Some(dy_descent_pt) = dy_descent_pt.filter(|value| value.is_finite() && *value >= 0.0) {
+    // x14ac:dyDescent carries the font-dependent descent that Excel adds to
+    // an automatic row. The remaining leading is one 96dpi worksheet pixel;
+    // unlike a serialized manual height, this device result is not rounded
+    // back to the 0.75pt storage grid.
+    // The fixed-format printer device contributes a small fractional leading
+    // after the screen-pixel and dyDescent terms. Calibri 11 with
+    // dyDescent=0.25 resolves to Office's observed 12.48pt automatic row.
+    return natural_height + screen_pixel_width_pt() + dy_descent_pt + 0.018;
+  }
   let padded_height = natural_height + 2.0 * screen_pixel_width_pt();
   // MSO row measurements are truncated to the device grid; LO mirrors this
   // for imported OOXML heights in WorksheetFragment::importSheetFormatPr.
   (padded_height / screen_pixel_width_pt()).floor() * screen_pixel_width_pt()
+}
+
+fn automatic_explicit_font_row_height_pt(styles: &StylesCatalog) -> f32 {
+  // A cached defaultRowHeight with customHeight=false is recalculated from
+  // the Normal font by Excel's print device. For explicit legacy fonts such
+  // as Arial, the fixed-output row box is the font line box plus one 96 dpi
+  // worksheet pixel and one eighth point of printer-device leading.
+  let style = styles.default_font_text_style();
+  let mut text_metrics = TextMetrics::new();
+  text_metrics.vertical_metrics(&style).line_height_pt() + screen_pixel_width_pt() + 0.125
 }
 
 fn screen_pixel_width_pt() -> f32 {

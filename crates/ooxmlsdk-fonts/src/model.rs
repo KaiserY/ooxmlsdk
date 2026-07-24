@@ -2769,7 +2769,16 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
       script: Some(TextScript::Han),
       language: None,
       families: vec![
+        // Windows fixed output uses its installed Simplified Chinese font
+        // linking before generic pan-CJK fallbacks. Keep family discovery in
+        // Fontique/fontdb so platforms without these Office fonts continue
+        // through the portable SC/JP chain.
+        Cow::Borrowed("Microsoft YaHei"),
+        Cow::Borrowed("Microsoft YaHei UI"),
+        Cow::Borrowed("DengXian"),
+        Cow::Borrowed("Noto Sans CJK SC"),
         Cow::Borrowed("Noto Sans CJK JP"),
+        Cow::Borrowed("Noto Serif CJK SC"),
         Cow::Borrowed("Noto Serif CJK JP"),
       ],
     },

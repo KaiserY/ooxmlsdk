@@ -1053,12 +1053,8 @@ fn lower_chart(
       chart.title = Some(shared_chart::ChartTitleText::Automatic);
     }
     let chart_text_properties = chart_resource.chart_space.text_properties.as_deref();
-    let title_properties = chart_resource
-      .chart_space
-      .chart
-      .title
-      .as_deref()
-      .and_then(|title| title.text_properties.as_deref());
+    let title = chart_resource.chart_space.chart.title.as_deref();
+    let title_properties = title.and_then(|title| title.text_properties.as_deref());
     let label_properties = chart.data_label_text_properties.or_else(|| {
       chart_resource
         .chart_space
@@ -1107,6 +1103,8 @@ fn lower_chart(
           title_properties,
           ui_language,
           18.0,
+          true,
+          title,
         ),
         label: chart_text_style(
           import,
@@ -1115,6 +1113,8 @@ fn lower_chart(
           label_properties,
           ui_language,
           12.0,
+          false,
+          None,
         ),
         data_label: chart_text_style(
           import,
@@ -1123,8 +1123,23 @@ fn lower_chart(
           label_properties,
           ui_language,
           12.0,
+          false,
+          None,
         ),
         point_colors,
+        data_label_fill_colors: chart
+          .data_labels
+          .iter()
+          .map(|label| {
+            label
+              .shape_properties
+              .and_then(shared_chart::chart_shape_solid_fill)
+              .and_then(|fill| {
+                display_paint_for_chart(import, slide, chart_resource, fill)
+                  .map(|paint| paint.color)
+              })
+          })
+          .collect(),
         chart_area_fill_color: chart_resource
           .chart_space
           .shape_properties
@@ -1259,6 +1274,7 @@ fn lower_chart(
         .title
         .as_deref()
         .and_then(|title| title.text_properties.as_deref());
+      let title = chart_resource.chart_space.chart.title.as_deref();
       let title_fill_color = chart_resource
         .chart_space
         .chart
@@ -1326,6 +1342,7 @@ fn lower_chart(
         shared_chart::automatic_chart_title(ui_language),
         &ClusteredColumnStyle {
           layout_profile: ChartLayoutProfile::PowerPoint,
+          stroke_scale: 1.0,
           has_explicit_title: matches!(
             chart.title,
             Some(shared_chart::ChartTitleText::Explicit(_))
@@ -1337,6 +1354,8 @@ fn lower_chart(
             title_properties,
             ui_language,
             18.0,
+            true,
+            title,
           ),
           title_fill_color,
           label: chart_text_style(
@@ -1346,6 +1365,28 @@ fn lower_chart(
             label_properties,
             ui_language,
             12.0,
+            false,
+            None,
+          ),
+          category_label: chart_text_style(
+            import,
+            slide,
+            chart_text_properties,
+            label_properties,
+            ui_language,
+            12.0,
+            false,
+            None,
+          ),
+          value_label: chart_text_style(
+            import,
+            slide,
+            chart_text_properties,
+            label_properties,
+            ui_language,
+            12.0,
+            false,
+            None,
           ),
           data_label: chart_text_style(
             import,
@@ -1354,10 +1395,31 @@ fn lower_chart(
             data_label_properties,
             ui_language,
             12.0,
+            false,
+            None,
           ),
           gridline_color,
           series_colors,
           series_point_colors,
+          data_label_fill_colors: chart
+            .series
+            .iter()
+            .map(|series| {
+              series
+                .data_labels
+                .iter()
+                .map(|label| {
+                  label
+                    .shape_properties
+                    .and_then(shared_chart::chart_shape_solid_fill)
+                    .and_then(|fill| {
+                      display_paint_for_chart(import, slide, chart_resource, fill)
+                        .map(|paint| paint.color)
+                    })
+                })
+                .collect()
+            })
+            .collect(),
           chart_area_fill_color: chart_resource
             .chart_space
             .shape_properties
@@ -1642,7 +1704,41 @@ fn chart_text_style(
   properties: Option<&c::TextProperties>,
   ui_language: Option<&str>,
   fallback_size_pt: f32,
+  fallback_bold: bool,
+  rich_title: Option<&c::Title>,
 ) -> TextStyle {
+  let title_has_explicit_size = properties.is_some_and(|properties| {
+    properties
+      .paragraph
+      .iter()
+      .filter_map(|paragraph| paragraph.paragraph_properties.as_deref())
+      .filter_map(|paragraph| paragraph.default_run_properties.as_deref())
+      .any(|properties| properties.font_size.is_some())
+  }) || rich_title
+    .and_then(|title| title.chart_text.as_deref())
+    .and_then(|text| text.chart_text_choice.as_ref())
+    .and_then(|choice| match choice {
+      c::ChartTextChoice::RichText(rich) => rich.paragraph.first(),
+      _ => None,
+    })
+    .is_some_and(|paragraph| {
+      paragraph
+        .paragraph_properties
+        .as_deref()
+        .and_then(|properties| properties.default_run_properties.as_deref())
+        .is_some_and(|properties| properties.font_size.is_some())
+        || paragraph.paragraph_choice.iter().any(|choice| match choice {
+          a::ParagraphChoice::Run(run) => run
+            .run_properties
+            .as_deref()
+            .is_some_and(|properties| properties.font_size.is_some()),
+          a::ParagraphChoice::Field(field) => field
+            .run_properties
+            .as_deref()
+            .is_some_and(|properties| properties.font_size.is_some()),
+          _ => false,
+        })
+    });
   let mut style = TextStyle {
     font_family: Some(Arc::from(
       import
@@ -1650,6 +1746,7 @@ fn chart_text_style(
         .unwrap_or("Liberation Sans"),
     )),
     font_size_pt: fallback_size_pt,
+    bold: fallback_bold,
     use_windows_font_metrics: true,
     ..TextStyle::default()
   };
@@ -1663,8 +1760,56 @@ fn chart_text_style(
       apply_default_run_properties(import, Some(slide), default_run_properties, &mut style);
     }
   }
+  if let Some(c::ChartTextChoice::RichText(rich)) = rich_title
+    .and_then(|title| title.chart_text.as_deref())
+    .and_then(|text| text.chart_text_choice.as_ref())
+    && let Some(paragraph) = rich.paragraph.first()
+  {
+    if let Some(properties) = paragraph
+      .paragraph_properties
+      .as_deref()
+      .and_then(|properties| properties.default_run_properties.as_deref())
+    {
+      apply_default_run_properties(import, Some(slide), properties, &mut style);
+    }
+    if let Some(properties) = paragraph.paragraph_choice.iter().find_map(|choice| match choice {
+      a::ParagraphChoice::Run(run) => run.run_properties.as_deref(),
+      a::ParagraphChoice::Field(field) => field.run_properties.as_deref(),
+      a::ParagraphChoice::Break(_)
+      | a::ParagraphChoice::TextMath(_)
+      | a::ParagraphChoice::AlternateContent(_) => None,
+    }) {
+      apply_run_common(
+        import,
+        RunCommon {
+          font_size: properties.font_size,
+          bold: properties.bold.as_ref().map(|value| value.as_bool()),
+          italic: properties.italic.as_ref().map(|value| value.as_bool()),
+          underline: properties.underline,
+          strike: properties.strike,
+          capital: properties.capital,
+          spacing: properties.spacing,
+          baseline: properties.baseline,
+          latin_font: properties.latin_font.as_ref(),
+          east_asian_font: properties.east_asian_font.as_ref(),
+          complex_script_font: properties.complex_script_font.as_ref(),
+          symbol_font: properties.symbol_font.as_ref(),
+        },
+        &mut style,
+      );
+      if let Some(fill) = properties.run_properties_choice1.as_ref() {
+        apply_text_fill(import, Some(slide), fill, &mut style);
+      }
+    }
+  }
   if let Some(typeface) = import.resolve_theme_font_for_language("+mn-ea", ui_language) {
     style.east_asia_font_family = Some(Arc::from(typeface));
+  }
+  if fallback_bold && !title_has_explicit_size {
+    // PowerPoint's automatic chart-title style promotes the chart-space text
+    // default by 120%. A direct title txPr or rich run size replaces that
+    // automatic style size rather than being scaled again.
+    style.font_size_pt *= 1.2;
   }
   style.font_size_pt =
     (style.font_size_pt * POWERPOINT_PRINT_DPI / 72.0).round() * 72.0 / POWERPOINT_PRINT_DPI;

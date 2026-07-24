@@ -127,6 +127,21 @@ pub(super) fn path_commands(
       let radius = width.min(height) * adjustment / 100_000.0;
       round_rectangle_path(left, top, width, height, radius)
     }
+    a::ShapeTypeValues::Round2SameRectangle => {
+      // ECMA-376 presetShapeDefinitions.xml defines independent top (adj1)
+      // and bottom (adj2) radii for round2SameRect.
+      let top_adjustment = adjustment(preset, 0, 16_667.0).clamp(0.0, 50_000.0);
+      let bottom_adjustment = adjustment(preset, 1, 0.0).clamp(0.0, 50_000.0);
+      let min_size = width.min(height);
+      round_2_same_rectangle_path(
+        left,
+        top,
+        width,
+        height,
+        min_size * top_adjustment / 100_000.0,
+        min_size * bottom_adjustment / 100_000.0,
+      )
+    }
     a::ShapeTypeValues::RightArrow => {
       let thickness = adjustment(preset, 0, 50_000.0);
       let head = adjustment(preset, 1, 50_000.0);
@@ -891,6 +906,48 @@ fn round_rectangle_path(
       control1: point(left, top + radius - tangent),
       control2: point(left + radius - tangent, top),
       end: point(left + radius, top),
+    },
+    PathCommand::Close,
+  ]
+}
+
+fn round_2_same_rectangle_path(
+  left: f32,
+  top: f32,
+  width: f32,
+  height: f32,
+  top_radius: f32,
+  bottom_radius: f32,
+) -> Vec<PathCommand> {
+  let right = left + width;
+  let bottom = top + height;
+  let top_tangent = top_radius * CIRCLE_CUBIC_BEZIER_KAPPA;
+  let bottom_tangent = bottom_radius * CIRCLE_CUBIC_BEZIER_KAPPA;
+  vec![
+    PathCommand::MoveTo(point(left + top_radius, top)),
+    PathCommand::LineTo(point(right - top_radius, top)),
+    PathCommand::CubicTo {
+      control1: point(right - top_radius + top_tangent, top),
+      control2: point(right, top + top_radius - top_tangent),
+      end: point(right, top + top_radius),
+    },
+    PathCommand::LineTo(point(right, bottom - bottom_radius)),
+    PathCommand::CubicTo {
+      control1: point(right, bottom - bottom_radius + bottom_tangent),
+      control2: point(right - bottom_radius + bottom_tangent, bottom),
+      end: point(right - bottom_radius, bottom),
+    },
+    PathCommand::LineTo(point(left + bottom_radius, bottom)),
+    PathCommand::CubicTo {
+      control1: point(left + bottom_radius - bottom_tangent, bottom),
+      control2: point(left, bottom - bottom_radius + bottom_tangent),
+      end: point(left, bottom - bottom_radius),
+    },
+    PathCommand::LineTo(point(left, top + top_radius)),
+    PathCommand::CubicTo {
+      control1: point(left, top + top_radius - top_tangent),
+      control2: point(left + top_radius - top_tangent, top),
+      end: point(left + top_radius, top),
     },
     PathCommand::Close,
   ]

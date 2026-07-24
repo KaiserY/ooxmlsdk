@@ -65,6 +65,16 @@ use super::{
 const DEFAULT_TEXT_FONT_SIZE_PT: f32 = 18.0;
 const DEFAULT_TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
 const DEFAULT_TABLE_BORDER_PT: f32 = 0.75;
+// Microsoft Office fixed-output evidence:
+// - smartart-missing-bullet.pptx scales the synthesized 22.5 pt indent with
+//   the SmartArt font scale;
+// - smartart-autofit-sync.pptx stops that spacing scale at 20% while its font
+//   continues shrinking.
+const POWERPOINT_SMARTART_MINIMUM_AUTOFIT_SPACING_SCALE: f32 = 0.2;
+// The explicitly sized C branch in smartart-autofit-sync.pptx disables font
+// autofit, but Office still emits the tx-generated 22.5 pt hanging indent at
+// 40% (9 pt). This is separate from document-authored paragraph indentation.
+const POWERPOINT_SMARTART_EXPLICIT_FONT_SPACING_SCALE: f32 = 0.4;
 
 pub(crate) fn lower_to_layout_document(
   import: &PowerPointImport,
@@ -2073,27 +2083,41 @@ fn lower_diagram(
       if diagram_shape.is_connector {
         drawing_items.push(PageItem::Line(diagram_connector_line_item(&diagram_shape)));
       } else {
-        drawing_items.push(PageItem::Rect(RectItem {
-          x_pt: diagram_shape.x,
-          y_pt: diagram_shape.y,
-          width_pt: diagram_shape.width,
-          height_pt: diagram_shape.height,
-          fill_color: diagram_shape
-            .shape_properties
-            .as_deref()
-            .is_none_or(|properties| !diagram_model_shape_has_blip_fill(properties))
-            .then_some(fill_color)
-            .filter(|_| !suppress_fill),
-          fill_opacity: 1.0,
-          stroke: diagram_shape
-            .shape_properties
-            .as_deref()
-            .and_then(|properties| {
-              diagram_model_shape_outline(context.import, context.slide, properties)
-            })
-            .or_else(|| (!suppress_fill).then_some(BorderStyle::default())),
-          stroke_opacity: 1.0,
-        }));
+        let fill_color = diagram_shape
+          .shape_properties
+          .as_deref()
+          .is_none_or(|properties| !diagram_model_shape_has_blip_fill(properties))
+          .then_some(fill_color)
+          .filter(|_| !suppress_fill);
+        let stroke = diagram_shape
+          .shape_properties
+          .as_deref()
+          .and_then(|properties| {
+            diagram_model_shape_outline(context.import, context.slide, properties)
+          })
+          .or_else(|| {
+            diagram_style_outline(
+              context.import,
+              context.slide,
+              diagram_shape.style.as_deref(),
+              diagram_shape.line_fill.map(pdf_rgb_color),
+            )
+          })
+          .or_else(|| (!suppress_fill).then_some(BorderStyle::default()));
+        if let Some(path) = diagram_model_shape_path_item(&diagram_shape, fill_color, stroke) {
+          drawing_items.push(PageItem::Path(path));
+        } else {
+          drawing_items.push(PageItem::Rect(RectItem {
+            x_pt: diagram_shape.x,
+            y_pt: diagram_shape.y,
+            width_pt: diagram_shape.width,
+            height_pt: diagram_shape.height,
+            fill_color,
+            fill_opacity: 1.0,
+            stroke,
+            stroke_opacity: 1.0,
+          }));
+        }
       }
     }
     if !diagram_shape.text_body.is_empty() {
@@ -2108,11 +2132,19 @@ fn lower_diagram(
             + rotation,
         );
       }
+      let text_bounds = diagram_model_shape_text_rectangle(&diagram_shape).unwrap_or(
+        shared_diagram::DiagramBounds {
+          x: diagram_shape.x,
+          y: diagram_shape.y,
+          width: diagram_shape.width,
+          height: diagram_shape.height,
+        },
+      );
       let text_frame = text_body_frame(
-        diagram_shape.x,
-        diagram_shape.y,
-        diagram_shape.width,
-        diagram_shape.height,
+        text_bounds.x,
+        text_bounds.y,
+        text_bounds.width,
+        text_bounds.height,
         &text_body,
       );
       record_smartart_text_shape(
@@ -2130,8 +2162,21 @@ fn lower_diagram(
         )
       });
       let options = TextLoweringOptions::from_text_body(&text_body);
-      let (font_scale, line_scale) = text_auto_fit_scales(&options);
       let sync_auto_fit = text_body.display_properties.auto_fit == TextAutoFit::Shape;
+      let (font_scale, line_scale) = if sync_auto_fit {
+        diagram_text_auto_fit_scales(
+          context.import,
+          context.page_index,
+          text_frame,
+          &text_body,
+          font_reference.as_ref(),
+          diagram_shape.font_size_pt,
+          diagram_shape.minimum_font_size_pt,
+          &options,
+        )
+      } else {
+        text_auto_fit_scales(&options)
+      };
       if sync_auto_fit && let Some(group) = diagram_shape.font_sync_group.as_deref() {
         font_sync_scales
           .entry(group.to_string())
@@ -2332,16 +2377,30 @@ fn lower_diagram_drawing_shape(
     bounds,
   );
   items.extend(fill_images.into_iter().map(PageItem::Image));
-  items.push(PageItem::Rect(RectItem {
-    x_pt: bounds.x,
-    y_pt: bounds.y,
-    width_pt: bounds.width,
-    height_pt: bounds.height,
-    fill_color: (!diagram_shape_has_blip_fill(&shape.shape_properties)).then_some(fill_color),
-    fill_opacity: 1.0,
-    stroke: Some(BorderStyle::default()),
-    stroke_opacity: 1.0,
-  }));
+  let fill_color = (!diagram_shape_has_blip_fill(&shape.shape_properties)
+    && !diagram_shape_suppresses_fill(&shape.shape_properties))
+  .then_some(fill_color);
+  let stroke = shape
+    .shape_properties
+    .outline
+    .as_deref()
+    .and_then(|outline| diagram_outline(context.import, context.slide, outline));
+  if let Some(path) =
+    diagram_drawing_shape_path_item(&shape.shape_properties, bounds, fill_color, stroke)
+  {
+    items.push(PageItem::Path(path));
+  } else {
+    items.push(PageItem::Rect(RectItem {
+      x_pt: bounds.x,
+      y_pt: bounds.y,
+      width_pt: bounds.width,
+      height_pt: bounds.height,
+      fill_color,
+      fill_opacity: 1.0,
+      stroke,
+      stroke_opacity: 1.0,
+    }));
+  }
   let Some(text_body) = shape.text_body.as_deref() else {
     return;
   };
@@ -2544,6 +2603,281 @@ struct PendingDiagramTextItem {
   line_scale: f32,
 }
 
+fn diagram_text_auto_fit_scales(
+  import: &PowerPointImport,
+  page_index: usize,
+  frame: TextFrame,
+  text_body: &TextBody,
+  font_reference: Option<&FontStyleReference>,
+  base_font_size_pt: Option<f32>,
+  minimum_font_size_pt: Option<f32>,
+  options: &TextLoweringOptions,
+) -> (f32, f32) {
+  let (initial_font_scale, line_scale) = text_auto_fit_scales(options);
+  if frame.width_pt <= f32::EPSILON || frame.height_pt <= f32::EPSILON {
+    return (initial_font_scale, line_scale);
+  }
+
+  // ECMA-376 Part 1 §21.4.7.1 requires the diagram tx algorithm to size text
+  // to fit its shape. LibreOffice's DiagramLayoutAtom enables AUTOFIT for
+  // default SmartArt text, then SdrTextObj::setupAutoFitText() measures the
+  // fixed text box and rounds the resulting font size to whole points.
+  let Some((required_width, required_height)) = diagram_text_required_size(
+    import,
+    page_index,
+    frame,
+    text_body,
+    font_reference,
+    base_font_size_pt,
+    initial_font_scale,
+    line_scale,
+  ) else {
+    return (initial_font_scale, line_scale);
+  };
+  let fit = (frame.width_pt / required_width)
+    .min(frame.height_pt / required_height)
+    .min(1.0);
+  let minimum_scale = minimum_font_size_pt
+    .zip(base_font_size_pt)
+    .filter(|(_, base)| *base > f32::EPSILON)
+    .map(|(minimum, base)| minimum / base)
+    .unwrap_or(0.0);
+  let mut fitted_scale = base_font_size_pt
+    .filter(|base| *base > f32::EPSILON)
+    .map(|base| (base * initial_font_scale * fit).round() / base)
+    .unwrap_or(initial_font_scale * fit)
+    .max(minimum_scale);
+
+  // Whole-point rounding is applied independently to SmartArt's primary and
+  // secondary font sizes. Re-measure the rounded result and step the primary
+  // size down until the actual line boxes fit, matching EditEngine's
+  // format-and-retry autofit loop instead of trusting a continuous ratio.
+  if let Some(base_font_size_pt) = base_font_size_pt.filter(|base| *base > f32::EPSILON) {
+    loop {
+      let fits = diagram_text_required_size(
+        import,
+        page_index,
+        frame,
+        text_body,
+        font_reference,
+        Some(base_font_size_pt),
+        fitted_scale,
+        line_scale,
+      )
+      .is_none_or(|(width, height)| width <= frame.width_pt && height <= frame.height_pt);
+      if fits || fitted_scale <= minimum_scale + f32::EPSILON {
+        break;
+      }
+      let current_font_size_pt = (base_font_size_pt * fitted_scale).round();
+      let next_font_size_pt = (current_font_size_pt - 1.0)
+        .max(minimum_font_size_pt.unwrap_or_default())
+        .max(0.0);
+      if next_font_size_pt >= current_font_size_pt {
+        break;
+      }
+      fitted_scale = next_font_size_pt / base_font_size_pt;
+    }
+  }
+  (fitted_scale, line_scale)
+}
+
+fn diagram_text_required_size(
+  import: &PowerPointImport,
+  page_index: usize,
+  frame: TextFrame,
+  text_body: &TextBody,
+  font_reference: Option<&FontStyleReference>,
+  base_font_size_pt: Option<f32>,
+  font_scale: f32,
+  line_scale: f32,
+) -> Option<(f32, f32)> {
+  let mut probe_items = Vec::new();
+  lower_diagram_text_body_at_with_style_and_scale(
+    import,
+    page_index,
+    frame,
+    text_body,
+    DiagramTextLoweringStyle {
+      font_reference,
+      table_text_style: None,
+      shape_hyperlink_url: None,
+      base_font_size_pt,
+      font_scale,
+      line_scale,
+      shape_order: 0,
+    },
+    None,
+    &mut probe_items,
+  );
+  let mut text_metrics = TextMetrics::new();
+  let mut left = f32::INFINITY;
+  let mut top = f32::INFINITY;
+  let mut right = f32::NEG_INFINITY;
+  let mut bottom = f32::NEG_INFINITY;
+  for probe in &probe_items {
+    let PageItem::Text(text) = &probe.item else {
+      continue;
+    };
+    let width = text_metrics.measure_text(text.text.as_str(), &text.style);
+    left = left.min(text.x_pt);
+    top = top.min(text.y_pt);
+    right = right.max(text.x_pt + width);
+    bottom = bottom.max(text.y_pt + text.line_height_pt);
+  }
+  if !left.is_finite() || !top.is_finite() || !right.is_finite() || !bottom.is_finite() {
+    return None;
+  }
+  Some((
+    (right - left).max(f32::EPSILON),
+    (bottom - top).max(f32::EPSILON),
+  ))
+}
+
+fn diagram_model_shape_path_item(
+  shape: &shared_diagram::DiagramShape,
+  fill_color: Option<RgbColor>,
+  stroke: Option<BorderStyle>,
+) -> Option<common::PathItem<'static>> {
+  let bounds = shared_diagram::DiagramBounds {
+    x: shape.x,
+    y: shape.y,
+    width: shape.width,
+    height: shape.height,
+  };
+  let commands = match shape
+    .shape_properties
+    .as_deref()
+    .and_then(|properties| properties.shape_properties_choice1.as_ref())
+  {
+    Some(dgm::ShapePropertiesChoice::PresetGeometry(preset)) => preset_geometry::path_commands(
+      Some(preset),
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+    ),
+    Some(dgm::ShapePropertiesChoice::CustomGeometry(geometry)) => {
+      custom_geometry::path_commands(geometry, bounds.x, bounds.y, bounds.width, bounds.height)?
+    }
+    None => preset_geometry::path_commands(
+      Some(shape.preset_geometry.as_deref()?),
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+    ),
+  };
+  let commands = commands
+    .into_iter()
+    .map(|command| transform_diagram_path_command(command, bounds, shape.shape_rotation_deg))
+    .collect();
+  Some(common::PathItem {
+    bounds: common_rect(bounds.x, bounds.y, bounds.width, bounds.height),
+    points: Vec::new(),
+    commands,
+    closed: true,
+    fill: fill_color
+      .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
+      .unwrap_or(common::Fill::None),
+    stroke: stroke.map(|stroke| common::Stroke {
+      width: common::Pt(stroke.width_pt),
+      color: common_rgb(stroke.color, 1.0),
+      dash: None,
+      source_style_id: None,
+    }),
+  })
+}
+
+fn diagram_model_shape_text_rectangle(
+  shape: &shared_diagram::DiagramShape,
+) -> Option<shared_diagram::DiagramBounds> {
+  let shape_bounds = shared_diagram::DiagramBounds {
+    x: shape.x,
+    y: shape.y,
+    width: shape.width,
+    height: shape.height,
+  };
+  let preset = match shape
+    .shape_properties
+    .as_deref()
+    .and_then(|properties| properties.shape_properties_choice1.as_ref())
+  {
+    Some(dgm::ShapePropertiesChoice::PresetGeometry(preset)) => preset.as_ref(),
+    Some(dgm::ShapePropertiesChoice::CustomGeometry(_)) => return None,
+    None => shape.preset_geometry.as_deref()?,
+  };
+  let text_bounds = preset_text_rectangle(preset, shape_bounds)?;
+  if shape.shape_rotation_deg.rem_euclid(360.0).abs() <= f32::EPSILON {
+    return Some(text_bounds);
+  }
+  let center_x = shape_bounds.x + shape_bounds.width / 2.0;
+  let center_y = shape_bounds.y + shape_bounds.height / 2.0;
+  let angle = shape.shape_rotation_deg.to_radians();
+  let corners = [
+    (text_bounds.x, text_bounds.y),
+    (text_bounds.x + text_bounds.width, text_bounds.y),
+    (
+      text_bounds.x + text_bounds.width,
+      text_bounds.y + text_bounds.height,
+    ),
+    (text_bounds.x, text_bounds.y + text_bounds.height),
+  ]
+  .map(|(x, y)| rotate_point(x, y, center_x, center_y, angle));
+  let left = corners
+    .iter()
+    .map(|(x, _)| *x)
+    .fold(f32::INFINITY, f32::min);
+  let top = corners
+    .iter()
+    .map(|(_, y)| *y)
+    .fold(f32::INFINITY, f32::min);
+  let right = corners
+    .iter()
+    .map(|(x, _)| *x)
+    .fold(f32::NEG_INFINITY, f32::max);
+  let bottom = corners
+    .iter()
+    .map(|(_, y)| *y)
+    .fold(f32::NEG_INFINITY, f32::max);
+  Some(shared_diagram::DiagramBounds {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  })
+}
+
+fn transform_diagram_path_command(
+  command: common::PathCommand,
+  bounds: shared_diagram::DiagramBounds,
+  rotation_deg: f32,
+) -> common::PathCommand {
+  let transform = |point: common::Point| {
+    let (x, y) = rotate_point(
+      point.x.0,
+      point.y.0,
+      bounds.x + bounds.width / 2.0,
+      bounds.y + bounds.height / 2.0,
+      rotation_deg.to_radians(),
+    );
+    common_point(x, y)
+  };
+  match command {
+    common::PathCommand::MoveTo(point) => common::PathCommand::MoveTo(transform(point)),
+    common::PathCommand::LineTo(point) => common::PathCommand::LineTo(transform(point)),
+    common::PathCommand::CubicTo {
+      control1,
+      control2,
+      end,
+    } => common::PathCommand::CubicTo {
+      control1: transform(control1),
+      control2: transform(control2),
+      end: transform(end),
+    },
+    common::PathCommand::Close => common::PathCommand::Close,
+  }
+}
+
 fn diagram_connector_line_item(diagram_shape: &shared_diagram::DiagramShape) -> LineItem {
   let center_x = diagram_shape.x + diagram_shape.width / 2.0;
   let center_y = diagram_shape.y + diagram_shape.height / 2.0;
@@ -2617,6 +2951,8 @@ fn diagram_text_body(source: &shared_diagram::DiagramTextBody) -> TextBody {
       .iter()
       .map(|paragraph| TextParagraph {
         diagram_source_order: paragraph.source_order,
+        diagram_synthesized_bullet_left_margin: paragraph.synthesized_bullet_left_margin,
+        diagram_synthesized_bullet_indent: paragraph.synthesized_bullet_indent,
         level: paragraph.level,
         paragraph_properties: paragraph.paragraph_properties.clone(),
         end_paragraph_run_properties: paragraph.end_paragraph_run_properties.clone(),
@@ -2682,6 +3018,14 @@ fn diagram_model_shape_outline(
   properties: &dgm::ShapeProperties,
 ) -> Option<BorderStyle> {
   let outline = properties.outline.as_deref()?;
+  diagram_outline(import, slide, outline)
+}
+
+fn diagram_outline(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  outline: &a::Outline,
+) -> Option<BorderStyle> {
   let color = match outline.outline_choice1.as_ref()? {
     a::OutlineChoice::NoFill(_) => return None,
     a::OutlineChoice::SolidFill(fill) => {
@@ -2704,6 +3048,60 @@ fn diagram_model_shape_outline(
     compound: false,
     shadow: false,
   })
+}
+
+fn diagram_drawing_shape_path_item(
+  properties: &dsp::ShapeProperties,
+  bounds: shared_diagram::DiagramBounds,
+  fill_color: Option<RgbColor>,
+  stroke: Option<BorderStyle>,
+) -> Option<common::PathItem<'static>> {
+  let commands = match properties.shape_properties_choice1.as_ref()? {
+    dsp::ShapePropertiesChoice::PresetGeometry(preset) => preset_geometry::path_commands(
+      Some(preset),
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+    ),
+    dsp::ShapePropertiesChoice::CustomGeometry(geometry) => {
+      custom_geometry::path_commands(geometry, bounds.x, bounds.y, bounds.width, bounds.height)?
+    }
+  };
+  Some(common::PathItem {
+    bounds: common_rect(bounds.x, bounds.y, bounds.width, bounds.height),
+    points: Vec::new(),
+    commands,
+    closed: true,
+    fill: fill_color
+      .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
+      .unwrap_or(common::Fill::None),
+    stroke: stroke.map(|stroke| common::Stroke {
+      width: common::Pt(stroke.width_pt),
+      color: common_rgb(stroke.color, 1.0),
+      dash: None,
+      source_style_id: None,
+    }),
+  })
+}
+
+fn diagram_style_outline(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  style: Option<&dgm::Style>,
+  line_fill: Option<RgbColor>,
+) -> Option<BorderStyle> {
+  let reference = &style?.line_reference;
+  let placeholder_color = line_fill.map(diagram_rgb_color).or_else(|| {
+    reference
+      .line_reference_choice
+      .as_ref()
+      .and_then(Color::from_line_reference_choice)
+  });
+  let line = import
+    .get_theme_line_style(reference.index)
+    .map(|line| line.with_placeholder_color(placeholder_color))?;
+  line_stroke(import, Some(slide), &line).map(|stroke| stroke.style)
 }
 
 fn diagram_model_shape_blip_fill_image_items(
@@ -3097,6 +3495,13 @@ fn diagram_preset_text_rectangle(
     dsp::ShapePropertiesChoice::PresetGeometry(preset) => preset.as_ref(),
     dsp::ShapePropertiesChoice::CustomGeometry(_) => return None,
   };
+  preset_text_rectangle(preset, bounds)
+}
+
+fn preset_text_rectangle(
+  preset: &a::PresetGeometry,
+  bounds: shared_diagram::DiagramBounds,
+) -> Option<shared_diagram::DiagramBounds> {
   let guide = |index: usize, default: f32| {
     preset
       .adjust_value_list
@@ -3312,6 +3717,13 @@ fn diagram_shape_has_blip_fill(properties: &dsp::ShapeProperties) -> bool {
   )
 }
 
+fn diagram_shape_suppresses_fill(properties: &dsp::ShapeProperties) -> bool {
+  matches!(
+    properties.shape_properties_choice2.as_ref(),
+    Some(dsp::ShapePropertiesChoice2::NoFill(_) | dsp::ShapePropertiesChoice2::BlipFill(_))
+  )
+}
+
 fn diagram_shape_blip_fill_image_items(
   import: &PowerPointImport,
   slide: &SlidePersist,
@@ -3415,6 +3827,7 @@ fn diagram_style_colors(
 ) -> Option<shared_diagram::DiagramStyleColors> {
   let color_resource = record.diagram_color_resource.as_ref()?;
   let mut fill_by_label = HashMap::new();
+  let mut line_by_label = HashMap::new();
   let mut text_fill_by_label = HashMap::new();
   for label in &color_resource.colors.color_transform_style_label {
     if let Some(fill_list) = label.fill_color_list.as_ref() {
@@ -3431,6 +3844,22 @@ fn diagram_style_colors(
         .collect();
       if !fills.is_empty() {
         fill_by_label.insert(label.name.clone(), fills);
+      }
+    }
+    if let Some(line_list) = label.line_color_list.as_ref() {
+      let lines: Vec<LayoutRgbColor> = line_list
+        .line_color_list_choice
+        .iter()
+        .filter_map(Color::from_diagram_line_color_choice)
+        .filter_map(|color| import.resolve_color_for_slide(slide, &color, None))
+        .map(|color| LayoutRgbColor {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+        })
+        .collect();
+      if !lines.is_empty() {
+        line_by_label.insert(label.name.clone(), lines);
       }
     }
     if let Some(text_fill_list) = label.text_fill_color_list.as_ref() {
@@ -3450,12 +3879,12 @@ fn diagram_style_colors(
       }
     }
   }
-  (!fill_by_label.is_empty() || !text_fill_by_label.is_empty()).then_some(
-    shared_diagram::DiagramStyleColors {
+  (!fill_by_label.is_empty() || !line_by_label.is_empty() || !text_fill_by_label.is_empty())
+    .then_some(shared_diagram::DiagramStyleColors {
       fill_by_label,
+      line_by_label,
       text_fill_by_label,
-    },
-  )
+    })
 }
 
 fn diagram_font_style_reference(
@@ -3486,6 +3915,13 @@ fn layout_rgb_color(color: RgbColor) -> LayoutRgbColor {
     g: color.g,
     b: color.b,
   }
+}
+
+fn diagram_rgb_color(color: RgbColor) -> Color {
+  Color::RgbHex(super::drawingml::color::RgbHexColor {
+    value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+    transformations: Vec::new(),
+  })
 }
 
 fn pdf_rgb_color(color: LayoutRgbColor) -> RgbColor {
@@ -4521,6 +4957,7 @@ fn supported_preset_vector_path_kind(
 ) -> Option<SupportedVectorPathKind> {
   match preset {
     a::ShapeTypeValues::RoundRectangle
+    | a::ShapeTypeValues::Round2SameRectangle
     | a::ShapeTypeValues::RightArrow
     | a::ShapeTypeValues::DownArrow
     | a::ShapeTypeValues::Ellipse
@@ -6525,7 +6962,7 @@ fn lower_paragraph(
     text_metrics,
     auto_numbering,
   } = output;
-  let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
+  let mut paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
   let mut paragraph_base_style = context.base_style.clone();
   paragraph_style.apply_master_default_run_style(
     context.import,
@@ -6583,6 +7020,7 @@ fn lower_paragraph(
     &paragraph_style,
     &bullet,
   );
+  paragraph_style.apply_diagram_autofit_spacing_scale(paragraph, context.options);
   let paragraph_left_offset = paragraph_style.left_offset(bullet.label.is_some());
   let paragraph_x = cursor.x_pt + paragraph_left_offset;
   // ECMA-376 Part 1 §21.1.2.2.7 defines marL and marR in addition to the
@@ -7948,6 +8386,30 @@ impl ParagraphDisplayStyle {
 
   fn left_offset(&self, has_bullet: bool) -> f32 {
     self.left_margin_pt + if has_bullet { 0.0 } else { self.indent_pt }
+  }
+
+  fn apply_diagram_autofit_spacing_scale(
+    &mut self,
+    paragraph: &TextParagraph,
+    options: &TextLoweringOptions,
+  ) {
+    if paragraph.diagram_synthesized_bullet_left_margin
+      || paragraph.diagram_synthesized_bullet_indent
+    {
+      let scale = if options.round_font_size_to_pt {
+        options
+          .font_scale
+          .max(POWERPOINT_SMARTART_MINIMUM_AUTOFIT_SPACING_SCALE)
+      } else {
+        POWERPOINT_SMARTART_EXPLICIT_FONT_SPACING_SCALE
+      };
+      if paragraph.diagram_synthesized_bullet_left_margin {
+        self.left_margin_pt *= scale;
+      }
+      if paragraph.diagram_synthesized_bullet_indent {
+        self.indent_pt *= scale;
+      }
+    }
   }
 
   fn available_width(&self, column_width: f32, left_offset: f32) -> f32 {

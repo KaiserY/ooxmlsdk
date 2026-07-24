@@ -114,6 +114,17 @@ impl Color {
     }
   }
 
+  pub(crate) fn from_diagram_line_color_choice(choice: &dgm::LineColorListChoice) -> Option<Self> {
+    match choice {
+      dgm::LineColorListChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      dgm::LineColorListChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      dgm::LineColorListChoice::HslColor(color) => Some(hsl_color(color)),
+      dgm::LineColorListChoice::SchemeColor(color) => Some(scheme_color(color)),
+      dgm::LineColorListChoice::PresetColor(color) => Some(preset_color(color)),
+      dgm::LineColorListChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
   pub(crate) fn from_diagram_text_fill_color_choice(
     choice: &dgm::TextFillColorListChoice,
   ) -> Option<Self> {

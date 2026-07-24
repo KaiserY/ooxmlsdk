@@ -9,6 +9,16 @@ use ooxmlsdk::simple_type::Coordinate32Value;
 use crate::model::RgbColor;
 use crate::render::math::text_math_text;
 
+// LibreOffice DiagramLayoutAtom::layoutShape() synthesizes this DrawingML
+// hanging indent when stBulletLvl turns a SmartArt tx paragraph into a bullet.
+const SMARTART_TX_BULLET_INDENT_EMU: i32 = 285_750;
+// Microsoft's SmartArt layout documentation defines the default secondary
+// font size used by bulleted lines as 78 percent of the primary font size.
+const SMARTART_DEFAULT_SECONDARY_FONT_SCALE: f32 = 0.78;
+// ECMA-376 preset shape adjustments use 100000 as the full guide scale,
+// while diagram layout shape adjustments are stored as normalized doubles.
+const DRAWINGML_ADJUST_FULL_SCALE: f64 = 100_000.0;
+
 #[derive(Clone, Debug)]
 pub struct DiagramShape {
   pub x: f32,
@@ -16,9 +26,12 @@ pub struct DiagramShape {
   pub width: f32,
   pub height: f32,
   pub text_body: DiagramTextBody,
+  pub preset_geometry: Option<Box<a::PresetGeometry>>,
   pub shape_properties: Option<Box<dgm::ShapeProperties>>,
   pub style: Option<Box<dgm::Style>>,
+  pub line_fill: Option<RgbColor>,
   pub text_fill: Option<RgbColor>,
+  pub shape_rotation_deg: f32,
   pub text_rotation_deg: f32,
   pub draw_geometry: bool,
   pub is_connector: bool,
@@ -27,6 +40,7 @@ pub struct DiagramShape {
   pub fill: RgbColor,
   pub text_order: usize,
   pub font_size_pt: Option<f32>,
+  pub minimum_font_size_pt: Option<f32>,
   pub font_sync_group: Option<String>,
 }
 
@@ -86,11 +100,22 @@ impl DiagramTextBody {
     }
   }
 
-  fn apply_primary_font_size(&mut self, font_size_pt: f32) {
-    let font_size = (font_size_pt * 100.0).round() as i32;
+  fn apply_font_sizes(&mut self, primary_font_size_pt: f32, secondary_font_size_pt: f32) {
+    let primary_font_size = (primary_font_size_pt * 100.0).round() as i32;
+    let secondary_font_size = (secondary_font_size_pt * 100.0).round() as i32;
     for paragraph in &mut self.paragraphs {
+      let uses_secondary_font_size = paragraph
+        .paragraph_properties
+        .as_deref()
+        .and_then(|properties| properties.paragraph_properties_choice4.as_ref())
+        .is_some_and(|bullet| !matches!(bullet, a::ParagraphPropertiesChoice4::NoBullet));
+      let font_size = if uses_secondary_font_size {
+        secondary_font_size
+      } else {
+        primary_font_size
+      };
       for run in &mut paragraph.runs {
-        run.apply_primary_font_size(font_size);
+        run.apply_layout_font_size(font_size);
       }
     }
   }
@@ -192,11 +217,15 @@ impl DiagramTextBody {
       properties.level = Some(i32::from(normalized_level));
       if normalized_level >= start_bullets_at_level {
         if properties.left_margin.is_none() {
-          properties.left_margin =
-            Some(285_750 * i32::from(normalized_level - start_bullets_at_level + 1));
+          properties.left_margin = Some(
+            SMARTART_TX_BULLET_INDENT_EMU
+              * i32::from(normalized_level - start_bullets_at_level + 1),
+          );
+          paragraph.synthesized_bullet_left_margin = true;
         }
         if properties.indent.is_none() {
-          properties.indent = Some(-285_750);
+          properties.indent = Some(-SMARTART_TX_BULLET_INDENT_EMU);
+          paragraph.synthesized_bullet_indent = true;
         }
         properties.paragraph_properties_choice4 = Some(
           a::ParagraphPropertiesChoice4::CharacterBullet(a::CharacterBullet {
@@ -228,6 +257,8 @@ pub struct DiagramTextParagraph {
   pub paragraph_properties: Option<Box<a::ParagraphProperties>>,
   pub end_paragraph_run_properties: Option<Box<a::EndParagraphRunProperties>>,
   pub runs: Vec<DiagramTextRun>,
+  pub synthesized_bullet_left_margin: bool,
+  pub synthesized_bullet_indent: bool,
 }
 
 impl DiagramTextParagraph {
@@ -249,6 +280,8 @@ impl DiagramTextParagraph {
         .iter()
         .filter_map(DiagramTextRun::from_dml)
         .collect(),
+      synthesized_bullet_left_margin: false,
+      synthesized_bullet_indent: false,
     }
   }
 
@@ -316,7 +349,7 @@ impl DiagramTextRun {
     }
   }
 
-  fn apply_primary_font_size(&mut self, font_size: i32) {
+  fn apply_layout_font_size(&mut self, font_size: i32) {
     if matches!(
       self.kind,
       DiagramTextRunKind::Run | DiagramTextRunKind::Field | DiagramTextRunKind::Math
@@ -342,6 +375,7 @@ pub enum DiagramTextRunKind {
 #[derive(Clone, Debug, Default)]
 pub struct DiagramStyleColors {
   pub fill_by_label: HashMap<String, Vec<RgbColor>>,
+  pub line_by_label: HashMap<String, Vec<RgbColor>>,
   pub text_fill_by_label: HashMap<String, Vec<RgbColor>>,
 }
 
@@ -402,12 +436,15 @@ struct DiagramShapeNode {
   is_blip_placeholder: bool,
   z_order_offset: i32,
   shape_properties: Option<Box<dgm::ShapeProperties>>,
+  preset_geometry: Option<Box<a::PresetGeometry>>,
   style: Option<Box<dgm::Style>>,
+  line_fill: Option<RgbColor>,
   text_fill: Option<RgbColor>,
   text_rotation_deg: f32,
   aspect_ratio: f32,
   data_node_type: Option<dgm::ElementValues>,
   font_size_pt: Option<f32>,
+  minimum_font_size_pt: Option<f32>,
   font_sync_group: Option<String>,
   text_order: usize,
   constraints: Vec<DiagramConstraint>,
@@ -431,12 +468,17 @@ struct DiagramConstraint {
   value: f32,
   target: dgm::ConstraintValues,
   reference: dgm::ConstraintValues,
+  relationship: Option<dgm::ConstraintRelationshipValues>,
+  operator: Option<dgm::BoolOperatorValues>,
   point_type: Option<dgm::ElementValues>,
 }
 
 #[derive(Clone, Debug)]
 struct DiagramRule {
   for_name: String,
+  target: dgm::ConstraintValues,
+  point_type: Option<dgm::ElementValues>,
+  value: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -630,12 +672,15 @@ fn build_diagram_shape_tree(
       is_blip_placeholder: false,
       z_order_offset: 0,
       shape_properties: None,
+      preset_geometry: None,
       style: None,
+      line_fill: None,
       text_fill: None,
       text_rotation_deg: 0.0,
       aspect_ratio: 0.0,
       data_node_type: None,
       font_size_pt: None,
+      minimum_font_size_pt: None,
       font_sync_group: None,
       text_order: usize::MAX,
       constraints: Vec::new(),
@@ -1158,6 +1203,13 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
           .and_then(|styles| styles.style_by_label.get(label))
       })
       .cloned();
+    let line_fill = style_label
+      .and_then(|label| {
+        self
+          .colors
+          .and_then(|colors| colors.line_by_label.get(label))
+      })
+      .and_then(|fills| color_by_index(fills, self.current_index));
     let text_fill = style_label
       .and_then(|label| {
         self
@@ -1167,7 +1219,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       .and_then(|fills| color_by_index(fills, self.current_index));
     let data_node_type = data_points
       .and_then(|points| points.first())
-      .and_then(|binding| binding.point.r#type)
+      .map(|binding| binding.point.r#type.unwrap_or_default())
       .and_then(point_type_to_element_type);
     let mut text_order = usize::MAX;
     if let Some(data_points) = data_points {
@@ -1211,6 +1263,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
     let is_connector = shape_atom
       .and_then(|shape| shape.r#type.as_deref())
       .is_some_and(|shape_type| shape_type == "conn");
+    let preset_geometry = shape_atom.and_then(diagram_layout_preset_geometry);
     let child = DiagramShapeNode {
       internal_name: name.to_string(),
       text_body,
@@ -1224,7 +1277,9 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       has_geometry,
       hidden_geometry,
       is_connector,
-      shape_rotation_deg: 0.0,
+      shape_rotation_deg: shape_atom
+        .and_then(|shape| shape.rotation)
+        .unwrap_or_default() as f32,
       connector_angle_deg: 0.0,
       is_blip_placeholder: shape_atom
         .and_then(|shape| shape.blip_placeholder)
@@ -1234,7 +1289,9 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         .and_then(|shape| shape.z_order_offset)
         .unwrap_or_default(),
       shape_properties,
+      preset_geometry,
       style,
+      line_fill,
       text_fill,
       text_rotation_deg: 0.0,
       aspect_ratio: active_algorithms
@@ -1244,11 +1301,8 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         .unwrap_or_default(),
       data_node_type,
       font_size_pt: self.metrics.font_sizes.get(name).copied(),
-      font_sync_group: self
-        .metrics
-        .font_sync_names
-        .contains(name)
-        .then(|| name.to_string()),
+      minimum_font_size_pt: None,
+      font_sync_group: None,
       text_order,
       constraints: self.active_constraints(layout_node),
       direct_constraints: direct_constraints_unfiltered(layout_node),
@@ -1686,6 +1740,8 @@ fn parse_constraint(
     value: constraint.val.unwrap_or_default() as f32,
     target: constraint.r#type,
     reference: constraint.reference_type.unwrap_or_default(),
+    relationship: constraint.r#for,
+    operator: constraint.operator,
     point_type: constraint.point_type,
   })
 }
@@ -1698,6 +1754,8 @@ fn parse_constraint_unfiltered(constraint: &dgm::Constraint) -> Option<DiagramCo
     value: constraint.val.unwrap_or_default() as f32,
     target: constraint.r#type,
     reference: constraint.reference_type.unwrap_or_default(),
+    relationship: constraint.r#for,
+    operator: constraint.operator,
     point_type: constraint.point_type,
   })
 }
@@ -1719,8 +1777,12 @@ fn parse_rules(rules: &dgm::RuleList) -> Vec<DiagramRule> {
     .rule
     .iter()
     .filter_map(|rule| {
-      let for_name = rule.for_name.clone().unwrap_or_default();
-      (!for_name.is_empty()).then_some(DiagramRule { for_name })
+      (rule.r#type != dgm::ConstraintValues::None).then(|| DiagramRule {
+        for_name: rule.for_name.clone().unwrap_or_default(),
+        target: rule.r#type,
+        point_type: rule.point_type,
+        value: rule.val.unwrap_or_default() as f32,
+      })
     })
     .collect()
 }
@@ -1728,7 +1790,6 @@ fn parse_rules(rules: &dgm::RuleList) -> Vec<DiagramRule> {
 #[derive(Clone, Debug, Default)]
 struct LayoutNodeMetrics {
   font_sizes: HashMap<String, f32>,
-  font_sync_names: HashSet<String>,
 }
 
 fn layout_node_metrics(layout: Option<&dgm::LayoutDefinition>) -> LayoutNodeMetrics {
@@ -1799,13 +1860,6 @@ fn collect_constraints(node: &dgm::LayoutNode, metrics: &mut LayoutNodeMetrics) 
         && let (Some(name), Some(value)) = (constraint.for_name.as_deref(), constraint.val)
       {
         metrics.font_sizes.insert(name.to_string(), value as f32);
-      }
-      if constraint.r#type == dgm::ConstraintValues::PrimaryFontSize
-        && constraint.r#for == Some(dgm::ConstraintRelationshipValues::Descendant)
-        && constraint.operator == Some(dgm::BoolOperatorValues::Equal)
-        && let Some(name) = constraint.for_name.as_deref()
-      {
-        metrics.font_sync_names.insert(name.to_string());
       }
     }
   }
@@ -1994,7 +2048,48 @@ fn algorithm_parameter_f32(
 }
 
 fn layout_diagram_shape_tree(root: &mut DiagramShapeNode) {
+  assign_diagram_font_sync_groups(root, &[]);
   layout_diagram_shape_node(root, &[], &[]);
+}
+
+#[derive(Clone)]
+struct DiagramFontSyncGroup {
+  key: String,
+  for_name: String,
+  point_type: Option<dgm::ElementValues>,
+}
+
+fn assign_diagram_font_sync_groups(
+  node: &mut DiagramShapeNode,
+  inherited_groups: &[DiagramFontSyncGroup],
+) {
+  node.font_sync_group = inherited_groups
+    .iter()
+    .rev()
+    .find(|group| {
+      (group.for_name.is_empty() || group.for_name == node.internal_name)
+        && group
+          .point_type
+          .is_none_or(|point_type| Some(point_type) == node.data_node_type)
+    })
+    .map(|group| group.key.clone());
+
+  let mut descendant_groups = inherited_groups.to_vec();
+  for (index, constraint) in node.direct_constraints.iter().enumerate() {
+    if constraint.target == dgm::ConstraintValues::PrimaryFontSize
+      && constraint.relationship == Some(dgm::ConstraintRelationshipValues::Descendant)
+      && constraint.operator == Some(dgm::BoolOperatorValues::Equal)
+    {
+      descendant_groups.push(DiagramFontSyncGroup {
+        key: format!("{}:{index}", node.internal_name),
+        for_name: constraint.for_name.clone(),
+        point_type: constraint.point_type,
+      });
+    }
+  }
+  for child in &mut node.children {
+    assign_diagram_font_sync_groups(child, &descendant_groups);
+  }
 }
 
 fn layout_diagram_shape_node(
@@ -2031,7 +2126,7 @@ fn layout_shape_children(
       hierarchy_layout_tree(node, algorithm)
     }
     dgm::AlgorithmValues::Snake => snake_layout_tree(node, algorithm, constraints),
-    dgm::AlgorithmValues::Text => apply_text_algorithm(node, constraints),
+    dgm::AlgorithmValues::Text => apply_text_algorithm(node, constraints, rules),
     dgm::AlgorithmValues::Space => {
       // ECMA-376 §21.4.7.1 assigns `sp` only spacing/no-op layout duties;
       // text layout belongs to `tx`. LibreOffice's DiagramLayoutAtom::layoutShape
@@ -2043,7 +2138,11 @@ fn layout_shape_children(
   }
 }
 
-fn apply_text_algorithm(node: &mut DiagramShapeNode, constraints: &[DiagramConstraint]) {
+fn apply_text_algorithm(
+  node: &mut DiagramShapeNode,
+  constraints: &[DiagramConstraint],
+  rules: &[DiagramRule],
+) {
   let has_direct_font_size = node.text_body.has_direct_font_size();
   let font_size = constraints
     .iter()
@@ -2056,8 +2155,21 @@ fn apply_text_algorithm(node: &mut DiagramShapeNode, constraints: &[DiagramConst
     .filter(|value| *value > 0.0);
   if let Some(font_size) = font_size {
     node.font_size_pt = Some(font_size);
-    node.text_body.apply_primary_font_size(font_size);
   }
+  // ECMA-376 Part 1 §21.4.2.24 defines a primFontSz rule value as the
+  // lower limit used while the tx algorithm shrinks text to fit.
+  node.minimum_font_size_pt = rules
+    .iter()
+    .rev()
+    .find(|rule| {
+      rule.target == dgm::ConstraintValues::PrimaryFontSize
+        && (rule.for_name.is_empty() || rule.for_name == node.internal_name)
+        && rule
+          .point_type
+          .is_none_or(|point_type| Some(point_type) == node.data_node_type)
+    })
+    .map(|rule| rule.value)
+    .filter(|value| *value > 0.0);
   node.text_body.apply_text_margins(
     node.width,
     node.height,
@@ -2108,10 +2220,60 @@ fn apply_text_algorithm(node: &mut DiagramShapeNode, constraints: &[DiagramConst
       .unwrap_or(2),
     alignment,
   );
+  if let Some(primary_font_size) = font_size {
+    let secondary_font_size = constraints
+      .iter()
+      .rev()
+      .find(|constraint| {
+        constraint.target == dgm::ConstraintValues::SecondaryFontSize
+          && (constraint.for_name.is_empty() || constraint.for_name == node.internal_name)
+      })
+      .map(|constraint| {
+        if constraint.value > 0.0 {
+          constraint.value
+        } else if constraint.reference == dgm::ConstraintValues::PrimaryFontSize {
+          primary_font_size * constraint.factor
+        } else {
+          primary_font_size * SMARTART_DEFAULT_SECONDARY_FONT_SCALE
+        }
+      })
+      .filter(|value| *value > 0.0)
+      .unwrap_or(primary_font_size * SMARTART_DEFAULT_SECONDARY_FONT_SCALE);
+    node
+      .text_body
+      .apply_font_sizes(primary_font_size, secondary_font_size);
+  }
 }
 
 fn points_to_emu(value: f32) -> i32 {
   (value * 12_700.0).round() as i32
+}
+
+fn diagram_layout_preset_geometry(shape: &dgm::Shape) -> Option<Box<a::PresetGeometry>> {
+  let preset = shape.r#type.as_deref()?.parse().ok()?;
+  let mut adjustments = shape
+    .adjust_list
+    .as_ref()
+    .map(|list| list.adjust.clone())
+    .unwrap_or_default();
+  adjustments.sort_by_key(|adjustment| adjustment.index);
+  let adjust_value_list = (!adjustments.is_empty()).then(|| a::AdjustValueList {
+    shape_guide: adjustments
+      .into_iter()
+      .map(|adjustment| a::ShapeGuide {
+        name: format!("adj{}", adjustment.index),
+        formula: format!(
+          "val {}",
+          (adjustment.val * DRAWINGML_ADJUST_FULL_SCALE).round()
+        ),
+      })
+      .collect(),
+  });
+  Some(Box::new(a::PresetGeometry {
+    xmlns: Vec::new(),
+    preset,
+    adjust_value_list,
+  }))
 }
 
 fn shape_rotation_degrees(node: &DiagramShapeNode) -> f32 {
@@ -2337,33 +2499,54 @@ fn linear_layout_tree(
     LinearDirection::Bottom => 90.0,
   };
   let mut properties: HashMap<String, HashMap<dgm::ConstraintValues, f32>> = HashMap::new();
-  for constraint in constraints
-    .iter()
-    .filter(|constraint| !constraint.for_name.is_empty())
-  {
-    if constraint.target == dgm::ConstraintValues::Width {
-      properties
-        .entry(constraint.for_name.clone())
-        .or_default()
-        .insert(
-          dgm::ConstraintValues::Width,
-          (node.width * constraint.factor).min(node.width),
-        );
-    }
-    if constraint.target == dgm::ConstraintValues::Height {
-      properties
-        .entry(constraint.for_name.clone())
-        .or_default()
-        .insert(
-          dgm::ConstraintValues::Height,
-          (node.height * constraint.factor).min(node.height),
-        );
+  for constraint in constraints {
+    let target_names = if !constraint.for_name.is_empty() {
+      vec![constraint.for_name.as_str()]
+    } else if let Some(point_type) = constraint.point_type {
+      node
+        .children
+        .iter()
+        .filter(|child| child.data_node_type == Some(point_type))
+        .map(|child| child.internal_name.as_str())
+        .collect()
+    } else {
+      Vec::new()
+    };
+    for target_name in target_names {
+      if constraint.target == dgm::ConstraintValues::Width {
+        properties
+          .entry(target_name.to_string())
+          .or_default()
+          .insert(
+            dgm::ConstraintValues::Width,
+            (node.width * constraint.factor).min(node.width),
+          );
+      }
+      if constraint.target == dgm::ConstraintValues::Height {
+        properties
+          .entry(target_name.to_string())
+          .or_default()
+          .insert(
+            dgm::ConstraintValues::Height,
+            (node.height * constraint.factor).min(node.height),
+          );
+      }
     }
   }
   let mut space_width = 0.0;
   let mut space_height = 0.0;
   for constraint in constraints {
     if matches!(constraint.for_name.as_str(), "sp" | "space" | "sibTrans") {
+      // A materialized spacing/transition layout node already consumes its
+      // constrained width or height in the linear child sequence. Adding the
+      // same value again between every child double-counts sibling spacing.
+      let has_explicit_spacing_child = node
+        .children
+        .iter()
+        .any(|child| child.internal_name == constraint.for_name);
+      if has_explicit_spacing_child {
+        continue;
+      }
       if constraint.target == dgm::ConstraintValues::Width {
         space_width = node.width * constraint.factor;
       }
@@ -2372,7 +2555,10 @@ fn linear_layout_tree(
       }
     }
   }
-  let mut shrink_names: HashSet<String> = rules.iter().map(|rule| rule.for_name.clone()).collect();
+  let mut shrink_names: HashSet<String> = rules
+    .iter()
+    .filter_map(|rule| (!rule.for_name.is_empty()).then(|| rule.for_name.clone()))
+    .collect();
   if !horizontal {
     shrink_names.clear();
   }
@@ -3101,9 +3287,12 @@ fn flatten_diagram_shape_tree(
       width: node.width,
       height: node.height,
       text_body: node.text_body.clone(),
+      preset_geometry: node.preset_geometry.clone(),
       shape_properties: node.shape_properties.clone(),
       style: node.style.clone(),
+      line_fill: node.line_fill,
       text_fill: node.text_fill,
+      shape_rotation_deg: shape_rotation_degrees(node),
       text_rotation_deg: node.text_rotation_deg,
       draw_geometry,
       is_connector: node.is_connector,
@@ -3112,6 +3301,7 @@ fn flatten_diagram_shape_tree(
       fill: node.fill,
       text_order: node.text_order,
       font_size_pt: node.font_size_pt,
+      minimum_font_size_pt: node.minimum_font_size_pt,
       font_sync_group: node.font_sync_group.clone(),
     });
   }

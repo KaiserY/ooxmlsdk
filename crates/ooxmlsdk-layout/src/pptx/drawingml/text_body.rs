@@ -53,6 +53,8 @@ pub(crate) enum TextAutoFit {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct TextParagraph {
   pub(crate) diagram_source_order: Option<usize>,
+  pub(crate) diagram_synthesized_bullet_left_margin: bool,
+  pub(crate) diagram_synthesized_bullet_indent: bool,
   pub(crate) level: Option<u8>,
   pub(crate) paragraph_properties: Option<Box<a::ParagraphProperties>>,
   pub(crate) end_paragraph_run_properties: Option<Box<a::EndParagraphRunProperties>>,
@@ -337,6 +339,8 @@ impl TextParagraph {
       .collect();
     Self {
       diagram_source_order: None,
+      diagram_synthesized_bullet_left_margin: false,
+      diagram_synthesized_bullet_indent: false,
       level,
       paragraph_properties: source.paragraph_properties.clone(),
       end_paragraph_run_properties: source.end_paragraph_run_properties.clone(),

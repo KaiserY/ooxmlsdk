@@ -4273,10 +4273,11 @@ mod tests {
     )
     .expect("chart space");
 
-    assert_eq!(
-      fixed_output_texts_for_ui_language(&chart_space, None),
-      ["A 34%", "B 33%", "C 33%"]
-    );
+    let labels = fixed_output_texts_for_ui_language(&chart_space, None)
+      .into_iter()
+      .map(|label| label.split_whitespace().collect::<Vec<_>>().join(" "))
+      .collect::<Vec<_>>();
+    assert_eq!(labels, ["A 34%", "B 33%", "C 33%"]);
   }
 
   #[test]

@@ -44,7 +44,13 @@ use ooxmlsdk_layout::fonts::{FontFaceData, FontStyleRef};
 use ooxmlsdk_layout::text_metrics::TextMetrics;
 
 const INTERNAL_LINK_DESTINATION_SHIFT_PT: f32 = 10.0;
-const LO_ARIAL_BOLD_11PT_VERTICAL_SCALE: f32 = 1.07;
+// Historical fixed-output calibration retained from the DOCX numbering/font
+// parity path. No matching LibreOffice source constant has been identified;
+// keep the trigger and scale isolated so font-metric work can remove it
+// without adding another renderer-wide conditional.
+const LEGACY_ARIAL_BOLD_FONT_SIZE_PT: f32 = 11.0;
+const LEGACY_ARIAL_BOLD_FONT_SIZE_TOLERANCE_PT: f32 = 0.01;
+const LEGACY_ARIAL_BOLD_VERTICAL_SCALE: f32 = 1.07;
 
 type PaintTextPortionRanges = SmallVec<[(PaintTextPortionKind, Range<usize>); 2]>;
 type PaintGlyphFontRuns = SmallVec<[PaintGlyphFontRun; 2]>;
@@ -1493,8 +1499,7 @@ fn pdf_page_dimension(engine_kind: common::LayoutEngineKind, dimension_pt: f32) 
     // dimensions to its 600 dpi print-device grid, with positive half-grid
     // dimensions rounded upward. Keep the OOXML/layout coordinate space exact
     // and apply this only at PDF page creation.
-    const PRINT_DPI: f32 = 600.0;
-    (dimension_pt * PRINT_DPI / 72.0).round() * 72.0 / PRINT_DPI
+    ooxmlsdk_layout::units::quantize_points_to_office_print_grid(dimension_pt)
   } else {
     dimension_pt
   }
@@ -3998,13 +4003,14 @@ fn shaped_pdf_glyphs(
 
 fn text_vertical_scale(style: &TextStyle<'_>) -> f32 {
   if style.bold
-    && (style.font_size_pt - 11.0).abs() < 0.01
+    && (style.font_size_pt - LEGACY_ARIAL_BOLD_FONT_SIZE_PT).abs()
+      < LEGACY_ARIAL_BOLD_FONT_SIZE_TOLERANCE_PT
     && style
       .font_family
       .as_deref()
       .is_some_and(|family| family.eq_ignore_ascii_case("Arial"))
   {
-    LO_ARIAL_BOLD_11PT_VERTICAL_SCALE
+    LEGACY_ARIAL_BOLD_VERTICAL_SCALE
   } else {
     1.0
   }

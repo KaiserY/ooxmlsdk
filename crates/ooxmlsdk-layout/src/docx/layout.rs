@@ -30,6 +30,7 @@ use crate::pptx::chart::{
   lower_clustered_column_chart, lower_radial_chart,
 };
 use crate::render::chart as shared_chart;
+use crate::render::chart_layout_profiles as chart_profiles;
 use crate::text_metrics::TextMetrics;
 use crate::units;
 
@@ -8352,7 +8353,7 @@ fn lower_word_pie_chart(
   let chart_y_pt = if bottom_legend || no_legend {
     y_pt
   } else {
-    y_pt + height_pt * 0.013_606_33
+    y_pt + height_pt * chart_profiles::WORD_SIDE_PIE_FRAME_Y_OFFSET_RATIO
   };
   let frame_stroke = if bottom_legend || no_legend {
     BorderStyle {
@@ -8388,28 +8389,17 @@ fn lower_word_pie_chart(
     // chart frame and centers the pie in the remaining plot region. These
     // ratios are calibrated against Office fixed output after applying the
     // ECMA/MS-OI29500 data-selection and angle rules above.
-    let (center_x, center_y, radius_x, radius_y) = if bottom_legend {
-      (
-        width_pt * 0.5,
-        height_pt * 0.454_6,
-        height_pt * 0.410_5,
-        height_pt * 0.410_5,
-      )
+    let profile = if bottom_legend {
+      chart_profiles::WORD_BOTTOM_LEGEND_PIE
     } else if no_legend {
-      (
-        width_pt * 0.5,
-        height_pt * 0.5,
-        height_pt * 0.394_355_15,
-        height_pt * 0.394_355_15,
-      )
+      chart_profiles::WORD_NO_LEGEND_PIE
     } else {
-      (
-        width_pt * 0.444_498_36,
-        height_pt * 0.5,
-        height_pt * 0.394_355_15,
-        height_pt * 0.394_355_15,
-      )
+      chart_profiles::WORD_SIDE_LEGEND_PIE
     };
+    let center_x = width_pt * profile.center_x_width_ratio;
+    let center_y = height_pt * profile.center_y_height_ratio;
+    let radius_x = height_pt * profile.radius_x_height_ratio;
+    let radius_y = height_pt * profile.radius_y_height_ratio;
     let mut start_angle = model.first_slice_angle_deg.to_radians() as f32;
     for (index, value) in model.values.iter().enumerate() {
       let sweep = value.unwrap_or(0.0) / total * std::f64::consts::TAU;
@@ -8458,9 +8448,11 @@ fn lower_word_pie_chart(
       // farther down while the upper slice remains above center. Keep the
       // horizontal ring circular enough to preserve centered label origins,
       // but use Office's vertically expanded label ring and center.
-      let center_y = height_pt * 0.504_26;
-      let label_radius_x = height_pt * 0.394_355_15 * 0.84;
-      let label_radius_y = height_pt * 0.348_384;
+      let label_profile = chart_profiles::WORD_NO_LEGEND_PIE_LABELS;
+      let center_y = height_pt * label_profile.center_y_height_ratio;
+      let label_radius_x =
+        height_pt * label_profile.plot_radius_x_height_ratio * label_profile.radius_x_scale;
+      let label_radius_y = height_pt * label_profile.radius_y_height_ratio;
       let start_angle = model.first_slice_angle_deg.to_radians() as f32;
       for label in &model.data_labels {
         let before = model
@@ -8501,9 +8493,10 @@ fn lower_word_pie_chart(
   }
 
   if bottom_legend {
-    let marker_size = chart.label_style.font_size_pt * 0.55;
-    let marker_text_gap = chart.label_style.font_size_pt * 0.275;
-    let item_gap = chart.label_style.font_size_pt * 0.515;
+    let legend_profile = chart_profiles::WORD_BOTTOM_PIE_LEGEND;
+    let marker_size = chart.label_style.font_size_pt * legend_profile.marker_size_em;
+    let marker_text_gap = chart.label_style.font_size_pt * legend_profile.marker_text_gap_em;
+    let item_gap = chart.label_style.font_size_pt * legend_profile.item_gap_em;
     let entries = model
       .visible_legend_indices
       .iter()
@@ -8518,9 +8511,11 @@ fn lower_word_pie_chart(
       .map(|(_, _, text_width)| marker_size + marker_text_gap + text_width)
       .sum::<f32>()
       + item_gap * entries.len().saturating_sub(1) as f32;
-    let mut item_x = x_pt + (width_pt - content_width) * 0.5 + width_pt * 0.004_6;
-    let marker_y = chart_y_pt + height_pt * 0.932_9;
-    let text_y = chart_y_pt + height_pt * 0.924_0;
+    let mut item_x = x_pt
+      + (width_pt - content_width) * 0.5
+      + width_pt * legend_profile.centered_row_offset_width_ratio;
+    let marker_y = chart_y_pt + height_pt * legend_profile.marker_y_height_ratio;
+    let text_y = chart_y_pt + height_pt * legend_profile.text_y_height_ratio;
     for (point_index, text, text_width) in entries {
       if let Some(color) = chart.pie_point_colors.get(point_index).copied() {
         items.push(PageItem::Rect(RectItem {
@@ -8556,14 +8551,15 @@ fn lower_word_pie_chart(
       item_x += marker_size + marker_text_gap + text_width + item_gap;
     }
   } else if model.legend_position.is_some() {
-    let marker_size = chart.label_style.font_size_pt * 0.502_87;
-    let marker_x = x_pt + width_pt * 0.899_492_86;
-    let text_x = x_pt + width_pt * 0.915_457_55;
-    let first_marker_y = chart_y_pt + height_pt * 0.389_812;
+    let legend_profile = chart_profiles::WORD_SIDE_PIE_LEGEND;
+    let marker_size = chart.label_style.font_size_pt * legend_profile.marker_size_em;
+    let marker_x = x_pt + width_pt * legend_profile.marker_x_width_ratio;
+    let text_x = x_pt + width_pt * legend_profile.text_x_width_ratio;
+    let first_marker_y = chart_y_pt + height_pt * legend_profile.first_marker_y_height_ratio;
     // TextItem's visible-text path adds the font ascent before emitting the
     // PDF text matrix; this is the text-box top, not the final PDF baseline.
-    let first_text_y = chart_y_pt + height_pt * 0.376_303_4;
-    let row_step = height_pt * 0.066_914_94;
+    let first_text_y = chart_y_pt + height_pt * legend_profile.first_text_y_height_ratio;
+    let row_step = height_pt * legend_profile.row_step_height_ratio;
     for (row, point_index) in model.visible_legend_indices.iter().copied().enumerate() {
       let row_offset = row as f32 * row_step;
       if let Some(color) = chart.pie_point_colors.get(point_index).copied() {
@@ -15823,8 +15819,7 @@ fn cjk_punctuation_compression_capacity(
 }
 
 fn word_print_grid_font_size(font_size_pt: f32) -> f32 {
-  const WORD_PRINT_DPI: f32 = 600.0;
-  (font_size_pt * WORD_PRINT_DPI / 72.0).round() * 72.0 / WORD_PRINT_DPI
+  units::quantize_points_to_office_print_grid(font_size_pt)
 }
 
 fn round_style_to_word_print_grid(style: &mut TextStyle) {

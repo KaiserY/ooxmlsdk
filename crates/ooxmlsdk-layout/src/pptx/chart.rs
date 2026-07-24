@@ -10,6 +10,8 @@ use crate::text_metrics::TextMetrics;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
+use crate::render::chart_layout_profiles as profiles;
+
 const TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
 
 #[derive(Clone, Copy, Debug)]
@@ -47,6 +49,14 @@ pub(crate) enum ChartLayoutProfile {
   PowerPoint,
   Word,
   Excel,
+}
+
+fn radial_host_defaults(profile: ChartLayoutProfile) -> profiles::RadialHostDefaults {
+  match profile {
+    ChartLayoutProfile::PowerPoint => profiles::POWERPOINT_RADIAL_DEFAULTS,
+    ChartLayoutProfile::Word => profiles::WORD_RADIAL_DEFAULTS,
+    ChartLayoutProfile::Excel => profiles::EXCEL_RADIAL_DEFAULTS,
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -370,106 +380,68 @@ pub(crate) fn lower_clustered_column_chart(
     && chart
       .value_axis
       .is_some_and(|axis| axis.text_properties.is_some());
+  let host_defaults = match style.layout_profile {
+    ChartLayoutProfile::PowerPoint => profiles::POWERPOINT_CARTESIAN_DEFAULTS,
+    ChartLayoutProfile::Word => profiles::WORD_CARTESIAN_DEFAULTS,
+    ChartLayoutProfile::Excel => profiles::EXCEL_CARTESIAN_DEFAULTS,
+  };
+  let host_side_legend_bands = match style.layout_profile {
+    ChartLayoutProfile::PowerPoint => profiles::POWERPOINT_SIDE_LEGEND_BANDS,
+    ChartLayoutProfile::Word if has_layout_explicit_title => {
+      profiles::WORD_EXPLICIT_TITLE_SIDE_LEGEND_BANDS
+    }
+    ChartLayoutProfile::Word => profiles::WORD_SIDE_LEGEND_BANDS,
+    ChartLayoutProfile::Excel => profiles::EXCEL_SIDE_LEGEND_BANDS,
+  };
   // Word's automatic cartesian layout places a side-legend plot band lower
   // than the corresponding PowerPoint chart-space layout. The ratio is
   // stable across the three Office title-fill fixtures, which share no
   // c:manualLayout but differ in title-area fill.
-  let word_side_vertical_offset = if style.layout_profile == ChartLayoutProfile::Word
+  let word_side_adjustment = if style.layout_profile == ChartLayoutProfile::Word
     && has_side_legend
     && has_layout_explicit_title
     && chart.plot_layout.is_none()
   {
-    frame.height_pt * 0.012_695
+    profiles::WORD_EXPLICIT_TITLE_SIDE_LEGEND
   } else {
-    0.0
+    profiles::CartesianLayoutAdjustment::default()
   };
-  let word_side_plot_top_offset = if style.layout_profile == ChartLayoutProfile::Word
+  let excel_side_adjustment = if style.layout_profile == ChartLayoutProfile::Excel
     && has_side_legend
     && has_layout_explicit_title
     && chart.plot_layout.is_none()
   {
-    frame.height_pt * 0.010_665
+    profiles::EXCEL_EXPLICIT_TITLE_SIDE_LEGEND
   } else {
-    0.0
+    profiles::CartesianLayoutAdjustment::default()
   };
-  let excel_side_category_offset = if style.layout_profile == ChartLayoutProfile::Excel
-    && has_side_legend
-    && has_layout_explicit_title
-    && chart.plot_layout.is_none()
-  {
-    -frame.height_pt * 0.013_298
-  } else {
-    0.0
-  };
-  let excel_side_plot_top_offset = if style.layout_profile == ChartLayoutProfile::Excel
-    && has_side_legend
-    && has_layout_explicit_title
-    && chart.plot_layout.is_none()
-  {
-    frame.height_pt * 0.003_864
-  } else {
-    0.0
-  };
-  let excel_untitled_side_category_offset = if style.layout_profile == ChartLayoutProfile::Excel
+  let excel_untitled_side_adjustment = if style.layout_profile == ChartLayoutProfile::Excel
     && has_side_legend
     && !has_layout_title
     && has_automatic_untitled_layout
     && chart.plot_layout.is_none()
   {
-    frame.height_pt
-      * if chart.title_overlay && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic)) {
-        // The pre-2007 empty-overlay title profile shares the automatic
-        // no-reservation layout, but its worksheet-relative print position is
-        // one text baseline above the later autoTitleDeleted profile.
-        0.019_2
-      } else {
-        if chart.title.is_none() && chart.has_explicit_categories {
-          0.020_37
-        } else {
-          0.028_17
-        }
-      }
+    if chart.title_overlay && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic)) {
+      profiles::EXCEL_LEGACY_EMPTY_OVERLAY_SIDE_LEGEND
+    } else if chart.title.is_none() && chart.has_explicit_categories {
+      profiles::EXCEL_UNTITLED_EXPLICIT_CATEGORY_SIDE_LEGEND
+    } else {
+      profiles::EXCEL_AUTOMATIC_UNTITLED_SIDE_LEGEND
+    }
   } else {
-    0.0
-  };
-  let excel_untitled_side_plot_top_offset = if style.layout_profile == ChartLayoutProfile::Excel
-    && has_side_legend
-    && !has_layout_title
-    && has_automatic_untitled_layout
-    && chart.plot_layout.is_none()
-  {
-    frame.height_pt
-      * if chart.title_overlay && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic)) {
-        // Keep the upper value label overlapping the same worksheet text
-        // band as Office fixed output; the PDF comparator groups spatial
-        // lines by strict glyph-bound overlap.
-        0.015
-      } else {
-        0.029_15
-      }
-  } else {
-    0.0
+    profiles::CartesianLayoutAdjustment::default()
   };
   // Excel's automatic cartesian layout uses a separate title reservation when
   // no legend is authored. Office fixed-output evidence keeps both the plot
   // and category-label bands lower than the side-legend profile.
-  let excel_title_only_category_offset = if style.layout_profile == ChartLayoutProfile::Excel
+  let excel_title_only_adjustment = if style.layout_profile == ChartLayoutProfile::Excel
     && legend_position.is_none()
     && has_layout_explicit_title
     && chart.plot_layout.is_none()
   {
-    frame.height_pt * 0.020_87
+    profiles::EXCEL_TITLE_ONLY
   } else {
-    0.0
-  };
-  let excel_title_only_plot_top_offset = if style.layout_profile == ChartLayoutProfile::Excel
-    && legend_position.is_none()
-    && has_layout_explicit_title
-    && chart.plot_layout.is_none()
-  {
-    frame.height_pt * 0.018_42
-  } else {
-    0.0
+    profiles::CartesianLayoutAdjustment::default()
   };
   let data_table_height = chart.data_table.map_or(0.0, |_| {
     label_line_height * (chart.series.len() as f32 + 1.0) + label_line_height * 0.45
@@ -480,41 +452,35 @@ pub(crate) fn lower_clustered_column_chart(
   // chart height, while actual label widths determine the left plot inset.
   let title_top = frame.y_pt
     + frame.height_pt
-      * if style.layout_profile == ChartLayoutProfile::Word {
-        0.0365
-      } else if style.layout_profile == ChartLayoutProfile::Excel
+      * if style.layout_profile == ChartLayoutProfile::Excel
         && chart.title_overlay
         && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic))
       {
-        0.053_15
+        profiles::EXCEL_LEGACY_EMPTY_OVERLAY_TITLE_TOP_RATIO
       } else if has_titled_indexed_scatter_layout {
-        0.052_7
+        profiles::EXCEL_TITLED_INDEXED_SCATTER_TITLE_TOP_RATIO
       } else if has_legacy_single_series_title_layout {
-        0.048_36
+        profiles::EXCEL_LEGACY_SINGLE_SERIES_TITLE_TOP_RATIO
       } else {
-        0.024
+        host_defaults.title_top_ratio
       }
     + if has_derived_single_series_side_title_layout {
-      frame.height_pt * 0.027_64
+      frame.height_pt * profiles::EXCEL_DERIVED_SINGLE_SERIES_SIDE_TITLE.title_top_ratio
     } else if has_explicit_single_series_side_title_layout {
-      frame.height_pt * 0.024_36
+      frame.height_pt * profiles::EXCEL_EXPLICIT_SINGLE_SERIES_SIDE_TITLE.title_top_ratio
     } else if has_explicit_bottom_column_layout {
-      frame.height_pt * 0.020_82
+      frame.height_pt * profiles::EXCEL_EXPLICIT_BOTTOM_COLUMN.title_top_ratio
     } else {
       0.0
     };
   let legend_bottom_margin = style.label.font_size_pt * 0.81;
   let legend_top = frame.y_pt + frame.height_pt - legend_bottom_margin - label_line_height;
-  let category_bottom_ratio = match style.layout_profile {
-    ChartLayoutProfile::Excel => 0.05,
-    ChartLayoutProfile::Word => 0.022_87,
-    ChartLayoutProfile::PowerPoint => 0.018,
-  };
+  let category_bottom_ratio = host_defaults.category_bottom_ratio;
   let mut category_top = if chart.data_table.is_some() {
     frame.y_pt + frame.height_pt
       - data_table_height
       - if has_bottom_legend {
-        label_line_height + frame.height_pt * 0.045
+        label_line_height + frame.height_pt * profiles::DATA_TABLE_BOTTOM_LEGEND_GAP_RATIO
       } else {
         frame.height_pt * category_bottom_ratio
       }
@@ -525,153 +491,155 @@ pub(crate) fn lower_clustered_column_chart(
       - category_label_height
       - frame.height_pt
         * if has_explicit_powerpoint_title {
-          0.026_1
+          profiles::POWERPOINT_TITLED_BOTTOM_LEGEND_CATEGORY_GAP_RATIO
         } else {
-          0.021
+          profiles::DEFAULT_BOTTOM_LEGEND_CATEGORY_GAP_RATIO
         }
   } else {
     frame.y_pt + frame.height_pt - category_label_height - frame.height_pt * category_bottom_ratio
-  } + word_side_plot_top_offset
-    + excel_side_category_offset
-    + excel_title_only_category_offset
-    + excel_untitled_side_category_offset;
+  } + frame.height_pt * word_side_adjustment.category_top_ratio
+    + frame.height_pt * excel_side_adjustment.category_top_ratio
+    + frame.height_pt * excel_title_only_adjustment.category_top_ratio
+    + frame.height_pt * excel_untitled_side_adjustment.category_top_ratio;
   if has_independent_axis_text_layout {
     // Excel's automatic plot reservation is slightly tighter when both axes
     // carry independent text bodies. Keep that authored-axis profile separate
     // from the ordinary untitled side-legend layout.
-    category_top -= frame.height_pt * 0.010_35;
+    category_top += frame.height_pt * profiles::EXCEL_INDEPENDENT_AXIS_TEXT.category_top_ratio;
   } else if has_titled_indexed_scatter_layout {
     // Excel 2013's automatic-title scatter layout reserves a shallower plot
     // above the bottom legend than the legacy untitled scatter profile.
-    category_top -= frame.height_pt * 0.018;
+    category_top += frame.height_pt * profiles::EXCEL_TITLED_INDEXED_SCATTER.category_top_ratio;
   } else if has_legacy_indexed_scatter_layout {
     // Pre-2013 string-valued scatter caches use indexed x positions, but keep
     // the ordinary single-component label and legend bands.
-    category_top += frame.height_pt * 0.013_2;
+    category_top += frame.height_pt * profiles::EXCEL_LEGACY_INDEXED_SCATTER.category_top_ratio;
   }
   if has_modern_single_series_title_layout {
-    category_top -= frame.height_pt * 0.006_82;
+    category_top += frame.height_pt * profiles::EXCEL_MODERN_SINGLE_SERIES_TITLE.category_top_ratio;
   }
   if has_unshifted_side_line_layout {
     // `crossBetween="midCat"` puts the first and last line markers on the
     // plot edges. Excel's automatic side-legend layout reserves a slightly
     // lower category band for that on-marker axis profile.
-    category_top += frame.height_pt * 0.013;
+    category_top += frame.height_pt * profiles::EXCEL_UNSHIFTED_SIDE_LINE.category_top_ratio;
   }
   if has_legacy_single_series_title_layout {
-    category_top += frame.height_pt * 0.025_8;
+    category_top += frame.height_pt * profiles::EXCEL_LEGACY_SINGLE_SERIES_TITLE.category_top_ratio;
   } else if has_untitled_bottom_column_layout {
     // Modern Excel's missing autoTitleDeleted marker keeps the chart
     // untitled and reserves a compact bottom category/legend band.
-    category_top -= frame.height_pt * 0.032_45;
+    category_top += frame.height_pt * profiles::EXCEL_UNTITLED_BOTTOM_COLUMN.category_top_ratio;
   } else if has_derived_single_series_side_title_layout {
-    category_top += frame.height_pt * 0.029_25;
+    category_top +=
+      frame.height_pt * profiles::EXCEL_DERIVED_SINGLE_SERIES_SIDE_TITLE.category_top_ratio;
   } else if has_explicit_single_series_side_title_layout {
-    category_top += frame.height_pt * 0.041_57;
+    category_top +=
+      frame.height_pt * profiles::EXCEL_EXPLICIT_SINGLE_SERIES_SIDE_TITLE.category_top_ratio;
   } else if has_untitled_bottom_line_no_marker_layout {
-    category_top -= frame.height_pt * 0.035_58;
+    category_top +=
+      frame.height_pt * profiles::EXCEL_UNTITLED_BOTTOM_LINE_NO_MARKER.category_top_ratio;
   } else if has_explicit_bottom_column_layout {
-    category_top -= frame.height_pt * 0.035_58;
+    category_top += frame.height_pt * profiles::EXCEL_EXPLICIT_BOTTOM_COLUMN.category_top_ratio;
   }
-  let untitled_plot_top_ratio = if style.layout_profile == ChartLayoutProfile::Excel {
-    if has_side_legend { 0.032 } else { 0.025 }
-  } else if has_side_legend {
-    0.0449
+  let untitled_plot_top_ratio = if has_side_legend {
+    host_defaults.untitled_side_plot_top_ratio
   } else {
-    0.035
+    host_defaults.untitled_no_side_plot_top_ratio
   };
   let mut plot_top = if has_layout_title {
     title_top + title_line_height + label_line_height * 0.9
   } else {
     frame.y_pt + frame.height_pt * untitled_plot_top_ratio
-  } + word_side_vertical_offset
-    + excel_side_plot_top_offset
-    + excel_title_only_plot_top_offset
-    + excel_untitled_side_plot_top_offset;
+  } + frame.height_pt * word_side_adjustment.plot_top_ratio
+    + frame.height_pt * excel_side_adjustment.plot_top_ratio
+    + frame.height_pt * excel_title_only_adjustment.plot_top_ratio
+    + frame.height_pt * excel_untitled_side_adjustment.plot_top_ratio;
   if has_independent_axis_text_layout {
-    plot_top -= frame.height_pt * 0.004_6;
+    plot_top += frame.height_pt * profiles::EXCEL_INDEPENDENT_AXIS_TEXT.plot_top_ratio;
   } else if has_legacy_indexed_scatter_layout {
-    plot_top += frame.height_pt * 0.025_55;
+    plot_top += frame.height_pt * profiles::EXCEL_LEGACY_INDEXED_SCATTER.plot_top_ratio;
   }
   if has_modern_single_series_title_layout {
-    plot_top -= frame.height_pt * 0.006_82;
+    plot_top += frame.height_pt * profiles::EXCEL_MODERN_SINGLE_SERIES_TITLE.plot_top_ratio;
   }
   if has_titled_indexed_scatter_layout {
-    plot_top += frame.height_pt * 0.006_15;
+    plot_top += frame.height_pt * profiles::EXCEL_TITLED_INDEXED_SCATTER.plot_top_ratio;
   } else if has_legacy_single_series_title_layout {
-    plot_top += frame.height_pt * 0.004_72;
+    plot_top += frame.height_pt * profiles::EXCEL_LEGACY_SINGLE_SERIES_TITLE.plot_top_ratio;
   } else if has_untitled_bottom_column_layout {
-    plot_top += frame.height_pt * 0.033_7;
+    plot_top += frame.height_pt * profiles::EXCEL_UNTITLED_BOTTOM_COLUMN.plot_top_ratio;
   } else if has_derived_single_series_side_title_layout {
     // title_top already carries the derived-title displacement; only the
     // residual plot reservation is added here.
-    plot_top += frame.height_pt * 0.003_91;
+    plot_top += frame.height_pt * profiles::EXCEL_DERIVED_SINGLE_SERIES_SIDE_TITLE.plot_top_ratio;
   } else if has_explicit_single_series_side_title_layout {
     // The title displacement above is part of the automatic plot
     // reservation; retain only the remaining Office plot-band offset.
-    plot_top += frame.height_pt * 0.006_41;
+    plot_top += frame.height_pt * profiles::EXCEL_EXPLICIT_SINGLE_SERIES_SIDE_TITLE.plot_top_ratio;
   } else if has_untitled_bottom_line_no_marker_layout {
-    plot_top += frame.height_pt * 0.032_24;
+    plot_top += frame.height_pt * profiles::EXCEL_UNTITLED_BOTTOM_LINE_NO_MARKER.plot_top_ratio;
   } else if has_explicit_bottom_column_layout {
     // title_top carries most of the authored-title displacement.
-    plot_top += frame.height_pt * 0.006_74;
+    plot_top += frame.height_pt * profiles::EXCEL_EXPLICIT_BOTTOM_COLUMN.plot_top_ratio;
   }
   if has_top_legend {
     plot_top += label_line_height
       + frame.height_pt
         * if style.layout_profile == ChartLayoutProfile::Word {
-          0.031
+          profiles::WORD_TOP_LEGEND_GAP_RATIO
         } else {
-          0.018
+          profiles::DEFAULT_TOP_LEGEND_GAP_RATIO
         };
   }
   let side_category_gap_ratio = match style.layout_profile {
     ChartLayoutProfile::Excel
       if has_side_legend && !has_layout_title && has_automatic_untitled_layout =>
     {
-      0.036_52
+      profiles::EXCEL_AUTOMATIC_UNTITLED_SIDE_CATEGORY_GAP_RATIO
     }
-    ChartLayoutProfile::Excel if has_derived_single_series_side_title_layout => 0.035_92,
-    ChartLayoutProfile::Excel if has_explicit_single_series_side_title_layout => 0.032_41,
-    ChartLayoutProfile::Excel => 0.025,
-    ChartLayoutProfile::Word if has_side_legend && has_layout_explicit_title => 0.023_376,
-    ChartLayoutProfile::Word => 0.027_75,
-    ChartLayoutProfile::PowerPoint => 0.033_35,
+    ChartLayoutProfile::Excel if has_derived_single_series_side_title_layout => {
+      profiles::EXCEL_DERIVED_TITLE_SIDE_CATEGORY_GAP_RATIO
+    }
+    ChartLayoutProfile::Excel if has_explicit_single_series_side_title_layout => {
+      profiles::EXCEL_EXPLICIT_TITLE_SIDE_CATEGORY_GAP_RATIO
+    }
+    ChartLayoutProfile::PowerPoint | ChartLayoutProfile::Word | ChartLayoutProfile::Excel => {
+      host_side_legend_bands.category_gap_ratio
+    }
   };
   let category_plot_gap_ratio =
     if style.layout_profile == ChartLayoutProfile::Word && category_label_line_count > 1.0 {
-      0.039
+      profiles::WORD_MULTILINE_CATEGORY_PLOT_GAP_RATIO
     } else if style.layout_profile == ChartLayoutProfile::Excel
       && legend_position.is_none()
       && has_layout_explicit_title
       && chart.plot_layout.is_none()
     {
-      0.035_09
-    } else if style.layout_profile == ChartLayoutProfile::Excel
+      profiles::EXCEL_TITLE_ONLY_CATEGORY_PLOT_GAP_RATIO
+    } else if (style.layout_profile == ChartLayoutProfile::Excel
       && legend_position.is_none()
       && has_legacy_single_series_title_layout
-      && chart.plot_layout.is_none()
+      && chart.plot_layout.is_none())
       || has_untitled_bottom_column_layout
     {
-      0.032_44
-    } else if has_untitled_bottom_line_no_marker_layout {
-      0.032_2
-    } else if has_explicit_bottom_column_layout {
-      0.032_2
+      profiles::EXCEL_LEGACY_TITLE_CATEGORY_PLOT_GAP_RATIO
+    } else if has_untitled_bottom_line_no_marker_layout || has_explicit_bottom_column_layout {
+      profiles::EXCEL_BOTTOM_CATEGORY_PLOT_GAP_RATIO
     } else {
-      0.018
+      profiles::DEFAULT_CATEGORY_PLOT_GAP_RATIO
     };
   let mut plot_bottom = category_top
     - frame.height_pt
       * if has_side_legend {
         side_category_gap_ratio
       } else if has_bottom_legend && has_explicit_powerpoint_title {
-        0.0225
+        profiles::POWERPOINT_TITLED_BOTTOM_PLOT_GAP_RATIO
       } else {
         category_plot_gap_ratio
       };
   if has_titled_indexed_scatter_layout {
-    plot_bottom -= frame.height_pt * 0.029_8;
+    plot_bottom += frame.height_pt * profiles::EXCEL_TITLED_INDEXED_SCATTER.plot_bottom_ratio;
   } else if has_indexed_scatter_automatic_layout {
     // Excel's untitled scatter profile reserves a wider four-sided axis
     // band than the generic cartesian profile. This is visible when string
@@ -680,13 +648,13 @@ pub(crate) fn lower_clustered_column_chart(
     // (0.1078, 0.0579)-(0.9573, 0.8721) of the chart frame. Keep the
     // adjustment relative to the frame so worksheet print scaling and
     // horizontal page clipping continue to apply normally.
-    category_top += frame.height_pt * 0.007_35;
-    plot_top += frame.height_pt * 0.033_46;
-    plot_bottom -= frame.height_pt * 0.006_33;
+    category_top += frame.height_pt * profiles::EXCEL_AUTOMATIC_INDEXED_SCATTER.category_top_ratio;
+    plot_top += frame.height_pt * profiles::EXCEL_AUTOMATIC_INDEXED_SCATTER.plot_top_ratio;
+    plot_bottom += frame.height_pt * profiles::EXCEL_AUTOMATIC_INDEXED_SCATTER.plot_bottom_ratio;
   }
   if has_unshifted_side_line_layout {
-    plot_top += frame.height_pt * 0.004_79;
-    plot_bottom += frame.height_pt * 0.008_4;
+    plot_top += frame.height_pt * profiles::EXCEL_UNSHIFTED_SIDE_LINE.plot_top_ratio;
+    plot_bottom += frame.height_pt * profiles::EXCEL_UNSHIFTED_SIDE_LINE.plot_bottom_ratio;
   }
   if plot_bottom <= plot_top {
     return Vec::new();
@@ -717,7 +685,7 @@ pub(crate) fn lower_clustered_column_chart(
   } else {
     0.0
   };
-  let side_plot_outer_margin = frame.height_pt * 0.0318;
+  let side_plot_outer_margin = frame.height_pt * profiles::CARTESIAN_SIDE_PLOT_OUTER_MARGIN_RATIO;
   let side_legend_outer_margin = frame.height_pt
     * match style.layout_profile {
       ChartLayoutProfile::Excel
@@ -728,12 +696,14 @@ pub(crate) fn lower_clustered_column_chart(
               && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic)))
             || has_indexed_scatter_automatic_layout) =>
       {
-        0.0575
+        profiles::EXCEL_AUTOMATIC_UNTITLED_SIDE_LEGEND_OUTER_MARGIN_RATIO
       }
-      ChartLayoutProfile::Excel if has_derived_single_series_side_title_layout => 0.056_24,
-      ChartLayoutProfile::Excel => 0.0445,
-      ChartLayoutProfile::Word => 0.039_77,
-      ChartLayoutProfile::PowerPoint => 0.028_25,
+      ChartLayoutProfile::Excel if has_derived_single_series_side_title_layout => {
+        profiles::EXCEL_DERIVED_TITLE_SIDE_LEGEND_OUTER_MARGIN_RATIO
+      }
+      ChartLayoutProfile::PowerPoint | ChartLayoutProfile::Word | ChartLayoutProfile::Excel => {
+        host_side_legend_bands.legend_outer_margin_ratio
+      }
     };
   let side_plot_gap = frame.height_pt
     * match style.layout_profile {
@@ -746,33 +716,36 @@ pub(crate) fn lower_clustered_column_chart(
             || (chart.title_overlay
               && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic)))) =>
       {
-        0.1064
+        profiles::EXCEL_AUTOMATIC_UNTITLED_COMPACT_SIDE_PLOT_GAP_RATIO
       }
       ChartLayoutProfile::Excel
         if has_side_legend && !has_layout_title && has_automatic_untitled_layout =>
       {
-        0.1765
+        profiles::EXCEL_AUTOMATIC_UNTITLED_WIDE_SIDE_PLOT_GAP_RATIO
       }
-      ChartLayoutProfile::Excel if has_unshifted_side_line_layout => 0.146_52,
-      ChartLayoutProfile::Excel => 0.0766,
-      ChartLayoutProfile::Word if has_layout_explicit_title => 0.065_677,
-      ChartLayoutProfile::Word => 0.070_91,
-      ChartLayoutProfile::PowerPoint => 0.048,
+      ChartLayoutProfile::Excel if has_unshifted_side_line_layout => {
+        profiles::EXCEL_UNSHIFTED_LINE_SIDE_PLOT_GAP_RATIO
+      }
+      ChartLayoutProfile::PowerPoint | ChartLayoutProfile::Word | ChartLayoutProfile::Excel => {
+        host_side_legend_bands.plot_gap_ratio
+      }
     };
   let tick_left_ratio = if has_titled_indexed_scatter_layout {
-    0.029_56
+    profiles::EXCEL_TITLED_INDEXED_SCATTER_TICK_LEFT_RATIO
   } else if has_legacy_single_series_title_layout {
-    0.029_58
+    profiles::EXCEL_LEGACY_SINGLE_SERIES_TICK_LEFT_RATIO
   } else if has_untitled_bottom_column_layout {
-    0.032_35
+    profiles::EXCEL_UNTITLED_BOTTOM_COLUMN_TICK_LEFT_RATIO
   } else if !value_tick_labels_visible && style.layout_profile == ChartLayoutProfile::Word {
-    0.0455
+    profiles::WORD_HIDDEN_VALUE_TICK_LEFT_RATIO
   } else if has_side_legend {
     match style.layout_profile {
-      ChartLayoutProfile::Word if has_layout_explicit_title => 0.022_392,
-      ChartLayoutProfile::Word => 0.025_81,
-      ChartLayoutProfile::Excel if !has_layout_title && has_automatic_untitled_layout => 0.031_43,
-      ChartLayoutProfile::PowerPoint | ChartLayoutProfile::Excel => 0.018_25,
+      ChartLayoutProfile::Excel if !has_layout_title && has_automatic_untitled_layout => {
+        profiles::EXCEL_AUTOMATIC_UNTITLED_SIDE_TICK_LEFT_RATIO
+      }
+      ChartLayoutProfile::PowerPoint | ChartLayoutProfile::Word | ChartLayoutProfile::Excel => {
+        host_side_legend_bands.tick_left_ratio
+      }
     }
   } else {
     if style.layout_profile == ChartLayoutProfile::Excel
@@ -780,23 +753,23 @@ pub(crate) fn lower_clustered_column_chart(
       && has_layout_explicit_title
       && chart.plot_layout.is_none()
     {
-      0.029_74
+      profiles::EXCEL_TITLE_ONLY_TICK_LEFT_RATIO
     } else if has_bottom_legend && has_explicit_powerpoint_title {
-      0.019
+      profiles::POWERPOINT_TITLED_BOTTOM_TICK_LEFT_RATIO
     } else {
-      0.015
+      profiles::DEFAULT_TICK_LEFT_RATIO
     }
   };
   let tick_left = frame.x_pt
     + frame.height_pt * tick_left_ratio
     + if has_derived_single_series_side_title_layout {
-      frame.height_pt * 0.012_92
+      frame.height_pt * profiles::EXCEL_DERIVED_SINGLE_SERIES_SIDE_TITLE.tick_left_ratio
     } else if has_explicit_single_series_side_title_layout {
-      frame.height_pt * 0.010_34
+      frame.height_pt * profiles::EXCEL_EXPLICIT_SINGLE_SERIES_SIDE_TITLE.tick_left_ratio
     } else if has_untitled_bottom_line_no_marker_layout {
-      frame.height_pt * 0.017_65
+      frame.height_pt * profiles::EXCEL_UNTITLED_BOTTOM_LINE_NO_MARKER.tick_left_ratio
     } else if has_explicit_bottom_column_layout {
-      frame.height_pt * 0.017_65
+      frame.height_pt * profiles::EXCEL_EXPLICIT_BOTTOM_COLUMN.tick_left_ratio
     } else {
       0.0
     }
@@ -807,27 +780,25 @@ pub(crate) fn lower_clustered_column_chart(
     };
   let tick_left = tick_left
     + if has_indexed_scatter_automatic_layout {
-      frame.height_pt * 0.015_34
+      frame.height_pt * profiles::EXCEL_AUTOMATIC_INDEXED_SCATTER.tick_left_ratio
     } else if has_legacy_indexed_scatter_layout {
-      frame.height_pt * 0.014_62
+      frame.height_pt * profiles::EXCEL_LEGACY_INDEXED_SCATTER.tick_left_ratio
     } else {
       0.0
     };
   let tick_gap = if value_tick_labels_visible {
     frame.height_pt
       * if has_side_legend {
-        if style.layout_profile == ChartLayoutProfile::Word {
-          0.0367
-        } else if has_unshifted_side_line_layout {
-          0.036_515
+        if has_unshifted_side_line_layout {
+          profiles::EXCEL_UNSHIFTED_LINE_SIDE_TICK_GAP_RATIO
         } else {
-          0.046_85
+          host_side_legend_bands.tick_gap_ratio
         }
       } else {
         if has_bottom_legend && has_explicit_powerpoint_title {
-          0.0323
+          profiles::POWERPOINT_TITLED_BOTTOM_TICK_GAP_RATIO
         } else {
-          0.026
+          profiles::DEFAULT_TICK_GAP_RATIO
         }
       }
   } else {
@@ -843,11 +814,11 @@ pub(crate) fn lower_clustered_column_chart(
     } else {
       frame.height_pt
         * if has_bottom_legend && has_explicit_powerpoint_title {
-          0.0301
+          profiles::POWERPOINT_TITLED_BOTTOM_RIGHT_MARGIN_RATIO
         } else if !value_tick_labels_visible && style.layout_profile == ChartLayoutProfile::Word {
-          0.041
+          profiles::WORD_HIDDEN_VALUE_RIGHT_MARGIN_RATIO
         } else {
-          0.026
+          profiles::DEFAULT_RIGHT_MARGIN_RATIO
         }
     };
   if style.layout_profile == ChartLayoutProfile::Excel
@@ -855,48 +826,51 @@ pub(crate) fn lower_clustered_column_chart(
     && has_layout_explicit_title
     && chart.plot_layout.is_none()
   {
-    plot_left -= frame.height_pt * 0.011_323;
-    plot_right += frame.height_pt * 0.007_094;
+    plot_left += frame.height_pt * excel_side_adjustment.plot_left_ratio;
+    plot_right += frame.height_pt * excel_side_adjustment.plot_right_ratio;
   } else if style.layout_profile == ChartLayoutProfile::Excel
     && has_side_legend
     && !has_layout_title
     && has_automatic_untitled_layout
     && chart.plot_layout.is_none()
   {
-    plot_left -= frame.height_pt * 0.003_74;
+    plot_left += frame.height_pt * excel_untitled_side_adjustment.plot_left_ratio;
   } else if style.layout_profile == ChartLayoutProfile::Excel
     && legend_position.is_none()
     && has_layout_explicit_title
     && chart.plot_layout.is_none()
   {
-    plot_left += frame.height_pt * 0.021_49;
-    plot_right -= frame.height_pt * 0.027_7;
+    plot_left += frame.height_pt * excel_title_only_adjustment.plot_left_ratio;
+    plot_right += frame.height_pt * excel_title_only_adjustment.plot_right_ratio;
   }
   if has_titled_indexed_scatter_layout {
-    plot_left += frame.height_pt * 0.016_9;
-    plot_right -= frame.height_pt * 0.045_46;
+    plot_left += frame.height_pt * profiles::EXCEL_TITLED_INDEXED_SCATTER.plot_left_ratio;
+    plot_right += frame.height_pt * profiles::EXCEL_TITLED_INDEXED_SCATTER.plot_right_ratio;
   } else if has_indexed_scatter_automatic_layout {
-    plot_left += frame.height_pt * 0.027_69;
-    plot_right -= frame.height_pt * 0.071_92;
+    plot_left += frame.height_pt * profiles::EXCEL_AUTOMATIC_INDEXED_SCATTER.plot_left_ratio;
+    plot_right += frame.height_pt * profiles::EXCEL_AUTOMATIC_INDEXED_SCATTER.plot_right_ratio;
   } else if has_legacy_indexed_scatter_layout {
-    plot_right -= frame.height_pt * 0.100_3;
+    plot_right += frame.height_pt * profiles::EXCEL_LEGACY_INDEXED_SCATTER.plot_right_ratio;
   } else if has_legacy_single_series_title_layout {
-    plot_left += frame.height_pt * 0.016_77;
-    plot_right -= frame.height_pt * 0.033_85;
+    plot_left += frame.height_pt * profiles::EXCEL_LEGACY_SINGLE_SERIES_TITLE.plot_left_ratio;
+    plot_right += frame.height_pt * profiles::EXCEL_LEGACY_SINGLE_SERIES_TITLE.plot_right_ratio;
   } else if has_untitled_bottom_column_layout {
-    plot_left += frame.height_pt * 0.016_9;
-    plot_right -= frame.height_pt * 0.035;
+    plot_left += frame.height_pt * profiles::EXCEL_UNTITLED_BOTTOM_COLUMN.plot_left_ratio;
+    plot_right += frame.height_pt * profiles::EXCEL_UNTITLED_BOTTOM_COLUMN.plot_right_ratio;
   } else if has_derived_single_series_side_title_layout {
-    plot_right -= frame.height_pt * 0.025_65;
+    plot_right +=
+      frame.height_pt * profiles::EXCEL_DERIVED_SINGLE_SERIES_SIDE_TITLE.plot_right_ratio;
   } else if has_explicit_single_series_side_title_layout {
-    plot_left += frame.height_pt * 0.007_37;
-    plot_right -= frame.height_pt * 0.034_82;
+    plot_left +=
+      frame.height_pt * profiles::EXCEL_EXPLICIT_SINGLE_SERIES_SIDE_TITLE.plot_left_ratio;
+    plot_right +=
+      frame.height_pt * profiles::EXCEL_EXPLICIT_SINGLE_SERIES_SIDE_TITLE.plot_right_ratio;
   } else if has_untitled_bottom_line_no_marker_layout {
-    plot_left += frame.height_pt * 0.016_68;
-    plot_right -= frame.height_pt * 0.035;
+    plot_left += frame.height_pt * profiles::EXCEL_UNTITLED_BOTTOM_LINE_NO_MARKER.plot_left_ratio;
+    plot_right += frame.height_pt * profiles::EXCEL_UNTITLED_BOTTOM_LINE_NO_MARKER.plot_right_ratio;
   } else if has_explicit_bottom_column_layout {
-    plot_left += frame.height_pt * 0.016_68;
-    plot_right -= frame.height_pt * 0.035;
+    plot_left += frame.height_pt * profiles::EXCEL_EXPLICIT_BOTTOM_COLUMN.plot_left_ratio;
+    plot_right += frame.height_pt * profiles::EXCEL_EXPLICIT_BOTTOM_COLUMN.plot_right_ratio;
   }
   if style.layout_profile == ChartLayoutProfile::Excel
     && has_side_legend
@@ -909,10 +883,10 @@ pub(crate) fn lower_clustered_column_chart(
     // larger value-axis inset while extending the right edge of the plot.
     // The ratios come from the Office fixed-output geometry of
     // chart-area-style-border.xlsx and are independent of page coordinates.
-    plot_left += frame.height_pt * 0.005_54;
-    plot_right += frame.height_pt * 0.000_63;
-    plot_top -= frame.height_pt * 0.002_76;
-    plot_bottom -= frame.height_pt * 0.002_80;
+    plot_left += frame.height_pt * profiles::EXCEL_EXPLICIT_CATEGORY_AUTOMATIC.plot_left_ratio;
+    plot_right += frame.height_pt * profiles::EXCEL_EXPLICIT_CATEGORY_AUTOMATIC.plot_right_ratio;
+    plot_top += frame.height_pt * profiles::EXCEL_EXPLICIT_CATEGORY_AUTOMATIC.plot_top_ratio;
+    plot_bottom += frame.height_pt * profiles::EXCEL_EXPLICIT_CATEGORY_AUTOMATIC.plot_bottom_ratio;
   }
   if horizontal_bar_only {
     let category_width = chart
@@ -1416,18 +1390,13 @@ pub(crate) fn lower_clustered_column_chart(
       Some(ChartLegendPosition::Top) => lower_horizontal_legend(
         &mut items,
         frame,
-        frame.x_pt + frame.height_pt * 0.004,
+        frame.x_pt + frame.height_pt * profiles::TOP_LEGEND_LEFT_INSET_RATIO,
         if has_layout_title {
           title_top
             + title_line_height
-            + frame.height_pt
-              * if style.layout_profile == ChartLayoutProfile::Word {
-                0.0375
-              } else {
-                0.009
-              }
+            + frame.height_pt * host_defaults.titled_top_legend_gap_ratio
         } else {
-          frame.y_pt + frame.height_pt * 0.018
+          frame.y_pt + frame.height_pt * profiles::UNTITLED_TOP_LEGEND_TOP_RATIO
         },
         chart,
         style,
@@ -1525,13 +1494,9 @@ pub(crate) fn lower_radial_chart(
     Some(ChartTitleText::Automatic) => Some(automatic_title),
     None => None,
   };
+  let host_defaults = radial_host_defaults(style.layout_profile);
   let title_height = title.map_or(0.0, |_| {
-    line_height(&style.title)
-      * if style.layout_profile == ChartLayoutProfile::PowerPoint {
-        1.3642
-      } else {
-        1.5
-      }
+    line_height(&style.title) * host_defaults.title_height_scale
   });
   let legend = chart.legend_position;
   let side_legend = matches!(
@@ -1547,13 +1512,7 @@ pub(crate) fn lower_radial_chart(
       .filter_map(|index| chart.categories.get(*index))
       .map(|text| metrics.measure_text(text, &style.label))
       .fold(0.0_f32, f32::max);
-    maximum_label_width
-      + style.label.font_size_pt
-        * match style.layout_profile {
-          ChartLayoutProfile::Excel => 2.12,
-          ChartLayoutProfile::PowerPoint => 1.7654,
-          ChartLayoutProfile::Word => 2.2,
-        }
+    maximum_label_width + style.label.font_size_pt * host_defaults.side_legend_width_em
   } else {
     0.0
   };
@@ -1585,30 +1544,18 @@ pub(crate) fn lower_radial_chart(
   } else {
     0.0
   };
-  let (radius_basis, radius_scale) = match style.layout_profile {
-    ChartLayoutProfile::PowerPoint => (
-      plot.width.min(plot.height * 1.35),
-      if title.is_some() && side_legend {
-        0.346
-      } else {
-        0.40
-      },
-    ),
-    ChartLayoutProfile::Word => (plot.width.min(plot.height * 1.35), 0.42),
-    // Excel keeps a circular 2-D pie inside the plot height. Using the
-    // PowerPoint/Word 4:3 height expansion makes a wide worksheet chart
-    // overflow its chart frame and leak onto the next print page.
-    ChartLayoutProfile::Excel => (
-      plot.width.min(plot.height),
-      if title.is_some() && bottom_legend {
-        // Excel reserves a materially smaller automatic pie when both a title
-        // and a bottom legend are present, leaving the label-fit region
-        // between those two text bands.
-        0.347
-      } else {
-        0.445
-      },
-    ),
+  // Excel keeps a circular 2-D pie inside the plot height. PowerPoint and
+  // Word use a 4:3-expanded height basis.
+  let radius_basis = plot
+    .width
+    .min(plot.height * host_defaults.radius_height_basis_scale);
+  let compact_plot =
+    style.layout_profile == ChartLayoutProfile::PowerPoint && title.is_some() && side_legend
+      || style.layout_profile == ChartLayoutProfile::Excel && title.is_some() && bottom_legend;
+  let radius_scale = if compact_plot {
+    host_defaults.compact_radius_scale
+  } else {
+    host_defaults.radius_scale
   };
   let radius_x = radius_basis * radius_scale;
   let radius_y = if chart.kind == RadialChartKind::Pie3D {
@@ -1678,13 +1625,10 @@ pub(crate) fn lower_radial_chart(
         .unwrap_or(chart.series_explosion_percent)
         / 100.0)
         .clamp(0.0, 1.0) as f32;
-      let explosion_scale = match style.layout_profile {
-        // Excel interprets c:explosion as approximately the percentage of
-        // the pie radius. The fixed-output plot reservation leaves a small
-        // inset, yielding about 90% of that nominal displacement.
-        ChartLayoutProfile::Excel => 0.9,
-        ChartLayoutProfile::PowerPoint | ChartLayoutProfile::Word => 0.24,
-      };
+      // Excel interprets c:explosion as approximately the percentage of the
+      // pie radius. The host profile retains its smaller Word/PowerPoint
+      // displacement policy.
+      let explosion_scale = host_defaults.explosion_scale;
       let offset_x = mid.sin() * radius_x * explosion * explosion_scale;
       let offset_y = -mid.cos() * radius_y * explosion * explosion_scale;
       let color = style.point_colors[index % style.point_colors.len()];
@@ -1803,9 +1747,9 @@ pub(crate) fn lower_radial_chart(
       &mut items,
       frame.x_pt + (frame.width_pt - width) * 0.5,
       frame.y_pt
-        + frame.height_pt * 0.025
+        + frame.height_pt * profiles::RADIAL_TITLE_TOP_RATIO
         + if style.layout_profile == ChartLayoutProfile::Excel && bottom_legend {
-          style.title.font_size_pt * 0.317
+          style.title.font_size_pt * profiles::EXCEL_BOTTOM_LEGEND_TITLE_OFFSET_EM
         } else {
           0.0
         },
@@ -1838,18 +1782,18 @@ fn excel_best_fit_pie_label_position(
   // may rotate the anchor away from the bisector so every corner remains in
   // the sector. These three continuous regions correspond to narrow,
   // ordinary, and reflex sectors in the Office fixed-output layout.
-  let (radius_factor, angle_adjustment_degrees): (f32, f32) = if sweep_degrees > 180.0 {
-    (0.589, 25.0)
+  let profile = if sweep_degrees > 180.0 {
+    profiles::EXCEL_REFLEX_BEST_FIT_LABEL
   } else if sweep_degrees > 75.0 {
-    (0.614, 9.1)
+    profiles::EXCEL_ORDINARY_BEST_FIT_LABEL
   } else {
-    (0.699, -2.1)
+    profiles::EXCEL_NARROW_BEST_FIT_LABEL
   };
-  let adjusted_angle = angle + angle_adjustment_degrees.to_radians();
+  let adjusted_angle = angle + profile.angle_adjustment_degrees.to_radians();
   let (width, height) = label_size;
   (
-    center.0 + adjusted_angle.sin() * radii.0 * radius_factor - width * 0.5,
-    center.1 - adjusted_angle.cos() * radii.1 * radius_factor - height * 0.5,
+    center.0 + adjusted_angle.sin() * radii.0 * profile.radius_factor - width * 0.5,
+    center.1 - adjusted_angle.cos() * radii.1 * profile.radius_factor - height * 0.5,
   )
 }
 
@@ -1888,24 +1832,23 @@ fn lower_of_pie_geometry(
   if primary_total <= f64::EPSILON {
     return;
   }
-  let (primary_x, secondary_x, center_y, primary_scale) =
-    if style.layout_profile == ChartLayoutProfile::Excel {
-      match chart.kind {
-        RadialChartKind::PieOfPie => (0.268, 0.7663, 0.5105, 0.314),
-        RadialChartKind::BarOfPie => (0.349, 0.761, 0.5, 0.393),
-        _ => (0.32, 0.77, 0.5, 0.29),
-      }
-    } else {
-      (0.32, 0.77, 0.5, 0.29)
-    };
+  let plot_profile = if style.layout_profile == ChartLayoutProfile::Excel {
+    match chart.kind {
+      RadialChartKind::PieOfPie => profiles::EXCEL_PIE_OF_PIE_PLOT,
+      RadialChartKind::BarOfPie => profiles::EXCEL_BAR_OF_PIE_PLOT,
+      _ => profiles::DEFAULT_OF_PIE_PLOT,
+    }
+  } else {
+    profiles::DEFAULT_OF_PIE_PLOT
+  };
   let primary_center = (
-    plot.left + plot.width * primary_x,
-    plot.top + plot.height * center_y,
+    plot.left + plot.width * plot_profile.primary_x_ratio,
+    plot.top + plot.height * plot_profile.center_y_ratio,
   );
-  let primary_radius = plot.width.min(plot.height) * primary_scale;
+  let primary_radius = plot.width.min(plot.height) * plot_profile.primary_radius_scale;
   let secondary_center = (
-    plot.left + plot.width * secondary_x,
-    plot.top + plot.height * center_y,
+    plot.left + plot.width * plot_profile.secondary_x_ratio,
+    plot.top + plot.height * plot_profile.center_y_ratio,
   );
   let secondary_radius =
     primary_radius * (chart.secondary_size_percent / 100.0).clamp(0.05, 2.0) as f32;
@@ -2079,17 +2022,9 @@ fn lower_radial_legend(
   let Some(position) = chart.legend_position else {
     return;
   };
-  let (marker, gap) = if style.layout_profile == ChartLayoutProfile::Excel {
-    (
-      style.label.font_size_pt * 0.4777,
-      style.label.font_size_pt * 0.2123,
-    )
-  } else {
-    (
-      style.label.font_size_pt * 0.55,
-      style.label.font_size_pt * 0.3,
-    )
-  };
+  let host_defaults = radial_host_defaults(style.layout_profile);
+  let marker = style.label.font_size_pt * host_defaults.legend_marker_em;
+  let gap = style.label.font_size_pt * host_defaults.legend_marker_gap_em;
   if let Some(layout) = chart.legend_layout {
     let mut y = frame.y_pt + layout.y.unwrap_or(0.1) * frame.height_pt;
     let x = frame.x_pt + layout.x.unwrap_or(0.75) * frame.width_pt;
@@ -2126,12 +2061,7 @@ fn lower_radial_legend(
     // automatic horizontal row uses a compact point-entry gap; keeping the
     // cartesian one-em gap makes the first/last entries fan out around the
     // correct center.
-    let entry_gap = style.label.font_size_pt
-      * if style.layout_profile == ChartLayoutProfile::Excel {
-        0.635
-      } else {
-        1.0
-      };
+    let entry_gap = style.label.font_size_pt * host_defaults.horizontal_legend_entry_gap_em;
     let widths = chart
       .visible_legend_indices
       .iter()
@@ -2140,18 +2070,16 @@ fn lower_radial_legend(
       .collect::<Vec<_>>();
     let total = widths.iter().sum::<f32>() + entry_gap * widths.len().saturating_sub(1) as f32;
     let mut x = frame.x_pt + (frame.width_pt - total) * 0.5;
-    if style.layout_profile == ChartLayoutProfile::Excel {
-      x += style.label.font_size_pt * 0.0529;
-    }
+    x += style.label.font_size_pt * host_defaults.horizontal_legend_center_offset_em;
     let y = if position == ChartLegendPosition::Top {
       frame.y_pt + horizontal_height * 0.2
     } else if style.layout_profile == ChartLayoutProfile::Excel {
       frame.y_pt + frame.height_pt
         - horizontal_height
           * if chart.title.is_some() {
-            0.9385
+            profiles::EXCEL_TITLED_BOTTOM_LEGEND_HEIGHT_SCALE
           } else {
-            1.2815
+            profiles::EXCEL_UNTITLED_BOTTOM_LEGEND_HEIGHT_SCALE
           }
     } else {
       frame.y_pt + frame.height_pt - horizontal_height * 0.8
@@ -2188,23 +2116,13 @@ fn lower_radial_legend(
     } else {
       frame.x_pt + frame.width_pt - side_width + side_inset
     };
-    let entry_step = line_height(&style.label)
-      * match style.layout_profile {
-        ChartLayoutProfile::Excel => 1.3508,
-        ChartLayoutProfile::PowerPoint => 1.285_65,
-        ChartLayoutProfile::Word => 1.0,
-      };
+    let entry_step = line_height(&style.label) * host_defaults.side_legend_entry_step;
     let entry_count = chart.visible_legend_indices.len();
     let total_height =
       line_height(&style.label) + entry_step * entry_count.saturating_sub(1) as f32;
     let center_y = frame.y_pt
       + frame.height_pt * 0.5
-      + style.label.font_size_pt
-        * if style.layout_profile == ChartLayoutProfile::PowerPoint {
-          0.9233
-        } else {
-          0.09
-        };
+      + style.label.font_size_pt * host_defaults.side_legend_center_offset_em;
     let mut y = center_y - total_height * 0.5;
     for index in chart.visible_legend_indices.iter().copied() {
       let Some(text) = chart.categories.get(index) else {
@@ -2387,13 +2305,23 @@ fn lower_series_geometry(
         chart,
         series,
         color,
-        plot,
-        scale,
-        category_count,
-        x_extent,
+        TrendlineGeometry {
+          plot,
+          scale,
+          category_count,
+          x_extent,
+        },
       );
     }
   }
+}
+
+#[derive(Clone, Copy)]
+struct TrendlineGeometry {
+  plot: PlotRect,
+  scale: crate::render::chart::LinearAxisScale,
+  category_count: usize,
+  x_extent: Option<(f64, f64)>,
 }
 
 fn lower_trendlines(
@@ -2401,11 +2329,14 @@ fn lower_trendlines(
   chart: &ClusteredColumnChart<'_>,
   series: &crate::render::chart::ClusteredColumnSeries<'_>,
   color: RgbColor,
-  plot: PlotRect,
-  scale: crate::render::chart::LinearAxisScale,
-  category_count: usize,
-  x_extent: Option<(f64, f64)>,
+  geometry: TrendlineGeometry,
 ) {
+  let TrendlineGeometry {
+    plot,
+    scale,
+    category_count,
+    x_extent,
+  } = geometry;
   let source = series
     .values
     .iter()
@@ -4199,7 +4130,7 @@ fn lower_horizontal_legend(
   style: &ClusteredColumnStyle,
   metrics: &mut TextMetrics,
 ) {
-  let marker_gap = style.label.font_size_pt * 0.247;
+  let marker_gap = style.label.font_size_pt * profiles::CARTESIAN_LEGEND_MARKER_GAP_EM;
   let titled_indexed_scatter = style.layout_profile == ChartLayoutProfile::Excel
     && !chart.title_overlay
     && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic))
@@ -4207,15 +4138,20 @@ fn lower_horizontal_legend(
   let explicit_bottom_column = excel_explicit_bottom_column_layout(chart, style);
   let untitled_bottom_column = excel_untitled_bottom_column_layout(chart, style);
   let untitled_bottom_line_no_marker = excel_untitled_bottom_line_no_marker_layout(chart, style);
-  let base_entry_gap = style.label.font_size_pt * 0.94;
-  let entry_gap = style.label.font_size_pt
-    * if titled_indexed_scatter {
-      2.43
-    } else if explicit_bottom_column || untitled_bottom_column {
-      0.6814
-    } else {
-      0.94
-    };
+  let legend_profile = if titled_indexed_scatter {
+    profiles::EXCEL_TITLED_INDEXED_SCATTER_LEGEND
+  } else if explicit_bottom_column {
+    profiles::EXCEL_EXPLICIT_BOTTOM_COLUMN_LEGEND
+  } else if untitled_bottom_column {
+    profiles::EXCEL_UNTITLED_BOTTOM_COLUMN_LEGEND
+  } else if untitled_bottom_line_no_marker {
+    profiles::EXCEL_UNTITLED_BOTTOM_LINE_LEGEND
+  } else {
+    profiles::DEFAULT_HORIZONTAL_CARTESIAN_LEGEND
+  };
+  let base_entry_gap =
+    style.label.font_size_pt * profiles::DEFAULT_HORIZONTAL_CARTESIAN_LEGEND.entry_gap_em;
+  let entry_gap = style.label.font_size_pt * legend_profile.entry_gap_em;
   let widths: Vec<f32> = chart
     .visible_legend_indices
     .iter()
@@ -4236,26 +4172,10 @@ fn lower_horizontal_legend(
   let mut x = available_left + (available_right - available_left - total_width) / 2.0;
   if titled_indexed_scatter {
     x += (entry_gap - base_entry_gap) * chart.visible_legend_indices.len().saturating_sub(1) as f32
-      / 2.0
-      - frame.height_pt * 0.008_5;
-  } else if explicit_bottom_column {
-    x -= frame.height_pt * 0.010_35;
-  } else if untitled_bottom_column {
-    x -= frame.height_pt * 0.006_09;
-  } else if untitled_bottom_line_no_marker {
-    x -= frame.height_pt * 0.009_21;
+      / 2.0;
   }
-  let y = if titled_indexed_scatter {
-    y + frame.height_pt * 0.004_16
-  } else if explicit_bottom_column {
-    y - frame.height_pt * 0.009_93
-  } else if untitled_bottom_column {
-    y - frame.height_pt * 0.005_91
-  } else if untitled_bottom_line_no_marker {
-    y - frame.height_pt * 0.009_93
-  } else {
-    y
-  };
+  x += frame.height_pt * legend_profile.x_offset_height_ratio;
+  let y = y + frame.height_pt * legend_profile.y_offset_height_ratio;
   for (index, width) in chart.visible_legend_indices.iter().copied().zip(widths) {
     let Some(series) = chart.series.get(index) else {
       continue;
@@ -4303,7 +4223,7 @@ fn horizontal_legend_key_width(
 ) -> f32 {
   style.label.font_size_pt
     * if series.kind == ChartSeriesKind::Line {
-      2.068
+      profiles::CARTESIAN_LINE_LEGEND_KEY_WIDTH_EM
     } else {
       0.55
     }
@@ -4342,9 +4262,9 @@ fn lower_vertical_legend(
       style.layout_profile,
       ChartLayoutProfile::Excel | ChartLayoutProfile::Word
     ) {
-      0.61
+      profiles::OFFICE_VERTICAL_LEGEND_ENTRY_GAP_EM
     } else {
-      0.344
+      profiles::POWERPOINT_VERTICAL_LEGEND_ENTRY_GAP_EM
     };
   let line_height = line_height(&style.label);
   let total_height = line_height * chart.visible_legend_indices.len() as f32
@@ -4357,12 +4277,12 @@ fn lower_vertical_legend(
   if style.layout_profile == ChartLayoutProfile::Excel && style.has_explicit_title && !align_top {
     y += frame.height_pt
       * if excel_explicit_single_series_side_title_layout(chart, style) {
-        0.074_94
+        profiles::EXCEL_EXPLICIT_SINGLE_SERIES_LEGEND_Y_RATIO
       } else {
-        0.0215
+        profiles::EXCEL_EXPLICIT_TITLE_LEGEND_Y_RATIO
       };
   } else if excel_derived_single_series_side_title_layout(chart, style) && !align_top {
-    y += frame.height_pt * 0.087_5;
+    y += frame.height_pt * profiles::EXCEL_DERIVED_TITLE_LEGEND_Y_RATIO;
   } else if style.layout_profile == ChartLayoutProfile::Excel
     && (chart.title.is_none()
       || (chart.title_overlay && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic))))
@@ -4379,26 +4299,26 @@ fn lower_vertical_legend(
             .iter()
             .any(|label| label.text_components.len() > 1)
         }) {
-          -0.002
+          profiles::EXCEL_INDEXED_SCATTER_MULTICOMPONENT_LEGEND_Y_RATIO
         } else {
           0.0
         }
       } else {
         if chart.title.is_none() && chart.has_explicit_categories {
-          0.002_44
+          profiles::EXCEL_EXPLICIT_CATEGORY_LEGEND_Y_RATIO
         } else {
-          0.0068
+          profiles::EXCEL_AUTOMATIC_UNTITLED_LEGEND_Y_RATIO
         }
       };
   } else if style.layout_profile == ChartLayoutProfile::Excel && !align_top {
-    y -= frame.height_pt * 0.0148;
+    y += frame.height_pt * profiles::EXCEL_GENERIC_LEGEND_Y_RATIO;
   } else if style.layout_profile == ChartLayoutProfile::Word
     && style.has_explicit_title
     && !align_top
   {
     // Word centers a right/left automatic legend in its lower chart band,
     // rather than around the raw drawing frame used by PowerPoint.
-    y += frame.height_pt * 0.060_738_5;
+    y += frame.height_pt * profiles::WORD_EXPLICIT_TITLE_LEGEND_Y_RATIO;
   }
   for index in chart.visible_legend_indices.iter().copied() {
     let Some(series) = chart.series.get(index) else {

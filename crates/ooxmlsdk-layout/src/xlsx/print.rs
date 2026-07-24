@@ -15,7 +15,10 @@ const XLSX_MAX_COLUMN: u32 = 16_384;
 const XLSX_MAX_ROW: u32 = 1_048_576;
 const CALC_CELL_TEXT_MARGIN_PT: f32 = 4.0;
 const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
-const LIBREOFFICE_GENERIC_PRINTER_DPI: f32 = 600.0;
+// LibreOffice sc/source/ui/view/printfun.cxx::ScPrintFunc::CalcZoom applies
+// this interoperability adjustment for width-only fit-to-page output.
+const LIBREOFFICE_FIT_TO_WIDTH_ZOOM_FACTOR: f32 = 0.98;
+// LibreOffice sc/source/core/data/attarray.cxx::SC_VISATTR_STOP.
 const SC_VISATTR_STOP: u32 = 84;
 
 #[derive(Clone, Debug)]
@@ -252,7 +255,9 @@ fn print_scale_state(
       && fit_to_height == 0
       && actual_row_page_count(import, sheet, areas, named_ranges, zoom, text_metrics) > 1
     {
-      let adjusted_zoom = ((zoom as f32) * 0.98).floor().max(ZOOM_MIN as f32) as u32;
+      let adjusted_zoom = ((zoom as f32) * LIBREOFFICE_FIT_TO_WIDTH_ZOOM_FACTOR)
+        .floor()
+        .max(ZOOM_MIN as f32) as u32;
       if adjusted_zoom < zoom
         && actual_row_page_count(
           import,
@@ -761,7 +766,7 @@ fn vml_anchor_y_pt(sheet: &CalcSheet, zero_based_row: u32, offset_px: i32) -> f3
 }
 
 fn vml_screen_pixel_to_pt(value: i32) -> f32 {
-  value as f32 * units::POINTS_PER_INCH / 96.0
+  value as f32 * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH
 }
 
 fn vml_style_rect_pt(style: &str) -> Option<(f32, f32, f32, f32)> {
@@ -804,7 +809,7 @@ fn parse_vml_length_pt(value: &str) -> Option<f32> {
 }
 
 fn vml_screen_pixel_to_pt_f32(value: f32) -> f32 {
-  value * units::POINTS_PER_INCH / 96.0
+  value * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH
 }
 
 fn sheet_column_for_x(sheet: &CalcSheet, x_pt: f32) -> u32 {
@@ -913,9 +918,9 @@ fn calc_cached_print_text_width_pt(width_pt: f32) -> f32 {
   // Calc print layout calls GetPrinter(); the Unix generic printer resolves
   // its DPI through PPDContext::getRenderResolution(), and LibreOffice's
   // bundled SGENPRT.PS has *DefaultResolution: 600dpi.
-  let pixels = (width_pt * LIBREOFFICE_GENERIC_PRINTER_DPI / units::POINTS_PER_INCH).round() as i64;
+  let pixels = (width_pt * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH).round() as i64;
   let cached_pixels = pixels as u16;
-  f32::from(cached_pixels) * units::POINTS_PER_INCH / LIBREOFFICE_GENERIC_PRINTER_DPI
+  f32::from(cached_pixels) * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI
 }
 
 fn print_cell_text_style(

@@ -1,6 +1,16 @@
+//! DrawingML preset-shape geometry.
+//!
+//! Adjustment defaults and guide equations follow the preset definitions in
+//! ECMA-376 Part 1, §20.1.10.56 (`prstGeom`) and its preset shape definitions.
+//! These values are schema geometry data, not Office-golden layout tuning.
+
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
 use crate::common::{PathCommand, Point, Pt};
+
+// Four cubic Bézier quarters approximate a circle with
+// 4 / 3 * tan(π / 8), the standard kappa control distance.
+const CIRCLE_CUBIC_BEZIER_KAPPA: f32 = 0.552_284_8;
 
 pub(super) fn path_commands(
   preset: Option<&a::PresetGeometry>,
@@ -158,9 +168,8 @@ fn ellipse_path(left: f32, top: f32, width: f32, height: f32) -> Vec<PathCommand
   let bottom = top + height;
   let center_x = left + width / 2.0;
   let center_y = top + height / 2.0;
-  const KAPPA: f32 = 0.552_284_8;
-  let tangent_x = width / 2.0 * KAPPA;
-  let tangent_y = height / 2.0 * KAPPA;
+  let tangent_x = width / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
+  let tangent_y = height / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
   vec![
     PathCommand::MoveTo(point(left, center_y)),
     PathCommand::CubicTo {
@@ -538,9 +547,8 @@ fn reverse_ellipse_path(left: f32, top: f32, width: f32, height: f32) -> Vec<Pat
   let bottom = top + height;
   let center_x = left + width / 2.0;
   let center_y = top + height / 2.0;
-  const KAPPA: f32 = 0.552_284_8;
-  let tangent_x = width / 2.0 * KAPPA;
-  let tangent_y = height / 2.0 * KAPPA;
+  let tangent_x = width / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
+  let tangent_y = height / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
   vec![
     PathCommand::MoveTo(point(left, center_y)),
     PathCommand::CubicTo {
@@ -572,9 +580,8 @@ fn flow_chart_delay_path(left: f32, top: f32, width: f32, height: f32) -> Vec<Pa
   let center_y = top + height / 2.0;
   let right = left + width;
   let bottom = top + height;
-  const KAPPA: f32 = 0.552_284_8;
-  let tangent_x = width / 2.0 * KAPPA;
-  let tangent_y = height / 2.0 * KAPPA;
+  let tangent_x = width / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
+  let tangent_y = height / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
   vec![
     PathCommand::MoveTo(point(left, top)),
     PathCommand::LineTo(point(center_x, top)),
@@ -858,8 +865,7 @@ fn round_rectangle_path(
   let bottom = top + height;
   // Four cubic Bézier arcs are the standard vector representation of the
   // quarter-circle arcs in the DrawingML roundRect preset.
-  const KAPPA: f32 = 0.552_284_8;
-  let tangent = radius * KAPPA;
+  let tangent = radius * CIRCLE_CUBIC_BEZIER_KAPPA;
   vec![
     PathCommand::MoveTo(point(left + radius, top)),
     PathCommand::LineTo(point(right - radius, top)),

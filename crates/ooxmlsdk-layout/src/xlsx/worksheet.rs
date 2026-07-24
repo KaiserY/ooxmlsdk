@@ -28,6 +28,15 @@ use crate::units;
 const CALC_DIGIT_WIDTH_MM: f32 = 2.0;
 const CALC_BASE_COLUMN_PADDING_PX: f32 = 5.0;
 const XLSX_MAX_COLUMN: u32 = 16_384;
+// Microsoft 365 fixed-output geometry for the implicit Calibri 11/x14ac
+// application profile: nine default columns occupy 470.76pt.
+const OFFICE_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT: f32 = 52.306_667;
+// Fixed-format printer leading measured after the 96dpi pixel and dyDescent
+// terms for the Calibri 11 automatic-row profile.
+const OFFICE_AUTOMATIC_ROW_PRINTER_LEADING_PT: f32 = 0.018;
+// Excel's legacy explicit-font automatic row adds one eighth point after the
+// font line box and one 96dpi worksheet pixel.
+const OFFICE_LEGACY_FONT_ROW_PRINTER_LEADING_PT: f32 = 0.125;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CalcSheet {
@@ -558,7 +567,7 @@ impl SheetGeometry {
       // the modern Calibri 11/x14ac profile occupy 470.76pt (52.306667pt
       // each). Explicit base/default widths and explicit document fonts retain
       // the established font-dependent conversion below.
-      52.306_667
+      OFFICE_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT
     } else if metrics
       .columns
       .iter()
@@ -1292,7 +1301,10 @@ fn automatic_default_row_height_pt(styles: &StylesCatalog, dy_descent_pt: Option
     // The fixed-format printer device contributes a small fractional leading
     // after the screen-pixel and dyDescent terms. Calibri 11 with
     // dyDescent=0.25 resolves to Office's observed 12.48pt automatic row.
-    return natural_height + screen_pixel_width_pt() + dy_descent_pt + 0.018;
+    return natural_height
+      + screen_pixel_width_pt()
+      + dy_descent_pt
+      + OFFICE_AUTOMATIC_ROW_PRINTER_LEADING_PT;
   }
   let padded_height = natural_height + 2.0 * screen_pixel_width_pt();
   // MSO row measurements are truncated to the device grid; LO mirrors this
@@ -1307,14 +1319,16 @@ fn automatic_explicit_font_row_height_pt(styles: &StylesCatalog) -> f32 {
   // worksheet pixel and one eighth point of printer-device leading.
   let style = styles.default_font_text_style();
   let mut text_metrics = TextMetrics::new();
-  text_metrics.vertical_metrics(&style).line_height_pt() + screen_pixel_width_pt() + 0.125
+  text_metrics.vertical_metrics(&style).line_height_pt()
+    + screen_pixel_width_pt()
+    + OFFICE_LEGACY_FONT_ROW_PRINTER_LEADING_PT
 }
 
 fn screen_pixel_width_pt() -> f32 {
   // Unit::ScreenX from GraphicHelper device pixels. The headless Calc export
   // path used by the upstream fixtures has a 96dpi reference device, i.e. one
   // screen pixel is 0.75pt.
-  units::POINTS_PER_INCH / 96.0
+  units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH
 }
 
 impl CalcCell {

@@ -7,6 +7,10 @@ use super::styles::{DefinedNameBuiltin, DefinedNamesCatalog};
 use super::workbook_catalog::WorkbookCatalog;
 use super::worksheet::{CalcCell, CalcSheet, CellAddress, CellRange};
 
+// Internal convergence guards, not OOXML or LibreOffice-defined values.
+const MAX_FORMULA_RECALCULATION_PASSES: usize = 12;
+const FORMULA_ZERO_TOLERANCE: f64 = 1.0e-12;
+
 pub(crate) fn recalculate_formula_cells(
   sheets: &mut [CalcSheet],
   defined_names: &DefinedNamesCatalog,
@@ -19,7 +23,7 @@ pub(crate) fn recalculate_formula_cells(
   let mut book = FormulaBook::from_sheets(sheets, &defined, workbook_catalog);
   let mut formula_book = formula_evaluation_book_from_calc_book(&book, source_file_name);
 
-  for _ in 0..12 {
+  for _ in 0..MAX_FORMULA_RECALCULATION_PASSES {
     let mut changed = false;
     let mut changed_cells = Vec::new();
     let mut refresh_all_cells = false;
@@ -450,10 +454,13 @@ fn should_replace_formula_result(old_text: &str, value: &Value) -> bool {
   match value {
     Value::Range(_) | Value::Blank => false,
     Value::Number(number)
-      if number.abs() < 0.000000000001
+      if number.abs() < FORMULA_ZERO_TOLERANCE
         && !old_text.is_empty()
         && !old_text.starts_with('#')
-        && !matches!(old_text.parse::<f64>(), Ok(old) if old.abs() < 0.000000000001) =>
+        && !matches!(
+          old_text.parse::<f64>(),
+          Ok(old) if old.abs() < FORMULA_ZERO_TOLERANCE
+        ) =>
     {
       false
     }
@@ -1129,7 +1136,7 @@ fn render_number(value: f64) -> String {
   if !value.is_finite() {
     return "#VALUE!".to_string();
   }
-  if (value.fract()).abs() < 0.000000000001 {
+  if (value.fract()).abs() < FORMULA_ZERO_TOLERANCE {
     format!("{}", value.round() as i64)
   } else {
     let text = format!("{value:.10}");

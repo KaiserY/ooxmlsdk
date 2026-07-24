@@ -8,7 +8,23 @@ enum PaperMeasure {
   Millimeters(f32, f32),
   Undefined,
 }
-// PaperSizeConv::spPaperSizeTable, indices are MS paperSize values.
+
+/// Microsoft `paperSize` identifiers used by the fixed-output fallback path.
+///
+/// ECMA-376 §18.3.1.63 stores the identifier, while LibreOffice's
+/// `filter/source/msfilter/util.cxx::spPaperSizeTable` supplies the dimensions.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u32)]
+enum MsPaperSize {
+  Letter = 1,
+  A4 = 9,
+}
+
+const DEFAULT_PRINT_SCALE_PERCENT: u32 = 100;
+const OFFICE_LETTER_TO_DEFAULT_A4_SCALE_PERCENT: u32 = 95;
+
+// LibreOffice filter/source/msfilter/util.cxx::spPaperSizeTable. Indices are
+// Microsoft paperSize values.
 const MS_PAPER_SIZE_TABLE: [PaperMeasure; 91] = [
   PaperMeasure::Undefined,
   PaperMeasure::Inches(8.5, 11.0),
@@ -162,15 +178,15 @@ impl Default for CalcPageSettings {
       margin_bottom_in: 0.75,
       margin_header_in: 0.3,
       margin_footer_in: 0.3,
-      paper_size: 1,
+      paper_size: MsPaperSize::Letter as u32,
       explicit_paper_size: false,
       valid_printer_settings: true,
       fit_to_page: false,
-      scale: 100,
+      scale: DEFAULT_PRINT_SCALE_PERCENT,
       fit_to_width: 1,
       fit_to_height: 1,
-      horizontal_dpi: 600,
-      vertical_dpi: 600,
+      horizontal_dpi: units::OFFICE_FIXED_OUTPUT_DPI as u32,
+      vertical_dpi: units::OFFICE_FIXED_OUTPUT_DPI as u32,
       page_order: Some(x::PageOrderValues::DownThenOver),
       orientation: None,
       horizontal_centered: false,
@@ -212,7 +228,8 @@ impl CalcPageSettings {
     if let Some(page_setup) = &chartsheet.chart_sheet_page_setup {
       settings.explicit_paper_size = page_setup.paper_size.is_some();
       settings.paper_size = page_setup.paper_size.unwrap_or(settings.paper_size);
-      settings.valid_printer_settings = page_setup.id.is_none() && page_setup.paper_size == Some(1)
+      settings.valid_printer_settings = page_setup.id.is_none()
+        && page_setup.paper_size == Some(MsPaperSize::Letter as u32)
         || page_setup
           .use_printer_defaults
           .is_some_and(|value| value.as_bool());
@@ -250,7 +267,8 @@ impl CalcPageSettings {
     // uncalibrated and falls back to the active default paper when that
     // relationship is absent. Non-default explicit sizes remain
     // authoritative without a relationship.
-    self.valid_printer_settings = page_setup.id.is_none() && page_setup.paper_size == Some(1)
+    self.valid_printer_settings = page_setup.id.is_none()
+      && page_setup.paper_size == Some(MsPaperSize::Letter as u32)
       || page_setup.paper_size.is_none()
       || page_setup
         .use_printer_defaults
@@ -285,7 +303,7 @@ impl CalcPageSettings {
     // unchanged, so Calc printing uses the document style default. The LO test
     // profile default is A4.
     let paper_size = if self.valid_printer_settings {
-      9
+      MsPaperSize::A4 as u32
     } else {
       self.paper_size
     };
@@ -306,13 +324,13 @@ impl CalcPageSettings {
         // PageSettingsConverter leaves PROP_Size unchanged for undefined or
         // invalid paper sizes, and sc/source/ui/view/printfun.cxx InitParam
         // falls back a null page size to PAPER_A4.
-        let default = MS_PAPER_SIZE_TABLE[9];
+        let default = MS_PAPER_SIZE_TABLE[MsPaperSize::A4 as usize];
         match default {
           PaperMeasure::Millimeters(width, height) => (
             units::millimeters_to_points(width),
             units::millimeters_to_points(height),
           ),
-          _ => unreachable!("MS paper size table index 9 is A4"),
+          _ => unreachable!("Microsoft paper size 9 is A4"),
         }
       }
     };
@@ -327,15 +345,18 @@ impl CalcPageSettings {
     // explicit Letter setup has no printer-settings relationship. Excel maps
     // the Letter worksheet canvas onto that default page at 95%; documents
     // without an explicit paper request remain native A4 at 100%.
-    if self.explicit_paper_size && self.paper_size == 1 && self.valid_printer_settings {
-      95
+    if self.explicit_paper_size
+      && self.paper_size == MsPaperSize::Letter as u32
+      && self.valid_printer_settings
+    {
+      OFFICE_LETTER_TO_DEFAULT_A4_SCALE_PERCENT
     } else {
-      100
+      DEFAULT_PRINT_SCALE_PERCENT
     }
   }
 
   pub(crate) fn printer_default_paper_body_offset_y_pt(&self, scale: f32) -> f32 {
-    if self.printer_default_paper_scale_percent() == 100 {
+    if self.printer_default_paper_scale_percent() == DEFAULT_PRINT_SCALE_PERCENT {
       return 0.0;
     }
     let (_, output_height) = self.page_size_pt();

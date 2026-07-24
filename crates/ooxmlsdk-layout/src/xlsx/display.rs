@@ -34,6 +34,27 @@ const XLSX_CELL_TEXT_INSET_PT: f32 = 20.0 / crate::units::TWIPS_PER_POINT;
 const XLSX_GRID_LINE_WIDTH_PT: f32 = 0.25;
 
 #[derive(Clone, Copy, Debug)]
+struct ChartTextClipSlack {
+  left_em: f32,
+  right_em: f32,
+}
+
+const DEFAULT_CHART_TEXT_CLIP_SLACK: ChartTextClipSlack = ChartTextClipSlack {
+  left_em: 0.5,
+  right_em: 0.5,
+};
+const INDEXED_SCATTER_TITLE_TEXT_CLIP_SLACK: ChartTextClipSlack = ChartTextClipSlack {
+  left_em: 0.5,
+  right_em: 0.0,
+};
+// Office fixed-output evidence from `ser_labels.xlsx`: the second-page x=2
+// tick origin is retained 5.26pt beyond the clip for 9pt axis text.
+const INDEXED_SCATTER_MULTICOMPONENT_TEXT_CLIP_SLACK: ChartTextClipSlack = ChartTextClipSlack {
+  left_em: 0.5,
+  right_em: 0.6,
+};
+
+#[derive(Clone, Copy, Debug)]
 struct CalcCellOutputArea {
   align_rect: CellRect,
   clip_rect: CellRect,
@@ -2259,7 +2280,14 @@ fn lower_drawing_chart(
   if let Some(chart_space) = resource.extended_chart_space.as_deref() {
     let mut items = super::chartex::lower_extended_chart(import, chart_space, rect);
     let mut metrics = TextMetrics::new();
-    items.retain_mut(|item| clip_chart_item_to_rect(item, page_clip_rect, &mut metrics, 0.5, 0.5));
+    items.retain_mut(|item| {
+      clip_chart_item_to_rect(
+        item,
+        page_clip_rect,
+        &mut metrics,
+        DEFAULT_CHART_TEXT_CLIP_SLACK,
+      )
+    });
     return (!items.is_empty()).then_some(items);
   }
   let chart_space = resource.chart_space.as_deref()?;
@@ -2374,8 +2402,14 @@ fn lower_drawing_chart(
     );
     if !items.is_empty() {
       let mut metrics = TextMetrics::new();
-      items
-        .retain_mut(|item| clip_chart_item_to_rect(item, page_clip_rect, &mut metrics, 0.5, 0.5));
+      items.retain_mut(|item| {
+        clip_chart_item_to_rect(
+          item,
+          page_clip_rect,
+          &mut metrics,
+          DEFAULT_CHART_TEXT_CLIP_SLACK,
+        )
+      });
       if let Some(hyperlink_url) = drawing_object_hyperlink_url(drawing, &anchor.object) {
         let left = rect.x_pt.max(page_clip_rect.x_pt);
         let top = rect.y_pt.max(page_clip_rect.y_pt);
@@ -2716,25 +2750,19 @@ fn lower_drawing_chart(
   ) && !chart.title_overlay
     && indexed_scatter_text
   {
-    (0.5, 0.0)
+    INDEXED_SCATTER_TITLE_TEXT_CLIP_SLACK
   } else if indexed_scatter_text && multicomponent_data_labels {
     // Excel retains a boundary tick in the PDF text layer when its origin is
     // up to 0.6em beyond a horizontal worksheet clip; the clip still hides
     // the glyph ink. The ser_labels.xlsx split keeps x=2 on both horizontal
     // pages at a 5.26pt offset for 9pt axis text.
-    (0.5, 0.6)
+    INDEXED_SCATTER_MULTICOMPONENT_TEXT_CLIP_SLACK
   } else {
-    (0.5, 0.5)
+    DEFAULT_CHART_TEXT_CLIP_SLACK
   };
   let mut metrics = TextMetrics::new();
   items.retain_mut(|item| {
-    clip_chart_item_to_rect(
-      item,
-      page_clip_rect,
-      &mut metrics,
-      text_boundary_slack_em.0,
-      text_boundary_slack_em.1,
-    )
+    clip_chart_item_to_rect(item, page_clip_rect, &mut metrics, text_boundary_slack_em)
   });
   if let Some(hyperlink_url) = drawing_object_hyperlink_url(drawing, &anchor.object) {
     let left = rect.x_pt.max(page_clip_rect.x_pt);
@@ -3161,8 +3189,7 @@ fn clip_chart_item_to_rect(
   item: &mut PageItem,
   clip: CellRect,
   metrics: &mut TextMetrics,
-  text_left_boundary_slack_em: f32,
-  text_right_boundary_slack_em: f32,
+  text_boundary_slack: ChartTextClipSlack,
 ) -> bool {
   match item {
     // Excel clips chart text at horizontal worksheet page boundaries, while
@@ -3182,8 +3209,8 @@ fn clip_chart_item_to_rect(
       // boundary even when fixed-output clipping hides its ink. Half an em
       // covers the pre-shaping/final-glyph-box difference without duplicating
       // a category label whose complete glyph box belongs to the prior page.
-      let left_boundary_slack = text.style.font_size_pt * text_left_boundary_slack_em;
-      let right_boundary_slack = text.style.font_size_pt * text_right_boundary_slack_em;
+      let left_boundary_slack = text.style.font_size_pt * text_boundary_slack.left_em;
+      let right_boundary_slack = text.style.font_size_pt * text_boundary_slack.right_em;
       right + left_boundary_slack >= clip.x_pt && text.x_pt <= clip_right + right_boundary_slack
     }
     PageItem::Rect(rect) => {
@@ -3855,7 +3882,7 @@ fn vml_anchor_y(sheet: &CalcSheet, zero_based_row: u32, offset_px: i32) -> f32 {
 }
 
 fn vml_screen_pixel_to_pt(value: i32) -> f32 {
-  value as f32 * units::POINTS_PER_INCH / 96.0
+  value as f32 * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH
 }
 
 fn vml_style_rect(style: &str) -> Option<(f32, f32, f32, f32)> {

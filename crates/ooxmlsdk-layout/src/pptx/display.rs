@@ -64,7 +64,6 @@ use super::{
 
 const DEFAULT_TEXT_FONT_SIZE_PT: f32 = 18.0;
 const DEFAULT_TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
-const POWERPOINT_PRINT_DPI: f32 = 600.0;
 const DEFAULT_TABLE_BORDER_PT: f32 = 0.75;
 
 pub(crate) fn lower_to_layout_document(
@@ -1063,6 +1062,12 @@ fn lower_chart(
         .as_deref()
         .and_then(|legend| legend.text_properties.as_deref())
     });
+    let text_style_context = ChartTextStyleContext {
+      import,
+      slide,
+      default_properties: chart_text_properties,
+      ui_language,
+    };
     let point_colors = (0..chart.values.len())
       .map(|index| {
         chart
@@ -1097,33 +1102,21 @@ fn lower_chart(
       &RadialChartStyle {
         layout_profile: ChartLayoutProfile::PowerPoint,
         title: chart_text_style(
-          import,
-          slide,
-          chart_text_properties,
+          text_style_context,
           title_properties,
-          ui_language,
-          18.0,
-          true,
+          POWERPOINT_CHART_TITLE_FALLBACK,
           title,
         ),
         label: chart_text_style(
-          import,
-          slide,
-          chart_text_properties,
+          text_style_context,
           label_properties,
-          ui_language,
-          12.0,
-          false,
+          POWERPOINT_CHART_LABEL_FALLBACK,
           None,
         ),
         data_label: chart_text_style(
-          import,
-          slide,
-          chart_text_properties,
+          text_style_context,
           label_properties,
-          ui_language,
-          12.0,
-          false,
+          POWERPOINT_CHART_LABEL_FALLBACK,
           None,
         ),
         point_colors,
@@ -1315,6 +1308,12 @@ fn lower_chart(
       // ECMA-376 Part 1 §21.2.2.216: c:chartSpace/c:txPr supplies
       // the defaults, while title/axis txPr overlays those defaults.
       let chart_text_properties = chart_resource.chart_space.text_properties.as_deref();
+      let text_style_context = ChartTextStyleContext {
+        import,
+        slide,
+        default_properties: chart_text_properties,
+        ui_language,
+      };
       let gridline_color = chart
         .value_axis
         .and_then(|axis| axis.major_gridlines.as_deref())
@@ -1349,54 +1348,34 @@ fn lower_chart(
             Some(shared_chart::ChartTitleText::Explicit(_))
           ),
           title: chart_text_style(
-            import,
-            slide,
-            chart_text_properties,
+            text_style_context,
             title_properties,
-            ui_language,
-            18.0,
-            true,
+            POWERPOINT_CHART_TITLE_FALLBACK,
             title,
           ),
           title_fill_color,
           label: chart_text_style(
-            import,
-            slide,
-            chart_text_properties,
+            text_style_context,
             label_properties,
-            ui_language,
-            12.0,
-            false,
+            POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
           category_label: chart_text_style(
-            import,
-            slide,
-            chart_text_properties,
+            text_style_context,
             label_properties,
-            ui_language,
-            12.0,
-            false,
+            POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
           value_label: chart_text_style(
-            import,
-            slide,
-            chart_text_properties,
+            text_style_context,
             label_properties,
-            ui_language,
-            12.0,
-            false,
+            POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
           data_label: chart_text_style(
-            import,
-            slide,
-            chart_text_properties,
+            text_style_context,
             data_label_properties,
-            ui_language,
-            12.0,
-            false,
+            POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
           gridline_color,
@@ -1698,14 +1677,34 @@ fn insert_chart_title_blip_fill(
   items.splice(title_index..title_index, images);
 }
 
+#[derive(Clone, Copy)]
+struct ChartTextStyleContext<'a> {
+  import: &'a PowerPointImport,
+  slide: &'a SlidePersist,
+  default_properties: Option<&'a c::TextProperties>,
+  ui_language: Option<&'a str>,
+}
+
+#[derive(Clone, Copy)]
+struct ChartTextFallback {
+  size_pt: f32,
+  bold: bool,
+}
+
+const POWERPOINT_CHART_TITLE_FALLBACK: ChartTextFallback = ChartTextFallback {
+  size_pt: 18.0,
+  bold: true,
+};
+const POWERPOINT_CHART_LABEL_FALLBACK: ChartTextFallback = ChartTextFallback {
+  size_pt: 12.0,
+  bold: false,
+};
+const POWERPOINT_AUTOMATIC_CHART_TITLE_SCALE: f32 = 1.2;
+
 fn chart_text_style(
-  import: &PowerPointImport,
-  slide: &SlidePersist,
-  default_properties: Option<&c::TextProperties>,
+  context: ChartTextStyleContext<'_>,
   properties: Option<&c::TextProperties>,
-  ui_language: Option<&str>,
-  fallback_size_pt: f32,
-  fallback_bold: bool,
+  fallback: ChartTextFallback,
   rich_title: Option<&c::Title>,
 ) -> TextStyle {
   let title_has_explicit_size = properties.is_some_and(|properties| {
@@ -1745,23 +1744,32 @@ fn chart_text_style(
     });
   let mut style = TextStyle {
     font_family: Some(Arc::from(
-      import
-        .resolve_theme_font_for_language("+mn-lt", ui_language)
+      context
+        .import
+        .resolve_theme_font_for_language("+mn-lt", context.ui_language)
         .unwrap_or("Liberation Sans"),
     )),
-    font_size_pt: fallback_size_pt,
-    bold: fallback_bold,
+    font_size_pt: fallback.size_pt,
+    bold: fallback.bold,
     use_windows_font_metrics: true,
     ..TextStyle::default()
   };
-  for text_properties in [default_properties, properties].into_iter().flatten() {
+  for text_properties in [context.default_properties, properties]
+    .into_iter()
+    .flatten()
+  {
     if let Some(default_run_properties) = text_properties
       .paragraph
       .iter()
       .filter_map(|paragraph| paragraph.paragraph_properties.as_deref())
       .find_map(|paragraph| paragraph.default_run_properties.as_deref())
     {
-      apply_default_run_properties(import, Some(slide), default_run_properties, &mut style);
+      apply_default_run_properties(
+        context.import,
+        Some(context.slide),
+        default_run_properties,
+        &mut style,
+      );
     }
   }
   if let Some(c::ChartTextChoice::RichText(rich)) = rich_title
@@ -1774,7 +1782,7 @@ fn chart_text_style(
       .as_deref()
       .and_then(|properties| properties.default_run_properties.as_deref())
     {
-      apply_default_run_properties(import, Some(slide), properties, &mut style);
+      apply_default_run_properties(context.import, Some(context.slide), properties, &mut style);
     }
     if let Some(properties) = paragraph
       .paragraph_choice
@@ -1788,7 +1796,7 @@ fn chart_text_style(
       })
     {
       apply_run_common(
-        import,
+        context.import,
         RunCommon {
           font_size: properties.font_size,
           bold: properties.bold.as_ref().map(|value| value.as_bool()),
@@ -1806,21 +1814,23 @@ fn chart_text_style(
         &mut style,
       );
       if let Some(fill) = properties.run_properties_choice1.as_ref() {
-        apply_text_fill(import, Some(slide), fill, &mut style);
+        apply_text_fill(context.import, Some(context.slide), fill, &mut style);
       }
     }
   }
-  if let Some(typeface) = import.resolve_theme_font_for_language("+mn-ea", ui_language) {
+  if let Some(typeface) = context
+    .import
+    .resolve_theme_font_for_language("+mn-ea", context.ui_language)
+  {
     style.east_asia_font_family = Some(Arc::from(typeface));
   }
-  if fallback_bold && !title_has_explicit_size {
+  if fallback.bold && !title_has_explicit_size {
     // PowerPoint's automatic chart-title style promotes the chart-space text
     // default by 120%. A direct title txPr or rich run size replaces that
     // automatic style size rather than being scaled again.
-    style.font_size_pt *= 1.2;
+    style.font_size_pt *= POWERPOINT_AUTOMATIC_CHART_TITLE_SCALE;
   }
-  style.font_size_pt =
-    (style.font_size_pt * POWERPOINT_PRINT_DPI / 72.0).round() * 72.0 / POWERPOINT_PRINT_DPI;
+  style.font_size_pt = units::quantize_points_to_office_print_grid(style.font_size_pt);
   style
 }
 
@@ -7078,8 +7088,7 @@ fn apply_text_scale(style: &mut TextStyle, options: &TextLoweringOptions) {
   // that device-space quantization before shaping: e.g. 40 pt becomes
   // 333/600 in and 20 pt becomes 167/600 in, matching the emitted Office PDF
   // text matrices without case-specific offsets.
-  style.font_size_pt =
-    (style.font_size_pt * POWERPOINT_PRINT_DPI / 72.0).round() * 72.0 / POWERPOINT_PRINT_DPI;
+  style.font_size_pt = units::quantize_points_to_office_print_grid(style.font_size_pt);
   style.character_spacing_pt *= options.font_scale;
   style.baseline_shift_pt *= options.font_scale;
 }

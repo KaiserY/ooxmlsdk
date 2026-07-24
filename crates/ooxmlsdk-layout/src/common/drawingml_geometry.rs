@@ -1,18 +1,11 @@
 use kurbo::{Affine, Arc, BezPath, PathEl, QuadBez, Shape};
 
-use crate::common::{PathCommand, Point, Pt};
+use crate::common::{PathCommand, Point, Pt, layout_scalar_from_f64};
 
 // Kurbo's SVG arc lowering uses the same 0.1-unit tolerance when converting
 // analytical arcs to cubic Béziers. DrawingML page coordinates are points, so
 // keep that library-established curve tolerance here.
 pub(crate) const CURVE_APPROXIMATION_TOLERANCE_PT: f64 = 0.1;
-
-pub(crate) fn append_arc(path: &mut BezPath, arc: Arc) {
-  arc.to_cubic_beziers(
-    CURVE_APPROXIMATION_TOLERANCE_PT,
-    |control1, control2, end| path.curve_to(control1, control2, end),
-  );
-}
 
 pub(crate) fn append_transformed_arc(path: &mut BezPath, arc: Arc, transform: Affine) {
   arc.to_cubic_beziers(
@@ -21,22 +14,6 @@ pub(crate) fn append_transformed_arc(path: &mut BezPath, arc: Arc, transform: Af
       path.curve_to(transform * control1, transform * control2, transform * end);
     },
   );
-}
-
-pub(crate) fn shape_commands<S: Shape>(shape: &S, reverse: bool) -> Vec<PathCommand> {
-  let mut elements = shape
-    .path_elements(CURVE_APPROXIMATION_TOLERANCE_PT)
-    .collect::<Vec<_>>();
-  if !matches!(elements.last(), Some(PathEl::ClosePath)) {
-    elements.push(PathEl::ClosePath);
-  }
-  let path: BezPath = elements.into_iter().collect();
-  let path = if reverse {
-    path.reverse_subpaths()
-  } else {
-    path
-  };
-  bez_path_commands(path)
 }
 
 pub(crate) fn bez_path_commands(path: BezPath) -> Vec<PathCommand> {
@@ -169,12 +146,12 @@ pub(crate) fn group_child_affine(
 pub(crate) fn common_transform(transform: Affine) -> crate::common::Transform {
   let [m11, m12, m21, m22, dx, dy] = transform.as_coeffs();
   crate::common::Transform {
-    m11: m11 as f32,
-    m12: m12 as f32,
-    m21: m21 as f32,
-    m22: m22 as f32,
-    dx: Pt(dx as f32),
-    dy: Pt(dy as f32),
+    m11: layout_scalar_from_f64(m11),
+    m12: layout_scalar_from_f64(m12),
+    m21: layout_scalar_from_f64(m21),
+    m22: layout_scalar_from_f64(m22),
+    dx: Pt::from_f64(dx),
+    dy: Pt::from_f64(dy),
   }
 }
 
@@ -188,13 +165,13 @@ pub(crate) fn point_bounds(points: impl IntoIterator<Item = kurbo::Point>) -> Op
 }
 
 pub(crate) fn kurbo_point(point: Point) -> kurbo::Point {
-  kurbo::Point::new(f64::from(point.x.0), f64::from(point.y.0))
+  kurbo::Point::new(f64::from(point.x), f64::from(point.y))
 }
 
 fn common_point(point: kurbo::Point) -> Point {
   Point {
-    x: Pt(point.x as f32),
-    y: Pt(point.y as f32),
+    x: Pt::from_f64(point.x),
+    y: Pt::from_f64(point.y),
   }
 }
 

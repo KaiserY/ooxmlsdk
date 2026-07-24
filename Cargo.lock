@@ -196,6 +196,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "color"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ec7c5eb7a16992b1904d76c517d170ab353b0e0b3d5a0c81a8a0cd1037893cf"
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -372,8 +378,6 @@ checksum = "91622ff5e7162018101f2fea40d6ebf4a78bbe5a49736a2020649edf9693679e"
 [[package]]
 name = "emfsdk"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "662afd8231566c47cb0ba3b38f5c4131a07ea68521e70917eeaee7d43db45f45"
 dependencies = [
  "bitflags 2.13.1",
  "emfsdk-derive",
@@ -387,8 +391,6 @@ dependencies = [
 [[package]]
 name = "emfsdk-derive"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16fb1b0b4c879ea8593fda0dae241fa9ad9d042b55b5b05a2e22980c7eb570f0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1367,6 +1369,7 @@ dependencies = [
 name = "ooxmlsdk-layout"
 version = "0.12.0"
 dependencies = [
+ "color",
  "emfsdk",
  "hypher",
  "icu_segmenter",
@@ -1388,6 +1391,7 @@ dependencies = [
 name = "ooxmlsdk-pdf"
 version = "0.12.0"
 dependencies = [
+ "emfsdk",
  "fontdb",
  "hypher",
  "icu_segmenter",
@@ -1395,6 +1399,7 @@ dependencies = [
  "jpeg-encoder",
  "krilla",
  "krilla-svg",
+ "kurbo",
  "lopdf",
  "ooxmlsdk",
  "ooxmlsdk-fonts",

@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::io::Cursor;
 use std::sync::Arc;
 
-use crate::common;
+use crate::common::{self, color_math};
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
 use kurbo::{Affine, Rect as KurboRect};
@@ -42,6 +42,7 @@ use ooxmlsdk::units as sdk_units;
 use smallvec::SmallVec;
 
 use crate::error::Result;
+use crate::model::common_rgb;
 use crate::options::{LayoutActionOptions, LayoutDiagnosticsOptions, LayoutOptions};
 use crate::render::chart as shared_chart;
 use crate::render::math as shared_math;
@@ -481,18 +482,11 @@ fn apply_drawingml_tint(color: RgbColor, amount: f32) -> RgbColor {
 }
 
 fn drawingml_rgb_component_to_crgb(value: u8) -> i32 {
-  let component = i32::from(value) * sdk_units::DRAWINGML_PERCENT_SCALE / 255;
-  drawingml_gamma(component, 2.3)
+  color_math::drawingml_srgb8_to_scrgb(value)
 }
 
 fn drawingml_crgb_component_to_rgb(value: i32) -> u8 {
-  let component = drawingml_gamma(value, 1.0 / 2.3);
-  (component * 255 / sdk_units::DRAWINGML_PERCENT_SCALE).clamp(0, 255) as u8
-}
-
-fn drawingml_gamma(value: i32, gamma: f64) -> i32 {
-  let scale = f64::from(sdk_units::DRAWINGML_PERCENT_SCALE);
-  ((f64::from(value) / scale).powf(gamma) * scale + 0.5) as i32
+  color_math::drawingml_scrgb_to_srgb8(value)
 }
 
 fn even_and_odd_headers(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> bool {
@@ -6708,19 +6702,7 @@ fn automatic_text_color_for_background(color: RgbColor) -> RgbColor {
 }
 
 fn color_wcag_relative_luminance(color: RgbColor) -> f32 {
-  let red = normalized_linear_rgb(color.r);
-  let green = normalized_linear_rgb(color.g);
-  let blue = normalized_linear_rgb(color.b);
-  red * 0.2126 + green * 0.7152 + blue * 0.0722
-}
-
-fn normalized_linear_rgb(component: u8) -> f32 {
-  let component = f32::from(component) / 255.0;
-  if component <= 0.04045 {
-    component / 12.92
-  } else {
-    ((component + 0.055) / 1.055).powf(2.4)
-  }
+  color_math::relative_luminance([color.r, color.g, color.b])
 }
 
 fn apply_wordprocessing_shape_textbox_body_properties(
@@ -7033,9 +7015,11 @@ fn wordprocessing_shape_textbox_frame(
     offset_x_pt,
     offset_y_pt,
     fill_color,
+    fill_pattern: None,
     additional_fill_colors,
     fill_image: None,
     stroke: frame_stroke.or_else(|| expands_auto_fit.then_some(BorderStyle::default())),
+    stroke_pattern: None,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
     inline_anchor_after_line: matches!(placement, ImagePlacement::Inline),
@@ -7407,15 +7391,22 @@ fn wordprocessing_shape_shape(
     .cloned()
     .unwrap_or_default();
   let properties = DrawingMlShapeProperties::Wordprocessing(shape_properties.clone());
+  let has_explicit_fill = properties.fill().is_some();
   let explicit_fill_color =
     drawingml_shape_properties_fill_color(&properties, &context.styles.theme_colors);
+  let fill_pattern =
+    drawingml_shape_properties_pattern_fill(&properties, &context.styles.theme_colors);
   let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
     None
   } else {
     explicit_fill_color.or_else(|| {
-      shape.shape_style.as_ref().and_then(|style| {
-        drawingml_fill_reference_color(&style.fill_reference, &context.styles.theme_colors)
-      })
+      (!has_explicit_fill)
+        .then(|| {
+          shape.shape_style.as_ref().and_then(|style| {
+            drawingml_fill_reference_color(&style.fill_reference, &context.styles.theme_colors)
+          })
+        })
+        .flatten()
     })
   };
   let fill_image = wordprocessing_shape_image_fill(&shape_properties, context.images);
@@ -7432,15 +7423,25 @@ fn wordprocessing_shape_shape(
       })
     })
   };
-  if fill_color.is_none() && fill_image.is_none() && stroke.is_none() {
+  let stroke_pattern = shape
+    .shape_properties
+    .as_deref()
+    .and_then(|properties| properties.outline.as_deref())
+    .and_then(|outline| match outline.outline_choice1.as_ref()? {
+      a::OutlineChoice::PatternFill(fill) => {
+        drawingml_pattern_fill(fill, &context.styles.theme_colors)
+      }
+      _ => None,
+    });
+  if fill_color.is_none() && fill_pattern.is_none() && fill_image.is_none() && stroke.is_none() {
     return None;
   }
 
   let mut geometry = properties
     .geometry_kind()
     .unwrap_or(InlineShapeGeometry::Rectangle);
-  let has_custom_geometry = properties.custom_geometry().is_some();
-  if geometry == InlineShapeGeometry::Rectangle && has_custom_geometry {
+  let has_path_geometry = properties.has_path_geometry();
+  if geometry == InlineShapeGeometry::Rectangle && has_path_geometry {
     geometry = InlineShapeGeometry::Polyline {
       points: Vec::new(),
       closed: false,
@@ -7452,11 +7453,11 @@ fn wordprocessing_shape_shape(
     transform.raw_coordinates,
     transform.fallback_size,
   )?;
-  if has_custom_geometry
-    && let Some(custom_geometry) =
-      drawingml_custom_geometry_from_properties(&properties, width_pt, height_pt)
+  if has_path_geometry
+    && let Some(path_geometry) =
+      drawingml_path_geometry_from_properties(&properties, width_pt, height_pt)
   {
-    geometry = custom_geometry;
+    geometry = path_geometry;
   }
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
@@ -7472,9 +7473,11 @@ fn wordprocessing_shape_shape(
     offset_x_pt,
     offset_y_pt,
     fill_color,
+    fill_pattern,
     additional_fill_colors: Vec::new(),
     fill_image,
     stroke,
+    stroke_pattern,
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
     inline_anchor_after_line: false,
@@ -7647,15 +7650,22 @@ fn drawingml_diagram_shape_shape(
   context: DrawingShapeImportContext<'_>,
 ) -> Option<InlineShape> {
   let properties = DrawingMlShapeProperties::Diagram((*shape.shape_properties).clone());
+  let has_explicit_fill = properties.fill().is_some();
   let explicit_fill_color =
     drawingml_shape_properties_fill_color(&properties, &context.styles.theme_colors);
+  let fill_pattern =
+    drawingml_shape_properties_pattern_fill(&properties, &context.styles.theme_colors);
   let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
     None
   } else {
     explicit_fill_color.or_else(|| {
-      shape.shape_style.as_ref().and_then(|style| {
-        drawingml_fill_reference_color(&style.fill_reference, &context.styles.theme_colors)
-      })
+      (!has_explicit_fill)
+        .then(|| {
+          shape.shape_style.as_ref().and_then(|style| {
+            drawingml_fill_reference_color(&style.fill_reference, &context.styles.theme_colors)
+          })
+        })
+        .flatten()
     })
   };
   let fill_image = drawingml_diagram_shape_image_fill(&shape.shape_properties, context.images);
@@ -7672,19 +7682,34 @@ fn drawingml_diagram_shape_shape(
       })
     })
   };
+  let stroke_pattern = shape
+    .shape_properties
+    .outline
+    .as_deref()
+    .and_then(|outline| match outline.outline_choice1.as_ref()? {
+      a::OutlineChoice::PatternFill(fill) => {
+        drawingml_pattern_fill(fill, &context.styles.theme_colors)
+      }
+      _ => None,
+    });
   let smartart_text_color = context
     .smartart_text_colors_by_model_id
     .and_then(|colors| colors.get(shape.model_id.as_str()).copied());
   let mut text_box = drawingml_diagram_shape_text_box(shape, context.styles, smartart_text_color);
-  if fill_color.is_none() && fill_image.is_none() && stroke.is_none() && text_box.is_none() {
+  if fill_color.is_none()
+    && fill_pattern.is_none()
+    && fill_image.is_none()
+    && stroke.is_none()
+    && text_box.is_none()
+  {
     return None;
   }
 
   let mut geometry = properties
     .geometry_kind()
     .unwrap_or(InlineShapeGeometry::Rectangle);
-  let has_custom_geometry = properties.custom_geometry().is_some();
-  if geometry == InlineShapeGeometry::Rectangle && has_custom_geometry {
+  let has_path_geometry = properties.has_path_geometry();
+  if geometry == InlineShapeGeometry::Rectangle && has_path_geometry {
     geometry = InlineShapeGeometry::Polyline {
       points: Vec::new(),
       closed: false,
@@ -7696,11 +7721,11 @@ fn drawingml_diagram_shape_shape(
     transform.raw_coordinates,
     transform.fallback_size,
   )?;
-  if has_custom_geometry
-    && let Some(custom_geometry) =
-      drawingml_custom_geometry_from_properties(&properties, width_pt, height_pt)
+  if has_path_geometry
+    && let Some(path_geometry) =
+      drawingml_path_geometry_from_properties(&properties, width_pt, height_pt)
   {
-    geometry = custom_geometry;
+    geometry = path_geometry;
   }
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
@@ -7715,9 +7740,11 @@ fn drawingml_diagram_shape_shape(
     offset_x_pt,
     offset_y_pt,
     fill_color,
+    fill_pattern,
     additional_fill_colors: Vec::new(),
     fill_image,
     stroke,
+    stroke_pattern,
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
     inline_anchor_after_line: matches!(placement, ImagePlacement::Inline)
@@ -8392,9 +8419,11 @@ fn chart_shape(
     offset_x_pt: 0.0,
     offset_y_pt,
     fill_color: None,
+    fill_pattern: None,
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke,
+    stroke_pattern: None,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
     inline_anchor_after_line: false,
@@ -8497,6 +8526,7 @@ enum DrawingMlFillProperties<'a> {
   NoFill,
   Solid(&'a a::SolidFill),
   Gradient(&'a a::GradientFill),
+  Pattern(&'a a::PatternFill),
 }
 
 impl DrawingMlShapeProperties {
@@ -8551,6 +8581,38 @@ impl DrawingMlShapeProperties {
     }
   }
 
+  fn preset_geometry(&self) -> Option<&a::PresetGeometry> {
+    match self {
+      Self::Diagram(properties) => match properties.shape_properties_choice1.as_ref()? {
+        dsp::ShapePropertiesChoice::PresetGeometry(geometry) => Some(geometry.as_ref()),
+        dsp::ShapePropertiesChoice::CustomGeometry(_) => None,
+      },
+      Self::Wordprocessing(properties) => match properties.shape_properties_choice1.as_ref()? {
+        wps::ShapePropertiesChoice::PresetGeometry(geometry) => Some(geometry.as_ref()),
+        wps::ShapePropertiesChoice::CustomGeometry(_) => None,
+      },
+      Self::Picture(properties) => match properties.shape_properties_choice1.as_ref()? {
+        pic::ShapePropertiesChoice::PresetGeometry(geometry) => Some(geometry.as_ref()),
+        pic::ShapePropertiesChoice::CustomGeometry(_) => None,
+      },
+    }
+  }
+
+  fn has_path_geometry(&self) -> bool {
+    self.custom_geometry().is_some()
+      || self
+        .preset_geometry()
+        .is_some_and(|geometry| geometry.preset != a::ShapeTypeValues::Line)
+  }
+
+  fn outline(&self) -> Option<&a::Outline> {
+    match self {
+      Self::Diagram(properties) => properties.outline.as_deref(),
+      Self::Wordprocessing(properties) => properties.outline.as_deref(),
+      Self::Picture(properties) => properties.outline.as_deref(),
+    }
+  }
+
   fn fill(&self) -> Option<DrawingMlFillProperties<'_>> {
     match self {
       Self::Diagram(properties) => match properties.shape_properties_choice2.as_ref()? {
@@ -8560,6 +8622,9 @@ impl DrawingMlShapeProperties {
         }
         dsp::ShapePropertiesChoice2::GradientFill(fill) => {
           Some(DrawingMlFillProperties::Gradient(fill.as_ref()))
+        }
+        dsp::ShapePropertiesChoice2::PatternFill(fill) => {
+          Some(DrawingMlFillProperties::Pattern(fill.as_ref()))
         }
         _ => None,
       },
@@ -8571,6 +8636,9 @@ impl DrawingMlShapeProperties {
         wps::ShapePropertiesChoice2::GradientFill(fill) => {
           Some(DrawingMlFillProperties::Gradient(fill.as_ref()))
         }
+        wps::ShapePropertiesChoice2::PatternFill(fill) => {
+          Some(DrawingMlFillProperties::Pattern(fill.as_ref()))
+        }
         _ => None,
       },
       Self::Picture(properties) => match properties.shape_properties_choice2.as_ref()? {
@@ -8580,6 +8648,9 @@ impl DrawingMlShapeProperties {
         }
         pic::ShapePropertiesChoice2::GradientFill(fill) => {
           Some(DrawingMlFillProperties::Gradient(fill.as_ref()))
+        }
+        pic::ShapePropertiesChoice2::PatternFill(fill) => {
+          Some(DrawingMlFillProperties::Pattern(fill.as_ref()))
         }
         _ => None,
       },
@@ -8607,9 +8678,11 @@ fn anchor_wrap_polygon_shape(
     offset_x_pt: 0.0,
     offset_y_pt: 0.0,
     fill_color: None,
+    fill_pattern: None,
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke: None,
+    stroke_pattern: None,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
     inline_anchor_after_line: false,
@@ -8765,25 +8838,41 @@ fn drawingml_group_transform_from_model(transform: &a::TransformGroup) -> Drawin
   group
 }
 
-fn drawingml_custom_geometry_from_properties(
+fn drawingml_path_geometry_from_properties(
   properties: &DrawingMlShapeProperties,
   width_pt: f32,
   height_pt: f32,
 ) -> Option<InlineShapeGeometry> {
-  let geometry = properties.custom_geometry()?;
-  if matches!(
-    geometry.path_list.path.as_slice(),
-    [path]
-      if matches!(
-        path.path_choice.as_slice(),
-        [a::PathChoice::MoveTo(_), a::PathChoice::LineTo(_)]
-      )
-  ) {
-    return Some(InlineShapeGeometry::Line);
+  if let Some(geometry) = properties.custom_geometry() {
+    if matches!(
+      geometry.path_list.path.as_slice(),
+      [path]
+        if matches!(
+          path.path_choice.as_slice(),
+          [a::PathChoice::MoveTo(_), a::PathChoice::LineTo(_)]
+        )
+    ) {
+      return Some(InlineShapeGeometry::Line);
+    }
+    return Some(InlineShapeGeometry::Path {
+      paths: common::drawingml_custom_geometry::paths(geometry, 0.0, 0.0, width_pt, height_pt)?,
+      outline: properties
+        .outline()
+        .map(|outline| Box::new(outline.clone())),
+    });
   }
-  let commands =
-    common::drawingml_custom_geometry::path_commands(geometry, 0.0, 0.0, width_pt, height_pt)?;
-  Some(InlineShapeGeometry::Path { commands })
+  Some(InlineShapeGeometry::Path {
+    paths: common::drawingml_preset_geometry::paths(
+      Some(properties.preset_geometry()?),
+      0.0,
+      0.0,
+      width_pt,
+      height_pt,
+    )?,
+    outline: properties
+      .outline()
+      .map(|outline| Box::new(outline.clone())),
+  })
 }
 
 fn drawingml_geometry_from_shape_properties(
@@ -8870,9 +8959,11 @@ fn drawingml_picture_frame(
     offset_x_pt,
     offset_y_pt,
     fill_color: None,
+    fill_pattern: None,
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke: None,
+    stroke_pattern: None,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
     inline_anchor_after_line: false,
@@ -9013,6 +9104,95 @@ fn resolve_drawingml_solid_fill(
       opacity: 1.0,
     }),
     _ => None,
+  }
+}
+
+fn drawingml_pattern_fill(
+  fill: &a::PatternFill,
+  theme_colors: &ThemeColors,
+) -> Option<common::PatternFill> {
+  let foreground = match fill
+    .foreground_color
+    .as_ref()
+    .and_then(|color| color.foreground_color_choice.as_ref())
+  {
+    Some(choice) => resolve_drawingml_foreground_color(choice, theme_colors)?,
+    None => ResolvedColor {
+      color: RgbColor { r: 0, g: 0, b: 0 },
+      opacity: 1.0,
+    },
+  };
+  let background = match fill
+    .background_color
+    .as_ref()
+    .and_then(|color| color.background_color_choice.as_ref())
+  {
+    Some(choice) => resolve_drawingml_background_color(choice, theme_colors)?,
+    None => ResolvedColor {
+      color: RgbColor {
+        r: u8::MAX,
+        g: u8::MAX,
+        b: u8::MAX,
+      },
+      opacity: 1.0,
+    },
+  };
+  Some(common::PatternFill {
+    hatch_style: common::drawingml_pattern::hatch_style(fill.preset),
+    foreground: common_rgb(foreground.color, foreground.opacity),
+    background: common_rgb(background.color, background.opacity),
+  })
+}
+
+fn resolve_drawingml_foreground_color(
+  choice: &a::ForegroundColorChoice,
+  theme_colors: &ThemeColors,
+) -> Option<ResolvedColor> {
+  match choice {
+    a::ForegroundColorChoice::RgbColorModelHex(color) => Some(ResolvedColor {
+      color: parse_hex_color(color.val.as_str())?,
+      opacity: opacity_from_drawingml_rgb_transforms(&color.rgb_color_model_hex_choice),
+    }),
+    a::ForegroundColorChoice::SystemColor(color) => Some(ResolvedColor {
+      color: color.last_color.as_deref().and_then(parse_hex_color)?,
+      opacity: opacity_from_drawingml_system_transforms(&color.system_color_choice),
+    }),
+    a::ForegroundColorChoice::SchemeColor(color) => Some(ResolvedColor {
+      color: resolve_drawingml_scheme_color(color, theme_colors)?,
+      opacity: opacity_from_drawingml_scheme_transforms(&color.scheme_color_choice),
+    }),
+    a::ForegroundColorChoice::PresetColor(color) => Some(ResolvedColor {
+      color: drawingml_preset_color_value(color.val)?,
+      opacity: 1.0,
+    }),
+    a::ForegroundColorChoice::RgbColorModelPercentage(_)
+    | a::ForegroundColorChoice::HslColor(_) => None,
+  }
+}
+
+fn resolve_drawingml_background_color(
+  choice: &a::BackgroundColorChoice,
+  theme_colors: &ThemeColors,
+) -> Option<ResolvedColor> {
+  match choice {
+    a::BackgroundColorChoice::RgbColorModelHex(color) => Some(ResolvedColor {
+      color: parse_hex_color(color.val.as_str())?,
+      opacity: opacity_from_drawingml_rgb_transforms(&color.rgb_color_model_hex_choice),
+    }),
+    a::BackgroundColorChoice::SystemColor(color) => Some(ResolvedColor {
+      color: color.last_color.as_deref().and_then(parse_hex_color)?,
+      opacity: opacity_from_drawingml_system_transforms(&color.system_color_choice),
+    }),
+    a::BackgroundColorChoice::SchemeColor(color) => Some(ResolvedColor {
+      color: resolve_drawingml_scheme_color(color, theme_colors)?,
+      opacity: opacity_from_drawingml_scheme_transforms(&color.scheme_color_choice),
+    }),
+    a::BackgroundColorChoice::PresetColor(color) => Some(ResolvedColor {
+      color: drawingml_preset_color_value(color.val)?,
+      opacity: 1.0,
+    }),
+    a::BackgroundColorChoice::RgbColorModelPercentage(_)
+    | a::BackgroundColorChoice::HslColor(_) => None,
   }
 }
 
@@ -9210,7 +9390,18 @@ fn drawingml_shape_properties_fill_color(
     DrawingMlFillProperties::Gradient(fill) => {
       drawingml_first_gradient_fill_color(fill, theme_colors)
     }
+    DrawingMlFillProperties::Pattern(_) => None,
   }
+}
+
+fn drawingml_shape_properties_pattern_fill(
+  properties: &DrawingMlShapeProperties,
+  theme_colors: &ThemeColors,
+) -> Option<common::PatternFill> {
+  let DrawingMlFillProperties::Pattern(fill) = properties.fill()? else {
+    return None;
+  };
+  drawingml_pattern_fill(fill, theme_colors)
 }
 
 fn drawingml_shape_properties_has_no_fill(properties: &DrawingMlShapeProperties) -> bool {
@@ -9300,7 +9491,14 @@ fn wordprocessing_shape_stroke(
     a::OutlineChoice::GradientFill(fill) => {
       drawingml_first_gradient_fill_color(fill.as_ref(), theme_colors)?
     }
-    a::OutlineChoice::PatternFill(_) => return None,
+    a::OutlineChoice::PatternFill(fill) => {
+      let pattern = drawingml_pattern_fill(fill, theme_colors)?;
+      RgbColor {
+        r: pattern.foreground.r,
+        g: pattern.foreground.g,
+        b: pattern.foreground.b,
+      }
+    }
   };
   let width_pt = line
     .width
@@ -9328,7 +9526,14 @@ fn drawingml_diagram_shape_stroke(
     a::OutlineChoice::GradientFill(fill) => {
       drawingml_first_gradient_fill_color(fill, theme_colors)?
     }
-    a::OutlineChoice::PatternFill(_) => return None,
+    a::OutlineChoice::PatternFill(fill) => {
+      let pattern = drawingml_pattern_fill(fill, theme_colors)?;
+      RgbColor {
+        r: pattern.foreground.r,
+        g: pattern.foreground.g,
+        b: pattern.foreground.b,
+      }
+    }
   };
   let width_pt = line
     .width
@@ -9601,9 +9806,11 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
     offset_x_pt: min_x,
     offset_y_pt: min_y,
     fill_color,
+    fill_pattern: None,
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke,
+    stroke_pattern: None,
     suppress_zero_relative_background: false,
     allow_outside_page: style.absolute_position,
     inline_anchor_after_line: false,
@@ -9701,9 +9908,11 @@ fn vml_inline_shape(
     offset_x_pt: 0.0,
     offset_y_pt: 0.0,
     fill_color,
+    fill_pattern: None,
     additional_fill_colors: Vec::new(),
     fill_image,
     stroke,
+    stroke_pattern: None,
     suppress_zero_relative_background: false,
     allow_outside_page: style.absolute_position,
     inline_anchor_after_line: false,
@@ -9761,9 +9970,11 @@ fn vml_textbox_frame(
     offset_x_pt: frame.left_pt,
     offset_y_pt: frame.top_pt,
     fill_color: None,
+    fill_pattern: None,
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke: None,
+    stroke_pattern: None,
     suppress_zero_relative_background: false,
     allow_outside_page: style.absolute_position,
     inline_anchor_after_line: false,
@@ -11217,23 +11428,23 @@ fn resolve_drawingml_scheme_color(
       }
       a::SchemeColorChoice::SaturationModulation(value) => {
         if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
-          let mut hsl = HslColor::from_rgb(resolved);
+          let mut hsl = hsl_color(resolved);
           hsl.apply_saturation_mod(amount);
-          resolved = hsl.to_rgb();
+          resolved = rgb_color(hsl);
         }
       }
       a::SchemeColorChoice::LuminanceModulation(value) => {
         if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
-          let mut hsl = HslColor::from_rgb(resolved);
+          let mut hsl = hsl_color(resolved);
           hsl.apply_luminance_mod(amount);
-          resolved = hsl.to_rgb();
+          resolved = rgb_color(hsl);
         }
       }
       a::SchemeColorChoice::LuminanceOffset(value) => {
         if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
-          let mut hsl = HslColor::from_rgb(resolved);
+          let mut hsl = hsl_color(resolved);
           hsl.apply_luminance_offset(amount);
-          resolved = hsl.to_rgb();
+          resolved = rgb_color(hsl);
         }
       }
       _ => {}
@@ -12377,7 +12588,7 @@ fn opacity_from_w14_alpha(alpha: Option<i32>) -> f32 {
 }
 
 fn apply_w14_scheme_transforms(color: RgbColor, transforms: &[w14::SchemeColorChoice]) -> RgbColor {
-  let mut hsl = HslColor::from_rgb(color);
+  let mut hsl = hsl_color(color);
   for transform in transforms {
     match transform {
       w14::SchemeColorChoice::Tint(value) => {
@@ -12395,135 +12606,34 @@ fn apply_w14_scheme_transforms(color: RgbColor, transforms: &[w14::SchemeColorCh
       _ => {}
     }
   }
-  hsl.to_rgb()
+  rgb_color(hsl)
 }
 
 fn apply_word_tint(color: RgbColor, tint: &str) -> RgbColor {
   let Some(tint) = u8::from_str_radix(tint, 16).ok() else {
     return color;
   };
-  let mut hsl = HslColor::from_rgb(color);
+  let mut hsl = hsl_color(color);
   hsl.apply_tint(1.0 - (tint as f32 / units::BYTE_MAX_AS_FLOAT));
-  hsl.to_rgb()
+  rgb_color(hsl)
 }
 
 fn apply_word_shade(color: RgbColor, shade: &str) -> RgbColor {
   let Some(shade) = u8::from_str_radix(shade, 16).ok() else {
     return color;
   };
-  let mut hsl = HslColor::from_rgb(color);
+  let mut hsl = hsl_color(color);
   hsl.apply_shade(shade as f32 / units::BYTE_MAX_AS_FLOAT);
-  hsl.to_rgb()
+  rgb_color(hsl)
 }
 
-#[derive(Clone, Copy, Debug)]
-struct HslColor {
-  hue: f32,
-  saturation: f32,
-  luminance: f32,
+fn hsl_color(color: RgbColor) -> color_math::HslColor {
+  color_math::HslColor::from_srgb8([color.r, color.g, color.b])
 }
 
-impl HslColor {
-  fn from_rgb(color: RgbColor) -> Self {
-    let red = color.r as f32 / units::BYTE_MAX_AS_FLOAT;
-    let green = color.g as f32 / units::BYTE_MAX_AS_FLOAT;
-    let blue = color.b as f32 / units::BYTE_MAX_AS_FLOAT;
-    let max = red.max(green.max(blue));
-    let min = red.min(green.min(blue));
-    let luminance = (max + min) / 2.0;
-
-    if (max - min).abs() < f32::EPSILON {
-      return Self {
-        hue: 0.0,
-        saturation: 0.0,
-        luminance,
-      };
-    }
-
-    let delta = max - min;
-    let saturation = if luminance > 0.5 {
-      delta / (2.0 - max - min)
-    } else {
-      delta / (max + min)
-    };
-    let hue = if (max - red).abs() < f32::EPSILON {
-      ((green - blue) / delta).rem_euclid(6.0)
-    } else if (max - green).abs() < f32::EPSILON {
-      ((blue - red) / delta) + 2.0
-    } else {
-      ((red - green) / delta) + 4.0
-    } / 6.0;
-
-    Self {
-      hue,
-      saturation,
-      luminance,
-    }
-  }
-
-  fn to_rgb(self) -> RgbColor {
-    if self.saturation <= f32::EPSILON {
-      let value = (self.luminance * units::BYTE_MAX_AS_FLOAT).round() as u8;
-      return RgbColor {
-        r: value,
-        g: value,
-        b: value,
-      };
-    }
-
-    let q = if self.luminance < 0.5 {
-      self.luminance * (1.0 + self.saturation)
-    } else {
-      self.luminance + self.saturation - self.luminance * self.saturation
-    };
-    let p = 2.0 * self.luminance - q;
-
-    RgbColor {
-      r: hue_to_rgb(p, q, self.hue + (1.0 / 3.0)),
-      g: hue_to_rgb(p, q, self.hue),
-      b: hue_to_rgb(p, q, self.hue - (1.0 / 3.0)),
-    }
-  }
-
-  fn apply_tint(&mut self, amount: f32) {
-    self.luminance = (self.luminance * (1.0 - amount) + amount).clamp(0.0, 1.0);
-  }
-
-  fn apply_shade(&mut self, amount: f32) {
-    self.luminance = (self.luminance * amount).clamp(0.0, 1.0);
-  }
-
-  fn apply_saturation_mod(&mut self, amount: f32) {
-    self.saturation = (self.saturation * amount).clamp(0.0, 1.0);
-  }
-
-  fn apply_luminance_mod(&mut self, amount: f32) {
-    self.luminance = (self.luminance * amount).clamp(0.0, 1.0);
-  }
-
-  fn apply_luminance_offset(&mut self, amount: f32) {
-    self.luminance = (self.luminance + amount).clamp(0.0, 1.0);
-  }
-}
-
-fn hue_to_rgb(p: f32, q: f32, mut hue: f32) -> u8 {
-  if hue < 0.0 {
-    hue += 1.0;
-  } else if hue > 1.0 {
-    hue -= 1.0;
-  }
-
-  let value = if hue < (1.0 / 6.0) {
-    p + (q - p) * 6.0 * hue
-  } else if hue < 0.5 {
-    q
-  } else if hue < (2.0 / 3.0) {
-    p + (q - p) * ((2.0 / 3.0) - hue) * 6.0
-  } else {
-    p
-  };
-
-  (value.clamp(0.0, 1.0) * units::BYTE_MAX_AS_FLOAT).round() as u8
+fn rgb_color(color: color_math::HslColor) -> RgbColor {
+  let [r, g, b] = color.to_srgb8();
+  RgbColor { r, g, b }
 }
 
 fn table_style_model(
@@ -15484,9 +15594,10 @@ mod tests {
     )
     .expect("custom geometry shape");
 
-    let InlineShapeGeometry::Path { commands } = shape.geometry else {
+    let InlineShapeGeometry::Path { paths, .. } = shape.geometry else {
       panic!("quadratic custom geometry must remain a path");
     };
+    let commands = &paths[0].commands;
     assert!(
       commands
         .iter()

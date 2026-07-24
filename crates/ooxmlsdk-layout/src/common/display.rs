@@ -70,6 +70,7 @@ pub enum DisplayItem<'doc> {
   Text(TextRun<'doc>),
   Glyphs(GlyphRun<'doc>),
   Image(ImageItem<'doc>),
+  Group(CompositingGroup<'doc>),
   Path(PathItem<'doc>),
   Rect(RectItem<'doc>),
   Line(LineItem<'doc>),
@@ -77,6 +78,44 @@ pub enum DisplayItem<'doc> {
   AnnotationHint(AnnotationHint<'doc>),
   Clip(ClipItem),
   Transform(Transform),
+}
+
+/// A sequence of display items composed as one graphics group.
+///
+/// Keeping the items grouped is significant for DrawingML effects. A mask or
+/// blend applied independently to overlapping paths changes their composite
+/// result at the overlap, while reflections need one transform shared by the
+/// content and its fade mask.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompositingGroup<'doc> {
+  pub mask: Option<ImageItem<'doc>>,
+  pub transform: Option<Transform>,
+  pub blend_mode: BlendMode,
+  pub opacity: f32,
+  pub items: Vec<DisplayItem<'doc>>,
+}
+
+impl<'doc> CompositingGroup<'doc> {
+  pub fn masked(mask: ImageItem<'doc>, items: Vec<DisplayItem<'doc>>) -> Self {
+    Self {
+      mask: Some(mask),
+      transform: None,
+      blend_mode: BlendMode::Normal,
+      opacity: 1.0,
+      items,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BlendMode {
+  #[default]
+  Normal,
+  Multiply,
+  Screen,
+  Darken,
+  Lighten,
+  Overlay,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -151,6 +190,99 @@ pub struct PathItem<'doc> {
   pub closed: bool,
   pub fill: Fill<'doc>,
   pub stroke: Option<Stroke<'doc>>,
+}
+
+/// Fill behavior attached to one DrawingML `a:path`.
+///
+/// This remains separate from [`Fill`] because the lighten and darken variants
+/// modify the owning shape fill rather than naming an independent paint.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum DrawingPathFillMode {
+  None,
+  #[default]
+  Normal,
+  Lighten,
+  LightenLess,
+  Darken,
+  DarkenLess,
+}
+
+impl DrawingPathFillMode {
+  /// Applies the per-path DrawingML shade/tint mode to resolved paint.
+  ///
+  /// `[MS-OI29500]` 20.1.10.37 defines Office's strong variants as a 40%
+  /// black/white blend and, importantly, the `Less` variants as exactly
+  /// `50/255` rather than `0.2`. Keeping the factors as integer channel units
+  /// avoids an unnecessary floating-point compatibility boundary.
+  pub fn apply_to_fill<'doc>(self, mut fill: Fill<'doc>) -> Fill<'doc> {
+    if self == Self::None {
+      return Fill::None;
+    }
+    if self == Self::Normal {
+      return fill;
+    }
+    match &mut fill {
+      Fill::Solid(color) => *color = self.apply_to_color(*color),
+      Fill::Gradient(gradient) => {
+        for stop in &mut gradient.stops {
+          stop.color = self.apply_to_color(stop.color);
+        }
+      }
+      Fill::Pattern(pattern) => {
+        pattern.foreground = self.apply_to_color(pattern.foreground);
+        pattern.background = self.apply_to_color(pattern.background);
+      }
+      Fill::None | Fill::Theme(_) | Fill::Image { .. } => {}
+    }
+    fill
+  }
+
+  pub fn apply_to_color(self, color: Color) -> Color {
+    const CHANNEL_MAX: u16 = u8::MAX as u16;
+    const STRONG_BLEND_CHANNELS: u16 = 102;
+    const LESS_BLEND_CHANNELS: u16 = 50;
+    let (target, target_weight) = match self {
+      Self::Lighten => (u8::MAX, STRONG_BLEND_CHANNELS),
+      Self::LightenLess => (u8::MAX, LESS_BLEND_CHANNELS),
+      Self::Darken => (u8::MIN, STRONG_BLEND_CHANNELS),
+      Self::DarkenLess => (u8::MIN, LESS_BLEND_CHANNELS),
+      Self::None | Self::Normal => return color,
+    };
+    let channel = |value: u8| -> u8 {
+      let source_weight = CHANNEL_MAX - target_weight;
+      ((u16::from(value) * source_weight + u16::from(target) * target_weight) / CHANNEL_MAX) as u8
+    };
+    Color {
+      r: channel(color.r),
+      g: channel(color.g),
+      b: channel(color.b),
+      a: color.a,
+    }
+  }
+}
+
+/// One independently painted path from a DrawingML custom or preset geometry.
+///
+/// DrawingML geometries may contain several paths with different fill and
+/// stroke flags. Keeping those flags beside the commands prevents host
+/// renderers from flattening stroke-only and fill-only paths into one shape.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DrawingPath {
+  pub commands: Vec<PathCommand>,
+  pub fill_mode: DrawingPathFillMode,
+  pub stroke: bool,
+  pub extrusion_allowed: bool,
+}
+
+impl Default for DrawingPath {
+  fn default() -> Self {
+    Self {
+      commands: Vec::new(),
+      fill_mode: DrawingPathFillMode::Normal,
+      stroke: true,
+      extrusion_allowed: true,
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -686,4 +818,37 @@ pub struct RestartPlan {
   pub cursor: FrameCursor,
   pub reason: ReflowReason,
   pub scope: ReflowScope,
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn drawing_path_less_fill_modes_use_office_50_over_255_factor() {
+    let source = Color {
+      r: 100,
+      g: 150,
+      b: 200,
+      a: 77,
+    };
+    assert_eq!(
+      DrawingPathFillMode::DarkenLess.apply_to_color(source),
+      Color {
+        r: 80,
+        g: 120,
+        b: 160,
+        a: 77,
+      }
+    );
+    assert_eq!(
+      DrawingPathFillMode::LightenLess.apply_to_color(source),
+      Color {
+        r: 130,
+        g: 170,
+        b: 210,
+        a: 77,
+      }
+    );
+  }
 }

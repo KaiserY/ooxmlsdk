@@ -249,6 +249,13 @@ pub enum FormWidgetKind {
 pub(crate) enum PageItem {
   Text(TextItem),
   Image(ImageItem),
+  Group {
+    mask: Option<ImageItem>,
+    transform: Option<common::Transform>,
+    blend_mode: common::BlendMode,
+    opacity: f32,
+    items: Vec<PageItem>,
+  },
   LinkArea(LinkAreaItem),
   Path(common::PathItem<'static>),
   Rect(RectItem),
@@ -438,6 +445,7 @@ pub(crate) fn common_stroke_from_border(
     color: common_rgb(style.color, opacity),
     dash: None,
     source_style_id: None,
+    ..Default::default()
   }
 }
 

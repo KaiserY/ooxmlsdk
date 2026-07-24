@@ -416,6 +416,7 @@ fn solid_scheme_line(value: a::SchemeColorValues) -> LineProperties {
     fill: LineFill::Solid(Some(scheme_color(value, None))),
     width_emu: None,
     placeholder_color: None,
+    source_outline: None,
   }
 }
 
@@ -1245,6 +1246,7 @@ fn table_border_line_properties(
       fill,
       width_emu,
       placeholder_color: None,
+      source_outline: None,
     })
   }
 }

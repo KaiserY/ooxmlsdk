@@ -61,7 +61,10 @@ use super::drawingml::text_list_style::{
   TextListLevelParagraphProperties, TextListParagraphStyle, TextListStyle,
 };
 use super::import::{PowerPointImport, ThemeFragmentRecord};
-use super::shadow::{ShadowFrame, outer_shadow_image_item};
+use super::shadow::{
+  ShadowFrame, glow_image_item, inner_shadow_image_item, outer_shadow_image_item,
+  reflection_mask_image_item, shadow_alignment, soft_edge_mask_image_item,
+};
 use super::slide::{BackgroundKind, ChartResource, ImageResource, SlidePersist};
 use super::{
   PptxBulletParagraphSummary, PptxDrawShapeSummary, PptxLayoutSummary,
@@ -150,6 +153,19 @@ fn common_display_item(item: PageItem) -> common::DisplayItem<'static> {
   match item {
     PageItem::Text(item) => common::DisplayItem::Text(common_text_run(item)),
     PageItem::Image(item) => common::DisplayItem::Image(common_image_item(item)),
+    PageItem::Group {
+      mask,
+      transform,
+      blend_mode,
+      opacity,
+      items,
+    } => common::DisplayItem::Group(common::CompositingGroup {
+      mask: mask.map(common_image_item),
+      transform,
+      blend_mode,
+      opacity,
+      items: items.into_iter().map(common_display_item).collect(),
+    }),
     PageItem::LinkArea(item) => common::DisplayItem::LinkArea(common::LinkArea {
       bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
       target: Cow::Owned(item.hyperlink_url),
@@ -254,6 +270,7 @@ fn common_line_item(item: LineItem) -> common::LineItem<'static> {
       color: common_rgb(item.color, 1.0),
       dash: None,
       source_style_id: None,
+      ..Default::default()
     },
     kind: match item.kind {
       LineItemKind::Stroke => common::LineKind::Stroke,
@@ -686,20 +703,41 @@ fn lower_background(
   fill_properties: &FillProperties,
   items: &mut Vec<PageItem>,
 ) {
-  if let Some(fill_paint) = background_fill_paint(import, slide, fill_properties) {
-    if is_default_white_page_background(fill_paint) {
-      return;
+  if let Some(fill) = common_fill_for_optional_slide(import, Some(slide), fill_properties) {
+    match fill {
+      common::Fill::Solid(color)
+        if is_default_white_page_background(DisplayPaint {
+          color: RgbColor {
+            r: color.r,
+            g: color.g,
+            b: color.b,
+          },
+          opacity: opacity_from_common_color(color),
+        }) => {}
+      common::Fill::Solid(color) => items.push(PageItem::Rect(RectItem {
+        x_pt: 0.0,
+        y_pt: 0.0,
+        width_pt: slide.size.width_pt,
+        height_pt: slide.size.height_pt,
+        fill_color: Some(RgbColor {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+        }),
+        fill_opacity: opacity_from_common_color(color),
+        stroke: None,
+        stroke_opacity: 1.0,
+      })),
+      common::Fill::Pattern(_) => push_pattern_rect(
+        items,
+        0.0,
+        0.0,
+        slide.size.width_pt,
+        slide.size.height_pt,
+        fill,
+      ),
+      _ => {}
     }
-    items.push(PageItem::Rect(RectItem {
-      x_pt: 0.0,
-      y_pt: 0.0,
-      width_pt: slide.size.width_pt,
-      height_pt: slide.size.height_pt,
-      fill_color: Some(fill_paint.color),
-      fill_opacity: fill_paint.opacity,
-      stroke: None,
-      stroke_opacity: 1.0,
-    }));
   } else {
     items.extend(
       blip_fill_image_items(
@@ -760,24 +798,6 @@ fn resolved_slide_background_fill(
 
 fn is_default_white_page_background(paint: DisplayPaint) -> bool {
   paint.opacity >= 1.0 && paint.color.r == 255 && paint.color.g == 255 && paint.color.b == 255
-}
-
-fn background_fill_paint(
-  import: &PowerPointImport,
-  slide: &SlidePersist,
-  fill: &FillProperties,
-) -> Option<DisplayPaint> {
-  match &fill.kind {
-    FillKind::Solid(color) => color.as_ref().and_then(|color| {
-      display_paint_for_slide(import, slide, color, fill.placeholder_color.as_ref())
-    }),
-    FillKind::None
-    | FillKind::SlideBackground
-    | FillKind::Group
-    | FillKind::Gradient(_)
-    | FillKind::Blip(_)
-    | FillKind::Pattern(_) => None,
-  }
 }
 
 fn lower_shapes(
@@ -2110,8 +2130,8 @@ fn lower_diagram(
             )
           })
           .or_else(|| (!suppress_fill).then_some(BorderStyle::default()));
-        if let Some(path) = diagram_model_shape_path_item(&diagram_shape, fill_color, stroke) {
-          drawing_items.push(PageItem::Path(path));
+        if let Some(paths) = diagram_model_shape_path_items(&diagram_shape, fill_color, stroke) {
+          drawing_items.extend(paths.into_iter().map(PageItem::Path));
         } else {
           drawing_items.push(PageItem::Rect(RectItem {
             x_pt: diagram_shape.x,
@@ -2393,21 +2413,10 @@ fn lower_diagram_drawing_shape(
     .outline
     .as_deref()
     .and_then(|outline| diagram_outline(context.import, context.slide, outline));
-  if let Some(path) =
-    diagram_drawing_shape_path_item(&shape.shape_properties, bounds, fill_color, stroke)
+  if let Some(paths) =
+    diagram_drawing_shape_path_items(&shape.shape_properties, bounds, fill_color, stroke)
   {
-    items.push(PageItem::Path(path));
-  } else {
-    items.push(PageItem::Rect(RectItem {
-      x_pt: bounds.x,
-      y_pt: bounds.y,
-      width_pt: bounds.width,
-      height_pt: bounds.height,
-      fill_color,
-      fill_opacity: 1.0,
-      stroke,
-      stroke_opacity: 1.0,
-    }));
+    items.extend(paths.into_iter().map(PageItem::Path));
   }
   let Some(text_body) = shape.text_body.as_deref() else {
     return;
@@ -2738,33 +2747,55 @@ fn diagram_text_required_size(
   ))
 }
 
-fn diagram_model_shape_path_item(
+fn diagram_model_shape_path_items(
   shape: &shared_diagram::DiagramShape,
   fill_color: Option<RgbColor>,
   stroke: Option<BorderStyle>,
-) -> Option<common::PathItem<'static>> {
+) -> Option<Vec<common::PathItem<'static>>> {
   let bounds = shared_diagram::DiagramBounds {
     x: shape.x,
     y: shape.y,
     width: shape.width,
     height: shape.height,
   };
-  let commands = shape.path_commands()?;
-  Some(common::PathItem {
-    bounds: common_rect(bounds.x, bounds.y, bounds.width, bounds.height),
-    points: Vec::new(),
-    commands,
-    closed: true,
-    fill: fill_color
-      .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
-      .unwrap_or(common::Fill::None),
-    stroke: stroke.map(|stroke| common::Stroke {
-      width: common::Pt(stroke.width_pt),
-      color: common_rgb(stroke.color, 1.0),
-      dash: None,
-      source_style_id: None,
-    }),
-  })
+  let outline = shape
+    .shape_properties
+    .as_deref()
+    .and_then(|properties| properties.outline.as_deref());
+  Some(
+    shape
+      .drawing_paths()?
+      .into_iter()
+      .map(|path| {
+        let closed = path
+          .commands
+          .iter()
+          .any(|command| matches!(command, common::PathCommand::Close));
+        common::PathItem {
+          bounds: common_rect(bounds.x, bounds.y, bounds.width, bounds.height),
+          points: Vec::new(),
+          commands: path.commands,
+          closed,
+          fill: path.fill_mode.apply_to_fill(
+            fill_color
+              .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
+              .unwrap_or(common::Fill::None),
+          ),
+          stroke: if path.stroke {
+            stroke.map(|stroke| {
+              let mut stroke = common_stroke_from_border(stroke, 1.0);
+              if let Some(outline) = outline {
+                common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+              }
+              stroke
+            })
+          } else {
+            None
+          },
+        }
+      })
+      .collect(),
+  )
 }
 
 fn diagram_model_shape_text_rectangle(
@@ -2983,28 +3014,45 @@ fn diagram_outline(
   })
 }
 
-fn diagram_drawing_shape_path_item(
+fn diagram_drawing_shape_path_items(
   properties: &dsp::ShapeProperties,
   bounds: shared_diagram::DiagramBounds,
   fill_color: Option<RgbColor>,
   stroke: Option<BorderStyle>,
-) -> Option<common::PathItem<'static>> {
-  let commands = shared_diagram::drawing_shape_path_commands(properties, bounds)?;
-  Some(common::PathItem {
-    bounds: common_rect(bounds.x, bounds.y, bounds.width, bounds.height),
-    points: Vec::new(),
-    commands,
-    closed: true,
-    fill: fill_color
-      .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
-      .unwrap_or(common::Fill::None),
-    stroke: stroke.map(|stroke| common::Stroke {
-      width: common::Pt(stroke.width_pt),
-      color: common_rgb(stroke.color, 1.0),
-      dash: None,
-      source_style_id: None,
-    }),
-  })
+) -> Option<Vec<common::PathItem<'static>>> {
+  Some(
+    shared_diagram::drawing_shape_paths(properties, bounds)?
+      .into_iter()
+      .map(|path| {
+        let closed = path
+          .commands
+          .iter()
+          .any(|command| matches!(command, common::PathCommand::Close));
+        common::PathItem {
+          bounds: common_rect(bounds.x, bounds.y, bounds.width, bounds.height),
+          points: Vec::new(),
+          commands: path.commands,
+          closed,
+          fill: path.fill_mode.apply_to_fill(
+            fill_color
+              .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
+              .unwrap_or(common::Fill::None),
+          ),
+          stroke: if path.stroke {
+            stroke.map(|stroke| {
+              let mut stroke = common_stroke_from_border(stroke, 1.0);
+              if let Some(outline) = properties.outline.as_deref() {
+                common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+              }
+              stroke
+            })
+          } else {
+            None
+          },
+        }
+      })
+      .collect(),
+  )
 }
 
 fn diagram_style_outline(
@@ -3965,7 +4013,7 @@ fn lower_table(
     });
   let table_background = table_style.and_then(|style| {
     table_style_part_fill(import, &style.table_background)
-      .and_then(|fill| fill_paint(import, &fill))
+      .and_then(|fill| common_fill_for_optional_slide(import, None, &fill))
   });
   let border_color = RgbColor { r: 0, g: 0, b: 0 };
   let draw_fallback_grid = table_style.is_none() && !table_has_visible_direct_borders(table);
@@ -4007,7 +4055,7 @@ fn lower_table(
           import,
           cell,
           style_part.as_ref(),
-          table_background,
+          table_background.clone(),
           TextFrame {
             x_pt: x,
             y_pt: y,
@@ -4347,25 +4395,23 @@ fn lower_table_cell(
   import: &PowerPointImport,
   cell: &TableCell,
   style_part: Option<&TableStylePart>,
-  table_background: Option<DisplayPaint>,
+  table_background: Option<common::Fill<'static>>,
   frame: TextFrame,
   items: &mut Vec<PageItem>,
 ) {
   if frame.width_pt <= 0.0 || frame.height_pt <= 0.0 {
     return;
   }
-  let fill = table_cell_fill_paint(import, cell, style_part, table_background);
-  if let Some(fill) = fill {
-    items.push(PageItem::Rect(RectItem {
-      x_pt: frame.x_pt,
-      y_pt: frame.y_pt,
-      width_pt: frame.width_pt,
-      height_pt: frame.height_pt,
-      fill_color: Some(fill.color),
-      fill_opacity: fill.opacity,
-      stroke: None,
-      stroke_opacity: 1.0,
-    }));
+  let cell_fill = table_cell_fill(import, cell, style_part);
+  if cell_fill
+    .as_ref()
+    .is_none_or(|fill| !common_fill_is_opaque(fill))
+    && let Some(background) = table_background
+  {
+    push_table_cell_fill(items, frame, background);
+  }
+  if let Some(fill) = cell_fill {
+    push_table_cell_fill(items, frame, fill);
   }
   let borders = table_cell_effective_borders(cell, style_part);
   lower_table_cell_borders(
@@ -4405,62 +4451,78 @@ fn lower_table_cell(
   }
 }
 
-fn table_cell_fill_paint(
+fn table_cell_fill(
   import: &PowerPointImport,
   cell: &TableCell,
   style_part: Option<&TableStylePart>,
-  table_background: Option<DisplayPaint>,
-) -> Option<DisplayPaint> {
-  let cell_fill = cell
+) -> Option<common::Fill<'static>> {
+  cell
     .fill_properties
     .as_ref()
-    .map(|fill| fill_paint(import, fill))
-    .unwrap_or_else(|| {
-      style_part
-        .and_then(|style| style.fill_properties.as_ref())
-        .and_then(|fill| fill_paint(import, fill))
-    });
-  match (table_background, cell_fill) {
-    (Some(background), Some(cell)) => Some(blend_table_cell_fill(background, cell)),
-    (Some(background), None) => Some(background),
-    (None, Some(cell)) => Some(cell),
-    (None, None) => None,
+    .or_else(|| style_part.and_then(|style| style.fill_properties.as_ref()))
+    .and_then(|fill| common_fill_for_optional_slide(import, None, fill))
+}
+
+fn push_table_cell_fill(items: &mut Vec<PageItem>, frame: TextFrame, fill: common::Fill<'static>) {
+  match fill {
+    common::Fill::Solid(color) => items.push(PageItem::Rect(RectItem {
+      x_pt: frame.x_pt,
+      y_pt: frame.y_pt,
+      width_pt: frame.width_pt,
+      height_pt: frame.height_pt,
+      fill_color: Some(RgbColor {
+        r: color.r,
+        g: color.g,
+        b: color.b,
+      }),
+      fill_opacity: opacity_from_common_color(color),
+      stroke: None,
+      stroke_opacity: 1.0,
+    })),
+    common::Fill::Pattern(_) => push_pattern_rect(
+      items,
+      frame.x_pt,
+      frame.y_pt,
+      frame.width_pt,
+      frame.height_pt,
+      fill,
+    ),
+    _ => {}
   }
 }
 
-fn blend_table_cell_fill(background: DisplayPaint, cell: DisplayPaint) -> DisplayPaint {
-  // through basegfx::interpolate(bg, cell, 1 - cellTransparency).
-  let cell_weight = cell.opacity.clamp(0.0, 1.0);
-  let background_weight = 1.0 - cell_weight;
-  DisplayPaint {
-    color: RgbColor {
-      r: blend_channel(
-        background.color.r,
-        cell.color.r,
-        background_weight,
-        cell_weight,
-      ),
-      g: blend_channel(
-        background.color.g,
-        cell.color.g,
-        background_weight,
-        cell_weight,
-      ),
-      b: blend_channel(
-        background.color.b,
-        cell.color.b,
-        background_weight,
-        cell_weight,
-      ),
-    },
-    opacity: background.opacity.max(cell.opacity).clamp(0.0, 1.0),
+fn common_fill_is_opaque(fill: &common::Fill<'_>) -> bool {
+  match fill {
+    common::Fill::Solid(color) => color.a == u8::MAX,
+    common::Fill::Pattern(pattern) => {
+      pattern.foreground.a == u8::MAX && pattern.background.a == u8::MAX
+    }
+    _ => false,
   }
 }
 
-fn blend_channel(background: u8, cell: u8, background_weight: f32, cell_weight: f32) -> u8 {
-  (f32::from(background) * background_weight + f32::from(cell) * cell_weight)
-    .round()
-    .clamp(0.0, 255.0) as u8
+fn push_pattern_rect(
+  items: &mut Vec<PageItem>,
+  x: f32,
+  y: f32,
+  width: f32,
+  height: f32,
+  fill: common::Fill<'static>,
+) {
+  items.push(PageItem::Path(common::PathItem {
+    bounds: common_rect(x, y, width, height),
+    points: Vec::new(),
+    commands: vec![
+      common::PathCommand::MoveTo(common_point(x, y)),
+      common::PathCommand::LineTo(common_point(x + width, y)),
+      common::PathCommand::LineTo(common_point(x + width, y + height)),
+      common::PathCommand::LineTo(common_point(x, y + height)),
+      common::PathCommand::Close,
+    ],
+    closed: true,
+    fill,
+    stroke: None,
+  }));
 }
 
 fn lower_table_cell_borders(
@@ -4561,6 +4623,25 @@ fn push_table_border_line(
   else {
     return;
   };
+  if stroke.common.pattern.is_some() {
+    items.push(PageItem::Path(common::PathItem {
+      bounds: common_rect(
+        x1_pt.min(x2_pt),
+        y1_pt.min(y2_pt),
+        (x2_pt - x1_pt).abs(),
+        (y2_pt - y1_pt).abs(),
+      ),
+      points: Vec::new(),
+      commands: vec![
+        common::PathCommand::MoveTo(common_point(x1_pt, y1_pt)),
+        common::PathCommand::LineTo(common_point(x2_pt, y2_pt)),
+      ],
+      closed: false,
+      fill: common::Fill::None,
+      stroke: Some(stroke.common),
+    }));
+    return;
+  }
   items.push(PageItem::Line(LineItem {
     x1_pt,
     y1_pt,
@@ -4626,10 +4707,10 @@ fn lower_shape_bounds(
     return;
   }
 
-  let fill_paint = shape
+  let shape_fill = shape
     .actual_fill_properties
     .as_ref()
-    .and_then(|fill| shape_fill_paint(import, slide, fill));
+    .and_then(|fill| shape_common_fill(import, slide, fill));
   let x_pt = offset.x_pt(shape.position.x);
   let y_pt = offset.y_pt(shape.position.y);
   let width_pt = offset.width_pt(shape.size.cx);
@@ -4673,33 +4754,103 @@ fn lower_shape_bounds(
   let gradient_path = shape
     .actual_fill_properties
     .as_ref()
-    .and_then(|fill| shape_gradient_path(import, slide, shape, fill, frame, line));
+    .and_then(|fill| shape_gradient_path(import, slide, shape, fill, frame, line.as_ref()));
   let has_fill_image = !fill_images.is_empty();
-  if fill_paint.is_none() && !has_fill_image && line.is_none() && gradient_path.is_none() {
+  let has_fill_overlay = shape
+    .actual_effect_properties
+    .as_ref()
+    .and_then(|effects| effects.fill_overlay.as_ref())
+    .and_then(|effect| effect.fill.as_ref())
+    .is_some();
+  if shape_fill.is_none()
+    && !has_fill_image
+    && line.is_none()
+    && gradient_path.is_none()
+    && !has_fill_overlay
+  {
     return;
   }
-  let (stroke, stroke_opacity) = line
-    .map(|line| (Some(line.style), line.opacity))
-    .unwrap_or((None, 1.0));
+  let common_stroke = line.as_ref().map(|line| line.common.clone());
+  let stroke = line.as_ref().map(|line| line.style);
+  let fill_overlay = shape
+    .actual_effect_properties
+    .as_ref()
+    .and_then(|effects| effects.fill_overlay.as_ref())
+    .and_then(|effect| {
+      let fill = effect.fill.as_ref()?;
+      let overlay_items = shape_effect_fill_items(import, slide, shape, fill, frame, &shape_path);
+      (!overlay_items.is_empty())
+        .then_some((drawingml_blend_mode(effect.blend_mode), overlay_items))
+    });
+  let reflection_frame = ShadowFrame {
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
+    stroke_width_pt: stroke.map_or(0.0, |stroke| stroke.width_pt),
+  };
+  let effect_bounds = transformed_shape_bounds(frame, shape);
+  let effect_frame = ShadowFrame {
+    x_pt: effect_bounds.origin.x.0,
+    y_pt: effect_bounds.origin.y.0,
+    width_pt: effect_bounds.size.width.0,
+    height_pt: effect_bounds.size.height.0,
+    stroke_width_pt: reflection_frame.stroke_width_pt,
+  };
+  let soft_edge_mask = shape
+    .actual_effect_properties
+    .as_ref()
+    .and_then(|effects| effects.soft_edge.as_ref())
+    .and_then(|effect| {
+      soft_edge_mask_image_item(
+        effect,
+        effect_frame,
+        &shape_path,
+        shape_fill.is_some() || has_fill_image || gradient_path.is_some() || fill_overlay.is_some(),
+        common_stroke.as_ref(),
+      )
+    });
+  let reflection = shape
+    .actual_effect_properties
+    .as_ref()
+    .and_then(|effects| effects.reflection.as_ref())
+    .and_then(|effect| {
+      let mask = reflection_mask_image_item(
+        effect,
+        reflection_frame,
+        shape.rotation,
+        shape.flip_h,
+        shape.flip_v,
+      )?;
+      Some((mask, reflection_transform(effect, frame, shape)))
+    });
+  let direct_shape_shadow_has_office_scale = shape
+    .effect_properties
+    .as_ref()
+    .and_then(|effects| effects.outer_shadow.as_ref())
+    .is_none_or(|shadow| {
+      shadow.scale_x.unwrap_or(100_000) == 100_000 && shadow.scale_y.unwrap_or(100_000) == 100_000
+    });
 
   if let Some(shadow) = shape
     .actual_effect_properties
     .as_ref()
-    .and_then(|effects| effects.shadow.as_ref())
+    .and_then(|effects| effects.outer_shadow.as_ref())
+    // MS-OI29500 §20.1.8.45 applies the 100% scale restriction specifically
+    // when the containing effect list is under this shape's `spPr`; a theme
+    // effect style is not such a direct child.
+    && direct_shape_shadow_has_office_scale
     && let Some(paint) = shadow
       .color
       .as_ref()
       .and_then(|color| display_paint_for_slide(import, slide, color, None))
     && let Some(image) = outer_shadow_image_item(
       shadow,
-      ShadowFrame {
-        x_pt,
-        y_pt,
-        width_pt,
-        height_pt,
-        stroke_width_pt: stroke.map_or(0.0, |stroke| stroke.width_pt),
-      },
+      effect_frame,
       &shape_path,
+      outer_shadow_transform(shadow, frame, shape),
+      shape_fill.is_some() || has_fill_image || gradient_path.is_some() || fill_overlay.is_some(),
+      common_stroke.as_ref(),
       paint.color,
       paint.opacity,
     )
@@ -4707,12 +4858,70 @@ fn lower_shape_bounds(
     items.push(PageItem::Image(image));
   }
 
+  let inner_shadow = shape
+    .actual_effect_properties
+    .as_ref()
+    .and_then(|effects| effects.inner_shadow.as_ref())
+    .and_then(|shadow| {
+      let paint = shadow
+        .color
+        .as_ref()
+        .and_then(|color| display_paint_for_slide(import, slide, color, None))?;
+      inner_shadow_image_item(
+        shadow,
+        effect_frame,
+        &shape_path,
+        shape_fill.is_some() || has_fill_image || gradient_path.is_some() || fill_overlay.is_some(),
+        common_stroke.as_ref(),
+        paint.color,
+        paint.opacity,
+      )
+    });
+
+  if let Some(glow) = shape
+    .actual_effect_properties
+    .as_ref()
+    .and_then(|effects| effects.glow.as_ref())
+    && let Some(paint) = glow
+      .color
+      .as_ref()
+      .and_then(|color| display_paint_for_slide(import, slide, color, None))
+    && let Some(image) = glow_image_item(
+      glow,
+      effect_frame,
+      &shape_path,
+      shape_fill.is_some() || has_fill_image || gradient_path.is_some() || fill_overlay.is_some(),
+      common_stroke.as_ref(),
+      paint.color,
+      paint.opacity,
+    )
+  {
+    items.push(PageItem::Image(image));
+  }
+
+  let shape_content_start = items.len();
   items.extend(fill_images.into_iter().map(PageItem::Image));
-  if let Some(path) = gradient_path {
-    items.push(PageItem::Path(path));
+  if let Some(paths) = gradient_path {
+    items.extend(paths.into_iter().map(PageItem::Path));
+    finish_shape_effects(
+      items,
+      shape_content_start,
+      fill_overlay,
+      inner_shadow,
+      soft_edge_mask,
+      reflection,
+    );
     return;
   }
-  if fill_paint.is_none() && stroke.is_none() {
+  if shape_fill.is_none() && stroke.is_none() {
+    finish_shape_effects(
+      items,
+      shape_content_start,
+      fill_overlay,
+      inner_shadow,
+      soft_edge_mask,
+      reflection,
+    );
     return;
   }
 
@@ -4723,140 +4932,314 @@ fn lower_shape_bounds(
       commands: shape_path,
       closed: false,
       fill: common::Fill::None,
-      stroke: stroke.map(|stroke| common::Stroke {
-        width: common::Pt(stroke.width_pt),
-        color: common_rgb(stroke.color, stroke_opacity),
-        dash: None,
-        source_style_id: None,
-      }),
+      stroke: common_stroke.clone(),
     }));
+    finish_shape_effects(
+      items,
+      shape_content_start,
+      fill_overlay,
+      inner_shadow,
+      soft_edge_mask,
+      reflection,
+    );
     return;
   }
 
-  if let Some(path_kind) = supported_shape_vector_path_kind(shape) {
-    items.push(PageItem::Path(common::PathItem {
-      bounds: transformed_shape_bounds(frame, shape),
-      points: Vec::new(),
-      commands: shape_path,
-      closed: path_kind == SupportedVectorPathKind::Closed,
-      fill: if path_kind == SupportedVectorPathKind::Closed {
-        fill_paint
-          .map(|paint| common::Fill::Solid(common_rgb(paint.color, paint.opacity)))
-          .unwrap_or(common::Fill::None)
-      } else {
-        common::Fill::None
-      },
-      stroke: stroke.map(|stroke| common::Stroke {
-        width: common::Pt(stroke.width_pt),
-        color: common_rgb(stroke.color, stroke_opacity),
-        dash: None,
-        source_style_id: None,
-      }),
-    }));
-    return;
-  }
-  if let Some(path_stroke_enabled) = supported_single_custom_path(shape, frame) {
-    items.push(PageItem::Path(common::PathItem {
-      bounds: transformed_shape_bounds(frame, shape),
-      points: Vec::new(),
-      commands: shape_path,
-      closed: true,
-      fill: fill_paint
-        .map(|paint| common::Fill::Solid(common_rgb(paint.color, paint.opacity)))
-        .unwrap_or(common::Fill::None),
-      stroke: path_stroke_enabled
-        .then_some(stroke)
-        .flatten()
-        .map(|stroke| common::Stroke {
-          width: common::Pt(stroke.width_pt),
-          color: common_rgb(stroke.color, stroke_opacity),
-          dash: None,
-          source_style_id: None,
-        }),
-    }));
-    return;
-  }
-
-  items.push(PageItem::Rect(RectItem {
-    x_pt,
-    y_pt,
-    width_pt,
-    height_pt,
-    fill_color: fill_paint.map(|fill| fill.color),
-    fill_opacity: fill_paint.map(|fill| fill.opacity).unwrap_or(1.0),
-    stroke,
-    stroke_opacity,
-  }));
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SupportedVectorPathKind {
-  Open,
-  Closed,
-}
-
-fn supported_shape_vector_path_kind(shape: &Shape) -> Option<SupportedVectorPathKind> {
-  let Some(CustomShapeGeometry::Preset(preset)) = shape.custom_shape_properties.geometry.as_ref()
-  else {
-    return None;
-  };
-  supported_preset_vector_path_kind(preset.preset)
-}
-
-fn supported_single_custom_path(shape: &Shape, frame: TextFrame) -> Option<bool> {
-  let Some(CustomShapeGeometry::Custom(geometry)) = shape.custom_shape_properties.geometry.as_ref()
-  else {
-    return None;
-  };
-  let [path] = geometry.path_list.path.as_slice() else {
-    return None;
-  };
-  if !matches!(path.fill, None | Some(a::PathFillModeValues::Norm))
-    || !path
-      .path_choice
-      .iter()
-      .any(|choice| matches!(choice, a::PathChoice::CloseShapePath))
-    || custom_geometry::path_commands(
-      geometry,
-      frame.x_pt,
-      frame.y_pt,
-      frame.width_pt,
-      frame.height_pt,
-    )
-    .is_none()
-  {
-    return None;
-  }
-  Some(path.stroke.as_ref().is_none_or(|value| value.as_bool()))
-}
-
-fn supported_preset_vector_path_kind(
-  preset: a::ShapeTypeValues,
-) -> Option<SupportedVectorPathKind> {
-  match preset {
-    a::ShapeTypeValues::RoundRectangle
-    | a::ShapeTypeValues::Round2SameRectangle
-    | a::ShapeTypeValues::RightArrow
-    | a::ShapeTypeValues::DownArrow
-    | a::ShapeTypeValues::Ellipse
-    | a::ShapeTypeValues::Triangle
-    | a::ShapeTypeValues::RightTriangle
-    | a::ShapeTypeValues::Diamond
-    | a::ShapeTypeValues::FlowChartExtract
-    | a::ShapeTypeValues::Hexagon
-    | a::ShapeTypeValues::LeftArrow
-    | a::ShapeTypeValues::UpArrow
-    | a::ShapeTypeValues::Parallelogram
-    | a::ShapeTypeValues::Trapezoid
-    | a::ShapeTypeValues::Plus
-    | a::ShapeTypeValues::Star5
-    | a::ShapeTypeValues::Donut
-    | a::ShapeTypeValues::FlowChartDelay
-    | a::ShapeTypeValues::Frame => Some(SupportedVectorPathKind::Closed),
-    a::ShapeTypeValues::Line | a::ShapeTypeValues::LineInverse => {
-      Some(SupportedVectorPathKind::Open)
+  if let Some(paths) = shape_drawing_paths(shape, frame) {
+    for path in paths {
+      let closed = path
+        .commands
+        .iter()
+        .any(|command| matches!(command, common::PathCommand::Close));
+      items.push(PageItem::Path(common::PathItem {
+        bounds: transformed_shape_bounds(frame, shape),
+        points: Vec::new(),
+        commands: path.commands,
+        closed,
+        fill: path
+          .fill_mode
+          .apply_to_fill(shape_fill.clone().unwrap_or(common::Fill::None)),
+        stroke: if path.stroke {
+          common_stroke.clone()
+        } else {
+          None
+        },
+      }));
     }
-    _ => None,
+    finish_shape_effects(
+      items,
+      shape_content_start,
+      fill_overlay,
+      inner_shadow,
+      soft_edge_mask,
+      reflection,
+    );
+    return;
+  }
+
+  finish_shape_effects(
+    items,
+    shape_content_start,
+    fill_overlay,
+    inner_shadow,
+    soft_edge_mask,
+    reflection,
+  );
+}
+
+fn finish_shape_effects(
+  items: &mut Vec<PageItem>,
+  content_start: usize,
+  fill_overlay: Option<(common::BlendMode, Vec<PageItem>)>,
+  inner_shadow: Option<ImageItem>,
+  soft_edge_mask: Option<ImageItem>,
+  reflection: Option<(ImageItem, common::Transform)>,
+) {
+  let has_fill_overlay = fill_overlay.is_some();
+  if let Some((blend_mode, overlay_items)) = fill_overlay {
+    items.push(PageItem::Group {
+      mask: None,
+      transform: None,
+      blend_mode,
+      opacity: 1.0,
+      items: overlay_items,
+    });
+  }
+  if let Some(inner_shadow) = inner_shadow {
+    items.push(PageItem::Image(inner_shadow));
+  }
+  if items.len() <= content_start {
+    return;
+  }
+  let mut content = items.drain(content_start..).collect::<Vec<_>>();
+  if soft_edge_mask.is_some() || has_fill_overlay {
+    content = vec![PageItem::Group {
+      mask: soft_edge_mask,
+      transform: None,
+      blend_mode: common::BlendMode::Normal,
+      opacity: 1.0,
+      items: content,
+    }];
+  }
+  if let Some((mask, transform)) = reflection {
+    let reflected_items = effect_copy_items(&content);
+    if !reflected_items.is_empty() {
+      items.push(PageItem::Group {
+        mask: Some(mask),
+        transform: Some(transform),
+        blend_mode: common::BlendMode::Normal,
+        opacity: 1.0,
+        items: reflected_items,
+      });
+    }
+  }
+  items.extend(content);
+}
+
+fn effect_copy_items(items: &[PageItem]) -> Vec<PageItem> {
+  items.iter().filter_map(effect_copy_item).collect()
+}
+
+fn effect_copy_item(item: &PageItem) -> Option<PageItem> {
+  Some(match item {
+    PageItem::Text(text) => {
+      let mut text = text.clone();
+      text.hyperlink_url = None;
+      PageItem::Text(text)
+    }
+    PageItem::Image(image) => {
+      let mut image = image.clone();
+      image.alt_text = None;
+      image.hyperlink_url = None;
+      PageItem::Image(image)
+    }
+    PageItem::Group {
+      mask,
+      transform,
+      blend_mode,
+      opacity,
+      items,
+    } => PageItem::Group {
+      mask: mask.clone(),
+      transform: *transform,
+      blend_mode: *blend_mode,
+      opacity: *opacity,
+      items: effect_copy_items(items),
+    },
+    PageItem::LinkArea(_) => return None,
+    PageItem::Path(path) => PageItem::Path(path.clone()),
+    PageItem::Rect(rect) => PageItem::Rect(rect.clone()),
+    PageItem::Line(line) => PageItem::Line(line.clone()),
+  })
+}
+
+fn reflection_transform(
+  effect: &super::drawingml::shape_properties::EffectReflectionProperties,
+  frame: TextFrame,
+  shape: &Shape,
+) -> common::Transform {
+  drawingml_effect_transform(
+    frame,
+    shape,
+    EffectTransformParameters {
+      scale_x: effect.scale_x,
+      scale_y: effect.scale_y,
+      horizontal_skew: effect.horizontal_skew,
+      vertical_skew: effect.vertical_skew,
+      alignment: effect.alignment,
+      distance_emu: effect.distance_emu,
+      direction: effect.direction,
+      rotate_with_shape: effect.rotate_with_shape.unwrap_or(true),
+    },
+  )
+}
+
+fn outer_shadow_transform(
+  effect: &super::drawingml::shape_properties::EffectShadowProperties,
+  frame: TextFrame,
+  shape: &Shape,
+) -> common::Transform {
+  drawingml_effect_transform(
+    frame,
+    shape,
+    EffectTransformParameters {
+      scale_x: effect.scale_x,
+      scale_y: effect.scale_y,
+      horizontal_skew: effect.horizontal_skew,
+      vertical_skew: effect.vertical_skew,
+      alignment: effect.alignment,
+      distance_emu: effect.distance_emu,
+      direction: effect.direction,
+      rotate_with_shape: effect.rotate_with_shape.unwrap_or(true),
+    },
+  )
+}
+
+#[derive(Clone, Copy)]
+struct EffectTransformParameters {
+  scale_x: Option<i32>,
+  scale_y: Option<i32>,
+  horizontal_skew: Option<i32>,
+  vertical_skew: Option<i32>,
+  alignment: Option<a::RectangleAlignmentValues>,
+  distance_emu: Option<i64>,
+  direction: Option<i32>,
+  rotate_with_shape: bool,
+}
+
+fn drawingml_effect_transform(
+  frame: TextFrame,
+  shape: &Shape,
+  parameters: EffectTransformParameters,
+) -> common::Transform {
+  let scale_x = parameters.scale_x.unwrap_or(100_000) as f64 / 100_000.0;
+  let scale_y = parameters.scale_y.unwrap_or(100_000) as f64 / 100_000.0;
+  let skew_x = (parameters.horizontal_skew.unwrap_or_default() as f64 / 60_000.0)
+    .to_radians()
+    .tan();
+  let skew_y = (parameters.vertical_skew.unwrap_or_default() as f64 / 60_000.0)
+    .to_radians()
+    .tan();
+  let (alignment_x, alignment_y) = shadow_alignment(parameters.alignment);
+  let anchor_x = f64::from(frame.x_pt + alignment_x * frame.width_pt);
+  let anchor_y = f64::from(frame.y_pt + alignment_y * frame.height_pt);
+  let distance = f64::from(units::emu_to_points(
+    parameters.distance_emu.unwrap_or_default(),
+  ));
+  let direction = (parameters.direction.unwrap_or_default() as f64 / 60_000.0).to_radians();
+  let offset_x = direction.cos() * distance;
+  let offset_y = direction.sin() * distance;
+
+  // ECMA-376 Part 1 §20.1.8.61 gives the authored matrix directly as
+  // [sx tan(kx) tx; tan(ky) sy ty]. Reflection alignment establishes the
+  // origin for that scale/skew/offset matrix.
+  let effect_transform = Affine::new([
+    scale_x,
+    skew_y,
+    skew_x,
+    scale_y,
+    anchor_x + offset_x - scale_x * anchor_x - skew_x * anchor_y,
+    anchor_y + offset_y - skew_y * anchor_x - scale_y * anchor_y,
+  ]);
+  let effect_transform = if parameters.rotate_with_shape {
+    let shape_transform = shape_path_transform(frame, shape);
+    shape_transform * effect_transform * shape_transform.inverse()
+  } else {
+    effect_transform
+  };
+  let [m11, m12, m21, m22, dx, dy] = effect_transform.as_coeffs();
+  common::Transform {
+    m11: m11 as f32,
+    m12: m12 as f32,
+    m21: m21 as f32,
+    m22: m22 as f32,
+    dx: common::Pt(dx as f32),
+    dy: common::Pt(dy as f32),
+  }
+}
+
+fn shape_effect_fill_items(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  shape: &Shape,
+  fill: &FillProperties,
+  frame: TextFrame,
+  shape_path: &[common::PathCommand],
+) -> Vec<PageItem> {
+  let mut items = blip_fill_image_items(
+    import,
+    slide,
+    fill,
+    ImageFillPlacement {
+      frame,
+      rotation_deg: shape.rotation,
+      flip_horizontal: shape.flip_h,
+      flip_vertical: shape.flip_v,
+      crop_bitmap: shape.custom_shape_properties.geometry.is_some(),
+      clip_path: shape_path.to_vec(),
+      alt_text: None,
+      hyperlink_url: None,
+    },
+  )
+  .into_iter()
+  .map(PageItem::Image)
+  .collect::<Vec<_>>();
+  if let Some(paths) = shape_gradient_path(import, slide, shape, fill, frame, None) {
+    items.extend(paths.into_iter().map(PageItem::Path));
+    return items;
+  }
+  let Some(fill) = shape_common_fill(import, slide, fill) else {
+    return items;
+  };
+  let Some(paths) = shape_drawing_paths(shape, frame) else {
+    return items;
+  };
+  for path in paths {
+    let closed = path
+      .commands
+      .iter()
+      .any(|command| matches!(command, common::PathCommand::Close));
+    items.push(PageItem::Path(common::PathItem {
+      bounds: transformed_shape_bounds(frame, shape),
+      points: Vec::new(),
+      commands: path.commands,
+      closed,
+      fill: path.fill_mode.apply_to_fill(fill.clone()),
+      stroke: None,
+    }));
+  }
+  items
+}
+
+fn drawingml_blend_mode(mode: a::BlendModeValues) -> common::BlendMode {
+  match mode {
+    // DrawingML token `over` is source-over compositing, not the PDF
+    // artistic "Overlay" blend mode.
+    a::BlendModeValues::Overlay => common::BlendMode::Normal,
+    a::BlendModeValues::Multiply => common::BlendMode::Multiply,
+    a::BlendModeValues::Screen => common::BlendMode::Screen,
+    a::BlendModeValues::Darken => common::BlendMode::Darken,
+    a::BlendModeValues::Lighten => common::BlendMode::Lighten,
   }
 }
 
@@ -4866,8 +5249,8 @@ fn shape_gradient_path(
   shape: &Shape,
   fill: &FillProperties,
   frame: TextFrame,
-  line: Option<DisplayStroke>,
-) -> Option<common::PathItem<'static>> {
+  line: Option<&DisplayStroke>,
+) -> Option<Vec<common::PathItem<'static>>> {
   let resolved_background;
   let (effective_fill, definition_bounds) = if matches!(fill.kind, FillKind::SlideBackground) {
     resolved_background = resolved_slide_background_fill(import, slide)?;
@@ -4883,10 +5266,6 @@ fn shape_gradient_path(
   };
   let FillKind::Gradient(gradient) = &effective_fill.kind else {
     return None;
-  };
-  let linear = match gradient.gradient_fill_choice.as_ref()? {
-    a::GradientFillChoice::LinearGradientFill(linear) => linear,
-    a::GradientFillChoice::PathGradientFill(_) => return None,
   };
   let stops = gradient
     .gradient_stop_list
@@ -4920,78 +5299,185 @@ fn shape_gradient_path(
     .rotate_with_shape
     .as_ref()
     .is_none_or(|value| value.as_bool());
-  let scaled = linear.scaled.as_ref().is_some_and(|value| value.as_bool());
-  let local_angle_degrees = linear.angle.unwrap_or_default() as f32 / 60_000.0;
   let has_shape_transform = shape.rotation.abs() > f32::EPSILON || shape.flip_h || shape.flip_v;
   let follows_shape_transform =
     rotate_with_shape && has_shape_transform && !matches!(fill.kind, FillKind::SlideBackground);
-  let gradient_line = follows_shape_transform.then(|| {
-    let (start, end) = linear_gradient_line(definition_bounds, local_angle_degrees, scaled);
-    (
-      transform_shape_point(start, frame, shape),
-      transform_shape_point(end, frame, shape),
-    )
+  let (angle_degrees, gradient_line, scaled, path, interpolation) =
+    match gradient.gradient_fill_choice.as_ref()? {
+      a::GradientFillChoice::LinearGradientFill(linear) => {
+        let scaled = linear.scaled.as_ref().is_some_and(|value| value.as_bool());
+        let local_angle_degrees = linear.angle.unwrap_or_default() as f32 / 60_000.0;
+        let gradient_line = follows_shape_transform.then(|| {
+          let (start, end) = linear_gradient_line(definition_bounds, local_angle_degrees, scaled);
+          (
+            transform_shape_point(start, frame, shape),
+            transform_shape_point(end, frame, shape),
+          )
+        });
+        let angle_degrees = if follows_shape_transform {
+          transformed_gradient_angle(local_angle_degrees, shape)
+        } else {
+          local_angle_degrees
+        };
+        (
+          Some(angle_degrees),
+          gradient_line,
+          scaled,
+          None,
+          if follows_shape_transform {
+            common::GradientInterpolation::PowerPointGammaSigma
+          } else {
+            common::GradientInterpolation::LinearSrgb
+          },
+        )
+      }
+      a::GradientFillChoice::PathGradientFill(path) => {
+        let fill_to = path
+          .fill_to_rectangle
+          .as_ref()
+          .map(path_gradient_fill_to_rect)
+          .unwrap_or(common::RelativeRect {
+            // MS-OI29500 §20.1.8 defines the Office hard-coded default for
+            // all four path-gradient focus insets as 50%.
+            left: 0.5,
+            top: 0.5,
+            right: 0.5,
+            bottom: 0.5,
+          });
+        let kind = match path.path.unwrap_or(a::PathShadeValues::Shape) {
+          a::PathShadeValues::Shape => common::GradientPathKind::Shape,
+          a::PathShadeValues::Circle => common::GradientPathKind::Circle,
+          a::PathShadeValues::Rectangle => common::GradientPathKind::Rectangle,
+        };
+        (
+          None,
+          None,
+          false,
+          Some(common::GradientPath {
+            kind,
+            fill_to,
+            transform: path_gradient_transform(frame, shape, follows_shape_transform),
+          }),
+          common::GradientInterpolation::LinearSrgb,
+        )
+      }
+    };
+  let fill = common::Fill::Gradient(common::GradientFill {
+    stops,
+    angle_degrees,
+    definition_bounds: Some(definition_bounds),
+    line: gradient_line,
+    interpolation,
+    scaled,
+    path,
   });
-  let angle_degrees = if follows_shape_transform {
-    transformed_gradient_angle(local_angle_degrees, shape)
-  } else {
-    local_angle_degrees
-  };
-  Some(common::PathItem {
-    bounds: transformed_shape_bounds(frame, shape),
-    points: Vec::new(),
-    commands: shape_path_commands(shape, frame),
-    closed: true,
-    fill: common::Fill::Gradient(common::GradientFill {
-      stops,
-      angle_degrees: Some(angle_degrees),
-      definition_bounds: Some(definition_bounds),
-      line: gradient_line,
-      interpolation: if follows_shape_transform {
-        common::GradientInterpolation::PowerPointGammaSigma
-      } else {
-        common::GradientInterpolation::LinearSrgb
-      },
-      scaled,
-      path: None,
-    }),
-    stroke: line.map(|line| common::Stroke {
-      width: common::Pt(line.style.width_pt),
-      color: common_rgb(line.style.color, line.opacity),
-      dash: None,
-      source_style_id: None,
-    }),
-  })
+  Some(
+    shape_drawing_paths(shape, frame)?
+      .into_iter()
+      .map(|path| {
+        let closed = path
+          .commands
+          .iter()
+          .any(|command| matches!(command, common::PathCommand::Close));
+        common::PathItem {
+          bounds: transformed_shape_bounds(frame, shape),
+          points: Vec::new(),
+          commands: path.commands,
+          closed,
+          fill: path.fill_mode.apply_to_fill(fill.clone()),
+          stroke: path
+            .stroke
+            .then(|| line.map(|line| line.common.clone()))
+            .flatten(),
+        }
+      })
+      .collect(),
+  )
+}
+
+fn path_gradient_fill_to_rect(rect: &a::FillToRectangle) -> common::RelativeRect {
+  common::RelativeRect {
+    left: drawingml_percent_ratio(rect.left.as_ref()),
+    top: drawingml_percent_ratio(rect.top.as_ref()),
+    right: drawingml_percent_ratio(rect.right.as_ref()),
+    bottom: drawingml_percent_ratio(rect.bottom.as_ref()),
+  }
+}
+
+fn path_gradient_transform(
+  frame: TextFrame,
+  shape: &Shape,
+  follows_shape_transform: bool,
+) -> common::Transform {
+  if !follows_shape_transform {
+    return common::Transform {
+      m11: frame.width_pt,
+      m12: 0.0,
+      m21: 0.0,
+      m22: frame.height_pt,
+      dx: common::Pt(frame.x_pt),
+      dy: common::Pt(frame.y_pt),
+    };
+  }
+  let top_left = transform_shape_point(common_point(frame.x_pt, frame.y_pt), frame, shape);
+  let top_right = transform_shape_point(
+    common_point(frame.x_pt + frame.width_pt, frame.y_pt),
+    frame,
+    shape,
+  );
+  let bottom_left = transform_shape_point(
+    common_point(frame.x_pt, frame.y_pt + frame.height_pt),
+    frame,
+    shape,
+  );
+  common::Transform {
+    m11: top_right.x.0 - top_left.x.0,
+    m12: top_right.y.0 - top_left.y.0,
+    m21: bottom_left.x.0 - top_left.x.0,
+    m22: bottom_left.y.0 - top_left.y.0,
+    dx: top_left.x,
+    dy: top_left.y,
+  }
 }
 
 fn shape_path_commands(shape: &Shape, frame: TextFrame) -> Vec<common::PathCommand> {
-  let commands = match shape.custom_shape_properties.geometry.as_ref() {
-    Some(CustomShapeGeometry::Custom(geometry)) => custom_geometry::path_commands(
+  shape_drawing_paths(shape, frame)
+    .unwrap_or_default()
+    .into_iter()
+    .filter(|path| path.fill_mode != common::DrawingPathFillMode::None)
+    .flat_map(|path| path.commands)
+    .collect()
+}
+
+fn shape_drawing_paths(shape: &Shape, frame: TextFrame) -> Option<Vec<common::DrawingPath>> {
+  let mut paths = match shape.custom_shape_properties.geometry.as_ref() {
+    Some(CustomShapeGeometry::Custom(geometry)) => custom_geometry::paths(
       geometry,
       frame.x_pt,
       frame.y_pt,
       frame.width_pt,
       frame.height_pt,
-    ),
-    Some(CustomShapeGeometry::Preset(preset)) => Some(preset_geometry::path_commands(
+    )?,
+    Some(CustomShapeGeometry::Preset(preset)) => preset_geometry::paths(
       Some(preset),
       frame.x_pt,
       frame.y_pt,
       frame.width_pt,
       frame.height_pt,
-    )),
-    None => None,
-  };
-  let commands = commands.unwrap_or_else(|| {
-    preset_geometry::path_commands(
+    )?,
+    None => preset_geometry::paths(
       None,
       frame.x_pt,
       frame.y_pt,
       frame.width_pt,
       frame.height_pt,
-    )
-  });
-  transform_commands(commands, shape_path_transform(frame, shape))
+    )?,
+  };
+  let transform = shape_path_transform(frame, shape);
+  for path in &mut paths {
+    path.commands = transform_commands(std::mem::take(&mut path.commands), transform);
+  }
+  Some(paths)
 }
 
 fn transform_shape_point(point: common::Point, frame: TextFrame, shape: &Shape) -> common::Point {
@@ -5371,21 +5857,36 @@ struct ImportedImageData {
   content_type: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-struct ImageEffects {
-  color_change: Option<ColorChangeEffect>,
-  grayscale: bool,
-  watermark: bool,
-  brightness: Option<i32>,
-  contrast: Option<i32>,
-  bilevel_threshold: Option<u8>,
+#[derive(Clone, Debug, Default, PartialEq)]
+struct ImageEffects(Vec<ImageEffect>);
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ImageEffect {
+  AlphaBiLevel(u8),
+  AlphaCeiling,
+  AlphaFloor,
+  AlphaInverse(Option<RgbColor>),
+  AlphaModulateFixed(f32),
+  AlphaReplace(u8),
+  BiLevel(u8),
+  ColorChange(ColorChangeEffect),
+  ColorReplacement(RgbColor),
+  Duotone(RgbColor, RgbColor),
+  Grayscale,
+  Luminance {
+    watermark: bool,
+    brightness: Option<i32>,
+    contrast: Option<i32>,
+  },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct ColorChangeEffect {
   from: RgbColor,
   to: RgbColor,
-  alpha: u8,
+  from_alpha: u8,
+  to_alpha: u8,
+  use_alpha: bool,
   tolerance: u8,
 }
 
@@ -5398,7 +5899,7 @@ fn image_data_with_blip_effects(
 ) -> ImportedImageData {
   let data_ref = data.as_ref();
   let effects = image_effects_from_blip(import, slide, blip_choices, content_type);
-  if effects == ImageEffects::default() {
+  if effects.0.is_empty() {
     return ImportedImageData {
       data: Arc::clone(data),
       content_type: content_type.map(str::to_string),
@@ -5425,6 +5926,42 @@ fn image_effects_from_blip(
   let mut effects = ImageEffects::default();
   for choice in blip_choices {
     match choice {
+      a::BlipChoice::AlphaBiLevel(effect) => {
+        effects.0.push(ImageEffect::AlphaBiLevel(
+          (effect.threshold.as_ratio() * 255.0)
+            .round()
+            .clamp(0.0, 255.0) as u8,
+        ));
+      }
+      a::BlipChoice::AlphaCeiling => effects.0.push(ImageEffect::AlphaCeiling),
+      a::BlipChoice::AlphaFloor => effects.0.push(ImageEffect::AlphaFloor),
+      a::BlipChoice::AlphaInverse(effect) => {
+        let color = effect
+          .alpha_inverse_choice
+          .as_ref()
+          .and_then(Color::from_alpha_inverse_choice)
+          .and_then(|color| import.resolve_color_for_slide(slide, &color, None))
+          .map(|color| RgbColor {
+            r: color.r,
+            g: color.g,
+            b: color.b,
+          });
+        effects.0.push(ImageEffect::AlphaInverse(color));
+      }
+      a::BlipChoice::AlphaModulationFixed(effect) => {
+        effects.0.push(ImageEffect::AlphaModulateFixed(
+          effect
+            .amount
+            .as_ref()
+            .map(|value| office_alpha_modulate_amount(*value))
+            .unwrap_or(1.0),
+        ));
+      }
+      a::BlipChoice::AlphaReplace(effect) => {
+        effects.0.push(ImageEffect::AlphaReplace(
+          (effect.alpha.as_ratio() * 255.0).round().clamp(0.0, 255.0) as u8,
+        ));
+      }
       a::BlipChoice::ColorChange(change) => {
         let Some(from) = change
           .color_from
@@ -5442,8 +5979,18 @@ fn image_effects_from_blip(
         else {
           continue;
         };
-        if from.r != to.r || from.g != to.g || from.b != to.b || to.alpha < 100_000 {
-          effects.color_change = Some(ColorChangeEffect {
+        let from_alpha = ((from.alpha.clamp(0, 100_000) as u32 * 255 + 50_000) / 100_000) as u8;
+        let to_alpha = ((to.alpha.clamp(0, 100_000) as u32 * 255 + 50_000) / 100_000) as u8;
+        let use_alpha = change
+          .use_alpha
+          .as_ref()
+          .is_some_and(|value| value.as_bool());
+        if from.r != to.r
+          || from.g != to.g
+          || from.b != to.b
+          || (use_alpha && from_alpha != to_alpha)
+        {
+          effects.0.push(ImageEffect::ColorChange(ColorChangeEffect {
             from: RgbColor {
               r: from.r,
               g: from.g,
@@ -5454,12 +6001,44 @@ fn image_effects_from_blip(
               g: to.g,
               b: to.b,
             },
-            alpha: ((to.alpha.clamp(0, 100_000) as u32 * 255 + 50_000) / 100_000) as u8,
+            from_alpha,
+            to_alpha,
+            use_alpha,
             tolerance: color_change_tolerance(content_type),
-          });
+          }));
         }
       }
-      a::BlipChoice::Grayscale => effects.grayscale = true,
+      a::BlipChoice::ColorReplacement(replacement) => {
+        if let Some(color) = replacement
+          .color_replacement_choice
+          .as_ref()
+          .and_then(Color::from_color_replacement_choice)
+          .and_then(|color| import.resolve_color_for_slide(slide, &color, None))
+        {
+          effects.0.push(ImageEffect::ColorReplacement(RgbColor {
+            r: color.r,
+            g: color.g,
+            b: color.b,
+          }));
+        }
+      }
+      a::BlipChoice::Duotone(duotone) => {
+        let colors = duotone
+          .duotone_choice
+          .iter()
+          .filter_map(Color::from_duotone_choice)
+          .filter_map(|color| import.resolve_color_for_slide(slide, &color, None))
+          .map(|color| RgbColor {
+            r: color.r,
+            g: color.g,
+            b: color.b,
+          })
+          .collect::<Vec<_>>();
+        if let [first, second] = colors.as_slice() {
+          effects.0.push(ImageEffect::Duotone(*first, *second));
+        }
+      }
+      a::BlipChoice::Grayscale => effects.0.push(ImageEffect::Grayscale),
       a::BlipChoice::LuminanceEffect(luminance) => {
         let brightness = luminance
           .brightness
@@ -5471,23 +6050,21 @@ fn image_effects_from_blip(
           .map(|value| (value.as_ratio() * 100.0).round() as i32);
         // maps MSO washout (bright=70%, contrast=-70%) to
         // GraphicDrawMode::Watermark and clears AdjustLuminance/Contrast.
-        if brightness == Some(70) && contrast == Some(-70) {
-          effects.watermark = true;
-          effects.brightness = None;
-          effects.contrast = None;
-        } else {
-          effects.brightness = brightness;
-          effects.contrast = contrast;
-        }
+        let watermark = brightness == Some(70) && contrast == Some(-70);
+        effects.0.push(ImageEffect::Luminance {
+          watermark,
+          brightness: (!watermark).then_some(brightness).flatten(),
+          contrast: (!watermark).then_some(contrast).flatten(),
+        });
       }
       a::BlipChoice::BiLevel(bilevel) => {
         // lclApplyBlackWhiteEffect maps DrawingML's 0..100000 threshold to
         // BitmapMonochromeFilter's 0..255 luminance threshold.
-        effects.bilevel_threshold = Some(
+        effects.0.push(ImageEffect::BiLevel(
           (bilevel.threshold.as_ratio() * 255.0)
             .round()
             .clamp(0.0, 255.0) as u8,
-        );
+        ));
       }
       _ => {}
     }
@@ -5537,43 +6114,92 @@ fn apply_image_effects(
   let mut image = image::load_from_memory(image_data).ok()?.to_rgba8();
   for pixel in image.pixels_mut() {
     let [mut r, mut g, mut b, mut a] = pixel.0;
-    if let Some(effect) = effects.color_change
-      && channel_within_tolerance(r, effect.from.r, effect.tolerance)
-      && channel_within_tolerance(g, effect.from.g, effect.tolerance)
-      && channel_within_tolerance(b, effect.from.b, effect.tolerance)
-    {
-      r = effect.to.r;
-      g = effect.to.g;
-      b = effect.to.b;
-      a = effect.alpha;
-    }
-    if effects.grayscale {
-      let luminance = image_luminance(r, g, b);
-      r = luminance;
-      g = luminance;
-      b = luminance;
-    }
-    if effects.watermark {
-      r = libreoffice_luminance_contrast_component(r, 0.5, -0.7);
-      g = libreoffice_luminance_contrast_component(g, 0.5, -0.7);
-      b = libreoffice_luminance_contrast_component(b, 0.5, -0.7);
-    }
-    if effects.brightness.is_some() || effects.contrast.is_some() {
-      let brightness = effects.brightness.unwrap_or(0);
-      let contrast = effects.contrast.unwrap_or(0);
-      r = mso_brightness_contrast_component(r, brightness, contrast);
-      g = mso_brightness_contrast_component(g, brightness, contrast);
-      b = mso_brightness_contrast_component(b, brightness, contrast);
-    }
-    if let Some(threshold) = effects.bilevel_threshold {
-      let value = if image_luminance(r, g, b) >= threshold {
-        255
-      } else {
-        0
-      };
-      r = value;
-      g = value;
-      b = value;
+    for effect in &effects.0 {
+      match *effect {
+        ImageEffect::AlphaBiLevel(threshold) => {
+          a = if a < threshold { 0 } else { u8::MAX };
+        }
+        ImageEffect::AlphaCeiling => {
+          if a > 0 {
+            a = u8::MAX;
+          }
+        }
+        ImageEffect::AlphaFloor => {
+          if a < u8::MAX {
+            a = 0;
+          }
+        }
+        ImageEffect::AlphaInverse(color) => {
+          a = u8::MAX - a;
+          if let Some(color) = color {
+            r = color.r;
+            g = color.g;
+            b = color.b;
+          }
+        }
+        ImageEffect::AlphaModulateFixed(amount) => {
+          a = (f32::from(a) * amount).round().clamp(0.0, 255.0) as u8;
+        }
+        ImageEffect::AlphaReplace(alpha) => a = alpha,
+        ImageEffect::BiLevel(threshold) => {
+          let value = if image_luminance(r, g, b) >= threshold {
+            u8::MAX
+          } else {
+            0
+          };
+          r = value;
+          g = value;
+          b = value;
+        }
+        ImageEffect::ColorChange(effect)
+          if channel_within_tolerance(r, effect.from.r, effect.tolerance)
+            && channel_within_tolerance(g, effect.from.g, effect.tolerance)
+            && channel_within_tolerance(b, effect.from.b, effect.tolerance)
+            && (!effect.use_alpha || a == effect.from_alpha) =>
+        {
+          r = effect.to.r;
+          g = effect.to.g;
+          b = effect.to.b;
+          if effect.use_alpha {
+            a = effect.to_alpha;
+          }
+        }
+        ImageEffect::ColorChange(_) => {}
+        ImageEffect::ColorReplacement(color) => {
+          r = color.r;
+          g = color.g;
+          b = color.b;
+        }
+        ImageEffect::Duotone(first, second) => {
+          let luminance = libreoffice_image_luminance(r, g, b);
+          r = duotone_component(luminance, first.r, second.r);
+          g = duotone_component(luminance, first.g, second.g);
+          b = duotone_component(luminance, first.b, second.b);
+        }
+        ImageEffect::Grayscale => {
+          let luminance = image_luminance(r, g, b);
+          r = luminance;
+          g = luminance;
+          b = luminance;
+        }
+        ImageEffect::Luminance {
+          watermark,
+          brightness,
+          contrast,
+        } => {
+          if watermark {
+            r = libreoffice_luminance_contrast_component(r, 0.5, -0.7);
+            g = libreoffice_luminance_contrast_component(g, 0.5, -0.7);
+            b = libreoffice_luminance_contrast_component(b, 0.5, -0.7);
+          } else if brightness.is_some() || contrast.is_some() {
+            let brightness = brightness.unwrap_or(0);
+            let contrast = contrast.unwrap_or(0);
+            r = mso_brightness_contrast_component(r, brightness, contrast);
+            g = mso_brightness_contrast_component(g, brightness, contrast);
+            b = mso_brightness_contrast_component(b, brightness, contrast);
+          }
+        }
+      }
     }
     pixel.0 = [r, g, b, a];
   }
@@ -5654,12 +6280,37 @@ fn channel_within_tolerance(actual: u8, expected: u8, tolerance: u8) -> bool {
   actual.abs_diff(expected) <= tolerance
 }
 
+fn office_alpha_modulate_amount(value: DrawingmlPercentageValue) -> f32 {
+  // MS-OI29500 §20.1.8.6 says Office modulates values beyond 100% instead
+  // of clamping them. Preserve exact positive multiples as 100%: 100% is
+  // also the schema/LibreOffice default and therefore cannot mean zero.
+  let authored = value.as_drawingml_percent().max(0);
+  let remainder = authored % 100_000;
+  let office_value = if authored > 0 && remainder == 0 {
+    100_000
+  } else {
+    remainder
+  };
+  office_value as f32 / 100_000.0
+}
+
 fn image_luminance(r: u8, g: u8, b: u8) -> u8 {
   // DrawingML gray uses the relative intensities of the sRGB primaries.
   // Keep the IEC 61966-2-1 / Rec. 709 coefficients in integer form so image
   // effects are deterministic across platforms.
   ((u32::from(r) * 2_126 + u32::from(g) * 7_152 + u32::from(b) * 722 + 5_000) / 10_000).min(255)
     as u8
+}
+
+fn libreoffice_image_luminance(r: u8, g: u8, b: u8) -> u8 {
+  // `tools::Color::GetLuminance`, used by BitmapDuoToneFilter.
+  ((u32::from(b) * 29 + u32::from(g) * 151 + u32::from(r) * 76) >> 8) as u8
+}
+
+fn duotone_component(luminance: u8, first: u8, second: u8) -> u8 {
+  let luminance = u16::from(luminance);
+  ((u16::from(second) * luminance / u16::from(u8::MAX))
+    + (u16::from(first) * (u16::from(u8::MAX) - luminance) / u16::from(u8::MAX))) as u8
 }
 
 fn mso_brightness_contrast_component(value: u8, brightness: i32, contrast: i32) -> u8 {
@@ -9485,60 +10136,97 @@ struct DisplayPaint {
   opacity: f32,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct DisplayStroke {
   style: BorderStyle,
   opacity: f32,
+  common: common::Stroke<'static>,
 }
 
-fn fill_paint(import: &PowerPointImport, fill: &FillProperties) -> Option<DisplayPaint> {
-  match &fill.kind {
-    FillKind::Solid(color) => color
-      .as_ref()
-      .and_then(|color| display_paint(import, color, fill.placeholder_color.as_ref())),
-    FillKind::None
-    | FillKind::SlideBackground
-    | FillKind::Group
-    | FillKind::Gradient(_)
-    | FillKind::Blip(_)
-    | FillKind::Pattern(_) => None,
-  }
-}
-
-fn fill_paint_for_slide(
+fn shape_common_fill(
   import: &PowerPointImport,
   slide: &SlidePersist,
   fill: &FillProperties,
-) -> Option<DisplayPaint> {
-  match &fill.kind {
-    FillKind::Solid(color) => color.as_ref().and_then(|color| {
-      display_paint_for_slide(import, slide, color, fill.placeholder_color.as_ref())
-    }),
-    FillKind::None
-    | FillKind::SlideBackground
-    | FillKind::Group
-    | FillKind::Gradient(_)
-    | FillKind::Blip(_)
-    | FillKind::Pattern(_) => None,
-  }
-}
-
-fn shape_fill_paint(
-  import: &PowerPointImport,
-  slide: &SlidePersist,
-  fill: &FillProperties,
-) -> Option<DisplayPaint> {
+) -> Option<common::Fill<'static>> {
   if !matches!(fill.kind, FillKind::SlideBackground) {
-    return fill_paint_for_slide(import, slide, fill);
+    return common_fill_for_optional_slide(import, Some(slide), fill);
   }
 
   let Some(background) = resolved_slide_background_fill(import, slide) else {
-    return Some(default_page_background_paint());
+    let paint = default_page_background_paint();
+    return Some(common::Fill::Solid(common_rgb(paint.color, paint.opacity)));
   };
   match background.kind {
-    // A no-fill page still exposes the PDF page's default white surface.
-    FillKind::None => Some(default_page_background_paint()),
-    _ => background_fill_paint(import, slide, &background),
+    FillKind::None => {
+      let paint = default_page_background_paint();
+      Some(common::Fill::Solid(common_rgb(paint.color, paint.opacity)))
+    }
+    _ => common_fill_for_optional_slide(import, Some(slide), &background),
+  }
+}
+
+fn common_fill_for_optional_slide(
+  import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
+  fill: &FillProperties,
+) -> Option<common::Fill<'static>> {
+  match &fill.kind {
+    FillKind::Solid(color) => color
+      .as_ref()
+      .and_then(|color| {
+        display_paint_for_optional_slide(import, slide, color, fill.placeholder_color.as_ref())
+      })
+      .map(|paint| common::Fill::Solid(common_rgb(paint.color, paint.opacity))),
+    FillKind::Pattern(pattern) => Some(common::Fill::Pattern(pattern_fill_for_optional_slide(
+      import,
+      slide,
+      pattern,
+      fill.placeholder_color.as_ref(),
+    ))),
+    FillKind::None
+    | FillKind::SlideBackground
+    | FillKind::Group
+    | FillKind::Gradient(_)
+    | FillKind::Blip(_) => None,
+  }
+}
+
+fn pattern_fill_for_optional_slide(
+  import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
+  fill: &a::PatternFill,
+  placeholder_color: Option<&Color>,
+) -> common::PatternFill {
+  let foreground = fill
+    .foreground_color
+    .as_ref()
+    .and_then(|color| color.foreground_color_choice.as_ref())
+    .and_then(Color::from_foreground_color_choice)
+    .and_then(|color| display_paint_for_optional_slide(import, slide, &color, placeholder_color))
+    .map(|paint| common_rgb(paint.color, paint.opacity))
+    .unwrap_or(common::Color {
+      r: 0,
+      g: 0,
+      b: 0,
+      a: u8::MAX,
+    });
+  let background = fill
+    .background_color
+    .as_ref()
+    .and_then(|color| color.background_color_choice.as_ref())
+    .and_then(Color::from_background_color_choice)
+    .and_then(|color| display_paint_for_optional_slide(import, slide, &color, placeholder_color))
+    .map(|paint| common_rgb(paint.color, paint.opacity))
+    .unwrap_or(common::Color {
+      r: u8::MAX,
+      g: u8::MAX,
+      b: u8::MAX,
+      a: u8::MAX,
+    });
+  common::PatternFill {
+    hatch_style: common::drawingml_pattern::hatch_style(fill.preset),
+    foreground,
+    background,
   }
 }
 
@@ -9558,22 +10246,55 @@ fn line_stroke(
   slide: Option<&SlidePersist>,
   line: &LineProperties,
 ) -> Option<DisplayStroke> {
-  let LineFill::Solid(color) = &line.fill else {
-    return None;
+  let (paint, pattern) = match &line.fill {
+    LineFill::Solid(color) => (
+      color.as_ref().and_then(|color| {
+        display_paint_for_optional_slide(import, slide, color, line.placeholder_color.as_ref())
+      })?,
+      None,
+    ),
+    LineFill::Pattern(fill) => {
+      let pattern =
+        pattern_fill_for_optional_slide(import, slide, fill, line.placeholder_color.as_ref());
+      (
+        DisplayPaint {
+          color: RgbColor {
+            r: pattern.foreground.r,
+            g: pattern.foreground.g,
+            b: pattern.foreground.b,
+          },
+          opacity: opacity_from_common_color(pattern.foreground),
+        },
+        Some(pattern),
+      )
+    }
+    LineFill::Unspecified | LineFill::None | LineFill::Gradient(_) => return None,
   };
-  let paint = color.as_ref().and_then(|color| {
-    display_paint_for_optional_slide(import, slide, color, line.placeholder_color.as_ref())
-  })?;
+  let width_pt = line.width_emu.map(units::emu_to_points).unwrap_or(0.75);
+  let mut common = common::Stroke {
+    width: common::Pt(width_pt),
+    color: common_rgb(paint.color, paint.opacity),
+    pattern,
+    ..Default::default()
+  };
+  if let Some(outline) = line.source_outline.as_deref() {
+    common::drawingml_stroke::apply_outline_style(&mut common, outline);
+  }
   Some(DisplayStroke {
     style: BorderStyle {
-      width_pt: line.width_emu.map(units::emu_to_points).unwrap_or(0.75),
+      width_pt,
       spacing_pt: 0.0,
       color: paint.color,
       compound: false,
       shadow: false,
     },
     opacity: paint.opacity,
+    common,
   })
+}
+
+fn opacity_from_common_color(color: common::Color) -> f32 {
+  f32::from(color.a) / f32::from(u8::MAX)
 }
 
 fn display_paint(
@@ -9713,47 +10434,6 @@ mod tests {
 
     assert_eq!(automatic_soft_break_empty_line_height(&style, 1.0), 24.0);
     assert_eq!(automatic_soft_break_empty_line_height(&style, 0.8), 19.2);
-  }
-
-  #[test]
-  fn only_presets_with_exact_solid_paths_bypass_the_rect_fallback() {
-    for preset in [
-      a::ShapeTypeValues::RoundRectangle,
-      a::ShapeTypeValues::RightArrow,
-      a::ShapeTypeValues::DownArrow,
-      a::ShapeTypeValues::Ellipse,
-      a::ShapeTypeValues::Triangle,
-      a::ShapeTypeValues::RightTriangle,
-      a::ShapeTypeValues::Diamond,
-      a::ShapeTypeValues::FlowChartExtract,
-      a::ShapeTypeValues::Hexagon,
-      a::ShapeTypeValues::LeftArrow,
-      a::ShapeTypeValues::UpArrow,
-      a::ShapeTypeValues::Parallelogram,
-      a::ShapeTypeValues::Trapezoid,
-      a::ShapeTypeValues::Plus,
-      a::ShapeTypeValues::Star5,
-      a::ShapeTypeValues::Donut,
-      a::ShapeTypeValues::FlowChartDelay,
-      a::ShapeTypeValues::Frame,
-    ] {
-      assert_eq!(
-        supported_preset_vector_path_kind(preset),
-        Some(SupportedVectorPathKind::Closed)
-      );
-    }
-    assert_eq!(
-      supported_preset_vector_path_kind(a::ShapeTypeValues::Line),
-      Some(SupportedVectorPathKind::Open)
-    );
-    assert_eq!(
-      supported_preset_vector_path_kind(a::ShapeTypeValues::LineInverse),
-      Some(SupportedVectorPathKind::Open)
-    );
-    assert_eq!(
-      supported_preset_vector_path_kind(a::ShapeTypeValues::Heart),
-      None
-    );
   }
 
   #[test]
@@ -10017,5 +10697,28 @@ mod tests {
 
     assert!(bullet.label.is_none());
     assert!(bullet.picture_relationship_id.is_none());
+  }
+
+  #[test]
+  fn office_alpha_modulation_wraps_values_beyond_one_hundred_percent() {
+    assert_eq!(
+      office_alpha_modulate_amount(DrawingmlPercentageValue::Decimal(100_000)),
+      1.0
+    );
+    assert_eq!(
+      office_alpha_modulate_amount(DrawingmlPercentageValue::Decimal(150_000)),
+      0.5
+    );
+    assert_eq!(
+      office_alpha_modulate_amount(DrawingmlPercentageValue::Decimal(200_000)),
+      1.0
+    );
+  }
+
+  #[test]
+  fn libreoffice_duotone_interpolation_uses_pixel_luminance() {
+    assert_eq!(duotone_component(0, 20, 220), 20);
+    assert_eq!(duotone_component(255, 20, 220), 220);
+    assert_eq!(duotone_component(128, 0, 255), 128);
   }
 }

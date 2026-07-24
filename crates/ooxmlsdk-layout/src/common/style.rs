@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use emfsdk::emfplus::EmfPlusHatchStyle;
 use ooxmlsdk_fonts::{FontRequest, TextScript, ThemeFontKind};
 
 use crate::common::Pt;
@@ -12,12 +13,127 @@ pub struct Color {
   pub a: u8,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Stroke<'doc> {
   pub width: Pt,
   pub color: Color,
+  /// Explicit physical dash lengths. DrawingML preset dash names are retained
+  /// separately because their expansion depends on line width and cap style.
   pub dash: Option<Vec<Pt>>,
+  pub preset_dash: Option<StrokeDashPreset>,
+  pub dash_offset: Pt,
+  pub cap: Option<StrokeCap>,
+  pub join: Option<StrokeJoin>,
+  pub compound: Option<StrokeCompound>,
+  pub alignment: Option<StrokeAlignment>,
+  pub head_end: Option<StrokeEnd>,
+  pub tail_end: Option<StrokeEnd>,
+  /// Pattern paint for DrawingML outlines. The solid `color` remains the
+  /// fallback used by consumers that cannot paint a tiling pattern.
+  pub pattern: Option<PatternFill>,
   pub source_style_id: Option<Cow<'doc, str>>,
+}
+
+impl Stroke<'_> {
+  /// Returns the authored physical dash array, expanding a DrawingML preset
+  /// relative to the resolved line width when necessary.
+  ///
+  /// The preset multipliers follow LibreOffice
+  /// `oox/source/drawingml/lineproperties.cxx`; keeping the expansion here
+  /// gives vector paint and effect-mask geometry one source of truth.
+  pub fn resolved_dash(&self) -> Option<Vec<Pt>> {
+    if let Some(dash) = &self.dash {
+      return Some(dash.clone());
+    }
+    let preset = self.preset_dash?;
+    let multipliers: &[f32] = match preset {
+      StrokeDashPreset::Solid => return None,
+      StrokeDashPreset::Dot => &[1.0, 3.0],
+      StrokeDashPreset::Dash => &[4.0, 3.0],
+      StrokeDashPreset::LargeDash => &[8.0, 3.0],
+      StrokeDashPreset::DashDot => &[4.0, 3.0, 1.0, 3.0],
+      StrokeDashPreset::LargeDashDot => &[8.0, 3.0, 1.0, 3.0],
+      StrokeDashPreset::LargeDashDotDot => &[8.0, 3.0, 1.0, 3.0, 1.0, 3.0],
+      StrokeDashPreset::SystemDash => &[3.0, 1.0],
+      StrokeDashPreset::SystemDot => &[1.0, 1.0],
+      StrokeDashPreset::SystemDashDot => &[3.0, 1.0, 1.0, 1.0],
+      StrokeDashPreset::SystemDashDotDot => &[3.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    };
+    Some(
+      multipliers
+        .iter()
+        .map(|multiplier| Pt(multiplier * self.width.0))
+        .collect(),
+    )
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StrokeCap {
+  Round,
+  Square,
+  Flat,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StrokeJoin {
+  Round,
+  Bevel,
+  Miter { limit: Option<f32> },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StrokeCompound {
+  Single,
+  Double,
+  ThickThin,
+  ThinThick,
+  Triple,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StrokeAlignment {
+  Center,
+  Inside,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StrokeDashPreset {
+  Solid,
+  Dot,
+  Dash,
+  LargeDash,
+  DashDot,
+  LargeDashDot,
+  LargeDashDotDot,
+  SystemDash,
+  SystemDot,
+  SystemDashDot,
+  SystemDashDotDot,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StrokeEnd {
+  pub kind: StrokeEndKind,
+  pub width: StrokeEndSize,
+  pub length: StrokeEndSize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StrokeEndKind {
+  None,
+  Triangle,
+  Stealth,
+  Diamond,
+  Oval,
+  Arrow,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StrokeEndSize {
+  Small,
+  Medium,
+  Large,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -31,10 +147,14 @@ pub enum Fill<'doc> {
     relationship_id: Option<Cow<'doc, str>>,
     tile: bool,
   },
-  Pattern {
-    foreground: Color,
-    background: Color,
-  },
+  Pattern(PatternFill),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PatternFill {
+  pub hatch_style: EmfPlusHatchStyle,
+  pub foreground: Color,
+  pub background: Color,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -51,7 +171,40 @@ pub struct GradientFill<'doc> {
   pub line: Option<(super::Point, super::Point)>,
   pub interpolation: GradientInterpolation,
   pub scaled: bool,
-  pub path: Option<Cow<'doc, str>>,
+  /// Resolved path-gradient geometry. DrawingML defines this independently
+  /// from the painted shape path; the latter remains on [`super::PathItem`]
+  /// and acts as the final clip.
+  pub path: Option<GradientPath>,
+}
+
+/// Static DrawingML path-gradient geometry after host inheritance and defaults
+/// have been resolved.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GradientPath {
+  pub kind: GradientPathKind,
+  /// Insets from the corresponding sides of the shape bounds, expressed as
+  /// ratios. Positive values inset and negative values outset the focus path.
+  pub fill_to: RelativeRect,
+  /// Maps the unit shape bounds to page space. Keeping the full affine retains
+  /// `rotWithShape`, flips, and non-square circle gradients without asking the
+  /// PDF backend to reconstruct host shape transforms.
+  pub transform: super::Transform,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum GradientPathKind {
+  #[default]
+  Shape,
+  Circle,
+  Rectangle,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct RelativeRect {
+  pub left: f32,
+  pub top: f32,
+  pub right: f32,
+  pub bottom: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

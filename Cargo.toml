@@ -31,10 +31,11 @@ ooxmlsdk-fonts = { version = "0.12.0", path = "crates/ooxmlsdk-fonts" }
 ooxmlsdk-formula = { version = "0.12.0", path = "crates/ooxmlsdk-formula" }
 ooxmlsdk-layout = { version = "0.12.0", path = "crates/ooxmlsdk-layout" }
 ooxmlsdk-pdf = { version = "0.12.0", path = "crates/ooxmlsdk-pdf" }
-emfsdk = { version = "0.2.0", features = ["render"] }
+emfsdk = { path = "../emfsdk/crates/emfsdk", features = ["render"] }
 base64 = "0.22.1"
 bitflags = "2.13.1"
 bytes = "1.12.1"
+color = "0.3.3"
 itoa = "1.0.18"
 lexical-parse-float = "1.0.6"
 quick-xml = "0.41.0"

@@ -7,6 +7,7 @@ pub(crate) struct LineProperties {
   pub(crate) fill: LineFill,
   pub(crate) width_emu: Option<i64>,
   pub(crate) placeholder_color: Option<Color>,
+  pub(crate) source_outline: Option<Box<a::Outline>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -35,6 +36,7 @@ impl LineProperties {
         fill,
         width_emu: outline.width.map(i64::from),
         placeholder_color: None,
+        source_outline: Some(Box::new(outline.clone())),
       })
     }
   }

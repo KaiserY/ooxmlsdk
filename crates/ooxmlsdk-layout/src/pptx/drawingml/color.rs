@@ -2,6 +2,8 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
+use crate::common::color_math;
+
 const COLOR_PERCENT_MAX: i32 = 100_000;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -78,6 +80,50 @@ impl Color {
       a::GradientStopChoice::SchemeColor(color) => Some(scheme_color(color)),
       a::GradientStopChoice::PresetColor(color) => Some(preset_color(color)),
       a::GradientStopChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_preset_shadow_choice(choice: &a::PresetShadowChoice) -> Option<Self> {
+    match choice {
+      a::PresetShadowChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::PresetShadowChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::PresetShadowChoice::HslColor(color) => Some(hsl_color(color)),
+      a::PresetShadowChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::PresetShadowChoice::PresetColor(color) => Some(preset_color(color)),
+      a::PresetShadowChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_color_replacement_choice(choice: &a::ColorReplacementChoice) -> Option<Self> {
+    match choice {
+      a::ColorReplacementChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::ColorReplacementChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::ColorReplacementChoice::HslColor(color) => Some(hsl_color(color)),
+      a::ColorReplacementChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::ColorReplacementChoice::PresetColor(color) => Some(preset_color(color)),
+      a::ColorReplacementChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_duotone_choice(choice: &a::DuotoneChoice) -> Option<Self> {
+    match choice {
+      a::DuotoneChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::DuotoneChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::DuotoneChoice::HslColor(color) => Some(hsl_color(color)),
+      a::DuotoneChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::DuotoneChoice::PresetColor(color) => Some(preset_color(color)),
+      a::DuotoneChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_alpha_inverse_choice(choice: &a::AlphaInverseChoice) -> Option<Self> {
+    match choice {
+      a::AlphaInverseChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::AlphaInverseChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::AlphaInverseChoice::HslColor(color) => Some(hsl_color(color)),
+      a::AlphaInverseChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::AlphaInverseChoice::PresetColor(color) => Some(preset_color(color)),
+      a::AlphaInverseChoice::SystemColor(color) => Some(system_color(color)),
     }
   }
 
@@ -291,7 +337,7 @@ impl Color {
         color.transformations.as_slice(),
       ),
       Self::Hsl(color) => (
-        hsl_to_rgb(color.hue, color.saturation, color.luminance),
+        drawingml_hsl_to_rgb(color.hue, color.saturation, color.luminance),
         color.transformations.as_slice(),
       ),
       Self::System(color) => (
@@ -834,8 +880,8 @@ fn apply_transformations(color: &mut ResolvedColor, transformations: &[ColorTran
       ColorTransformationKind::Tint => apply_tint(color, value),
       ColorTransformationKind::Gray => apply_gray(color),
       ColorTransformationKind::Comp => {
-        let (h, s, l) = rgb_to_hsl(*color);
-        set_rgb_preserve_alpha(color, hsl_to_rgb(wrap_hue(h, 180 * 60_000), s, l));
+        let (h, s, l) = drawingml_rgb_to_hsl(*color);
+        set_rgb_preserve_alpha(color, drawingml_hsl_to_rgb(wrap_hue(h, 180 * 60_000), s, l));
       }
       ColorTransformationKind::Inv => {
         apply_inverse(color);
@@ -857,7 +903,7 @@ fn apply_transformations(color: &mut ResolvedColor, transformations: &[ColorTran
 }
 
 fn apply_hsl_transform(color: &mut ResolvedColor, kind: ColorTransformationKind, value: i32) {
-  let (mut h, mut s, mut l) = rgb_to_hsl(*color);
+  let (mut h, mut s, mut l) = drawingml_rgb_to_hsl(*color);
   match kind {
     ColorTransformationKind::Hue => h = value.rem_euclid(360 * 60_000),
     ColorTransformationKind::HueMod => h = mod_value(h, value, 360 * 60_000),
@@ -873,7 +919,7 @@ fn apply_hsl_transform(color: &mut ResolvedColor, kind: ColorTransformationKind,
   if l == 0 || l == COLOR_PERCENT_MAX {
     s = 0;
   }
-  set_rgb_preserve_alpha(color, hsl_to_rgb(h, s, l));
+  set_rgb_preserve_alpha(color, drawingml_hsl_to_rgb(h, s, l));
 }
 
 fn apply_shade(color: &mut ResolvedColor, value: i32) {
@@ -939,46 +985,21 @@ fn gamma_channel(value: u8, inverse: bool) -> u8 {
 
 fn crgb_percent_to_channel(value: i32) -> u8 {
   // ECMA-376 Part 1, 20.1.2.3.30 and 20.1.2.3.32 distinguish linear
-  // scRGB from sRGB. Use the sRGB transfer function cited by the standard;
-  // the older 2.2/2.3 power approximation does not preserve Office's 8-bit
-  // color results after DrawingML tint and shade transforms.
-  let linear = f64::from(clamp_percent(value)) / f64::from(COLOR_PERCENT_MAX);
-  let srgb = if linear <= 0.003_130_8 {
-    linear * 12.92
-  } else {
-    1.055 * linear.powf(1.0 / 2.4) - 0.055
-  };
-  (srgb * 255.0).round().clamp(0.0, 255.0) as u8
+  // scRGB from sRGB. `color` owns the IEC 61966-2-1 transfer function; this
+  // adapter retains DrawingML's integer fixed-point boundary and rounding.
+  color_math::drawingml_scrgb_to_srgb8(value)
 }
 
 fn channel_to_crgb_percent(value: u8) -> i32 {
-  let srgb = f64::from(value) / 255.0;
-  let linear = if srgb <= 0.040_45 {
-    srgb / 12.92
-  } else {
-    ((srgb + 0.055) / 1.055).powf(2.4)
-  };
-  (linear * f64::from(COLOR_PERCENT_MAX)).round() as i32
+  color_math::drawingml_srgb8_to_scrgb(value)
 }
 
 fn linear_to_srgb_percent(value: i32) -> i32 {
-  let linear = f64::from(clamp_percent(value)) / f64::from(COLOR_PERCENT_MAX);
-  let srgb = if linear <= 0.003_130_8 {
-    linear * 12.92
-  } else {
-    1.055 * linear.powf(1.0 / 2.4) - 0.055
-  };
-  (srgb * f64::from(COLOR_PERCENT_MAX)).round() as i32
+  color_math::drawingml_linear_to_srgb_percent(value)
 }
 
 fn srgb_to_linear_percent(value: i32) -> i32 {
-  let srgb = f64::from(clamp_percent(value)) / f64::from(COLOR_PERCENT_MAX);
-  let linear = if srgb <= 0.040_45 {
-    srgb / 12.92
-  } else {
-    ((srgb + 0.055) / 1.055).powf(2.4)
-  };
-  (linear * f64::from(COLOR_PERCENT_MAX)).round() as i32
+  color_math::drawingml_srgb_to_linear_percent(value)
 }
 
 fn mod_crgb_channel(channel: u8, value: i32) -> u8 {
@@ -1021,74 +1042,23 @@ fn clamp_percent(value: i32) -> i32 {
   value.clamp(0, COLOR_PERCENT_MAX)
 }
 
-fn rgb_to_hsl(color: ResolvedColor) -> (i32, i32, i32) {
-  let r = f64::from(color.r) / 255.0;
-  let g = f64::from(color.g) / 255.0;
-  let b = f64::from(color.b) / 255.0;
-  let max = r.max(g).max(b);
-  let min = r.min(g).min(b);
-  let l = (max + min) / 2.0;
-  if (max - min).abs() < f64::EPSILON {
-    return (0, 0, (l * COLOR_PERCENT_MAX as f64).round() as i32);
-  }
-  let d = max - min;
-  let s = if l > 0.5 {
-    d / (2.0 - max - min)
-  } else {
-    d / (max + min)
-  };
-  let h = if (max - r).abs() < f64::EPSILON {
-    ((g - b) / d + if g < b { 6.0 } else { 0.0 }) / 6.0
-  } else if (max - g).abs() < f64::EPSILON {
-    ((b - r) / d + 2.0) / 6.0
-  } else {
-    ((r - g) / d + 4.0) / 6.0
-  };
+fn drawingml_rgb_to_hsl(color: ResolvedColor) -> (i32, i32, i32) {
+  let hsl = color_math::HslColor::from_srgb8([color.r, color.g, color.b]);
   (
-    (h * (360 * 60_000) as f64).round() as i32,
-    (s * COLOR_PERCENT_MAX as f64).round() as i32,
-    (l * COLOR_PERCENT_MAX as f64).round() as i32,
+    (hsl.hue_degrees * 60_000.0).round() as i32,
+    (hsl.saturation * COLOR_PERCENT_MAX as f32).round() as i32,
+    (hsl.lightness * COLOR_PERCENT_MAX as f32).round() as i32,
   )
 }
 
-fn hsl_to_rgb(hue: i32, saturation: i32, luminance: i32) -> ResolvedColor {
-  let h = hue.rem_euclid(360 * 60_000) as f64 / (360 * 60_000) as f64;
-  let s = clamp_percent(saturation) as f64 / COLOR_PERCENT_MAX as f64;
-  let l = clamp_percent(luminance) as f64 / COLOR_PERCENT_MAX as f64;
-  if s == 0.0 {
-    let gray = (l * 255.0).round() as u8;
-    return ResolvedColor::new(gray, gray, gray);
+fn drawingml_hsl_to_rgb(hue: i32, saturation: i32, luminance: i32) -> ResolvedColor {
+  let [r, g, b] = color_math::HslColor {
+    hue_degrees: hue.rem_euclid(360 * 60_000) as f32 / 60_000.0,
+    saturation: clamp_percent(saturation) as f32 / COLOR_PERCENT_MAX as f32,
+    lightness: clamp_percent(luminance) as f32 / COLOR_PERCENT_MAX as f32,
   }
-  let q = if l < 0.5 {
-    l * (1.0 + s)
-  } else {
-    l + s - l * s
-  };
-  let p = 2.0 * l - q;
-  ResolvedColor::new(
-    hue_to_channel(p, q, h + 1.0 / 3.0),
-    hue_to_channel(p, q, h),
-    hue_to_channel(p, q, h - 1.0 / 3.0),
-  )
-}
-
-fn hue_to_channel(p: f64, q: f64, mut t: f64) -> u8 {
-  if t < 0.0 {
-    t += 1.0;
-  }
-  if t > 1.0 {
-    t -= 1.0;
-  }
-  let value = if t < 1.0 / 6.0 {
-    p + (q - p) * 6.0 * t
-  } else if t < 1.0 / 2.0 {
-    q
-  } else if t < 2.0 / 3.0 {
-    p + (q - p) * (2.0 / 3.0 - t) * 6.0
-  } else {
-    p
-  };
-  (value * 255.0).round().clamp(0.0, 255.0) as u8
+  .to_srgb8();
+  ResolvedColor::new(r, g, b)
 }
 
 #[cfg(test)]

@@ -9,7 +9,7 @@ use ooxmlsdk::schemas::{
 use ooxmlsdk::simple_type::Coordinate32Value;
 
 use crate::common::{
-  PathCommand, drawingml_custom_geometry, drawingml_geometry, drawingml_preset_geometry,
+  DrawingPath, drawingml_custom_geometry, drawingml_geometry, drawingml_preset_geometry,
 };
 use crate::model::RgbColor;
 use crate::render::math::text_math_text;
@@ -50,65 +50,55 @@ pub struct DiagramShape {
 }
 
 impl DiagramShape {
-  pub(crate) fn path_commands(&self) -> Option<Vec<PathCommand>> {
-    let commands = match self
+  pub(crate) fn drawing_paths(&self) -> Option<Vec<DrawingPath>> {
+    let mut paths = match self
       .shape_properties
       .as_deref()
       .and_then(|properties| properties.shape_properties_choice1.as_ref())
     {
       Some(dgm::ShapePropertiesChoice::PresetGeometry(preset)) => {
-        drawingml_preset_geometry::path_commands(
-          Some(preset),
-          self.x,
-          self.y,
-          self.width,
-          self.height,
-        )
+        drawingml_preset_geometry::paths(Some(preset), self.x, self.y, self.width, self.height)?
       }
       Some(dgm::ShapePropertiesChoice::CustomGeometry(geometry)) => {
-        drawingml_custom_geometry::path_commands(geometry, self.x, self.y, self.width, self.height)?
+        drawingml_custom_geometry::paths(geometry, self.x, self.y, self.width, self.height)?
       }
-      None => drawingml_preset_geometry::path_commands(
+      None => drawingml_preset_geometry::paths(
         Some(self.preset_geometry.as_deref()?),
         self.x,
         self.y,
         self.width,
         self.height,
-      ),
+      )?,
     };
-    Some(drawingml_geometry::transform_commands(
-      commands,
-      Affine::rotate_about(
-        f64::from(self.shape_rotation_deg.to_radians()),
-        (
-          f64::from(self.x + self.width / 2.0),
-          f64::from(self.y + self.height / 2.0),
-        ),
+    let transform = Affine::rotate_about(
+      f64::from(self.shape_rotation_deg.to_radians()),
+      (
+        f64::from(self.x + self.width / 2.0),
+        f64::from(self.y + self.height / 2.0),
       ),
-    ))
+    );
+    for path in &mut paths {
+      path.commands =
+        drawingml_geometry::transform_commands(std::mem::take(&mut path.commands), transform);
+    }
+    Some(paths)
   }
 }
 
-pub(crate) fn drawing_shape_path_commands(
+pub(crate) fn drawing_shape_paths(
   properties: &dsp::ShapeProperties,
   bounds: DiagramBounds,
-) -> Option<Vec<PathCommand>> {
-  let commands = match properties.shape_properties_choice1.as_ref()? {
-    dsp::ShapePropertiesChoice::PresetGeometry(preset) => drawingml_preset_geometry::path_commands(
+) -> Option<Vec<DrawingPath>> {
+  let mut paths = match properties.shape_properties_choice1.as_ref()? {
+    dsp::ShapePropertiesChoice::PresetGeometry(preset) => drawingml_preset_geometry::paths(
       Some(preset),
       bounds.x,
       bounds.y,
       bounds.width,
       bounds.height,
-    ),
+    )?,
     dsp::ShapePropertiesChoice::CustomGeometry(geometry) => {
-      drawingml_custom_geometry::path_commands(
-        geometry,
-        bounds.x,
-        bounds.y,
-        bounds.width,
-        bounds.height,
-      )?
+      drawingml_custom_geometry::paths(geometry, bounds.x, bounds.y, bounds.width, bounds.height)?
     }
   };
   let rotation = properties
@@ -117,16 +107,18 @@ pub(crate) fn drawing_shape_path_commands(
     .and_then(|transform| transform.rotation)
     .unwrap_or_default() as f64
     / 60_000.0;
-  Some(drawingml_geometry::transform_commands(
-    commands,
-    Affine::rotate_about(
-      rotation.to_radians(),
-      (
-        f64::from(bounds.x + bounds.width / 2.0),
-        f64::from(bounds.y + bounds.height / 2.0),
-      ),
+  let transform = Affine::rotate_about(
+    rotation.to_radians(),
+    (
+      f64::from(bounds.x + bounds.width / 2.0),
+      f64::from(bounds.y + bounds.height / 2.0),
     ),
-  ))
+  );
+  for path in &mut paths {
+    path.commands =
+      drawingml_geometry::transform_commands(std::mem::take(&mut path.commands), transform);
+  }
+  Some(paths)
 }
 
 #[derive(Clone, Debug, Default)]
@@ -845,6 +837,49 @@ fn collect_for_each_refs_from_choose<'a>(
   }
 }
 
+/// Selects zero-based entries using DrawingML's one-based iterator syntax.
+///
+/// ECMA-376 Part 1 §21.4.2.14 and `AG_IteratorAttributes` define `st=1`,
+/// `cnt=0`, and `step=1` as the defaults. A zero count means that the
+/// iterator is not count-limited. Negative starts and steps are used by
+/// Office SmartArt layouts to walk a set from its last entry.
+fn iterator_indices(available: usize, start: i32, count: usize, step: i32) -> Vec<usize> {
+  if available == 0 || step == 0 {
+    return Vec::new();
+  }
+  let available = available.min(i32::MAX as usize) as i32;
+  let mut index = match start.cmp(&0) {
+    std::cmp::Ordering::Greater => start - 1,
+    std::cmp::Ordering::Equal => 0,
+    std::cmp::Ordering::Less => available.saturating_add(start),
+  };
+  let limit = if count == 0 { usize::MAX } else { count };
+  let mut indices = Vec::new();
+  while index >= 0 && index < available && indices.len() < limit {
+    indices.push(index as usize);
+    let Some(next) = index.checked_add(step) else {
+      break;
+    };
+    index = next;
+  }
+  indices
+}
+
+fn point_matches_element_type(point: &dgm::Point, point_type: dgm::ElementValues) -> bool {
+  let kind = point.r#type.unwrap_or(dgm::PointValues::Node);
+  match point_type {
+    dgm::ElementValues::All => true,
+    dgm::ElementValues::Document => kind == dgm::PointValues::Document,
+    dgm::ElementValues::Node | dgm::ElementValues::Normal => kind == dgm::PointValues::Node,
+    dgm::ElementValues::NonNormal => kind == dgm::PointValues::Assistant,
+    dgm::ElementValues::Assistant => kind == dgm::PointValues::Assistant,
+    dgm::ElementValues::NonAssistant => kind != dgm::PointValues::Assistant,
+    dgm::ElementValues::ParentTransition => kind == dgm::PointValues::ParentTransition,
+    dgm::ElementValues::Presentation => kind == dgm::PointValues::Presentation,
+    dgm::ElementValues::SiblingTransition => kind == dgm::PointValues::SiblingTransition,
+  }
+}
+
 struct DiagramShapeCreationVisitor<'a> {
   point_by_id: &'a HashMap<&'a str, &'a dgm::Point>,
   point_orders: &'a HashMap<&'a str, usize>,
@@ -923,7 +958,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
           .first()
           .is_some_and(|axis| *axis == dgm::AxisValues::FollowSibling)
       })
-      && self.current_index + self.current_step >= self.current_count
+      && self.current_index.saturating_add(self.current_step) >= self.current_count
     {
       return;
     }
@@ -945,27 +980,30 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       .as_ref()
       .and_then(|counts| counts.first())
       .map(|count| *count as usize)
-      .unwrap_or(children);
-    let count = children.min(requested_count);
+      .unwrap_or_default();
+    let start = for_each
+      .start
+      .as_ref()
+      .and_then(|starts| starts.first())
+      .copied()
+      .unwrap_or(1);
     let step = for_each
       .step
       .as_ref()
       .and_then(|steps| steps.first())
       .copied()
-      .unwrap_or(1)
-      .max(1) as usize;
+      .unwrap_or(1);
+    let indices = iterator_indices(children, start, requested_count, step);
     let old_index = self.current_index;
     let old_step = self.current_step;
     let old_count = self.current_count;
-    self.current_step = step;
-    self.current_count = count;
-    let mut index = 0usize;
-    while index < count {
+    self.current_step = step.unsigned_abs() as usize;
+    self.current_count = children;
+    for index in indices {
       self.current_index = index;
       for choice in &for_each.for_each_choice {
         self.visit_for_each_choice(choice);
       }
-      index += step;
     }
     self.current_index = old_index;
     self.current_step = old_step;
@@ -1027,15 +1065,43 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       ),
       dgm::FunctionValues::MaxDepth => self.compare_condition(
         branch.operator,
-        self.max_depth_for_condition(self.current_point),
+        self.max_depth_for_condition(branch),
         branch.val.parse::<i32>().unwrap_or_default(),
       ),
-      dgm::FunctionValues::Depth
-      | dgm::FunctionValues::Position
-      | dgm::FunctionValues::ReversePosition
-      | dgm::FunctionValues::PositionEven
-      | dgm::FunctionValues::PositionOdd => true,
+      dgm::FunctionValues::Depth => self.compare_condition(
+        branch.operator,
+        self.depth_for_condition(self.current_point),
+        branch.val.parse::<i32>().unwrap_or_default(),
+      ),
+      dgm::FunctionValues::Position => self.compare_condition(
+        branch.operator,
+        self.iteration_position(),
+        branch.val.parse::<i32>().unwrap_or_default(),
+      ),
+      dgm::FunctionValues::ReversePosition => self.compare_condition(
+        branch.operator,
+        self.iteration_reverse_position(),
+        branch.val.parse::<i32>().unwrap_or_default(),
+      ),
+      dgm::FunctionValues::PositionEven => self.compare_condition(
+        branch.operator,
+        i32::from(self.iteration_position() % 2 == 0),
+        branch.val.parse::<i32>().unwrap_or_default(),
+      ),
+      dgm::FunctionValues::PositionOdd => self.compare_condition(
+        branch.operator,
+        i32::from(self.iteration_position() % 2 != 0),
+        branch.val.parse::<i32>().unwrap_or_default(),
+      ),
     }
+  }
+
+  fn iteration_position(&self) -> i32 {
+    self.current_index.saturating_add(1) as i32
+  }
+
+  fn iteration_reverse_position(&self) -> i32 {
+    self.current_count.saturating_sub(self.current_index) as i32
   }
 
   fn compare_condition(
@@ -1055,17 +1121,120 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
   }
 
   fn node_count_for_condition(&self, branch: &dgm::DiagramChooseIf) -> i32 {
-    let Some(mut node_id) = presentation_association_id(self.current_point) else {
-      return 0;
+    self.condition_axis_points(branch).len() as i32
+  }
+
+  fn condition_axis_points(&self, branch: &dgm::DiagramChooseIf) -> Vec<&'a dgm::Point> {
+    let Some(start_point) = self.condition_data_point(self.current_point) else {
+      return Vec::new();
     };
-    if branch.axis.as_ref().is_some_and(|axes| {
-      axes.len() == 2 && axes[0] == dgm::AxisValues::Child && axes[1] == dgm::AxisValues::Child
-    }) && let Some(child_id) =
-      self.navigate_connection(dgm::ConnectionValues::ParentOf, node_id, true)
-    {
-      node_id = child_id;
+    let Some(axes) = branch.axis.as_deref() else {
+      return Vec::new();
+    };
+    let mut points = vec![start_point];
+    for (level, axis) in axes.iter().copied().enumerate() {
+      let point_type = branch
+        .point_type
+        .as_deref()
+        .and_then(|types| types.get(level))
+        .copied()
+        .unwrap_or_default();
+      points = self.points_on_axis(&points, axis, point_type);
+      let start = branch
+        .start
+        .as_deref()
+        .and_then(|starts| starts.get(level))
+        .copied()
+        .unwrap_or(1);
+      let count = branch
+        .count
+        .as_deref()
+        .and_then(|counts| counts.get(level))
+        .copied()
+        .unwrap_or_default() as usize;
+      let step = branch
+        .step
+        .as_deref()
+        .and_then(|steps| steps.get(level))
+        .copied()
+        .unwrap_or(1);
+      points = iterator_indices(points.len(), start, count, step)
+        .into_iter()
+        .filter_map(|index| points.get(index).copied())
+        .collect();
     }
-    self
+    points
+  }
+
+  fn points_on_axis(
+    &self,
+    points: &[&'a dgm::Point],
+    axis: dgm::AxisValues,
+    point_type: dgm::ElementValues,
+  ) -> Vec<&'a dgm::Point> {
+    let mut selected = Vec::new();
+    for point in points {
+      match axis {
+        dgm::AxisValues::_Self => self.push_matching_point(&mut selected, point, point_type),
+        dgm::AxisValues::Child => {
+          self.push_children_on_axis(&mut selected, point, point_type, false);
+        }
+        dgm::AxisValues::Descendant => {
+          self.push_descendants_on_axis(&mut selected, point, point_type, &mut HashSet::new());
+        }
+        dgm::AxisValues::DescendantOrSelf => {
+          self.push_matching_point(&mut selected, point, point_type);
+          self.push_descendants_on_axis(&mut selected, point, point_type, &mut HashSet::new());
+        }
+        dgm::AxisValues::Parent => {
+          if let Some(parent) = self.parent_data_point(point) {
+            self.push_matching_point(&mut selected, parent, point_type);
+          }
+        }
+        dgm::AxisValues::Ancestor => {
+          self.push_ancestors_on_axis(&mut selected, point, point_type, false);
+        }
+        dgm::AxisValues::AncestorOrSelf => {
+          self.push_matching_point(&mut selected, point, point_type);
+          self.push_ancestors_on_axis(&mut selected, point, point_type, false);
+        }
+        dgm::AxisValues::FollowSibling => {
+          self.push_siblings_on_axis(&mut selected, point, point_type, true, false);
+        }
+        dgm::AxisValues::PrecedingSibling => {
+          self.push_siblings_on_axis(&mut selected, point, point_type, false, false);
+        }
+        dgm::AxisValues::Follow => {
+          self.push_siblings_on_axis(&mut selected, point, point_type, true, true);
+        }
+        dgm::AxisValues::Preceding => {
+          self.push_siblings_on_axis(&mut selected, point, point_type, false, true);
+        }
+        dgm::AxisValues::Root => {
+          let mut root = *point;
+          let mut visited = HashSet::new();
+          while visited.insert(root.model_id.to_string()) {
+            let Some(parent) = self.parent_data_point(root) else {
+              break;
+            };
+            root = parent;
+          }
+          self.push_matching_point(&mut selected, root, point_type);
+        }
+        dgm::AxisValues::None => {}
+      }
+    }
+    selected
+  }
+
+  fn push_children_on_axis(
+    &self,
+    selected: &mut Vec<&'a dgm::Point>,
+    point: &dgm::Point,
+    point_type: dgm::ElementValues,
+    include_descendants: bool,
+  ) {
+    let mut child_connections: Vec<&dgm::Connection> = self
       .connections
       .connection
       .iter()
@@ -1073,16 +1242,320 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         connection
           .r#type
           .is_none_or(|kind| kind == dgm::ConnectionValues::ParentOf)
-          && connection.source_id == node_id
+          && connection.source_id == point.model_id
       })
-      .count() as i32
+      .collect();
+    child_connections.sort_by_key(|connection| connection.source_position);
+    for connection in child_connections {
+      if matches!(
+        point_type,
+        dgm::ElementValues::All | dgm::ElementValues::ParentTransition
+      ) && let Some(transition) = connection
+        .parent_transition_id
+        .as_deref()
+        .and_then(|id| self.point_by_id.get(id))
+        .copied()
+      {
+        self.push_unique_point(selected, transition);
+      }
+      if let Some(child) = self
+        .point_by_id
+        .get(connection.destination_id.as_str())
+        .copied()
+      {
+        self.push_matching_point(selected, child, point_type);
+        if include_descendants {
+          self.push_descendants_on_axis(selected, child, point_type, &mut HashSet::new());
+        }
+      }
+      if matches!(
+        point_type,
+        dgm::ElementValues::All | dgm::ElementValues::SiblingTransition
+      ) && let Some(transition) = connection
+        .sibling_transition_id
+        .as_deref()
+        .and_then(|id| self.point_by_id.get(id))
+        .copied()
+      {
+        self.push_unique_point(selected, transition);
+      }
+    }
   }
 
-  fn max_depth_for_condition(&self, point: &dgm::Point) -> i32 {
-    let Some(node_id) = presentation_association_id(point) else {
+  fn push_descendants_on_axis(
+    &self,
+    selected: &mut Vec<&'a dgm::Point>,
+    point: &dgm::Point,
+    point_type: dgm::ElementValues,
+    visited: &mut HashSet<String>,
+  ) {
+    if !visited.insert(point.model_id.to_string()) {
+      return;
+    }
+    let mut child_connections: Vec<&dgm::Connection> = self
+      .connections
+      .connection
+      .iter()
+      .filter(|connection| {
+        connection
+          .r#type
+          .is_none_or(|kind| kind == dgm::ConnectionValues::ParentOf)
+          && connection.source_id == point.model_id
+      })
+      .collect();
+    child_connections.sort_by_key(|connection| connection.source_position);
+    for connection in child_connections {
+      if matches!(
+        point_type,
+        dgm::ElementValues::All | dgm::ElementValues::ParentTransition
+      ) && let Some(transition) = connection
+        .parent_transition_id
+        .as_deref()
+        .and_then(|id| self.point_by_id.get(id))
+        .copied()
+      {
+        self.push_unique_point(selected, transition);
+      }
+      if let Some(child) = self
+        .point_by_id
+        .get(connection.destination_id.as_str())
+        .copied()
+      {
+        self.push_matching_point(selected, child, point_type);
+        self.push_descendants_on_axis(selected, child, point_type, visited);
+      }
+      if matches!(
+        point_type,
+        dgm::ElementValues::All | dgm::ElementValues::SiblingTransition
+      ) && let Some(transition) = connection
+        .sibling_transition_id
+        .as_deref()
+        .and_then(|id| self.point_by_id.get(id))
+        .copied()
+      {
+        self.push_unique_point(selected, transition);
+      }
+    }
+    visited.remove(point.model_id.as_str());
+  }
+
+  fn push_ancestors_on_axis(
+    &self,
+    selected: &mut Vec<&'a dgm::Point>,
+    point: &dgm::Point,
+    point_type: dgm::ElementValues,
+    include_self: bool,
+  ) {
+    let mut current = point;
+    let mut visited = HashSet::new();
+    if include_self {
+      self.push_matching_point(selected, current, point_type);
+    }
+    while visited.insert(current.model_id.to_string()) {
+      let Some(parent) = self.parent_data_point(current) else {
+        break;
+      };
+      self.push_matching_point(selected, parent, point_type);
+      current = parent;
+    }
+  }
+
+  fn push_siblings_on_axis(
+    &self,
+    selected: &mut Vec<&'a dgm::Point>,
+    point: &dgm::Point,
+    point_type: dgm::ElementValues,
+    following: bool,
+    include_descendants: bool,
+  ) {
+    let Some(current_connection) = self.parent_connection_for_point(point) else {
+      return;
+    };
+    if following
+      && matches!(
+        point_type,
+        dgm::ElementValues::All | dgm::ElementValues::SiblingTransition
+      )
+      && let Some(transition) = current_connection
+        .sibling_transition_id
+        .as_deref()
+        .and_then(|id| self.point_by_id.get(id))
+        .copied()
+    {
+      self.push_unique_point(selected, transition);
+      if point_type == dgm::ElementValues::SiblingTransition {
+        return;
+      }
+    }
+    if !following
+      && matches!(
+        point_type,
+        dgm::ElementValues::All | dgm::ElementValues::ParentTransition
+      )
+      && let Some(transition) = current_connection
+        .parent_transition_id
+        .as_deref()
+        .and_then(|id| self.point_by_id.get(id))
+        .copied()
+    {
+      self.push_unique_point(selected, transition);
+      if point_type == dgm::ElementValues::ParentTransition {
+        return;
+      }
+    }
+    let mut sibling_connections: Vec<&dgm::Connection> = self
+      .connections
+      .connection
+      .iter()
+      .filter(|connection| {
+        connection
+          .r#type
+          .is_none_or(|kind| kind == dgm::ConnectionValues::ParentOf)
+          && connection.source_id == current_connection.source_id
+          && if following {
+            connection.source_position > current_connection.source_position
+          } else {
+            connection.source_position < current_connection.source_position
+          }
+      })
+      .collect();
+    sibling_connections.sort_by_key(|connection| connection.source_position);
+    if !following {
+      sibling_connections.reverse();
+    }
+    for connection in sibling_connections {
+      let Some(sibling) = self
+        .point_by_id
+        .get(connection.destination_id.as_str())
+        .copied()
+      else {
+        continue;
+      };
+      self.push_matching_point(selected, sibling, point_type);
+      if include_descendants {
+        self.push_descendants_on_axis(selected, sibling, point_type, &mut HashSet::new());
+      }
+    }
+  }
+
+  fn parent_connection_for_point(&self, point: &dgm::Point) -> Option<&'a dgm::Connection> {
+    if matches!(
+      point.r#type,
+      Some(dgm::PointValues::ParentTransition | dgm::PointValues::SiblingTransition)
+    ) {
+      let connection_id = point.connection_id.as_deref()?;
+      return self
+        .connections
+        .connection
+        .iter()
+        .find(|connection| connection.model_id == connection_id);
+    }
+    self.connections.connection.iter().find(|connection| {
+      connection
+        .r#type
+        .is_none_or(|kind| kind == dgm::ConnectionValues::ParentOf)
+        && connection.destination_id == point.model_id
+    })
+  }
+
+  fn parent_data_point(&self, point: &dgm::Point) -> Option<&'a dgm::Point> {
+    let connection = self.parent_connection_for_point(point)?;
+    self.point_by_id.get(connection.source_id.as_str()).copied()
+  }
+
+  fn push_matching_point(
+    &self,
+    selected: &mut Vec<&'a dgm::Point>,
+    point: &'a dgm::Point,
+    point_type: dgm::ElementValues,
+  ) {
+    if point_matches_element_type(point, point_type) {
+      self.push_unique_point(selected, point);
+    }
+  }
+
+  fn push_unique_point(&self, selected: &mut Vec<&'a dgm::Point>, point: &'a dgm::Point) {
+    if !selected
+      .iter()
+      .any(|existing| existing.model_id == point.model_id)
+    {
+      selected.push(point);
+    }
+  }
+
+  fn depth_for_condition(&self, point: &dgm::Point) -> i32 {
+    let Some(node_id) = self.condition_data_node_id(point) else {
       return 0;
     };
+    self.depth_from_node(node_id, &mut HashSet::new())
+  }
+
+  fn depth_from_node(&self, node_id: &str, visited: &mut HashSet<String>) -> i32 {
+    if !visited.insert(node_id.to_string()) {
+      return 0;
+    }
+    let depth = self
+      .connections
+      .connection
+      .iter()
+      .find(|connection| {
+        connection
+          .r#type
+          .is_none_or(|kind| kind == dgm::ConnectionValues::ParentOf)
+          && connection.destination_id == node_id
+      })
+      .map(|connection| self.depth_from_node(connection.source_id.as_str(), visited) + 1)
+      .unwrap_or_default();
+    visited.remove(node_id);
+    depth
+  }
+
+  fn max_depth_for_condition(&self, branch: &dgm::DiagramChooseIf) -> i32 {
+    let Some(mut node_id) = self.condition_data_node_id(self.current_point) else {
+      return 0;
+    };
+    if let Some(first_axis) = branch.axis.as_ref().and_then(|axes| axes.first()) {
+      match first_axis {
+        dgm::AxisValues::Parent => {
+          if let Some(parent_id) =
+            self.navigate_connection(dgm::ConnectionValues::ParentOf, node_id, false)
+          {
+            node_id = parent_id;
+          }
+        }
+        dgm::AxisValues::Root => {
+          while let Some(parent_id) =
+            self.navigate_connection(dgm::ConnectionValues::ParentOf, node_id, false)
+          {
+            node_id = parent_id;
+          }
+        }
+        _ => {}
+      }
+    }
     self.max_depth_from_node(node_id, &mut HashSet::new())
+  }
+
+  fn condition_data_node_id(&self, point: &dgm::Point) -> Option<&'a str> {
+    let data_point = self.condition_data_point(point)?;
+    if matches!(
+      data_point.r#type,
+      Some(dgm::PointValues::ParentTransition | dgm::PointValues::SiblingTransition)
+    ) && let Some(connection_id) = data_point.connection_id.as_deref()
+      && let Some(connection) = self
+        .connections
+        .connection
+        .iter()
+        .find(|connection| connection.model_id == connection_id)
+    {
+      return Some(connection.destination_id.as_str());
+    }
+    Some(data_point.model_id.as_str())
+  }
+
+  fn condition_data_point(&self, point: &dgm::Point) -> Option<&'a dgm::Point> {
+    let point_id = presentation_association_id(point).unwrap_or(point.model_id.as_str());
+    self.point_by_id.get(point_id).copied()
   }
 
   fn max_depth_from_node(&self, node_id: &str, visited: &mut HashSet<String>) -> i32 {

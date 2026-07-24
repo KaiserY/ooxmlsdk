@@ -24,6 +24,35 @@ pub(crate) enum FillKind {
 }
 
 impl FillProperties {
+  pub(crate) fn from_fill_overlay_choice(choice: &a::FillOverlayChoice) -> Self {
+    match choice {
+      a::FillOverlayChoice::NoFill(_) => Self {
+        kind: FillKind::None,
+        placeholder_color: None,
+      },
+      a::FillOverlayChoice::SolidFill(fill) => Self {
+        kind: FillKind::Solid(color_from_solid_fill(fill)),
+        placeholder_color: None,
+      },
+      a::FillOverlayChoice::GradientFill(fill) => Self {
+        kind: FillKind::Gradient(fill.clone()),
+        placeholder_color: None,
+      },
+      a::FillOverlayChoice::BlipFill(fill) => Self {
+        kind: FillKind::Blip(fill.clone()),
+        placeholder_color: None,
+      },
+      a::FillOverlayChoice::PatternFill(fill) => Self {
+        kind: FillKind::Pattern(fill.clone()),
+        placeholder_color: None,
+      },
+      a::FillOverlayChoice::GroupFill => Self {
+        kind: FillKind::Group,
+        placeholder_color: None,
+      },
+    }
+  }
+
   pub(crate) fn from_dml_fill_properties(properties: &a::FillProperties) -> Option<Self> {
     Some(match properties.fill_properties_choice.as_ref()? {
       a::FillPropertiesChoice::NoFill(_) => Self {

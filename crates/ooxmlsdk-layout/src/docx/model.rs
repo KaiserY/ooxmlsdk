@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
 pub(crate) use crate::model::{
@@ -567,9 +568,11 @@ pub(crate) struct InlineShape {
   pub offset_x_pt: f32,
   pub offset_y_pt: f32,
   pub fill_color: Option<RgbColor>,
+  pub fill_pattern: Option<common::PatternFill>,
   pub additional_fill_colors: Vec<RgbColor>,
   pub fill_image: Option<InlineShapeImageFill>,
   pub stroke: Option<BorderStyle>,
+  pub stroke_pattern: Option<common::PatternFill>,
   pub suppress_zero_relative_background: bool,
   pub allow_outside_page: bool,
   pub inline_anchor_after_line: bool,
@@ -620,7 +623,8 @@ pub(crate) enum InlineShapeGeometry {
   Rectangle,
   Line,
   Path {
-    commands: Vec<common::PathCommand>,
+    paths: Vec<common::DrawingPath>,
+    outline: Option<Box<a::Outline>>,
   },
   Polyline {
     points: Vec<(f32, f32)>,

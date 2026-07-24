@@ -2009,6 +2009,7 @@ fn radial_segment_path(
       ),
       dash: None,
       source_style_id: None,
+      ..Default::default()
     }),
   })
 }
@@ -2932,6 +2933,7 @@ fn lower_natural_cubic_chart_line(
       color: common_rgb(color, 1.0),
       dash: None,
       source_style_id: None,
+      ..Default::default()
     }),
   }));
 }

@@ -1,22 +1,30 @@
 use std::borrow::Cow;
+use std::io::Cursor;
 use std::num::NonZeroU16;
 use std::num::NonZeroU32;
 use std::ops::Range;
 use std::sync::Arc;
 
+use image::codecs::png::PngEncoder;
+use image::{ColorType, ImageEncoder};
 use krilla::Document;
 use krilla::action::{Action, LinkAction};
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
+use krilla::blend::BlendMode;
 use krilla::color::rgb;
 use krilla::destination::{Destination, NamedDestination, XyzDestination};
 use krilla::embed::{AssociationKind, EmbeddedFile, MimeType};
 use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::Image;
+use krilla::mask::{Mask, MaskType};
 use krilla::metadata::{DateTime, Metadata};
 use krilla::num::NormalizedF32;
 use krilla::outline::{Outline, OutlineNode};
 use krilla::page::{NumberingStyle, PageLabel, PageSettings};
-use krilla::paint::{Fill, FillRule, LineJoin, LinearGradient, SpreadMethod, Stop, Stroke};
+use krilla::paint::{
+  Fill, FillRule, LineCap, LineJoin, LinearGradient, Pattern, RadialGradient, SpreadMethod, Stop,
+  Stroke, StrokeDash,
+};
 use krilla::surface::Surface;
 use krilla::tagging::{
   Artifact, ArtifactType, BBox, ContentTag, Identifier, Node, SpanTag, TableHeaderScope, Tag,
@@ -24,6 +32,7 @@ use krilla::tagging::{
 };
 use krilla::text::{Glyph, GlyphId};
 use krilla_svg::{SurfaceExt, SvgSettings};
+use kurbo::{PathEl, flatten};
 use rustc_hash::FxHashMap as HashMap;
 use smallvec::SmallVec;
 
@@ -51,6 +60,19 @@ const INTERNAL_LINK_DESTINATION_SHIFT_PT: f32 = 10.0;
 const LEGACY_ARIAL_BOLD_FONT_SIZE_PT: f32 = 11.0;
 const LEGACY_ARIAL_BOLD_FONT_SIZE_TOLERANCE_PT: f32 = 0.01;
 const LEGACY_ARIAL_BOLD_VERTICAL_SCALE: f32 = 1.07;
+// Path gradients that cannot be represented by one PDF radial shading are
+// rasterized within a bounded shape-sized surface. Match the established
+// Drawing effect budget so authored shapes cannot allocate page-sized masks
+// at device resolution.
+const MAX_PATH_GRADIENT_RASTER_PIXELS: f32 = 250_000.0;
+const MAX_PATH_GRADIENT_PIXELS_PER_POINT: f32 = 2.0;
+const PATH_GRADIENT_BINARY_STEPS: usize = 10;
+// Office emits DrawingML preset hatches as 16×16 image cells under a 0.375
+// pattern matrix, i.e. a 6pt tile. The canonical GDI+ mask is 8×8, so each
+// logical mask cell occupies 0.75pt.
+const DRAWINGML_PATTERN_TILE_PT: f32 = 6.0;
+const DRAWINGML_PATTERN_CELL_PT: f32 =
+  DRAWINGML_PATTERN_TILE_PT / emfsdk::emfplus::EmfPlusHatchStyle::TILE_SIZE as f32;
 
 type PaintTextPortionRanges = SmallVec<[(PaintTextPortionKind, Range<usize>); 2]>;
 type PaintGlyphFontRuns = SmallVec<[PaintGlyphFontRun; 2]>;
@@ -319,6 +341,7 @@ fn render_inner(
             })
         }
         PaintItem::Image(_)
+        | PaintItem::Group { .. }
         | PaintItem::LinkArea(_)
         | PaintItem::Rect(_)
         | PaintItem::Line(_)
@@ -429,6 +452,13 @@ struct PaintPage<'doc> {
 enum PageItem<'doc> {
   Text(Box<TextItem<'doc>>),
   Image(ImageItem<'doc>),
+  Group {
+    mask: Option<ImageItem<'doc>>,
+    transform: Option<common::Transform>,
+    blend_mode: common::BlendMode,
+    opacity: f32,
+    items: Vec<PageItem<'doc>>,
+  },
   LinkArea(LinkAreaItem<'doc>),
   Rect(RectItem),
   Line(LineItem),
@@ -533,7 +563,7 @@ struct PolylineItem<'doc> {
   commands: &'doc [common::PathCommand],
   closed: bool,
   fill: &'doc common::Fill<'static>,
-  stroke: Option<BorderStyle>,
+  stroke: Option<&'doc common::Stroke<'static>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -707,6 +737,13 @@ struct DecorationRenderMetadata {
 enum PaintItem<'doc> {
   Text(Box<PaintText<'doc>>),
   Image(ImageItem<'doc>),
+  Group {
+    mask: Option<ImageItem<'doc>>,
+    transform: Option<common::Transform>,
+    blend_mode: common::BlendMode,
+    opacity: f32,
+    items: Vec<PaintItem<'doc>>,
+  },
   LinkArea(LinkAreaItem<'doc>),
   Rect(RectItem),
   Line(LineItem),
@@ -1331,6 +1368,9 @@ impl InternalLinkTargets {
               });
             }
           }
+          PaintItem::Group { items, .. } => {
+            collect_internal_link_targets(items, page_index, &mut positions);
+          }
           PaintItem::Image(_)
           | PaintItem::LinkArea(_)
           | PaintItem::Rect(_)
@@ -1348,6 +1388,36 @@ impl InternalLinkTargets {
       position.page_index,
       Point::from_xy(position.x_pt, position.y_pt),
     ))))
+  }
+}
+
+fn collect_internal_link_targets(
+  items: &[PaintItem<'_>],
+  page_index: usize,
+  positions: &mut HashMap<String, InternalLinkPosition>,
+) {
+  for item in items {
+    match item {
+      PaintItem::Text(text) => {
+        if let Some(url) = &text.item.hyperlink_url
+          && let Some(source_url) = reciprocal_internal_link_url(url)
+        {
+          positions.entry(source_url).or_insert(InternalLinkPosition {
+            page_index,
+            x_pt: text.item.x_pt,
+            y_pt: (text.baseline_y - INTERNAL_LINK_DESTINATION_SHIFT_PT).max(0.0),
+          });
+        }
+      }
+      PaintItem::Group { items, .. } => {
+        collect_internal_link_targets(items, page_index, positions);
+      }
+      PaintItem::Image(_)
+      | PaintItem::LinkArea(_)
+      | PaintItem::Rect(_)
+      | PaintItem::Line(_)
+      | PaintItem::Polyline(_) => {}
+    }
   }
 }
 
@@ -1476,6 +1546,22 @@ impl<'doc> PaintDocument<'doc> {
               )))
             }
             PageItem::Image(image) => PaintItem::Image(image),
+            PageItem::Group {
+              mask,
+              transform,
+              blend_mode,
+              opacity,
+              items,
+            } => PaintItem::Group {
+              mask,
+              transform,
+              blend_mode,
+              opacity,
+              items: items
+                .into_iter()
+                .map(|item| paint_group_item(item, page.setup.size.width.0, text_metrics))
+                .collect(),
+            },
             PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area),
             PageItem::Rect(rect) => PaintItem::Rect(rect),
             PageItem::Line(line) => PaintItem::Line(line),
@@ -1558,6 +1644,7 @@ fn expand_metafile_semantic_text_items<'doc>(
         .collect::<Vec<_>>()
       }
       PageItem::Image(_)
+      | PageItem::Group { .. }
       | PageItem::Text(_)
       | PageItem::LinkArea(_)
       | PageItem::Rect(_)
@@ -1578,6 +1665,17 @@ fn page_item_from_common<'doc>(item: &'doc common::DisplayItem<'static>) -> Opti
   match item {
     common::DisplayItem::Text(text) => Some(PageItem::Text(Box::new(text_item_from_common(text)))),
     common::DisplayItem::Image(image) => Some(PageItem::Image(image_item_from_common(image))),
+    common::DisplayItem::Group(group) => Some(PageItem::Group {
+      mask: group.mask.as_ref().map(image_item_from_common),
+      transform: group.transform,
+      blend_mode: group.blend_mode,
+      opacity: group.opacity,
+      items: group
+        .items
+        .iter()
+        .filter_map(page_item_from_common)
+        .collect(),
+    }),
     common::DisplayItem::Path(path) => Some(PageItem::Polyline(polyline_from_common(path))),
     common::DisplayItem::Rect(rect) => Some(PageItem::Rect(rect_item_from_common(rect))),
     common::DisplayItem::Line(line) => Some(PageItem::Line(line_item_from_common(line))),
@@ -1586,6 +1684,43 @@ fn page_item_from_common<'doc>(item: &'doc common::DisplayItem<'static>) -> Opti
     | common::DisplayItem::AnnotationHint(_)
     | common::DisplayItem::Clip(_)
     | common::DisplayItem::Transform(_) => None,
+  }
+}
+
+fn paint_group_item<'doc>(
+  item: PageItem<'doc>,
+  page_width_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> PaintItem<'doc> {
+  match item {
+    PageItem::Text(text) => PaintItem::Text(Box::new(PaintText::from_layout_text(
+      *text,
+      None,
+      None,
+      page_width_pt,
+      text_metrics,
+    ))),
+    PageItem::Image(image) => PaintItem::Image(image),
+    PageItem::Group {
+      mask,
+      transform,
+      blend_mode,
+      opacity,
+      items,
+    } => PaintItem::Group {
+      mask,
+      transform,
+      blend_mode,
+      opacity,
+      items: items
+        .into_iter()
+        .map(|item| paint_group_item(item, page_width_pt, text_metrics))
+        .collect(),
+    },
+    PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area),
+    PageItem::Rect(rect) => PaintItem::Rect(rect),
+    PageItem::Line(line) => PaintItem::Line(line),
+    PageItem::Polyline(polyline) => PaintItem::Polyline(polyline),
   }
 }
 
@@ -1654,7 +1789,7 @@ fn polyline_from_common<'doc>(path: &'doc common::PathItem<'static>) -> Polyline
     commands: &path.commands,
     closed: path.closed,
     fill: &path.fill,
-    stroke: path.stroke.as_ref().map(stroke_from_common),
+    stroke: path.stroke.as_ref(),
   }
 }
 
@@ -1824,7 +1959,7 @@ fn solid_color(fill: &common::Fill<'static>) -> Option<common::Color> {
     | common::Fill::Theme(_)
     | common::Fill::Gradient(_)
     | common::Fill::Image { .. }
-    | common::Fill::Pattern { .. } => None,
+    | common::Fill::Pattern(_) => None,
   }
 }
 
@@ -1861,6 +1996,21 @@ fn coalesced_writer_text_items<'doc>(
         output.push(PageItem::Text(text));
       }
       PageItem::Image(image) => output.push(PageItem::Image(image)),
+      PageItem::Group {
+        mask,
+        transform,
+        blend_mode,
+        opacity,
+        items,
+      } => {
+        output.push(PageItem::Group {
+          mask,
+          transform,
+          blend_mode,
+          opacity,
+          items,
+        });
+      }
       PageItem::LinkArea(link_area) => output.push(PageItem::LinkArea(link_area)),
       PageItem::Rect(rect) => output.push(PageItem::Rect(rect)),
       PageItem::Line(line) => output.push(PageItem::Line(line)),
@@ -2478,10 +2628,29 @@ fn tagged_content_tag(item: &PaintItem<'_>) -> Option<ContentTag<'static>> {
     {
       Some(ContentTag::Other)
     }
+    PaintItem::Group { .. } if paint_item_alt_text(item).is_some() => Some(ContentTag::Other),
     PaintItem::Image(_) | PaintItem::Rect(_) | PaintItem::Line(_) | PaintItem::Polyline(_) => Some(
       ContentTag::Artifact(Artifact::with_kind(ArtifactType::Layout)),
     ),
+    PaintItem::Group { .. } => Some(ContentTag::Artifact(Artifact::with_kind(
+      ArtifactType::Layout,
+    ))),
     PaintItem::Text(_) | PaintItem::LinkArea(_) => None,
+  }
+}
+
+fn paint_item_alt_text<'a>(item: &'a PaintItem<'_>) -> Option<&'a str> {
+  match item {
+    PaintItem::Image(image) => image
+      .alt_text
+      .as_deref()
+      .filter(|alt| !alt.trim().is_empty()),
+    PaintItem::Group { items, .. } => items.iter().find_map(paint_item_alt_text),
+    PaintItem::Text(_)
+    | PaintItem::LinkArea(_)
+    | PaintItem::Rect(_)
+    | PaintItem::Line(_)
+    | PaintItem::Polyline(_) => None,
   }
 }
 
@@ -2612,6 +2781,26 @@ fn build_page_tag_group(
         };
         blocks.push(PageTagBlock::Node(node));
       }
+      PaintItem::Group { .. }
+        if let Some(alt_text) = paint_item_alt_text(item)
+          && let Some(content) = tagged_leaf_node(record.identifier, Vec::new()) =>
+      {
+        let bbox = paint_item_bounds(item)
+          .and_then(|(left, top, right, bottom)| {
+            Rect::from_xywh(left, top, right - left, bottom - top)
+          })
+          .map(|rect| BBox::new(page_index, rect));
+        let figure = Tag::Figure(Some(alt_text.to_string())).with_bbox(bbox);
+        let figure: Node = TagGroup::with_children(figure, vec![content]).into();
+        let node = if annotations.is_empty() {
+          figure
+        } else {
+          let mut link_children = annotations.into_iter().map(Node::Leaf).collect::<Vec<_>>();
+          link_children.push(figure);
+          TagGroup::with_children(Tag::Link, link_children).into()
+        };
+        blocks.push(PageTagBlock::Node(node));
+      }
       PaintItem::LinkArea(_) if !annotations.is_empty() => {
         blocks.push(PageTagBlock::Node(
           TagGroup::with_children(Tag::Link, annotations.into_iter().map(Node::Leaf).collect())
@@ -2620,6 +2809,7 @@ fn build_page_tag_group(
       }
       PaintItem::Text(_)
       | PaintItem::Image(_)
+      | PaintItem::Group { .. }
       | PaintItem::Rect(_)
       | PaintItem::Line(_)
       | PaintItem::Polyline(_)
@@ -2871,10 +3061,121 @@ fn draw_paint_item(
         link_annotations.push(annotation);
       }
     }
+    PaintItem::Group {
+      mask,
+      transform,
+      blend_mode,
+      opacity,
+      items,
+    } => {
+      draw_compositing_group(
+        surface,
+        mask.as_ref(),
+        transform.as_ref(),
+        *blend_mode,
+        *opacity,
+        items,
+        fonts,
+        images,
+        internal_links,
+        link_annotations,
+        options,
+      )?;
+    }
     PaintItem::Line(line) => draw_line_item(surface, line),
     PaintItem::Polyline(polyline) => draw_polyline_item(surface, polyline),
   }
   Ok(())
+}
+
+fn draw_compositing_group(
+  surface: &mut Surface<'_>,
+  mask: Option<&ImageItem<'_>>,
+  transform: Option<&common::Transform>,
+  blend_mode: common::BlendMode,
+  opacity: f32,
+  items: &[PaintItem<'_>],
+  fonts: &mut FontSet,
+  images: &mut ImageSet,
+  internal_links: &InternalLinkTargets,
+  link_annotations: &mut Vec<Annotation>,
+  options: &PdfOptions,
+) -> Result<()> {
+  let decoded_mask = mask.and_then(|mask| {
+    let pdf_mask_image = images
+      .raster(
+        &mask.data,
+        mask.content_type.as_deref(),
+        options,
+        None,
+        mask.width_pt,
+        mask.height_pt,
+      )
+      .ok()?;
+    let mut builder = surface.stream_builder();
+    let mut mask_surface = builder.surface();
+    draw_image_item(&mut mask_surface, mask, pdf_mask_image);
+    mask_surface.finish();
+    Some(Mask::new(builder.finish(), MaskType::Alpha))
+  });
+
+  let mut pushed_states = 0;
+  if let Some(transform) = transform {
+    surface.push_transform(&Transform::from_row(
+      transform.m11,
+      transform.m12,
+      transform.m21,
+      transform.m22,
+      transform.dx.0,
+      transform.dy.0,
+    ));
+    pushed_states += 1;
+  }
+  if blend_mode != common::BlendMode::Normal {
+    surface.push_blend_mode(krilla_blend_mode(blend_mode));
+    pushed_states += 1;
+  }
+  if opacity < 1.0 {
+    let opacity = NormalizedF32::new(opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ONE);
+    surface.push_opacity(opacity);
+    pushed_states += 1;
+  }
+  if let Some(mask) = decoded_mask {
+    surface.push_mask(mask);
+    pushed_states += 1;
+  }
+  // Keep the authored content as one transparency group. Blend mode and
+  // opacity are pushed on the parent first so they apply when this group
+  // XObject is composited against its backdrop, not independently to each
+  // child inside the group.
+  surface.push_isolated();
+  pushed_states += 1;
+  for item in items {
+    draw_paint_item(
+      surface,
+      item,
+      fonts,
+      images,
+      internal_links,
+      link_annotations,
+      options,
+    )?;
+  }
+  for _ in 0..pushed_states {
+    surface.pop();
+  }
+  Ok(())
+}
+
+fn krilla_blend_mode(mode: common::BlendMode) -> BlendMode {
+  match mode {
+    common::BlendMode::Normal => BlendMode::Normal,
+    common::BlendMode::Multiply => BlendMode::Multiply,
+    common::BlendMode::Screen => BlendMode::Screen,
+    common::BlendMode::Darken => BlendMode::Darken,
+    common::BlendMode::Lighten => BlendMode::Lighten,
+    common::BlendMode::Overlay => BlendMode::Overlay,
+  }
 }
 
 fn metafile_render_options_for_image(
@@ -2933,6 +3234,17 @@ fn paint_item_bounds(item: &PaintItem<'_>) -> Option<(f32, f32, f32, f32)> {
       image.x_pt + image.width_pt,
       image.y_pt + image.height_pt,
     )),
+    PaintItem::Group {
+      transform, items, ..
+    } => {
+      let bounds = items
+        .iter()
+        .filter_map(paint_item_bounds)
+        .reduce(union_paint_bounds)?;
+      transform.as_ref().map_or(Some(bounds), |transform| {
+        Some(transform_paint_bounds(bounds, transform))
+      })
+    }
     PaintItem::LinkArea(link_area) => Some((
       link_area.x_pt,
       link_area.y_pt,
@@ -2961,6 +3273,52 @@ fn paint_item_bounds(item: &PaintItem<'_>) -> Option<(f32, f32, f32, f32)> {
       polyline.y_pt + polyline.height_pt,
     )),
   }
+}
+
+fn union_paint_bounds(
+  left: (f32, f32, f32, f32),
+  right: (f32, f32, f32, f32),
+) -> (f32, f32, f32, f32) {
+  (
+    left.0.min(right.0),
+    left.1.min(right.1),
+    left.2.max(right.2),
+    left.3.max(right.3),
+  )
+}
+
+fn transform_paint_bounds(
+  (left, top, right, bottom): (f32, f32, f32, f32),
+  transform: &common::Transform,
+) -> (f32, f32, f32, f32) {
+  let transform_point = |x: f32, y: f32| {
+    (
+      transform.m11 * x + transform.m21 * y + transform.dx.0,
+      transform.m12 * x + transform.m22 * y + transform.dy.0,
+    )
+  };
+  let corners = [
+    transform_point(left, top),
+    transform_point(right, top),
+    transform_point(right, bottom),
+    transform_point(left, bottom),
+  ];
+  corners.into_iter().fold(
+    (
+      f32::INFINITY,
+      f32::INFINITY,
+      f32::NEG_INFINITY,
+      f32::NEG_INFINITY,
+    ),
+    |bounds, (x, y)| {
+      (
+        bounds.0.min(x),
+        bounds.1.min(y),
+        bounds.2.max(x),
+        bounds.3.max(y),
+      )
+    },
+  )
 }
 
 fn rotated_rect_bounds(
@@ -3421,18 +3779,6 @@ fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
     return;
   }
 
-  surface.set_fill(path_fill_from_common(polyline.fill, polyline));
-  if let Some(stroke) = polyline.stroke {
-    surface.set_stroke(Some(Stroke {
-      width: stroke.width_pt,
-      paint: rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into(),
-      line_join: LineJoin::Bevel,
-      ..Default::default()
-    }));
-  } else {
-    surface.set_stroke(None);
-  }
-
   let mut path = PathBuilder::new();
   if polyline.commands.is_empty() {
     let first = polyline.points[0];
@@ -3465,7 +3811,254 @@ fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
     }
   }
   if let Some(path) = path.finish() {
-    surface.draw_path(&path);
+    let mut fill = path_fill_from_common(surface, polyline.fill, polyline);
+    if fill.is_none() && draw_path_gradient_raster(surface, &path, polyline) {
+      // The bounded raster already painted the fill under the same path clip;
+      // retain only the independently resolved stroke below.
+      fill = None;
+    }
+    if let Some(stroke) = polyline.stroke
+      && stroke.alignment == Some(common::StrokeAlignment::Inside)
+      && polyline.closed
+    {
+      surface.set_fill(fill);
+      surface.set_stroke(None);
+      surface.draw_path(&path);
+      surface.push_clip_path(&path, &FillRule::NonZero);
+      let mut inside_stroke =
+        path_stroke_from_common(surface, stroke, polyline.x_pt, polyline.y_pt);
+      inside_stroke.width *= 2.0;
+      surface.set_fill(None);
+      surface.set_stroke(Some(inside_stroke));
+      surface.draw_path(&path);
+      surface.pop();
+    } else {
+      let stroke = polyline
+        .stroke
+        .map(|stroke| path_stroke_from_common(surface, stroke, polyline.x_pt, polyline.y_pt));
+      surface.set_fill(fill);
+      surface.set_stroke(stroke);
+      surface.draw_path(&path);
+    }
+  }
+  if let Some(stroke) = polyline.stroke {
+    draw_stroke_end_markers(surface, polyline, stroke);
+  }
+}
+
+fn draw_stroke_end_markers(
+  surface: &mut Surface<'_>,
+  polyline: &PolylineItem<'_>,
+  stroke: &common::Stroke<'static>,
+) {
+  let Some((start, start_outward, end, end_outward)) = path_endpoints(polyline) else {
+    return;
+  };
+  let markers = [
+    stroke.head_end.map(|marker| (marker, start, start_outward)),
+    stroke.tail_end.map(|marker| (marker, end, end_outward)),
+  ];
+  surface.set_stroke(None);
+  surface.set_fill(Some(Fill {
+    paint: rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into(),
+    opacity: NormalizedF32::new(opacity(stroke.color)).unwrap_or(NormalizedF32::ZERO),
+    rule: FillRule::NonZero,
+  }));
+  for marker in markers.into_iter().flatten() {
+    if let Some(path) = stroke_end_path(marker.0, marker.1, marker.2, stroke.width.0) {
+      surface.draw_path(&path);
+    }
+  }
+}
+
+fn path_endpoints(
+  polyline: &PolylineItem<'_>,
+) -> Option<((f32, f32), (f32, f32), (f32, f32), (f32, f32))> {
+  if polyline.commands.is_empty() {
+    let [first, second, ..] = polyline.points else {
+      return None;
+    };
+    let penultimate = polyline.points[polyline.points.len() - 2];
+    let last = polyline.points[polyline.points.len() - 1];
+    return Some((
+      (first.x.0, first.y.0),
+      normalized_direction(second.x.0, second.y.0, first.x.0, first.y.0)?,
+      (last.x.0, last.y.0),
+      normalized_direction(penultimate.x.0, penultimate.y.0, last.x.0, last.y.0)?,
+    ));
+  }
+  let mut first = None;
+  let mut first_tangent = None;
+  let mut current = None;
+  let mut last_tangent = None;
+  let mut closed = false;
+  for command in polyline.commands {
+    match *command {
+      common::PathCommand::MoveTo(point) => {
+        current = Some((point.x.0, point.y.0));
+        first.get_or_insert((point.x.0, point.y.0));
+      }
+      common::PathCommand::LineTo(point) => {
+        let start = current?;
+        let end = (point.x.0, point.y.0);
+        first_tangent.get_or_insert((start, end));
+        last_tangent = Some((start, end));
+        current = Some(end);
+      }
+      common::PathCommand::CubicTo {
+        control1,
+        control2,
+        end,
+      } => {
+        let start = current?;
+        let control1 = (control1.x.0, control1.y.0);
+        let control2 = (control2.x.0, control2.y.0);
+        let end = (end.x.0, end.y.0);
+        first_tangent.get_or_insert((start, if control1 != start { control1 } else { end }));
+        last_tangent = Some((if control2 != end { control2 } else { start }, end));
+        current = Some(end);
+      }
+      common::PathCommand::Close => closed = true,
+    }
+  }
+  if closed {
+    return None;
+  }
+  let first = first?;
+  let (first_from, first_to) = first_tangent?;
+  let (last_from, last) = last_tangent?;
+  Some((
+    first,
+    normalized_direction(first_to.0, first_to.1, first_from.0, first_from.1)?,
+    last,
+    normalized_direction(last_from.0, last_from.1, last.0, last.1)?,
+  ))
+}
+
+fn normalized_direction(from_x: f32, from_y: f32, to_x: f32, to_y: f32) -> Option<(f32, f32)> {
+  let dx = to_x - from_x;
+  let dy = to_y - from_y;
+  let length = dx.hypot(dy);
+  (length > f32::EPSILON).then_some((dx / length, dy / length))
+}
+
+fn stroke_end_path(
+  marker: common::StrokeEnd,
+  endpoint: (f32, f32),
+  outward: (f32, f32),
+  line_width: f32,
+) -> Option<krilla::geom::Path> {
+  use common::{StrokeEndKind as Kind, StrokeEndSize as Size};
+  if marker.kind == Kind::None {
+    return None;
+  }
+  // `lineproperties.cxx::lclPushMarkerProperties` uses 70 EMU as the minimum
+  // marker baseline and these length/width multipliers.
+  const MIN_MARKER_BASE_PT: f32 = 70.0 / 12_700.0;
+  let is_open_arrow = marker.kind == Kind::Arrow;
+  let factor = |size| match (size, is_open_arrow) {
+    (Size::Small, false) => 2.0,
+    (Size::Medium, false) => 3.0,
+    (Size::Large, false) => 5.0,
+    (Size::Small, true) => 2.5,
+    (Size::Medium, true) => 3.5,
+    (Size::Large, true) => 5.5,
+  };
+  let baseline = line_width.max(MIN_MARKER_BASE_PT);
+  let width = factor(marker.width) * baseline;
+  let length = factor(marker.length) * baseline;
+  let centered = matches!(marker.kind, Kind::Diamond | Kind::Oval);
+  let line_half_width = (50.0 * line_width / width).max(1.0);
+  let points: &[(f32, f32)] = match marker.kind {
+    Kind::Triangle => &[(50.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
+    Kind::Stealth => &[(50.0, 0.0), (100.0, 100.0), (50.0, 60.0), (0.0, 100.0)],
+    Kind::Diamond => &[(50.0, 0.0), (100.0, 50.0), (50.0, 100.0), (0.0, 50.0)],
+    Kind::Oval => &[
+      (50.0, 0.0),
+      (75.0, 7.0),
+      (93.0, 25.0),
+      (100.0, 50.0),
+      (93.0, 75.0),
+      (75.0, 93.0),
+      (50.0, 100.0),
+      (25.0, 93.0),
+      (7.0, 75.0),
+      (0.0, 50.0),
+      (7.0, 25.0),
+      (25.0, 7.0),
+    ],
+    Kind::Arrow => &[
+      (50.0, 0.0),
+      (100.0, 100.0 - line_half_width * 1.5),
+      (100.0 - line_half_width * 1.5, 100.0),
+      (50.0 + line_half_width, 5.5 * line_half_width),
+      (50.0 + line_half_width, 100.0),
+      (50.0 - line_half_width, 100.0),
+      (50.0 - line_half_width, 5.5 * line_half_width),
+      (line_half_width * 1.5, 100.0),
+      (0.0, 100.0 - line_half_width * 1.5),
+    ],
+    Kind::None => return None,
+  };
+  let perpendicular = (-outward.1, outward.0);
+  let point = |x: f32, y: f32| {
+    let across = (x / 100.0 - 0.5) * width;
+    let back = (y / 100.0 - if centered { 0.5 } else { 0.0 }) * length;
+    (
+      endpoint.0 - outward.0 * back + perpendicular.0 * across,
+      endpoint.1 - outward.1 * back + perpendicular.1 * across,
+    )
+  };
+  let mut path = PathBuilder::new();
+  let first = point(points[0].0, points[0].1);
+  path.move_to(first.0, first.1);
+  for &(x, y) in &points[1..] {
+    let point = point(x, y);
+    path.line_to(point.0, point.1);
+  }
+  path.close();
+  path.finish()
+}
+
+fn path_stroke_from_common(
+  surface: &mut Surface<'_>,
+  stroke: &common::Stroke<'static>,
+  pattern_origin_x: f32,
+  pattern_origin_y: f32,
+) -> Stroke {
+  let line_join = match stroke.join {
+    Some(common::StrokeJoin::Round) => LineJoin::Round,
+    Some(common::StrokeJoin::Bevel) => LineJoin::Bevel,
+    Some(common::StrokeJoin::Miter { .. }) | None => LineJoin::Miter,
+  };
+  let miter_limit = match stroke.join {
+    Some(common::StrokeJoin::Miter { limit: Some(limit) }) => limit,
+    _ => Stroke::default().miter_limit,
+  };
+  let line_cap = match stroke.cap {
+    Some(common::StrokeCap::Round) => LineCap::Round,
+    Some(common::StrokeCap::Square) => LineCap::Square,
+    Some(common::StrokeCap::Flat) | None => LineCap::Butt,
+  };
+  let dash = stroke.resolved_dash().as_ref().map(|values| StrokeDash {
+    array: values.iter().map(|value| value.0).collect(),
+    offset: stroke.dash_offset.0,
+  });
+  Stroke {
+    width: stroke.width.0,
+    paint: stroke.pattern.map_or_else(
+      || rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into(),
+      |pattern| drawingml_pattern_paint(surface, pattern, pattern_origin_x, pattern_origin_y),
+    ),
+    opacity: if stroke.pattern.is_some() {
+      NormalizedF32::ONE
+    } else {
+      NormalizedF32::new(opacity(stroke.color)).unwrap_or(NormalizedF32::ZERO)
+    },
+    line_cap,
+    line_join,
+    miter_limit,
+    dash,
   }
 }
 
@@ -3496,55 +4089,457 @@ fn path_from_commands(commands: &[common::PathCommand]) -> Option<krilla::geom::
   path.finish()
 }
 
-fn path_fill_from_common(fill: &common::Fill<'static>, path: &PolylineItem<'_>) -> Option<Fill> {
+fn path_fill_from_common(
+  surface: &mut Surface<'_>,
+  fill: &common::Fill<'static>,
+  path: &PolylineItem<'_>,
+) -> Option<Fill> {
   let paint = match fill {
     common::Fill::Solid(color) => rgb::Color::new(color.r, color.g, color.b).into(),
     common::Fill::Gradient(gradient) => {
-      let (start, end) = gradient.line.unwrap_or_else(|| {
-        let bounds = gradient.definition_bounds.unwrap_or(common::Rect {
-          origin: common::Point {
-            x: common::Pt(path.x_pt),
-            y: common::Pt(path.y_pt),
-          },
-          size: common::Size {
-            width: common::Pt(path.width_pt),
-            height: common::Pt(path.height_pt),
-          },
+      if let Some(path) = gradient.path {
+        path_gradient_paint(gradient, path)?
+      } else {
+        let (start, end) = gradient.line.unwrap_or_else(|| {
+          let bounds = gradient.definition_bounds.unwrap_or(common::Rect {
+            origin: common::Point {
+              x: common::Pt(path.x_pt),
+              y: common::Pt(path.y_pt),
+            },
+            size: common::Size {
+              width: common::Pt(path.width_pt),
+              height: common::Pt(path.height_pt),
+            },
+          });
+          linear_gradient_line(bounds, gradient.angle_degrees, gradient.scaled)
         });
-        linear_gradient_line(bounds, gradient.angle_degrees, gradient.scaled)
-      });
-      let stops = gradient_stops_for_pdf(gradient);
-      LinearGradient {
-        x1: start.x.0,
-        y1: start.y.0,
-        x2: end.x.0,
-        y2: end.y.0,
-        transform: Transform::default(),
-        spread_method: SpreadMethod::Pad,
-        stops: stops
-          .iter()
-          .filter_map(|stop| {
-            Some(Stop {
-              offset: NormalizedF32::new(stop.position.clamp(0.0, 1.0))?,
-              color: rgb::Color::new(stop.color.r, stop.color.g, stop.color.b).into(),
-              opacity: NormalizedF32::new(f32::from(stop.color.a) / 255.0)?,
-            })
-          })
-          .collect(),
-        anti_alias: true,
+        let stops = gradient_stops_for_pdf(gradient);
+        LinearGradient {
+          x1: start.x.0,
+          y1: start.y.0,
+          x2: end.x.0,
+          y2: end.y.0,
+          transform: Transform::default(),
+          spread_method: SpreadMethod::Pad,
+          stops: pdf_gradient_stops(&stops, false),
+          anti_alias: true,
+        }
+        .into()
       }
-      .into()
     }
-    common::Fill::None
-    | common::Fill::Theme(_)
-    | common::Fill::Image { .. }
-    | common::Fill::Pattern { .. } => return None,
+    common::Fill::Pattern(pattern) => {
+      drawingml_pattern_paint(surface, *pattern, path.x_pt, path.y_pt)
+    }
+    common::Fill::None | common::Fill::Theme(_) | common::Fill::Image { .. } => return None,
   };
   Some(Fill {
     paint,
     opacity: NormalizedF32::ONE,
     rule: FillRule::EvenOdd,
   })
+}
+
+fn drawingml_pattern_paint(
+  surface: &mut Surface<'_>,
+  pattern: common::PatternFill,
+  origin_x: f32,
+  origin_y: f32,
+) -> krilla::paint::Paint {
+  let mut stream_builder = surface.stream_builder();
+  let mut pattern_surface = stream_builder.surface();
+  pattern_surface.set_stroke(None);
+  pattern_surface.set_fill(Some(pattern_color_fill(pattern.background)));
+  if let Some(background) = rect_path(
+    0.0,
+    0.0,
+    DRAWINGML_PATTERN_TILE_PT,
+    DRAWINGML_PATTERN_TILE_PT,
+  ) {
+    pattern_surface.draw_path(&background);
+  }
+
+  let mut foreground = PathBuilder::new();
+  for (row, mask) in pattern
+    .hatch_style
+    .pattern_rows()
+    .iter()
+    .copied()
+    .enumerate()
+  {
+    for column in 0..emfsdk::emfplus::EmfPlusHatchStyle::TILE_SIZE as usize {
+      if mask & (0x80_u8 >> column) == 0 {
+        continue;
+      }
+      let x = column as f32 * DRAWINGML_PATTERN_CELL_PT;
+      let y = row as f32 * DRAWINGML_PATTERN_CELL_PT;
+      foreground.move_to(x, y);
+      foreground.line_to(x + DRAWINGML_PATTERN_CELL_PT, y);
+      foreground.line_to(x + DRAWINGML_PATTERN_CELL_PT, y + DRAWINGML_PATTERN_CELL_PT);
+      foreground.line_to(x, y + DRAWINGML_PATTERN_CELL_PT);
+      foreground.close();
+    }
+  }
+  pattern_surface.set_fill(Some(pattern_color_fill(pattern.foreground)));
+  if let Some(foreground) = foreground.finish() {
+    pattern_surface.draw_path(&foreground);
+  }
+  pattern_surface.finish();
+
+  Pattern {
+    stream: stream_builder.finish(),
+    transform: Transform::from_translate(origin_x, origin_y),
+    width: DRAWINGML_PATTERN_TILE_PT,
+    height: DRAWINGML_PATTERN_TILE_PT,
+  }
+  .into()
+}
+
+fn pattern_color_fill(color: common::Color) -> Fill {
+  Fill {
+    paint: rgb::Color::new(color.r, color.g, color.b).into(),
+    opacity: NormalizedF32::new(opacity(color)).unwrap_or(NormalizedF32::ZERO),
+    rule: FillRule::NonZero,
+  }
+}
+
+fn path_gradient_paint(
+  gradient: &common::GradientFill<'static>,
+  path: common::GradientPath,
+) -> Option<krilla::paint::Paint> {
+  if path.kind != common::GradientPathKind::Circle {
+    return None;
+  }
+  let focus_width = 1.0 - path.fill_to.left - path.fill_to.right;
+  let focus_height = 1.0 - path.fill_to.top - path.fill_to.bottom;
+  // A PDF type-3 radial shading can represent two circles under one affine.
+  // This exactly covers DrawingML circle gradients whose focus path is a
+  // similarly scaled ellipse. Independent x/y focus scales require the
+  // bounded path-gradient raster path used for rect/shape gradients.
+  if focus_width < 0.0 || focus_height < 0.0 || (focus_width - focus_height).abs() > 1.0e-5 {
+    return None;
+  }
+  let focus_x = (path.fill_to.left + 1.0 - path.fill_to.right) / 2.0;
+  let focus_y = (path.fill_to.top + 1.0 - path.fill_to.bottom) / 2.0;
+  let transform = path.transform;
+  let stops = gradient_stops_for_pdf(gradient);
+  Some(
+    RadialGradient {
+      fx: focus_x,
+      fy: focus_y,
+      fr: focus_width / 2.0,
+      cx: 0.5,
+      cy: 0.5,
+      cr: 0.5,
+      transform: Transform::from_row(
+        transform.m11,
+        transform.m12,
+        transform.m21,
+        transform.m22,
+        transform.dx.0,
+        transform.dy.0,
+      ),
+      spread_method: SpreadMethod::Pad,
+      // GDI+ path gradients define interpolation position 0 at the outer
+      // boundary and 1 at the focus path. Krilla/PDF radial shading starts at
+      // the focus circle, so reverse the color-band parameter exactly once.
+      stops: pdf_gradient_stops(&stops, true),
+      anti_alias: true,
+    }
+    .into(),
+  )
+}
+
+fn draw_path_gradient_raster(
+  surface: &mut Surface<'_>,
+  clip_path: &krilla::geom::Path,
+  polyline: &PolylineItem<'_>,
+) -> bool {
+  let common::Fill::Gradient(gradient) = polyline.fill else {
+    return false;
+  };
+  let Some(path) = gradient.path else {
+    return false;
+  };
+  if polyline.width_pt <= f32::EPSILON
+    || polyline.height_pt <= f32::EPSILON
+    || gradient.stops.is_empty()
+  {
+    return false;
+  }
+  let focus_width = 1.0 - path.fill_to.left - path.fill_to.right;
+  let focus_height = 1.0 - path.fill_to.top - path.fill_to.bottom;
+  if focus_width < 0.0 || focus_height < 0.0 {
+    return false;
+  }
+
+  let mut pixels_per_point =
+    (MAX_PATH_GRADIENT_RASTER_PIXELS / (polyline.width_pt * polyline.height_pt)).sqrt();
+  pixels_per_point = pixels_per_point
+    .min(MAX_PATH_GRADIENT_PIXELS_PER_POINT)
+    .max(0.25);
+  let width_px = (polyline.width_pt * pixels_per_point).ceil().max(1.0) as u32;
+  let height_px = (polyline.height_pt * pixels_per_point).ceil().max(1.0) as u32;
+  let base_shape = if path.kind == common::GradientPathKind::Shape {
+    let Some(polygons) = path_polygons_in_gradient_space(polyline.commands, path.transform) else {
+      return false;
+    };
+    Some(polygons)
+  } else {
+    None
+  };
+
+  let mut rgba = Vec::with_capacity(width_px as usize * height_px as usize * 4);
+  let pixel_width_pt = f64::from(polyline.width_pt) / f64::from(width_px);
+  let pixel_height_pt = f64::from(polyline.height_pt) / f64::from(height_px);
+  for y in 0..height_px {
+    let page_y = f64::from(polyline.y_pt) + (f64::from(y) + 0.5) * pixel_height_pt;
+    for x in 0..width_px {
+      let page_x = f64::from(polyline.x_pt) + (f64::from(x) + 0.5) * pixel_width_pt;
+      let Some(point) = inverse_gradient_point(path.transform, page_x, page_y) else {
+        return false;
+      };
+      let position = path_gradient_position(path, point, base_shape.as_deref()).unwrap_or_default();
+      let color = sample_gradient(&gradient.stops, position);
+      rgba.extend_from_slice(&[color.r, color.g, color.b, color.a]);
+    }
+  }
+
+  let mut encoded = Cursor::new(Vec::new());
+  if PngEncoder::new(&mut encoded)
+    .write_image(&rgba, width_px, height_px, ColorType::Rgba8.into())
+    .is_err()
+  {
+    return false;
+  }
+  let Ok(image) = Image::from_png(encoded.into_inner().into(), true) else {
+    return false;
+  };
+  let Some(size) = Size::from_wh(polyline.width_pt, polyline.height_pt) else {
+    return false;
+  };
+  surface.push_clip_path(clip_path, &FillRule::EvenOdd);
+  surface.push_transform(&Transform::from_translate(polyline.x_pt, polyline.y_pt));
+  surface.draw_image(image, size);
+  surface.pop();
+  surface.pop();
+  true
+}
+
+fn inverse_gradient_point(
+  transform: common::Transform,
+  page_x: f64,
+  page_y: f64,
+) -> Option<kurbo::Point> {
+  let m11 = f64::from(transform.m11);
+  let m12 = f64::from(transform.m12);
+  let m21 = f64::from(transform.m21);
+  let m22 = f64::from(transform.m22);
+  let determinant = m11 * m22 - m12 * m21;
+  if !determinant.is_finite() || determinant.abs() <= f64::from(f32::EPSILON) {
+    return None;
+  }
+  let x = page_x - f64::from(transform.dx);
+  let y = page_y - f64::from(transform.dy);
+  Some(kurbo::Point::new(
+    (m22 * x - m21 * y) / determinant,
+    (-m12 * x + m11 * y) / determinant,
+  ))
+}
+
+fn path_gradient_position(
+  path: common::GradientPath,
+  point: kurbo::Point,
+  shape: Option<&[Vec<kurbo::Point>]>,
+) -> Option<f32> {
+  if !path_gradient_contains(path, point, 1.0, shape)? {
+    return Some(0.0);
+  }
+  if path_gradient_contains(path, point, 0.0, shape)? {
+    return Some(1.0);
+  }
+  // Microsoft GDI+ defines focus scales as an inner copy of the boundary
+  // path. Search the monotonic family of affine copies between that focus and
+  // the outer path, then convert outer-to-inner distance to the DrawingML
+  // color-band direction.
+  let mut outside = 0.0;
+  let mut inside = 1.0;
+  for _ in 0..PATH_GRADIENT_BINARY_STEPS {
+    let middle = (outside + inside) / 2.0;
+    if path_gradient_contains(path, point, middle, shape)? {
+      inside = middle;
+    } else {
+      outside = middle;
+    }
+  }
+  Some(normalized_f64_to_f32(1.0 - inside))
+}
+
+fn path_gradient_contains(
+  path: common::GradientPath,
+  point: kurbo::Point,
+  outer_ratio: f64,
+  shape: Option<&[Vec<kurbo::Point>]>,
+) -> Option<bool> {
+  let focus_width = 1.0 - f64::from(path.fill_to.left) - f64::from(path.fill_to.right);
+  let focus_height = 1.0 - f64::from(path.fill_to.top) - f64::from(path.fill_to.bottom);
+  let scale_x = focus_width + (1.0 - focus_width) * outer_ratio;
+  let scale_y = focus_height + (1.0 - focus_height) * outer_ratio;
+  let offset_x = f64::from(path.fill_to.left) * (1.0 - outer_ratio);
+  let offset_y = f64::from(path.fill_to.top) * (1.0 - outer_ratio);
+  if scale_x.abs() <= f64::EPSILON || scale_y.abs() <= f64::EPSILON {
+    return Some(
+      (point.x - offset_x).abs() <= f64::EPSILON && (point.y - offset_y).abs() <= f64::EPSILON,
+    );
+  }
+  let base = kurbo::Point::new(
+    (point.x - offset_x) / scale_x,
+    (point.y - offset_y) / scale_y,
+  );
+  Some(match path.kind {
+    common::GradientPathKind::Circle => {
+      let x = (base.x - 0.5) * 2.0;
+      let y = (base.y - 0.5) * 2.0;
+      x.mul_add(x, y * y) <= 1.0
+    }
+    common::GradientPathKind::Rectangle => {
+      (0.0..=1.0).contains(&base.x) && (0.0..=1.0).contains(&base.y)
+    }
+    common::GradientPathKind::Shape => point_in_polygons(base, shape?),
+  })
+}
+
+fn path_polygons_in_gradient_space(
+  commands: &[common::PathCommand],
+  transform: common::Transform,
+) -> Option<Vec<Vec<kurbo::Point>>> {
+  let mut elements = Vec::with_capacity(commands.len());
+  for command in commands {
+    match *command {
+      common::PathCommand::MoveTo(point) => {
+        let point = inverse_gradient_point(transform, f64::from(point.x), f64::from(point.y))?;
+        elements.push(PathEl::MoveTo(point));
+      }
+      common::PathCommand::LineTo(point) => {
+        let point = inverse_gradient_point(transform, f64::from(point.x), f64::from(point.y))?;
+        elements.push(PathEl::LineTo(point));
+      }
+      common::PathCommand::CubicTo {
+        control1,
+        control2,
+        end,
+      } => {
+        let control1 =
+          inverse_gradient_point(transform, f64::from(control1.x), f64::from(control1.y))?;
+        let control2 =
+          inverse_gradient_point(transform, f64::from(control2.x), f64::from(control2.y))?;
+        let end = inverse_gradient_point(transform, f64::from(end.x), f64::from(end.y))?;
+        elements.push(PathEl::CurveTo(control1, control2, end));
+      }
+      common::PathCommand::Close => elements.push(PathEl::ClosePath),
+    }
+  }
+  let mut polygons = Vec::new();
+  let mut polygon = Vec::new();
+  // The unit gradient space is scaled to at most 500 pixels in either axis,
+  // so this is a quarter-pixel curve tolerance at the raster budget ceiling.
+  flatten(elements, 0.0005, |element| match element {
+    PathEl::MoveTo(point) => {
+      finish_gradient_polygon(&mut polygons, &mut polygon);
+      polygon.push(point);
+    }
+    PathEl::LineTo(point) => polygon.push(point),
+    PathEl::ClosePath => finish_gradient_polygon(&mut polygons, &mut polygon),
+    PathEl::QuadTo(_, _) | PathEl::CurveTo(_, _, _) => {
+      unreachable!("kurbo::flatten only emits line path elements")
+    }
+  });
+  finish_gradient_polygon(&mut polygons, &mut polygon);
+  (!polygons.is_empty()).then_some(polygons)
+}
+
+fn finish_gradient_polygon(polygons: &mut Vec<Vec<kurbo::Point>>, polygon: &mut Vec<kurbo::Point>) {
+  if polygon.len() >= 3 {
+    if polygon.first() != polygon.last() {
+      polygon.push(polygon[0]);
+    }
+    polygons.push(std::mem::take(polygon));
+  } else {
+    polygon.clear();
+  }
+}
+
+fn point_in_polygons(point: kurbo::Point, polygons: &[Vec<kurbo::Point>]) -> bool {
+  let mut inside = false;
+  for polygon in polygons {
+    for edge in polygon.windows(2) {
+      let (x1, y1) = (edge[0].x, edge[0].y);
+      let (x2, y2) = (edge[1].x, edge[1].y);
+      if (y1 > point.y) != (y2 > point.y) && point.x < (x2 - x1) * (point.y - y1) / (y2 - y1) + x1 {
+        inside = !inside;
+      }
+    }
+  }
+  inside
+}
+
+fn normalized_f64_to_f32(value: f64) -> f32 {
+  debug_assert!(value.is_finite());
+  value.clamp(0.0, 1.0) as f32
+}
+
+fn sample_gradient(stops: &[common::GradientStop<'static>], position: f32) -> common::Color {
+  let Some(first) = stops.first() else {
+    return common::Color::default();
+  };
+  if position <= first.position {
+    return first.color;
+  }
+  for pair in stops.windows(2) {
+    let start = &pair[0];
+    let end = &pair[1];
+    if position <= end.position {
+      let span = end.position - start.position;
+      let ratio = if span.abs() <= f32::EPSILON {
+        1.0
+      } else {
+        ((position - start.position) / span).clamp(0.0, 1.0)
+      };
+      let channel = |start: u8, end: u8| {
+        (f32::from(start) + (f32::from(end) - f32::from(start)) * ratio)
+          .round()
+          .clamp(0.0, 255.0) as u8
+      };
+      return common::Color {
+        r: channel(start.color.r, end.color.r),
+        g: channel(start.color.g, end.color.g),
+        b: channel(start.color.b, end.color.b),
+        a: channel(start.color.a, end.color.a),
+      };
+    }
+  }
+  stops.last().map_or(first.color, |stop| stop.color)
+}
+
+fn pdf_gradient_stops(stops: &[common::GradientStop<'static>], reverse: bool) -> Vec<Stop> {
+  let iter: Box<dyn Iterator<Item = &common::GradientStop<'static>> + '_> = if reverse {
+    Box::new(stops.iter().rev())
+  } else {
+    Box::new(stops.iter())
+  };
+  iter
+    .filter_map(|stop| {
+      let position = if reverse {
+        1.0 - stop.position
+      } else {
+        stop.position
+      };
+      Some(Stop {
+        offset: NormalizedF32::new(position.clamp(0.0, 1.0))?,
+        color: rgb::Color::new(stop.color.r, stop.color.g, stop.color.b).into(),
+        opacity: NormalizedF32::new(f32::from(stop.color.a) / 255.0)?,
+      })
+    })
+    .collect()
 }
 
 fn draw_rect_item(surface: &mut Surface<'_>, rect: &RectItem) {

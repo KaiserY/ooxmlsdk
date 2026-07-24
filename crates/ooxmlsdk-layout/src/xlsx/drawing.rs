@@ -19,8 +19,10 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_spreadsheet_drawing as xdr;
 use ooxmlsdk::sdk::SdkPart;
 
+use crate::common;
 use crate::error::Result;
 use crate::model::RgbColor;
+use crate::pptx::drawingml::color::{Color, RgbHexColor};
 use crate::render::chart as shared_chart;
 
 use super::normalize_hyperlink_target;
@@ -44,7 +46,7 @@ pub(crate) struct ImageResource {
   pub(crate) content_type: Option<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct DrawingAnchorModel {
   pub(crate) kind: DrawingAnchorKind,
   pub(crate) object: DrawingObjectModel,
@@ -73,7 +75,7 @@ pub(crate) struct DrawingMarkerModel {
   pub(crate) row_offset_emu: i64,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct DrawingObjectModel {
   pub(crate) kind: DrawingObjectKind,
   pub(crate) id: Option<u32>,
@@ -104,9 +106,24 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) child_objects: usize,
   pub(crate) has_style: bool,
   pub(crate) fill_color: Option<RgbColor>,
+  pub(crate) fill_pattern: Option<common::PatternFill>,
   pub(crate) line_color: Option<RgbColor>,
+  pub(crate) line_pattern: Option<common::PatternFill>,
   pub(crate) line_width_emu: Option<i32>,
   pub(crate) no_line: bool,
+  pub(crate) geometry: Option<DrawingGeometryModel>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum DrawingGeometryModel {
+  Custom {
+    geometry: Box<a::CustomGeometry>,
+    outline: Option<Box<a::Outline>>,
+  },
+  Preset {
+    geometry: Box<a::PresetGeometry>,
+    outline: Option<Box<a::Outline>>,
+  },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -653,10 +670,13 @@ impl DrawingObjectModel {
       has_style: shape.shape_style.is_some(),
       fill_color: shape_fill_color(&shape.shape_properties)
         .or_else(|| shape_style_fill_color(shape.shape_style.as_deref())),
+      fill_pattern: shape_fill_pattern(&shape.shape_properties),
       line_color: shape_line_color(&shape.shape_properties)
         .or_else(|| shape_style_line_color(shape.shape_style.as_deref())),
+      line_pattern: shape_line_pattern(&shape.shape_properties),
       line_width_emu: shape_line_width_emu(&shape.shape_properties),
       no_line: shape_no_line(&shape.shape_properties),
+      geometry: shape_geometry(&shape.shape_properties),
     }
   }
 
@@ -696,9 +716,12 @@ impl DrawingObjectModel {
       child_objects: group.group_shape_choice.len(),
       has_style: false,
       fill_color: None,
+      fill_pattern: None,
       line_color: None,
+      line_pattern: None,
       line_width_emu: None,
       no_line: false,
+      geometry: None,
     }
   }
 
@@ -738,9 +761,12 @@ impl DrawingObjectModel {
       child_objects: frame.graphic.graphic_data.graphic_data_choice.len(),
       has_style: false,
       fill_color: None,
+      fill_pattern: None,
       line_color: None,
+      line_pattern: None,
       line_width_emu: None,
       no_line: false,
+      geometry: None,
     }
   }
 
@@ -781,10 +807,13 @@ impl DrawingObjectModel {
       has_style: shape.shape_style.is_some(),
       fill_color: shape_fill_color(&shape.shape_properties)
         .or_else(|| shape_style_fill_color(shape.shape_style.as_deref())),
+      fill_pattern: shape_fill_pattern(&shape.shape_properties),
       line_color: shape_line_color(&shape.shape_properties)
         .or_else(|| shape_style_line_color(shape.shape_style.as_deref())),
+      line_pattern: shape_line_pattern(&shape.shape_properties),
       line_width_emu: shape_line_width_emu(&shape.shape_properties),
       no_line: shape_no_line(&shape.shape_properties),
+      geometry: shape_geometry(&shape.shape_properties),
     }
   }
 
@@ -828,9 +857,12 @@ impl DrawingObjectModel {
       child_objects: 0,
       has_style: picture.shape_style.is_some(),
       fill_color: None,
+      fill_pattern: None,
       line_color: None,
+      line_pattern: None,
       line_width_emu: None,
       no_line: false,
+      geometry: None,
     }
   }
 
@@ -890,9 +922,12 @@ impl DrawingObjectModel {
       child_objects: 0,
       has_style: false,
       fill_color: None,
+      fill_pattern: None,
       line_color: None,
+      line_pattern: None,
       line_width_emu: None,
       no_line: false,
+      geometry: None,
     }
   }
 }
@@ -1289,6 +1324,28 @@ fn shape_fill_color(properties: &xdr::ShapeProperties) -> Option<RgbColor> {
   }
 }
 
+fn shape_fill_pattern(properties: &xdr::ShapeProperties) -> Option<common::PatternFill> {
+  let xdr::ShapePropertiesChoice2::PatternFill(fill) =
+    properties.shape_properties_choice2.as_ref()?
+  else {
+    return None;
+  };
+  drawingml_pattern_fill(fill)
+}
+
+fn shape_geometry(properties: &xdr::ShapeProperties) -> Option<DrawingGeometryModel> {
+  match properties.shape_properties_choice1.as_ref()? {
+    xdr::ShapePropertiesChoice::CustomGeometry(geometry) => Some(DrawingGeometryModel::Custom {
+      geometry: geometry.clone(),
+      outline: properties.outline.clone(),
+    }),
+    xdr::ShapePropertiesChoice::PresetGeometry(geometry) => Some(DrawingGeometryModel::Preset {
+      geometry: geometry.clone(),
+      outline: properties.outline.clone(),
+    }),
+  }
+}
+
 fn shape_line_color(properties: &xdr::ShapeProperties) -> Option<RgbColor> {
   let outline = properties.outline.as_deref()?;
   match outline.outline_choice1.as_ref()? {
@@ -1297,6 +1354,15 @@ fn shape_line_color(properties: &xdr::ShapeProperties) -> Option<RgbColor> {
     | a::OutlineChoice::GradientFill(_)
     | a::OutlineChoice::PatternFill(_) => None,
   }
+}
+
+fn shape_line_pattern(properties: &xdr::ShapeProperties) -> Option<common::PatternFill> {
+  let a::OutlineChoice::PatternFill(fill) =
+    properties.outline.as_deref()?.outline_choice1.as_ref()?
+  else {
+    return None;
+  };
+  drawingml_pattern_fill(fill)
 }
 
 fn shape_line_width_emu(properties: &xdr::ShapeProperties) -> Option<i32> {
@@ -1333,7 +1399,11 @@ fn scheme_color(color: &a::SchemeColor) -> Option<RgbColor> {
   // theme/style matrix before SdrObject painting. Until the workbook theme
   // bridge owns these colors, keep the Office default theme mapping used by
   // OOXML's generated style references.
-  match color.val {
+  default_scheme_color(color.val)
+}
+
+fn default_scheme_color(value: a::SchemeColorValues) -> Option<RgbColor> {
+  match value {
     a::SchemeColorValues::Accent1 => Some(RgbColor {
       r: 0x4f,
       g: 0x81,
@@ -1366,6 +1436,61 @@ fn scheme_color(color: &a::SchemeColor) -> Option<RgbColor> {
     }),
     _ => None,
   }
+}
+
+fn drawingml_pattern_fill(fill: &a::PatternFill) -> Option<common::PatternFill> {
+  let foreground = match fill
+    .foreground_color
+    .as_ref()
+    .and_then(|color| color.foreground_color_choice.as_ref())
+  {
+    Some(choice) => {
+      Color::from_foreground_color_choice(choice).and_then(resolve_drawingml_pattern_color)?
+    }
+    None => common::Color {
+      r: 0,
+      g: 0,
+      b: 0,
+      a: u8::MAX,
+    },
+  };
+  let background = match fill
+    .background_color
+    .as_ref()
+    .and_then(|color| color.background_color_choice.as_ref())
+  {
+    Some(choice) => {
+      Color::from_background_color_choice(choice).and_then(resolve_drawingml_pattern_color)?
+    }
+    None => common::Color {
+      r: u8::MAX,
+      g: u8::MAX,
+      b: u8::MAX,
+      a: u8::MAX,
+    },
+  };
+  Some(common::PatternFill {
+    hatch_style: common::drawingml_pattern::hatch_style(fill.preset),
+    foreground,
+    background,
+  })
+}
+
+fn resolve_drawingml_pattern_color(color: Color) -> Option<common::Color> {
+  let mut scheme_resolver = |value| {
+    let color = default_scheme_color(value)?;
+    Some(Color::RgbHex(RgbHexColor {
+      value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+      transformations: Vec::new(),
+    }))
+  };
+  let color = color.resolve_rgb(&mut scheme_resolver, None)?;
+  Some(common::Color {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+    a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
+  })
 }
 
 fn solid_fill_color(fill: &a::SolidFill) -> Option<RgbColor> {

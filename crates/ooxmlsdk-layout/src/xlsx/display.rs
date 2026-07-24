@@ -183,6 +183,19 @@ fn common_display_item(item: PageItem) -> common::DisplayItem<'static> {
   match item {
     PageItem::Text(item) => common::DisplayItem::Text(common_text_run(item)),
     PageItem::Image(item) => common::DisplayItem::Image(common_image_item(item)),
+    PageItem::Group {
+      mask,
+      transform,
+      blend_mode,
+      opacity,
+      items,
+    } => common::DisplayItem::Group(common::CompositingGroup {
+      mask: mask.map(common_image_item),
+      transform,
+      blend_mode,
+      opacity,
+      items: items.into_iter().map(common_display_item).collect(),
+    }),
     PageItem::LinkArea(item) => common::DisplayItem::LinkArea(common::LinkArea {
       bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
       target: Cow::Owned(item.hyperlink_url),
@@ -270,6 +283,7 @@ fn common_line_item(item: LineItem) -> common::LineItem<'static> {
       color: common_rgb(item.color, 1.0),
       dash: None,
       source_style_id: None,
+      ..Default::default()
     },
     kind: match item.kind {
       LineItemKind::Stroke => common::LineKind::Stroke,
@@ -1795,16 +1809,97 @@ fn print_page_shape_items(
       continue;
     }
     let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
-    items.push(PageItem::Rect(RectItem {
-      x_pt: rect.x_pt,
-      y_pt: rect.y_pt,
-      width_pt: rect.width_pt,
-      height_pt: rect.height_pt,
-      fill_color: anchor.object.fill_color,
-      fill_opacity: 1.0,
-      stroke: shape_stroke(&anchor.object),
-      stroke_opacity: 1.0,
-    }));
+    if let Some(geometry) = anchor.object.geometry.as_ref() {
+      let (paths, outline) = match geometry {
+        super::drawing::DrawingGeometryModel::Custom { geometry, outline } => (
+          common::drawingml_custom_geometry::paths(
+            geometry,
+            rect.x_pt,
+            rect.y_pt,
+            rect.width_pt,
+            rect.height_pt,
+          ),
+          outline.as_deref(),
+        ),
+        super::drawing::DrawingGeometryModel::Preset { geometry, outline } => (
+          common::drawingml_preset_geometry::paths(
+            Some(geometry),
+            rect.x_pt,
+            rect.y_pt,
+            rect.width_pt,
+            rect.height_pt,
+          ),
+          outline.as_deref(),
+        ),
+      };
+      let Some(paths) = paths else {
+        continue;
+      };
+      let stroke = shape_stroke(&anchor.object);
+      for path in paths {
+        let closed = path
+          .commands
+          .iter()
+          .any(|command| matches!(command, common::PathCommand::Close));
+        items.push(PageItem::Path(common::PathItem {
+          bounds: common_rect(rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
+          points: Vec::new(),
+          commands: path.commands,
+          closed,
+          fill: path
+            .fill_mode
+            .apply_to_fill(drawing_object_common_fill(&anchor.object)),
+          stroke: if path.stroke {
+            stroke.map(|stroke| {
+              let mut stroke = common_stroke_from_border(stroke, 1.0);
+              stroke.pattern = anchor.object.line_pattern;
+              if let Some(outline) = outline {
+                common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+              }
+              stroke
+            })
+          } else {
+            None
+          },
+        }));
+      }
+      continue;
+    }
+    if anchor.object.fill_pattern.is_some() || anchor.object.line_pattern.is_some() {
+      let stroke = shape_stroke(&anchor.object).map(|stroke| {
+        let mut stroke = common_stroke_from_border(stroke, 1.0);
+        stroke.pattern = anchor.object.line_pattern;
+        stroke
+      });
+      items.push(PageItem::Path(common::PathItem {
+        bounds: common_rect(rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
+        points: Vec::new(),
+        commands: vec![
+          common::PathCommand::MoveTo(common_point(rect.x_pt, rect.y_pt)),
+          common::PathCommand::LineTo(common_point(rect.x_pt + rect.width_pt, rect.y_pt)),
+          common::PathCommand::LineTo(common_point(
+            rect.x_pt + rect.width_pt,
+            rect.y_pt + rect.height_pt,
+          )),
+          common::PathCommand::LineTo(common_point(rect.x_pt, rect.y_pt + rect.height_pt)),
+          common::PathCommand::Close,
+        ],
+        closed: true,
+        fill: drawing_object_common_fill(&anchor.object),
+        stroke,
+      }));
+    } else {
+      items.push(PageItem::Rect(RectItem {
+        x_pt: rect.x_pt,
+        y_pt: rect.y_pt,
+        width_pt: rect.width_pt,
+        height_pt: rect.height_pt,
+        fill_color: anchor.object.fill_color,
+        fill_opacity: 1.0,
+        stroke: shape_stroke(&anchor.object),
+        stroke_opacity: 1.0,
+      }));
+    }
   }
   items
 }
@@ -1963,42 +2058,32 @@ fn push_persisted_diagram_shape(
     width,
     height,
   };
-  if let Some(commands) =
-    shared_diagram::drawing_shape_path_commands(&shape.shape_properties, shape_bounds)
-  {
-    let closed = commands
-      .iter()
-      .any(|command| matches!(command, common::PathCommand::Close));
-    items.push(PageItem::Path(common::PathItem {
-      bounds: common_rect(x, y, width, height),
-      points: Vec::new(),
-      commands,
-      closed,
-      fill: common::Fill::Solid(common_rgb(
-        RgbColor {
-          r: 0x4f,
-          g: 0x81,
-          b: 0xbd,
-        },
-        1.0,
-      )),
-      stroke: Some(common_stroke_from_border(BorderStyle::default(), 1.0)),
-    }));
-  } else {
-    items.push(PageItem::Rect(RectItem {
-      x_pt: x,
-      y_pt: y,
-      width_pt: width,
-      height_pt: height,
-      fill_color: Some(RgbColor {
-        r: 0x4f,
-        g: 0x81,
-        b: 0xbd,
-      }),
-      fill_opacity: 1.0,
-      stroke: Some(BorderStyle::default()),
-      stroke_opacity: 1.0,
-    }));
+  if let Some(paths) = shared_diagram::drawing_shape_paths(&shape.shape_properties, shape_bounds) {
+    for path in paths {
+      let closed = path
+        .commands
+        .iter()
+        .any(|command| matches!(command, common::PathCommand::Close));
+      let mut stroke = common_stroke_from_border(BorderStyle::default(), 1.0);
+      if let Some(outline) = shape.shape_properties.outline.as_deref() {
+        common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+      }
+      items.push(PageItem::Path(common::PathItem {
+        bounds: common_rect(x, y, width, height),
+        points: Vec::new(),
+        commands: path.commands,
+        closed,
+        fill: path.fill_mode.apply_to_fill(common::Fill::Solid(common_rgb(
+          RgbColor {
+            r: 0x4f,
+            g: 0x81,
+            b: 0xbd,
+          },
+          1.0,
+        ))),
+        stroke: path.stroke.then_some(stroke),
+      }));
+    }
   }
   let Some(text_body) = shape.text_body.as_deref() else {
     return;
@@ -2210,24 +2295,39 @@ fn push_diagram_shape_items(items: &mut Vec<PageItem>, shape: &shared_diagram::D
   if shape.draw_geometry {
     if shape.is_connector {
       items.push(PageItem::Line(diagram_connector_line_item(shape)));
-    } else if let Some(commands) = shape.path_commands() {
-      let closed = commands
-        .iter()
-        .any(|command| matches!(command, common::PathCommand::Close));
-      items.push(PageItem::Path(common::PathItem {
-        bounds: common_rect(shape.x, shape.y, shape.width, shape.height),
-        points: Vec::new(),
-        commands,
-        closed,
-        fill: common::Fill::Solid(common_rgb(shape.fill, 1.0)),
-        stroke: Some(common_stroke_from_border(
-          BorderStyle {
-            color: shape.line_fill.unwrap_or_default(),
-            ..BorderStyle::default()
-          },
-          1.0,
-        )),
-      }));
+    } else if let Some(paths) = shape.drawing_paths() {
+      for path in paths {
+        let closed = path
+          .commands
+          .iter()
+          .any(|command| matches!(command, common::PathCommand::Close));
+        items.push(PageItem::Path(common::PathItem {
+          bounds: common_rect(shape.x, shape.y, shape.width, shape.height),
+          points: Vec::new(),
+          commands: path.commands,
+          closed,
+          fill: path
+            .fill_mode
+            .apply_to_fill(common::Fill::Solid(common_rgb(shape.fill, 1.0))),
+          stroke: path.stroke.then(|| {
+            let mut stroke = common_stroke_from_border(
+              BorderStyle {
+                color: shape.line_fill.unwrap_or_default(),
+                ..BorderStyle::default()
+              },
+              1.0,
+            );
+            if let Some(outline) = shape
+              .shape_properties
+              .as_deref()
+              .and_then(|properties| properties.outline.as_deref())
+            {
+              common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+            }
+            stroke
+          }),
+        }));
+      }
     } else {
       items.push(PageItem::Rect(RectItem {
         x_pt: shape.x,
@@ -3368,6 +3468,10 @@ fn clip_chart_item_to_rect(
       path.bounds.origin.y.0 + path.bounds.size.height.0,
       clip,
     ),
+    PageItem::Group { items, .. } => {
+      items.retain_mut(|item| clip_chart_item_to_rect(item, clip, metrics, text_boundary_slack));
+      !items.is_empty()
+    }
     PageItem::Image(_) | PageItem::LinkArea(_) => true,
   }
 }
@@ -4015,7 +4119,13 @@ fn shape_stroke(object: &super::drawing::DrawingObjectModel) -> Option<BorderSty
   if object.no_line {
     return None;
   }
-  let color = object.line_color?;
+  let color = object.line_color.or_else(|| {
+    object.line_pattern.map(|pattern| RgbColor {
+      r: pattern.foreground.r,
+      g: pattern.foreground.g,
+      b: pattern.foreground.b,
+    })
+  })?;
   Some(BorderStyle {
     width_pt: object
       .line_width_emu
@@ -4024,6 +4134,20 @@ fn shape_stroke(object: &super::drawing::DrawingObjectModel) -> Option<BorderSty
     color,
     ..BorderStyle::default()
   })
+}
+
+fn drawing_object_common_fill(
+  object: &super::drawing::DrawingObjectModel,
+) -> common::Fill<'static> {
+  object
+    .fill_pattern
+    .map(common::Fill::Pattern)
+    .or_else(|| {
+      object
+        .fill_color
+        .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
+    })
+    .unwrap_or(common::Fill::None)
 }
 
 fn anchor_rect_pt(

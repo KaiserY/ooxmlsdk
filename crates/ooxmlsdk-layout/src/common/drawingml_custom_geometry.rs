@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use kurbo::{Affine, Arc, BezPath, ParamCurve};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
+#[cfg(test)]
 use crate::common::PathCommand;
+use crate::common::{DrawingPath, DrawingPathFillMode};
 
 use super::drawingml_geometry::{append_transformed_arc, bez_path_commands};
 
@@ -13,18 +15,16 @@ use super::drawingml_geometry::{append_transformed_arc, bez_path_commands};
 /// Guides are evaluated in that space, then points are scaled into the shape
 /// frame. Unsupported commands reject the custom path as a unit so callers can
 /// retain their existing conservative fallback.
-pub(crate) fn path_commands(
+pub(crate) fn paths(
   geometry: &a::CustomGeometry,
   left: f32,
   top: f32,
   width: f32,
   height: f32,
-) -> Option<Vec<PathCommand>> {
-  let mut output = BezPath::new();
+) -> Option<Vec<DrawingPath>> {
+  let mut paths = Vec::with_capacity(geometry.path_list.path.len());
   for path in &geometry.path_list.path {
-    if matches!(path.fill, Some(a::PathFillModeValues::None)) {
-      continue;
-    }
+    let mut output = BezPath::new();
     let viewport_width = path
       .width
       .map(|value| value.to_emu() as f64)
@@ -113,8 +113,53 @@ pub(crate) fn path_commands(
         }
       }
     }
+    if !output.is_empty() {
+      paths.push(DrawingPath {
+        commands: bez_path_commands(output),
+        fill_mode: path
+          .fill
+          .map(drawing_path_fill_mode)
+          .unwrap_or(DrawingPathFillMode::Normal),
+        stroke: path.stroke.as_ref().is_none_or(|value| value.as_bool()),
+        extrusion_allowed: path
+          .extrusion_ok
+          .as_ref()
+          .is_none_or(|value| value.as_bool()),
+      });
+    }
   }
-  (!output.is_empty()).then(|| bez_path_commands(output))
+  (!paths.is_empty()).then_some(paths)
+}
+
+/// Compatibility adapter for hosts that still paint one flattened geometry.
+///
+/// Historically those hosts ignored `fill="none"` paths, so retain that
+/// behavior until they migrate to [`paths`] and can apply per-path paint.
+#[cfg(test)]
+fn path_commands(
+  geometry: &a::CustomGeometry,
+  left: f32,
+  top: f32,
+  width: f32,
+  height: f32,
+) -> Option<Vec<PathCommand>> {
+  let commands = paths(geometry, left, top, width, height)?
+    .into_iter()
+    .filter(|path| path.fill_mode != DrawingPathFillMode::None)
+    .flat_map(|path| path.commands)
+    .collect::<Vec<_>>();
+  (!commands.is_empty()).then_some(commands)
+}
+
+fn drawing_path_fill_mode(value: a::PathFillModeValues) -> DrawingPathFillMode {
+  match value {
+    a::PathFillModeValues::None => DrawingPathFillMode::None,
+    a::PathFillModeValues::Norm => DrawingPathFillMode::Normal,
+    a::PathFillModeValues::Lighten => DrawingPathFillMode::Lighten,
+    a::PathFillModeValues::LightenLess => DrawingPathFillMode::LightenLess,
+    a::PathFillModeValues::Darken => DrawingPathFillMode::Darken,
+    a::PathFillModeValues::DarkenLess => DrawingPathFillMode::DarkenLess,
+  }
 }
 
 /// ECMA-376 Part 1 §20.1.9.4 anchors the ellipse at the current pen position
@@ -251,8 +296,8 @@ mod tests {
 
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
-  use super::{formula, path_commands};
-  use crate::common::{PathCommand, Point, Pt};
+  use super::{formula, path_commands, paths};
+  use crate::common::{DrawingPathFillMode, PathCommand, Point, Pt};
 
   #[test]
   fn scales_custom_path_coordinates_into_the_shape_frame() {
@@ -294,6 +339,78 @@ mod tests {
           y: Pt(120.0)
         }),
         PathCommand::Close,
+      ]
+    );
+  }
+
+  #[test]
+  fn preserves_per_path_fill_stroke_and_extrusion_semantics() {
+    let make_path =
+      |fill: Option<a::PathFillModeValues>, stroke: bool, extrusion_allowed: bool, y: &str| {
+        a::Path {
+          width: Some("100".parse().unwrap()),
+          height: Some("100".parse().unwrap()),
+          fill,
+          stroke: Some(stroke.into()),
+          extrusion_ok: Some(extrusion_allowed.into()),
+          path_choice: vec![
+            a::PathChoice::MoveTo(Box::new(a::MoveTo {
+              point: a::Point {
+                x: "0".into(),
+                y: y.into(),
+              },
+            })),
+            a::PathChoice::LineTo(Box::new(a::LineTo {
+              point: a::Point {
+                x: "100".into(),
+                y: y.into(),
+              },
+            })),
+          ],
+        }
+      };
+    let geometry = a::CustomGeometry {
+      path_list: a::PathList {
+        path: vec![
+          make_path(Some(a::PathFillModeValues::None), true, false, "25"),
+          make_path(Some(a::PathFillModeValues::DarkenLess), false, true, "75"),
+        ],
+      },
+      ..Default::default()
+    };
+
+    let paths = paths(&geometry, 10.0, 20.0, 100.0, 200.0).unwrap();
+    assert_eq!(paths.len(), 2);
+    assert_eq!(paths[0].fill_mode, DrawingPathFillMode::None);
+    assert!(paths[0].stroke);
+    assert!(!paths[0].extrusion_allowed);
+    assert_eq!(paths[1].fill_mode, DrawingPathFillMode::DarkenLess);
+    assert!(!paths[1].stroke);
+    assert!(paths[1].extrusion_allowed);
+    assert_eq!(
+      paths[0].commands,
+      [
+        PathCommand::MoveTo(Point {
+          x: Pt(10.0),
+          y: Pt(70.0)
+        }),
+        PathCommand::LineTo(Point {
+          x: Pt(110.0),
+          y: Pt(70.0)
+        }),
+      ]
+    );
+    assert_eq!(
+      paths[1].commands,
+      [
+        PathCommand::MoveTo(Point {
+          x: Pt(10.0),
+          y: Pt(170.0)
+        }),
+        PathCommand::LineTo(Point {
+          x: Pt(110.0),
+          y: Pt(170.0)
+        }),
       ]
     );
   }

@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
 use kurbo::Affine;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use unicode_bidi::{BidiInfo, Level};
@@ -1461,6 +1462,7 @@ fn into_common_line_item(item: LineItem) -> common::LineItem<'static> {
       color: common_rgb(item.color, 1.0),
       dash: None,
       source_style_id: None,
+      ..Default::default()
     },
     kind: match item.kind {
       LineItemKind::Stroke => common::LineKind::Stroke,
@@ -8212,7 +8214,7 @@ fn lower_inline_chart(
       chart.label_style.clone(),
     )
     .into_iter()
-    .filter_map(docx_chart_page_item)
+    .flat_map(docx_chart_page_items)
     .collect();
   }
   let Some(chart_space) = chart.chart_space.as_deref() else {
@@ -8280,7 +8282,7 @@ fn lower_inline_chart(
       },
     )
     .into_iter()
-    .filter_map(docx_chart_page_item)
+    .flat_map(docx_chart_page_items)
     .collect::<Vec<_>>();
     if !lowered.is_empty() {
       return lowered;
@@ -8364,7 +8366,7 @@ fn lower_inline_chart(
       },
     )
     .into_iter()
-    .filter_map(docx_chart_page_item),
+    .flat_map(docx_chart_page_items),
   );
   items
 }
@@ -8742,9 +8744,9 @@ fn lower_generic_inline_chart(
   items
 }
 
-fn docx_chart_page_item(item: crate::model::PageItem) -> Option<PageItem> {
+fn docx_chart_page_items(item: crate::model::PageItem) -> Vec<PageItem> {
   match item {
-    crate::model::PageItem::Text(text) => Some(PageItem::Text(Box::new(TextItem {
+    crate::model::PageItem::Text(text) => vec![PageItem::Text(Box::new(TextItem {
       x_pt: text.x_pt,
       y_pt: text.y_pt,
       line_height_pt: text.line_height_pt,
@@ -8765,8 +8767,8 @@ fn docx_chart_page_item(item: crate::model::PageItem) -> Option<PageItem> {
         crate::model::PdfTextSegmentation::Line => PdfTextSegmentation::Line,
         crate::model::PdfTextSegmentation::Portion => PdfTextSegmentation::Portion,
       },
-    }))),
-    crate::model::PageItem::Rect(rect) => Some(PageItem::Rect(RectItem {
+    }))],
+    crate::model::PageItem::Rect(rect) => vec![PageItem::Rect(RectItem {
       x_pt: rect.x_pt,
       y_pt: rect.y_pt,
       width_pt: rect.width_pt,
@@ -8775,8 +8777,8 @@ fn docx_chart_page_item(item: crate::model::PageItem) -> Option<PageItem> {
       fill_opacity: rect.fill_opacity,
       stroke: rect.stroke,
       stroke_opacity: rect.stroke_opacity,
-    })),
-    crate::model::PageItem::Line(line) => Some(PageItem::Line(LineItem {
+    })],
+    crate::model::PageItem::Line(line) => vec![PageItem::Line(LineItem {
       x1_pt: line.x1_pt,
       y1_pt: line.y1_pt,
       x2_pt: line.x2_pt,
@@ -8784,7 +8786,10 @@ fn docx_chart_page_item(item: crate::model::PageItem) -> Option<PageItem> {
       width_pt: line.width_pt,
       color: line.color,
       kind: LineItemKind::Stroke,
-    })),
+    })],
+    crate::model::PageItem::Group { items, .. } => {
+      items.into_iter().flat_map(docx_chart_page_items).collect()
+    }
     crate::model::PageItem::Path(path) if !path.points.is_empty() => {
       let fill_color = match path.fill {
         crate::common::Fill::Solid(color) => Some(RgbColor {
@@ -8803,7 +8808,7 @@ fn docx_chart_page_item(item: crate::model::PageItem) -> Option<PageItem> {
         },
         ..BorderStyle::default()
       });
-      Some(PageItem::Polyline(PolylineItem {
+      vec![PageItem::Polyline(PolylineItem {
         x_pt: 0.0,
         y_pt: 0.0,
         width_pt: path.bounds.size.width.0,
@@ -8816,11 +8821,11 @@ fn docx_chart_page_item(item: crate::model::PageItem) -> Option<PageItem> {
         closed: path.closed,
         fill_color,
         stroke,
-      }))
+      })]
     }
     crate::model::PageItem::Image(_)
     | crate::model::PageItem::LinkArea(_)
-    | crate::model::PageItem::Path(_) => None,
+    | crate::model::PageItem::Path(_) => Vec::new(),
   }
 }
 
@@ -12301,6 +12306,31 @@ fn textbox_auto_fit_bounds_inset(shape: &crate::docx::InlineShape) -> f32 {
     .unwrap_or(BorderStyle::default().width_pt / 2.0)
 }
 
+fn inline_shape_common_fill(shape: &crate::docx::InlineShape) -> common::Fill<'static> {
+  shape
+    .fill_pattern
+    .map(common::Fill::Pattern)
+    .or_else(|| {
+      shape
+        .fill_color
+        .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
+    })
+    .unwrap_or(common::Fill::None)
+}
+
+fn inline_shape_common_stroke(
+  shape: &crate::docx::InlineShape,
+  border: BorderStyle,
+  outline: Option<&a::Outline>,
+) -> common::Stroke<'static> {
+  let mut stroke = common_stroke_from_border(border, 1.0);
+  stroke.pattern = shape.stroke_pattern;
+  if let Some(outline) = outline {
+    common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+  }
+  stroke
+}
+
 fn shape_has_invisible_auto_fit_textbox_bounds(
   shape: &crate::docx::InlineShape,
   flow: FlowContext,
@@ -12309,6 +12339,7 @@ fn shape_has_invisible_auto_fit_textbox_bounds(
     && !shape.text_box_blocks.is_empty()
     && flow.text_segmentation == TextSegmentation::RepeatingSlot
     && shape.fill_color.is_none()
+    && shape.fill_pattern.is_none()
     && shape.fill_image.is_none()
     && shape.stroke.is_none()
     && shape.additional_fill_colors.is_empty()
@@ -12860,7 +12891,7 @@ fn floating_shape_is_zero_relative_background(
         && shape.effect_bottom_pt <= LAYOUT_EPSILON_PT))
     && placement.relative_width_pct.is_some_and(|pct| pct <= 0.0)
     && placement.relative_height_pct.is_some_and(|pct| pct <= 0.0)
-    && shape.fill_color.is_some()
+    && (shape.fill_color.is_some() || shape.fill_pattern.is_some())
     && shape.fill_image.is_none()
     && shape.stroke.is_none()
     && shape.text_box_blocks.is_empty()
@@ -14921,29 +14952,60 @@ impl<'a> TextFrameLayout<'a> {
             }
             if shape.geometry == InlineShapeGeometry::Line
               && shape.fill_color.is_none()
+              && shape.fill_pattern.is_none()
               && let Some(stroke) = shape.stroke
             {
-              push_styled_line(
-                current,
-                x_pt,
-                y_pt,
-                x_pt + width_pt,
-                y_pt + height_pt,
-                stroke,
-              );
+              if shape.stroke_pattern.is_some() {
+                current.items.push(PageItem::Path(common::PathItem {
+                  bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
+                  points: Vec::new(),
+                  commands: vec![
+                    common::PathCommand::MoveTo(common_point(x_pt, y_pt)),
+                    common::PathCommand::LineTo(common_point(x_pt + width_pt, y_pt + height_pt)),
+                  ],
+                  closed: false,
+                  fill: common::Fill::None,
+                  stroke: Some(inline_shape_common_stroke(shape, stroke, None)),
+                }));
+              } else {
+                push_styled_line(
+                  current,
+                  x_pt,
+                  y_pt,
+                  x_pt + width_pt,
+                  y_pt + height_pt,
+                  stroke,
+                );
+              }
               return (item_start, current.items.len());
             }
             if let InlineShapeGeometry::Polyline { points, closed } = &shape.geometry {
-              current.items.push(PageItem::Polyline(PolylineItem {
-                x_pt,
-                y_pt,
-                width_pt,
-                height_pt,
-                points: points.clone(),
-                closed: *closed,
-                fill_color: shape.fill_color,
-                stroke: shape.stroke,
-              }));
+              if shape.fill_pattern.is_some() || shape.stroke_pattern.is_some() {
+                current.items.push(PageItem::Path(common::PathItem {
+                  bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
+                  points: points
+                    .iter()
+                    .map(|(x, y)| common_point(x_pt + x, y_pt + y))
+                    .collect(),
+                  commands: Vec::new(),
+                  closed: *closed,
+                  fill: inline_shape_common_fill(shape),
+                  stroke: shape
+                    .stroke
+                    .map(|stroke| inline_shape_common_stroke(shape, stroke, None)),
+                }));
+              } else {
+                current.items.push(PageItem::Polyline(PolylineItem {
+                  x_pt,
+                  y_pt,
+                  width_pt,
+                  height_pt,
+                  points: points.clone(),
+                  closed: *closed,
+                  fill_color: shape.fill_color,
+                  stroke: shape.stroke,
+                }));
+              }
               for color in &shape.additional_fill_colors {
                 current.items.push(PageItem::Polyline(PolylineItem {
                   x_pt,
@@ -14970,36 +15032,45 @@ impl<'a> TextFrameLayout<'a> {
               );
               return (item_start, current.items.len());
             }
-            if let InlineShapeGeometry::Path { commands } = &shape.geometry {
-              let commands = common::drawingml_geometry::transform_commands(
-                commands.iter().copied(),
-                Affine::translate((f64::from(x_pt), f64::from(y_pt))),
-              );
-              let closed = commands
-                .iter()
-                .any(|command| matches!(command, common::PathCommand::Close));
-              current.items.push(PageItem::Path(common::PathItem {
-                bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
-                points: Vec::new(),
-                commands: commands.clone(),
-                closed,
-                fill: shape
-                  .fill_color
-                  .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
-                  .unwrap_or(common::Fill::None),
-                stroke: shape
-                  .stroke
-                  .map(|stroke| common_stroke_from_border(stroke, 1.0)),
-              }));
-              for color in &shape.additional_fill_colors {
+            if let InlineShapeGeometry::Path { paths, outline } = &shape.geometry {
+              for path in paths {
+                let commands = common::drawingml_geometry::transform_commands(
+                  path.commands.iter().copied(),
+                  Affine::translate((f64::from(x_pt), f64::from(y_pt))),
+                );
+                let closed = commands
+                  .iter()
+                  .any(|command| matches!(command, common::PathCommand::Close));
                 current.items.push(PageItem::Path(common::PathItem {
                   bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
                   points: Vec::new(),
                   commands: commands.clone(),
                   closed,
-                  fill: common::Fill::Solid(common_rgb(*color, 1.0)),
-                  stroke: None,
+                  fill: path
+                    .fill_mode
+                    .apply_to_fill(inline_shape_common_fill(shape)),
+                  stroke: if path.stroke {
+                    shape
+                      .stroke
+                      .map(|stroke| inline_shape_common_stroke(shape, stroke, outline.as_deref()))
+                  } else {
+                    None
+                  },
                 }));
+                if path.fill_mode != common::DrawingPathFillMode::None {
+                  for color in &shape.additional_fill_colors {
+                    current.items.push(PageItem::Path(common::PathItem {
+                      bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
+                      points: Vec::new(),
+                      commands: commands.clone(),
+                      closed,
+                      fill: path
+                        .fill_mode
+                        .apply_to_fill(common::Fill::Solid(common_rgb(*color, 1.0))),
+                      stroke: None,
+                    }));
+                  }
+                }
               }
               layout_shape_text_box(
                 current,
@@ -15015,7 +15086,24 @@ impl<'a> TextFrameLayout<'a> {
               );
               return (item_start, current.items.len());
             }
-            if shape.fill_color.is_some() || shape.stroke.is_some() {
+            if shape.fill_pattern.is_some() || shape.stroke_pattern.is_some() {
+              current.items.push(PageItem::Path(common::PathItem {
+                bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
+                points: Vec::new(),
+                commands: vec![
+                  common::PathCommand::MoveTo(common_point(x_pt, y_pt)),
+                  common::PathCommand::LineTo(common_point(x_pt + width_pt, y_pt)),
+                  common::PathCommand::LineTo(common_point(x_pt + width_pt, y_pt + height_pt)),
+                  common::PathCommand::LineTo(common_point(x_pt, y_pt + height_pt)),
+                  common::PathCommand::Close,
+                ],
+                closed: true,
+                fill: inline_shape_common_fill(shape),
+                stroke: shape
+                  .stroke
+                  .map(|stroke| inline_shape_common_stroke(shape, stroke, None)),
+              }));
+            } else if shape.fill_color.is_some() || shape.stroke.is_some() {
               current.items.push(PageItem::Rect(RectItem {
                 x_pt,
                 y_pt,
@@ -15143,6 +15231,7 @@ impl<'a> TextFrameLayout<'a> {
               );
               if placement.behind_text
                 && shape.fill_color.is_none()
+                && shape.fill_pattern.is_none()
                 && shape.fill_image.is_none()
                 && shape.stroke.is_none()
                 && shape.additional_fill_colors.is_empty()
@@ -17645,9 +17734,11 @@ mod tests {
       offset_x_pt: 0.0,
       offset_y_pt: 0.0,
       fill_color: None,
+      fill_pattern: None,
       additional_fill_colors: Vec::new(),
       fill_image: None,
       stroke: None,
+      stroke_pattern: None,
       suppress_zero_relative_background: false,
       allow_outside_page: false,
       inline_anchor_after_line: false,

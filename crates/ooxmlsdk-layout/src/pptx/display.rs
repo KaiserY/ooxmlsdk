@@ -4,7 +4,14 @@ use std::io::Cursor;
 use std::ops::Range;
 use std::sync::Arc;
 
+use crate::common::drawingml_geometry::{
+  common_transform, group_child_affine, transform_commands, transform_point, transform_rect_bounds,
+  transform_vector,
+};
 use crate::common::{self, DebugProperty, DebugRecord, DebugShape, DebugValue, Point, Rect, Size};
+use crate::common::{
+  drawingml_custom_geometry as custom_geometry, drawingml_preset_geometry as preset_geometry,
+};
 use crate::model::{
   BorderStyle, ImageCrop, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PageSetup,
   PdfTextSegmentation, RectItem, RgbColor, RgbColor as LayoutRgbColor, TextItem, TextStyle,
@@ -21,6 +28,7 @@ use crate::text_metrics::TextMetrics;
 use crate::units;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder};
+use kurbo::{Affine, Rect as KurboRect};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex as cx;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
@@ -35,7 +43,6 @@ use super::chart::{
   ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, RadialChartStyle,
   lower_clustered_column_chart, lower_radial_chart,
 };
-use super::custom_geometry;
 use super::drawingml::color::{Color, SchemeColor};
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::line::{LineFill, LineProperties};
@@ -54,7 +61,6 @@ use super::drawingml::text_list_style::{
   TextListLevelParagraphProperties, TextListParagraphStyle, TextListStyle,
 };
 use super::import::{PowerPointImport, ThemeFragmentRecord};
-use super::preset_geometry;
 use super::shadow::{ShadowFrame, outer_shadow_image_item};
 use super::slide::{BackgroundKind, ChartResource, ImageResource, SlidePersist};
 use super::{
@@ -520,12 +526,11 @@ fn collect_shape_summary(
     return;
   }
 
-  let x_pt =
-    units::emu_to_points_f32(transform.x_emu + shape.position.x as f32 * transform.scale_x);
-  let y_pt =
-    units::emu_to_points_f32(transform.y_emu + shape.position.y as f32 * transform.scale_y);
-  let width_pt = units::emu_to_points_f32(shape.size.cx as f32 * transform.scale_x);
-  let height_pt = units::emu_to_points_f32(shape.size.cy as f32 * transform.scale_y);
+  let bounds = transform.shape_bounds(shape);
+  let x_pt = units::emu_to_points_f32(bounds.x0 as f32);
+  let y_pt = units::emu_to_points_f32(bounds.y0 as f32);
+  let width_pt = units::emu_to_points_f32(bounds.width() as f32);
+  let height_pt = units::emu_to_points_f32(bounds.height() as f32);
   let (geo_x_pt, geo_y_pt) =
     rotated_shape_geo_top_left(x_pt, y_pt, width_pt, height_pt, shape.rotation);
   summary
@@ -561,44 +566,47 @@ fn collect_shape_summary(
 }
 
 #[derive(Clone, Copy, Debug)]
-struct ShapeSummaryTransform {
-  x_emu: f32,
-  y_emu: f32,
-  scale_x: f32,
-  scale_y: f32,
-}
+struct ShapeSummaryTransform(Affine);
 
 impl Default for ShapeSummaryTransform {
   fn default() -> Self {
-    Self {
-      x_emu: 0.0,
-      y_emu: 0.0,
-      scale_x: 1.0,
-      scale_y: 1.0,
-    }
+    Self(Affine::IDENTITY)
   }
 }
 
 impl ShapeSummaryTransform {
+  fn shape_bounds(self, shape: &Shape) -> KurboRect {
+    transform_rect_bounds(
+      KurboRect::new(
+        shape.position.x as f64,
+        shape.position.y as f64,
+        shape.position.x as f64 + shape.size.cx as f64,
+        shape.position.y as f64 + shape.size.cy as f64,
+      ),
+      self.0,
+    )
+  }
+
   fn child(self, shape: &Shape) -> Self {
-    let scale_x = if shape.child_size.cx != 0 {
-      self.scale_x * shape.size.cx as f32 / shape.child_size.cx as f32
+    let child_width = if shape.child_size.cx != 0 {
+      shape.child_size.cx
     } else {
-      self.scale_x
+      shape.size.cx
     };
-    let scale_y = if shape.child_size.cy != 0 {
-      self.scale_y * shape.size.cy as f32 / shape.child_size.cy as f32
+    let child_height = if shape.child_size.cy != 0 {
+      shape.child_size.cy
     } else {
-      self.scale_y
+      shape.size.cy
     };
-    let parent_x = self.x_emu + shape.position.x as f32 * self.scale_x;
-    let parent_y = self.y_emu + shape.position.y as f32 * self.scale_y;
-    Self {
-      x_emu: parent_x - shape.child_position.x as f32 * scale_x,
-      y_emu: parent_y - shape.child_position.y as f32 * scale_y,
-      scale_x,
-      scale_y,
-    }
+    Self(
+      self.0
+        * group_child_affine(
+          kurbo::Point::new(shape.position.x as f64, shape.position.y as f64),
+          kurbo::Vec2::new(shape.size.cx as f64, shape.size.cy as f64),
+          kurbo::Point::new(shape.child_position.x as f64, shape.child_position.y as f64),
+          kurbo::Vec2::new(child_width as f64, child_height as f64),
+        ),
+    )
   }
 }
 
@@ -791,39 +799,37 @@ fn lower_shapes(
 }
 
 #[derive(Clone, Copy, Debug)]
-struct DisplayOffset {
-  x_emu: f32,
-  y_emu: f32,
-  scale_x: f32,
-  scale_y: f32,
-}
+struct DisplayOffset(Affine);
 
 impl Default for DisplayOffset {
   fn default() -> Self {
-    Self {
-      x_emu: 0.0,
-      y_emu: 0.0,
-      scale_x: 1.0,
-      scale_y: 1.0,
-    }
+    Self(Affine::IDENTITY)
   }
 }
 
 impl DisplayOffset {
   fn x_pt(self, x_emu: i64) -> f32 {
-    units::emu_to_points_f32(self.x_emu + x_emu as f32 * self.scale_x)
+    let point = self.0 * kurbo::Point::new(x_emu as f64, 0.0);
+    units::emu_to_points_f32(point.x as f32)
   }
 
   fn y_pt(self, y_emu: i64) -> f32 {
-    units::emu_to_points_f32(self.y_emu + y_emu as f32 * self.scale_y)
+    let point = self.0 * kurbo::Point::new(0.0, y_emu as f64);
+    units::emu_to_points_f32(point.y as f32)
   }
 
   fn width_pt(self, width_emu: i64) -> f32 {
-    units::emu_to_points_f32(width_emu as f32 * self.scale_x)
+    let vector = transform_vector(kurbo::Vec2::new(width_emu as f64, 0.0), self.0);
+    units::emu_to_points_f32(vector.x as f32)
   }
 
   fn height_pt(self, height_emu: i64) -> f32 {
-    units::emu_to_points_f32(height_emu as f32 * self.scale_y)
+    let vector = transform_vector(kurbo::Vec2::new(0.0, height_emu as f64), self.0);
+    units::emu_to_points_f32(vector.y as f32)
+  }
+
+  fn scale_y(self) -> f32 {
+    self.0.as_coeffs()[3] as f32
   }
 }
 
@@ -2165,12 +2171,14 @@ fn lower_diagram(
       let sync_auto_fit = text_body.display_properties.auto_fit == TextAutoFit::Shape;
       let (font_scale, line_scale) = if sync_auto_fit {
         diagram_text_auto_fit_scales(
-          context.import,
-          context.page_index,
-          text_frame,
-          &text_body,
-          font_reference.as_ref(),
-          diagram_shape.font_size_pt,
+          DiagramTextMeasurement {
+            import: context.import,
+            page_index: context.page_index,
+            frame: text_frame,
+            text_body: &text_body,
+            font_reference: font_reference.as_ref(),
+            base_font_size_pt: diagram_shape.font_size_pt,
+          },
           diagram_shape.minimum_font_size_pt,
           &options,
         )
@@ -2603,18 +2611,23 @@ struct PendingDiagramTextItem {
   line_scale: f32,
 }
 
-fn diagram_text_auto_fit_scales(
-  import: &PowerPointImport,
+#[derive(Clone, Copy)]
+struct DiagramTextMeasurement<'a> {
+  import: &'a PowerPointImport,
   page_index: usize,
   frame: TextFrame,
-  text_body: &TextBody,
-  font_reference: Option<&FontStyleReference>,
+  text_body: &'a TextBody,
+  font_reference: Option<&'a FontStyleReference>,
   base_font_size_pt: Option<f32>,
+}
+
+fn diagram_text_auto_fit_scales(
+  measurement: DiagramTextMeasurement<'_>,
   minimum_font_size_pt: Option<f32>,
   options: &TextLoweringOptions,
 ) -> (f32, f32) {
   let (initial_font_scale, line_scale) = text_auto_fit_scales(options);
-  if frame.width_pt <= f32::EPSILON || frame.height_pt <= f32::EPSILON {
+  if measurement.frame.width_pt <= f32::EPSILON || measurement.frame.height_pt <= f32::EPSILON {
     return (initial_font_scale, line_scale);
   }
 
@@ -2622,27 +2635,21 @@ fn diagram_text_auto_fit_scales(
   // to fit its shape. LibreOffice's DiagramLayoutAtom enables AUTOFIT for
   // default SmartArt text, then SdrTextObj::setupAutoFitText() measures the
   // fixed text box and rounds the resulting font size to whole points.
-  let Some((required_width, required_height)) = diagram_text_required_size(
-    import,
-    page_index,
-    frame,
-    text_body,
-    font_reference,
-    base_font_size_pt,
-    initial_font_scale,
-    line_scale,
-  ) else {
+  let Some((required_width, required_height)) =
+    diagram_text_required_size(measurement, initial_font_scale, line_scale)
+  else {
     return (initial_font_scale, line_scale);
   };
-  let fit = (frame.width_pt / required_width)
-    .min(frame.height_pt / required_height)
+  let fit = (measurement.frame.width_pt / required_width)
+    .min(measurement.frame.height_pt / required_height)
     .min(1.0);
   let minimum_scale = minimum_font_size_pt
-    .zip(base_font_size_pt)
+    .zip(measurement.base_font_size_pt)
     .filter(|(_, base)| *base > f32::EPSILON)
     .map(|(minimum, base)| minimum / base)
     .unwrap_or(0.0);
-  let mut fitted_scale = base_font_size_pt
+  let mut fitted_scale = measurement
+    .base_font_size_pt
     .filter(|base| *base > f32::EPSILON)
     .map(|base| (base * initial_font_scale * fit).round() / base)
     .unwrap_or(initial_font_scale * fit)
@@ -2652,19 +2659,22 @@ fn diagram_text_auto_fit_scales(
   // secondary font sizes. Re-measure the rounded result and step the primary
   // size down until the actual line boxes fit, matching EditEngine's
   // format-and-retry autofit loop instead of trusting a continuous ratio.
-  if let Some(base_font_size_pt) = base_font_size_pt.filter(|base| *base > f32::EPSILON) {
+  if let Some(base_font_size_pt) = measurement
+    .base_font_size_pt
+    .filter(|base| *base > f32::EPSILON)
+  {
     loop {
       let fits = diagram_text_required_size(
-        import,
-        page_index,
-        frame,
-        text_body,
-        font_reference,
-        Some(base_font_size_pt),
+        DiagramTextMeasurement {
+          base_font_size_pt: Some(base_font_size_pt),
+          ..measurement
+        },
         fitted_scale,
         line_scale,
       )
-      .is_none_or(|(width, height)| width <= frame.width_pt && height <= frame.height_pt);
+      .is_none_or(|(width, height)| {
+        width <= measurement.frame.width_pt && height <= measurement.frame.height_pt
+      });
       if fits || fitted_scale <= minimum_scale + f32::EPSILON {
         break;
       }
@@ -2682,26 +2692,21 @@ fn diagram_text_auto_fit_scales(
 }
 
 fn diagram_text_required_size(
-  import: &PowerPointImport,
-  page_index: usize,
-  frame: TextFrame,
-  text_body: &TextBody,
-  font_reference: Option<&FontStyleReference>,
-  base_font_size_pt: Option<f32>,
+  measurement: DiagramTextMeasurement<'_>,
   font_scale: f32,
   line_scale: f32,
 ) -> Option<(f32, f32)> {
   let mut probe_items = Vec::new();
   lower_diagram_text_body_at_with_style_and_scale(
-    import,
-    page_index,
-    frame,
-    text_body,
+    measurement.import,
+    measurement.page_index,
+    measurement.frame,
+    measurement.text_body,
     DiagramTextLoweringStyle {
-      font_reference,
+      font_reference: measurement.font_reference,
       table_text_style: None,
       shape_hyperlink_url: None,
-      base_font_size_pt,
+      base_font_size_pt: measurement.base_font_size_pt,
       font_scale,
       line_scale,
       shape_order: 0,
@@ -2744,33 +2749,7 @@ fn diagram_model_shape_path_item(
     width: shape.width,
     height: shape.height,
   };
-  let commands = match shape
-    .shape_properties
-    .as_deref()
-    .and_then(|properties| properties.shape_properties_choice1.as_ref())
-  {
-    Some(dgm::ShapePropertiesChoice::PresetGeometry(preset)) => preset_geometry::path_commands(
-      Some(preset),
-      bounds.x,
-      bounds.y,
-      bounds.width,
-      bounds.height,
-    ),
-    Some(dgm::ShapePropertiesChoice::CustomGeometry(geometry)) => {
-      custom_geometry::path_commands(geometry, bounds.x, bounds.y, bounds.width, bounds.height)?
-    }
-    None => preset_geometry::path_commands(
-      Some(shape.preset_geometry.as_deref()?),
-      bounds.x,
-      bounds.y,
-      bounds.width,
-      bounds.height,
-    ),
-  };
-  let commands = commands
-    .into_iter()
-    .map(|command| transform_diagram_path_command(command, bounds, shape.shape_rotation_deg))
-    .collect();
+  let commands = shape.path_commands()?;
   Some(common::PathItem {
     bounds: common_rect(bounds.x, bounds.y, bounds.width, bounds.height),
     points: Vec::new(),
@@ -2812,70 +2791,24 @@ fn diagram_model_shape_text_rectangle(
   }
   let center_x = shape_bounds.x + shape_bounds.width / 2.0;
   let center_y = shape_bounds.y + shape_bounds.height / 2.0;
-  let angle = shape.shape_rotation_deg.to_radians();
-  let corners = [
-    (text_bounds.x, text_bounds.y),
-    (text_bounds.x + text_bounds.width, text_bounds.y),
-    (
-      text_bounds.x + text_bounds.width,
-      text_bounds.y + text_bounds.height,
+  let bounds = transform_rect_bounds(
+    KurboRect::new(
+      f64::from(text_bounds.x),
+      f64::from(text_bounds.y),
+      f64::from(text_bounds.x + text_bounds.width),
+      f64::from(text_bounds.y + text_bounds.height),
     ),
-    (text_bounds.x, text_bounds.y + text_bounds.height),
-  ]
-  .map(|(x, y)| rotate_point(x, y, center_x, center_y, angle));
-  let left = corners
-    .iter()
-    .map(|(x, _)| *x)
-    .fold(f32::INFINITY, f32::min);
-  let top = corners
-    .iter()
-    .map(|(_, y)| *y)
-    .fold(f32::INFINITY, f32::min);
-  let right = corners
-    .iter()
-    .map(|(x, _)| *x)
-    .fold(f32::NEG_INFINITY, f32::max);
-  let bottom = corners
-    .iter()
-    .map(|(_, y)| *y)
-    .fold(f32::NEG_INFINITY, f32::max);
+    Affine::rotate_about(
+      f64::from(shape.shape_rotation_deg.to_radians()),
+      (f64::from(center_x), f64::from(center_y)),
+    ),
+  );
   Some(shared_diagram::DiagramBounds {
-    x: left,
-    y: top,
-    width: right - left,
-    height: bottom - top,
+    x: bounds.x0 as f32,
+    y: bounds.y0 as f32,
+    width: bounds.width() as f32,
+    height: bounds.height() as f32,
   })
-}
-
-fn transform_diagram_path_command(
-  command: common::PathCommand,
-  bounds: shared_diagram::DiagramBounds,
-  rotation_deg: f32,
-) -> common::PathCommand {
-  let transform = |point: common::Point| {
-    let (x, y) = rotate_point(
-      point.x.0,
-      point.y.0,
-      bounds.x + bounds.width / 2.0,
-      bounds.y + bounds.height / 2.0,
-      rotation_deg.to_radians(),
-    );
-    common_point(x, y)
-  };
-  match command {
-    common::PathCommand::MoveTo(point) => common::PathCommand::MoveTo(transform(point)),
-    common::PathCommand::LineTo(point) => common::PathCommand::LineTo(transform(point)),
-    common::PathCommand::CubicTo {
-      control1,
-      control2,
-      end,
-    } => common::PathCommand::CubicTo {
-      control1: transform(control1),
-      control2: transform(control2),
-      end: transform(end),
-    },
-    common::PathCommand::Close => common::PathCommand::Close,
-  }
 }
 
 fn diagram_connector_line_item(diagram_shape: &shared_diagram::DiagramShape) -> LineItem {
@@ -3056,18 +2989,7 @@ fn diagram_drawing_shape_path_item(
   fill_color: Option<RgbColor>,
   stroke: Option<BorderStyle>,
 ) -> Option<common::PathItem<'static>> {
-  let commands = match properties.shape_properties_choice1.as_ref()? {
-    dsp::ShapePropertiesChoice::PresetGeometry(preset) => preset_geometry::path_commands(
-      Some(preset),
-      bounds.x,
-      bounds.y,
-      bounds.width,
-      bounds.height,
-    ),
-    dsp::ShapePropertiesChoice::CustomGeometry(geometry) => {
-      custom_geometry::path_commands(geometry, bounds.x, bounds.y, bounds.width, bounds.height)?
-    }
-  };
+  let commands = shared_diagram::drawing_shape_path_commands(properties, bounds)?;
   Some(common::PathItem {
     bounds: common_rect(bounds.x, bounds.y, bounds.width, bounds.height),
     points: Vec::new(),
@@ -3168,14 +3090,7 @@ fn diagram_model_shape_blip_fill_image_items(
 }
 
 #[derive(Clone, Copy, Debug)]
-struct DiagramDrawingTransform {
-  xx: f32,
-  xy: f32,
-  yx: f32,
-  yy: f32,
-  tx_pt: f32,
-  ty_pt: f32,
-}
+struct DiagramDrawingTransform(Affine);
 
 impl DiagramDrawingTransform {
   fn root(
@@ -3185,14 +3100,7 @@ impl DiagramDrawingTransform {
     height_pt: f32,
     transform: Option<&a::TransformGroup>,
   ) -> Self {
-    let mut root = Self {
-      xx: 1.0,
-      xy: 0.0,
-      yx: 0.0,
-      yy: 1.0,
-      tx_pt: x_pt,
-      ty_pt: y_pt,
-    };
+    let mut root = Self(Affine::translate((f64::from(x_pt), f64::from(y_pt))));
     root = root.for_group_transform(transform, width_pt, height_pt);
     root
   }
@@ -3252,67 +3160,34 @@ impl DiagramDrawingTransform {
       .as_ref()
       .map(|extents| units::emu_to_points(extents.cy.to_emu()))
       .unwrap_or(ext_height);
-    let scale_x = if child_width != 0.0 {
-      ext_width / child_width
-    } else {
-      1.0
-    };
-    let scale_y = if child_height != 0.0 {
-      ext_height / child_height
-    } else {
-      1.0
-    };
-    let group = Self {
-      xx: scale_x,
-      xy: 0.0,
-      yx: 0.0,
-      yy: scale_y,
-      tx_pt: off_x - child_x * scale_x,
-      ty_pt: off_y - child_y * scale_y,
-    };
+    let group = Self(group_child_affine(
+      kurbo::Point::new(f64::from(off_x), f64::from(off_y)),
+      kurbo::Vec2::new(f64::from(ext_width), f64::from(ext_height)),
+      kurbo::Point::new(f64::from(child_x), f64::from(child_y)),
+      kurbo::Vec2::new(f64::from(child_width), f64::from(child_height)),
+    ));
     self.concat(group)
   }
 
   fn concat(self, child: Self) -> Self {
-    Self {
-      xx: self.xx * child.xx + self.xy * child.yx,
-      xy: self.xx * child.xy + self.xy * child.yy,
-      yx: self.yx * child.xx + self.yy * child.yx,
-      yy: self.yx * child.xy + self.yy * child.yy,
-      tx_pt: self.xx * child.tx_pt + self.xy * child.ty_pt + self.tx_pt,
-      ty_pt: self.yx * child.tx_pt + self.yy * child.ty_pt + self.ty_pt,
-    }
-  }
-
-  fn apply_point(self, x: f32, y: f32) -> (f32, f32) {
-    (
-      self.xx * x + self.xy * y + self.tx_pt,
-      self.yx * x + self.yy * y + self.ty_pt,
-    )
+    Self(self.0 * child.0)
   }
 
   fn apply_bounds(self, x: f32, y: f32, width: f32, height: f32) -> shared_diagram::DiagramBounds {
-    let points = [
-      self.apply_point(x, y),
-      self.apply_point(x + width, y),
-      self.apply_point(x, y + height),
-      self.apply_point(x + width, y + height),
-    ];
-    let left = points.iter().map(|(x, _)| *x).fold(f32::INFINITY, f32::min);
-    let top = points.iter().map(|(_, y)| *y).fold(f32::INFINITY, f32::min);
-    let right = points
-      .iter()
-      .map(|(x, _)| *x)
-      .fold(f32::NEG_INFINITY, f32::max);
-    let bottom = points
-      .iter()
-      .map(|(_, y)| *y)
-      .fold(f32::NEG_INFINITY, f32::max);
+    let bounds = transform_rect_bounds(
+      KurboRect::new(
+        f64::from(x),
+        f64::from(y),
+        f64::from(x + width),
+        f64::from(y + height),
+      ),
+      self.0,
+    );
     shared_diagram::DiagramBounds {
-      x: left,
-      y: top,
-      width: right - left,
-      height: bottom - top,
+      x: bounds.x0 as f32,
+      y: bounds.y0 as f32,
+      width: bounds.width() as f32,
+      height: bounds.height() as f32,
     }
   }
 }
@@ -3407,10 +3282,13 @@ fn diagram_drawing_text_frame(
     let preset_center_y = preset_bounds.y + preset_bounds.height / 2.0;
     let text_center_x = text_bounds.x + text_bounds.width / 2.0;
     let text_center_y = text_bounds.y + text_bounds.height / 2.0;
-    let dx = text_center_x - preset_center_x;
-    let dy = text_center_y - preset_center_y;
-    let rotated_center_x = preset_center_x + dx * angle.cos() - dy * angle.sin();
-    let rotated_center_y = preset_center_y + dx * angle.sin() + dy * angle.cos();
+    let (rotated_center_x, rotated_center_y) = rotate_point(
+      text_center_x,
+      text_center_y,
+      preset_center_x,
+      preset_center_y,
+      angle,
+    );
     text_bounds.x += rotated_center_x - text_center_x;
     text_bounds.y += rotated_center_y - text_center_y;
   }
@@ -4105,7 +3983,7 @@ fn lower_table(
   let max_column = table.grid.len().saturating_sub(1);
   for (row_index, row) in table.rows.iter().enumerate() {
     let row_height =
-      table_row_display_height(row.height, row_height_sum, shape.size.cy, offset.scale_y);
+      table_row_display_height(row.height, row_height_sum, shape.size.cy, offset.scale_y());
     let mut x = x0;
     let mut grid_index = 0usize;
     for cell in &row.cells {
@@ -5113,79 +4991,41 @@ fn shape_path_commands(shape: &Shape, frame: TextFrame) -> Vec<common::PathComma
       frame.height_pt,
     )
   });
-  commands
-    .into_iter()
-    .map(|command| transform_shape_path_command(command, frame, shape))
-    .collect()
-}
-
-fn transform_shape_path_command(
-  command: common::PathCommand,
-  frame: TextFrame,
-  shape: &Shape,
-) -> common::PathCommand {
-  match command {
-    common::PathCommand::MoveTo(point) => {
-      common::PathCommand::MoveTo(transform_shape_point(point, frame, shape))
-    }
-    common::PathCommand::LineTo(point) => {
-      common::PathCommand::LineTo(transform_shape_point(point, frame, shape))
-    }
-    common::PathCommand::CubicTo {
-      control1,
-      control2,
-      end,
-    } => common::PathCommand::CubicTo {
-      control1: transform_shape_point(control1, frame, shape),
-      control2: transform_shape_point(control2, frame, shape),
-      end: transform_shape_point(end, frame, shape),
-    },
-    common::PathCommand::Close => common::PathCommand::Close,
-  }
+  transform_commands(commands, shape_path_transform(frame, shape))
 }
 
 fn transform_shape_point(point: common::Point, frame: TextFrame, shape: &Shape) -> common::Point {
+  transform_point(point, shape_path_transform(frame, shape))
+}
+
+fn shape_path_transform(frame: TextFrame, shape: &Shape) -> Affine {
   let center_x = frame.x_pt + frame.width_pt / 2.0;
   let center_y = frame.y_pt + frame.height_pt / 2.0;
-  let x = if shape.flip_h {
-    2.0 * center_x - point.x.0
-  } else {
-    point.x.0
-  };
-  let y = if shape.flip_v {
-    2.0 * center_y - point.y.0
-  } else {
-    point.y.0
-  };
-  let (x, y) = rotate_point(x, y, center_x, center_y, shape.rotation.to_radians());
-  common_point(x, y)
+  Affine::translate((-f64::from(center_x), -f64::from(center_y)))
+    .then_scale_non_uniform(
+      if shape.flip_h { -1.0 } else { 1.0 },
+      if shape.flip_v { -1.0 } else { 1.0 },
+    )
+    .then_rotate(f64::from(shape.rotation.to_radians()))
+    .then_translate((f64::from(center_x), f64::from(center_y)).into())
 }
 
 fn transformed_shape_bounds(frame: TextFrame, shape: &Shape) -> common::Rect {
-  let corners = [
-    common_point(frame.x_pt, frame.y_pt),
-    common_point(frame.x_pt + frame.width_pt, frame.y_pt),
-    common_point(frame.x_pt + frame.width_pt, frame.y_pt + frame.height_pt),
-    common_point(frame.x_pt, frame.y_pt + frame.height_pt),
-  ]
-  .map(|point| transform_shape_point(point, frame, shape));
-  let left = corners
-    .iter()
-    .map(|point| point.x.0)
-    .fold(f32::INFINITY, f32::min);
-  let top = corners
-    .iter()
-    .map(|point| point.y.0)
-    .fold(f32::INFINITY, f32::min);
-  let right = corners
-    .iter()
-    .map(|point| point.x.0)
-    .fold(f32::NEG_INFINITY, f32::max);
-  let bottom = corners
-    .iter()
-    .map(|point| point.y.0)
-    .fold(f32::NEG_INFINITY, f32::max);
-  common_rect(left, top, right - left, bottom - top)
+  let bounds = transform_rect_bounds(
+    KurboRect::new(
+      f64::from(frame.x_pt),
+      f64::from(frame.y_pt),
+      f64::from(frame.x_pt + frame.width_pt),
+      f64::from(frame.y_pt + frame.height_pt),
+    ),
+    shape_path_transform(frame, shape),
+  );
+  common_rect(
+    bounds.x0 as f32,
+    bounds.y0 as f32,
+    bounds.width() as f32,
+    bounds.height() as f32,
+  )
 }
 
 fn linear_gradient_line(
@@ -5231,24 +5071,25 @@ fn transformed_gradient_angle(local_angle_degrees: f32, shape: &Shape) -> f32 {
 }
 
 fn child_display_offset(shape: &Shape, offset: DisplayOffset) -> DisplayOffset {
-  let scale_x = if shape.child_size.cx != 0 {
-    offset.scale_x * shape.size.cx as f32 / shape.child_size.cx as f32
+  let child_width = if shape.child_size.cx != 0 {
+    shape.child_size.cx
   } else {
-    offset.scale_x
+    shape.size.cx
   };
-  let scale_y = if shape.child_size.cy != 0 {
-    offset.scale_y * shape.size.cy as f32 / shape.child_size.cy as f32
+  let child_height = if shape.child_size.cy != 0 {
+    shape.child_size.cy
   } else {
-    offset.scale_y
+    shape.size.cy
   };
-  let parent_x = offset.x_emu + shape.position.x as f32 * offset.scale_x;
-  let parent_y = offset.y_emu + shape.position.y as f32 * offset.scale_y;
-  DisplayOffset {
-    x_emu: parent_x - shape.child_position.x as f32 * scale_x,
-    y_emu: parent_y - shape.child_position.y as f32 * scale_y,
-    scale_x,
-    scale_y,
-  }
+  DisplayOffset(
+    offset.0
+      * group_child_affine(
+        kurbo::Point::new(shape.position.x as f64, shape.position.y as f64),
+        kurbo::Vec2::new(shape.size.cx as f64, shape.size.cy as f64),
+        kurbo::Point::new(shape.child_position.x as f64, shape.child_position.y as f64),
+        kurbo::Vec2::new(child_width as f64, child_height as f64),
+      ),
+  )
 }
 
 #[derive(Clone, Debug)]
@@ -6177,16 +6018,12 @@ fn apply_plain_word_art_transform(
   // preset text warp. PowerPoint retains the natural text as an invisible
   // semantic layer, while the visible glyph paths are independently scaled
   // from the laid-out text bounds to the complete text frame.
-  let scale_x = frame.width_pt / source_width;
-  let scale_y = frame.height_pt / source_height;
-  let transform = common::Transform {
-    m11: scale_x,
-    m12: 0.0,
-    m21: 0.0,
-    m22: scale_y,
-    dx: common::Pt(frame.x_pt - left * scale_x),
-    dy: common::Pt(frame.y_pt - top * scale_y),
-  };
+  let transform = common_transform(group_child_affine(
+    kurbo::Point::new(f64::from(frame.x_pt), f64::from(frame.y_pt)),
+    kurbo::Vec2::new(f64::from(frame.width_pt), f64::from(frame.height_pt)),
+    kurbo::Point::new(f64::from(left), f64::from(top)),
+    kurbo::Vec2::new(f64::from(source_width), f64::from(source_height)),
+  ));
   for item in items {
     if let PageItem::Text(text) = item {
       let semantic_text_overlay = text
@@ -6722,12 +6559,9 @@ fn points_to_100mm(value: f32) -> i32 {
 }
 
 fn rotate_point(x: f32, y: f32, center_x: f32, center_y: f32, angle: f32) -> (f32, f32) {
-  let dx = x - center_x;
-  let dy = y - center_y;
-  (
-    center_x + dx * angle.cos() - dy * angle.sin(),
-    center_y + dx * angle.sin() + dy * angle.cos(),
-  )
+  let point = Affine::rotate_about(f64::from(angle), (f64::from(center_x), f64::from(center_y)))
+    * kurbo::Point::new(f64::from(x), f64::from(y));
+  (point.x as f32, point.y as f32)
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -9821,10 +9655,10 @@ mod tests {
 
     let child = child_display_offset(&shape, DisplayOffset::default());
 
-    assert_eq!(child.scale_x, 2.0);
-    assert_eq!(child.scale_y, 2.0);
-    assert_eq!(child.x_emu, 800.0);
-    assert_eq!(child.y_emu, 1_600.0);
+    assert_eq!(child.0.as_coeffs()[0], 2.0);
+    assert_eq!(child.scale_y(), 2.0);
+    assert_eq!(child.0.as_coeffs()[4], 800.0);
+    assert_eq!(child.0.as_coeffs()[5], 1_600.0);
     assert_eq!(child.x_pt(100), units::emu_to_points_f32(1_000.0));
     assert_eq!(child.y_pt(200), units::emu_to_points_f32(2_000.0));
   }

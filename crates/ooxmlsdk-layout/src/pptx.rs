@@ -1,11 +1,9 @@
 pub(crate) mod chart;
-mod custom_geometry;
 mod display;
 pub(crate) mod drawingml;
 mod gradient;
 mod import;
 mod presentation;
-mod preset_geometry;
 mod shadow;
 mod shape;
 mod shape_context;

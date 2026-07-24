@@ -15,6 +15,7 @@ use std::sync::Arc;
 use crate::common;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
+use kurbo::{Affine, Rect as KurboRect};
 use ooxmlsdk::parts::{
   main_document_part::MainDocumentPart, wordprocessing_document::WordprocessingDocument,
 };
@@ -8411,10 +8412,7 @@ fn chart_shape(
 
 #[derive(Clone, Copy, Debug)]
 struct DrawingMlGroupTransform {
-  scale_x: f32,
-  scale_y: f32,
-  translate_x_pt: f32,
-  translate_y_pt: f32,
+  affine: Affine,
   raw_coordinates: bool,
   fallback_size: Option<(f32, f32)>,
 }
@@ -8430,10 +8428,7 @@ struct DrawingEffectExtent {
 impl DrawingMlGroupTransform {
   fn identity() -> Self {
     Self {
-      scale_x: 1.0,
-      scale_y: 1.0,
-      translate_x_pt: 0.0,
-      translate_y_pt: 0.0,
+      affine: Affine::IDENTITY,
       raw_coordinates: false,
       fallback_size: None,
     }
@@ -8445,38 +8440,37 @@ impl DrawingMlGroupTransform {
   }
 
   fn child(self, xfrm: DrawingMlGroupXfrm) -> Self {
-    let scale_x = if xfrm.child_width != 0.0 {
-      xfrm.width_pt / xfrm.child_width
-    } else {
-      1.0
-    };
-    let scale_y = if xfrm.child_height != 0.0 {
-      xfrm.height_pt / xfrm.child_height
-    } else {
-      1.0
-    };
-    let (offset_x_pt, offset_y_pt, _, _) = self.rect(
-      xfrm.offset_x_pt,
-      xfrm.offset_y_pt,
-      xfrm.width_pt,
-      xfrm.height_pt,
+    let child = common::drawingml_geometry::group_child_affine(
+      kurbo::Point::new(f64::from(xfrm.offset_x_pt), f64::from(xfrm.offset_y_pt)),
+      kurbo::Vec2::new(f64::from(xfrm.width_pt), f64::from(xfrm.height_pt)),
+      kurbo::Point::new(
+        f64::from(xfrm.child_offset_x),
+        f64::from(xfrm.child_offset_y),
+      ),
+      kurbo::Vec2::new(f64::from(xfrm.child_width), f64::from(xfrm.child_height)),
     );
     Self {
-      scale_x: self.scale_x * scale_x,
-      scale_y: self.scale_y * scale_y,
-      translate_x_pt: offset_x_pt - self.scale_x * xfrm.child_offset_x * scale_x,
-      translate_y_pt: offset_y_pt - self.scale_y * xfrm.child_offset_y * scale_y,
+      affine: self.affine * child,
       raw_coordinates: true,
       fallback_size: None,
     }
   }
 
   fn rect(self, x_pt: f32, y_pt: f32, width_pt: f32, height_pt: f32) -> (f32, f32, f32, f32) {
+    let bounds = common::drawingml_geometry::transform_rect_bounds(
+      KurboRect::new(
+        f64::from(x_pt),
+        f64::from(y_pt),
+        f64::from(x_pt + width_pt),
+        f64::from(y_pt + height_pt),
+      ),
+      self.affine,
+    );
     (
-      self.translate_x_pt + x_pt * self.scale_x,
-      self.translate_y_pt + y_pt * self.scale_y,
-      width_pt * self.scale_x.abs(),
-      height_pt * self.scale_y.abs(),
+      bounds.x0 as f32,
+      bounds.y0 as f32,
+      bounds.width() as f32,
+      bounds.height() as f32,
     )
   }
 }
@@ -8777,75 +8771,19 @@ fn drawingml_custom_geometry_from_properties(
   height_pt: f32,
 ) -> Option<InlineShapeGeometry> {
   let geometry = properties.custom_geometry()?;
-  let path = geometry.path_list.path.first()?;
-  let path_width = path
-    .width
-    .map(|value| value.to_emu() as f32)
-    .unwrap_or(width_pt);
-  let path_height = path
-    .height
-    .map(|value| value.to_emu() as f32)
-    .unwrap_or(height_pt);
-  let mut points = Vec::new();
-  let mut closed = false;
-
-  for choice in &path.path_choice {
-    match choice {
-      a::PathChoice::CloseShapePath => closed = true,
-      a::PathChoice::MoveTo(point) => {
-        let x = point.point.x.parse::<f32>().ok()?;
-        let y = point.point.y.parse::<f32>().ok()?;
-        points.push(drawingml_custom_geometry_point(
-          x,
-          y,
-          path_width,
-          path_height,
-          width_pt,
-          height_pt,
-        ));
-      }
-      a::PathChoice::LineTo(point) => {
-        let x = point.point.x.parse::<f32>().ok()?;
-        let y = point.point.y.parse::<f32>().ok()?;
-        points.push(drawingml_custom_geometry_point(
-          x,
-          y,
-          path_width,
-          path_height,
-          width_pt,
-          height_pt,
-        ));
-      }
-      _ => {}
-    }
-  }
-
-  if points.len() == 2 && !closed {
+  if matches!(
+    geometry.path_list.path.as_slice(),
+    [path]
+      if matches!(
+        path.path_choice.as_slice(),
+        [a::PathChoice::MoveTo(_), a::PathChoice::LineTo(_)]
+      )
+  ) {
     return Some(InlineShapeGeometry::Line);
   }
-
-  (points.len() >= 2).then_some(InlineShapeGeometry::Polyline { points, closed })
-}
-
-fn drawingml_custom_geometry_point(
-  x: f32,
-  y: f32,
-  path_width: f32,
-  path_height: f32,
-  width_pt: f32,
-  height_pt: f32,
-) -> (f32, f32) {
-  let scaled_x = if path_width == 0.0 {
-    0.0
-  } else {
-    x / path_width * width_pt
-  };
-  let scaled_y = if path_height == 0.0 {
-    0.0
-  } else {
-    y / path_height * height_pt
-  };
-  (scaled_x, scaled_y)
+  let commands =
+    common::drawingml_custom_geometry::path_commands(geometry, 0.0, 0.0, width_pt, height_pt)?;
+  Some(InlineShapeGeometry::Path { commands })
 }
 
 fn drawingml_geometry_from_shape_properties(
@@ -8882,6 +8820,7 @@ fn drawingml_geometry_from_shape_properties(
     InlineShapeGeometry::Line if width_pt <= 0.0 && height_pt <= 0.0 => return None,
     InlineShapeGeometry::Rectangle
     | InlineShapeGeometry::Line
+    | InlineShapeGeometry::Path { .. }
     | InlineShapeGeometry::Polyline { .. } => {}
   }
 
@@ -9942,18 +9881,17 @@ fn vml_polyline_points(value: &str) -> Option<Vec<(f32, f32)>> {
 }
 
 fn polyline_bounds(points: &[(f32, f32)]) -> Option<(f32, f32, f32, f32)> {
-  let &(first_x, first_y) = points.first()?;
-  let mut min_x = first_x;
-  let mut min_y = first_y;
-  let mut max_x = first_x;
-  let mut max_y = first_y;
-  for &(x, y) in points {
-    min_x = min_x.min(x);
-    min_y = min_y.min(y);
-    max_x = max_x.max(x);
-    max_y = max_y.max(y);
-  }
-  Some((min_x, min_y, max_x, max_y))
+  let bounds = common::drawingml_geometry::point_bounds(
+    points
+      .iter()
+      .map(|&(x, y)| kurbo::Point::new(f64::from(x), f64::from(y))),
+  )?;
+  Some((
+    bounds.x0 as f32,
+    bounds.y0 as f32,
+    bounds.x1 as f32,
+    bounds.y1 as f32,
+  ))
 }
 
 fn pict_image_impl(picture: &w::Picture, images: &ImageCatalog) -> Option<InlineImage> {
@@ -10609,13 +10547,17 @@ struct VmlImageStyle {
 
 #[derive(Clone, Copy, Debug)]
 struct VmlGroupTransform {
-  origin_x: f32,
-  origin_y: f32,
-  scale_x: f32,
-  scale_y: f32,
+  affine: Affine,
 }
 
 impl VmlGroupTransform {
+  fn new(origin_x: f32, origin_y: f32, scale_x: f32, scale_y: f32) -> Self {
+    Self {
+      affine: Affine::translate((-f64::from(origin_x), -f64::from(origin_y)))
+        .then_scale_non_uniform(f64::from(scale_x), f64::from(scale_y)),
+    }
+  }
+
   fn from_group(group: &v::Group) -> Option<Self> {
     let style = vml_image_style(group.style.as_deref());
     let (width_pt, height_pt) = style.size_pt?;
@@ -10626,12 +10568,12 @@ impl VmlGroupTransform {
     let (origin_x, origin_y) =
       vml_coordinate_pair(group.coordinate_origin.as_deref()).unwrap_or((0.0, 0.0));
 
-    Some(Self {
+    Some(Self::new(
       origin_x,
       origin_y,
-      scale_x: width_pt / coord_width,
-      scale_y: height_pt / coord_height,
-    })
+      width_pt / coord_width,
+      height_pt / coord_height,
+    ))
   }
 
   fn child_style(self, style: Option<&str>) -> Option<String> {
@@ -10645,10 +10587,24 @@ impl VmlGroupTransform {
       let name = name.trim();
       let value = value.trim();
       let transformed = match name.to_ascii_lowercase().as_str() {
-        "left" => vml_raw_coordinate(value).map(|coord| (coord - self.origin_x) * self.scale_x),
-        "top" => vml_raw_coordinate(value).map(|coord| (coord - self.origin_y) * self.scale_y),
-        "width" => vml_raw_coordinate(value).map(|coord| coord * self.scale_x),
-        "height" => vml_raw_coordinate(value).map(|coord| coord * self.scale_y),
+        "left" => vml_raw_coordinate(value)
+          .map(|coord| (self.affine * kurbo::Point::new(f64::from(coord), 0.0)).x as f32),
+        "top" => vml_raw_coordinate(value)
+          .map(|coord| (self.affine * kurbo::Point::new(0.0, f64::from(coord))).y as f32),
+        "width" => vml_raw_coordinate(value).map(|coord| {
+          common::drawingml_geometry::transform_vector(
+            kurbo::Vec2::new(f64::from(coord), 0.0),
+            self.affine,
+          )
+          .x as f32
+        }),
+        "height" => vml_raw_coordinate(value).map(|coord| {
+          common::drawingml_geometry::transform_vector(
+            kurbo::Vec2::new(0.0, f64::from(coord)),
+            self.affine,
+          )
+          .y as f32
+        }),
         _ => None,
       };
       if let Some(value_pt) = transformed {
@@ -15004,12 +14960,7 @@ mod tests {
 
   #[test]
   fn vml_group_textbox_anchor_includes_parent_absolute_offset() {
-    let transform = VmlGroupTransform {
-      origin_x: 3_165.0,
-      origin_y: 3_599.0,
-      scale_x: 0.05,
-      scale_y: 0.05,
-    };
+    let transform = VmlGroupTransform::new(3_165.0, 3_599.0, 0.05, 0.05);
     let style = transform
       .child_anchor_style(
         Some("position:absolute;margin-left:86.25pt;margin-top:94.9pt"),
@@ -15512,6 +15463,36 @@ mod tests {
     assert_eq!(shape.geometry, InlineShapeGeometry::Line);
     assert!(shape.fill_color.is_none());
     assert_eq!(shape.stroke.expect("stroke").color.r, 0xff);
+  }
+
+  #[test]
+  fn wps_custom_geometry_preserves_quadratic_curve_as_path() {
+    let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:custGeom><a:pathLst><a:path w="100" h="100"><a:moveTo><a:pt x="0" y="100"/></a:moveTo><a:quadBezTo><a:pt x="50" y="0"/><a:pt x="100" y="100"/></a:quadBezTo><a:close/></a:path></a:pathLst></a:custGeom><a:solidFill><a:srgbClr val="336699"/></a:solidFill></wps:spPr></wps:wsp>"#;
+    let wordprocessing_shape =
+      wps::WordprocessingShape::from_bytes(xml.as_bytes()).expect("typed WPS shape");
+    let shape = wordprocessing_shape_shape(
+      &wordprocessing_shape,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      DrawingShapeImportContext {
+        effect_extent: DrawingEffectExtent::default(),
+        styles: &StylesCatalog::default(),
+        images: &ImageCatalog::default(),
+        hyperlinks: &HyperlinkCatalog::default(),
+        smartart_text_colors_by_model_id: None,
+      },
+    )
+    .expect("custom geometry shape");
+
+    let InlineShapeGeometry::Path { commands } = shape.geometry else {
+      panic!("quadratic custom geometry must remain a path");
+    };
+    assert!(
+      commands
+        .iter()
+        .any(|command| matches!(command, common::PathCommand::CubicTo { .. }))
+    );
+    assert!(matches!(commands.last(), Some(common::PathCommand::Close)));
   }
 
   #[test]

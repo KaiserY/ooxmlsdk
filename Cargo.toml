@@ -82,6 +82,7 @@ krilla = { version = "0.8.2", default-features = false, features = [
   "simple-text",
 ] }
 krilla-svg = "0.8.1"
+kurbo = "0.13.1"
 libm = "0.2.16"
 num-complex = "0.4.6"
 num-integer = "0.1.46"

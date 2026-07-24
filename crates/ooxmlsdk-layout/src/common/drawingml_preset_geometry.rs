@@ -4,15 +4,14 @@
 //! ECMA-376 Part 1, §20.1.10.56 (`prstGeom`) and its preset shape definitions.
 //! These values are schema geometry data, not Office-golden layout tuning.
 
+use kurbo::{Arc, BezPath, Ellipse, Rect, RoundedRect};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
 use crate::common::{PathCommand, Point, Pt};
 
-// Four cubic Bézier quarters approximate a circle with
-// 4 / 3 * tan(π / 8), the standard kappa control distance.
-const CIRCLE_CUBIC_BEZIER_KAPPA: f32 = 0.552_284_8;
+use super::drawingml_geometry::{append_arc, bez_path_commands, kurbo_point, shape_commands};
 
-pub(super) fn path_commands(
+pub(crate) fn path_commands(
   preset: Option<&a::PresetGeometry>,
   left: f32,
   top: f32,
@@ -161,9 +160,12 @@ fn open_path(points: impl IntoIterator<Item = Point>) -> Vec<PathCommand> {
   let Some(first) = points.next() else {
     return Vec::new();
   };
-  let mut commands = vec![PathCommand::MoveTo(first)];
-  commands.extend(points.map(PathCommand::LineTo));
-  commands
+  let mut path = BezPath::new();
+  path.move_to(kurbo_point(first));
+  for point in points {
+    path.line_to(kurbo_point(point));
+  }
+  bez_path_commands(path)
 }
 
 fn adjusted_axis(origin: f32, extent: f32, adjustment: f32) -> f32 {
@@ -179,36 +181,15 @@ fn inverse_line_path(left: f32, top: f32, width: f32, height: f32) -> Vec<PathCo
 }
 
 fn ellipse_path(left: f32, top: f32, width: f32, height: f32) -> Vec<PathCommand> {
-  let right = left + width;
-  let bottom = top + height;
-  let center_x = left + width / 2.0;
-  let center_y = top + height / 2.0;
-  let tangent_x = width / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
-  let tangent_y = height / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
-  vec![
-    PathCommand::MoveTo(point(left, center_y)),
-    PathCommand::CubicTo {
-      control1: point(left, center_y - tangent_y),
-      control2: point(center_x - tangent_x, top),
-      end: point(center_x, top),
-    },
-    PathCommand::CubicTo {
-      control1: point(center_x + tangent_x, top),
-      control2: point(right, center_y - tangent_y),
-      end: point(right, center_y),
-    },
-    PathCommand::CubicTo {
-      control1: point(right, center_y + tangent_y),
-      control2: point(center_x + tangent_x, bottom),
-      end: point(center_x, bottom),
-    },
-    PathCommand::CubicTo {
-      control1: point(center_x - tangent_x, bottom),
-      control2: point(left, center_y + tangent_y),
-      end: point(left, center_y),
-    },
-    PathCommand::Close,
-  ]
+  shape_commands(
+    &Ellipse::from_rect(Rect::new(
+      f64::from(left),
+      f64::from(top),
+      f64::from(left + width),
+      f64::from(top + height),
+    )),
+    false,
+  )
 }
 
 fn wedge_round_rectangle_callout_path(
@@ -279,46 +260,65 @@ fn wedge_round_rectangle_callout_path(
     bottom
   };
   let radius = width.min(height) * radius_adjustment.clamp(0.0, 50_000.0) / 100_000.0;
-  let kappa = radius * 0.552_284_8;
-  vec![
-    PathCommand::MoveTo(point(left, top + radius)),
-    PathCommand::CubicTo {
-      control1: point(left, top + radius - kappa),
-      control2: point(left + radius - kappa, top),
-      end: point(left + radius, top),
-    },
-    PathCommand::LineTo(point(x1, top)),
-    PathCommand::LineTo(point(top_tip_x, top_tip_y)),
-    PathCommand::LineTo(point(x2, top)),
-    PathCommand::LineTo(point(right - radius, top)),
-    PathCommand::CubicTo {
-      control1: point(right - radius + kappa, top),
-      control2: point(right, top + radius - kappa),
-      end: point(right, top + radius),
-    },
-    PathCommand::LineTo(point(right, y1)),
-    PathCommand::LineTo(point(right_tip_x, right_tip_y)),
-    PathCommand::LineTo(point(right, y2)),
-    PathCommand::LineTo(point(right, bottom - radius)),
-    PathCommand::CubicTo {
-      control1: point(right, bottom - radius + kappa),
-      control2: point(right - radius + kappa, bottom),
-      end: point(right - radius, bottom),
-    },
-    PathCommand::LineTo(point(x2, bottom)),
-    PathCommand::LineTo(point(bottom_tip_x, bottom_tip_y)),
-    PathCommand::LineTo(point(x1, bottom)),
-    PathCommand::LineTo(point(left + radius, bottom)),
-    PathCommand::CubicTo {
-      control1: point(left + radius - kappa, bottom),
-      control2: point(left, bottom - radius + kappa),
-      end: point(left, bottom - radius),
-    },
-    PathCommand::LineTo(point(left, y2)),
-    PathCommand::LineTo(point(left_tip_x, left_tip_y)),
-    PathCommand::LineTo(point(left, y1)),
-    PathCommand::Close,
-  ]
+  let mut path = BezPath::new();
+  path.move_to((f64::from(left), f64::from(top + radius)));
+  append_arc(
+    &mut path,
+    Arc::new(
+      (f64::from(left + radius), f64::from(top + radius)),
+      (f64::from(radius), f64::from(radius)),
+      std::f64::consts::PI,
+      std::f64::consts::FRAC_PI_2,
+      0.0,
+    ),
+  );
+  path.line_to((f64::from(x1), f64::from(top)));
+  path.line_to((f64::from(top_tip_x), f64::from(top_tip_y)));
+  path.line_to((f64::from(x2), f64::from(top)));
+  path.line_to((f64::from(right - radius), f64::from(top)));
+  append_arc(
+    &mut path,
+    Arc::new(
+      (f64::from(right - radius), f64::from(top + radius)),
+      (f64::from(radius), f64::from(radius)),
+      -std::f64::consts::FRAC_PI_2,
+      std::f64::consts::FRAC_PI_2,
+      0.0,
+    ),
+  );
+  path.line_to((f64::from(right), f64::from(y1)));
+  path.line_to((f64::from(right_tip_x), f64::from(right_tip_y)));
+  path.line_to((f64::from(right), f64::from(y2)));
+  path.line_to((f64::from(right), f64::from(bottom - radius)));
+  append_arc(
+    &mut path,
+    Arc::new(
+      (f64::from(right - radius), f64::from(bottom - radius)),
+      (f64::from(radius), f64::from(radius)),
+      0.0,
+      std::f64::consts::FRAC_PI_2,
+      0.0,
+    ),
+  );
+  path.line_to((f64::from(x2), f64::from(bottom)));
+  path.line_to((f64::from(bottom_tip_x), f64::from(bottom_tip_y)));
+  path.line_to((f64::from(x1), f64::from(bottom)));
+  path.line_to((f64::from(left + radius), f64::from(bottom)));
+  append_arc(
+    &mut path,
+    Arc::new(
+      (f64::from(left + radius), f64::from(bottom - radius)),
+      (f64::from(radius), f64::from(radius)),
+      std::f64::consts::FRAC_PI_2,
+      std::f64::consts::FRAC_PI_2,
+      0.0,
+    ),
+  );
+  path.line_to((f64::from(left), f64::from(y2)));
+  path.line_to((f64::from(left_tip_x), f64::from(left_tip_y)));
+  path.line_to((f64::from(left), f64::from(y1)));
+  path.close_path();
+  bez_path_commands(path)
 }
 
 fn triangle_path(
@@ -558,61 +558,37 @@ fn donut_path(left: f32, top: f32, width: f32, height: f32, adjustment: f32) -> 
 }
 
 fn reverse_ellipse_path(left: f32, top: f32, width: f32, height: f32) -> Vec<PathCommand> {
-  let right = left + width;
-  let bottom = top + height;
-  let center_x = left + width / 2.0;
-  let center_y = top + height / 2.0;
-  let tangent_x = width / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
-  let tangent_y = height / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
-  vec![
-    PathCommand::MoveTo(point(left, center_y)),
-    PathCommand::CubicTo {
-      control1: point(left, center_y + tangent_y),
-      control2: point(center_x - tangent_x, bottom),
-      end: point(center_x, bottom),
-    },
-    PathCommand::CubicTo {
-      control1: point(center_x + tangent_x, bottom),
-      control2: point(right, center_y + tangent_y),
-      end: point(right, center_y),
-    },
-    PathCommand::CubicTo {
-      control1: point(right, center_y - tangent_y),
-      control2: point(center_x + tangent_x, top),
-      end: point(center_x, top),
-    },
-    PathCommand::CubicTo {
-      control1: point(center_x - tangent_x, top),
-      control2: point(left, center_y - tangent_y),
-      end: point(left, center_y),
-    },
-    PathCommand::Close,
-  ]
+  shape_commands(
+    &Ellipse::from_rect(Rect::new(
+      f64::from(left),
+      f64::from(top),
+      f64::from(left + width),
+      f64::from(top + height),
+    )),
+    true,
+  )
 }
 
 fn flow_chart_delay_path(left: f32, top: f32, width: f32, height: f32) -> Vec<PathCommand> {
   let center_x = left + width / 2.0;
   let center_y = top + height / 2.0;
-  let right = left + width;
   let bottom = top + height;
-  let tangent_x = width / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
-  let tangent_y = height / 2.0 * CIRCLE_CUBIC_BEZIER_KAPPA;
-  vec![
-    PathCommand::MoveTo(point(left, top)),
-    PathCommand::LineTo(point(center_x, top)),
-    PathCommand::CubicTo {
-      control1: point(center_x + tangent_x, top),
-      control2: point(right, center_y - tangent_y),
-      end: point(right, center_y),
-    },
-    PathCommand::CubicTo {
-      control1: point(right, center_y + tangent_y),
-      control2: point(center_x + tangent_x, bottom),
-      end: point(center_x, bottom),
-    },
-    PathCommand::LineTo(point(left, bottom)),
-    PathCommand::Close,
-  ]
+  let mut path = BezPath::new();
+  path.move_to((f64::from(left), f64::from(top)));
+  path.line_to((f64::from(center_x), f64::from(top)));
+  append_arc(
+    &mut path,
+    Arc::new(
+      (f64::from(center_x), f64::from(center_y)),
+      (f64::from(width / 2.0), f64::from(height / 2.0)),
+      -std::f64::consts::FRAC_PI_2,
+      std::f64::consts::PI,
+      0.0,
+    ),
+  );
+  path.line_to((f64::from(left), f64::from(bottom)));
+  path.close_path();
+  bez_path_commands(path)
 }
 
 fn frame_path(left: f32, top: f32, width: f32, height: f32, adjustment: f32) -> Vec<PathCommand> {
@@ -696,14 +672,14 @@ fn bent_connector_5_path(
 }
 
 fn curved_connector_2_path(left: f32, top: f32, width: f32, height: f32) -> Vec<PathCommand> {
-  vec![
-    PathCommand::MoveTo(point(left, top)),
-    PathCommand::CubicTo {
-      control1: point(left + width / 2.0, top),
-      control2: point(left + width, top + height / 2.0),
-      end: point(left + width, top + height),
-    },
-  ]
+  cubic_path(
+    point(left, top),
+    [[
+      point(left + width / 2.0, top),
+      point(left + width, top + height / 2.0),
+      point(left + width, top + height),
+    ]],
+  )
 }
 
 fn curved_connector_3_path(
@@ -718,19 +694,21 @@ fn curved_connector_3_path(
   let x2 = adjusted_axis(left, width, adjustment_1);
   let x1 = (left + x2) / 2.0;
   let x3 = (right + x2) / 2.0;
-  vec![
-    PathCommand::MoveTo(point(left, top)),
-    PathCommand::CubicTo {
-      control1: point(x1, top),
-      control2: point(x2, top + height / 4.0),
-      end: point(x2, top + height / 2.0),
-    },
-    PathCommand::CubicTo {
-      control1: point(x2, top + height * 3.0 / 4.0),
-      control2: point(x3, bottom),
-      end: point(right, bottom),
-    },
-  ]
+  cubic_path(
+    point(left, top),
+    [
+      [
+        point(x1, top),
+        point(x2, top + height / 4.0),
+        point(x2, top + height / 2.0),
+      ],
+      [
+        point(x2, top + height * 3.0 / 4.0),
+        point(x3, bottom),
+        point(right, bottom),
+      ],
+    ],
+  )
 }
 
 fn curved_connector_4_path(
@@ -753,24 +731,14 @@ fn curved_connector_4_path(
   let y2 = (top + y1) / 2.0;
   let y3 = (y1 + y4) / 2.0;
   let y5 = (bottom + y4) / 2.0;
-  vec![
-    PathCommand::MoveTo(point(left, top)),
-    PathCommand::CubicTo {
-      control1: point(x1, top),
-      control2: point(x2, y2),
-      end: point(x2, y1),
-    },
-    PathCommand::CubicTo {
-      control1: point(x2, y3),
-      control2: point(x4, y4),
-      end: point(x3, y4),
-    },
-    PathCommand::CubicTo {
-      control1: point(x5, y4),
-      control2: point(right, y5),
-      end: point(right, bottom),
-    },
-  ]
+  cubic_path(
+    point(left, top),
+    [
+      [point(x1, top), point(x2, y2), point(x2, y1)],
+      [point(x2, y3), point(x4, y4), point(x3, y4)],
+      [point(x5, y4), point(right, y5), point(right, bottom)],
+    ],
+  )
 }
 
 fn curved_connector_5_path(
@@ -798,29 +766,15 @@ fn curved_connector_5_path(
   let y5 = (bottom + y4) / 2.0;
   let y6 = (y5 + y4) / 2.0;
   let y7 = (y5 + bottom) / 2.0;
-  vec![
-    PathCommand::MoveTo(point(left, top)),
-    PathCommand::CubicTo {
-      control1: point(x2, top),
-      control2: point(x3, y2),
-      end: point(x3, y1),
-    },
-    PathCommand::CubicTo {
-      control1: point(x3, y3),
-      control2: point(x4, y4),
-      end: point(x1, y4),
-    },
-    PathCommand::CubicTo {
-      control1: point(x5, y4),
-      control2: point(x6, y6),
-      end: point(x6, y5),
-    },
-    PathCommand::CubicTo {
-      control1: point(x6, y7),
-      control2: point(x7, bottom),
-      end: point(right, bottom),
-    },
-  ]
+  cubic_path(
+    point(left, top),
+    [
+      [point(x2, top), point(x3, y2), point(x3, y1)],
+      [point(x3, y3), point(x4, y4), point(x1, y4)],
+      [point(x5, y4), point(x6, y6), point(x6, y5)],
+      [point(x6, y7), point(x7, bottom), point(right, bottom)],
+    ],
+  )
 }
 
 fn adjustment(preset: &a::PresetGeometry, index: usize, default: f32) -> f32 {
@@ -844,15 +798,31 @@ fn point(x: f32, y: f32) -> Point {
   Point { x: Pt(x), y: Pt(y) }
 }
 
+fn cubic_path(start: Point, segments: impl IntoIterator<Item = [Point; 3]>) -> Vec<PathCommand> {
+  let mut path = BezPath::new();
+  path.move_to(kurbo_point(start));
+  for [control1, control2, end] in segments {
+    path.curve_to(
+      kurbo_point(control1),
+      kurbo_point(control2),
+      kurbo_point(end),
+    );
+  }
+  bez_path_commands(path)
+}
+
 fn polygon(points: impl IntoIterator<Item = Point>) -> Vec<PathCommand> {
   let mut points = points.into_iter();
   let Some(first) = points.next() else {
     return Vec::new();
   };
-  let mut commands = vec![PathCommand::MoveTo(first)];
-  commands.extend(points.map(PathCommand::LineTo));
-  commands.push(PathCommand::Close);
-  commands
+  let mut path = BezPath::new();
+  path.move_to(kurbo_point(first));
+  for point in points {
+    path.line_to(kurbo_point(point));
+  }
+  path.close_path();
+  bez_path_commands(path)
 }
 
 fn rectangle_path(left: f32, top: f32, width: f32, height: f32) -> Vec<PathCommand> {
@@ -876,39 +846,16 @@ fn round_rectangle_path(
   if radius <= f32::EPSILON {
     return rectangle_path(left, top, width, height);
   }
-  let right = left + width;
-  let bottom = top + height;
-  // Four cubic Bézier arcs are the standard vector representation of the
-  // quarter-circle arcs in the DrawingML roundRect preset.
-  let tangent = radius * CIRCLE_CUBIC_BEZIER_KAPPA;
-  vec![
-    PathCommand::MoveTo(point(left + radius, top)),
-    PathCommand::LineTo(point(right - radius, top)),
-    PathCommand::CubicTo {
-      control1: point(right - radius + tangent, top),
-      control2: point(right, top + radius - tangent),
-      end: point(right, top + radius),
-    },
-    PathCommand::LineTo(point(right, bottom - radius)),
-    PathCommand::CubicTo {
-      control1: point(right, bottom - radius + tangent),
-      control2: point(right - radius + tangent, bottom),
-      end: point(right - radius, bottom),
-    },
-    PathCommand::LineTo(point(left + radius, bottom)),
-    PathCommand::CubicTo {
-      control1: point(left + radius - tangent, bottom),
-      control2: point(left, bottom - radius + tangent),
-      end: point(left, bottom - radius),
-    },
-    PathCommand::LineTo(point(left, top + radius)),
-    PathCommand::CubicTo {
-      control1: point(left, top + radius - tangent),
-      control2: point(left + radius - tangent, top),
-      end: point(left + radius, top),
-    },
-    PathCommand::Close,
-  ]
+  shape_commands(
+    &RoundedRect::new(
+      f64::from(left),
+      f64::from(top),
+      f64::from(left + width),
+      f64::from(top + height),
+      f64::from(radius),
+    ),
+    false,
+  )
 }
 
 fn round_2_same_rectangle_path(
@@ -919,38 +866,21 @@ fn round_2_same_rectangle_path(
   top_radius: f32,
   bottom_radius: f32,
 ) -> Vec<PathCommand> {
-  let right = left + width;
-  let bottom = top + height;
-  let top_tangent = top_radius * CIRCLE_CUBIC_BEZIER_KAPPA;
-  let bottom_tangent = bottom_radius * CIRCLE_CUBIC_BEZIER_KAPPA;
-  vec![
-    PathCommand::MoveTo(point(left + top_radius, top)),
-    PathCommand::LineTo(point(right - top_radius, top)),
-    PathCommand::CubicTo {
-      control1: point(right - top_radius + top_tangent, top),
-      control2: point(right, top + top_radius - top_tangent),
-      end: point(right, top + top_radius),
-    },
-    PathCommand::LineTo(point(right, bottom - bottom_radius)),
-    PathCommand::CubicTo {
-      control1: point(right, bottom - bottom_radius + bottom_tangent),
-      control2: point(right - bottom_radius + bottom_tangent, bottom),
-      end: point(right - bottom_radius, bottom),
-    },
-    PathCommand::LineTo(point(left + bottom_radius, bottom)),
-    PathCommand::CubicTo {
-      control1: point(left + bottom_radius - bottom_tangent, bottom),
-      control2: point(left, bottom - bottom_radius + bottom_tangent),
-      end: point(left, bottom - bottom_radius),
-    },
-    PathCommand::LineTo(point(left, top + top_radius)),
-    PathCommand::CubicTo {
-      control1: point(left, top + top_radius - top_tangent),
-      control2: point(left + top_radius - top_tangent, top),
-      end: point(left + top_radius, top),
-    },
-    PathCommand::Close,
-  ]
+  shape_commands(
+    &RoundedRect::new(
+      f64::from(left),
+      f64::from(top),
+      f64::from(left + width),
+      f64::from(top + height),
+      (
+        f64::from(top_radius),
+        f64::from(top_radius),
+        f64::from(bottom_radius),
+        f64::from(bottom_radius),
+      ),
+    ),
+    false,
+  )
 }
 
 fn right_arrow_path(

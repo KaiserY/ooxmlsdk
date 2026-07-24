@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
+use kurbo::{Affine, Arc, BezPath, ParamCurve};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
-use crate::common::{PathCommand, Point, Pt};
+use crate::common::PathCommand;
+
+use super::drawingml_geometry::{append_transformed_arc, bez_path_commands};
 
 /// Lowers DrawingML custom-geometry paths into page-space commands.
 ///
@@ -10,14 +13,14 @@ use crate::common::{PathCommand, Point, Pt};
 /// Guides are evaluated in that space, then points are scaled into the shape
 /// frame. Unsupported commands reject the custom path as a unit so callers can
 /// retain their existing conservative fallback.
-pub(super) fn path_commands(
+pub(crate) fn path_commands(
   geometry: &a::CustomGeometry,
   left: f32,
   top: f32,
   width: f32,
   height: f32,
 ) -> Option<Vec<PathCommand>> {
-  let mut commands = Vec::new();
+  let mut output = BezPath::new();
   for path in &geometry.path_list.path {
     if matches!(path.fill, Some(a::PathFillModeValues::None)) {
       continue;
@@ -36,12 +39,14 @@ pub(super) fn path_commands(
       return None;
     }
     let guides = evaluate_guides(geometry, viewport_width, viewport_height)?;
-    let map_coordinates = |x: f64, y: f64| -> Point {
-      Point {
-        x: Pt(left + (x / viewport_width) as f32 * width),
-        y: Pt(top + (y / viewport_height) as f32 * height),
-      }
-    };
+    let map_coordinates = Affine::new([
+      f64::from(width) / viewport_width,
+      0.0,
+      0.0,
+      f64::from(height) / viewport_height,
+      f64::from(left),
+      f64::from(top),
+    ]);
     let point_coordinates = |point: &a::Point| -> Option<(f64, f64)> {
       Some((
         coordinate(&point.x, &guides, viewport_width, viewport_height)?,
@@ -53,35 +58,31 @@ pub(super) fn path_commands(
     for choice in &path.path_choice {
       match choice {
         a::PathChoice::CloseShapePath => {
-          commands.push(PathCommand::Close);
+          output.close_path();
           current = subpath_start;
         }
         a::PathChoice::MoveTo(move_to) => {
           let point = point_coordinates(&move_to.point)?;
-          commands.push(PathCommand::MoveTo(map_coordinates(point.0, point.1)));
+          output.move_to(map_coordinates * kurbo::Point::new(point.0, point.1));
           current = Some(point);
           subpath_start = Some(point);
         }
         a::PathChoice::LineTo(line_to) => {
           let point = point_coordinates(&line_to.point)?;
-          commands.push(PathCommand::LineTo(map_coordinates(point.0, point.1)));
+          output.line_to(map_coordinates * kurbo::Point::new(point.0, point.1));
           current = Some(point);
         }
         a::PathChoice::QuadraticBezierCurveTo(curve) => {
           let [control, end] = curve.point.as_slice() else {
             return None;
           };
-          let start = current?;
           let control = point_coordinates(control)?;
           let end = point_coordinates(end)?;
-          let start = map_coordinates(start.0, start.1);
-          let control = map_coordinates(control.0, control.1);
-          let mapped_end = map_coordinates(end.0, end.1);
-          commands.push(PathCommand::CubicTo {
-            control1: interpolate(start, control, 2.0 / 3.0),
-            control2: interpolate(mapped_end, control, 2.0 / 3.0),
-            end: mapped_end,
-          });
+          current?;
+          output.quad_to(
+            map_coordinates * kurbo::Point::new(control.0, control.1),
+            map_coordinates * kurbo::Point::new(end.0, end.1),
+          );
           current = Some(end);
         }
         a::PathChoice::CubicBezierCurveTo(curve) => {
@@ -91,11 +92,12 @@ pub(super) fn path_commands(
           let control1 = point_coordinates(control1)?;
           let control2 = point_coordinates(control2)?;
           let end = point_coordinates(end)?;
-          commands.push(PathCommand::CubicTo {
-            control1: map_coordinates(control1.0, control1.1),
-            control2: map_coordinates(control2.0, control2.1),
-            end: map_coordinates(end.0, end.1),
-          });
+          current?;
+          output.curve_to(
+            map_coordinates * kurbo::Point::new(control1.0, control1.1),
+            map_coordinates * kurbo::Point::new(control2.0, control2.1),
+            map_coordinates * kurbo::Point::new(end.0, end.1),
+          );
           current = Some(end);
         }
         a::PathChoice::ArcTo(arc) => {
@@ -104,92 +106,43 @@ pub(super) fn path_commands(
           let radius_y = coordinate(&arc.height_radius, &guides, viewport_width, viewport_height)?;
           let start_angle = coordinate(&arc.start_angle, &guides, viewport_width, viewport_height)?;
           let sweep_angle = coordinate(&arc.swing_angle, &guides, viewport_width, viewport_height)?;
-          let arc_commands = elliptical_arc_commands(
-            start,
-            radius_x,
-            radius_y,
-            start_angle,
-            sweep_angle,
-            &map_coordinates,
-          )?;
-          if let Some(last) = arc_commands.last() {
-            current = Some(last.end_coordinates);
-          }
-          commands.extend(arc_commands.into_iter().map(|command| command.path_command));
+          let arc = drawingml_arc(start, radius_x, radius_y, start_angle, sweep_angle)?;
+          let end = arc.eval(1.0);
+          append_transformed_arc(&mut output, arc, map_coordinates);
+          current = Some((end.x, end.y));
         }
       }
     }
   }
-  (!commands.is_empty()).then_some(commands)
-}
-
-struct ArcCommand {
-  path_command: PathCommand,
-  end_coordinates: (f64, f64),
+  (!output.is_empty()).then(|| bez_path_commands(output))
 }
 
 /// ECMA-376 Part 1 §20.1.9.4 anchors the ellipse at the current pen position
-/// and measures both angles clockwise in 60,000ths of a degree. PDF paths do
-/// not have an elliptical-arc primitive, so each at-most-quarter turn is
-/// represented by its standard cubic Bézier equivalent.
-fn elliptical_arc_commands(
+/// and measures both angles clockwise in 60,000ths of a degree. Kurbo owns
+/// the tolerance-bounded conversion from this analytical arc to cubic Béziers.
+fn drawingml_arc(
   start: (f64, f64),
   radius_x: f64,
   radius_y: f64,
   start_angle: f64,
   sweep_angle: f64,
-  map_coordinates: &impl Fn(f64, f64) -> Point,
-) -> Option<Vec<ArcCommand>> {
+) -> Option<Arc> {
   if radius_x <= 0.0 || radius_y <= 0.0 || !sweep_angle.is_finite() {
     return None;
-  }
-  if sweep_angle == 0.0 {
-    return Some(Vec::new());
   }
 
   let start_radians = angle_radians(start_angle);
   let sweep_radians = angle_radians(sweep_angle);
-  let center = (
-    start.0 - radius_x * start_radians.cos(),
-    start.1 - radius_y * start_radians.sin(),
-  );
-  let segment_count = (sweep_radians.abs() / (std::f64::consts::PI / 2.0)).ceil() as usize;
-  let segment_sweep = sweep_radians / segment_count as f64;
-  let mut commands = Vec::with_capacity(segment_count);
-  let mut angle = start_radians;
-  for _ in 0..segment_count {
-    let end_angle = angle + segment_sweep;
-    let tangent = 4.0 / 3.0 * (segment_sweep / 4.0).tan();
-    let control1 = (
-      center.0 + radius_x * (angle.cos() - tangent * angle.sin()),
-      center.1 + radius_y * (angle.sin() + tangent * angle.cos()),
-    );
-    let control2 = (
-      center.0 + radius_x * (end_angle.cos() + tangent * end_angle.sin()),
-      center.1 + radius_y * (end_angle.sin() - tangent * end_angle.cos()),
-    );
-    let end = (
-      center.0 + radius_x * end_angle.cos(),
-      center.1 + radius_y * end_angle.sin(),
-    );
-    commands.push(ArcCommand {
-      path_command: PathCommand::CubicTo {
-        control1: map_coordinates(control1.0, control1.1),
-        control2: map_coordinates(control2.0, control2.1),
-        end: map_coordinates(end.0, end.1),
-      },
-      end_coordinates: end,
-    });
-    angle = end_angle;
-  }
-  Some(commands)
-}
-
-fn interpolate(from: Point, to: Point, amount: f32) -> Point {
-  Point {
-    x: Pt(from.x.0 + (to.x.0 - from.x.0) * amount),
-    y: Pt(from.y.0 + (to.y.0 - from.y.0) * amount),
-  }
+  Some(Arc::new(
+    (
+      start.0 - radius_x * start_radians.cos(),
+      start.1 - radius_y * start_radians.sin(),
+    ),
+    (radius_x, radius_y),
+    start_radians,
+    sweep_radians,
+    0.0,
+  ))
 }
 
 fn evaluate_guides(

@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
+use kurbo::{PathEl, flatten};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
 use crate::common::{PathCommand, Point};
@@ -10,6 +11,7 @@ use crate::model::{ImageCrop, ImageItem, RgbColor};
 use crate::units;
 
 use super::drawingml::shape_properties::{EffectShadowKind, EffectShadowProperties};
+use crate::common::drawingml_geometry::mapped_path_elements;
 
 // LibreOffice caps the temporary bitmap used by a blurred shadow at 250,000
 // pixels. Keep the same bound so large Office shapes do not turn into
@@ -17,6 +19,9 @@ use super::drawingml::shape_properties::{EffectShadowKind, EffectShadowPropertie
 const MAX_SHADOW_RASTER_PIXELS: f32 = 250_000.0;
 const MAX_SHADOW_PIXELS_PER_POINT: f32 = 2.0;
 const MAX_STACK_BLUR_RADIUS_PX: f32 = 254.0;
+// Match Kurbo's own SVG curve-lowering tolerance, expressed here in the
+// shadow mask's pixel coordinate space.
+const SHADOW_CURVE_FLATTEN_TOLERANCE_PX: f64 = 0.1;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ShadowFrame {
@@ -214,53 +219,31 @@ fn flattened_subpaths(
   commands: &[PathCommand],
   map: impl Fn(Point) -> (f32, f32),
 ) -> Vec<Vec<(f32, f32)>> {
+  let elements = mapped_path_elements(commands, |point| {
+    let (x, y) = map(point);
+    kurbo::Point::new(f64::from(x), f64::from(y))
+  });
   let mut polygons = Vec::new();
   let mut polygon = Vec::new();
-  let mut current = None;
-  for command in commands {
-    match *command {
-      PathCommand::MoveTo(point) => {
+  flatten(
+    elements,
+    SHADOW_CURVE_FLATTEN_TOLERANCE_PX,
+    |element| match element {
+      PathEl::MoveTo(point) => {
         finish_subpath(&mut polygons, &mut polygon);
-        let point = map(point);
-        polygon.push(point);
-        current = Some(point);
+        polygon.push((point.x as f32, point.y as f32));
       }
-      PathCommand::LineTo(point) => {
-        let point = map(point);
-        polygon.push(point);
-        current = Some(point);
+      PathEl::LineTo(point) => {
+        polygon.push((point.x as f32, point.y as f32));
       }
-      PathCommand::CubicTo {
-        control1,
-        control2,
-        end,
-      } => {
-        let Some(start) = current else {
-          continue;
-        };
-        let control1 = map(control1);
-        let control2 = map(control2);
-        let end = map(end);
-        let length =
-          distance(start, control1) + distance(control1, control2) + distance(control2, end);
-        let segments = (length / 4.0).ceil().clamp(4.0, 64.0) as usize;
-        for step in 1..=segments {
-          polygon.push(cubic_point(
-            start,
-            control1,
-            control2,
-            end,
-            step as f32 / segments as f32,
-          ));
-        }
-        current = Some(end);
-      }
-      PathCommand::Close => {
+      PathEl::ClosePath => {
         finish_subpath(&mut polygons, &mut polygon);
-        current = None;
       }
-    }
-  }
+      PathEl::QuadTo(_, _) | PathEl::CurveTo(_, _, _) => {
+        unreachable!("kurbo::flatten only emits line path elements")
+      }
+    },
+  );
   finish_subpath(&mut polygons, &mut polygon);
   polygons
 }
@@ -284,28 +267,6 @@ fn fill_scanline_span(alpha: &mut [u8], width: usize, y: usize, start: f32, end:
   if start_index < end_index {
     alpha[y * width + start_index..y * width + end_index].fill(255);
   }
-}
-
-fn distance(left: (f32, f32), right: (f32, f32)) -> f32 {
-  (right.0 - left.0).hypot(right.1 - left.1)
-}
-
-fn cubic_point(
-  start: (f32, f32),
-  control1: (f32, f32),
-  control2: (f32, f32),
-  end: (f32, f32),
-  t: f32,
-) -> (f32, f32) {
-  let inverse = 1.0 - t;
-  let a = inverse * inverse * inverse;
-  let b = 3.0 * inverse * inverse * t;
-  let c = 3.0 * inverse * t * t;
-  let d = t * t * t;
-  (
-    a * start.0 + b * control1.0 + c * control2.0 + d * end.0,
-    a * start.1 + b * control1.1 + c * control2.1 + d * end.1,
-  )
 }
 
 fn shadow_alignment(alignment: Option<a::RectangleAlignmentValues>) -> (f32, f32) {

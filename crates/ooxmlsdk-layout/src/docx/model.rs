@@ -619,6 +619,9 @@ pub(crate) struct InlineShapeImageFill {
 pub(crate) enum InlineShapeGeometry {
   Rectangle,
   Line,
+  Path {
+    commands: Vec<common::PathCommand>,
+  },
   Polyline {
     points: Vec<(f32, f32)>,
     closed: bool,

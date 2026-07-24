@@ -7,10 +7,13 @@ use crate::render::chart::{
   PieChartModel, RadialChartKind, clustered_column_slot, linear_axis_scale,
 };
 use crate::text_metrics::TextMetrics;
+use kurbo::BezPath;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
 use crate::render::chart_layout_profiles as profiles;
+
+use crate::common::drawingml_geometry::bez_path_commands;
 
 const TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
 
@@ -2889,15 +2892,8 @@ fn lower_natural_cubic_chart_line(
     second[index] = rhs[index] - upper[index] * second[index + 1];
   }
 
-  let mut commands = Vec::with_capacity(count);
-  commands.push(crate::common::PathCommand::MoveTo(common_point(
-    points[0].0,
-    points[0].1,
-  )));
-  let mut left = points[0].0;
-  let mut top = points[0].1;
-  let mut right = points[0].0;
-  let mut bottom = points[0].1;
+  let mut path = BezPath::with_capacity(count);
+  path.move_to((f64::from(points[0].0), f64::from(points[0].1)));
   for index in 0..count - 1 {
     let start = points[index];
     let end = points[index + 1];
@@ -2906,23 +2902,27 @@ fn lower_natural_cubic_chart_line(
       (end.1 - start.1) / h - h * (2.0 * second[index] + second[index + 1]) / 6.0;
     let end_derivative =
       (end.1 - start.1) / h + h * (second[index] + 2.0 * second[index + 1]) / 6.0;
-    let control1 = common_point(start.0 + h / 3.0, start.1 + start_derivative * h / 3.0);
-    let control2 = common_point(end.0 - h / 3.0, end.1 - end_derivative * h / 3.0);
-    let end = common_point(end.0, end.1);
-    for point in [control1, control2, end] {
-      left = left.min(point.x.0);
-      top = top.min(point.y.0);
-      right = right.max(point.x.0);
-      bottom = bottom.max(point.y.0);
-    }
-    commands.push(crate::common::PathCommand::CubicTo {
-      control1,
-      control2,
-      end,
-    });
+    path.curve_to(
+      (
+        f64::from(start.0 + h / 3.0),
+        f64::from(start.1 + start_derivative * h / 3.0),
+      ),
+      (
+        f64::from(end.0 - h / 3.0),
+        f64::from(end.1 - end_derivative * h / 3.0),
+      ),
+      (f64::from(end.0), f64::from(end.1)),
+    );
   }
+  let bounds = path.control_box();
+  let commands = bez_path_commands(path);
   items.push(PageItem::Path(crate::common::PathItem {
-    bounds: common_rect(left, top, right - left, bottom - top),
+    bounds: common_rect(
+      bounds.x0 as f32,
+      bounds.y0 as f32,
+      bounds.width() as f32,
+      bounds.height() as f32,
+    ),
     points: Vec::new(),
     commands,
     closed: false,

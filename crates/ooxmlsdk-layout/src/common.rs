@@ -1,5 +1,8 @@
 mod debug;
 mod display;
+pub(crate) mod drawingml_custom_geometry;
+pub(crate) mod drawingml_geometry;
+pub(crate) mod drawingml_preset_geometry;
 mod geom;
 mod style;
 mod units;

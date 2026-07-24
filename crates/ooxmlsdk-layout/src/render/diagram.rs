@@ -1,11 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
+use kurbo::Affine;
 use ooxmlsdk::schemas::{
+  schemas_microsoft_com_office_drawing_2008_diagram as dsp,
   schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
   schemas_openxmlformats_org_drawingml_2006_main as a,
 };
 use ooxmlsdk::simple_type::Coordinate32Value;
 
+use crate::common::{
+  PathCommand, drawingml_custom_geometry, drawingml_geometry, drawingml_preset_geometry,
+};
 use crate::model::RgbColor;
 use crate::render::math::text_math_text;
 
@@ -42,6 +47,86 @@ pub struct DiagramShape {
   pub font_size_pt: Option<f32>,
   pub minimum_font_size_pt: Option<f32>,
   pub font_sync_group: Option<String>,
+}
+
+impl DiagramShape {
+  pub(crate) fn path_commands(&self) -> Option<Vec<PathCommand>> {
+    let commands = match self
+      .shape_properties
+      .as_deref()
+      .and_then(|properties| properties.shape_properties_choice1.as_ref())
+    {
+      Some(dgm::ShapePropertiesChoice::PresetGeometry(preset)) => {
+        drawingml_preset_geometry::path_commands(
+          Some(preset),
+          self.x,
+          self.y,
+          self.width,
+          self.height,
+        )
+      }
+      Some(dgm::ShapePropertiesChoice::CustomGeometry(geometry)) => {
+        drawingml_custom_geometry::path_commands(geometry, self.x, self.y, self.width, self.height)?
+      }
+      None => drawingml_preset_geometry::path_commands(
+        Some(self.preset_geometry.as_deref()?),
+        self.x,
+        self.y,
+        self.width,
+        self.height,
+      ),
+    };
+    Some(drawingml_geometry::transform_commands(
+      commands,
+      Affine::rotate_about(
+        f64::from(self.shape_rotation_deg.to_radians()),
+        (
+          f64::from(self.x + self.width / 2.0),
+          f64::from(self.y + self.height / 2.0),
+        ),
+      ),
+    ))
+  }
+}
+
+pub(crate) fn drawing_shape_path_commands(
+  properties: &dsp::ShapeProperties,
+  bounds: DiagramBounds,
+) -> Option<Vec<PathCommand>> {
+  let commands = match properties.shape_properties_choice1.as_ref()? {
+    dsp::ShapePropertiesChoice::PresetGeometry(preset) => drawingml_preset_geometry::path_commands(
+      Some(preset),
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+    ),
+    dsp::ShapePropertiesChoice::CustomGeometry(geometry) => {
+      drawingml_custom_geometry::path_commands(
+        geometry,
+        bounds.x,
+        bounds.y,
+        bounds.width,
+        bounds.height,
+      )?
+    }
+  };
+  let rotation = properties
+    .transform2_d
+    .as_deref()
+    .and_then(|transform| transform.rotation)
+    .unwrap_or_default() as f64
+    / 60_000.0;
+  Some(drawingml_geometry::transform_commands(
+    commands,
+    Affine::rotate_about(
+      rotation.to_radians(),
+      (
+        f64::from(bounds.x + bounds.width / 2.0),
+        f64::from(bounds.y + bounds.height / 2.0),
+      ),
+    ),
+  ))
 }
 
 #[derive(Clone, Debug, Default)]
@@ -1776,13 +1861,12 @@ fn parse_rules(rules: &dgm::RuleList) -> Vec<DiagramRule> {
   rules
     .rule
     .iter()
-    .filter_map(|rule| {
-      (rule.r#type != dgm::ConstraintValues::None).then(|| DiagramRule {
-        for_name: rule.for_name.clone().unwrap_or_default(),
-        target: rule.r#type,
-        point_type: rule.point_type,
-        value: rule.val.unwrap_or_default() as f32,
-      })
+    .filter(|rule| rule.r#type != dgm::ConstraintValues::None)
+    .map(|rule| DiagramRule {
+      for_name: rule.for_name.clone().unwrap_or_default(),
+      target: rule.r#type,
+      point_type: rule.point_type,
+      value: rule.val.unwrap_or_default() as f32,
     })
     .collect()
 }
@@ -2557,7 +2641,8 @@ fn linear_layout_tree(
   }
   let mut shrink_names: HashSet<String> = rules
     .iter()
-    .filter_map(|rule| (!rule.for_name.is_empty()).then(|| rule.for_name.clone()))
+    .filter(|rule| !rule.for_name.is_empty())
+    .map(|rule| rule.for_name.clone())
     .collect();
   if !horizontal {
     shrink_names.clear();

@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
+use kurbo::Affine;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use unicode_bidi::{BidiInfo, Level};
@@ -712,6 +713,7 @@ pub(crate) enum PageItem {
   Rect(RectItem),
   Fill(FillItem),
   Line(LineItem),
+  Path(common::PathItem<'static>),
   Polyline(PolylineItem),
 }
 
@@ -1380,6 +1382,7 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
       stroke: None,
     }),
     PageItem::Line(item) => common::DisplayItem::Line(into_common_line_item(item)),
+    PageItem::Path(item) => common::DisplayItem::Path(item),
     PageItem::Polyline(item) => common::DisplayItem::Path(into_common_path_item(item)),
   }
 }
@@ -3279,6 +3282,7 @@ fn line_number_text_metrics_for_items(
       | PageItem::Rect(_)
       | PageItem::Fill(_)
       | PageItem::Line(_)
+      | PageItem::Path(_)
       | PageItem::Polyline(_) => None,
     })
 }
@@ -4503,6 +4507,7 @@ fn item_line_y(item: &PageItem) -> Option<f32> {
     | PageItem::Rect(_)
     | PageItem::Fill(_)
     | PageItem::Line(_)
+    | PageItem::Path(_)
     | PageItem::Polyline(_) => None,
   }
 }
@@ -4545,6 +4550,12 @@ fn item_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Option<(f32, 
         line.y1_pt.max(line.y2_pt) + half_width,
       ))
     }
+    PageItem::Path(path) => Some((
+      path.bounds.origin.x.0,
+      path.bounds.origin.y.0,
+      path.bounds.origin.x.0 + path.bounds.size.width.0,
+      path.bounds.origin.y.0 + path.bounds.size.height.0,
+    )),
     PageItem::Polyline(polyline) => Some((
       polyline.x_pt,
       polyline.y_pt,
@@ -4586,6 +4597,10 @@ fn item_vertical_bounds(item: &PageItem) -> (f32, f32) {
         line.y1_pt.max(line.y2_pt) + half_width,
       )
     }
+    PageItem::Path(path) => (
+      path.bounds.origin.y.0,
+      path.bounds.origin.y.0 + path.bounds.size.height.0,
+    ),
     PageItem::Polyline(polyline) => (polyline.y_pt, polyline.y_pt + polyline.height_pt),
   }
 }
@@ -5512,6 +5527,10 @@ fn page_has_body_region_items(page: &Page, flow: FlowContext) -> bool {
     PageItem::Polyline(polyline) => polyline.points.iter().any(|(_, y)| {
       *y >= flow.content_top_pt - LAYOUT_EPSILON_PT && *y <= flow.content_bottom + LAYOUT_EPSILON_PT
     }),
+    PageItem::Path(path) => {
+      path.bounds.origin.y.0 >= flow.content_top_pt - LAYOUT_EPSILON_PT
+        && path.bounds.origin.y.0 <= flow.content_bottom + LAYOUT_EPSILON_PT
+    }
     PageItem::Fill(_) => false,
   })
 }
@@ -8030,6 +8049,7 @@ fn page_item_is_path(item: &PageItem) -> bool {
   match item {
     PageItem::Rect(rect) => rect.fill_color.is_some() || rect.stroke.is_some(),
     PageItem::Line(_) => true,
+    PageItem::Path(path) => !matches!(path.fill, common::Fill::None) || path.stroke.is_some(),
     PageItem::Polyline(polyline) => polyline.fill_color.is_some() || polyline.stroke.is_some(),
     PageItem::Text(_) | PageItem::Image(_) | PageItem::Fill(_) => false,
   }
@@ -8146,6 +8166,18 @@ fn translate_page_item(mut item: PageItem, dx_pt: f32, dy_pt: f32) -> PageItem {
       line.y1_pt += dy_pt;
       line.x2_pt += dx_pt;
       line.y2_pt += dy_pt;
+    }
+    PageItem::Path(path) => {
+      path.bounds.origin.x.0 += dx_pt;
+      path.bounds.origin.y.0 += dy_pt;
+      for point in &mut path.points {
+        point.x.0 += dx_pt;
+        point.y.0 += dy_pt;
+      }
+      path.commands = common::drawingml_geometry::transform_commands(
+        std::mem::take(&mut path.commands),
+        Affine::translate((f64::from(dx_pt), f64::from(dy_pt))),
+      );
     }
     PageItem::Polyline(polyline) => {
       polyline.x_pt += dx_pt;
@@ -12129,7 +12161,7 @@ fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom:
     PageItem::Text(text) => text.y_pt + text.line_height_pt >= top && text.y_pt <= bottom,
     PageItem::Image(image) => image.y_pt + image.height_pt >= top && image.y_pt <= bottom,
     PageItem::Rect(rect) => rect.y_pt + rect.height_pt >= top && rect.y_pt <= bottom,
-    PageItem::Fill(_) | PageItem::Line(_) | PageItem::Polyline(_) => true,
+    PageItem::Fill(_) | PageItem::Line(_) | PageItem::Path(_) | PageItem::Polyline(_) => true,
   }
 }
 
@@ -14938,6 +14970,51 @@ impl<'a> TextFrameLayout<'a> {
               );
               return (item_start, current.items.len());
             }
+            if let InlineShapeGeometry::Path { commands } = &shape.geometry {
+              let commands = common::drawingml_geometry::transform_commands(
+                commands.iter().copied(),
+                Affine::translate((f64::from(x_pt), f64::from(y_pt))),
+              );
+              let closed = commands
+                .iter()
+                .any(|command| matches!(command, common::PathCommand::Close));
+              current.items.push(PageItem::Path(common::PathItem {
+                bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
+                points: Vec::new(),
+                commands: commands.clone(),
+                closed,
+                fill: shape
+                  .fill_color
+                  .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
+                  .unwrap_or(common::Fill::None),
+                stroke: shape
+                  .stroke
+                  .map(|stroke| common_stroke_from_border(stroke, 1.0)),
+              }));
+              for color in &shape.additional_fill_colors {
+                current.items.push(PageItem::Path(common::PathItem {
+                  bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
+                  points: Vec::new(),
+                  commands: commands.clone(),
+                  closed,
+                  fill: common::Fill::Solid(common_rgb(*color, 1.0)),
+                  stroke: None,
+                }));
+              }
+              layout_shape_text_box(
+                current,
+                shape_flow,
+                text_metrics,
+                shape,
+                ShapeTextBoxRect {
+                  x: x_pt,
+                  y: y_pt,
+                  width: width_pt,
+                  height: height_pt,
+                },
+              );
+              return (item_start, current.items.len());
+            }
             if shape.fill_color.is_some() || shape.stroke.is_some() {
               current.items.push(PageItem::Rect(RectItem {
                 x_pt,
@@ -16783,6 +16860,7 @@ fn item_y(item: &PageItem) -> Option<f32> {
     PageItem::Rect(rect) => Some(rect.y_pt),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
+    PageItem::Path(_) => None,
     PageItem::Polyline(_) => None,
   }
 }
@@ -16798,6 +16876,7 @@ fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Op
     PageItem::Rect(rect) => Some((rect.x_pt, rect.width_pt)),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
+    PageItem::Path(_) => None,
     PageItem::Polyline(_) => None,
   }
 }
@@ -16809,6 +16888,7 @@ fn shift_item_x(item: &mut PageItem, offset: f32) {
     PageItem::Rect(rect) => rect.x_pt += offset,
     PageItem::Fill(_) => {}
     PageItem::Line(_) => {}
+    PageItem::Path(_) => {}
     PageItem::Polyline(_) => {}
   }
 }
@@ -16827,7 +16907,7 @@ fn shift_item(item: &mut PageItem, dx: f32, dy: f32) {
       rect.x_pt += dx;
       rect.y_pt += dy;
     }
-    PageItem::Fill(_) | PageItem::Line(_) | PageItem::Polyline(_) => {}
+    PageItem::Fill(_) | PageItem::Line(_) | PageItem::Path(_) | PageItem::Polyline(_) => {}
   }
 }
 

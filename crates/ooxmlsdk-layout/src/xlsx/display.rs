@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use kurbo::{Affine, Rect as KurboRect};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
@@ -497,6 +498,59 @@ struct CellAreaRenderLayout {
   zoom_scale: f32,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct SheetPageTransform(Affine);
+
+impl SheetPageTransform {
+  fn new(origin_x_pt: f32, origin_y_pt: f32, zoom_scale: f32, source: CellRect) -> Self {
+    Self(
+      Affine::translate((-f64::from(source.x_pt), -f64::from(source.y_pt)))
+        .then_scale(f64::from(zoom_scale))
+        .then_translate((f64::from(origin_x_pt), f64::from(origin_y_pt)).into()),
+    )
+  }
+
+  fn for_page(
+    page: &CalcPrintPage<'_>,
+    origin_x_pt: f32,
+    origin_y_pt: f32,
+    zoom_scale: f32,
+  ) -> Self {
+    let source = page
+      .area
+      .map(|area| page.sheet.range_rect(area))
+      .unwrap_or_default();
+    Self::new(origin_x_pt, origin_y_pt, zoom_scale, source)
+  }
+
+  fn rect(self, rect: CellRect) -> CellRect {
+    let bounds = common::drawingml_geometry::transform_rect_bounds(
+      KurboRect::new(
+        f64::from(rect.x_pt),
+        f64::from(rect.y_pt),
+        f64::from(rect.x_pt + rect.width_pt),
+        f64::from(rect.y_pt + rect.height_pt),
+      ),
+      self.0,
+    );
+    CellRect {
+      x_pt: bounds.x0 as f32,
+      y_pt: bounds.y0 as f32,
+      width_pt: bounds.width() as f32,
+      height_pt: bounds.height() as f32,
+    }
+  }
+
+  fn rect_from_xywh(self, x_pt: f32, y_pt: f32, width_pt: f32, height_pt: f32) -> CellRect {
+    self.rect(CellRect {
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+    })
+  }
+}
+
 fn render_cell_area(
   items: &mut Vec<PageItem>,
   import: &ExcelImport,
@@ -507,6 +561,12 @@ fn render_cell_area(
   text_metrics: &mut TextMetrics,
 ) {
   let area_rect = page.sheet.range_rect(area);
+  let page_transform = SheetPageTransform::new(
+    layout.origin_x_pt,
+    layout.origin_y_pt,
+    layout.zoom_scale,
+    area_rect,
+  );
   let occupied_cells = calc_occupied_text_cells(cells);
   for cell in cells {
     if page.sheet.is_covered_merged_cell(cell.address) {
@@ -516,10 +576,12 @@ fn render_cell_area(
     if rect.width_pt <= 0.0 || rect.height_pt <= 0.0 {
       continue;
     }
-    let x_pt = layout.origin_x_pt + (rect.x_pt - area_rect.x_pt) * layout.zoom_scale;
-    let y_pt = layout.origin_y_pt + (rect.y_pt - area_rect.y_pt) * layout.zoom_scale;
-    let width_pt = rect.width_pt * layout.zoom_scale;
-    let height_pt = rect.height_pt * layout.zoom_scale;
+    let CellRect {
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+    } = page_transform.rect(rect);
     let table_builtin_style = super::table::builtin_table_style_for_address(
       &page.sheet.resources.tables,
       &import.styles,
@@ -1587,7 +1649,7 @@ fn print_page_image_items(
   zoom_scale: f32,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
   for drawing in &page.sheet.resources.drawings {
     for anchor in &drawing.anchors {
       if anchor.object.hidden || !anchor.print_with_sheet {
@@ -1611,14 +1673,13 @@ fn print_page_image_items(
       if width_pt <= 0.0 || height_pt <= 0.0 {
         continue;
       }
-      let (x_pt, y_pt) =
-        page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+      let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
       let hyperlink_url = drawing_object_hyperlink_url(drawing, &anchor.object);
       items.push(PageItem::Image(ImageItem {
-        x_pt: origin_x_pt + x_pt * zoom_scale,
-        y_pt: origin_y_pt + y_pt * zoom_scale,
-        width_pt: width_pt * zoom_scale,
-        height_pt: height_pt * zoom_scale,
+        x_pt: rect.x_pt,
+        y_pt: rect.y_pt,
+        width_pt: rect.width_pt,
+        height_pt: rect.height_pt,
         crop: ImageCrop::default(),
         clip_path: Vec::new(),
         rotation_deg: 0.0,
@@ -1638,10 +1699,10 @@ fn print_page_image_items(
       render_metafile_texts(
         &mut items,
         resource,
-        origin_x_pt + x_pt * zoom_scale,
-        origin_y_pt + y_pt * zoom_scale,
-        width_pt * zoom_scale,
-        height_pt * zoom_scale,
+        rect.x_pt,
+        rect.y_pt,
+        rect.width_pt,
+        rect.height_pt,
         hyperlink_url.as_deref(),
       );
     }
@@ -1666,13 +1727,12 @@ fn print_page_image_items(
       if width_pt <= 0.0 || height_pt <= 0.0 {
         continue;
       }
-      let (x_pt, y_pt) =
-        page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+      let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
       items.push(PageItem::Image(ImageItem {
-        x_pt: origin_x_pt + x_pt * zoom_scale,
-        y_pt: origin_y_pt + y_pt * zoom_scale,
-        width_pt: width_pt * zoom_scale,
-        height_pt: height_pt * zoom_scale,
+        x_pt: rect.x_pt,
+        y_pt: rect.y_pt,
+        width_pt: rect.width_pt,
+        height_pt: rect.height_pt,
         crop: ImageCrop::default(),
         clip_path: Vec::new(),
         rotation_deg: 0.0,
@@ -1688,10 +1748,10 @@ fn print_page_image_items(
       render_metafile_texts(
         &mut items,
         resource,
-        origin_x_pt + x_pt * zoom_scale,
-        origin_y_pt + y_pt * zoom_scale,
-        width_pt * zoom_scale,
-        height_pt * zoom_scale,
+        rect.x_pt,
+        rect.y_pt,
+        rect.width_pt,
+        rect.height_pt,
         None,
       );
     }
@@ -1706,7 +1766,7 @@ fn print_page_shape_items(
   zoom_scale: f32,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
   for anchor in page
     .sheet
     .resources
@@ -1734,13 +1794,12 @@ fn print_page_shape_items(
     if width_pt <= 0.0 || height_pt <= 0.0 {
       continue;
     }
-    let (x_pt, y_pt) =
-      page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+    let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
     items.push(PageItem::Rect(RectItem {
-      x_pt: origin_x_pt + x_pt * zoom_scale,
-      y_pt: origin_y_pt + y_pt * zoom_scale,
-      width_pt: width_pt * zoom_scale,
-      height_pt: height_pt * zoom_scale,
+      x_pt: rect.x_pt,
+      y_pt: rect.y_pt,
+      width_pt: rect.width_pt,
+      height_pt: rect.height_pt,
       fill_color: anchor.object.fill_color,
       fill_opacity: 1.0,
       stroke: shape_stroke(&anchor.object),
@@ -1757,7 +1816,7 @@ fn print_page_diagram_items(
   zoom_scale: f32,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
   for drawing in &page.sheet.resources.drawings {
     for anchor in &drawing.anchors {
       if anchor.object.hidden
@@ -1790,13 +1849,12 @@ fn print_page_diagram_items(
       if width_pt <= 0.0 || height_pt <= 0.0 {
         continue;
       }
-      let (x_pt, y_pt) =
-        page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+      let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
       let bounds = shared_diagram::DiagramBounds {
-        x: origin_x_pt + x_pt * zoom_scale,
-        y: origin_y_pt + y_pt * zoom_scale,
-        width: width_pt * zoom_scale,
-        height: height_pt * zoom_scale,
+        x: rect.x_pt,
+        y: rect.y_pt,
+        width: rect.width_pt,
+        height: rect.height_pt,
       };
       if let Some(drawing) = persisted_diagram_drawing(&drawing.diagrams, data_model)
         && push_persisted_diagram_items(&mut items, drawing, bounds)
@@ -1899,20 +1957,49 @@ fn push_persisted_diagram_shape(
   ) else {
     return;
   };
-  items.push(PageItem::Rect(RectItem {
-    x_pt: x,
-    y_pt: y,
-    width_pt: width,
-    height_pt: height,
-    fill_color: Some(RgbColor {
-      r: 0x4f,
-      g: 0x81,
-      b: 0xbd,
-    }),
-    fill_opacity: 1.0,
-    stroke: Some(BorderStyle::default()),
-    stroke_opacity: 1.0,
-  }));
+  let shape_bounds = shared_diagram::DiagramBounds {
+    x,
+    y,
+    width,
+    height,
+  };
+  if let Some(commands) =
+    shared_diagram::drawing_shape_path_commands(&shape.shape_properties, shape_bounds)
+  {
+    let closed = commands
+      .iter()
+      .any(|command| matches!(command, common::PathCommand::Close));
+    items.push(PageItem::Path(common::PathItem {
+      bounds: common_rect(x, y, width, height),
+      points: Vec::new(),
+      commands,
+      closed,
+      fill: common::Fill::Solid(common_rgb(
+        RgbColor {
+          r: 0x4f,
+          g: 0x81,
+          b: 0xbd,
+        },
+        1.0,
+      )),
+      stroke: Some(common_stroke_from_border(BorderStyle::default(), 1.0)),
+    }));
+  } else {
+    items.push(PageItem::Rect(RectItem {
+      x_pt: x,
+      y_pt: y,
+      width_pt: width,
+      height_pt: height,
+      fill_color: Some(RgbColor {
+        r: 0x4f,
+        g: 0x81,
+        b: 0xbd,
+      }),
+      fill_opacity: 1.0,
+      stroke: Some(BorderStyle::default()),
+      stroke_opacity: 1.0,
+    }));
+  }
   let Some(text_body) = shape.text_body.as_deref() else {
     return;
   };
@@ -2024,13 +2111,26 @@ fn transform_bounds_from_emu(
 ) -> Option<(f32, f32, f32, f32)> {
   let (min_x, min_y, max_x, max_y) =
     content_bounds.unwrap_or((x_emu, y_emu, x_emu + width_emu, y_emu + height_emu));
-  let content_width = (max_x - min_x).max(1) as f32;
-  let content_height = (max_y - min_y).max(1) as f32;
+  let transform = common::drawingml_geometry::group_child_affine(
+    kurbo::Point::new(f64::from(bounds.x), f64::from(bounds.y)),
+    kurbo::Vec2::new(f64::from(bounds.width), f64::from(bounds.height)),
+    kurbo::Point::new(min_x as f64, min_y as f64),
+    kurbo::Vec2::new((max_x - min_x).max(1) as f64, (max_y - min_y).max(1) as f64),
+  );
+  let transformed = common::drawingml_geometry::transform_rect_bounds(
+    kurbo::Rect::new(
+      x_emu as f64,
+      y_emu as f64,
+      x_emu as f64 + width_emu as f64,
+      y_emu as f64 + height_emu as f64,
+    ),
+    transform,
+  );
   Some((
-    bounds.x + (x_emu - min_x) as f32 / content_width * bounds.width,
-    bounds.y + (y_emu - min_y) as f32 / content_height * bounds.height,
-    width_emu as f32 / content_width * bounds.width,
-    height_emu as f32 / content_height * bounds.height,
+    transformed.x0 as f32,
+    transformed.y0 as f32,
+    transformed.width() as f32,
+    transformed.height() as f32,
   ))
 }
 
@@ -2110,6 +2210,24 @@ fn push_diagram_shape_items(items: &mut Vec<PageItem>, shape: &shared_diagram::D
   if shape.draw_geometry {
     if shape.is_connector {
       items.push(PageItem::Line(diagram_connector_line_item(shape)));
+    } else if let Some(commands) = shape.path_commands() {
+      let closed = commands
+        .iter()
+        .any(|command| matches!(command, common::PathCommand::Close));
+      items.push(PageItem::Path(common::PathItem {
+        bounds: common_rect(shape.x, shape.y, shape.width, shape.height),
+        points: Vec::new(),
+        commands,
+        closed,
+        fill: common::Fill::Solid(common_rgb(shape.fill, 1.0)),
+        stroke: Some(common_stroke_from_border(
+          BorderStyle {
+            color: shape.line_fill.unwrap_or_default(),
+            ..BorderStyle::default()
+          },
+          1.0,
+        )),
+      }));
     } else {
       items.push(PageItem::Rect(RectItem {
         x_pt: shape.x,
@@ -2185,6 +2303,7 @@ fn print_page_drawing_text_items(
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
   let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
   let page_clip_rect = page_area_rect.map_or(
     CellRect {
       x_pt: 0.0,
@@ -2192,12 +2311,7 @@ fn print_page_drawing_text_items(
       width_pt: setup.width_pt,
       height_pt: setup.height_pt,
     },
-    |rect| CellRect {
-      x_pt: origin_x_pt,
-      y_pt: origin_y_pt,
-      width_pt: rect.width_pt * zoom_scale,
-      height_pt: rect.height_pt * zoom_scale,
-    },
+    |rect| page_transform.rect(rect),
   );
   let horizontal_page_overlap_pt = page
     .area
@@ -2218,18 +2332,12 @@ fn print_page_drawing_text_items(
       if width_pt <= 0.0 || height_pt <= 0.0 {
         continue;
       }
-      let (x_pt, y_pt) =
-        page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
-      let drawing_rect = CellRect {
-        // Excel's fixed-output printer device overlaps adjacent horizontal
-        // worksheet pages by 0.96pt while retaining the unshifted page clip.
-        // Apply that overlap to drawings on continuation pages; ordinary
-        // sheet cells and explicit-width compatibility paths remain unchanged.
-        x_pt: origin_x_pt + x_pt * zoom_scale + horizontal_page_overlap_pt,
-        y_pt: origin_y_pt + y_pt * zoom_scale,
-        width_pt: width_pt * zoom_scale,
-        height_pt: height_pt * zoom_scale,
-      };
+      let mut drawing_rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
+      // Excel's fixed-output printer device overlaps adjacent horizontal
+      // worksheet pages by 0.96pt while retaining the unshifted page clip.
+      // Apply that overlap to drawings on continuation pages; ordinary
+      // sheet cells and explicit-width compatibility paths remain unchanged.
+      drawing_rect.x_pt += horizontal_page_overlap_pt;
       if let Some(chart_items) = lower_drawing_chart(
         import,
         drawing,
@@ -3286,24 +3394,20 @@ fn clip_closed_polygon_to_rect(path: &mut common::PathItem<'static>, clip: CellR
     }
   }
 
-  let left = points
-    .iter()
-    .map(|point| point.x.0)
-    .fold(f32::MAX, f32::min);
-  let top = points
-    .iter()
-    .map(|point| point.y.0)
-    .fold(f32::MAX, f32::min);
-  let right = points
-    .iter()
-    .map(|point| point.x.0)
-    .fold(f32::MIN, f32::max);
-  let bottom = points
-    .iter()
-    .map(|point| point.y.0)
-    .fold(f32::MIN, f32::max);
+  let Some(bounds) = common::drawingml_geometry::point_bounds(
+    points
+      .iter()
+      .map(|point| kurbo::Point::new(f64::from(point.x.0), f64::from(point.y.0))),
+  ) else {
+    return false;
+  };
   path.points = points;
-  path.bounds = common_rect(left, top, right - left, bottom - top);
+  path.bounds = common_rect(
+    bounds.x0 as f32,
+    bounds.y0 as f32,
+    bounds.width() as f32,
+    bounds.height() as f32,
+  );
   true
 }
 
@@ -3734,7 +3838,7 @@ fn print_page_vml_text_items(
   zoom_scale: f32,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
   for shape in page
     .sheet
     .resources
@@ -3756,21 +3860,8 @@ fn print_page_vml_text_items(
     let Some((x_pt, y_pt, width_pt, height_pt)) = vml_shape_rect(page.sheet, shape) else {
       continue;
     };
-    let (x_pt, y_pt) =
-      page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
-    render_drawing_text(
-      &mut items,
-      text,
-      CellRect {
-        x_pt: origin_x_pt + x_pt * zoom_scale,
-        y_pt: origin_y_pt + y_pt * zoom_scale,
-        width_pt: width_pt * zoom_scale,
-        height_pt: height_pt * zoom_scale,
-      },
-      None,
-      None,
-      None,
-    );
+    let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
+    render_drawing_text(&mut items, text, rect, None, None, None);
   }
   items
 }
@@ -4412,6 +4503,31 @@ mod drawing_page_tests {
       (400.0, 250.0, 100.0, 100.0),
       page
     ));
+  }
+
+  #[test]
+  fn sheet_page_transform_translates_source_origin_then_applies_zoom() {
+    let transform = SheetPageTransform::new(
+      18.0,
+      24.0,
+      0.5,
+      CellRect {
+        x_pt: 100.0,
+        y_pt: 200.0,
+        width_pt: 300.0,
+        height_pt: 400.0,
+      },
+    );
+
+    assert_eq!(
+      transform.rect_from_xywh(120.0, 240.0, 60.0, 80.0),
+      CellRect {
+        x_pt: 28.0,
+        y_pt: 44.0,
+        width_pt: 30.0,
+        height_pt: 40.0,
+      }
+    );
   }
 }
 

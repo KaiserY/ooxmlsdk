@@ -1144,7 +1144,80 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
             parse_hierarchy_branch_condition_value(branch.val.as_str()),
           )
         }
-        _ => true,
+        Some("orgChart") => self.compare_condition(
+          branch.operator,
+          i32::from(
+            self
+              .presentation_layout_variables(self.current_point)
+              .and_then(|variables| variables.organization_chart.as_ref())
+              .and_then(|value| value.val.as_ref())
+              .is_some_and(|value| value.as_bool()),
+          ),
+          parse_boolean_condition_value(branch.val.as_str()),
+        ),
+        Some("chMax") => self.compare_condition(
+          branch.operator,
+          self
+            .presentation_layout_variables(self.current_point)
+            .and_then(|variables| variables.max_number_of_children.as_ref())
+            .and_then(|value| value.val)
+            .unwrap_or(-1),
+          branch.val.parse::<i32>().unwrap_or(-1),
+        ),
+        Some("chPref") => self.compare_condition(
+          branch.operator,
+          self
+            .presentation_layout_variables(self.current_point)
+            .and_then(|variables| variables.preferred_number_of_children.as_ref())
+            .and_then(|value| value.val)
+            .unwrap_or(-1),
+          branch.val.parse::<i32>().unwrap_or(-1),
+        ),
+        Some("bulletEnabled") => self.compare_condition(
+          branch.operator,
+          i32::from(
+            self
+              .presentation_layout_variables(self.current_point)
+              .and_then(|variables| variables.bullet_enabled.as_ref())
+              .and_then(|value| value.val.as_ref())
+              .is_some_and(|value| value.as_bool()),
+          ),
+          parse_boolean_condition_value(branch.val.as_str()),
+        ),
+        Some("animOne") => self.compare_condition(
+          branch.operator,
+          animate_one_condition_value(
+            self
+              .presentation_layout_variables(self.current_point)
+              .and_then(|variables| variables.animate_one_by_one.as_ref())
+              .and_then(|value| value.val)
+              .unwrap_or_default(),
+          ),
+          parse_animate_one_condition_value(branch.val.as_str()),
+        ),
+        Some("animLvl") => self.compare_condition(
+          branch.operator,
+          animation_level_condition_value(
+            self
+              .presentation_layout_variables(self.current_point)
+              .and_then(|variables| variables.animation_level.as_ref())
+              .and_then(|value| value.val)
+              .unwrap_or_default(),
+          ),
+          parse_animation_level_condition_value(branch.val.as_str()),
+        ),
+        Some("resizeHandles") => self.compare_condition(
+          branch.operator,
+          resize_handles_condition_value(
+            self
+              .presentation_layout_variables(self.current_point)
+              .and_then(|variables| variables.resize_handles.as_ref())
+              .and_then(|value| value.val)
+              .unwrap_or_default(),
+          ),
+          parse_resize_handles_condition_value(branch.val.as_str()),
+        ),
+        _ => false,
       },
       dgm::FunctionValues::Count => self.compare_condition(
         branch.operator,
@@ -1674,6 +1747,28 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       .and_then(|properties| properties.presentation_layout_variables.as_deref())
       .and_then(|variables| variables.direction.as_ref())
       .and_then(|direction| direction.val)
+  }
+
+  fn presentation_layout_variables(
+    &self,
+    point: &'a dgm::Point,
+  ) -> Option<&'a dgm::PresentationLayoutVariables> {
+    let direct = point
+      .property_set
+      .as_deref()
+      .and_then(|properties| properties.presentation_layout_variables.as_deref());
+    if direct.is_some() {
+      return direct;
+    }
+    self
+      .navigate_connection(
+        dgm::ConnectionValues::PresentationParentOf,
+        point.model_id.as_str(),
+        false,
+      )
+      .and_then(|parent_id| self.point_by_id.get(parent_id).copied())
+      .and_then(|parent| parent.property_set.as_deref())
+      .and_then(|properties| properties.presentation_layout_variables.as_deref())
   }
 
   fn presentation_hierarchy_branch(&self, point: &dgm::Point) -> dgm::HierarchyBranchStyleValues {
@@ -2273,6 +2368,56 @@ fn parse_hierarchy_branch_condition_value(value: &str) -> i32 {
     "hang" => hierarchy_branch_condition_value(dgm::HierarchyBranchStyleValues::Hanging),
     "init" => hierarchy_branch_condition_value(dgm::HierarchyBranchStyleValues::Initial),
     _ => hierarchy_branch_condition_value(dgm::HierarchyBranchStyleValues::Standard),
+  }
+}
+
+fn parse_boolean_condition_value(value: &str) -> i32 {
+  i32::from(matches!(value, "1" | "true" | "on"))
+}
+
+fn animate_one_condition_value(value: dgm::AnimateOneByOneValues) -> i32 {
+  match value {
+    dgm::AnimateOneByOneValues::None => 0,
+    dgm::AnimateOneByOneValues::One => 1,
+    dgm::AnimateOneByOneValues::Branch => 2,
+  }
+}
+
+fn parse_animate_one_condition_value(value: &str) -> i32 {
+  match value {
+    "one" => animate_one_condition_value(dgm::AnimateOneByOneValues::One),
+    "branch" => animate_one_condition_value(dgm::AnimateOneByOneValues::Branch),
+    _ => animate_one_condition_value(dgm::AnimateOneByOneValues::None),
+  }
+}
+
+fn animation_level_condition_value(value: dgm::AnimationLevelStringValues) -> i32 {
+  match value {
+    dgm::AnimationLevelStringValues::None => 0,
+    dgm::AnimationLevelStringValues::Level => 1,
+    dgm::AnimationLevelStringValues::Center => 2,
+  }
+}
+
+fn parse_animation_level_condition_value(value: &str) -> i32 {
+  match value {
+    "lvl" => animation_level_condition_value(dgm::AnimationLevelStringValues::Level),
+    "ctr" => animation_level_condition_value(dgm::AnimationLevelStringValues::Center),
+    _ => animation_level_condition_value(dgm::AnimationLevelStringValues::None),
+  }
+}
+
+fn resize_handles_condition_value(value: dgm::ResizeHandlesStringValues) -> i32 {
+  match value {
+    dgm::ResizeHandlesStringValues::Exact => 0,
+    dgm::ResizeHandlesStringValues::Relative => 1,
+  }
+}
+
+fn parse_resize_handles_condition_value(value: &str) -> i32 {
+  match value {
+    "rel" => resize_handles_condition_value(dgm::ResizeHandlesStringValues::Relative),
+    _ => resize_handles_condition_value(dgm::ResizeHandlesStringValues::Exact),
   }
 }
 

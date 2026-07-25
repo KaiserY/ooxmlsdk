@@ -124,6 +124,10 @@ fn symbol_font_symbol(code: u32) -> Option<char> {
     0x78 => 'ξ',
     0x79 => 'ψ',
     0x7A => 'ζ',
+    // Older binary Word producers use the Windows symbol-font byte 0x94 for
+    // a black square. The OOXML transport form is F094; it is not a Unicode
+    // PUA scalar and Microsoft's Symbol cmap consequently has no U+F094.
+    0x94 => '■',
     0xA2 => '′',
     0xA3 => '≤',
     0xA5 => '∞',

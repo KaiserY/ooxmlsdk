@@ -28,7 +28,7 @@ pub(crate) fn wordprocessing_math_text(choice: &w::ParagraphChoice) -> Option<St
     w::ParagraphChoice::EquationArray(value) => append_equation_array_text(value, &mut text),
     w::ParagraphChoice::Fraction(value) => append_fraction_text(value, &mut text),
     w::ParagraphChoice::MathFunction(value) => append_math_function_text(value, &mut text),
-    w::ParagraphChoice::GroupChar(value) => append_base_text(&value.base, &mut text),
+    w::ParagraphChoice::GroupChar(value) => append_group_char_text(value, &mut text),
     w::ParagraphChoice::LimitLower(value) => append_limit_lower_text(value, &mut text),
     w::ParagraphChoice::LimitUpper(value) => append_limit_upper_text(value, &mut text),
     w::ParagraphChoice::Matrix(value) => append_matrix_text(value, &mut text),
@@ -66,7 +66,7 @@ macro_rules! append_math_choice {
       m::$choice_type::EquationArray(value) => append_equation_array_text(value, $text),
       m::$choice_type::Fraction(value) => append_fraction_text(value, $text),
       m::$choice_type::MathFunction(value) => append_math_function_text(value, $text),
-      m::$choice_type::GroupChar(value) => append_base_text(&value.base, $text),
+      m::$choice_type::GroupChar(value) => append_group_char_text(value, $text),
       m::$choice_type::LimitLower(value) => append_limit_lower_text(value, $text),
       m::$choice_type::LimitUpper(value) => append_limit_upper_text(value, $text),
       m::$choice_type::Matrix(value) => append_matrix_text(value, $text),
@@ -142,30 +142,55 @@ fn append_accent_text(accent: &m::Accent, text: &mut String) {
     .as_deref()
     .and_then(|properties| properties.accent_char.as_ref())
   {
+    // Office fixed output exposes the stretched/accent glyph as a separate
+    // searchable-text portion. Keeping it out of the base glyph's shaping
+    // cluster also prevents the ToUnicode mapping from losing the base.
+    text.push(' ');
     text.push_str(character.val.as_str());
   }
 }
 
 fn append_delimiter_text(delimiter: &m::Delimiter, text: &mut String) {
   let properties = delimiter.delimiter_properties.as_deref();
-  if let Some(character) = properties.and_then(|properties| properties.begin_char.as_ref()) {
-    text.push_str(character.val.as_str());
-  }
+  // ECMA-376 Part 1, 22.1.2.24 defaults omitted delimiter properties to
+  // parentheses and the separator to a vertical bar.  An explicitly empty
+  // value is different: it suppresses that delimiter.
+  let begin = properties
+    .and_then(|properties| properties.begin_char.as_ref())
+    .map_or("(", |character| character.val.as_str());
+  let separator = properties
+    .and_then(|properties| properties.separator_char.as_ref())
+    .map_or("|", |character| character.val.as_str());
+  let end = properties
+    .and_then(|properties| properties.end_char.as_ref())
+    .map_or(")", |character| character.val.as_str());
+  text.push_str(begin);
   for (index, base) in delimiter.base.iter().enumerate() {
-    if index > 0
-      && let Some(character) = properties.and_then(|properties| properties.separator_char.as_ref())
-    {
-      text.push_str(character.val.as_str());
+    if index > 0 {
+      text.push_str(separator);
     }
-    append_base_text(base, text);
+    let mut base_text = String::new();
+    append_base_text(base, &mut base_text);
+    for (line_index, line) in base_text.split('\n').enumerate() {
+      if line_index > 0 {
+        // A stretched delimiter surrounds every visual row. Repeating the
+        // boundary characters in the flattened representation matches the
+        // searchable text emitted by Word's fixed-output PDF.
+        text.push_str(end);
+        text.push('\n');
+        text.push_str(begin);
+      }
+      text.push_str(line);
+    }
   }
-  if let Some(character) = properties.and_then(|properties| properties.end_char.as_ref()) {
-    text.push_str(character.val.as_str());
-  }
+  text.push_str(end);
 }
 
 fn append_equation_array_text(array: &m::EquationArray, text: &mut String) {
-  for base in &array.base {
+  for (index, base) in array.base.iter().enumerate() {
+    if index > 0 {
+      text.push('\n');
+    }
     append_base_text(base, text);
   }
 }
@@ -195,6 +220,17 @@ fn append_math_function_text(function: &m::MathFunction, text: &mut String) {
   append_base_text(&function.base, text);
 }
 
+fn append_group_char_text(group: &m::GroupChar, text: &mut String) {
+  append_base_text(&group.base, text);
+  text.push_str(
+    group
+      .group_char_properties
+      .as_deref()
+      .and_then(|properties| properties.accent_char.as_ref())
+      .map_or("\u{23df}", |character| character.val.as_str()),
+  );
+}
+
 fn append_limit_lower_text(limit: &m::LimitLower, text: &mut String) {
   append_base_text(&limit.base, text);
   append_limit_text(&limit.limit, text);
@@ -206,7 +242,10 @@ fn append_limit_upper_text(limit: &m::LimitUpper, text: &mut String) {
 }
 
 fn append_matrix_text(matrix: &m::Matrix, text: &mut String) {
-  for row in &matrix.matrix_row {
+  for (row_index, row) in matrix.matrix_row.iter().enumerate() {
+    if row_index > 0 {
+      text.push('\n');
+    }
     for base in &row.base {
       append_base_text(base, text);
     }
@@ -257,14 +296,25 @@ fn append_superscript_text(value: &m::Superscript, text: &mut String) {
 fn append_run_text(run: &m::Run, text: &mut String) {
   let (script, style, normal_text) = math_run_variant(run.math_run_properties.as_deref());
   for choice in &run.run_choice {
-    if let m::RunChoice::MText(value) = choice
-      && let Some(content) = value.xml_content.as_deref()
-    {
+    let content = match choice {
+      m::RunChoice::MText(value) => value.xml_content.as_deref(),
+      m::RunChoice::WText(value) => value.0.xml_content.as_deref(),
+      _ => None,
+    };
+    if let Some(content) = content {
       if normal_text {
         text.push_str(content);
       } else {
         append_math_variant_text(content, script, style, text);
       }
+      continue;
+    }
+    match choice {
+      m::RunChoice::TabChar => text.push('\t'),
+      m::RunChoice::CarriageReturn | m::RunChoice::Break(_) => text.push('\n'),
+      m::RunChoice::NoBreakHyphen => text.push('\u{2011}'),
+      m::RunChoice::SoftHyphen => text.push('\u{00ad}'),
+      _ => {}
     }
   }
 }
@@ -422,6 +472,28 @@ mod tests {
     assert_eq!(
       wordprocessing_math_text(&paragraph.paragraph_choice[0]).as_deref(),
       Some("𝑎⁄𝑏𝑐⁄𝑑𝑒𝑓")
+    );
+  }
+
+  #[test]
+  fn wordprocessing_math_preserves_word_text_and_structure_defaults() {
+    let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:d><m:e><m:r><w:t>x</w:t></m:r></m:e><m:e><m:r><m:t>y</m:t></m:r></m:e></m:d><m:eqArr><m:e><m:r><m:t>a</m:t></m:r></m:e><m:e><m:r><m:t>b</m:t></m:r></m:e></m:eqArr><m:m><m:mr><m:e><m:r><m:t>1</m:t></m:r></m:e><m:e><m:r><m:t>2</m:t></m:r></m:e></m:mr><m:mr><m:e><m:r><m:t>3</m:t></m:r></m:e><m:e><m:r><m:t>4</m:t></m:r></m:e></m:mr></m:m></m:oMath></w:p>"#;
+    let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
+
+    assert_eq!(
+      wordprocessing_math_text(&paragraph.paragraph_choice[0]).as_deref(),
+      Some("(𝑥|𝑦)𝑎\n𝑏12\n34")
+    );
+  }
+
+  #[test]
+  fn wordprocessing_accent_keeps_base_from_word_run_properties() {
+    let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:acc><m:accPr><m:chr m:val="&#x301;"/></m:accPr><m:e><m:r><w:rPr><w:rFonts w:ascii="Cambria Math"/></w:rPr><m:t>a</m:t></m:r></m:e></m:acc></m:oMath></w:p>"#;
+    let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
+
+    assert_eq!(
+      wordprocessing_math_text(&paragraph.paragraph_choice[0]).as_deref(),
+      Some("𝑎 \u{301}")
     );
   }
 }

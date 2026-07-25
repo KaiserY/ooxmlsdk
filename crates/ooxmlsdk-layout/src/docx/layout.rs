@@ -1431,6 +1431,7 @@ fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
       .map(Cow::Owned)
       .unwrap_or(Cow::Borrowed("application/octet-stream")),
     bytes: item.data,
+    metafile_monochrome_dib_palette_override: None,
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
@@ -6831,17 +6832,12 @@ fn resolve_dynamic_fields(
   let total_pages = pages.len();
   let page_refs = anchor_pages
     .iter()
-    .map(|anchor| {
-      (
-        anchor.name.as_str(),
-        anchor.virtual_page_number.max(1).to_string(),
-      )
-    })
+    .map(|anchor| (anchor.name.as_str(), anchor.virtual_page_number.to_string()))
     .collect::<HashMap<_, _>>();
   let style_ref_candidates = style_ref_candidates_by_page(pages);
   resolve_page_note_numbering(pages, footnote_numbering, endnote_numbering);
   for (page_index, page) in pages.iter_mut().enumerate() {
-    let page_number = page_index + 1;
+    let page_number = virtual_page_number(page.setup, page.section_page_index, page_index);
     let items = page.items.iter_mut().chain(
       page
         .repeating_adornment
@@ -8254,6 +8250,14 @@ fn lower_inline_chart(
   }
 
   if let Some(mut model) = shared_chart::pie_chart_model(chart_space) {
+    if model.title.is_none()
+      && shared_chart::has_word_automatic_title_placeholder(&chart_space.chart)
+      && !model.series_name.is_empty()
+    {
+      model.title = Some(shared_chart::ChartTitleText::Explicit(
+        model.series_name.clone(),
+      ));
+    }
     if matches!(model.title, Some(shared_chart::ChartTitleText::Automatic))
       && chart_space.chart.title.is_none()
     {
@@ -8296,7 +8300,13 @@ fn lower_inline_chart(
   };
   if model.title.is_none() && shared_chart::has_word_automatic_title_placeholder(&chart_space.chart)
   {
-    model.title = Some(shared_chart::ChartTitleText::Automatic);
+    model.title = if model.series.len() == 1 && !model.series[0].name.is_empty() {
+      Some(shared_chart::ChartTitleText::Explicit(
+        model.series[0].name.clone(),
+      ))
+    } else {
+      Some(shared_chart::ChartTitleText::Automatic)
+    };
   }
   if matches!(model.title, Some(shared_chart::ChartTitleText::Automatic))
     && chart_space.chart.title.is_none()
@@ -12277,26 +12287,114 @@ fn layout_shape_text_box(
   materialize_pending_floating_table_follows_in_local_pages(&mut nested_page, &mut discarded_pages);
 
   let auto_fit_inset = textbox_auto_fit_bounds_inset(shape);
-  current.items.extend(
-    flatten_nested_pages(nested_page, discarded_pages, text_y, content_bottom)
-      .into_iter()
-      .filter_map(|item| {
-        let item = if shape.text_box_auto_fit {
-          textbox_item_inside_shape_bounds(
-            item,
-            text_metrics,
-            rect.x + auto_fit_inset,
-            shape_y + auto_fit_inset,
-            (rect.width - auto_fit_inset * 2.0).max(DEFAULT_FONT_SIZE_PT),
-            (rect.height - auto_fit_inset * 2.0).max(DEFAULT_LINE_HEIGHT_PT),
-          )
-        } else {
-          item
-        };
-        table_cell_item_intersects_vertical_bounds(&item, content_top, content_bottom)
-          .then_some(item)
-      }),
-  );
+  let mut items = flatten_nested_pages(nested_page, discarded_pages, text_y, content_bottom)
+    .into_iter()
+    .filter_map(|item| {
+      let item = if shape.text_box_auto_fit {
+        textbox_item_inside_shape_bounds(
+          item,
+          text_metrics,
+          rect.x + auto_fit_inset,
+          shape_y + auto_fit_inset,
+          (rect.width - auto_fit_inset * 2.0).max(DEFAULT_FONT_SIZE_PT),
+          (rect.height - auto_fit_inset * 2.0).max(DEFAULT_LINE_HEIGHT_PT),
+        )
+      } else {
+        item
+      };
+      table_cell_item_intersects_vertical_bounds(&item, content_top, content_bottom).then_some(item)
+    })
+    .collect::<Vec<_>>();
+  apply_shape_text_warp(&mut items, shape, rect, text_metrics);
+  current.items.extend(items);
+}
+
+fn apply_shape_text_warp(
+  items: &mut [PageItem],
+  shape: &crate::docx::InlineShape,
+  rect: ShapeTextBoxRect,
+  text_metrics: &mut TextMetrics,
+) {
+  let Some(preset) = shape.text_warp.as_deref() else {
+    return;
+  };
+  let Some((left, top, right, bottom)) = text_items_ink_bounds(items, text_metrics) else {
+    return;
+  };
+  let Some(text_warp) = common::drawingml_text_warp::text_warp(
+    preset,
+    common_rect(left, top, right - left, bottom - top),
+    common_rect(rect.x, rect.y, rect.width, rect.height),
+  ) else {
+    return;
+  };
+  for item in items {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    if let Some(color) = shape.fill_color {
+      text.style.color = color;
+    }
+    text.style.pdf_glyph_outlines = true;
+    let mut options = text
+      .style
+      .pdf_glyph_outline_options
+      .as_deref()
+      .cloned()
+      .unwrap_or_default();
+    // Word's fixed-format output emits warped WordArt (including text
+    // watermarks) as outlines without a duplicate searchable-text layer.
+    options.semantic_text_overlay = false;
+    options.transform = None;
+    options.text_warp = Some(text_warp.clone());
+    text.style.pdf_glyph_outline_options = Some(Arc::new(options));
+  }
+}
+
+fn text_items_ink_bounds(
+  items: &[PageItem],
+  text_metrics: &mut TextMetrics,
+) -> Option<(f32, f32, f32, f32)> {
+  let mut bounds: Option<(f32, f32, f32, f32)> = None;
+  for item in items {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    let baseline_offset = if text.style.use_windows_font_metrics {
+      text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+        &text.text,
+        &text.style,
+        text.line_height_pt,
+      )
+    } else {
+      text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
+    };
+    let baseline = text.y_pt + baseline_offset;
+    let mut glyph_x = text.x_pt;
+    let Some(shaped) = text_metrics.shape_text(&text.text, &text.style) else {
+      continue;
+    };
+    for glyph in shaped.glyphs {
+      let font_size = glyph.font_size_pt;
+      if let Some(glyph_bounds) = glyph.bounds_em {
+        let glyph_left = glyph_x + (glyph.x_offset_em + glyph_bounds.x_min_em) * font_size;
+        let glyph_right = glyph_x + (glyph.x_offset_em + glyph_bounds.x_max_em) * font_size;
+        let glyph_top = baseline - (glyph.y_offset_em + glyph_bounds.y_max_em) * font_size;
+        let glyph_bottom = baseline - (glyph.y_offset_em + glyph_bounds.y_min_em) * font_size;
+        bounds = Some(match bounds {
+          Some((old_left, old_top, old_right, old_bottom)) => (
+            old_left.min(glyph_left),
+            old_top.min(glyph_top),
+            old_right.max(glyph_right),
+            old_bottom.max(glyph_bottom),
+          ),
+          None => (glyph_left, glyph_top, glyph_right, glyph_bottom),
+        });
+      }
+      glyph_x += glyph.x_advance_em * font_size;
+    }
+  }
+  bounds
 }
 
 fn textbox_auto_fit_bounds_inset(shape: &crate::docx::InlineShape) -> f32 {
@@ -13108,7 +13206,7 @@ fn record_anchor_page(
 fn virtual_page_number(setup: PageSetup, section_page_index: usize, page_index: usize) -> usize {
   setup
     .page_number_start
-    .map(|start| start.saturating_add(section_page_index as i32).max(1) as usize)
+    .map(|start| start.saturating_add(section_page_index as i32).max(0) as usize)
     .unwrap_or(page_index + 1)
 }
 
@@ -15099,7 +15197,9 @@ impl<'a> TextFrameLayout<'a> {
               );
               return (item_start, current.items.len());
             }
-            if shape.fill_pattern.is_some() || shape.stroke_pattern.is_some() {
+            if shape.text_warp.is_none()
+              && (shape.fill_pattern.is_some() || shape.stroke_pattern.is_some())
+            {
               current.items.push(PageItem::Path(common::PathItem {
                 bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
                 points: Vec::new(),
@@ -15116,7 +15216,9 @@ impl<'a> TextFrameLayout<'a> {
                   .stroke
                   .map(|stroke| inline_shape_common_stroke(shape, stroke, None)),
               }));
-            } else if shape.fill_color.is_some() || shape.stroke.is_some() {
+            } else if shape.text_warp.is_none()
+              && (shape.fill_color.is_some() || shape.stroke.is_some())
+            {
               current.items.push(PageItem::Rect(RectItem {
                 x_pt,
                 y_pt,
@@ -15128,17 +15230,19 @@ impl<'a> TextFrameLayout<'a> {
                 stroke_opacity: 1.0,
               }));
             }
-            for color in &shape.additional_fill_colors {
-              current.items.push(PageItem::Rect(RectItem {
-                x_pt,
-                y_pt,
-                width_pt,
-                height_pt,
-                fill_color: Some(*color),
-                fill_opacity: 1.0,
-                stroke: None,
-                stroke_opacity: 1.0,
-              }));
+            if shape.text_warp.is_none() {
+              for color in &shape.additional_fill_colors {
+                current.items.push(PageItem::Rect(RectItem {
+                  x_pt,
+                  y_pt,
+                  width_pt,
+                  height_pt,
+                  fill_color: Some(*color),
+                  fill_opacity: 1.0,
+                  stroke: None,
+                  stroke_opacity: 1.0,
+                }));
+              }
             }
             if shape_has_invisible_auto_fit_textbox_bounds(shape, shape_flow) {
               // content even when the owning draw shape has no fill/stroke,
@@ -15308,7 +15412,7 @@ impl<'a> TextFrameLayout<'a> {
                   line_height = base_line_height;
                 }
                 ImageWrapMode::Square | ImageWrapMode::Tight
-                  if effective_layout_in_cell(placement, flow) =>
+                  if effective_layout_in_cell(placement, flow) && !shape.allow_outside_page =>
                 {
                   if !placement.behind_text {
                     append_vertical_wrap_exclusion(
@@ -17778,6 +17882,7 @@ mod tests {
         margin_left_pt: 0.0,
       }),
       chart: None,
+      text_warp: None,
       text_box_blocks: Vec::new(),
       text_inset_left_pt: 0.0,
       text_inset_top_pt: 0.0,

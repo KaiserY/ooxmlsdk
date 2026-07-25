@@ -5,9 +5,9 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use crate::common::drawingml_geometry::{
-  common_transform, group_child_affine, transform_commands, transform_point, transform_rect_bounds,
-  transform_vector,
+  group_child_affine, transform_commands, transform_point, transform_rect_bounds, transform_vector,
 };
+use crate::common::drawingml_image_effects::{ColorChangeEffect, ImageEffect};
 use crate::common::{self, DebugProperty, DebugRecord, DebugShape, DebugValue, Point, Rect, Size};
 use crate::common::{
   drawingml_custom_geometry as custom_geometry, drawingml_preset_geometry as preset_geometry,
@@ -21,7 +21,6 @@ use crate::model::{
 use crate::options::LayoutOptions;
 use crate::render::chart as shared_chart;
 use crate::render::diagram as shared_diagram;
-use crate::render::emf_wmf;
 use crate::render::symbol as shared_symbol;
 use crate::text_layout::{StyledTextSpan, break_text_lines};
 use crate::text_metrics::TextMetrics;
@@ -224,6 +223,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
       .map(Cow::Owned)
       .unwrap_or(Cow::Borrowed("application/octet-stream")),
     bytes: item.data,
+    metafile_monochrome_dib_palette_override: item.metafile_monochrome_dib_palette_override,
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
@@ -2886,6 +2886,7 @@ fn diagram_blip_placeholder_image_item(bounds: shared_diagram::DiagramBounds) ->
     flip_vertical: false,
     data: transparent_png_1x1()?,
     content_type: Some("image/png".to_string()),
+    metafile_monochrome_dib_palette_override: None,
     alt_text: None,
     hyperlink_url: None,
     floating: false,
@@ -3285,17 +3286,70 @@ fn diagram_shape_bounds(
 }
 
 fn diagram_text_transform_bounds(
+  shape: &dsp::Shape,
   transform: &dsp::Transform2D,
   parent_transform: DiagramDrawingTransform,
 ) -> Option<shared_diagram::DiagramBounds> {
   let offset = transform.offset.as_ref()?;
   let extents = transform.extents.as_ref()?;
+  let shape_transform = shape.shape_properties.transform2_d.as_deref()?;
+  let shape_offset = shape_transform.offset.as_ref()?;
+  let shape_extents = shape_transform.extents.as_ref()?;
+  let shape_bounds = shared_diagram::DiagramBounds {
+    x: units::emu_to_points(shape_offset.x.to_emu()),
+    y: units::emu_to_points(shape_offset.y.to_emu()),
+    width: units::emu_to_points(shape_extents.cx.to_emu()),
+    height: units::emu_to_points(shape_extents.cy.to_emu()),
+  };
+  let preset_bounds = diagram_preset_text_rectangle(shape, shape_bounds)?;
+  let mut text_bounds = shared_diagram::DiagramBounds {
+    x: units::emu_to_points(offset.x.to_emu()),
+    y: units::emu_to_points(offset.y.to_emu()),
+    width: units::emu_to_points(extents.cx.to_emu()),
+    height: units::emu_to_points(extents.cy.to_emu()),
+  };
+
+  // LibreOffice Transform2DContext::onCreateContext() first compensates a
+  // txXfrm rotation that is not cancelled by the owning shape rotation. The
+  // resulting text rectangle is then positioned in the rotated shape's
+  // coordinate system. Keep its width/height unrotated: those are the text
+  // frame dimensions, not the axis-aligned bounds of a rotated rectangle.
+  let shape_rotation = shape_transform.rotation.unwrap_or_default() as f32 / 60_000.0;
+  let text_rotation = transform.rotation.unwrap_or_default() as f32 / 60_000.0;
+  let angle_difference = (shape_rotation + text_rotation).rem_euclid(360.0);
+  if angle_difference.abs() > f32::EPSILON {
+    let preset_center = (
+      preset_bounds.x + preset_bounds.width / 2.0,
+      preset_bounds.y + preset_bounds.height / 2.0,
+    );
+    let text_center = (
+      text_bounds.x + text_bounds.width / 2.0,
+      text_bounds.y + text_bounds.height / 2.0,
+    );
+    let rotated = rotate_diagram_point(text_center, preset_center, -angle_difference);
+    text_bounds.x += rotated.0 - text_center.0;
+    text_bounds.y += rotated.1 - text_center.1;
+  }
+  let shape_center = (
+    shape_bounds.x + shape_bounds.width / 2.0,
+    shape_bounds.y + shape_bounds.height / 2.0,
+  );
+  (text_bounds.x, text_bounds.y) =
+    rotate_diagram_point((text_bounds.x, text_bounds.y), shape_center, shape_rotation);
   Some(parent_transform.apply_bounds(
-    units::emu_to_points(offset.x.to_emu()),
-    units::emu_to_points(offset.y.to_emu()),
-    units::emu_to_points(extents.cx.to_emu()),
-    units::emu_to_points(extents.cy.to_emu()),
+    text_bounds.x,
+    text_bounds.y,
+    text_bounds.width,
+    text_bounds.height,
   ))
+}
+
+fn rotate_diagram_point(point: (f32, f32), center: (f32, f32), angle_degrees: f32) -> (f32, f32) {
+  let angle = angle_degrees.to_radians();
+  let (sin, cos) = angle.sin_cos();
+  let x = point.0 - center.0;
+  let y = point.1 - center.1;
+  (center.0 + x * cos - y * sin, center.1 + x * sin + y * cos)
 }
 
 fn diagram_drawing_text_frame(
@@ -3317,7 +3371,8 @@ fn diagram_drawing_text_frame(
       shape_bounds.y,
     );
   };
-  let Some(text_bounds) = diagram_text_transform_bounds(text_transform, parent_transform) else {
+  let Some(text_bounds) = diagram_text_transform_bounds(shape, text_transform, parent_transform)
+  else {
     return DiagramDrawingTextFrame::new(
       text_body_frame(
         shape_bounds.x,
@@ -3950,6 +4005,7 @@ fn lower_picture(
     flip_vertical,
     data,
     content_type,
+    metafile_monochrome_dib_palette_override: resource.monochrome_dib_palette_override,
     alt_text: shape
       .description
       .clone()
@@ -5687,6 +5743,7 @@ fn blip_fill_image_items_from_resource(
     flip_vertical,
     data,
     content_type,
+    metafile_monochrome_dib_palette_override: None,
     alt_text: placement.alt_text,
     hyperlink_url: placement.hyperlink_url,
     floating: false,
@@ -5767,6 +5824,7 @@ fn tiled_blip_fill_image_items(
           flip_vertical: placement.flip_vertical ^ tile_flip_v,
           data: Arc::clone(&data),
           content_type: content_type.clone(),
+          metafile_monochrome_dib_palette_override: None,
           alt_text: placement.alt_text.clone(),
           hyperlink_url: placement.hyperlink_url.clone(),
           floating: false,
@@ -5853,36 +5911,6 @@ struct ImportedImageData {
 #[derive(Clone, Debug, Default, PartialEq)]
 struct ImageEffects(Vec<ImageEffect>);
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum ImageEffect {
-  AlphaBiLevel(u8),
-  AlphaCeiling,
-  AlphaFloor,
-  AlphaInverse(Option<RgbColor>),
-  AlphaModulateFixed(f32),
-  AlphaReplace(u8),
-  BiLevel(u8),
-  ColorChange(ColorChangeEffect),
-  ColorReplacement(RgbColor),
-  Duotone(RgbColor, RgbColor),
-  Grayscale,
-  Luminance {
-    watermark: bool,
-    brightness: Option<i32>,
-    contrast: Option<i32>,
-  },
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct ColorChangeEffect {
-  from: RgbColor,
-  to: RgbColor,
-  from_alpha: u8,
-  to_alpha: u8,
-  use_alpha: bool,
-  tolerance: u8,
-}
-
 fn image_data_with_blip_effects(
   import: &PowerPointImport,
   slide: &SlidePersist,
@@ -5898,7 +5926,9 @@ fn image_data_with_blip_effects(
       content_type: content_type.map(str::to_string),
     };
   }
-  let Some(data) = apply_image_effects(data_ref, content_type, effects) else {
+  let Some(data) =
+    common::drawingml_image_effects::apply(data_ref, content_type, effects.0.as_slice())
+  else {
     return ImportedImageData {
       data: Arc::clone(data),
       content_type: content_type.map(str::to_string),
@@ -5946,7 +5976,7 @@ fn image_effects_from_blip(
           effect
             .amount
             .as_ref()
-            .map(|value| office_alpha_modulate_amount(*value))
+            .map(|value| common::drawingml_image_effects::office_alpha_modulate_amount(*value))
             .unwrap_or(1.0),
         ));
       }
@@ -5997,7 +6027,7 @@ fn image_effects_from_blip(
             from_alpha,
             to_alpha,
             use_alpha,
-            tolerance: color_change_tolerance(content_type),
+            tolerance: common::drawingml_image_effects::color_change_tolerance(content_type),
           }));
         }
       }
@@ -6032,6 +6062,19 @@ fn image_effects_from_blip(
         }
       }
       a::BlipChoice::Grayscale => effects.0.push(ImageEffect::Grayscale),
+      a::BlipChoice::Hsl(effect) => {
+        effects.0.push(ImageEffect::Hsl {
+          hue_degrees: effect.hue.unwrap_or_default() as f32 / 60_000.0,
+          saturation_offset: effect
+            .saturation
+            .map(|value| value.as_ratio() as f32)
+            .unwrap_or_default(),
+          luminance_offset: effect
+            .luminance
+            .map(|value| value.as_ratio() as f32)
+            .unwrap_or_default(),
+        });
+      }
       a::BlipChoice::LuminanceEffect(luminance) => {
         let brightness = luminance
           .brightness
@@ -6059,6 +6102,23 @@ fn image_effects_from_blip(
             .clamp(0.0, 255.0) as u8,
         ));
       }
+      a::BlipChoice::Blur(blur) => effects.0.push(ImageEffect::Blur {
+        // DrawingML coordinates are EMUs; 9,525 EMUs map to one 96-DPI
+        // raster pixel in Office's bitmap-effect pipeline.
+        radius_px: blur
+          .radius
+          .map(|radius| radius.to_emu() as f32 / 9_525.0)
+          .unwrap_or_default(),
+        grow_bounds: blur.grow.as_ref().is_none_or(|value| value.as_bool()),
+      }),
+      a::BlipChoice::TintEffect(tint) => effects.0.push(ImageEffect::Tint {
+        hue_degrees: tint.hue.unwrap_or_default() as f32 / 60_000.0,
+        amount: tint
+          .amount
+          .as_ref()
+          .map(|value| value.as_ratio() as f32)
+          .unwrap_or_default(),
+      }),
       _ => {}
     }
   }
@@ -6088,133 +6148,6 @@ fn resolve_color_to_choice(
 ) -> Option<super::drawingml::color::ResolvedColor> {
   let color = Color::from_color_to_choice(choice)?;
   import.resolve_color_for_slide(slide, &color, None)
-}
-
-fn color_change_tolerance(content_type: Option<&str>) -> u8 {
-  // lclCheckAndApplyChangeColorTransform uses 9 by default, native JPEG 15,
-  // native PNG/TIFF 1, and native BMP 0.
-  match content_type {
-    Some("image/jpeg" | "image/jpg") => 15,
-    Some("image/png" | "image/tiff" | "image/tif") => 1,
-    Some("image/bmp" | "image/x-bmp") => 0,
-    _ => 9,
-  }
-}
-
-fn apply_image_effects(
-  data: &[u8],
-  content_type: Option<&str>,
-  effects: ImageEffects,
-) -> Option<Vec<u8>> {
-  let raster_data = emf_wmf::decode_metafile_as_raster(data, content_type)
-    .ok()
-    .flatten()
-    .map(|raster| raster.data);
-  let image_data = raster_data.as_deref().unwrap_or(data);
-  let mut image = image::load_from_memory(image_data).ok()?.to_rgba8();
-  for pixel in image.pixels_mut() {
-    let [mut r, mut g, mut b, mut a] = pixel.0;
-    for effect in &effects.0 {
-      match *effect {
-        ImageEffect::AlphaBiLevel(threshold) => {
-          a = if a < threshold { 0 } else { u8::MAX };
-        }
-        ImageEffect::AlphaCeiling => {
-          if a > 0 {
-            a = u8::MAX;
-          }
-        }
-        ImageEffect::AlphaFloor => {
-          if a < u8::MAX {
-            a = 0;
-          }
-        }
-        ImageEffect::AlphaInverse(color) => {
-          a = u8::MAX - a;
-          if let Some(color) = color {
-            r = color.r;
-            g = color.g;
-            b = color.b;
-          }
-        }
-        ImageEffect::AlphaModulateFixed(amount) => {
-          a = (f32::from(a) * amount).round().clamp(0.0, 255.0) as u8;
-        }
-        ImageEffect::AlphaReplace(alpha) => a = alpha,
-        ImageEffect::BiLevel(threshold) => {
-          let value = if image_luminance(r, g, b) >= threshold {
-            u8::MAX
-          } else {
-            0
-          };
-          r = value;
-          g = value;
-          b = value;
-        }
-        ImageEffect::ColorChange(effect)
-          if channel_within_tolerance(r, effect.from.r, effect.tolerance)
-            && channel_within_tolerance(g, effect.from.g, effect.tolerance)
-            && channel_within_tolerance(b, effect.from.b, effect.tolerance)
-            && (!effect.use_alpha || a == effect.from_alpha) =>
-        {
-          r = effect.to.r;
-          g = effect.to.g;
-          b = effect.to.b;
-          if effect.use_alpha {
-            a = effect.to_alpha;
-          }
-        }
-        ImageEffect::ColorChange(_) => {}
-        ImageEffect::ColorReplacement(color) => {
-          r = color.r;
-          g = color.g;
-          b = color.b;
-        }
-        ImageEffect::Duotone(first, second) => {
-          let luminance = libreoffice_image_luminance(r, g, b);
-          r = duotone_component(luminance, first.r, second.r);
-          g = duotone_component(luminance, first.g, second.g);
-          b = duotone_component(luminance, first.b, second.b);
-        }
-        ImageEffect::Grayscale => {
-          let luminance = image_luminance(r, g, b);
-          r = luminance;
-          g = luminance;
-          b = luminance;
-        }
-        ImageEffect::Luminance {
-          watermark,
-          brightness,
-          contrast,
-        } => {
-          if watermark {
-            r = libreoffice_luminance_contrast_component(r, 0.5, -0.7);
-            g = libreoffice_luminance_contrast_component(g, 0.5, -0.7);
-            b = libreoffice_luminance_contrast_component(b, 0.5, -0.7);
-          } else if brightness.is_some() || contrast.is_some() {
-            let brightness = brightness.unwrap_or(0);
-            let contrast = contrast.unwrap_or(0);
-            r = mso_brightness_contrast_component(r, brightness, contrast);
-            g = mso_brightness_contrast_component(g, brightness, contrast);
-            b = mso_brightness_contrast_component(b, brightness, contrast);
-          }
-        }
-      }
-    }
-    pixel.0 = [r, g, b, a];
-  }
-
-  let mut output = Vec::new();
-  let encoder = PngEncoder::new(Cursor::new(&mut output));
-  encoder
-    .write_image(
-      image.as_raw(),
-      image.width(),
-      image.height(),
-      ColorType::Rgba8.into(),
-    )
-    .ok()?;
-  Some(output)
 }
 
 fn transform_image_data_to_png(
@@ -6276,72 +6209,14 @@ fn transform_image_data_to_png(
   Some(output)
 }
 
-fn channel_within_tolerance(actual: u8, expected: u8, tolerance: u8) -> bool {
-  actual.abs_diff(expected) <= tolerance
-}
-
+#[cfg(test)]
 fn office_alpha_modulate_amount(value: DrawingmlPercentageValue) -> f32 {
-  // MS-OI29500 §20.1.8.6 says Office modulates values beyond 100% instead
-  // of clamping them. Preserve exact positive multiples as 100%: 100% is
-  // also the schema/LibreOffice default and therefore cannot mean zero.
-  let authored = value.as_drawingml_percent().max(0);
-  let remainder = authored % 100_000;
-  let office_value = if authored > 0 && remainder == 0 {
-    100_000
-  } else {
-    remainder
-  };
-  office_value as f32 / 100_000.0
+  common::drawingml_image_effects::office_alpha_modulate_amount(value)
 }
 
-fn image_luminance(r: u8, g: u8, b: u8) -> u8 {
-  // DrawingML gray uses the relative intensities of the sRGB primaries.
-  // Keep the IEC 61966-2-1 / Rec. 709 coefficients in integer form so image
-  // effects are deterministic across platforms.
-  ((u32::from(r) * 2_126 + u32::from(g) * 7_152 + u32::from(b) * 722 + 5_000) / 10_000).min(255)
-    as u8
-}
-
-fn libreoffice_image_luminance(r: u8, g: u8, b: u8) -> u8 {
-  // `tools::Color::GetLuminance`, used by BitmapDuoToneFilter.
-  ((u32::from(b) * 29 + u32::from(g) * 151 + u32::from(r) * 76) >> 8) as u8
-}
-
+#[cfg(test)]
 fn duotone_component(luminance: u8, first: u8, second: u8) -> u8 {
-  let luminance = u16::from(luminance);
-  ((u16::from(second) * luminance / u16::from(u8::MAX))
-    + (u16::from(first) * (u16::from(u8::MAX) - luminance) / u16::from(u8::MAX))) as u8
-}
-
-fn mso_brightness_contrast_component(value: u8, brightness: i32, contrast: i32) -> u8 {
-  let contrast = contrast.clamp(-100, 100) as f32;
-  let slope = if contrast >= 0.0 {
-    128.0 / (128.0 - 1.27 * contrast)
-  } else {
-    (128.0 + 1.27 * contrast) / 128.0
-  };
-  let offset = brightness.clamp(-100, 100) as f32 * 2.55;
-  ((f32::from(value) + offset / 2.0 - 128.0) * slope + 128.0 + offset / 2.0)
-    .round()
-    .clamp(0.0, 255.0) as u8
-}
-
-fn libreoffice_luminance_contrast_component(value: u8, luminance: f32, contrast: f32) -> u8 {
-  // basegfx/source/color/bcolormodifier.cxx
-  // BColorModifier_RGBLuminanceContrast applies contrast as a 0..1 slope and
-  // combines luminance with the prepared contrast offset.
-  let luminance = luminance.clamp(-1.0, 1.0);
-  let contrast = contrast.clamp(-1.0, 1.0);
-  let contrast_offset = if contrast >= 0.0 {
-    128.0 / (128.0 - contrast * 127.0)
-  } else {
-    (128.0 + contrast * 127.0) / 128.0
-  };
-  let prepared_contrast_offset = (128.0 - contrast_offset * 128.0) / 255.0;
-  ((f32::from(value) / 255.0) * contrast_offset + luminance + prepared_contrast_offset)
-    .clamp(0.0, 1.0)
-    .mul_add(255.0, 0.0)
-    .round() as u8
+  common::drawingml_image_effects::duotone_component(luminance, first, second)
 }
 
 fn blip_fill_image_crop(blip_fill: &a::BlipFill) -> ImageCrop {
@@ -6635,7 +6510,7 @@ fn lower_text_body_at_with_style_and_scale(
       },
     );
   }
-  apply_plain_word_art_transform(
+  apply_word_art_transform(
     &mut items[item_start..],
     frame,
     text_body,
@@ -6648,92 +6523,36 @@ fn lower_text_body_at_with_style_and_scale(
   );
 }
 
-fn apply_plain_word_art_transform(
+fn apply_word_art_transform(
   items: &mut [PageItem],
   frame: TextFrame,
   text_body: &TextBody,
   text_metrics: &mut TextMetrics,
 ) {
-  if text_body.display_properties.preset_text_warp != Some(a::TextShapeValues::TextPlain) {
-    return;
-  }
-  let Some((left, top, right, bottom)) = text_items_ink_bounds(items, text_metrics) else {
+  let Some(preset) = text_body
+    .display_properties
+    .preset_text_warp_geometry
+    .as_deref()
+    .filter(|preset| preset.preset != a::TextShapeValues::TextNoShape)
+  else {
     return;
   };
-  let source_width = right - left;
-  let source_height = bottom - top;
-  if source_width <= f32::EPSILON || source_height <= f32::EPSILON {
-    return;
-  }
-  // ECMA-376 Part 1, 20.1.10.76 identifies textPlain as the rectangular
-  // preset text warp. PowerPoint retains the natural text as an invisible
-  // semantic layer, while the visible glyph paths are independently scaled
-  // from the laid-out text bounds to the complete text frame.
-  let transform = common_transform(group_child_affine(
-    kurbo::Point::new(f64::from(frame.x_pt), f64::from(frame.y_pt)),
-    kurbo::Vec2::new(f64::from(frame.width_pt), f64::from(frame.height_pt)),
-    kurbo::Point::new(f64::from(left), f64::from(top)),
-    kurbo::Vec2::new(f64::from(source_width), f64::from(source_height)),
-  ));
-  for item in items {
-    if let PageItem::Text(text) = item {
-      let semantic_text_overlay = text
-        .style
-        .pdf_glyph_outline_options
-        .as_deref()
-        .is_some_and(|options| options.semantic_text_overlay);
-      text.style.pdf_glyph_outline_options = Some(Arc::new(common::PdfGlyphOutlineOptions {
-        semantic_text_overlay,
-        transform: Some(transform),
-      }));
-    }
-  }
-}
-
-fn text_items_ink_bounds(
-  items: &[PageItem],
-  text_metrics: &mut TextMetrics,
-) -> Option<(f32, f32, f32, f32)> {
-  let mut bounds: Option<(f32, f32, f32, f32)> = None;
-  for item in items {
-    let PageItem::Text(text) = item else {
-      continue;
-    };
-    let baseline_offset = if text.style.use_windows_font_metrics {
-      text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
-        &text.text,
-        &text.style,
-        text.line_height_pt,
-      )
-    } else {
-      text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
-    };
-    let baseline = text.y_pt + baseline_offset;
-    let mut glyph_x = text.x_pt;
-    let Some(shaped) = text_metrics.shape_text(&text.text, &text.style) else {
-      continue;
-    };
-    for glyph in shaped.glyphs {
-      let font_size = glyph.font_size_pt;
-      if let Some(glyph_bounds) = glyph.bounds_em {
-        let left = glyph_x + (glyph.x_offset_em + glyph_bounds.x_min_em) * font_size;
-        let right = glyph_x + (glyph.x_offset_em + glyph_bounds.x_max_em) * font_size;
-        let top = baseline - (glyph.y_offset_em + glyph_bounds.y_max_em) * font_size;
-        let bottom = baseline - (glyph.y_offset_em + glyph_bounds.y_min_em) * font_size;
-        bounds = Some(match bounds {
-          Some((old_left, old_top, old_right, old_bottom)) => (
-            old_left.min(left),
-            old_top.min(top),
-            old_right.max(right),
-            old_bottom.max(bottom),
-          ),
-          None => (left, top, right, bottom),
-        });
-      }
-      glyph_x += glyph.x_advance_em * font_size;
-    }
-  }
-  bounds
+  crate::common::drawingml_text_warp::apply_to_text_items(
+    items,
+    preset,
+    common::Rect {
+      origin: common::Point {
+        x: common::Pt(frame.x_pt),
+        y: common::Pt(frame.y_pt),
+      },
+      size: common::Size {
+        width: common::Pt(frame.width_pt),
+        height: common::Pt(frame.height_pt),
+      },
+    },
+    text_metrics,
+    None,
+  );
 }
 
 fn apply_text_camera_z_rotation(
@@ -6825,6 +6644,7 @@ fn text_base_style(
       Arc::new(common::PdfGlyphOutlineOptions {
         semantic_text_overlay: !vectorize_without_semantic_overlay,
         transform: None,
+        text_warp: None,
       })
     }),
     ..TextStyle::default()
@@ -8210,6 +8030,7 @@ fn bullet_graphic_item(
     flip_vertical: false,
     data: resource.data.clone(),
     content_type: resource.content_type.clone(),
+    metafile_monochrome_dib_palette_override: resource.monochrome_dib_palette_override,
     alt_text: None,
     hyperlink_url: shape_hyperlink_url.map(ToString::to_string),
     floating: false,
@@ -8359,6 +8180,7 @@ fn push_math_ole_preview_item(
     flip_vertical: false,
     data,
     content_type: Some("image/png".to_string()),
+    metafile_monochrome_dib_palette_override: None,
     alt_text: None,
     hyperlink_url: None,
     floating: false,
@@ -9813,6 +9635,7 @@ fn apply_run_properties(
       style.pdf_glyph_outline_options = Some(Arc::new(common::PdfGlyphOutlineOptions {
         semantic_text_overlay: true,
         transform: None,
+        text_warp: None,
       }));
     }
   }
@@ -9869,6 +9692,7 @@ fn apply_default_run_properties(
       style.pdf_glyph_outline_options = Some(Arc::new(common::PdfGlyphOutlineOptions {
         semantic_text_overlay: true,
         transform: None,
+        text_warp: None,
       }));
     }
   }

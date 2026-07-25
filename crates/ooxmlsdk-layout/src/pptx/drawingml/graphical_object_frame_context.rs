@@ -41,11 +41,16 @@ impl GraphicalObjectFrameContext {
     };
     let record = graphic_data_record(graphic_data, kind, slide_persist);
     shape.set_graphic_data_record(record);
-    if kind == GraphicDataKind::Ole
-      && shape.picture.is_none()
-      && let Some(preview) = ole_preview_picture(graphic_data, slide_persist)
-    {
-      shape.picture = Some(preview);
+    if kind == GraphicDataKind::Ole && shape.picture.is_none() {
+      if let Some(picture) = ole_preview_picture(graphic_data)
+        && let Some(preview) = picture_record(picture, slide_persist)
+      {
+        shape.picture = Some(preview);
+        // The fallback p:pic is the complete static representation, not just
+        // an image relationship. Its outline/fill/effects are visible in
+        // Office fixed output (for example an OLE preview selection border).
+        crate::pptx::shape_group_context::apply_shape_properties(shape, &picture.shape_properties);
+      }
     }
     match kind {
       GraphicDataKind::Ole => shape.set_ole_object_type(),
@@ -159,18 +164,14 @@ fn graphic_data_record(
   record
 }
 
-fn ole_preview_picture(
-  graphic_data: &a::GraphicData,
-  slide_persist: &SlidePersist,
-) -> Option<PictureRecord> {
-  let picture = graphic_data
+fn ole_preview_picture(graphic_data: &a::GraphicData) -> Option<&p::Picture> {
+  graphic_data
     .graphic_data_choice
     .iter()
     .find_map(|choice| match choice {
       a::GraphicDataChoice::POleObject(ole_object) => ole_object.picture.as_deref(),
       _ => None,
-    })?;
-  picture_record(picture, slide_persist)
+    })
 }
 
 fn picture_record(picture: &p::Picture, slide_persist: &SlidePersist) -> Option<PictureRecord> {

@@ -32,7 +32,7 @@ use krilla::tagging::{
 };
 use krilla::text::{Glyph, GlyphId};
 use krilla_svg::{SurfaceExt, SvgSettings};
-use kurbo::{PathEl, flatten};
+use kurbo::{BezPath, PathEl, flatten};
 use rustc_hash::FxHashMap as HashMap;
 use smallvec::SmallVec;
 
@@ -502,6 +502,7 @@ struct ImageItem<'doc> {
   flip_vertical: bool,
   data: Cow<'doc, [u8]>,
   content_type: Option<Cow<'doc, str>>,
+  metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   alt_text: Option<Cow<'doc, str>>,
   hyperlink_url: Option<Cow<'doc, str>>,
   semantic_metafile_text: bool,
@@ -1625,6 +1626,8 @@ fn expand_metafile_semantic_text_items<'doc>(
             style: TextStyle {
               font_family: run.font_family.map(Cow::Owned),
               font_size_pt,
+              bold: run.bold,
+              italic: run.italic,
               semantic_only: true,
               ..TextStyle::default()
             },
@@ -1651,12 +1654,26 @@ fn expand_metafile_semantic_text_items<'doc>(
       | PageItem::Line(_)
       | PageItem::Polyline(_) => Vec::new(),
     };
-    expanded_items.push(item);
-    expanded_owners.push(owner);
-    for semantic_run in semantic_runs {
-      expanded_items.push(semantic_run);
-      expanded_owners.push(None);
+    if semantic_runs.is_empty() {
+      expanded_items.push(item);
+    } else {
+      let mut group_items = Vec::with_capacity(semantic_runs.len() + 1);
+      group_items.push(item);
+      group_items.extend(semantic_runs);
+      // Office emits metafile previews as Form XObjects whose visible
+      // graphics and searchable text share one form stream. Keeping the
+      // semantic overlay in the same isolated group preserves text extraction
+      // without exposing producer-specific form text as page-level text style
+      // or geometry.
+      expanded_items.push(PageItem::Group {
+        mask: None,
+        transform: None,
+        blend_mode: common::BlendMode::Normal,
+        opacity: 1.0,
+        items: group_items,
+      });
     }
+    expanded_owners.push(owner);
   }
   (expanded_items, expanded_owners)
 }
@@ -1765,6 +1782,7 @@ fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> Imag
     flip_vertical: image.flip_vertical,
     data: Cow::Borrowed(image.bytes.as_ref()),
     content_type: Some(Cow::Borrowed(image.content_type.as_ref())),
+    metafile_monochrome_dib_palette_override: image.metafile_monochrome_dib_palette_override,
     alt_text: image
       .alt_text
       .as_ref()
@@ -1873,7 +1891,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
     pdf_glyph_outlines: style.pdf_glyph_outlines,
-    pdf_glyph_outline_options: style.pdf_glyph_outline_options.as_deref().copied(),
+    pdf_glyph_outline_options: style.pdf_glyph_outline_options.as_deref().cloned(),
     bold: style.bold,
     italic: style.italic,
     complex_bold: style.complex_bold,
@@ -3207,6 +3225,8 @@ fn metafile_render_options_for_image(
     target_width_px: Some(pixels_for_axis(image.width_pt, visible_width)),
     target_height_px: Some(pixels_for_axis(image.height_pt, visible_height)),
     max_pixels: Some(dpi.saturating_mul(dpi).saturating_mul(64)),
+    monochrome_dib_palette_override: image.metafile_monochrome_dib_palette_override,
+    filter_high_frequency_pattern_brushes: true,
   }
 }
 
@@ -3451,7 +3471,12 @@ fn draw_text_item(
     } else {
       text_vertical_scale(&item.style)
     };
-    if (vertical_scale - 1.0).abs() > f32::EPSILON {
+    let text_warp = item
+      .style
+      .pdf_glyph_outline_options
+      .as_ref()
+      .and_then(|options| options.text_warp.as_deref());
+    if text_warp.is_none() && (vertical_scale - 1.0).abs() > f32::EPSILON {
       surface.push_transform(&Transform::from_row(
         1.0,
         0.0,
@@ -3462,7 +3487,7 @@ fn draw_text_item(
       ));
     }
     let horizontal_scale = item.style.horizontal_scale.unwrap_or(1.0);
-    if (horizontal_scale - 1.0).abs() > f32::EPSILON {
+    if text_warp.is_none() && (horizontal_scale - 1.0).abs() > f32::EPSILON {
       surface.push_transform(&Transform::from_row(
         horizontal_scale,
         0.0,
@@ -3486,10 +3511,25 @@ fn draw_text_item(
           selected.synthetic_bold,
           run.font_size_pt,
         ));
+        let warped = glyph_outlines
+          && text_warp.is_some_and(|warp| {
+            draw_warped_glyphs(
+              surface,
+              warp,
+              &run.font_face,
+              &run.glyphs,
+              portion.x_pt + run.x_offset_pt * horizontal_scale,
+              portion.baseline_y,
+              run.font_size_pt,
+              horizontal_scale,
+            )
+          });
         if glyph_outlines
+          && !warped
           && let Some(transform) = item
             .style
             .pdf_glyph_outline_options
+            .as_ref()
             .and_then(|options| options.transform)
         {
           surface.push_transform(&Transform::from_row(
@@ -3501,18 +3541,22 @@ fn draw_text_item(
             transform.dy.0,
           ));
         }
-        surface.draw_glyphs(
-          Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
-          &run.glyphs,
-          selected.font.clone(),
-          &glyph_semantic_text,
-          run.font_size_pt,
-          glyph_outlines,
-        );
+        if !warped {
+          surface.draw_glyphs(
+            Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
+            &run.glyphs,
+            selected.font.clone(),
+            &glyph_semantic_text,
+            run.font_size_pt,
+            glyph_outlines,
+          );
+        }
         if glyph_outlines
+          && !warped
           && item
             .style
             .pdf_glyph_outline_options
+            .as_ref()
             .is_some_and(|options| options.transform.is_some())
         {
           surface.pop();
@@ -3521,12 +3565,12 @@ fn draw_text_item(
           && item
             .style
             .pdf_glyph_outline_options
+            .as_ref()
             .is_some_and(|options| options.semantic_text_overlay)
         {
-          // PowerPoint fixed output paints WordArt and ordinary explicitly
-          // outlined DrawingML text as glyph paths, then overlays invisible
-          // text for search and accessibility. Keep that semantic layer
-          // separate from the visible path paint.
+          // Some explicitly outlined DrawingML text retains a separate
+          // invisible search/accessibility layer. Warped WordArt disables
+          // this option because Office's fixed output contains outlines only.
           surface.set_fill(Some(Fill {
             paint: rgb::Color::new(0, 0, 0).into(),
             opacity: NormalizedF32::ZERO,
@@ -3545,10 +3589,10 @@ fn draw_text_item(
         }
       }
     }
-    if (horizontal_scale - 1.0).abs() > f32::EPSILON {
+    if text_warp.is_none() && (horizontal_scale - 1.0).abs() > f32::EPSILON {
       surface.pop();
     }
-    if (vertical_scale - 1.0).abs() > f32::EPSILON {
+    if text_warp.is_none() && (vertical_scale - 1.0).abs() > f32::EPSILON {
       surface.pop();
     }
     if let Some(underline) = &portion.underline {
@@ -3580,6 +3624,221 @@ fn draw_text_item(
     }
   }
   Ok(())
+}
+
+fn draw_warped_glyphs(
+  surface: &mut Surface<'_>,
+  warp: &common::TextWarp,
+  face_data: &FontFaceData,
+  glyphs: &[PaintGlyph],
+  start_x: f32,
+  baseline_y: f32,
+  font_size_pt: f32,
+  horizontal_scale: f32,
+) -> bool {
+  let Ok(face) = ttf_parser::Face::parse(face_data.data.as_ref(), face_data.index) else {
+    return false;
+  };
+  let units_per_em = f32::from(face.units_per_em());
+  if units_per_em <= f32::EPSILON {
+    return false;
+  }
+  let boundaries = warp
+    .boundaries
+    .iter()
+    .filter_map(|commands| flatten_text_warp_boundary(commands))
+    .collect::<Vec<_>>();
+  if boundaries.is_empty() {
+    return false;
+  }
+
+  let mut cursor_x = start_x;
+  let glyph_scale = font_size_pt / units_per_em;
+  for glyph in glyphs {
+    let mut outline = TtfGlyphOutline::default();
+    let Ok(glyph_id) = u16::try_from(glyph.glyph_id.to_u32()) else {
+      cursor_x += glyph.x_advance * font_size_pt * horizontal_scale;
+      continue;
+    };
+    if face
+      .outline_glyph(ttf_parser::GlyphId(glyph_id), &mut outline)
+      .is_none()
+    {
+      cursor_x += glyph.x_advance * font_size_pt * horizontal_scale;
+      continue;
+    }
+    let origin_x = cursor_x + glyph.x_offset * font_size_pt * horizontal_scale;
+    let origin_y = baseline_y - glyph.y_offset * font_size_pt;
+    let elements = outline.path.into_elements().into_iter().map(|element| {
+      let point = |point: kurbo::Point| {
+        // LibreOffice's PDF writer uses a 1/3 horizontal shear for an
+        // artificial italic face. Apply it in glyph space before the
+        // non-linear WordArt mapping so the authored envelope also bends the
+        // synthesized slant.
+        let synthetic_italic_x = if face_data.synthetic_italic {
+          point.x + point.y / 3.0
+        } else {
+          point.x
+        };
+        kurbo::Point::new(
+          f64::from(origin_x) + synthetic_italic_x * f64::from(glyph_scale * horizontal_scale),
+          f64::from(origin_y) - point.y * f64::from(glyph_scale),
+        )
+      };
+      match element {
+        PathEl::MoveTo(value) => PathEl::MoveTo(point(value)),
+        PathEl::LineTo(value) => PathEl::LineTo(point(value)),
+        PathEl::QuadTo(control, end) => PathEl::QuadTo(point(control), point(end)),
+        PathEl::CurveTo(control1, control2, end) => {
+          PathEl::CurveTo(point(control1), point(control2), point(end))
+        }
+        PathEl::ClosePath => PathEl::ClosePath,
+      }
+    });
+    let mut path = PathBuilder::new();
+    flatten(elements, 0.2, |element| match element {
+      PathEl::MoveTo(point) => {
+        let point = text_warp_point(warp, &boundaries, point);
+        path.move_to(point.x as f32, point.y as f32);
+      }
+      PathEl::LineTo(point) => {
+        let point = text_warp_point(warp, &boundaries, point);
+        path.line_to(point.x as f32, point.y as f32);
+      }
+      PathEl::ClosePath => path.close(),
+      PathEl::QuadTo(_, _) | PathEl::CurveTo(_, _, _) => {
+        unreachable!("kurbo::flatten only emits line path elements")
+      }
+    });
+    if let Some(path) = path.finish() {
+      surface.draw_path(&path);
+    }
+    cursor_x += glyph.x_advance * font_size_pt * horizontal_scale;
+  }
+  true
+}
+
+#[derive(Default)]
+struct TtfGlyphOutline {
+  path: BezPath,
+}
+
+impl ttf_parser::OutlineBuilder for TtfGlyphOutline {
+  fn move_to(&mut self, x: f32, y: f32) {
+    self.path.move_to((f64::from(x), f64::from(y)));
+  }
+
+  fn line_to(&mut self, x: f32, y: f32) {
+    self.path.line_to((f64::from(x), f64::from(y)));
+  }
+
+  fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+    self
+      .path
+      .quad_to((f64::from(x1), f64::from(y1)), (f64::from(x), f64::from(y)));
+  }
+
+  fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+    self.path.curve_to(
+      (f64::from(x1), f64::from(y1)),
+      (f64::from(x2), f64::from(y2)),
+      (f64::from(x), f64::from(y)),
+    );
+  }
+
+  fn close(&mut self) {
+    self.path.close_path();
+  }
+}
+
+fn flatten_text_warp_boundary(commands: &[common::PathCommand]) -> Option<Vec<kurbo::Point>> {
+  let elements = commands.iter().map(|command| match *command {
+    common::PathCommand::MoveTo(point) => {
+      PathEl::MoveTo(kurbo::Point::new(f64::from(point.x), f64::from(point.y)))
+    }
+    common::PathCommand::LineTo(point) => {
+      PathEl::LineTo(kurbo::Point::new(f64::from(point.x), f64::from(point.y)))
+    }
+    common::PathCommand::CubicTo {
+      control1,
+      control2,
+      end,
+    } => PathEl::CurveTo(
+      kurbo::Point::new(f64::from(control1.x), f64::from(control1.y)),
+      kurbo::Point::new(f64::from(control2.x), f64::from(control2.y)),
+      kurbo::Point::new(f64::from(end.x), f64::from(end.y)),
+    ),
+    common::PathCommand::Close => PathEl::ClosePath,
+  });
+  let mut points = Vec::new();
+  flatten(elements, 0.2, |element| match element {
+    PathEl::MoveTo(point) | PathEl::LineTo(point) => points.push(point),
+    PathEl::ClosePath => {}
+    PathEl::QuadTo(_, _) | PathEl::CurveTo(_, _, _) => {
+      unreachable!("kurbo::flatten only emits line path elements")
+    }
+  });
+  (points.len() >= 2).then_some(points)
+}
+
+fn text_warp_point(
+  warp: &common::TextWarp,
+  boundaries: &[Vec<kurbo::Point>],
+  point: kurbo::Point,
+) -> kurbo::Point {
+  let source = warp.source_bounds;
+  let width = f64::from(source.size.width).max(f64::EPSILON);
+  let height = f64::from(source.size.height).max(f64::EPSILON);
+  let u = ((point.x - f64::from(source.origin.x)) / width).clamp(0.0, 1.0);
+  let v = ((point.y - f64::from(source.origin.y)) / height).clamp(0.0, 1.0);
+  if boundaries.len() >= 2 {
+    // Presets such as textButton (3 paths), textDeflateInflate (4), and
+    // textButtonPour (6) define intermediate deformation grid lines. Map the
+    // source height piecewise between each adjacent authored pair; using only
+    // the outer paths would erase the defining inner bulges and pinches.
+    let grid_position = v * (boundaries.len() - 1) as f64;
+    let upper_index = (grid_position.floor() as usize).min(boundaries.len() - 2);
+    let local_v = (grid_position - upper_index as f64).clamp(0.0, 1.0);
+    let upper = sample_text_warp_boundary(&boundaries[upper_index], u);
+    let lower = sample_text_warp_boundary(&boundaries[upper_index + 1], u);
+    return upper + (lower - upper) * local_v;
+  }
+
+  // Curve-only presets (arch, circle, and curve) define a centerline
+  // rather than two envelope edges. Offset shaped outlines along its local
+  // normal so glyph proportions are retained while their baseline follows the
+  // authored path.
+  let upper = sample_text_warp_boundary(&boundaries[0], u);
+  let before = sample_text_warp_boundary(&boundaries[0], (u - 0.001).max(0.0));
+  let after = sample_text_warp_boundary(&boundaries[0], (u + 0.001).min(1.0));
+  let tangent = after - before;
+  let length = tangent.hypot();
+  if length <= f64::EPSILON {
+    return upper;
+  }
+  let normal = kurbo::Vec2::new(-tangent.y / length, tangent.x / length);
+  upper + normal * ((v - 0.5) * height)
+}
+
+fn sample_text_warp_boundary(points: &[kurbo::Point], position: f64) -> kurbo::Point {
+  let total = points
+    .windows(2)
+    .map(|segment| segment[0].distance(segment[1]))
+    .sum::<f64>();
+  if total <= f64::EPSILON {
+    return points[0];
+  }
+  let target = position.clamp(0.0, 1.0) * total;
+  let mut traversed = 0.0;
+  for segment in points.windows(2) {
+    let length = segment[0].distance(segment[1]);
+    if traversed + length >= target && length > f64::EPSILON {
+      let local = (target - traversed) / length;
+      return segment[0] + (segment[1] - segment[0]) * local;
+    }
+    traversed += length;
+  }
+  *points.last().expect("text warp boundary is non-empty")
 }
 
 fn text_has_visible_glyph_paint(style: &TextStyle<'_>) -> bool {
@@ -5137,6 +5396,7 @@ mod tests {
       flip_vertical: false,
       data: Cow::Borrowed(&[]),
       content_type: Some(Cow::Borrowed("image/emf")),
+      metafile_monochrome_dib_palette_override: None,
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
@@ -5667,6 +5927,31 @@ mod tests {
     let stroke = text_stroke(&style, true, 18.0).expect("synthetic bold stroke");
 
     assert!((stroke.width - 0.6).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn wordart_uses_every_intermediate_warp_boundary() {
+    let warp = common::TextWarp {
+      source_bounds: common::Rect {
+        origin: common::Point {
+          x: Pt(0.0),
+          y: Pt(0.0),
+        },
+        size: common::Size {
+          width: Pt(100.0),
+          height: Pt(100.0),
+        },
+      },
+      boundaries: Vec::new(),
+    };
+    let line = |y| vec![kurbo::Point::new(0.0, y), kurbo::Point::new(100.0, y)];
+    let boundaries = vec![line(0.0), line(80.0), line(100.0)];
+
+    let upper_half = super::text_warp_point(&warp, &boundaries, kurbo::Point::new(50.0, 25.0));
+    let lower_half = super::text_warp_point(&warp, &boundaries, kurbo::Point::new(50.0, 75.0));
+
+    assert!((upper_half.y - 40.0).abs() < f64::EPSILON);
+    assert!((lower_half.y - 90.0).abs() < f64::EPSILON);
   }
 
   #[test]

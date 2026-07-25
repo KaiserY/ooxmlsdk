@@ -42,6 +42,58 @@ impl PPTShapeGroupContext {
     self.import_shape_tree_choices(slide_persist, &shape_tree.shape_tree_choice);
   }
 
+  pub(crate) fn import_control_list(
+    &mut self,
+    slide_persist: &mut SlidePersist,
+    controls: &p::ControlList,
+  ) {
+    for choice in &controls.xml_children {
+      match choice {
+        p::ControlListChoice::Control(control) => {
+          self.import_control(slide_persist, control);
+        }
+        // The package MCE processor selects AlternateContent before schema
+        // deserialization when the `mce` feature is enabled. Import code must
+        // not reinterpret or select MCE branches a second time.
+        p::ControlListChoice::AlternateContent(_) => {}
+      }
+    }
+  }
+
+  fn import_control(&mut self, slide_persist: &mut SlidePersist, control: &p::Control) {
+    let active_x_state = control
+      .id
+      .as_ref()
+      .and_then(|id| slide_persist.active_x_controls.get(id))
+      .cloned();
+    if let Some(state) = &active_x_state {
+      if let Some(name) = &control.name {
+        slide_persist
+          .active_x_controls_by_shape
+          .insert(name.clone(), state.clone());
+      }
+      if let Some(shape_id) = &control.shape_id {
+        slide_persist
+          .active_x_controls_by_shape
+          .insert(format!("_x0000_s{shape_id}"), state.clone());
+      }
+    }
+    if let Some(picture) = control.picture.as_deref() {
+      let mut shape = self.import_picture(slide_persist, picture);
+      if let Some(palette) = active_x_state
+        .as_ref()
+        .and_then(|state| state.preview_palette_override())
+        && let Some(resource) = shape
+          .picture
+          .as_mut()
+          .and_then(|picture| picture.image_resource.as_mut())
+      {
+        resource.monochrome_dib_palette_override = Some(palette);
+      }
+      slide_persist.shapes.push(shape);
+    }
+  }
+
   fn import_shape_tree_choices(
     &mut self,
     slide_persist: &mut SlidePersist,
@@ -565,7 +617,7 @@ fn apply_application_media(
   }
 }
 
-fn apply_shape_properties(shape: &mut Shape, properties: &p::ShapeProperties) {
+pub(crate) fn apply_shape_properties(shape: &mut Shape, properties: &p::ShapeProperties) {
   // ShapePropertiesContext owns fill/line/effect state before the PPT shape is
   // converted to drawing objects.
   if let Some(geometry) = properties

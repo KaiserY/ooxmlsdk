@@ -7,6 +7,8 @@ pub struct MetafileTextRun {
   pub y: f32,
   pub font_size: Option<f32>,
   pub font_family: Option<String>,
+  pub bold: bool,
+  pub italic: bool,
   pub width: Option<f32>,
 }
 
@@ -37,10 +39,16 @@ pub fn extract_metafile_text_runs(data: &[u8], content_type: Option<&str>) -> Ve
       x: run.x,
       y: run.y,
       font_size: run.font_size,
-      font_family: metadata
-        .get(index)
-        .and_then(|metadata| metadata.font_family.clone()),
-      width: metadata.get(index).and_then(|metadata| metadata.width),
+      font_family: run.font_family.or_else(|| {
+        metadata
+          .get(index)
+          .and_then(|metadata| metadata.font_family.clone())
+      }),
+      bold: run.bold,
+      italic: run.italic,
+      width: run
+        .width
+        .or_else(|| metadata.get(index).and_then(|metadata| metadata.width)),
     })
     .collect()
 }

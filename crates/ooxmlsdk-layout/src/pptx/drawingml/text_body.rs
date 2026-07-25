@@ -35,6 +35,7 @@ pub(crate) struct TextBodyDisplayProperties {
   pub(crate) anchor_center: bool,
   pub(crate) from_word_art: bool,
   pub(crate) preset_text_warp: Option<a::TextShapeValues>,
+  pub(crate) preset_text_warp_geometry: Option<Box<a::PresetTextWarp>>,
   pub(crate) upright: bool,
   pub(crate) auto_fit: TextAutoFit,
 }
@@ -184,6 +185,7 @@ impl Default for TextBodyDisplayProperties {
       anchor_center: false,
       from_word_art: false,
       preset_text_warp: None,
+      preset_text_warp_geometry: None,
       upright: false,
       auto_fit: TextAutoFit::None,
     }
@@ -236,6 +238,7 @@ impl TextBodyDisplayProperties {
         .preset_text_warp
         .as_deref()
         .map(|warp| warp.preset),
+      preset_text_warp_geometry: properties.preset_text_warp.clone(),
       upright: properties.up_right.is_some_and(|value| value.as_bool()),
       auto_fit: TextAutoFit::None,
     };

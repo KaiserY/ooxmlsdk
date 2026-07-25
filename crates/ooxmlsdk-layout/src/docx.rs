@@ -9,12 +9,9 @@ mod table;
 mod text;
 
 use std::collections::{BTreeMap, HashMap};
-use std::io::Cursor;
 use std::sync::Arc;
 
 use crate::common::{self, color_math};
-use image::codecs::png::PngEncoder;
-use image::{ColorType, ImageEncoder};
 use kurbo::{Affine, Rect as KurboRect};
 use ooxmlsdk::parts::{
   main_document_part::MainDocumentPart, wordprocessing_document::WordprocessingDocument,
@@ -41,9 +38,11 @@ use ooxmlsdk::simple_type::{
 use ooxmlsdk::units as sdk_units;
 use smallvec::SmallVec;
 
+use crate::common::drawingml_image_effects::{ColorChangeEffect, ImageEffect};
 use crate::error::Result;
 use crate::model::common_rgb;
 use crate::options::{LayoutActionOptions, LayoutDiagnosticsOptions, LayoutOptions};
+use crate::pptx::drawingml::color::{Color, RgbHexColor};
 use crate::render::chart as shared_chart;
 use crate::render::math as shared_math;
 use crate::render::symbol as shared_symbol;
@@ -5314,6 +5313,10 @@ fn append_word_text(output: &mut String, text: &w::TextType, inherited_space_pre
       // in CT_Text are whitespace and must not enter TextFrameLayout as hard
       // line-break markers.
       output.push(' ');
+    } else if ch == '\u{f020}' {
+      // U+F020 is the historical Symbol-font transport form of byte 0x20.
+      // Some Word documents retain it in w:t after changing the run font.
+      output.push(' ');
     } else {
       output.push(ch);
     }
@@ -5857,10 +5860,13 @@ fn symbol_transport_char(symbol: &w::SymbolChar) -> Option<char> {
       .get(font.len().saturating_sub(" symbol".len())..)
       .is_some_and(|suffix| suffix.eq_ignore_ascii_case(" symbol"))
     || is_wingdings;
-  if is_symbol_font && (!is_wingdings || code & 0xFF >= 0x80) {
+  let mapped = shared_symbol::font_symbol_code(symbol.font.as_deref(), code)?;
+  if font.eq_ignore_ascii_case("Symbol") && code & 0xFF == 0x94 {
+    Some(mapped)
+  } else if is_symbol_font && (!is_wingdings || code & 0xFF >= 0x80) {
     char::from_u32(code)
   } else {
-    shared_symbol::font_symbol_code(symbol.font.as_deref(), code)
+    Some(mapped)
   }
 }
 
@@ -6407,20 +6413,18 @@ fn wordprocessing_shape_textbox_is_vertical(shape: &wps::WordprocessingShape) ->
   )
 }
 
-fn wordprocessing_shape_textbox_has_fontwork_warp(shape: &wps::WordprocessingShape) -> bool {
+fn wordprocessing_shape_textbox_fontwork_warp(
+  shape: &wps::WordprocessingShape,
+) -> Option<Box<a::PresetTextWarp>> {
   shape
     .text_body_properties
     .as_deref()
     .and_then(|properties| properties.preset_text_warp.as_ref())
-    .is_some_and(|warp| {
-      !matches!(
-        warp.preset,
-        a::TextShapeValues::TextPlain | a::TextShapeValues::TextNoShape
-      )
-    })
+    .filter(|warp| warp.preset != a::TextShapeValues::TextNoShape)
+    .cloned()
 }
 
-fn fontwork_warp_geometry() -> InlineShapeGeometry {
+fn legacy_fontwork_warp_geometry() -> InlineShapeGeometry {
   const SEGMENTS: usize = 16;
   let mut points = Vec::with_capacity(SEGMENTS * 2 + 1);
   for index in 0..=SEGMENTS {
@@ -6979,7 +6983,8 @@ fn wordprocessing_shape_textbox_frame(
   } else {
     shape_height_pt.max(DEFAULT_TEXTBOX_MIN_HEIGHT_PT)
   };
-  let has_fontwork_warp = wordprocessing_shape_textbox_has_fontwork_warp(shape);
+  let text_warp = wordprocessing_shape_textbox_fontwork_warp(shape);
+  let has_fontwork_warp = text_warp.is_some();
   let mut wordart_fill_colors = if has_fontwork_warp {
     wordprocessing_textbox_fill_colors(content, &context.styles.theme_colors)
   } else {
@@ -6993,11 +6998,7 @@ fn wordprocessing_shape_textbox_frame(
   }
   let fill_color = wordart_fill_colors.first().copied();
   let additional_fill_colors = wordart_fill_colors.into_iter().skip(1).collect();
-  let geometry = if has_fontwork_warp {
-    fontwork_warp_geometry()
-  } else {
-    InlineShapeGeometry::Rectangle
-  };
+  let geometry = InlineShapeGeometry::Rectangle;
   let placement = if auto_fit {
     autofit_textbox_placement(placement)
   } else {
@@ -7025,6 +7026,7 @@ fn wordprocessing_shape_textbox_frame(
     inline_anchor_after_line: matches!(placement, ImagePlacement::Inline),
     placement,
     chart: None,
+    text_warp,
     text_box_blocks: text_box.blocks,
     text_inset_left_pt: text_box.left_pt,
     text_inset_top_pt: text_box.top_pt,
@@ -7483,6 +7485,7 @@ fn wordprocessing_shape_shape(
     inline_anchor_after_line: false,
     placement,
     chart: None,
+    text_warp: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -7751,6 +7754,7 @@ fn drawingml_diagram_shape_shape(
       && shape.text_body.is_some(),
     placement,
     chart: None,
+    text_warp: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -8429,6 +8433,7 @@ fn chart_shape(
     inline_anchor_after_line: false,
     placement,
     chart: None,
+    text_warp: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -8688,6 +8693,7 @@ fn anchor_wrap_polygon_shape(
     inline_anchor_after_line: false,
     placement,
     chart: None,
+    text_warp: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -8969,6 +8975,7 @@ fn drawingml_picture_frame(
     inline_anchor_after_line: false,
     placement,
     chart: None,
+    text_warp: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -9253,14 +9260,26 @@ fn image_data_with_effects(
   resource: &package::ImageResource,
   properties: &DrawingImageProperties,
 ) -> ImportedImageData {
-  if properties.effects == ImageEffects::default() {
+  if properties.effects.is_empty() {
     return ImportedImageData {
       data: resource.data.clone(),
       content_type: resource.content_type.clone(),
     };
   }
 
-  let Some(data) = apply_image_effects(&resource.data, properties.effects) else {
+  let mut effects = properties.effects.clone();
+  let color_change_tolerance =
+    common::drawingml_image_effects::color_change_tolerance(resource.content_type.as_deref());
+  for effect in &mut effects {
+    if let ImageEffect::ColorChange(change) = effect {
+      change.tolerance = color_change_tolerance;
+    }
+  }
+  let Some(data) = common::drawingml_image_effects::apply(
+    &resource.data,
+    resource.content_type.as_deref(),
+    &effects,
+  ) else {
     return ImportedImageData {
       data: resource.data.clone(),
       content_type: resource.content_type.clone(),
@@ -9271,69 +9290,6 @@ fn image_data_with_effects(
     data: data.into(),
     content_type: Some("image/png".into()),
   }
-}
-
-fn apply_image_effects(data: &[u8], effects: ImageEffects) -> Option<Vec<u8>> {
-  let mut image = image::load_from_memory(data).ok()?.to_rgba8();
-
-  for pixel in image.pixels_mut() {
-    let [mut r, mut g, mut b, a] = pixel.0;
-    if effects.grayscale {
-      let luminance = image_luminance(r, g, b);
-      r = luminance;
-      g = luminance;
-      b = luminance;
-    }
-    if let Some((color1, color2)) = effects.duotone {
-      let luminance = image_luminance(r, g, b) as u16;
-      r = duotone_component(luminance, color1.r, color2.r);
-      g = duotone_component(luminance, color1.g, color2.g);
-      b = duotone_component(luminance, color1.b, color2.b);
-    }
-    if effects.brightness.is_some() || effects.contrast.is_some() {
-      let brightness = effects.brightness.unwrap_or(0);
-      let contrast = effects.contrast.unwrap_or(0);
-      r = mso_brightness_contrast_component(r, brightness, contrast);
-      g = mso_brightness_contrast_component(g, brightness, contrast);
-      b = mso_brightness_contrast_component(b, brightness, contrast);
-    }
-    pixel.0 = [r, g, b, a];
-  }
-
-  let mut output = Vec::new();
-  let encoder = PngEncoder::new(Cursor::new(&mut output));
-  encoder
-    .write_image(
-      image.as_raw(),
-      image.width(),
-      image.height(),
-      ColorType::Rgba8.into(),
-    )
-    .ok()?;
-  Some(output)
-}
-
-fn image_luminance(r: u8, g: u8, b: u8) -> u8 {
-  ((u16::from(b) * 29 + u16::from(g) * 151 + u16::from(r) * 76) >> 8) as u8
-}
-
-fn duotone_component(luminance: u16, color1: u8, color2: u8) -> u8 {
-  let light = u16::from(color2) * luminance / 255;
-  let dark = u16::from(color1) * (255 - luminance) / 255;
-  (light + dark) as u8
-}
-
-fn mso_brightness_contrast_component(value: u8, brightness: i32, contrast: i32) -> u8 {
-  let contrast = contrast.clamp(-100, 100) as f32;
-  let slope = if contrast >= 0.0 {
-    128.0 / (128.0 - 1.27 * contrast)
-  } else {
-    (128.0 + 1.27 * contrast) / 128.0
-  };
-  let offset = brightness.clamp(-100, 100) as f32 * 2.55;
-  ((f32::from(value) + offset / 2.0 - 128.0) * slope + 128.0 + offset / 2.0)
-    .round()
-    .clamp(0.0, 255.0) as u8
 }
 
 fn drawingml_picture_alt_text(picture: &pic::Picture) -> Option<String> {
@@ -9573,18 +9529,44 @@ fn push_pict_shapes_impl(
   inlines: &mut Vec<InlineItem>,
   images: &ImageCatalog,
 ) {
+  let shape_types = picture
+    .picture_choice
+    .iter()
+    .flat_map(vml_picture_choice_shape_types)
+    .collect::<Vec<_>>();
   for choice in &picture.picture_choice {
-    push_picture_choice_shapes(choice, inlines, images);
+    push_picture_choice_shapes(choice, inlines, images, &shape_types);
   }
+}
+
+fn vml_picture_choice_shape_types(choice: &w::PictureChoice) -> Vec<&v::Shapetype> {
+  match choice {
+    w::PictureChoice::Shapetype(shape_type) => vec![shape_type],
+    w::PictureChoice::Group(group) => vml_group_shape_types(group),
+    _ => Vec::new(),
+  }
+}
+
+fn vml_group_shape_types(group: &v::Group) -> Vec<&v::Shapetype> {
+  group
+    .group_choice
+    .iter()
+    .flat_map(|choice| match choice {
+      v::GroupChoice::Shapetype(shape_type) => vec![shape_type.as_ref()],
+      v::GroupChoice::Group(group) => vml_group_shape_types(group),
+      _ => Vec::new(),
+    })
+    .collect()
 }
 
 fn push_picture_choice_shapes(
   choice: &w::PictureChoice,
   inlines: &mut Vec<InlineItem>,
   images: &ImageCatalog,
+  shape_types: &[&v::Shapetype],
 ) {
   match choice {
-    w::PictureChoice::Group(group) => push_group_shapes(group, inlines, images),
+    w::PictureChoice::Group(group) => push_group_shapes(group, inlines, images, shape_types),
     w::PictureChoice::Rectangle(rectangle) => {
       if let Some(shape) = vml_rectangle_shape(rectangle, images) {
         inlines.push(InlineItem::Shape(shape));
@@ -9596,7 +9578,7 @@ fn push_picture_choice_shapes(
       }
     }
     w::PictureChoice::Shape(shape) => {
-      if let Some(shape) = vml_shape_shape(shape, images) {
+      if let Some(shape) = vml_shape_shape(shape, images, shape_types) {
         inlines.push(InlineItem::Shape(shape));
       }
     }
@@ -9609,11 +9591,18 @@ fn push_picture_choice_shapes(
   }
 }
 
-fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &ImageCatalog) {
+fn push_group_shapes(
+  group: &v::Group,
+  inlines: &mut Vec<InlineItem>,
+  images: &ImageCatalog,
+  inherited_shape_types: &[&v::Shapetype],
+) {
   let transform = VmlGroupTransform::from_group(group);
   for choice in &group.group_choice {
     match choice {
-      v::GroupChoice::Group(group) => push_group_shapes(group, inlines, images),
+      v::GroupChoice::Group(group) => {
+        push_group_shapes(group, inlines, images, inherited_shape_types)
+      }
       v::GroupChoice::Rectangle(rectangle) => {
         let style = transform.and_then(|transform| {
           transform.child_anchor_style(group.style.as_deref(), rectangle.style.as_deref())
@@ -9635,7 +9624,9 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &I
         let style = transform.and_then(|transform| {
           transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
         });
-        if let Some(shape) = vml_shape_shape_with_style(shape, style.as_deref(), images) {
+        if let Some(shape) =
+          vml_shape_shape_with_style(shape, style.as_deref(), images, inherited_shape_types)
+        {
           inlines.push(InlineItem::Shape(shape));
         }
       }
@@ -9694,40 +9685,365 @@ fn vml_round_rectangle_shape_with_style(
   )
 }
 
-fn vml_shape_shape(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShape> {
-  vml_shape_shape_with_style(shape, shape.style.as_deref(), images)
+fn vml_shape_shape(
+  shape: &v::Shape,
+  images: &ImageCatalog,
+  shape_types: &[&v::Shapetype],
+) -> Option<InlineShape> {
+  vml_shape_shape_with_style(shape, shape.style.as_deref(), images, shape_types)
 }
 
 fn vml_shape_shape_with_style(
   shape: &v::Shape,
   style: Option<&str>,
   images: &ImageCatalog,
+  shape_types: &[&v::Shapetype],
 ) -> Option<InlineShape> {
-  let has_path = shape
-    .edge_path
-    .as_deref()
-    .is_some_and(|path| !path.trim().is_empty());
-  let stroked = shape.stroked.is_none_or(|value| value.as_bool());
-  vml_inline_shape(
+  let shape_type = shape.r#type.as_deref().and_then(|reference| {
+    let id = reference.strip_prefix('#').unwrap_or(reference);
+    shape_types
+      .iter()
+      .copied()
+      .rev()
+      .find(|shape_type| shape_type.id.as_deref() == Some(id))
+  });
+  let merged_style = merge_vml_style(
+    shape_type.and_then(|shape_type| shape_type.style.as_deref()),
     style,
-    vml_allow_in_cell(shape.allow_in_cell),
-    shape.fill_color.as_deref(),
-    vml_shape_fill_image(shape, images),
-    shape
-      .stroke_color
-      .as_deref()
-      .or_else(|| (has_path && stroked).then_some("black"))
-      .or_else(|| vml_shape_has_textbox(shape).then_some("black")),
-    shape.stroke_weight.as_deref(),
-    vml_fontwork_shape_geometry(shape.r#type.as_deref(), shape.id.as_deref()),
-  )
+  );
+  let style = merged_style.as_deref().or(style);
+  let direct_path = vml_shape_path(shape);
+  let inherited_path = shape_type.and_then(vml_shapetype_path);
+  let path = direct_path
+    .and_then(|path| path.value.as_deref())
+    .or_else(|| {
+      shape
+        .edge_path
+        .as_deref()
+        .filter(|path| !path.trim().is_empty())
+    })
+    .or_else(|| inherited_path.and_then(|path| path.value.as_deref()))
+    .or_else(|| {
+      shape_type
+        .and_then(|shape_type| shape_type.edge_path.as_deref())
+        .filter(|path| !path.trim().is_empty())
+    });
+  let path_properties = direct_path.or(inherited_path);
+  let direct_fill = vml_shape_fill(shape);
+  let inherited_fill = shape_type.and_then(vml_shapetype_fill);
+  let direct_stroke = vml_shape_stroke(shape);
+  let inherited_stroke = shape_type.and_then(vml_shapetype_stroke);
+  let fill_image = direct_fill
+    .and_then(|fill| vml_fill_image(fill, style, images))
+    .or_else(|| inherited_fill.and_then(|fill| vml_fill_image(fill, style, images)));
+  let filled = direct_fill
+    .and_then(|fill| fill.on.map(|value| value.as_bool()))
+    .or_else(|| shape.filled.map(|value| value.as_bool()))
+    .or_else(|| inherited_fill.and_then(|fill| fill.on.map(|value| value.as_bool())))
+    .or_else(|| shape_type.and_then(|value| value.filled.map(|value| value.as_bool())))
+    .unwrap_or(true);
+  let stroked = direct_stroke
+    .and_then(|stroke| stroke.on.map(|value| value.as_bool()))
+    .or_else(|| shape.stroked.map(|value| value.as_bool()))
+    .or_else(|| inherited_stroke.and_then(|stroke| stroke.on.map(|value| value.as_bool())))
+    .or_else(|| shape_type.and_then(|value| value.stroked.map(|value| value.as_bool())))
+    .unwrap_or(true);
+  let mut inline = vml_inline_shape(
+    style,
+    vml_allow_in_cell(
+      shape
+        .allow_in_cell
+        .or_else(|| shape_type.and_then(|value| value.allow_in_cell)),
+    ),
+    filled
+      .then_some(
+        direct_fill
+          .and_then(|fill| fill.color.as_deref())
+          .or(shape.fill_color.as_deref())
+          .or_else(|| inherited_fill.and_then(|fill| fill.color.as_deref()))
+          .or_else(|| shape_type.and_then(|shape_type| shape_type.fill_color.as_deref()))
+          .unwrap_or("white"),
+      )
+      .filter(|_| fill_image.is_none()),
+    fill_image,
+    stroked.then_some(
+      direct_stroke
+        .and_then(|stroke| stroke.color.as_deref())
+        .or(shape.stroke_color.as_deref())
+        .or_else(|| inherited_stroke.and_then(|stroke| stroke.color.as_deref()))
+        .or_else(|| shape_type.and_then(|shape_type| shape_type.stroke_color.as_deref()))
+        .unwrap_or("black"),
+    ),
+    direct_stroke
+      .and_then(|stroke| stroke.weight.as_deref())
+      .or(shape.stroke_weight.as_deref())
+      .or_else(|| inherited_stroke.and_then(|stroke| stroke.weight.as_deref()))
+      .or_else(|| shape_type.and_then(|shape_type| shape_type.stroke_weight.as_deref())),
+    path
+      .is_none()
+      .then(|| vml_fontwork_shape_geometry(shape.r#type.as_deref(), shape.id.as_deref()))
+      .flatten(),
+  )?;
+  if let Some(path) = path
+    && let Some(geometry) = vml_path_geometry(
+      path,
+      shape
+        .coordinate_origin
+        .as_deref()
+        .or_else(|| shape_type.and_then(|shape_type| shape_type.coordinate_origin.as_deref())),
+      shape
+        .coordinate_size
+        .as_deref()
+        .or_else(|| shape_type.and_then(|shape_type| shape_type.coordinate_size.as_deref())),
+      inline.width_pt,
+      inline.height_pt,
+      shape
+        .adjustment
+        .as_deref()
+        .or_else(|| shape_type.and_then(|shape_type| shape_type.adjustment.as_deref())),
+      vml_shape_formulas(shape).or_else(|| shape_type.and_then(vml_shapetype_formulas)),
+      path_properties
+        .and_then(|path| path.allow_fill)
+        .is_none_or(|value| value.as_bool()),
+      path_properties
+        .and_then(|path| path.allow_stroke)
+        .is_none_or(|value| value.as_bool()),
+      path_properties
+        .and_then(|path| path.allow_extrusion)
+        .is_none_or(|value| value.as_bool()),
+    )
+  {
+    inline.geometry = geometry;
+  }
+  if let Some((preset, text_path)) = vml_fontwork_text_path(shape, shape_type) {
+    inline.text_warp = Some(Box::new(a::PresetTextWarp {
+      preset,
+      ..a::PresetTextWarp::default()
+    }));
+    inline.text_box_blocks = vec![simple_text_block(
+      text_path.string.as_deref()?.to_string(),
+      vml_text_path_style(text_path.style.as_deref()),
+    )];
+    inline.text_inset_left_pt = 0.0;
+    inline.text_inset_top_pt = 0.0;
+    inline.text_inset_right_pt = 0.0;
+    inline.text_inset_bottom_pt = 0.0;
+  }
+  Some(inline)
 }
 
-fn vml_shape_has_textbox(shape: &v::Shape) -> bool {
-  shape
+fn vml_shape_path(shape: &v::Shape) -> Option<&v::Path> {
+  shape.shape_choice.iter().find_map(|choice| match choice {
+    v::ShapeChoice::Path(path) => Some(path.as_ref()),
+    _ => None,
+  })
+}
+
+fn vml_shapetype_path(shape_type: &v::Shapetype) -> Option<&v::Path> {
+  shape_type
+    .shapetype_choice
+    .iter()
+    .find_map(|choice| match choice {
+      v::ShapetypeChoice::Path(path) => Some(path.as_ref()),
+      _ => None,
+    })
+}
+
+fn vml_shape_fill(shape: &v::Shape) -> Option<&v::Fill> {
+  shape.shape_choice.iter().find_map(|choice| match choice {
+    v::ShapeChoice::Fill(fill) => Some(fill.as_ref()),
+    _ => None,
+  })
+}
+
+fn vml_shapetype_fill(shape_type: &v::Shapetype) -> Option<&v::Fill> {
+  shape_type
+    .shapetype_choice
+    .iter()
+    .find_map(|choice| match choice {
+      v::ShapetypeChoice::Fill(fill) => Some(fill.as_ref()),
+      _ => None,
+    })
+}
+
+fn vml_shape_stroke(shape: &v::Shape) -> Option<&v::Stroke> {
+  shape.shape_choice.iter().find_map(|choice| match choice {
+    v::ShapeChoice::Stroke(stroke) => Some(stroke.as_ref()),
+    _ => None,
+  })
+}
+
+fn vml_shapetype_stroke(shape_type: &v::Shapetype) -> Option<&v::Stroke> {
+  shape_type
+    .shapetype_choice
+    .iter()
+    .find_map(|choice| match choice {
+      v::ShapetypeChoice::Stroke(stroke) => Some(stroke.as_ref()),
+      _ => None,
+    })
+}
+
+fn vml_shape_formulas(shape: &v::Shape) -> Option<&v::Formulas> {
+  shape.shape_choice.iter().find_map(|choice| match choice {
+    v::ShapeChoice::Formulas(formulas) => Some(formulas),
+    _ => None,
+  })
+}
+
+fn vml_shapetype_formulas(shape_type: &v::Shapetype) -> Option<&v::Formulas> {
+  shape_type
+    .shapetype_choice
+    .iter()
+    .find_map(|choice| match choice {
+      v::ShapetypeChoice::Formulas(formulas) => Some(formulas),
+      _ => None,
+    })
+}
+
+fn merge_vml_style(base: Option<&str>, direct: Option<&str>) -> Option<String> {
+  match (base, direct) {
+    (None, None) => None,
+    (Some(value), None) | (None, Some(value)) => Some(value.to_string()),
+    (Some(base), Some(direct)) => {
+      let mut declarations = Vec::<(String, String)>::new();
+      for source in [base, direct] {
+        for declaration in source.split(';') {
+          let Some((name, value)) = declaration.split_once(':') else {
+            continue;
+          };
+          let name = name.trim().to_ascii_lowercase();
+          if let Some(existing) = declarations
+            .iter_mut()
+            .find(|(existing, _)| *existing == name)
+          {
+            existing.1 = value.trim().to_string();
+          } else {
+            declarations.push((name, value.trim().to_string()));
+          }
+        }
+      }
+      Some(
+        declarations
+          .into_iter()
+          .map(|(name, value)| format!("{name}:{value}"))
+          .collect::<Vec<_>>()
+          .join(";"),
+      )
+    }
+  }
+}
+
+fn vml_fontwork_text_path<'a>(
+  shape: &'a v::Shape,
+  shape_type: Option<&'a v::Shapetype>,
+) -> Option<(a::TextShapeValues, &'a v::TextPath)> {
+  let text_path = shape
     .shape_choice
     .iter()
-    .any(|choice| matches!(choice, v::ShapeChoice::TextBox(_)))
+    .find_map(|choice| match choice {
+      v::ShapeChoice::TextPath(path) => Some(path.as_ref()),
+      _ => None,
+    })
+    .filter(|path| path.on.is_none_or(|value| value.as_bool()))?;
+  let shape_type_number = shape_type
+    .and_then(|shape_type| shape_type.optional_number.map(i32::from))
+    .or_else(|| {
+      shape
+        .r#type
+        .as_deref()
+        .or(shape.id.as_deref())
+        .and_then(vml_shape_type_number)
+    })?;
+  Some((vml_fontwork_preset(shape_type_number)?, text_path))
+}
+
+fn vml_shape_type_number(value: &str) -> Option<i32> {
+  value
+    .rsplit_once("_x0000_t")
+    .or_else(|| value.rsplit_once("mso-spt"))
+    .and_then(|(_, value)| value.trim_start_matches('#').parse().ok())
+}
+
+fn vml_fontwork_preset(shape_type: i32) -> Option<a::TextShapeValues> {
+  Some(match shape_type {
+    136 => a::TextShapeValues::TextPlain,
+    137 => a::TextShapeValues::TextStop,
+    138 => a::TextShapeValues::TextTriangle,
+    139 => a::TextShapeValues::TextTriangleInverted,
+    140 => a::TextShapeValues::TextChevron,
+    141 => a::TextShapeValues::TextChevronInverted,
+    142 => a::TextShapeValues::TextRingInside,
+    143 => a::TextShapeValues::TextRingOutside,
+    144 => a::TextShapeValues::TextArchUp,
+    145 => a::TextShapeValues::TextArchDown,
+    146 => a::TextShapeValues::TextCircle,
+    147 => a::TextShapeValues::TextButton,
+    148 => a::TextShapeValues::TextArchUpPour,
+    149 => a::TextShapeValues::TextArchDownPour,
+    150 => a::TextShapeValues::TextCirclePour,
+    151 => a::TextShapeValues::TextButtonPour,
+    152 => a::TextShapeValues::TextCurveUp,
+    153 => a::TextShapeValues::TextCurveDown,
+    154 => a::TextShapeValues::TextCascadeUp,
+    155 => a::TextShapeValues::TextCascadeDown,
+    156 => a::TextShapeValues::TextWave1,
+    157 => a::TextShapeValues::TextWave2,
+    158 => a::TextShapeValues::TextDoubleWave1,
+    159 => a::TextShapeValues::TextWave4,
+    160 => a::TextShapeValues::TextInflate,
+    161 => a::TextShapeValues::TextDeflate,
+    162 => a::TextShapeValues::TextInflateBottom,
+    163 => a::TextShapeValues::TextDeflateBottom,
+    164 => a::TextShapeValues::TextInflateTop,
+    165 => a::TextShapeValues::TextDeflateTop,
+    166 => a::TextShapeValues::TextDeflateInflate,
+    167 => a::TextShapeValues::TextDeflateInflateDeflate,
+    168 => a::TextShapeValues::TextFadeRight,
+    169 => a::TextShapeValues::TextFadeLeft,
+    170 => a::TextShapeValues::TextFadeUp,
+    171 => a::TextShapeValues::TextFadeDown,
+    172 => a::TextShapeValues::TextSlantUp,
+    173 => a::TextShapeValues::TextSlantDown,
+    174 => a::TextShapeValues::TextCanUp,
+    175 => a::TextShapeValues::TextCanDown,
+    _ => return None,
+  })
+}
+
+fn vml_text_path_style(style: Option<&str>) -> TextStyle {
+  let mut text_style = TextStyle::default();
+  for declaration in style.into_iter().flat_map(|style| style.split(';')) {
+    let Some((name, value)) = declaration.split_once(':') else {
+      continue;
+    };
+    match name.trim().to_ascii_lowercase().as_str() {
+      "font-family" => {
+        let family = value.trim().trim_matches(['\'', '"']);
+        if !family.is_empty() {
+          text_style.font_family = Some(Arc::from(family));
+        }
+      }
+      "font-size" => {
+        if let Some(size) = vml_measure_to_points(value.trim()) {
+          text_style.font_size_pt = size;
+        }
+      }
+      "font-weight" => {
+        text_style.bold = matches!(
+          value.trim().to_ascii_lowercase().as_str(),
+          "bold" | "bolder" | "600" | "700" | "800" | "900"
+        );
+      }
+      "font-style" => {
+        text_style.italic = matches!(
+          value.trim().to_ascii_lowercase().as_str(),
+          "italic" | "oblique"
+        );
+      }
+      _ => {}
+    }
+  }
+  text_style
 }
 
 fn vml_fontwork_shape_geometry(
@@ -9739,7 +10055,562 @@ fn vml_fontwork_shape_geometry(
     let marker = format!("_x0000_t{index}");
     value.contains(&marker)
   });
-  is_legacy_fontwork.then(fontwork_warp_geometry)
+  is_legacy_fontwork.then(legacy_fontwork_warp_geometry)
+}
+
+#[derive(Clone, Copy)]
+enum VmlPathToken<'a> {
+  Command(&'a str),
+  Value(VmlFormulaValue),
+}
+
+#[derive(Clone, Copy)]
+enum VmlFormulaValue {
+  Number(f64),
+  Adjustment(usize),
+  Formula(usize),
+}
+
+fn vml_path_geometry(
+  source: &str,
+  coordinate_origin: Option<&str>,
+  coordinate_size: Option<&str>,
+  width_pt: f32,
+  height_pt: f32,
+  adjustment: Option<&str>,
+  formulas: Option<&v::Formulas>,
+  allow_fill: bool,
+  allow_stroke: bool,
+  allow_extrusion: bool,
+) -> Option<InlineShapeGeometry> {
+  let tokens = vml_path_tokens(source)?;
+  let (origin_x, origin_y) = coordinate_origin
+    .and_then(vml_path_coordinate_pair)
+    .unwrap_or((0.0, 0.0));
+  let (coordinate_width, coordinate_height) = coordinate_size
+    .and_then(vml_path_coordinate_pair)
+    .unwrap_or((21_600.0, 21_600.0));
+  if coordinate_width.abs() <= f32::EPSILON || coordinate_height.abs() <= f32::EPSILON {
+    return None;
+  }
+  let adjustments = adjustment
+    .into_iter()
+    .flat_map(|values| values.split([',', ' ']))
+    .filter(|value| !value.is_empty())
+    .map(str::parse::<f64>)
+    .collect::<std::result::Result<Vec<_>, _>>()
+    .ok()?;
+  let formula_values = vml_formula_values(
+    formulas,
+    &adjustments,
+    f64::from(coordinate_width),
+    f64::from(coordinate_height),
+  )?;
+  let resolve = |value: VmlFormulaValue| -> Option<f32> {
+    Some(match value {
+      VmlFormulaValue::Number(value) => value,
+      VmlFormulaValue::Adjustment(index) => *adjustments.get(index)?,
+      VmlFormulaValue::Formula(index) => *formula_values.get(index)?,
+    } as f32)
+  };
+  let map = |x: f32, y: f32| common::Point {
+    x: common::Pt((x - origin_x) * width_pt / coordinate_width),
+    y: common::Pt((y - origin_y) * height_pt / coordinate_height),
+  };
+  let mut paths = Vec::new();
+  let mut commands = Vec::new();
+  let mut index = 0;
+  let mut current = (0.0, 0.0);
+  let mut subpath_start = (0.0, 0.0);
+  let mut fill = true;
+  let mut stroke = true;
+  while index < tokens.len() {
+    let VmlPathToken::Command(command) = tokens[index] else {
+      return None;
+    };
+    index += 1;
+    let start = index;
+    while index < tokens.len() && matches!(tokens[index], VmlPathToken::Value(_)) {
+      index += 1;
+    }
+    let values = tokens[start..index]
+      .iter()
+      .map(|token| match token {
+        VmlPathToken::Value(value) => resolve(*value),
+        VmlPathToken::Command(_) => None,
+      })
+      .collect::<Option<Vec<_>>>()?;
+    match command {
+      "m" | "t" => {
+        if values.len() < 2 || values.len() % 2 != 0 {
+          return None;
+        }
+        for (pair_index, pair) in values.chunks_exact(2).enumerate() {
+          let point = if command == "t" {
+            (current.0 + pair[0], current.1 + pair[1])
+          } else {
+            (pair[0], pair[1])
+          };
+          if pair_index == 0 {
+            commands.push(common::PathCommand::MoveTo(map(point.0, point.1)));
+            subpath_start = point;
+          } else {
+            commands.push(common::PathCommand::LineTo(map(point.0, point.1)));
+          }
+          current = point;
+        }
+      }
+      "l" | "r" => {
+        if values.len() < 2 || values.len() % 2 != 0 {
+          return None;
+        }
+        for pair in values.chunks_exact(2) {
+          let point = if command == "r" {
+            (current.0 + pair[0], current.1 + pair[1])
+          } else {
+            (pair[0], pair[1])
+          };
+          commands.push(common::PathCommand::LineTo(map(point.0, point.1)));
+          current = point;
+        }
+      }
+      "c" | "v" => {
+        if values.len() % 6 != 0 {
+          return None;
+        }
+        for curve in values.chunks_exact(6) {
+          let relative = command == "v";
+          let point = |x: f32, y: f32| {
+            if relative {
+              (current.0 + x, current.1 + y)
+            } else {
+              (x, y)
+            }
+          };
+          let control1 = point(curve[0], curve[1]);
+          let control2 = point(curve[2], curve[3]);
+          let end = point(curve[4], curve[5]);
+          commands.push(common::PathCommand::CubicTo {
+            control1: map(control1.0, control1.1),
+            control2: map(control2.0, control2.1),
+            end: map(end.0, end.1),
+          });
+          current = end;
+        }
+      }
+      "qx" | "qy" => {
+        if values.len() % 2 != 0 {
+          return None;
+        }
+        for end in values.chunks_exact(2) {
+          let end = (end[0], end[1]);
+          append_vml_quadrant(&mut commands, map, current, end, command == "qx");
+          current = end;
+        }
+      }
+      "qb" => {
+        if values.len() < 4 || values.len() % 2 != 0 {
+          return None;
+        }
+        let points = values
+          .chunks_exact(2)
+          .map(|pair| (pair[0], pair[1]))
+          .collect::<Vec<_>>();
+        for (point_index, control) in points[..points.len() - 1].iter().copied().enumerate() {
+          let end = if point_index + 1 == points.len() - 1 {
+            points[points.len() - 1]
+          } else {
+            let next = points[point_index + 1];
+            ((control.0 + next.0) / 2.0, (control.1 + next.1) / 2.0)
+          };
+          append_vml_quadratic(&mut commands, map, current, control, end);
+          current = end;
+        }
+      }
+      "at" | "ar" | "wa" | "wr" => {
+        if values.len() % 8 != 0 {
+          return None;
+        }
+        for arc in values.chunks_exact(8) {
+          let left = arc[0].min(arc[2]);
+          let top = arc[1].min(arc[3]);
+          let right = arc[0].max(arc[2]);
+          let bottom = arc[1].max(arc[3]);
+          let center = ((left + right) / 2.0, (top + bottom) / 2.0);
+          let radii = ((right - left) / 2.0, (bottom - top) / 2.0);
+          if radii.0 <= f32::EPSILON || radii.1 <= f32::EPSILON {
+            return None;
+          }
+          let angle = |point: (f32, f32)| {
+            ((point.1 - center.1) / radii.1).atan2((point.0 - center.0) / radii.0)
+          };
+          let start_angle = angle((arc[4], arc[5]));
+          let end_angle = angle((arc[6], arc[7]));
+          let clockwise = matches!(command, "wa" | "wr");
+          let sweep = vml_arc_sweep(start_angle, end_angle, clockwise);
+          let move_to_start = matches!(command, "ar" | "wr");
+          current = append_vml_arc(
+            &mut commands,
+            map,
+            center,
+            radii,
+            start_angle,
+            sweep,
+            move_to_start,
+          )?;
+          if move_to_start {
+            subpath_start = (
+              center.0 + radii.0 * start_angle.cos(),
+              center.1 + radii.1 * start_angle.sin(),
+            );
+          }
+        }
+      }
+      "ae" | "al" => {
+        if values.len() % 6 != 0 {
+          return None;
+        }
+        for arc in values.chunks_exact(6) {
+          let radii = (arc[2].abs(), arc[3].abs());
+          if radii.0 <= f32::EPSILON || radii.1 <= f32::EPSILON {
+            return None;
+          }
+          let start_angle = (arc[4] / 65_536.0).to_radians();
+          let end_angle = (arc[5] / 65_536.0).to_radians();
+          let sweep = vml_arc_sweep(start_angle, end_angle, true);
+          let move_to_start = command == "al";
+          current = append_vml_arc(
+            &mut commands,
+            map,
+            (arc[0], arc[1]),
+            radii,
+            start_angle,
+            sweep,
+            move_to_start,
+          )?;
+          if move_to_start {
+            subpath_start = (
+              arc[0] + radii.0 * start_angle.cos(),
+              arc[1] + radii.1 * start_angle.sin(),
+            );
+          }
+        }
+      }
+      "x" => {
+        if !values.is_empty() {
+          return None;
+        }
+        commands.push(common::PathCommand::Close);
+        current = subpath_start;
+      }
+      "e" => {
+        if !values.is_empty() {
+          return None;
+        }
+        push_vml_drawing_path(
+          &mut paths,
+          &mut commands,
+          fill && allow_fill,
+          stroke && allow_stroke,
+          allow_extrusion,
+        );
+        fill = true;
+        stroke = true;
+      }
+      "nf" if values.is_empty() => fill = false,
+      "ns" if values.is_empty() => stroke = false,
+      _ => return None,
+    }
+  }
+  push_vml_drawing_path(
+    &mut paths,
+    &mut commands,
+    fill && allow_fill,
+    stroke && allow_stroke,
+    allow_extrusion,
+  );
+  if paths.is_empty() {
+    return None;
+  }
+  Some(InlineShapeGeometry::Path {
+    paths,
+    outline: None,
+  })
+}
+
+fn push_vml_drawing_path(
+  paths: &mut Vec<common::DrawingPath>,
+  commands: &mut Vec<common::PathCommand>,
+  fill: bool,
+  stroke: bool,
+  extrusion_allowed: bool,
+) {
+  if commands.is_empty() {
+    return;
+  }
+  paths.push(common::DrawingPath {
+    commands: std::mem::take(commands),
+    fill_mode: if fill {
+      common::DrawingPathFillMode::Normal
+    } else {
+      common::DrawingPathFillMode::None
+    },
+    stroke,
+    extrusion_allowed,
+  });
+}
+
+fn append_vml_quadrant(
+  commands: &mut Vec<common::PathCommand>,
+  map: impl Fn(f32, f32) -> common::Point,
+  start: (f32, f32),
+  end: (f32, f32),
+  horizontal_tangent: bool,
+) {
+  const KAPPA: f32 = 0.552_284_8;
+  let dx = end.0 - start.0;
+  let dy = end.1 - start.1;
+  let (control1, control2) = if horizontal_tangent {
+    ((start.0 + KAPPA * dx, start.1), (end.0, end.1 - KAPPA * dy))
+  } else {
+    ((start.0, start.1 + KAPPA * dy), (end.0 - KAPPA * dx, end.1))
+  };
+  commands.push(common::PathCommand::CubicTo {
+    control1: map(control1.0, control1.1),
+    control2: map(control2.0, control2.1),
+    end: map(end.0, end.1),
+  });
+}
+
+fn append_vml_quadratic(
+  commands: &mut Vec<common::PathCommand>,
+  map: impl Fn(f32, f32) -> common::Point,
+  start: (f32, f32),
+  control: (f32, f32),
+  end: (f32, f32),
+) {
+  commands.push(common::PathCommand::CubicTo {
+    control1: map(
+      start.0 + (control.0 - start.0) * (2.0 / 3.0),
+      start.1 + (control.1 - start.1) * (2.0 / 3.0),
+    ),
+    control2: map(
+      end.0 + (control.0 - end.0) * (2.0 / 3.0),
+      end.1 + (control.1 - end.1) * (2.0 / 3.0),
+    ),
+    end: map(end.0, end.1),
+  });
+}
+
+fn vml_arc_sweep(start: f32, end: f32, clockwise: bool) -> f32 {
+  let full_turn = std::f32::consts::TAU;
+  let mut sweep = (end - start) % full_turn;
+  if clockwise {
+    if sweep <= f32::EPSILON {
+      sweep += full_turn;
+    }
+  } else if sweep >= -f32::EPSILON {
+    sweep -= full_turn;
+  }
+  sweep
+}
+
+fn append_vml_arc(
+  commands: &mut Vec<common::PathCommand>,
+  map: impl Fn(f32, f32) -> common::Point,
+  center: (f32, f32),
+  radii: (f32, f32),
+  start_angle: f32,
+  sweep_angle: f32,
+  move_to_start: bool,
+) -> Option<(f32, f32)> {
+  let segment_count = (sweep_angle.abs() / std::f32::consts::FRAC_PI_2)
+    .ceil()
+    .max(1.0) as usize;
+  let step = sweep_angle / segment_count as f32;
+  let start = (
+    center.0 + radii.0 * start_angle.cos(),
+    center.1 + radii.1 * start_angle.sin(),
+  );
+  if move_to_start || commands.is_empty() {
+    commands.push(common::PathCommand::MoveTo(map(start.0, start.1)));
+  } else {
+    commands.push(common::PathCommand::LineTo(map(start.0, start.1)));
+  }
+  let mut angle = start_angle;
+  let mut end = start;
+  for _ in 0..segment_count {
+    let next_angle = angle + step;
+    let alpha = (4.0 / 3.0) * (step / 4.0).tan();
+    end = (
+      center.0 + radii.0 * next_angle.cos(),
+      center.1 + radii.1 * next_angle.sin(),
+    );
+    commands.push(common::PathCommand::CubicTo {
+      control1: map(
+        center.0 + radii.0 * (angle.cos() - alpha * angle.sin()),
+        center.1 + radii.1 * (angle.sin() + alpha * angle.cos()),
+      ),
+      control2: map(
+        center.0 + radii.0 * (next_angle.cos() + alpha * next_angle.sin()),
+        center.1 + radii.1 * (next_angle.sin() - alpha * next_angle.cos()),
+      ),
+      end: map(end.0, end.1),
+    });
+    angle = next_angle;
+  }
+  Some(end)
+}
+
+fn vml_path_coordinate_pair(value: &str) -> Option<(f32, f32)> {
+  let mut values = value
+    .split([',', ' '])
+    .filter(|value| !value.is_empty())
+    .map(str::parse::<f32>);
+  Some((values.next()?.ok()?, values.next()?.ok()?))
+}
+
+fn vml_path_tokens(source: &str) -> Option<Vec<VmlPathToken<'_>>> {
+  let bytes = source.as_bytes();
+  let mut tokens = Vec::new();
+  let mut index = 0;
+  while index < bytes.len() {
+    match bytes[index] {
+      b' ' | b',' | b'\t' | b'\r' | b'\n' => index += 1,
+      byte if byte.is_ascii_alphabetic() => {
+        let start = index;
+        index += 1;
+        if index < bytes.len()
+          && bytes[index].is_ascii_alphabetic()
+          && matches!(bytes[start], b'n' | b'a' | b'w' | b'q' | b'h')
+        {
+          index += 1;
+        }
+        tokens.push(VmlPathToken::Command(&source[start..index]));
+      }
+      marker @ (b'@' | b'#') => {
+        index += 1;
+        let start = index;
+        while index < bytes.len() && bytes[index].is_ascii_digit() {
+          index += 1;
+        }
+        let reference = source[start..index].parse::<usize>().ok()?;
+        tokens.push(VmlPathToken::Value(if marker == b'@' {
+          VmlFormulaValue::Formula(reference)
+        } else {
+          VmlFormulaValue::Adjustment(reference)
+        }));
+      }
+      _ => {
+        let start = index;
+        if matches!(bytes[index], b'+' | b'-') {
+          index += 1;
+        }
+        while index < bytes.len() && (bytes[index].is_ascii_digit() || bytes[index] == b'.') {
+          index += 1;
+        }
+        if start == index {
+          return None;
+        }
+        tokens.push(VmlPathToken::Value(VmlFormulaValue::Number(
+          source[start..index].parse().ok()?,
+        )));
+      }
+    }
+  }
+  Some(tokens)
+}
+
+fn vml_formula_values(
+  formulas: Option<&v::Formulas>,
+  adjustments: &[f64],
+  width: f64,
+  height: f64,
+) -> Option<Vec<f64>> {
+  let mut values = Vec::new();
+  for formula in formulas.into_iter().flat_map(|formulas| &formulas.formula) {
+    let equation = formula.equation.as_deref()?;
+    values.push(vml_formula(equation, adjustments, &values, width, height)?);
+  }
+  Some(values)
+}
+
+fn vml_formula(
+  equation: &str,
+  adjustments: &[f64],
+  formulas: &[f64],
+  width: f64,
+  height: f64,
+) -> Option<f64> {
+  let mut tokens = equation.split_ascii_whitespace();
+  let operation = tokens.next()?;
+  let operands = tokens
+    .map(|token| vml_formula_operand(token, adjustments, formulas, width, height))
+    .collect::<Option<Vec<_>>>()?;
+  let operand = |index: usize, default: f64| operands.get(index).copied().unwrap_or(default);
+  let v = operand(0, 0.0);
+  let p1 = operand(1, 0.0);
+  let p2 = operand(2, 0.0);
+  Some(match operation {
+    "val" => v,
+    "sum" => v + p1 - p2,
+    "prod" | "product" => {
+      if p2.abs() <= f64::EPSILON {
+        return None;
+      }
+      v * p1 / p2
+    }
+    "mid" => (v + p1) / 2.0,
+    "abs" => v.abs(),
+    "min" => v.min(p1),
+    "max" => v.max(p1),
+    "if" => {
+      if v > 0.0 {
+        p1
+      } else {
+        p2
+      }
+    }
+    "mod" => (v * v + p1 * p1 + p2 * p2).sqrt(),
+    "atan2" => p1.atan2(v).to_degrees() * 65_536.0,
+    "sin" => v * (p1 / 65_536.0).to_radians().sin(),
+    "cos" => v * (p1 / 65_536.0).to_radians().cos(),
+    "cosatan2" => v * p2.atan2(p1).cos(),
+    "sinatan2" => v * p2.atan2(p1).sin(),
+    "sqrt" => v.max(0.0).sqrt(),
+    "sumangle" => v + (p1 + p2) * 65_536.0,
+    "ellipse" => {
+      if p1.abs() <= f64::EPSILON {
+        return None;
+      }
+      p2 * (1.0 - (v / p1).powi(2)).max(0.0).sqrt()
+    }
+    "tan" => v * (p1 / 65_536.0).to_radians().tan(),
+    _ => return None,
+  })
+}
+
+fn vml_formula_operand(
+  token: &str,
+  adjustments: &[f64],
+  formulas: &[f64],
+  width: f64,
+  height: f64,
+) -> Option<f64> {
+  if let Some(index) = token.strip_prefix('#') {
+    return adjustments.get(index.parse::<usize>().ok()?).copied();
+  }
+  if let Some(index) = token.strip_prefix('@') {
+    return formulas.get(index.parse::<usize>().ok()?).copied();
+  }
+  Some(match token {
+    "width" | "pixelWidth" => width,
+    "height" | "pixelHeight" => height,
+    "xcenter" => width / 2.0,
+    "ycenter" => height / 2.0,
+    "pixelLineWidth" | "lineDrawn" => 1.0,
+    _ => token.parse().ok()?,
+  })
 }
 
 fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
@@ -9816,6 +10687,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
     inline_anchor_after_line: false,
     placement: style.placement(),
     chart: None,
+    text_warp: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -9837,13 +10709,6 @@ fn vml_rectangle_fill_image(
       v::RectangleChoice::Fill(fill) => vml_fill_image(fill, rectangle.style.as_deref(), images),
       _ => None,
     })
-}
-
-fn vml_shape_fill_image(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShapeImageFill> {
-  shape.shape_choice.iter().find_map(|choice| match choice {
-    v::ShapeChoice::Fill(fill) => vml_fill_image(fill, shape.style.as_deref(), images),
-    _ => None,
-  })
 }
 
 fn vml_fill_image(
@@ -9918,6 +10783,7 @@ fn vml_inline_shape(
     inline_anchor_after_line: false,
     placement: style.placement(),
     chart: None,
+    text_warp: None,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -9980,6 +10846,7 @@ fn vml_textbox_frame(
     inline_anchor_after_line: false,
     placement: style.placement(),
     chart: None,
+    text_warp: None,
     text_box_blocks: frame.blocks,
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -10106,10 +10973,16 @@ fn polyline_bounds(points: &[(f32, f32)]) -> Option<(f32, f32, f32, f32)> {
 }
 
 fn pict_image_impl(picture: &w::Picture, images: &ImageCatalog) -> Option<InlineImage> {
-  picture
+  let mut image = picture
     .picture_choice
     .iter()
-    .find_map(|choice| picture_choice_image(choice, images))
+    .find_map(|choice| picture_choice_image(choice, images))?;
+  // Word controls use the VML picture as their static fixed-output
+  // representation. TextOut records in that metafile are real control
+  // content, while strings in an ordinary VML image are not automatically
+  // document text.
+  image.semantic_metafile_text |= picture.control.is_some();
+  Some(image)
 }
 
 fn push_pict_textboxes_impl(
@@ -10161,7 +11034,7 @@ fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> O
       w::EmbeddedObjectChoice::Shape(shape) => shape_image(shape, images),
       _ => None,
     })?;
-  image.semantic_metafile_text = semantic_metafile_text;
+  image.semantic_metafile_text |= semantic_metafile_text;
   Some(image)
 }
 
@@ -11169,18 +12042,10 @@ struct DrawingImageProperties {
   relationship_id: Option<String>,
   hyperlink_relationship_id: Option<String>,
   crop: ImageCrop,
-  effects: ImageEffects,
+  effects: Vec<ImageEffect>,
   rotation_deg: f32,
   flip_horizontal: bool,
   flip_vertical: bool,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-struct ImageEffects {
-  grayscale: bool,
-  brightness: Option<i32>,
-  contrast: Option<i32>,
-  duotone: Option<(RgbColor, RgbColor)>,
 }
 
 fn drawing_image_properties(
@@ -11358,24 +12223,157 @@ fn apply_image_effects_from_blip(
 ) {
   for choice in &blip.blip_choice {
     match choice {
-      a::BlipChoice::Grayscale => properties.effects.grayscale = true,
+      a::BlipChoice::AlphaBiLevel(effect) => {
+        properties.effects.push(ImageEffect::AlphaBiLevel(
+          (effect.threshold.as_ratio() * 255.0)
+            .round()
+            .clamp(0.0, 255.0) as u8,
+        ));
+      }
+      a::BlipChoice::AlphaCeiling => properties.effects.push(ImageEffect::AlphaCeiling),
+      a::BlipChoice::AlphaFloor => properties.effects.push(ImageEffect::AlphaFloor),
+      a::BlipChoice::AlphaInverse(effect) => {
+        let color = effect
+          .alpha_inverse_choice
+          .as_ref()
+          .and_then(Color::from_alpha_inverse_choice)
+          .and_then(|color| docx_image_color(color, theme_colors))
+          .map(|color| RgbColor {
+            r: color.r,
+            g: color.g,
+            b: color.b,
+          });
+        properties.effects.push(ImageEffect::AlphaInverse(color));
+      }
+      a::BlipChoice::AlphaModulationFixed(effect) => {
+        properties.effects.push(ImageEffect::AlphaModulateFixed(
+          effect
+            .amount
+            .as_ref()
+            .map(|amount| common::drawingml_image_effects::office_alpha_modulate_amount(*amount))
+            .unwrap_or(1.0),
+        ));
+      }
+      a::BlipChoice::AlphaReplace(effect) => {
+        properties.effects.push(ImageEffect::AlphaReplace(
+          (effect.alpha.as_ratio() * 255.0).round().clamp(0.0, 255.0) as u8,
+        ));
+      }
+      a::BlipChoice::ColorChange(change) => {
+        let from = change
+          .color_from
+          .color_from_choice
+          .as_ref()
+          .and_then(Color::from_color_from_choice)
+          .and_then(|color| docx_image_color(color, theme_colors));
+        let to = change
+          .color_to
+          .color_to_choice
+          .as_ref()
+          .and_then(Color::from_color_to_choice)
+          .and_then(|color| docx_image_color(color, theme_colors));
+        let (Some(from), Some(to)) = (from, to) else {
+          continue;
+        };
+        let use_alpha = change
+          .use_alpha
+          .as_ref()
+          .is_none_or(|value| value.as_bool());
+        properties
+          .effects
+          .push(ImageEffect::ColorChange(ColorChangeEffect {
+            from: RgbColor {
+              r: from.r,
+              g: from.g,
+              b: from.b,
+            },
+            to: RgbColor {
+              r: to.r,
+              g: to.g,
+              b: to.b,
+            },
+            from_alpha: from.a,
+            to_alpha: to.a,
+            use_alpha,
+            // Word's color-change matching is exact for decoded raster
+            // images. Metafile tolerance is applied after the resource is
+            // rasterized by the shared engine.
+            tolerance: 0,
+          }));
+      }
+      a::BlipChoice::ColorReplacement(replacement) => {
+        if let Some(color) = replacement
+          .color_replacement_choice
+          .as_ref()
+          .and_then(Color::from_color_replacement_choice)
+          .and_then(|color| docx_image_color(color, theme_colors))
+        {
+          properties
+            .effects
+            .push(ImageEffect::ColorReplacement(RgbColor {
+              r: color.r,
+              g: color.g,
+              b: color.b,
+            }));
+        }
+      }
+      a::BlipChoice::Grayscale => properties.effects.push(ImageEffect::Grayscale),
+      a::BlipChoice::Hsl(effect) => properties.effects.push(ImageEffect::Hsl {
+        hue_degrees: effect.hue.unwrap_or_default() as f32 / 60_000.0,
+        saturation_offset: effect
+          .saturation
+          .map(|value| value.as_ratio() as f32)
+          .unwrap_or_default(),
+        luminance_offset: effect
+          .luminance
+          .map(|value| value.as_ratio() as f32)
+          .unwrap_or_default(),
+      }),
       a::BlipChoice::LuminanceEffect(luminance) => {
-        properties.effects.brightness = luminance
+        let brightness = luminance
           .brightness
           .as_ref()
           .and_then(drawingml_percent_to_ratio)
           .map(drawingml_ratio_to_effect_percent);
-        properties.effects.contrast = luminance
+        let contrast = luminance
           .contrast
           .as_ref()
           .and_then(drawingml_percent_to_ratio)
           .map(drawingml_ratio_to_effect_percent);
+        let watermark = brightness == Some(70) && contrast == Some(-70);
+        properties.effects.push(ImageEffect::Luminance {
+          watermark,
+          brightness: (!watermark).then_some(brightness).flatten(),
+          contrast: (!watermark).then_some(contrast).flatten(),
+        });
       }
       a::BlipChoice::Duotone(duotone) => {
         if let Some(colors) = image_duotone_colors_from_model(duotone, theme_colors) {
-          properties.effects.duotone = Some(colors);
+          properties
+            .effects
+            .push(ImageEffect::Duotone(colors.0, colors.1));
         }
       }
+      a::BlipChoice::BiLevel(effect) => properties.effects.push(ImageEffect::BiLevel(
+        (effect.threshold.as_ratio() * 255.0)
+          .round()
+          .clamp(0.0, 255.0) as u8,
+      )),
+      a::BlipChoice::Blur(blur) => properties.effects.push(ImageEffect::Blur {
+        radius_px: blur
+          .radius
+          .map(|radius| radius.to_emu() as f32 / 9_525.0)
+          .unwrap_or_default(),
+        grow_bounds: blur.grow.as_ref().is_none_or(|value| value.as_bool()),
+      }),
+      a::BlipChoice::TintEffect(tint) => properties.effects.push(ImageEffect::Tint {
+        hue_degrees: tint.hue.unwrap_or_default() as f32 / 60_000.0,
+        amount: tint
+          .amount
+          .as_ref()
+          .map(|value| value.as_ratio() as f32)
+          .unwrap_or_default(),
+      }),
       _ => {}
     }
   }
@@ -11383,6 +12381,23 @@ fn apply_image_effects_from_blip(
 
 fn drawingml_ratio_to_effect_percent(value: f32) -> i32 {
   (value * 100.0).round() as i32
+}
+
+fn docx_image_color(color: Color, theme_colors: &ThemeColors) -> Option<common::Color> {
+  let mut scheme_resolver = |value| {
+    let color = resolve_drawingml_scheme_color_value(value, theme_colors)?;
+    Some(Color::RgbHex(RgbHexColor {
+      value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+      transformations: Vec::new(),
+    }))
+  };
+  let color = color.resolve_rgb(&mut scheme_resolver, None)?;
+  Some(common::Color {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+    a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
+  })
 }
 
 fn image_duotone_colors_from_model(
@@ -13519,7 +14534,7 @@ impl NumberingCatalog {
       self.counters.remove(&(num_id, key_level));
     }
 
-    let text = format_numbering_label(
+    let mut text = format_numbering_label(
       level,
       num_id,
       level_index,
@@ -13536,6 +14551,7 @@ impl NumberingCatalog {
       &self.counters,
     );
     let mut style = base_style;
+    let inherited_bullet_style = style.clone();
     // LibreOffice's NewNumberPortion starts ordinary numbering from the
     // paragraph font and clears underline/overline only. Character bullets
     // additionally clear paragraph bold/italic before their explicit
@@ -13565,6 +14581,21 @@ impl NumberingCatalog {
         &styles.theme_fonts,
         &styles.theme_colors,
       );
+    }
+    if matches!(level.format, w::NumberFormatValues::Bullet)
+      && style
+        .font_family
+        .as_deref()
+        .is_some_and(|font| font.eq_ignore_ascii_case("Symbol"))
+      && text.contains('\u{f094}')
+    {
+      // Word's legacy list transport uses F094 for a black square even
+      // though Microsoft's Symbol cmap has no U+F094. Let the paragraph font
+      // (and normal fallback chain) paint the Unicode square.
+      text = text.replace('\u{f094}', "■");
+      style.font_family = inherited_bullet_style.font_family;
+      style.fallback_font_family = inherited_bullet_style.fallback_font_family;
+      style.symbol_font_family = None;
     }
     let image = level
       .picture_bullet_id
@@ -13720,13 +14751,7 @@ fn format_numbering_label(
       &placeholder,
       &referenced_level.map_or_else(
         || value.to_string(),
-        |referenced_level| {
-          format_numbering_level_value(
-            value,
-            referenced_level,
-            level.is_legal && index < level_index,
-          )
-        },
+        |referenced_level| format_numbering_level_value(value, referenced_level, level.is_legal),
       ),
     );
   }
@@ -13776,11 +14801,7 @@ fn format_numbering_label_suppressing_non_numerical(
       output.push_str(&referenced_level.map_or_else(
         || referenced_value.to_string(),
         |referenced_level| {
-          format_numbering_level_value(
-            referenced_value,
-            referenced_level,
-            level.is_legal && referenced_index < level_index,
-          )
+          format_numbering_level_value(referenced_value, referenced_level, level.is_legal)
         },
       ));
     } else if is_word_numbering_delimiter(ch) {
@@ -14880,6 +15901,75 @@ mod tests {
 
   fn twips(value: u32) -> TwipsMeasureValue {
     TwipsMeasureValue::Twips(value as u64)
+  }
+
+  #[test]
+  fn vml_path_resolves_formulas_quadrants_and_path_paint_groups() {
+    let formulas = v::Formulas::from_bytes(
+      br#"<v:formulas xmlns:v="urn:schemas-microsoft-com:vml"><v:f eqn="sum 33030 0 #0"/><v:f eqn="prod #0 4 3"/><v:f eqn="prod @0 1 3"/><v:f eqn="sum @1 0 @2"/></v:formulas>"#,
+    )
+    .expect("VML formulas");
+    let geometry = vml_path_geometry(
+      "m10800,0qx0,10800,10800,21600,21600,10800,10800,0xe\
+       m7340,6445qx6215,7570,7340,8695,8465,7570,7340,6445xnfe\
+       m4960@0c8853@3,12747@3,16640@0nfe",
+      Some("0,0"),
+      Some("21600,21600"),
+      216.0,
+      216.0,
+      Some("17520"),
+      Some(&formulas),
+      true,
+      true,
+      false,
+    )
+    .expect("formula-backed VML path");
+    let InlineShapeGeometry::Path { paths, .. } = geometry else {
+      panic!("expected VML path geometry");
+    };
+
+    assert_eq!(paths.len(), 3);
+    assert_eq!(paths[0].fill_mode, common::DrawingPathFillMode::Normal);
+    assert!(paths[0].stroke);
+    assert_eq!(paths[1].fill_mode, common::DrawingPathFillMode::None);
+    assert!(paths[1].stroke);
+    assert_eq!(paths[2].fill_mode, common::DrawingPathFillMode::None);
+    assert!(paths[2].stroke);
+    assert!(
+      paths
+        .iter()
+        .flat_map(|path| &path.commands)
+        .any(|command| matches!(command, common::PathCommand::CubicTo { .. }))
+    );
+  }
+
+  #[test]
+  fn vml_path_lowers_clockwise_and_counterclockwise_arcs() {
+    let geometry = vml_path_geometry(
+      "m0,50wa0,0,100,100,0,50,100,50e\
+       m100,50at0,0,100,100,100,50,0,50e",
+      Some("0,0"),
+      Some("100,100"),
+      100.0,
+      100.0,
+      None,
+      None,
+      true,
+      true,
+      false,
+    )
+    .expect("VML arc paths");
+    let InlineShapeGeometry::Path { paths, .. } = geometry else {
+      panic!("expected VML path geometry");
+    };
+
+    assert_eq!(paths.len(), 2);
+    assert!(paths.iter().all(|path| {
+      path
+        .commands
+        .iter()
+        .any(|command| matches!(command, common::PathCommand::CubicTo { .. }))
+    }));
   }
 
   #[test]

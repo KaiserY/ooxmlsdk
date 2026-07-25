@@ -173,7 +173,12 @@ fn decode_image(
         }
         let image = decode_png_relaxed(&raster.data)
           .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF PNG: {err}")))?;
-        Image::from_custom(image, false).map_err(PdfError::Krilla)
+        // A generated metafile raster represents scalable GDI output, not
+        // authored pixel art. GDI+ paints image-backed pattern brushes
+        // through Cairo's filtered image path; preserve that downsampling
+        // behavior when the PDF consumer maps our high-DPI raster to the
+        // picture frame.
+        Image::from_custom(image, true).map_err(PdfError::Krilla)
       }
       content_type => Err(PdfError::Krilla(format!(
         "unsupported EMF/WMF raster content type: {content_type}"

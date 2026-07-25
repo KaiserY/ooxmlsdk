@@ -39,7 +39,3 @@ impl From<Pt> for f64 {
     Self::from(value.0)
   }
 }
-
-pub(crate) fn layout_scalar_from_f64(value: f64) -> f32 {
-  Pt::from_f64(value).0
-}

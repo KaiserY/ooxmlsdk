@@ -196,6 +196,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "codepage"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "48f68d061bc2828ae826206326e61251aca94c1e4a5305cf52d9138639c918b4"
+dependencies = [
+ "encoding_rs",
+]
+
+[[package]]
 name = "color"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1265,6 +1274,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "olecfsdk"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.13.1",
+ "codepage",
+ "encoding_rs",
+ "flate2",
+ "olecfsdk-derive",
+ "thiserror",
+]
+
+[[package]]
+name = "olecfsdk-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1362,6 +1392,7 @@ dependencies = [
  "icu_segmenter",
  "image",
  "kurbo",
+ "olecfsdk",
  "ooxmlsdk",
  "ooxmlsdk-fonts",
  "ooxmlsdk-formula",

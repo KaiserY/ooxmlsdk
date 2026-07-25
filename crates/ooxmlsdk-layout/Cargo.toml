@@ -19,9 +19,10 @@ hypher = { workspace = true }
 icu_segmenter = { workspace = true }
 image = { workspace = true }
 kurbo = { workspace = true }
-ooxmlsdk = { workspace = true, features = ["parts"] }
+ooxmlsdk = { workspace = true, features = ["parts", "mce"] }
 ooxmlsdk-fonts = { workspace = true }
 ooxmlsdk-formula = { workspace = true }
+olecfsdk = { workspace = true }
 parley = { workspace = true }
 quick-xml = { workspace = true }
 rustc-hash = { workspace = true }

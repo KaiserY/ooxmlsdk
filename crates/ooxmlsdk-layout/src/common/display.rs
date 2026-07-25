@@ -165,6 +165,9 @@ pub struct ImageItem<'doc> {
   pub flip_vertical: bool,
   pub content_type: Cow<'doc, str>,
   pub bytes: Arc<[u8]>,
+  /// Optional caller-specific realization colors for a one-bit WMF DIB
+  /// pattern. Ordinary metafiles retain their embedded palettes.
+  pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   pub relationship_id: Option<Cow<'doc, str>>,
   pub alt_text: Option<Cow<'doc, str>>,
   pub hyperlink_url: Option<Cow<'doc, str>>,
@@ -506,11 +509,21 @@ pub struct TextStyle<'doc> {
   pub underline_color: Option<Color>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct PdfGlyphOutlineOptions {
   pub semantic_text_overlay: bool,
   /// Page-space transform applied only to visible vector glyphs.
   pub transform: Option<crate::common::Transform>,
+  /// Non-affine DrawingML WordArt mapping applied after shaping. A one-path
+  /// preset follows a centerline; a multi-path preset interpolates piecewise
+  /// across every authored warp boundary.
+  pub text_warp: Option<Arc<TextWarp>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextWarp {
+  pub source_bounds: Rect,
+  pub boundaries: Vec<Vec<PathCommand>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

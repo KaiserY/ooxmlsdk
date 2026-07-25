@@ -7,6 +7,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
 use crate::error::Result;
 
+use super::activex::collect_slide_active_x_controls;
 use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::text_list_style::TextListStyle;
@@ -48,7 +49,9 @@ impl SlideFragmentHandler {
     self
       .slide_persist
       .import_graphic_frame_related_parts(package, slide_part)?;
-    self.slide_persist.drawing.imported = slide_part.vml_drawing_parts(package).next().is_some();
+    self.slide_persist.active_x_controls = collect_slide_active_x_controls(package, slide_part);
+    let vml_drawing_parts = slide_part.vml_drawing_parts(package).collect::<Vec<_>>();
+    self.slide_persist.drawing.imported = !vml_drawing_parts.is_empty();
     let slide = slide_part.root_element(package)?;
     self.slide_persist.visible = slide.show.is_none_or(|value| value.as_bool());
     self.slide_persist.show_master_shapes =
@@ -63,6 +66,9 @@ impl SlideFragmentHandler {
     }
     self.slide_name = slide.common_slide_data.name.clone();
     self.import_common_slide_data(&slide.common_slide_data);
+    self
+      .slide_persist
+      .import_vml_preview_drawings(package, &vml_drawing_parts);
     Ok(())
   }
 
@@ -84,7 +90,8 @@ impl SlideFragmentHandler {
     self
       .slide_persist
       .import_graphic_frame_related_parts(package, notes_part)?;
-    self.slide_persist.drawing.imported = notes_part.vml_drawing_parts(package).next().is_some();
+    let vml_drawing_parts = notes_part.vml_drawing_parts(package).collect::<Vec<_>>();
+    self.slide_persist.drawing.imported = !vml_drawing_parts.is_empty();
     let notes = notes_part.root_element(package)?;
     self.slide_persist.show_master_shapes =
       notes.show_master_shapes.is_none_or(|value| value.as_bool());
@@ -98,6 +105,9 @@ impl SlideFragmentHandler {
     }
     self.slide_name = notes.common_slide_data.name.clone();
     self.import_common_slide_data(&notes.common_slide_data);
+    self
+      .slide_persist
+      .import_vml_preview_drawings(package, &vml_drawing_parts);
     Ok(())
   }
 
@@ -119,10 +129,10 @@ impl SlideFragmentHandler {
     self
       .slide_persist
       .import_graphic_frame_related_parts(package, notes_master_part)?;
-    self.slide_persist.drawing.imported = notes_master_part
+    let vml_drawing_parts = notes_master_part
       .vml_drawing_parts(package)
-      .next()
-      .is_some();
+      .collect::<Vec<_>>();
+    self.slide_persist.drawing.imported = !vml_drawing_parts.is_empty();
     let notes_master = notes_master_part.root_element(package)?;
     self
       .slide_persist
@@ -138,6 +148,9 @@ impl SlideFragmentHandler {
       .map(|style| TextListStyle::from_pml_notes_style(style));
     self.slide_name = notes_master.common_slide_data.name.clone();
     self.import_common_slide_data(&notes_master.common_slide_data);
+    self
+      .slide_persist
+      .import_vml_preview_drawings(package, &vml_drawing_parts);
     Ok(())
   }
 
@@ -147,6 +160,10 @@ impl SlideFragmentHandler {
       self.import_background(background);
     }
     self.on_create_context(&common_slide_data.shape_tree);
+    if let Some(controls) = &common_slide_data.control_list {
+      let mut group_context = PPTShapeGroupContext::new(self.shape_location);
+      group_context.import_control_list(&mut self.slide_persist, controls);
+    }
   }
 
   pub(crate) fn finalize_import(mut self) -> SlidePersist {

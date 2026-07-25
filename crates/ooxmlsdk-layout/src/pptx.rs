@@ -1,3 +1,4 @@
+mod activex;
 pub(crate) mod chart;
 mod display;
 pub(crate) mod drawingml;

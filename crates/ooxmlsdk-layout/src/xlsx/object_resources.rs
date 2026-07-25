@@ -38,6 +38,8 @@ pub(crate) struct VmlDrawingResourceCatalog {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct VmlShapeModel {
+  pub(crate) id: Option<String>,
+  pub(crate) shape_id: Option<String>,
   pub(crate) text: String,
   pub(crate) style: Option<String>,
   pub(crate) object_type: Option<String>,
@@ -80,6 +82,8 @@ impl VmlClientAnchor {
 impl Default for VmlShapeModel {
   fn default() -> Self {
     Self {
+      id: None,
+      shape_id: None,
       text: String::new(),
       style: None,
       object_type: None,
@@ -182,7 +186,7 @@ impl VmlDrawingResourceCatalog {
   }
 }
 
-fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
+pub(crate) fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
   let mut reader = quick_xml::Reader::from_reader(data);
   reader.config_mut().trim_text(false);
 
@@ -329,6 +333,8 @@ fn vml_shape_models_from_bytes(local_name: &[u8], bytes: &[u8]) -> Vec<VmlShapeM
 }
 
 trait VmlShapeElement {
+  fn id(&self) -> Option<String>;
+  fn shape_id(&self) -> Option<String>;
   fn style(&self) -> Option<String>;
   fn user_hidden(&self) -> bool;
   fn collect_model_children(&self, model: &mut VmlShapeModel);
@@ -337,6 +343,14 @@ trait VmlShapeElement {
 macro_rules! impl_vml_shape_element {
   ($type:ident, $children:ident, $choice:ident) => {
     impl VmlShapeElement for vml::$type {
+      fn id(&self) -> Option<String> {
+        self.id.clone()
+      }
+
+      fn shape_id(&self) -> Option<String> {
+        self.optional_string.clone()
+      }
+
       fn style(&self) -> Option<String> {
         self.style.clone()
       }
@@ -375,6 +389,8 @@ impl_vml_shape_element!(RoundRectangle, round_rectangle_choice, RoundRectangleCh
 
 fn vml_shape_from_typed(shape: &impl VmlShapeElement) -> VmlShapeModel {
   let mut model = VmlShapeModel {
+    id: shape.id(),
+    shape_id: shape.shape_id(),
     style: shape.style(),
     hidden: shape.user_hidden(),
     ..VmlShapeModel::default()
@@ -743,7 +759,8 @@ mod tests {
         <x:ClientData ObjectType="Pict"><x:Visible/></x:ClientData>
       </v:line>
       <v:group>
-        <v:shape style="position:absolute;width:36pt;height:18pt">
+        <v:shape id="ToggleButton2" o:spid="_x0000_s1028"
+          style="position:absolute;width:36pt;height:18pt">
           <v:textbox><div><b>Nested</b></div></v:textbox>
         </v:shape>
       </v:group>
@@ -773,6 +790,8 @@ mod tests {
     assert_eq!(shapes[1].object_type.as_deref(), Some("Pict"));
     assert!(shapes[1].visible);
     assert_eq!(shapes[2].text, "Nested");
+    assert_eq!(shapes[2].id.as_deref(), Some("ToggleButton2"));
+    assert_eq!(shapes[2].shape_id.as_deref(), Some("_x0000_s1028"));
   }
 
   #[test]

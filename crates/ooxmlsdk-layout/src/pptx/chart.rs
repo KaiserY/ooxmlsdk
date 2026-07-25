@@ -4,7 +4,7 @@ use crate::model::{
 };
 use crate::render::chart::{
   ChartLegendPosition, ChartSeriesGrouping, ChartSeriesKind, ChartTitleText, ClusteredColumnChart,
-  PieChartModel, RadialChartKind, clustered_column_slot, linear_axis_scale,
+  PieChartModel, RadialChartKind, clustered_column_slot, date_axis_ticks, linear_axis_scale,
 };
 use crate::text_metrics::TextMetrics;
 use kurbo::BezPath;
@@ -336,13 +336,23 @@ pub(crate) fn lower_clustered_column_chart(
         })
       })
       .unwrap_or(true);
+  let date_ticks = category_tick_labels_visible
+    .then(|| date_axis_ticks(chart))
+    .flatten();
   let category_label_lines: Vec<Vec<String>> = if category_tick_labels_visible {
     let slot_width = frame.width_pt / category_count as f32 * 0.9;
-    chart
-      .categories
-      .iter()
-      .map(|category| wrap_chart_label(category, slot_width, &style.category_label, &mut metrics))
-      .collect()
+    if let Some(ticks) = date_ticks.as_ref() {
+      ticks
+        .iter()
+        .map(|tick| wrap_chart_label(&tick.text, slot_width, &style.category_label, &mut metrics))
+        .collect()
+    } else {
+      chart
+        .categories
+        .iter()
+        .map(|category| wrap_chart_label(category, slot_width, &style.category_label, &mut metrics))
+        .collect()
+    }
   } else {
     Vec::new()
   };
@@ -1129,8 +1139,21 @@ pub(crate) fn lower_clustered_column_chart(
         .or_else(|| chart.date_axis.map(date_axis_has_major_ticks))
         .unwrap_or(true)
     {
-      for boundary in 0..=category_count {
-        let x = plot_left + boundary as f32 / category_count as f32 * plot_width;
+      let tick_positions = date_ticks
+        .as_ref()
+        .map(|ticks| ticks.iter().map(|tick| tick.position).collect::<Vec<_>>())
+        .unwrap_or_else(|| {
+          (0..=category_count)
+            .map(|boundary| boundary as f64 / category_count as f64)
+            .collect()
+        });
+      for position in tick_positions {
+        let position = if chart.category_axis_reversed {
+          1.0 - position
+        } else {
+          position
+        };
+        let x = plot_left + position as f32 * plot_width;
         items.push(PageItem::Line(LineItem {
           x1_pt: x,
           y1_pt: zero_y,
@@ -1279,27 +1302,32 @@ pub(crate) fn lower_clustered_column_chart(
   }
   if category_tick_labels_visible {
     for (category_index, lines) in category_label_lines.iter().enumerate() {
-      let display_index = category_display_index(chart, category_index, category_count);
-      let center = category_point_x(
-        chart,
-        display_index,
-        category_count,
-        PlotRect {
-          left: plot_left,
-          top: plot_top,
-          width: plot_width,
-          height: plot_height,
-        },
-      );
+      let center = if let Some(ticks) = date_ticks.as_ref() {
+        let position = if chart.category_axis_reversed {
+          1.0 - ticks[category_index].position
+        } else {
+          ticks[category_index].position
+        };
+        plot_left + position as f32 * plot_width
+      } else {
+        let display_index = category_display_index(chart, category_index, category_count);
+        category_point_x(
+          chart,
+          display_index,
+          category_count,
+          PlotRect {
+            left: plot_left,
+            top: plot_top,
+            width: plot_width,
+            height: plot_height,
+          },
+        )
+      };
       for (line_index, line) in lines.iter().enumerate() {
         let width = metrics.measure_text(line, &style.category_label);
-        push_text(
-          &mut items,
-          center - width / 2.0,
-          category_top + line_index as f32 * category_label_line_height,
-          line.clone(),
-          style.category_label.clone(),
-        );
+        let x = center - width / 2.0;
+        let y = category_top + line_index as f32 * category_label_line_height;
+        push_text(&mut items, x, y, line.clone(), style.category_label.clone());
       }
     }
   }
@@ -2309,6 +2337,7 @@ fn lower_series_geometry(
         chart,
         series,
         color,
+        &style.data_label,
         TrendlineGeometry {
           plot,
           scale,
@@ -2333,6 +2362,7 @@ fn lower_trendlines(
   chart: &ClusteredColumnChart<'_>,
   series: &crate::render::chart::ClusteredColumnSeries<'_>,
   color: RgbColor,
+  label_style: &TextStyle,
   geometry: TrendlineGeometry,
 ) {
   let TrendlineGeometry {
@@ -2368,6 +2398,7 @@ fn lower_trendlines(
       .trendline_type
       .val
       .unwrap_or(c::TrendlineValues::Linear);
+    let mut regression = None;
     let points = if kind == c::TrendlineValues::MovingAverage {
       let period = trendline
         .period
@@ -2401,6 +2432,28 @@ fn lower_trendlines(
       let Some((slope, intercept)) = linear_regression(&transformed) else {
         continue;
       };
+      let mean =
+        transformed.iter().map(|(_, value)| *value).sum::<f64>() / transformed.len() as f64;
+      let residual_sum = transformed
+        .iter()
+        .map(|(x, y)| {
+          let residual = y - (slope * x + intercept);
+          residual * residual
+        })
+        .sum::<f64>();
+      let total_sum = transformed
+        .iter()
+        .map(|(_, y)| {
+          let difference = y - mean;
+          difference * difference
+        })
+        .sum::<f64>();
+      let r_squared = if total_sum <= f64::EPSILON {
+        1.0
+      } else {
+        (1.0 - residual_sum / total_sum).clamp(0.0, 1.0)
+      };
+      regression = Some((slope, intercept, r_squared));
       let (x_minimum, x_maximum) = source.iter().fold(
         (f64::INFINITY, f64::NEG_INFINITY),
         |(minimum, maximum), (x, _)| (minimum.min(*x), maximum.max(*x)),
@@ -2446,6 +2499,79 @@ fn lower_trendlines(
         }));
       }
       previous = Some((x, y));
+    }
+    if trendline.trendline_label.is_some()
+      && let Some((slope, intercept, r_squared)) = regression
+    {
+      let show_equation = trendline
+        .display_equation
+        .as_ref()
+        .is_none_or(|value| value.val.is_none_or(|value| value.as_bool()));
+      let show_r_squared = trendline
+        .display_r_squared_value
+        .as_ref()
+        .is_none_or(|value| value.val.is_none_or(|value| value.as_bool()));
+      let mut fields = Vec::new();
+      if show_equation {
+        fields.push(trendline_equation(kind, slope, intercept));
+      }
+      if show_r_squared {
+        fields.push(format!(
+          "R² = {}",
+          crate::render::chart::format_chart_number(r_squared, None)
+        ));
+      }
+      if !fields.is_empty() {
+        push_text(
+          items,
+          plot.left + plot.width * 0.08,
+          plot.top - line_height(label_style),
+          fields.join(" "),
+          label_style.clone(),
+        );
+      }
+    }
+  }
+}
+
+fn trendline_equation(kind: c::TrendlineValues, slope: f64, intercept: f64) -> String {
+  let coefficient = crate::render::chart::format_chart_number(slope.abs(), None);
+  let intercept_value = crate::render::chart::format_chart_number(intercept.abs(), None);
+  let signed_intercept = if intercept.abs() <= 1.0e-12 {
+    String::new()
+  } else if intercept < 0.0 {
+    format!(" - {intercept_value}")
+  } else {
+    format!(" + {intercept_value}")
+  };
+  match kind {
+    c::TrendlineValues::Exponential => {
+      format!(
+        "y = {}e^({}x)",
+        crate::render::chart::format_chart_number(intercept.exp(), None),
+        crate::render::chart::format_chart_number(slope, None)
+      )
+    }
+    c::TrendlineValues::Logarithmic => {
+      format!(
+        "y = {}ln(x){signed_intercept}",
+        crate::render::chart::format_chart_number(slope, None)
+      )
+    }
+    c::TrendlineValues::Power => format!(
+      "y = {}x^{}",
+      crate::render::chart::format_chart_number(intercept.exp(), None),
+      crate::render::chart::format_chart_number(slope, None)
+    ),
+    _ => {
+      let slope = if (slope - 1.0).abs() <= 1.0e-12 {
+        String::new()
+      } else if (slope + 1.0).abs() <= 1.0e-12 {
+        "-".to_string()
+      } else {
+        coefficient
+      };
+      format!("y = {slope}x{signed_intercept}")
     }
   }
 }
@@ -3758,6 +3884,53 @@ fn category_point_x(
   category_count: usize,
   plot: PlotRect,
 ) -> f32 {
+  if let Some(axis) = chart.date_axis {
+    let source_index = if chart.category_axis_reversed && display_index < category_count {
+      category_count - 1 - display_index
+    } else {
+      display_index
+    };
+    if let Some(value) = chart
+      .category_axis_values
+      .get(source_index)
+      .copied()
+      .flatten()
+    {
+      let source_minimum = chart
+        .category_axis_values
+        .iter()
+        .flatten()
+        .copied()
+        .filter(|value| value.is_finite())
+        .fold(f64::INFINITY, f64::min);
+      let source_maximum = chart
+        .category_axis_values
+        .iter()
+        .flatten()
+        .copied()
+        .filter(|value| value.is_finite())
+        .fold(f64::NEG_INFINITY, f64::max);
+      let minimum = axis
+        .scaling
+        .min_axis_value
+        .as_ref()
+        .map_or(source_minimum, |value| value.val);
+      let maximum = axis
+        .scaling
+        .max_axis_value
+        .as_ref()
+        .map_or(source_maximum, |value| value.val);
+      if minimum.is_finite() && maximum.is_finite() && maximum > minimum {
+        let ratio = (value - minimum) / (maximum - minimum);
+        let ratio = if chart.category_axis_reversed {
+          1.0 - ratio
+        } else {
+          ratio
+        };
+        return plot.left + ratio as f32 * plot.width;
+      }
+    }
+  }
   category_value_x(chart, display_index as f32 + 1.0, category_count, plot)
 }
 
@@ -4484,6 +4657,7 @@ fn push_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String, style: Tex
 
 #[cfg(test)]
 mod tests {
+  use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
   use super::{category_axis_text_rotation_is_supported, format_axis_value};
@@ -4511,5 +4685,13 @@ mod tests {
       Some(&text_properties),
       8
     ));
+  }
+
+  #[test]
+  fn linear_trendline_equation_uses_office_terms() {
+    assert_eq!(
+      super::trendline_equation(c::TrendlineValues::Linear, 1.0, 1.0),
+      "y = x + 1"
+    );
   }
 }

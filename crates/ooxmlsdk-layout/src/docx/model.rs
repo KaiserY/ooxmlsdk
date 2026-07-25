@@ -578,6 +578,7 @@ pub(crate) struct InlineShape {
   pub inline_anchor_after_line: bool,
   pub placement: ImagePlacement,
   pub chart: Option<Box<InlineChart>>,
+  pub text_warp: Option<Box<a::PresetTextWarp>>,
   pub text_box_blocks: Vec<Block>,
   pub text_inset_left_pt: f32,
   pub text_inset_top_pt: f32,

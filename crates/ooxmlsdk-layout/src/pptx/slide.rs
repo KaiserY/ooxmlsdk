@@ -10,7 +10,7 @@ use ooxmlsdk::parts::{
   embedded_object_part::EmbeddedObjectPart, embedded_package_part::EmbeddedPackagePart,
   extended_chart_part::ExtendedChartPart, image_part::ImagePart,
   presentation_document::PresentationDocument, slide_part::SlidePart,
-  theme_override_part::ThemeOverridePart,
+  theme_override_part::ThemeOverridePart, vml_drawing_part::VmlDrawingPart,
 };
 use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_drawing_2008_diagram as dsp,
@@ -24,11 +24,12 @@ use ooxmlsdk::schemas::{
 };
 use ooxmlsdk::sdk::SdkPart;
 
-use crate::docx::PageSetup;
+use crate::docx::{ImageCrop, PageSetup};
 use crate::error::Result;
 use crate::render::math::text_math_text;
 use crate::units;
 
+use super::activex::ActiveXControlState;
 use super::drawingml::color::Color;
 use super::drawingml::fill::FillProperties;
 use super::drawingml::shape::{Shape, ShapeMapEntry};
@@ -135,12 +136,15 @@ pub(crate) struct SlidePersist {
   pub(crate) embedded_package_resources: HashMap<String, BinaryResource>,
   pub(crate) media_resources: HashMap<String, MediaResource>,
   pub(crate) hyperlink_targets: HashMap<String, String>,
+  pub(crate) active_x_controls: HashMap<String, ActiveXControlState>,
+  pub(crate) active_x_controls_by_shape: HashMap<String, ActiveXControlState>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ImageResource {
   pub(crate) data: Arc<[u8]>,
   pub(crate) content_type: Option<String>,
+  pub(crate) monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -442,6 +446,7 @@ where
             .part()
             .content_type(package)
             .map(str::to_string),
+          monochrome_dib_palette_override: None,
         },
       ))
     })
@@ -935,6 +940,8 @@ impl SlidePersist {
       embedded_package_resources: HashMap::new(),
       media_resources: HashMap::new(),
       hyperlink_targets: HashMap::new(),
+      active_x_controls: HashMap::new(),
+      active_x_controls_by_shape: HashMap::new(),
     }
   }
 
@@ -994,6 +1001,7 @@ impl SlidePersist {
         ImageResource {
           data: data.into(),
           content_type: image_part.content_type(package).map(str::to_string),
+          monochrome_dib_palette_override: None,
         },
       );
     }
@@ -1217,6 +1225,87 @@ impl SlidePersist {
     self.comment_authors = reference.comment_authors.clone();
   }
 
+  pub(crate) fn import_vml_preview_drawings(
+    &mut self,
+    package: &PresentationDocument,
+    drawing_parts: &[VmlDrawingPart],
+  ) {
+    for drawing_part in drawing_parts {
+      let image_resources = collect_image_resources(package, drawing_part);
+      let models = drawing_part
+        .data_to_vec(package)
+        .map(|data| crate::xlsx::object_resources::vml_shapes(&data))
+        .unwrap_or_default();
+      for model in models {
+        if model.hidden || !model.print_object {
+          continue;
+        }
+        let Some(relationship_id) = model.image_relationship_id.as_deref() else {
+          continue;
+        };
+        let Some(mut resource) = image_resources.get(relationship_id).cloned() else {
+          continue;
+        };
+        let active_x_state = model
+          .id
+          .as_ref()
+          .and_then(|id| self.active_x_controls_by_shape.get(id))
+          .or_else(|| {
+            model
+              .shape_id
+              .as_ref()
+              .and_then(|id| self.active_x_controls_by_shape.get(id))
+          });
+        if let Some(palette) =
+          active_x_state.and_then(ActiveXControlState::preview_palette_override)
+        {
+          // ActiveX previews use the persisted live control BackColor when
+          // realizing a one-bit DIB pattern. Keep ordinary WMF/DIB palette
+          // semantics untouched for every other image.
+          resource.monochrome_dib_palette_override = Some(palette);
+        }
+        let Some((left_pt, top_pt, width_pt, height_pt)) =
+          vml_absolute_rectangle(model.style.as_deref())
+        else {
+          continue;
+        };
+        if self.shapes.iter().any(|shape| {
+          shape
+            .picture
+            .as_ref()
+            .and_then(|picture| picture.image_resource.as_ref())
+            .is_some_and(|existing| {
+              existing == &resource
+                && vml_preview_rectangle_matches_shape(shape, left_pt, top_pt, width_pt, height_pt)
+            })
+        }) {
+          // PowerPoint commonly retains the rounded VML compatibility
+          // preview beside a more precise DrawingML p:pic fallback. They are
+          // alternate representations of one OLE object, not two pictures.
+          continue;
+        }
+        let mut shape = Shape::new(super::drawingml::shape::ShapeService::GraphicObject);
+        shape.shape_location = Some(self.shape_location);
+        shape.position = super::drawingml::shape::Point {
+          x: points_to_emu(left_pt),
+          y: points_to_emu(top_pt),
+        };
+        shape.size = super::drawingml::shape::Size {
+          cx: points_to_emu(width_pt),
+          cy: points_to_emu(height_pt),
+        };
+        shape.set_picture(
+          Some(relationship_id.to_string()),
+          None,
+          ImageCrop::default(),
+          Vec::new(),
+          Some(resource),
+        );
+        self.shapes.push(shape);
+      }
+    }
+  }
+
   pub(crate) fn get_sub_type_text_list_style(
     &self,
     sub_type: Option<p::PlaceholderValues>,
@@ -1316,6 +1405,71 @@ impl SlidePersist {
       shape.collect_shape_maps(&mut self.shape_map, &mut self.connector_shape_map);
     }
   }
+}
+
+fn points_to_emu(value: f32) -> i64 {
+  (value * ooxmlsdk::units::EMUS_PER_POINT as f32).round() as i64
+}
+
+fn vml_preview_rectangle_matches_shape(
+  shape: &Shape,
+  left_pt: f32,
+  top_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+) -> bool {
+  const VML_ROUNDING_TOLERANCE_PT: f32 = 1.0;
+  [
+    (units::emu_to_points(shape.position.x), left_pt),
+    (units::emu_to_points(shape.position.y), top_pt),
+    (units::emu_to_points(shape.size.cx), width_pt),
+    (units::emu_to_points(shape.size.cy), height_pt),
+  ]
+  .into_iter()
+  .all(|(actual, expected)| (actual - expected).abs() <= VML_ROUNDING_TOLERANCE_PT)
+}
+
+fn vml_absolute_rectangle(style: Option<&str>) -> Option<(f32, f32, f32, f32)> {
+  let mut left = None;
+  let mut top = None;
+  let mut width = None;
+  let mut height = None;
+  for declaration in style?.split(';') {
+    let Some((name, value)) = declaration.split_once(':') else {
+      continue;
+    };
+    let slot = match name.trim().to_ascii_lowercase().as_str() {
+      "left" | "margin-left" => &mut left,
+      "top" | "margin-top" => &mut top,
+      "width" => &mut width,
+      "height" => &mut height,
+      _ => continue,
+    };
+    *slot = vml_measure_to_points(value);
+  }
+  Some((left?, top?, width?, height?))
+}
+
+fn vml_measure_to_points(value: &str) -> Option<f32> {
+  let value = value.trim();
+  let (number, multiplier) = if let Some(number) = value.strip_suffix("pt") {
+    (number, 1.0)
+  } else if let Some(number) = value.strip_suffix("in") {
+    (number, units::POINTS_PER_INCH)
+  } else if let Some(number) = value.strip_suffix("cm") {
+    (number, units::POINTS_PER_INCH / units::CENTIMETERS_PER_INCH)
+  } else if let Some(number) = value.strip_suffix("mm") {
+    (number, units::POINTS_PER_INCH / units::MILLIMETERS_PER_INCH)
+  } else if let Some(number) = value.strip_suffix("px") {
+    (number, units::POINTS_PER_CSS_PIXEL)
+  } else {
+    (value, 1.0)
+  };
+  number
+    .trim()
+    .parse::<f32>()
+    .ok()
+    .map(|value| value * multiplier)
 }
 
 fn slide_anchor(path: &str) -> Option<String> {

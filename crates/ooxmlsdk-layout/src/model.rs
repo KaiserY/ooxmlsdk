@@ -297,6 +297,7 @@ pub(crate) struct ImageItem {
   pub flip_vertical: bool,
   pub data: Arc<[u8]>,
   pub content_type: Option<String>,
+  pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
   pub floating: bool,

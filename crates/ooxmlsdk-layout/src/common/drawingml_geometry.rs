@@ -1,6 +1,6 @@
 use kurbo::{Affine, Arc, BezPath, PathEl, QuadBez, Shape};
 
-use crate::common::{PathCommand, Point, Pt, layout_scalar_from_f64};
+use crate::common::{PathCommand, Point, Pt};
 
 // Kurbo's SVG arc lowering uses the same 0.1-unit tolerance when converting
 // analytical arcs to cubic Béziers. DrawingML page coordinates are points, so
@@ -141,18 +141,6 @@ pub(crate) fn group_child_affine(
   Affine::translate((-child_offset.x, -child_offset.y))
     .then_scale_non_uniform(scale_x, scale_y)
     .then_translate(offset.to_vec2())
-}
-
-pub(crate) fn common_transform(transform: Affine) -> crate::common::Transform {
-  let [m11, m12, m21, m22, dx, dy] = transform.as_coeffs();
-  crate::common::Transform {
-    m11: layout_scalar_from_f64(m11),
-    m12: layout_scalar_from_f64(m12),
-    m21: layout_scalar_from_f64(m21),
-    m22: layout_scalar_from_f64(m22),
-    dx: Pt::from_f64(dx),
-    dy: Pt::from_f64(dy),
-  }
 }
 
 pub(crate) fn point_bounds(points: impl IntoIterator<Item = kurbo::Point>) -> Option<kurbo::Rect> {

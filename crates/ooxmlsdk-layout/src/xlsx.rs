@@ -5,7 +5,7 @@ mod drawing;
 mod formula;
 mod import;
 mod model;
-mod object_resources;
+pub(crate) mod object_resources;
 mod page_settings;
 mod pivot;
 mod print;

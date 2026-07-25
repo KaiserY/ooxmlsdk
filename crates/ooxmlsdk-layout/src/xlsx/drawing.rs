@@ -21,7 +21,7 @@ use ooxmlsdk::sdk::SdkPart;
 
 use crate::common;
 use crate::error::Result;
-use crate::model::RgbColor;
+use crate::model::{ImageCrop, RgbColor};
 use crate::pptx::drawingml::color::{Color, RgbHexColor};
 use crate::render::chart as shared_chart;
 
@@ -99,6 +99,9 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) text_italic: Option<bool>,
   pub(crate) text_alignment: Option<a::TextAlignmentTypeValues>,
   pub(crate) text_vertical: Option<a::TextVerticalValues>,
+  pub(crate) text_rotation_deg: f32,
+  pub(crate) text_upright: bool,
+  pub(crate) text_warp: Option<Box<a::PresetTextWarp>>,
   pub(crate) text_left_inset_emu: Option<i64>,
   pub(crate) text_top_inset_emu: Option<i64>,
   pub(crate) text_right_inset_emu: Option<i64>,
@@ -107,10 +110,21 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) has_style: bool,
   pub(crate) fill_color: Option<RgbColor>,
   pub(crate) fill_pattern: Option<common::PatternFill>,
+  pub(crate) fill_gradient: Option<Box<a::GradientFill>>,
   pub(crate) line_color: Option<RgbColor>,
   pub(crate) line_pattern: Option<common::PatternFill>,
   pub(crate) line_width_emu: Option<i32>,
   pub(crate) no_line: bool,
+  pub(crate) rotation_deg: f32,
+  pub(crate) flip_horizontal: bool,
+  pub(crate) flip_vertical: bool,
+  pub(crate) image_crop: ImageCrop,
+  pub(crate) image_effects: Vec<a::BlipChoice>,
+  pub(crate) transform_offset_emu: Option<(i64, i64)>,
+  pub(crate) transform_extent_emu: Option<(i64, i64)>,
+  pub(crate) group_child_offset_emu: Option<(i64, i64)>,
+  pub(crate) group_child_extent_emu: Option<(i64, i64)>,
+  pub(crate) children: Vec<DrawingObjectModel>,
   pub(crate) geometry: Option<DrawingGeometryModel>,
 }
 
@@ -595,7 +609,9 @@ impl DrawingObjectModel {
       description: properties.description.clone(),
       hidden: properties.hidden.is_some_and(|value| value.as_bool()),
       macro_name: shape.r#macro.clone(),
-      relationship_id: None,
+      relationship_id: shape_blip_fill(&shape.shape_properties)
+        .and_then(|fill| fill.blip.as_deref())
+        .and_then(blip_relationship_id),
       hyperlink_relationship_id: hyperlink_relationship_id(
         properties.hyperlink_on_click.as_deref(),
       ),
@@ -640,6 +656,23 @@ impl DrawingObjectModel {
         .text_body
         .as_deref()
         .and_then(|text_body| text_body.body_properties.vertical),
+      text_rotation_deg: shape
+        .text_body
+        .as_deref()
+        .and_then(|text_body| text_body.body_properties.rotation)
+        .map(|rotation| rotation as f32 / 60_000.0)
+        .unwrap_or_default(),
+      text_upright: shape.text_body.as_deref().is_some_and(|text_body| {
+        text_body
+          .body_properties
+          .up_right
+          .is_some_and(|value| value.as_bool())
+      }),
+      text_warp: shape
+        .text_body
+        .as_deref()
+        .and_then(|text_body| text_body.body_properties.preset_text_warp.clone())
+        .filter(|warp| warp.preset != a::TextShapeValues::TextNoShape),
       text_left_inset_emu: shape.text_body.as_deref().map(|text_body| {
         text_body
           .body_properties
@@ -671,11 +704,27 @@ impl DrawingObjectModel {
       fill_color: shape_fill_color(&shape.shape_properties)
         .or_else(|| shape_style_fill_color(shape.shape_style.as_deref())),
       fill_pattern: shape_fill_pattern(&shape.shape_properties),
+      fill_gradient: shape_fill_gradient(&shape.shape_properties),
       line_color: shape_line_color(&shape.shape_properties)
         .or_else(|| shape_style_line_color(shape.shape_style.as_deref())),
       line_pattern: shape_line_pattern(&shape.shape_properties),
       line_width_emu: shape_line_width_emu(&shape.shape_properties),
       no_line: shape_no_line(&shape.shape_properties),
+      rotation_deg: transform_rotation_deg(shape.shape_properties.transform2_d.as_deref()),
+      flip_horizontal: transform_flip_horizontal(shape.shape_properties.transform2_d.as_deref()),
+      flip_vertical: transform_flip_vertical(shape.shape_properties.transform2_d.as_deref()),
+      image_crop: shape_blip_fill(&shape.shape_properties)
+        .map(drawingml_blip_crop)
+        .unwrap_or_default(),
+      image_effects: shape_blip_fill(&shape.shape_properties)
+        .and_then(|fill| fill.blip.as_deref())
+        .map(|blip| blip.blip_choice.clone())
+        .unwrap_or_default(),
+      transform_offset_emu: transform_offset(shape.shape_properties.transform2_d.as_deref()),
+      transform_extent_emu: transform_extent(shape.shape_properties.transform2_d.as_deref()),
+      group_child_offset_emu: None,
+      group_child_extent_emu: None,
+      children: Vec::new(),
       geometry: shape_geometry(&shape.shape_properties),
     }
   }
@@ -712,15 +761,71 @@ impl DrawingObjectModel {
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
       text_vertical: None,
+      text_rotation_deg: 0.0,
+      text_upright: false,
+      text_warp: None,
       text_len: group_shape_text_len(group),
       child_objects: group.group_shape_choice.len(),
       has_style: false,
       fill_color: None,
       fill_pattern: None,
+      fill_gradient: None,
       line_color: None,
       line_pattern: None,
       line_width_emu: None,
       no_line: false,
+      rotation_deg: group
+        .group_shape_properties
+        .transform_group
+        .as_deref()
+        .and_then(|transform| transform.rotation)
+        .map(|rotation| rotation as f32 / 60_000.0)
+        .unwrap_or_default(),
+      flip_horizontal: group
+        .group_shape_properties
+        .transform_group
+        .as_deref()
+        .and_then(|transform| transform.horizontal_flip)
+        .map(bool::from)
+        .unwrap_or(false),
+      flip_vertical: group
+        .group_shape_properties
+        .transform_group
+        .as_deref()
+        .and_then(|transform| transform.vertical_flip)
+        .map(bool::from)
+        .unwrap_or(false),
+      image_crop: ImageCrop::default(),
+      image_effects: Vec::new(),
+      transform_offset_emu: group
+        .group_shape_properties
+        .transform_group
+        .as_deref()
+        .and_then(|transform| transform.offset.as_ref())
+        .map(|offset| (offset.x.to_emu(), offset.y.to_emu())),
+      transform_extent_emu: group
+        .group_shape_properties
+        .transform_group
+        .as_deref()
+        .and_then(|transform| transform.extents.as_ref())
+        .map(|extents| (extents.cx.to_emu(), extents.cy.to_emu())),
+      group_child_offset_emu: group
+        .group_shape_properties
+        .transform_group
+        .as_deref()
+        .and_then(|transform| transform.child_offset.as_ref())
+        .map(|offset| (offset.x.to_emu(), offset.y.to_emu())),
+      group_child_extent_emu: group
+        .group_shape_properties
+        .transform_group
+        .as_deref()
+        .and_then(|transform| transform.child_extents.as_ref())
+        .map(|extents| (extents.cx.to_emu(), extents.cy.to_emu())),
+      children: group
+        .group_shape_choice
+        .iter()
+        .filter_map(Self::from_group_choice)
+        .collect(),
       geometry: None,
     }
   }
@@ -758,14 +863,48 @@ impl DrawingObjectModel {
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
       text_vertical: None,
+      text_rotation_deg: 0.0,
+      text_upright: false,
+      text_warp: None,
       child_objects: frame.graphic.graphic_data.graphic_data_choice.len(),
       has_style: false,
       fill_color: None,
       fill_pattern: None,
+      fill_gradient: None,
       line_color: None,
       line_pattern: None,
       line_width_emu: None,
       no_line: false,
+      rotation_deg: frame
+        .transform
+        .rotation
+        .map(|rotation| rotation as f32 / 60_000.0)
+        .unwrap_or_default(),
+      flip_horizontal: frame
+        .transform
+        .horizontal_flip
+        .map(bool::from)
+        .unwrap_or(false),
+      flip_vertical: frame
+        .transform
+        .vertical_flip
+        .map(bool::from)
+        .unwrap_or(false),
+      image_crop: ImageCrop::default(),
+      image_effects: Vec::new(),
+      transform_offset_emu: frame
+        .transform
+        .offset
+        .as_ref()
+        .map(|offset| (offset.x.to_emu(), offset.y.to_emu())),
+      transform_extent_emu: frame
+        .transform
+        .extents
+        .as_ref()
+        .map(|extents| (extents.cx.to_emu(), extents.cy.to_emu())),
+      group_child_offset_emu: None,
+      group_child_extent_emu: None,
+      children: Vec::new(),
       geometry: None,
     }
   }
@@ -782,7 +921,9 @@ impl DrawingObjectModel {
       hidden: properties.hidden.is_some_and(|value| value.as_bool()),
       macro_name: shape.r#macro.clone(),
       text_len: 0,
-      relationship_id: None,
+      relationship_id: shape_blip_fill(&shape.shape_properties)
+        .and_then(|fill| fill.blip.as_deref())
+        .and_then(blip_relationship_id),
       hyperlink_relationship_id: hyperlink_relationship_id(
         properties.hyperlink_on_click.as_deref(),
       ),
@@ -803,16 +944,35 @@ impl DrawingObjectModel {
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
       text_vertical: None,
+      text_rotation_deg: 0.0,
+      text_upright: false,
+      text_warp: None,
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
       fill_color: shape_fill_color(&shape.shape_properties)
         .or_else(|| shape_style_fill_color(shape.shape_style.as_deref())),
       fill_pattern: shape_fill_pattern(&shape.shape_properties),
+      fill_gradient: shape_fill_gradient(&shape.shape_properties),
       line_color: shape_line_color(&shape.shape_properties)
         .or_else(|| shape_style_line_color(shape.shape_style.as_deref())),
       line_pattern: shape_line_pattern(&shape.shape_properties),
       line_width_emu: shape_line_width_emu(&shape.shape_properties),
       no_line: shape_no_line(&shape.shape_properties),
+      rotation_deg: transform_rotation_deg(shape.shape_properties.transform2_d.as_deref()),
+      flip_horizontal: transform_flip_horizontal(shape.shape_properties.transform2_d.as_deref()),
+      flip_vertical: transform_flip_vertical(shape.shape_properties.transform2_d.as_deref()),
+      image_crop: shape_blip_fill(&shape.shape_properties)
+        .map(drawingml_blip_crop)
+        .unwrap_or_default(),
+      image_effects: shape_blip_fill(&shape.shape_properties)
+        .and_then(|fill| fill.blip.as_deref())
+        .map(|blip| blip.blip_choice.clone())
+        .unwrap_or_default(),
+      transform_offset_emu: transform_offset(shape.shape_properties.transform2_d.as_deref()),
+      transform_extent_emu: transform_extent(shape.shape_properties.transform2_d.as_deref()),
+      group_child_offset_emu: None,
+      group_child_extent_emu: None,
+      children: Vec::new(),
       geometry: shape_geometry(&shape.shape_properties),
     }
   }
@@ -854,15 +1014,38 @@ impl DrawingObjectModel {
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
       text_vertical: None,
+      text_rotation_deg: 0.0,
+      text_upright: false,
+      text_warp: None,
       child_objects: 0,
       has_style: picture.shape_style.is_some(),
       fill_color: None,
       fill_pattern: None,
+      fill_gradient: None,
       line_color: None,
       line_pattern: None,
       line_width_emu: None,
       no_line: false,
-      geometry: None,
+      rotation_deg: transform_rotation_deg(picture.shape_properties.transform2_d.as_deref()),
+      flip_horizontal: transform_flip_horizontal(picture.shape_properties.transform2_d.as_deref()),
+      flip_vertical: transform_flip_vertical(picture.shape_properties.transform2_d.as_deref()),
+      image_crop: picture
+        .blip_fill
+        .as_deref()
+        .map(picture_blip_crop)
+        .unwrap_or_default(),
+      image_effects: picture
+        .blip_fill
+        .as_deref()
+        .and_then(|fill| fill.blip.as_ref())
+        .map(|blip| blip.blip_choice.clone())
+        .unwrap_or_default(),
+      transform_offset_emu: transform_offset(picture.shape_properties.transform2_d.as_deref()),
+      transform_extent_emu: transform_extent(picture.shape_properties.transform2_d.as_deref()),
+      group_child_offset_emu: None,
+      group_child_extent_emu: None,
+      children: Vec::new(),
+      geometry: shape_geometry(&picture.shape_properties),
     }
   }
 
@@ -887,6 +1070,8 @@ impl DrawingObjectModel {
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
       text_vertical: None,
+      text_rotation_deg: 0.0,
+      text_upright: false,
       ..Self::unknown()
     }
   }
@@ -919,17 +1104,128 @@ impl DrawingObjectModel {
       text_right_inset_emu: None,
       text_bottom_inset_emu: None,
       text_vertical: None,
+      text_rotation_deg: 0.0,
+      text_upright: false,
+      text_warp: None,
       child_objects: 0,
       has_style: false,
       fill_color: None,
       fill_pattern: None,
+      fill_gradient: None,
       line_color: None,
       line_pattern: None,
       line_width_emu: None,
       no_line: false,
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      image_crop: ImageCrop::default(),
+      image_effects: Vec::new(),
+      transform_offset_emu: None,
+      transform_extent_emu: None,
+      group_child_offset_emu: None,
+      group_child_extent_emu: None,
+      children: Vec::new(),
       geometry: None,
     }
   }
+
+  fn from_group_choice(choice: &xdr::GroupShapeChoice) -> Option<Self> {
+    Some(match choice {
+      xdr::GroupShapeChoice::Shape(shape) => Self::from_shape(shape),
+      xdr::GroupShapeChoice::GroupShape(group) => Self::from_group_shape(group),
+      xdr::GroupShapeChoice::GraphicFrame(frame) => Self::from_graphic_frame(frame),
+      xdr::GroupShapeChoice::ConnectionShape(shape) => Self::from_connection_shape(shape),
+      xdr::GroupShapeChoice::Picture(picture) => Self::from_picture(picture),
+      xdr::GroupShapeChoice::ContentPart(part) => Self::from_content_part(&part.relationship_id),
+    })
+  }
+}
+
+fn picture_blip_crop(blip_fill: &xdr::BlipFill) -> ImageCrop {
+  let source = blip_fill.source_rectangle.as_ref();
+  ImageCrop {
+    left: source
+      .and_then(|source| source.left.as_ref())
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or_default(),
+    top: source
+      .and_then(|source| source.top.as_ref())
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or_default(),
+    right: source
+      .and_then(|source| source.right.as_ref())
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or_default(),
+    bottom: source
+      .and_then(|source| source.bottom.as_ref())
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or_default(),
+  }
+}
+
+fn shape_blip_fill(properties: &xdr::ShapeProperties) -> Option<&a::BlipFill> {
+  match properties.shape_properties_choice2.as_ref()? {
+    xdr::ShapePropertiesChoice2::BlipFill(fill) => Some(fill),
+    _ => None,
+  }
+}
+
+fn drawingml_blip_crop(blip_fill: &a::BlipFill) -> ImageCrop {
+  let source = blip_fill.source_rectangle.as_ref();
+  ImageCrop {
+    left: source
+      .and_then(|source| source.left.as_ref())
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or_default(),
+    top: source
+      .and_then(|source| source.top.as_ref())
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or_default(),
+    right: source
+      .and_then(|source| source.right.as_ref())
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or_default(),
+    bottom: source
+      .and_then(|source| source.bottom.as_ref())
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or_default(),
+  }
+}
+
+fn transform_rotation_deg(transform: Option<&a::Transform2D>) -> f32 {
+  transform
+    .and_then(|transform| transform.rotation)
+    .map(|rotation| rotation as f32 / 60_000.0)
+    .unwrap_or_default()
+}
+
+fn transform_offset(transform: Option<&a::Transform2D>) -> Option<(i64, i64)> {
+  transform?
+    .offset
+    .as_ref()
+    .map(|offset| (offset.x.to_emu(), offset.y.to_emu()))
+}
+
+fn transform_extent(transform: Option<&a::Transform2D>) -> Option<(i64, i64)> {
+  transform?
+    .extents
+    .as_ref()
+    .map(|extents| (extents.cx.to_emu(), extents.cy.to_emu()))
+}
+
+fn transform_flip_horizontal(transform: Option<&a::Transform2D>) -> bool {
+  transform
+    .and_then(|transform| transform.horizontal_flip)
+    .map(bool::from)
+    .unwrap_or(false)
+}
+
+fn transform_flip_vertical(transform: Option<&a::Transform2D>) -> bool {
+  transform
+    .and_then(|transform| transform.vertical_flip)
+    .map(bool::from)
+    .unwrap_or(false)
 }
 
 fn blip_relationship_id(blip: &a::Blip) -> Option<String> {
@@ -1331,6 +1627,15 @@ fn shape_fill_pattern(properties: &xdr::ShapeProperties) -> Option<common::Patte
     return None;
   };
   drawingml_pattern_fill(fill)
+}
+
+fn shape_fill_gradient(properties: &xdr::ShapeProperties) -> Option<Box<a::GradientFill>> {
+  let xdr::ShapePropertiesChoice2::GradientFill(fill) =
+    properties.shape_properties_choice2.as_ref()?
+  else {
+    return None;
+  };
+  Some(fill.clone())
 }
 
 fn shape_geometry(properties: &xdr::ShapeProperties) -> Option<DrawingGeometryModel> {

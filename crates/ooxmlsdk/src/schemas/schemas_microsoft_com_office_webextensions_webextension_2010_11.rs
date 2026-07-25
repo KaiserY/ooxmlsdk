@@ -11,22 +11,25 @@ pub struct WebExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// id
   #[sdk(attr(qname = ":id"))]
-  pub id: crate::simple_type::StringValue,
+  pub id: Option<crate::simple_type::StringValue>,
   /// frozen
   #[sdk(attr(qname = ":frozen"))]
   pub frozen: Option<crate::simple_type::BooleanValue>,
+  /// Relationship to the WebExtensionPart when embedded in DrawingML graphic data.
+  #[sdk(attr(qname = "r:id"))]
+  pub relationship_id: Option<crate::simple_type::StringValue>,
   /// Defines the WebExtensionStoreReference Class.
   #[sdk(child(qname = "we:reference"))]
-  pub web_extension_store_reference: std::boxed::Box<WebExtensionStoreReference>,
+  pub web_extension_store_reference: Option<std::boxed::Box<WebExtensionStoreReference>>,
   /// Defines the WebExtensionReferenceList Class.
   #[sdk(child(qname = "we:alternateReferences"))]
   pub web_extension_reference_list: Option<WebExtensionReferenceList>,
   /// Defines the WebExtensionPropertyBag Class.
   #[sdk(child(qname = "we:properties"))]
-  pub web_extension_property_bag: WebExtensionPropertyBag,
+  pub web_extension_property_bag: Option<WebExtensionPropertyBag>,
   /// Defines the WebExtensionBindingList Class.
   #[sdk(child(qname = "we:bindings"))]
-  pub web_extension_binding_list: WebExtensionBindingList,
+  pub web_extension_binding_list: Option<WebExtensionBindingList>,
   /// Defines the Snapshot Class.
   #[sdk(child(qname = "we:snapshot"))]
   pub snapshot: Option<std::boxed::Box<Snapshot>>,

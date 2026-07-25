@@ -60,6 +60,7 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
     out_dir_path,
     include_known_namespace: true,
     include_uri_by_prefix: false,
+    include_minimum_version_by_uri: true,
     include_default_namespace_style: false,
   })?;
 
@@ -79,6 +80,7 @@ pub fn gen_derive_namespace_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) ->
     out_dir_path: out_dir.as_ref(),
     include_known_namespace: false,
     include_uri_by_prefix: true,
+    include_minimum_version_by_uri: false,
     include_default_namespace_style: false,
   })?;
   simple_type_mapping::write_simple_type_mapping(&loaded_schemas, out_dir.as_ref())?;
@@ -321,12 +323,14 @@ struct NamespacesInput<'a> {
   out_dir_path: &'a Path,
   include_known_namespace: bool,
   include_uri_by_prefix: bool,
+  include_minimum_version_by_uri: bool,
   include_default_namespace_style: bool,
 }
 
 fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
   let mut prefix_to_uri_arms: Vec<syn::Arm> = vec![];
   let mut prefix_to_minimum_version_arms: Vec<syn::Arm> = vec![];
+  let mut uri_to_minimum_version_arms: Vec<syn::Arm> = vec![];
   let mut known_namespace_variants: Vec<TokenStream> = vec![];
   let mut seen_uris = HashSet::new();
   let mut seen_prefixes = HashSet::new();
@@ -350,6 +354,16 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
           #variant_ident,
         });
       }
+      let version = if namespace.version.is_empty() {
+        "Office2007"
+      } else {
+        namespace.version.as_str()
+      };
+      let version_ident: Ident = parse_str(version)?;
+      let uri_bytes = syn::LitByteStr::new(uri.as_bytes(), proc_macro2::Span::call_site());
+      uri_to_minimum_version_arms.push(parse2(quote! {
+        #uri_bytes => Some(crate::sdk::FileFormatVersion::#version_ident),
+      })?);
     }
 
     if seen_prefixes.insert(prefix) {
@@ -378,6 +392,21 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
       pub(crate) fn minimum_version_by_prefix(prefix: &str) -> Option<&'static str> {
         match prefix {
           #( #prefix_to_minimum_version_arms )*
+          _ => None,
+        }
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let minimum_version_by_uri_tokens = if input.include_minimum_version_by_uri {
+    quote! {
+      #[cfg(feature = "mce")]
+      pub(crate) fn minimum_version_by_uri(
+        uri: &[u8],
+      ) -> Option<crate::sdk::FileFormatVersion> {
+        match uri {
+          #( #uri_to_minimum_version_arms )*
           _ => None,
         }
       }
@@ -418,6 +447,7 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
     #known_namespace_tokens
 
     #uri_by_prefix_tokens
+    #minimum_version_by_uri_tokens
     #default_namespace_style_tokens
   };
 

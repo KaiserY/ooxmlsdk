@@ -107,6 +107,8 @@ pub enum VerticalAnchorValues {
   Page,
   #[sdk(rename = "text")]
   Text,
+  #[sdk(rename = "line")]
+  Line,
 }
 /// Top Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

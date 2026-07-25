@@ -4127,57 +4127,7 @@ fn xlsx_chart_style_id(chart_space: &c::ChartSpace) -> Option<u8> {
     c::ChartSpaceChoice::CStyle(style) => {
       normalize_xlsx_chart_style(u16::from(style.val.unwrap_or(2)))
     }
-    c::ChartSpaceChoice::AlternateContent(content) => {
-      let preferred = content
-        .alternate_content_choice
-        .iter()
-        .filter_map(|branch| match branch {
-          ooxmlsdk::schemas::mc::AlternateContentChoice::Choice(choice) => Some(choice.as_ref()),
-          _ => None,
-        })
-        .flat_map(|choice| choice.xml_children.iter())
-        .find_map(|xml| xlsx_chart_style_from_xml(xml));
-      preferred.or_else(|| {
-        content
-          .alternate_content_choice
-          .iter()
-          .filter_map(|branch| match branch {
-            ooxmlsdk::schemas::mc::AlternateContentChoice::Fallback(fallback) => {
-              Some(fallback.as_ref())
-            }
-            _ => None,
-          })
-          .flat_map(|fallback| fallback.xml_children.iter())
-          .find_map(|xml| xlsx_chart_style_from_xml(xml))
-      })
-    }
-  }
-}
-
-fn xlsx_chart_style_from_xml(xml: &[u8]) -> Option<u8> {
-  use quick_xml::events::Event;
-
-  let mut reader = quick_xml::Reader::from_reader(xml);
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event) | Event::Empty(event)) if event.local_name().as_ref() == b"style" => {
-        let value = event.attributes().flatten().find_map(|attribute| {
-          (attribute.key.local_name().as_ref() == b"val")
-            .then(|| {
-              attribute
-                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
-                .ok()
-            })
-            .flatten()
-        })?;
-        return value
-          .parse::<u16>()
-          .ok()
-          .and_then(normalize_xlsx_chart_style);
-      }
-      Ok(Event::Eof) | Err(_) => return None,
-      _ => {}
-    }
+    c::ChartSpaceChoice::AlternateContent(_) => None,
   }
 }
 

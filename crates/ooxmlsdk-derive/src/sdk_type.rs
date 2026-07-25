@@ -2169,7 +2169,10 @@ fn mce_process_content_method_tokens(
   })
 }
 
-fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> syn::Result<proc_macro2::TokenStream> {
+fn mce_choice_impl_tokens(
+  field: &SdkTypeChoiceField,
+  default_tag_prefix: &str,
+) -> syn::Result<proc_macro2::TokenStream> {
   if !generate_mce_tokens() {
     return Ok(quote! {});
   }
@@ -2229,7 +2232,8 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> syn::Result<proc_macro2
   };
   let process_self_choice = process_choice_for(quote! { self });
 
-  let mut parse_replacement_arms = Vec::new();
+  let mut parse_replacement_dispatch =
+    std::collections::BTreeMap::<String, Vec<QNameDispatchArm>>::new();
   for item in &field.items {
     match item {
       SdkTypeChoiceItem::Child {
@@ -2239,7 +2243,6 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> syn::Result<proc_macro2
         qname,
         ..
       } => {
-        let targets = qname_match_targets(std::slice::from_ref(qname));
         let read_child_tokens = choice_child_read_tokens(
           &choice_ty,
           variant,
@@ -2247,19 +2250,18 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> syn::Result<proc_macro2
           *boxed,
           quote! { &mut child_reader },
         );
-        parse_replacement_arms.push(quote! {
-          #( #targets )|* => {
-            Some(#read_child_tokens)
-          }
-        });
+        push_qname_dispatch_arm(
+          &mut parse_replacement_dispatch,
+          qname,
+          quote! { Some(#read_child_tokens) },
+        );
       }
       SdkTypeChoiceItem::EmptyChild { variant, qname, .. } => {
-        let targets = qname_match_targets(std::slice::from_ref(qname));
-        parse_replacement_arms.push(quote! {
-          #( #targets )|* => {
-            Some(#choice_ty::#variant)
-          }
-        });
+        push_qname_dispatch_arm(
+          &mut parse_replacement_dispatch,
+          qname,
+          quote! { Some(#choice_ty::#variant) },
+        );
       }
       SdkTypeChoiceItem::TextChild {
         variant,
@@ -2283,9 +2285,10 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> syn::Result<proc_macro2
           quote! { stringify!(#ident) },
           quote! { stringify!(#variant) },
         );
-        let targets = qname_match_targets(std::slice::from_ref(qname));
-        parse_replacement_arms.push(quote! {
-          #( #targets )|* => {
+        push_qname_dispatch_arm(
+          &mut parse_replacement_dispatch,
+          qname,
+          quote! {
             let parsed_child = if next_empty {
               #empty_parse_tokens
             } else {
@@ -2293,25 +2296,28 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> syn::Result<proc_macro2
               #value_parse_tokens
             };
             Some(#choice_ty::#variant(parsed_child))
-          }
-        });
+          },
+        );
       }
       SdkTypeChoiceItem::AnyChild { variant, qname, .. } => {
-        let targets = qname_match_targets(std::slice::from_ref(qname));
         let parsed_tokens =
           build_choice_any_child_parse_tokens(ident, qname, quote! { &mut child_reader });
-        parse_replacement_arms.push(quote! {
-          #( #targets )|* => {
+        push_qname_dispatch_arm(
+          &mut parse_replacement_dispatch,
+          qname,
+          quote! {
             #parsed_tokens
             Some(#choice_ty::#variant(parsed_child.into()))
-          }
-        });
+          },
+        );
       }
       SdkTypeChoiceItem::Sequence { .. }
       | SdkTypeChoiceItem::Any { .. }
       | SdkTypeChoiceItem::Text { .. } => {}
     }
   }
+  let parse_replacement_arms =
+    qname_dispatch_match_arms(&parse_replacement_dispatch, default_tag_prefix);
 
   let mut mce_replacement_read_methods = Vec::new();
   if alternate_content_variant.is_some() {
@@ -2457,9 +2463,23 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> syn::Result<proc_macro2
 fn mce_process_choice_field_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStream {
   let ident = &field.ident;
   let choice_ty = unwrap_option_vec_type(&field.ty);
+  let has_alternate_content = field.items.iter().any(|item| {
+    matches!(
+      item,
+      SdkTypeChoiceItem::Child { variant, qname, .. }
+        if variant == "AlternateContent"
+          && parse_qname_info(qname).local_name == "AlternateContent"
+    )
+  });
   if field.repeated {
     quote! {
       #choice_ty::process_mce_choices_with_context(&mut self.#ident, settings, context)?;
+    }
+  } else if field.optional && has_alternate_content {
+    quote! {
+      let mut choices = self.#ident.take().into_iter().collect::<Vec<_>>();
+      #choice_ty::process_mce_choices_with_context(&mut choices, settings, context)?;
+      self.#ident = choices.into_iter().next();
     }
   } else if field.optional {
     quote! {
@@ -3910,7 +3930,7 @@ fn expand_helper_struct(
         let choice_ty = unwrap_option_vec_type(&field.ty);
         mce_choice_impl_keys
           .insert(quote! { #choice_ty }.to_string())
-          .then(|| mce_choice_impl_tokens(field))
+          .then(|| mce_choice_impl_tokens(field, &default_dispatch_prefix))
       })
       .collect::<syn::Result<Vec<_>>>()?
   } else {
@@ -6845,9 +6865,18 @@ fn expand_named_struct(
         } else {
           quote! { &mut alternate_content }
         };
-        let parse_arms = field
-          .children
+        // MCE is conceptually expanded before the selected child is matched
+        // against the surrounding particle. When multiple static
+        // AlternateContent slots are separated only by optional children, the
+        // initial XML parse cannot unambiguously assign an AlternateContent
+        // node to one slot. Accept every promoted child supported by the
+        // containing type here; the selected child's QName determines its
+        // actual field.
+        let mut seen_children = std::collections::HashSet::new();
+        let parse_arms = mce_fields
           .iter()
+          .flat_map(|field| field.children.iter())
+          .filter(|child| seen_children.insert(child.to_string()))
           .map(|child| {
             mce_replacement_parse_arms
               .get(&child.to_string())
@@ -6915,7 +6944,7 @@ fn expand_named_struct(
         let choice_ty = unwrap_option_vec_type(&field.ty);
         mce_choice_impl_keys
           .insert(quote! { #choice_ty }.to_string())
-          .then(|| mce_choice_impl_tokens(field))
+          .then(|| mce_choice_impl_tokens(field, &default_dispatch_prefix))
       })
       .collect::<syn::Result<Vec<_>>>()?
   } else {

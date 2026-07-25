@@ -173,7 +173,7 @@ impl TableProperties {
     self.style_id = match &properties.table_properties_choice3 {
       Some(a::TablePropertiesChoice3::TableStyle(style)) => {
         self.inline_style = Some(TableStyle::from_dml_table_style(style));
-        Some(style.style_id.clone())
+        style.style_id.clone()
       }
       Some(a::TablePropertiesChoice3::TableStyleId(style_id)) => Some(style_id.clone()),
       None => None,
@@ -454,11 +454,11 @@ trait TableStyleSource {
 
 impl TableStyleSource for a::TableStyle {
   fn style_id(&self) -> &str {
-    &self.style_id
+    self.style_id.as_deref().unwrap_or_default()
   }
 
   fn style_name(&self) -> &str {
-    &self.style_name
+    self.style_name.as_deref().unwrap_or_default()
   }
 
   fn table_background(&self) -> Option<&a::TableBackground> {
@@ -520,11 +520,11 @@ impl TableStyleSource for a::TableStyle {
 
 impl TableStyleSource for a::TableStyleEntry {
   fn style_id(&self) -> &str {
-    &self.style_id
+    self.style_id.as_deref().unwrap_or_default()
   }
 
   fn style_name(&self) -> &str {
-    &self.style_name
+    self.style_name.as_deref().unwrap_or_default()
   }
 
   fn table_background(&self) -> Option<&a::TableBackground> {

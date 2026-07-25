@@ -229,7 +229,17 @@
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "TableStyleEntry"
+      "ClassName": "TableStyleType",
+      "Attributes": [
+        {
+          "PropertyName": "StyleId",
+          "Optional": true
+        },
+        {
+          "PropertyName": "StyleName",
+          "Optional": true
+        }
+      ]
     }
   ]
 }

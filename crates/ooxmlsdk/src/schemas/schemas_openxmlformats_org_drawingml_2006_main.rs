@@ -7042,10 +7042,10 @@ pub struct TableStyle {
   #[sdk(attr(qname = ":styleId"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
-  pub style_id: crate::simple_type::StringValue,
+  pub style_id: Option<crate::simple_type::StringValue>,
   /// Name
   #[sdk(attr(qname = ":styleName"))]
-  pub style_name: crate::simple_type::StringValue,
+  pub style_name: Option<crate::simple_type::StringValue>,
   /// Table Background
   #[sdk(child(qname = "a:tblBg"))]
   pub table_background: Option<std::boxed::Box<TableBackground>>,
@@ -7100,10 +7100,10 @@ pub struct TableStyleEntry {
   #[sdk(attr(qname = ":styleId"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
-  pub style_id: crate::simple_type::StringValue,
+  pub style_id: Option<crate::simple_type::StringValue>,
   /// Name
   #[sdk(attr(qname = ":styleName"))]
-  pub style_name: crate::simple_type::StringValue,
+  pub style_name: Option<crate::simple_type::StringValue>,
   /// Table Background
   #[sdk(child(qname = "a:tblBg"))]
   pub table_background: Option<std::boxed::Box<TableBackground>>,

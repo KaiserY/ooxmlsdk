@@ -1,4 +1,15 @@
 {
+  "Enums": [
+    {
+      "Name": "VerticalAnchorValues",
+      "AddFacets": [
+        {
+          "Name": "Line",
+          "Value": "line"
+        }
+      ]
+    }
+  ],
   "Types": [
     {
       "ClassName": "TopBorder",

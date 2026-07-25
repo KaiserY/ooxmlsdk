@@ -308,6 +308,9 @@ pub(crate) fn namespace_supported(ns: &[u8], target: FileFormatVersion) -> bool 
 }
 
 fn namespace_minimum_version(ns: &[u8]) -> Option<FileFormatVersion> {
+  if let Some(version) = crate::namespaces::minimum_version_by_uri(ns) {
+    return Some(version);
+  }
   if bytes_contains(ns, b"openxmlformats.org")
     || bytes_contains(ns, b"/2006/")
     || bytes_contains(ns, b":office:")

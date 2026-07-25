@@ -3518,10 +3518,12 @@ fn draw_text_item(
               warp,
               &run.font_face,
               &run.glyphs,
-              portion.x_pt + run.x_offset_pt * horizontal_scale,
-              portion.baseline_y,
-              run.font_size_pt,
-              horizontal_scale,
+              WarpedGlyphPlacement {
+                start_x: portion.x_pt + run.x_offset_pt * horizontal_scale,
+                baseline_y: portion.baseline_y,
+                font_size_pt: run.font_size_pt,
+                horizontal_scale,
+              },
             )
           });
         if glyph_outlines
@@ -3626,15 +3628,19 @@ fn draw_text_item(
   Ok(())
 }
 
+struct WarpedGlyphPlacement {
+  start_x: f32,
+  baseline_y: f32,
+  font_size_pt: f32,
+  horizontal_scale: f32,
+}
+
 fn draw_warped_glyphs(
   surface: &mut Surface<'_>,
   warp: &common::TextWarp,
   face_data: &FontFaceData,
   glyphs: &[PaintGlyph],
-  start_x: f32,
-  baseline_y: f32,
-  font_size_pt: f32,
-  horizontal_scale: f32,
+  placement: WarpedGlyphPlacement,
 ) -> bool {
   let Ok(face) = ttf_parser::Face::parse(face_data.data.as_ref(), face_data.index) else {
     return false;
@@ -3652,23 +3658,23 @@ fn draw_warped_glyphs(
     return false;
   }
 
-  let mut cursor_x = start_x;
-  let glyph_scale = font_size_pt / units_per_em;
+  let mut cursor_x = placement.start_x;
+  let glyph_scale = placement.font_size_pt / units_per_em;
   for glyph in glyphs {
     let mut outline = TtfGlyphOutline::default();
     let Ok(glyph_id) = u16::try_from(glyph.glyph_id.to_u32()) else {
-      cursor_x += glyph.x_advance * font_size_pt * horizontal_scale;
+      cursor_x += glyph.x_advance * placement.font_size_pt * placement.horizontal_scale;
       continue;
     };
     if face
       .outline_glyph(ttf_parser::GlyphId(glyph_id), &mut outline)
       .is_none()
     {
-      cursor_x += glyph.x_advance * font_size_pt * horizontal_scale;
+      cursor_x += glyph.x_advance * placement.font_size_pt * placement.horizontal_scale;
       continue;
     }
-    let origin_x = cursor_x + glyph.x_offset * font_size_pt * horizontal_scale;
-    let origin_y = baseline_y - glyph.y_offset * font_size_pt;
+    let origin_x = cursor_x + glyph.x_offset * placement.font_size_pt * placement.horizontal_scale;
+    let origin_y = placement.baseline_y - glyph.y_offset * placement.font_size_pt;
     let elements = outline.path.into_elements().into_iter().map(|element| {
       let point = |point: kurbo::Point| {
         // LibreOffice's PDF writer uses a 1/3 horizontal shear for an
@@ -3681,7 +3687,8 @@ fn draw_warped_glyphs(
           point.x
         };
         kurbo::Point::new(
-          f64::from(origin_x) + synthetic_italic_x * f64::from(glyph_scale * horizontal_scale),
+          f64::from(origin_x)
+            + synthetic_italic_x * f64::from(glyph_scale * placement.horizontal_scale),
           f64::from(origin_y) - point.y * f64::from(glyph_scale),
         )
       };
@@ -3713,7 +3720,7 @@ fn draw_warped_glyphs(
     if let Some(path) = path.finish() {
       surface.draw_path(&path);
     }
-    cursor_x += glyph.x_advance * font_size_pt * horizontal_scale;
+    cursor_x += glyph.x_advance * placement.font_size_pt * placement.horizontal_scale;
   }
   true
 }

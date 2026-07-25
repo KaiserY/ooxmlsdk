@@ -6,7 +6,36 @@
     },
     {
       "ClassName": "WebExtension",
-      "HaveXmlnsFields": true
+      "HaveXmlnsFields": true,
+      "Attributes": [
+        {
+          "QName": ":id",
+          "PropertyName": "Id",
+          "Optional": true
+        },
+        {
+          "QName": "r:id",
+          "PropertyName": "RelationshipId",
+          "PropertyComments": "Relationship to the WebExtensionPart when embedded in DrawingML graphic data.",
+          "Version": "Office2013",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ],
+      "Children": [
+        {
+          "PropertyName": "WebExtensionStoreReference",
+          "Optional": true
+        },
+        {
+          "PropertyName": "WebExtensionPropertyBag",
+          "Optional": true
+        },
+        {
+          "PropertyName": "WebExtensionBindingList",
+          "Optional": true
+        }
+      ]
     }
   ]
 }

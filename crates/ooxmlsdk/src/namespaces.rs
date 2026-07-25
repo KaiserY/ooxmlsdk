@@ -587,3 +587,493 @@ impl Default for XmlKnownNamespace {
     Self::A
   }
 }
+#[cfg(feature = "mce")]
+pub(crate) fn minimum_version_by_uri(uri: &[u8]) -> Option<crate::sdk::FileFormatVersion> {
+  match uri {
+    b"http://schemas.openxmlformats.org/drawingml/2006/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2010/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2012/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2014/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2016/11/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2018/animation/model3d" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2018/animation" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.openxmlformats.org/officeDocument/2006/characteristics" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2020/classificationShape" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2017/decorative" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2018/hyperlinkcolor" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2022/imageformula" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2016/ink" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2021/livefeed" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2017/model3d" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2021/oembed" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2018/sketchyshapes" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2021/scriptlink" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2016/SVG/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/2006/activeX" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/officeDocument/2006/bibliography" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/drawingml/2006/chart" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2007/8/2/chart" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2012/chart" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2014/chart" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2014/chart/ac" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2017/03/chart" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/2006/customDocumentInformationPanel" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/drawingml/2006/chartDrawing" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2010/chartDrawing" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/2020/mipLabelMetadata" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2010/compatibility" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.openxmlformats.org/drawingml/2006/compatibility" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/package/2006/metadata/core-properties" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/2006/coverPageProps" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/comments/2020/reactions" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2012/chartStyle" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/2006/metadata/contentType" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2014/chartex" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://purl.org/dc/elements/1.1/" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://purl.org/dc/terms/" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://schemas.openxmlformats.org/drawingml/2006/diagram" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2010/diagram" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2016/11/diagram" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2016/12/diagram" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.openxmlformats.org/officeDocument/2006/customXml" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2008/diagram" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://www.w3.org/2003/04/emma" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://www.w3.org/2003/InkML" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://schemas.openxmlformats.org/drawingml/2006/lockedCanvas" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/2006/metadata/longProperties" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/officeDocument/2006/math" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/2006/metadata/properties/metaAttributes" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/markup-compatibility/2006" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/office/2011/9/metroDictionary" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/ink/2010/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/2006/01/customui" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/2009/07/customui" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/2006/metadata/customXsn" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"urn:schemas-microsoft-com:office:office" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://schemas.microsoft.com/office/drawing/2013/main/command" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/2019/extlst" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/presentationml/2006/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2010/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2012/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2015/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2017/10/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2017/3/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2018/4/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2018/8/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2019/12/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2020/02/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2021/06/main" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2022/03/main" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2022/08/main" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2023/02/main" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2012/roamingSettings" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/internal/2007/ofapi/packaging" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/2007/6/19/audiovideo" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2013/main/command" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2019/9/main/command" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/powerpoint/2022/06/main/command" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.openxmlformats.org/package/2006/content-types" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/drawingml/2006/picture" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2010/picture" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/projectml/2012/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"urn:schemas-microsoft-com:office:powerpoint" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/officeDocument/2006/relationships" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/schemaLibrary/2006/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2010/slicer" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/tasks/2019/documenttasks" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/thememl/2012/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2012/timeslicer" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"urn:schemas-microsoft-com:vml" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/wordprocessingml/2006/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"urn:schemas-microsoft-com:office:word" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://schemas.microsoft.com/office/word/2010/wordml" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/word/2012/wordml" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/word/2018/wordml/cex" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/word/2016/wordml/cid" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/word/2018/wordml" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/word/2023/wordml/word16du" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/word/2024/wordml/sdtformatlock" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/word/2015/wordml/symex" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/webextensions/webextension/2010/11" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/webextensions/taskpanes/2010/11" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/word/2006/wordml" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/word/2020/oembed" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/word/2012/wordprocessingDrawing" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/word/2010/wordprocessingShape" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.openxmlformats.org/spreadsheetml/2006/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2011/1/ac" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2010/11/ac" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2014/11/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2015/02/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2018/08/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2018/calcfeatures" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2017/dynamicarray" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/excel/2010/spreadsheetDrawing" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2022/featurepropertybag" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2016/01/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2023/externalCodeService" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2025/externalCodeService2" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2023/msForms" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2024/pivotAutoRefresh" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2023/pivot2023Calculation" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2024/pivotDynamicArrays" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2025/pivotDataSource" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2017/richdata" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2020/richdatawebimage" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2020/richvaluerefresh" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2022/richvaluerel" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2020/threadedcomments2" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2024/workbookCompatibilityVersion" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://www.w3.org/XML/1998/namespace" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://schemas.microsoft.com/office/excel/2006/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2016/pivotdefaultlayout" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2022/pivotRichData" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2014/revision" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2016/revision10" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2017/revision16" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2015/revision2" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2016/revision3" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2016/revision5" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2016/revision6" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2016/revision9" => {
+      Some(crate::sdk::FileFormatVersion::Office2019)
+    }
+    b"http://www.w3.org/2001/XMLSchema" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"urn:schemas-microsoft-com:office:excel" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://schemas.microsoft.com/office/spreadsheetml/2023/dataSourceVersioning" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2021/extlinks2021" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2019/extlinksprops" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2020/pivotNov2020" => {
+      Some(crate::sdk::FileFormatVersion::Office2021)
+    }
+    b"http://schemas.microsoft.com/office/spreadsheetml/2022/pivotVersionInfo" => {
+      Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    _ => None,
+  }
+}

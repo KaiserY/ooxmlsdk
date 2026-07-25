@@ -41,16 +41,16 @@ impl GraphicalObjectFrameContext {
     };
     let record = graphic_data_record(graphic_data, kind, slide_persist);
     shape.set_graphic_data_record(record);
-    if kind == GraphicDataKind::Ole && shape.picture.is_none() {
-      if let Some(picture) = ole_preview_picture(graphic_data)
-        && let Some(preview) = picture_record(picture, slide_persist)
-      {
-        shape.picture = Some(preview);
-        // The fallback p:pic is the complete static representation, not just
-        // an image relationship. Its outline/fill/effects are visible in
-        // Office fixed output (for example an OLE preview selection border).
-        crate::pptx::shape_group_context::apply_shape_properties(shape, &picture.shape_properties);
-      }
+    if kind == GraphicDataKind::Ole
+      && shape.picture.is_none()
+      && let Some(picture) = ole_preview_picture(graphic_data)
+      && let Some(preview) = picture_record(picture, slide_persist)
+    {
+      shape.picture = Some(preview);
+      // The fallback p:pic is the complete static representation, not just
+      // an image relationship. Its outline/fill/effects are visible in
+      // Office fixed output (for example an OLE preview selection border).
+      crate::pptx::shape_group_context::apply_shape_properties(shape, &picture.shape_properties);
     }
     match kind {
       GraphicDataKind::Ole => shape.set_ole_object_type(),

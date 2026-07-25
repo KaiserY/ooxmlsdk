@@ -28,7 +28,6 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_drawingml_2006_main as a,
   schemas_openxmlformats_org_drawingml_2006_picture as pic,
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
-  schemas_openxmlformats_org_markup_compatibility_2006 as mc,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w, www_w3_org_xml_1998_namespace as xml,
 };
 use ooxmlsdk::sdk::SdkType;
@@ -3906,20 +3905,7 @@ fn paragraph_inlines(
         None,
         &mut inline_context,
       ),
-      w::ParagraphChoice::AlternateContent(alternate_content) => {
-        push_alternate_content_inlines(
-          alternate_content,
-          &mut inlines,
-          AlternateContentImportContext {
-            base_style: base_style.clone(),
-            style: base_style.clone(),
-            styles,
-            images,
-            hyperlinks,
-            hyperlink_url: None,
-          },
-        );
-      }
+      w::ParagraphChoice::AlternateContent(_) => {}
       w::ParagraphChoice::Break(br) => {
         let run = w::Run {
           run_choice: vec![w::RunChoice::Break(br.clone())],
@@ -5014,27 +5000,7 @@ fn push_run(
         }
       }
       w::RunChoice::PositionalTab(_) => text.push('\t'),
-      w::RunChoice::AlternateContent(alternate_content) => {
-        flush_run_text(
-          inlines,
-          &mut text,
-          style.clone(),
-          hyperlink_url,
-          &style_ref_keys,
-        );
-        push_alternate_content_inlines(
-          alternate_content,
-          inlines,
-          AlternateContentImportContext {
-            base_style: base_style.clone(),
-            style: style.clone(),
-            styles,
-            images,
-            hyperlinks,
-            hyperlink_url: hyperlink_url.map(str::to_owned),
-          },
-        );
-      }
+      w::RunChoice::AlternateContent(_) => {}
       w::RunChoice::Ruby(ruby) => {
         flush_run_text(
           inlines,
@@ -5079,132 +5045,6 @@ fn push_run(
   }
 
   flush_run_text(inlines, &mut text, style, hyperlink_url, &style_ref_keys);
-}
-
-#[derive(Clone)]
-struct AlternateContentImportContext<'a> {
-  base_style: TextStyle,
-  style: TextStyle,
-  styles: &'a StylesCatalog,
-  images: &'a ImageCatalog,
-  hyperlinks: &'a HyperlinkCatalog,
-  hyperlink_url: Option<String>,
-}
-
-fn push_alternate_content_inlines(
-  alternate_content: &mc::AlternateContent,
-  inlines: &mut Vec<InlineItem>,
-  context: AlternateContentImportContext<'_>,
-) {
-  let fallback =
-    alternate_content
-      .alternate_content_choice
-      .iter()
-      .find_map(|branch| match branch {
-        mc::AlternateContentChoice::Fallback(fallback) => Some(fallback.as_ref()),
-        _ => None,
-      });
-
-  for choice in alternate_content
-    .alternate_content_choice
-    .iter()
-    .filter_map(|branch| match branch {
-      mc::AlternateContentChoice::Choice(choice) => Some(choice.as_ref()),
-      _ => None,
-    })
-  {
-    let mut choice_inlines = Vec::new();
-    for child in &choice.xml_children {
-      push_alternate_content_child(child, &mut choice_inlines, &context, true);
-    }
-    if !choice_inlines.is_empty() {
-      inlines.extend(choice_inlines);
-      return;
-    }
-  }
-
-  if let Some(fallback) = fallback {
-    for child in &fallback.xml_children {
-      push_alternate_content_child(child, inlines, &context, false);
-    }
-  }
-}
-
-fn push_alternate_content_child(
-  xml: &[u8],
-  inlines: &mut Vec<InlineItem>,
-  context: &AlternateContentImportContext<'_>,
-  choice_branch: bool,
-) {
-  let Ok(xml_text) = std::str::from_utf8(xml) else {
-    return;
-  };
-  match root_qname(xml_text) {
-    Some("w:r") => {
-      if let Ok(run) = w::Run::from_bytes(xml) {
-        push_run(
-          &run,
-          inlines,
-          context.base_style.clone(),
-          context.styles,
-          context.images,
-          context.hyperlinks,
-          context.hyperlink_url.as_deref(),
-        );
-      }
-    }
-    Some("w:drawing") => {
-      let Ok(drawing) = w::Drawing::from_bytes(xml) else {
-        return;
-      };
-      if choice_branch
-        && drawing_graphic_data(&drawing).is_some_and(|graphic_data| {
-          graphic_data.uri
-            == "http://schemas.microsoft.com/office/word/2008/6/28/wordprocessingShape"
-        })
-      {
-        return;
-      }
-      if let Some(image) =
-        drawing::inline_image(&drawing, context.styles, context.images, context.hyperlinks)
-      {
-        inlines.push(InlineItem::Image(image));
-      }
-      drawing::push_drawing_shapes(
-        &drawing,
-        inlines,
-        context.styles,
-        context.images,
-        context.hyperlinks,
-      );
-      drawing::push_drawing_textboxes(
-        &drawing,
-        inlines,
-        context.style.clone(),
-        context.styles,
-        context.images,
-        context.hyperlinks,
-      );
-    }
-    Some("w:pict") => {
-      let Ok(picture) = w::Picture::from_bytes(xml) else {
-        return;
-      };
-      if let Some(image) = drawing::pict_image(&picture, context.images) {
-        inlines.push(InlineItem::Image(image));
-      }
-      drawing::push_pict_shapes(&picture, inlines, context.images);
-      drawing::push_pict_textboxes(
-        &picture,
-        inlines,
-        context.base_style.clone(),
-        context.styles,
-        context.images,
-        context.hyperlinks,
-      );
-    }
-    _ => {}
-  }
 }
 
 fn push_hidden_style_ref_run(
@@ -9787,30 +9627,32 @@ fn vml_shape_shape_with_style(
   if let Some(path) = path
     && let Some(geometry) = vml_path_geometry(
       path,
-      shape
-        .coordinate_origin
-        .as_deref()
-        .or_else(|| shape_type.and_then(|shape_type| shape_type.coordinate_origin.as_deref())),
-      shape
-        .coordinate_size
-        .as_deref()
-        .or_else(|| shape_type.and_then(|shape_type| shape_type.coordinate_size.as_deref())),
-      inline.width_pt,
-      inline.height_pt,
-      shape
-        .adjustment
-        .as_deref()
-        .or_else(|| shape_type.and_then(|shape_type| shape_type.adjustment.as_deref())),
-      vml_shape_formulas(shape).or_else(|| shape_type.and_then(vml_shapetype_formulas)),
-      path_properties
-        .and_then(|path| path.allow_fill)
-        .is_none_or(|value| value.as_bool()),
-      path_properties
-        .and_then(|path| path.allow_stroke)
-        .is_none_or(|value| value.as_bool()),
-      path_properties
-        .and_then(|path| path.allow_extrusion)
-        .is_none_or(|value| value.as_bool()),
+      VmlPathGeometryOptions {
+        coordinate_origin: shape
+          .coordinate_origin
+          .as_deref()
+          .or_else(|| shape_type.and_then(|shape_type| shape_type.coordinate_origin.as_deref())),
+        coordinate_size: shape
+          .coordinate_size
+          .as_deref()
+          .or_else(|| shape_type.and_then(|shape_type| shape_type.coordinate_size.as_deref())),
+        width_pt: inline.width_pt,
+        height_pt: inline.height_pt,
+        adjustment: shape
+          .adjustment
+          .as_deref()
+          .or_else(|| shape_type.and_then(|shape_type| shape_type.adjustment.as_deref())),
+        formulas: vml_shape_formulas(shape).or_else(|| shape_type.and_then(vml_shapetype_formulas)),
+        allow_fill: path_properties
+          .and_then(|path| path.allow_fill)
+          .is_none_or(|value| value.as_bool()),
+        allow_stroke: path_properties
+          .and_then(|path| path.allow_stroke)
+          .is_none_or(|value| value.as_bool()),
+        allow_extrusion: path_properties
+          .and_then(|path| path.allow_extrusion)
+          .is_none_or(|value| value.as_bool()),
+      },
     )
   {
     inline.geometry = geometry;
@@ -9946,7 +9788,7 @@ fn vml_fontwork_text_path<'a>(
     })
     .filter(|path| path.on.is_none_or(|value| value.as_bool()))?;
   let shape_type_number = shape_type
-    .and_then(|shape_type| shape_type.optional_number.map(i32::from))
+    .and_then(|shape_type| shape_type.optional_number)
     .or_else(|| {
       shape
         .r#type
@@ -10071,29 +9913,36 @@ enum VmlFormulaValue {
   Formula(usize),
 }
 
-fn vml_path_geometry(
-  source: &str,
-  coordinate_origin: Option<&str>,
-  coordinate_size: Option<&str>,
+struct VmlPathGeometryOptions<'a> {
+  coordinate_origin: Option<&'a str>,
+  coordinate_size: Option<&'a str>,
   width_pt: f32,
   height_pt: f32,
-  adjustment: Option<&str>,
-  formulas: Option<&v::Formulas>,
+  adjustment: Option<&'a str>,
+  formulas: Option<&'a v::Formulas>,
   allow_fill: bool,
   allow_stroke: bool,
   allow_extrusion: bool,
+}
+
+fn vml_path_geometry(
+  source: &str,
+  options: VmlPathGeometryOptions<'_>,
 ) -> Option<InlineShapeGeometry> {
   let tokens = vml_path_tokens(source)?;
-  let (origin_x, origin_y) = coordinate_origin
+  let (origin_x, origin_y) = options
+    .coordinate_origin
     .and_then(vml_path_coordinate_pair)
     .unwrap_or((0.0, 0.0));
-  let (coordinate_width, coordinate_height) = coordinate_size
+  let (coordinate_width, coordinate_height) = options
+    .coordinate_size
     .and_then(vml_path_coordinate_pair)
     .unwrap_or((21_600.0, 21_600.0));
   if coordinate_width.abs() <= f32::EPSILON || coordinate_height.abs() <= f32::EPSILON {
     return None;
   }
-  let adjustments = adjustment
+  let adjustments = options
+    .adjustment
     .into_iter()
     .flat_map(|values| values.split([',', ' ']))
     .filter(|value| !value.is_empty())
@@ -10101,7 +9950,7 @@ fn vml_path_geometry(
     .collect::<std::result::Result<Vec<_>, _>>()
     .ok()?;
   let formula_values = vml_formula_values(
-    formulas,
+    options.formulas,
     &adjustments,
     f64::from(coordinate_width),
     f64::from(coordinate_height),
@@ -10114,8 +9963,8 @@ fn vml_path_geometry(
     } as f32)
   };
   let map = |x: f32, y: f32| common::Point {
-    x: common::Pt((x - origin_x) * width_pt / coordinate_width),
-    y: common::Pt((y - origin_y) * height_pt / coordinate_height),
+    x: common::Pt((x - origin_x) * options.width_pt / coordinate_width),
+    y: common::Pt((y - origin_y) * options.height_pt / coordinate_height),
   };
   let mut paths = Vec::new();
   let mut commands = Vec::new();
@@ -10310,9 +10159,9 @@ fn vml_path_geometry(
         push_vml_drawing_path(
           &mut paths,
           &mut commands,
-          fill && allow_fill,
-          stroke && allow_stroke,
-          allow_extrusion,
+          fill && options.allow_fill,
+          stroke && options.allow_stroke,
+          options.allow_extrusion,
         );
         fill = true;
         stroke = true;
@@ -10325,9 +10174,9 @@ fn vml_path_geometry(
   push_vml_drawing_path(
     &mut paths,
     &mut commands,
-    fill && allow_fill,
-    stroke && allow_stroke,
-    allow_extrusion,
+    fill && options.allow_fill,
+    stroke && options.allow_stroke,
+    options.allow_extrusion,
   );
   if paths.is_empty() {
     return None;
@@ -15913,15 +15762,17 @@ mod tests {
       "m10800,0qx0,10800,10800,21600,21600,10800,10800,0xe\
        m7340,6445qx6215,7570,7340,8695,8465,7570,7340,6445xnfe\
        m4960@0c8853@3,12747@3,16640@0nfe",
-      Some("0,0"),
-      Some("21600,21600"),
-      216.0,
-      216.0,
-      Some("17520"),
-      Some(&formulas),
-      true,
-      true,
-      false,
+      VmlPathGeometryOptions {
+        coordinate_origin: Some("0,0"),
+        coordinate_size: Some("21600,21600"),
+        width_pt: 216.0,
+        height_pt: 216.0,
+        adjustment: Some("17520"),
+        formulas: Some(&formulas),
+        allow_fill: true,
+        allow_stroke: true,
+        allow_extrusion: false,
+      },
     )
     .expect("formula-backed VML path");
     let InlineShapeGeometry::Path { paths, .. } = geometry else {
@@ -15948,15 +15799,17 @@ mod tests {
     let geometry = vml_path_geometry(
       "m0,50wa0,0,100,100,0,50,100,50e\
        m100,50at0,0,100,100,100,50,0,50e",
-      Some("0,0"),
-      Some("100,100"),
-      100.0,
-      100.0,
-      None,
-      None,
-      true,
-      true,
-      false,
+      VmlPathGeometryOptions {
+        coordinate_origin: Some("0,0"),
+        coordinate_size: Some("100,100"),
+        width_pt: 100.0,
+        height_pt: 100.0,
+        adjustment: None,
+        formulas: None,
+        allow_fill: true,
+        allow_stroke: true,
+        allow_extrusion: false,
+      },
     )
     .expect("VML arc paths");
     let InlineShapeGeometry::Path { paths, .. } = geometry else {
@@ -16697,32 +16550,6 @@ mod tests {
   }
 
   #[test]
-  fn alternate_content_drawing_imports_choice_shape() {
-    let xml = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><mc:Choice Requires="wps"><w:drawing><wp:anchor behindDoc="1" distT="0" distB="0" distL="114300" distR="114300" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>1080135</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>1260475</wp:posOffset></wp:positionV><wp:extent cx="5760720" cy="0"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="1" name="Freeform 2"/><a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr/><wps:spPr><a:custGeom><a:pathLst><a:path w="8504" h="0"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="8504" y="0"/></a:lnTo></a:path></a:pathLst></a:custGeom><a:noFill/><a:ln w="6480"><a:solidFill><a:srgbClr val="ff0101"/></a:solidFill></a:ln></wps:spPr><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></mc:Choice><mc:Fallback><w:pict/></mc:Fallback></mc:AlternateContent>"#;
-    let alternate_content = mc::AlternateContent::from_bytes(xml.as_bytes()).expect("MCE");
-    let mut inlines = Vec::new();
-    let styles = StylesCatalog::default();
-    let images = ImageCatalog::default();
-    let hyperlinks = HyperlinkCatalog::default();
-    push_alternate_content_inlines(
-      &alternate_content,
-      &mut inlines,
-      AlternateContentImportContext {
-        base_style: TextStyle::default(),
-        style: TextStyle::default(),
-        styles: &styles,
-        images: &images,
-        hyperlinks: &hyperlinks,
-        hyperlink_url: None,
-      },
-    );
-
-    assert!(inlines
-      .iter()
-      .any(|inline| matches!(inline, InlineItem::Shape(shape) if shape.geometry == InlineShapeGeometry::Line)));
-  }
-
-  #[test]
   fn symbol_runs_preserve_declared_symbol_font_transport_codes() {
     let mut inlines = Vec::new();
     let run = w::Run {
@@ -16830,37 +16657,6 @@ mod tests {
     };
     let ImagePlacement::Floating(placement) = shape.placement else {
       panic!("expected floating WPS textbox");
-    };
-    assert!((placement.vertical_offset_pt - 16.1).abs() < 0.001);
-    assert!((shape.offset_y_pt - 0.0).abs() < 0.001);
-    assert!((shape.text_inset_top_pt - 0.0).abs() < 0.001);
-
-    let alternate_content = mc::AlternateContent::from_bytes(
-      format!(
-        r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="wps">{}</mc:Choice></mc:AlternateContent>"#,
-        std::str::from_utf8(drawing_xml).expect("drawing XML")
-      )
-      .as_bytes(),
-    )
-    .expect("alternate content");
-    let mut inlines = Vec::new();
-    push_alternate_content_inlines(
-      &alternate_content,
-      &mut inlines,
-      AlternateContentImportContext {
-        base_style: TextStyle::default(),
-        style: TextStyle::default(),
-        styles: &StylesCatalog::default(),
-        images: &ImageCatalog::default(),
-        hyperlinks: &HyperlinkCatalog::default(),
-        hyperlink_url: None,
-      },
-    );
-    let InlineItem::Shape(shape) = &inlines[0] else {
-      panic!("expected alternate-content WPS textbox shape");
-    };
-    let ImagePlacement::Floating(placement) = shape.placement else {
-      panic!("expected alternate-content floating WPS textbox");
     };
     assert!((placement.vertical_offset_pt - 16.1).abs() < 0.001);
     assert!((shape.offset_y_pt - 0.0).abs() < 0.001);

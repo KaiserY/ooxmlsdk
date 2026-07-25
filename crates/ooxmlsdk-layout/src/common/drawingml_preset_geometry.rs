@@ -108,8 +108,8 @@ mod tests {
     });
     let commands = path_commands(Some(&preset), 0.0, 0.0, 100.0, 100.0);
     assert_eq!(
-      commands.first(),
-      Some(&PathCommand::MoveTo(crate::common::Point {
+      commands.get(1),
+      Some(&PathCommand::LineTo(crate::common::Point {
         x: crate::common::Pt(0.0),
         y: crate::common::Pt(0.0),
       }))

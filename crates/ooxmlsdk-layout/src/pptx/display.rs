@@ -62,7 +62,7 @@ use super::drawingml::text_list_style::{
 };
 use super::import::{PowerPointImport, ThemeFragmentRecord};
 use super::shadow::{
-  ShadowFrame, glow_image_item, inner_shadow_image_item, outer_shadow_image_item,
+  ShadowFrame, ShadowShape, glow_image_item, inner_shadow_image_item, outer_shadow_image_item,
   reflection_mask_image_item, shadow_alignment, soft_edge_mask_image_item,
 };
 use super::slide::{BackgroundKind, ChartResource, ImageResource, SlidePersist};
@@ -72,6 +72,7 @@ use super::{
 };
 
 const DEFAULT_TEXT_FONT_SIZE_PT: f32 = 18.0;
+const MINIMUM_TEXT_FONT_SIZE_PT: f32 = 1.0;
 const DEFAULT_TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
 const DEFAULT_TABLE_BORDER_PT: f32 = 0.75;
 // Microsoft Office fixed-output evidence:
@@ -2023,11 +2024,13 @@ fn lower_diagram(
       stroke_opacity: 1.0,
     }));
   }
+  let colors = diagram_style_colors(context.import, context.slide, record);
   if let Some(drawing) = diagram_drawing_resource(context.slide, &data_resource.model)
     && lower_diagram_drawing(
       context,
       drawing,
       &data_resource.model,
+      colors.as_ref(),
       TextFrame {
         x_pt,
         y_pt,
@@ -2042,7 +2045,6 @@ fn lower_diagram(
   }
   let fill = layout_rgb_color(diagram_accent_fill(context.import, context.slide));
   let styles = diagram_styles(record);
-  let colors = diagram_style_colors(context.import, context.slide, record);
   let shapes = shared_diagram::layout_shapes(
     &data_resource.model,
     record
@@ -2147,17 +2149,7 @@ fn lower_diagram(
       }
     }
     if !diagram_shape.text_body.is_empty() {
-      let mut text_body = diagram_text_body(&diagram_shape.text_body);
-      if diagram_shape.text_rotation_deg != 0.0 {
-        let rotation = (diagram_shape.text_rotation_deg * 60_000.0).round() as i32;
-        text_body.display_properties.text_area_rotation = Some(
-          text_body
-            .display_properties
-            .text_area_rotation
-            .unwrap_or_default()
-            + rotation,
-        );
-      }
+      let text_body = diagram_text_body(&diagram_shape.text_body);
       let text_bounds = diagram_model_shape_text_rectangle(&diagram_shape).unwrap_or(
         shared_diagram::DiagramBounds {
           x: diagram_shape.x,
@@ -2225,6 +2217,7 @@ fn lower_diagram(
         sync_auto_fit,
         font_scale,
         line_scale,
+        shape_rotation_deg: diagram_shape.text_rotation_deg,
       });
     }
   }
@@ -2248,6 +2241,7 @@ fn lower_diagram(
         font_scale,
         line_scale,
         shape_order: pending.order,
+        shape_rotation_deg: pending.shape_rotation_deg,
       },
       summary.as_deref_mut(),
       &mut text_items,
@@ -2279,6 +2273,7 @@ fn lower_diagram_drawing(
   context: PptxLoweringContext<'_>,
   drawing_resource: &super::slide::DiagramDrawingResource,
   data: &dgm::DataModelRoot,
+  colors: Option<&shared_diagram::DiagramStyleColors>,
   frame: TextFrame,
   items: &mut Vec<PageItem>,
   mut summary: Option<&mut PptxLayoutSummary>,
@@ -2298,11 +2293,13 @@ fn lower_diagram_drawing(
       .as_deref(),
   );
   let text_orders = shared_diagram::presentation_point_list_orders(data);
+  let text_fills = shared_diagram::presentation_point_text_fills(data, colors);
   let drawing_context = DiagramDrawingLoweringContext {
     import: context.import,
     slide: context.slide,
     drawing_resource,
     text_orders: &text_orders,
+    text_fills: &text_fills,
     page_index: context.page_index,
   };
   let mut drawing_items = Vec::new();
@@ -2342,6 +2339,7 @@ struct DiagramDrawingLoweringContext<'a> {
   slide: &'a SlidePersist,
   drawing_resource: &'a super::slide::DiagramDrawingResource,
   text_orders: &'a HashMap<String, usize>,
+  text_fills: &'a HashMap<String, RgbColor>,
   page_index: usize,
 }
 
@@ -2422,6 +2420,15 @@ fn lower_diagram_drawing_shape(
     return;
   };
   let mut text_body = TextBody::from_diagram_drawing(text_body);
+  if diagram_text_body_is_symbol_only(&text_body)
+    && let Some(scene3_d) = shape.shape_properties.scene3_d_type.as_deref()
+  {
+    text_body
+      .body_properties
+      .get_or_insert_with(|| Box::new(a::BodyProperties::default()))
+      .scene3_d_type = Some(Box::new(scene3_d.clone()));
+    text_body.has_body_properties = true;
+  }
   if text_body
     .paragraphs
     .iter()
@@ -2439,31 +2446,12 @@ fn lower_diagram_drawing_shape(
     text_frame.text_area_y_pt,
     text_frame.frame,
   );
-  let shape_rotation = shape
-    .shape_properties
-    .transform2_d
-    .as_deref()
-    .and_then(|transform| transform.rotation)
-    .unwrap_or_default();
-  let text_rotation = shape
-    .transform2_d
-    .as_deref()
-    .and_then(|transform| transform.rotation)
-    .unwrap_or_default();
-  let total_rotation = shape_rotation + text_rotation;
-  if total_rotation != 0 {
-    text_body.display_properties.text_area_rotation = Some(
-      text_body
-        .display_properties
-        .text_area_rotation
-        .unwrap_or_default()
-        - total_rotation,
-    );
-  }
-  let font_reference = shape
-    .shape_style
-    .as_deref()
-    .map(|style| diagram_font_style_reference(&style.font_reference, None));
+  let font_reference = shape.shape_style.as_deref().map(|style| {
+    diagram_font_style_reference(
+      &style.font_reference,
+      context.text_fills.get(shape.model_id.as_str()).copied(),
+    )
+  });
   let mut lowered_text_items = Vec::new();
   lower_text_body_at_with_style(
     context.import,
@@ -2484,6 +2472,10 @@ fn lower_diagram_drawing_shape(
   for item in &mut lowered_text_items {
     if let PageItem::Text(text) = item {
       text.preserve_text_portion = true;
+      if text_frame.rotation_deg.abs() > f32::EPSILON {
+        text.style.rotation_deg += text_frame.rotation_deg;
+        text.rotation_center_pt = text_frame.rotation_center_pt;
+      }
     }
   }
   let order = context
@@ -2516,6 +2508,7 @@ struct DiagramTextLoweringStyle<'a> {
   font_scale: f32,
   line_scale: f32,
   shape_order: usize,
+  shape_rotation_deg: f32,
 }
 
 fn lower_diagram_text_body_at_with_style_and_scale(
@@ -2598,6 +2591,13 @@ fn lower_diagram_text_body_at_with_style_and_scale(
     items.extend(paragraph_items.into_iter().map(|mut item| {
       if let PageItem::Text(text_item) = &mut item {
         text_item.preserve_text_portion = true;
+        if style_inputs.shape_rotation_deg.abs() > f32::EPSILON {
+          text_item.style.rotation_deg += style_inputs.shape_rotation_deg;
+          text_item.rotation_center_pt = Some((
+            frame.x_pt + frame.width_pt / 2.0,
+            frame.y_pt + frame.height_pt / 2.0,
+          ));
+        }
       }
       DiagramDrawingTextItem {
         order: style_inputs.shape_order,
@@ -2618,6 +2618,7 @@ struct PendingDiagramTextItem {
   sync_auto_fit: bool,
   font_scale: f32,
   line_scale: f32,
+  shape_rotation_deg: f32,
 }
 
 #[derive(Clone, Copy)]
@@ -2655,7 +2656,13 @@ fn diagram_text_auto_fit_scales(
   let minimum_scale = minimum_font_size_pt
     .zip(measurement.base_font_size_pt)
     .filter(|(_, base)| *base > f32::EPSILON)
-    .map(|(minimum, base)| minimum / base)
+    .map(|(minimum, base)| minimum.max(MINIMUM_TEXT_FONT_SIZE_PT) / base)
+    .or_else(|| {
+      measurement
+        .base_font_size_pt
+        .filter(|base| *base > f32::EPSILON)
+        .map(|base| MINIMUM_TEXT_FONT_SIZE_PT / base)
+    })
     .unwrap_or(0.0);
   let mut fitted_scale = measurement
     .base_font_size_pt
@@ -2688,9 +2695,11 @@ fn diagram_text_auto_fit_scales(
         break;
       }
       let current_font_size_pt = (base_font_size_pt * fitted_scale).round();
-      let next_font_size_pt = (current_font_size_pt - 1.0)
-        .max(minimum_font_size_pt.unwrap_or_default())
-        .max(0.0);
+      let next_font_size_pt = (current_font_size_pt - 1.0).max(
+        minimum_font_size_pt
+          .unwrap_or(MINIMUM_TEXT_FONT_SIZE_PT)
+          .max(MINIMUM_TEXT_FONT_SIZE_PT),
+      );
       if next_font_size_pt >= current_font_size_pt {
         break;
       }
@@ -2719,6 +2728,7 @@ fn diagram_text_required_size(
       font_scale,
       line_scale,
       shape_order: 0,
+      shape_rotation_deg: 0.0,
     },
     None,
     &mut probe_items,
@@ -2942,6 +2952,25 @@ fn diagram_text_body(source: &shared_diagram::DiagramTextBody) -> TextBody {
       })
       .collect(),
   }
+}
+
+fn diagram_text_body_is_symbol_only(text_body: &TextBody) -> bool {
+  let mut saw_symbol = false;
+  for character in text_body
+    .paragraphs
+    .iter()
+    .flat_map(|paragraph| paragraph.runs.iter())
+    .flat_map(|run| run.text.chars())
+  {
+    if character.is_whitespace() {
+      continue;
+    }
+    if character.is_alphanumeric() || (character as u32) < 0x2000 {
+      return false;
+    }
+    saw_symbol = true;
+  }
+  saw_symbol
 }
 
 fn diagram_model_shape_fill_color(
@@ -3288,8 +3317,7 @@ fn diagram_drawing_text_frame(
       shape_bounds.y,
     );
   };
-  let Some(mut text_bounds) = diagram_text_transform_bounds(text_transform, parent_transform)
-  else {
+  let Some(text_bounds) = diagram_text_transform_bounds(text_transform, parent_transform) else {
     return DiagramDrawingTextFrame::new(
       text_body_frame(
         shape_bounds.x,
@@ -3316,31 +3344,6 @@ fn diagram_drawing_text_frame(
     );
   };
 
-  let shape_rotation = shape
-    .shape_properties
-    .transform2_d
-    .as_deref()
-    .and_then(|transform| transform.rotation)
-    .unwrap_or_default();
-  let text_rotation = text_transform.rotation.unwrap_or_default();
-  let angle_diff = (shape_rotation + text_rotation).rem_euclid(21_600_000);
-  if angle_diff != 0 {
-    let angle = -(angle_diff as f32 / 60_000.0).to_radians();
-    let preset_center_x = preset_bounds.x + preset_bounds.width / 2.0;
-    let preset_center_y = preset_bounds.y + preset_bounds.height / 2.0;
-    let text_center_x = text_bounds.x + text_bounds.width / 2.0;
-    let text_center_y = text_bounds.y + text_bounds.height / 2.0;
-    let (rotated_center_x, rotated_center_y) = rotate_point(
-      text_center_x,
-      text_center_y,
-      preset_center_x,
-      preset_center_y,
-      angle,
-    );
-    text_bounds.x += rotated_center_x - text_center_x;
-    text_bounds.y += rotated_center_y - text_center_y;
-  }
-
   let offsets = TextDistances {
     left: text_bounds.x - preset_bounds.x,
     top: text_bounds.y - preset_bounds.y,
@@ -3363,25 +3366,20 @@ fn diagram_drawing_text_frame(
     preset_bounds.height,
     frame,
   ));
-  let mut frame = frame;
-  let shape_rotation = shape_rotation.rem_euclid(21_600_000);
-  if shape_rotation != 0 {
-    let angle = (shape_rotation as f32 / 60_000.0).to_radians();
-    let (x, y) = rotate_point(
-      frame.x_pt,
-      frame.y_pt,
-      shape_bounds.x + shape_bounds.width / 2.0,
-      shape_bounds.y + shape_bounds.height / 2.0,
-      angle,
-    );
-    frame.x_pt = x;
-    frame.y_pt = y;
-  }
   DiagramDrawingTextFrame {
     frame,
     text_area_x_pt: preset_bounds.x,
     text_area_y_pt: preset_bounds.y,
-    rotation_center_pt: (angle_diff != 0).then_some((frame.x_pt, frame.y_pt)),
+    rotation_center_pt: text_transform.rotation.map(|_| {
+      (
+        text_bounds.x + text_bounds.width / 2.0,
+        text_bounds.y + text_bounds.height / 2.0,
+      )
+    }),
+    rotation_deg: text_transform
+      .rotation
+      .map(|rotation| rotation as f32 / 60_000.0)
+      .unwrap_or_default(),
     text_distances_100mm,
   }
 }
@@ -3392,6 +3390,7 @@ struct DiagramDrawingTextFrame {
   text_area_x_pt: f32,
   text_area_y_pt: f32,
   rotation_center_pt: Option<(f32, f32)>,
+  rotation_deg: f32,
   text_distances_100mm: Option<ShapeTextDistances100mm>,
 }
 
@@ -3402,6 +3401,7 @@ impl DiagramDrawingTextFrame {
       text_area_x_pt,
       text_area_y_pt,
       rotation_center_pt: None,
+      rotation_deg: 0.0,
       text_distances_100mm: Some(text_distances_from_frame(
         text_area_x_pt,
         text_area_y_pt,
@@ -4824,22 +4824,10 @@ fn lower_shape_bounds(
       )?;
       Some((mask, reflection_transform(effect, frame, shape)))
     });
-  let direct_shape_shadow_has_office_scale = shape
-    .effect_properties
-    .as_ref()
-    .and_then(|effects| effects.outer_shadow.as_ref())
-    .is_none_or(|shadow| {
-      shadow.scale_x.unwrap_or(100_000) == 100_000 && shadow.scale_y.unwrap_or(100_000) == 100_000
-    });
-
   if let Some(shadow) = shape
     .actual_effect_properties
     .as_ref()
     .and_then(|effects| effects.outer_shadow.as_ref())
-    // MS-OI29500 §20.1.8.45 applies the 100% scale restriction specifically
-    // when the containing effect list is under this shape's `spPr`; a theme
-    // effect style is not such a direct child.
-    && direct_shape_shadow_has_office_scale
     && let Some(paint) = shadow
       .color
       .as_ref()
@@ -4847,10 +4835,15 @@ fn lower_shape_bounds(
     && let Some(image) = outer_shadow_image_item(
       shadow,
       effect_frame,
-      &shape_path,
+      ShadowShape {
+        path: &shape_path,
+        has_fill: shape_fill.is_some()
+          || has_fill_image
+          || gradient_path.is_some()
+          || fill_overlay.is_some(),
+        stroke_style: common_stroke.as_ref(),
+      },
       outer_shadow_transform(shadow, frame, shape),
-      shape_fill.is_some() || has_fill_image || gradient_path.is_some() || fill_overlay.is_some(),
-      common_stroke.as_ref(),
       paint.color,
       paint.opacity,
     )
@@ -5068,8 +5061,8 @@ fn effect_copy_item(item: &PageItem) -> Option<PageItem> {
     },
     PageItem::LinkArea(_) => return None,
     PageItem::Path(path) => PageItem::Path(path.clone()),
-    PageItem::Rect(rect) => PageItem::Rect(rect.clone()),
-    PageItem::Line(line) => PageItem::Line(line.clone()),
+    PageItem::Rect(rect) => PageItem::Rect(*rect),
+    PageItem::Line(line) => PageItem::Line(*line),
   })
 }
 
@@ -5981,10 +5974,10 @@ fn image_effects_from_blip(
         };
         let from_alpha = ((from.alpha.clamp(0, 100_000) as u32 * 255 + 50_000) / 100_000) as u8;
         let to_alpha = ((to.alpha.clamp(0, 100_000) as u32 * 255 + 50_000) / 100_000) as u8;
-        let use_alpha = change
-          .use_alpha
-          .as_ref()
-          .is_some_and(|value| value.as_bool());
+        // ECMA-376 CT_ColorChangeEffect defaults useA to true. In
+        // particular, Office-authored clrChange effects commonly omit the
+        // attribute while changing an opaque color to transparent.
+        let use_alpha = color_change_uses_alpha(change);
         if from.r != to.r
           || from.g != to.g
           || from.b != to.b
@@ -6079,6 +6072,13 @@ fn resolve_color_from_choice(
 ) -> Option<super::drawingml::color::ResolvedColor> {
   let color = Color::from_color_from_choice(choice)?;
   import.resolve_color_for_slide(slide, &color, None)
+}
+
+fn color_change_uses_alpha(change: &a::ColorChange) -> bool {
+  change
+    .use_alpha
+    .as_ref()
+    .is_none_or(|value| value.as_bool())
 }
 
 fn resolve_color_to_choice(
@@ -7602,6 +7602,12 @@ fn lower_paragraph(
           .first()
           .map(|run| run.style.clone())
           .unwrap_or_else(|| paragraph_base_style.clone());
+        if bullet.auto_number.is_none() && !bullet.font_follows_text {
+          bullet_style.bold = false;
+          bullet_style.italic = false;
+          bullet_style.underline = false;
+          bullet_style.strikethrough = false;
+        }
         if let Some(font) = bullet.font.as_deref() {
           bullet_style.font_family = Some(Arc::from(resolve_theme_font(context.import, font)));
         }
@@ -8000,20 +8006,28 @@ fn styled_text_run(
 }
 
 fn apply_text_scale(style: &mut TextStyle, options: &TextLoweringOptions) {
-  style.font_size_pt = if options.round_font_size_to_pt {
+  style.font_size_pt = scaled_text_font_size_pt(
+    style.font_size_pt,
+    options.font_scale,
+    options.round_font_size_to_pt,
+  );
+  style.character_spacing_pt *= options.font_scale;
+  style.baseline_shift_pt *= options.font_scale;
+}
+
+fn scaled_text_font_size_pt(font_size_pt: f32, font_scale: f32, round_to_pt: bool) -> f32 {
+  let scaled = if round_to_pt {
     // setRoundFontSizeToPt(true) for AUTOFIT; editeng then rounds the
     // unscaled font size and the scaled font size to the nearest point.
-    (style.font_size_pt.round() * options.font_scale).round()
+    (font_size_pt.round() * font_scale).round()
   } else {
-    style.font_size_pt * options.font_scale
+    font_size_pt * font_scale
   };
   // PowerPoint's PDF path lays out type on its 600 dpi print grid. Preserve
   // that device-space quantization before shaping: e.g. 40 pt becomes
   // 333/600 in and 20 pt becomes 167/600 in, matching the emitted Office PDF
   // text matrices without case-specific offsets.
-  style.font_size_pt = units::quantize_points_to_office_print_grid(style.font_size_pt);
-  style.character_spacing_pt *= options.font_scale;
-  style.baseline_shift_pt *= options.font_scale;
+  units::quantize_points_to_office_print_grid(scaled).max(MINIMUM_TEXT_FONT_SIZE_PT)
 }
 
 fn aligned_paragraph_x(
@@ -8382,6 +8396,7 @@ struct BulletDisplay {
   label: Option<String>,
   auto_number: Option<AutoNumberBullet>,
   font: Option<String>,
+  font_follows_text: bool,
   color: Option<Color>,
   picture_relationship_id: Option<String>,
   size: BulletSize,
@@ -9389,8 +9404,14 @@ impl BulletDisplay {
   fn apply_font(&mut self, font: BulletFontOverride) {
     match font {
       BulletFontOverride::Unspecified => {}
-      BulletFontOverride::FollowText => self.font = None,
-      BulletFontOverride::Font(font) => self.font = Some(font),
+      BulletFontOverride::FollowText => {
+        self.font = None;
+        self.font_follows_text = true;
+      }
+      BulletFontOverride::Font(font) => {
+        self.font = Some(font);
+        self.font_follows_text = false;
+      }
     }
   }
 
@@ -10351,6 +10372,15 @@ mod tests {
   use super::*;
 
   #[test]
+  fn drawingml_color_change_defaults_to_using_alpha() {
+    let mut change = a::ColorChange::default();
+
+    assert!(color_change_uses_alpha(&change));
+    change.use_alpha = Some(false.into());
+    assert!(!color_change_uses_alpha(&change));
+  }
+
+  #[test]
   fn metafile_images_enable_a_searchable_text_overlay() {
     assert!(supports_semantic_metafile_text(Some("image/x-emf")));
     assert!(supports_semantic_metafile_text(Some("IMAGE/WMF")));
@@ -10434,6 +10464,12 @@ mod tests {
 
     assert_eq!(automatic_soft_break_empty_line_height(&style, 1.0), 24.0);
     assert_eq!(automatic_soft_break_empty_line_height(&style, 0.8), 19.2);
+  }
+
+  #[test]
+  fn rounded_autofit_never_produces_a_zero_point_font() {
+    assert_eq!(scaled_text_font_size_pt(2.0, 0.1, true), 1.0);
+    assert_eq!(scaled_text_font_size_pt(12.0, 0.5, true), 6.0);
   }
 
   #[test]

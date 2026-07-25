@@ -3824,9 +3824,18 @@ fn category_axis_text_rotation_is_supported(
   properties
     .and_then(|properties| properties.body_properties.rotation)
     // DrawingML chart tick-label rotation is limited to -90..90 degrees.
-    // Office still lays out short axes carrying an out-of-range legacy value,
-    // but suppresses dense label sets whose invalid geometry cannot fit.
-    .is_none_or(|rotation| (-5_400_000..=5_400_000).contains(&rotation) || category_count <= 6)
+    // Normalize legacy values by full revolutions before applying that range:
+    // Office documents in the wild can store, for example, -1000 degrees for
+    // the equivalent visible 80-degree orientation.
+    .is_none_or(|rotation| {
+      let normalized = rotation.rem_euclid(21_600_000);
+      let normalized = if normalized > 10_800_000 {
+        normalized - 21_600_000
+      } else {
+        normalized
+      };
+      (-5_400_000..=5_400_000).contains(&normalized) || category_count <= 6
+    })
 }
 
 fn wrap_chart_label(
@@ -4475,12 +4484,32 @@ fn push_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String, style: Tex
 
 #[cfg(test)]
 mod tests {
-  use super::format_axis_value;
+  use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+
+  use super::{category_axis_text_rotation_is_supported, format_axis_value};
 
   #[test]
   fn axis_values_do_not_expose_binary_float_artifacts() {
     let value_with_binary_artifact = f64::from_bits(4.4_f64.to_bits() + 1);
     assert_eq!(format_axis_value(value_with_binary_artifact, 0.2), "4.4");
     assert_eq!(format_axis_value(6.0, 1.0), "6");
+  }
+
+  #[test]
+  fn category_axis_rotation_normalizes_full_revolutions() {
+    let properties = a::BodyProperties {
+      rotation: Some(-60_000_000),
+      ..Default::default()
+    };
+    let text_properties =
+      ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart::TextProperties {
+        body_properties: Box::new(properties),
+        ..Default::default()
+      };
+
+    assert!(category_axis_text_rotation_is_supported(
+      Some(&text_properties),
+      8
+    ));
   }
 }

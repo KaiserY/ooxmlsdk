@@ -1428,10 +1428,17 @@ fn resolved_data_labels<'a>(
     settings.show_bubble_size = false;
   }
   let percentage_total = values.iter().flatten().sum::<f64>();
-  let whole_percentages = (series_labels
-    .or(chart_group_labels)
-    .and_then(data_labels_format_code)
-    .is_none()
+  let percentage_values_are_valid = values
+    .iter()
+    .flatten()
+    .all(|value| value.is_finite() && *value >= 0.0);
+  let whole_percentages = (settings.show_percent
+    && defaults.supports_percent
+    && percentage_values_are_valid
+    && series_labels
+      .or(chart_group_labels)
+      .and_then(data_labels_format_code)
+      .is_none()
     && percentage_total > f64::EPSILON)
     .then(|| largest_remainder_percentages(values, percentage_total));
 
@@ -1770,15 +1777,24 @@ fn compose_clustered_column_data_label<'a>(
 }
 
 fn largest_remainder_percentages(values: &[Option<f64>], total: f64) -> Vec<f64> {
+  if !total.is_finite()
+    || total <= f64::EPSILON
+    || values
+      .iter()
+      .flatten()
+      .any(|value| !value.is_finite() || *value < 0.0)
+  {
+    return vec![0.0; values.len()];
+  }
   let mut percentages = values
     .iter()
     .map(|value| value.map(|value| value / total * 100.0).unwrap_or(0.0))
     .collect::<Vec<_>>();
-  let mut remaining = 100_i32
+  let mut remaining = 100_i64
     - percentages
       .iter()
-      .map(|value| value.floor() as i32)
-      .sum::<i32>();
+      .map(|value| value.floor() as i64)
+      .sum::<i64>();
   let mut order = (0..percentages.len()).collect::<Vec<_>>();
   order.sort_by(|left, right| {
     percentages[*right]
@@ -1789,7 +1805,7 @@ fn largest_remainder_percentages(values: &[Option<f64>], total: f64) -> Vec<f64>
   for index in order {
     let floor = percentages[index].floor();
     percentages[index] = floor + f64::from(remaining > 0);
-    remaining -= i32::from(remaining > 0);
+    remaining -= i64::from(remaining > 0);
   }
   percentages
 }
@@ -4219,8 +4235,8 @@ mod tests {
     ChartTitleText, automatic_chart_title, automatic_series_title, chart_title_text,
     clustered_column_chart, clustered_column_slot, fixed_output_latin_font_family,
     fixed_output_texts_for_ui_language, format_chart_number,
-    has_indexed_scatter_multicomponent_data_labels, linear_axis_scale,
-    ordinary_clustered_column_chart, pie_chart_model,
+    has_indexed_scatter_multicomponent_data_labels, largest_remainder_percentages,
+    linear_axis_scale, ordinary_clustered_column_chart, pie_chart_model,
   };
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
   use ooxmlsdk::sdk::SdkType;
@@ -4244,6 +4260,18 @@ mod tests {
     assert_eq!(format_chart_number(30.8, None), "30.8");
     assert_eq!(format_chart_number(66.79, Some("General")), "66.79");
     assert_eq!(format_chart_number(2.0e-9, Some("0.0E+00")), "2.0E-09");
+  }
+
+  #[test]
+  fn largest_remainder_percentages_rejects_mixed_sign_and_invalid_totals() {
+    assert_eq!(
+      largest_remainder_percentages(&[Some(1.0), Some(-1.0)], f64::EPSILON * 2.0),
+      vec![0.0, 0.0]
+    );
+    assert_eq!(
+      largest_remainder_percentages(&[Some(1.0), Some(2.0)], f64::INFINITY),
+      vec![0.0, 0.0]
+    );
   }
 
   #[test]

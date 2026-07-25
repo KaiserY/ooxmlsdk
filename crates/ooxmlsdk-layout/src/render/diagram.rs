@@ -217,6 +217,21 @@ impl DiagramTextBody {
       })
   }
 
+  fn direct_primary_font_size_pt(&self) -> Option<f32> {
+    self
+      .paragraphs
+      .iter()
+      .flat_map(|paragraph| &paragraph.runs)
+      .filter_map(|run| {
+        run
+          .run_properties
+          .as_ref()
+          .and_then(|properties| properties.font_size)
+      })
+      .max()
+      .map(|font_size| font_size as f32 / 100.0)
+  }
+
   fn apply_text_margins(
     &mut self,
     shape_width_pt: f32,
@@ -571,7 +586,8 @@ struct LayoutAlgorithm {
   rotation_path_along_path: bool,
   aspect_ratio: Option<f32>,
   auto_text_rotation: Option<dgm::AutoTextRotationValues>,
-  text_anchor_vertical: dgm::TextAnchorVerticalValues,
+  text_anchor_vertical: Option<dgm::TextAnchorVerticalValues>,
+  vertical_alignment: Option<dgm::TextAnchorVerticalValues>,
   start_bullets_at_level: i32,
   parent_text_left_to_right_alignment: Option<dgm::TextAlignmentValues>,
 }
@@ -624,6 +640,28 @@ pub fn presentation_point_list_orders(data: &dgm::DataModelRoot) -> HashMap<Stri
       data_orders
         .get(connection.source_id.as_str())
         .map(|order| (connection.destination_id.clone(), *order))
+    })
+    .collect()
+}
+
+pub fn presentation_point_text_fills(
+  data: &dgm::DataModelRoot,
+  colors: Option<&DiagramStyleColors>,
+) -> HashMap<String, RgbColor> {
+  let Some(colors) = colors else {
+    return HashMap::new();
+  };
+  diagram_points(data)
+    .into_iter()
+    .filter_map(|point| {
+      let properties = point.property_set.as_deref()?;
+      let label = properties.presentation_style_label.as_deref()?;
+      let fills = colors.text_fill_by_label.get(label)?;
+      let index = properties
+        .presentation_style_index
+        .unwrap_or_default()
+        .max(0) as usize;
+      color_by_index(fills, index).map(|fill| (point.model_id.clone(), fill))
     })
     .collect()
 }
@@ -909,13 +947,21 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
     let Some(points) = self.points_by_presentation_name.get(name) else {
       return;
     };
-    let Some(new_point) = points.get(self.current_index).copied() else {
+    let indexed_point = points.get(self.current_index).copied();
+    let new_point = indexed_point
+      .filter(|point| self.has_connection(self.current_point, point))
+      .or_else(|| {
+        let current_association = presentation_association_id(self.current_point)?;
+        let mut connected = points.iter().copied().filter(|point| {
+          self.has_connection(self.current_point, point)
+            && presentation_association_id(point) == Some(current_association)
+        });
+        let point = connected.next()?;
+        connected.next().is_none().then_some(point)
+      });
+    let Some(new_point) = new_point else {
       return;
     };
-    if !self.has_connection(self.current_point, new_point) {
-      return;
-    }
-
     let previous_point = self.current_point;
     let previous_path = self.parent_path.clone();
     self.current_point = new_point;
@@ -968,6 +1014,26 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       .and_then(|types| types.first())
       .copied()
       .unwrap_or_default();
+    let requested_count = for_each
+      .count
+      .as_ref()
+      .and_then(|counts| counts.first())
+      .map(|count| *count as usize)
+      .unwrap_or_default();
+    let step = for_each
+      .step
+      .as_ref()
+      .and_then(|steps| steps.first())
+      .copied()
+      .unwrap_or(1);
+    let start = for_each
+      .start
+      .as_ref()
+      .and_then(|starts| starts.first())
+      .copied()
+      .unwrap_or(1);
+    let assistant_indices = (point_type == dgm::ElementValues::Assistant)
+      .then(|| self.connected_assistant_template_indices());
     let mut children = 1usize;
     if matches!(
       point_type,
@@ -975,30 +1041,35 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
     ) {
       children = self.shallow_presentation_name_count(&for_each.for_each_choice);
     }
-    let requested_count = for_each
-      .count
+    // LibreOffice's `LayoutAtomVisitorBase::visit(ForEachAtom&)` applies
+    // `st` while selecting data through `presOf`, but intentionally starts
+    // shape-template traversal at index zero. Some built-in layouts (notably
+    // `hList3`) use `st="2"` with a single presentation point named
+    // `pillarX`; applying that start to the presentation-name vector drops
+    // the second data-bound shape entirely.
+    let template_count = if requested_count == 0 {
+      children
+    } else {
+      children.min(requested_count)
+    };
+    let iteration_count = assistant_indices
       .as_ref()
-      .and_then(|counts| counts.first())
-      .map(|count| *count as usize)
-      .unwrap_or_default();
-    let start = for_each
-      .start
-      .as_ref()
-      .and_then(|starts| starts.first())
-      .copied()
-      .unwrap_or(1);
-    let step = for_each
-      .step
-      .as_ref()
-      .and_then(|steps| steps.first())
-      .copied()
-      .unwrap_or(1);
-    let indices = iterator_indices(children, start, requested_count, step);
+      .and_then(|indices| indices.last().copied())
+      .map(|index| index.saturating_add(1))
+      .unwrap_or(template_count);
+    let indices = if let Some(assistant_indices) = assistant_indices {
+      iterator_indices(assistant_indices.len(), start, requested_count, step)
+        .into_iter()
+        .filter_map(|index| assistant_indices.get(index).copied())
+        .collect()
+    } else {
+      iterator_indices(template_count, 1, 0, step)
+    };
     let old_index = self.current_index;
     let old_step = self.current_step;
     let old_count = self.current_count;
     self.current_step = step.unsigned_abs() as usize;
-    self.current_count = children;
+    self.current_count = iteration_count;
     for index in indices {
       self.current_index = index;
       for choice in &for_each.for_each_choice {
@@ -1008,6 +1079,23 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
     self.current_index = old_index;
     self.current_step = old_step;
     self.current_count = old_count;
+  }
+
+  fn connected_assistant_template_indices(&self) -> Vec<usize> {
+    let mut indices = Vec::new();
+    for points in self.points_by_presentation_name.values() {
+      for (index, point) in points.iter().copied().enumerate() {
+        if self.has_connection(self.current_point, point)
+          && associated_data_point(point, self.point_by_id)
+            .is_some_and(|data_point| data_point.r#type == Some(dgm::PointValues::Assistant))
+        {
+          indices.push(index);
+        }
+      }
+    }
+    indices.sort_unstable();
+    indices.dedup();
+    indices
   }
 
   fn visit_for_each_choice(&mut self, choice: &'a dgm::ForEachChoice) {
@@ -1342,7 +1430,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
   fn push_ancestors_on_axis(
     &self,
     selected: &mut Vec<&'a dgm::Point>,
-    point: &dgm::Point,
+    point: &'a dgm::Point,
     point_type: dgm::ElementValues,
     include_self: bool,
   ) {
@@ -2518,8 +2606,13 @@ fn layout_algorithm(algorithm: &dgm::Algorithm) -> LayoutAlgorithm {
       .iter()
       .find(|parameter| parameter.r#type == dgm::ParameterIdValues::TextAnchorVertical)
       .and_then(|parameter| parameter.val.as_deref())
-      .map(text_anchor_vertical_from_value)
-      .unwrap_or(dgm::TextAnchorVerticalValues::Middle),
+      .map(text_anchor_vertical_from_value),
+    vertical_alignment: algorithm
+      .parameter
+      .iter()
+      .find(|parameter| parameter.r#type == dgm::ParameterIdValues::VerticalAlignment)
+      .and_then(|parameter| parameter.val.as_deref())
+      .map(text_anchor_vertical_from_value),
     start_bullets_at_level: algorithm_parameter_f32(
       algorithm,
       dgm::ParameterIdValues::StartBulletsAtLevel,
@@ -2606,7 +2699,7 @@ fn algorithm_parameter_f32(
 
 fn layout_diagram_shape_tree(root: &mut DiagramShapeNode) {
   assign_diagram_font_sync_groups(root, &[]);
-  layout_diagram_shape_node(root, &[], &[]);
+  layout_diagram_shape_node(root, &[], &[], None);
 }
 
 #[derive(Clone)]
@@ -2653,16 +2746,23 @@ fn layout_diagram_shape_node(
   node: &mut DiagramShapeNode,
   inherited_constraints: &[DiagramConstraint],
   inherited_rules: &[DiagramRule],
+  inherited_vertical_alignment: Option<dgm::TextAnchorVerticalValues>,
 ) {
   let mut constraints = inherited_constraints.to_vec();
   constraints.extend(node.constraints.clone());
   let mut rules = inherited_rules.to_vec();
   rules.extend(node.rules.clone());
+  let vertical_alignment = node
+    .algorithms
+    .iter()
+    .rev()
+    .find_map(|algorithm| algorithm.vertical_alignment)
+    .or(inherited_vertical_alignment);
   for algorithm in node.algorithms.clone() {
-    layout_shape_children(node, algorithm, &constraints, &rules);
+    layout_shape_children(node, algorithm, &constraints, &rules, vertical_alignment);
   }
   for child in &mut node.children {
-    layout_diagram_shape_node(child, &constraints, &rules);
+    layout_diagram_shape_node(child, &constraints, &rules, vertical_alignment);
   }
 }
 
@@ -2671,6 +2771,7 @@ fn layout_shape_children(
   algorithm: LayoutAlgorithm,
   constraints: &[DiagramConstraint],
   rules: &[DiagramRule],
+  inherited_vertical_alignment: Option<dgm::TextAnchorVerticalValues>,
 ) {
   node
     .children
@@ -2683,7 +2784,9 @@ fn layout_shape_children(
       hierarchy_layout_tree(node, algorithm)
     }
     dgm::AlgorithmValues::Snake => snake_layout_tree(node, algorithm, constraints),
-    dgm::AlgorithmValues::Text => apply_text_algorithm(node, constraints, rules),
+    dgm::AlgorithmValues::Text => {
+      apply_text_algorithm(node, constraints, rules, inherited_vertical_alignment)
+    }
     dgm::AlgorithmValues::Space => {
       // ECMA-376 §21.4.7.1 assigns `sp` only spacing/no-op layout duties;
       // text layout belongs to `tx`. LibreOffice's DiagramLayoutAtom::layoutShape
@@ -2699,6 +2802,7 @@ fn apply_text_algorithm(
   node: &mut DiagramShapeNode,
   constraints: &[DiagramConstraint],
   rules: &[DiagramRule],
+  inherited_vertical_alignment: Option<dgm::TextAnchorVerticalValues>,
 ) {
   let has_direct_font_size = node.text_body.has_direct_font_size();
   let font_size = constraints
@@ -2730,7 +2834,11 @@ fn apply_text_algorithm(
   node.text_body.apply_text_margins(
     node.width,
     node.height,
-    font_size.or(node.font_size_pt),
+    has_direct_font_size
+      .then(|| node.text_body.direct_primary_font_size_pt())
+      .flatten()
+      .or(font_size)
+      .or(node.font_size_pt),
     constraints,
   );
   node
@@ -2752,8 +2860,8 @@ fn apply_text_algorithm(
       .algorithms
       .iter()
       .rev()
-      .map(|algorithm| algorithm.text_anchor_vertical)
-      .next()
+      .find_map(|algorithm| algorithm.text_anchor_vertical)
+      .or(inherited_vertical_alignment)
       .unwrap_or(dgm::TextAnchorVerticalValues::Middle)
     {
       dgm::TextAnchorVerticalValues::Top => a::TextAnchoringTypeValues::Top,

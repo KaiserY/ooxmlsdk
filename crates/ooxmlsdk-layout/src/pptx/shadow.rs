@@ -38,13 +38,18 @@ pub(crate) struct ShadowFrame {
   pub(crate) stroke_width_pt: f32,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct ShadowShape<'a> {
+  pub(crate) path: &'a [PathCommand],
+  pub(crate) has_fill: bool,
+  pub(crate) stroke_style: Option<&'a crate::common::Stroke<'a>>,
+}
+
 pub(crate) fn outer_shadow_image_item(
   effect: &EffectShadowProperties,
   frame: ShadowFrame,
-  shape_path: &[PathCommand],
+  shape: ShadowShape<'_>,
   transform: crate::common::Transform,
-  has_fill: bool,
-  stroke_style: Option<&crate::common::Stroke<'_>>,
   color: RgbColor,
   opacity: f32,
 ) -> Option<ImageItem> {
@@ -58,7 +63,7 @@ pub(crate) fn outer_shadow_image_item(
       transform.m12 * point.x.0 + transform.m22 * point.y.0 + transform.dy.0,
     )
   };
-  let transformed_elements = mapped_path_elements(shape_path, |point| {
+  let transformed_elements = mapped_path_elements(shape.path, |point| {
     let (x, y) = transform_point(point);
     kurbo::Point::new(f64::from(x), f64::from(y))
   });
@@ -135,13 +140,13 @@ pub(crate) fn outer_shadow_image_item(
   let height_px = (image_height_pt * pixels_per_point).ceil().max(1.0) as u32;
   let mut alpha = vec![0_u8; width_px as usize * height_px as usize];
 
-  let path_filled = has_fill
-    && !shape_path.is_empty()
+  let path_filled = shape.has_fill
+    && !shape.path.is_empty()
     && fill_path_alpha(
       &mut alpha,
       width_px as usize,
       height_px as usize,
-      shape_path,
+      shape.path,
       |point| {
         let (x, y) = transform_point(point);
         (
@@ -150,11 +155,11 @@ pub(crate) fn outer_shadow_image_item(
         )
       },
     );
-  if let Some(stroke_style) = stroke_style
+  if let Some(stroke_style) = shape.stroke_style
     && stroke_style.width.0 > 0.0
-    && !shape_path.is_empty()
+    && !shape.path.is_empty()
   {
-    let source_elements = mapped_path_elements(shape_path, |point| {
+    let source_elements = mapped_path_elements(shape.path, |point| {
       kurbo::Point::new(f64::from(point.x.0), f64::from(point.y.0))
     });
     let outline = stroke(
@@ -187,7 +192,7 @@ pub(crate) fn outer_shadow_image_item(
       outline.iter(),
     );
   }
-  if !path_filled && has_fill && alpha.iter().all(|value| *value == 0) {
+  if !path_filled && shape.has_fill && alpha.iter().all(|value| *value == 0) {
     let left_px = ((transformed_bounds.x0 as f32 - image_x_pt) * pixels_per_point)
       .floor()
       .max(0.0) as u32;
@@ -291,14 +296,17 @@ pub(crate) fn inner_shadow_image_item(
   let pixel_count = width_px as usize * height_px as usize;
   let mut clip_alpha = vec![0_u8; pixel_count];
   let mut shifted_alpha = vec![0_u8; pixel_count];
+  let shape = ShadowShape {
+    path: shape_path,
+    has_fill,
+    stroke_style,
+  };
 
   let shape_rasterized = raster_shape_alpha(
     &mut clip_alpha,
     width_px as usize,
     height_px as usize,
-    shape_path,
-    has_fill,
-    stroke_style,
+    shape,
     pixels_per_point,
     |point| {
       (
@@ -312,9 +320,7 @@ pub(crate) fn inner_shadow_image_item(
       &mut shifted_alpha,
       width_px as usize,
       height_px as usize,
-      shape_path,
-      has_fill,
-      stroke_style,
+      shape,
       pixels_per_point,
       |point| {
         (
@@ -532,8 +538,7 @@ pub(crate) fn reflection_mask_image_item(
 
   let pixels_per_point = (MAX_SHADOW_RASTER_PIXELS / (frame.width_pt * frame.height_pt))
     .sqrt()
-    .min(MAX_SHADOW_PIXELS_PER_POINT)
-    .max(0.25);
+    .clamp(0.25, MAX_SHADOW_PIXELS_PER_POINT);
   let width_px = (frame.width_pt * pixels_per_point).ceil().max(1.0) as u32;
   let height_px = (frame.height_pt * pixels_per_point).ceil().max(1.0) as u32;
   let fade_radians =
@@ -599,23 +604,21 @@ fn raster_shape_alpha(
   alpha: &mut [u8],
   width: usize,
   height: usize,
-  shape_path: &[PathCommand],
-  has_fill: bool,
-  stroke_style: Option<&crate::common::Stroke<'_>>,
+  shape: ShadowShape<'_>,
   coordinate_scale: f32,
   map: impl Fn(Point) -> (f32, f32),
 ) -> bool {
-  if shape_path.is_empty() {
+  if shape.path.is_empty() {
     return false;
   }
-  let path_elements = mapped_path_elements(shape_path, |point| {
+  let path_elements = mapped_path_elements(shape.path, |point| {
     let (x, y) = map(point);
     kurbo::Point::new(f64::from(x), f64::from(y))
   });
-  if has_fill {
+  if shape.has_fill {
     fill_elements_alpha(alpha, width, height, path_elements.iter().copied());
   }
-  if let Some(stroke_style) = stroke_style
+  if let Some(stroke_style) = shape.stroke_style
     && stroke_style.width.0 > 0.0
   {
     let outline = stroke(
@@ -776,9 +779,11 @@ pub(crate) fn glow_image_item(
     &mut alpha,
     width_px as usize,
     height_px as usize,
-    shape_path,
-    has_fill,
-    stroke_style,
+    ShadowShape {
+      path: shape_path,
+      has_fill,
+      stroke_style,
+    },
     pixels_per_point,
     |point| {
       (

@@ -165,6 +165,57 @@ impl PPTShapeGroupContext {
     slide_persist: &mut SlidePersist,
     group: &p::GroupShape,
   ) -> Shape {
+    struct PendingGroup<'a> {
+      source: &'a p::GroupShape,
+      shape: PptShape,
+      next_child: usize,
+    }
+
+    let mut pending = vec![PendingGroup {
+      source: group,
+      shape: self.import_group_shape_shell(slide_persist, group),
+      next_child: 0,
+    }];
+    loop {
+      let frame = pending.last_mut().expect("root group remains pending");
+      if let Some(choice) = frame.source.group_shape_choice.get(frame.next_child) {
+        frame.next_child += 1;
+        if let p::GroupShapeChoice::GroupShape(child) = choice {
+          pending.push(PendingGroup {
+            source: child,
+            shape: self.import_group_shape_shell(slide_persist, child),
+            next_child: 0,
+          });
+        } else if let Some(child) = self.import_group_shape_choice(slide_persist, choice) {
+          pending
+            .last_mut()
+            .expect("current group remains pending")
+            .shape
+            .shape
+            .children
+            .push(child);
+        }
+        continue;
+      }
+
+      let completed = pending
+        .pop()
+        .expect("completed group remains pending")
+        .shape
+        .into_shape(slide_persist);
+      if let Some(parent) = pending.last_mut() {
+        parent.shape.shape.children.push(completed);
+      } else {
+        return completed;
+      }
+    }
+  }
+
+  fn import_group_shape_shell(
+    &mut self,
+    slide_persist: &mut SlidePersist,
+    group: &p::GroupShape,
+  ) -> PptShape {
     let mut shape = PptShape::new(ShapeService::Group, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
@@ -185,12 +236,7 @@ impl PPTShapeGroupContext {
     ) {
       shape.shape.fill_properties = Some(fill);
     }
-    shape.shape.children = group
-      .group_shape_choice
-      .iter()
-      .filter_map(|choice| self.import_group_shape_choice(slide_persist, choice))
-      .collect();
-    shape.into_shape(slide_persist)
+    shape
   }
 
   fn import_graphic_frame(

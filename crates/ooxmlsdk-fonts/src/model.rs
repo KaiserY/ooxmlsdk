@@ -8,7 +8,6 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::Instant;
 
-use fontdb::{Database as FontDatabase, Source as FontDbSource};
 use fontique::{
   Attributes as PlatformFontAttributes, Collection as PlatformFontCollection,
   CollectionOptions as PlatformFontCollectionOptions, FontStyle as PlatformFontStyle,
@@ -33,12 +32,12 @@ use crate::{FontError, Result};
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct FontId(pub Arc<str>);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FontBytes(Arc<[u8]>);
+#[derive(Clone)]
+pub struct FontBytes(Arc<dyn AsRef<[u8]> + Send + Sync>);
 
 impl FontBytes {
   pub fn as_slice(&self) -> &[u8] {
-    &self.0
+    self.0.as_ref().as_ref()
   }
 }
 
@@ -56,35 +55,58 @@ impl Deref for FontBytes {
   }
 }
 
+impl fmt::Debug for FontBytes {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("FontBytes")
+      .field("len", &self.len())
+      .finish_non_exhaustive()
+  }
+}
+
+impl PartialEq for FontBytes {
+  fn eq(&self, other: &Self) -> bool {
+    self.as_slice() == other.as_slice()
+  }
+}
+
+impl Eq for FontBytes {}
+
 impl From<Vec<u8>> for FontBytes {
   fn from(data: Vec<u8>) -> Self {
-    Self(Arc::from(data))
+    Self(Arc::new(data))
   }
 }
 
 impl From<Arc<[u8]>> for FontBytes {
   fn from(data: Arc<[u8]>) -> Self {
+    Self(Arc::new(data))
+  }
+}
+
+impl From<Arc<dyn AsRef<[u8]> + Send + Sync>> for FontBytes {
+  fn from(data: Arc<dyn AsRef<[u8]> + Send + Sync>) -> Self {
     Self(data)
   }
 }
 
 impl From<&'static [u8]> for FontBytes {
   fn from(data: &'static [u8]) -> Self {
-    Self(Arc::from(data))
+    Self(Arc::new(data))
   }
 }
 
 impl<'a> From<Cow<'a, [u8]>> for FontBytes {
   fn from(data: Cow<'a, [u8]>) -> Self {
     match data {
-      Cow::Borrowed(data) => Self(Arc::from(data)),
+      Cow::Borrowed(data) => Self::from(data.to_vec()),
       Cow::Owned(data) => Self::from(data),
     }
   }
 }
 
 struct RuntimeFace {
-  faces: Yoke<RuntimeFaces<'static>, Arc<[u8]>>,
+  faces: Yoke<RuntimeFaces<'static>, Box<FontBytes>>,
   shaper_data: ShaperData,
   glyph_bounds: RwLock<HashMap<u16, Option<GlyphBounds>>>,
   shape_plans: RwLock<HashMap<ShapePlanKey, Arc<ShapePlan>>>,
@@ -133,11 +155,14 @@ struct RuntimeFaces<'a> {
 
 impl RuntimeFace {
   fn new(data: FontBytes, face_index: u32) -> Result<Self> {
-    let faces = Yoke::<RuntimeFaces<'static>, Arc<[u8]>>::try_attach_to_cart(data.0, |slice| {
-      let harf = HarfFontRef::from_index(slice, face_index).map_err(|_| FontError::InvalidFace)?;
-      let ttf = TtfFace::parse(slice, face_index).map_err(|_| FontError::InvalidFace)?;
-      Ok(RuntimeFaces { harf, ttf })
-    })?;
+    let faces =
+      Yoke::<RuntimeFaces<'static>, Box<FontBytes>>::try_attach_to_cart(Box::new(data), |data| {
+        let harf = HarfFontRef::from_index(data.as_slice(), face_index)
+          .map_err(|_| FontError::InvalidFace)?;
+        let ttf =
+          TtfFace::parse(data.as_slice(), face_index).map_err(|_| FontError::InvalidFace)?;
+        Ok(RuntimeFaces { harf, ttf })
+      })?;
     let shaper_data = ShaperData::new(&faces.get().harf);
     Ok(Self {
       faces,
@@ -271,38 +296,41 @@ impl<'a> FontRegistry<'a> {
   }
 
   pub fn register_system_fonts(&mut self) -> Result<usize> {
-    let mut database = FontDatabase::new();
-    database.load_system_fonts();
     let mut registered = 0usize;
-    for info in database.faces() {
-      let Some((data, face_index)) =
-        database.with_face_data(info.id, |data, face_index| (data.to_vec(), face_index))
-      else {
+    for platform_font in platform_system_fonts() {
+      let id = format!(
+        "system:{}:{}",
+        platform_font
+          .face
+          .postscript_name
+          .as_deref()
+          .unwrap_or("unknown"),
+        platform_font.face_index
+      );
+      if self
+        .sources
+        .iter()
+        .any(|source| source.id() == Some(id.as_str()))
+      {
         continue;
-      };
-      let id = format!("system:{}:{}", info.post_script_name, face_index);
-      let face = FontFaceInfo::from_fontdb_face_info(&id, info);
-      let source = match &info.source {
-        FontDbSource::File(path) | FontDbSource::SharedFile(path, _) => FontSource::Path {
+      }
+      let mut face = (*platform_font.face).clone();
+      face.font_id = FontId(Arc::from(id.as_str()));
+      self.register_face(
+        FontSource::Memory {
           id: Cow::Owned(id),
-          path: path.clone(),
-          data: Some(data.into()),
+          data: platform_font.data,
         },
-        FontDbSource::Binary(_) => FontSource::Memory {
-          id: Cow::Owned(id),
-          data: data.into(),
-        },
-      };
-      self.register_face(source, face);
+        face,
+      );
       registered += 1;
     }
     Ok(registered)
   }
 
   pub fn register_system_query_fonts(&mut self, request: &FontRequest<'_>) -> Result<usize> {
-    let database = font_timing("system font database", system_font_database);
     let mut registered = 0usize;
-    let mut queries = SmallVec::<[FontDbQueryFamily; 8]>::new();
+    let mut queries = SmallVec::<[PlatformFontQueryFamily; 8]>::new();
     if let Some(family) = request
       .family
       .as_deref()
@@ -313,63 +341,56 @@ impl<'a> FontRegistry<'a> {
         .map(str::trim)
         .filter(|family| !family.is_empty())
       {
-        queries.push(FontDbQueryFamily::Name(family.to_string()));
+        queries.push(PlatformFontQueryFamily::Name(family.to_string()));
         let aliased = resolve_family_alias(&self.book, Cow::Borrowed(family));
         if aliased.as_ref() != family {
-          queries.push(FontDbQueryFamily::Name(aliased.into_owned()));
+          queries.push(PlatformFontQueryFamily::Name(aliased.into_owned()));
         }
       }
       for family in self.fallback_families(request) {
-        queries.push(FontDbQueryFamily::Name(family.to_owned()));
+        queries.push(PlatformFontQueryFamily::Name(family.to_owned()));
       }
-      queries.push(FontDbQueryFamily::SansSerif);
-      queries.push(FontDbQueryFamily::Serif);
+      queries.push(PlatformFontQueryFamily::SansSerif);
+      queries.push(PlatformFontQueryFamily::Serif);
     } else {
-      // `fontdb` scans platform font sources but does not guarantee that its
-      // CSS generic-family names are configured on every backend. Resolve the
+      // Resolve the
       // Office/script fallback chain by family name before asking for the
       // generic aliases, so an unspecified OOXML typeface still produces a
       // portable, shapeable system face.
       for family in self.fallback_families(request) {
-        queries.push(FontDbQueryFamily::Name(family.to_owned()));
+        queries.push(PlatformFontQueryFamily::Name(family.to_owned()));
       }
-      queries.push(FontDbQueryFamily::SansSerif);
-      queries.push(FontDbQueryFamily::Serif);
+      queries.push(PlatformFontQueryFamily::SansSerif);
+      queries.push(PlatformFontQueryFamily::Serif);
     }
 
     for query_family in queries {
       let platform_fonts = font_timing("platform font query", || {
         platform_system_query_fonts(&query_family, request)
       });
-      let mut platform_matched = false;
       for platform_font in platform_fonts {
-        let Ok(mut face) = FontFaceInfo::from_ttf_bytes(
-          "platform-system-query",
-          &platform_font.data,
-          platform_font.face_index,
-        ) else {
-          continue;
-        };
-        let matched_legacy_postscript_name = if let FontDbQueryFamily::Name(family) = &query_family
-        {
-          let normalized = normalize_family(family);
-          if !family_matches_names(&face, std::slice::from_ref(&normalized))
-            && !face
+        let mut face = (*platform_font.face).clone();
+        let matched_legacy_postscript_name =
+          if let PlatformFontQueryFamily::Name(family) = &query_family {
+            let normalized = normalize_family(family);
+            if !family_matches_names(&face, std::slice::from_ref(&normalized))
+              && !face
+                .postscript_name
+                .as_deref()
+                .is_some_and(|name| normalized_family_eq_normalized(name, &normalized))
+            {
+              continue;
+            }
+            face
               .postscript_name
               .as_deref()
               .is_some_and(|name| normalized_family_eq_normalized(name, &normalized))
-          {
-            continue;
-          }
-          face
-            .postscript_name
-            .as_deref()
-            .is_some_and(|name| normalized_family_eq_normalized(name, &normalized))
-        } else {
-          false
-        };
-        platform_matched = true;
-        if matched_legacy_postscript_name && let FontDbQueryFamily::Name(family) = &query_family {
+          } else {
+            false
+          };
+        if matched_legacy_postscript_name
+          && let PlatformFontQueryFamily::Name(family) = &query_family
+        {
           // Fontique matched this platform family name even when it is a
           // legacy name that is not the face's preferred OpenType family.
           // Preserve that evidence so the Office resolver can still select
@@ -397,7 +418,7 @@ impl<'a> FontRegistry<'a> {
             .iter_mut()
             .find(|existing| existing.font_id.0.as_ref() == font_id)
             && matched_legacy_postscript_name
-            && let FontDbQueryFamily::Name(family) = &query_family
+            && let PlatformFontQueryFamily::Name(family) = &query_family
           {
             push_unique_string(&mut existing.family_names, family.clone());
           }
@@ -407,52 +428,12 @@ impl<'a> FontRegistry<'a> {
         self.register_face(
           FontSource::Memory {
             id: Cow::Owned(font_id),
-            data: platform_font.data.into(),
+            data: platform_font.data,
           },
           face,
         );
         registered += 1;
       }
-      if platform_matched {
-        continue;
-      }
-
-      let Some(id) = font_timing("fontdb query", || query_family.query(database, request)) else {
-        continue;
-      };
-      let Some(info) = database.face(id) else {
-        continue;
-      };
-      let font_id = format!("system-query:{}:{}", info.post_script_name, info.index);
-      if self
-        .sources
-        .iter()
-        .any(|source| source.id() == Some(font_id.as_str()))
-      {
-        continue;
-      }
-      let Some(system_font) = font_timing("system query font", || {
-        cached_system_query_font(database, id, info, &font_id)
-      }) else {
-        continue;
-      };
-      let Some(data) = font_timing("fontdb face data", || cached_system_font_data(database, id))
-      else {
-        continue;
-      };
-      let source = match &info.source {
-        FontDbSource::File(path) | FontDbSource::SharedFile(path, _) => FontSource::Path {
-          id: Cow::Owned(font_id),
-          path: path.clone(),
-          data: Some(data),
-        },
-        FontDbSource::Binary(_) => FontSource::Memory {
-          id: Cow::Owned(font_id),
-          data,
-        },
-      };
-      self.register_face(source, system_font.face.clone());
-      registered += 1;
     }
     Ok(registered)
   }
@@ -956,7 +937,7 @@ impl<'a> FontRegistry<'a> {
       }
       if chain
         .script
-        .is_some_and(|script| request.script.is_some_and(|requested| requested != script))
+        .is_some_and(|script| request.script != Some(script))
       {
         continue;
       }
@@ -1306,36 +1287,6 @@ impl<'a> FontFaceInfo<'a> {
       bounds: font_bounds_from_ttf(&face),
       face_index,
     })
-  }
-
-  fn from_fontdb_face_info(id: &str, info: &fontdb::FaceInfo) -> Self {
-    let mut face = Self::synthetic(id.to_string(), id.to_string());
-    face.family_names = info
-      .families
-      .iter()
-      .map(|(family, _)| Cow::Owned(family.clone()))
-      .collect();
-    if face.family_names.is_empty() {
-      face.family_names.push(Cow::Owned(id.to_string()));
-    }
-    face.postscript_name =
-      (!info.post_script_name.is_empty()).then(|| Cow::Owned(info.post_script_name.clone()));
-    face.style_name = Some(Cow::Owned(format!("{:?}", info.style)));
-    face.weight = font_weight_from_ttf(info.weight.0);
-    face.slant = match info.style {
-      fontdb::Style::Italic => FontSlant::Italic,
-      fontdb::Style::Oblique => FontSlant::Oblique,
-      fontdb::Style::Normal => FontSlant::Upright,
-    };
-    face.stretch = font_stretch_from_fontdb(info.stretch);
-    face.pitch = if info.monospaced {
-      FontPitch::Fixed
-    } else {
-      FontPitch::Variable
-    };
-    face.flags.monospace = info.monospaced;
-    face.face_index = info.index;
-    face
   }
 }
 
@@ -2593,7 +2544,7 @@ pub enum ThemeFontKind {
   MinorComplexScript,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum FontWeight {
   Thin,
   ExtraLight,
@@ -2607,7 +2558,7 @@ pub enum FontWeight {
   Black,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum FontSlant {
   #[default]
   Upright,
@@ -2615,7 +2566,7 @@ pub enum FontSlant {
   Oblique,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum FontStretch {
   UltraCondensed,
   ExtraCondensed,
@@ -2702,7 +2653,7 @@ const DEFAULT_OFFICE_ALIASES: &[(&str, &str)] = &[
   ("Courier", "Courier New"),
   ("TimesNewRomanPSMT", "Times New Roman"),
   // Office documents can store the Simplified Chinese localized family name,
-  // while the same installed face is commonly exposed to fontdb under its
+  // while the same installed face is commonly exposed by platform APIs under its
   // English family name.
   ("等线", "DengXian"),
   // Legacy Office workbooks use the old Windows localized family name,
@@ -2771,7 +2722,7 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
       families: vec![
         // Windows fixed output uses its installed Simplified Chinese font
         // linking before generic pan-CJK fallbacks. Keep family discovery in
-        // Fontique/fontdb so platforms without these Office fonts continue
+        // Fontique so platforms without these Office fonts continue
         // through the portable SC/JP chain.
         Cow::Borrowed("Microsoft YaHei"),
         Cow::Borrowed("Microsoft YaHei UI"),
@@ -3064,7 +3015,7 @@ fn font_charset_matches(
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-enum FontDbQueryFamily {
+enum PlatformFontQueryFamily {
   Name(String),
   SansSerif,
   Serif,
@@ -3087,51 +3038,325 @@ impl PlatformFontSystem {
   }
 }
 
+#[derive(Clone)]
 struct PlatformFontCandidate {
-  data: Vec<u8>,
+  data: FontBytes,
   face_index: u32,
+  face: Arc<FontFaceInfo<'static>>,
 }
 
-fn platform_system_query_fonts(
-  query_family: &FontDbQueryFamily,
-  request: &FontRequest<'_>,
-) -> Vec<PlatformFontCandidate> {
+fn platform_font_system() -> &'static Mutex<PlatformFontSystem> {
   static SYSTEM: OnceLock<Mutex<PlatformFontSystem>> = OnceLock::new();
+  SYSTEM.get_or_init(|| Mutex::new(PlatformFontSystem::new()))
+}
 
-  let mut system = SYSTEM
-    .get_or_init(|| Mutex::new(PlatformFontSystem::new()))
+fn platform_system_fonts() -> Vec<PlatformFontCandidate> {
+  let mut system = platform_font_system()
     .lock()
     .unwrap_or_else(std::sync::PoisonError::into_inner);
   let PlatformFontSystem {
     collection,
     source_cache,
   } = &mut *system;
-  let family = match query_family {
-    FontDbQueryFamily::Name(name) => PlatformQueryFamily::Named(name),
-    FontDbQueryFamily::SansSerif => PlatformQueryFamily::Generic(PlatformGenericFamily::SansSerif),
-    FontDbQueryFamily::Serif => PlatformQueryFamily::Generic(PlatformGenericFamily::Serif),
-  };
-  let mut query = collection.query(source_cache);
-  query.set_families([family]);
-  query.set_attributes(PlatformFontAttributes::new(
-    platform_font_width(request),
-    platform_font_style(request),
-    platform_font_weight(request),
-  ));
-
+  let family_names = collection
+    .family_names()
+    .map(str::to_owned)
+    .collect::<Vec<_>>();
+  let family_ids = family_names
+    .iter()
+    .filter_map(|name| collection.family_id(name))
+    .collect::<BTreeSet<_>>();
+  let mut seen = BTreeSet::new();
   let mut candidates = Vec::new();
-  query.matches_with(|font| {
-    candidates.push(PlatformFontCandidate {
-      data: font.blob.as_ref().to_vec(),
-      face_index: font.index,
-    });
-    if candidates.len() >= 32 {
-      PlatformQueryStatus::Stop
-    } else {
-      PlatformQueryStatus::Continue
+  for family_id in family_ids {
+    let Some(family) = collection.family(family_id) else {
+      continue;
+    };
+    for (font_index, font) in family.fonts().iter().enumerate() {
+      let Some(blob) = font.load(Some(source_cache)) else {
+        continue;
+      };
+      if !seen.insert((blob.id(), font.index())) {
+        continue;
+      }
+      let data = FontBytes::from(blob.into_raw_parts().0);
+      let Some(face) = cached_platform_font_face(
+        PlatformFontFaceKey {
+          family_id: family_id.to_u64(),
+          font_index,
+          face_index: font.index(),
+        },
+        data.clone(),
+      ) else {
+        continue;
+      };
+      candidates.push(PlatformFontCandidate {
+        data,
+        face_index: font.index(),
+        face,
+      });
     }
-  });
+  }
   candidates
+}
+
+fn platform_system_query_fonts(
+  query_family: &PlatformFontQueryFamily,
+  request: &FontRequest<'_>,
+) -> Vec<PlatformFontCandidate> {
+  static CACHE: OnceLock<Mutex<PlatformFontQueryCache>> = OnceLock::new();
+
+  let key = PlatformFontQueryKey {
+    family: query_family.clone(),
+    weight: requested_weight(request),
+    slant: requested_slant(request),
+    stretch: request.stretch.unwrap_or_default(),
+  };
+  let slot = CACHE
+    .get_or_init(|| Mutex::new(PlatformFontQueryCache::default()))
+    .lock()
+    .unwrap_or_else(std::sync::PoisonError::into_inner)
+    .slot(key);
+
+  slot
+    .get_or_init(|| {
+      let mut system = platform_font_system()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+      let PlatformFontSystem {
+        collection,
+        source_cache,
+      } = &mut *system;
+      if let PlatformFontQueryFamily::Name(name) = query_family {
+        let normalized = normalize_family(name);
+        let direct_family_id = collection.family_id(name);
+        let prefix_family_name = if direct_family_id.is_none() {
+          collection
+            .family_names()
+            .filter_map(|family| {
+              let normalized_family = normalize_family(family);
+              (!normalized_family.is_empty() && normalized.starts_with(&normalized_family))
+                .then_some((normalized_family.len(), family.to_owned()))
+            })
+            .max_by_key(|(length, _)| *length)
+            .map(|(_, family)| family)
+        } else {
+          None
+        };
+        let family_id = direct_family_id.or_else(|| {
+          prefix_family_name
+            .as_deref()
+            .and_then(|family| collection.family_id(family))
+        });
+        if let Some(family_id) = family_id
+          && let Some(family) = collection.family(family_id)
+        {
+          let mut family_candidates = Vec::new();
+          for (font_index, font) in family.fonts().iter().enumerate() {
+            let Some(blob) = font.load(Some(source_cache)) else {
+              continue;
+            };
+            let data = FontBytes::from(blob.into_raw_parts().0);
+            let Some(face) = cached_platform_font_face(
+              PlatformFontFaceKey {
+                family_id: family_id.to_u64(),
+                font_index,
+                face_index: font.index(),
+              },
+              data.clone(),
+            ) else {
+              continue;
+            };
+            if !family_matches_names(face.as_ref(), std::slice::from_ref(&normalized))
+              && !face
+                .postscript_name
+                .as_deref()
+                .is_some_and(|candidate| normalized_family_eq_normalized(candidate, &normalized))
+            {
+              continue;
+            }
+            family_candidates.push(PlatformFontCandidate {
+              data,
+              face_index: font.index(),
+              face,
+            });
+          }
+
+          // DirectWrite and CoreText expose legacy subfamilies such as
+          // "Calibri Light" and "Segoe UI Light" as aliases of a larger
+          // typographic family. Fontique correctly resolves that family, but
+          // attribute matching alone can then turn a bold request into
+          // Calibri Bold. Office instead keeps the explicitly named legacy
+          // face and synthesizes bold. Prefer faces whose primary family or
+          // PostScript name exactly represents the requested legacy name,
+          // then apply the ordinary attribute ranking within that subset.
+          let has_exact_legacy_face = family_candidates.iter().any(|candidate| {
+            candidate
+              .face
+              .family_names
+              .first()
+              .is_some_and(|family| normalized_family_eq_normalized(family, &normalized))
+              || candidate
+                .face
+                .postscript_name
+                .as_deref()
+                .is_some_and(|postscript| normalized_family_eq_normalized(postscript, &normalized))
+          });
+          if has_exact_legacy_face {
+            family_candidates.retain(|candidate| {
+              candidate
+                .face
+                .family_names
+                .first()
+                .is_some_and(|family| normalized_family_eq_normalized(family, &normalized))
+                || candidate
+                  .face
+                  .postscript_name
+                  .as_deref()
+                  .is_some_and(|postscript| {
+                    normalized_family_eq_normalized(postscript, &normalized)
+                  })
+            });
+          }
+          if !family_candidates.is_empty() {
+            return family_candidates;
+          }
+        }
+      }
+      let family = match query_family {
+        PlatformFontQueryFamily::Name(name) => PlatformQueryFamily::Named(name),
+        PlatformFontQueryFamily::SansSerif => {
+          PlatformQueryFamily::Generic(PlatformGenericFamily::SansSerif)
+        }
+        PlatformFontQueryFamily::Serif => {
+          PlatformQueryFamily::Generic(PlatformGenericFamily::Serif)
+        }
+      };
+      let mut query = collection.query(source_cache);
+      query.set_families([family]);
+      query.set_attributes(PlatformFontAttributes::new(
+        platform_font_width(request),
+        platform_font_style(request),
+        platform_font_weight(request),
+      ));
+
+      let mut candidates = Vec::new();
+      query.matches_with(|font| {
+        let data = FontBytes::from(font.blob.clone().into_raw_parts().0);
+        let Some(face) = cached_platform_font_face(
+          PlatformFontFaceKey {
+            family_id: font.family.0.to_u64(),
+            font_index: font.family.1,
+            face_index: font.index,
+          },
+          data.clone(),
+        ) else {
+          return PlatformQueryStatus::Continue;
+        };
+        let matches_requested_family = match query_family {
+          PlatformFontQueryFamily::Name(family) => {
+            let normalized = normalize_family(family);
+            family_matches_names(face.as_ref(), std::slice::from_ref(&normalized))
+              || face
+                .postscript_name
+                .as_deref()
+                .is_some_and(|name| normalized_family_eq_normalized(name, &normalized))
+          }
+          PlatformFontQueryFamily::SansSerif | PlatformFontQueryFamily::Serif => true,
+        };
+        if !matches_requested_family {
+          return PlatformQueryStatus::Continue;
+        }
+        candidates.push(PlatformFontCandidate {
+          data,
+          face_index: font.index,
+          face,
+        });
+        // Fontique orders matches by the requested family and attributes. One
+        // accepted face is sufficient for this query: later families are fallback
+        // candidates that the OOXML registry adds through their own ordered
+        // queries. Copying all of them here duplicated tens of complete font files
+        // for every text style and made a small DOCX consume gigabytes.
+        PlatformQueryStatus::Stop
+      });
+      candidates
+    })
+    .clone()
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct PlatformFontFaceKey {
+  family_id: u64,
+  font_index: usize,
+  face_index: u32,
+}
+
+fn cached_platform_font_face(
+  key: PlatformFontFaceKey,
+  data: FontBytes,
+) -> Option<Arc<FontFaceInfo<'static>>> {
+  type FaceSlot = OnceLock<Option<Arc<FontFaceInfo<'static>>>>;
+  static CACHE: OnceLock<RwLock<HashMap<PlatformFontFaceKey, Arc<FaceSlot>>>> = OnceLock::new();
+
+  let cache = CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+  let cached = {
+    cache
+      .read()
+      .unwrap_or_else(std::sync::PoisonError::into_inner)
+      .get(&key)
+      .cloned()
+  };
+  let slot = cached.unwrap_or_else(|| {
+    cache
+      .write()
+      .unwrap_or_else(std::sync::PoisonError::into_inner)
+      .entry(key)
+      .or_insert_with(|| Arc::new(FaceSlot::new()))
+      .clone()
+  });
+  slot
+    .get_or_init(|| {
+      FontFaceInfo::from_ttf_bytes("platform-system-font", &data, key.face_index)
+        .ok()
+        .map(Arc::new)
+    })
+    .clone()
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct PlatformFontQueryKey {
+  family: PlatformFontQueryFamily,
+  weight: FontWeight,
+  slant: FontSlant,
+  stretch: FontStretch,
+}
+
+type PlatformFontSlot = OnceLock<Vec<PlatformFontCandidate>>;
+
+const PLATFORM_FONT_QUERY_CACHE_ENTRIES: usize = 4_096;
+
+#[derive(Default)]
+struct PlatformFontQueryCache {
+  slots: HashMap<PlatformFontQueryKey, Arc<PlatformFontSlot>>,
+  insertion_order: VecDeque<PlatformFontQueryKey>,
+}
+
+impl PlatformFontQueryCache {
+  fn slot(&mut self, key: PlatformFontQueryKey) -> Arc<PlatformFontSlot> {
+    if let Some(slot) = self.slots.get(&key) {
+      return slot.clone();
+    }
+    while self.slots.len() >= PLATFORM_FONT_QUERY_CACHE_ENTRIES {
+      let Some(evicted) = self.insertion_order.pop_front() else {
+        break;
+      };
+      self.slots.remove(&evicted);
+    }
+    let slot = Arc::new(PlatformFontSlot::new());
+    self.insertion_order.push_back(key.clone());
+    self.slots.insert(key, slot.clone());
+    slot
+  }
 }
 
 fn platform_font_weight(request: &FontRequest<'_>) -> PlatformFontWeight {
@@ -3168,293 +3393,6 @@ fn platform_font_width(request: &FontRequest<'_>) -> PlatformFontWidth {
     FontStretch::ExtraExpanded => PlatformFontWidth::EXTRA_EXPANDED,
     FontStretch::UltraExpanded => PlatformFontWidth::ULTRA_EXPANDED,
   }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct SystemFontQueryKey {
-  family: FontDbQueryFamily,
-  weight: fontdb::Weight,
-  style: fontdb::Style,
-}
-
-type SystemFontQuerySlot = OnceLock<Option<fontdb::ID>>;
-
-const SYSTEM_FONT_QUERY_CACHE_ENTRIES: usize = 4_096;
-
-#[derive(Default)]
-struct SystemFontQueryCache {
-  slots: HashMap<SystemFontQueryKey, Arc<SystemFontQuerySlot>>,
-  insertion_order: VecDeque<SystemFontQueryKey>,
-}
-
-impl SystemFontQueryCache {
-  fn slot(&mut self, key: SystemFontQueryKey) -> Arc<SystemFontQuerySlot> {
-    if let Some(slot) = self.slots.get(&key) {
-      return slot.clone();
-    }
-    while self.slots.len() >= SYSTEM_FONT_QUERY_CACHE_ENTRIES {
-      let Some(evicted) = self.insertion_order.pop_front() else {
-        break;
-      };
-      self.slots.remove(&evicted);
-    }
-    let slot = Arc::new(SystemFontQuerySlot::new());
-    self.insertion_order.push_back(key.clone());
-    self.slots.insert(key, slot.clone());
-    slot
-  }
-}
-
-impl FontDbQueryFamily {
-  fn as_fontdb_family(&self) -> fontdb::Family<'_> {
-    match self {
-      Self::Name(family) => fontdb::Family::Name(family),
-      Self::SansSerif => fontdb::Family::SansSerif,
-      Self::Serif => fontdb::Family::Serif,
-    }
-  }
-
-  fn query(&self, database: &FontDatabase, request: &FontRequest<'_>) -> Option<fontdb::ID> {
-    static CACHE: OnceLock<Mutex<SystemFontQueryCache>> = OnceLock::new();
-
-    let key = SystemFontQueryKey {
-      family: self.clone(),
-      weight: fontdb_weight(request),
-      style: fontdb_style(request),
-    };
-    let slot = CACHE
-      .get_or_init(|| Mutex::new(SystemFontQueryCache::default()))
-      .lock()
-      .unwrap_or_else(std::sync::PoisonError::into_inner)
-      .slot(key);
-    *slot.get_or_init(|| {
-      let family = self.as_fontdb_family();
-      let query = fontdb::Query {
-        families: &[family],
-        weight: fontdb_weight(request),
-        style: fontdb_style(request),
-        ..fontdb::Query::default()
-      };
-      match self {
-        // A typographic family alias may also appear on a distinct Office face:
-        // Aptos Display, for example, advertises Aptos as an alias. Resolve the
-        // requested concrete/legacy typeface before accepting fontdb's broader
-        // family match so an Aptos request cannot become Aptos Display merely
-        // because that face was indexed first.
-        Self::Name(typeface) => query_legacy_system_typeface(database, typeface, request)
-          .or_else(|| database.query(&query)),
-        Self::SansSerif | Self::Serif => database.query(&query),
-      }
-    })
-  }
-}
-
-/// Resolves OpenType legacy family names (name ID 1) that contain a face
-/// style, such as `Poppins Medium` and `Calibri Light`.
-///
-/// `fontdb` indexes the typographic family (name ID 16) when it exists, so a
-/// CSS-like family query cannot find these Office typeface names. LibreOffice
-/// handles the same distinction in
-/// `PhysicalFontCollection::FindFontFaceByLegacyName`: first narrow by the
-/// typographic-family prefix, then inspect the matching faces' legacy names.
-fn query_legacy_system_typeface(
-  database: &FontDatabase,
-  requested_typeface: &str,
-  request: &FontRequest<'_>,
-) -> Option<fontdb::ID> {
-  let requested = normalize_family(requested_typeface);
-  let requested_weight = fontdb_weight(request).0;
-  let requested_style = fontdb_style(request);
-
-  database
-    .faces()
-    .filter(|info| {
-      normalized_family_eq_normalized(&info.post_script_name, &requested)
-        || info.families.iter().any(|(family, _)| {
-          let family = normalize_family(family);
-          !family.is_empty() && requested.starts_with(&family)
-        })
-    })
-    .filter_map(|info| {
-      database
-        .with_face_data(info.id, |data, face_index| {
-          let face =
-            FontFaceInfo::from_ttf_bytes("system-typeface-probe", data, face_index).ok()?;
-          (normalized_family_eq_normalized(&info.post_script_name, &requested)
-            || family_matches_names(&face, std::slice::from_ref(&requested)))
-          .then(|| {
-            let primary_family_mismatch = face
-              .family_names
-              .first()
-              .is_none_or(|family| !normalized_family_eq_normalized(family, &requested));
-            (info, primary_family_mismatch)
-          })
-        })
-        .flatten()
-    })
-    .min_by(
-      |(left, left_primary_mismatch), (right, right_primary_mismatch)| {
-        let left_rank = (
-          left_primary_mismatch,
-          left.style != requested_style,
-          left.weight.0.abs_diff(requested_weight),
-          left.post_script_name.as_str(),
-        );
-        let right_rank = (
-          right_primary_mismatch,
-          right.style != requested_style,
-          right.weight.0.abs_diff(requested_weight),
-          right.post_script_name.as_str(),
-        );
-        left_rank.cmp(&right_rank)
-      },
-    )
-    .map(|(info, _)| info.id)
-}
-
-fn fontdb_weight(request: &FontRequest<'_>) -> fontdb::Weight {
-  match requested_weight(request) {
-    FontWeight::Thin => fontdb::Weight::THIN,
-    FontWeight::ExtraLight => fontdb::Weight::EXTRA_LIGHT,
-    FontWeight::Light => fontdb::Weight::LIGHT,
-    FontWeight::Normal => fontdb::Weight::NORMAL,
-    FontWeight::Medium => fontdb::Weight::MEDIUM,
-    FontWeight::SemiBold => fontdb::Weight::SEMIBOLD,
-    FontWeight::Bold => fontdb::Weight::BOLD,
-    FontWeight::ExtraBold => fontdb::Weight::EXTRA_BOLD,
-    FontWeight::Black => fontdb::Weight::BLACK,
-  }
-}
-
-fn fontdb_style(request: &FontRequest<'_>) -> fontdb::Style {
-  match requested_slant(request) {
-    FontSlant::Italic => fontdb::Style::Italic,
-    FontSlant::Oblique => fontdb::Style::Oblique,
-    FontSlant::Upright => fontdb::Style::Normal,
-  }
-}
-
-fn system_font_database() -> &'static FontDatabase {
-  static DATABASE: OnceLock<FontDatabase> = OnceLock::new();
-  DATABASE.get_or_init(|| {
-    let mut database = FontDatabase::new();
-    database.load_system_fonts();
-    database
-  })
-}
-
-struct CachedSystemQueryFont {
-  face: FontFaceInfo<'static>,
-}
-
-const SYSTEM_FONT_DATA_CACHE_BYTES: usize = 64 * 1024 * 1024;
-
-#[derive(Default)]
-struct SystemFontDataCache {
-  data: HashMap<fontdb::ID, FontBytes>,
-  least_to_most_recent: VecDeque<fontdb::ID>,
-  bytes: usize,
-}
-
-impl SystemFontDataCache {
-  fn get(&mut self, id: fontdb::ID) -> Option<FontBytes> {
-    let data = self.data.get(&id)?.clone();
-    if let Some(index) = self
-      .least_to_most_recent
-      .iter()
-      .position(|cached| *cached == id)
-    {
-      self.least_to_most_recent.remove(index);
-    }
-    self.least_to_most_recent.push_back(id);
-    Some(data)
-  }
-
-  fn insert(&mut self, id: fontdb::ID, data: FontBytes) -> FontBytes {
-    if let Some(cached) = self.get(id) {
-      return cached;
-    }
-    if data.len() > SYSTEM_FONT_DATA_CACHE_BYTES {
-      return data;
-    }
-    while self.bytes + data.len() > SYSTEM_FONT_DATA_CACHE_BYTES {
-      let Some(evicted_id) = self.least_to_most_recent.pop_front() else {
-        break;
-      };
-      if let Some(evicted) = self.data.remove(&evicted_id) {
-        self.bytes -= evicted.len();
-      }
-    }
-    self.bytes += data.len();
-    self.least_to_most_recent.push_back(id);
-    self.data.insert(id, data.clone());
-    data
-  }
-}
-
-fn cached_system_font_data(database: &FontDatabase, id: fontdb::ID) -> Option<FontBytes> {
-  static CACHE: OnceLock<Mutex<SystemFontDataCache>> = OnceLock::new();
-  let cache = CACHE.get_or_init(|| Mutex::new(SystemFontDataCache::default()));
-  if let Some(data) = cache
-    .lock()
-    .unwrap_or_else(std::sync::PoisonError::into_inner)
-    .get(id)
-  {
-    return Some(data);
-  }
-
-  let data = database.with_face_data(id, |data, _| FontBytes::from(Arc::<[u8]>::from(data)))?;
-  Some(
-    cache
-      .lock()
-      .unwrap_or_else(std::sync::PoisonError::into_inner)
-      .insert(id, data),
-  )
-}
-
-fn cached_system_query_font(
-  database: &FontDatabase,
-  id: fontdb::ID,
-  info: &fontdb::FaceInfo,
-  font_id: &str,
-) -> Option<Arc<CachedSystemQueryFont>> {
-  type FontSlot = OnceLock<Option<Arc<CachedSystemQueryFont>>>;
-  static CACHE: OnceLock<RwLock<HashMap<fontdb::ID, Arc<FontSlot>>>> = OnceLock::new();
-
-  let cache = CACHE.get_or_init(|| RwLock::new(HashMap::new()));
-  let cached = {
-    cache
-      .read()
-      .unwrap_or_else(std::sync::PoisonError::into_inner)
-      .get(&id)
-      .cloned()
-  };
-  let slot = cached.unwrap_or_else(|| {
-    cache
-      .write()
-      .unwrap_or_else(std::sync::PoisonError::into_inner)
-      .entry(id)
-      .or_insert_with(|| Arc::new(FontSlot::new()))
-      .clone()
-  });
-  slot
-    .get_or_init(|| {
-      let face = database.with_face_data(id, |data, face_index| {
-        debug_assert_eq!(face_index, info.index);
-        let mut face = FontFaceInfo::from_ttf_bytes(font_id, data, face_index)
-          .unwrap_or_else(|_| FontFaceInfo::from_fontdb_face_info(font_id, info));
-        // fontdb exposes the family aliases produced by the platform font
-        // matcher. Preserve them alongside the raw name-table families: some
-        // Office faces (notably Calibri Light) use a WWS family alias that is
-        // required to address the face by the name stored in the theme.
-        for (family, _) in &info.families {
-          push_unique_string(&mut face.family_names, family.clone());
-        }
-        face
-      })?;
-      Some(Arc::new(CachedSystemQueryFont { face }))
-    })
-    .clone()
 }
 
 fn runtime_face_for_data(data: FontBytes, face_index: u32) -> Option<Arc<RuntimeFace>> {
@@ -4263,10 +4201,6 @@ fn font_stretch_from_ttf(width: u16) -> FontStretch {
   }
 }
 
-fn font_stretch_from_fontdb(stretch: fontdb::Stretch) -> FontStretch {
-  font_stretch_from_ttf(stretch.to_number())
-}
-
 fn harf_direction(direction: TextDirection) -> Option<HarfDirection> {
   match direction {
     TextDirection::LeftToRight => Some(HarfDirection::LeftToRight),
@@ -4298,6 +4232,21 @@ fn harf_script(script: TextScript) -> Option<HarfScript> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  fn platform_has_font(family: &str, postscript_name: &str) -> bool {
+    let request = FontRequest {
+      family: Some(Cow::Borrowed(family)),
+      ..FontRequest::default()
+    };
+    platform_system_query_fonts(&PlatformFontQueryFamily::Name(family.to_string()), &request)
+      .iter()
+      .any(|font| {
+        FontFaceInfo::from_ttf_bytes("platform-font-probe", &font.data, font.face_index)
+          .ok()
+          .and_then(|face| face.postscript_name)
+          .is_some_and(|name| name == postscript_name)
+      })
+  }
 
   #[test]
   fn default_office_policy_maps_localized_dengxian_family() {
@@ -4335,22 +4284,41 @@ mod tests {
   }
 
   #[test]
-  fn system_font_query_cache_stays_bounded() {
-    let mut cache = SystemFontQueryCache::default();
-    for index in 0..=SYSTEM_FONT_QUERY_CACHE_ENTRIES {
-      cache.slot(SystemFontQueryKey {
-        family: FontDbQueryFamily::Name(format!("Fixture {index}")),
-        weight: fontdb::Weight::NORMAL,
-        style: fontdb::Style::Normal,
+  fn platform_font_query_cache_stays_bounded() {
+    let mut cache = PlatformFontQueryCache::default();
+    for index in 0..=PLATFORM_FONT_QUERY_CACHE_ENTRIES {
+      cache.slot(PlatformFontQueryKey {
+        family: PlatformFontQueryFamily::Name(format!("Fixture {index}")),
+        weight: FontWeight::Normal,
+        slant: FontSlant::Upright,
+        stretch: FontStretch::Normal,
       });
     }
 
-    assert_eq!(cache.slots.len(), SYSTEM_FONT_QUERY_CACHE_ENTRIES);
-    assert!(!cache.slots.contains_key(&SystemFontQueryKey {
-      family: FontDbQueryFamily::Name("Fixture 0".to_string()),
-      weight: fontdb::Weight::NORMAL,
-      style: fontdb::Style::Normal,
+    assert_eq!(cache.slots.len(), PLATFORM_FONT_QUERY_CACHE_ENTRIES);
+    assert!(!cache.slots.contains_key(&PlatformFontQueryKey {
+      family: PlatformFontQueryFamily::Name("Fixture 0".to_string()),
+      weight: FontWeight::Normal,
+      slant: FontSlant::Upright,
+      stretch: FontStretch::Normal,
     }));
+  }
+
+  #[test]
+  fn unspecified_script_does_not_preload_script_specific_fallbacks() {
+    let registry = FontRegistry::with_default_policy();
+    let request = FontRequest::default();
+    let families = registry.fallback_families(&request);
+
+    assert!(!families.contains(&"Amiri"));
+    assert!(!families.contains(&"Malgun Gothic"));
+    assert!(!families.contains(&"Cambria Math"));
+
+    let arabic = FontRequest {
+      script: Some(TextScript::Arabic),
+      ..FontRequest::default()
+    };
+    assert!(registry.fallback_families(&arabic).contains(&"Amiri"));
   }
 
   #[test]
@@ -4513,10 +4481,7 @@ mod tests {
 
   #[test]
   fn system_query_prefers_installed_calibri_light_face() {
-    if !system_font_database()
-      .faces()
-      .any(|face| face.post_script_name.contains("Calibri-Light"))
-    {
+    if !platform_has_font("Calibri Light", "Calibri-Light") {
       return;
     }
     let mut registry = FontRegistry::with_default_policy();
@@ -4552,11 +4517,31 @@ mod tests {
   }
 
   #[test]
+  fn system_query_keeps_installed_calibri_light_for_bold_request() {
+    if !platform_has_font("Calibri Light", "Calibri-Light") {
+      return;
+    }
+    let mut registry = FontRegistry::with_default_policy();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Calibri Light")),
+      bold: true,
+      ..FontRequest::default()
+    };
+
+    registry.register_system_query_fonts(&request).unwrap();
+    let resolved = registry.resolve_with_diagnostics(&request).unwrap();
+
+    assert!(
+      resolved.font_id.0.contains("Calibri-Light"),
+      "resolved={}",
+      resolved.font_id.0
+    );
+    assert!(resolved.synthetic_bold);
+  }
+
+  #[test]
   fn system_query_prefers_installed_aptos_face_over_display_alias() {
-    if !system_font_database()
-      .faces()
-      .any(|face| face.post_script_name == "Aptos")
-    {
+    if !platform_has_font("Aptos", "Aptos") {
       return;
     }
     let mut registry = FontRegistry::with_default_policy();
@@ -4577,10 +4562,7 @@ mod tests {
 
   #[test]
   fn system_query_prefers_installed_noto_sans_face_over_condensed_alias() {
-    if !system_font_database()
-      .faces()
-      .any(|face| face.post_script_name == "NotoSans-Regular")
-    {
+    if !platform_has_font("Noto Sans", "NotoSans-Regular") {
       return;
     }
     let mut registry = FontRegistry::with_default_policy();

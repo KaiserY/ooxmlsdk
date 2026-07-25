@@ -15033,10 +15033,23 @@ impl<'a> TextFrameLayout<'a> {
               return (item_start, current.items.len());
             }
             if let InlineShapeGeometry::Path { paths, outline } = &shape.geometry {
+              let scale_x = if shape.width_pt.abs() > f32::EPSILON {
+                width_pt / shape.width_pt
+              } else {
+                1.0
+              };
+              let scale_y = if shape.height_pt.abs() > f32::EPSILON {
+                height_pt / shape.height_pt
+              } else {
+                1.0
+              };
+              let path_transform =
+                Affine::scale_non_uniform(f64::from(scale_x), f64::from(scale_y))
+                  .then_translate((f64::from(x_pt), f64::from(y_pt)).into());
               for path in paths {
                 let commands = common::drawingml_geometry::transform_commands(
                   path.commands.iter().copied(),
-                  Affine::translate((f64::from(x_pt), f64::from(y_pt))),
+                  path_transform,
                 );
                 let closed = commands
                   .iter()

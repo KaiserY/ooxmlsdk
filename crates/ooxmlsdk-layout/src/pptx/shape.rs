@@ -286,7 +286,7 @@ fn find_placeholder_path(
   index: Option<u32>,
   scope: PlaceholderCandidateScope,
 ) -> Option<(Vec<usize>, Shape)> {
-  let mut choices: [Option<(Vec<usize>, Shape)>; 5] = Default::default();
+  let mut choices: [Option<Vec<usize>>; 5] = Default::default();
   find_placeholder_candidates(
     shapes,
     first,
@@ -296,7 +296,9 @@ fn find_placeholder_path(
     &mut Vec::new(),
     &mut choices,
   );
-  choices.into_iter().flatten().next()
+  let path = choices.into_iter().flatten().next()?;
+  let shape = shape_at_path(shapes, &path)?.clone();
+  Some((path, shape))
 }
 
 fn find_placeholder_candidates(
@@ -306,7 +308,7 @@ fn find_placeholder_candidates(
   index: Option<u32>,
   scope: PlaceholderCandidateScope,
   path: &mut Vec<usize>,
-  choices: &mut [Option<(Vec<usize>, Shape)>; 5],
+  choices: &mut [Option<Vec<usize>>; 5],
 ) {
   for (shape_index, shape) in shapes.iter().enumerate().rev() {
     path.push(shape_index);
@@ -330,7 +332,7 @@ fn add_placeholder_choice(
   second: Option<p::PlaceholderValues>,
   index: Option<u32>,
   path: &[usize],
-  choices: &mut [Option<(Vec<usize>, Shape)>; 5],
+  choices: &mut [Option<Vec<usize>>; 5],
 ) {
   let same_first = shape.sub_type == Some(first);
   let same_second = second.is_some_and(|candidate| shape.sub_type == Some(candidate));
@@ -351,7 +353,17 @@ fn add_placeholder_choice(
   if let Some(priority) = priority
     && choices[priority].is_none()
   {
-    choices[priority] = Some((path.to_vec(), shape.clone()));
+    choices[priority] = Some(path.to_vec());
+  }
+}
+
+fn shape_at_path<'a>(shapes: &'a [Shape], path: &[usize]) -> Option<&'a Shape> {
+  let (&index, rest) = path.split_first()?;
+  let shape = shapes.get(index)?;
+  if rest.is_empty() {
+    Some(shape)
+  } else {
+    shape_at_path(&shape.children, rest)
   }
 }
 

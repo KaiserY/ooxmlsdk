@@ -17,7 +17,6 @@ default = []
 ooxml = ["dep:ooxmlsdk"]
 
 [dependencies]
-fontdb = { workspace = true }
 fontique = { workspace = true }
 harfrust = { workspace = true }
 icu_segmenter = { workspace = true }

@@ -7453,14 +7453,14 @@ fn wordprocessing_shape_shape(
     transform.raw_coordinates,
     transform.fallback_size,
   )?;
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
   if has_path_geometry
     && let Some(path_geometry) =
       drawingml_path_geometry_from_properties(&properties, width_pt, height_pt)
   {
     geometry = path_geometry;
   }
-  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
 
   Some(InlineShape {
     width_pt,
@@ -7721,14 +7721,14 @@ fn drawingml_diagram_shape_shape(
     transform.raw_coordinates,
     transform.fallback_size,
   )?;
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
   if has_path_geometry
     && let Some(path_geometry) =
       drawingml_path_geometry_from_properties(&properties, width_pt, height_pt)
   {
     geometry = path_geometry;
   }
-  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
   let mut shape = InlineShape {
     width_pt,
     height_pt,

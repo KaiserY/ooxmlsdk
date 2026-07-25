@@ -3070,11 +3070,13 @@ fn draw_paint_item(
     } => {
       draw_compositing_group(
         surface,
-        mask.as_ref(),
-        transform.as_ref(),
-        *blend_mode,
-        *opacity,
-        items,
+        CompositingGroup {
+          mask: mask.as_ref(),
+          transform: transform.as_ref(),
+          blend_mode: *blend_mode,
+          opacity: *opacity,
+          items,
+        },
         fonts,
         images,
         internal_links,
@@ -3088,20 +3090,24 @@ fn draw_paint_item(
   Ok(())
 }
 
-fn draw_compositing_group(
-  surface: &mut Surface<'_>,
-  mask: Option<&ImageItem<'_>>,
-  transform: Option<&common::Transform>,
+struct CompositingGroup<'borrow, 'paint> {
+  mask: Option<&'borrow ImageItem<'paint>>,
+  transform: Option<&'borrow common::Transform>,
   blend_mode: common::BlendMode,
   opacity: f32,
-  items: &[PaintItem<'_>],
+  items: &'borrow [PaintItem<'paint>],
+}
+
+fn draw_compositing_group(
+  surface: &mut Surface<'_>,
+  group: CompositingGroup<'_, '_>,
   fonts: &mut FontSet,
   images: &mut ImageSet,
   internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
   options: &PdfOptions,
 ) -> Result<()> {
-  let decoded_mask = mask.and_then(|mask| {
+  let decoded_mask = group.mask.and_then(|mask| {
     let pdf_mask_image = images
       .raster(
         &mask.data,
@@ -3120,7 +3126,7 @@ fn draw_compositing_group(
   });
 
   let mut pushed_states = 0;
-  if let Some(transform) = transform {
+  if let Some(transform) = group.transform {
     surface.push_transform(&Transform::from_row(
       transform.m11,
       transform.m12,
@@ -3131,12 +3137,12 @@ fn draw_compositing_group(
     ));
     pushed_states += 1;
   }
-  if blend_mode != common::BlendMode::Normal {
-    surface.push_blend_mode(krilla_blend_mode(blend_mode));
+  if group.blend_mode != common::BlendMode::Normal {
+    surface.push_blend_mode(krilla_blend_mode(group.blend_mode));
     pushed_states += 1;
   }
-  if opacity < 1.0 {
-    let opacity = NormalizedF32::new(opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ONE);
+  if group.opacity < 1.0 {
+    let opacity = NormalizedF32::new(group.opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ONE);
     surface.push_opacity(opacity);
     pushed_states += 1;
   }
@@ -3150,7 +3156,7 @@ fn draw_compositing_group(
   // child inside the group.
   surface.push_isolated();
   pushed_states += 1;
-  for item in items {
+  for item in group.items {
     draw_paint_item(
       surface,
       item,
@@ -3179,7 +3185,7 @@ fn krilla_blend_mode(mode: common::BlendMode) -> BlendMode {
 }
 
 fn metafile_render_options_for_image(
-  _image: &ImageItem<'_>,
+  image: &ImageItem<'_>,
   options: &PdfOptions,
 ) -> ooxmlsdk_layout::render::emf_wmf::RenderOptions {
   let dpi = options
@@ -3187,9 +3193,19 @@ fn metafile_render_options_for_image(
     .max_resolution_dpi
     .unwrap_or(300)
     .clamp(72, 600);
+  let visible_width = (1.0 - image.crop.left - image.crop.right).max(f32::EPSILON);
+  let visible_height = (1.0 - image.crop.top - image.crop.bottom).max(f32::EPSILON);
+  let pixels_for_axis = |size_pt: f32, visible_fraction: f32| {
+    ((size_pt.max(0.0) / visible_fraction) * dpi as f32 / 72.0)
+      .ceil()
+      .clamp(1.0, u32::MAX as f32) as u32
+  };
   ooxmlsdk_layout::render::emf_wmf::RenderOptions {
-    target_width_px: None,
-    target_height_px: None,
+    // EMF headers may advertise an enormous natural canvas. Rasterize for
+    // the size actually painted into the PDF, including cropped-away source
+    // area, instead of paying for pixels the fixed output cannot expose.
+    target_width_px: Some(pixels_for_axis(image.width_pt, visible_width)),
+    target_height_px: Some(pixels_for_axis(image.height_pt, visible_height)),
     max_pixels: Some(dpi.saturating_mul(dpi).saturating_mul(64)),
   }
 }
@@ -3812,7 +3828,10 @@ fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
   }
   if let Some(path) = path.finish() {
     let mut fill = path_fill_from_common(surface, polyline.fill, polyline);
-    if fill.is_none() && draw_path_gradient_raster(surface, &path, polyline) {
+    if fill.is_none()
+      && matches!(polyline.fill, common::Fill::Gradient(_))
+      && draw_path_gradient_raster(surface, &path, polyline)
+    {
       // The bounded raster already painted the fill under the same path clip;
       // retain only the independently resolved stroke below.
       fill = None;
@@ -3836,9 +3855,11 @@ fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
       let stroke = polyline
         .stroke
         .map(|stroke| path_stroke_from_common(surface, stroke, polyline.x_pt, polyline.y_pt));
-      surface.set_fill(fill);
-      surface.set_stroke(stroke);
-      surface.draw_path(&path);
+      if fill.is_some() || stroke.is_some() {
+        surface.set_fill(fill);
+        surface.set_stroke(stroke);
+        surface.draw_path(&path);
+      }
     }
   }
   if let Some(stroke) = polyline.stroke {
@@ -3851,12 +3872,16 @@ fn draw_stroke_end_markers(
   polyline: &PolylineItem<'_>,
   stroke: &common::Stroke<'static>,
 ) {
-  let Some((start, start_outward, end, end_outward)) = path_endpoints(polyline) else {
+  let Some(endpoints) = path_endpoints(polyline) else {
     return;
   };
   let markers = [
-    stroke.head_end.map(|marker| (marker, start, start_outward)),
-    stroke.tail_end.map(|marker| (marker, end, end_outward)),
+    stroke
+      .head_end
+      .map(|marker| (marker, endpoints.start, endpoints.start_outward)),
+    stroke
+      .tail_end
+      .map(|marker| (marker, endpoints.end, endpoints.end_outward)),
   ];
   surface.set_stroke(None);
   surface.set_fill(Some(Fill {
@@ -3871,21 +3896,26 @@ fn draw_stroke_end_markers(
   }
 }
 
-fn path_endpoints(
-  polyline: &PolylineItem<'_>,
-) -> Option<((f32, f32), (f32, f32), (f32, f32), (f32, f32))> {
+struct PathEndpoints {
+  start: (f32, f32),
+  start_outward: (f32, f32),
+  end: (f32, f32),
+  end_outward: (f32, f32),
+}
+
+fn path_endpoints(polyline: &PolylineItem<'_>) -> Option<PathEndpoints> {
   if polyline.commands.is_empty() {
     let [first, second, ..] = polyline.points else {
       return None;
     };
     let penultimate = polyline.points[polyline.points.len() - 2];
     let last = polyline.points[polyline.points.len() - 1];
-    return Some((
-      (first.x.0, first.y.0),
-      normalized_direction(second.x.0, second.y.0, first.x.0, first.y.0)?,
-      (last.x.0, last.y.0),
-      normalized_direction(penultimate.x.0, penultimate.y.0, last.x.0, last.y.0)?,
-    ));
+    return Some(PathEndpoints {
+      start: (first.x.0, first.y.0),
+      start_outward: normalized_direction(second.x.0, second.y.0, first.x.0, first.y.0)?,
+      end: (last.x.0, last.y.0),
+      end_outward: normalized_direction(penultimate.x.0, penultimate.y.0, last.x.0, last.y.0)?,
+    });
   }
   let mut first = None;
   let mut first_tangent = None;
@@ -3927,12 +3957,12 @@ fn path_endpoints(
   let first = first?;
   let (first_from, first_to) = first_tangent?;
   let (last_from, last) = last_tangent?;
-  Some((
-    first,
-    normalized_direction(first_to.0, first_to.1, first_from.0, first_from.1)?,
-    last,
-    normalized_direction(last_from.0, last_from.1, last.0, last.1)?,
-  ))
+  Some(PathEndpoints {
+    start: first,
+    start_outward: normalized_direction(first_to.0, first_to.1, first_from.0, first_from.1)?,
+    end: last,
+    end_outward: normalized_direction(last_from.0, last_from.1, last.0, last.1)?,
+  })
 }
 
 fn normalized_direction(from_x: f32, from_y: f32, to_x: f32, to_y: f32) -> Option<(f32, f32)> {
@@ -4094,6 +4124,16 @@ fn path_fill_from_common(
   fill: &common::Fill<'static>,
   path: &PolylineItem<'_>,
 ) -> Option<Fill> {
+  let fill_opacity = match fill {
+    common::Fill::Solid(color) => {
+      NormalizedF32::new(opacity(*color)).unwrap_or(NormalizedF32::ZERO)
+    }
+    common::Fill::None
+    | common::Fill::Theme(_)
+    | common::Fill::Gradient(_)
+    | common::Fill::Image { .. }
+    | common::Fill::Pattern(_) => NormalizedF32::ONE,
+  };
   let paint = match fill {
     common::Fill::Solid(color) => rgb::Color::new(color.r, color.g, color.b).into(),
     common::Fill::Gradient(gradient) => {
@@ -4134,7 +4174,7 @@ fn path_fill_from_common(
   };
   Some(Fill {
     paint,
-    opacity: NormalizedF32::ONE,
+    opacity: fill_opacity,
     rule: FillRule::EvenOdd,
   })
 }
@@ -4274,9 +4314,7 @@ fn draw_path_gradient_raster(
 
   let mut pixels_per_point =
     (MAX_PATH_GRADIENT_RASTER_PIXELS / (polyline.width_pt * polyline.height_pt)).sqrt();
-  pixels_per_point = pixels_per_point
-    .min(MAX_PATH_GRADIENT_PIXELS_PER_POINT)
-    .max(0.25);
+  pixels_per_point = pixels_per_point.clamp(0.25, MAX_PATH_GRADIENT_PIXELS_PER_POINT);
   let width_px = (polyline.width_pt * pixels_per_point).ceil().max(1.0) as u32;
   let height_px = (polyline.height_pt * pixels_per_point).ceil().max(1.0) as u32;
   let base_shape = if path.kind == common::GradientPathKind::Shape {
@@ -5063,13 +5101,15 @@ fn text_stroke(
 
 #[cfg(test)]
 mod tests {
+  use std::borrow::Cow;
   use std::sync::Arc;
 
   use super::{
-    GlyphId, PaintDocument, PaintItem, PaintTextPortionKind, TextItem, TextMetrics,
-    TextStyle as PaintTextStyle, conversion_font_audit, gamma_correct_gradient_color, pdf_metadata,
-    pdf_page_dimension, render, source_range_requires_visible_glyph, symbol_font_semantic_text,
-    text_portion_ranges, text_requires_glyph_outlines, text_stroke, text_style_from_common,
+    GlyphId, ImageCrop, ImageItem, PaintDocument, PaintItem, PaintTextPortionKind, TextItem,
+    TextMetrics, TextStyle as PaintTextStyle, conversion_font_audit, gamma_correct_gradient_color,
+    metafile_render_options_for_image, pdf_metadata, pdf_page_dimension, render,
+    source_range_requires_visible_glyph, symbol_font_semantic_text, text_portion_ranges,
+    text_requires_glyph_outlines, text_stroke, text_style_from_common,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -5078,6 +5118,34 @@ mod tests {
   use ooxmlsdk_layout::common::{
     self, Color, DisplayItem, DisplayPage, LayoutDocument, LayoutEngineKind, Pt, TextRun, TextStyle,
   };
+
+  #[test]
+  fn metafile_raster_size_follows_painted_size_and_crop() {
+    let image = ImageItem {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: 72.0,
+      height_pt: 36.0,
+      crop: ImageCrop {
+        left: 0.25,
+        right: 0.25,
+        ..ImageCrop::default()
+      },
+      clip_path: &[],
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      data: Cow::Borrowed(&[]),
+      content_type: Some(Cow::Borrowed("image/emf")),
+      alt_text: None,
+      hyperlink_url: None,
+      semantic_metafile_text: false,
+    };
+    let options = metafile_render_options_for_image(&image, &PdfOptions::default());
+
+    assert_eq!(options.target_width_px, Some(600));
+    assert_eq!(options.target_height_px, Some(150));
+  }
 
   #[test]
   fn word_line_segmentation_isolates_breakable_hyphens() {

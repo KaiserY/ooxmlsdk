@@ -48,9 +48,10 @@ const INDEXED_SCATTER_TITLE_TEXT_CLIP_SLACK: ChartTextClipSlack = ChartTextClipS
   left_em: 0.5,
   right_em: 0.0,
 };
-// Office fixed-output evidence from `ser_labels.xlsx`: the second-page x=2
-// tick origin is retained 5.26pt beyond the clip for 9pt axis text.
-const INDEXED_SCATTER_MULTICOMPONENT_TEXT_CLIP_SLACK: ChartTextClipSlack = ChartTextClipSlack {
+// Office fixed-output evidence from `ser_labels.xlsx` and `tdf134553.xlsx`:
+// a separate data-label field whose origin is just beyond a worksheet page
+// clip remains in the PDF text layer.
+const MULTICOMPONENT_DATA_LABEL_TEXT_CLIP_SLACK: ChartTextClipSlack = ChartTextClipSlack {
   left_em: 0.5,
   right_em: 0.6,
 };
@@ -2488,14 +2489,12 @@ fn lower_drawing_chart(
   if let Some(chart_space) = resource.extended_chart_space.as_deref() {
     let mut items = super::chartex::lower_extended_chart(import, chart_space, rect);
     let mut metrics = TextMetrics::new();
-    items.retain_mut(|item| {
-      clip_chart_item_to_rect(
-        item,
-        page_clip_rect,
-        &mut metrics,
-        DEFAULT_CHART_TEXT_CLIP_SLACK,
-      )
-    });
+    clip_chart_items_to_rect(
+      &mut items,
+      page_clip_rect,
+      &mut metrics,
+      DEFAULT_CHART_TEXT_CLIP_SLACK,
+    );
     return (!items.is_empty()).then_some(items);
   }
   let chart_space = resource.chart_space.as_deref()?;
@@ -2610,14 +2609,12 @@ fn lower_drawing_chart(
     );
     if !items.is_empty() {
       let mut metrics = TextMetrics::new();
-      items.retain_mut(|item| {
-        clip_chart_item_to_rect(
-          item,
-          page_clip_rect,
-          &mut metrics,
-          DEFAULT_CHART_TEXT_CLIP_SLACK,
-        )
-      });
+      clip_chart_items_to_rect(
+        &mut items,
+        page_clip_rect,
+        &mut metrics,
+        DEFAULT_CHART_TEXT_CLIP_SLACK,
+      );
       if let Some(hyperlink_url) = drawing_object_hyperlink_url(drawing, &anchor.object) {
         let left = rect.x_pt.max(page_clip_rect.x_pt);
         let top = rect.y_pt.max(page_clip_rect.y_pt);
@@ -2655,6 +2652,10 @@ fn lower_drawing_chart(
       .as_deref()
       .is_some_and(|title| title.chart_text.is_none())
     && chart.series.len() == 1
+    && chart
+      .series
+      .first()
+      .is_some_and(|series| series.has_explicit_name)
   {
     chart.title = chart
       .series
@@ -2959,19 +2960,22 @@ fn lower_drawing_chart(
     && indexed_scatter_text
   {
     INDEXED_SCATTER_TITLE_TEXT_CLIP_SLACK
-  } else if indexed_scatter_text && multicomponent_data_labels {
-    // Excel retains a boundary tick in the PDF text layer when its origin is
-    // up to 0.6em beyond a horizontal worksheet clip; the clip still hides
-    // the glyph ink. The ser_labels.xlsx split keeps x=2 on both horizontal
-    // pages at a 5.26pt offset for 9pt axis text.
-    INDEXED_SCATTER_MULTICOMPONENT_TEXT_CLIP_SLACK
+  } else if multicomponent_data_labels {
+    // Excel retains a boundary text field in the PDF text layer when its
+    // origin is up to 0.6em beyond a horizontal worksheet clip; the clip
+    // still hides the glyph ink. `ser_labels.xlsx` measures 5.26pt at a 9pt
+    // font size.
+    MULTICOMPONENT_DATA_LABEL_TEXT_CLIP_SLACK
   } else {
     DEFAULT_CHART_TEXT_CLIP_SLACK
   };
   let mut metrics = TextMetrics::new();
-  items.retain_mut(|item| {
-    clip_chart_item_to_rect(item, page_clip_rect, &mut metrics, text_boundary_slack_em)
-  });
+  clip_chart_items_to_rect(
+    &mut items,
+    page_clip_rect,
+    &mut metrics,
+    text_boundary_slack_em,
+  );
   if let Some(hyperlink_url) = drawing_object_hyperlink_url(drawing, &anchor.object) {
     let left = rect.x_pt.max(page_clip_rect.x_pt);
     let top = rect.y_pt.max(page_clip_rect.y_pt);
@@ -3393,6 +3397,15 @@ fn xlsx_scheme_color_index(value: a::SchemeColorValues) -> Option<u32> {
   }
 }
 
+fn clip_chart_items_to_rect(
+  items: &mut Vec<PageItem>,
+  clip: CellRect,
+  metrics: &mut TextMetrics,
+  text_boundary_slack: ChartTextClipSlack,
+) {
+  items.retain_mut(|item| clip_chart_item_to_rect(item, clip, metrics, text_boundary_slack));
+}
+
 fn clip_chart_item_to_rect(
   item: &mut PageItem,
   clip: CellRect,
@@ -3469,7 +3482,7 @@ fn clip_chart_item_to_rect(
       clip,
     ),
     PageItem::Group { items, .. } => {
-      items.retain_mut(|item| clip_chart_item_to_rect(item, clip, metrics, text_boundary_slack));
+      clip_chart_items_to_rect(items, clip, metrics, text_boundary_slack);
       !items.is_empty()
     }
     PageItem::Image(_) | PageItem::LinkArea(_) => true,

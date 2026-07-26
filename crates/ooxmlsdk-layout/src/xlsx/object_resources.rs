@@ -8,6 +8,7 @@ use ooxmlsdk::parts::vml_drawing_part::VmlDrawingPart;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_excel as xvml;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main as x14;
+use ooxmlsdk::schemas::schemas_microsoft_com_office_word as wvml;
 use ooxmlsdk::schemas::schemas_microsoft_com_vml as vml;
 use ooxmlsdk::sdk::{SdkPart, SdkType};
 use quick_xml::events::Event;
@@ -38,18 +39,86 @@ pub(crate) struct VmlDrawingResourceCatalog {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct VmlShapeModel {
+  pub(crate) is_shape_type: bool,
+  pub(crate) kind: VmlShapeKind,
   pub(crate) id: Option<String>,
   pub(crate) shape_id: Option<String>,
   pub(crate) text: String,
   pub(crate) style: Option<String>,
   pub(crate) object_type: Option<String>,
   pub(crate) image_relationship_id: Option<String>,
+  pub(crate) shape_type_reference: Option<String>,
+  pub(crate) coordinate_size: Option<String>,
+  pub(crate) coordinate_origin: Option<String>,
+  pub(crate) path: Option<String>,
+  pub(crate) fill_color: Option<String>,
+  pub(crate) fill_color2: Option<String>,
+  pub(crate) fill_opacity: Option<String>,
+  pub(crate) fill_opacity2: Option<String>,
+  pub(crate) fill_colors: Option<String>,
+  pub(crate) fill_type: Option<vml::FillTypeValues>,
+  pub(crate) fill_angle: Option<String>,
+  pub(crate) fill_focus: Option<String>,
+  pub(crate) fill_focus_position: Option<String>,
+  pub(crate) fill_focus_size: Option<String>,
+  pub(crate) fill_method: Option<vml::FillMethodValues>,
+  pub(crate) fill_rotate_with_shape: Option<bool>,
+  pub(crate) fill_image_relationship_id: Option<String>,
+  pub(crate) fill_image_size: Option<String>,
+  pub(crate) fill_image_origin: Option<String>,
+  pub(crate) fill_image_position: Option<String>,
+  pub(crate) fill_image_aspect: Option<vml::ImageAspectValues>,
+  pub(crate) stroke_color: Option<String>,
+  pub(crate) stroke_opacity: Option<String>,
+  pub(crate) stroke_weight: Option<String>,
+  pub(crate) stroke_dash_style: Option<String>,
+  pub(crate) stroke_line_style: Option<vml::StrokeLineStyleValues>,
+  pub(crate) stroke_join_style: Option<vml::StrokeJoinStyleValues>,
+  pub(crate) stroke_end_cap: Option<vml::StrokeEndCapValues>,
+  pub(crate) stroke_start_arrow: Option<vml::StrokeArrowValues>,
+  pub(crate) stroke_start_arrow_width: Option<vml::StrokeArrowWidthValues>,
+  pub(crate) stroke_start_arrow_length: Option<vml::StrokeArrowLengthValues>,
+  pub(crate) stroke_end_arrow: Option<vml::StrokeArrowValues>,
+  pub(crate) stroke_end_arrow_width: Option<vml::StrokeArrowWidthValues>,
+  pub(crate) stroke_end_arrow_length: Option<vml::StrokeArrowLengthValues>,
+  pub(crate) wrap_type: Option<wvml::WrapValues>,
+  pub(crate) wrap_side: Option<wvml::WrapSideValues>,
+  pub(crate) wrap_anchor_x: Option<wvml::HorizontalAnchorValues>,
+  pub(crate) wrap_anchor_y: Option<wvml::VerticalAnchorValues>,
+  pub(crate) filled: bool,
+  pub(crate) stroked: bool,
+  pub(crate) filled_authored: Option<bool>,
+  pub(crate) stroked_authored: Option<bool>,
+  pub(crate) from: Option<String>,
+  pub(crate) to: Option<String>,
+  pub(crate) control1: Option<String>,
+  pub(crate) control2: Option<String>,
+  pub(crate) points: Option<String>,
+  pub(crate) start_angle: Option<String>,
+  pub(crate) end_angle: Option<String>,
+  pub(crate) arc_size: Option<String>,
   pub(crate) anchor: Option<VmlClientAnchor>,
   pub(crate) note_row: Option<u32>,
   pub(crate) note_column: Option<u32>,
   pub(crate) print_object: bool,
+  pub(crate) allow_in_cell: bool,
   pub(crate) visible: bool,
   pub(crate) hidden: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum VmlShapeKind {
+  Shape,
+  Group,
+  Arc,
+  Curve,
+  Image,
+  Line,
+  Oval,
+  Polyline,
+  #[default]
+  Rectangle,
+  RoundRectangle,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -82,16 +151,69 @@ impl VmlClientAnchor {
 impl Default for VmlShapeModel {
   fn default() -> Self {
     Self {
+      kind: VmlShapeKind::Rectangle,
+      is_shape_type: false,
       id: None,
       shape_id: None,
       text: String::new(),
       style: None,
       object_type: None,
       image_relationship_id: None,
+      shape_type_reference: None,
+      coordinate_size: None,
+      coordinate_origin: None,
+      path: None,
+      fill_color: None,
+      fill_color2: None,
+      fill_opacity: None,
+      fill_opacity2: None,
+      fill_colors: None,
+      fill_type: None,
+      fill_angle: None,
+      fill_focus: None,
+      fill_focus_position: None,
+      fill_focus_size: None,
+      fill_method: None,
+      fill_rotate_with_shape: None,
+      fill_image_relationship_id: None,
+      fill_image_size: None,
+      fill_image_origin: None,
+      fill_image_position: None,
+      fill_image_aspect: None,
+      stroke_color: None,
+      stroke_opacity: None,
+      stroke_weight: None,
+      stroke_dash_style: None,
+      stroke_line_style: None,
+      stroke_join_style: None,
+      stroke_end_cap: None,
+      stroke_start_arrow: None,
+      stroke_start_arrow_width: None,
+      stroke_start_arrow_length: None,
+      stroke_end_arrow: None,
+      stroke_end_arrow_width: None,
+      stroke_end_arrow_length: None,
+      wrap_type: None,
+      wrap_side: None,
+      wrap_anchor_x: None,
+      wrap_anchor_y: None,
+      filled: true,
+      stroked: true,
+      filled_authored: None,
+      stroked_authored: None,
+      from: None,
+      to: None,
+      control1: None,
+      control2: None,
+      points: None,
+      start_angle: None,
+      end_angle: None,
+      arc_size: None,
       anchor: None,
       note_row: None,
       note_column: None,
       print_object: true,
+      allow_in_cell: true,
       visible: false,
       hidden: false,
     }
@@ -187,7 +309,8 @@ impl VmlDrawingResourceCatalog {
 }
 
 pub(crate) fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
-  let mut reader = quick_xml::Reader::from_reader(data);
+  let normalized = strip_office_vml_conditional_markers(data);
+  let mut reader = quick_xml::Reader::from_reader(normalized.as_slice());
   reader.config_mut().trim_text(false);
 
   let mut shapes = Vec::new();
@@ -284,7 +407,32 @@ pub(crate) fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
       Err(_) => break,
     }
   }
-  shapes
+  resolve_vml_shape_type_inheritance(shapes)
+}
+
+fn strip_office_vml_conditional_markers(data: &[u8]) -> Vec<u8> {
+  let mut output = Vec::with_capacity(data.len());
+  let mut offset = 0;
+  while offset < data.len() {
+    let remaining = &data[offset..];
+    let marker_end = if remaining.starts_with(b"<![if") {
+      remaining
+        .windows(2)
+        .position(|window| window == b"]>")
+        .map(|index| index + 2)
+    } else if remaining.starts_with(b"<![endif]>") {
+      Some(b"<![endif]>".len())
+    } else {
+      None
+    };
+    if let Some(marker_end) = marker_end {
+      offset += marker_end;
+    } else {
+      output.push(data[offset]);
+      offset += 1;
+    }
+  }
+  output
 }
 
 fn is_vml_shape_element(name: &[u8]) -> bool {
@@ -300,36 +448,351 @@ fn is_vml_shape_element(name: &[u8]) -> bool {
       | b"polyline"
       | b"rect"
       | b"roundrect"
+      | b"shapetype"
   )
 }
 
 fn vml_shape_models_from_bytes(local_name: &[u8], bytes: &[u8]) -> Vec<VmlShapeModel> {
   macro_rules! typed_model {
-    ($type:ty) => {
+    ($type:ty, $kind:expr) => {
       <$type>::from_bytes(bytes)
         .ok()
-        .map(|shape| vml_shape_from_typed(&shape))
+        .map(|shape| vml_shape_from_typed(&shape, $kind))
         .into_iter()
         .collect()
     };
   }
 
   match local_name {
-    b"shape" => typed_model!(vml::Shape),
+    b"shapetype" => vml::Shapetype::from_bytes(bytes)
+      .ok()
+      .map(vml_shape_type_model)
+      .into_iter()
+      .collect(),
+    b"shape" => vml::Shape::from_bytes(bytes)
+      .ok()
+      .map(|shape| {
+        let mut model = vml_shape_from_typed(&shape, VmlShapeKind::Shape);
+        model.shape_type_reference = shape.r#type;
+        model.coordinate_origin = shape.coordinate_origin;
+        model.path = shape.edge_path.or(model.path);
+        model
+      })
+      .into_iter()
+      .collect(),
     b"group" => vml::Group::from_bytes(bytes)
       .ok()
       .map(|group| vml_group_shape_models(&group))
       .unwrap_or_default(),
-    b"arc" => typed_model!(vml::Arc),
-    b"curve" => typed_model!(vml::Curve),
-    b"image" => typed_model!(vml::ImageFile),
-    b"line" => typed_model!(vml::Line),
-    b"oval" => typed_model!(vml::Oval),
-    b"polyline" => typed_model!(vml::PolyLine),
-    b"rect" => typed_model!(vml::Rectangle),
-    b"roundrect" => typed_model!(vml::RoundRectangle),
+    b"arc" => vml::Arc::from_bytes(bytes)
+      .ok()
+      .map(|shape| {
+        let mut model = vml_shape_from_typed(&shape, VmlShapeKind::Arc);
+        model.coordinate_origin.clone_from(&shape.coordinate_origin);
+        model.start_angle = shape.start_angle.as_ref().map(ToString::to_string);
+        model.end_angle = shape.end_angle.as_ref().map(ToString::to_string);
+        model
+      })
+      .into_iter()
+      .collect(),
+    b"curve" => vml::Curve::from_bytes(bytes)
+      .ok()
+      .map(|shape| {
+        let mut model = vml_shape_from_typed(&shape, VmlShapeKind::Curve);
+        model.coordinate_origin.clone_from(&shape.coordinate_origin);
+        model.from = shape.from;
+        model.to = shape.to;
+        model.control1 = shape.control1;
+        model.control2 = shape.control2;
+        model
+      })
+      .into_iter()
+      .collect(),
+    b"image" => typed_model!(vml::ImageFile, VmlShapeKind::Image),
+    b"line" => vml::Line::from_bytes(bytes)
+      .ok()
+      .map(|shape| {
+        let mut model = vml_shape_from_typed(&shape, VmlShapeKind::Line);
+        model.coordinate_origin.clone_from(&shape.coordinate_origin);
+        model.from = shape.from;
+        model.to = shape.to;
+        model
+      })
+      .into_iter()
+      .collect(),
+    b"oval" => vml::Oval::from_bytes(bytes)
+      .ok()
+      .map(|shape| {
+        let mut model = vml_shape_from_typed(&shape, VmlShapeKind::Oval);
+        model.coordinate_origin = shape.coordinate_origin;
+        model
+      })
+      .into_iter()
+      .collect(),
+    b"polyline" => vml::PolyLine::from_bytes(bytes)
+      .ok()
+      .map(|shape| {
+        let mut model = vml_shape_from_typed(&shape, VmlShapeKind::Polyline);
+        model.coordinate_origin.clone_from(&shape.coordinate_origin);
+        model.points = shape.points;
+        model
+      })
+      .into_iter()
+      .collect(),
+    b"rect" => vml::Rectangle::from_bytes(bytes)
+      .ok()
+      .map(|shape| {
+        let mut model = vml_shape_from_typed(&shape, VmlShapeKind::Rectangle);
+        model.coordinate_origin = shape.coordinate_origin;
+        model
+      })
+      .into_iter()
+      .collect(),
+    b"roundrect" => vml::RoundRectangle::from_bytes(bytes)
+      .ok()
+      .map(|shape| {
+        let mut model = vml_shape_from_typed(&shape, VmlShapeKind::RoundRectangle);
+        model.arc_size = shape.arc_size;
+        model
+      })
+      .into_iter()
+      .collect(),
     _ => Vec::new(),
   }
+}
+
+fn vml_shape_type_model(shape_type: vml::Shapetype) -> VmlShapeModel {
+  let path = shape_type.edge_path.clone().or_else(|| {
+    shape_type
+      .shapetype_choice
+      .iter()
+      .find_map(|choice| match choice {
+        vml::ShapetypeChoice::Path(path) => path.value.clone(),
+        _ => None,
+      })
+  });
+  let mut model = VmlShapeModel {
+    kind: VmlShapeKind::Shape,
+    is_shape_type: true,
+    id: shape_type.id,
+    style: shape_type.style,
+    coordinate_size: shape_type.coordinate_size,
+    coordinate_origin: shape_type.coordinate_origin,
+    path,
+    fill_color: shape_type.fill_color,
+    stroke_color: shape_type.stroke_color,
+    stroke_weight: shape_type.stroke_weight,
+    filled: shape_type.filled.is_none_or(|value| value.as_bool()),
+    stroked: shape_type.stroked.is_none_or(|value| value.as_bool()),
+    filled_authored: shape_type.filled.map(|value| value.as_bool()),
+    stroked_authored: shape_type.stroked.map(|value| value.as_bool()),
+    ..VmlShapeModel::default()
+  };
+  for choice in &shape_type.shapetype_choice {
+    match choice {
+      vml::ShapetypeChoice::Fill(fill) => collect_typed_vml_fill(&mut model, fill),
+      vml::ShapetypeChoice::Stroke(stroke) => collect_typed_vml_stroke(&mut model, stroke),
+      vml::ShapetypeChoice::TextWrap(text_wrap) => {
+        model.wrap_type = text_wrap.r#type;
+        model.wrap_side = text_wrap.side;
+        model.wrap_anchor_x = text_wrap.anchor_x;
+        model.wrap_anchor_y = text_wrap.anchor_y;
+      }
+      _ => {}
+    }
+  }
+  model
+}
+
+fn resolve_vml_shape_type_inheritance(models: Vec<VmlShapeModel>) -> Vec<VmlShapeModel> {
+  let shape_types = models
+    .iter()
+    .filter(|model| model.is_shape_type)
+    .filter_map(|model| {
+      Some((
+        model.id.as_deref()?.trim_start_matches('#').to_string(),
+        model.clone(),
+      ))
+    })
+    .collect::<HashMap<_, _>>();
+  models
+    .into_iter()
+    .filter(|model| !model.is_shape_type)
+    .map(|mut model| {
+      let Some(shape_type) = model
+        .shape_type_reference
+        .as_deref()
+        .map(|value| value.trim_start_matches('#'))
+        .and_then(|id| shape_types.get(id))
+      else {
+        return model;
+      };
+      model.style = merge_vml_style(shape_type.style.as_deref(), model.style.as_deref());
+      if model.coordinate_size.is_none() {
+        model
+          .coordinate_size
+          .clone_from(&shape_type.coordinate_size);
+      }
+      if model.coordinate_origin.is_none() {
+        model
+          .coordinate_origin
+          .clone_from(&shape_type.coordinate_origin);
+      }
+      if model.path.is_none() {
+        model.path.clone_from(&shape_type.path);
+      }
+      if model.fill_color.is_none() {
+        model.fill_color.clone_from(&shape_type.fill_color);
+      }
+      if model.fill_color2.is_none() {
+        model.fill_color2.clone_from(&shape_type.fill_color2);
+      }
+      if model.fill_opacity.is_none() {
+        model.fill_opacity.clone_from(&shape_type.fill_opacity);
+      }
+      if model.fill_opacity2.is_none() {
+        model.fill_opacity2.clone_from(&shape_type.fill_opacity2);
+      }
+      if model.fill_colors.is_none() {
+        model.fill_colors.clone_from(&shape_type.fill_colors);
+      }
+      if model.fill_type.is_none() {
+        model.fill_type = shape_type.fill_type;
+      }
+      if model.fill_angle.is_none() {
+        model.fill_angle.clone_from(&shape_type.fill_angle);
+      }
+      if model.fill_focus.is_none() {
+        model.fill_focus.clone_from(&shape_type.fill_focus);
+      }
+      if model.fill_focus_position.is_none() {
+        model
+          .fill_focus_position
+          .clone_from(&shape_type.fill_focus_position);
+      }
+      if model.fill_focus_size.is_none() {
+        model
+          .fill_focus_size
+          .clone_from(&shape_type.fill_focus_size);
+      }
+      if model.fill_method.is_none() {
+        model.fill_method = shape_type.fill_method;
+      }
+      if model.fill_rotate_with_shape.is_none() {
+        model.fill_rotate_with_shape = shape_type.fill_rotate_with_shape;
+      }
+      if model.fill_image_relationship_id.is_none() {
+        model
+          .fill_image_relationship_id
+          .clone_from(&shape_type.fill_image_relationship_id);
+      }
+      if model.fill_image_size.is_none() {
+        model
+          .fill_image_size
+          .clone_from(&shape_type.fill_image_size);
+      }
+      if model.fill_image_origin.is_none() {
+        model
+          .fill_image_origin
+          .clone_from(&shape_type.fill_image_origin);
+      }
+      if model.fill_image_position.is_none() {
+        model
+          .fill_image_position
+          .clone_from(&shape_type.fill_image_position);
+      }
+      if model.fill_image_aspect.is_none() {
+        model.fill_image_aspect = shape_type.fill_image_aspect;
+      }
+      if model.stroke_color.is_none() {
+        model.stroke_color.clone_from(&shape_type.stroke_color);
+      }
+      if model.stroke_opacity.is_none() {
+        model.stroke_opacity.clone_from(&shape_type.stroke_opacity);
+      }
+      if model.stroke_weight.is_none() {
+        model.stroke_weight.clone_from(&shape_type.stroke_weight);
+      }
+      if model.stroke_dash_style.is_none() {
+        model
+          .stroke_dash_style
+          .clone_from(&shape_type.stroke_dash_style);
+      }
+      if model.stroke_line_style.is_none() {
+        model.stroke_line_style = shape_type.stroke_line_style;
+      }
+      if model.stroke_join_style.is_none() {
+        model.stroke_join_style = shape_type.stroke_join_style;
+      }
+      if model.stroke_end_cap.is_none() {
+        model.stroke_end_cap = shape_type.stroke_end_cap;
+      }
+      if model.stroke_start_arrow.is_none() {
+        model.stroke_start_arrow = shape_type.stroke_start_arrow;
+      }
+      if model.stroke_start_arrow_width.is_none() {
+        model.stroke_start_arrow_width = shape_type.stroke_start_arrow_width;
+      }
+      if model.stroke_start_arrow_length.is_none() {
+        model.stroke_start_arrow_length = shape_type.stroke_start_arrow_length;
+      }
+      if model.stroke_end_arrow.is_none() {
+        model.stroke_end_arrow = shape_type.stroke_end_arrow;
+      }
+      if model.stroke_end_arrow_width.is_none() {
+        model.stroke_end_arrow_width = shape_type.stroke_end_arrow_width;
+      }
+      if model.stroke_end_arrow_length.is_none() {
+        model.stroke_end_arrow_length = shape_type.stroke_end_arrow_length;
+      }
+      if model.wrap_type.is_none() {
+        model.wrap_type = shape_type.wrap_type;
+      }
+      if model.wrap_side.is_none() {
+        model.wrap_side = shape_type.wrap_side;
+      }
+      if model.wrap_anchor_x.is_none() {
+        model.wrap_anchor_x = shape_type.wrap_anchor_x;
+      }
+      if model.wrap_anchor_y.is_none() {
+        model.wrap_anchor_y = shape_type.wrap_anchor_y;
+      }
+      if model.filled_authored.is_none() {
+        model.filled = shape_type.filled;
+      }
+      if model.stroked_authored.is_none() {
+        model.stroked = shape_type.stroked;
+      }
+      model
+    })
+    .collect()
+}
+
+fn merge_vml_style(base: Option<&str>, direct: Option<&str>) -> Option<String> {
+  let mut declarations = Vec::<(String, String)>::new();
+  for source in [base, direct].into_iter().flatten() {
+    for declaration in source.split(';') {
+      let Some((name, value)) = declaration.split_once(':') else {
+        continue;
+      };
+      let name = name.trim().to_ascii_lowercase();
+      if let Some(existing) = declarations
+        .iter_mut()
+        .find(|(existing_name, _)| *existing_name == name)
+      {
+        existing.1 = value.trim().to_string();
+      } else {
+        declarations.push((name, value.trim().to_string()));
+      }
+    }
+  }
+  (!declarations.is_empty()).then(|| {
+    declarations
+      .into_iter()
+      .map(|(name, value)| format!("{name}:{value}"))
+      .collect::<Vec<_>>()
+      .join(";")
+  })
 }
 
 trait VmlShapeElement {
@@ -337,6 +800,15 @@ trait VmlShapeElement {
   fn shape_id(&self) -> Option<String>;
   fn style(&self) -> Option<String>;
   fn user_hidden(&self) -> bool;
+  fn allow_in_cell(&self) -> bool;
+  fn coordinate_size(&self) -> Option<String>;
+  fn coordinate_origin(&self) -> Option<String>;
+  fn edge_path(&self) -> Option<String>;
+  fn fill_color(&self) -> Option<String>;
+  fn stroke_color(&self) -> Option<String>;
+  fn stroke_weight(&self) -> Option<String>;
+  fn filled(&self) -> Option<bool>;
+  fn stroked(&self) -> Option<bool>;
   fn collect_model_children(&self, model: &mut VmlShapeModel);
 }
 
@@ -359,6 +831,45 @@ macro_rules! impl_vml_shape_element {
         self.user_hidden.is_some_and(|value| value.as_bool())
       }
 
+      fn allow_in_cell(&self) -> bool {
+        self.allow_in_cell.is_none_or(|value| value.as_bool())
+      }
+
+      fn coordinate_size(&self) -> Option<String> {
+        self.coordinate_size.clone()
+      }
+
+      fn coordinate_origin(&self) -> Option<String> {
+        None
+      }
+
+      fn edge_path(&self) -> Option<String> {
+        self.$children.iter().find_map(|child| match child {
+          vml::$choice::Path(path) => path.value.clone(),
+          _ => None,
+        })
+      }
+
+      fn fill_color(&self) -> Option<String> {
+        self.fill_color.clone()
+      }
+
+      fn stroke_color(&self) -> Option<String> {
+        self.stroke_color.clone()
+      }
+
+      fn stroke_weight(&self) -> Option<String> {
+        self.stroke_weight.clone()
+      }
+
+      fn filled(&self) -> Option<bool> {
+        self.filled.map(|value| value.as_bool())
+      }
+
+      fn stroked(&self) -> Option<bool> {
+        self.stroked.map(|value| value.as_bool())
+      }
+
       fn collect_model_children(&self, model: &mut VmlShapeModel) {
         for child in &self.$children {
           match child {
@@ -368,6 +879,14 @@ macro_rules! impl_vml_shape_element {
             }
             vml::$choice::ClientData(client_data) => {
               collect_typed_vml_client_data(model, client_data);
+            }
+            vml::$choice::Fill(fill) => collect_typed_vml_fill(model, fill),
+            vml::$choice::Stroke(stroke) => collect_typed_vml_stroke(model, stroke),
+            vml::$choice::TextWrap(text_wrap) => {
+              model.wrap_type = text_wrap.r#type;
+              model.wrap_side = text_wrap.side;
+              model.wrap_anchor_x = text_wrap.anchor_x;
+              model.wrap_anchor_y = text_wrap.anchor_y;
             }
             _ => {}
           }
@@ -387,12 +906,24 @@ impl_vml_shape_element!(PolyLine, poly_line_choice, PolyLineChoice);
 impl_vml_shape_element!(Rectangle, rectangle_choice, RectangleChoice);
 impl_vml_shape_element!(RoundRectangle, round_rectangle_choice, RoundRectangleChoice);
 
-fn vml_shape_from_typed(shape: &impl VmlShapeElement) -> VmlShapeModel {
+fn vml_shape_from_typed(shape: &impl VmlShapeElement, kind: VmlShapeKind) -> VmlShapeModel {
   let mut model = VmlShapeModel {
+    kind,
     id: shape.id(),
     shape_id: shape.shape_id(),
     style: shape.style(),
     hidden: shape.user_hidden(),
+    allow_in_cell: shape.allow_in_cell(),
+    coordinate_size: shape.coordinate_size(),
+    coordinate_origin: shape.coordinate_origin(),
+    path: shape.edge_path(),
+    fill_color: shape.fill_color(),
+    stroke_color: shape.stroke_color(),
+    stroke_weight: shape.stroke_weight(),
+    filled: shape.filled().unwrap_or(true),
+    stroked: shape.stroked().unwrap_or(true),
+    filled_authored: shape.filled(),
+    stroked_authored: shape.stroked(),
     ..VmlShapeModel::default()
   };
   if model
@@ -407,27 +938,273 @@ fn vml_shape_from_typed(shape: &impl VmlShapeElement) -> VmlShapeModel {
   model
 }
 
+pub(crate) fn vml_arc_model(shape: &vml::Arc) -> VmlShapeModel {
+  let mut model = vml_shape_from_typed(shape, VmlShapeKind::Arc);
+  model.coordinate_origin.clone_from(&shape.coordinate_origin);
+  model.start_angle = shape.start_angle.as_ref().map(ToString::to_string);
+  model.end_angle = shape.end_angle.as_ref().map(ToString::to_string);
+  model
+}
+
+pub(crate) fn vml_shape_model(
+  shape: &vml::Shape,
+  shape_type: Option<&vml::Shapetype>,
+) -> VmlShapeModel {
+  let mut model = vml_shape_from_typed(shape, VmlShapeKind::Shape);
+  model.shape_type_reference.clone_from(&shape.r#type);
+  model.path = shape.edge_path.clone().or(model.path);
+  let Some(shape_type) = shape_type else {
+    return model;
+  };
+  resolve_vml_shape_type_inheritance(vec![vml_shape_type_model(shape_type.clone()), model])
+    .into_iter()
+    .next()
+    .unwrap_or_default()
+}
+
+pub(crate) fn vml_curve_model(shape: &vml::Curve) -> VmlShapeModel {
+  let mut model = vml_shape_from_typed(shape, VmlShapeKind::Curve);
+  model.coordinate_origin.clone_from(&shape.coordinate_origin);
+  model.from.clone_from(&shape.from);
+  model.to.clone_from(&shape.to);
+  model.control1.clone_from(&shape.control1);
+  model.control2.clone_from(&shape.control2);
+  model
+}
+
+pub(crate) fn vml_line_model(shape: &vml::Line) -> VmlShapeModel {
+  let mut model = vml_shape_from_typed(shape, VmlShapeKind::Line);
+  model.coordinate_origin.clone_from(&shape.coordinate_origin);
+  model.from.clone_from(&shape.from);
+  model.to.clone_from(&shape.to);
+  model
+}
+
+pub(crate) fn vml_oval_model(shape: &vml::Oval) -> VmlShapeModel {
+  let mut model = vml_shape_from_typed(shape, VmlShapeKind::Oval);
+  model.coordinate_origin.clone_from(&shape.coordinate_origin);
+  model
+}
+
+pub(crate) fn vml_rectangle_model(shape: &vml::Rectangle) -> VmlShapeModel {
+  vml_shape_from_typed(shape, VmlShapeKind::Rectangle)
+}
+
+pub(crate) fn vml_polyline_model(shape: &vml::PolyLine) -> VmlShapeModel {
+  let mut model = vml_shape_from_typed(shape, VmlShapeKind::Polyline);
+  model.coordinate_origin.clone_from(&shape.coordinate_origin);
+  model.points.clone_from(&shape.points);
+  model
+}
+
+pub(crate) fn vml_round_rectangle_model(shape: &vml::RoundRectangle) -> VmlShapeModel {
+  let mut model = vml_shape_from_typed(shape, VmlShapeKind::RoundRectangle);
+  model.arc_size.clone_from(&shape.arc_size);
+  model
+}
+
+fn collect_typed_vml_fill(model: &mut VmlShapeModel, fill: &vml::Fill) {
+  if let Some(on) = fill.on {
+    model.filled = on.as_bool();
+    model.filled_authored = Some(model.filled);
+  }
+  if fill.color.is_some() {
+    model.fill_color.clone_from(&fill.color);
+  }
+  if fill.color2.is_some() {
+    model.fill_color2.clone_from(&fill.color2);
+  }
+  if fill.opacity.is_some() {
+    model.fill_opacity.clone_from(&fill.opacity);
+  }
+  if fill.opacity2.is_some() {
+    model.fill_opacity2.clone_from(&fill.opacity2);
+  }
+  if fill.colors.is_some() {
+    model.fill_colors.clone_from(&fill.colors);
+  }
+  if fill.r#type.is_some() {
+    model.fill_type = fill.r#type;
+  }
+  if let Some(angle) = fill.angle.as_ref() {
+    model.fill_angle = Some(angle.to_string());
+  }
+  if fill.focus.is_some() {
+    model.fill_focus.clone_from(&fill.focus);
+  }
+  if fill.focus_position.is_some() {
+    model.fill_focus_position.clone_from(&fill.focus_position);
+  }
+  if fill.focus_size.is_some() {
+    model.fill_focus_size.clone_from(&fill.focus_size);
+  }
+  if fill.method.is_some() {
+    model.fill_method = fill.method;
+  }
+  if let Some(rotate) = fill.rotate {
+    model.fill_rotate_with_shape = Some(rotate.as_bool());
+  }
+  if fill.relationship_id.is_some() || fill.id.is_some() {
+    model.fill_image_relationship_id = fill.relationship_id.clone().or_else(|| fill.id.clone());
+  }
+  if fill.size.is_some() {
+    model.fill_image_size.clone_from(&fill.size);
+  }
+  if fill.origin.is_some() {
+    model.fill_image_origin.clone_from(&fill.origin);
+  }
+  if fill.position.is_some() {
+    model.fill_image_position.clone_from(&fill.position);
+  }
+  if fill.aspect.is_some() {
+    model.fill_image_aspect = fill.aspect;
+  }
+}
+
+fn collect_typed_vml_stroke(model: &mut VmlShapeModel, stroke: &vml::Stroke) {
+  if let Some(on) = stroke.on {
+    model.stroked = on.as_bool();
+    model.stroked_authored = Some(model.stroked);
+  }
+  if stroke.color.is_some() {
+    model.stroke_color.clone_from(&stroke.color);
+  }
+  if stroke.weight.is_some() {
+    model.stroke_weight.clone_from(&stroke.weight);
+  }
+  if stroke.opacity.is_some() {
+    model.stroke_opacity.clone_from(&stroke.opacity);
+  }
+  if stroke.dash_style.is_some() {
+    model.stroke_dash_style.clone_from(&stroke.dash_style);
+  }
+  if stroke.line_style.is_some() {
+    model.stroke_line_style = stroke.line_style;
+  }
+  if stroke.join_style.is_some() {
+    model.stroke_join_style = stroke.join_style;
+  }
+  if stroke.end_cap.is_some() {
+    model.stroke_end_cap = stroke.end_cap;
+  }
+  if stroke.start_arrow.is_some() {
+    model.stroke_start_arrow = stroke.start_arrow;
+  }
+  if stroke.start_arrow_width.is_some() {
+    model.stroke_start_arrow_width = stroke.start_arrow_width;
+  }
+  if stroke.start_arrow_length.is_some() {
+    model.stroke_start_arrow_length = stroke.start_arrow_length;
+  }
+  if stroke.end_arrow.is_some() {
+    model.stroke_end_arrow = stroke.end_arrow;
+  }
+  if stroke.end_arrow_width.is_some() {
+    model.stroke_end_arrow_width = stroke.end_arrow_width;
+  }
+  if stroke.end_arrow_length.is_some() {
+    model.stroke_end_arrow_length = stroke.end_arrow_length;
+  }
+}
+
 fn vml_group_shape_models(group: &vml::Group) -> Vec<VmlShapeModel> {
+  vml_group_shape_models_with_style(group, group.style.as_deref())
+}
+
+fn vml_group_shape_models_with_style(
+  group: &vml::Group,
+  group_style: Option<&str>,
+) -> Vec<VmlShapeModel> {
   let mut shapes = Vec::new();
   let mut group_model = VmlShapeModel {
-    style: group.style.clone(),
+    kind: VmlShapeKind::Group,
+    style: group_style.map(ToOwned::to_owned),
     hidden: group.user_hidden.is_some_and(|value| value.as_bool()),
     ..VmlShapeModel::default()
   };
 
   for child in &group.group_choice {
     match child {
-      vml::GroupChoice::Group(group) => shapes.extend(vml_group_shape_models(group)),
-      vml::GroupChoice::Shape(shape) => shapes.push(vml_shape_from_typed(shape.as_ref())),
-      vml::GroupChoice::Arc(shape) => shapes.push(vml_shape_from_typed(shape.as_ref())),
-      vml::GroupChoice::Curve(shape) => shapes.push(vml_shape_from_typed(shape.as_ref())),
-      vml::GroupChoice::ImageFile(shape) => shapes.push(vml_shape_from_typed(shape.as_ref())),
-      vml::GroupChoice::Line(shape) => shapes.push(vml_shape_from_typed(shape.as_ref())),
-      vml::GroupChoice::Oval(shape) => shapes.push(vml_shape_from_typed(shape.as_ref())),
-      vml::GroupChoice::PolyLine(shape) => shapes.push(vml_shape_from_typed(shape.as_ref())),
-      vml::GroupChoice::Rectangle(shape) => shapes.push(vml_shape_from_typed(shape.as_ref())),
+      vml::GroupChoice::Group(child_group) => {
+        let child_style =
+          crate::docx::vml_group_child_style(group, group_style, child_group.style.as_deref());
+        shapes.extend(vml_group_shape_models_with_style(
+          child_group,
+          child_style.as_deref().or(child_group.style.as_deref()),
+        ));
+      }
+      vml::GroupChoice::Shape(shape) => {
+        let mut model =
+          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Shape);
+        model.shape_type_reference.clone_from(&shape.r#type);
+        model.path = shape.edge_path.clone().or(model.path);
+        shapes.push(model);
+      }
+      vml::GroupChoice::Arc(shape) => {
+        let mut model =
+          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Arc);
+        model.coordinate_origin.clone_from(&shape.coordinate_origin);
+        model.start_angle = shape.start_angle.as_ref().map(ToString::to_string);
+        model.end_angle = shape.end_angle.as_ref().map(ToString::to_string);
+        shapes.push(model);
+      }
+      vml::GroupChoice::Curve(shape) => {
+        let mut model =
+          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Curve);
+        model.coordinate_origin.clone_from(&shape.coordinate_origin);
+        model.from.clone_from(&shape.from);
+        model.to.clone_from(&shape.to);
+        model.control1.clone_from(&shape.control1);
+        model.control2.clone_from(&shape.control2);
+        shapes.push(model);
+      }
+      vml::GroupChoice::ImageFile(shape) => {
+        shapes.push(vml_group_child_model(
+          group,
+          group_style,
+          shape.as_ref(),
+          VmlShapeKind::Image,
+        ));
+      }
+      vml::GroupChoice::Line(shape) => {
+        let mut model =
+          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Line);
+        model.coordinate_origin.clone_from(&shape.coordinate_origin);
+        model.from.clone_from(&shape.from);
+        model.to.clone_from(&shape.to);
+        shapes.push(model);
+      }
+      vml::GroupChoice::Oval(shape) => {
+        let mut model =
+          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Oval);
+        model.coordinate_origin.clone_from(&shape.coordinate_origin);
+        shapes.push(model);
+      }
+      vml::GroupChoice::PolyLine(shape) => {
+        let mut model =
+          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Polyline);
+        model.coordinate_origin.clone_from(&shape.coordinate_origin);
+        model.points.clone_from(&shape.points);
+        shapes.push(model);
+      }
+      vml::GroupChoice::Rectangle(shape) => {
+        let mut model =
+          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Rectangle);
+        model.coordinate_origin.clone_from(&shape.coordinate_origin);
+        shapes.push(model);
+      }
       vml::GroupChoice::RoundRectangle(shape) => {
-        shapes.push(vml_shape_from_typed(shape.as_ref()));
+        let mut model = vml_group_child_model(
+          group,
+          group_style,
+          shape.as_ref(),
+          VmlShapeKind::RoundRectangle,
+        );
+        model.arc_size.clone_from(&shape.arc_size);
+        shapes.push(model);
+      }
+      vml::GroupChoice::Shapetype(shape_type) => {
+        shapes.push(vml_shape_type_model(shape_type.as_ref().clone()));
       }
       vml::GroupChoice::ClientData(client_data) => {
         collect_typed_vml_client_data(&mut group_model, client_data);
@@ -440,6 +1217,21 @@ fn vml_group_shape_models(group: &vml::Group) -> Vec<VmlShapeModel> {
     shapes.insert(0, group_model);
   }
   shapes
+}
+
+fn vml_group_child_model(
+  group: &vml::Group,
+  group_style: Option<&str>,
+  shape: &impl VmlShapeElement,
+  kind: VmlShapeKind,
+) -> VmlShapeModel {
+  let mut model = vml_shape_from_typed(shape, kind);
+  if let Some(style) =
+    crate::docx::vml_group_child_style(group, group_style, model.style.as_deref())
+  {
+    model.style = Some(style);
+  }
+  model
 }
 
 fn collect_typed_vml_textbox(model: &mut VmlShapeModel, text_box: &vml::TextBox) {
@@ -795,6 +1587,26 @@ mod tests {
   }
 
   #[test]
+  fn powerpoint_vml_conditionals_preserve_control_preview_images() {
+    let shapes = vml_shapes(
+      br#"<xml xmlns:v="urn:schemas-microsoft-com:vml"
+          xmlns:o="urn:schemas-microsoft-com:office:office">
+        <v:shape id="OptionButton1" o:spid="_x0000_s1027"
+          style="position:absolute;left:114pt;top:98pt;width:148pt;height:57pt">
+          <![if gte mso 9]>
+          <v:imagedata o:relid="rId1"/>
+          <![endif]>
+        </v:shape>
+      </xml>"#,
+    );
+
+    assert_eq!(shapes.len(), 1);
+    assert_eq!(shapes[0].id.as_deref(), Some("OptionButton1"));
+    assert_eq!(shapes[0].shape_id.as_deref(), Some("_x0000_s1027"));
+    assert_eq!(shapes[0].image_relationship_id.as_deref(), Some("rId1"));
+  }
+
+  #[test]
   fn xml_text_content_is_limited_to_vml_textbox_wildcard_payload() {
     assert_eq!(
       normalize_vml_text(&xml_text_content(
@@ -802,5 +1614,64 @@ mod tests {
       )),
       "one two three & four"
     );
+  }
+
+  #[test]
+  fn vml_shape_type_paint_is_inherited_then_overridden_by_child_elements() {
+    let xml = br##"<xml xmlns:v="urn:schemas-microsoft-com:vml">
+      <v:shapetype id="base" coordsize="1000,500" path="m0,0l1000,500e"
+        fillcolor="#112233" strokecolor="#445566" stroked="f"/>
+      <v:shape type="#base" style="margin-left:1pt;margin-top:2pt;width:10pt;height:5pt">
+        <v:fill on="t" color="#AABBCC"/>
+        <v:stroke on="t" color="#DDEEFF" weight="2pt"/>
+      </v:shape>
+    </xml>"##;
+
+    let shapes = vml_shapes(xml);
+    assert_eq!(shapes.len(), 1);
+    assert_eq!(shapes[0].coordinate_size.as_deref(), Some("1000,500"));
+    assert_eq!(shapes[0].path.as_deref(), Some("m0,0l1000,500e"));
+    assert_eq!(shapes[0].fill_color.as_deref(), Some("#AABBCC"));
+    assert_eq!(shapes[0].stroke_color.as_deref(), Some("#DDEEFF"));
+    assert_eq!(shapes[0].stroke_weight.as_deref(), Some("2pt"));
+    assert!(shapes[0].filled);
+    assert!(shapes[0].stroked);
+  }
+
+  #[test]
+  fn vml_group_coordinate_space_is_lowered_into_child_style() {
+    let xml = br#"<xml xmlns:v="urn:schemas-microsoft-com:vml">
+      <v:group style="width:100pt;height:50pt" coordsize="1000,500">
+        <v:curve style="left:100;top:50;width:200;height:100"
+          from="0,0" control1="0,100" control2="200,0" to="200,100"/>
+      </v:group>
+    </xml>"#;
+
+    let shapes = vml_shapes(xml);
+    assert_eq!(shapes.len(), 1);
+    let style = shapes[0].style.as_deref().unwrap();
+    assert!(style.contains("left:10pt"));
+    assert!(style.contains("top:5pt"));
+    assert!(style.contains("width:20pt"));
+    assert!(style.contains("height:10pt"));
+    assert_eq!(shapes[0].control1.as_deref(), Some("0,100"));
+    assert_eq!(shapes[0].control2.as_deref(), Some("200,0"));
+  }
+
+  #[test]
+  fn vml_group_local_shape_type_is_available_to_nested_shape() {
+    let xml = br##"<xml xmlns:v="urn:schemas-microsoft-com:vml">
+      <v:group style="width:100pt;height:50pt" coordsize="1000,500">
+        <v:shapetype id="local" coordsize="200,100" path="m0,0l200,100e"
+          fillcolor="#123456"/>
+        <v:shape type="#local" style="left:0;top:0;width:200;height:100"/>
+      </v:group>
+    </xml>"##;
+
+    let shapes = vml_shapes(xml);
+    assert_eq!(shapes.len(), 1);
+    assert_eq!(shapes[0].path.as_deref(), Some("m0,0l200,100e"));
+    assert_eq!(shapes[0].coordinate_size.as_deref(), Some("200,100"));
+    assert_eq!(shapes[0].fill_color.as_deref(), Some("#123456"));
   }
 }

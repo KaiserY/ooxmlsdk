@@ -32,6 +32,12 @@
           "QName": "cx:chart",
           "PayloadRustType": "RelId",
           "PayloadModulePath": "crate::schemas::schemas_microsoft_com_office_drawing_2014_chartex"
+        },
+        {
+          "RustName": "Model3D",
+          "QName": "am3d:model3d",
+          "PayloadRustType": "Model3D",
+          "PayloadModulePath": "crate::schemas::schemas_microsoft_com_office_drawing_2017_model3d"
         }
       ]
     },

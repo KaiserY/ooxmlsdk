@@ -12,13 +12,13 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use crate::common::{self, color_math};
-use kurbo::{Affine, Rect as KurboRect};
+use kurbo::Affine;
 use ooxmlsdk::parts::{
   main_document_part::MainDocumentPart, wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_drawing_2008_diagram as dsp,
-  schemas_microsoft_com_office_word_2010_wordml as w14,
+  schemas_microsoft_com_office_word as w10, schemas_microsoft_com_office_word_2010_wordml as w14,
   schemas_microsoft_com_office_word_2010_wordprocessing_canvas as wpc,
   schemas_microsoft_com_office_word_2010_wordprocessing_drawing as wp14,
   schemas_microsoft_com_office_word_2010_wordprocessing_group as wpg,
@@ -37,7 +37,9 @@ use ooxmlsdk::simple_type::{
 use ooxmlsdk::units as sdk_units;
 use smallvec::SmallVec;
 
-use crate::common::drawingml_image_effects::{ColorChangeEffect, ImageEffect};
+use crate::common::drawingml_image_effects::{
+  ImageEffect, ImageEffectColorResolver, ResolvedEffectColor,
+};
 use crate::error::Result;
 use crate::model::common_rgb;
 use crate::options::{LayoutActionOptions, LayoutDiagnosticsOptions, LayoutOptions};
@@ -156,7 +158,8 @@ pub(crate) fn extract(
     import_settings,
     options.ui_language.as_deref(),
   )?;
-  let mut numbering = NumberingCatalog::load(package, &main, import_settings)?;
+  let mut numbering =
+    NumberingCatalog::load(package, &main, import_settings, &styles.theme_colors)?;
   let images = ImageCatalog::load(package, &main);
   let alt_chunks = AltChunkCatalog::load(package, &main);
   let hyperlinks = HyperlinkCatalog::load(package, &main);
@@ -1069,6 +1072,7 @@ fn paragraph_is_effectively_empty(paragraph: &Paragraph) -> bool {
       InlineItem::Image(_) | InlineItem::Shape(_) => false,
       InlineItem::BookmarkStart(_) => true,
       InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
+      InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => true,
       InlineItem::LastRenderedPageBreak => true,
       InlineItem::PageBreak | InlineItem::ColumnBreak => false,
     })
@@ -1089,6 +1093,8 @@ fn paragraph_drop_cap_text(paragraph: &Paragraph) -> Option<String> {
       | InlineItem::BookmarkStart(_)
       | InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
+      | InlineItem::DrawingGroupStart(_)
+      | InlineItem::DrawingGroupEnd
       | InlineItem::LastRenderedPageBreak
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak => None,
@@ -2461,7 +2467,9 @@ pub(super) fn paragraph_starts_after_last_rendered_page_break(inlines: &[InlineI
       InlineItem::Text(_)
       | InlineItem::BookmarkStart(_)
       | InlineItem::FormWidgetStart(_)
-      | InlineItem::FormWidgetEnd(_) => {}
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::DrawingGroupStart(_)
+      | InlineItem::DrawingGroupEnd => {}
     }
   }
   false
@@ -4318,6 +4326,7 @@ fn field_result_text(result: &[InlineItem]) -> Option<String> {
     match item {
       InlineItem::Text(run) => text.push_str(&run.text),
       InlineItem::PageBreak | InlineItem::ColumnBreak | InlineItem::LastRenderedPageBreak => {}
+      InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => {}
       InlineItem::Image(_)
       | InlineItem::Shape(_)
       | InlineItem::BookmarkStart(_)
@@ -5722,8 +5731,11 @@ fn inline_image_impl(
 
   match drawing.drawing_choice.as_ref()? {
     w::DrawingChoice::Inline(inline) => {
-      let properties =
-        drawing_image_properties(&inline.graphic.graphic_data, &styles.theme_colors)?;
+      let properties = drawing_image_properties(
+        &inline.graphic.graphic_data,
+        &styles.theme_colors,
+        Some(images),
+      )?;
       let relationship_id = properties.relationship_id.as_deref()?;
       let resource = images.by_relationship_id.get(relationship_id)?;
       let image_data = image_data_with_effects(resource, &properties);
@@ -5762,7 +5774,8 @@ fn inline_image_impl(
     w::DrawingChoice::Anchor(anchor) => {
       let graphic = anchor.graphic.as_ref();
       let extent = &anchor.extent;
-      let properties = drawing_image_properties(&graphic.graphic_data, &styles.theme_colors)?;
+      let properties =
+        drawing_image_properties(&graphic.graphic_data, &styles.theme_colors, Some(images))?;
       let relationship_id = properties.relationship_id.as_deref()?;
       let resource = images.by_relationship_id.get(relationship_id)?;
       let image_data = image_data_with_effects(resource, &properties);
@@ -6115,7 +6128,7 @@ fn push_drawing_textboxes_impl(
   let Some(graphic_data) = drawing_graphic_data(drawing) else {
     return;
   };
-  if drawing_image_properties(graphic_data, &styles.theme_colors).is_some() {
+  if drawing_image_properties(graphic_data, &styles.theme_colors, None).is_some() {
     return;
   }
 
@@ -6201,6 +6214,7 @@ fn merge_textbox_frame_into_owning_shape(
   shape.text_inset_bottom_pt = text_box_frame.text_inset_bottom_pt;
   shape.text_box_auto_fit = text_box_frame.text_box_auto_fit;
   shape.text_vertical_alignment = text_box_frame.text_vertical_alignment;
+  shape.text_fill = text_box_frame.text_fill.take();
   Ok(())
 }
 
@@ -6323,6 +6337,190 @@ fn drawingml_w14_gradient_fill_colors(
       }
     })
     .collect()
+}
+
+fn drawingml_w14_gradient_fill(
+  fill: &w14::GradientFillProperties,
+  theme_colors: &ThemeColors,
+) -> Option<common::Fill<'static>> {
+  let mut stops = fill
+    .gradient_stop_list
+    .as_ref()?
+    .gradient_stop
+    .iter()
+    .filter_map(|stop| {
+      let resolved = match stop.gradient_stop_choice.as_ref()? {
+        w14::GradientStopChoice::RgbColorModelHex(color) => ResolvedColor {
+          color: parse_hex_color(color.val.as_str())?,
+          opacity: opacity_from_w14_rgb_transforms(&color.rgb_color_model_hex_choice),
+        },
+        w14::GradientStopChoice::SchemeColor(color) => ResolvedColor {
+          color: apply_w14_scheme_transforms(
+            theme_colors.resolve_word2010(color.val)?,
+            &color.scheme_color_choice,
+          ),
+          opacity: opacity_from_w14_scheme_transforms(&color.scheme_color_choice),
+        },
+      };
+      Some(common::GradientStop {
+        position: stop.stop_position as f32 / 100_000.0,
+        color: common_rgb(resolved.color, resolved.opacity),
+        scheme: None,
+      })
+    })
+    .collect::<Vec<_>>();
+  stops.sort_by(|left, right| left.position.total_cmp(&right.position));
+  if stops.is_empty() {
+    return None;
+  }
+  let (angle_degrees, scaled, path) = match fill.gradient_fill_properties_choice.as_ref()? {
+    w14::GradientFillPropertiesChoice::LinearShadeProperties(linear) => (
+      Some(linear.angle.unwrap_or_default() as f32 / 60_000.0),
+      linear
+        .scaled
+        .is_some_and(|value| matches!(value, w14::OnOffValues::True | w14::OnOffValues::One)),
+      None,
+    ),
+    w14::GradientFillPropertiesChoice::PathShadeProperties(path) => {
+      let fill_to = path
+        .fill_to_rectangle
+        .as_ref()
+        .map(|rect| common::RelativeRect {
+          left: rect.left.unwrap_or(50_000) as f32 / 100_000.0,
+          top: rect.top.unwrap_or(50_000) as f32 / 100_000.0,
+          right: rect.right.unwrap_or(50_000) as f32 / 100_000.0,
+          bottom: rect.bottom.unwrap_or(50_000) as f32 / 100_000.0,
+        })
+        .unwrap_or(common::RelativeRect {
+          left: 0.5,
+          top: 0.5,
+          right: 0.5,
+          bottom: 0.5,
+        });
+      let kind = match path.path.unwrap_or_default() {
+        w14::PathShadeTypeValues::Shape => common::GradientPathKind::Shape,
+        w14::PathShadeTypeValues::Circle => common::GradientPathKind::Circle,
+        w14::PathShadeTypeValues::Rect => common::GradientPathKind::Rectangle,
+      };
+      (
+        None,
+        false,
+        Some(common::GradientPath {
+          kind,
+          fill_to,
+          transform: common::Transform::default(),
+          mirror_tile: false,
+        }),
+      )
+    }
+  };
+  Some(common::Fill::Gradient(common::GradientFill {
+    stops,
+    angle_degrees,
+    definition_bounds: None,
+    line: None,
+    interpolation: common::GradientInterpolation::LinearSrgb,
+    scaled,
+    rotate_with_shape: Some(true),
+    path,
+  }))
+}
+
+pub(super) fn drawingml_text_effect_common_fill(
+  fill: &w14::FillTextEffect,
+  theme_colors: &ThemeColors,
+) -> Option<common::Fill<'static>> {
+  match fill.fill_text_effect_choice.as_ref()? {
+    w14::FillTextEffectChoice::NoFillEmpty => Some(common::Fill::None),
+    w14::FillTextEffectChoice::SolidColorFillProperties(fill) => {
+      let resolved = resolve_solid_text_fill(fill, theme_colors)?;
+      Some(common::Fill::Solid(common_rgb(
+        resolved.color,
+        resolved.opacity,
+      )))
+    }
+    w14::FillTextEffectChoice::GradientFillProperties(fill) => {
+      drawingml_w14_gradient_fill(fill, theme_colors)
+    }
+  }
+}
+
+pub(super) fn drawingml_text_outline_effect_common_fill(
+  outline: &w14::TextOutlineEffect,
+  theme_colors: &ThemeColors,
+) -> Option<common::Fill<'static>> {
+  match outline.text_outline_effect_choice1.as_ref()? {
+    w14::TextOutlineEffectChoice::NoFillEmpty => Some(common::Fill::None),
+    w14::TextOutlineEffectChoice::SolidColorFillProperties(fill) => {
+      let resolved = resolve_solid_text_fill(fill, theme_colors)?;
+      Some(common::Fill::Solid(common_rgb(
+        resolved.color,
+        resolved.opacity,
+      )))
+    }
+    w14::TextOutlineEffectChoice::GradientFillProperties(fill) => {
+      drawingml_w14_gradient_fill(fill, theme_colors)
+    }
+  }
+}
+
+fn wordprocessing_textbox_common_fill(
+  content: &w::TextBoxContent,
+  theme_colors: &ThemeColors,
+) -> Option<common::Fill<'static>> {
+  for paragraph in content
+    .text_box_content_choice
+    .iter()
+    .filter_map(|choice| match choice {
+      w::TextBoxContentChoice::Paragraph(paragraph) => Some(paragraph.as_ref()),
+      _ => None,
+    })
+  {
+    if let Some(fill) = paragraph
+      .paragraph_properties
+      .as_deref()
+      .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
+      .and_then(|properties| properties.fill_text_effect.as_deref())
+      .and_then(|fill| drawingml_text_effect_common_fill(fill, theme_colors))
+    {
+      return Some(fill);
+    }
+    for run in paragraph
+      .paragraph_choice
+      .iter()
+      .filter_map(|choice| match choice {
+        w::ParagraphChoice::WRun(run) => Some(run.as_ref()),
+        _ => None,
+      })
+    {
+      if let Some(fill) = wordprocessing_run_common_fill(run, theme_colors) {
+        return Some(fill);
+      }
+    }
+  }
+  None
+}
+
+fn wordprocessing_run_common_fill(
+  run: &w::Run,
+  theme_colors: &ThemeColors,
+) -> Option<common::Fill<'static>> {
+  if let Some(fill) = run
+    .run_properties
+    .as_deref()
+    .and_then(|properties| properties.fill_text_effect.as_deref())
+    .and_then(|fill| drawingml_text_effect_common_fill(fill, theme_colors))
+  {
+    return Some(fill);
+  }
+  run
+    .run_choice
+    .iter()
+    .filter_map(|choice| match choice {
+      w::RunChoice::Run(run) => Some(run.as_ref()),
+      _ => None,
+    })
+    .find_map(|run| wordprocessing_run_common_fill(run, theme_colors))
 }
 
 fn wordprocessing_textbox_fill_colors(
@@ -6479,19 +6677,30 @@ fn text_box_frame_from_wordprocessing_shape(
 }
 
 fn wordprocessing_shape_textbox_text_rotation(shape: &wps::WordprocessingShape) -> Option<f32> {
-  match shape
-    .text_body_properties
-    .as_ref()
-    .and_then(|properties| properties.vertical)
-  {
+  let properties = shape.text_body_properties.as_deref()?;
+  let vertical_rotation = match properties.vertical {
     Some(a::TextVerticalValues::Vertical)
     | Some(a::TextVerticalValues::WordArtVertical)
-    | Some(a::TextVerticalValues::EastAsianVetical) => Some(-90.0),
+    | Some(a::TextVerticalValues::EastAsianVetical) => -90.0,
     Some(a::TextVerticalValues::Vertical270) | Some(a::TextVerticalValues::WordArtLeftToRight) => {
-      Some(90.0)
+      90.0
     }
-    _ => None,
-  }
+    _ => 0.0,
+  };
+  let text_area_rotation = if properties
+    .up_right
+    .as_ref()
+    .is_some_and(|value| value.as_bool())
+  {
+    0.0
+  } else {
+    properties
+      .rotation
+      .map(|value| -(sdk_units::drawingml_angle_to_degrees(value) as f32))
+      .unwrap_or_default()
+  };
+  let rotation = vertical_rotation + text_area_rotation;
+  (rotation.abs() > f32::EPSILON).then_some(rotation)
 }
 
 fn rotate_textbox_blocks(blocks: &mut [Block], rotation_deg: f32) {
@@ -6811,8 +7020,17 @@ fn wordprocessing_shape_textbox_frame(
       transform.raw_coordinates,
       None,
     )?;
+  let mapped = transform.map_rect(
+    offset_x_pt,
+    offset_y_pt,
+    shape_width_pt,
+    shape_height_pt,
+    properties.rotation_deg(),
+    properties.flip_horizontal(),
+    properties.flip_vertical(),
+  );
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
-    transform.rect(offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt);
+    (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
   let width_pt = if expands_auto_fit {
     shape_width_pt.max(DEFAULT_TEXTBOX_AUTO_FIT_WIDTH_PT)
   } else {
@@ -6825,6 +7043,9 @@ fn wordprocessing_shape_textbox_frame(
   };
   let text_warp = wordprocessing_shape_textbox_fontwork_warp(shape);
   let has_fontwork_warp = text_warp.is_some();
+  let text_fill = has_fontwork_warp
+    .then(|| wordprocessing_textbox_common_fill(content, &context.styles.theme_colors))
+    .flatten();
   let mut wordart_fill_colors = if has_fontwork_warp {
     wordprocessing_textbox_fill_colors(content, &context.styles.theme_colors)
   } else {
@@ -6855,18 +7076,31 @@ fn wordprocessing_shape_textbox_frame(
     geometry,
     offset_x_pt,
     offset_y_pt,
+    rotation_deg: mapped.rotation_deg,
+    flip_horizontal: mapped.flip_horizontal,
+    flip_vertical: mapped.flip_vertical,
     fill_color,
     fill_pattern: None,
+    fill_override: None,
     additional_fill_colors,
     fill_image: None,
     stroke: frame_stroke.or_else(|| expands_auto_fit.then_some(BorderStyle::default())),
     stroke_pattern: None,
+    stroke_override: None,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
     inline_anchor_after_line: matches!(placement, ImagePlacement::Inline),
     placement,
     chart: None,
     text_warp,
+    text_fill,
+    effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
+    static3d: properties.static3d(&context.styles.theme_colors),
+    text_upright: shape
+      .text_body_properties
+      .as_ref()
+      .and_then(|properties| properties.up_right.as_ref())
+      .is_some_and(|value| value.as_bool()),
     text_box_blocks: text_box.blocks,
     text_inset_left_pt: text_box.left_pt,
     text_inset_top_pt: text_box.top_pt,
@@ -6970,7 +7204,8 @@ fn push_drawing_shapes_impl(
   let Some(graphic_data) = drawing_graphic_data(drawing) else {
     return;
   };
-  let is_top_level_picture = drawing_image_properties(graphic_data, &styles.theme_colors).is_some();
+  let is_top_level_picture =
+    drawing_image_properties(graphic_data, &styles.theme_colors, None).is_some();
 
   let placement = match drawing.drawing_choice.as_ref() {
     Some(w::DrawingChoice::Inline(_)) => ImagePlacement::Inline,
@@ -6993,6 +7228,7 @@ fn push_drawing_shapes_impl(
   let transform =
     DrawingMlGroupTransform::identity().with_fallback_size(drawing_extent_size(drawing));
   let effect_extent = drawing_effect_extent(drawing);
+  let placement = drawing_placement_with_effect_extent(placement, effect_extent);
   for choice in &graphic_data.graphic_data_choice {
     match choice {
       a::GraphicDataChoice::ChartReference(reference) => {
@@ -7134,7 +7370,7 @@ fn wordprocessing_group_shapes(
     effect_extent: DrawingEffectExtent::default(),
     ..context
   };
-  group
+  let children = group
     .wordprocessing_group_choice
     .iter()
     .flat_map(|choice| {
@@ -7145,7 +7381,14 @@ fn wordprocessing_group_shapes(
         child_context,
       )
     })
-    .collect()
+    .collect();
+  wrap_wordprocessing_group_effects(
+    children,
+    &group.group_shape_properties,
+    child_transform.rotation_degrees(),
+    placement,
+    context,
+  )
 }
 
 fn wordprocessing_group_shape_shapes(
@@ -7161,7 +7404,7 @@ fn wordprocessing_group_shape_shapes(
     effect_extent: DrawingEffectExtent::default(),
     ..context
   };
-  group
+  let children = group
     .group_shape_choice
     .iter()
     .flat_map(|choice| {
@@ -7172,7 +7415,90 @@ fn wordprocessing_group_shape_shapes(
         child_context,
       )
     })
-    .collect()
+    .collect();
+  wrap_wordprocessing_group_effects(
+    children,
+    &group.group_shape_properties,
+    child_transform.rotation_degrees(),
+    placement,
+    context,
+  )
+}
+
+fn wrap_wordprocessing_group_effects(
+  children: Vec<InlineItem>,
+  properties: &wpg::GroupShapeProperties,
+  rotation_deg: f32,
+  placement: ImagePlacement,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  let Some(effects) = properties
+    .group_shape_properties_choice2
+    .as_ref()
+    .map(|choice| {
+      let resolver = DocxImageEffectColorResolver {
+        theme_colors: &context.styles.theme_colors,
+        images: Some(context.images),
+      };
+      match choice {
+        wpg::GroupShapePropertiesChoice2::EffectList(source) => common::DrawingEffectSource::List {
+          source: source.clone(),
+          resolved: Some(common::drawingml_image_effects::from_effect_list(
+            source, None, &resolver,
+          )),
+        },
+        wpg::GroupShapePropertiesChoice2::EffectDag(source) => common::DrawingEffectSource::Dag {
+          source: source.clone(),
+          resolved: Some(common::drawingml_image_effects::from_effect_dag(
+            source, None, &resolver,
+          )),
+        },
+      }
+    })
+  else {
+    return children;
+  };
+  let has_runtime_effects = match &effects {
+    common::DrawingEffectSource::List {
+      resolved: Some(value),
+      ..
+    }
+    | common::DrawingEffectSource::Dag {
+      resolved: Some(value),
+      ..
+    } => !value.effects.is_empty(),
+    _ => false,
+  };
+  if !has_runtime_effects || children.is_empty() {
+    return children;
+  }
+  let mut children = children;
+  suppress_group_child_wrap(&mut children);
+  let mut grouped = Vec::with_capacity(children.len() + 2);
+  grouped.push(InlineItem::DrawingGroupStart(InlineDrawingGroupEffect {
+    effects,
+    rotation_deg,
+    placement,
+  }));
+  grouped.extend(children);
+  grouped.push(InlineItem::DrawingGroupEnd);
+  grouped
+}
+
+fn suppress_group_child_wrap(children: &mut [InlineItem]) {
+  for child in children {
+    let placement = match child {
+      InlineItem::Image(image) => &mut image.placement,
+      InlineItem::Shape(shape) => &mut shape.placement,
+      InlineItem::DrawingGroupStart(group) => &mut group.placement,
+      _ => continue,
+    };
+    if let ImagePlacement::Floating(placement) = placement {
+      // The host group owns one wrap contour. Its children keep floating
+      // coordinates for paint, but must not each advance the paragraph.
+      placement.wrap = ImageWrapMode::Inline;
+    }
+  }
 }
 
 fn wordprocessing_group_choice_shapes(
@@ -7238,6 +7564,8 @@ fn wordprocessing_shape_shape(
     drawingml_shape_properties_fill_color(&properties, &context.styles.theme_colors);
   let fill_pattern =
     drawingml_shape_properties_pattern_fill(&properties, &context.styles.theme_colors);
+  let fill_override =
+    drawingml_shape_properties_common_fill(&properties, &context.styles.theme_colors);
   let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
     None
   } else {
@@ -7275,7 +7603,20 @@ fn wordprocessing_shape_shape(
       }
       _ => None,
     });
-  if fill_color.is_none() && fill_pattern.is_none() && fill_image.is_none() && stroke.is_none() {
+  let stroke_override = shape
+    .shape_properties
+    .as_deref()
+    .and_then(|properties| properties.outline.as_deref())
+    .and_then(|outline| drawingml_outline_common_stroke(outline, &context.styles.theme_colors));
+  if fill_color.is_none()
+    && fill_pattern.is_none()
+    && fill_override
+      .as_ref()
+      .is_none_or(|fill| matches!(fill, common::Fill::None))
+    && fill_image.is_none()
+    && stroke.is_none()
+    && stroke_override.is_none()
+  {
     return None;
   }
 
@@ -7295,8 +7636,17 @@ fn wordprocessing_shape_shape(
     transform.raw_coordinates,
     transform.fallback_size,
   )?;
+  let mapped = transform.map_rect(
+    offset_x_pt,
+    offset_y_pt,
+    width_pt,
+    height_pt,
+    properties.rotation_deg(),
+    properties.flip_horizontal(),
+    properties.flip_vertical(),
+  );
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
+    (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
   if has_path_geometry
     && let Some(path_geometry) =
       drawingml_path_geometry_from_properties(&properties, width_pt, height_pt)
@@ -7314,18 +7664,27 @@ fn wordprocessing_shape_shape(
     geometry,
     offset_x_pt,
     offset_y_pt,
+    rotation_deg: mapped.rotation_deg,
+    flip_horizontal: mapped.flip_horizontal,
+    flip_vertical: mapped.flip_vertical,
     fill_color,
     fill_pattern,
+    fill_override,
     additional_fill_colors: Vec::new(),
     fill_image,
     stroke,
     stroke_pattern,
+    stroke_override,
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
     inline_anchor_after_line: false,
     placement,
     chart: None,
     text_warp: None,
+    text_fill: None,
+    effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
+    static3d: properties.static3d(&context.styles.theme_colors),
+    text_upright: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -7353,7 +7712,13 @@ fn drawingml_picture_items(
   ) {
     items.push(InlineItem::Image(image));
   }
-  if let Some(shape) = drawingml_picture_frame(picture, placement, transform) {
+  if let Some(shape) = drawingml_picture_frame(
+    picture,
+    placement,
+    transform,
+    &context.styles.theme_colors,
+    context.images,
+  ) {
     items.push(InlineItem::Shape(shape));
   }
   items
@@ -7409,7 +7774,7 @@ fn drawingml_diagram_drawing_shapes(
     drawingml_group_transform_from_diagram_properties(&drawing.shape_tree.group_shape_properties)
       .map(|xfrm| transform.child(xfrm))
       .unwrap_or(transform);
-  drawing
+  let children = drawing
     .shape_tree
     .shape_tree_choice
     .iter()
@@ -7421,7 +7786,14 @@ fn drawingml_diagram_drawing_shapes(
         context,
       )
     })
-    .collect()
+    .collect();
+  wrap_diagram_group_effects(
+    children,
+    &drawing.shape_tree.group_shape_properties,
+    child_transform.rotation_degrees(),
+    placement,
+    context,
+  )
 }
 
 fn drawingml_diagram_group_shapes(
@@ -7434,7 +7806,7 @@ fn drawingml_diagram_group_shapes(
     drawingml_group_transform_from_diagram_properties(&group.group_shape_properties)
       .map(|xfrm| transform.child(xfrm))
       .unwrap_or(transform);
-  group
+  let children = group
     .group_shape_choice
     .iter()
     .flat_map(|choice| {
@@ -7445,7 +7817,74 @@ fn drawingml_diagram_group_shapes(
         context,
       )
     })
-    .collect()
+    .collect();
+  wrap_diagram_group_effects(
+    children,
+    &group.group_shape_properties,
+    child_transform.rotation_degrees(),
+    placement,
+    context,
+  )
+}
+
+fn wrap_diagram_group_effects(
+  children: Vec<InlineItem>,
+  properties: &dsp::GroupShapeProperties,
+  rotation_deg: f32,
+  placement: ImagePlacement,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  let Some(effects) = properties
+    .group_shape_properties_choice2
+    .as_ref()
+    .map(|choice| {
+      let resolver = DocxImageEffectColorResolver {
+        theme_colors: &context.styles.theme_colors,
+        images: Some(context.images),
+      };
+      match choice {
+        dsp::GroupShapePropertiesChoice2::EffectList(source) => common::DrawingEffectSource::List {
+          source: source.clone(),
+          resolved: Some(common::drawingml_image_effects::from_effect_list(
+            source, None, &resolver,
+          )),
+        },
+        dsp::GroupShapePropertiesChoice2::EffectDag(source) => common::DrawingEffectSource::Dag {
+          source: source.clone(),
+          resolved: Some(common::drawingml_image_effects::from_effect_dag(
+            source, None, &resolver,
+          )),
+        },
+      }
+    })
+  else {
+    return children;
+  };
+  let has_runtime_effects = match &effects {
+    common::DrawingEffectSource::List {
+      resolved: Some(value),
+      ..
+    }
+    | common::DrawingEffectSource::Dag {
+      resolved: Some(value),
+      ..
+    } => !value.effects.is_empty(),
+    _ => false,
+  };
+  if !has_runtime_effects || children.is_empty() {
+    return children;
+  }
+  let mut children = children;
+  suppress_group_child_wrap(&mut children);
+  let mut grouped = Vec::with_capacity(children.len() + 2);
+  grouped.push(InlineItem::DrawingGroupStart(InlineDrawingGroupEffect {
+    effects,
+    rotation_deg,
+    placement,
+  }));
+  grouped.extend(children);
+  grouped.push(InlineItem::DrawingGroupEnd);
+  grouped
 }
 
 fn drawingml_diagram_shape_tree_choice_shapes(
@@ -7498,6 +7937,8 @@ fn drawingml_diagram_shape_shape(
     drawingml_shape_properties_fill_color(&properties, &context.styles.theme_colors);
   let fill_pattern =
     drawingml_shape_properties_pattern_fill(&properties, &context.styles.theme_colors);
+  let fill_override =
+    drawingml_shape_properties_common_fill(&properties, &context.styles.theme_colors);
   let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
     None
   } else {
@@ -7535,14 +7976,21 @@ fn drawingml_diagram_shape_shape(
       }
       _ => None,
     });
+  let stroke_override = shape
+    .shape_properties
+    .outline
+    .as_deref()
+    .and_then(|outline| drawingml_outline_common_stroke(outline, &context.styles.theme_colors));
   let smartart_text_color = context
     .smartart_text_colors_by_model_id
     .and_then(|colors| colors.get(shape.model_id.as_str()).copied());
   let mut text_box = drawingml_diagram_shape_text_box(shape, context.styles, smartart_text_color);
   if fill_color.is_none()
     && fill_pattern.is_none()
+    && fill_override.is_none()
     && fill_image.is_none()
     && stroke.is_none()
+    && stroke_override.is_none()
     && text_box.is_none()
   {
     return None;
@@ -7564,8 +8012,17 @@ fn drawingml_diagram_shape_shape(
     transform.raw_coordinates,
     transform.fallback_size,
   )?;
+  let mapped = transform.map_rect(
+    offset_x_pt,
+    offset_y_pt,
+    width_pt,
+    height_pt,
+    properties.rotation_deg(),
+    properties.flip_horizontal(),
+    properties.flip_vertical(),
+  );
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
+    (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
   if has_path_geometry
     && let Some(path_geometry) =
       drawingml_path_geometry_from_properties(&properties, width_pt, height_pt)
@@ -7582,12 +8039,17 @@ fn drawingml_diagram_shape_shape(
     geometry,
     offset_x_pt,
     offset_y_pt,
+    rotation_deg: mapped.rotation_deg,
+    flip_horizontal: mapped.flip_horizontal,
+    flip_vertical: mapped.flip_vertical,
     fill_color,
     fill_pattern,
+    fill_override,
     additional_fill_colors: Vec::new(),
     fill_image,
     stroke,
     stroke_pattern,
+    stroke_override,
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
     inline_anchor_after_line: matches!(placement, ImagePlacement::Inline)
@@ -7595,6 +8057,10 @@ fn drawingml_diagram_shape_shape(
     placement,
     chart: None,
     text_warp: None,
+    text_fill: None,
+    effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
+    static3d: properties.static3d(&context.styles.theme_colors),
+    text_upright: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -8245,6 +8711,26 @@ fn drawing_effect_extent(drawing: &w::Drawing) -> DrawingEffectExtent {
   }
 }
 
+fn drawing_placement_with_effect_extent(
+  placement: ImagePlacement,
+  extent: DrawingEffectExtent,
+) -> ImagePlacement {
+  match placement {
+    ImagePlacement::Floating(mut placement) => {
+      // wp:effectExtent is part of the floating object's wrap bounds. The
+      // child geometry remains in the authored wp:extent coordinate space;
+      // folding these distances into the wrap margins expands the exclusion
+      // once without translating or independently resizing group children.
+      placement.margin_left_pt += extent.left_pt.max(0.0);
+      placement.margin_top_pt += extent.top_pt.max(0.0);
+      placement.margin_right_pt += extent.right_pt.max(0.0);
+      placement.margin_bottom_pt += extent.bottom_pt.max(0.0);
+      ImagePlacement::Floating(placement)
+    }
+    ImagePlacement::Inline => ImagePlacement::Inline,
+  }
+}
+
 fn chart_shape(
   width_pt: f32,
   height_pt: f32,
@@ -8262,18 +8748,27 @@ fn chart_shape(
     geometry: InlineShapeGeometry::Rectangle,
     offset_x_pt: 0.0,
     offset_y_pt,
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
     fill_color: None,
     fill_pattern: None,
+    fill_override: None,
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke,
     stroke_pattern: None,
+    stroke_override: None,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
     inline_anchor_after_line: false,
     placement,
     chart: None,
     text_warp: None,
+    text_fill: None,
+    effects: None,
+    static3d: None,
+    text_upright: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -8314,7 +8809,7 @@ impl DrawingMlGroupTransform {
   }
 
   fn child(self, xfrm: DrawingMlGroupXfrm) -> Self {
-    let child = common::drawingml_geometry::group_child_affine(
+    let child_coordinates = common::drawingml_geometry::group_child_affine(
       kurbo::Point::new(f64::from(xfrm.offset_x_pt), f64::from(xfrm.offset_y_pt)),
       kurbo::Vec2::new(f64::from(xfrm.width_pt), f64::from(xfrm.height_pt)),
       kurbo::Point::new(
@@ -8323,34 +8818,89 @@ impl DrawingMlGroupTransform {
       ),
       kurbo::Vec2::new(f64::from(xfrm.child_width), f64::from(xfrm.child_height)),
     );
+    let center_x = xfrm.offset_x_pt + xfrm.width_pt / 2.0;
+    let center_y = xfrm.offset_y_pt + xfrm.height_pt / 2.0;
+    let orientation = Affine::translate((-f64::from(center_x), -f64::from(center_y)))
+      .then_scale_non_uniform(
+        if xfrm.flip_horizontal { -1.0 } else { 1.0 },
+        if xfrm.flip_vertical { -1.0 } else { 1.0 },
+      )
+      .then_rotate(f64::from(xfrm.rotation_deg.to_radians()))
+      .then_translate((f64::from(center_x), f64::from(center_y)).into());
     Self {
-      affine: self.affine * child,
+      affine: self.affine * orientation * child_coordinates,
       raw_coordinates: true,
       fallback_size: None,
     }
   }
 
-  fn rect(self, x_pt: f32, y_pt: f32, width_pt: f32, height_pt: f32) -> (f32, f32, f32, f32) {
-    let bounds = common::drawingml_geometry::transform_rect_bounds(
-      KurboRect::new(
-        f64::from(x_pt),
-        f64::from(y_pt),
-        f64::from(x_pt + width_pt),
-        f64::from(y_pt + height_pt),
-      ),
-      self.affine,
-    );
-    (
-      bounds.x0 as f32,
-      bounds.y0 as f32,
-      bounds.width() as f32,
-      bounds.height() as f32,
-    )
+  fn rotation_degrees(self) -> f32 {
+    let horizontal =
+      common::drawingml_geometry::transform_vector(kurbo::Vec2::new(1.0, 0.0), self.affine);
+    horizontal.y.atan2(horizontal.x).to_degrees() as f32
   }
+
+  fn map_rect(
+    self,
+    x_pt: f32,
+    y_pt: f32,
+    width_pt: f32,
+    height_pt: f32,
+    rotation_deg: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+  ) -> DrawingMlMappedRect {
+    let center = kurbo::Point::new(
+      f64::from(x_pt + width_pt * 0.5),
+      f64::from(y_pt + height_pt * 0.5),
+    );
+    let local_orientation = Affine::translate((-center.x, -center.y))
+      .then_scale_non_uniform(
+        if flip_horizontal { -1.0 } else { 1.0 },
+        if flip_vertical { -1.0 } else { 1.0 },
+      )
+      .then_rotate(f64::from(rotation_deg.to_radians()))
+      .then_translate(center.to_vec2());
+    let transform = self.affine * local_orientation;
+    let mapped_center = transform * center;
+    let horizontal =
+      common::drawingml_geometry::transform_vector(kurbo::Vec2::new(1.0, 0.0), transform);
+    let vertical =
+      common::drawingml_geometry::transform_vector(kurbo::Vec2::new(0.0, 1.0), transform);
+    let mapped_width = f64::from(width_pt) * horizontal.hypot();
+    let mapped_height = f64::from(height_pt) * vertical.hypot();
+    let determinant = horizontal.x * vertical.y - horizontal.y * vertical.x;
+    DrawingMlMappedRect {
+      x_pt: (mapped_center.x - mapped_width * 0.5) as f32,
+      y_pt: (mapped_center.y - mapped_height * 0.5) as f32,
+      width_pt: mapped_width as f32,
+      height_pt: mapped_height as f32,
+      rotation_deg: horizontal.y.atan2(horizontal.x).to_degrees() as f32,
+      // Any reflected affine can be represented by one axis flip. Keeping it
+      // on the vertical axis lets the first column retain the authored
+      // rotation angle and avoids an arbitrary extra 180-degree turn.
+      flip_horizontal: false,
+      flip_vertical: determinant < 0.0,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DrawingMlMappedRect {
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  rotation_deg: f32,
+  flip_horizontal: bool,
+  flip_vertical: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
 struct DrawingMlGroupXfrm {
+  rotation_deg: f32,
+  flip_horizontal: bool,
+  flip_vertical: bool,
   offset_x_pt: f32,
   offset_y_pt: f32,
   width_pt: f32,
@@ -8381,6 +8931,28 @@ impl DrawingMlShapeProperties {
       Self::Wordprocessing(properties) => properties.transform2_d.as_deref(),
       Self::Picture(properties) => properties.transform2_d.as_deref(),
     }
+  }
+
+  fn rotation_deg(&self) -> f32 {
+    self
+      .transform2_d()
+      .and_then(|transform| transform.rotation)
+      .map(|value| sdk_units::drawingml_angle_to_degrees(value) as f32)
+      .unwrap_or_default()
+  }
+
+  fn flip_horizontal(&self) -> bool {
+    self
+      .transform2_d()
+      .and_then(|transform| transform.horizontal_flip.as_ref())
+      .is_some_and(|value| value.as_bool())
+  }
+
+  fn flip_vertical(&self) -> bool {
+    self
+      .transform2_d()
+      .and_then(|transform| transform.vertical_flip.as_ref())
+      .is_some_and(|value| value.as_bool())
   }
 
   fn geometry_kind(&self) -> Option<InlineShapeGeometry> {
@@ -8461,7 +9033,11 @@ impl DrawingMlShapeProperties {
   fn fill(&self) -> Option<DrawingMlFillProperties<'_>> {
     match self {
       Self::Diagram(properties) => match properties.shape_properties_choice2.as_ref()? {
-        dsp::ShapePropertiesChoice2::NoFill(_) => Some(DrawingMlFillProperties::NoFill),
+        // MS-OI29500 §5.9.3.7: Office displays a diagram shape's grpFill
+        // as an empty fill, regardless of its parent group paint.
+        dsp::ShapePropertiesChoice2::NoFill(_) | dsp::ShapePropertiesChoice2::GroupFill => {
+          Some(DrawingMlFillProperties::NoFill)
+        }
         dsp::ShapePropertiesChoice2::SolidFill(fill) => {
           Some(DrawingMlFillProperties::Solid(fill.as_ref()))
         }
@@ -8501,6 +9077,102 @@ impl DrawingMlShapeProperties {
       },
     }
   }
+
+  fn effects(
+    &self,
+    theme_colors: &ThemeColors,
+    images: Option<&ImageCatalog>,
+  ) -> Option<common::DrawingEffectSource> {
+    let resolve_dag = |source: Box<a::EffectDag>| {
+      let resolved = common::drawingml_image_effects::from_effect_dag(
+        &source,
+        None,
+        &DocxImageEffectColorResolver {
+          theme_colors,
+          images,
+        },
+      );
+      common::DrawingEffectSource::Dag {
+        source,
+        resolved: Some(resolved),
+      }
+    };
+    let resolve_list = |source: Box<a::EffectList>| {
+      let resolved = common::drawingml_image_effects::from_effect_list(
+        &source,
+        None,
+        &DocxImageEffectColorResolver {
+          theme_colors,
+          images,
+        },
+      );
+      common::DrawingEffectSource::List {
+        source,
+        resolved: Some(resolved),
+      }
+    };
+    match self {
+      Self::Diagram(properties) => match properties.shape_properties_choice3.as_ref()? {
+        dsp::ShapePropertiesChoice3::EffectList(list) => Some(resolve_list(list.clone())),
+        dsp::ShapePropertiesChoice3::EffectDag(dag) => Some(resolve_dag(dag.clone())),
+      },
+      Self::Wordprocessing(properties) => match properties.shape_properties_choice3.as_ref()? {
+        wps::ShapePropertiesChoice3::EffectList(list) => Some(resolve_list(list.clone())),
+        wps::ShapePropertiesChoice3::EffectDag(dag) => Some(resolve_dag(dag.clone())),
+      },
+      Self::Picture(properties) => match properties.shape_properties_choice3.as_ref()? {
+        pic::ShapePropertiesChoice3::EffectList(list) => Some(resolve_list(list.clone())),
+        pic::ShapePropertiesChoice3::EffectDag(dag) => Some(resolve_dag(dag.clone())),
+      },
+    }
+  }
+
+  fn static3d(&self, theme_colors: &ThemeColors) -> Option<common::drawingml_3d::Static3dStyle> {
+    let (scene, shape) = match self {
+      Self::Diagram(properties) => (
+        properties.scene3_d_type.as_ref()?,
+        properties.shape3_d_type.as_ref()?,
+      ),
+      Self::Wordprocessing(properties) => (
+        properties.scene3_d_type.as_ref()?,
+        properties.shape3_d_type.as_ref()?,
+      ),
+      Self::Picture(properties) => (
+        properties.scene3_d_type.as_ref()?,
+        properties.shape3_d_type.as_ref()?,
+      ),
+    };
+    let resolver = DocxImageEffectColorResolver {
+      theme_colors,
+      images: None,
+    };
+    let extrusion_color = shape
+      .extrusion_color
+      .as_deref()
+      .and_then(|color| color.extrusion_color_choice.as_ref())
+      .and_then(Color::from_extrusion_color_choice)
+      .and_then(|color| resolver.resolve(Some(color)))
+      .map(|color| common::drawingml_3d::Static3dColor {
+        color: color.color,
+        alpha: color.alpha,
+      });
+    let contour_color = shape
+      .contour_color
+      .as_deref()
+      .and_then(|color| color.contour_color_choice.as_ref())
+      .and_then(Color::from_contour_color_choice)
+      .and_then(|color| resolver.resolve(Some(color)))
+      .map(|color| common::drawingml_3d::Static3dColor {
+        color: color.color,
+        alpha: color.alpha,
+      });
+    Some(common::drawingml_3d::Static3dStyle {
+      scene: scene.clone(),
+      shape: shape.clone(),
+      extrusion_color,
+      contour_color,
+    })
+  }
 }
 
 fn anchor_wrap_polygon_shape(
@@ -8522,18 +9194,27 @@ fn anchor_wrap_polygon_shape(
     geometry,
     offset_x_pt: 0.0,
     offset_y_pt: 0.0,
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
     fill_color: None,
     fill_pattern: None,
+    fill_override: None,
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke: None,
     stroke_pattern: None,
+    stroke_override: None,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
     inline_anchor_after_line: false,
     placement,
     chart: None,
     text_warp: None,
+    text_fill: None,
+    effects: None,
+    static3d: None,
+    text_upright: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -8664,6 +9345,18 @@ fn drawingml_group_transform_from_diagram_properties(
 fn drawingml_group_transform_from_model(transform: &a::TransformGroup) -> DrawingMlGroupXfrm {
   let mut group = DrawingMlGroupXfrm::default();
 
+  group.rotation_deg = transform
+    .rotation
+    .map(|value| sdk_units::drawingml_angle_to_degrees(value) as f32)
+    .unwrap_or_default();
+  group.flip_horizontal = transform
+    .horizontal_flip
+    .as_ref()
+    .is_some_and(|value| value.as_bool());
+  group.flip_vertical = transform
+    .vertical_flip
+    .as_ref()
+    .is_some_and(|value| value.as_bool());
   if let Some(offset) = &transform.offset {
     group.offset_x_pt = units::emu_to_points(offset.x.to_emu());
     group.offset_y_pt = units::emu_to_points(offset.y.to_emu());
@@ -8774,6 +9467,8 @@ fn drawingml_picture_frame(
   picture: &pic::Picture,
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
+  theme_colors: &ThemeColors,
+  images: &ImageCatalog,
 ) -> Option<InlineShape> {
   let properties = DrawingMlShapeProperties::Picture(
     picture
@@ -8791,8 +9486,17 @@ fn drawingml_picture_frame(
     transform.raw_coordinates,
     None,
   )?;
+  let mapped = transform.map_rect(
+    offset_x_pt,
+    offset_y_pt,
+    width_pt,
+    height_pt,
+    properties.rotation_deg(),
+    properties.flip_horizontal(),
+    properties.flip_vertical(),
+  );
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
+    (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
 
   Some(InlineShape {
     width_pt,
@@ -8804,18 +9508,27 @@ fn drawingml_picture_frame(
     geometry: InlineShapeGeometry::Rectangle,
     offset_x_pt,
     offset_y_pt,
+    rotation_deg: mapped.rotation_deg,
+    flip_horizontal: mapped.flip_horizontal,
+    flip_vertical: mapped.flip_vertical,
     fill_color: None,
     fill_pattern: None,
+    fill_override: None,
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke: None,
     stroke_pattern: None,
+    stroke_override: None,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
     inline_anchor_after_line: false,
     placement,
     chart: None,
     text_warp: None,
+    text_fill: None,
+    effects: properties.effects(theme_colors, Some(images)),
+    static3d: properties.static3d(theme_colors),
+    text_upright: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -8834,7 +9547,7 @@ fn drawingml_picture_image(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Option<InlineImage> {
-  let properties = drawing_picture_image_properties(picture, &styles.theme_colors)?;
+  let properties = drawing_picture_image_properties(picture, &styles.theme_colors, Some(images))?;
   let relationship_id = properties.relationship_id.as_deref()?;
   let resource = images.by_relationship_id.get(relationship_id)?;
   let image_data = image_data_with_effects(resource, &properties);
@@ -8854,8 +9567,17 @@ fn drawingml_picture_image(
     transform.raw_coordinates,
     None,
   )?;
+  let mapped = transform.map_rect(
+    offset_x_pt,
+    offset_y_pt,
+    width_pt,
+    height_pt,
+    properties.rotation_deg,
+    properties.flip_horizontal,
+    properties.flip_vertical,
+  );
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
+    (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
   let hyperlink_url = properties
     .hyperlink_relationship_id
     .as_deref()
@@ -8871,9 +9593,9 @@ fn drawingml_picture_image(
     effect_right_pt: 0.0,
     effect_bottom_pt: 0.0,
     crop: properties.crop,
-    rotation_deg: properties.rotation_deg,
-    flip_horizontal: properties.flip_horizontal,
-    flip_vertical: properties.flip_vertical,
+    rotation_deg: mapped.rotation_deg,
+    flip_horizontal: mapped.flip_horizontal,
+    flip_vertical: mapped.flip_vertical,
     alt_text: drawingml_picture_alt_text(picture),
     hyperlink_url,
     semantic_metafile_text: false,
@@ -8890,7 +9612,8 @@ fn wordprocessing_shape_image_fill(
   else {
     return None;
   };
-  let image_properties = drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default())?;
+  let image_properties =
+    drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default(), Some(images))?;
   let relationship_id = image_properties.relationship_id.as_deref()?;
   let resource = images.by_relationship_id.get(relationship_id)?;
   let image_data = image_data_with_effects(resource, &image_properties);
@@ -8902,6 +9625,11 @@ fn wordprocessing_shape_image_fill(
     rotation_deg: image_properties.rotation_deg,
     flip_horizontal: image_properties.flip_horizontal,
     flip_vertical: image_properties.flip_vertical,
+    rotate_with_shape: blip_fill
+      .rotate_with_shape
+      .as_ref()
+      .is_some_and(|value| value.as_bool()),
+    mode: drawingml_image_fill_mode(blip_fill),
   })
 }
 
@@ -8914,7 +9642,8 @@ fn drawingml_diagram_shape_image_fill(
   else {
     return None;
   };
-  let image_properties = drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default())?;
+  let image_properties =
+    drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default(), Some(images))?;
   let relationship_id = image_properties.relationship_id.as_deref()?;
   let resource = images.by_relationship_id.get(relationship_id)?;
   let image_data = image_data_with_effects(resource, &image_properties);
@@ -8926,32 +9655,31 @@ fn drawingml_diagram_shape_image_fill(
     rotation_deg: image_properties.rotation_deg,
     flip_horizontal: image_properties.flip_horizontal,
     flip_vertical: image_properties.flip_vertical,
+    rotate_with_shape: blip_fill
+      .rotate_with_shape
+      .as_ref()
+      .is_some_and(|value| value.as_bool()),
+    mode: drawingml_image_fill_mode(blip_fill),
   })
+}
+
+fn drawingml_image_fill_mode(fill: &a::BlipFill) -> InlineShapeImageFillMode {
+  match fill.blip_fill_choice.as_ref() {
+    Some(a::BlipFillChoice::Stretch(_)) => InlineShapeImageFillMode::Stretch,
+    Some(a::BlipFillChoice::Tile(tile)) => InlineShapeImageFillMode::DrawingMlTile(tile.clone()),
+    // Office treats an omitted bitmap mode on a shape fill as tiled.
+    None => InlineShapeImageFillMode::DrawingMlTile(Box::default()),
+  }
 }
 
 fn resolve_drawingml_solid_fill(
   fill: &a::SolidFill,
   theme_colors: &ThemeColors,
 ) -> Option<ResolvedColor> {
-  match fill.solid_fill_choice.as_ref()? {
-    a::SolidFillChoice::RgbColorModelHex(color) => Some(ResolvedColor {
-      color: parse_hex_color(color.val.as_str())?,
-      opacity: opacity_from_drawingml_rgb_transforms(&color.rgb_color_model_hex_choice),
-    }),
-    a::SolidFillChoice::SystemColor(color) => Some(ResolvedColor {
-      color: color.last_color.as_deref().and_then(parse_hex_color)?,
-      opacity: opacity_from_drawingml_system_transforms(&color.system_color_choice),
-    }),
-    a::SolidFillChoice::SchemeColor(color) => Some(ResolvedColor {
-      color: resolve_drawingml_scheme_color(color, theme_colors)?,
-      opacity: opacity_from_drawingml_scheme_transforms(&color.scheme_color_choice),
-    }),
-    a::SolidFillChoice::PresetColor(color) => Some(ResolvedColor {
-      color: drawingml_preset_color_value(color.val)?,
-      opacity: 1.0,
-    }),
-    _ => None,
-  }
+  resolved_docx_drawing_color(
+    Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)?,
+    theme_colors,
+  )
 }
 
 fn drawingml_pattern_fill(
@@ -8991,56 +9719,128 @@ fn drawingml_pattern_fill(
   })
 }
 
+fn drawingml_gradient_fill(
+  fill: &a::GradientFill,
+  theme_colors: &ThemeColors,
+) -> Option<common::Fill<'static>> {
+  let mut stops = fill
+    .gradient_stop_list
+    .as_ref()?
+    .gradient_stop
+    .iter()
+    .filter_map(|stop| {
+      let color = resolved_docx_drawing_color(
+        Color::from_gradient_stop_choice(stop.gradient_stop_choice.as_ref()?)?,
+        theme_colors,
+      )?;
+      Some(common::GradientStop {
+        position: stop.position.as_ratio() as f32,
+        color: common_rgb(color.color, color.opacity),
+        scheme: None,
+      })
+    })
+    .collect::<Vec<_>>();
+  stops.sort_by(|left, right| left.position.total_cmp(&right.position));
+  if stops.is_empty() {
+    return None;
+  }
+  let (angle_degrees, scaled, path) = match fill.gradient_fill_choice.as_ref()? {
+    a::GradientFillChoice::LinearGradientFill(linear) => (
+      Some(linear.angle.unwrap_or_default() as f32 / 60_000.0),
+      linear.scaled.as_ref().is_some_and(|value| value.as_bool()),
+      None,
+    ),
+    a::GradientFillChoice::PathGradientFill(path) => {
+      let fill_to = path
+        .fill_to_rectangle
+        .as_ref()
+        .map(|rect| common::RelativeRect {
+          left: rect
+            .left
+            .as_ref()
+            .map_or(0.5, |value| value.as_ratio() as f32),
+          top: rect
+            .top
+            .as_ref()
+            .map_or(0.5, |value| value.as_ratio() as f32),
+          right: rect
+            .right
+            .as_ref()
+            .map_or(0.5, |value| value.as_ratio() as f32),
+          bottom: rect
+            .bottom
+            .as_ref()
+            .map_or(0.5, |value| value.as_ratio() as f32),
+        })
+        .unwrap_or(common::RelativeRect {
+          left: 0.5,
+          top: 0.5,
+          right: 0.5,
+          bottom: 0.5,
+        });
+      let kind = match path.path.unwrap_or(a::PathShadeValues::Shape) {
+        a::PathShadeValues::Shape => common::GradientPathKind::Shape,
+        a::PathShadeValues::Circle => common::GradientPathKind::Circle,
+        a::PathShadeValues::Rectangle => common::GradientPathKind::Rectangle,
+      };
+      (
+        None,
+        false,
+        Some(common::GradientPath {
+          kind,
+          fill_to,
+          transform: common::Transform::default(),
+          mirror_tile: false,
+        }),
+      )
+    }
+  };
+  Some(common::Fill::Gradient(common::GradientFill {
+    stops,
+    angle_degrees,
+    definition_bounds: None,
+    line: None,
+    interpolation: common::GradientInterpolation::LinearSrgb,
+    scaled,
+    rotate_with_shape: Some(
+      fill
+        .rotate_with_shape
+        .as_ref()
+        .is_none_or(|value| value.as_bool()),
+    ),
+    path,
+  }))
+}
+
+fn drawingml_shape_properties_common_fill(
+  properties: &DrawingMlShapeProperties,
+  theme_colors: &ThemeColors,
+) -> Option<common::Fill<'static>> {
+  match properties.fill()? {
+    DrawingMlFillProperties::NoFill => Some(common::Fill::None),
+    DrawingMlFillProperties::Solid(fill) => {
+      let color = resolve_drawingml_solid_fill(fill, theme_colors)?;
+      Some(common::Fill::Solid(common_rgb(color.color, color.opacity)))
+    }
+    DrawingMlFillProperties::Gradient(fill) => drawingml_gradient_fill(fill, theme_colors),
+    DrawingMlFillProperties::Pattern(fill) => {
+      drawingml_pattern_fill(fill, theme_colors).map(common::Fill::Pattern)
+    }
+  }
+}
+
 fn resolve_drawingml_foreground_color(
   choice: &a::ForegroundColorChoice,
   theme_colors: &ThemeColors,
 ) -> Option<ResolvedColor> {
-  match choice {
-    a::ForegroundColorChoice::RgbColorModelHex(color) => Some(ResolvedColor {
-      color: parse_hex_color(color.val.as_str())?,
-      opacity: opacity_from_drawingml_rgb_transforms(&color.rgb_color_model_hex_choice),
-    }),
-    a::ForegroundColorChoice::SystemColor(color) => Some(ResolvedColor {
-      color: color.last_color.as_deref().and_then(parse_hex_color)?,
-      opacity: opacity_from_drawingml_system_transforms(&color.system_color_choice),
-    }),
-    a::ForegroundColorChoice::SchemeColor(color) => Some(ResolvedColor {
-      color: resolve_drawingml_scheme_color(color, theme_colors)?,
-      opacity: opacity_from_drawingml_scheme_transforms(&color.scheme_color_choice),
-    }),
-    a::ForegroundColorChoice::PresetColor(color) => Some(ResolvedColor {
-      color: drawingml_preset_color_value(color.val)?,
-      opacity: 1.0,
-    }),
-    a::ForegroundColorChoice::RgbColorModelPercentage(_)
-    | a::ForegroundColorChoice::HslColor(_) => None,
-  }
+  resolved_docx_drawing_color(Color::from_foreground_color_choice(choice)?, theme_colors)
 }
 
 fn resolve_drawingml_background_color(
   choice: &a::BackgroundColorChoice,
   theme_colors: &ThemeColors,
 ) -> Option<ResolvedColor> {
-  match choice {
-    a::BackgroundColorChoice::RgbColorModelHex(color) => Some(ResolvedColor {
-      color: parse_hex_color(color.val.as_str())?,
-      opacity: opacity_from_drawingml_rgb_transforms(&color.rgb_color_model_hex_choice),
-    }),
-    a::BackgroundColorChoice::SystemColor(color) => Some(ResolvedColor {
-      color: color.last_color.as_deref().and_then(parse_hex_color)?,
-      opacity: opacity_from_drawingml_system_transforms(&color.system_color_choice),
-    }),
-    a::BackgroundColorChoice::SchemeColor(color) => Some(ResolvedColor {
-      color: resolve_drawingml_scheme_color(color, theme_colors)?,
-      opacity: opacity_from_drawingml_scheme_transforms(&color.scheme_color_choice),
-    }),
-    a::BackgroundColorChoice::PresetColor(color) => Some(ResolvedColor {
-      color: drawingml_preset_color_value(color.val)?,
-      opacity: 1.0,
-    }),
-    a::BackgroundColorChoice::RgbColorModelPercentage(_)
-    | a::BackgroundColorChoice::HslColor(_) => None,
-  }
+  resolved_docx_drawing_color(Color::from_background_color_choice(choice)?, theme_colors)
 }
 
 fn drawingml_first_gradient_fill_color(
@@ -9048,47 +9848,23 @@ fn drawingml_first_gradient_fill_color(
   theme_colors: &ThemeColors,
 ) -> Option<RgbColor> {
   let stop = fill.gradient_stop_list.as_ref()?.gradient_stop.first()?;
-  match stop.gradient_stop_choice.as_ref()? {
-    a::GradientStopChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
-    a::GradientStopChoice::SystemColor(color) => {
-      color.last_color.as_deref().and_then(parse_hex_color)
-    }
-    a::GradientStopChoice::SchemeColor(color) => {
-      resolve_drawingml_scheme_color(color, theme_colors)
-    }
-    a::GradientStopChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
-    _ => None,
-  }
+  resolved_docx_drawing_color(
+    Color::from_gradient_stop_choice(stop.gradient_stop_choice.as_ref()?)?,
+    theme_colors,
+  )
+  .map(|color| color.color)
 }
 
-fn opacity_from_drawingml_rgb_transforms(transforms: &[a::RgbColorModelHexChoice]) -> f32 {
-  transforms
-    .iter()
-    .find_map(|transform| match transform {
-      a::RgbColorModelHexChoice::Alpha(value) => drawingml_percent_to_ratio(&value.val),
-      _ => None,
-    })
-    .unwrap_or(1.0)
-}
-
-fn opacity_from_drawingml_system_transforms(transforms: &[a::SystemColorChoice]) -> f32 {
-  transforms
-    .iter()
-    .find_map(|transform| match transform {
-      a::SystemColorChoice::Alpha(value) => drawingml_percent_to_ratio(&value.val),
-      _ => None,
-    })
-    .unwrap_or(1.0)
-}
-
-fn opacity_from_drawingml_scheme_transforms(transforms: &[a::SchemeColorChoice]) -> f32 {
-  transforms
-    .iter()
-    .find_map(|transform| match transform {
-      a::SchemeColorChoice::Alpha(value) => drawingml_percent_to_ratio(&value.val),
-      _ => None,
-    })
-    .unwrap_or(1.0)
+fn resolved_docx_drawing_color(color: Color, theme_colors: &ThemeColors) -> Option<ResolvedColor> {
+  let color = docx_image_color(color, theme_colors)?;
+  Some(ResolvedColor {
+    color: RgbColor {
+      r: color.r,
+      g: color.g,
+      b: color.b,
+    },
+    opacity: f32::from(color.a) / f32::from(u8::MAX),
+  })
 }
 
 struct ImportedImageData {
@@ -9110,11 +9886,7 @@ fn image_data_with_effects(
   let mut effects = properties.effects.clone();
   let color_change_tolerance =
     common::drawingml_image_effects::color_change_tolerance(resource.content_type.as_deref());
-  for effect in &mut effects {
-    if let ImageEffect::ColorChange(change) = effect {
-      change.tolerance = color_change_tolerance;
-    }
-  }
+  common::drawingml_image_effects::set_color_change_tolerance(&mut effects, color_change_tolerance);
   let Some(data) = common::drawingml_image_effects::apply(
     &resource.data,
     resource.content_type.as_deref(),
@@ -9311,6 +10083,48 @@ fn wordprocessing_shape_stroke(
   })
 }
 
+fn drawingml_outline_common_stroke(
+  outline: &a::Outline,
+  theme_colors: &ThemeColors,
+) -> Option<common::Stroke<'static>> {
+  let width_pt = outline
+    .width
+    .map(i64::from)
+    .map(units::emu_to_points)
+    .unwrap_or_else(|| units::emu_to_points(DRAWINGML_DEFAULT_LINE_WIDTH_EMU));
+  let (color, pattern, gradient) = match outline.outline_choice1.as_ref()? {
+    a::OutlineChoice::NoFill(_) => return None,
+    a::OutlineChoice::SolidFill(fill) => {
+      let color = resolve_drawingml_solid_fill(fill, theme_colors)?;
+      (common_rgb(color.color, color.opacity), None, None)
+    }
+    a::OutlineChoice::PatternFill(fill) => {
+      let pattern = drawingml_pattern_fill(fill, theme_colors)?;
+      (pattern.foreground, Some(pattern), None)
+    }
+    a::OutlineChoice::GradientFill(fill) => {
+      let common::Fill::Gradient(gradient) = drawingml_gradient_fill(fill, theme_colors)? else {
+        return None;
+      };
+      let color = gradient
+        .stops
+        .first()
+        .map(|stop| stop.color)
+        .unwrap_or_default();
+      (color, None, Some(gradient))
+    }
+  };
+  let mut stroke = common::Stroke {
+    width: common::Pt(width_pt),
+    color,
+    pattern,
+    gradient,
+    ..Default::default()
+  };
+  common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+  Some(stroke)
+}
+
 fn drawingml_diagram_shape_stroke(
   shape: &dsp::Shape,
   theme_colors: &ThemeColors,
@@ -9407,6 +10221,38 @@ fn push_picture_choice_shapes(
 ) {
   match choice {
     w::PictureChoice::Group(group) => push_group_shapes(group, inlines, images, shape_types),
+    w::PictureChoice::Arc(shape) => {
+      if let Some(shape) = vml_special_shape(
+        crate::xlsx::object_resources::vml_arc_model(shape),
+        shape.style.as_deref(),
+      ) {
+        inlines.push(InlineItem::Shape(shape));
+      }
+    }
+    w::PictureChoice::Curve(shape) => {
+      if let Some(shape) = vml_special_shape(
+        crate::xlsx::object_resources::vml_curve_model(shape),
+        shape.style.as_deref(),
+      ) {
+        inlines.push(InlineItem::Shape(shape));
+      }
+    }
+    w::PictureChoice::Line(shape) => {
+      if let Some(shape) = vml_special_shape(
+        crate::xlsx::object_resources::vml_line_model(shape),
+        shape.style.as_deref(),
+      ) {
+        inlines.push(InlineItem::Shape(shape));
+      }
+    }
+    w::PictureChoice::Oval(shape) => {
+      if let Some(shape) = vml_special_shape(
+        crate::xlsx::object_resources::vml_oval_model(shape),
+        shape.style.as_deref(),
+      ) {
+        inlines.push(InlineItem::Shape(shape));
+      }
+    }
     w::PictureChoice::Rectangle(rectangle) => {
       if let Some(shape) = vml_rectangle_shape(rectangle, images) {
         inlines.push(InlineItem::Shape(shape));
@@ -9442,6 +10288,50 @@ fn push_group_shapes(
     match choice {
       v::GroupChoice::Group(group) => {
         push_group_shapes(group, inlines, images, inherited_shape_types)
+      }
+      v::GroupChoice::Arc(shape) => {
+        let style = transform.and_then(|transform| {
+          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
+        });
+        if let Some(shape) = vml_special_shape(
+          crate::xlsx::object_resources::vml_arc_model(shape),
+          style.as_deref().or(shape.style.as_deref()),
+        ) {
+          inlines.push(InlineItem::Shape(shape));
+        }
+      }
+      v::GroupChoice::Curve(shape) => {
+        let style = transform.and_then(|transform| {
+          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
+        });
+        if let Some(shape) = vml_special_shape(
+          crate::xlsx::object_resources::vml_curve_model(shape),
+          style.as_deref().or(shape.style.as_deref()),
+        ) {
+          inlines.push(InlineItem::Shape(shape));
+        }
+      }
+      v::GroupChoice::Line(shape) => {
+        let style = transform.and_then(|transform| {
+          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
+        });
+        if let Some(shape) = vml_special_shape(
+          crate::xlsx::object_resources::vml_line_model(shape),
+          style.as_deref().or(shape.style.as_deref()),
+        ) {
+          inlines.push(InlineItem::Shape(shape));
+        }
+      }
+      v::GroupChoice::Oval(shape) => {
+        let style = transform.and_then(|transform| {
+          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
+        });
+        if let Some(shape) = vml_special_shape(
+          crate::xlsx::object_resources::vml_oval_model(shape),
+          style.as_deref().or(shape.style.as_deref()),
+        ) {
+          inlines.push(InlineItem::Shape(shape));
+        }
       }
       v::GroupChoice::Rectangle(rectangle) => {
         let style = transform.and_then(|transform| {
@@ -9480,6 +10370,38 @@ fn push_group_shapes(
   }
 }
 
+fn vml_special_shape(
+  model: crate::xlsx::object_resources::VmlShapeModel,
+  style: Option<&str>,
+) -> Option<InlineShape> {
+  let fill_override = crate::xlsx::vml_shape_common_fill(&model, Affine::IDENTITY);
+  let stroke_override = crate::xlsx::vml_shape_common_stroke(&model);
+  let mut shape = vml_inline_shape(
+    style.or(model.style.as_deref()),
+    model.allow_in_cell,
+    model
+      .filled
+      .then_some(model.fill_color.as_deref().unwrap_or("white")),
+    None,
+    model
+      .stroked
+      .then_some(model.stroke_color.as_deref().unwrap_or("black")),
+    model.stroke_weight.as_deref(),
+    None,
+  )?;
+  shape.geometry = InlineShapeGeometry::Path {
+    paths: crate::xlsx::vml_shape_drawing_paths(&model, shape.width_pt, shape.height_pt)?,
+    outline: None,
+  };
+  shape.fill_override = Some(fill_override);
+  shape.stroke_override = stroke_override;
+  apply_vml_model_wrap(&mut shape, &model);
+  if !model.text.is_empty() {
+    shape.text_box_blocks = vec![simple_text_block(model.text, TextStyle::default())];
+  }
+  Some(shape)
+}
+
 fn vml_rectangle_shape(rectangle: &v::Rectangle, images: &ImageCatalog) -> Option<InlineShape> {
   vml_rectangle_shape_with_style(rectangle, rectangle.style.as_deref(), images)
 }
@@ -9489,7 +10411,7 @@ fn vml_rectangle_shape_with_style(
   style: Option<&str>,
   images: &ImageCatalog,
 ) -> Option<InlineShape> {
-  vml_inline_shape(
+  let mut shape = vml_inline_shape(
     style,
     vml_allow_in_cell(rectangle.allow_in_cell),
     rectangle.fill_color.as_deref(),
@@ -9497,7 +10419,12 @@ fn vml_rectangle_shape_with_style(
     rectangle.stroke_color.as_deref(),
     rectangle.stroke_weight.as_deref(),
     None,
-  )
+  )?;
+  apply_vml_model_wrap(
+    &mut shape,
+    &crate::xlsx::object_resources::vml_rectangle_model(rectangle),
+  );
+  Some(shape)
 }
 
 fn vml_round_rectangle_shape(round_rectangle: &v::RoundRectangle) -> Option<InlineShape> {
@@ -9508,20 +10435,9 @@ fn vml_round_rectangle_shape_with_style(
   round_rectangle: &v::RoundRectangle,
   style: Option<&str>,
 ) -> Option<InlineShape> {
-  let filled = round_rectangle.filled.is_none_or(|value| value.as_bool());
-  let stroked = round_rectangle.stroked.is_none_or(|value| value.as_bool());
-  vml_inline_shape(
+  vml_special_shape(
+    crate::xlsx::object_resources::vml_round_rectangle_model(round_rectangle),
     style,
-    vml_allow_in_cell(round_rectangle.allow_in_cell),
-    filled
-      .then_some(round_rectangle.fill_color.as_deref())
-      .flatten(),
-    None,
-    stroked
-      .then_some(round_rectangle.stroke_color.as_deref())
-      .flatten(),
-    round_rectangle.stroke_weight.as_deref(),
-    None,
   )
 }
 
@@ -9552,6 +10468,7 @@ fn vml_shape_shape_with_style(
     style,
   );
   let style = merged_style.as_deref().or(style);
+  let common_model = crate::xlsx::object_resources::vml_shape_model(shape, shape_type);
   let direct_path = vml_shape_path(shape);
   let inherited_path = shape_type.and_then(vml_shapetype_path);
   let path = direct_path
@@ -9576,6 +10493,7 @@ fn vml_shape_shape_with_style(
   let fill_image = direct_fill
     .and_then(|fill| vml_fill_image(fill, style, images))
     .or_else(|| inherited_fill.and_then(|fill| vml_fill_image(fill, style, images)));
+  let has_fill_image = fill_image.is_some();
   let filled = direct_fill
     .and_then(|fill| fill.on.map(|value| value.as_bool()))
     .or_else(|| shape.filled.map(|value| value.as_bool()))
@@ -9624,6 +10542,13 @@ fn vml_shape_shape_with_style(
       .then(|| vml_fontwork_shape_geometry(shape.r#type.as_deref(), shape.id.as_deref()))
       .flatten(),
   )?;
+  if !has_fill_image {
+    inline.fill_override = Some(crate::xlsx::vml_shape_common_fill(
+      &common_model,
+      Affine::IDENTITY,
+    ));
+  }
+  inline.stroke_override = crate::xlsx::vml_shape_common_stroke(&common_model);
   if let Some(path) = path
     && let Some(geometry) = vml_path_geometry(
       path,
@@ -9671,6 +10596,7 @@ fn vml_shape_shape_with_style(
     inline.text_inset_right_pt = 0.0;
     inline.text_inset_bottom_pt = 0.0;
   }
+  apply_vml_model_wrap(&mut inline, &common_model);
   Some(inline)
 }
 
@@ -9913,19 +10839,19 @@ enum VmlFormulaValue {
   Formula(usize),
 }
 
-struct VmlPathGeometryOptions<'a> {
-  coordinate_origin: Option<&'a str>,
-  coordinate_size: Option<&'a str>,
-  width_pt: f32,
-  height_pt: f32,
-  adjustment: Option<&'a str>,
-  formulas: Option<&'a v::Formulas>,
-  allow_fill: bool,
-  allow_stroke: bool,
-  allow_extrusion: bool,
+pub(crate) struct VmlPathGeometryOptions<'a> {
+  pub(crate) coordinate_origin: Option<&'a str>,
+  pub(crate) coordinate_size: Option<&'a str>,
+  pub(crate) width_pt: f32,
+  pub(crate) height_pt: f32,
+  pub(crate) adjustment: Option<&'a str>,
+  pub(crate) formulas: Option<&'a v::Formulas>,
+  pub(crate) allow_fill: bool,
+  pub(crate) allow_stroke: bool,
+  pub(crate) allow_extrusion: bool,
 }
 
-fn vml_path_geometry(
+pub(crate) fn vml_path_geometry(
   source: &str,
   options: VmlPathGeometryOptions<'_>,
 ) -> Option<InlineShapeGeometry> {
@@ -10473,7 +11399,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
   if width_pt <= f32::EPSILON || height_pt <= f32::EPSILON {
     return None;
   }
-  let closed = points
+  let repeated_endpoint = points
     .first()
     .zip(points.last())
     .is_some_and(|(first, last)| {
@@ -10485,6 +11411,10 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
     .collect();
   let filled = polyline.filled.is_none_or(|value| value.as_bool());
   let stroked = polyline.stroked.is_none_or(|value| value.as_bool());
+  let closed = filled || repeated_endpoint;
+  let common_model = crate::xlsx::object_resources::vml_polyline_model(polyline);
+  let fill_override = crate::xlsx::vml_shape_common_fill(&common_model, Affine::IDENTITY);
+  let stroke_override = crate::xlsx::vml_shape_common_stroke(&common_model);
   let fill_color = filled
     .then(|| polyline.fill_color.as_deref().and_then(parse_vml_color))
     .flatten();
@@ -10507,12 +11437,12 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
   } else {
     None
   };
-  if fill_color.is_none() && stroke.is_none() {
+  if matches!(&fill_override, common::Fill::None) && stroke_override.is_none() {
     return None;
   }
   let mut style = vml_image_style(polyline.style.as_deref());
   style.layout_in_cell = vml_allow_in_cell(polyline.allow_in_cell);
-  Some(InlineShape {
+  let mut shape = InlineShape {
     width_pt,
     height_pt,
     effect_left_pt: 0.0,
@@ -10525,18 +11455,27 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
     },
     offset_x_pt: min_x,
     offset_y_pt: min_y,
+    rotation_deg: style.rotation_deg,
+    flip_horizontal: style.flip_horizontal,
+    flip_vertical: style.flip_vertical,
     fill_color,
     fill_pattern: None,
+    fill_override: Some(fill_override),
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke,
     stroke_pattern: None,
+    stroke_override,
     suppress_zero_relative_background: false,
     allow_outside_page: style.absolute_position,
     inline_anchor_after_line: false,
     placement: style.placement(),
     chart: None,
     text_warp: None,
+    text_fill: None,
+    effects: None,
+    static3d: None,
+    text_upright: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -10544,7 +11483,9 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
     text_inset_bottom_pt: 0.0,
     text_box_auto_fit: false,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
-  })
+  };
+  apply_vml_model_wrap(&mut shape, &common_model);
+  Some(shape)
 }
 
 fn vml_rectangle_fill_image(
@@ -10562,20 +11503,44 @@ fn vml_rectangle_fill_image(
 
 fn vml_fill_image(
   fill: &v::Fill,
-  shape_style: Option<&str>,
+  _shape_style: Option<&str>,
   images: &ImageCatalog,
 ) -> Option<InlineShapeImageFill> {
   let relationship_id = fill.relationship_id.as_ref().or(fill.id.as_ref())?;
   let resource = images.by_relationship_id.get(relationship_id)?;
-  let style = vml_image_style(shape_style);
+  let recolored_pattern =
+    crate::xlsx::recolor_typed_vml_pattern_image(fill, resource.data.as_ref());
+  let data = recolored_pattern
+    .map(Arc::from)
+    .unwrap_or_else(|| resource.data.clone());
+  let content_type = if data.as_ref() == resource.data.as_ref() {
+    resource.content_type.clone()
+  } else {
+    Some("image/png".to_string())
+  };
 
   Some(InlineShapeImageFill {
-    data: resource.data.clone(),
-    content_type: resource.content_type.clone(),
+    data,
+    content_type,
     crop: ImageCrop::default(),
-    rotation_deg: style.rotation_deg,
-    flip_horizontal: style.flip_horizontal,
-    flip_vertical: style.flip_vertical,
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
+    rotate_with_shape: fill.rotate.is_some_and(|value| value.as_bool()),
+    mode: match fill.r#type {
+      Some(v::FillTypeValues::Tile | v::FillTypeValues::Pattern) => {
+        InlineShapeImageFillMode::Tile {
+          size: fill.size.clone(),
+          origin: fill.origin.clone(),
+          position: fill.position.clone(),
+        }
+      }
+      _ => match fill.aspect.unwrap_or_default() {
+        v::ImageAspectValues::AtMost => InlineShapeImageFillMode::Contain,
+        v::ImageAspectValues::AtLeast => InlineShapeImageFillMode::Cover,
+        v::ImageAspectValues::Ignore => InlineShapeImageFillMode::Stretch,
+      },
+    },
   })
 }
 
@@ -10621,18 +11586,27 @@ fn vml_inline_shape(
     geometry: geometry_override.unwrap_or(InlineShapeGeometry::Rectangle),
     offset_x_pt: 0.0,
     offset_y_pt: 0.0,
+    rotation_deg: style.rotation_deg,
+    flip_horizontal: style.flip_horizontal,
+    flip_vertical: style.flip_vertical,
     fill_color,
     fill_pattern: None,
+    fill_override: None,
     additional_fill_colors: Vec::new(),
     fill_image,
     stroke,
     stroke_pattern: None,
+    stroke_override: None,
     suppress_zero_relative_background: false,
     allow_outside_page: style.absolute_position,
     inline_anchor_after_line: false,
     placement: style.placement(),
     chart: None,
     text_warp: None,
+    text_fill: None,
+    effects: None,
+    static3d: None,
+    text_upright: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -10684,18 +11658,27 @@ fn vml_textbox_frame(
     geometry: InlineShapeGeometry::Rectangle,
     offset_x_pt: frame.left_pt,
     offset_y_pt: frame.top_pt,
+    rotation_deg: style.rotation_deg,
+    flip_horizontal: style.flip_horizontal,
+    flip_vertical: style.flip_vertical,
     fill_color: None,
     fill_pattern: None,
+    fill_override: None,
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke: None,
     stroke_pattern: None,
+    stroke_override: None,
     suppress_zero_relative_background: false,
     allow_outside_page: style.absolute_position,
     inline_anchor_after_line: false,
     placement: style.placement(),
     chart: None,
     text_warp: None,
+    text_fill: None,
+    effects: None,
+    static3d: None,
+    text_upright: false,
     text_box_blocks: frame.blocks,
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -10758,7 +11741,7 @@ fn apply_vml_textbox_properties(textbox: &v::TextBox, frame: &mut TextBoxFrameCo
   }
 }
 
-fn parse_vml_color(value: &str) -> Option<RgbColor> {
+pub(crate) fn parse_vml_color(value: &str) -> Option<RgbColor> {
   let value = value.trim().trim_matches('"');
   let base = value.split_whitespace().next()?;
   if let Some(hex) = base.strip_prefix('#') {
@@ -10859,7 +11842,9 @@ fn picture_choice_image(choice: &w::PictureChoice, images: &ImageCatalog) -> Opt
     w::PictureChoice::Group(group) => group_image(group, images),
     w::PictureChoice::ImageFile(image) => image_file_image(image, images),
     w::PictureChoice::Rectangle(rectangle) => rectangle_image(rectangle, images),
-    w::PictureChoice::RoundRectangle(_) => None,
+    w::PictureChoice::RoundRectangle(round_rectangle) => {
+      round_rectangle_image(round_rectangle, images)
+    }
     w::PictureChoice::Shape(shape) => shape_image(shape, images),
     _ => None,
   }
@@ -10880,6 +11865,9 @@ fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> O
       w::EmbeddedObjectChoice::Group(group) => group_image(group, images),
       w::EmbeddedObjectChoice::ImageFile(image) => image_file_image(image, images),
       w::EmbeddedObjectChoice::Rectangle(rectangle) => rectangle_image(rectangle, images),
+      w::EmbeddedObjectChoice::RoundRectangle(round_rectangle) => {
+        round_rectangle_image(round_rectangle, images)
+      }
       w::EmbeddedObjectChoice::Shape(shape) => shape_image(shape, images),
       _ => None,
     })?;
@@ -10930,7 +11918,9 @@ fn group_image(group: &v::Group, images: &ImageCatalog) -> Option<InlineImage> {
     v::GroupChoice::Group(group) => group_image(group, images),
     v::GroupChoice::ImageFile(image) => image_file_image(image, images),
     v::GroupChoice::Rectangle(rectangle) => rectangle_image(rectangle, images),
-    v::GroupChoice::RoundRectangle(_) => None,
+    v::GroupChoice::RoundRectangle(round_rectangle) => {
+      round_rectangle_image(round_rectangle, images)
+    }
     v::GroupChoice::Shape(shape) => shape_image(shape, images),
     _ => None,
   })
@@ -11091,6 +12081,29 @@ fn rectangle_image(rectangle: &v::Rectangle, images: &ImageCatalog) -> Option<In
         rectangle.style.as_deref(),
         vml_allow_in_cell(rectangle.allow_in_cell),
         rectangle.alternate.clone(),
+        images,
+      ),
+      _ => None,
+    })
+}
+
+fn round_rectangle_image(
+  round_rectangle: &v::RoundRectangle,
+  images: &ImageCatalog,
+) -> Option<InlineImage> {
+  if vml_style_is_hidden(round_rectangle.style.as_deref()) {
+    return None;
+  }
+
+  round_rectangle
+    .round_rectangle_choice
+    .iter()
+    .find_map(|choice| match choice {
+      v::RoundRectangleChoice::ImageData(data) => vml_image_data(
+        data,
+        round_rectangle.style.as_deref(),
+        vml_allow_in_cell(round_rectangle.allow_in_cell),
+        round_rectangle.alternate.clone(),
         images,
       ),
       _ => None,
@@ -11492,7 +12505,11 @@ impl VmlGroupTransform {
   }
 
   fn from_group(group: &v::Group) -> Option<Self> {
-    let style = vml_image_style(group.style.as_deref());
+    Self::from_group_with_style(group, group.style.as_deref())
+  }
+
+  fn from_group_with_style(group: &v::Group, group_style: Option<&str>) -> Option<Self> {
+    let style = vml_image_style(group_style);
     let (width_pt, height_pt) = style.size_pt?;
     let (coord_width, coord_height) = vml_coordinate_pair(group.coordinate_size.as_deref())?;
     if coord_width.abs() <= f32::EPSILON || coord_height.abs() <= f32::EPSILON {
@@ -11580,6 +12597,15 @@ impl VmlGroupTransform {
     }
     Some(output.join(";"))
   }
+}
+
+pub(crate) fn vml_group_child_style(
+  group: &v::Group,
+  group_style: Option<&str>,
+  child_style: Option<&str>,
+) -> Option<String> {
+  VmlGroupTransform::from_group_with_style(group, group_style)?
+    .child_anchor_style(group_style, child_style)
 }
 
 fn vml_horizontal_reference_style(reference: HorizontalImageReference) -> &'static str {
@@ -11785,11 +12811,12 @@ fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
     }
   }
 
-  // A negative VML z-index without an authored mso-wrap-style is a
-  // behind-text object, not an implicit square-wrap object. DrawingML carries
-  // wrapping independently in wp:wrap*, while legacy VML omits the style for
-  // the through-text default used by Word.
-  if output.behind_text && !wrap_set {
+  // LibreOffice's VML importer initializes the object surround mode to
+  // WrapTextMode_THROUGH and changes it only when a wrap type is authored
+  // (oox/source/vml/vmlshape.cxx::lcl_setSurround). Word commonly omits the
+  // wrap declaration on absolute legacy shapes, including positive-z shapes
+  // that still follow text flow inside a table cell.
+  if output.absolute_position && !wrap_set {
     output.wrap = ImageWrapMode::Through;
   }
   output.size_pt = width.zip(height);
@@ -11841,6 +12868,35 @@ fn vml_wrap_mode(value: &str) -> ImageWrapMode {
   }
 }
 
+fn apply_vml_model_wrap(
+  shape: &mut InlineShape,
+  model: &crate::xlsx::object_resources::VmlShapeModel,
+) {
+  let ImagePlacement::Floating(placement) = &mut shape.placement else {
+    return;
+  };
+  if let Some(wrap_type) = model.wrap_type {
+    placement.wrap = match wrap_type {
+      w10::WrapValues::TopAndBottom => ImageWrapMode::TopBottom,
+      w10::WrapValues::None => ImageWrapMode::Through,
+      w10::WrapValues::Square => ImageWrapMode::Square,
+      w10::WrapValues::Tight | w10::WrapValues::Through => ImageWrapMode::Tight,
+    };
+  }
+  if let Some(side) = model.wrap_side {
+    placement.wrap_side = match side {
+      w10::WrapSideValues::Both => ImageWrapSide::BothSides,
+      w10::WrapSideValues::Left => ImageWrapSide::Left,
+      w10::WrapSideValues::Right => ImageWrapSide::Right,
+      w10::WrapSideValues::Largest => ImageWrapSide::Largest,
+    };
+  }
+  // w10:wrap/@anchorx and @anchory locate the wrap coordinate system; they
+  // do not replace the shape position references authored by
+  // mso-position-*-relative. Word commonly emits anchory="page" together
+  // with mso-position-vertical-relative:bottom-margin-area.
+}
+
 fn vml_rotation_degrees(value: &str) -> f32 {
   let value = value.trim();
   let rotation = if let Some(fixed) = value.strip_suffix("fd") {
@@ -11855,7 +12911,7 @@ fn vml_rotation_degrees(value: &str) -> f32 {
   -rotation.unwrap_or(0.0)
 }
 
-fn vml_measure_to_points(value: &str) -> Option<f32> {
+pub(crate) fn vml_measure_to_points(value: &str) -> Option<f32> {
   let value = value.trim();
   if value.is_empty() {
     return None;
@@ -11897,16 +12953,111 @@ struct DrawingImageProperties {
   flip_vertical: bool,
 }
 
+struct DocxImageEffectColorResolver<'a> {
+  theme_colors: &'a ThemeColors,
+  images: Option<&'a ImageCatalog>,
+}
+
+impl DocxImageEffectColorResolver<'_> {
+  fn resolve(&self, color: Option<Color>) -> Option<ResolvedEffectColor> {
+    let color = docx_image_color(color?, self.theme_colors)?;
+    Some(ResolvedEffectColor {
+      color: RgbColor {
+        r: color.r,
+        g: color.g,
+        b: color.b,
+      },
+      alpha: color.a,
+    })
+  }
+}
+
+impl ImageEffectColorResolver for DocxImageEffectColorResolver<'_> {
+  fn alpha_inverse(&self, choice: &a::AlphaInverseChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_alpha_inverse_choice(choice))
+  }
+
+  fn color_from(&self, choice: &a::ColorFromChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_color_from_choice(choice))
+  }
+
+  fn color_to(&self, choice: &a::ColorToChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_color_to_choice(choice))
+  }
+
+  fn color_replacement(&self, choice: &a::ColorReplacementChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_color_replacement_choice(choice))
+  }
+
+  fn duotone(&self, choice: &a::DuotoneChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_duotone_choice(choice))
+  }
+
+  fn solid_fill(&self, choice: &a::SolidFillChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_solid_fill_choice(choice))
+  }
+
+  fn gradient_stop(&self, choice: &a::GradientStopChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_gradient_stop_choice(choice))
+  }
+
+  fn foreground(&self, choice: &a::ForegroundColorChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_foreground_color_choice(choice))
+  }
+
+  fn background(&self, choice: &a::BackgroundColorChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_background_color_choice(choice))
+  }
+
+  fn glow(&self, choice: &a::GlowChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_glow_choice(choice))
+  }
+
+  fn inner_shadow(&self, choice: &a::InnerShadowChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_inner_shadow_choice(choice))
+  }
+
+  fn outer_shadow(&self, choice: &a::OuterShadowChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_outer_shadow_choice(choice))
+  }
+
+  fn preset_shadow(&self, choice: &a::PresetShadowChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_preset_shadow_choice(choice))
+  }
+
+  fn blip_fill(
+    &self,
+    fill: &a::BlipFill,
+  ) -> Option<common::drawingml_image_effects::ImageEffectFill> {
+    let blip = fill.blip.as_ref()?;
+    let resource = self
+      .images?
+      .by_relationship_id
+      .get(blip.embed.as_deref()?)?;
+    let effects = common::drawingml_image_effects::from_blip_choices(
+      &blip.blip_choice,
+      resource.content_type.as_deref(),
+      self,
+    );
+    common::drawingml_image_effects::raster_fill_image(
+      &resource.data,
+      resource.content_type.as_deref(),
+      &effects,
+    )
+  }
+}
+
 fn drawing_image_properties(
   graphic_data: &ooxmlsdk::schemas::a::GraphicData,
   theme_colors: &ThemeColors,
+  images: Option<&ImageCatalog>,
 ) -> Option<DrawingImageProperties> {
   if graphic_data.uri != "http://schemas.openxmlformats.org/drawingml/2006/picture" {
     return None;
   }
   graphic_data.graphic_data_choice.iter().find_map(|choice| {
     if let a::GraphicDataChoice::Picture(picture) = choice {
-      drawing_picture_image_properties(picture, theme_colors)
+      drawing_picture_image_properties(picture, theme_colors, images)
     } else {
       None
     }
@@ -11916,6 +13067,7 @@ fn drawing_image_properties(
 fn drawing_picture_image_properties(
   picture: &pic::Picture,
   theme_colors: &ThemeColors,
+  images: Option<&ImageCatalog>,
 ) -> Option<DrawingImageProperties> {
   let blip_fill = picture.blip_fill.as_deref()?;
   let mut properties = DrawingImageProperties {
@@ -11960,7 +13112,7 @@ fn drawing_picture_image_properties(
   }
 
   if let Some(blip) = blip_fill.blip.as_ref() {
-    apply_image_effects_from_blip(&mut properties, blip, theme_colors);
+    apply_image_effects_from_blip(&mut properties, blip, theme_colors, images);
   }
 
   Some(properties)
@@ -11969,6 +13121,7 @@ fn drawing_picture_image_properties(
 fn drawing_blip_fill_image_properties(
   blip_fill: &a::BlipFill,
   theme_colors: &ThemeColors,
+  images: Option<&ImageCatalog>,
 ) -> Option<DrawingImageProperties> {
   let mut properties = DrawingImageProperties {
     relationship_id: blip_fill.blip.as_ref()?.embed.clone(),
@@ -11994,7 +13147,7 @@ fn drawing_blip_fill_image_properties(
   }
 
   if let Some(blip) = blip_fill.blip.as_ref() {
-    apply_image_effects_from_blip(&mut properties, blip, theme_colors);
+    apply_image_effects_from_blip(&mut properties, blip, theme_colors, images);
   }
 
   Some(properties)
@@ -12069,167 +13222,18 @@ fn apply_image_effects_from_blip(
   properties: &mut DrawingImageProperties,
   blip: &a::Blip,
   theme_colors: &ThemeColors,
+  images: Option<&ImageCatalog>,
 ) {
-  for choice in &blip.blip_choice {
-    match choice {
-      a::BlipChoice::AlphaBiLevel(effect) => {
-        properties.effects.push(ImageEffect::AlphaBiLevel(
-          (effect.threshold.as_ratio() * 255.0)
-            .round()
-            .clamp(0.0, 255.0) as u8,
-        ));
-      }
-      a::BlipChoice::AlphaCeiling => properties.effects.push(ImageEffect::AlphaCeiling),
-      a::BlipChoice::AlphaFloor => properties.effects.push(ImageEffect::AlphaFloor),
-      a::BlipChoice::AlphaInverse(effect) => {
-        let color = effect
-          .alpha_inverse_choice
-          .as_ref()
-          .and_then(Color::from_alpha_inverse_choice)
-          .and_then(|color| docx_image_color(color, theme_colors))
-          .map(|color| RgbColor {
-            r: color.r,
-            g: color.g,
-            b: color.b,
-          });
-        properties.effects.push(ImageEffect::AlphaInverse(color));
-      }
-      a::BlipChoice::AlphaModulationFixed(effect) => {
-        properties.effects.push(ImageEffect::AlphaModulateFixed(
-          effect
-            .amount
-            .as_ref()
-            .map(|amount| common::drawingml_image_effects::office_alpha_modulate_amount(*amount))
-            .unwrap_or(1.0),
-        ));
-      }
-      a::BlipChoice::AlphaReplace(effect) => {
-        properties.effects.push(ImageEffect::AlphaReplace(
-          (effect.alpha.as_ratio() * 255.0).round().clamp(0.0, 255.0) as u8,
-        ));
-      }
-      a::BlipChoice::ColorChange(change) => {
-        let from = change
-          .color_from
-          .color_from_choice
-          .as_ref()
-          .and_then(Color::from_color_from_choice)
-          .and_then(|color| docx_image_color(color, theme_colors));
-        let to = change
-          .color_to
-          .color_to_choice
-          .as_ref()
-          .and_then(Color::from_color_to_choice)
-          .and_then(|color| docx_image_color(color, theme_colors));
-        let (Some(from), Some(to)) = (from, to) else {
-          continue;
-        };
-        let use_alpha = change
-          .use_alpha
-          .as_ref()
-          .is_none_or(|value| value.as_bool());
-        properties
-          .effects
-          .push(ImageEffect::ColorChange(ColorChangeEffect {
-            from: RgbColor {
-              r: from.r,
-              g: from.g,
-              b: from.b,
-            },
-            to: RgbColor {
-              r: to.r,
-              g: to.g,
-              b: to.b,
-            },
-            from_alpha: from.a,
-            to_alpha: to.a,
-            use_alpha,
-            // Word's color-change matching is exact for decoded raster
-            // images. Metafile tolerance is applied after the resource is
-            // rasterized by the shared engine.
-            tolerance: 0,
-          }));
-      }
-      a::BlipChoice::ColorReplacement(replacement) => {
-        if let Some(color) = replacement
-          .color_replacement_choice
-          .as_ref()
-          .and_then(Color::from_color_replacement_choice)
-          .and_then(|color| docx_image_color(color, theme_colors))
-        {
-          properties
-            .effects
-            .push(ImageEffect::ColorReplacement(RgbColor {
-              r: color.r,
-              g: color.g,
-              b: color.b,
-            }));
-        }
-      }
-      a::BlipChoice::Grayscale => properties.effects.push(ImageEffect::Grayscale),
-      a::BlipChoice::Hsl(effect) => properties.effects.push(ImageEffect::Hsl {
-        hue_degrees: effect.hue.unwrap_or_default() as f32 / 60_000.0,
-        saturation_offset: effect
-          .saturation
-          .map(|value| value.as_ratio() as f32)
-          .unwrap_or_default(),
-        luminance_offset: effect
-          .luminance
-          .map(|value| value.as_ratio() as f32)
-          .unwrap_or_default(),
-      }),
-      a::BlipChoice::LuminanceEffect(luminance) => {
-        let brightness = luminance
-          .brightness
-          .as_ref()
-          .and_then(drawingml_percent_to_ratio)
-          .map(drawingml_ratio_to_effect_percent);
-        let contrast = luminance
-          .contrast
-          .as_ref()
-          .and_then(drawingml_percent_to_ratio)
-          .map(drawingml_ratio_to_effect_percent);
-        let watermark = brightness == Some(70) && contrast == Some(-70);
-        properties.effects.push(ImageEffect::Luminance {
-          watermark,
-          brightness: (!watermark).then_some(brightness).flatten(),
-          contrast: (!watermark).then_some(contrast).flatten(),
-        });
-      }
-      a::BlipChoice::Duotone(duotone) => {
-        if let Some(colors) = image_duotone_colors_from_model(duotone, theme_colors) {
-          properties
-            .effects
-            .push(ImageEffect::Duotone(colors.0, colors.1));
-        }
-      }
-      a::BlipChoice::BiLevel(effect) => properties.effects.push(ImageEffect::BiLevel(
-        (effect.threshold.as_ratio() * 255.0)
-          .round()
-          .clamp(0.0, 255.0) as u8,
-      )),
-      a::BlipChoice::Blur(blur) => properties.effects.push(ImageEffect::Blur {
-        radius_px: blur
-          .radius
-          .map(|radius| radius.to_emu() as f32 / 9_525.0)
-          .unwrap_or_default(),
-        grow_bounds: blur.grow.as_ref().is_none_or(|value| value.as_bool()),
-      }),
-      a::BlipChoice::TintEffect(tint) => properties.effects.push(ImageEffect::Tint {
-        hue_degrees: tint.hue.unwrap_or_default() as f32 / 60_000.0,
-        amount: tint
-          .amount
-          .as_ref()
-          .map(|value| value.as_ratio() as f32)
-          .unwrap_or_default(),
-      }),
-      _ => {}
-    }
-  }
-}
-
-fn drawingml_ratio_to_effect_percent(value: f32) -> i32 {
-  (value * 100.0).round() as i32
+  properties
+    .effects
+    .extend(common::drawingml_image_effects::from_blip_choices(
+      &blip.blip_choice,
+      None,
+      &DocxImageEffectColorResolver {
+        theme_colors,
+        images,
+      },
+    ));
 }
 
 fn docx_image_color(color: Color, theme_colors: &ThemeColors) -> Option<common::Color> {
@@ -12247,30 +13251,6 @@ fn docx_image_color(color: Color, theme_colors: &ThemeColors) -> Option<common::
     b: color.b,
     a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
   })
-}
-
-fn image_duotone_colors_from_model(
-  duotone: &a::Duotone,
-  theme_colors: &ThemeColors,
-) -> Option<(RgbColor, RgbColor)> {
-  let colors = duotone
-    .duotone_choice
-    .iter()
-    .filter_map(|choice| drawingml_duotone_color(choice, theme_colors))
-    .collect::<Vec<_>>();
-  Some((colors.first().copied()?, colors.get(1).copied()?))
-}
-
-fn drawingml_duotone_color(
-  choice: &a::DuotoneChoice,
-  theme_colors: &ThemeColors,
-) -> Option<RgbColor> {
-  match choice {
-    a::DuotoneChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
-    a::DuotoneChoice::SchemeColor(color) => resolve_drawingml_scheme_color(color, theme_colors),
-    a::DuotoneChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
-    _ => None,
-  }
 }
 
 fn resolve_drawingml_scheme_color(
@@ -14288,6 +15268,7 @@ impl NumberingCatalog {
     package: &mut WordprocessingDocument,
     main: &MainDocumentPart,
     import_settings: ImportSettings,
+    theme_colors: &ThemeColors,
   ) -> Result<Self> {
     let Some(numbering_part) = main.numbering_definitions_part(package) else {
       return Ok(Self::default());
@@ -14297,7 +15278,9 @@ impl NumberingCatalog {
     let mut catalog = Self::default();
 
     for picture_bullet in &numbering.numbering_picture_bullet {
-      if let Some(image) = numbering_picture_bullet_image(picture_bullet, &numbering_images) {
+      if let Some(image) =
+        numbering_picture_bullet_image(picture_bullet, &numbering_images, theme_colors)
+      {
         catalog
           .picture_bullets
           .insert(picture_bullet.numbering_picture_bullet_id, image);
@@ -14532,13 +15515,67 @@ fn numbering_level_list_tab_stop_pt(level: &w::Level) -> Option<f32> {
 fn numbering_picture_bullet_image(
   picture_bullet: &w::NumberingPictureBullet,
   images: &ImageCatalog,
+  theme_colors: &ThemeColors,
 ) -> Option<InlineImage> {
   match picture_bullet.numbering_picture_bullet_choice.as_ref()? {
     w::NumberingPictureBulletChoice::PictureBulletBase(picture) => {
       picture_bullet_base_image(picture, images).map(normalize_picture_bullet_image_size)
     }
-    w::NumberingPictureBulletChoice::Drawing(_) => None,
+    w::NumberingPictureBulletChoice::Drawing(drawing) => {
+      numbering_drawing_image(drawing, images, theme_colors)
+        .map(normalize_picture_bullet_image_size)
+    }
   }
+}
+
+fn numbering_drawing_image(
+  drawing: &w::Drawing,
+  images: &ImageCatalog,
+  theme_colors: &ThemeColors,
+) -> Option<InlineImage> {
+  if drawing_is_hidden(drawing) {
+    return None;
+  }
+  let (graphic_data, width_pt, height_pt, alt_text) = match drawing.drawing_choice.as_ref()? {
+    w::DrawingChoice::Inline(inline) => (
+      &inline.graphic.graphic_data,
+      units::emu_to_points(inline.extent.cx),
+      units::emu_to_points(inline.extent.cy),
+      inline.doc_properties.description.clone(),
+    ),
+    w::DrawingChoice::Anchor(anchor) => (
+      &anchor.graphic.as_ref().graphic_data,
+      units::emu_to_points(anchor.extent.cx),
+      units::emu_to_points(anchor.extent.cy),
+      anchor
+        .doc_properties
+        .as_deref()
+        .and_then(|properties| properties.description.clone()),
+    ),
+  };
+  let properties = drawing_image_properties(graphic_data, theme_colors, Some(images))?;
+  let resource = images
+    .by_relationship_id
+    .get(properties.relationship_id.as_deref()?)?;
+  let image_data = image_data_with_effects(resource, &properties);
+  Some(InlineImage {
+    data: image_data.data,
+    content_type: image_data.content_type,
+    width_pt,
+    height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
+    crop: properties.crop,
+    rotation_deg: properties.rotation_deg,
+    flip_horizontal: properties.flip_horizontal,
+    flip_vertical: properties.flip_vertical,
+    alt_text,
+    hyperlink_url: None,
+    semantic_metafile_text: false,
+    placement: ImagePlacement::Inline,
+  })
 }
 
 fn picture_bullet_base_image(
@@ -14552,6 +15589,9 @@ fn picture_bullet_base_image(
       w::PictureBulletBaseChoice::Group(group) => group_image(group, images),
       w::PictureBulletBaseChoice::ImageFile(image) => image_file_image(image, images),
       w::PictureBulletBaseChoice::Rectangle(rectangle) => rectangle_image(rectangle, images),
+      w::PictureBulletBaseChoice::RoundRectangle(round_rectangle) => {
+        round_rectangle_image(round_rectangle, images)
+      }
       w::PictureBulletBaseChoice::Shape(shape) => shape_image(shape, images),
       _ => None,
     })
@@ -15543,16 +16583,50 @@ impl<'a> RunProps<'a> {
   fn text_fill(&self) -> Option<&'a w14::FillTextEffect> {
     match self {
       Self::Direct(properties) => properties.fill_text_effect.as_deref(),
+      Self::Style(properties) => properties.fill_text_effect.as_deref(),
+      Self::BaseStyle(_) => None,
+      Self::Numbering(properties) => properties.fill_text_effect.as_deref(),
       Self::ParagraphMark(properties) => properties.fill_text_effect.as_deref(),
-      Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
     }
   }
 
   fn text_outline(&self) -> Option<&'a w14::TextOutlineEffect> {
     match self {
       Self::Direct(properties) => properties.text_outline_effect.as_deref(),
+      Self::Style(properties) => properties.text_outline_effect.as_deref(),
+      Self::BaseStyle(_) => None,
+      Self::Numbering(properties) => properties.text_outline_effect.as_deref(),
       Self::ParagraphMark(properties) => properties.text_outline_effect.as_deref(),
-      Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
+    }
+  }
+
+  fn text_glow(&self) -> Option<&'a w14::Glow> {
+    match self {
+      Self::Direct(properties) => properties.glow.as_deref(),
+      Self::Style(properties) => properties.glow.as_deref(),
+      Self::BaseStyle(_) => None,
+      Self::Numbering(properties) => properties.glow.as_deref(),
+      Self::ParagraphMark(properties) => properties.glow.as_deref(),
+    }
+  }
+
+  fn text_shadow(&self) -> Option<&'a w14::Shadow> {
+    match self {
+      Self::Direct(properties) => properties.shadow14.as_deref(),
+      Self::Style(properties) => properties.shadow14.as_deref(),
+      Self::BaseStyle(_) => None,
+      Self::Numbering(properties) => properties.shadow14.as_deref(),
+      Self::ParagraphMark(properties) => properties.shadow.as_deref(),
+    }
+  }
+
+  fn text_reflection(&self) -> Option<&'a w14::Reflection> {
+    match self {
+      Self::Direct(properties) => properties.reflection.as_ref(),
+      Self::Style(properties) => properties.reflection.as_ref(),
+      Self::BaseStyle(_) => None,
+      Self::Numbering(properties) => properties.reflection.as_ref(),
+      Self::ParagraphMark(properties) => properties.reflection.as_ref(),
     }
   }
 
@@ -15792,6 +16866,31 @@ mod tests {
         .flat_map(|path| &path.commands)
         .any(|command| matches!(command, common::PathCommand::CubicTo { .. }))
     );
+  }
+
+  #[test]
+  fn vml_curve_is_retained_as_cubic_shape_geometry() {
+    let curve = v::Curve::from_bytes(
+      br##"<v:curve xmlns:v="urn:schemas-microsoft-com:vml"
+        style="width:20pt;height:10pt" from="0,0" control1="0,100"
+        control2="200,0" to="200,100" fillcolor="#112233" strokecolor="#445566"/>"##,
+    )
+    .expect("VML curve");
+    let shape = vml_special_shape(
+      crate::xlsx::object_resources::vml_curve_model(&curve),
+      curve.style.as_deref(),
+    )
+    .expect("VML curve shape");
+    let InlineShapeGeometry::Path { paths, .. } = shape.geometry else {
+      panic!("curve must lower to a path");
+    };
+    assert!(matches!(
+      paths[0].commands.as_slice(),
+      [
+        common::PathCommand::MoveTo(_),
+        common::PathCommand::CubicTo { .. }
+      ]
+    ));
   }
 
   #[test]
@@ -16334,7 +17433,7 @@ mod tests {
     let xml = r#"<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><pic:nvPicPr><pic:cNvPr id="1" name="Picture 1"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId7"/><a:srcRect l="10000" t="20000" r="30000" b="40000"/></pic:blipFill><pic:spPr><a:xfrm rot="5400000" flipH="1" flipV="true"/></pic:spPr></pic:pic>"#;
 
     let picture = pic::Picture::from_bytes(xml.as_bytes()).expect("picture");
-    let properties = drawing_picture_image_properties(&picture, &ThemeColors::default())
+    let properties = drawing_picture_image_properties(&picture, &ThemeColors::default(), None)
       .expect("image properties");
 
     assert_eq!(properties.relationship_id.as_deref(), Some("rId7"));
@@ -16446,6 +17545,46 @@ mod tests {
     assert!((frame.text_inset_left_pt - 5.53).abs() < 0.001);
     assert!((frame.text_inset_top_pt - 3.6).abs() < 0.001);
     assert_eq!(frame.text_box_blocks.len(), 1);
+  }
+
+  #[test]
+  fn wps_explicit_no_fill_and_no_line_remains_a_textbox_only_shape() {
+    let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5752465" cy="204470"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="6350"><a:noFill/></a:ln></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>Der …</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr lIns="0" tIns="0" rIns="0" bIns="0" anchor="t"><a:noAutofit/></wps:bodyPr></wps:wsp>"#;
+    let source = wps::WordprocessingShape::from_bytes(xml.as_bytes()).expect("WPS shape");
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+
+    assert!(
+      wordprocessing_shape_shape(
+        &source,
+        ImagePlacement::Inline,
+        DrawingMlGroupTransform::identity(),
+        DrawingShapeImportContext {
+          effect_extent: DrawingEffectExtent::default(),
+          styles: &styles,
+          images: &images,
+          hyperlinks: &hyperlinks,
+          smartart_text_colors_by_model_id: None,
+        },
+      )
+      .is_none(),
+      "explicit noFill must not create a visible owning shape"
+    );
+
+    let text_box = wordprocessing_shape_textbox_frame(
+      &source,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      DrawingTextBoxImportContext {
+        base_style: TextStyle::default(),
+        styles: &styles,
+        images: &images,
+        hyperlinks: &hyperlinks,
+      },
+    )
+    .expect("textbox frame");
+    assert!(text_box.inline_anchor_after_line);
   }
 
   #[test]
@@ -17984,6 +19123,8 @@ mod tests {
         | InlineItem::BookmarkStart(_)
         | InlineItem::FormWidgetStart(_)
         | InlineItem::FormWidgetEnd(_)
+        | InlineItem::DrawingGroupStart(_)
+        | InlineItem::DrawingGroupEnd
         | InlineItem::LastRenderedPageBreak
         | InlineItem::PageBreak
         | InlineItem::ColumnBreak => None,
@@ -18049,6 +19190,20 @@ mod tests {
       panic!("floating placement");
     };
     assert!(placement.behind_text);
+    assert_eq!(placement.wrap, ImageWrapMode::Through);
+  }
+
+  #[test]
+  fn vml_absolute_shape_without_wrap_style_uses_through_default() {
+    let style = vml_image_style(Some(
+      "position:absolute;margin-left:-36.9pt;margin-top:-25.2pt;\
+       width:400pt;height:21.6pt;z-index:251664384",
+    ));
+
+    let ImagePlacement::Floating(placement) = style.placement() else {
+      panic!("floating placement");
+    };
+    assert!(!placement.behind_text);
     assert_eq!(placement.wrap, ImageWrapMode::Through);
   }
 
@@ -18134,6 +19289,112 @@ mod tests {
     assert_eq!(frames.len(), 1);
     assert!((frames[0].offset_x_pt - 214.2).abs() < 0.5);
     assert!((frames[0].width_pt - 336.4).abs() < 0.5);
+  }
+
+  #[test]
+  fn drawingml_wpg_group_effects_wrap_children_once_and_skip_empty_lists() {
+    fn group(effect_xml: &str) -> wpg::WordprocessingGroup {
+      let xml = format!(
+        r#"
+        <wpg:wgp xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+                 xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+                 xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <wpg:cNvGrpSpPr/>
+          <wpg:grpSpPr>
+            <a:xfrm>
+              <a:off x="0" y="0"/><a:ext cx="127000" cy="127000"/>
+              <a:chOff x="0" y="0"/><a:chExt cx="127000" cy="127000"/>
+            </a:xfrm>
+            {effect_xml}
+          </wpg:grpSpPr>
+          <wps:wsp>
+            <wps:cNvSpPr/>
+            <wps:spPr>
+              <a:xfrm><a:off x="0" y="0"/><a:ext cx="127000" cy="127000"/></a:xfrm>
+              <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+              <a:solidFill><a:srgbClr val="336699"/></a:solidFill>
+            </wps:spPr>
+            <wps:bodyPr/>
+          </wps:wsp>
+        </wpg:wgp>
+        "#
+      );
+      wpg::WordprocessingGroup::from_bytes(xml.as_bytes()).expect("typed WPG group")
+    }
+
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let import = |group: &wpg::WordprocessingGroup| {
+      wordprocessing_group_shapes(
+        group,
+        ImagePlacement::Inline,
+        DrawingMlGroupTransform::identity(),
+        DrawingShapeImportContext {
+          effect_extent: DrawingEffectExtent::default(),
+          styles: &styles,
+          images: &images,
+          hyperlinks: &hyperlinks,
+          smartart_text_colors_by_model_id: None,
+        },
+      )
+    };
+
+    let with_glow =
+      group(r#"<a:effectLst><a:glow rad="12700"><a:srgbClr val="FF0000"/></a:glow></a:effectLst>"#);
+    let items = import(&with_glow);
+    assert!(matches!(
+      items.as_slice(),
+      [
+        InlineItem::DrawingGroupStart(_),
+        InlineItem::Shape(_),
+        InlineItem::DrawingGroupEnd
+      ]
+    ));
+
+    let empty = group("<a:effectLst/>");
+    let items = import(&empty);
+    assert!(matches!(items.as_slice(), [InlineItem::Shape(_)]));
+  }
+
+  #[test]
+  fn drawingml_group_rotation_remains_an_oriented_child_frame() {
+    let transform = DrawingMlGroupTransform::identity().child(DrawingMlGroupXfrm {
+      rotation_deg: 90.0,
+      width_pt: 200.0,
+      height_pt: 100.0,
+      child_width: 200.0,
+      child_height: 100.0,
+      ..DrawingMlGroupXfrm::default()
+    });
+    let mapped = transform.map_rect(0.0, 0.0, 200.0, 100.0, 0.0, false, false);
+
+    assert!((mapped.rotation_deg - 90.0).abs() < 0.001);
+    assert!((mapped.width_pt - 200.0).abs() < 0.001);
+    assert!((mapped.height_pt - 100.0).abs() < 0.001);
+    assert!((mapped.x_pt - 0.0).abs() < 0.001);
+    assert!((mapped.y_pt - 0.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn drawingml_textbox_rotation_honors_upright_body_property() {
+    let rotated = wps::WordprocessingShape::from_bytes(
+      br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:bodyPr rot="5400000"/></wps:wsp>"#,
+    )
+    .expect("rotated WPS shape");
+    assert_eq!(
+      wordprocessing_shape_textbox_text_rotation(&rotated),
+      Some(-90.0)
+    );
+
+    let upright = wps::WordprocessingShape::from_bytes(
+      br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:bodyPr rot="5400000" upright="1" vert="vert"/></wps:wsp>"#,
+    )
+    .expect("upright WPS shape");
+    assert_eq!(
+      wordprocessing_shape_textbox_text_rotation(&upright),
+      Some(-90.0)
+    );
   }
 
   #[test]
@@ -18557,6 +19818,8 @@ mod tests {
         | InlineItem::BookmarkStart(_)
         | InlineItem::FormWidgetStart(_)
         | InlineItem::FormWidgetEnd(_)
+        | InlineItem::DrawingGroupStart(_)
+        | InlineItem::DrawingGroupEnd
         | InlineItem::LastRenderedPageBreak
         | InlineItem::PageBreak
         | InlineItem::ColumnBreak => None,
@@ -18800,6 +20063,55 @@ mod tests {
       }
     );
     assert!((resolved.opacity - 0.8).abs() < 0.001);
+  }
+
+  #[test]
+  fn drawingml_gradient_preserves_percentage_hsl_and_rotation_semantics() {
+    let fill = a::GradientFill::from_bytes(
+      br#"<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="0"><a:gsLst><a:gs pos="0"><a:scrgbClr r="100000" g="0" b="0"><a:alpha val="50000"/></a:scrgbClr></a:gs><a:gs pos="100000"><a:hslClr hue="14400000" sat="100000" lum="50000"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill>"#,
+    )
+    .expect("DrawingML gradient");
+
+    let common::Fill::Gradient(gradient) =
+      drawingml_gradient_fill(&fill, &ThemeColors::default()).expect("resolved gradient")
+    else {
+      panic!("expected gradient fill");
+    };
+
+    assert_eq!(gradient.stops.len(), 2);
+    assert!(gradient.stops[0].color.r > gradient.stops[0].color.b);
+    assert!((120..=135).contains(&gradient.stops[0].color.a));
+    assert!(gradient.stops[1].color.b > gradient.stops[1].color.r);
+    assert_eq!(gradient.rotate_with_shape, Some(false));
+  }
+
+  #[test]
+  fn drawingml_shape_tile_fill_is_not_flattened_to_stretch() {
+    let fill = a::BlipFill::from_bytes(
+      br#"<a:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:blip/><a:tile sx="75000" sy="50000" flip="xy" algn="br"/></a:blipFill>"#,
+    )
+    .expect("DrawingML blip fill");
+
+    let InlineShapeImageFillMode::DrawingMlTile(tile) = drawingml_image_fill_mode(&fill) else {
+      panic!("expected DrawingML tile");
+    };
+    assert_eq!(
+      tile.alignment,
+      Some(a::RectangleAlignmentValues::BottomRight)
+    );
+    assert_eq!(tile.flip, Some(a::TileFlipValues::HorizontalAndVertical));
+  }
+
+  #[test]
+  fn office_treats_diagram_group_fill_as_no_fill() {
+    let properties = dsp::ShapeProperties::from_bytes(
+      br#"<dsp:spPr xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:grpFill/></dsp:spPr>"#,
+    )
+    .expect("diagram shape properties");
+
+    assert!(drawingml_shape_properties_has_no_fill(
+      &DrawingMlShapeProperties::Diagram(properties)
+    ));
   }
 
   #[test]

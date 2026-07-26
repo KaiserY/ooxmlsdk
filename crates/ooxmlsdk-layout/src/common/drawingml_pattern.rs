@@ -1,5 +1,10 @@
+use std::io::Cursor;
+
 use emfsdk::emfplus::EmfPlusHatchStyle;
+use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetPatternValues;
+
+use super::Color;
 
 /// Resolves a DrawingML preset pattern to its canonical GDI+/EMF+ hatch.
 ///
@@ -74,6 +79,42 @@ pub(crate) const fn hatch_style(preset: Option<PresetPatternValues>) -> EmfPlusH
   }
 }
 
+/// Applies VML's historical 8×8 pattern palette.
+///
+/// VML pattern images encode the foreground as white and the background as
+/// black; `v:fill@color` and `color2` replace those two entries. LibreOffice
+/// performs the same conversion in `oox/source/vml/vmlformatting.cxx`.
+/// Rejecting images that are not exactly an opaque black/white 8×8 mask keeps
+/// ordinary tile images byte-for-byte unchanged.
+pub(crate) fn recolor_vml_historical_pattern(
+  data: &[u8],
+  foreground: Color,
+  background: Color,
+) -> Option<Vec<u8>> {
+  let mut image = image::load_from_memory(data).ok()?.to_rgba8();
+  if image.dimensions() != (8, 8) {
+    return None;
+  }
+  for pixel in image.pixels() {
+    if pixel[3] != 255 || !matches!((pixel[0], pixel[1], pixel[2]), (0, 0, 0) | (255, 255, 255)) {
+      return None;
+    }
+  }
+  for pixel in image.pixels_mut() {
+    let color = if pixel[0] == 255 {
+      foreground
+    } else {
+      background
+    };
+    *pixel = image::Rgba([color.r, color.g, color.b, color.a]);
+  }
+  let mut output = Vec::new();
+  PngEncoder::new(Cursor::new(&mut output))
+    .write_image(image.as_raw(), 8, 8, ColorType::Rgba8.into())
+    .ok()?;
+  Some(output)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -93,5 +134,37 @@ mod tests {
   #[test]
   fn missing_drawingml_pattern_uses_the_office_pct5_default() {
     assert_eq!(hatch_style(None), EmfPlusHatchStyle::Percent05);
+  }
+
+  #[test]
+  fn vml_historical_pattern_uses_white_as_foreground() {
+    let mut input = Vec::new();
+    let mut pixels = vec![0_u8; 8 * 8 * 4];
+    for (index, pixel) in pixels.chunks_exact_mut(4).enumerate() {
+      let value = if index % 2 == 0 { 255 } else { 0 };
+      pixel.copy_from_slice(&[value, value, value, 255]);
+    }
+    PngEncoder::new(Cursor::new(&mut input))
+      .write_image(&pixels, 8, 8, ColorType::Rgba8.into())
+      .unwrap();
+    let output = recolor_vml_historical_pattern(
+      &input,
+      Color {
+        r: 1,
+        g: 2,
+        b: 3,
+        a: 4,
+      },
+      Color {
+        r: 5,
+        g: 6,
+        b: 7,
+        a: 8,
+      },
+    )
+    .unwrap();
+    let output = image::load_from_memory(&output).unwrap().to_rgba8();
+    assert_eq!(output.get_pixel(0, 0).0, [1, 2, 3, 4]);
+    assert_eq!(output.get_pixel(1, 0).0, [5, 6, 7, 8]);
   }
 }

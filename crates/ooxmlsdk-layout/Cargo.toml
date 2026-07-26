@@ -28,5 +28,7 @@ quick-xml = { workspace = true }
 rustc-hash = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
+tiny-skia = "0.12.0"
+ttf-parser = { workspace = true }
 unicode-bidi = { workspace = true }
 unicode-script = { workspace = true }

@@ -528,12 +528,21 @@ pub(crate) enum InlineItem {
   Text(TextRun),
   Image(InlineImage),
   Shape(InlineShape),
+  DrawingGroupStart(InlineDrawingGroupEffect),
+  DrawingGroupEnd,
   BookmarkStart(String),
   FormWidgetStart(u32),
   FormWidgetEnd(u32),
   LastRenderedPageBreak,
   PageBreak,
   ColumnBreak,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct InlineDrawingGroupEffect {
+  pub effects: common::DrawingEffectSource,
+  pub rotation_deg: f32,
+  pub placement: ImagePlacement,
 }
 
 #[derive(Clone, Debug)]
@@ -567,18 +576,27 @@ pub(crate) struct InlineShape {
   pub geometry: InlineShapeGeometry,
   pub offset_x_pt: f32,
   pub offset_y_pt: f32,
+  pub rotation_deg: f32,
+  pub flip_horizontal: bool,
+  pub flip_vertical: bool,
   pub fill_color: Option<RgbColor>,
   pub fill_pattern: Option<common::PatternFill>,
+  pub fill_override: Option<common::Fill<'static>>,
   pub additional_fill_colors: Vec<RgbColor>,
   pub fill_image: Option<InlineShapeImageFill>,
   pub stroke: Option<BorderStyle>,
   pub stroke_pattern: Option<common::PatternFill>,
+  pub stroke_override: Option<common::Stroke<'static>>,
   pub suppress_zero_relative_background: bool,
   pub allow_outside_page: bool,
   pub inline_anchor_after_line: bool,
   pub placement: ImagePlacement,
   pub chart: Option<Box<InlineChart>>,
   pub text_warp: Option<Box<a::PresetTextWarp>>,
+  pub text_fill: Option<common::Fill<'static>>,
+  pub effects: Option<common::DrawingEffectSource>,
+  pub static3d: Option<common::drawingml_3d::Static3dStyle>,
+  pub text_upright: bool,
   pub text_box_blocks: Vec<Block>,
   pub text_inset_left_pt: f32,
   pub text_inset_top_pt: f32,
@@ -617,6 +635,21 @@ pub(crate) struct InlineShapeImageFill {
   pub rotation_deg: f32,
   pub flip_horizontal: bool,
   pub flip_vertical: bool,
+  pub rotate_with_shape: bool,
+  pub mode: InlineShapeImageFillMode,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum InlineShapeImageFillMode {
+  Stretch,
+  Contain,
+  Cover,
+  DrawingMlTile(Box<a::Tile>),
+  Tile {
+    size: Option<String>,
+    origin: Option<String>,
+    position: Option<String>,
+  },
 }
 
 #[derive(Clone, Debug, PartialEq)]

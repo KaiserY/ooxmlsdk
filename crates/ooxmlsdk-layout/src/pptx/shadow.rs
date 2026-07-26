@@ -9,6 +9,9 @@ use kurbo::{
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
+use crate::common::drawingml_image_effects::stack_blur_alpha;
+#[cfg(test)]
+use crate::common::drawingml_image_effects::triangular_blur_line;
 use crate::common::{PathCommand, Point};
 use crate::model::{ImageCrop, ImageItem, RgbColor};
 use crate::units;
@@ -988,68 +991,6 @@ pub(crate) fn shadow_alignment(alignment: Option<a::RectangleAlignmentValues>) -
     a::RectangleAlignmentValues::BottomLeft => (0.0, 1.0),
     a::RectangleAlignmentValues::Bottom => (0.5, 1.0),
     a::RectangleAlignmentValues::BottomRight => (1.0, 1.0),
-  }
-}
-
-fn stack_blur_alpha(alpha: &mut [u8], width: usize, height: usize, radius: usize) {
-  let radius = radius.min(MAX_STACK_BLUR_RADIUS_PX as usize);
-  if radius == 0 || width == 0 || height == 0 {
-    return;
-  }
-  let mut horizontal = vec![0_u8; alpha.len()];
-  for y in 0..height {
-    triangular_blur_line(
-      &alpha[y * width..(y + 1) * width],
-      &mut horizontal[y * width..(y + 1) * width],
-      radius,
-    );
-  }
-  let mut column = vec![0_u8; height];
-  let mut blurred_column = vec![0_u8; height];
-  for x in 0..width {
-    for y in 0..height {
-      column[y] = horizontal[y * width + x];
-    }
-    triangular_blur_line(&column, &mut blurred_column, radius);
-    for y in 0..height {
-      alpha[y * width + x] = blurred_column[y];
-    }
-  }
-}
-
-/// Applies the triangular kernel used by stack blur in linear time.
-///
-/// The expanded shadow bitmap has transparent edge pixels, so samples beyond
-/// the bitmap are transparent too. The recurrence moves the weighted window
-/// by subtracting the left half and adding the right half.
-fn triangular_blur_line(input: &[u8], output: &mut [u8], radius: usize) {
-  debug_assert_eq!(input.len(), output.len());
-  if input.is_empty() {
-    return;
-  }
-  let divisor = ((radius + 1) * (radius + 1)) as i64;
-  let mut prefix = Vec::with_capacity(input.len() + 1);
-  prefix.push(0_i64);
-  for value in input {
-    prefix.push(prefix.last().copied().unwrap_or_default() + i64::from(*value));
-  }
-  let range_sum = |start: usize, end: usize| prefix[end] - prefix[start];
-
-  let mut weighted_sum = 0_i64;
-  for (index, value) in input.iter().take(radius + 1).enumerate() {
-    weighted_sum += i64::from(*value) * (radius + 1 - index) as i64;
-  }
-  for (center, output_value) in output.iter_mut().enumerate() {
-    *output_value = (weighted_sum / divisor).clamp(0, 255) as u8;
-    if center + 1 == input.len() {
-      break;
-    }
-    let left_start = center.saturating_sub(radius);
-    let left_end = center + 1;
-    let right_start = center + 1;
-    let right_end = (center + radius + 2).min(input.len());
-    weighted_sum -= range_sum(left_start, left_end);
-    weighted_sum += range_sum(right_start, right_end);
   }
 }
 

@@ -1,3 +1,4 @@
+use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2017_model3d as am3d;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
@@ -17,6 +18,7 @@ const DML_CHART_PURL_URI: &str = "http://purl.oclc.org/ooxml/drawingml/chart";
 const DML_CHART_EX_URI: &str = "http://schemas.microsoft.com/office/drawing/2014/chartex";
 const DML_TABLE_URI: &str = "http://schemas.openxmlformats.org/drawingml/2006/table";
 const DML_TABLE_PURL_URI: &str = "http://purl.oclc.org/ooxml/drawingml/table";
+const DML_MODEL3D_URI: &str = "http://schemas.microsoft.com/office/drawing/2017/model3d";
 
 #[derive(Debug, Default)]
 pub(crate) struct GraphicalObjectFrameContext;
@@ -37,6 +39,7 @@ impl GraphicalObjectFrameContext {
       DML_CHART_URI | DML_CHART_PURL_URI => GraphicDataKind::Chart,
       DML_CHART_EX_URI => GraphicDataKind::ChartEx,
       DML_TABLE_URI | DML_TABLE_PURL_URI => GraphicDataKind::Table,
+      DML_MODEL3D_URI => GraphicDataKind::Model3D,
       _ => GraphicDataKind::Unsupported,
     };
     let record = graphic_data_record(graphic_data, kind, slide_persist);
@@ -51,6 +54,12 @@ impl GraphicalObjectFrameContext {
       // an image relationship. Its outline/fill/effects are visible in
       // Office fixed output (for example an OLE preview selection border).
       crate::pptx::shape_group_context::apply_shape_properties(shape, &picture.shape_properties);
+    }
+    if kind == GraphicDataKind::Model3D
+      && shape.picture.is_none()
+      && let Some(preview) = model3d_preview_picture(graphic_data, slide_persist)
+    {
+      shape.picture = Some(preview);
     }
     match kind {
       GraphicDataKind::Ole => shape.set_ole_object_type(),
@@ -67,6 +76,7 @@ impl GraphicalObjectFrameContext {
           }
         });
       }
+      GraphicDataKind::Model3D => {}
       GraphicDataKind::Unsupported => {}
     }
   }
@@ -162,6 +172,60 @@ fn graphic_data_record(
     }
   }
   record
+}
+
+fn model3d_preview_picture(
+  graphic_data: &a::GraphicData,
+  slide_persist: &SlidePersist,
+) -> Option<PictureRecord> {
+  let blip = graphic_data
+    .graphic_data_choice
+    .iter()
+    .find_map(|choice| match choice {
+      a::GraphicDataChoice::Model3D(model) => model
+        .model3_d_raster
+        .as_deref()
+        .and_then(|raster| raster.blip.as_deref()),
+      _ => None,
+    })?;
+  let image_resource = blip
+    .embed
+    .as_deref()
+    .and_then(|relationship_id| slide_persist.image_resources.get(relationship_id))
+    .cloned();
+  Some(PictureRecord {
+    embed_relationship_id: blip.embed.clone(),
+    link_relationship_id: blip.link.clone(),
+    crop: ImageCrop::default(),
+    blip_choices: blip.blip_choice.iter().map(model3d_blip_choice).collect(),
+    image_resource,
+  })
+}
+
+fn model3d_blip_choice(choice: &am3d::BlipChoice) -> a::BlipChoice {
+  match choice {
+    am3d::BlipChoice::AlphaBiLevel(value) => a::BlipChoice::AlphaBiLevel(value.clone()),
+    am3d::BlipChoice::AlphaCeiling => a::BlipChoice::AlphaCeiling,
+    am3d::BlipChoice::AlphaFloor => a::BlipChoice::AlphaFloor,
+    am3d::BlipChoice::AlphaInverse(value) => a::BlipChoice::AlphaInverse(value.clone()),
+    am3d::BlipChoice::AlphaModulationEffect(value) => {
+      a::BlipChoice::AlphaModulationEffect(value.clone())
+    }
+    am3d::BlipChoice::AlphaModulationFixed(value) => {
+      a::BlipChoice::AlphaModulationFixed(value.clone())
+    }
+    am3d::BlipChoice::AlphaReplace(value) => a::BlipChoice::AlphaReplace(value.clone()),
+    am3d::BlipChoice::BiLevel(value) => a::BlipChoice::BiLevel(value.clone()),
+    am3d::BlipChoice::Blur(value) => a::BlipChoice::Blur(value.clone()),
+    am3d::BlipChoice::ColorChange(value) => a::BlipChoice::ColorChange(value.clone()),
+    am3d::BlipChoice::ColorReplacement(value) => a::BlipChoice::ColorReplacement(value.clone()),
+    am3d::BlipChoice::Duotone(value) => a::BlipChoice::Duotone(value.clone()),
+    am3d::BlipChoice::FillOverlay(value) => a::BlipChoice::FillOverlay(value.clone()),
+    am3d::BlipChoice::Grayscale => a::BlipChoice::Grayscale,
+    am3d::BlipChoice::Hsl(value) => a::BlipChoice::Hsl(value.clone()),
+    am3d::BlipChoice::LuminanceEffect(value) => a::BlipChoice::LuminanceEffect(value.clone()),
+    am3d::BlipChoice::TintEffect(value) => a::BlipChoice::TintEffect(value.clone()),
+  }
 }
 
 fn ole_preview_picture(graphic_data: &a::GraphicData) -> Option<&p::Picture> {

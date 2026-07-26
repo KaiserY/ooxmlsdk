@@ -106,6 +106,26 @@ pub(crate) fn paths(
           let radius_y = coordinate(&arc.height_radius, &guides, viewport_width, viewport_height)?;
           let start_angle = coordinate(&arc.start_angle, &guides, viewport_width, viewport_height)?;
           let sweep_angle = coordinate(&arc.swing_angle, &guides, viewport_width, viewport_height)?;
+          if radius_x < 0.0
+            || radius_y < 0.0
+            || !radius_x.is_finite()
+            || !radius_y.is_finite()
+            || !start_angle.is_finite()
+            || !sweep_angle.is_finite()
+          {
+            return None;
+          }
+          if radius_x == 0.0 || radius_y == 0.0 {
+            // Preset adjustments may legally pin an arc radius to zero. The
+            // arc then degenerates to its analytically derived endpoint;
+            // rejecting it would discard the complete surrounding shape.
+            let end = drawingml_arc_endpoint(start, radius_x, radius_y, start_angle, sweep_angle);
+            if end != start {
+              output.line_to(map_coordinates * kurbo::Point::new(end.0, end.1));
+            }
+            current = Some(end);
+            continue;
+          }
           let arc = drawingml_arc(start, radius_x, radius_y, start_angle, sweep_angle)?;
           let end = arc.eval(1.0);
           append_transformed_arc(&mut output, arc, map_coordinates);
@@ -172,7 +192,13 @@ fn drawingml_arc(
   start_angle: f64,
   sweep_angle: f64,
 ) -> Option<Arc> {
-  if radius_x <= 0.0 || radius_y <= 0.0 || !sweep_angle.is_finite() {
+  if radius_x <= 0.0
+    || radius_y <= 0.0
+    || !radius_x.is_finite()
+    || !radius_y.is_finite()
+    || !start_angle.is_finite()
+    || !sweep_angle.is_finite()
+  {
     return None;
   }
 
@@ -188,6 +214,23 @@ fn drawingml_arc(
     sweep_radians,
     0.0,
   ))
+}
+
+fn drawingml_arc_endpoint(
+  start: (f64, f64),
+  radius_x: f64,
+  radius_y: f64,
+  start_angle: f64,
+  sweep_angle: f64,
+) -> (f64, f64) {
+  let start_radians = angle_radians(start_angle);
+  let end_radians = start_radians + angle_radians(sweep_angle);
+  let center_x = start.0 - radius_x * start_radians.cos();
+  let center_y = start.1 - radius_y * start_radians.sin();
+  (
+    center_x + radius_x * end_radians.cos(),
+    center_y + radius_y * end_radians.sin(),
+  )
 }
 
 fn evaluate_guides(

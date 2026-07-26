@@ -288,6 +288,16 @@ impl PPTShapeGroupContext {
     ) {
       shape.shape.fill_properties = Some(fill);
     }
+    shape.shape.effect_properties = group
+      .group_shape_properties
+      .group_shape_properties_choice2
+      .as_ref()
+      .map(EffectProperties::from_pml_group_shape_properties_choice);
+    shape.shape.scene3d = group
+      .group_shape_properties
+      .scene3_d_type
+      .as_deref()
+      .cloned();
     shape
   }
 
@@ -644,6 +654,8 @@ pub(crate) fn apply_shape_properties(shape: &mut Shape, properties: &p::ShapePro
   if let Some(effect) = properties.shape_properties_choice3.as_ref() {
     shape.effect_properties = Some(EffectProperties::from_pml_shape_properties_choice(effect));
   }
+  shape.scene3d = properties.scene3_d_type.as_deref().cloned();
+  shape.shape3d = properties.shape3_d_type.as_deref().cloned();
 }
 
 fn image_crop_from_source_rectangle(rect: Option<&a::SourceRectangle>) -> ImageCrop {

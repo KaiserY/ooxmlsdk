@@ -5546,6 +5546,7 @@ pub struct GraphicData {
             child(variant = TimeSlicer, boxed, qname = "tsle:timeslicer"),
             child(variant = AlternateContent, boxed, qname = "mc:AlternateContent"),
             child(variant = ExtendedChartReference, qname = "cx:chart"),
+            child(variant = Model3D, boxed, qname = "am3d:model3d"),
             any(qnames = ["wp:wsp"])
         )
     )]
@@ -11482,6 +11483,7 @@ pub enum GraphicDataChoice {
   TimeSlicer(std::boxed::Box<crate::schemas::tsle::TimeSlicer>),
   AlternateContent(std::boxed::Box<crate::schemas::mc::AlternateContent>),
   ExtendedChartReference(crate::schemas::cx::RelId),
+  Model3D(std::boxed::Box<crate::schemas::am3d::Model3D>),
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]

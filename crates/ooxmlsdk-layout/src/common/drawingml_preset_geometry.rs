@@ -116,6 +116,33 @@ mod tests {
     );
   }
 
+  #[test]
+  fn zero_radius_preset_arc_keeps_the_surrounding_shape_path() {
+    let mut preset = preset("snipRoundRect");
+    preset.adjust_value_list = Some(a::AdjustValueList {
+      shape_guide: vec![
+        a::ShapeGuide {
+          name: "adj1".into(),
+          formula: "val 0".into(),
+        },
+        a::ShapeGuide {
+          name: "adj2".into(),
+          formula: "val 50000".into(),
+        },
+      ],
+    });
+
+    let paths = paths(Some(&preset), 0.0, 0.0, 100.0, 20.0)
+      .expect("a legal zero-radius corner must not discard the preset shape");
+    assert_eq!(paths.len(), 1);
+    assert!(
+      paths[0]
+        .commands
+        .iter()
+        .any(|command| matches!(command, PathCommand::Close))
+    );
+  }
+
   trait PathCommandExt {
     fn is_move_to(&self) -> bool;
   }

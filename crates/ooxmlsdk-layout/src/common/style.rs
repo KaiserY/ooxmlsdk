@@ -1,9 +1,28 @@
 use std::borrow::Cow;
 
 use emfsdk::emfplus::EmfPlusHatchStyle;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk_fonts::{FontRequest, TextScript, ThemeFontKind};
 
 use crate::common::Pt;
+
+/// Typed DrawingML effect source retained across all host lowerers.
+///
+/// DOCX, PPTX, XLSX, charts, and diagrams use host-specific `spPr` wrapper
+/// types, but the effect payload itself is always the shared DrawingML type.
+/// Keeping this enum in the common model prevents non-Presentation hosts from
+/// silently dropping ordered DAGs before paint.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum DrawingEffectSource {
+  List {
+    source: Box<a::EffectList>,
+    resolved: Option<super::drawingml_image_effects::ImageEffectContainer>,
+  },
+  Dag {
+    source: Box<a::EffectDag>,
+    resolved: Option<super::drawingml_image_effects::ImageEffectContainer>,
+  },
+}
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Color {
@@ -31,6 +50,9 @@ pub struct Stroke<'doc> {
   /// Pattern paint for DrawingML outlines. The solid `color` remains the
   /// fallback used by consumers that cannot paint a tiling pattern.
   pub pattern: Option<PatternFill>,
+  /// Gradient paint for DrawingML outlines, resolved in the same page-space
+  /// coordinate system as the owning path.
+  pub gradient: Option<GradientFill<'doc>>,
   pub source_style_id: Option<Cow<'doc, str>>,
 }
 
@@ -46,6 +68,13 @@ impl Stroke<'_> {
       return Some(dash.clone());
     }
     let preset = self.preset_dash?;
+    if preset == StrokeDashPreset::SystemDot && self.cap == Some(StrokeCap::Round) {
+      // A round cap extends half a line width beyond both ends of every dash
+      // segment. PowerPoint therefore lowers a round-capped `sysDot` to a
+      // zero-length segment followed by a two-width gap: the cap turns the
+      // segment into a one-width circle while preserving the two-width cycle.
+      return Some(vec![Pt(0.0), Pt(2.0 * self.width.0)]);
+    }
     let multipliers: &[f32] = match preset {
       StrokeDashPreset::Solid => return None,
       StrokeDashPreset::Dot => &[1.0, 3.0],
@@ -112,6 +141,35 @@ pub enum StrokeDashPreset {
   SystemDashDotDot,
 }
 
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn round_system_dot_compensates_for_the_cap_extension() {
+    let stroke = Stroke {
+      width: Pt(1.8),
+      preset_dash: Some(StrokeDashPreset::SystemDot),
+      cap: Some(StrokeCap::Round),
+      ..Stroke::default()
+    };
+
+    assert_eq!(stroke.resolved_dash(), Some(vec![Pt(0.0), Pt(3.6)]));
+  }
+
+  #[test]
+  fn flat_system_dot_keeps_the_authored_binary_pattern() {
+    let stroke = Stroke {
+      width: Pt(1.8),
+      preset_dash: Some(StrokeDashPreset::SystemDot),
+      cap: Some(StrokeCap::Flat),
+      ..Stroke::default()
+    };
+
+    assert_eq!(stroke.resolved_dash(), Some(vec![Pt(1.8), Pt(1.8)]));
+  }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StrokeEnd {
   pub kind: StrokeEndKind,
@@ -171,6 +229,10 @@ pub struct GradientFill<'doc> {
   pub line: Option<(super::Point, super::Point)>,
   pub interpolation: GradientInterpolation,
   pub scaled: bool,
+  /// Unresolved DrawingML `rotWithShape` intent. Hosts that lower a shape
+  /// before its final page transform retain this until they can resolve the
+  /// gradient line/path into page coordinates.
+  pub rotate_with_shape: Option<bool>,
   /// Resolved path-gradient geometry. DrawingML defines this independently
   /// from the painted shape path; the latter remains on [`super::PathItem`]
   /// and acts as the final clip.
@@ -189,6 +251,38 @@ pub struct GradientPath {
   /// `rotWithShape`, flips, and non-square circle gradients without asking the
   /// PDF backend to reconstruct host shape transforms.
   pub transform: super::Transform,
+  /// The authored tile rectangle is smaller than the owning shape, so Office
+  /// mirrors successive copies in both axes while covering the shape.
+  pub mirror_tile: bool,
+}
+
+/// Expands a DrawingML circle-gradient rectangle to its circumscribed circle.
+///
+/// PowerPoint uses half of the transformed rectangle's diagonal as the outer
+/// radius. LibreOffice tracks the smaller-rendering interoperability gap as
+/// tdf#166140 in `oox/source/drawingml/fillproperties.cxx`.
+pub fn office_circle_gradient_transform(transform: super::Transform) -> super::Transform {
+  let width = transform.m11.hypot(transform.m12);
+  let height = transform.m21.hypot(transform.m22);
+  let diameter = width.hypot(height);
+  if width <= f32::EPSILON || height <= f32::EPSILON || diameter <= f32::EPSILON {
+    return transform;
+  }
+
+  let m11 = transform.m11 / width * diameter;
+  let m12 = transform.m12 / width * diameter;
+  let m21 = transform.m21 / height * diameter;
+  let m22 = transform.m22 / height * diameter;
+  let center_x = transform.dx.0 + (transform.m11 + transform.m21) * 0.5;
+  let center_y = transform.dy.0 + (transform.m12 + transform.m22) * 0.5;
+  super::Transform {
+    m11,
+    m12,
+    m21,
+    m22,
+    dx: Pt(center_x - (m11 + m21) * 0.5),
+    dy: Pt(center_y - (m12 + m22) * 0.5),
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

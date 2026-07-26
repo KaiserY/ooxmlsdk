@@ -50,6 +50,28 @@ impl Color {
     }
   }
 
+  pub(crate) fn from_extrusion_color_choice(choice: &a::ExtrusionColorChoice) -> Option<Self> {
+    match choice {
+      a::ExtrusionColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::ExtrusionColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::ExtrusionColorChoice::HslColor(color) => Some(hsl_color(color)),
+      a::ExtrusionColorChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::ExtrusionColorChoice::PresetColor(color) => Some(preset_color(color)),
+      a::ExtrusionColorChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_contour_color_choice(choice: &a::ContourColorChoice) -> Option<Self> {
+    match choice {
+      a::ContourColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::ContourColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::ContourColorChoice::HslColor(color) => Some(hsl_color(color)),
+      a::ContourColorChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::ContourColorChoice::PresetColor(color) => Some(preset_color(color)),
+      a::ContourColorChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
   pub(crate) fn from_underline_fill_choice(choice: &a::UnderlineFillChoice) -> Option<Self> {
     match choice {
       a::UnderlineFillChoice::SolidFill(fill) => fill
@@ -62,14 +84,6 @@ impl Color {
       | a::UnderlineFillChoice::BlipFill(_)
       | a::UnderlineFillChoice::GroupFill => None,
     }
-  }
-
-  pub(crate) fn best_solid_gradient_color(fill: &a::GradientFill) -> Option<Self> {
-    best_solid_gradient_color(fill)
-  }
-
-  pub(crate) fn best_solid_pattern_color(fill: &a::PatternFill) -> Option<Self> {
-    best_solid_pattern_color(fill)
   }
 
   pub(crate) fn from_gradient_stop_choice(choice: &a::GradientStopChoice) -> Option<Self> {

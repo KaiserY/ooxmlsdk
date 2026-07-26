@@ -30,9 +30,11 @@ use crate::render::math::text_math_text;
 use crate::units;
 
 use super::activex::ActiveXControlState;
-use super::drawingml::color::Color;
-use super::drawingml::fill::FillProperties;
-use super::drawingml::shape::{Shape, ShapeMapEntry};
+use super::drawingml::color::{Color, RgbHexColor};
+use super::drawingml::fill::{FillKind, FillProperties};
+use super::drawingml::line::{LineFill, LineProperties};
+use super::drawingml::shape::{LegacyVmlFillImage, Shape, ShapeMapEntry};
+use super::drawingml::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
 use super::drawingml::text_list_style::TextListStyle;
 use super::import::PowerPointImport;
 // a 28000 x 21000 mm100 master page when exporting a presentation with no page
@@ -1240,6 +1242,122 @@ impl SlidePersist {
         if model.hidden || !model.print_object {
           continue;
         }
+        if model.image_relationship_id.is_none() {
+          let Some((left_pt, top_pt, width_pt, height_pt)) =
+            vml_absolute_rectangle(model.style.as_deref())
+          else {
+            continue;
+          };
+          let Some(paths) = crate::xlsx::vml_shape_drawing_paths(&model, width_pt, height_pt)
+          else {
+            continue;
+          };
+          let mut shape = Shape::new(super::drawingml::shape::ShapeService::Custom);
+          shape.shape_location = Some(self.shape_location);
+          shape.position = super::drawingml::shape::Point {
+            x: points_to_emu(left_pt),
+            y: points_to_emu(top_pt),
+          };
+          shape.size = super::drawingml::shape::Size {
+            cx: points_to_emu(width_pt),
+            cy: points_to_emu(height_pt),
+          };
+          shape.rotation = model
+            .style
+            .as_deref()
+            .and_then(|style| vml_style_value(style, "rotation"))
+            .map(vml_rotation_degrees)
+            .unwrap_or(0.0);
+          let flip = model
+            .style
+            .as_deref()
+            .and_then(|style| vml_style_value(style, "flip"))
+            .unwrap_or_default();
+          shape.flip_h = flip
+            .split_whitespace()
+            .any(|value| value.eq_ignore_ascii_case("x"));
+          shape.flip_v = flip
+            .split_whitespace()
+            .any(|value| value.eq_ignore_ascii_case("y"));
+          shape.legacy_vml_paths = Some(paths);
+          shape.legacy_vml_fill = Some(crate::xlsx::vml_shape_common_fill(
+            &model,
+            kurbo::Affine::IDENTITY,
+          ));
+          shape.legacy_vml_stroke = crate::xlsx::vml_shape_common_stroke(&model);
+          shape.legacy_vml_fill_image = model
+            .fill_image_relationship_id
+            .as_deref()
+            .and_then(|relationship_id| image_resources.get(relationship_id))
+            .cloned()
+            .map(|mut resource| {
+              if let Some(data) =
+                crate::xlsx::recolor_vml_pattern_image(&model, resource.data.as_ref())
+              {
+                resource.data = Arc::from(data);
+                resource.content_type = Some("image/png".to_string());
+                resource.monochrome_dib_palette_override = None;
+              }
+              LegacyVmlFillImage {
+                resource,
+                fill_type: model.fill_type,
+                aspect: model.fill_image_aspect,
+                size: model.fill_image_size.clone(),
+                origin: model.fill_image_origin.clone(),
+                position: model.fill_image_position.clone(),
+                rotate_with_shape: model.fill_rotate_with_shape == Some(true),
+              }
+            });
+          if shape.legacy_vml_fill_image.is_some() {
+            shape.legacy_vml_fill = Some(crate::common::Fill::None);
+          }
+          shape.fill_properties = Some(FillProperties {
+            kind: if model.filled {
+              FillKind::Solid(Some(vml_preview_color(
+                model.fill_color.as_deref(),
+                (255, 255, 255),
+              )))
+            } else {
+              FillKind::None
+            },
+            placeholder_color: None,
+          });
+          shape.line_properties = Some(LineProperties {
+            fill: if model.stroked {
+              LineFill::Solid(Some(vml_preview_color(
+                model.stroke_color.as_deref(),
+                (0, 0, 0),
+              )))
+            } else {
+              LineFill::None
+            },
+            width_emu: model
+              .stroke_weight
+              .as_deref()
+              .and_then(vml_measure_to_points)
+              .map(points_to_emu),
+            placeholder_color: None,
+            source_outline: None,
+          });
+          if !model.text.is_empty() {
+            shape.text_body = Some(TextBody {
+              paragraphs: vec![TextParagraph {
+                runs: vec![TextRun {
+                  text: model.text,
+                  kind: TextRunKind::Run,
+                  hyperlink_url: None,
+                  field_type: None,
+                  run_properties: None,
+                  field_paragraph_properties: None,
+                }],
+                ..TextParagraph::default()
+              }],
+              ..TextBody::default()
+            });
+          }
+          self.shapes.push(shape);
+          continue;
+        }
         let Some(relationship_id) = model.image_relationship_id.as_deref() else {
           continue;
         };
@@ -1407,6 +1525,37 @@ impl SlidePersist {
   }
 }
 
+fn vml_preview_color(value: Option<&str>, fallback: (u8, u8, u8)) -> Color {
+  let color = value
+    .and_then(crate::docx::parse_vml_color)
+    .map(|color| (color.r, color.g, color.b))
+    .unwrap_or(fallback);
+  Color::RgbHex(RgbHexColor {
+    value: format!("{:02X}{:02X}{:02X}", color.0, color.1, color.2),
+    transformations: Vec::new(),
+  })
+}
+
+fn vml_style_value<'a>(style: &'a str, key: &str) -> Option<&'a str> {
+  style.split(';').find_map(|declaration| {
+    let (name, value) = declaration.split_once(':')?;
+    name
+      .trim()
+      .eq_ignore_ascii_case(key)
+      .then_some(value.trim())
+  })
+}
+
+fn vml_rotation_degrees(value: &str) -> f32 {
+  let value = value.trim();
+  -value
+    .strip_suffix("fd")
+    .and_then(|value| value.trim().parse::<f32>().ok())
+    .map(|value| value / 65_536.0)
+    .or_else(|| value.parse::<f32>().ok())
+    .unwrap_or(0.0)
+}
+
 fn points_to_emu(value: f32) -> i64 {
   (value * ooxmlsdk::units::EMUS_PER_POINT as f32).round() as i64
 }
@@ -1450,7 +1599,7 @@ fn vml_absolute_rectangle(style: Option<&str>) -> Option<(f32, f32, f32, f32)> {
   Some((left?, top?, width?, height?))
 }
 
-fn vml_measure_to_points(value: &str) -> Option<f32> {
+pub(crate) fn vml_measure_to_points(value: &str) -> Option<f32> {
   let value = value.trim();
   let (number, multiplier) = if let Some(number) = value.strip_suffix("pt") {
     (number, 1.0)

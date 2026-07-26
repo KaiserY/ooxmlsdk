@@ -1,13 +1,17 @@
 pub(crate) mod color_math;
 mod debug;
 mod display;
+pub(crate) mod drawingml_3d;
 pub(crate) mod drawingml_custom_geometry;
 pub(crate) mod drawingml_geometry;
+pub(crate) mod drawingml_gradient;
 pub(crate) mod drawingml_image_effects;
+pub(crate) mod drawingml_image_tile;
 pub(crate) mod drawingml_pattern;
 pub(crate) mod drawingml_preset_data;
 mod drawingml_preset_data_generated;
 pub(crate) mod drawingml_preset_geometry;
+pub(crate) mod drawingml_shape_raster;
 pub(crate) mod drawingml_stroke;
 pub(crate) mod drawingml_text_warp;
 mod drawingml_text_warp_data_generated;

@@ -44,9 +44,13 @@ pub(crate) struct ActiveXControlState {
 
 impl ActiveXControlState {
   pub(crate) fn preview_palette_override(&self) -> Option<[[u8; 3]; 2]> {
-    self
-      .opaque_background
-      .then_some([self.back_color?, [255, 255, 255]])
+    let back_color = self.back_color?;
+    let requires_system_palette = matches!(
+      self.kind,
+      ActiveXControlKind::ScrollBar | ActiveXControlKind::SpinButton
+    );
+    (self.opaque_background && (requires_system_palette || back_color != [240, 240, 240]))
+      .then_some([back_color, [255, 255, 255]])
   }
 }
 

@@ -3218,12 +3218,19 @@ fn metafile_render_options_for_image(
       .ceil()
       .clamp(1.0, u32::MAX as f32) as u32
   };
+  let target_size = options.images.reduce_resolution.then(|| {
+    (
+      pixels_for_axis(image.width_pt, visible_width),
+      pixels_for_axis(image.height_pt, visible_height),
+    )
+  });
   ooxmlsdk_layout::render::emf_wmf::RenderOptions {
-    // EMF headers may advertise an enormous natural canvas. Rasterize for
-    // the size actually painted into the PDF, including cropped-away source
-    // area, instead of paying for pixels the fixed output cannot expose.
-    target_width_px: Some(pixels_for_axis(image.width_pt, visible_width)),
-    target_height_px: Some(pixels_for_axis(image.height_pt, visible_height)),
+    // Preserve the authored EMF device bounds by default. Office's fixed
+    // output retains that native raster size (including small vector
+    // previews such as 76x76); max_pixels still bounds pathological headers.
+    // An explicit reduce-resolution request selects the painted-size viewport.
+    target_width_px: target_size.map(|size| size.0),
+    target_height_px: target_size.map(|size| size.1),
     max_pixels: Some(dpi.saturating_mul(dpi).saturating_mul(64)),
     monochrome_dib_palette_override: image.metafile_monochrome_dib_palette_override,
     filter_high_frequency_pattern_brushes: true,
@@ -3465,7 +3472,6 @@ fn draw_text_item(
     if let Some(highlight) = &portion.highlight {
       draw_paint_rect(surface, highlight);
     }
-    surface.set_fill(Some(fill(&item.style)));
     let vertical_scale = if item.text.contains('\t') {
       1.0
     } else {
@@ -3476,6 +3482,52 @@ fn draw_text_item(
       .pdf_glyph_outline_options
       .as_ref()
       .and_then(|options| options.text_warp.as_deref());
+    let glyph_fill = item
+      .style
+      .pdf_glyph_outline_options
+      .as_ref()
+      .and_then(|options| options.fill.as_ref())
+      .and_then(|fill| {
+        text_outline_fill(
+          surface,
+          fill,
+          portion.x_pt,
+          item.y_pt,
+          portion.width_pt.max(item.style.font_size_pt),
+          item.line_height_pt.max(item.style.font_size_pt),
+        )
+      });
+    let glyph_outline_fill = item
+      .style
+      .pdf_glyph_outline_options
+      .as_ref()
+      .and_then(|options| options.outline_fill.as_ref())
+      .and_then(|fill| {
+        text_outline_fill(
+          surface,
+          fill,
+          portion.x_pt,
+          item.y_pt,
+          portion.width_pt.max(item.style.font_size_pt),
+          item.line_height_pt.max(item.style.font_size_pt),
+        )
+      });
+    let glyph_outline_stroke = item
+      .style
+      .pdf_glyph_outline_options
+      .as_ref()
+      .and_then(|options| options.outline_stroke.as_ref())
+      .map(|stroke| {
+        text_stroke_from_common(
+          surface,
+          stroke,
+          portion.x_pt,
+          item.y_pt,
+          portion.width_pt.max(item.style.font_size_pt),
+          item.line_height_pt.max(item.style.font_size_pt),
+        )
+      });
+    surface.set_fill(glyph_fill.clone().or_else(|| Some(fill(&item.style))));
     if text_warp.is_none() && (vertical_scale - 1.0).abs() > f32::EPSILON {
       surface.push_transform(&Transform::from_row(
         1.0,
@@ -3506,16 +3558,23 @@ fn draw_text_item(
       for run in glyphs {
         let selected = fonts.select_face(&run.font_face)?;
         let glyph_outlines = text_requires_glyph_outlines(&item.style);
-        surface.set_stroke(text_stroke(
+        surface.set_stroke(text_stroke_with_fill(
           &item.style,
           selected.synthetic_bold,
           run.font_size_pt,
+          glyph_outline_stroke.clone(),
+          glyph_outline_fill.clone(),
         ));
         let warped = glyph_outlines
           && text_warp.is_some_and(|warp| {
             draw_warped_glyphs(
               surface,
               warp,
+              item
+                .style
+                .pdf_glyph_outline_options
+                .as_ref()
+                .and_then(|options| options.fill.as_ref()),
               &run.font_face,
               &run.glyphs,
               WarpedGlyphPlacement {
@@ -3526,6 +3585,32 @@ fn draw_text_item(
               },
             )
           });
+        let path_gradient_rasterized = glyph_outlines
+          && !warped
+          && item
+            .style
+            .pdf_glyph_outline_options
+            .as_ref()
+            .and_then(|options| options.fill.as_ref())
+            .is_some_and(|fill| {
+              draw_unwarped_path_gradient_glyphs(
+                surface,
+                fill,
+                &run.font_face,
+                &run.glyphs,
+                UnwarpedGlyphPlacement {
+                  start_x: portion.x_pt + run.x_offset_pt,
+                  baseline_y: portion.baseline_y,
+                  font_size_pt: run.font_size_pt,
+                },
+                TextPaintFrame {
+                  x_pt: portion.x_pt,
+                  y_pt: item.y_pt,
+                  width_pt: portion.width_pt.max(item.style.font_size_pt),
+                  height_pt: item.line_height_pt.max(item.style.font_size_pt),
+                },
+              )
+            });
         if glyph_outlines
           && !warped
           && let Some(transform) = item
@@ -3543,7 +3628,7 @@ fn draw_text_item(
             transform.dy.0,
           ));
         }
-        if !warped {
+        if !warped && !path_gradient_rasterized {
           surface.draw_glyphs(
             Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
             &run.glyphs,
@@ -3552,6 +3637,27 @@ fn draw_text_item(
             run.font_size_pt,
             glyph_outlines,
           );
+        }
+        if path_gradient_rasterized
+          && text_stroke_with_fill(
+            &item.style,
+            selected.synthetic_bold,
+            run.font_size_pt,
+            glyph_outline_stroke.clone(),
+            glyph_outline_fill.clone(),
+          )
+          .is_some()
+        {
+          surface.set_fill(None);
+          surface.draw_glyphs(
+            Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
+            &run.glyphs,
+            selected.font.clone(),
+            &glyph_semantic_text,
+            run.font_size_pt,
+            true,
+          );
+          surface.set_fill(glyph_fill.clone().or_else(|| Some(fill(&item.style))));
         }
         if glyph_outlines
           && !warped
@@ -3635,9 +3741,185 @@ struct WarpedGlyphPlacement {
   horizontal_scale: f32,
 }
 
+struct UnwarpedGlyphPlacement {
+  start_x: f32,
+  baseline_y: f32,
+  font_size_pt: f32,
+}
+
+#[derive(Clone, Copy)]
+struct TextPaintFrame {
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+}
+
+fn draw_unwarped_path_gradient_glyphs(
+  surface: &mut Surface<'_>,
+  fill: &common::Fill<'static>,
+  face_data: &FontFaceData,
+  glyphs: &[PaintGlyph],
+  placement: UnwarpedGlyphPlacement,
+  frame: TextPaintFrame,
+) -> bool {
+  let resolved_fill = resolved_text_outline_common_fill(
+    fill,
+    frame.x_pt,
+    frame.y_pt,
+    frame.width_pt,
+    frame.height_pt,
+  );
+  let common::Fill::Gradient(gradient) = &resolved_fill else {
+    return false;
+  };
+  let Some(path_gradient) = gradient.path else {
+    return false;
+  };
+  if path_gradient_paint(gradient, path_gradient).is_some() {
+    return false;
+  }
+  let Ok(face) = ttf_parser::Face::parse(face_data.data.as_ref(), face_data.index) else {
+    return false;
+  };
+  let units_per_em = f32::from(face.units_per_em());
+  if units_per_em <= f32::EPSILON {
+    return false;
+  }
+  let scale = placement.font_size_pt / units_per_em;
+  let mut path = PathBuilder::new();
+  let mut commands = Vec::new();
+  let mut cursor_x = placement.start_x;
+  for glyph in glyphs {
+    let Ok(glyph_id) = u16::try_from(glyph.glyph_id.to_u32()) else {
+      cursor_x += glyph.x_advance * placement.font_size_pt;
+      continue;
+    };
+    let origin_x = cursor_x + glyph.x_offset * placement.font_size_pt;
+    let origin_y = placement.baseline_y - glyph.y_offset * placement.font_size_pt;
+    let mut outline = KrillaGlyphOutline {
+      path: &mut path,
+      commands: &mut commands,
+      origin_x,
+      origin_y,
+      scale,
+      synthetic_italic: face_data.synthetic_italic,
+      current: None,
+    };
+    let _ = face.outline_glyph(ttf_parser::GlyphId(glyph_id), &mut outline);
+    cursor_x += glyph.x_advance * placement.font_size_pt;
+  }
+  let Some(path) = path.finish() else {
+    return false;
+  };
+  let gradient_frame = PolylineItem {
+    x_pt: frame.x_pt,
+    y_pt: frame.y_pt,
+    width_pt: frame.width_pt,
+    height_pt: frame.height_pt,
+    points: &[],
+    commands: &commands,
+    closed: true,
+    fill: &resolved_fill,
+    stroke: None,
+  };
+  draw_path_gradient_raster(surface, &path, &gradient_frame)
+}
+
+struct KrillaGlyphOutline<'a> {
+  path: &'a mut PathBuilder,
+  commands: &'a mut Vec<common::PathCommand>,
+  origin_x: f32,
+  origin_y: f32,
+  scale: f32,
+  synthetic_italic: bool,
+  current: Option<common::Point>,
+}
+
+impl KrillaGlyphOutline<'_> {
+  fn point(&self, x: f32, y: f32) -> common::Point {
+    let x = if self.synthetic_italic {
+      x + y / 3.0
+    } else {
+      x
+    };
+    common::Point {
+      x: common::Pt(self.origin_x + x * self.scale),
+      y: common::Pt(self.origin_y - y * self.scale),
+    }
+  }
+}
+
+impl ttf_parser::OutlineBuilder for KrillaGlyphOutline<'_> {
+  fn move_to(&mut self, x: f32, y: f32) {
+    let point = self.point(x, y);
+    self.path.move_to(point.x.0, point.y.0);
+    self.commands.push(common::PathCommand::MoveTo(point));
+    self.current = Some(point);
+  }
+
+  fn line_to(&mut self, x: f32, y: f32) {
+    let point = self.point(x, y);
+    self.path.line_to(point.x.0, point.y.0);
+    self.commands.push(common::PathCommand::LineTo(point));
+    self.current = Some(point);
+  }
+
+  fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+    let control = self.point(x1, y1);
+    let end = self.point(x, y);
+    self
+      .path
+      .quad_to(control.x.0, control.y.0, end.x.0, end.y.0);
+    if let Some(start) = self.current {
+      let control1 = common::Point {
+        x: common::Pt(start.x.0 + (control.x.0 - start.x.0) * (2.0 / 3.0)),
+        y: common::Pt(start.y.0 + (control.y.0 - start.y.0) * (2.0 / 3.0)),
+      };
+      let control2 = common::Point {
+        x: common::Pt(end.x.0 + (control.x.0 - end.x.0) * (2.0 / 3.0)),
+        y: common::Pt(end.y.0 + (control.y.0 - end.y.0) * (2.0 / 3.0)),
+      };
+      self.commands.push(common::PathCommand::CubicTo {
+        control1,
+        control2,
+        end,
+      });
+    }
+    self.current = Some(end);
+  }
+
+  fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+    let control1 = self.point(x1, y1);
+    let control2 = self.point(x2, y2);
+    let end = self.point(x, y);
+    self.path.cubic_to(
+      control1.x.0,
+      control1.y.0,
+      control2.x.0,
+      control2.y.0,
+      end.x.0,
+      end.y.0,
+    );
+    self.commands.push(common::PathCommand::CubicTo {
+      control1,
+      control2,
+      end,
+    });
+    self.current = Some(end);
+  }
+
+  fn close(&mut self) {
+    self.path.close();
+    self.commands.push(common::PathCommand::Close);
+    self.current = None;
+  }
+}
+
 fn draw_warped_glyphs(
   surface: &mut Surface<'_>,
   warp: &common::TextWarp,
+  outline_fill: Option<&common::Fill<'static>>,
   face_data: &FontFaceData,
   glyphs: &[PaintGlyph],
   placement: WarpedGlyphPlacement,
@@ -3657,9 +3939,60 @@ fn draw_warped_glyphs(
   if boundaries.is_empty() {
     return false;
   }
+  let paint_bounds = warp.paint_bounds;
+  let target_fill = outline_fill.and_then(|fill| {
+    (paint_bounds.size.width.0 > f32::EPSILON && paint_bounds.size.height.0 > f32::EPSILON).then(
+      || {
+        text_outline_fill(
+          surface,
+          fill,
+          paint_bounds.origin.x.0,
+          paint_bounds.origin.y.0,
+          paint_bounds.size.width.0,
+          paint_bounds.size.height.0,
+        )
+      },
+    )
+  });
+  if let Some(fill) = target_fill.flatten() {
+    // WordArt brushes are defined over the authored warp envelope, not each
+    // shaped line portion. Office reuses the same radial/path brush matrix for
+    // every paragraph clipped into that envelope.
+    surface.set_fill(Some(fill));
+  }
 
   let mut cursor_x = placement.start_x;
   let glyph_scale = placement.font_size_pt / units_per_em;
+  let raster_path_gradient_fill = outline_fill
+    .filter(|fill| {
+      matches!(
+        fill,
+        common::Fill::Gradient(common::GradientFill {
+          path: Some(common::GradientPath {
+            kind: common::GradientPathKind::Rectangle | common::GradientPathKind::Shape,
+            ..
+          }),
+          ..
+        })
+      )
+    })
+    .and_then(|fill| {
+      (paint_bounds.size.width.0 > f32::EPSILON && paint_bounds.size.height.0 > f32::EPSILON).then(
+        || {
+          resolved_text_outline_common_fill(
+            fill,
+            paint_bounds.origin.x.0,
+            paint_bounds.origin.y.0,
+            paint_bounds.size.width.0,
+            paint_bounds.size.height.0,
+          )
+        },
+      )
+    });
+  let raster_path_gradient = raster_path_gradient_fill.is_some();
+  let mut warped_paths = Vec::new();
+  let mut combined_path = raster_path_gradient.then(PathBuilder::new);
+  let mut combined_commands = Vec::new();
   for glyph in glyphs {
     let mut outline = TtfGlyphOutline::default();
     let Ok(glyph_id) = u16::try_from(glyph.glyph_id.to_u32()) else {
@@ -3703,26 +4036,152 @@ fn draw_warped_glyphs(
       }
     });
     let mut path = PathBuilder::new();
-    flatten(elements, 0.2, |element| match element {
-      PathEl::MoveTo(point) => {
-        let point = text_warp_point(warp, &boundaries, point);
-        path.move_to(point.x as f32, point.y as f32);
+    let mut current = None;
+    for element in elements {
+      match element {
+        PathEl::MoveTo(point) => {
+          let point = text_warp_point(warp, &boundaries, point);
+          path.move_to(point.x as f32, point.y as f32);
+          current = Some(point);
+          if let Some(combined) = &mut combined_path {
+            combined.move_to(point.x as f32, point.y as f32);
+            combined_commands.push(common::PathCommand::MoveTo(common::Point {
+              x: common::Pt(point.x as f32),
+              y: common::Pt(point.y as f32),
+            }));
+          }
+        }
+        PathEl::LineTo(point) => {
+          let point = text_warp_point(warp, &boundaries, point);
+          path.line_to(point.x as f32, point.y as f32);
+          current = Some(point);
+          if let Some(combined) = &mut combined_path {
+            combined.line_to(point.x as f32, point.y as f32);
+            combined_commands.push(common::PathCommand::LineTo(common::Point {
+              x: common::Pt(point.x as f32),
+              y: common::Pt(point.y as f32),
+            }));
+          }
+        }
+        PathEl::QuadTo(control, end) => {
+          let control = text_warp_point(warp, &boundaries, control);
+          let end = text_warp_point(warp, &boundaries, end);
+          path.quad_to(
+            control.x as f32,
+            control.y as f32,
+            end.x as f32,
+            end.y as f32,
+          );
+          if let Some(combined) = &mut combined_path {
+            combined.quad_to(
+              control.x as f32,
+              control.y as f32,
+              end.x as f32,
+              end.y as f32,
+            );
+            if let Some(start) = current {
+              let control1 = start + (control - start) * (2.0 / 3.0);
+              let control2 = end + (control - end) * (2.0 / 3.0);
+              combined_commands.push(common::PathCommand::CubicTo {
+                control1: common::Point {
+                  x: common::Pt(control1.x as f32),
+                  y: common::Pt(control1.y as f32),
+                },
+                control2: common::Point {
+                  x: common::Pt(control2.x as f32),
+                  y: common::Pt(control2.y as f32),
+                },
+                end: common::Point {
+                  x: common::Pt(end.x as f32),
+                  y: common::Pt(end.y as f32),
+                },
+              });
+            }
+          }
+          current = Some(end);
+        }
+        PathEl::CurveTo(control1, control2, end) => {
+          let control1 = text_warp_point(warp, &boundaries, control1);
+          let control2 = text_warp_point(warp, &boundaries, control2);
+          let end = text_warp_point(warp, &boundaries, end);
+          path.cubic_to(
+            control1.x as f32,
+            control1.y as f32,
+            control2.x as f32,
+            control2.y as f32,
+            end.x as f32,
+            end.y as f32,
+          );
+          if let Some(combined) = &mut combined_path {
+            combined.cubic_to(
+              control1.x as f32,
+              control1.y as f32,
+              control2.x as f32,
+              control2.y as f32,
+              end.x as f32,
+              end.y as f32,
+            );
+            combined_commands.push(common::PathCommand::CubicTo {
+              control1: common::Point {
+                x: common::Pt(control1.x as f32),
+                y: common::Pt(control1.y as f32),
+              },
+              control2: common::Point {
+                x: common::Pt(control2.x as f32),
+                y: common::Pt(control2.y as f32),
+              },
+              end: common::Point {
+                x: common::Pt(end.x as f32),
+                y: common::Pt(end.y as f32),
+              },
+            });
+          }
+          current = Some(end);
+        }
+        PathEl::ClosePath => {
+          path.close();
+          current = None;
+          if let Some(combined) = &mut combined_path {
+            combined.close();
+            combined_commands.push(common::PathCommand::Close);
+          }
+        }
       }
-      PathEl::LineTo(point) => {
-        let point = text_warp_point(warp, &boundaries, point);
-        path.line_to(point.x as f32, point.y as f32);
-      }
-      PathEl::ClosePath => path.close(),
-      PathEl::QuadTo(_, _) | PathEl::CurveTo(_, _, _) => {
-        unreachable!("kurbo::flatten only emits line path elements")
-      }
-    });
+    }
     if let Some(path) = path.finish() {
-      surface.draw_path(&path);
+      warped_paths.push(path);
     }
     cursor_x += glyph.x_advance * placement.font_size_pt * placement.horizontal_scale;
   }
-  true
+  if let (Some(fill), Some(path), Some(bounds)) = (
+    raster_path_gradient_fill.as_ref(),
+    combined_path.and_then(PathBuilder::finish),
+    raster_path_gradient_fill
+      .as_ref()
+      .and_then(|fill| match fill {
+        common::Fill::Gradient(gradient) => gradient.definition_bounds,
+        _ => None,
+      }),
+  ) {
+    let gradient_frame = PolylineItem {
+      x_pt: bounds.origin.x.0,
+      y_pt: bounds.origin.y.0,
+      width_pt: bounds.size.width.0,
+      height_pt: bounds.size.height.0,
+      points: &[],
+      commands: &combined_commands,
+      closed: true,
+      fill,
+      stroke: None,
+    };
+    if draw_path_gradient_raster(surface, &path, &gradient_frame) {
+      return true;
+    }
+  }
+  for path in &warped_paths {
+    surface.draw_path(path);
+  }
+  !warped_paths.is_empty()
 }
 
 #[derive(Default)]
@@ -4110,8 +4569,7 @@ fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
       surface.set_stroke(None);
       surface.draw_path(&path);
       surface.push_clip_path(&path, &FillRule::NonZero);
-      let mut inside_stroke =
-        path_stroke_from_common(surface, stroke, polyline.x_pt, polyline.y_pt);
+      let mut inside_stroke = path_stroke_from_common(surface, stroke, polyline);
       inside_stroke.width *= 2.0;
       surface.set_fill(None);
       surface.set_stroke(Some(inside_stroke));
@@ -4120,7 +4578,7 @@ fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
     } else {
       let stroke = polyline
         .stroke
-        .map(|stroke| path_stroke_from_common(surface, stroke, polyline.x_pt, polyline.y_pt));
+        .map(|stroke| path_stroke_from_common(surface, stroke, polyline));
       if fill.is_some() || stroke.is_some() {
         surface.set_fill(fill);
         surface.set_stroke(stroke);
@@ -4319,8 +4777,7 @@ fn stroke_end_path(
 fn path_stroke_from_common(
   surface: &mut Surface<'_>,
   stroke: &common::Stroke<'static>,
-  pattern_origin_x: f32,
-  pattern_origin_y: f32,
+  path: &PolylineItem<'_>,
 ) -> Stroke {
   let line_join = match stroke.join {
     Some(common::StrokeJoin::Round) => LineJoin::Round,
@@ -4342,11 +4799,46 @@ fn path_stroke_from_common(
   });
   Stroke {
     width: stroke.width.0,
-    paint: stroke.pattern.map_or_else(
-      || rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into(),
-      |pattern| drawingml_pattern_paint(surface, pattern, pattern_origin_x, pattern_origin_y),
-    ),
-    opacity: if stroke.pattern.is_some() {
+    paint: if let Some(gradient) = stroke.gradient.as_ref() {
+      if let Some(path_gradient) = gradient.path {
+        path_gradient_paint(gradient, path_gradient)
+          .unwrap_or_else(|| rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into())
+      } else {
+        let (start, end) = gradient.line.unwrap_or_else(|| {
+          linear_gradient_line(
+            gradient.definition_bounds.unwrap_or(common::Rect {
+              origin: common::Point {
+                x: common::Pt(path.x_pt),
+                y: common::Pt(path.y_pt),
+              },
+              size: common::Size {
+                width: common::Pt(path.width_pt),
+                height: common::Pt(path.height_pt),
+              },
+            }),
+            gradient.angle_degrees,
+            gradient.scaled,
+          )
+        });
+        let stops = gradient_stops_for_pdf(gradient);
+        LinearGradient {
+          x1: start.x.0,
+          y1: start.y.0,
+          x2: end.x.0,
+          y2: end.y.0,
+          transform: Transform::default(),
+          spread_method: SpreadMethod::Pad,
+          stops: pdf_gradient_stops(&stops, false),
+          anti_alias: true,
+        }
+        .into()
+      }
+    } else if let Some(pattern) = stroke.pattern {
+      drawingml_pattern_paint(surface, pattern, path.x_pt, path.y_pt)
+    } else {
+      rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into()
+    },
+    opacity: if stroke.pattern.is_some() || stroke.gradient.is_some() {
       NormalizedF32::ONE
     } else {
       NormalizedF32::new(opacity(stroke.color)).unwrap_or(NormalizedF32::ZERO)
@@ -4512,7 +5004,7 @@ fn path_gradient_paint(
   gradient: &common::GradientFill<'static>,
   path: common::GradientPath,
 ) -> Option<krilla::paint::Paint> {
-  if path.kind != common::GradientPathKind::Circle {
+  if path.kind != common::GradientPathKind::Circle || path.mirror_tile {
     return None;
   }
   let focus_width = 1.0 - path.fill_to.left - path.fill_to.right;
@@ -4545,10 +5037,9 @@ fn path_gradient_paint(
         transform.dy.0,
       ),
       spread_method: SpreadMethod::Pad,
-      // GDI+ path gradients define interpolation position 0 at the outer
-      // boundary and 1 at the focus path. Krilla/PDF radial shading starts at
-      // the focus circle, so reverse the color-band parameter exactly once.
-      stops: pdf_gradient_stops(&stops, true),
+      // DrawingML path gradients start at the focus path and grow toward the
+      // outer boundary. A PDF radial shading uses the same direction.
+      stops: pdf_gradient_stops(&stops, false),
       anti_alias: true,
     }
     .into(),
@@ -4652,19 +5143,22 @@ fn inverse_gradient_point(
 
 fn path_gradient_position(
   path: common::GradientPath,
-  point: kurbo::Point,
+  mut point: kurbo::Point,
   shape: Option<&[Vec<kurbo::Point>]>,
 ) -> Option<f32> {
-  if !path_gradient_contains(path, point, 1.0, shape)? {
-    return Some(0.0);
+  if path.mirror_tile {
+    point.x = mirrored_tile_coordinate(point.x);
+    point.y = mirrored_tile_coordinate(point.y);
   }
-  if path_gradient_contains(path, point, 0.0, shape)? {
+  if !path_gradient_contains(path, point, 1.0, shape)? {
     return Some(1.0);
   }
-  // Microsoft GDI+ defines focus scales as an inner copy of the boundary
-  // path. Search the monotonic family of affine copies between that focus and
-  // the outer path, then convert outer-to-inner distance to the DrawingML
-  // color-band direction.
+  if path_gradient_contains(path, point, 0.0, shape)? {
+    return Some(0.0);
+  }
+  // Search the monotonic family of affine copies between the focus and outer
+  // paths. DrawingML stop position 0 is the focus and position 1 is the outer
+  // boundary.
   let mut outside = 0.0;
   let mut inside = 1.0;
   for _ in 0..PATH_GRADIENT_BINARY_STEPS {
@@ -4675,7 +5169,17 @@ fn path_gradient_position(
       outside = middle;
     }
   }
-  Some(normalized_f64_to_f32(1.0 - inside))
+  Some(normalized_f64_to_f32(inside))
+}
+
+fn mirrored_tile_coordinate(value: f64) -> f64 {
+  let tile = value.floor();
+  let fraction = value - tile;
+  if tile.rem_euclid(2.0) < 1.0 {
+    fraction
+  } else {
+    1.0 - fraction
+  }
 }
 
 fn path_gradient_contains(
@@ -5333,6 +5837,92 @@ fn fill(style: &TextStyle<'_>) -> Fill {
   }
 }
 
+fn text_outline_fill(
+  surface: &mut Surface<'_>,
+  fill: &common::Fill<'static>,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+) -> Option<Fill> {
+  let resolved_fill = resolved_text_outline_common_fill(fill, x_pt, y_pt, width_pt, height_pt);
+  let path = PolylineItem {
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
+    points: &[],
+    commands: &[],
+    closed: true,
+    fill: &resolved_fill,
+    stroke: None,
+  };
+  path_fill_from_common(surface, &resolved_fill, &path)
+}
+
+fn text_stroke_from_common(
+  surface: &mut Surface<'_>,
+  stroke: &common::Stroke<'static>,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+) -> Stroke {
+  let path = PolylineItem {
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
+    points: &[],
+    commands: &[],
+    closed: true,
+    fill: &common::Fill::None,
+    stroke: Some(stroke),
+  };
+  path_stroke_from_common(surface, stroke, &path)
+}
+
+fn resolved_text_outline_common_fill(
+  fill: &common::Fill<'static>,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+) -> common::Fill<'static> {
+  let mut resolved_fill = fill.clone();
+  if let common::Fill::Gradient(gradient) = &mut resolved_fill {
+    let unresolved = gradient.definition_bounds.is_none();
+    let bounds = common::Rect {
+      origin: common::Point {
+        x: common::Pt(x_pt),
+        y: common::Pt(y_pt),
+      },
+      size: common::Size {
+        width: common::Pt(width_pt),
+        height: common::Pt(height_pt),
+      },
+    };
+    gradient.definition_bounds.get_or_insert(bounds);
+    if let Some(path) = &mut gradient.path
+      && unresolved
+    {
+      let normalized = path.transform;
+      path.transform = common::Transform {
+        m11: width_pt * normalized.m11,
+        m12: height_pt * normalized.m12,
+        m21: width_pt * normalized.m21,
+        m22: height_pt * normalized.m22,
+        dx: common::Pt(x_pt + width_pt * normalized.dx.0),
+        dy: common::Pt(y_pt + height_pt * normalized.dy.0),
+      };
+      if path.kind == common::GradientPathKind::Circle {
+        path.transform = common::office_circle_gradient_transform(path.transform);
+      }
+    }
+  }
+  resolved_fill
+}
+
 fn stroke(style: &TextStyle<'_>) -> Option<Stroke> {
   let color = style.outline_color?;
   if style.outline_width_pt <= f32::EPSILON {
@@ -5347,22 +5937,36 @@ fn stroke(style: &TextStyle<'_>) -> Option<Stroke> {
   })
 }
 
-fn text_stroke(
+fn text_stroke_with_fill(
   style: &TextStyle<'_>,
   synthetic_bold: bool,
   rendered_font_size_pt: f32,
+  outline_stroke: Option<Stroke>,
+  outline_fill: Option<Fill>,
 ) -> Option<Stroke> {
   // LibreOffice's PDF writer uses fill-then-stroke for an artificial bold
   // face, with a stroke width of one thirtieth of the font height. An
   // explicit text outline wins over artificial bold there as well.
-  stroke(style).or_else(|| {
-    synthetic_bold.then(|| Stroke {
-      width: rendered_font_size_pt / 30.0,
-      paint: rgb::Color::new(style.color.r, style.color.g, style.color.b).into(),
-      opacity: NormalizedF32::new(style.opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ZERO),
-      ..Default::default()
+  outline_stroke
+    .or_else(|| {
+      outline_fill
+        .filter(|_| style.outline_width_pt > f32::EPSILON)
+        .map(|fill| Stroke {
+          width: style.outline_width_pt,
+          paint: fill.paint,
+          opacity: fill.opacity,
+          ..Default::default()
+        })
     })
-  })
+    .or_else(|| stroke(style))
+    .or_else(|| {
+      synthetic_bold.then(|| Stroke {
+        width: rendered_font_size_pt / 30.0,
+        paint: rgb::Color::new(style.color.r, style.color.g, style.color.b).into(),
+        opacity: NormalizedF32::new(style.opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ZERO),
+        ..Default::default()
+      })
+    })
 }
 
 #[cfg(test)]
@@ -5375,7 +5979,7 @@ mod tests {
     TextMetrics, TextStyle as PaintTextStyle, conversion_font_audit, gamma_correct_gradient_color,
     metafile_render_options_for_image, pdf_metadata, pdf_page_dimension, render,
     source_range_requires_visible_glyph, symbol_font_semantic_text, text_portion_ranges,
-    text_requires_glyph_outlines, text_stroke, text_style_from_common,
+    text_requires_glyph_outlines, text_stroke_with_fill, text_style_from_common,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -5386,7 +5990,7 @@ mod tests {
   };
 
   #[test]
-  fn metafile_raster_size_follows_painted_size_and_crop() {
+  fn metafile_raster_size_preserves_native_bounds_unless_reduction_is_requested() {
     let image = ImageItem {
       x_pt: 0.0,
       y_pt: 0.0,
@@ -5408,10 +6012,16 @@ mod tests {
       hyperlink_url: None,
       semantic_metafile_text: false,
     };
-    let options = metafile_render_options_for_image(&image, &PdfOptions::default());
+    let native = metafile_render_options_for_image(&image, &PdfOptions::default());
 
-    assert_eq!(options.target_width_px, Some(600));
-    assert_eq!(options.target_height_px, Some(150));
+    assert_eq!(native.target_width_px, None);
+    assert_eq!(native.target_height_px, None);
+
+    let mut pdf_options = PdfOptions::default();
+    pdf_options.images.reduce_resolution = true;
+    let reduced = metafile_render_options_for_image(&image, &pdf_options);
+    assert_eq!(reduced.target_width_px, Some(600));
+    assert_eq!(reduced.target_height_px, Some(150));
   }
 
   #[test]
@@ -5931,7 +6541,8 @@ mod tests {
     };
     let style = text_style_from_common(&common_style);
 
-    let stroke = text_stroke(&style, true, 18.0).expect("synthetic bold stroke");
+    let stroke =
+      text_stroke_with_fill(&style, true, 18.0, None, None).expect("synthetic bold stroke");
 
     assert!((stroke.width - 0.6).abs() < f32::EPSILON);
   }
@@ -5940,6 +6551,16 @@ mod tests {
   fn wordart_uses_every_intermediate_warp_boundary() {
     let warp = common::TextWarp {
       source_bounds: common::Rect {
+        origin: common::Point {
+          x: Pt(0.0),
+          y: Pt(0.0),
+        },
+        size: common::Size {
+          width: Pt(100.0),
+          height: Pt(100.0),
+        },
+      },
+      paint_bounds: common::Rect {
         origin: common::Point {
           x: Pt(0.0),
           y: Pt(0.0),

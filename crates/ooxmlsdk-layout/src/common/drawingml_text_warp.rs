@@ -39,6 +39,7 @@ pub(crate) fn apply_to_text_items(
   items: &mut [PageItem],
   preset: &a::PresetTextWarp,
   target: Rect,
+  paint_bounds: Rect,
   text_metrics: &mut TextMetrics,
   color: Option<RgbColor>,
 ) -> bool {
@@ -60,7 +61,7 @@ pub(crate) fn apply_to_text_items(
       height: super::Pt(source_height),
     },
   };
-  let Some(text_warp) = text_warp(preset, source_bounds, target) else {
+  let Some(text_warp) = text_warp(preset, source_bounds, target, paint_bounds) else {
     return false;
   };
   for item in items {
@@ -90,6 +91,7 @@ pub(crate) fn text_warp(
   preset: &a::PresetTextWarp,
   source_bounds: Rect,
   target: Rect,
+  paint_bounds: Rect,
 ) -> Option<Arc<TextWarp>> {
   if source_bounds.size.width.0 <= f32::EPSILON || source_bounds.size.height.0 <= f32::EPSILON {
     return None;
@@ -111,6 +113,7 @@ pub(crate) fn text_warp(
   }
   Some(Arc::new(TextWarp {
     source_bounds,
+    paint_bounds,
     boundaries,
   }))
 }

@@ -114,6 +114,17 @@ impl EffectProperties {
     properties
   }
 
+  pub(crate) fn from_pml_group_shape_properties_choice(
+    choice: &p::GroupShapePropertiesChoice2,
+  ) -> Self {
+    let mut properties = match choice {
+      p::GroupShapePropertiesChoice2::EffectList(list) => Self::from_effect_list(list),
+      p::GroupShapePropertiesChoice2::EffectDag(dag) => Self::from_effect_dag(dag),
+    };
+    properties.clears_inherited = true;
+    properties
+  }
+
   pub(crate) fn from_effect_style_choice(choice: &a::EffectStyleChoice) -> Self {
     match choice {
       a::EffectStyleChoice::EffectList(list) => Self::from_effect_list(list),

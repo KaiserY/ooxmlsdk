@@ -1,8 +1,11 @@
 use std::borrow::Cow;
+use std::io::Cursor;
 use std::sync::Arc;
 
 use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
-use kurbo::Affine;
+use image::codecs::png::PngEncoder;
+use image::{ColorType, GenericImageView, ImageEncoder};
+use kurbo::{Affine, Rect as KurboRect};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -14,10 +17,11 @@ use crate::docx::{
   FloatingFramePlacement, FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment,
   FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
   HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
-  InlineChart, InlineItem, InlineShape, InlineShapeGeometry, LineHeightRule, LineNumbering,
-  NoteNumberingSpec, PRESERVED_WORD_TEXT_TAB, PageSetup, ParagraphAlignment, RgbColor,
-  SectionBreakKind, SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment,
-  TableCell, TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
+  InlineChart, InlineDrawingGroupEffect, InlineItem, InlineShape, InlineShapeGeometry,
+  InlineShapeImageFill, InlineShapeImageFillMode, LineHeightRule, LineNumbering, NoteNumberingSpec,
+  PRESERVED_WORD_TEXT_TAB, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
+  SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
+  TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
   VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
@@ -91,6 +95,8 @@ fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
     InlineItem::Text(_) => None,
     InlineItem::Image(_)
     | InlineItem::Shape(_)
+    | InlineItem::DrawingGroupStart(_)
+    | InlineItem::DrawingGroupEnd
     | InlineItem::BookmarkStart(_)
     | InlineItem::FormWidgetStart(_)
     | InlineItem::FormWidgetEnd(_)
@@ -753,6 +759,7 @@ pub(crate) struct ImageItem {
   pub width_pt: f32,
   pub height_pt: f32,
   pub crop: ImageCrop,
+  pub clip_path: Vec<common::PathCommand>,
   pub rotation_deg: f32,
   pub flip_horizontal: bool,
   pub flip_vertical: bool,
@@ -1388,6 +1395,579 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
   }
 }
 
+fn finish_docx_shape_effects(
+  items: &mut Vec<PageItem>,
+  content_start: usize,
+  shape: &InlineShape,
+  content_bounds: common::Rect,
+) {
+  let effects = shape.effects.as_ref().and_then(|source| match source {
+    common::DrawingEffectSource::List {
+      resolved: Some(effects),
+      ..
+    }
+    | common::DrawingEffectSource::Dag {
+      resolved: Some(effects),
+      ..
+    } => Some(effects),
+    _ => None,
+  });
+  if effects.is_none_or(|effects| effects.effects.is_empty()) && shape.static3d.is_none() {
+    return;
+  }
+  if items.len() <= content_start {
+    return;
+  }
+  let mut effects =
+    effects
+      .cloned()
+      .unwrap_or_else(|| common::drawingml_image_effects::ImageEffectContainer {
+        kind: common::drawingml_image_effects::ImageEffectContainerKind::Sibling,
+        effects: Vec::new(),
+      });
+  if shape.static3d.is_some() {
+    common::drawingml_image_effects::suppress_soft_edge(&mut effects);
+  }
+  if effects.effects.is_empty() && shape.static3d.is_none() {
+    return;
+  }
+  common::drawingml_image_effects::rotate_container_with_shape(
+    &mut effects,
+    inline_shape_visual_rotation_degrees(shape),
+  );
+  let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds(
+    &effects,
+    content_bounds.size.width.0,
+    content_bounds.size.height.0,
+  ) else {
+    return;
+  };
+  let static_padding = shape
+    .static3d
+    .as_ref()
+    .map(|style| {
+      common::drawingml_3d::output_padding(
+        common::drawingml_3d::camera_projection(&style.scene, shape.rotation_deg),
+        &style.shape,
+        content_bounds.size.width.0,
+        content_bounds.size.height.0,
+      )
+    })
+    .unwrap_or_default();
+  let relative_left = output_bounds.left_pt.min(0.0) - static_padding.left_pt;
+  let relative_top = output_bounds.top_pt.min(0.0) - static_padding.top_pt;
+  let relative_right =
+    output_bounds.right_pt.max(content_bounds.size.width.0) + static_padding.right_pt;
+  let relative_bottom =
+    output_bounds.bottom_pt.max(content_bounds.size.height.0) + static_padding.bottom_pt;
+  let raster_bounds = common::Rect {
+    origin: common::Point {
+      x: common::Pt(content_bounds.origin.x.0 + relative_left),
+      y: common::Pt(content_bounds.origin.y.0 + relative_top),
+    },
+    size: common::Size {
+      width: common::Pt(relative_right - relative_left),
+      height: common::Pt(relative_bottom - relative_top),
+    },
+  };
+  let mut display_items = items[content_start..]
+    .iter()
+    .cloned()
+    .map(into_common_page_item)
+    .collect::<Vec<_>>();
+  let shape_clip = display_items
+    .iter()
+    .filter_map(|item| match item {
+      common::DisplayItem::Path(path) if path.closed => Some(path.commands.as_slice()),
+      _ => None,
+    })
+    .flatten()
+    .copied()
+    .collect::<Vec<_>>();
+  if !shape_clip.is_empty() {
+    for item in &mut display_items {
+      if let common::DisplayItem::Image(image) = item
+        && image.clip_path.is_empty()
+      {
+        image.clip_path.clone_from(&shape_clip);
+      }
+    }
+  }
+  let automatic_extrusion_color =
+    common::drawingml_3d::automatic_extrusion_color_from_items(&display_items);
+  let Some(mut raster) = common::drawingml_shape_raster::rasterize_vector_items_for_effects(
+    &display_items,
+    raster_bounds,
+    &effects,
+  ) else {
+    return;
+  };
+  if let Some(style) = shape.static3d.as_ref() {
+    common::drawingml_3d::apply_static_3d(
+      &mut raster.image,
+      &style.scene,
+      common::drawingml_3d::camera_projection(&style.scene, shape.rotation_deg),
+      &style.shape,
+      style.extrusion_color.or(automatic_extrusion_color),
+      style.contour_color,
+      raster.pixels_per_point,
+      Some(common::drawingml_3d::Static3dSurface {
+        left_px: (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
+        top_px: (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
+        width_px: content_bounds.size.width.0 * raster.pixels_per_point,
+        height_px: content_bounds.size.height.0 * raster.pixels_per_point,
+      }),
+    );
+  }
+  let mut scaled_effects = effects;
+  common::drawingml_image_effects::scale_container_pixel_lengths(
+    &mut scaled_effects,
+    raster.pixels_per_point / (96.0 / 72.0),
+  );
+  common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
+    &mut raster.image,
+    &scaled_effects,
+    -relative_left * raster.pixels_per_point,
+    -relative_top * raster.pixels_per_point,
+    content_bounds.size.width.0 * raster.pixels_per_point,
+    content_bounds.size.height.0 * raster.pixels_per_point,
+    common::drawingml_image_effects::ImageEffectSourceImages {
+      fill: raster.fill_image.as_ref(),
+      line: raster.line_image.as_ref(),
+      fill_line: raster.fill_line_image.as_ref(),
+      children: raster.children_image.as_ref(),
+    },
+  );
+  let mut png = Cursor::new(Vec::new());
+  if PngEncoder::new(&mut png)
+    .write_image(
+      raster.image.as_raw(),
+      raster.image.width(),
+      raster.image.height(),
+      ColorType::Rgba8.into(),
+    )
+    .is_err()
+  {
+    return;
+  }
+  items.truncate(content_start);
+  items.push(PageItem::Image(ImageItem {
+    x_pt: raster_bounds.origin.x.0,
+    y_pt: raster_bounds.origin.y.0,
+    width_pt: raster_bounds.size.width.0,
+    height_pt: raster_bounds.size.height.0,
+    crop: ImageCrop::default(),
+    clip_path: Vec::new(),
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
+    data: Arc::from(png.into_inner()),
+    content_type: Some("image/png".to_string()),
+    alt_text: None,
+    hyperlink_url: None,
+    semantic_metafile_text: false,
+    floating: matches!(shape.placement, crate::docx::ImagePlacement::Floating(_)),
+    behind_text: false,
+  }));
+}
+
+fn finish_docx_group_effects(
+  items: &mut Vec<PageItem>,
+  content_start: usize,
+  group: &InlineDrawingGroupEffect,
+  text_metrics: &mut TextMetrics,
+) {
+  if items.len() <= content_start {
+    return;
+  }
+  let Some((left, top, right, bottom)) = page_items_bounds(&items[content_start..], text_metrics)
+  else {
+    return;
+  };
+  let content_bounds = common_rect(left, top, right - left, bottom - top);
+  let mut effects = match &group.effects {
+    common::DrawingEffectSource::List {
+      resolved: Some(value),
+      ..
+    }
+    | common::DrawingEffectSource::Dag {
+      resolved: Some(value),
+      ..
+    } => value.clone(),
+    _ => return,
+  };
+  if effects.effects.is_empty() {
+    return;
+  }
+  common::drawingml_image_effects::rotate_container_with_shape(&mut effects, group.rotation_deg);
+  let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds(
+    &effects,
+    content_bounds.size.width.0,
+    content_bounds.size.height.0,
+  ) else {
+    return;
+  };
+  let relative_left = output_bounds.left_pt.min(0.0);
+  let relative_top = output_bounds.top_pt.min(0.0);
+  let relative_right = output_bounds.right_pt.max(content_bounds.size.width.0);
+  let relative_bottom = output_bounds.bottom_pt.max(content_bounds.size.height.0);
+  let raster_bounds = common::Rect {
+    origin: common::Point {
+      x: common::Pt(content_bounds.origin.x.0 + relative_left),
+      y: common::Pt(content_bounds.origin.y.0 + relative_top),
+    },
+    size: common::Size {
+      width: common::Pt(relative_right - relative_left),
+      height: common::Pt(relative_bottom - relative_top),
+    },
+  };
+  let display_items = items[content_start..]
+    .iter()
+    .cloned()
+    .map(into_common_page_item)
+    .collect::<Vec<_>>();
+  let Some(mut raster) = common::drawingml_shape_raster::rasterize_group_items_for_effects(
+    &display_items,
+    raster_bounds,
+    &effects,
+  ) else {
+    return;
+  };
+  common::drawingml_image_effects::scale_container_pixel_lengths(
+    &mut effects,
+    raster.pixels_per_point / (96.0 / 72.0),
+  );
+  common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
+    &mut raster.image,
+    &effects,
+    -relative_left * raster.pixels_per_point,
+    -relative_top * raster.pixels_per_point,
+    content_bounds.size.width.0 * raster.pixels_per_point,
+    content_bounds.size.height.0 * raster.pixels_per_point,
+    common::drawingml_image_effects::ImageEffectSourceImages {
+      fill: raster.fill_image.as_ref(),
+      line: raster.line_image.as_ref(),
+      fill_line: raster.fill_line_image.as_ref(),
+      children: raster.children_image.as_ref(),
+    },
+  );
+  let mut png = Cursor::new(Vec::new());
+  if PngEncoder::new(&mut png)
+    .write_image(
+      raster.image.as_raw(),
+      raster.image.width(),
+      raster.image.height(),
+      ColorType::Rgba8.into(),
+    )
+    .is_err()
+  {
+    return;
+  }
+  items.truncate(content_start);
+  items.push(PageItem::Image(ImageItem {
+    x_pt: raster_bounds.origin.x.0,
+    y_pt: raster_bounds.origin.y.0,
+    width_pt: raster_bounds.size.width.0,
+    height_pt: raster_bounds.size.height.0,
+    crop: ImageCrop::default(),
+    clip_path: Vec::new(),
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
+    data: Arc::from(png.into_inner()),
+    content_type: Some("image/png".to_string()),
+    alt_text: None,
+    hyperlink_url: None,
+    semantic_metafile_text: false,
+    floating: matches!(group.placement, crate::docx::ImagePlacement::Floating(_)),
+    behind_text: matches!(
+      group.placement,
+      crate::docx::ImagePlacement::Floating(placement) if placement.behind_text
+    ),
+  }));
+}
+
+fn inline_shape_path_transform(
+  shape: &InlineShape,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+) -> Affine {
+  let center_x = x_pt + width_pt / 2.0;
+  let center_y = y_pt + height_pt / 2.0;
+  Affine::translate((-f64::from(center_x), -f64::from(center_y)))
+    .then_scale_non_uniform(
+      if shape.flip_horizontal { -1.0 } else { 1.0 },
+      if shape.flip_vertical { -1.0 } else { 1.0 },
+    )
+    .then_rotate(f64::from(
+      inline_shape_visual_rotation_degrees(shape).to_radians(),
+    ))
+    .then_translate((f64::from(center_x), f64::from(center_y)).into())
+}
+
+fn inline_shape_image_clip_path(
+  shape: &InlineShape,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  shape_transform: Affine,
+) -> Vec<common::PathCommand> {
+  match &shape.geometry {
+    InlineShapeGeometry::Line => Vec::new(),
+    InlineShapeGeometry::Rectangle => common::drawingml_geometry::transform_commands(
+      vec![
+        common::PathCommand::MoveTo(common_point(x_pt, y_pt)),
+        common::PathCommand::LineTo(common_point(x_pt + width_pt, y_pt)),
+        common::PathCommand::LineTo(common_point(x_pt + width_pt, y_pt + height_pt)),
+        common::PathCommand::LineTo(common_point(x_pt, y_pt + height_pt)),
+        common::PathCommand::Close,
+      ],
+      shape_transform,
+    ),
+    InlineShapeGeometry::Polyline { points, closed } => {
+      let mut commands = points
+        .iter()
+        .enumerate()
+        .map(|(index, (x, y))| {
+          let point = common::drawingml_geometry::transform_point(
+            common_point(x_pt + x, y_pt + y),
+            shape_transform,
+          );
+          if index == 0 {
+            common::PathCommand::MoveTo(point)
+          } else {
+            common::PathCommand::LineTo(point)
+          }
+        })
+        .collect::<Vec<_>>();
+      if *closed {
+        commands.push(common::PathCommand::Close);
+      }
+      commands
+    }
+    InlineShapeGeometry::Path { paths, .. } => {
+      let scale_x = if shape.width_pt.abs() > f32::EPSILON {
+        width_pt / shape.width_pt
+      } else {
+        1.0
+      };
+      let scale_y = if shape.height_pt.abs() > f32::EPSILON {
+        height_pt / shape.height_pt
+      } else {
+        1.0
+      };
+      let path_transform = shape_transform
+        * Affine::scale_non_uniform(f64::from(scale_x), f64::from(scale_y))
+          .then_translate((f64::from(x_pt), f64::from(y_pt)).into());
+      paths
+        .iter()
+        .filter(|path| path.fill_mode != common::DrawingPathFillMode::None)
+        .flat_map(|path| {
+          common::drawingml_geometry::transform_commands(
+            path.commands.iter().copied(),
+            path_transform,
+          )
+        })
+        .collect()
+    }
+  }
+}
+
+fn inline_shape_fill_image_items(
+  shape: &InlineShape,
+  fill: &InlineShapeImageFill,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  shape_transform: Affine,
+) -> Vec<ImageItem> {
+  if width_pt <= f32::EPSILON || height_pt <= f32::EPSILON {
+    return Vec::new();
+  }
+  let clip_path =
+    inline_shape_image_clip_path(shape, x_pt, y_pt, width_pt, height_pt, shape_transform);
+  let rotation_deg = fill.rotation_deg
+    + fill
+      .rotate_with_shape
+      .then_some(shape.rotation_deg)
+      .unwrap_or(0.0);
+  let flip_horizontal = fill.flip_horizontal ^ (fill.rotate_with_shape && shape.flip_horizontal);
+  let flip_vertical = fill.flip_vertical ^ (fill.rotate_with_shape && shape.flip_vertical);
+  let make_item =
+    |x_pt: f32, y_pt: f32, width_pt: f32, height_pt: f32, crop: ImageCrop| ImageItem {
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+      crop,
+      clip_path: clip_path.clone(),
+      rotation_deg,
+      flip_horizontal,
+      flip_vertical,
+      data: fill.data.clone(),
+      content_type: fill.content_type.clone(),
+      alt_text: None,
+      hyperlink_url: None,
+      semantic_metafile_text: false,
+      floating: matches!(shape.placement, crate::docx::ImagePlacement::Floating(_)),
+      behind_text: false,
+    };
+  let dimensions = image::load_from_memory(fill.data.as_ref())
+    .ok()
+    .map(|image| image.dimensions());
+  match &fill.mode {
+    InlineShapeImageFillMode::Stretch => {
+      vec![make_item(x_pt, y_pt, width_pt, height_pt, fill.crop)]
+    }
+    InlineShapeImageFillMode::Contain => {
+      let Some((pixel_width, pixel_height)) = dimensions else {
+        return vec![make_item(x_pt, y_pt, width_pt, height_pt, fill.crop)];
+      };
+      let image_aspect = pixel_width as f32 / pixel_height.max(1) as f32;
+      let frame_aspect = width_pt / height_pt;
+      let (image_width, image_height) = if image_aspect > frame_aspect {
+        (width_pt, width_pt / image_aspect)
+      } else {
+        (height_pt * image_aspect, height_pt)
+      };
+      vec![make_item(
+        x_pt + (width_pt - image_width) / 2.0,
+        y_pt + (height_pt - image_height) / 2.0,
+        image_width,
+        image_height,
+        fill.crop,
+      )]
+    }
+    InlineShapeImageFillMode::Cover => {
+      let Some((pixel_width, pixel_height)) = dimensions else {
+        return vec![make_item(x_pt, y_pt, width_pt, height_pt, fill.crop)];
+      };
+      let image_aspect = pixel_width as f32 / pixel_height.max(1) as f32;
+      let frame_aspect = width_pt / height_pt;
+      let crop = if image_aspect > frame_aspect {
+        let visible = frame_aspect / image_aspect;
+        ImageCrop {
+          left: (1.0 - visible) / 2.0,
+          right: (1.0 - visible) / 2.0,
+          ..fill.crop
+        }
+      } else {
+        let visible = image_aspect / frame_aspect;
+        ImageCrop {
+          top: (1.0 - visible) / 2.0,
+          bottom: (1.0 - visible) / 2.0,
+          ..fill.crop
+        }
+      };
+      vec![make_item(x_pt, y_pt, width_pt, height_pt, crop)]
+    }
+    InlineShapeImageFillMode::DrawingMlTile(tile) => {
+      let natural_size = dimensions
+        .map(|(width, height)| (width as f32 * 0.75, height as f32 * 0.75))
+        .unwrap_or((width_pt, height_pt));
+      common::drawingml_image_tile::placements(
+        (x_pt, y_pt, width_pt, height_pt),
+        natural_size,
+        tile,
+        fill.crop,
+        1024,
+      )
+      .into_iter()
+      .map(|placement| {
+        let placement = common::drawingml_image_tile::rotate_placement_about_frame(
+          placement,
+          (x_pt, y_pt, width_pt, height_pt),
+          rotation_deg,
+        );
+        let mut item = make_item(
+          placement.x_pt,
+          placement.y_pt,
+          placement.width_pt,
+          placement.height_pt,
+          placement.crop,
+        );
+        item.flip_horizontal ^= placement.flip_horizontal;
+        item.flip_vertical ^= placement.flip_vertical;
+        item
+      })
+      .collect()
+    }
+    InlineShapeImageFillMode::Tile {
+      size,
+      origin,
+      position,
+    } => {
+      let natural_size = dimensions
+        .map(|(width, height)| (width as f32 * 0.75, height as f32 * 0.75))
+        .unwrap_or((width_pt, height_pt));
+      let tile_size = size
+        .as_deref()
+        .and_then(|value| docx_vml_fill_size_points(value, width_pt, height_pt))
+        .unwrap_or(natural_size);
+      if tile_size.0 <= f32::EPSILON || tile_size.1 <= f32::EPSILON {
+        return Vec::new();
+      }
+      let (phase_x, phase_y) = crate::xlsx::vml_tile_phase(
+        origin.as_deref(),
+        position.as_deref(),
+        width_pt,
+        height_pt,
+        tile_size.0,
+        tile_size.1,
+      );
+      let start_x = x_pt + phase_x.rem_euclid(tile_size.0) - tile_size.0;
+      let start_y = y_pt + phase_y.rem_euclid(tile_size.1) - tile_size.1;
+      let columns = ((x_pt + width_pt - start_x) / tile_size.0).ceil().max(1.0) as usize;
+      let rows = ((y_pt + height_pt - start_y) / tile_size.1).ceil().max(1.0) as usize;
+      let mut items = Vec::with_capacity(columns.saturating_mul(rows).min(1024));
+      for row in 0..rows {
+        for column in 0..columns {
+          if items.len() == 1024 {
+            return items;
+          }
+          items.push(make_item(
+            start_x + column as f32 * tile_size.0,
+            start_y + row as f32 * tile_size.1,
+            tile_size.0,
+            tile_size.1,
+            fill.crop,
+          ));
+        }
+      }
+      items
+    }
+  }
+}
+
+fn docx_vml_fill_size_points(
+  value: &str,
+  frame_width: f32,
+  frame_height: f32,
+) -> Option<(f32, f32)> {
+  let mut values = value.split(',').map(str::trim);
+  let parse = |value: &str, reference: f32| {
+    value
+      .strip_suffix('%')
+      .and_then(|value| value.trim().parse::<f32>().ok())
+      .map(|value| reference * value / 100.0)
+      .or_else(|| crate::docx::vml_measure_to_points(value))
+  };
+  Some((
+    parse(values.next()?, frame_width)?,
+    parse(values.next()?, frame_height)?,
+  ))
+}
+
+fn inline_shape_visual_rotation_degrees(shape: &InlineShape) -> f32 {
+  // The static 3-D projection folds in the authored shape rotation. Keep its
+  // raster source in unrotated model coordinates.
+  shape.static3d.as_ref().map_or(shape.rotation_deg, |_| 0.0)
+}
+
 fn into_common_text_run(item: TextItem) -> common::TextRun<'static> {
   let color = common_rgb(item.style.color, item.style.opacity);
   common::TextRun {
@@ -1422,7 +2002,7 @@ fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
       right: item.crop.right,
       bottom: item.crop.bottom,
     }),
-    clip_path: Vec::new(),
+    clip_path: item.clip_path,
     rotation_degrees: item.rotation_deg,
     flip_horizontal: item.flip_horizontal,
     flip_vertical: item.flip_vertical,
@@ -1947,6 +2527,7 @@ impl<'a> RootFrameLayout<'a> {
 
     materialize_table_frame_fragment_bounds(&mut self.pages, &self.frames);
     materialize_repeating_adornments(&mut self.pages, &mut self.frames);
+    materialize_wordprocessing_text_effects(&mut self.pages, &mut self.text_metrics);
 
     LayoutDocument {
       pages: self.pages,
@@ -2906,6 +3487,144 @@ impl<'a> RootFrameLayout<'a> {
   }
 }
 
+fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mut TextMetrics) {
+  for page in pages {
+    let mut semantic_overlays = Vec::new();
+    for item in &mut page.items {
+      let PageItem::Text(text) = item else {
+        continue;
+      };
+      let collapsed_numbering_shadow = text.style_ref_numbering_text.is_some()
+        && text.pdf_text_segmentation == PdfTextSegmentation::Line
+        && text.style.text_glow.is_none()
+        && text.style.text_reflection.is_none()
+        && text.style.text_shadow.is_some_and(|shadow| {
+          shadow.blur_radius_px <= f32::EPSILON
+            && shadow.scale_x.abs() <= f32::EPSILON
+            && shadow.scale_y.abs() <= f32::EPSILON
+        });
+      if collapsed_numbering_shadow {
+        // Writer keeps this authored w14 markup in numbering definitions, but
+        // a zero-blur shadow collapsed to 0% x 0% has no drawable area. Keep
+        // SwNumberPortion as ordinary text so it remains owned by the first
+        // paragraph line instead of appending a detached semantic overlay.
+        text.style.text_shadow = None;
+        continue;
+      }
+      let Some(mut effects) = common::drawingml_image_effects::from_wordprocessing_text_effects(
+        text.style.text_glow,
+        text.style.text_shadow,
+        text.style.text_reflection,
+      ) else {
+        continue;
+      };
+      let width = text_metrics.measure_text(&text.text, &text.style);
+      if width <= f32::EPSILON || text.line_height_pt <= f32::EPSILON {
+        continue;
+      }
+      let Some((ink_left, ink_top, ink_right, ink_bottom)) =
+        text_item_ink_bounds(text, text_metrics)
+      else {
+        continue;
+      };
+      let ink_width = (ink_right - ink_left).max(f32::EPSILON);
+      let ink_height = (ink_bottom - ink_top).max(f32::EPSILON);
+      let content_bounds = common_rect(ink_left, ink_top, ink_width, ink_height);
+      let Some(output_bounds) =
+        common::drawingml_image_effects::container_output_bounds(&effects, ink_width, ink_height)
+      else {
+        continue;
+      };
+      let relative_left = output_bounds.left_pt.min(0.0);
+      let relative_top = output_bounds.top_pt.min(0.0);
+      let relative_right = output_bounds.right_pt.max(ink_width);
+      let relative_bottom = output_bounds.bottom_pt.max(ink_height);
+      let raster_bounds = common::Rect {
+        origin: common::Point {
+          x: common::Pt(ink_left + relative_left),
+          y: common::Pt(ink_top + relative_top),
+        },
+        size: common::Size {
+          width: common::Pt(relative_right - relative_left),
+          height: common::Pt(relative_bottom - relative_top),
+        },
+      };
+      let common_text = common::DisplayItem::Text(into_common_text_run((**text).clone()));
+      let Some(mut raster) = common::drawingml_shape_raster::rasterize_vector_items_for_effects(
+        std::slice::from_ref(&common_text),
+        raster_bounds,
+        &effects,
+      ) else {
+        continue;
+      };
+      common::drawingml_image_effects::scale_container_pixel_lengths(
+        &mut effects,
+        raster.pixels_per_point / (96.0 / 72.0),
+      );
+      common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
+        &mut raster.image,
+        &effects,
+        -relative_left * raster.pixels_per_point,
+        -relative_top * raster.pixels_per_point,
+        content_bounds.size.width.0 * raster.pixels_per_point,
+        content_bounds.size.height.0 * raster.pixels_per_point,
+        common::drawingml_image_effects::ImageEffectSourceImages {
+          fill: raster.fill_image.as_ref(),
+          line: raster.line_image.as_ref(),
+          fill_line: raster.fill_line_image.as_ref(),
+          children: raster.children_image.as_ref(),
+        },
+      );
+      let mut png = Cursor::new(Vec::new());
+      if PngEncoder::new(&mut png)
+        .write_image(
+          raster.image.as_raw(),
+          raster.image.width(),
+          raster.image.height(),
+          ColorType::Rgba8.into(),
+        )
+        .is_err()
+      {
+        continue;
+      }
+      let mut semantic_text = (**text).clone();
+      // `semantic_only` text carries an already-resolved baseline (the same
+      // convention used by semantic EMF replay). Word's fixed-output path for
+      // w14 character effects anchors that hidden searchable layer at the
+      // bottom of the run's line box; the visible glyphs remain in the effect
+      // raster at their ordinary font-metric baseline.
+      semantic_text.y_pt += semantic_text.line_height_pt;
+      semantic_text.style.semantic_only = true;
+      semantic_text.style.text_glow = None;
+      semantic_text.style.text_shadow = None;
+      semantic_text.style.text_reflection = None;
+      semantic_overlays.push(PageItem::Text(Box::new(semantic_text)));
+      *item = PageItem::Image(ImageItem {
+        x_pt: raster_bounds.origin.x.0,
+        y_pt: raster_bounds.origin.y.0,
+        width_pt: raster_bounds.size.width.0,
+        height_pt: raster_bounds.size.height.0,
+        crop: ImageCrop::default(),
+        clip_path: Vec::new(),
+        rotation_deg: 0.0,
+        flip_horizontal: false,
+        flip_vertical: false,
+        data: Arc::from(png.into_inner()),
+        content_type: Some("image/png".to_string()),
+        alt_text: None,
+        hyperlink_url: text.hyperlink_url.clone(),
+        semantic_metafile_text: false,
+        floating: false,
+        behind_text: false,
+      });
+    }
+    // Keep the established frame item ranges immutable. Appending the hidden
+    // searchable layer preserves document order without shifting every later
+    // paragraph/table owner after an effect-bearing run.
+    page.items.extend(semantic_overlays);
+  }
+}
+
 fn paragraph_outline_text(paragraph: &crate::docx::Paragraph) -> String {
   let mut text = paragraph.list_label.clone().unwrap_or_default();
   let inline_count = paragraph
@@ -2921,6 +3640,8 @@ fn paragraph_outline_text(paragraph: &crate::docx::Paragraph) -> String {
         InlineItem::Text(text) => Some(text.text.as_str()),
         InlineItem::Image(_)
         | InlineItem::Shape(_)
+        | InlineItem::DrawingGroupStart(_)
+        | InlineItem::DrawingGroupEnd
         | InlineItem::BookmarkStart(_)
         | InlineItem::FormWidgetStart(_)
         | InlineItem::FormWidgetEnd(_)
@@ -4645,6 +5366,7 @@ fn block_is_page_break_only_paragraph(block: &Block) -> bool {
     match inline {
       InlineItem::PageBreak => saw_page_break = true,
       InlineItem::LastRenderedPageBreak | InlineItem::ColumnBreak => {}
+      InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => {}
       InlineItem::Text(run) if run.text.trim().is_empty() => {}
       InlineItem::BookmarkStart(_) => {}
       InlineItem::Text(_) | InlineItem::Image(_) | InlineItem::Shape(_) => return false,
@@ -4660,6 +5382,7 @@ fn block_is_empty_paragraph(block: &Block) -> bool {
   };
   paragraph.inlines.iter().all(|inline| match inline {
     InlineItem::LastRenderedPageBreak => true,
+    InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => true,
     InlineItem::Text(run) => run.text.trim().is_empty(),
     InlineItem::BookmarkStart(_) => true,
     InlineItem::PageBreak
@@ -5466,6 +6189,7 @@ fn estimated_paragraph_content_height(
       InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
       | InlineItem::LastRenderedPageBreak => {}
+      InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => {}
       InlineItem::PageBreak | InlineItem::ColumnBreak => {
         finish_line(&mut content_height, &mut line_height, &mut line_index);
         x = 0.0;
@@ -6711,6 +7435,8 @@ fn block_has_visible_body_content(block: &Block) -> bool {
       InlineItem::BookmarkStart(_) => false,
       InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
+      | InlineItem::DrawingGroupStart(_)
+      | InlineItem::DrawingGroupEnd
       | InlineItem::LastRenderedPageBreak
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak => false,
@@ -10978,6 +11704,8 @@ fn blocks_contain_following_text_flow_cell_floating(blocks: &[Block]) -> bool {
       | InlineItem::BookmarkStart(_)
       | InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
+      | InlineItem::DrawingGroupStart(_)
+      | InlineItem::DrawingGroupEnd
       | InlineItem::LastRenderedPageBreak
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak => false,
@@ -12046,6 +12774,7 @@ fn paragraph_inlines_are_layout_empty(inlines: &[InlineItem]) -> bool {
     InlineItem::Text(run) => run.text.trim().is_empty(),
     InlineItem::BookmarkStart(_) => true,
     InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
+    InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => true,
     InlineItem::LastRenderedPageBreak => true,
     InlineItem::Image(_)
     | InlineItem::Shape(_)
@@ -12306,7 +13035,75 @@ fn layout_shape_text_box(
     })
     .collect::<Vec<_>>();
   apply_shape_text_warp(&mut items, shape, rect, text_metrics);
+  if !shape.text_upright && shape.rotation_deg.abs() > f32::EPSILON {
+    rotate_shape_text_items(&mut items, rect, shape.rotation_deg);
+  }
   current.items.extend(items);
+}
+
+fn rotate_shape_text_items(items: &mut Vec<PageItem>, rect: ShapeTextBoxRect, rotation_deg: f32) {
+  let center_x = rect.x + rect.width * 0.5;
+  let center_y = rect.y + rect.height * 0.5;
+  let transform = Affine::translate((-f64::from(center_x), -f64::from(center_y)))
+    .then_rotate(f64::from(rotation_deg.to_radians()))
+    .then_translate((f64::from(center_x), f64::from(center_y)).into());
+  let rotate_xy = |x: f32, y: f32| {
+    let point = transform * kurbo::Point::new(f64::from(x), f64::from(y));
+    (point.x as f32, point.y as f32)
+  };
+  for item in items.iter_mut() {
+    match item {
+      PageItem::Text(text) => {
+        text.style.rotation_deg += rotation_deg;
+        text.rotation_center_pt = Some((center_x, center_y));
+      }
+      PageItem::Image(image) => {
+        let (image_center_x, image_center_y) = rotate_xy(
+          image.x_pt + image.width_pt * 0.5,
+          image.y_pt + image.height_pt * 0.5,
+        );
+        image.x_pt = image_center_x - image.width_pt * 0.5;
+        image.y_pt = image_center_y - image.height_pt * 0.5;
+        image.rotation_deg += rotation_deg;
+      }
+      PageItem::Line(line) => {
+        (line.x1_pt, line.y1_pt) = rotate_xy(line.x1_pt, line.y1_pt);
+        (line.x2_pt, line.y2_pt) = rotate_xy(line.x2_pt, line.y2_pt);
+      }
+      PageItem::Path(path) => {
+        path.commands = common::drawingml_geometry::transform_commands(
+          std::mem::take(&mut path.commands),
+          transform,
+        );
+        let bounds = common::drawingml_geometry::transform_rect_bounds(
+          KurboRect::new(
+            f64::from(path.bounds.origin.x.0),
+            f64::from(path.bounds.origin.y.0),
+            f64::from(path.bounds.origin.x.0 + path.bounds.size.width.0),
+            f64::from(path.bounds.origin.y.0 + path.bounds.size.height.0),
+          ),
+          transform,
+        );
+        path.bounds = common_rect(
+          bounds.x0 as f32,
+          bounds.y0 as f32,
+          bounds.width() as f32,
+          bounds.height() as f32,
+        );
+      }
+      PageItem::Polyline(polyline) => {
+        for point in &mut polyline.points {
+          *point = rotate_xy(polyline.x_pt + point.0, polyline.y_pt + point.1);
+        }
+        polyline.x_pt = 0.0;
+        polyline.y_pt = 0.0;
+      }
+      PageItem::Rect(_) | PageItem::Fill(_) => {
+        // Text layout emits rectangles only for auxiliary clipping/debug
+        // frames. They are not painted as part of ordinary shape text.
+      }
+    }
+  }
 }
 
 fn apply_shape_text_warp(
@@ -12325,9 +13122,18 @@ fn apply_shape_text_warp(
     preset,
     common_rect(left, top, right - left, bottom - top),
     common_rect(rect.x, rect.y, rect.width, rect.height),
+    common_rect(rect.x, rect.y, rect.width, rect.height),
   ) else {
     return;
   };
+  let mut text_fill = shape.text_fill.clone();
+  if let Some(common::Fill::Gradient(gradient)) = &mut text_fill {
+    resolve_inline_shape_gradient_transform(
+      gradient,
+      Affine::scale_non_uniform(f64::from(rect.width), f64::from(rect.height))
+        .then_translate((f64::from(rect.x), f64::from(rect.y)).into()),
+    );
+  }
   for item in items {
     let PageItem::Text(text) = item else {
       continue;
@@ -12345,6 +13151,7 @@ fn apply_shape_text_warp(
     // Word's fixed-format output emits warped WordArt (including text
     // watermarks) as outlines without a duplicate searchable-text layer.
     options.semantic_text_overlay = false;
+    options.fill = text_fill.clone();
     options.transform = None;
     options.text_warp = Some(text_warp.clone());
     text.style.pdf_glyph_outline_options = Some(Arc::new(options));
@@ -12360,39 +13167,57 @@ fn text_items_ink_bounds(
     let PageItem::Text(text) = item else {
       continue;
     };
-    let baseline_offset = if text.style.use_windows_font_metrics {
-      text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
-        &text.text,
-        &text.style,
-        text.line_height_pt,
-      )
-    } else {
-      text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
-    };
-    let baseline = text.y_pt + baseline_offset;
-    let mut glyph_x = text.x_pt;
-    let Some(shaped) = text_metrics.shape_text(&text.text, &text.style) else {
+    let Some((left, top, right, bottom)) = text_item_ink_bounds(text, text_metrics) else {
       continue;
     };
-    for glyph in shaped.glyphs {
-      let font_size = glyph.font_size_pt;
-      if let Some(glyph_bounds) = glyph.bounds_em {
-        let glyph_left = glyph_x + (glyph.x_offset_em + glyph_bounds.x_min_em) * font_size;
-        let glyph_right = glyph_x + (glyph.x_offset_em + glyph_bounds.x_max_em) * font_size;
-        let glyph_top = baseline - (glyph.y_offset_em + glyph_bounds.y_max_em) * font_size;
-        let glyph_bottom = baseline - (glyph.y_offset_em + glyph_bounds.y_min_em) * font_size;
-        bounds = Some(match bounds {
-          Some((old_left, old_top, old_right, old_bottom)) => (
-            old_left.min(glyph_left),
-            old_top.min(glyph_top),
-            old_right.max(glyph_right),
-            old_bottom.max(glyph_bottom),
-          ),
-          None => (glyph_left, glyph_top, glyph_right, glyph_bottom),
-        });
-      }
-      glyph_x += glyph.x_advance_em * font_size;
+    bounds = Some(match bounds {
+      Some((old_left, old_top, old_right, old_bottom)) => (
+        old_left.min(left),
+        old_top.min(top),
+        old_right.max(right),
+        old_bottom.max(bottom),
+      ),
+      None => (left, top, right, bottom),
+    });
+  }
+  bounds
+}
+
+fn text_item_ink_bounds(
+  text: &TextItem,
+  text_metrics: &mut TextMetrics,
+) -> Option<(f32, f32, f32, f32)> {
+  let baseline_offset = if text.style.use_windows_font_metrics {
+    text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+      &text.text,
+      &text.style,
+      text.line_height_pt,
+    )
+  } else {
+    text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
+  };
+  let baseline = text.y_pt + baseline_offset;
+  let mut glyph_x = text.x_pt;
+  let mut bounds: Option<(f32, f32, f32, f32)> = None;
+  let shaped = text_metrics.shape_text(&text.text, &text.style)?;
+  for glyph in shaped.glyphs {
+    let font_size = glyph.font_size_pt;
+    if let Some(glyph_bounds) = glyph.bounds_em {
+      let glyph_left = glyph_x + (glyph.x_offset_em + glyph_bounds.x_min_em) * font_size;
+      let glyph_right = glyph_x + (glyph.x_offset_em + glyph_bounds.x_max_em) * font_size;
+      let glyph_top = baseline - (glyph.y_offset_em + glyph_bounds.y_max_em) * font_size;
+      let glyph_bottom = baseline - (glyph.y_offset_em + glyph_bounds.y_min_em) * font_size;
+      bounds = Some(match bounds {
+        Some((old_left, old_top, old_right, old_bottom)) => (
+          old_left.min(glyph_left),
+          old_top.min(glyph_top),
+          old_right.max(glyph_right),
+          old_bottom.max(glyph_bottom),
+        ),
+        None => (glyph_left, glyph_top, glyph_right, glyph_bottom),
+      });
     }
+    glyph_x += glyph.x_advance_em * font_size;
   }
   bounds
 }
@@ -12404,25 +13229,146 @@ fn textbox_auto_fit_bounds_inset(shape: &crate::docx::InlineShape) -> f32 {
     .unwrap_or(BorderStyle::default().width_pt / 2.0)
 }
 
-fn inline_shape_common_fill(shape: &crate::docx::InlineShape) -> common::Fill<'static> {
-  shape
-    .fill_pattern
-    .map(common::Fill::Pattern)
-    .or_else(|| {
-      shape
-        .fill_color
-        .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
-    })
-    .unwrap_or(common::Fill::None)
+fn inline_shape_common_fill(
+  shape: &crate::docx::InlineShape,
+  gradient_transform: Option<Affine>,
+) -> common::Fill<'static> {
+  let mut fill = shape.fill_override.clone().unwrap_or_else(|| {
+    shape
+      .fill_pattern
+      .map(common::Fill::Pattern)
+      .or_else(|| {
+        shape
+          .fill_color
+          .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
+      })
+      .unwrap_or(common::Fill::None)
+  });
+  if let (common::Fill::Gradient(gradient), Some(transform)) = (&mut fill, gradient_transform) {
+    resolve_inline_shape_gradient_transform(gradient, transform);
+  }
+  fill
+}
+
+fn resolve_inline_shape_gradient_transform(
+  gradient: &mut common::GradientFill<'static>,
+  transform: Affine,
+) {
+  let rotate_with_shape = gradient.rotate_with_shape.take().unwrap_or(true);
+  if rotate_with_shape {
+    if let Some(path) = &mut gradient.path {
+      path.transform = crate::xlsx::common_transform_from_affine(transform);
+      let corners = [
+        transform * kurbo::Point::new(0.0, 0.0),
+        transform * kurbo::Point::new(1.0, 0.0),
+        transform * kurbo::Point::new(1.0, 1.0),
+        transform * kurbo::Point::new(0.0, 1.0),
+      ];
+      let left = corners
+        .iter()
+        .map(|point| point.x)
+        .fold(f64::INFINITY, f64::min) as f32;
+      let top = corners
+        .iter()
+        .map(|point| point.y)
+        .fold(f64::INFINITY, f64::min) as f32;
+      let right = corners
+        .iter()
+        .map(|point| point.x)
+        .fold(f64::NEG_INFINITY, f64::max) as f32;
+      let bottom = corners
+        .iter()
+        .map(|point| point.y)
+        .fold(f64::NEG_INFINITY, f64::max) as f32;
+      // Rect/shape path gradients are rasterized as a single bounded brush
+      // over all warped glyph outlines. Retain that authored definition box;
+      // otherwise the PDF fallback can only use the run's solid text color.
+      gradient.definition_bounds = Some(common::Rect {
+        origin: common_point(left, top),
+        size: common::Size {
+          width: common::Pt((right - left).max(0.0)),
+          height: common::Pt((bottom - top).max(0.0)),
+        },
+      });
+    } else if gradient.line.is_none() {
+      let angle = gradient.angle_degrees.unwrap_or_default().to_radians();
+      let (sin, cos) = angle.sin_cos();
+      let half_span = (cos.abs() + sin.abs()) * 0.5;
+      let center = kurbo::Point::new(0.5, 0.5);
+      let start = transform
+        * kurbo::Point::new(
+          center.x - f64::from(cos * half_span),
+          center.y - f64::from(sin * half_span),
+        );
+      let end = transform
+        * kurbo::Point::new(
+          center.x + f64::from(cos * half_span),
+          center.y + f64::from(sin * half_span),
+        );
+      gradient.line = Some((
+        common_point(start.x as f32, start.y as f32),
+        common_point(end.x as f32, end.y as f32),
+      ));
+    }
+    return;
+  }
+
+  let corners = [
+    transform * kurbo::Point::new(0.0, 0.0),
+    transform * kurbo::Point::new(1.0, 0.0),
+    transform * kurbo::Point::new(1.0, 1.0),
+    transform * kurbo::Point::new(0.0, 1.0),
+  ];
+  let left = corners
+    .iter()
+    .map(|point| point.x)
+    .fold(f64::INFINITY, f64::min) as f32;
+  let top = corners
+    .iter()
+    .map(|point| point.y)
+    .fold(f64::INFINITY, f64::min) as f32;
+  let right = corners
+    .iter()
+    .map(|point| point.x)
+    .fold(f64::NEG_INFINITY, f64::max) as f32;
+  let bottom = corners
+    .iter()
+    .map(|point| point.y)
+    .fold(f64::NEG_INFINITY, f64::max) as f32;
+  gradient.definition_bounds = Some(common::Rect {
+    origin: common_point(left, top),
+    size: common::Size {
+      width: common::Pt((right - left).max(0.0)),
+      height: common::Pt((bottom - top).max(0.0)),
+    },
+  });
+  gradient.line = None;
+  if let Some(path) = &mut gradient.path {
+    path.transform = common::Transform {
+      m11: (right - left).max(0.0),
+      m12: 0.0,
+      m21: 0.0,
+      m22: (bottom - top).max(0.0),
+      dx: common::Pt(left),
+      dy: common::Pt(top),
+    };
+  }
 }
 
 fn inline_shape_common_stroke(
   shape: &crate::docx::InlineShape,
   border: BorderStyle,
   outline: Option<&a::Outline>,
+  gradient_transform: Option<Affine>,
 ) -> common::Stroke<'static> {
-  let mut stroke = common_stroke_from_border(border, 1.0);
+  let mut stroke = shape
+    .stroke_override
+    .clone()
+    .unwrap_or_else(|| common_stroke_from_border(border, 1.0));
   stroke.pattern = shape.stroke_pattern;
+  if let (Some(gradient), Some(transform)) = (&mut stroke.gradient, gradient_transform) {
+    resolve_inline_shape_gradient_transform(gradient, transform);
+  }
   if let Some(outline) = outline {
     common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
   }
@@ -12438,8 +13384,10 @@ fn shape_has_invisible_auto_fit_textbox_bounds(
     && flow.text_segmentation == TextSegmentation::RepeatingSlot
     && shape.fill_color.is_none()
     && shape.fill_pattern.is_none()
+    && shape.fill_override.is_none()
     && shape.fill_image.is_none()
     && shape.stroke.is_none()
+    && shape.stroke_override.is_none()
     && shape.additional_fill_colors.is_empty()
 }
 
@@ -13587,7 +14535,9 @@ fn can_defer_page_break_for_following_floating_anchor(
       InlineItem::Text(run) if run.text.trim().is_empty() => None,
       InlineItem::BookmarkStart(_)
       | InlineItem::FormWidgetStart(_)
-      | InlineItem::FormWidgetEnd(_) => None,
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::DrawingGroupStart(_)
+      | InlineItem::DrawingGroupEnd => None,
       InlineItem::Text(_)
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak
@@ -13610,7 +14560,9 @@ fn can_defer_page_break_for_following_floating_anchor(
         InlineItem::Text(run) => run.text.trim().is_empty(),
         InlineItem::BookmarkStart(_)
         | InlineItem::FormWidgetStart(_)
-        | InlineItem::FormWidgetEnd(_) => true,
+        | InlineItem::FormWidgetEnd(_)
+        | InlineItem::DrawingGroupStart(_)
+        | InlineItem::DrawingGroupEnd => true,
         InlineItem::PageBreak
         | InlineItem::ColumnBreak
         | InlineItem::Image(_)
@@ -13909,6 +14861,8 @@ impl<'a> TextFrameLayout<'a> {
       .collect::<Vec<_>>();
     let mut emitted = paragraph.list_label.is_some();
     let mut behind_text_floating_only = false;
+    let mut flow_blocking_floating_only = false;
+    let mut floating_wrap_advanced_line = false;
     let mut pending_text_page_break = false;
     let mut ended_with_explicit_page_break = false;
     let mut pending_tab: Option<PendingAlignedTab> = None;
@@ -14012,7 +14966,10 @@ impl<'a> TextFrameLayout<'a> {
         dynamic_field: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
-        style_ref_numbering_text: None,
+        // Preserve the number-portion identity through the internal effect
+        // materialization pass. This metadata is not emitted to the common
+        // display list when there are no STYLEREF candidate keys.
+        style_ref_numbering_text: Some(Arc::from(visible_label)),
         preserve_text_portion: false,
         form_widget_id: None,
         paragraph_bidi: false,
@@ -14096,9 +15053,115 @@ impl<'a> TextFrameLayout<'a> {
     let mut active_form_widget_ids = Vec::new();
     let mut line_has_form_widget = false;
     let mut tab_over_margin_active = false;
+    let mut drawing_group_effects = Vec::<(usize, InlineDrawingGroupEffect)>::new();
 
     for (inline_index, item) in paragraph.inlines.iter().enumerate() {
       match item {
+        InlineItem::DrawingGroupStart(group) => {
+          text_state.set_position(InlineCursor::after_inline(inline_index));
+          drawing_group_effects.push((current.items.len(), group.clone()));
+        }
+        InlineItem::DrawingGroupEnd => {
+          text_state.set_position(InlineCursor::after_inline(inline_index));
+          if let Some((content_start, group)) = drawing_group_effects.pop() {
+            let content_bounds = page_items_bounds(&current.items[content_start..], text_metrics);
+            finish_docx_group_effects(&mut current.items, content_start, &group, text_metrics);
+            if let (
+              Some((left, top, right, bottom)),
+              crate::docx::ImagePlacement::Floating(placement),
+            ) = (content_bounds, group.placement)
+              && !placement.behind_text
+            {
+              let influence_bounds = Some(FrameBounds {
+                x_pt: left - placement.margin_left_pt,
+                y_pt: top - placement.margin_top_pt,
+                width_pt: right - left + placement.margin_left_pt + placement.margin_right_pt,
+                height_pt: bottom - top + placement.margin_top_pt + placement.margin_bottom_pt,
+              });
+              let item_end = current.items.len();
+              match placement.wrap {
+                ImageWrapMode::Square | ImageWrapMode::Tight
+                  if !effective_layout_in_cell(placement, flow) =>
+                {
+                  let exclusion = WrapExclusion {
+                    left_pt: left - placement.margin_left_pt,
+                    right_pt: right + placement.margin_right_pt,
+                    top_pt: top - placement.margin_top_pt,
+                    bottom_pt: bottom + placement.margin_bottom_pt,
+                    side: placement.wrap_side,
+                    blocks_flow: false,
+                  };
+                  wrap_exclusions.push(exclusion);
+                  current.wrap_exclusions.push(exclusion);
+                  push_page_influence(
+                    current,
+                    FrameInfluenceKind::FlyWrap,
+                    content_start,
+                    item_end,
+                    influence_bounds,
+                  );
+                  (line_left, line_right) =
+                    self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
+                  x = x.max(line_left).min(line_right);
+                  line_height = line_height.max((bottom - top).min(base_line_height));
+                }
+                ImageWrapMode::TopBottom
+                | ImageWrapMode::None
+                | ImageWrapMode::Square
+                | ImageWrapMode::Tight
+                | ImageWrapMode::Through
+                  if effective_layout_in_cell(placement, flow)
+                    || matches!(
+                      placement.wrap,
+                      ImageWrapMode::TopBottom | ImageWrapMode::None
+                    ) =>
+                {
+                  append_vertical_wrap_exclusion(
+                    current,
+                    flow,
+                    left - placement.margin_left_pt,
+                    top - placement.margin_top_pt,
+                    right + placement.margin_right_pt,
+                    bottom + placement.margin_bottom_pt,
+                  );
+                  reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
+                  push_page_influence(
+                    current,
+                    FrameInfluenceKind::FlyWrap,
+                    content_start,
+                    item_end,
+                    influence_bounds,
+                  );
+                  y = y.max(bottom + placement.margin_bottom_pt);
+                  if y + base_line_height > flow.content_bottom
+                    && page_has_body_region_items(current, flow)
+                  {
+                    (flow, y) = advance_section_flow(flow, current, pages);
+                    text_frame = TextFrame::new(self.paragraph, flow, text_metrics);
+                    text_state.note_page_follow(pages.len(), y);
+                    reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
+                    default_line_right = text_frame.default_line_right;
+                    paragraph_left = text_frame.paragraph_left;
+                    base_line_height = text_frame.base_line_height;
+                    line_height = base_line_height;
+                    line_item_start_index = current.items.len();
+                  }
+                  (line_left, line_right) =
+                    self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
+                  x = line_left;
+                  line_height = base_line_height;
+                }
+                ImageWrapMode::Through | ImageWrapMode::Inline => {}
+                ImageWrapMode::TopBottom
+                | ImageWrapMode::None
+                | ImageWrapMode::Square
+                | ImageWrapMode::Tight => {
+                  unreachable!("group wrap branch is covered by the preceding conditions")
+                }
+              }
+            }
+          }
+        }
         InlineItem::BookmarkStart(name) => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
           pending_tab = None;
@@ -14109,6 +15172,7 @@ impl<'a> TextFrameLayout<'a> {
         InlineItem::Text(run) => {
           if !run.text.is_empty() {
             ended_with_explicit_page_break = false;
+            flow_blocking_floating_only = false;
           }
           if pending_text_page_break {
             (flow, text_frame, y, line_left, line_right, line_height) =
@@ -14380,6 +15444,14 @@ impl<'a> TextFrameLayout<'a> {
               && pending_tab.is_none()
               && !tab_over_margin_active
             {
+              let next_wrap_segment = next_wrap_line_segment_for_y(
+                text_frame.default_line_left,
+                text_frame.default_line_right,
+                y,
+                line_height,
+                line_right,
+                &wrap_exclusions,
+              );
               flush_text(
                 current,
                 TextPlacement {
@@ -14399,30 +15471,54 @@ impl<'a> TextFrameLayout<'a> {
                 line_left,
                 line_right,
               );
-              (flow, text_frame, y, line_left, line_right) = self.advance_line(
-                TextLineAdvance {
-                  current,
-                  pages,
-                  text_metrics: &mut *text_metrics,
-                  wrap_exclusions: &mut wrap_exclusions,
-                  state: &mut text_state,
-                  active: ActiveTextFrame {
-                    flow,
-                    frame: text_frame,
-                  },
-                  line_left,
+              if let Some((next_left, next_right)) = next_wrap_segment {
+                finalize_cjk_punctuation_compression(
+                  &mut current.items,
+                  line_item_start_index,
+                  y,
                   line_right,
-                  justify: justify_wrapped_lines,
-                  line_item_start_index: &mut line_item_start_index,
-                  line_has_form_widget: &mut line_has_form_widget,
-                },
-                y,
-                &mut line_height,
-              );
-              default_line_right = text_frame.default_line_right;
-              paragraph_left = text_frame.paragraph_left;
-              base_line_height = text_frame.base_line_height;
-              x = line_left;
+                  text_metrics,
+                );
+                if justify_wrapped_lines {
+                  justify_line_items(
+                    &mut current.items,
+                    line_item_start_index,
+                    y,
+                    line_left,
+                    line_right,
+                    text_metrics,
+                  );
+                }
+                line_left = next_left;
+                line_right = next_right;
+                x = next_left;
+                line_item_start_index = current.items.len();
+              } else {
+                (flow, text_frame, y, line_left, line_right) = self.advance_line(
+                  TextLineAdvance {
+                    current,
+                    pages,
+                    text_metrics: &mut *text_metrics,
+                    wrap_exclusions: &mut wrap_exclusions,
+                    state: &mut text_state,
+                    active: ActiveTextFrame {
+                      flow,
+                      frame: text_frame,
+                    },
+                    line_left,
+                    line_right,
+                    justify: justify_wrapped_lines,
+                    line_item_start_index: &mut line_item_start_index,
+                    line_has_form_widget: &mut line_has_form_widget,
+                  },
+                  y,
+                  &mut line_height,
+                );
+                default_line_right = text_frame.default_line_right;
+                paragraph_left = text_frame.paragraph_left;
+                base_line_height = text_frame.base_line_height;
+                x = line_left;
+              }
               chunk_x = x;
               line_used_shrink_fit = false;
               line_used_punctuation_fit = false;
@@ -14765,6 +15861,7 @@ impl<'a> TextFrameLayout<'a> {
               width_pt: width,
               height_pt: height,
               crop: image.crop,
+              clip_path: Vec::new(),
               rotation_deg: image.rotation_deg,
               flip_horizontal: image.flip_horizontal,
               flip_vertical: image.flip_vertical,
@@ -14813,7 +15910,9 @@ impl<'a> TextFrameLayout<'a> {
                     current.items.len(),
                     influence_bounds,
                   );
+                  let previous_y = y;
                   y = y.max(image_y + height + placement.margin_bottom_pt);
+                  floating_wrap_advanced_line |= y > previous_y + LAYOUT_EPSILON_PT;
                   if y + base_line_height > flow.content_bottom
                     && page_has_body_region_items(current, flow)
                   {
@@ -14881,7 +15980,9 @@ impl<'a> TextFrameLayout<'a> {
                     current.items.len(),
                     influence_bounds,
                   );
+                  let previous_y = y;
                   y = y.max(image_y + height + placement.margin_bottom_pt);
+                  floating_wrap_advanced_line |= y > previous_y + LAYOUT_EPSILON_PT;
                   (line_left, line_right) =
                     self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
                   x = line_left;
@@ -14896,6 +15997,9 @@ impl<'a> TextFrameLayout<'a> {
             if placement.behind_text {
               behind_text_floating_only = true;
             } else {
+              if !emitted {
+                flow_blocking_floating_only = true;
+              }
               emitted = true;
             }
             continue;
@@ -14979,6 +16083,7 @@ impl<'a> TextFrameLayout<'a> {
             width_pt: metrics.content_width_pt,
             height_pt: metrics.content_height_pt,
             crop: image.crop,
+            clip_path: Vec::new(),
             rotation_deg: image.rotation_deg,
             flip_horizontal: image.flip_horizontal,
             flip_vertical: image.flip_vertical,
@@ -15004,6 +16109,7 @@ impl<'a> TextFrameLayout<'a> {
           }
           x += metrics.frame_width_pt;
           line_height = line_height.max(object_line_height);
+          flow_blocking_floating_only = false;
           emitted = true;
         }
         InlineItem::Shape(shape) => {
@@ -15029,93 +16135,120 @@ impl<'a> TextFrameLayout<'a> {
               ));
               return (item_start, current.items.len());
             }
+            let shape_transform =
+              inline_shape_path_transform(shape, x_pt, y_pt, width_pt, height_pt);
+            let transformed_bounds = common::drawingml_geometry::transform_rect_bounds(
+              KurboRect::new(
+                f64::from(x_pt),
+                f64::from(y_pt),
+                f64::from(x_pt + width_pt),
+                f64::from(y_pt + height_pt),
+              ),
+              shape_transform,
+            );
+            let shape_bounds = common_rect(
+              transformed_bounds.x0 as f32,
+              transformed_bounds.y0 as f32,
+              transformed_bounds.width() as f32,
+              transformed_bounds.height() as f32,
+            );
+            let has_shape_transform = shape.rotation_deg.abs() > f32::EPSILON
+              || shape.flip_horizontal
+              || shape.flip_vertical;
             if let Some(fill_image) = &shape.fill_image {
-              current.items.push(PageItem::Image(ImageItem {
-                x_pt,
-                y_pt,
-                width_pt,
-                height_pt,
-                crop: fill_image.crop,
-                rotation_deg: fill_image.rotation_deg,
-                flip_horizontal: fill_image.flip_horizontal,
-                flip_vertical: fill_image.flip_vertical,
-                data: fill_image.data.clone(),
-                content_type: fill_image.content_type.clone(),
-                alt_text: None,
-                hyperlink_url: None,
-                semantic_metafile_text: false,
-                floating: matches!(shape.placement, crate::docx::ImagePlacement::Floating(_)),
-                behind_text: false,
-              }));
+              current.items.extend(
+                inline_shape_fill_image_items(
+                  shape,
+                  fill_image,
+                  x_pt,
+                  y_pt,
+                  width_pt,
+                  height_pt,
+                  shape_transform,
+                )
+                .into_iter()
+                .map(PageItem::Image),
+              );
             }
             if shape.geometry == InlineShapeGeometry::Line
               && shape.fill_color.is_none()
               && shape.fill_pattern.is_none()
               && let Some(stroke) = shape.stroke
             {
-              if shape.stroke_pattern.is_some() {
-                current.items.push(PageItem::Path(common::PathItem {
-                  bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
-                  points: Vec::new(),
-                  commands: vec![
-                    common::PathCommand::MoveTo(common_point(x_pt, y_pt)),
-                    common::PathCommand::LineTo(common_point(x_pt + width_pt, y_pt + height_pt)),
-                  ],
-                  closed: false,
-                  fill: common::Fill::None,
-                  stroke: Some(inline_shape_common_stroke(shape, stroke, None)),
-                }));
-              } else {
-                push_styled_line(
-                  current,
-                  x_pt,
-                  y_pt,
-                  x_pt + width_pt,
-                  y_pt + height_pt,
+              let commands = common::drawingml_geometry::transform_commands(
+                vec![
+                  common::PathCommand::MoveTo(common_point(x_pt, y_pt)),
+                  common::PathCommand::LineTo(common_point(x_pt + width_pt, y_pt + height_pt)),
+                ],
+                shape_transform,
+              );
+              current.items.push(PageItem::Path(common::PathItem {
+                bounds: shape_bounds,
+                points: Vec::new(),
+                commands,
+                closed: false,
+                fill: common::Fill::None,
+                stroke: Some(inline_shape_common_stroke(
+                  shape,
                   stroke,
-                );
-              }
+                  None,
+                  Some(
+                    shape_transform
+                      * Affine::scale_non_uniform(f64::from(width_pt), f64::from(height_pt))
+                        .then_translate((f64::from(x_pt), f64::from(y_pt)).into()),
+                  ),
+                )),
+              }));
+              finish_docx_shape_effects(&mut current.items, item_start, shape, shape_bounds);
               return (item_start, current.items.len());
             }
             if let InlineShapeGeometry::Polyline { points, closed } = &shape.geometry {
-              if shape.fill_pattern.is_some() || shape.stroke_pattern.is_some() {
+              let transformed_points = points
+                .iter()
+                .map(|(x, y)| {
+                  common::drawingml_geometry::transform_point(
+                    common_point(x_pt + x, y_pt + y),
+                    shape_transform,
+                  )
+                })
+                .collect::<Vec<_>>();
+              current.items.push(PageItem::Path(common::PathItem {
+                bounds: shape_bounds,
+                points: transformed_points.clone(),
+                commands: Vec::new(),
+                closed: *closed,
+                fill: inline_shape_common_fill(
+                  shape,
+                  Some(
+                    shape_transform
+                      * Affine::scale_non_uniform(f64::from(width_pt), f64::from(height_pt))
+                        .then_translate((f64::from(x_pt), f64::from(y_pt)).into()),
+                  ),
+                ),
+                stroke: shape.stroke.map(|stroke| {
+                  inline_shape_common_stroke(
+                    shape,
+                    stroke,
+                    None,
+                    Some(
+                      shape_transform
+                        * Affine::scale_non_uniform(f64::from(width_pt), f64::from(height_pt))
+                          .then_translate((f64::from(x_pt), f64::from(y_pt)).into()),
+                    ),
+                  )
+                }),
+              }));
+              for color in &shape.additional_fill_colors {
                 current.items.push(PageItem::Path(common::PathItem {
-                  bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
-                  points: points
-                    .iter()
-                    .map(|(x, y)| common_point(x_pt + x, y_pt + y))
-                    .collect(),
+                  bounds: shape_bounds,
+                  points: transformed_points.clone(),
                   commands: Vec::new(),
                   closed: *closed,
-                  fill: inline_shape_common_fill(shape),
-                  stroke: shape
-                    .stroke
-                    .map(|stroke| inline_shape_common_stroke(shape, stroke, None)),
-                }));
-              } else {
-                current.items.push(PageItem::Polyline(PolylineItem {
-                  x_pt,
-                  y_pt,
-                  width_pt,
-                  height_pt,
-                  points: points.clone(),
-                  closed: *closed,
-                  fill_color: shape.fill_color,
-                  stroke: shape.stroke,
-                }));
-              }
-              for color in &shape.additional_fill_colors {
-                current.items.push(PageItem::Polyline(PolylineItem {
-                  x_pt,
-                  y_pt,
-                  width_pt,
-                  height_pt,
-                  points: points.clone(),
-                  closed: *closed,
-                  fill_color: Some(*color),
+                  fill: common::Fill::Solid(common_rgb(*color, 1.0)),
                   stroke: None,
                 }));
               }
+              finish_docx_shape_effects(&mut current.items, item_start, shape, shape_bounds);
               layout_shape_text_box(
                 current,
                 shape_flow,
@@ -15144,6 +16277,7 @@ impl<'a> TextFrameLayout<'a> {
               let path_transform =
                 Affine::scale_non_uniform(f64::from(scale_x), f64::from(scale_y))
                   .then_translate((f64::from(x_pt), f64::from(y_pt)).into());
+              let path_transform = shape_transform * path_transform;
               for path in paths {
                 let commands = common::drawingml_geometry::transform_commands(
                   path.commands.iter().copied(),
@@ -15153,17 +16287,35 @@ impl<'a> TextFrameLayout<'a> {
                   .iter()
                   .any(|command| matches!(command, common::PathCommand::Close));
                 current.items.push(PageItem::Path(common::PathItem {
-                  bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
+                  bounds: shape_bounds,
                   points: Vec::new(),
                   commands: commands.clone(),
                   closed,
-                  fill: path
-                    .fill_mode
-                    .apply_to_fill(inline_shape_common_fill(shape)),
+                  fill: path.fill_mode.apply_to_fill(inline_shape_common_fill(
+                    shape,
+                    Some(
+                      path_transform
+                        * Affine::scale_non_uniform(
+                          f64::from(shape.width_pt),
+                          f64::from(shape.height_pt),
+                        ),
+                    ),
+                  )),
                   stroke: if path.stroke {
-                    shape
-                      .stroke
-                      .map(|stroke| inline_shape_common_stroke(shape, stroke, outline.as_deref()))
+                    shape.stroke.map(|stroke| {
+                      inline_shape_common_stroke(
+                        shape,
+                        stroke,
+                        outline.as_deref(),
+                        Some(
+                          path_transform
+                            * Affine::scale_non_uniform(
+                              f64::from(shape.width_pt),
+                              f64::from(shape.height_pt),
+                            ),
+                        ),
+                      )
+                    })
                   } else {
                     None
                   },
@@ -15171,7 +16323,7 @@ impl<'a> TextFrameLayout<'a> {
                 if path.fill_mode != common::DrawingPathFillMode::None {
                   for color in &shape.additional_fill_colors {
                     current.items.push(PageItem::Path(common::PathItem {
-                      bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
+                      bounds: shape_bounds,
                       points: Vec::new(),
                       commands: commands.clone(),
                       closed,
@@ -15183,6 +16335,7 @@ impl<'a> TextFrameLayout<'a> {
                   }
                 }
               }
+              finish_docx_shape_effects(&mut current.items, item_start, shape, shape_bounds);
               layout_shape_text_box(
                 current,
                 shape_flow,
@@ -15198,23 +16351,47 @@ impl<'a> TextFrameLayout<'a> {
               return (item_start, current.items.len());
             }
             if shape.text_warp.is_none()
-              && (shape.fill_pattern.is_some() || shape.stroke_pattern.is_some())
+              && (shape.fill_pattern.is_some()
+                || shape.stroke_pattern.is_some()
+                || shape.fill_override.is_some()
+                || shape.stroke_override.is_some()
+                || has_shape_transform)
             {
-              current.items.push(PageItem::Path(common::PathItem {
-                bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
-                points: Vec::new(),
-                commands: vec![
+              let commands = common::drawingml_geometry::transform_commands(
+                vec![
                   common::PathCommand::MoveTo(common_point(x_pt, y_pt)),
                   common::PathCommand::LineTo(common_point(x_pt + width_pt, y_pt)),
                   common::PathCommand::LineTo(common_point(x_pt + width_pt, y_pt + height_pt)),
                   common::PathCommand::LineTo(common_point(x_pt, y_pt + height_pt)),
                   common::PathCommand::Close,
                 ],
+                shape_transform,
+              );
+              current.items.push(PageItem::Path(common::PathItem {
+                bounds: shape_bounds,
+                points: Vec::new(),
+                commands,
                 closed: true,
-                fill: inline_shape_common_fill(shape),
-                stroke: shape
-                  .stroke
-                  .map(|stroke| inline_shape_common_stroke(shape, stroke, None)),
+                fill: inline_shape_common_fill(
+                  shape,
+                  Some(
+                    shape_transform
+                      * Affine::scale_non_uniform(f64::from(width_pt), f64::from(height_pt))
+                        .then_translate((f64::from(x_pt), f64::from(y_pt)).into()),
+                  ),
+                ),
+                stroke: shape.stroke.map(|stroke| {
+                  inline_shape_common_stroke(
+                    shape,
+                    stroke,
+                    None,
+                    Some(
+                      shape_transform
+                        * Affine::scale_non_uniform(f64::from(width_pt), f64::from(height_pt))
+                          .then_translate((f64::from(x_pt), f64::from(y_pt)).into()),
+                    ),
+                  )
+                }),
               }));
             } else if shape.text_warp.is_none()
               && (shape.fill_color.is_some() || shape.stroke.is_some())
@@ -15232,18 +16409,40 @@ impl<'a> TextFrameLayout<'a> {
             }
             if shape.text_warp.is_none() {
               for color in &shape.additional_fill_colors {
-                current.items.push(PageItem::Rect(RectItem {
-                  x_pt,
-                  y_pt,
-                  width_pt,
-                  height_pt,
-                  fill_color: Some(*color),
-                  fill_opacity: 1.0,
-                  stroke: None,
-                  stroke_opacity: 1.0,
-                }));
+                if has_shape_transform {
+                  let commands = common::drawingml_geometry::transform_commands(
+                    vec![
+                      common::PathCommand::MoveTo(common_point(x_pt, y_pt)),
+                      common::PathCommand::LineTo(common_point(x_pt + width_pt, y_pt)),
+                      common::PathCommand::LineTo(common_point(x_pt + width_pt, y_pt + height_pt)),
+                      common::PathCommand::LineTo(common_point(x_pt, y_pt + height_pt)),
+                      common::PathCommand::Close,
+                    ],
+                    shape_transform,
+                  );
+                  current.items.push(PageItem::Path(common::PathItem {
+                    bounds: shape_bounds,
+                    points: Vec::new(),
+                    commands,
+                    closed: true,
+                    fill: common::Fill::Solid(common_rgb(*color, 1.0)),
+                    stroke: None,
+                  }));
+                } else {
+                  current.items.push(PageItem::Rect(RectItem {
+                    x_pt,
+                    y_pt,
+                    width_pt,
+                    height_pt,
+                    fill_color: Some(*color),
+                    fill_opacity: 1.0,
+                    stroke: None,
+                    stroke_opacity: 1.0,
+                  }));
+                }
               }
             }
+            finish_docx_shape_effects(&mut current.items, item_start, shape, shape_bounds);
             if shape_has_invisible_auto_fit_textbox_bounds(shape, shape_flow) {
               // content even when the owning draw shape has no fill/stroke,
               // but that layout-only frame is not painted as a polypolygon.
@@ -15292,6 +16491,7 @@ impl<'a> TextFrameLayout<'a> {
                 | crate::docx::VerticalImageReference::Line
                   if shape.allow_outside_page =>
                 {
+                  // Legacy VML is referenced from Writer's anchor line box.
                   vml_anchor_line_height
                 }
                 crate::docx::VerticalImageReference::TopMargin
@@ -15352,6 +16552,7 @@ impl<'a> TextFrameLayout<'a> {
                 && shape.fill_image.is_none()
                 && shape.stroke.is_none()
                 && shape.additional_fill_colors.is_empty()
+                && shape.effects.is_none()
                 && !shape.text_box_blocks.is_empty()
               {
                 current.items.push(PageItem::Rect(RectItem {
@@ -15391,7 +16592,9 @@ impl<'a> TextFrameLayout<'a> {
                       shape_item_end,
                       influence_bounds,
                     );
+                    let previous_y = y;
                     y = y.max(shape_y + height + placement.margin_bottom_pt);
+                    floating_wrap_advanced_line |= y > previous_y + LAYOUT_EPSILON_PT;
                     if y + base_line_height > flow.content_bottom
                       && page_has_body_region_items(current, flow)
                     {
@@ -15431,7 +16634,9 @@ impl<'a> TextFrameLayout<'a> {
                       shape_item_end,
                       influence_bounds,
                     );
+                    let previous_y = y;
                     y = y.max(shape_y + height + placement.margin_bottom_pt);
+                    floating_wrap_advanced_line |= y > previous_y + LAYOUT_EPSILON_PT;
                     if y + base_line_height > flow.content_bottom
                       && page_has_body_region_items(current, flow)
                     {
@@ -15478,35 +16683,73 @@ impl<'a> TextFrameLayout<'a> {
                 }
                 ImageWrapMode::Through if effective_layout_in_cell(placement, flow) => {
                   if !placement.behind_text {
-                    append_vertical_wrap_exclusion(
-                      current,
-                      flow,
-                      shape_x - placement.margin_left_pt,
-                      shape_y - placement.margin_top_pt,
-                      shape_x + width + placement.margin_right_pt,
-                      shape_y + height + placement.margin_bottom_pt,
-                    );
-                    reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
-                    push_page_influence(
-                      current,
-                      FrameInfluenceKind::FlyWrap,
-                      shape_item_start,
-                      shape_item_end,
-                      influence_bounds,
-                    );
-                    y = y.max(shape_y + height + placement.margin_bottom_pt);
-                    if y + base_line_height > flow.content_bottom
-                      && page_has_body_region_items(current, flow)
-                    {
-                      (flow, y) = advance_section_flow(flow, current, pages);
-                      text_frame = TextFrame::new(self.paragraph, flow, text_metrics);
-                      text_state.note_page_follow(pages.len(), y);
+                    if shape.allow_outside_page && shape_x > x + LAYOUT_EPSILON_PT {
+                      // A Word VML object without w10:wrap uses the `none`
+                      // default ([MS-OI29500] §19.3.2.6). Text can remain
+                      // before an object that starts later on the same line;
+                      // it just cannot continue through the object's span.
+                      // Keep the left segment instead of turning the object
+                      // into a full-width top/bottom exclusion.
+                      let exclusion = WrapExclusion {
+                        left_pt: shape_x - placement.margin_left_pt,
+                        right_pt: shape_x + width + placement.margin_right_pt,
+                        top_pt: shape_paint_y - placement.margin_top_pt,
+                        bottom_pt: shape_paint_y + height + placement.margin_bottom_pt,
+                        side: ImageWrapSide::Left,
+                        blocks_flow: false,
+                      };
+                      wrap_exclusions.push(exclusion);
+                      current.wrap_exclusions.push(exclusion);
+                      push_page_influence(
+                        current,
+                        FrameInfluenceKind::FlyWrap,
+                        shape_item_start,
+                        shape_item_end,
+                        influence_bounds,
+                      );
+                    } else {
+                      append_vertical_wrap_exclusion(
+                        current,
+                        flow,
+                        shape_x - placement.margin_left_pt,
+                        shape_y - placement.margin_top_pt,
+                        shape_x + width + placement.margin_right_pt,
+                        shape_y + height + placement.margin_bottom_pt,
+                      );
                       reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
-                      default_line_right = text_frame.default_line_right;
-                      paragraph_left = text_frame.paragraph_left;
-                      base_line_height = text_frame.base_line_height;
-                      line_height = base_line_height;
-                      line_item_start_index = current.items.len();
+                      push_page_influence(
+                        current,
+                        FrameInfluenceKind::FlyWrap,
+                        shape_item_start,
+                        shape_item_end,
+                        influence_bounds,
+                      );
+                      let wrap_bottom = shape_y + height + placement.margin_bottom_pt;
+                      // Table-cell text items use a resolved-baseline origin.
+                      // When the object covers the current text origin, a
+                      // following-text-flow exclusion ends at the line top,
+                      // so advance by the baseline offset as well; otherwise
+                      // the glyph ink still overlaps the VML object
+                      // (tdf153909).
+                      let wrapped_line_y = wrap_bottom
+                        + text_metrics.baseline_offset_in_line_with_windows_metrics(
+                          &paragraph_base_line_style(paragraph),
+                          line_height,
+                        );
+                      y = y.max(wrapped_line_y);
+                      if y + base_line_height > flow.content_bottom
+                        && page_has_body_region_items(current, flow)
+                      {
+                        (flow, y) = advance_section_flow(flow, current, pages);
+                        text_frame = TextFrame::new(self.paragraph, flow, text_metrics);
+                        text_state.note_page_follow(pages.len(), y);
+                        reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
+                        default_line_right = text_frame.default_line_right;
+                        paragraph_left = text_frame.paragraph_left;
+                        base_line_height = text_frame.base_line_height;
+                        line_height = base_line_height;
+                        line_item_start_index = current.items.len();
+                      }
                     }
                   }
                   (line_left, line_right) =
@@ -15615,6 +16858,13 @@ impl<'a> TextFrameLayout<'a> {
           ) {
             behind_text_floating_only = true;
           } else {
+            if matches!(shape.placement, crate::docx::ImagePlacement::Floating(_)) {
+              if !emitted {
+                flow_blocking_floating_only = true;
+              }
+            } else {
+              flow_blocking_floating_only = false;
+            }
             emitted = true;
           }
         }
@@ -15685,7 +16935,15 @@ impl<'a> TextFrameLayout<'a> {
     }
 
     let paragraph_bottom;
-    if emitted {
+    if emitted && flow_blocking_floating_only && floating_wrap_advanced_line {
+      // A front floating object is anchored to this paragraph's original
+      // line. Once top/bottom wrapping has moved the cursor to the object's
+      // lower edge, allocating another empty anchor line there double-counts
+      // the paragraph height. Word starts the following paragraph at that
+      // lower edge (tdf125885_WordArt3).
+      paragraph_bottom = y;
+      y = paragraph_bottom + self.spacing_after_pt;
+    } else if emitted {
       if paragraph.format.bidi {
         reorder_bidi_line_items(&mut current.items, line_item_start_index, y, text_metrics);
       }
@@ -16397,53 +17655,109 @@ fn available_line_bounds_for_y(
   line_height: f32,
   exclusions: &[WrapExclusion],
 ) -> Option<(f32, f32)> {
-  let mut left = default_left;
-  let mut right = default_right;
-  let mut obstructed = false;
-  for exclusion in exclusions {
-    if exclusion.blocks_flow {
-      continue;
-    }
-    if y + line_height <= exclusion.top_pt || y >= exclusion.bottom_pt {
-      continue;
-    }
-    if exclusion.right_pt <= default_left || exclusion.left_pt >= default_right {
-      continue;
-    }
-    obstructed = true;
+  available_line_segments_for_y(default_left, default_right, y, line_height, exclusions)
+    .into_iter()
+    .next()
+}
 
+fn next_wrap_line_segment_for_y(
+  default_left: f32,
+  default_right: f32,
+  y: f32,
+  line_height: f32,
+  current_right: f32,
+  exclusions: &[WrapExclusion],
+) -> Option<(f32, f32)> {
+  let has_both_sides = exclusions.iter().any(|exclusion| {
+    exclusion.side == ImageWrapSide::BothSides
+      && wrap_exclusion_overlaps_line(exclusion, default_left, default_right, y, line_height)
+  });
+  if !has_both_sides {
+    return None;
+  }
+  available_line_segments_for_y(default_left, default_right, y, line_height, exclusions)
+    .into_iter()
+    .find(|(left, _)| *left + LAYOUT_EPSILON_PT >= current_right)
+}
+
+fn available_line_segments_for_y(
+  default_left: f32,
+  default_right: f32,
+  y: f32,
+  line_height: f32,
+  exclusions: &[WrapExclusion],
+) -> Vec<(f32, f32)> {
+  let mut segments = vec![(default_left, default_right)];
+  for exclusion in exclusions {
+    if !wrap_exclusion_overlaps_line(exclusion, default_left, default_right, y, line_height) {
+      continue;
+    }
     let exclude_left = exclusion.left_pt.max(default_left);
     let exclude_right = exclusion.right_pt.min(default_right);
     match exclusion.side {
       ImageWrapSide::Left => {
-        right = right.min(exclude_left);
+        for (_, right) in &mut segments {
+          *right = right.min(exclude_left);
+        }
       }
       ImageWrapSide::Right => {
-        left = left.max(exclude_right);
+        for (left, _) in &mut segments {
+          *left = left.max(exclude_right);
+        }
       }
       ImageWrapSide::BothSides | ImageWrapSide::Largest => {
-        if exclude_left <= default_left {
-          left = left.max(exclude_right);
-        } else if exclude_right >= default_right {
-          right = right.min(exclude_left);
-        } else {
-          let left_space = exclude_left - default_left;
-          let right_space = default_right - exclude_right;
-          if right_space >= left_space {
-            left = left.max(exclude_right);
-          } else {
-            right = right.min(exclude_left);
+        let mut split = Vec::with_capacity(segments.len() + 1);
+        for (left, right) in segments {
+          if exclude_right <= left || exclude_left >= right {
+            split.push((left, right));
+            continue;
           }
+          if exclude_left > left {
+            split.push((left, exclude_left));
+          }
+          if exclude_right < right {
+            split.push((exclude_right, right));
+          }
+        }
+        segments = split;
+        if exclusion.side == ImageWrapSide::Largest
+          && let Some(largest) = segments.iter().copied().max_by(|first, second| {
+            (first.1 - first.0)
+              .partial_cmp(&(second.1 - second.0))
+              .unwrap_or(std::cmp::Ordering::Equal)
+          })
+        {
+          segments.clear();
+          segments.push(largest);
         }
       }
     }
+    segments.retain(|(left, right)| right - left >= DEFAULT_FONT_SIZE_PT);
+    if segments.is_empty() {
+      break;
+    }
   }
+  segments.sort_by(|first, second| {
+    first
+      .0
+      .partial_cmp(&second.0)
+      .unwrap_or(std::cmp::Ordering::Equal)
+  });
+  segments
+}
 
-  if obstructed && right - left < DEFAULT_FONT_SIZE_PT {
-    None
-  } else {
-    Some((left, right))
-  }
+fn wrap_exclusion_overlaps_line(
+  exclusion: &WrapExclusion,
+  default_left: f32,
+  default_right: f32,
+  y: f32,
+  line_height: f32,
+) -> bool {
+  !exclusion.blocks_flow
+    && y + line_height > exclusion.top_pt
+    && y < exclusion.bottom_pt
+    && exclusion.right_pt > default_left
+    && exclusion.left_pt < default_right
 }
 
 fn dodge_text_wrap_exclusions(
@@ -17405,6 +18719,40 @@ mod tests {
   }
 
   #[test]
+  fn both_sides_wrap_exposes_left_then_right_segments_on_one_line() {
+    let exclusion = WrapExclusion {
+      left_pt: 100.0,
+      right_pt: 200.0,
+      top_pt: 72.0,
+      bottom_pt: 120.0,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: false,
+    };
+
+    assert_eq!(
+      line_bounds_for_y(36.0, 300.0, 80.0, 12.0, &[exclusion]),
+      (36.0, 100.0)
+    );
+    assert_eq!(
+      next_wrap_line_segment_for_y(36.0, 300.0, 80.0, 12.0, 100.0, &[exclusion]),
+      Some((200.0, 300.0))
+    );
+
+    let largest = WrapExclusion {
+      side: ImageWrapSide::Largest,
+      ..exclusion
+    };
+    assert_eq!(
+      line_bounds_for_y(36.0, 300.0, 80.0, 12.0, &[largest]),
+      (200.0, 300.0)
+    );
+    assert_eq!(
+      next_wrap_line_segment_for_y(36.0, 300.0, 80.0, 12.0, 300.0, &[largest]),
+      None
+    );
+  }
+
+  #[test]
   fn word_upper_margin_moves_first_line_only_when_fly_reaches_print_area() {
     let crossing = WrapExclusion {
       left_pt: 300.0,
@@ -17850,12 +19198,17 @@ mod tests {
       geometry: InlineShapeGeometry::Rectangle,
       offset_x_pt: 0.0,
       offset_y_pt: 0.0,
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
       fill_color: None,
       fill_pattern: None,
+      fill_override: None,
       additional_fill_colors: Vec::new(),
       fill_image: None,
       stroke: None,
       stroke_pattern: None,
+      stroke_override: None,
       suppress_zero_relative_background: false,
       allow_outside_page: false,
       inline_anchor_after_line: false,
@@ -17883,6 +19236,10 @@ mod tests {
       }),
       chart: None,
       text_warp: None,
+      text_fill: None,
+      effects: None,
+      static3d: None,
+      text_upright: false,
       text_box_blocks: Vec::new(),
       text_inset_left_pt: 0.0,
       text_inset_top_pt: 0.0,
@@ -18651,6 +20008,7 @@ mod tests {
         width_pt: 120.0,
         height_pt: 120.0,
         crop: ImageCrop::default(),
+        clip_path: Vec::new(),
         rotation_deg: 0.0,
         flip_horizontal: false,
         flip_vertical: false,

@@ -69,6 +69,15 @@ pub struct TextStyle {
   pub cjk_punctuation_compression_ratio: f32,
   pub pdf_glyph_outlines: bool,
   pub pdf_glyph_outline_options: Option<Arc<common::PdfGlyphOutlineOptions>>,
+  pub(crate) text_glow: Option<common::drawingml_image_effects::WordprocessingTextGlow>,
+  pub(crate) text_shadow: Option<common::drawingml_image_effects::WordprocessingTextShadow>,
+  pub(crate) text_reflection: Option<common::drawingml_image_effects::WordprocessingTextReflection>,
+  /// Resolved DrawingML `a:effectLst`/`a:effectDag` attached to character
+  /// properties. This remains on the implementation-side style until the
+  /// owning text body materializes the visible glyph raster.
+  pub(crate) drawingml_text_effects: Option<common::drawingml_image_effects::ImageEffectContainer>,
+  /// DrawingML `a:bodyPr/a:scene3d` plus `a:sp3d` text extrusion.
+  pub(crate) drawingml_text_static3d: Option<common::drawingml_3d::Static3dStyle>,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,
@@ -112,6 +121,11 @@ impl Default for TextStyle {
       cjk_punctuation_compression_ratio: 0.0,
       pdf_glyph_outlines: false,
       pdf_glyph_outline_options: None,
+      text_glow: None,
+      text_shadow: None,
+      text_reflection: None,
+      drawingml_text_effects: None,
+      drawingml_text_static3d: None,
       bold: false,
       italic: false,
       underline: false,

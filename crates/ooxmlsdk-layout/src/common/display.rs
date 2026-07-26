@@ -512,6 +512,19 @@ pub struct TextStyle<'doc> {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PdfGlyphOutlineOptions {
   pub semantic_text_overlay: bool,
+  /// Vector paint for outlined DrawingML text. WordArt text fills live on the
+  /// WordprocessingML run rather than the owning shape, so retaining the
+  /// resolved fill here lets the PDF backend clip the authored gradient or
+  /// pattern to the warped glyph outlines.
+  pub fill: Option<Fill<'static>>,
+  /// Vector paint for a DrawingML character outline. This stays independent
+  /// from `fill`: w14:textOutline and a:rPr/a:ln may use a gradient while the
+  /// glyph interior uses a solid color (or the reverse).
+  pub outline_fill: Option<Fill<'static>>,
+  /// Complete DrawingML character-outline style. Keeping the authored stroke
+  /// beside the glyph paint preserves preset/custom dashes, cap, join, and
+  /// miter semantics when text is vectorized or rasterized for WordArt.
+  pub outline_stroke: Option<Stroke<'static>>,
   /// Page-space transform applied only to visible vector glyphs.
   pub transform: Option<crate::common::Transform>,
   /// Non-affine DrawingML WordArt mapping applied after shaping. A one-path
@@ -523,6 +536,10 @@ pub struct PdfGlyphOutlineOptions {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextWarp {
   pub source_bounds: Rect,
+  /// Authored text-body paint coordinate space. Preset warp paths use the
+  /// outer shape geometry, while Office keeps WordArt gradient and pattern
+  /// brushes in the inset text-body frame.
+  pub paint_bounds: Rect,
   pub boundaries: Vec<Vec<PathCommand>>,
 }
 

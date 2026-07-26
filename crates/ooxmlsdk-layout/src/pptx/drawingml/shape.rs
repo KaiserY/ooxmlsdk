@@ -44,11 +44,17 @@ pub(crate) struct Shape {
   pub(crate) line_properties: Option<LineProperties>,
   pub(crate) fill_properties: Option<FillProperties>,
   pub(crate) custom_shape_properties: CustomShapeProperties,
+  pub(crate) legacy_vml_paths: Option<Vec<crate::common::DrawingPath>>,
+  pub(crate) legacy_vml_fill: Option<crate::common::Fill<'static>>,
+  pub(crate) legacy_vml_stroke: Option<crate::common::Stroke<'static>>,
+  pub(crate) legacy_vml_fill_image: Option<LegacyVmlFillImage>,
   pub(crate) table_properties: Option<TableProperties>,
   pub(crate) picture: Option<PictureRecord>,
   pub(crate) media: Option<MediaRecord>,
   pub(crate) content_part: Option<ContentPartRecord>,
   pub(crate) effect_properties: Option<EffectProperties>,
+  pub(crate) scene3d: Option<a::Scene3DType>,
+  pub(crate) shape3d: Option<a::Shape3DType>,
   pub(crate) text_body: Option<TextBody>,
   pub(crate) master_text_list_style: Option<TextListStyle>,
   pub(crate) shape_ref_line_properties: Option<LineProperties>,
@@ -224,6 +230,7 @@ pub(crate) enum GraphicDataKind {
   Chart,
   ChartEx,
   Table,
+  Model3D,
   #[default]
   Unsupported,
 }
@@ -257,11 +264,17 @@ impl Shape {
       line_properties: None,
       fill_properties: None,
       custom_shape_properties: CustomShapeProperties::default(),
+      legacy_vml_paths: None,
+      legacy_vml_fill: None,
+      legacy_vml_stroke: None,
+      legacy_vml_fill_image: None,
       table_properties: None,
       picture: None,
       media: None,
       content_part: None,
       effect_properties: None,
+      scene3d: None,
+      shape3d: None,
       text_body: None,
       master_text_list_style: None,
       shape_ref_line_properties: None,
@@ -298,6 +311,8 @@ impl Shape {
       .clone()
       .or_else(|| reference.effect_properties.clone());
     self.custom_shape_properties = reference.custom_shape_properties.clone();
+    self.scene3d = reference.scene3d.clone();
+    self.shape3d = reference.shape3d.clone();
     if use_text {
       self.text_body = reference.text_body.clone();
     } else {
@@ -652,6 +667,17 @@ impl Shape {
   pub(crate) fn keep_diagram_drawing(&mut self) {
     self.frame_type = FrameType::Diagram;
   }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct LegacyVmlFillImage {
+  pub(crate) resource: ImageResource,
+  pub(crate) fill_type: Option<ooxmlsdk::schemas::schemas_microsoft_com_vml::FillTypeValues>,
+  pub(crate) aspect: Option<ooxmlsdk::schemas::schemas_microsoft_com_vml::ImageAspectValues>,
+  pub(crate) size: Option<String>,
+  pub(crate) origin: Option<String>,
+  pub(crate) position: Option<String>,
+  pub(crate) rotate_with_shape: bool,
 }
 
 fn merge_line_properties(

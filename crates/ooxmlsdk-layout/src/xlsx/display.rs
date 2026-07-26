@@ -1,16 +1,22 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::sync::Arc;
 
+use image::codecs::png::PngEncoder;
+use image::{ColorType, GenericImageView, ImageEncoder};
 use kurbo::{Affine, Rect as KurboRect};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
+use ooxmlsdk::schemas::schemas_microsoft_com_vml as vml;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
 use crate::common;
-use crate::common::drawingml_image_effects::{ColorChangeEffect, ImageEffect};
+use crate::common::drawingml_image_effects::{
+  ImageEffect, ImageEffectColorResolver, ResolvedEffectColor,
+};
 use crate::model::{
   BorderStyle, ImageCrop, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PageSetup,
   PdfTextSegmentation, RectItem, RgbColor, TextItem, TextStyle, common_page_setup, common_point,
@@ -472,6 +478,12 @@ fn print_page_items(
     body_origin_y + repeat_height,
     zoom_scale,
   ));
+  items.extend(print_page_vml_shape_items(
+    page,
+    body_origin_x + repeat_width,
+    body_origin_y + repeat_height,
+    zoom_scale,
+  ));
   items.extend(print_page_vml_text_items(
     page,
     body_origin_x + repeat_width,
@@ -487,6 +499,957 @@ fn print_page_items(
     &mut text_metrics,
   );
   items
+}
+
+fn print_page_vml_shape_items(
+  page: &CalcPrintPage<'_>,
+  origin_x_pt: f32,
+  origin_y_pt: f32,
+  zoom_scale: f32,
+) -> Vec<PageItem> {
+  let mut items = Vec::new();
+  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
+  for shape in page
+    .sheet
+    .resources
+    .object_resources
+    .vml_drawings
+    .iter()
+    .flat_map(|drawing| drawing.shapes.iter())
+  {
+    if shape.hidden
+      || !shape.print_object
+      || shape.image_relationship_id.is_some()
+      || shape.kind == super::object_resources::VmlShapeKind::Group
+      || !vml_shape_intersects_page(page, shape)
+    {
+      continue;
+    }
+    let Some((x_pt, y_pt, width_pt, height_pt)) = vml_shape_rect(page.sheet, shape) else {
+      continue;
+    };
+    if width_pt <= 0.0 || height_pt <= 0.0 {
+      continue;
+    }
+    let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
+    if let Some(paths) = vml_shape_drawing_paths(shape, rect.width_pt, rect.height_pt) {
+      let transform = vml_shape_path_transform(shape.style.as_deref(), rect);
+      let fill = vml_shape_common_fill(
+        shape,
+        transform * Affine::scale_non_uniform(f64::from(rect.width_pt), f64::from(rect.height_pt)),
+      );
+      let stroke = vml_shape_common_stroke(shape);
+      for path in paths {
+        let closed = path
+          .commands
+          .iter()
+          .any(|command| matches!(command, common::PathCommand::Close));
+        items.push(PageItem::Path(common::PathItem {
+          bounds: common_rect(rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
+          points: Vec::new(),
+          commands: common::drawingml_geometry::transform_commands(path.commands, transform),
+          closed,
+          fill: path.fill_mode.apply_to_fill(fill.clone()),
+          stroke: path.stroke.then(|| stroke.clone()).flatten(),
+        }));
+      }
+      continue;
+    }
+  }
+  items
+}
+
+pub(crate) fn vml_shape_common_fill(
+  shape: &super::object_resources::VmlShapeModel,
+  unit_to_page: Affine,
+) -> common::Fill<'static> {
+  if !shape.filled {
+    return common::Fill::None;
+  }
+  let primary = vml_common_color(
+    shape.fill_color.as_deref(),
+    shape.fill_opacity.as_deref(),
+    RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    },
+  );
+  if !matches!(
+    shape.fill_type,
+    Some(vml::FillTypeValues::Gradient | vml::FillTypeValues::GradientRadial)
+  ) {
+    return common::Fill::Solid(primary);
+  }
+  let secondary = vml_common_color(
+    shape.fill_color2.as_deref(),
+    shape.fill_opacity2.as_deref(),
+    RgbColor {
+      r: primary.r,
+      g: primary.g,
+      b: primary.b,
+    },
+  );
+  let focus = shape
+    .fill_focus
+    .as_deref()
+    .and_then(parse_vml_ratio)
+    .unwrap_or(0.0);
+  let mut stops = vml_gradient_intermediate_stops(shape.fill_colors.as_deref());
+  let (angle_degrees, path) = if shape.fill_type == Some(vml::FillTypeValues::GradientRadial) {
+    if stops.is_empty() {
+      let outer_to_inner = (-0.5..=0.5).contains(&focus);
+      stops = vec![
+        common::GradientStop {
+          position: 0.0,
+          color: if outer_to_inner { secondary } else { primary },
+          scheme: None,
+        },
+        common::GradientStop {
+          position: 1.0,
+          color: if outer_to_inner { primary } else { secondary },
+          scheme: None,
+        },
+      ];
+    }
+    let (focus_x, focus_y) = shape
+      .fill_focus_position
+      .as_deref()
+      .and_then(parse_vml_ratio_pair)
+      .unwrap_or((0.0, 0.0));
+    let (focus_width, focus_height) = shape
+      .fill_focus_size
+      .as_deref()
+      .and_then(parse_vml_ratio_pair)
+      .unwrap_or((0.0, 0.0));
+    let right = (focus_x + focus_width).clamp(focus_x, 1.0);
+    let bottom = (focus_y + focus_height).clamp(focus_y, 1.0);
+    (
+      None,
+      Some(common::GradientPath {
+        // LibreOffice maps VML gradientRadial to DrawingML's rectangular
+        // path gradient, not to an ellipse.
+        kind: common::GradientPathKind::Rectangle,
+        fill_to: common::RelativeRect {
+          left: focus_x.clamp(0.0, 1.0),
+          top: focus_y.clamp(0.0, 1.0),
+          right: (1.0 - right).clamp(0.0, 1.0),
+          bottom: (1.0 - bottom).clamp(0.0, 1.0),
+        },
+        transform: common_transform_from_affine(unit_to_page),
+        mirror_tile: false,
+      }),
+    )
+  } else {
+    let authored_angle = shape
+      .fill_angle
+      .as_deref()
+      .and_then(|value| value.parse::<f32>().ok())
+      .unwrap_or(0.0);
+    if stops.is_empty() {
+      let axial = (-0.75..=-0.25).contains(&focus) || (0.25..=0.75).contains(&focus);
+      if axial {
+        let mut outer_to_inner = focus > 0.0;
+        if authored_angle < 0.0 {
+          outer_to_inner = !outer_to_inner;
+        }
+        let outer = if outer_to_inner { primary } else { secondary };
+        let inner = if outer_to_inner { secondary } else { primary };
+        stops = vec![
+          common::GradientStop {
+            position: 0.0,
+            color: outer,
+            scheme: None,
+          },
+          common::GradientStop {
+            position: 0.5,
+            color: inner,
+            scheme: None,
+          },
+          common::GradientStop {
+            position: 1.0,
+            color: outer,
+            scheme: None,
+          },
+        ];
+      } else {
+        let mut swap = true;
+        if focus.abs() > 0.5 {
+          swap = !swap;
+        }
+        if authored_angle < 0.0 {
+          swap = !swap;
+        }
+        stops = vec![
+          common::GradientStop {
+            position: 0.0,
+            color: if swap { secondary } else { primary },
+            scheme: None,
+          },
+          common::GradientStop {
+            position: 1.0,
+            color: if swap { primary } else { secondary },
+            scheme: None,
+          },
+        ];
+      }
+    }
+    // VML measures counter-clockwise from the bottom; DrawingML/common
+    // gradients measure clockwise from the left.
+    (
+      Some((90.0 - authored_angle.rem_euclid(360.0)).rem_euclid(360.0)),
+      None,
+    )
+  };
+  common::Fill::Gradient(common::GradientFill {
+    stops,
+    angle_degrees,
+    interpolation: if matches!(
+      shape.fill_method,
+      Some(vml::FillMethodValues::Sigma | vml::FillMethodValues::Linearsigma)
+    ) {
+      common::GradientInterpolation::PowerPointGammaSigma
+    } else {
+      common::GradientInterpolation::LinearSrgb
+    },
+    path,
+    ..common::GradientFill::default()
+  })
+}
+
+pub(crate) fn vml_shape_common_stroke(
+  shape: &super::object_resources::VmlShapeModel,
+) -> Option<common::Stroke<'static>> {
+  if !shape.stroked {
+    return None;
+  }
+  let width = shape
+    .stroke_weight
+    .as_deref()
+    .and_then(parse_vml_length_pt)
+    .unwrap_or(0.75);
+  let color = vml_common_color(
+    shape.stroke_color.as_deref(),
+    shape.stroke_opacity.as_deref(),
+    RgbColor { r: 0, g: 0, b: 0 },
+  );
+  Some(common::Stroke {
+    width: common::Pt(width),
+    color,
+    dash: vml_dash_array(shape.stroke_dash_style.as_deref(), width),
+    cap: Some(
+      match shape
+        .stroke_end_cap
+        .unwrap_or(vml::StrokeEndCapValues::Flat)
+      {
+        vml::StrokeEndCapValues::Flat => common::StrokeCap::Flat,
+        vml::StrokeEndCapValues::Square => common::StrokeCap::Square,
+        vml::StrokeEndCapValues::Round => common::StrokeCap::Round,
+      },
+    ),
+    join: Some(
+      match shape
+        .stroke_join_style
+        .unwrap_or(vml::StrokeJoinStyleValues::Round)
+      {
+        vml::StrokeJoinStyleValues::Round => common::StrokeJoin::Round,
+        vml::StrokeJoinStyleValues::Bevel => common::StrokeJoin::Bevel,
+        vml::StrokeJoinStyleValues::Miter => common::StrokeJoin::Miter { limit: None },
+      },
+    ),
+    compound: Some(
+      match shape
+        .stroke_line_style
+        .unwrap_or(vml::StrokeLineStyleValues::Single)
+      {
+        vml::StrokeLineStyleValues::Single => common::StrokeCompound::Single,
+        vml::StrokeLineStyleValues::ThinThin => common::StrokeCompound::Double,
+        vml::StrokeLineStyleValues::ThinThick => common::StrokeCompound::ThinThick,
+        vml::StrokeLineStyleValues::ThickThin => common::StrokeCompound::ThickThin,
+        vml::StrokeLineStyleValues::ThickBetweenThin => common::StrokeCompound::Triple,
+      },
+    ),
+    head_end: vml_stroke_end(
+      shape.stroke_start_arrow,
+      shape.stroke_start_arrow_width,
+      shape.stroke_start_arrow_length,
+    ),
+    tail_end: vml_stroke_end(
+      shape.stroke_end_arrow,
+      shape.stroke_end_arrow_width,
+      shape.stroke_end_arrow_length,
+    ),
+    ..common::Stroke::default()
+  })
+}
+
+fn vml_common_color(
+  value: Option<&str>,
+  opacity: Option<&str>,
+  default: RgbColor,
+) -> common::Color {
+  let color = value
+    .and_then(crate::docx::parse_vml_color)
+    .unwrap_or(default);
+  common_rgb(color, opacity.and_then(parse_vml_opacity).unwrap_or(1.0))
+}
+
+pub(crate) fn recolor_vml_pattern_image(
+  shape: &super::object_resources::VmlShapeModel,
+  data: &[u8],
+) -> Option<Vec<u8>> {
+  if shape.fill_type != Some(vml::FillTypeValues::Pattern) {
+    return None;
+  }
+  // Historical VML uses light gray for an omitted foreground even though the
+  // prose default says white; this is the Office-observed default also used
+  // by LibreOffice's VML importer.
+  common::drawingml_pattern::recolor_vml_historical_pattern(
+    data,
+    vml_common_color(
+      shape.fill_color.as_deref(),
+      shape.fill_opacity.as_deref(),
+      RgbColor {
+        r: 0xd3,
+        g: 0xd3,
+        b: 0xd3,
+      },
+    ),
+    vml_common_color(
+      shape.fill_color2.as_deref(),
+      shape.fill_opacity2.as_deref(),
+      RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      },
+    ),
+  )
+}
+
+pub(crate) fn recolor_typed_vml_pattern_image(fill: &vml::Fill, data: &[u8]) -> Option<Vec<u8>> {
+  if fill.r#type != Some(vml::FillTypeValues::Pattern) {
+    return None;
+  }
+  common::drawingml_pattern::recolor_vml_historical_pattern(
+    data,
+    vml_common_color(
+      fill.color.as_deref(),
+      fill.opacity.as_deref(),
+      RgbColor {
+        r: 0xd3,
+        g: 0xd3,
+        b: 0xd3,
+      },
+    ),
+    vml_common_color(
+      fill.color2.as_deref(),
+      fill.opacity2.as_deref(),
+      RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      },
+    ),
+  )
+}
+
+fn parse_vml_opacity(value: &str) -> Option<f32> {
+  let value = value.trim();
+  let opacity = if let Some(value) = value.strip_suffix('f') {
+    value.trim().parse::<f32>().ok()? / 65_536.0
+  } else {
+    parse_vml_ratio(value)?
+  };
+  Some(opacity.clamp(0.0, 1.0))
+}
+
+fn parse_vml_ratio(value: &str) -> Option<f32> {
+  let value = value.trim();
+  if let Some(value) = value.strip_suffix('%') {
+    return Some(value.trim().parse::<f32>().ok()? / 100.0);
+  }
+  Some(value.parse::<f32>().ok()?)
+}
+
+fn parse_vml_ratio_pair(value: &str) -> Option<(f32, f32)> {
+  let mut values = value.split(',').map(str::trim);
+  Some((
+    parse_vml_ratio(values.next()?)?,
+    parse_vml_ratio(values.next()?)?,
+  ))
+}
+
+fn parse_vml_vector_component(value: &str) -> Option<f32> {
+  let value = value.trim();
+  if let Some(value) = value.strip_suffix('f') {
+    return Some(value.trim().parse::<f32>().ok()? / 65_536.0);
+  }
+  parse_vml_ratio(value)
+}
+
+pub(crate) fn vml_tile_phase(
+  origin: Option<&str>,
+  position: Option<&str>,
+  frame_width: f32,
+  frame_height: f32,
+  tile_width: f32,
+  tile_height: f32,
+) -> (f32, f32) {
+  let parse_pair = |value: &str| {
+    let mut values = value.split(',').map(str::trim);
+    Some((
+      parse_vml_vector_component(values.next()?)?,
+      parse_vml_vector_component(values.next()?)?,
+    ))
+  };
+  // Both attributes default to their respective centers. The image-space
+  // origin is placed on the shape-space position, then tiling repeats in both
+  // directions from that anchor.
+  let (origin_x, origin_y) = origin.and_then(parse_pair).unwrap_or((0.5, 0.5));
+  let (position_x, position_y) = position.and_then(parse_pair).unwrap_or((0.5, 0.5));
+  (
+    position_x * frame_width - origin_x * tile_width,
+    position_y * frame_height - origin_y * tile_height,
+  )
+}
+
+fn vml_gradient_intermediate_stops(value: Option<&str>) -> Vec<common::GradientStop<'static>> {
+  let mut stops = value
+    .into_iter()
+    .flat_map(|value| value.split(';'))
+    .filter_map(|entry| {
+      let entry = entry.trim();
+      let split = entry
+        .char_indices()
+        .find(|(_, ch)| ch.is_whitespace())
+        .map(|(index, _)| index)?;
+      let position = parse_vml_ratio(entry[..split].trim())?.clamp(0.0, 1.0);
+      let color = crate::docx::parse_vml_color(entry[split..].trim())?;
+      Some(common::GradientStop {
+        position,
+        color: common_rgb(color, 1.0),
+        scheme: None,
+      })
+    })
+    .collect::<Vec<_>>();
+  stops.sort_by(|left, right| left.position.total_cmp(&right.position));
+  stops
+}
+
+fn vml_dash_array(value: Option<&str>, width: f32) -> Option<Vec<common::Pt>> {
+  let value = value?.trim();
+  let preset: &[f32] = match value.to_ascii_lowercase().as_str() {
+    "solid" => return None,
+    "shortdot" => &[1.0, 1.0],
+    "shortdash" => &[3.0, 1.0],
+    "shortdashdot" => &[3.0, 1.0, 1.0, 1.0],
+    "shortdashdotdot" => &[3.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    "dot" => &[1.0, 3.0],
+    "dash" => &[4.0, 3.0],
+    "longdash" => &[8.0, 3.0],
+    "dashdot" => &[4.0, 3.0, 1.0, 3.0],
+    "longdashdot" => &[8.0, 3.0, 1.0, 3.0],
+    "longdashdotdot" => &[8.0, 3.0, 1.0, 3.0, 1.0, 3.0],
+    _ => {
+      let values = value
+        .split_whitespace()
+        .map(|value| {
+          value
+            .parse::<f32>()
+            .ok()
+            .map(|value| common::Pt(value * width))
+        })
+        .collect::<Option<Vec<_>>>()?;
+      return (!values.is_empty()).then_some(values);
+    }
+  };
+  Some(
+    preset
+      .iter()
+      .map(|value| common::Pt(value * width))
+      .collect(),
+  )
+}
+
+fn vml_stroke_end(
+  kind: Option<vml::StrokeArrowValues>,
+  width: Option<vml::StrokeArrowWidthValues>,
+  length: Option<vml::StrokeArrowLengthValues>,
+) -> Option<common::StrokeEnd> {
+  let kind = match kind.unwrap_or(vml::StrokeArrowValues::None) {
+    vml::StrokeArrowValues::None => return None,
+    vml::StrokeArrowValues::Block => common::StrokeEndKind::Triangle,
+    vml::StrokeArrowValues::Classic => common::StrokeEndKind::Stealth,
+    vml::StrokeArrowValues::Oval => common::StrokeEndKind::Oval,
+    vml::StrokeArrowValues::Diamond => common::StrokeEndKind::Diamond,
+    vml::StrokeArrowValues::Open => common::StrokeEndKind::Arrow,
+  };
+  let size = |value| match value {
+    0 => common::StrokeEndSize::Small,
+    2 => common::StrokeEndSize::Large,
+    _ => common::StrokeEndSize::Medium,
+  };
+  Some(common::StrokeEnd {
+    kind,
+    width: size(match width.unwrap_or(vml::StrokeArrowWidthValues::Medium) {
+      vml::StrokeArrowWidthValues::Narrow => 0,
+      vml::StrokeArrowWidthValues::Medium => 1,
+      vml::StrokeArrowWidthValues::Wide => 2,
+    }),
+    length: size(
+      match length.unwrap_or(vml::StrokeArrowLengthValues::Medium) {
+        vml::StrokeArrowLengthValues::Short => 0,
+        vml::StrokeArrowLengthValues::Medium => 1,
+        vml::StrokeArrowLengthValues::Long => 2,
+      },
+    ),
+  })
+}
+
+pub(crate) fn common_transform_from_affine(transform: Affine) -> common::Transform {
+  let [m11, m12, m21, m22, dx, dy] = transform.as_coeffs();
+  common::Transform {
+    m11: m11 as f32,
+    m12: m12 as f32,
+    m21: m21 as f32,
+    m22: m22 as f32,
+    dx: common::Pt(dx as f32),
+    dy: common::Pt(dy as f32),
+  }
+}
+
+fn vml_shape_path_transform(style: Option<&str>, rect: CellRect) -> Affine {
+  let rotation = style
+    .and_then(|style| vml_style_value(style, "rotation"))
+    .map(vml_rotation_degrees)
+    .unwrap_or(0.0);
+  let flip = style
+    .and_then(|style| vml_style_value(style, "flip"))
+    .unwrap_or_default()
+    .to_ascii_lowercase();
+  let scale_x = if flip.split_whitespace().any(|value| value == "x") {
+    -1.0
+  } else {
+    1.0
+  };
+  let scale_y = if flip.split_whitespace().any(|value| value == "y") {
+    -1.0
+  } else {
+    1.0
+  };
+  let center_x = f64::from(rect.width_pt) * 0.5;
+  let center_y = f64::from(rect.height_pt) * 0.5;
+  Affine::translate((-center_x, -center_y))
+    .then_scale_non_uniform(scale_x, scale_y)
+    .then_rotate(f64::from(rotation.to_radians()))
+    .then_translate(
+      (
+        center_x + f64::from(rect.x_pt),
+        center_y + f64::from(rect.y_pt),
+      )
+        .into(),
+    )
+}
+
+fn vml_style_value<'a>(style: &'a str, key: &str) -> Option<&'a str> {
+  style.split(';').find_map(|declaration| {
+    let (name, value) = declaration.split_once(':')?;
+    name
+      .trim()
+      .eq_ignore_ascii_case(key)
+      .then_some(value.trim())
+  })
+}
+
+fn vml_rotation_degrees(value: &str) -> f32 {
+  let value = value.trim();
+  let degrees = value
+    .strip_suffix("fd")
+    .and_then(|value| value.trim().parse::<f32>().ok())
+    .map(|value| value / 65_536.0)
+    .or_else(|| value.parse::<f32>().ok())
+    .unwrap_or(0.0);
+  -degrees
+}
+
+fn xlsx_vml_special_geometry(
+  shape: &super::object_resources::VmlShapeModel,
+  rect: CellRect,
+) -> Option<crate::docx::InlineShapeGeometry> {
+  use super::object_resources::VmlShapeKind as Kind;
+  match shape.kind {
+    Kind::Curve => {
+      let points = [
+        parse_vml_coordinate_pair(shape.from.as_deref()?)?,
+        parse_vml_coordinate_pair(shape.control1.as_deref()?)?,
+        parse_vml_coordinate_pair(shape.control2.as_deref()?)?,
+        parse_vml_coordinate_pair(shape.to.as_deref()?)?,
+      ];
+      let points = map_vml_coordinates(shape, &points, rect)?;
+      Some(crate::docx::InlineShapeGeometry::Path {
+        paths: vec![common::DrawingPath {
+          commands: vec![
+            common::PathCommand::MoveTo(common_point(points[0].0, points[0].1)),
+            common::PathCommand::CubicTo {
+              control1: common_point(points[1].0, points[1].1),
+              control2: common_point(points[2].0, points[2].1),
+              end: common_point(points[3].0, points[3].1),
+            },
+          ],
+          fill_mode: common::DrawingPathFillMode::None,
+          stroke: shape.stroked,
+          extrusion_allowed: true,
+        }],
+        outline: None,
+      })
+    }
+    Kind::Line if shape.from.is_some() && shape.to.is_some() => {
+      let points = [
+        parse_vml_coordinate_pair(shape.from.as_deref()?)?,
+        parse_vml_coordinate_pair(shape.to.as_deref()?)?,
+      ];
+      let points = map_vml_coordinates(shape, &points, rect)?;
+      Some(crate::docx::InlineShapeGeometry::Polyline {
+        points,
+        closed: false,
+      })
+    }
+    Kind::Polyline => {
+      let points = parse_vml_coordinate_list(shape.points.as_deref()?)?;
+      let points = map_vml_coordinates(shape, &points, rect)?;
+      let repeated_endpoint = points
+        .first()
+        .zip(points.last())
+        .is_some_and(|(first, last)| {
+          (first.0 - last.0).abs() <= 0.01 && (first.1 - last.1).abs() <= 0.01
+        });
+      Some(crate::docx::InlineShapeGeometry::Polyline {
+        points,
+        // LibreOffice imports a filled VML polyline as a polygon even when
+        // the first point is not repeated (`tdf112450_vml_polyline`).
+        closed: shape.filled || repeated_endpoint,
+      })
+    }
+    Kind::Arc => vml_arc_geometry(shape, rect),
+    Kind::RoundRectangle if shape.arc_size.is_some() => vml_round_rectangle_geometry(shape, rect),
+    _ => None,
+  }
+}
+
+pub(crate) fn vml_shape_drawing_paths(
+  shape: &super::object_resources::VmlShapeModel,
+  width_pt: f32,
+  height_pt: f32,
+) -> Option<Vec<common::DrawingPath>> {
+  let rect = CellRect {
+    x_pt: 0.0,
+    y_pt: 0.0,
+    width_pt,
+    height_pt,
+  };
+  let geometry = if let Some(path) = shape.path.as_deref() {
+    crate::docx::vml_path_geometry(
+      path,
+      crate::docx::VmlPathGeometryOptions {
+        coordinate_origin: shape.coordinate_origin.as_deref(),
+        coordinate_size: shape.coordinate_size.as_deref(),
+        width_pt,
+        height_pt,
+        adjustment: None,
+        formulas: None,
+        allow_fill: shape.filled,
+        allow_stroke: shape.stroked,
+        allow_extrusion: true,
+      },
+    )
+  } else {
+    xlsx_vml_special_geometry(shape, rect)
+  };
+  if let Some(geometry) = geometry {
+    return inline_vml_geometry_paths(geometry, width_pt, height_pt);
+  }
+  // An authored generic VML path is the shape geometry. If it cannot be
+  // interpreted, silently replacing it with a rectangle produces visible
+  // content that Office never authored.
+  if shape.path.is_some() {
+    return None;
+  }
+
+  use super::object_resources::VmlShapeKind as Kind;
+  let preset = match shape.kind {
+    Kind::Oval => a::ShapeTypeValues::Ellipse,
+    Kind::RoundRectangle => a::ShapeTypeValues::RoundRectangle,
+    Kind::Line => {
+      return Some(vec![common::DrawingPath {
+        commands: vec![
+          common::PathCommand::MoveTo(common_point(0.0, 0.0)),
+          common::PathCommand::LineTo(common_point(width_pt, height_pt)),
+        ],
+        fill_mode: common::DrawingPathFillMode::None,
+        stroke: shape.stroked,
+        extrusion_allowed: true,
+      }]);
+    }
+    Kind::Group | Kind::Image => return None,
+    _ => a::ShapeTypeValues::Rectangle,
+  };
+  common::drawingml_preset_geometry::paths(
+    Some(&a::PresetGeometry {
+      preset,
+      ..a::PresetGeometry::default()
+    }),
+    0.0,
+    0.0,
+    width_pt,
+    height_pt,
+  )
+}
+
+fn inline_vml_geometry_paths(
+  geometry: crate::docx::InlineShapeGeometry,
+  width_pt: f32,
+  height_pt: f32,
+) -> Option<Vec<common::DrawingPath>> {
+  Some(match geometry {
+    crate::docx::InlineShapeGeometry::Path { paths, .. } => paths,
+    crate::docx::InlineShapeGeometry::Polyline { points, closed } => {
+      let mut commands = points
+        .into_iter()
+        .enumerate()
+        .map(|(index, (x, y))| {
+          if index == 0 {
+            common::PathCommand::MoveTo(common_point(x, y))
+          } else {
+            common::PathCommand::LineTo(common_point(x, y))
+          }
+        })
+        .collect::<Vec<_>>();
+      if closed {
+        commands.push(common::PathCommand::Close);
+      }
+      vec![common::DrawingPath {
+        commands,
+        fill_mode: if closed {
+          common::DrawingPathFillMode::Normal
+        } else {
+          common::DrawingPathFillMode::None
+        },
+        stroke: true,
+        extrusion_allowed: true,
+      }]
+    }
+    crate::docx::InlineShapeGeometry::Line => vec![common::DrawingPath {
+      commands: vec![
+        common::PathCommand::MoveTo(common_point(0.0, 0.0)),
+        common::PathCommand::LineTo(common_point(width_pt, height_pt)),
+      ],
+      fill_mode: common::DrawingPathFillMode::None,
+      stroke: true,
+      extrusion_allowed: true,
+    }],
+    crate::docx::InlineShapeGeometry::Rectangle => {
+      return common::drawingml_preset_geometry::paths(None, 0.0, 0.0, width_pt, height_pt);
+    }
+  })
+}
+
+fn parse_vml_coordinate_pair(value: &str) -> Option<(f32, f32)> {
+  let mut values = value
+    .split(',')
+    .map(|value| parse_vml_length_pt(value.trim()));
+  Some((values.next()??, values.next()??))
+}
+
+fn parse_vml_coordinate_list(value: &str) -> Option<Vec<(f32, f32)>> {
+  let values = value
+    .split(',')
+    .map(|value| parse_vml_length_pt(value.trim()))
+    .collect::<Option<Vec<_>>>()?;
+  if values.len() < 4 || values.len() % 2 != 0 {
+    return None;
+  }
+  Some(
+    values
+      .chunks_exact(2)
+      .map(|pair| (pair[0], pair[1]))
+      .collect(),
+  )
+}
+
+fn map_vml_coordinates(
+  shape: &super::object_resources::VmlShapeModel,
+  points: &[(f32, f32)],
+  rect: CellRect,
+) -> Option<Vec<(f32, f32)>> {
+  let (origin_x, origin_y, width, height) = if let Some((width, height)) = shape
+    .coordinate_size
+    .as_deref()
+    .and_then(parse_vml_numeric_pair)
+  {
+    let (origin_x, origin_y) = shape
+      .coordinate_origin
+      .as_deref()
+      .and_then(parse_vml_numeric_pair)
+      .unwrap_or((0.0, 0.0));
+    (origin_x, origin_y, width, height)
+  } else {
+    let bounds = common::drawingml_geometry::point_bounds(
+      points
+        .iter()
+        .map(|&(x, y)| kurbo::Point::new(f64::from(x), f64::from(y))),
+    )?;
+    (
+      bounds.x0 as f32,
+      bounds.y0 as f32,
+      bounds.width() as f32,
+      bounds.height() as f32,
+    )
+  };
+  Some(
+    points
+      .iter()
+      .map(|&(x, y)| {
+        let x = if width.abs() <= f32::EPSILON {
+          rect.width_pt * 0.5
+        } else {
+          (x - origin_x) * rect.width_pt / width
+        };
+        let y = if height.abs() <= f32::EPSILON {
+          rect.height_pt * 0.5
+        } else {
+          (y - origin_y) * rect.height_pt / height
+        };
+        (x, y)
+      })
+      .collect(),
+  )
+}
+
+fn parse_vml_numeric_pair(value: &str) -> Option<(f32, f32)> {
+  let mut values = value.split(',').map(str::trim);
+  Some((values.next()?.parse().ok()?, values.next()?.parse().ok()?))
+}
+
+fn vml_arc_geometry(
+  shape: &super::object_resources::VmlShapeModel,
+  rect: CellRect,
+) -> Option<crate::docx::InlineShapeGeometry> {
+  let start = shape
+    .start_angle
+    .as_deref()
+    .unwrap_or("0")
+    .parse::<f32>()
+    .ok()?;
+  let end = shape
+    .end_angle
+    .as_deref()
+    .unwrap_or("90")
+    .parse::<f32>()
+    .ok()?;
+  let mut sweep = end - start;
+  if sweep.abs() <= f32::EPSILON {
+    sweep = 360.0;
+  }
+  while sweep < 0.0 {
+    sweep += 360.0;
+  }
+  while sweep > 360.0 {
+    sweep -= 360.0;
+  }
+  let center = (rect.width_pt * 0.5, rect.height_pt * 0.5);
+  let radii = (rect.width_pt * 0.5, rect.height_pt * 0.5);
+  let segments = (sweep.abs() / 90.0).ceil().max(1.0) as usize;
+  let step = sweep.to_radians() / segments as f32;
+  let mut angle = start.to_radians();
+  let mut commands = vec![common::PathCommand::MoveTo(common_point(
+    center.0 + radii.0 * angle.cos(),
+    center.1 + radii.1 * angle.sin(),
+  ))];
+  for _ in 0..segments {
+    let next = angle + step;
+    let tangent = (4.0 / 3.0) * (step / 4.0).tan();
+    commands.push(common::PathCommand::CubicTo {
+      control1: common_point(
+        center.0 + radii.0 * (angle.cos() - tangent * angle.sin()),
+        center.1 + radii.1 * (angle.sin() + tangent * angle.cos()),
+      ),
+      control2: common_point(
+        center.0 + radii.0 * (next.cos() + tangent * next.sin()),
+        center.1 + radii.1 * (next.sin() - tangent * next.cos()),
+      ),
+      end: common_point(
+        center.0 + radii.0 * next.cos(),
+        center.1 + radii.1 * next.sin(),
+      ),
+    });
+    angle = next;
+  }
+  Some(crate::docx::InlineShapeGeometry::Path {
+    paths: vec![common::DrawingPath {
+      commands,
+      fill_mode: common::DrawingPathFillMode::None,
+      stroke: shape.stroked,
+      extrusion_allowed: true,
+    }],
+    outline: None,
+  })
+}
+
+fn vml_round_rectangle_geometry(
+  shape: &super::object_resources::VmlShapeModel,
+  rect: CellRect,
+) -> Option<crate::docx::InlineShapeGeometry> {
+  let value = shape.arc_size.as_deref()?.trim();
+  let fraction = if let Some(value) = value.strip_suffix('f') {
+    value.trim().parse::<f32>().ok()? / 65_536.0
+  } else if let Some(value) = value.strip_suffix('%') {
+    value.trim().parse::<f32>().ok()? / 100.0
+  } else {
+    value.parse::<f32>().ok()?
+  }
+  .clamp(0.0, 1.0);
+  let radius = rect.width_pt.min(rect.height_pt) * 0.5 * fraction;
+  let kappa = 0.552_284_8;
+  let width = rect.width_pt;
+  let height = rect.height_pt;
+  let commands = vec![
+    common::PathCommand::MoveTo(common_point(radius, 0.0)),
+    common::PathCommand::LineTo(common_point(width - radius, 0.0)),
+    common::PathCommand::CubicTo {
+      control1: common_point(width - radius + radius * kappa, 0.0),
+      control2: common_point(width, radius - radius * kappa),
+      end: common_point(width, radius),
+    },
+    common::PathCommand::LineTo(common_point(width, height - radius)),
+    common::PathCommand::CubicTo {
+      control1: common_point(width, height - radius + radius * kappa),
+      control2: common_point(width - radius + radius * kappa, height),
+      end: common_point(width - radius, height),
+    },
+    common::PathCommand::LineTo(common_point(radius, height)),
+    common::PathCommand::CubicTo {
+      control1: common_point(radius - radius * kappa, height),
+      control2: common_point(0.0, height - radius + radius * kappa),
+      end: common_point(0.0, height - radius),
+    },
+    common::PathCommand::LineTo(common_point(0.0, radius)),
+    common::PathCommand::CubicTo {
+      control1: common_point(0.0, radius - radius * kappa),
+      control2: common_point(radius - radius * kappa, 0.0),
+      end: common_point(radius, 0.0),
+    },
+    common::PathCommand::Close,
+  ];
+  Some(crate::docx::InlineShapeGeometry::Path {
+    paths: vec![common::DrawingPath {
+      commands,
+      fill_mode: common::DrawingPathFillMode::Normal,
+      stroke: shape.stroked,
+      extrusion_allowed: true,
+    }],
+    outline: None,
+  })
 }
 
 fn calc_axis_centering_offset(enabled: bool, available_pt: f32, content_pt: f32) -> f32 {
@@ -1713,29 +2676,23 @@ fn print_page_image_items(
       let hyperlink_url = drawing_object_hyperlink_url(drawing, &anchor.object);
       let clip_path = drawing_object_clip_path(rect, &anchor.object);
       let (image_data, image_content_type) =
-        xlsx_image_data_with_effects(import, resource, &anchor.object);
-      items.push(PageItem::Image(ImageItem {
-        x_pt: rect.x_pt,
-        y_pt: rect.y_pt,
-        width_pt: rect.width_pt,
-        height_pt: rect.height_pt,
-        crop: anchor.object.image_crop,
+        xlsx_image_data_with_effects(import, drawing, resource, &anchor.object);
+      items.extend(drawingml_image_fill_items(
+        &anchor.object,
+        rect,
         clip_path,
-        rotation_deg: anchor.object.rotation_deg,
-        flip_horizontal: anchor.object.flip_horizontal,
-        flip_vertical: anchor.object.flip_vertical,
-        data: image_data,
-        content_type: image_content_type,
-        metafile_monochrome_dib_palette_override: None,
-        alt_text: anchor
+        drawing_object_visual_rotation_degrees(&anchor.object),
+        anchor.object.flip_horizontal,
+        anchor.object.flip_vertical,
+        image_data,
+        image_content_type,
+        anchor
           .object
           .description
           .clone()
           .or_else(|| anchor.object.name.clone()),
-        hyperlink_url: hyperlink_url.as_deref().map(ToString::to_string),
-        floating: false,
-        behind_text: false,
-      }));
+        hyperlink_url.as_deref().map(ToString::to_string),
+      ));
       if anchor.object.image_effects.is_empty() {
         render_metafile_texts(
           &mut items,
@@ -1757,7 +2714,11 @@ fn print_page_image_items(
       if !vml_shape_intersects_page(page, shape) {
         continue;
       }
-      let Some(relationship_id) = shape.image_relationship_id.as_deref() else {
+      let Some(relationship_id) = shape
+        .image_relationship_id
+        .as_deref()
+        .or(shape.fill_image_relationship_id.as_deref())
+      else {
         continue;
       };
       let Some(resource) = drawing.image_resources.get(relationship_id) else {
@@ -1770,24 +2731,7 @@ fn print_page_image_items(
         continue;
       }
       let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
-      items.push(PageItem::Image(ImageItem {
-        x_pt: rect.x_pt,
-        y_pt: rect.y_pt,
-        width_pt: rect.width_pt,
-        height_pt: rect.height_pt,
-        crop: ImageCrop::default(),
-        clip_path: Vec::new(),
-        rotation_deg: 0.0,
-        flip_horizontal: false,
-        flip_vertical: false,
-        data: resource.data.clone(),
-        content_type: resource.content_type.clone(),
-        metafile_monochrome_dib_palette_override: None,
-        alt_text: None,
-        hyperlink_url: None,
-        floating: false,
-        behind_text: false,
-      }));
+      items.extend(vml_image_items(shape, resource, rect));
       render_metafile_texts(
         &mut items,
         resource,
@@ -1845,26 +2789,288 @@ fn push_group_image_items(
     let determinant = x_axis.x * y_axis.y - x_axis.y * y_axis.x;
     let rotation_deg = x_axis.y.atan2(x_axis.x).to_degrees() as f32;
     let hyperlink_url = drawing_object_hyperlink_url(drawing, child);
-    let (image_data, image_content_type) = xlsx_image_data_with_effects(import, resource, child);
-    items.push(PageItem::Image(ImageItem {
-      x_pt: center.x as f32 - width_pt / 2.0,
-      y_pt: center.y as f32 - height_pt / 2.0,
-      width_pt,
-      height_pt,
-      crop: child.image_crop,
-      clip_path: drawing_object_clip_path_with_transform(child_rect, child, transform),
+    let (image_data, image_content_type) =
+      xlsx_image_data_with_effects(import, drawing, resource, child);
+    items.extend(drawingml_image_fill_items(
+      child,
+      CellRect {
+        x_pt: center.x as f32 - width_pt / 2.0,
+        y_pt: center.y as f32 - height_pt / 2.0,
+        width_pt,
+        height_pt,
+      },
+      drawing_object_clip_path_with_transform(child_rect, child, transform),
       rotation_deg,
-      flip_horizontal: false,
-      flip_vertical: determinant < 0.0,
-      data: image_data,
-      content_type: image_content_type,
+      false,
+      determinant < 0.0,
+      image_data,
+      image_content_type,
+      child.description.clone().or_else(|| child.name.clone()),
+      hyperlink_url.as_deref().map(ToString::to_string),
+    ));
+  }
+}
+
+fn drawingml_image_fill_items(
+  object: &super::drawing::DrawingObjectModel,
+  rect: CellRect,
+  clip_path: Vec<common::PathCommand>,
+  authored_rotation_deg: f32,
+  authored_flip_horizontal: bool,
+  authored_flip_vertical: bool,
+  data: Arc<[u8]>,
+  content_type: Option<String>,
+  alt_text: Option<String>,
+  hyperlink_url: Option<String>,
+) -> Vec<PageItem> {
+  let rotation_deg = object
+    .image_rotate_with_shape
+    .then_some(authored_rotation_deg)
+    .unwrap_or_default();
+  let flip_horizontal = object.image_rotate_with_shape && authored_flip_horizontal;
+  let flip_vertical = object.image_rotate_with_shape && authored_flip_vertical;
+  let make_item = |placement: common::drawingml_image_tile::ImageTilePlacement| {
+    PageItem::Image(ImageItem {
+      x_pt: placement.x_pt,
+      y_pt: placement.y_pt,
+      width_pt: placement.width_pt,
+      height_pt: placement.height_pt,
+      crop: placement.crop,
+      clip_path: clip_path.clone(),
+      rotation_deg,
+      flip_horizontal: flip_horizontal ^ placement.flip_horizontal,
+      flip_vertical: flip_vertical ^ placement.flip_vertical,
+      data: Arc::clone(&data),
+      content_type: content_type.clone(),
       metafile_monochrome_dib_palette_override: None,
-      alt_text: child.description.clone().or_else(|| child.name.clone()),
-      hyperlink_url: hyperlink_url.as_deref().map(ToString::to_string),
+      alt_text: alt_text.clone(),
+      hyperlink_url: hyperlink_url.clone(),
       floating: false,
       behind_text: false,
-    }));
+    })
+  };
+  let Some(tile) = object.image_tile.as_deref() else {
+    return vec![make_item(
+      common::drawingml_image_tile::ImageTilePlacement {
+        x_pt: rect.x_pt,
+        y_pt: rect.y_pt,
+        width_pt: rect.width_pt,
+        height_pt: rect.height_pt,
+        crop: object.image_crop,
+        flip_horizontal: false,
+        flip_vertical: false,
+      },
+    )];
+  };
+  let natural_size = image::load_from_memory(&data)
+    .ok()
+    .map(|image| {
+      (
+        image.width() as f32 * units::POINTS_PER_CSS_PIXEL,
+        image.height() as f32 * units::POINTS_PER_CSS_PIXEL,
+      )
+    })
+    .unwrap_or((rect.width_pt, rect.height_pt));
+  common::drawingml_image_tile::placements(
+    (rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
+    natural_size,
+    tile,
+    object.image_crop,
+    1024,
+  )
+  .into_iter()
+  .map(|placement| {
+    common::drawingml_image_tile::rotate_placement_about_frame(
+      placement,
+      (rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
+      rotation_deg,
+    )
+  })
+  .map(make_item)
+  .collect()
+}
+
+fn vml_image_items(
+  shape: &super::object_resources::VmlShapeModel,
+  resource: &super::drawing::ImageResource,
+  rect: CellRect,
+) -> Vec<PageItem> {
+  let is_fill = shape.image_relationship_id.is_none() && shape.fill_image_relationship_id.is_some();
+  let recolored_pattern = is_fill
+    .then(|| recolor_vml_pattern_image(shape, &resource.data))
+    .flatten();
+  let image_data: Arc<[u8]> = recolored_pattern
+    .map(Arc::from)
+    .unwrap_or_else(|| resource.data.clone());
+  let content_type = if image_data.as_ref() == resource.data.as_ref() {
+    resource.content_type.clone()
+  } else {
+    Some("image/png".to_string())
+  };
+  let transform = vml_shape_path_transform(shape.style.as_deref(), rect);
+  let clip_path = is_fill
+    .then(|| {
+      vml_shape_drawing_paths(shape, rect.width_pt, rect.height_pt)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|path| path.fill_mode != common::DrawingPathFillMode::None)
+        .flat_map(|path| common::drawingml_geometry::transform_commands(path.commands, transform))
+        .collect::<Vec<_>>()
+    })
+    .unwrap_or_default();
+  let style_rotation = shape
+    .style
+    .as_deref()
+    .and_then(|style| vml_style_value(style, "rotation"))
+    .map(vml_rotation_degrees)
+    .unwrap_or(0.0);
+  let flip = shape
+    .style
+    .as_deref()
+    .and_then(|style| vml_style_value(style, "flip"))
+    .unwrap_or_default();
+  let flip_horizontal = flip
+    .split_whitespace()
+    .any(|value| value.eq_ignore_ascii_case("x"));
+  let flip_vertical = flip
+    .split_whitespace()
+    .any(|value| value.eq_ignore_ascii_case("y"));
+  let image_dimensions = image::load_from_memory(&image_data)
+    .ok()
+    .map(|image| image.dimensions());
+  let make_item = |bounds: CellRect, crop: ImageCrop| {
+    PageItem::Image(ImageItem {
+      x_pt: bounds.x_pt,
+      y_pt: bounds.y_pt,
+      width_pt: bounds.width_pt,
+      height_pt: bounds.height_pt,
+      crop,
+      clip_path: clip_path.clone(),
+      rotation_deg: is_fill
+        .then_some(shape.fill_rotate_with_shape == Some(true))
+        .filter(|value| *value)
+        .map_or(0.0, |_| style_rotation),
+      flip_horizontal: is_fill && shape.fill_rotate_with_shape == Some(true) && flip_horizontal,
+      flip_vertical: is_fill && shape.fill_rotate_with_shape == Some(true) && flip_vertical,
+      data: image_data.clone(),
+      content_type: content_type.clone(),
+      metafile_monochrome_dib_palette_override: None,
+      alt_text: None,
+      hyperlink_url: None,
+      floating: false,
+      behind_text: false,
+    })
+  };
+  if !is_fill {
+    return vec![make_item(rect, ImageCrop::default())];
   }
+  if matches!(
+    shape.fill_type,
+    Some(vml::FillTypeValues::Tile | vml::FillTypeValues::Pattern)
+  ) {
+    let (natural_width, natural_height) = image_dimensions
+      .map(|(width, height)| (width as f32 * 0.75, height as f32 * 0.75))
+      .unwrap_or((rect.width_pt, rect.height_pt));
+    let (tile_width, tile_height) = shape
+      .fill_image_size
+      .as_deref()
+      .and_then(|value| parse_vml_fill_image_size(value, rect))
+      .unwrap_or((natural_width, natural_height));
+    if tile_width <= f32::EPSILON || tile_height <= f32::EPSILON {
+      return Vec::new();
+    }
+    let (phase_x, phase_y) = vml_tile_phase(
+      shape.fill_image_origin.as_deref(),
+      shape.fill_image_position.as_deref(),
+      rect.width_pt,
+      rect.height_pt,
+      tile_width,
+      tile_height,
+    );
+    let start_x = rect.x_pt + phase_x.rem_euclid(tile_width) - tile_width;
+    let start_y = rect.y_pt + phase_y.rem_euclid(tile_height) - tile_height;
+    let columns = ((rect.x_pt + rect.width_pt - start_x) / tile_width)
+      .ceil()
+      .max(1.0) as usize;
+    let rows = ((rect.y_pt + rect.height_pt - start_y) / tile_height)
+      .ceil()
+      .max(1.0) as usize;
+    let mut output = Vec::with_capacity(columns.saturating_mul(rows).min(1024));
+    for row in 0..rows {
+      for column in 0..columns {
+        if output.len() == 1024 {
+          return output;
+        }
+        output.push(make_item(
+          CellRect {
+            x_pt: start_x + column as f32 * tile_width,
+            y_pt: start_y + row as f32 * tile_height,
+            width_pt: tile_width,
+            height_pt: tile_height,
+          },
+          ImageCrop::default(),
+        ));
+      }
+    }
+    return output;
+  }
+  let Some((pixel_width, pixel_height)) = image_dimensions else {
+    return vec![make_item(rect, ImageCrop::default())];
+  };
+  let image_aspect = pixel_width as f32 / pixel_height.max(1) as f32;
+  let frame_aspect = rect.width_pt / rect.height_pt.max(f32::EPSILON);
+  match shape.fill_image_aspect.unwrap_or_default() {
+    vml::ImageAspectValues::Ignore => vec![make_item(rect, ImageCrop::default())],
+    vml::ImageAspectValues::AtMost => {
+      let (width_pt, height_pt) = if image_aspect > frame_aspect {
+        (rect.width_pt, rect.width_pt / image_aspect)
+      } else {
+        (rect.height_pt * image_aspect, rect.height_pt)
+      };
+      vec![make_item(
+        CellRect {
+          x_pt: rect.x_pt + (rect.width_pt - width_pt) / 2.0,
+          y_pt: rect.y_pt + (rect.height_pt - height_pt) / 2.0,
+          width_pt,
+          height_pt,
+        },
+        ImageCrop::default(),
+      )]
+    }
+    vml::ImageAspectValues::AtLeast => {
+      let crop = if image_aspect > frame_aspect {
+        let visible = frame_aspect / image_aspect;
+        ImageCrop {
+          left: (1.0 - visible) / 2.0,
+          right: (1.0 - visible) / 2.0,
+          ..ImageCrop::default()
+        }
+      } else {
+        let visible = image_aspect / frame_aspect;
+        ImageCrop {
+          top: (1.0 - visible) / 2.0,
+          bottom: (1.0 - visible) / 2.0,
+          ..ImageCrop::default()
+        }
+      };
+      vec![make_item(rect, crop)]
+    }
+  }
+}
+
+fn parse_vml_fill_image_size(value: &str, rect: CellRect) -> Option<(f32, f32)> {
+  let mut values = value.split(',').map(str::trim);
+  let parse = |value: &str, reference: f32| {
+    value
+      .strip_suffix('%')
+      .and_then(|value| value.trim().parse::<f32>().ok())
+      .map(|value| reference * value / 100.0)
+      .or_else(|| parse_vml_length_pt(value))
+  };
+  Some((
+    parse(values.next()?, rect.width_pt)?,
+    parse(values.next()?, rect.height_pt)?,
+  ))
 }
 
 fn print_page_shape_items(
@@ -1876,12 +3082,12 @@ fn print_page_shape_items(
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
   let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
-  for anchor in page
+  for (drawing, anchor) in page
     .sheet
     .resources
     .drawings
     .iter()
-    .flat_map(|drawing| drawing.anchors.iter())
+    .flat_map(|drawing| drawing.anchors.iter().map(move |anchor| (drawing, anchor)))
   {
     if anchor.object.hidden || !anchor.print_with_sheet {
       continue;
@@ -1905,9 +3111,18 @@ fn print_page_shape_items(
     }
     let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
     if anchor.object.kind == super::drawing::DrawingObjectKind::GroupShape {
-      push_group_shape_items(import, &mut items, &anchor.object, rect, Affine::IDENTITY);
+      push_group_shape_items(
+        import,
+        drawing,
+        &mut items,
+        &anchor.object,
+        rect,
+        Affine::IDENTITY,
+        None,
+      );
       continue;
     }
+    let item_start = items.len();
     let shape_transform = drawing_object_path_transform(rect, &anchor.object);
     let transformed_bounds = common::drawingml_geometry::transform_rect_bounds(
       KurboRect::new(
@@ -1950,7 +3165,7 @@ fn print_page_shape_items(
       let Some(paths) = paths else {
         continue;
       };
-      let stroke = shape_stroke(&anchor.object);
+      let stroke = shape_stroke(import, &anchor.object);
       for mut path in paths {
         path.commands = common::drawingml_geometry::transform_commands(
           std::mem::take(&mut path.commands),
@@ -1973,29 +3188,40 @@ fn print_page_shape_items(
           )),
           stroke: if path.stroke {
             stroke.map(|stroke| {
-              let mut stroke = common_stroke_from_border(stroke, 1.0);
-              stroke.pattern = anchor.object.line_pattern;
-              if let Some(outline) = outline {
-                common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
-              }
-              stroke
+              drawing_object_common_stroke(
+                import,
+                &anchor.object,
+                stroke,
+                rect,
+                shape_transform,
+                outline,
+              )
             })
           } else {
             None
           },
         }));
       }
+      finish_xlsx_shape_effects(
+        import,
+        drawing,
+        &mut items,
+        item_start,
+        &anchor.object,
+        path_bounds,
+        affine_rotation_degrees(shape_transform),
+        false,
+      );
       continue;
     }
     if anchor.object.fill_pattern.is_some()
       || anchor.object.fill_gradient.is_some()
       || anchor.object.line_pattern.is_some()
+      || anchor.object.line_gradient.is_some()
       || drawing_object_has_path_transform(&anchor.object)
     {
-      let stroke = shape_stroke(&anchor.object).map(|stroke| {
-        let mut stroke = common_stroke_from_border(stroke, 1.0);
-        stroke.pattern = anchor.object.line_pattern;
-        stroke
+      let stroke = shape_stroke(import, &anchor.object).map(|stroke| {
+        drawing_object_common_stroke(import, &anchor.object, stroke, rect, shape_transform, None)
       });
       let commands = common::drawingml_geometry::transform_commands(
         vec![
@@ -2024,34 +3250,95 @@ fn print_page_shape_items(
         y_pt: rect.y_pt,
         width_pt: rect.width_pt,
         height_pt: rect.height_pt,
-        fill_color: anchor.object.fill_color,
+        fill_color: drawing_object_solid_fill_color(import, &anchor.object),
         fill_opacity: 1.0,
-        stroke: shape_stroke(&anchor.object),
+        stroke: shape_stroke(import, &anchor.object),
         stroke_opacity: 1.0,
       }));
     }
+    finish_xlsx_shape_effects(
+      import,
+      drawing,
+      &mut items,
+      item_start,
+      &anchor.object,
+      path_bounds,
+      affine_rotation_degrees(shape_transform),
+      false,
+    );
   }
   items
 }
 
 fn push_group_shape_items(
   import: &ExcelImport,
+  drawing: &super::drawing::DrawingResourceCatalog,
   items: &mut Vec<PageItem>,
   group: &super::drawing::DrawingObjectModel,
   rect: CellRect,
   parent_transform: Affine,
+  inherited_group_fill: Option<&common::Fill<'static>>,
 ) {
+  let item_start = items.len();
   let group_transform = parent_transform * drawing_object_path_transform(rect, group);
+  let authored_group_fill = drawing_object_common_fill(import, group, rect, group_transform);
+  let group_fill = if group.use_group_fill {
+    inherited_group_fill.cloned()
+  } else if matches!(authored_group_fill, common::Fill::None) {
+    None
+  } else {
+    Some(authored_group_fill)
+  };
   for (child, child_rect) in drawing_group_child_rects(group, rect) {
     if child.kind == super::drawing::DrawingObjectKind::GroupShape {
-      push_group_shape_items(import, items, child, child_rect, group_transform);
+      push_group_shape_items(
+        import,
+        drawing,
+        items,
+        child,
+        child_rect,
+        group_transform,
+        group_fill.as_ref(),
+      );
     } else if matches!(
       child.kind,
       super::drawing::DrawingObjectKind::Shape | super::drawing::DrawingObjectKind::ConnectionShape
     ) {
-      push_drawing_object_shape(import, items, child, child_rect, group_transform);
+      push_drawing_object_shape(
+        import,
+        drawing,
+        items,
+        child,
+        child_rect,
+        group_transform,
+        group_fill.as_ref(),
+      );
     }
   }
+  let bounds = common::drawingml_geometry::transform_rect_bounds(
+    KurboRect::new(
+      f64::from(rect.x_pt),
+      f64::from(rect.y_pt),
+      f64::from(rect.x_pt + rect.width_pt),
+      f64::from(rect.y_pt + rect.height_pt),
+    ),
+    group_transform,
+  );
+  finish_xlsx_shape_effects(
+    import,
+    drawing,
+    items,
+    item_start,
+    group,
+    common_rect(
+      bounds.x0 as f32,
+      bounds.y0 as f32,
+      bounds.width() as f32,
+      bounds.height() as f32,
+    ),
+    affine_rotation_degrees(group_transform),
+    true,
+  );
 }
 
 fn drawing_group_child_rects(
@@ -2095,11 +3382,14 @@ fn drawing_group_child_rects(
 
 fn push_drawing_object_shape(
   import: &ExcelImport,
+  drawing: &super::drawing::DrawingResourceCatalog,
   items: &mut Vec<PageItem>,
   object: &super::drawing::DrawingObjectModel,
   rect: CellRect,
   parent_transform: Affine,
+  group_fill: Option<&common::Fill<'static>>,
 ) {
+  let item_start = items.len();
   let transform = parent_transform * drawing_object_path_transform(rect, object);
   let bounds = common::drawingml_geometry::transform_rect_bounds(
     KurboRect::new(
@@ -2146,7 +3436,7 @@ fn push_drawing_object_shape(
       super::drawing::DrawingGeometryModel::Custom { outline, .. }
       | super::drawing::DrawingGeometryModel::Preset { outline, .. } => outline.as_deref(),
     });
-  let stroke = shape_stroke(object);
+  let stroke = shape_stroke(import, object);
   if let Some(paths) = paths {
     for mut path in paths {
       path.commands = common::drawingml_geometry::transform_commands(path.commands, transform);
@@ -2161,21 +3451,28 @@ fn push_drawing_object_shape(
         closed,
         fill: path
           .fill_mode
-          .apply_to_fill(drawing_object_common_fill(import, object, rect, transform)),
+          .apply_to_fill(drawing_object_effective_common_fill(
+            import, object, rect, transform, group_fill,
+          )),
         stroke: if path.stroke {
           stroke.map(|stroke| {
-            let mut stroke = common_stroke_from_border(stroke, 1.0);
-            stroke.pattern = object.line_pattern;
-            if let Some(outline) = outline {
-              common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
-            }
-            stroke
+            drawing_object_common_stroke(import, object, stroke, rect, transform, outline)
           })
         } else {
           None
         },
       }));
     }
+    finish_xlsx_shape_effects(
+      import,
+      drawing,
+      items,
+      item_start,
+      object,
+      path_bounds,
+      affine_rotation_degrees(transform),
+      false,
+    );
     return;
   }
   let commands = common::drawingml_geometry::transform_commands(
@@ -2196,13 +3493,214 @@ fn push_drawing_object_shape(
     points: Vec::new(),
     commands,
     closed: true,
-    fill: drawing_object_common_fill(import, object, rect, transform),
-    stroke: stroke.map(|stroke| common_stroke_from_border(stroke, 1.0)),
+    fill: drawing_object_effective_common_fill(import, object, rect, transform, group_fill),
+    stroke: stroke
+      .map(|stroke| drawing_object_common_stroke(import, object, stroke, rect, transform, outline)),
+  }));
+  finish_xlsx_shape_effects(
+    import,
+    drawing,
+    items,
+    item_start,
+    object,
+    path_bounds,
+    affine_rotation_degrees(transform),
+    false,
+  );
+}
+
+fn affine_rotation_degrees(transform: Affine) -> f32 {
+  let [m11, m12, _, _, _, _] = transform.as_coeffs();
+  m12.atan2(m11).to_degrees() as f32
+}
+
+fn finish_xlsx_shape_effects(
+  import: &ExcelImport,
+  drawing: &super::drawing::DrawingResourceCatalog,
+  items: &mut Vec<PageItem>,
+  content_start: usize,
+  object: &super::drawing::DrawingObjectModel,
+  content_bounds: common::Rect,
+  rotation_degrees: f32,
+  children_source: bool,
+) {
+  if object.shape_effects.is_none() && (object.scene3d.is_none() || object.shape3d.is_none()) {
+    return;
+  }
+  let resolver = XlsxImageEffectColorResolver {
+    import,
+    image_resources: &drawing.image_resources,
+  };
+  let mut effects = match object.shape_effects.as_ref() {
+    Some(common::DrawingEffectSource::List { source, .. }) => {
+      common::drawingml_image_effects::from_effect_list(source, None, &resolver)
+    }
+    Some(common::DrawingEffectSource::Dag { source, .. }) => {
+      common::drawingml_image_effects::from_effect_dag(source, None, &resolver)
+    }
+    None => common::drawingml_image_effects::ImageEffectContainer {
+      kind: common::drawingml_image_effects::ImageEffectContainerKind::Sibling,
+      effects: Vec::new(),
+    },
+  };
+  if object.scene3d.is_some() || object.shape3d.is_some() {
+    common::drawingml_image_effects::suppress_soft_edge(&mut effects);
+  }
+  if effects.effects.is_empty() && (object.scene3d.is_none() || object.shape3d.is_none()) {
+    return;
+  }
+  common::drawingml_image_effects::rotate_container_with_shape(&mut effects, rotation_degrees);
+  let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds(
+    &effects,
+    content_bounds.size.width.0,
+    content_bounds.size.height.0,
+  ) else {
+    return;
+  };
+  let static_padding = object
+    .scene3d
+    .as_deref()
+    .zip(object.shape3d.as_deref())
+    .map(|(scene, shape)| {
+      common::drawingml_3d::output_padding(
+        common::drawingml_3d::camera_projection(scene, object.rotation_deg),
+        shape,
+        content_bounds.size.width.0,
+        content_bounds.size.height.0,
+      )
+    })
+    .unwrap_or_default();
+  let relative_left = output_bounds.left_pt.min(0.0) - static_padding.left_pt;
+  let relative_top = output_bounds.top_pt.min(0.0) - static_padding.top_pt;
+  let relative_right =
+    output_bounds.right_pt.max(content_bounds.size.width.0) + static_padding.right_pt;
+  let relative_bottom =
+    output_bounds.bottom_pt.max(content_bounds.size.height.0) + static_padding.bottom_pt;
+  let raster_bounds = common::Rect {
+    origin: common::Point {
+      x: common::Pt(content_bounds.origin.x.0 + relative_left),
+      y: common::Pt(content_bounds.origin.y.0 + relative_top),
+    },
+    size: common::Size {
+      width: common::Pt(relative_right - relative_left),
+      height: common::Pt(relative_bottom - relative_top),
+    },
+  };
+  let display_items = items[content_start..]
+    .iter()
+    .cloned()
+    .map(common_display_item)
+    .collect::<Vec<_>>();
+  let raster = if children_source {
+    common::drawingml_shape_raster::rasterize_group_items_for_effects(
+      &display_items,
+      raster_bounds,
+      &effects,
+    )
+  } else {
+    common::drawingml_shape_raster::rasterize_vector_items_for_effects(
+      &display_items,
+      raster_bounds,
+      &effects,
+    )
+  };
+  let automatic_extrusion_color =
+    common::drawingml_3d::automatic_extrusion_color_from_items(&display_items);
+  let Some(mut raster) = raster else {
+    return;
+  };
+  if let Some((scene, shape)) = object.scene3d.as_deref().zip(object.shape3d.as_deref()) {
+    let extrusion_color = shape
+      .extrusion_color
+      .as_deref()
+      .and_then(|color| color.extrusion_color_choice.as_ref())
+      .and_then(Color::from_extrusion_color_choice)
+      .and_then(|color| resolver.resolve(Some(color)))
+      .map(|color| common::drawingml_3d::Static3dColor {
+        color: color.color,
+        alpha: color.alpha,
+      });
+    let contour_color = shape
+      .contour_color
+      .as_deref()
+      .and_then(|color| color.contour_color_choice.as_ref())
+      .and_then(Color::from_contour_color_choice)
+      .and_then(|color| resolver.resolve(Some(color)))
+      .map(|color| common::drawingml_3d::Static3dColor {
+        color: color.color,
+        alpha: color.alpha,
+      });
+    common::drawingml_3d::apply_static_3d(
+      &mut raster.image,
+      scene,
+      common::drawingml_3d::camera_projection(scene, object.rotation_deg),
+      shape,
+      extrusion_color.or(automatic_extrusion_color),
+      contour_color,
+      raster.pixels_per_point,
+      Some(common::drawingml_3d::Static3dSurface {
+        left_px: (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
+        top_px: (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
+        width_px: content_bounds.size.width.0 * raster.pixels_per_point,
+        height_px: content_bounds.size.height.0 * raster.pixels_per_point,
+      }),
+    );
+  }
+  common::drawingml_image_effects::scale_container_pixel_lengths(
+    &mut effects,
+    raster.pixels_per_point / (96.0 / 72.0),
+  );
+  common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
+    &mut raster.image,
+    &effects,
+    -relative_left * raster.pixels_per_point,
+    -relative_top * raster.pixels_per_point,
+    content_bounds.size.width.0 * raster.pixels_per_point,
+    content_bounds.size.height.0 * raster.pixels_per_point,
+    common::drawingml_image_effects::ImageEffectSourceImages {
+      fill: raster.fill_image.as_ref(),
+      line: raster.line_image.as_ref(),
+      fill_line: raster.fill_line_image.as_ref(),
+      children: raster.children_image.as_ref(),
+    },
+  );
+  let mut png = Cursor::new(Vec::new());
+  if PngEncoder::new(&mut png)
+    .write_image(
+      raster.image.as_raw(),
+      raster.image.width(),
+      raster.image.height(),
+      ColorType::Rgba8.into(),
+    )
+    .is_err()
+  {
+    return;
+  }
+  items.truncate(content_start);
+  items.push(PageItem::Image(ImageItem {
+    x_pt: raster_bounds.origin.x.0,
+    y_pt: raster_bounds.origin.y.0,
+    width_pt: raster_bounds.size.width.0,
+    height_pt: raster_bounds.size.height.0,
+    crop: ImageCrop::default(),
+    clip_path: Vec::new(),
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
+    data: Arc::from(png.into_inner()),
+    content_type: Some("image/png".to_string()),
+    metafile_monochrome_dib_palette_override: None,
+    alt_text: object.description.clone().or_else(|| object.name.clone()),
+    hyperlink_url: None,
+    floating: false,
+    behind_text: false,
   }));
 }
 
 fn drawing_object_has_path_transform(object: &super::drawing::DrawingObjectModel) -> bool {
-  object.rotation_deg.abs() > f32::EPSILON || object.flip_horizontal || object.flip_vertical
+  drawing_object_visual_rotation_degrees(object).abs() > f32::EPSILON
+    || object.flip_horizontal
+    || object.flip_vertical
 }
 
 fn drawing_object_clip_path(
@@ -2259,8 +3757,17 @@ fn drawing_object_path_transform(
       if object.flip_horizontal { -1.0 } else { 1.0 },
       if object.flip_vertical { -1.0 } else { 1.0 },
     )
-    .then_rotate(f64::from(object.rotation_deg.to_radians()))
+    .then_rotate(f64::from(
+      drawing_object_visual_rotation_degrees(object).to_radians(),
+    ))
     .then_translate((f64::from(center_x), f64::from(center_y)).into())
+}
+
+fn drawing_object_visual_rotation_degrees(object: &super::drawing::DrawingObjectModel) -> f32 {
+  object
+    .scene3d
+    .as_deref()
+    .map_or(object.rotation_deg, |_| 0.0)
 }
 
 fn print_page_diagram_items(
@@ -2653,8 +4160,32 @@ fn collect_persisted_group_bounds(
 
 fn push_diagram_shape_items(items: &mut Vec<PageItem>, shape: &shared_diagram::DiagramShape) {
   if shape.draw_geometry {
-    if shape.is_connector {
-      items.push(PageItem::Line(diagram_connector_line_item(shape)));
+    if shape.is_connector
+      && shape.connector_dimension == dgm::ConnectorDimensionValues::OneDimension
+    {
+      let mut stroke = common_stroke_from_border(
+        BorderStyle {
+          color: shape.line_fill.unwrap_or_default(),
+          ..BorderStyle::default()
+        },
+        1.0,
+      );
+      if let Some(outline) = shape
+        .shape_properties
+        .as_deref()
+        .and_then(|properties| properties.outline.as_deref())
+      {
+        common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+      }
+      shape.apply_connector_ends(&mut stroke);
+      items.push(PageItem::Path(common::PathItem {
+        bounds: common_rect(shape.x, shape.y, shape.width, shape.height),
+        points: Vec::new(),
+        commands: shape.connector_commands(),
+        closed: false,
+        fill: common::Fill::None,
+        stroke: Some(stroke),
+      }));
     } else if let Some(paths) = shape.drawing_paths() {
       for path in paths {
         let closed = path
@@ -2721,24 +4252,6 @@ fn push_diagram_shape_items(items: &mut Vec<PageItem>, shape: &shared_diagram::D
         .and_then(|properties| properties.preset_text_warp.as_deref()),
       None,
     );
-  }
-}
-
-fn diagram_connector_line_item(shape: &shared_diagram::DiagramShape) -> LineItem {
-  let center_x = shape.x + shape.width / 2.0;
-  let center_y = shape.y + shape.height / 2.0;
-  let length = shape.width.max(shape.height).max(1.0);
-  let radians = shape.connector_angle_deg.to_radians();
-  let dx = radians.cos() * length / 2.0;
-  let dy = radians.sin() * length / 2.0;
-  LineItem {
-    x1_pt: center_x - dx,
-    y1_pt: center_y - dy,
-    x2_pt: center_x + dx,
-    y2_pt: center_y + dy,
-    width_pt: 1.0,
-    color: RgbColor { r: 0, g: 0, b: 0 },
-    kind: LineItemKind::Stroke,
   }
 }
 
@@ -2907,8 +4420,23 @@ fn transform_group_text_items(items: &mut [PageItem], transform: Affine, rect: C
       continue;
     };
     let mut options = options.clone();
+    let paint_bounds = common::drawingml_geometry::transform_rect_bounds(
+      kurbo::Rect::new(
+        f64::from(warp.paint_bounds.origin.x.0),
+        f64::from(warp.paint_bounds.origin.y.0),
+        f64::from(warp.paint_bounds.origin.x.0 + warp.paint_bounds.size.width.0),
+        f64::from(warp.paint_bounds.origin.y.0 + warp.paint_bounds.size.height.0),
+      ),
+      transform,
+    );
     options.text_warp = Some(Arc::new(common::TextWarp {
       source_bounds: warp.source_bounds,
+      paint_bounds: common_rect(
+        paint_bounds.x0 as f32,
+        paint_bounds.y0 as f32,
+        paint_bounds.width() as f32,
+        paint_bounds.height() as f32,
+      ),
       boundaries: warp
         .boundaries
         .iter()
@@ -4192,10 +5720,24 @@ fn render_drawing_text(
   } else {
     vertical_rotation_deg + layout.text_rotation_deg + layout.shape_rotation_deg
   };
+  if layout.shape_rotation_deg.rem_euclid(360.0).abs() > f32::EPSILON {
+    // Excel's fixed-format writer paints text in rotated worksheet shapes as
+    // vector glyph outlines (the Office reference PDF contains no font or
+    // extractable text for these runs). Keep bodyPr-only rotation independent:
+    // this rule belongs to the owning worksheet shape transform.
+    style.pdf_glyph_outlines = true;
+    let mut options = style
+      .pdf_glyph_outline_options
+      .as_deref()
+      .cloned()
+      .unwrap_or_default();
+    options.semantic_text_overlay = false;
+    style.pdf_glyph_outline_options = Some(Arc::new(options));
+  }
+  let vertical_text = vertical_rotation_deg != 0.0;
   let line_height = (style.font_size_pt * 1.15).max(1.0);
   let mut text_metrics = TextMetrics::new();
   for (index, line) in text.lines().filter(|line| !line.is_empty()).enumerate() {
-    let vertical_text = style.rotation_deg != 0.0;
     let y = if vertical_text {
       rect.y_pt + (rect.height_pt - line_height) / 2.0
     } else {
@@ -4230,7 +5772,7 @@ fn render_drawing_text(
       line_height_pt: line_height,
       text: line.to_string(),
       style: style.clone(),
-      rotation_center_pt: vertical_text.then_some((
+      rotation_center_pt: (style.rotation_deg != 0.0).then_some((
         rect.x_pt + rect.width_pt / 2.0,
         rect.y_pt + rect.height_pt / 2.0,
       )),
@@ -4257,6 +5799,7 @@ fn apply_drawing_text_warp(
   common::drawingml_text_warp::apply_to_text_items(
     items,
     preset,
+    common_rect(rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
     common_rect(rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
     text_metrics,
     None,
@@ -4297,7 +5840,7 @@ fn drawing_object_text_layout(object: &super::drawing::DrawingObjectModel) -> Dr
     alignment: object.text_alignment.unwrap_or_default(),
     vertical: object.text_vertical,
     text_rotation_deg: object.text_rotation_deg,
-    shape_rotation_deg: object.rotation_deg,
+    shape_rotation_deg: drawing_object_visual_rotation_degrees(object),
     upright: object.text_upright,
     left_inset_pt: object
       .text_left_inset_emu
@@ -4322,7 +5865,11 @@ fn drawing_object_text_style(
   if let Some(font_size) = object.text_font_size_points100 {
     style.font_size_pt = font_size as f32 / 100.0;
   }
-  if let Some(color) = object.text_color {
+  if let Some(color) = object
+    .text_color
+    .clone()
+    .and_then(|color| xlsx_drawing_rgb_color(color, import))
+  {
     style.color = color;
   }
   if let Some(bold) = object.text_bold {
@@ -4531,8 +6078,9 @@ fn vml_screen_pixel_to_pt(value: i32) -> f32 {
 }
 
 fn vml_style_rect(style: &str) -> Option<(f32, f32, f32, f32)> {
-  let x = vml_style_length_pt(style, "margin-left")?;
-  let y = vml_style_length_pt(style, "margin-top")?;
+  let x =
+    vml_style_length_pt(style, "margin-left").or_else(|| vml_style_length_pt(style, "left"))?;
+  let y = vml_style_length_pt(style, "margin-top").or_else(|| vml_style_length_pt(style, "top"))?;
   let width = vml_style_length_pt(style, "width")?;
   let height = vml_style_length_pt(style, "height")?;
   Some((x, y, width, height))
@@ -4562,20 +6110,41 @@ fn parse_vml_length_pt(value: &str) -> Option<f32> {
   if let Some(value) = value.strip_suffix("px") {
     return value.trim().parse::<f32>().ok().map(|value| value * 0.75);
   }
+  if let Some(value) = value.strip_suffix("cm") {
+    return value
+      .trim()
+      .parse::<f32>()
+      .ok()
+      .map(|value| value * units::POINTS_PER_INCH / units::CENTIMETERS_PER_INCH);
+  }
+  if let Some(value) = value.strip_suffix("mm") {
+    return value
+      .trim()
+      .parse::<f32>()
+      .ok()
+      .map(|value| value * units::POINTS_PER_INCH / units::MILLIMETERS_PER_INCH);
+  }
   value.parse::<f32>().ok()
 }
 
-fn shape_stroke(object: &super::drawing::DrawingObjectModel) -> Option<BorderStyle> {
+fn shape_stroke(
+  import: &ExcelImport,
+  object: &super::drawing::DrawingObjectModel,
+) -> Option<BorderStyle> {
   if object.no_line {
     return None;
   }
-  let color = object.line_color.or_else(|| {
-    object.line_pattern.map(|pattern| RgbColor {
-      r: pattern.foreground.r,
-      g: pattern.foreground.g,
-      b: pattern.foreground.b,
-    })
-  })?;
+  let color = object
+    .line_color
+    .clone()
+    .and_then(|color| xlsx_drawing_rgb_color(color, import))
+    .or_else(|| {
+      object.line_pattern.map(|pattern| RgbColor {
+        r: pattern.foreground.r,
+        g: pattern.foreground.g,
+        b: pattern.foreground.b,
+      })
+    })?;
   Some(BorderStyle {
     width_pt: object
       .line_width_emu
@@ -4588,6 +6157,7 @@ fn shape_stroke(object: &super::drawing::DrawingObjectModel) -> Option<BorderSty
 
 fn xlsx_image_data_with_effects(
   import: &ExcelImport,
+  drawing: &super::drawing::DrawingResourceCatalog,
   resource: &super::drawing::ImageResource,
   object: &super::drawing::DrawingObjectModel,
 ) -> (Arc<[u8]>, Option<String>) {
@@ -4595,6 +6165,7 @@ fn xlsx_image_data_with_effects(
     import,
     &object.image_effects,
     resource.content_type.as_deref(),
+    &drawing.image_resources,
   );
   if effects.is_empty() {
     return (resource.data.clone(), resource.content_type.clone());
@@ -4608,167 +6179,111 @@ fn xlsx_image_data_with_effects(
   .unwrap_or_else(|| (resource.data.clone(), resource.content_type.clone()))
 }
 
+struct XlsxImageEffectColorResolver<'a> {
+  import: &'a ExcelImport,
+  image_resources: &'a HashMap<String, super::drawing::ImageResource>,
+}
+
+impl XlsxImageEffectColorResolver<'_> {
+  fn resolve(&self, color: Option<Color>) -> Option<ResolvedEffectColor> {
+    let color = xlsx_drawing_color(color?, self.import)?;
+    Some(ResolvedEffectColor {
+      color: RgbColor {
+        r: color.r,
+        g: color.g,
+        b: color.b,
+      },
+      alpha: color.a,
+    })
+  }
+}
+
+impl ImageEffectColorResolver for XlsxImageEffectColorResolver<'_> {
+  fn alpha_inverse(&self, choice: &a::AlphaInverseChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_alpha_inverse_choice(choice))
+  }
+
+  fn color_from(&self, choice: &a::ColorFromChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_color_from_choice(choice))
+  }
+
+  fn color_to(&self, choice: &a::ColorToChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_color_to_choice(choice))
+  }
+
+  fn color_replacement(&self, choice: &a::ColorReplacementChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_color_replacement_choice(choice))
+  }
+
+  fn duotone(&self, choice: &a::DuotoneChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_duotone_choice(choice))
+  }
+
+  fn solid_fill(&self, choice: &a::SolidFillChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_solid_fill_choice(choice))
+  }
+
+  fn gradient_stop(&self, choice: &a::GradientStopChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_gradient_stop_choice(choice))
+  }
+
+  fn foreground(&self, choice: &a::ForegroundColorChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_foreground_color_choice(choice))
+  }
+
+  fn background(&self, choice: &a::BackgroundColorChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_background_color_choice(choice))
+  }
+
+  fn glow(&self, choice: &a::GlowChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_glow_choice(choice))
+  }
+
+  fn inner_shadow(&self, choice: &a::InnerShadowChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_inner_shadow_choice(choice))
+  }
+
+  fn outer_shadow(&self, choice: &a::OuterShadowChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_outer_shadow_choice(choice))
+  }
+
+  fn preset_shadow(&self, choice: &a::PresetShadowChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_preset_shadow_choice(choice))
+  }
+
+  fn blip_fill(
+    &self,
+    fill: &a::BlipFill,
+  ) -> Option<common::drawingml_image_effects::ImageEffectFill> {
+    let blip = fill.blip.as_ref()?;
+    let resource = self.image_resources.get(blip.embed.as_deref()?)?;
+    let effects = common::drawingml_image_effects::from_blip_choices(
+      &blip.blip_choice,
+      resource.content_type.as_deref(),
+      self,
+    );
+    common::drawingml_image_effects::raster_fill_image(
+      &resource.data,
+      resource.content_type.as_deref(),
+      &effects,
+    )
+  }
+}
+
 fn xlsx_image_effects(
   import: &ExcelImport,
   choices: &[a::BlipChoice],
   content_type: Option<&str>,
+  image_resources: &HashMap<String, super::drawing::ImageResource>,
 ) -> Vec<ImageEffect> {
-  let mut effects = Vec::new();
-  for choice in choices {
-    match choice {
-      a::BlipChoice::AlphaBiLevel(effect) => effects.push(ImageEffect::AlphaBiLevel(
-        (effect.threshold.as_ratio() * 255.0)
-          .round()
-          .clamp(0.0, 255.0) as u8,
-      )),
-      a::BlipChoice::AlphaCeiling => effects.push(ImageEffect::AlphaCeiling),
-      a::BlipChoice::AlphaFloor => effects.push(ImageEffect::AlphaFloor),
-      a::BlipChoice::AlphaInverse(effect) => {
-        let color = effect
-          .alpha_inverse_choice
-          .as_ref()
-          .and_then(Color::from_alpha_inverse_choice)
-          .and_then(|color| xlsx_drawing_color(color, import))
-          .map(|color| RgbColor {
-            r: color.r,
-            g: color.g,
-            b: color.b,
-          });
-        effects.push(ImageEffect::AlphaInverse(color));
-      }
-      a::BlipChoice::AlphaModulationFixed(effect) => {
-        effects.push(ImageEffect::AlphaModulateFixed(
-          effect
-            .amount
-            .as_ref()
-            .map(|amount| common::drawingml_image_effects::office_alpha_modulate_amount(*amount))
-            .unwrap_or(1.0),
-        ));
-      }
-      a::BlipChoice::AlphaReplace(effect) => effects.push(ImageEffect::AlphaReplace(
-        (effect.alpha.as_ratio() * 255.0).round().clamp(0.0, 255.0) as u8,
-      )),
-      a::BlipChoice::ColorChange(change) => {
-        let from = change
-          .color_from
-          .color_from_choice
-          .as_ref()
-          .and_then(Color::from_color_from_choice)
-          .and_then(|color| xlsx_drawing_color(color, import));
-        let to = change
-          .color_to
-          .color_to_choice
-          .as_ref()
-          .and_then(Color::from_color_to_choice)
-          .and_then(|color| xlsx_drawing_color(color, import));
-        let (Some(from), Some(to)) = (from, to) else {
-          continue;
-        };
-        let use_alpha = change
-          .use_alpha
-          .as_ref()
-          .is_none_or(|value| value.as_bool());
-        if from.r != to.r || from.g != to.g || from.b != to.b || (use_alpha && from.a != to.a) {
-          effects.push(ImageEffect::ColorChange(ColorChangeEffect {
-            from: RgbColor {
-              r: from.r,
-              g: from.g,
-              b: from.b,
-            },
-            to: RgbColor {
-              r: to.r,
-              g: to.g,
-              b: to.b,
-            },
-            from_alpha: from.a,
-            to_alpha: to.a,
-            use_alpha,
-            tolerance: common::drawingml_image_effects::color_change_tolerance(content_type),
-          }));
-        }
-      }
-      a::BlipChoice::ColorReplacement(replacement) => {
-        if let Some(color) = replacement
-          .color_replacement_choice
-          .as_ref()
-          .and_then(Color::from_color_replacement_choice)
-          .and_then(|color| xlsx_drawing_color(color, import))
-        {
-          effects.push(ImageEffect::ColorReplacement(RgbColor {
-            r: color.r,
-            g: color.g,
-            b: color.b,
-          }));
-        }
-      }
-      a::BlipChoice::Duotone(duotone) => {
-        let colors = duotone
-          .duotone_choice
-          .iter()
-          .filter_map(Color::from_duotone_choice)
-          .filter_map(|color| xlsx_drawing_color(color, import))
-          .map(|color| RgbColor {
-            r: color.r,
-            g: color.g,
-            b: color.b,
-          })
-          .collect::<Vec<_>>();
-        if let [first, second] = colors.as_slice() {
-          effects.push(ImageEffect::Duotone(*first, *second));
-        }
-      }
-      a::BlipChoice::Grayscale => effects.push(ImageEffect::Grayscale),
-      a::BlipChoice::Hsl(effect) => effects.push(ImageEffect::Hsl {
-        hue_degrees: effect.hue.unwrap_or_default() as f32 / 60_000.0,
-        saturation_offset: effect
-          .saturation
-          .map(|value| value.as_ratio() as f32)
-          .unwrap_or_default(),
-        luminance_offset: effect
-          .luminance
-          .map(|value| value.as_ratio() as f32)
-          .unwrap_or_default(),
-      }),
-      a::BlipChoice::LuminanceEffect(effect) => {
-        let brightness = effect
-          .brightness
-          .as_ref()
-          .map(|value| (value.as_ratio() * 100.0).round() as i32);
-        let contrast = effect
-          .contrast
-          .as_ref()
-          .map(|value| (value.as_ratio() * 100.0).round() as i32);
-        let watermark = brightness == Some(70) && contrast == Some(-70);
-        effects.push(ImageEffect::Luminance {
-          watermark,
-          brightness: (!watermark).then_some(brightness).flatten(),
-          contrast: (!watermark).then_some(contrast).flatten(),
-        });
-      }
-      a::BlipChoice::BiLevel(effect) => effects.push(ImageEffect::BiLevel(
-        (effect.threshold.as_ratio() * 255.0)
-          .round()
-          .clamp(0.0, 255.0) as u8,
-      )),
-      a::BlipChoice::Blur(blur) => effects.push(ImageEffect::Blur {
-        radius_px: blur
-          .radius
-          .map(|radius| radius.to_emu() as f32 / 9_525.0)
-          .unwrap_or_default(),
-        grow_bounds: blur.grow.as_ref().is_none_or(|value| value.as_bool()),
-      }),
-      a::BlipChoice::TintEffect(tint) => effects.push(ImageEffect::Tint {
-        hue_degrees: tint.hue.unwrap_or_default() as f32 / 60_000.0,
-        amount: tint
-          .amount
-          .as_ref()
-          .map(|value| value.as_ratio() as f32)
-          .unwrap_or_default(),
-      }),
-      _ => {}
-    }
-  }
-  effects
+  common::drawingml_image_effects::from_blip_choices(
+    choices,
+    content_type,
+    &XlsxImageEffectColorResolver {
+      import,
+      image_resources,
+    },
+  )
 }
 
 fn drawing_object_common_fill(
@@ -4789,9 +6304,58 @@ fn drawing_object_common_fill(
     .or_else(|| {
       object
         .fill_color
-        .map(|color| common::Fill::Solid(common_rgb(color, 1.0)))
+        .clone()
+        .and_then(|color| xlsx_drawing_color(color, import))
+        .map(common::Fill::Solid)
     })
     .unwrap_or(common::Fill::None)
+}
+
+fn drawing_object_solid_fill_color(
+  import: &ExcelImport,
+  object: &super::drawing::DrawingObjectModel,
+) -> Option<RgbColor> {
+  object
+    .fill_color
+    .clone()
+    .and_then(|color| xlsx_drawing_rgb_color(color, import))
+}
+
+fn drawing_object_effective_common_fill(
+  import: &ExcelImport,
+  object: &super::drawing::DrawingObjectModel,
+  rect: CellRect,
+  transform: Affine,
+  group_fill: Option<&common::Fill<'static>>,
+) -> common::Fill<'static> {
+  if object.use_group_fill {
+    return group_fill.cloned().unwrap_or(common::Fill::None);
+  }
+  drawing_object_common_fill(import, object, rect, transform)
+}
+
+fn drawing_object_common_stroke(
+  import: &ExcelImport,
+  object: &super::drawing::DrawingObjectModel,
+  border: BorderStyle,
+  rect: CellRect,
+  transform: Affine,
+  outline: Option<&a::Outline>,
+) -> common::Stroke<'static> {
+  let mut stroke = common_stroke_from_border(border, 1.0);
+  stroke.pattern = object.line_pattern;
+  stroke.gradient = object
+    .line_gradient
+    .as_deref()
+    .and_then(|gradient| drawing_object_gradient_fill(import, gradient, rect, transform))
+    .and_then(|fill| match fill {
+      common::Fill::Gradient(gradient) => Some(gradient),
+      _ => None,
+    });
+  if let Some(outline) = outline {
+    common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+  }
+  stroke
 }
 
 fn drawing_object_gradient_fill(
@@ -4906,6 +6470,7 @@ fn drawing_object_gradient_fill(
           kind,
           fill_to,
           transform: gradient_transform,
+          mirror_tile: false,
         }),
       )
     }
@@ -4922,6 +6487,7 @@ fn drawing_object_gradient_fill(
     line,
     interpolation: common::GradientInterpolation::LinearSrgb,
     scaled,
+    rotate_with_shape: None,
     path,
   }))
 }
@@ -4941,6 +6507,15 @@ fn xlsx_drawing_color(color: Color, import: &ExcelImport) -> Option<common::Colo
     g: color.g,
     b: color.b,
     a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
+  })
+}
+
+fn xlsx_drawing_rgb_color(color: Color, import: &ExcelImport) -> Option<RgbColor> {
+  let color = xlsx_drawing_color(color, import)?;
+  Some(RgbColor {
+    r: color.r,
+    g: color.g,
+    b: color.b,
   })
 }
 
@@ -4999,7 +6574,7 @@ fn anchor_rect_pt(
   sheet: &CalcSheet,
   anchor: &super::drawing::DrawingAnchorModel,
 ) -> Option<(f32, f32, f32, f32)> {
-  match anchor.kind {
+  let rect = match anchor.kind {
     super::drawing::DrawingAnchorKind::TwoCell => {
       let from = anchor.from.as_ref()?;
       let to = anchor.to.as_ref()?;
@@ -5023,6 +6598,34 @@ fn anchor_rect_pt(
         units::emu_to_points(cy),
       ))
     }
+  }?;
+  Some(excel_unrotated_anchor_rect(
+    rect,
+    anchor.object.rotation_deg,
+  ))
+}
+
+fn excel_unrotated_anchor_rect(
+  (x, y, width, height): (f32, f32, f32, f32),
+  rotation_deg: f32,
+) -> (f32, f32, f32, f32) {
+  // Excel rewrites the from/to markers of rotated drawings to the bounding
+  // cells of a quarter-turned rectangle in these two angular ranges. Restore
+  // the unrotated shape rectangle before applying a:xfrm rotation. This is the
+  // same threshold and center-preserving width/height swap used by Calc's OOXML
+  // drawing importer (tdf#83593).
+  let rotation_deg = rotation_deg.rem_euclid(360.0);
+  if (45.0..135.0).contains(&rotation_deg) || (225.0..315.0).contains(&rotation_deg) {
+    let center_x = x + width / 2.0;
+    let center_y = y + height / 2.0;
+    (
+      center_x - height / 2.0,
+      center_y - width / 2.0,
+      height,
+      width,
+    )
+  } else {
+    (x, y, width, height)
   }
 }
 
@@ -5475,6 +7078,65 @@ mod drawing_page_tests {
   }
 
   #[test]
+  fn excel_rotated_anchor_threshold_restores_unrotated_shape_rect() {
+    let source = (10.0, 20.0, 30.0, 90.0);
+    assert_eq!(excel_unrotated_anchor_rect(source, 44.0), source);
+    assert_eq!(
+      excel_unrotated_anchor_rect(source, 45.0),
+      (-20.0, 50.0, 90.0, 30.0)
+    );
+    assert_eq!(
+      excel_unrotated_anchor_rect(source, 134.999),
+      (-20.0, 50.0, 90.0, 30.0)
+    );
+    assert_eq!(excel_unrotated_anchor_rect(source, 135.0), source);
+    assert_eq!(
+      excel_unrotated_anchor_rect(source, -45.001),
+      (-20.0, 50.0, 90.0, 30.0)
+    );
+  }
+
+  #[test]
+  fn shape_rotation_does_not_turn_horizontal_text_into_vertical_layout() {
+    let mut items = Vec::new();
+    let rect = CellRect {
+      x_pt: 10.0,
+      y_pt: 20.0,
+      width_pt: 100.0,
+      height_pt: 30.0,
+    };
+    render_drawing_text(
+      &mut items,
+      "text",
+      rect,
+      Some(TextStyle::default()),
+      Some(DrawingTextLayout {
+        shape_rotation_deg: 45.0,
+        ..DrawingTextLayout::default()
+      }),
+      None,
+      None,
+    );
+
+    let PageItem::Text(text) = &items[0] else {
+      panic!("expected text item");
+    };
+    assert_eq!(text.x_pt, rect.x_pt + XLSX_CELL_TEXT_INSET_PT);
+    assert_eq!(text.y_pt, rect.y_pt + XLSX_CELL_TEXT_INSET_PT);
+    assert_eq!(text.style.rotation_deg, 45.0);
+    assert_eq!(text.rotation_center_pt, Some((60.0, 35.0)));
+    assert!(text.style.pdf_glyph_outlines);
+    assert_eq!(
+      text
+        .style
+        .pdf_glyph_outline_options
+        .as_deref()
+        .map(|options| options.semantic_text_overlay),
+      Some(false)
+    );
+  }
+
+  #[test]
   fn sheet_page_transform_translates_source_origin_then_applies_zoom() {
     let transform = SheetPageTransform::new(
       18.0,
@@ -5496,6 +7158,115 @@ mod drawing_page_tests {
         width_pt: 30.0,
         height_pt: 40.0,
       }
+    );
+  }
+
+  #[test]
+  fn vml_curve_attributes_lower_to_one_cubic_path() {
+    let shape = super::super::object_resources::VmlShapeModel {
+      kind: super::super::object_resources::VmlShapeKind::Curve,
+      from: Some("0,0".into()),
+      control1: Some("0,100".into()),
+      control2: Some("200,0".into()),
+      to: Some("200,100".into()),
+      ..Default::default()
+    };
+
+    let paths = vml_shape_drawing_paths(&shape, 20.0, 10.0).unwrap();
+    assert_eq!(paths.len(), 1);
+    assert!(matches!(
+      paths[0].commands.as_slice(),
+      [
+        common::PathCommand::MoveTo(_),
+        common::PathCommand::CubicTo { .. }
+      ]
+    ));
+  }
+
+  #[test]
+  fn filled_vml_polyline_is_closed_without_repeated_endpoint() {
+    let shape = super::super::object_resources::VmlShapeModel {
+      kind: super::super::object_resources::VmlShapeKind::Polyline,
+      points: Some("0,0,100,0,50,100".into()),
+      filled: true,
+      ..Default::default()
+    };
+
+    let paths = vml_shape_drawing_paths(&shape, 10.0, 10.0).unwrap();
+    assert_eq!(paths[0].commands.last(), Some(&common::PathCommand::Close));
+    assert_eq!(paths[0].fill_mode, common::DrawingPathFillMode::Normal);
+  }
+
+  #[test]
+  fn invalid_authored_vml_path_is_not_replaced_by_rectangle() {
+    let shape = super::super::object_resources::VmlShapeModel {
+      kind: super::super::object_resources::VmlShapeKind::Shape,
+      path: Some("not-a-vml-path".into()),
+      ..Default::default()
+    };
+    assert!(vml_shape_drawing_paths(&shape, 10.0, 10.0).is_none());
+  }
+
+  #[test]
+  fn vml_gradient_and_stroke_style_lower_to_common_paint() {
+    let shape = super::super::object_resources::VmlShapeModel {
+      fill_color: Some("#FF0000".into()),
+      fill_color2: Some("#0000FF".into()),
+      fill_opacity: Some("32768f".into()),
+      fill_type: Some(vml::FillTypeValues::GradientRadial),
+      fill_focus_position: Some("25%,20%".into()),
+      fill_focus_size: Some("50%,60%".into()),
+      stroke_dash_style: Some("dashdot".into()),
+      stroke_end_cap: Some(vml::StrokeEndCapValues::Flat),
+      stroke_end_arrow: Some(vml::StrokeArrowValues::Classic),
+      stroke_end_arrow_width: Some(vml::StrokeArrowWidthValues::Wide),
+      stroke_end_arrow_length: Some(vml::StrokeArrowLengthValues::Long),
+      ..Default::default()
+    };
+    let fill = vml_shape_common_fill(
+      &shape,
+      Affine::scale_non_uniform(40.0, 20.0).then_translate((2.0, 3.0).into()),
+    );
+    let common::Fill::Gradient(gradient) = fill else {
+      panic!("expected gradient");
+    };
+    assert_eq!(gradient.stops.len(), 2);
+    assert_eq!(gradient.stops[1].color.a, 128);
+    let path = gradient.path.expect("radial VML fill-to rectangle");
+    assert_eq!(path.kind, common::GradientPathKind::Rectangle);
+    assert!((path.fill_to.left - 0.25).abs() < 0.001);
+    assert!((path.fill_to.right - 0.25).abs() < 0.001);
+    assert_eq!(path.transform.m11, 40.0);
+    assert_eq!(path.transform.m22, 20.0);
+
+    let stroke = vml_shape_common_stroke(&shape).expect("stroke");
+    assert_eq!(stroke.cap, Some(common::StrokeCap::Flat));
+    assert_eq!(
+      stroke.tail_end,
+      Some(common::StrokeEnd {
+        kind: common::StrokeEndKind::Stealth,
+        width: common::StrokeEndSize::Large,
+        length: common::StrokeEndSize::Large,
+      })
+    );
+    assert_eq!(stroke.dash.as_ref().map(Vec::len), Some(4));
+  }
+
+  #[test]
+  fn vml_tile_origin_is_placed_on_shape_position() {
+    let phase = vml_tile_phase(
+      Some("0.25,-16384f"),
+      Some("75%,0.5"),
+      100.0,
+      80.0,
+      20.0,
+      16.0,
+    );
+    assert!((phase.0 - 70.0).abs() < 0.001);
+    assert!((phase.1 - 44.0).abs() < 0.001);
+    assert_eq!(
+      vml_tile_phase(None, None, 100.0, 80.0, 20.0, 16.0),
+      (40.0, 32.0)
     );
   }
 }

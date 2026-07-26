@@ -12,6 +12,7 @@ use crate::common::{
   DrawingPath, drawingml_custom_geometry, drawingml_geometry, drawingml_preset_geometry,
 };
 use crate::model::RgbColor;
+use crate::model::common_point;
 use crate::render::math::text_math_text;
 
 // LibreOffice DiagramLayoutAtom::layoutShape() synthesizes this DrawingML
@@ -41,12 +42,41 @@ pub struct DiagramShape {
   pub draw_geometry: bool,
   pub is_connector: bool,
   pub connector_angle_deg: f32,
+  pub connector_route: DiagramConnectorRoute,
+  pub connector_dimension: dgm::ConnectorDimensionValues,
+  pub connector_bend_at_end: bool,
+  pub connector_begin_arrow: bool,
+  pub connector_end_arrow: bool,
+  pub connector_begin_points: Option<String>,
+  pub connector_end_points: Option<String>,
+  pub connector_start_override: Option<(f32, f32)>,
+  pub connector_end_override: Option<(f32, f32)>,
   pub is_blip_placeholder: bool,
   pub fill: RgbColor,
   pub text_order: usize,
   pub font_size_pt: Option<f32>,
   pub minimum_font_size_pt: Option<f32>,
   pub font_sync_group: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DiagramConnectorRoute {
+  #[default]
+  Straight,
+  Bend,
+  Curve,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum ConnectorPointSet {
+  #[default]
+  Auto,
+  TopCenter,
+  BottomCenter,
+  MiddleLeft,
+  MiddleRight,
+  MiddleLeftOrRight,
+  Radial,
 }
 
 impl DiagramShape {
@@ -82,6 +112,107 @@ impl DiagramShape {
         drawingml_geometry::transform_commands(std::mem::take(&mut path.commands), transform);
     }
     Some(paths)
+  }
+
+  pub(crate) fn connector_commands(&self) -> Vec<crate::common::PathCommand> {
+    let center_x = self.x + self.width / 2.0;
+    let center_y = self.y + self.height / 2.0;
+    let length = self.width.max(self.height).max(1.0);
+    let radians = self.connector_angle_deg.to_radians();
+    let delta = (radians.cos() * length / 2.0, radians.sin() * length / 2.0);
+    let automatic_start = (center_x - delta.0, center_y - delta.1);
+    let automatic_end = (center_x + delta.0, center_y + delta.1);
+    let start = self.connector_start_override.unwrap_or_else(|| {
+      diagram_connector_point(
+        self.connector_begin_points.as_deref(),
+        self,
+        automatic_start,
+        delta.0 >= 0.0,
+      )
+    });
+    let end = self.connector_end_override.unwrap_or_else(|| {
+      diagram_connector_point(
+        self.connector_end_points.as_deref(),
+        self,
+        automatic_end,
+        delta.0 < 0.0,
+      )
+    });
+    let mut commands = vec![crate::common::PathCommand::MoveTo(common_point(
+      start.0, start.1,
+    ))];
+    match self.connector_route {
+      DiagramConnectorRoute::Straight => {
+        commands.push(crate::common::PathCommand::LineTo(common_point(
+          end.0, end.1,
+        )));
+      }
+      DiagramConnectorRoute::Bend => {
+        let bend = if self.connector_bend_at_end {
+          (start.0, end.1)
+        } else {
+          (end.0, start.1)
+        };
+        if (bend.0 - start.0).abs() > f32::EPSILON || (bend.1 - start.1).abs() > f32::EPSILON {
+          commands.push(crate::common::PathCommand::LineTo(common_point(
+            bend.0, bend.1,
+          )));
+        }
+        commands.push(crate::common::PathCommand::LineTo(common_point(
+          end.0, end.1,
+        )));
+      }
+      DiagramConnectorRoute::Curve => {
+        let control1 = if self.connector_bend_at_end {
+          (start.0, (start.1 + end.1) / 2.0)
+        } else {
+          ((start.0 + end.0) / 2.0, start.1)
+        };
+        let control2 = if self.connector_bend_at_end {
+          (end.0, (start.1 + end.1) / 2.0)
+        } else {
+          ((start.0 + end.0) / 2.0, end.1)
+        };
+        commands.push(crate::common::PathCommand::CubicTo {
+          control1: common_point(control1.0, control1.1),
+          control2: common_point(control2.0, control2.1),
+          end: common_point(end.0, end.1),
+        });
+      }
+    }
+    commands
+  }
+
+  pub(crate) fn apply_connector_ends(&self, stroke: &mut crate::common::Stroke<'static>) {
+    let arrow = crate::common::StrokeEnd {
+      kind: crate::common::StrokeEndKind::Triangle,
+      width: crate::common::StrokeEndSize::Medium,
+      length: crate::common::StrokeEndSize::Medium,
+    };
+    if self.connector_begin_arrow {
+      stroke.head_end = Some(arrow);
+    }
+    if self.connector_end_arrow {
+      stroke.tail_end = Some(arrow);
+    }
+  }
+}
+
+fn diagram_connector_point(
+  authored: Option<&str>,
+  shape: &DiagramShape,
+  automatic: (f32, f32),
+  prefer_left: bool,
+) -> (f32, f32) {
+  match authored {
+    Some("tCtr") => (shape.x + shape.width / 2.0, shape.y),
+    Some("bCtr") => (shape.x + shape.width / 2.0, shape.y + shape.height),
+    Some("midL") => (shape.x, shape.y + shape.height / 2.0),
+    Some("midR") => (shape.x + shape.width, shape.y + shape.height / 2.0),
+    Some("midL midR") if prefer_left => (shape.x, shape.y + shape.height / 2.0),
+    Some("midL midR") => (shape.x + shape.width, shape.y + shape.height / 2.0),
+    Some("radial") | None => automatic,
+    Some(_) => automatic,
   }
 }
 
@@ -284,6 +415,38 @@ impl DiagramTextBody {
     self.body_properties = Some(body_properties);
   }
 
+  fn set_horizontal_anchor_center(&mut self, centered: bool) {
+    let mut body_properties = self.body_properties.clone().unwrap_or_default();
+    body_properties.anchor_center = Some(centered.into());
+    self.body_properties = Some(body_properties);
+  }
+
+  fn has_child_text(&self) -> bool {
+    let Some(base_level) = self
+      .paragraphs
+      .iter()
+      .filter_map(|paragraph| paragraph.level)
+      .min()
+    else {
+      return false;
+    };
+    self
+      .paragraphs
+      .iter()
+      .filter_map(|paragraph| paragraph.level)
+      .any(|level| level > base_level)
+  }
+
+  fn is_right_to_left(&self) -> bool {
+    self.paragraphs.iter().any(|paragraph| {
+      paragraph
+        .paragraph_properties
+        .as_deref()
+        .and_then(|properties| properties.right_to_left)
+        .is_some_and(|value| value.as_bool())
+    })
+  }
+
   fn apply_text_algorithm_paragraph_rules(
     &mut self,
     start_bullets_at_level: i32,
@@ -338,6 +501,53 @@ impl DiagramTextBody {
         properties.alignment = Some(alignment);
         paragraph.paragraph_properties = Some(properties);
       }
+    }
+  }
+
+  fn apply_algorithm_spacing(&mut self, algorithm: &LayoutAlgorithm) {
+    let Some(base_level) = self
+      .paragraphs
+      .iter()
+      .filter_map(|paragraph| paragraph.level)
+      .min()
+    else {
+      return;
+    };
+    for paragraph in &mut self.paragraphs {
+      let child = paragraph.level.unwrap_or(base_level) > base_level;
+      let line_spacing = if child {
+        algorithm.line_spacing_children
+      } else {
+        algorithm.line_spacing_parent
+      };
+      let space_after = if child {
+        algorithm.line_spacing_after_children
+      } else {
+        algorithm.line_spacing_after_parent
+      };
+      if line_spacing.is_none() && space_after.is_none() {
+        continue;
+      }
+      let mut properties = paragraph.paragraph_properties.clone().unwrap_or_default();
+      if let Some(value) = line_spacing {
+        properties.line_spacing = Some(Box::new(a::LineSpacing {
+          line_spacing_choice: Some(a::LineSpacingChoice::SpacingPercent(a::SpacingPercent {
+            val: ooxmlsdk::units::DrawingmlPercentageValue::Decimal(
+              (value * 1_000.0).round().clamp(0.0, 13_200_000.0) as i32,
+            ),
+          })),
+        }));
+      }
+      if let Some(value) = space_after {
+        properties.space_after = Some(Box::new(a::SpaceAfter {
+          space_after_choice: Some(a::SpaceAfterChoice::SpacingPercent(a::SpacingPercent {
+            val: ooxmlsdk::units::DrawingmlPercentageValue::Decimal(
+              (value * 1_000.0).round().clamp(0.0, 13_200_000.0) as i32,
+            ),
+          })),
+        }));
+      }
+      paragraph.paragraph_properties = Some(properties);
     }
   }
 }
@@ -525,6 +735,18 @@ struct DiagramShapeNode {
   is_connector: bool,
   shape_rotation_deg: f32,
   connector_angle_deg: f32,
+  connector_route: DiagramConnectorRoute,
+  connector_dimension: dgm::ConnectorDimensionValues,
+  connector_bend_at_end: bool,
+  connector_begin_arrow: bool,
+  connector_end_arrow: bool,
+  connector_begin_points: Option<String>,
+  connector_end_points: Option<String>,
+  connector_source_node: Option<String>,
+  connector_destination_node: Option<String>,
+  connector_route_shortest_distance: bool,
+  connector_start_override: Option<(f32, f32)>,
+  connector_end_override: Option<(f32, f32)>,
   is_blip_placeholder: bool,
   z_order_offset: i32,
   shape_properties: Option<Box<dgm::ShapeProperties>>,
@@ -573,23 +795,65 @@ struct DiagramRule {
   value: f32,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct LayoutAlgorithm {
   kind: dgm::AlgorithmValues,
   linear_direction: LinearDirection,
   secondary_linear_direction: LinearDirection,
+  child_direction: Option<dgm::ChildDirectionValues>,
+  child_alignment: Option<ChildAlignment>,
+  secondary_child_alignment: Option<ChildAlignment>,
+  horizontal_alignment: Option<AxisAlignment>,
+  vertical_alignment: Option<AxisAlignment>,
+  node_horizontal_alignment: Option<AxisAlignment>,
+  node_vertical_alignment: Option<AxisAlignment>,
+  hierarchy_horizontal_alignment: Option<AxisAlignment>,
+  hierarchy_vertical_alignment: Option<AxisAlignment>,
   grow_direction: GrowDirection,
   continue_direction: ContinueDirection,
+  flow_direction: dgm::FlowDirectionValues,
+  breakpoint: dgm::BreakpointValues,
+  breakpoint_fixed_value: usize,
+  offset: dgm::OffsetValues,
   start_angle: f32,
   span_angle: f32,
+  start_element: dgm::StartingElementValues,
   center_shape_mapping_first_node: bool,
   rotation_path_along_path: bool,
   aspect_ratio: Option<f32>,
   auto_text_rotation: Option<dgm::AutoTextRotationValues>,
+  text_anchor_horizontal_center: Option<bool>,
   text_anchor_vertical: Option<dgm::TextAnchorVerticalValues>,
-  vertical_alignment: Option<dgm::TextAnchorVerticalValues>,
+  text_anchor_horizontal_with_children_center: Option<bool>,
+  text_anchor_vertical_with_children: Option<dgm::TextAnchorVerticalValues>,
   start_bullets_at_level: i32,
   parent_text_left_to_right_alignment: Option<dgm::TextAlignmentValues>,
+  parent_text_right_to_left_alignment: Option<dgm::TextAlignmentValues>,
+  shape_text_left_to_right_alignment_with_children: Option<dgm::TextAlignmentValues>,
+  shape_text_right_to_left_alignment_with_children: Option<dgm::TextAlignmentValues>,
+  text_alignment: Option<dgm::TextAlignmentValues>,
+  text_direction: dgm::TextDirectionValues,
+  text_block_direction: dgm::TextBlockDirectionValues,
+  fallback_dimension: dgm::FallbackDimensionValues,
+  pyramid_accent_position: dgm::PyramidAccentPositionValues,
+  pyramid_accent_text_margin: dgm::PyramidAccentTextMarginValues,
+  pyramid_level_node: Option<String>,
+  pyramid_accent_background_node: Option<String>,
+  pyramid_accent_text_node: Option<String>,
+  line_spacing_parent: Option<f32>,
+  line_spacing_after_parent: Option<f32>,
+  line_spacing_children: Option<f32>,
+  line_spacing_after_children: Option<f32>,
+  connector_route: DiagramConnectorRoute,
+  connector_dimension: dgm::ConnectorDimensionValues,
+  connector_bend_at_end: bool,
+  connector_begin_arrow: bool,
+  connector_end_arrow: bool,
+  connector_begin_points: ConnectorPointSet,
+  connector_end_points: ConnectorPointSet,
+  connector_source_node: Option<String>,
+  connector_destination_node: Option<String>,
+  connector_route_shortest_distance: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -615,6 +879,22 @@ enum ContinueDirection {
   #[default]
   SameDirection,
   ReverseDirection,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ChildAlignment {
+  Top,
+  Bottom,
+  Left,
+  Right,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AxisAlignment {
+  Start,
+  Center,
+  End,
+  None,
 }
 
 pub fn presentation_point_list_orders(data: &dgm::DataModelRoot) -> HashMap<String, usize> {
@@ -784,6 +1064,18 @@ fn build_diagram_shape_tree(
       is_connector: false,
       shape_rotation_deg: 0.0,
       connector_angle_deg: 0.0,
+      connector_route: DiagramConnectorRoute::Straight,
+      connector_dimension: dgm::ConnectorDimensionValues::OneDimension,
+      connector_bend_at_end: true,
+      connector_begin_arrow: false,
+      connector_end_arrow: false,
+      connector_begin_points: None,
+      connector_end_points: None,
+      connector_source_node: None,
+      connector_destination_node: None,
+      connector_route_shortest_distance: false,
+      connector_start_override: None,
+      connector_end_override: None,
       is_blip_placeholder: false,
       z_order_offset: 0,
       shape_properties: None,
@@ -2022,6 +2314,18 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         .and_then(|shape| shape.rotation)
         .unwrap_or_default() as f32,
       connector_angle_deg: 0.0,
+      connector_route: DiagramConnectorRoute::Straight,
+      connector_dimension: dgm::ConnectorDimensionValues::OneDimension,
+      connector_bend_at_end: true,
+      connector_begin_arrow: false,
+      connector_end_arrow: false,
+      connector_begin_points: None,
+      connector_end_points: None,
+      connector_source_node: None,
+      connector_destination_node: None,
+      connector_route_shortest_distance: false,
+      connector_start_override: None,
+      connector_end_override: None,
       is_blip_placeholder: shape_atom
         .and_then(|shape| shape.blip_placeholder)
         .map(bool::from)
@@ -2717,16 +3021,87 @@ fn layout_algorithm(algorithm: &dgm::Algorithm) -> LayoutAlgorithm {
     .and_then(|parameter| parameter.val.as_deref())
     .map(continue_direction_from_value)
     .unwrap_or_default();
+  let (hierarchy_horizontal_alignment, hierarchy_vertical_alignment) =
+    algorithm_parameter_value(algorithm, dgm::ParameterIdValues::HierarchyAlignment)
+      .map(hierarchy_axis_alignments)
+      .unwrap_or((None, None));
   LayoutAlgorithm {
     kind: algorithm.r#type,
     linear_direction,
     secondary_linear_direction,
+    child_direction: algorithm_parameter_value(algorithm, dgm::ParameterIdValues::ChildDirection)
+      .map(|value| {
+        if value == "vert" {
+          dgm::ChildDirectionValues::Vertical
+        } else {
+          dgm::ChildDirectionValues::Horizontal
+        }
+      }),
+    child_alignment: algorithm_parameter_value(algorithm, dgm::ParameterIdValues::ChildAlignment)
+      .and_then(child_alignment_from_value),
+    secondary_child_alignment: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::SecondaryChildAlignment,
+    )
+    .and_then(child_alignment_from_value),
+    horizontal_alignment: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::HorizontalAlignment,
+    )
+    .map(axis_alignment_from_value),
+    vertical_alignment: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::VerticalAlignment,
+    )
+    .map(axis_alignment_from_value),
+    node_horizontal_alignment: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::NodeHorizontalAlignment,
+    )
+    .map(axis_alignment_from_value),
+    node_vertical_alignment: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::NodeVerticalAlignment,
+    )
+    .map(axis_alignment_from_value),
+    hierarchy_horizontal_alignment,
+    hierarchy_vertical_alignment,
     grow_direction,
     continue_direction,
+    flow_direction: match algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::FlowDirection,
+    ) {
+      Some("col") => dgm::FlowDirectionValues::Column,
+      _ => dgm::FlowDirectionValues::Row,
+    },
+    breakpoint: match algorithm_parameter_value(algorithm, dgm::ParameterIdValues::Breakpoint) {
+      Some("bal") => dgm::BreakpointValues::Balanced,
+      Some("fixed") => dgm::BreakpointValues::Fixed,
+      _ => dgm::BreakpointValues::EndCanvas,
+    },
+    breakpoint_fixed_value: algorithm_parameter_f32(
+      algorithm,
+      dgm::ParameterIdValues::BreakpointFixedValue,
+    )
+    .unwrap_or(1.0)
+    .round()
+    .max(1.0) as usize,
+    offset: match algorithm_parameter_value(algorithm, dgm::ParameterIdValues::Offset) {
+      Some("off") => dgm::OffsetValues::Offset,
+      _ => dgm::OffsetValues::Center,
+    },
     start_angle: algorithm_parameter_f32(algorithm, dgm::ParameterIdValues::StartAngle)
       .unwrap_or_default(),
     span_angle: algorithm_parameter_f32(algorithm, dgm::ParameterIdValues::SpanAngle)
       .unwrap_or(360.0),
+    start_element: if algorithm_parameter_value(algorithm, dgm::ParameterIdValues::StartElement)
+      == Some("trans")
+    {
+      dgm::StartingElementValues::Transition
+    } else {
+      dgm::StartingElementValues::Node
+    },
     center_shape_mapping_first_node: algorithm
       .parameter
       .iter()
@@ -2746,18 +3121,27 @@ fn layout_algorithm(algorithm: &dgm::Algorithm) -> LayoutAlgorithm {
       .find(|parameter| parameter.r#type == dgm::ParameterIdValues::AutoTextRotation)
       .and_then(|parameter| parameter.val.as_deref())
       .map(auto_text_rotation_from_value),
+    text_anchor_horizontal_center: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::TextAnchorHorizontal,
+    )
+    .map(text_anchor_horizontal_center_from_value),
     text_anchor_vertical: algorithm
       .parameter
       .iter()
       .find(|parameter| parameter.r#type == dgm::ParameterIdValues::TextAnchorVertical)
       .and_then(|parameter| parameter.val.as_deref())
       .map(text_anchor_vertical_from_value),
-    vertical_alignment: algorithm
-      .parameter
-      .iter()
-      .find(|parameter| parameter.r#type == dgm::ParameterIdValues::VerticalAlignment)
-      .and_then(|parameter| parameter.val.as_deref())
-      .map(text_anchor_vertical_from_value),
+    text_anchor_horizontal_with_children_center: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::TextAnchorHorizontalWithChildren,
+    )
+    .map(text_anchor_horizontal_center_from_value),
+    text_anchor_vertical_with_children: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::TextAnchorVerticalWithChildren,
+    )
+    .map(text_anchor_vertical_from_value),
     start_bullets_at_level: algorithm_parameter_f32(
       algorithm,
       dgm::ParameterIdValues::StartBulletsAtLevel,
@@ -2770,7 +3154,154 @@ fn layout_algorithm(algorithm: &dgm::Algorithm) -> LayoutAlgorithm {
       .find(|parameter| parameter.r#type == dgm::ParameterIdValues::ParentTextLeftToRightAlignment)
       .and_then(|parameter| parameter.val.as_deref())
       .map(text_alignment_from_value),
+    parent_text_right_to_left_alignment: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::ParentTextRightToLeftAlignment,
+    )
+    .map(text_alignment_from_value),
+    shape_text_left_to_right_alignment_with_children: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::ShapeTextLeftToRightAlignment,
+    )
+    .map(text_alignment_from_value),
+    shape_text_right_to_left_alignment_with_children: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::ShapeTextRightToLeftAlignment,
+    )
+    .map(text_alignment_from_value),
+    text_alignment: algorithm_parameter_value(algorithm, dgm::ParameterIdValues::TextAlignment)
+      .map(text_alignment_from_value),
+    text_direction: if algorithm_parameter_value(algorithm, dgm::ParameterIdValues::TextDirection)
+      == Some("fromB")
+    {
+      dgm::TextDirectionValues::FromBottom
+    } else {
+      dgm::TextDirectionValues::FromTop
+    },
+    text_block_direction: if algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::TextBlockDirection,
+    ) == Some("vert")
+    {
+      dgm::TextBlockDirectionValues::Vertical
+    } else {
+      dgm::TextBlockDirectionValues::Horizontal
+    },
+    fallback_dimension: if algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::FallbackScale,
+    ) == Some("2D")
+    {
+      dgm::FallbackDimensionValues::TwoDimension
+    } else {
+      dgm::FallbackDimensionValues::OneDimension
+    },
+    pyramid_accent_position: if algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::PyramidAccentPosition,
+    ) == Some("aft")
+    {
+      dgm::PyramidAccentPositionValues::After
+    } else {
+      dgm::PyramidAccentPositionValues::Before
+    },
+    pyramid_accent_text_margin: if algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::PyramidAccentTextMargin,
+    ) == Some("stack")
+    {
+      dgm::PyramidAccentTextMarginValues::Stack
+    } else {
+      dgm::PyramidAccentTextMarginValues::Step
+    },
+    pyramid_level_node: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::PyramidLevelNode,
+    )
+    .map(ToString::to_string),
+    pyramid_accent_background_node: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::PyramidAccentBackgroundNode,
+    )
+    .map(ToString::to_string),
+    pyramid_accent_text_node: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::PyramidAccentTextNode,
+    )
+    .map(ToString::to_string),
+    line_spacing_parent: algorithm_parameter_f32(
+      algorithm,
+      dgm::ParameterIdValues::LineSpacingParent,
+    ),
+    line_spacing_after_parent: algorithm_parameter_f32(
+      algorithm,
+      dgm::ParameterIdValues::LineSpacingAfterParentParagraph,
+    ),
+    line_spacing_children: algorithm_parameter_f32(
+      algorithm,
+      dgm::ParameterIdValues::LineSpacingChildren,
+    ),
+    line_spacing_after_children: algorithm_parameter_f32(
+      algorithm,
+      dgm::ParameterIdValues::LineSpacingAfterChildrenParagraph,
+    ),
+    connector_route: match algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::ConnectionRoute,
+    ) {
+      Some("bend") => DiagramConnectorRoute::Bend,
+      Some("curve") => DiagramConnectorRoute::Curve,
+      _ => DiagramConnectorRoute::Straight,
+    },
+    connector_dimension: match algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::ConnectorDimension,
+    ) {
+      Some("2D") => dgm::ConnectorDimensionValues::TwoDimension,
+      Some("cust") => dgm::ConnectorDimensionValues::Custom,
+      _ => dgm::ConnectorDimensionValues::OneDimension,
+    },
+    connector_bend_at_end: algorithm_parameter_value(algorithm, dgm::ParameterIdValues::BendPoint)
+      .is_none_or(|value| value == "end"),
+    connector_begin_arrow: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::BeginningArrowheadStyle,
+    ) == Some("arr"),
+    connector_end_arrow: algorithm_parameter_value(algorithm, dgm::ParameterIdValues::EndStyle)
+      == Some("arr"),
+    connector_begin_points: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::BeginningPoints,
+    )
+    .map(connector_point_set_from_value)
+    .unwrap_or_default(),
+    connector_end_points: algorithm_parameter_value(algorithm, dgm::ParameterIdValues::EndPoints)
+      .map(connector_point_set_from_value)
+      .unwrap_or_default(),
+    connector_source_node: algorithm_parameter_value(algorithm, dgm::ParameterIdValues::SourceNode)
+      .map(ToString::to_string),
+    connector_destination_node: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::DestinationNode,
+    )
+    .map(ToString::to_string),
+    connector_route_shortest_distance: algorithm_parameter_value(
+      algorithm,
+      dgm::ParameterIdValues::RouteShortestDistance,
+    )
+    .is_some_and(|value| matches!(value, "true" | "1" | "t")),
   }
+}
+
+fn algorithm_parameter_value(
+  algorithm: &dgm::Algorithm,
+  kind: dgm::ParameterIdValues,
+) -> Option<&str> {
+  algorithm
+    .parameter
+    .iter()
+    .find(|parameter| parameter.r#type == kind)
+    .and_then(|parameter| parameter.val.as_deref())
 }
 
 fn text_alignment_from_value(value: &str) -> dgm::TextAlignmentValues {
@@ -2803,6 +3334,73 @@ fn text_anchor_vertical_from_value(value: &str) -> dgm::TextAnchorVerticalValues
     "b" => dgm::TextAnchorVerticalValues::Bottom,
     _ => dgm::TextAnchorVerticalValues::Middle,
   }
+}
+
+fn text_anchor_horizontal_center_from_value(value: &str) -> bool {
+  matches!(value, "ctr" | "mid")
+}
+
+fn child_alignment_from_value(value: &str) -> Option<ChildAlignment> {
+  Some(match value {
+    "t" => ChildAlignment::Top,
+    "b" => ChildAlignment::Bottom,
+    "l" => ChildAlignment::Left,
+    "r" => ChildAlignment::Right,
+    "none" => return None,
+    _ => return None,
+  })
+}
+
+fn axis_alignment_from_value(value: &str) -> AxisAlignment {
+  match value {
+    "l" | "t" => AxisAlignment::Start,
+    "ctr" | "mid" => AxisAlignment::Center,
+    "r" | "b" => AxisAlignment::End,
+    _ => AxisAlignment::None,
+  }
+}
+
+fn hierarchy_axis_alignments(value: &str) -> (Option<AxisAlignment>, Option<AxisAlignment>) {
+  let horizontal = match value {
+    "tL" | "bL" => Some(AxisAlignment::Start),
+    "tR" | "bR" => Some(AxisAlignment::End),
+    "tCtrCh" | "tCtrDes" | "bCtrCh" | "bCtrDes" => Some(AxisAlignment::Center),
+    _ => None,
+  };
+  let vertical = match value {
+    "lT" | "rT" => Some(AxisAlignment::Start),
+    "lB" | "rB" => Some(AxisAlignment::End),
+    "lCtrCh" | "lCtrDes" | "rCtrCh" | "rCtrDes" => Some(AxisAlignment::Center),
+    _ => None,
+  };
+  (horizontal, vertical)
+}
+
+fn connector_point_set_from_value(value: &str) -> ConnectorPointSet {
+  match value {
+    "tCtr" => ConnectorPointSet::TopCenter,
+    "bCtr" => ConnectorPointSet::BottomCenter,
+    "midL" => ConnectorPointSet::MiddleLeft,
+    "midR" => ConnectorPointSet::MiddleRight,
+    "midL midR" | "midR midL" => ConnectorPointSet::MiddleLeftOrRight,
+    "radial" => ConnectorPointSet::Radial,
+    _ => ConnectorPointSet::Auto,
+  }
+}
+
+fn connector_point_set_name(value: ConnectorPointSet) -> Option<String> {
+  Some(
+    match value {
+      ConnectorPointSet::Auto => return None,
+      ConnectorPointSet::TopCenter => "tCtr",
+      ConnectorPointSet::BottomCenter => "bCtr",
+      ConnectorPointSet::MiddleLeft => "midL",
+      ConnectorPointSet::MiddleRight => "midR",
+      ConnectorPointSet::MiddleLeftOrRight => "midL midR",
+      ConnectorPointSet::Radial => "radial",
+    }
+    .to_string(),
+  )
 }
 
 fn linear_direction_from_value(value: &str) -> LinearDirection {
@@ -2845,6 +3443,122 @@ fn algorithm_parameter_f32(
 fn layout_diagram_shape_tree(root: &mut DiagramShapeNode) {
   assign_diagram_font_sync_groups(root, &[]);
   layout_diagram_shape_node(root, &[], &[], None);
+  apply_diagram_pyramid_adjustments(root);
+  resolve_diagram_connector_targets(root);
+}
+
+fn apply_diagram_pyramid_adjustments(node: &mut DiagramShapeNode) {
+  for child in &mut node.children {
+    apply_diagram_pyramid_adjustments(child);
+  }
+  let Some(algorithm) = node
+    .algorithms
+    .iter()
+    .rev()
+    .find(|algorithm| algorithm.kind == dgm::AlgorithmValues::Pyramid)
+    .cloned()
+  else {
+    return;
+  };
+  let Some(level_name) = algorithm.pyramid_level_node.as_deref() else {
+    return;
+  };
+  let accent_background_name = algorithm.pyramid_accent_background_node.as_deref();
+  let accent_text_name = algorithm.pyramid_accent_text_node.as_deref();
+  let has_accent = node.children.iter().any(|level| {
+    level.children.iter().any(|child| {
+      accent_background_name == Some(child.internal_name.as_str())
+        || accent_text_name == Some(child.internal_name.as_str())
+    })
+  });
+  let accent_ratio = node
+    .constraints
+    .iter()
+    .chain(&node.direct_constraints)
+    .rev()
+    .find(|constraint| constraint.target == dgm::ConstraintValues::PyramidAccentRatio)
+    .map(|constraint| constraint.value)
+    .filter(|value| *value > 0.0)
+    .unwrap_or(if has_accent { 0.32 } else { 0.0 })
+    .clamp(0.0, 0.8);
+  let pyramid_width = node.width * (1.0 - accent_ratio);
+  for level in &mut node.children {
+    let physical_top = level.y.clamp(0.0, node.height);
+    let physical_bottom = (level.y + level.height).clamp(0.0, node.height);
+    let level_width =
+      (pyramid_width * physical_bottom / node.height.max(f32::EPSILON)).max(level.height * 0.25);
+    let level_top_width = pyramid_width * physical_top / node.height.max(f32::EPSILON);
+    // DrawingML's trapezoid guide defines x2 as `ss * adj / 100000`,
+    // where ss is the shorter side.
+    let trapezoid_adjustment =
+      (level_width - level_top_width) / (2.0 * level_width.min(level.height).max(f32::EPSILON));
+    let pyramid_origin =
+      if algorithm.pyramid_accent_position == dgm::PyramidAccentPositionValues::Before {
+        node.width - pyramid_width
+      } else {
+        0.0
+      };
+    let level_x = pyramid_origin + (pyramid_width - level_width) / 2.0;
+    let step_accent =
+      algorithm.pyramid_accent_text_margin == dgm::PyramidAccentTextMarginValues::Step;
+    for child in &mut level.children {
+      let is_level = child.internal_name == level_name
+        || child.internal_name.starts_with(&format!("{level_name}Tx"));
+      let is_accent = accent_background_name == Some(child.internal_name.as_str())
+        || accent_text_name == Some(child.internal_name.as_str());
+      if is_level {
+        child.x = level_x;
+        child.y = 0.0;
+        child.width = level_width;
+        child.height = level.height;
+        set_pyramid_trapezoid_adjustment(child, trapezoid_adjustment);
+      } else if is_accent {
+        let (accent_x, accent_width) = match algorithm.pyramid_accent_position {
+          dgm::PyramidAccentPositionValues::Before => {
+            let right = if step_accent { level_x } else { pyramid_origin };
+            (0.0, right.max(0.0))
+          }
+          dgm::PyramidAccentPositionValues::After => {
+            let left = if step_accent {
+              level_x + level_width
+            } else {
+              pyramid_origin + pyramid_width
+            };
+            (left, (node.width - left).max(0.0))
+          }
+        };
+        child.x = accent_x;
+        child.y = 0.0;
+        child.width = accent_width;
+        child.height = level.height;
+      }
+    }
+  }
+}
+
+fn set_pyramid_trapezoid_adjustment(node: &mut DiagramShapeNode, adjustment: f32) {
+  let adjustment = (adjustment * DRAWINGML_ADJUST_FULL_SCALE as f32).round();
+  let set_adjustment = |preset: &mut a::PresetGeometry| {
+    if preset.preset != a::ShapeTypeValues::Trapezoid {
+      return;
+    }
+    preset.adjust_value_list = Some(a::AdjustValueList {
+      shape_guide: vec![a::ShapeGuide {
+        name: "adj".into(),
+        formula: format!("val {adjustment}"),
+      }],
+    });
+  };
+  if let Some(preset) = node.preset_geometry.as_deref_mut() {
+    set_adjustment(preset);
+  }
+  if let Some(dgm::ShapePropertiesChoice::PresetGeometry(preset)) = node
+    .shape_properties
+    .as_deref_mut()
+    .and_then(|properties| properties.shape_properties_choice1.as_mut())
+  {
+    set_adjustment(preset);
+  }
 }
 
 #[derive(Clone)]
@@ -2901,7 +3615,7 @@ fn layout_diagram_shape_node(
     .algorithms
     .iter()
     .rev()
-    .find_map(|algorithm| algorithm.vertical_alignment)
+    .find_map(|algorithm| algorithm.text_anchor_vertical)
     .or(inherited_vertical_alignment);
   for algorithm in node.algorithms.clone() {
     layout_shape_children(node, algorithm, &constraints, &rules, vertical_alignment);
@@ -2922,33 +3636,55 @@ fn layout_shape_children(
     .children
     .retain(|child| algorithm.kind == dgm::AlgorithmValues::Linear || !child.is_empty_group());
   match algorithm.kind {
-    dgm::AlgorithmValues::Composite => composite_layout_tree(node, algorithm, constraints),
-    dgm::AlgorithmValues::Linear => linear_layout_tree(node, algorithm, constraints, rules),
-    dgm::AlgorithmValues::Cycle => cycle_layout_tree(node, algorithm),
+    dgm::AlgorithmValues::Composite => composite_layout_tree(node, algorithm.clone(), constraints),
+    dgm::AlgorithmValues::Linear => linear_layout_tree(node, algorithm.clone(), constraints, rules),
+    dgm::AlgorithmValues::Cycle => cycle_layout_tree(node, algorithm.clone()),
     dgm::AlgorithmValues::HierarchyRoot | dgm::AlgorithmValues::HierarchyChild => {
-      hierarchy_layout_tree(node, algorithm)
+      hierarchy_layout_tree(node, algorithm.clone())
     }
-    dgm::AlgorithmValues::Snake => snake_layout_tree(node, algorithm, constraints),
-    dgm::AlgorithmValues::Text => {
-      apply_text_algorithm(node, constraints, rules, inherited_vertical_alignment)
-    }
+    dgm::AlgorithmValues::Snake => snake_layout_tree(node, algorithm.clone(), constraints),
+    dgm::AlgorithmValues::Text => apply_text_algorithm(
+      node,
+      algorithm.clone(),
+      constraints,
+      rules,
+      inherited_vertical_alignment,
+    ),
     dgm::AlgorithmValues::Space => {
       // ECMA-376 §21.4.7.1 assigns `sp` only spacing/no-op layout duties;
       // text layout belongs to `tx`. LibreOffice's DiagramLayoutAtom::layoutShape
       // likewise clears the `sp` shape text before the `tx` atom lays it out.
       node.text_body = DiagramTextBody::default();
     }
-    dgm::AlgorithmValues::Connector => connector_layout_tree(node),
-    dgm::AlgorithmValues::Pyramid => pyramid_layout_tree(node),
+    dgm::AlgorithmValues::Connector => connector_layout_tree(node, algorithm.clone()),
+    dgm::AlgorithmValues::Pyramid => pyramid_layout_tree(node, algorithm.clone()),
   }
+  align_children_in_parent(
+    node,
+    algorithm.horizontal_alignment,
+    algorithm.vertical_alignment,
+  );
 }
 
 fn apply_text_algorithm(
   node: &mut DiagramShapeNode,
+  algorithm: LayoutAlgorithm,
   constraints: &[DiagramConstraint],
   rules: &[DiagramRule],
   inherited_vertical_alignment: Option<dgm::TextAnchorVerticalValues>,
 ) {
+  if algorithm.text_direction == dgm::TextDirectionValues::FromBottom {
+    node.text_body.paragraphs.reverse();
+  }
+  if algorithm.text_block_direction == dgm::TextBlockDirectionValues::Vertical {
+    node
+      .text_body
+      .body_properties
+      .get_or_insert_with(|| Box::new(a::BodyProperties::default()))
+      .vertical = Some(a::TextVerticalValues::Vertical);
+  }
+  let has_child_text = node.text_body.has_child_text();
+  let right_to_left = node.text_body.is_right_to_left();
   let has_direct_font_size = node.text_body.has_direct_font_size();
   let font_size = constraints
     .iter()
@@ -3005,7 +3741,12 @@ fn apply_text_algorithm(
       .algorithms
       .iter()
       .rev()
-      .find_map(|algorithm| algorithm.text_anchor_vertical)
+      .find_map(|algorithm| {
+        has_child_text
+          .then_some(algorithm.text_anchor_vertical_with_children)
+          .flatten()
+          .or(algorithm.text_anchor_vertical)
+      })
       .or(inherited_vertical_alignment)
       .unwrap_or(dgm::TextAnchorVerticalValues::Middle)
     {
@@ -3014,11 +3755,28 @@ fn apply_text_algorithm(
       dgm::TextAnchorVerticalValues::Middle => a::TextAnchoringTypeValues::Center,
     },
   );
+  if let Some(centered) = node.algorithms.iter().rev().find_map(|algorithm| {
+    has_child_text
+      .then_some(algorithm.text_anchor_horizontal_with_children_center)
+      .flatten()
+      .or(algorithm.text_anchor_horizontal_center)
+  }) {
+    node.text_body.set_horizontal_anchor_center(centered);
+  }
+  node.text_body.apply_algorithm_spacing(&algorithm);
   let alignment = node
     .algorithms
     .iter()
     .rev()
-    .find_map(|algorithm| algorithm.parent_text_left_to_right_alignment)
+    .find_map(|algorithm| {
+      let directional = match (has_child_text, right_to_left) {
+        (true, true) => algorithm.shape_text_right_to_left_alignment_with_children,
+        (true, false) => algorithm.shape_text_left_to_right_alignment_with_children,
+        (false, true) => algorithm.parent_text_right_to_left_alignment,
+        (false, false) => algorithm.parent_text_left_to_right_alignment,
+      };
+      directional.or(algorithm.text_alignment)
+    })
     .map(drawingml_alignment_from_diagram);
   node.text_body.apply_text_algorithm_paragraph_rules(
     node
@@ -3294,9 +4052,14 @@ fn linear_layout_tree(
   if node.children.is_empty() || node.width == 0.0 || node.height == 0.0 {
     return;
   }
-  let horizontal = matches!(
-    algorithm.linear_direction,
-    LinearDirection::Left | LinearDirection::Right
+  let horizontal = algorithm.child_direction.map_or_else(
+    || {
+      matches!(
+        algorithm.linear_direction,
+        LinearDirection::Left | LinearDirection::Right
+      )
+    },
+    |direction| direction == dgm::ChildDirectionValues::Horizontal,
   );
   let reverse = matches!(
     algorithm.linear_direction,
@@ -3460,16 +4223,23 @@ fn linear_layout_tree(
   } else {
     (count - 1.0).max(0.0) * space_height
   };
-  let width_scale = if horizontal && total_primary > node.width {
+  let mut width_scale = if horizontal && total_primary > node.width {
     node.width / total_primary
   } else {
     1.0
   };
-  let height_scale = if !horizontal && total_primary > node.height {
+  let mut height_scale = if !horizontal && total_primary > node.height {
     node.height / total_primary
   } else {
     1.0
   };
+  if algorithm.fallback_dimension == dgm::FallbackDimensionValues::TwoDimension {
+    if horizontal {
+      height_scale = width_scale;
+    } else {
+      width_scale = height_scale;
+    }
+  }
   space_width *= width_scale;
   space_height *= height_scale;
   let mut cursor = if reverse {
@@ -3501,7 +4271,15 @@ fn linear_layout_tree(
         x
       };
       child.x = x.max(0.0);
-      child.y = ((node.height - height) / 2.0).max(0.0);
+      child.y = child_cross_axis_offset(
+        node.height,
+        height,
+        algorithm
+          .child_alignment
+          .or(algorithm.secondary_child_alignment),
+        algorithm.node_vertical_alignment,
+        true,
+      );
       child.width = width;
       child.height = height;
       if child.is_connector {
@@ -3521,7 +4299,15 @@ fn linear_layout_tree(
         cursor += height;
         y
       };
-      child.x = ((node.width - width) / 2.0).max(0.0);
+      child.x = child_cross_axis_offset(
+        node.width,
+        width,
+        algorithm
+          .child_alignment
+          .or(algorithm.secondary_child_alignment),
+        algorithm.node_horizontal_alignment,
+        false,
+      );
       child.y = y.max(0.0);
       child.width = width;
       child.height = height;
@@ -3540,9 +4326,91 @@ fn linear_layout_tree(
   }
 }
 
+fn child_cross_axis_offset(
+  available: f32,
+  extent: f32,
+  child_alignment: Option<ChildAlignment>,
+  node_alignment: Option<AxisAlignment>,
+  vertical_axis: bool,
+) -> f32 {
+  let alignment = child_alignment
+    .and_then(|alignment| match (vertical_axis, alignment) {
+      (true, ChildAlignment::Top) | (false, ChildAlignment::Left) => Some(AxisAlignment::Start),
+      (true, ChildAlignment::Bottom) | (false, ChildAlignment::Right) => Some(AxisAlignment::End),
+      _ => None,
+    })
+    .or(node_alignment)
+    .unwrap_or(AxisAlignment::Center);
+  axis_alignment_offset(available, extent, alignment)
+}
+
+fn axis_alignment_offset(available: f32, extent: f32, alignment: AxisAlignment) -> f32 {
+  let slack = (available - extent).max(0.0);
+  match alignment {
+    AxisAlignment::Start | AxisAlignment::None => 0.0,
+    AxisAlignment::Center => slack / 2.0,
+    AxisAlignment::End => slack,
+  }
+}
+
+fn align_children_in_parent(
+  node: &mut DiagramShapeNode,
+  horizontal: Option<AxisAlignment>,
+  vertical: Option<AxisAlignment>,
+) {
+  if node.children.is_empty() {
+    return;
+  }
+  let left = node
+    .children
+    .iter()
+    .map(|child| child.x)
+    .fold(f32::INFINITY, f32::min);
+  let top = node
+    .children
+    .iter()
+    .map(|child| child.y)
+    .fold(f32::INFINITY, f32::min);
+  let right = node
+    .children
+    .iter()
+    .map(|child| child.x + child.width)
+    .fold(f32::NEG_INFINITY, f32::max);
+  let bottom = node
+    .children
+    .iter()
+    .map(|child| child.y + child.height)
+    .fold(f32::NEG_INFINITY, f32::max);
+  let dx = horizontal
+    .filter(|alignment| *alignment != AxisAlignment::None)
+    .map(|alignment| axis_alignment_offset(node.width, right - left, alignment) - left)
+    .unwrap_or(0.0);
+  let dy = vertical
+    .filter(|alignment| *alignment != AxisAlignment::None)
+    .map(|alignment| axis_alignment_offset(node.height, bottom - top, alignment) - top)
+    .unwrap_or(0.0);
+  if dx == 0.0 && dy == 0.0 {
+    return;
+  }
+  for child in &mut node.children {
+    child.x += dx;
+    child.y += dy;
+  }
+}
+
 fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
   if node.children.is_empty() {
     return;
+  }
+  if algorithm.start_element == dgm::StartingElementValues::Transition
+    && let Some(index) = node.children.iter().position(|child| {
+      matches!(
+        child.data_node_type,
+        Some(dgm::ElementValues::ParentTransition | dgm::ElementValues::SiblingTransition)
+      )
+    })
+  {
+    node.children.rotate_left(index);
   }
   let center_x = lo_i32(node.width / 2.0);
   let center_y = lo_i32(node.height / 2.0);
@@ -3598,10 +4466,20 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
   }
 }
 
-fn connector_layout_tree(node: &mut DiagramShapeNode) {
+fn connector_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
   if !node.is_connector {
     return;
   }
+  node.connector_route = algorithm.connector_route;
+  node.connector_dimension = algorithm.connector_dimension;
+  node.connector_bend_at_end = algorithm.connector_bend_at_end;
+  node.connector_begin_arrow = algorithm.connector_begin_arrow;
+  node.connector_end_arrow = algorithm.connector_end_arrow;
+  node.connector_begin_points = connector_point_set_name(algorithm.connector_begin_points);
+  node.connector_end_points = connector_point_set_name(algorithm.connector_end_points);
+  node.connector_source_node = algorithm.connector_source_node;
+  node.connector_destination_node = algorithm.connector_destination_node;
+  node.connector_route_shortest_distance = algorithm.connector_route_shortest_distance;
   let mut properties = HashMap::from([(
     String::new(),
     HashMap::from([
@@ -3642,26 +4520,21 @@ fn connector_layout_tree(node: &mut DiagramShapeNode) {
   node.height = height;
 }
 
-fn pyramid_layout_tree(node: &mut DiagramShapeNode) {
+fn pyramid_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
   if node.children.is_empty() || node.width == 0.0 || node.height == 0.0 {
     return;
   }
   let count = node.children.len();
-  let aspect_ratio = 0.32;
-  let mut child_width = node.width / count as f32;
   let child_height = node.height / count as f32;
-  let mut x = aspect_ratio * child_width * (count - 1) as f32;
-  let mut y = aspect_ratio * child_height;
-  for child in &mut node.children {
-    child.x = x;
-    child.y = y;
-    if count > 1 {
-      x -= child_height / (count - 1) as f32;
-    }
-    child_width += child_height;
-    child.width = child_width;
+  for (index, child) in node.children.iter_mut().enumerate() {
+    child.x = 0.0;
+    child.y = if algorithm.linear_direction == LinearDirection::Bottom {
+      node.height - (index + 1) as f32 * child_height
+    } else {
+      index as f32 * child_height
+    };
+    child.width = node.width;
     child.height = child_height;
-    y += child_height;
   }
 }
 
@@ -3672,6 +4545,15 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
 
   let direction = if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot {
     LinearDirection::Top
+  } else if algorithm.child_direction == Some(dgm::ChildDirectionValues::Vertical) {
+    LinearDirection::Top
+  } else if algorithm.child_direction == Some(dgm::ChildDirectionValues::Horizontal)
+    && matches!(
+      algorithm.linear_direction,
+      LinearDirection::Top | LinearDirection::Bottom
+    )
+  {
+    LinearDirection::Left
   } else {
     algorithm.linear_direction
   };
@@ -3758,10 +4640,15 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
     }
     index += 1;
   }
+  align_children_in_parent(
+    node,
+    algorithm.hierarchy_horizontal_alignment,
+    algorithm.hierarchy_vertical_alignment,
+  );
 }
 
 fn vertical_shapes_count(node: &DiagramShapeNode) -> usize {
-  let Some(algorithm) = node.algorithms.last().copied() else {
+  let Some(algorithm) = node.algorithms.last().cloned() else {
     return if node.is_connector { 0 } else { 1 };
   };
   if node.children.is_empty() {
@@ -3769,6 +4656,15 @@ fn vertical_shapes_count(node: &DiagramShapeNode) -> usize {
   }
   let direction = if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot {
     LinearDirection::Top
+  } else if algorithm.child_direction == Some(dgm::ChildDirectionValues::Vertical) {
+    LinearDirection::Top
+  } else if algorithm.child_direction == Some(dgm::ChildDirectionValues::Horizontal)
+    && matches!(
+      algorithm.linear_direction,
+      LinearDirection::Top | LinearDirection::Bottom
+    )
+  {
+    LinearDirection::Left
   } else {
     algorithm.linear_direction
   };
@@ -3885,18 +4781,11 @@ fn snake_layout_tree(
     .collect();
 
   let space_from_constraints = space_from_constraint != 1.0;
-  let mut horizontal = true;
   let (increment_x, increment_y) = match algorithm.grow_direction {
     GrowDirection::TopLeft => (1.0, 1.0),
     GrowDirection::TopRight => (-1.0, 1.0),
-    GrowDirection::BottomLeft => {
-      horizontal = false;
-      (1.0, -1.0)
-    }
-    GrowDirection::BottomRight => {
-      horizontal = false;
-      (-1.0, -1.0)
-    }
+    GrowDirection::BottomLeft => (1.0, -1.0),
+    GrowDirection::BottomRight => (-1.0, -1.0),
   };
 
   let count = node.children.len();
@@ -3923,6 +4812,18 @@ fn snake_layout_tree(
       }
     }
   }
+  match algorithm.breakpoint {
+    dgm::BreakpointValues::Fixed => {
+      columns = algorithm.breakpoint_fixed_value.min(count).max(1);
+      rows = count.div_ceil(columns);
+    }
+    dgm::BreakpointValues::Balanced => {
+      let canvas_aspect = (node.width / node.height.max(f32::EPSILON)).max(f32::EPSILON);
+      columns = ((count as f32 * canvas_aspect).sqrt().ceil() as usize).clamp(1, count.max(1));
+      rows = count.div_ceil(columns);
+    }
+    dgm::BreakpointValues::EndCanvas => {}
+  }
 
   let mut child_width = lo_i32(node.width / (columns as f32 + (columns - 1) as f32 * space));
   let mut child_height = lo_i32(child_width * grid_aspect_ratio);
@@ -3935,7 +4836,6 @@ fn snake_layout_tree(
     if child_aspect_ratio > 1.0 {
       child_width = node.width.min(lo_i32(child_height * child_aspect_ratio));
     }
-    horizontal = false;
   }
 
   let mut x = if increment_x == -1.0 {
@@ -3945,7 +4845,7 @@ fn snake_layout_tree(
   };
   let mut y = if increment_y == -1.0 {
     node.height - child_height
-  } else if space_from_constraints && !horizontal {
+  } else if space_from_constraints && algorithm.flow_direction == dgm::FlowDirectionValues::Column {
     child_height * space * 2.0
   } else {
     0.0
@@ -4048,10 +4948,225 @@ fn snake_layout_tree(
       }
     }
   }
+  if algorithm.offset == dgm::OffsetValues::Offset {
+    for (index, child) in node.children.iter_mut().enumerate() {
+      let line = index / columns.max(1);
+      if line.is_multiple_of(2) {
+        continue;
+      }
+      child.x += increment_x * child.width * 0.5;
+    }
+  }
+  if algorithm.flow_direction == dgm::FlowDirectionValues::Column {
+    for child in &mut node.children {
+      let old_x = child.x;
+      let old_y = child.y;
+      let old_width = child.width;
+      let old_height = child.height;
+      child.x = old_y / node.height.max(f32::EPSILON) * node.width;
+      child.y = old_x / node.width.max(f32::EPSILON) * node.height;
+      child.width = old_height / node.height.max(f32::EPSILON) * node.width;
+      child.height = old_width / node.width.max(f32::EPSILON) * node.height;
+    }
+  }
 }
 
 fn lo_i32(value: f32) -> f32 {
   (value as i32) as f32
+}
+
+#[derive(Clone, Debug)]
+struct DiagramNamedBounds {
+  name: String,
+  x: f32,
+  y: f32,
+  width: f32,
+  height: f32,
+}
+
+fn resolve_diagram_connector_targets(root: &mut DiagramShapeNode) {
+  let mut bounds = Vec::new();
+  collect_diagram_named_bounds(root, 0.0, 0.0, &mut bounds);
+  resolve_diagram_connector_targets_in_node(root, 0.0, 0.0, &bounds);
+}
+
+fn collect_diagram_named_bounds(
+  node: &DiagramShapeNode,
+  parent_x: f32,
+  parent_y: f32,
+  output: &mut Vec<DiagramNamedBounds>,
+) {
+  let x = parent_x + node.x;
+  let y = parent_y + node.y;
+  if !node.internal_name.is_empty() {
+    output.push(DiagramNamedBounds {
+      name: node.internal_name.clone(),
+      x,
+      y,
+      width: node.width,
+      height: node.height,
+    });
+  }
+  for child in &node.children {
+    collect_diagram_named_bounds(child, x, y, output);
+  }
+}
+
+fn resolve_diagram_connector_targets_in_node(
+  node: &mut DiagramShapeNode,
+  parent_x: f32,
+  parent_y: f32,
+  bounds: &[DiagramNamedBounds],
+) {
+  let x = parent_x + node.x;
+  let y = parent_y + node.y;
+  if node.is_connector {
+    let connector_center = (x + node.width / 2.0, y + node.height / 2.0);
+    let source = node
+      .connector_source_node
+      .as_deref()
+      .and_then(|name| nearest_diagram_named_bounds(name, connector_center, bounds));
+    let destination = node
+      .connector_destination_node
+      .as_deref()
+      .and_then(|name| nearest_diagram_named_bounds(name, connector_center, bounds));
+    let (default_start, default_end) =
+      default_diagram_connector_points(node, x, y, connector_center);
+    let source_target = destination
+      .map(diagram_bounds_center)
+      .unwrap_or(default_end);
+    let destination_target = source.map(diagram_bounds_center).unwrap_or(default_start);
+    node.connector_start_override = source.map(|source| {
+      let point = diagram_bounds_attachment(
+        source,
+        node.connector_begin_points.as_deref(),
+        source_target,
+        node.connector_route_shortest_distance,
+      );
+      (point.0 - x, point.1 - y)
+    });
+    node.connector_end_override = destination.map(|destination| {
+      let point = diagram_bounds_attachment(
+        destination,
+        node.connector_end_points.as_deref(),
+        destination_target,
+        node.connector_route_shortest_distance,
+      );
+      (point.0 - x, point.1 - y)
+    });
+  }
+  for child in &mut node.children {
+    resolve_diagram_connector_targets_in_node(child, x, y, bounds);
+  }
+}
+
+fn nearest_diagram_named_bounds<'a>(
+  name: &str,
+  point: (f32, f32),
+  bounds: &'a [DiagramNamedBounds],
+) -> Option<&'a DiagramNamedBounds> {
+  bounds
+    .iter()
+    .filter(|bounds| bounds.name == name)
+    .min_by(|left, right| {
+      let distance = |bounds: &DiagramNamedBounds| {
+        let center = diagram_bounds_center(bounds);
+        (center.0 - point.0).powi(2) + (center.1 - point.1).powi(2)
+      };
+      distance(left).total_cmp(&distance(right))
+    })
+}
+
+fn diagram_bounds_center(bounds: &DiagramNamedBounds) -> (f32, f32) {
+  (
+    bounds.x + bounds.width / 2.0,
+    bounds.y + bounds.height / 2.0,
+  )
+}
+
+fn default_diagram_connector_points(
+  node: &DiagramShapeNode,
+  x: f32,
+  y: f32,
+  center: (f32, f32),
+) -> ((f32, f32), (f32, f32)) {
+  let length = node.width.max(node.height).max(1.0);
+  let radians = node.connector_angle_deg.to_radians();
+  let delta = (radians.cos() * length / 2.0, radians.sin() * length / 2.0);
+  let bounds = DiagramNamedBounds {
+    name: String::new(),
+    x,
+    y,
+    width: node.width,
+    height: node.height,
+  };
+  (
+    diagram_bounds_attachment(
+      &bounds,
+      node.connector_begin_points.as_deref(),
+      (center.0 - delta.0, center.1 - delta.1),
+      false,
+    ),
+    diagram_bounds_attachment(
+      &bounds,
+      node.connector_end_points.as_deref(),
+      (center.0 + delta.0, center.1 + delta.1),
+      false,
+    ),
+  )
+}
+
+fn diagram_bounds_attachment(
+  bounds: &DiagramNamedBounds,
+  authored: Option<&str>,
+  toward: (f32, f32),
+  shortest: bool,
+) -> (f32, f32) {
+  let center = diagram_bounds_center(bounds);
+  let top = (center.0, bounds.y);
+  let bottom = (center.0, bounds.y + bounds.height);
+  let left = (bounds.x, center.1);
+  let right = (bounds.x + bounds.width, center.1);
+  match authored {
+    Some("tCtr") => top,
+    Some("bCtr") => bottom,
+    Some("midL") => left,
+    Some("midR") => right,
+    Some("midL midR") => {
+      if (left.0 - toward.0).abs() <= (right.0 - toward.0).abs() {
+        left
+      } else {
+        right
+      }
+    }
+    Some("radial") | None if !shortest => {
+      let dx = toward.0 - center.0;
+      let dy = toward.1 - center.1;
+      if dx.abs() <= f32::EPSILON && dy.abs() <= f32::EPSILON {
+        return center;
+      }
+      let tx = if dx.abs() > f32::EPSILON {
+        bounds.width.abs() / 2.0 / dx.abs()
+      } else {
+        f32::INFINITY
+      };
+      let ty = if dy.abs() > f32::EPSILON {
+        bounds.height.abs() / 2.0 / dy.abs()
+      } else {
+        f32::INFINITY
+      };
+      let scale = tx.min(ty);
+      (center.0 + dx * scale, center.1 + dy * scale)
+    }
+    Some("radial") | None | Some(_) => [top, bottom, left, right]
+      .into_iter()
+      .min_by(|left, right| {
+        let distance =
+          |point: (f32, f32)| (point.0 - toward.0).powi(2) + (point.1 - toward.1).powi(2);
+        distance(*left).total_cmp(&distance(*right))
+      })
+      .unwrap_or(center),
+  }
 }
 
 fn sort_diagram_shape_children_by_z_order(node: &mut DiagramShapeNode) {
@@ -4108,6 +5223,19 @@ fn flatten_diagram_shape_tree(
       draw_geometry,
       is_connector: node.is_connector,
       connector_angle_deg: node.connector_angle_deg,
+      connector_route: node.connector_route,
+      connector_dimension: node.connector_dimension,
+      connector_bend_at_end: node.connector_bend_at_end,
+      connector_begin_arrow: node.connector_begin_arrow,
+      connector_end_arrow: node.connector_end_arrow,
+      connector_begin_points: node.connector_begin_points.clone(),
+      connector_end_points: node.connector_end_points.clone(),
+      connector_start_override: node
+        .connector_start_override
+        .map(|point| (x + point.0, y + point.1)),
+      connector_end_override: node
+        .connector_end_override
+        .map(|point| (x + point.0, y + point.1)),
       is_blip_placeholder: node.is_blip_placeholder,
       fill: node.fill,
       text_order: node.text_order,
@@ -4118,5 +5246,119 @@ fn flatten_diagram_shape_tree(
   }
   for child in &node.children {
     flatten_diagram_shape_tree(child, x, y, shapes);
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn parameter(kind: dgm::ParameterIdValues, value: &str) -> dgm::Parameter {
+    dgm::Parameter {
+      r#type: kind,
+      val: Some(value.to_string()),
+      ..dgm::Parameter::default()
+    }
+  }
+
+  #[test]
+  fn spatial_vertical_alignment_is_not_used_as_text_anchor() {
+    let algorithm = dgm::Algorithm {
+      r#type: dgm::AlgorithmValues::Linear,
+      parameter: vec![
+        parameter(dgm::ParameterIdValues::VerticalAlignment, "b"),
+        parameter(dgm::ParameterIdValues::TextAnchorVertical, "t"),
+      ],
+      ..dgm::Algorithm::default()
+    };
+    let algorithm = layout_algorithm(&algorithm);
+    assert_eq!(algorithm.vertical_alignment, Some(AxisAlignment::End));
+    assert_eq!(
+      algorithm.text_anchor_vertical,
+      Some(dgm::TextAnchorVerticalValues::Top)
+    );
+  }
+
+  #[test]
+  fn connector_parameters_retain_route_ends_and_attachment_sets() {
+    let algorithm = dgm::Algorithm {
+      r#type: dgm::AlgorithmValues::Connector,
+      parameter: vec![
+        parameter(dgm::ParameterIdValues::ConnectionRoute, "curve"),
+        parameter(dgm::ParameterIdValues::BendPoint, "beg"),
+        parameter(dgm::ParameterIdValues::BeginningArrowheadStyle, "arr"),
+        parameter(dgm::ParameterIdValues::EndStyle, "arr"),
+        parameter(dgm::ParameterIdValues::BeginningPoints, "midL midR"),
+        parameter(dgm::ParameterIdValues::EndPoints, "tCtr"),
+        parameter(dgm::ParameterIdValues::SourceNode, "source"),
+        parameter(dgm::ParameterIdValues::DestinationNode, "destination"),
+        parameter(dgm::ParameterIdValues::ConnectorDimension, "2D"),
+        parameter(dgm::ParameterIdValues::RouteShortestDistance, "true"),
+      ],
+      ..dgm::Algorithm::default()
+    };
+    let algorithm = layout_algorithm(&algorithm);
+    assert_eq!(algorithm.connector_route, DiagramConnectorRoute::Curve);
+    assert!(!algorithm.connector_bend_at_end);
+    assert!(algorithm.connector_begin_arrow);
+    assert!(algorithm.connector_end_arrow);
+    assert_eq!(
+      algorithm.connector_begin_points,
+      ConnectorPointSet::MiddleLeftOrRight
+    );
+    assert_eq!(algorithm.connector_end_points, ConnectorPointSet::TopCenter);
+    assert_eq!(algorithm.connector_source_node.as_deref(), Some("source"));
+    assert_eq!(
+      algorithm.connector_destination_node.as_deref(),
+      Some("destination")
+    );
+    assert_eq!(
+      algorithm.connector_dimension,
+      dgm::ConnectorDimensionValues::TwoDimension
+    );
+    assert!(algorithm.connector_route_shortest_distance);
+  }
+
+  #[test]
+  fn snake_parameters_retain_flow_breakpoint_and_offset() {
+    let algorithm = dgm::Algorithm {
+      r#type: dgm::AlgorithmValues::Snake,
+      parameter: vec![
+        parameter(dgm::ParameterIdValues::FlowDirection, "col"),
+        parameter(dgm::ParameterIdValues::Breakpoint, "fixed"),
+        parameter(dgm::ParameterIdValues::BreakpointFixedValue, "3"),
+        parameter(dgm::ParameterIdValues::Offset, "off"),
+        parameter(dgm::ParameterIdValues::ContinueDirection, "sameDir"),
+      ],
+      ..dgm::Algorithm::default()
+    };
+    let algorithm = layout_algorithm(&algorithm);
+    assert_eq!(algorithm.flow_direction, dgm::FlowDirectionValues::Column);
+    assert_eq!(algorithm.breakpoint, dgm::BreakpointValues::Fixed);
+    assert_eq!(algorithm.breakpoint_fixed_value, 3);
+    assert_eq!(algorithm.offset, dgm::OffsetValues::Offset);
+    assert_eq!(
+      algorithm.continue_direction,
+      ContinueDirection::SameDirection
+    );
+  }
+
+  #[test]
+  fn named_connector_attachment_uses_the_requested_shape_edge() {
+    let bounds = DiagramNamedBounds {
+      name: "node".to_string(),
+      x: 10.0,
+      y: 20.0,
+      width: 40.0,
+      height: 30.0,
+    };
+    assert_eq!(
+      diagram_bounds_attachment(&bounds, Some("bCtr"), (30.0, 100.0), false),
+      (30.0, 50.0)
+    );
+    assert_eq!(
+      diagram_bounds_attachment(&bounds, Some("midL midR"), (100.0, 35.0), true),
+      (50.0, 35.0)
+    );
   }
 }

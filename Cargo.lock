@@ -1401,6 +1401,8 @@ dependencies = [
  "rustc-hash",
  "smallvec",
  "thiserror",
+ "tiny-skia",
+ "ttf-parser",
  "unicode-bidi",
  "unicode-script",
 ]

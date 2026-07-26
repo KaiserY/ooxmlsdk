@@ -955,9 +955,10 @@ fn print_area_is_empty(
   area: CellRange,
   text_metrics: &mut TextMetrics,
 ) -> bool {
-  // Calc treats a block as printable when it has cell content, border lines, or
-  // drawing content. Drawing content is checked by the caller because it uses
-  // drawing anchors rather than cell records.
+  // Excel retains pages containing visible cell paint even when their cells
+  // have no values. This matters for wide formatted ranges whose trailing
+  // columns fall on a separate horizontal page. Drawing content is checked by
+  // the caller because it uses drawing anchors rather than cell records.
   for (row_position, row) in sheet.rows.iter().enumerate() {
     let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
     if row_index < area.start.row || row_index > area.end.row || row.hidden {
@@ -990,6 +991,7 @@ fn print_area_is_empty(
         || borders.right.is_some()
         || borders.top.is_some()
         || borders.bottom.is_some()
+        || import.styles.fill_for_cell(style_index).color.is_some()
       {
         return false;
       }
@@ -1144,6 +1146,7 @@ fn sheet_body_is_empty(import: &ExcelImport, sheet: &CalcSheet) -> bool {
         && borders.right.is_none()
         && borders.top.is_none()
         && borders.bottom.is_none()
+        && import.styles.fill_for_cell(style_index).color.is_none()
     })
   })
 }

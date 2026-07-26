@@ -2,12 +2,16 @@ use super::{
   LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE, LO_SUBSCRIPT_BASELINE_SHIFT_SCALE,
   LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE, MIN_ESCAPEMENT_FONT_SIZE_PT, ParagraphFormat,
   ParagraphProps, RunProps, RunStyleOverrides, StylesCatalog, TextStyle, ThemeColors, ThemeFonts,
-  merge_paragraph_format, resolve_run_color, resolve_text_fill, resolve_text_outline,
+  apply_w14_scheme_transforms, drawingml_text_effect_common_fill,
+  drawingml_text_outline_effect_common_fill, merge_paragraph_format,
+  opacity_from_w14_rgb_transforms, opacity_from_w14_scheme_transforms, parse_hex_color,
+  resolve_run_color, resolve_text_fill, resolve_text_outline,
 };
 use crate::common;
 use crate::units;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_word_2010_wordml as w14;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
+use std::sync::Arc;
 
 pub(super) fn paragraph_format(
   styles: &StylesCatalog,
@@ -170,21 +174,125 @@ pub(super) fn merge_run_style(
       style.color = rgb;
     }
   }
-  if let Some(fill) = properties.text_fill()
-    && let Some(resolved) = resolve_text_fill(fill, theme_colors)
-  {
-    style.color = resolved.color;
-    style.opacity = resolved.opacity;
+  if let Some(fill_effect) = properties.text_fill() {
+    match drawingml_text_effect_common_fill(fill_effect, theme_colors) {
+      Some(common::Fill::None) => {
+        // w14:textFill supersedes w:color. Keep the run for layout and for an
+        // independently authored outline, but do not paint its interior.
+        style.opacity = 0.0;
+      }
+      Some(fill @ common::Fill::Gradient(_)) => {
+        // Word's fixed-format writer clips the authored gradient to glyph
+        // outlines and retains a separate searchable text layer.
+        style.pdf_glyph_outlines = true;
+        style.opacity = 1.0;
+        let mut options = style
+          .pdf_glyph_outline_options
+          .as_deref()
+          .cloned()
+          .unwrap_or_default();
+        options.semantic_text_overlay = true;
+        options.fill = Some(fill);
+        style.pdf_glyph_outline_options = Some(Arc::new(options));
+      }
+      Some(common::Fill::Solid(_)) | None => {
+        if let Some(resolved) = resolve_text_fill(fill_effect, theme_colors) {
+          style.color = resolved.color;
+          style.opacity = resolved.opacity;
+        }
+      }
+      Some(common::Fill::Pattern(_))
+      | Some(common::Fill::Theme(_))
+      | Some(common::Fill::Image { .. }) => {
+        // The Word 2010 text-effect schema cannot produce these variants.
+      }
+    }
   }
-  if let Some(outline) = properties.text_outline()
-    && let Some(resolved) = resolve_text_outline(outline, theme_colors)
-  {
-    style.outline_color = Some(resolved.color);
-    style.outline_opacity = resolved.opacity;
-    style.outline_width_pt = outline
+  if let Some(outline_effect) = properties.text_outline() {
+    style.outline_width_pt = outline_effect
       .line_width
       .map(|width| units::emu_to_points(width as i64))
       .unwrap_or(style.outline_width_pt);
+    match drawingml_text_outline_effect_common_fill(outline_effect, theme_colors) {
+      Some(common::Fill::None) => {
+        style.outline_color = None;
+        style.outline_width_pt = 0.0;
+        if let Some(options) = style.pdf_glyph_outline_options.as_deref() {
+          let mut options = options.clone();
+          options.outline_fill = None;
+          options.outline_stroke = None;
+          style.pdf_glyph_outline_options = Some(Arc::new(options));
+        }
+      }
+      Some(fill @ common::Fill::Gradient(_)) => {
+        style.pdf_glyph_outlines = true;
+        let mut options = style
+          .pdf_glyph_outline_options
+          .as_deref()
+          .cloned()
+          .unwrap_or_default();
+        options.semantic_text_overlay = true;
+        options.outline_fill = Some(fill);
+        style.pdf_glyph_outline_options = Some(Arc::new(options));
+      }
+      Some(common::Fill::Solid(_)) | None => {
+        if let Some(resolved) = resolve_text_outline(outline_effect, theme_colors) {
+          style.outline_color = Some(resolved.color);
+          style.outline_opacity = resolved.opacity;
+        }
+      }
+      Some(common::Fill::Pattern(_))
+      | Some(common::Fill::Theme(_))
+      | Some(common::Fill::Image { .. }) => {}
+    }
+  }
+  if let Some(glow) = properties.text_glow()
+    && let Some(color) = glow
+      .glow_choice
+      .as_ref()
+      .and_then(|choice| resolve_w14_glow_color(choice, theme_colors))
+  {
+    style.text_glow = Some(common::drawingml_image_effects::WordprocessingTextGlow {
+      radius_px: glow.glow_radius.unwrap_or_default() as f32 / 9_525.0,
+      color,
+    });
+  }
+  if let Some(shadow) = properties.text_shadow()
+    && let Some(color) = shadow
+      .shadow_choice
+      .as_ref()
+      .and_then(|choice| resolve_w14_shadow_color(choice, theme_colors))
+  {
+    style.text_shadow = Some(common::drawingml_image_effects::WordprocessingTextShadow {
+      blur_radius_px: shadow.blur_radius.unwrap_or_default() as f32 / 9_525.0,
+      distance_px: shadow.distance_from_text.unwrap_or_default() as f32 / 9_525.0,
+      direction_degrees: shadow.direction_angle.unwrap_or_default() as f32 / 60_000.0,
+      scale_x: shadow.horizontal_scaling_factor.unwrap_or(100_000) as f32 / 100_000.0,
+      scale_y: shadow.vertical_scaling_factor.unwrap_or(100_000) as f32 / 100_000.0,
+      skew_x_degrees: shadow.horizontal_skew_angle.unwrap_or_default() as f32 / 60_000.0,
+      skew_y_degrees: shadow.vertical_skew_angle.unwrap_or_default() as f32 / 60_000.0,
+      alignment: w14_effect_alignment(shadow.alignment),
+      color,
+    });
+  }
+  if let Some(reflection) = properties.text_reflection() {
+    style.text_reflection = Some(
+      common::drawingml_image_effects::WordprocessingTextReflection {
+        blur_radius_px: reflection.blur_radius.unwrap_or_default() as f32 / 9_525.0,
+        start_opacity: reflection.starting_opacity.unwrap_or(100_000) as f32 / 100_000.0,
+        start_position: reflection.start_position.unwrap_or_default() as f32 / 100_000.0,
+        end_opacity: reflection.ending_opacity.unwrap_or_default() as f32 / 100_000.0,
+        end_position: reflection.end_position.unwrap_or(100_000) as f32 / 100_000.0,
+        distance_px: reflection.distance_from_text.unwrap_or_default() as f32 / 9_525.0,
+        direction_degrees: reflection.direction_angle.unwrap_or_default() as f32 / 60_000.0,
+        fade_direction_degrees: reflection.fade_direction.unwrap_or_default() as f32 / 60_000.0,
+        scale_x: reflection.horizontal_scaling_factor.unwrap_or(100_000) as f32 / 100_000.0,
+        scale_y: reflection.vertical_scaling_factor.unwrap_or(100_000) as f32 / 100_000.0,
+        skew_x_degrees: reflection.horizontal_skew_angle.unwrap_or_default() as f32 / 60_000.0,
+        skew_y_degrees: reflection.vertical_skew_angle.unwrap_or_default() as f32 / 60_000.0,
+        alignment: w14_effect_alignment(reflection.alignment),
+      },
+    );
   }
   if let Some(spacing) = properties.spacing() {
     style.character_spacing_pt = units::twips_to_points(spacing.val as f32);
@@ -301,6 +409,66 @@ pub(super) fn merge_run_style(
   }
   if let Some(highlight) = properties.highlight() {
     style.highlight = highlight_color(highlight.val);
+  }
+}
+
+fn resolve_w14_glow_color(
+  choice: &w14::GlowChoice,
+  theme_colors: &ThemeColors,
+) -> Option<common::drawingml_image_effects::ResolvedEffectColor> {
+  match choice {
+    w14::GlowChoice::RgbColorModelHex(color) => resolve_w14_rgb_effect_color(color),
+    w14::GlowChoice::SchemeColor(color) => resolve_w14_scheme_effect_color(color, theme_colors),
+  }
+}
+
+fn resolve_w14_shadow_color(
+  choice: &w14::ShadowChoice,
+  theme_colors: &ThemeColors,
+) -> Option<common::drawingml_image_effects::ResolvedEffectColor> {
+  match choice {
+    w14::ShadowChoice::RgbColorModelHex(color) => resolve_w14_rgb_effect_color(color),
+    w14::ShadowChoice::SchemeColor(color) => resolve_w14_scheme_effect_color(color, theme_colors),
+  }
+}
+
+fn resolve_w14_rgb_effect_color(
+  color: &w14::RgbColorModelHex,
+) -> Option<common::drawingml_image_effects::ResolvedEffectColor> {
+  Some(common::drawingml_image_effects::ResolvedEffectColor {
+    color: parse_hex_color(color.val.as_str())?,
+    alpha: (opacity_from_w14_rgb_transforms(&color.rgb_color_model_hex_choice) * 255.0)
+      .round()
+      .clamp(0.0, 255.0) as u8,
+  })
+}
+
+fn resolve_w14_scheme_effect_color(
+  color: &w14::SchemeColor,
+  theme_colors: &ThemeColors,
+) -> Option<common::drawingml_image_effects::ResolvedEffectColor> {
+  Some(common::drawingml_image_effects::ResolvedEffectColor {
+    color: apply_w14_scheme_transforms(
+      theme_colors.resolve_word2010(color.val)?,
+      &color.scheme_color_choice,
+    ),
+    alpha: (opacity_from_w14_scheme_transforms(&color.scheme_color_choice) * 255.0)
+      .round()
+      .clamp(0.0, 255.0) as u8,
+  })
+}
+
+fn w14_effect_alignment(alignment: Option<w14::RectangleAlignmentValues>) -> (f32, f32) {
+  match alignment.unwrap_or(w14::RectangleAlignmentValues::Bottom) {
+    w14::RectangleAlignmentValues::TopLeft => (0.0, 0.0),
+    w14::RectangleAlignmentValues::Top => (0.5, 0.0),
+    w14::RectangleAlignmentValues::TopRight => (1.0, 0.0),
+    w14::RectangleAlignmentValues::Left => (0.0, 0.5),
+    w14::RectangleAlignmentValues::Center => (0.5, 0.5),
+    w14::RectangleAlignmentValues::Right => (1.0, 0.5),
+    w14::RectangleAlignmentValues::BottomLeft => (0.0, 1.0),
+    w14::RectangleAlignmentValues::Bottom | w14::RectangleAlignmentValues::None => (0.5, 1.0),
+    w14::RectangleAlignmentValues::BottomRight => (1.0, 1.0),
   }
 }
 

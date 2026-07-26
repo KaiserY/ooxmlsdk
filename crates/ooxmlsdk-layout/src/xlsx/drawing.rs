@@ -22,7 +22,7 @@ use ooxmlsdk::sdk::SdkPart;
 use crate::common;
 use crate::error::Result;
 use crate::model::{ImageCrop, RgbColor};
-use crate::pptx::drawingml::color::{Color, RgbHexColor};
+use crate::pptx::drawingml::color::{Color, RgbHexColor, SchemeColor};
 use crate::render::chart as shared_chart;
 
 use super::normalize_hyperlink_target;
@@ -94,7 +94,7 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) text_font_family: Option<String>,
   pub(crate) text_east_asia_font_family: Option<String>,
   pub(crate) text_complex_font_family: Option<String>,
-  pub(crate) text_color: Option<RgbColor>,
+  pub(crate) text_color: Option<Color>,
   pub(crate) text_bold: Option<bool>,
   pub(crate) text_italic: Option<bool>,
   pub(crate) text_alignment: Option<a::TextAlignmentTypeValues>,
@@ -108,18 +108,25 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) text_bottom_inset_emu: Option<i64>,
   pub(crate) child_objects: usize,
   pub(crate) has_style: bool,
-  pub(crate) fill_color: Option<RgbColor>,
+  pub(crate) fill_color: Option<Color>,
   pub(crate) fill_pattern: Option<common::PatternFill>,
   pub(crate) fill_gradient: Option<Box<a::GradientFill>>,
-  pub(crate) line_color: Option<RgbColor>,
+  pub(crate) use_group_fill: bool,
+  pub(crate) line_color: Option<Color>,
   pub(crate) line_pattern: Option<common::PatternFill>,
+  pub(crate) line_gradient: Option<Box<a::GradientFill>>,
   pub(crate) line_width_emu: Option<i32>,
   pub(crate) no_line: bool,
   pub(crate) rotation_deg: f32,
   pub(crate) flip_horizontal: bool,
   pub(crate) flip_vertical: bool,
   pub(crate) image_crop: ImageCrop,
+  pub(crate) image_tile: Option<Box<a::Tile>>,
+  pub(crate) image_rotate_with_shape: bool,
   pub(crate) image_effects: Vec<a::BlipChoice>,
+  pub(crate) shape_effects: Option<common::DrawingEffectSource>,
+  pub(crate) scene3d: Option<Box<a::Scene3DType>>,
+  pub(crate) shape3d: Option<Box<a::Shape3DType>>,
   pub(crate) transform_offset_emu: Option<(i64, i64)>,
   pub(crate) transform_extent_emu: Option<(i64, i64)>,
   pub(crate) group_child_offset_emu: Option<(i64, i64)>,
@@ -639,7 +646,8 @@ impl DrawingObjectModel {
       text_color: shape
         .text_body
         .as_deref()
-        .and_then(xdr_text_body_first_run_color),
+        .and_then(xdr_text_body_first_run_color)
+        .or_else(|| shape_style_font_color(shape.shape_style.as_deref())),
       text_bold: shape
         .text_body
         .as_deref()
@@ -705,9 +713,11 @@ impl DrawingObjectModel {
         .or_else(|| shape_style_fill_color(shape.shape_style.as_deref())),
       fill_pattern: shape_fill_pattern(&shape.shape_properties),
       fill_gradient: shape_fill_gradient(&shape.shape_properties),
+      use_group_fill: shape_uses_group_fill(&shape.shape_properties),
       line_color: shape_line_color(&shape.shape_properties)
         .or_else(|| shape_style_line_color(shape.shape_style.as_deref())),
       line_pattern: shape_line_pattern(&shape.shape_properties),
+      line_gradient: shape_line_gradient(&shape.shape_properties),
       line_width_emu: shape_line_width_emu(&shape.shape_properties),
       no_line: shape_no_line(&shape.shape_properties),
       rotation_deg: transform_rotation_deg(shape.shape_properties.transform2_d.as_deref()),
@@ -716,10 +726,20 @@ impl DrawingObjectModel {
       image_crop: shape_blip_fill(&shape.shape_properties)
         .map(drawingml_blip_crop)
         .unwrap_or_default(),
+      image_tile: shape_blip_fill(&shape.shape_properties).and_then(shape_blip_tile),
+      image_rotate_with_shape: shape_blip_fill(&shape.shape_properties).is_some_and(|fill| {
+        fill
+          .rotate_with_shape
+          .as_ref()
+          .is_some_and(|value| value.as_bool())
+      }),
       image_effects: shape_blip_fill(&shape.shape_properties)
         .and_then(|fill| fill.blip.as_deref())
         .map(|blip| blip.blip_choice.clone())
         .unwrap_or_default(),
+      shape_effects: xdr_shape_effects(&shape.shape_properties),
+      scene3d: shape.shape_properties.scene3_d_type.clone(),
+      shape3d: shape.shape_properties.shape3_d_type.clone(),
       transform_offset_emu: transform_offset(shape.shape_properties.transform2_d.as_deref()),
       transform_extent_emu: transform_extent(shape.shape_properties.transform2_d.as_deref()),
       group_child_offset_emu: None,
@@ -767,11 +787,13 @@ impl DrawingObjectModel {
       text_len: group_shape_text_len(group),
       child_objects: group.group_shape_choice.len(),
       has_style: false,
-      fill_color: None,
-      fill_pattern: None,
-      fill_gradient: None,
+      fill_color: group_fill_color(&group.group_shape_properties),
+      fill_pattern: group_fill_pattern(&group.group_shape_properties),
+      fill_gradient: group_fill_gradient(&group.group_shape_properties),
+      use_group_fill: group_uses_group_fill(&group.group_shape_properties),
       line_color: None,
       line_pattern: None,
+      line_gradient: None,
       line_width_emu: None,
       no_line: false,
       rotation_deg: group
@@ -796,7 +818,25 @@ impl DrawingObjectModel {
         .map(bool::from)
         .unwrap_or(false),
       image_crop: ImageCrop::default(),
+      image_tile: None,
+      image_rotate_with_shape: false,
       image_effects: Vec::new(),
+      shape_effects: group
+        .group_shape_properties
+        .group_shape_properties_choice2
+        .as_ref()
+        .map(|choice| match choice {
+          xdr::GroupShapePropertiesChoice2::EffectList(list) => common::DrawingEffectSource::List {
+            source: list.clone(),
+            resolved: None,
+          },
+          xdr::GroupShapePropertiesChoice2::EffectDag(dag) => common::DrawingEffectSource::Dag {
+            source: dag.clone(),
+            resolved: None,
+          },
+        }),
+      scene3d: group.group_shape_properties.scene3_d_type.clone(),
+      shape3d: None,
       transform_offset_emu: group
         .group_shape_properties
         .transform_group
@@ -871,8 +911,10 @@ impl DrawingObjectModel {
       fill_color: None,
       fill_pattern: None,
       fill_gradient: None,
+      use_group_fill: false,
       line_color: None,
       line_pattern: None,
+      line_gradient: None,
       line_width_emu: None,
       no_line: false,
       rotation_deg: frame
@@ -891,7 +933,12 @@ impl DrawingObjectModel {
         .map(bool::from)
         .unwrap_or(false),
       image_crop: ImageCrop::default(),
+      image_tile: None,
+      image_rotate_with_shape: false,
       image_effects: Vec::new(),
+      shape_effects: None,
+      scene3d: None,
+      shape3d: None,
       transform_offset_emu: frame
         .transform
         .offset
@@ -953,9 +1000,11 @@ impl DrawingObjectModel {
         .or_else(|| shape_style_fill_color(shape.shape_style.as_deref())),
       fill_pattern: shape_fill_pattern(&shape.shape_properties),
       fill_gradient: shape_fill_gradient(&shape.shape_properties),
+      use_group_fill: shape_uses_group_fill(&shape.shape_properties),
       line_color: shape_line_color(&shape.shape_properties)
         .or_else(|| shape_style_line_color(shape.shape_style.as_deref())),
       line_pattern: shape_line_pattern(&shape.shape_properties),
+      line_gradient: shape_line_gradient(&shape.shape_properties),
       line_width_emu: shape_line_width_emu(&shape.shape_properties),
       no_line: shape_no_line(&shape.shape_properties),
       rotation_deg: transform_rotation_deg(shape.shape_properties.transform2_d.as_deref()),
@@ -964,10 +1013,20 @@ impl DrawingObjectModel {
       image_crop: shape_blip_fill(&shape.shape_properties)
         .map(drawingml_blip_crop)
         .unwrap_or_default(),
+      image_tile: shape_blip_fill(&shape.shape_properties).and_then(shape_blip_tile),
+      image_rotate_with_shape: shape_blip_fill(&shape.shape_properties).is_some_and(|fill| {
+        fill
+          .rotate_with_shape
+          .as_ref()
+          .is_some_and(|value| value.as_bool())
+      }),
       image_effects: shape_blip_fill(&shape.shape_properties)
         .and_then(|fill| fill.blip.as_deref())
         .map(|blip| blip.blip_choice.clone())
         .unwrap_or_default(),
+      shape_effects: xdr_shape_effects(&shape.shape_properties),
+      scene3d: shape.shape_properties.scene3_d_type.clone(),
+      shape3d: shape.shape_properties.shape3_d_type.clone(),
       transform_offset_emu: transform_offset(shape.shape_properties.transform2_d.as_deref()),
       transform_extent_emu: transform_extent(shape.shape_properties.transform2_d.as_deref()),
       group_child_offset_emu: None,
@@ -1022,8 +1081,10 @@ impl DrawingObjectModel {
       fill_color: None,
       fill_pattern: None,
       fill_gradient: None,
+      use_group_fill: false,
       line_color: None,
       line_pattern: None,
+      line_gradient: None,
       line_width_emu: None,
       no_line: false,
       rotation_deg: transform_rotation_deg(picture.shape_properties.transform2_d.as_deref()),
@@ -1034,12 +1095,22 @@ impl DrawingObjectModel {
         .as_deref()
         .map(picture_blip_crop)
         .unwrap_or_default(),
+      image_tile: picture.blip_fill.as_deref().and_then(|fill| {
+        match fill.blip_fill_choice.as_ref() {
+          Some(xdr::BlipFillChoice::Tile(tile)) => Some(tile.clone()),
+          _ => None,
+        }
+      }),
+      image_rotate_with_shape: true,
       image_effects: picture
         .blip_fill
         .as_deref()
         .and_then(|fill| fill.blip.as_ref())
         .map(|blip| blip.blip_choice.clone())
         .unwrap_or_default(),
+      shape_effects: xdr_shape_effects(&picture.shape_properties),
+      scene3d: picture.shape_properties.scene3_d_type.clone(),
+      shape3d: picture.shape_properties.shape3_d_type.clone(),
       transform_offset_emu: transform_offset(picture.shape_properties.transform2_d.as_deref()),
       transform_extent_emu: transform_extent(picture.shape_properties.transform2_d.as_deref()),
       group_child_offset_emu: None,
@@ -1112,15 +1183,22 @@ impl DrawingObjectModel {
       fill_color: None,
       fill_pattern: None,
       fill_gradient: None,
+      use_group_fill: false,
       line_color: None,
       line_pattern: None,
+      line_gradient: None,
       line_width_emu: None,
       no_line: false,
       rotation_deg: 0.0,
       flip_horizontal: false,
       flip_vertical: false,
       image_crop: ImageCrop::default(),
+      image_tile: None,
+      image_rotate_with_shape: false,
       image_effects: Vec::new(),
+      shape_effects: None,
+      scene3d: None,
+      shape3d: None,
       transform_offset_emu: None,
       transform_extent_emu: None,
       group_child_offset_emu: None,
@@ -1168,6 +1246,15 @@ fn shape_blip_fill(properties: &xdr::ShapeProperties) -> Option<&a::BlipFill> {
   match properties.shape_properties_choice2.as_ref()? {
     xdr::ShapePropertiesChoice2::BlipFill(fill) => Some(fill),
     _ => None,
+  }
+}
+
+fn shape_blip_tile(fill: &a::BlipFill) -> Option<Box<a::Tile>> {
+  match fill.blip_fill_choice.as_ref() {
+    Some(a::BlipFillChoice::Stretch(_)) => None,
+    Some(a::BlipFillChoice::Tile(tile)) => Some(tile.clone()),
+    // DrawingML shape bitmap fills default to tile when no mode is authored.
+    None => Some(Box::default()),
   }
 }
 
@@ -1516,7 +1603,7 @@ fn drawingml_default_run_font_family(
   .filter(|typeface| !typeface.is_empty())
 }
 
-fn xdr_text_body_first_run_color(text_body: &xdr::TextBody) -> Option<RgbColor> {
+fn xdr_text_body_first_run_color(text_body: &xdr::TextBody) -> Option<Color> {
   text_body
     .paragraph
     .iter()
@@ -1609,7 +1696,7 @@ fn dml_paragraph_text(paragraph: &a::Paragraph) -> Option<String> {
   (!text.is_empty()).then_some(text)
 }
 
-fn shape_fill_color(properties: &xdr::ShapeProperties) -> Option<RgbColor> {
+fn shape_fill_color(properties: &xdr::ShapeProperties) -> Option<Color> {
   match properties.shape_properties_choice2.as_ref()? {
     xdr::ShapePropertiesChoice2::SolidFill(fill) => solid_fill_color(fill),
     xdr::ShapePropertiesChoice2::NoFill(_)
@@ -1617,6 +1704,19 @@ fn shape_fill_color(properties: &xdr::ShapeProperties) -> Option<RgbColor> {
     | xdr::ShapePropertiesChoice2::BlipFill(_)
     | xdr::ShapePropertiesChoice2::PatternFill(_)
     | xdr::ShapePropertiesChoice2::GroupFill => None,
+  }
+}
+
+fn xdr_shape_effects(properties: &xdr::ShapeProperties) -> Option<common::DrawingEffectSource> {
+  match properties.shape_properties_choice3.as_ref()? {
+    xdr::ShapePropertiesChoice3::EffectList(list) => Some(common::DrawingEffectSource::List {
+      source: list.clone(),
+      resolved: None,
+    }),
+    xdr::ShapePropertiesChoice3::EffectDag(dag) => Some(common::DrawingEffectSource::Dag {
+      source: dag.clone(),
+      resolved: None,
+    }),
   }
 }
 
@@ -1638,6 +1738,47 @@ fn shape_fill_gradient(properties: &xdr::ShapeProperties) -> Option<Box<a::Gradi
   Some(fill.clone())
 }
 
+fn shape_uses_group_fill(properties: &xdr::ShapeProperties) -> bool {
+  matches!(
+    properties.shape_properties_choice2.as_ref(),
+    Some(xdr::ShapePropertiesChoice2::GroupFill)
+  )
+}
+
+fn group_fill_color(properties: &xdr::GroupShapeProperties) -> Option<Color> {
+  let xdr::GroupShapePropertiesChoice::SolidFill(fill) =
+    properties.group_shape_properties_choice1.as_ref()?
+  else {
+    return None;
+  };
+  solid_fill_color(fill)
+}
+
+fn group_fill_pattern(properties: &xdr::GroupShapeProperties) -> Option<common::PatternFill> {
+  let xdr::GroupShapePropertiesChoice::PatternFill(fill) =
+    properties.group_shape_properties_choice1.as_ref()?
+  else {
+    return None;
+  };
+  drawingml_pattern_fill(fill)
+}
+
+fn group_fill_gradient(properties: &xdr::GroupShapeProperties) -> Option<Box<a::GradientFill>> {
+  let xdr::GroupShapePropertiesChoice::GradientFill(fill) =
+    properties.group_shape_properties_choice1.as_ref()?
+  else {
+    return None;
+  };
+  Some(fill.clone())
+}
+
+fn group_uses_group_fill(properties: &xdr::GroupShapeProperties) -> bool {
+  matches!(
+    properties.group_shape_properties_choice1.as_ref(),
+    Some(xdr::GroupShapePropertiesChoice::GroupFill)
+  )
+}
+
 fn shape_geometry(properties: &xdr::ShapeProperties) -> Option<DrawingGeometryModel> {
   match properties.shape_properties_choice1.as_ref()? {
     xdr::ShapePropertiesChoice::CustomGeometry(geometry) => Some(DrawingGeometryModel::Custom {
@@ -1651,7 +1792,7 @@ fn shape_geometry(properties: &xdr::ShapeProperties) -> Option<DrawingGeometryMo
   }
 }
 
-fn shape_line_color(properties: &xdr::ShapeProperties) -> Option<RgbColor> {
+fn shape_line_color(properties: &xdr::ShapeProperties) -> Option<Color> {
   let outline = properties.outline.as_deref()?;
   match outline.outline_choice1.as_ref()? {
     a::OutlineChoice::SolidFill(fill) => solid_fill_color(fill),
@@ -1670,6 +1811,15 @@ fn shape_line_pattern(properties: &xdr::ShapeProperties) -> Option<common::Patte
   drawingml_pattern_fill(fill)
 }
 
+fn shape_line_gradient(properties: &xdr::ShapeProperties) -> Option<Box<a::GradientFill>> {
+  let a::OutlineChoice::GradientFill(fill) =
+    properties.outline.as_deref()?.outline_choice1.as_ref()?
+  else {
+    return None;
+  };
+  Some(fill.clone())
+}
+
 fn shape_line_width_emu(properties: &xdr::ShapeProperties) -> Option<i32> {
   properties.outline.as_deref().and_then(|line| line.width)
 }
@@ -1682,29 +1832,31 @@ fn shape_no_line(properties: &xdr::ShapeProperties) -> bool {
     .is_some_and(|choice| matches!(choice, a::OutlineChoice::NoFill(_)))
 }
 
-fn shape_style_fill_color(style: Option<&xdr::ShapeStyle>) -> Option<RgbColor> {
+fn shape_style_fill_color(style: Option<&xdr::ShapeStyle>) -> Option<Color> {
   let choice = style?.fill_reference.fill_reference_choice.as_ref()?;
-  match choice {
-    a::FillReferenceChoice::RgbColorModelHex(color) => rgb_hex_color(&color.val),
-    a::FillReferenceChoice::SchemeColor(color) => scheme_color(color),
-    _ => None,
-  }
+  Color::from_fill_reference_choice(choice)
 }
 
-fn shape_style_line_color(style: Option<&xdr::ShapeStyle>) -> Option<RgbColor> {
+fn shape_style_line_color(style: Option<&xdr::ShapeStyle>) -> Option<Color> {
   let choice = style?.line_reference.line_reference_choice.as_ref()?;
-  match choice {
-    a::LineReferenceChoice::RgbColorModelHex(color) => rgb_hex_color(&color.val),
-    a::LineReferenceChoice::SchemeColor(color) => scheme_color(color),
-    _ => None,
-  }
+  Color::from_line_reference_choice(choice)
 }
 
-fn scheme_color(color: &a::SchemeColor) -> Option<RgbColor> {
-  // theme/style matrix before SdrObject painting. Until the workbook theme
-  // bridge owns these colors, keep the Office default theme mapping used by
-  // OOXML's generated style references.
-  default_scheme_color(color.val)
+fn shape_style_font_color(style: Option<&xdr::ShapeStyle>) -> Option<Color> {
+  let reference = &style?.font_reference;
+  reference
+    .font_reference_choice
+    .as_ref()
+    .and_then(Color::from_font_reference_choice)
+    .or_else(|| {
+      // DrawingML defines tx1 as the default placeholder text color when a
+      // fontRef omits its color child. LibreOffice's ShapeStyleContext applies
+      // the same fallback before inserting the shape text.
+      Some(Color::Scheme(SchemeColor {
+        value: a::SchemeColorValues::Text1,
+        transformations: Vec::new(),
+      }))
+    })
 }
 
 fn default_scheme_color(value: a::SchemeColorValues) -> Option<RgbColor> {
@@ -1798,33 +1950,15 @@ fn resolve_drawingml_pattern_color(color: Color) -> Option<common::Color> {
   })
 }
 
-fn solid_fill_color(fill: &a::SolidFill) -> Option<RgbColor> {
-  match fill.solid_fill_choice.as_ref()? {
-    a::SolidFillChoice::RgbColorModelHex(color) => rgb_hex_color(&color.val),
-    _ => None,
-  }
+fn solid_fill_color(fill: &a::SolidFill) -> Option<Color> {
+  Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)
 }
 
-fn drawingml_run_color(properties: &a::RunProperties) -> Option<RgbColor> {
+fn drawingml_run_color(properties: &a::RunProperties) -> Option<Color> {
   match properties.run_properties_choice1.as_ref()? {
     a::RunPropertiesChoice::SolidFill(fill) => solid_fill_color(fill),
     _ => None,
   }
-}
-
-fn rgb_hex_color(value: &str) -> Option<RgbColor> {
-  let value = value.strip_prefix('#').unwrap_or(value);
-  let value = match value.len() {
-    8 => &value[2..],
-    6 => value,
-    _ => return None,
-  };
-  let color = u32::from_str_radix(value, 16).ok()?;
-  Some(RgbColor {
-    r: ((color >> 16) & 0xff) as u8,
-    g: ((color >> 8) & 0xff) as u8,
-    b: (color & 0xff) as u8,
-  })
 }
 
 impl DiagramResourceCatalog {
@@ -2476,6 +2610,50 @@ mod tests {
       shape_transform(shape.shape_properties.transform2_d.as_deref()),
       Some(((4_238_625, 641_985), (1_476_375, 558_165)))
     );
+  }
+
+  #[test]
+  fn group_fill_and_gradient_outline_survive_drawing_import() {
+    let group = xdr::GroupShape::from_bytes(
+      br#"<xdr:grpSp xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:nvGrpSpPr><xdr:cNvPr id="1" name="group"/><xdr:cNvGrpSpPr/></xdr:nvGrpSpPr><xdr:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1000000" cy="1000000"/><a:chOff x="0" y="0"/><a:chExt cx="1000000" cy="1000000"/></a:xfrm><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs><a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill></xdr:grpSpPr><xdr:sp><xdr:nvSpPr><xdr:cNvPr id="2" name="child"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="500000" cy="500000"/></a:xfrm><a:prstGeom prst="rect"/><a:grpFill/><a:ln><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="00FF00"/></a:gs><a:gs pos="100000"><a:srgbClr val="000000"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill></a:ln></xdr:spPr></xdr:sp></xdr:grpSp>"#,
+    )
+    .expect("group shape");
+
+    let model = DrawingObjectModel::from_group_shape(&group);
+    assert!(model.fill_gradient.is_some());
+    assert_eq!(model.children.len(), 1);
+    assert!(model.children[0].use_group_fill);
+    assert!(model.children[0].line_gradient.is_some());
+  }
+
+  #[test]
+  fn drawingml_shape_tile_fill_retains_authored_tile_properties() {
+    let shape = xdr::Shape::from_bytes(
+      br#"<xdr:sp xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><xdr:nvSpPr><xdr:cNvPr id="1" name="tile"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr><a:prstGeom prst="rect"/><a:blipFill><a:blip r:embed="rId1"/><a:srcRect l="10000"/><a:tile tx="9525" sx="50000" flip="x" algn="ctr"/></a:blipFill></xdr:spPr></xdr:sp>"#,
+    )
+    .expect("shape");
+
+    let model = DrawingObjectModel::from_shape(&shape);
+    let tile = model.image_tile.expect("tile retained");
+    assert_eq!(tile.alignment, Some(a::RectangleAlignmentValues::Center));
+    assert_eq!(tile.flip, Some(a::TileFlipValues::Horizontal));
+    assert!((model.image_crop.left - 0.1).abs() < 0.001);
+  }
+
+  #[test]
+  fn shape_text_inherits_font_reference_color_when_run_has_no_fill() {
+    let shape = xdr::Shape::from_bytes(
+      br#"<xdr:sp xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:nvSpPr><xdr:cNvPr id="1" name="shape"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr/><xdr:style><a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="0"><a:schemeClr val="accent1"/></a:fillRef><a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef><a:fontRef idx="minor"><a:schemeClr val="lt1"/></a:fontRef></xdr:style><xdr:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="1100"/><a:t>text</a:t></a:r></a:p></xdr:txBody></xdr:sp>"#,
+    )
+    .expect("shape");
+
+    assert!(matches!(
+      DrawingObjectModel::from_shape(&shape).text_color,
+      Some(Color::Scheme(SchemeColor {
+        value: a::SchemeColorValues::Light1,
+        ..
+      }))
+    ));
   }
 
   #[test]

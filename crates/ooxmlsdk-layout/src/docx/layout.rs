@@ -257,7 +257,7 @@ fn inline_drawing_line_height(
   if matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
     return object_height_pt;
   }
-  // ECMA-376 Part 1 §20.4.2.3 defines an inline drawing as affecting its
+  // ECMA-376 Part 1 §20.4.2.8 defines an inline drawing as affecting its
   // line like a character glyph of similar size. The object's height is the
   // ascent above the baseline; the paragraph mark still supplies the normal
   // font descent below it. Writer models the same split in
@@ -14685,13 +14685,6 @@ impl<'a> TextFrameLayout<'a> {
         advance.text_metrics,
       );
     }
-    align_image_only_inline_object_line(
-      &mut advance.current.items,
-      *advance.line_item_start_index,
-      y,
-      &paragraph_base_line_style(self.paragraph),
-      advance.text_metrics,
-    );
     align_text_baseline_to_inline_object(
       &mut advance.current.items,
       *advance.line_item_start_index,
@@ -16132,9 +16125,16 @@ impl<'a> TextFrameLayout<'a> {
             line_used_punctuation_fit = false;
             line_has_tab = false;
           }
+          let picture_control_descent = if image.picture_content_control {
+            text_metrics
+              .vertical_metrics(&paragraph_base_line_style(paragraph))
+              .descent_pt
+          } else {
+            0.0
+          };
           current.items.push(PageItem::Image(ImageItem {
             x_pt: x + metrics.content_offset_x_pt,
-            y_pt: y + metrics.content_offset_y_pt,
+            y_pt: y + metrics.content_offset_y_pt + picture_control_descent,
             width_pt: metrics.content_width_pt,
             height_pt: metrics.content_height_pt,
             crop: image.crop,
@@ -17008,13 +17008,6 @@ impl<'a> TextFrameLayout<'a> {
         line_item_start_index,
         y,
         line_right,
-        text_metrics,
-      );
-      align_image_only_inline_object_line(
-        &mut current.items,
-        line_item_start_index,
-        y,
-        &paragraph_base_line_style(paragraph),
         text_metrics,
       );
       align_text_baseline_to_inline_object(
@@ -18350,7 +18343,7 @@ fn align_text_baseline_to_inline_object(
     return;
   };
 
-  // ECMA-376 Part 1 §20.4.2.3 makes an inline drawing participate in its
+  // ECMA-376 Part 1 §20.4.2.8 makes an inline drawing participate in its
   // line like a character. Writer's MaxAscentDescent() therefore treats the
   // object height as ascent and keeps the ordinary font descent below it;
   // text sharing the line is bottom-aligned to the object's baseline rather
@@ -18374,46 +18367,6 @@ fn align_text_baseline_to_inline_object(
     let current_baseline = text.y_pt + baseline_offset;
     if object_baseline > current_baseline {
       text.y_pt += object_baseline - current_baseline;
-    }
-  }
-}
-
-fn align_image_only_inline_object_line(
-  items: &mut [PageItem],
-  start_index: usize,
-  y: f32,
-  paragraph_mark_style: &TextStyle,
-  text_metrics: &mut TextMetrics,
-) {
-  let line_items = &mut items[start_index..];
-  let has_text = line_items
-    .iter()
-    .any(|item| matches!(item, PageItem::Text(text) if (text.y_pt - y).abs() < 0.01));
-  if has_text {
-    return;
-  }
-  let has_inline_image = line_items
-    .iter()
-    .any(|item| matches!(item, PageItem::Image(image) if !image.floating));
-  if !has_inline_image {
-    return;
-  }
-
-  // A paragraph containing only an as-character picture still has Word's
-  // implicit paragraph mark. Office places the picture after that mark's
-  // descent has established the line origin: its bottom is the line baseline,
-  // not `y + object_height`. Writer reaches the same result through the dummy
-  // text portion and SwFlyCntPortion::SetBase(). Keep this source-derived
-  // adjustment line-relative; a fixed picture offset is wrong because the
-  // observed displacement changes with the paragraph font.
-  let descent_pt = text_metrics
-    .vertical_metrics(paragraph_mark_style)
-    .descent_pt;
-  for item in line_items {
-    if let PageItem::Image(image) = item
-      && !image.floating
-    {
-      image.y_pt += descent_pt;
     }
   }
 }
@@ -20134,39 +20087,6 @@ mod tests {
     assert!((second.word_spacing_pt - 6.0).abs() < 0.001);
     assert!((second.x_pt - (first_width + 6.0)).abs() < 0.001);
     assert!((second.x_pt + second_width + second.word_spacing_pt - line_right).abs() < 0.001);
-  }
-
-  #[test]
-  fn image_only_inline_object_line_keeps_paragraph_mark_descent() {
-    let style = TextStyle::default();
-    let mut items = vec![PageItem::Image(ImageItem {
-      x_pt: 0.0,
-      y_pt: 20.0,
-      width_pt: 12.0,
-      height_pt: 12.0,
-      crop: ImageCrop::default(),
-      clip_path: Vec::new(),
-      rotation_deg: 0.0,
-      flip_horizontal: false,
-      flip_vertical: false,
-      data: Arc::from([]),
-      content_type: None,
-      metafile_background_color: None,
-      alt_text: None,
-      hyperlink_url: None,
-      semantic_metafile_text: false,
-      floating: false,
-      behind_text: false,
-    })];
-    let mut text_metrics = TextMetrics::new();
-    let expected_descent = text_metrics.vertical_metrics(&style).descent_pt;
-
-    align_image_only_inline_object_line(&mut items, 0, 20.0, &style, &mut text_metrics);
-
-    let PageItem::Image(image) = &items[0] else {
-      panic!("expected image item");
-    };
-    assert!((image.y_pt - (20.0 + expected_descent)).abs() < 0.001);
   }
 
   #[test]

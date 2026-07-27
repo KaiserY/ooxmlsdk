@@ -414,6 +414,7 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      picture_content_control: false,
       placement: ImagePlacement::Floating(FloatingImagePlacement {
         horizontal_relative_to: HorizontalImageReference::Page,
         vertical_relative_to: VerticalImageReference::Page,
@@ -5269,6 +5270,12 @@ fn push_sdt_run(
     return;
   };
   let start = inlines.len();
+  let picture_content_control = sdt.sdt_properties.as_ref().is_some_and(|properties| {
+    properties
+      .sdt_properties_choice
+      .iter()
+      .any(|choice| matches!(choice, w::SdtPropertiesChoice::SdtContentPicture))
+  });
   let showing_placeholder = sdt
     .sdt_properties
     .as_ref()
@@ -5394,6 +5401,17 @@ fn push_sdt_run(
     }
   }
   flush_unclosed_complex_fields(inlines, &mut complex_fields);
+  if picture_content_control {
+    // ECMA-376 Part 1 §17.5.2.24 makes this a distinct inline control whose
+    // content is one DrawingML picture. Writer likewise retains it as a
+    // ContentControl text portion containing the frame (SdtHelper.cxx), not
+    // as an ordinary bare image. Preserve that ownership for line placement.
+    for inline in &mut inlines[start..] {
+      if let InlineItem::Image(image) = inline {
+        image.picture_content_control = true;
+      }
+    }
+  }
   if showing_placeholder {
     for inline in &mut inlines[start..] {
       if let InlineItem::Text(run) = inline {
@@ -5780,6 +5798,7 @@ fn inline_image_impl(
         alt_text: inline.doc_properties.description.clone(),
         hyperlink_url,
         semantic_metafile_text: false,
+        picture_content_control: false,
         placement: ImagePlacement::Inline,
       })
     }
@@ -5822,6 +5841,7 @@ fn inline_image_impl(
           .and_then(|properties| properties.description.clone()),
         hyperlink_url,
         semantic_metafile_text: false,
+        picture_content_control: false,
         placement: ImagePlacement::Floating(floating_image_placement(anchor)),
       })
     }
@@ -9611,6 +9631,7 @@ fn drawingml_picture_image(
     alt_text: drawingml_picture_alt_text(picture),
     hyperlink_url,
     semantic_metafile_text: false,
+    picture_content_control: false,
     placement: drawingml_child_placement(placement, offset_x_pt, offset_y_pt),
   })
 }
@@ -12561,6 +12582,7 @@ fn vml_image_data(
     alt_text: alt_text.or_else(|| data.title.clone()),
     hyperlink_url: None,
     semantic_metafile_text: false,
+    picture_content_control: false,
     placement: style.placement(),
   })
 }
@@ -15675,6 +15697,7 @@ fn numbering_drawing_image(
     alt_text,
     hyperlink_url: None,
     semantic_metafile_text: false,
+    picture_content_control: false,
     placement: ImagePlacement::Inline,
   })
 }

@@ -563,6 +563,7 @@ pub(crate) struct InlineImage {
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
   pub semantic_metafile_text: bool,
+  pub picture_content_control: bool,
   pub placement: ImagePlacement,
 }
 

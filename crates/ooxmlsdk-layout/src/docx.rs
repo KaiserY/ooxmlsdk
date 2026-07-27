@@ -8,7 +8,8 @@ mod settings;
 mod table;
 mod text;
 
-use std::collections::{BTreeMap, HashMap};
+use std::borrow::Cow;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::common::{self, color_math};
@@ -18,13 +19,15 @@ use ooxmlsdk::parts::{
 };
 use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_drawing_2008_diagram as dsp,
-  schemas_microsoft_com_office_word as w10, schemas_microsoft_com_office_word_2010_wordml as w14,
+  schemas_microsoft_com_office_office as o, schemas_microsoft_com_office_word as w10,
+  schemas_microsoft_com_office_word_2010_wordml as w14,
   schemas_microsoft_com_office_word_2010_wordprocessing_canvas as wpc,
   schemas_microsoft_com_office_word_2010_wordprocessing_drawing as wp14,
   schemas_microsoft_com_office_word_2010_wordprocessing_group as wpg,
   schemas_microsoft_com_office_word_2010_wordprocessing_shape as wps,
   schemas_microsoft_com_vml as v, schemas_openxmlformats_org_drawingml_2006_chart as c,
   schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
+  schemas_openxmlformats_org_drawingml_2006_locked_canvas as lc,
   schemas_openxmlformats_org_drawingml_2006_main as a,
   schemas_openxmlformats_org_drawingml_2006_picture as pic,
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
@@ -147,19 +150,21 @@ pub(crate) fn extract(
 ) -> Result<DocxDocument> {
   let main = package.main_document_part()?;
   let compatibility_mode = compatibility_mode(package, &main);
+  let document_math_settings = document_math_settings(package, &main);
   let import_settings = ImportSettings {
     compatibility_mode,
     justify_lines_with_shrinking: compatibility_mode >= 15,
     ..Default::default()
   };
-  let styles = StylesCatalog::load(
+  let mut styles = StylesCatalog::load(
     package,
     &main,
     import_settings,
     options.ui_language.as_deref(),
   )?;
-  let mut numbering =
-    NumberingCatalog::load(package, &main, import_settings, &styles.theme_colors)?;
+  styles.display_math_alignment = document_math_settings.display_alignment;
+  styles.math_font_family = document_math_settings.font_family;
+  let mut numbering = NumberingCatalog::load(package, &main, import_settings, &styles)?;
   let images = ImageCatalog::load(package, &main);
   let alt_chunks = AltChunkCatalog::load(package, &main);
   let hyperlinks = HyperlinkCatalog::load(package, &main);
@@ -400,6 +405,9 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
     inlines: vec![InlineItem::Image(InlineImage {
       data: image.data,
       content_type: image.content_type,
+      picture_frame: None,
+      effects: None,
+      static3d: None,
       width_pt: page.width_pt,
       height_pt: page.height_pt,
       effect_left_pt: 0.0,
@@ -516,6 +524,53 @@ fn mirror_margins(package: &mut WordprocessingDocument, main: &MainDocumentPart)
         .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
     })
     .unwrap_or(false)
+}
+
+#[derive(Clone, Debug)]
+struct DocumentMathSettings {
+  display_alignment: Option<ParagraphAlignment>,
+  font_family: Option<Arc<str>>,
+}
+
+fn document_math_settings(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> DocumentMathSettings {
+  let math_properties = main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| settings.math_properties.as_deref().cloned());
+  let font_family = math_properties
+    .as_ref()
+    .and_then(|properties| properties.math_font.as_ref())
+    .map(|font| Arc::<str>::from(font.val.as_str()));
+  let display_defaults = math_properties
+    .as_ref()
+    .and_then(|properties| properties.display_defaults.as_ref())
+    .and_then(|display| display.val)
+    .is_none_or(|value| {
+      matches!(
+        value,
+        ooxmlsdk::schemas::m::BooleanValues::True
+          | ooxmlsdk::schemas::m::BooleanValues::On
+          | ooxmlsdk::schemas::m::BooleanValues::One
+      )
+    });
+  if !display_defaults {
+    return DocumentMathSettings {
+      display_alignment: None,
+      font_family,
+    };
+  }
+  let justification = math_properties
+    .as_ref()
+    .and_then(|properties| properties.default_justification.as_ref())
+    .map(|justification| justification.val)
+    .unwrap_or(ooxmlsdk::schemas::m::JustificationValues::CenterGroup);
+  DocumentMathSettings {
+    display_alignment: Some(math_justification_alignment(justification)),
+    font_family,
+  }
 }
 
 fn resolve_section_repeating_blocks(
@@ -806,7 +861,9 @@ fn alt_chunk_blocks(resource: &AltChunkResource, style: TextStyle) -> Vec<Block>
     .trim()
     .to_ascii_lowercase();
   let paragraphs = match content_type.as_str() {
-    "text/html" | "application/xhtml+xml" => html_alt_chunk_paragraphs(&resource.data),
+    "text/html" | "application/xhtml+xml" => {
+      html_alt_chunk_paragraphs(&resource.data, resource.content_type.as_deref())
+    }
     "text/plain" => String::from_utf8_lossy(&resource.data)
       .lines()
       .map(str::trim)
@@ -821,73 +878,153 @@ fn alt_chunk_blocks(resource: &AltChunkResource, style: TextStyle) -> Vec<Block>
     .collect()
 }
 
-fn html_alt_chunk_paragraphs(data: &[u8]) -> Vec<String> {
-  use quick_xml::events::Event;
+fn html_alt_chunk_paragraphs(data: &[u8], content_type: Option<&str>) -> Vec<String> {
+  use std::cell::RefCell;
 
-  let mut reader = quick_xml::Reader::from_reader(data);
-  reader.config_mut().trim_text(false);
-  let mut paragraphs = Vec::new();
-  let mut text = String::new();
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) => {
-        let name = event.local_name();
-        if html_block_tag(name.as_ref()) {
-          push_alt_chunk_paragraph(&mut paragraphs, &mut text);
-        } else if name.as_ref().eq_ignore_ascii_case(b"br") {
-          text.push('\n');
-        }
-      }
-      Ok(Event::Empty(event)) => {
-        let name = event.local_name();
-        if name.as_ref().eq_ignore_ascii_case(b"br") {
-          text.push('\n');
-        } else if html_block_tag(name.as_ref()) {
-          push_alt_chunk_paragraph(&mut paragraphs, &mut text);
-        }
-      }
-      Ok(Event::End(event)) => {
-        if html_block_tag(event.local_name().as_ref()) {
-          push_alt_chunk_paragraph(&mut paragraphs, &mut text);
-        }
-      }
-      Ok(Event::Text(value)) => {
-        if let Ok(value) = value.xml10_content() {
-          text.push_str(&value);
-        }
-      }
-      Ok(Event::CData(value)) => {
-        if let Ok(value) = value.xml10_content() {
-          text.push_str(&value);
-        }
-      }
-      Ok(Event::GeneralRef(value)) => {
-        if let Ok(value) = value.decode() {
-          let reference = format!("&{value};");
-          if let Ok(value) = quick_xml::escape::unescape(&reference) {
-            text.push_str(&value);
+  use html5ever::tendril::StrTendril;
+  use html5ever::tokenizer::{
+    BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts,
+  };
+
+  #[derive(Default)]
+  struct HtmlTextState {
+    paragraphs: Vec<String>,
+    text: String,
+    hidden_depth: usize,
+  }
+
+  #[derive(Default)]
+  struct HtmlTextSink {
+    state: RefCell<HtmlTextState>,
+  }
+
+  impl TokenSink for HtmlTextSink {
+    type Handle = ();
+
+    fn process_token(&self, token: Token, _line_number: u64) -> TokenSinkResult<Self::Handle> {
+      let mut state = self.state.borrow_mut();
+      match token {
+        Token::TagToken(tag) => {
+          let name = tag.name.as_ref().as_bytes();
+          let hidden = html_hidden_tag(name);
+          match tag.kind {
+            TagKind::StartTag if state.hidden_depth > 0 => {
+              state.hidden_depth += usize::from(hidden);
+            }
+            TagKind::StartTag if hidden => state.hidden_depth = 1,
+            TagKind::StartTag if html_block_tag(name) => {
+              let HtmlTextState {
+                paragraphs, text, ..
+              } = &mut *state;
+              push_alt_chunk_paragraph(paragraphs, text);
+            }
+            TagKind::StartTag if name.eq_ignore_ascii_case(b"br") => state.text.push('\n'),
+            TagKind::EndTag if state.hidden_depth > 0 => {
+              if hidden {
+                state.hidden_depth -= 1;
+              }
+            }
+            TagKind::EndTag if html_block_tag(name) => {
+              let HtmlTextState {
+                paragraphs, text, ..
+              } = &mut *state;
+              push_alt_chunk_paragraph(paragraphs, text);
+            }
+            _ => {}
           }
         }
+        Token::CharacterTokens(value) if state.hidden_depth == 0 => state.text.push_str(&value),
+        _ => {}
       }
-      Ok(Event::Eof) | Err(_) => break,
-      _ => {}
+      TokenSinkResult::Continue
     }
   }
-  push_alt_chunk_paragraph(&mut paragraphs, &mut text);
-  paragraphs
+
+  let decoded = decode_html_alt_chunk(data, content_type);
+  let input = BufferQueue::default();
+  input.push_back(StrTendril::from_slice(&decoded));
+  let tokenizer = Tokenizer::new(HtmlTextSink::default(), TokenizerOpts::default());
+  let _ = tokenizer.feed(&input);
+  tokenizer.end();
+  let mut state = tokenizer.sink.state.into_inner();
+  push_alt_chunk_paragraph(&mut state.paragraphs, &mut state.text);
+  state.paragraphs
+}
+
+fn decode_html_alt_chunk<'a>(data: &'a [u8], content_type: Option<&str>) -> Cow<'a, str> {
+  if let Some((encoding, bom_len)) = encoding_rs::Encoding::for_bom(data) {
+    return encoding.decode(&data[bom_len..]).0;
+  }
+  if let Some(encoding) = content_type
+    .and_then(html_content_type_charset)
+    .and_then(|label| encoding_rs::Encoding::for_label(label.as_bytes()))
+  {
+    return encoding.decode(data).0;
+  }
+  if std::str::from_utf8(data).is_ok() {
+    return String::from_utf8_lossy(data);
+  }
+  encoding_rs::WINDOWS_1252.decode(data).0
+}
+
+fn html_content_type_charset(content_type: &str) -> Option<&str> {
+  content_type.split(';').skip(1).find_map(|parameter| {
+    let (name, value) = parameter.split_once('=')?;
+    name
+      .trim()
+      .eq_ignore_ascii_case("charset")
+      .then(|| value.trim().trim_matches(['"', '\'']))
+  })
 }
 
 fn html_block_tag(name: &[u8]) -> bool {
   [
+    b"address".as_slice(),
+    b"article".as_slice(),
+    b"aside".as_slice(),
+    b"blockquote".as_slice(),
+    b"dd".as_slice(),
     b"p".as_slice(),
     b"div".as_slice(),
+    b"dl".as_slice(),
+    b"dt".as_slice(),
+    b"figcaption".as_slice(),
+    b"figure".as_slice(),
+    b"footer".as_slice(),
+    b"form".as_slice(),
     b"li".as_slice(),
+    b"main".as_slice(),
+    b"nav".as_slice(),
+    b"ol".as_slice(),
+    b"pre".as_slice(),
+    b"section".as_slice(),
+    b"table".as_slice(),
+    b"tbody".as_slice(),
+    b"td".as_slice(),
+    b"tfoot".as_slice(),
+    b"th".as_slice(),
+    b"thead".as_slice(),
+    b"tr".as_slice(),
+    b"ul".as_slice(),
     b"h1".as_slice(),
     b"h2".as_slice(),
     b"h3".as_slice(),
     b"h4".as_slice(),
     b"h5".as_slice(),
     b"h6".as_slice(),
+  ]
+  .iter()
+  .any(|tag| name.eq_ignore_ascii_case(tag))
+}
+
+fn html_hidden_tag(name: &[u8]) -> bool {
+  [
+    b"head".as_slice(),
+    b"noscript".as_slice(),
+    b"script".as_slice(),
+    b"style".as_slice(),
+    b"template".as_slice(),
+    b"title".as_slice(),
   ]
   .iter()
   .any(|tag| name.eq_ignore_ascii_case(tag))
@@ -1071,7 +1208,7 @@ fn paragraph_is_effectively_empty(paragraph: &Paragraph) -> bool {
     && paragraph.endnote_reference_ids.is_empty()
     && paragraph.inlines.iter().all(|inline| match inline {
       InlineItem::Text(run) => run.text.trim().is_empty(),
-      InlineItem::Image(_) | InlineItem::Shape(_) => false,
+      InlineItem::Ruby(_) | InlineItem::Image(_) | InlineItem::Shape(_) => false,
       InlineItem::BookmarkStart(_) => true,
       InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
       InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => true,
@@ -1090,6 +1227,7 @@ fn paragraph_drop_cap_text(paragraph: &Paragraph) -> Option<String> {
     .iter()
     .filter_map(|inline| match inline {
       InlineItem::Text(run) => Some(run.text.as_str()),
+      InlineItem::Ruby(ruby) => ruby.base.first().map(|run| run.text.as_str()),
       InlineItem::Image(_)
       | InlineItem::Shape(_)
       | InlineItem::BookmarkStart(_)
@@ -1399,6 +1537,18 @@ fn sdt_block_blocks(
   hyperlinks: &HyperlinkCatalog,
   controls: SdtBlockControls<'_>,
 ) -> Vec<Block> {
+  sdt_block_blocks_with_base(sdt, styles, numbering, images, hyperlinks, controls, None)
+}
+
+fn sdt_block_blocks_with_base(
+  sdt: &w::SdtBlock,
+  styles: &StylesCatalog,
+  numbering: &mut NumberingCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  controls: SdtBlockControls<'_>,
+  paragraph_base_style: Option<&TextStyle>,
+) -> Vec<Block> {
   let SdtBlockControls {
     custom_xml_bindings,
     form_widget_ids,
@@ -1429,15 +1579,31 @@ fn sdt_block_blocks(
     .iter()
     .filter_map(|choice| match choice {
       w::SdtContentBlockChoice::Paragraph(paragraph) => {
-        let mut model = paragraph_model(
-          paragraph.as_ref(),
-          styles,
-          numbering,
-          images,
-          hyperlinks,
-          custom_xml_bindings,
-          form_widget_ids,
-        );
+        let mut model = if let Some(base_style) = paragraph_base_style {
+          paragraph_model_with_base(
+            paragraph.as_ref(),
+            styles,
+            numbering,
+            images,
+            hyperlinks,
+            form_widget_ids,
+            ParagraphImportBase {
+              run_style: base_style.clone(),
+              custom_xml_bindings: Some(custom_xml_bindings),
+              ..Default::default()
+            },
+          )
+        } else {
+          paragraph_model(
+            paragraph.as_ref(),
+            styles,
+            numbering,
+            images,
+            hyperlinks,
+            custom_xml_bindings,
+            form_widget_ids,
+          )
+        };
         if !in_header_footer {
           apply_recovered_body_paragraph_defaults(paragraph, styles, &mut model);
         }
@@ -1458,7 +1624,7 @@ fn sdt_block_blocks(
           in_header_footer,
         },
       ))]),
-      w::SdtContentBlockChoice::SdtBlock(sdt) => Some(sdt_block_blocks(
+      w::SdtContentBlockChoice::SdtBlock(sdt) => Some(sdt_block_blocks_with_base(
         sdt.as_ref(),
         styles,
         numbering,
@@ -1469,6 +1635,7 @@ fn sdt_block_blocks(
           form_widget_ids: &mut *form_widget_ids,
           in_header_footer,
         },
+        paragraph_base_style,
       )),
       _ => None,
     })
@@ -2120,7 +2287,10 @@ fn footnotes(
         .footnote_choice
         .iter()
         .filter_map(|choice| match choice {
-          w::FootnoteChoice::Paragraph(paragraph) => Some(paragraph.as_ref()),
+          w::FootnoteChoice::Paragraph(paragraph) => {
+            Some(NoteBlockChoice::Paragraph(paragraph.as_ref()))
+          }
+          w::FootnoteChoice::Table(table) => Some(NoteBlockChoice::Table(table.as_ref())),
           _ => None,
         }),
       &mut context,
@@ -2181,7 +2351,10 @@ fn endnotes(
         .endnote_choice
         .iter()
         .filter_map(|choice| match choice {
-          w::EndnoteChoice::Paragraph(paragraph) => Some(paragraph.as_ref()),
+          w::EndnoteChoice::Paragraph(paragraph) => {
+            Some(NoteBlockChoice::Paragraph(paragraph.as_ref()))
+          }
+          w::EndnoteChoice::Table(table) => Some(NoteBlockChoice::Table(table.as_ref())),
           _ => None,
         }),
       &mut context,
@@ -2223,30 +2396,58 @@ struct NoteImportContext<'a> {
   form_widget_ids: &'a mut FormWidgetIdAllocator,
 }
 
+enum NoteBlockChoice<'a> {
+  Paragraph(&'a w::Paragraph),
+  Table(&'a w::Table),
+}
+
 fn append_note_blocks<'a>(
   blocks: &mut Vec<Block>,
   label: NoteLabel,
-  paragraphs: impl Iterator<Item = &'a w::Paragraph>,
+  choices: impl Iterator<Item = NoteBlockChoice<'a>>,
   context: &mut NoteImportContext<'_>,
 ) {
   let mut is_first_paragraph = true;
-  for paragraph in paragraphs {
-    let mut model = paragraph_model(
-      paragraph,
-      context.styles,
-      context.numbering,
-      context.images,
-      context.hyperlinks,
-      context.custom_xml_bindings,
-      context.form_widget_ids,
-    );
-    if is_first_paragraph {
-      let marker_style = note_marker_run_style(paragraph, &model.base_style, context.styles);
-      prepend_note_marker(&mut model, &label, marker_style);
-      is_first_paragraph = false;
+  for choice in choices {
+    match choice {
+      NoteBlockChoice::Paragraph(paragraph) => {
+        let mut model = paragraph_model(
+          paragraph,
+          context.styles,
+          context.numbering,
+          context.images,
+          context.hyperlinks,
+          context.custom_xml_bindings,
+          context.form_widget_ids,
+        );
+        if is_first_paragraph {
+          let marker_style = note_marker_run_style(paragraph, &model.base_style, context.styles);
+          prepend_note_marker(&mut model, &label, marker_style);
+          is_first_paragraph = false;
+        }
+        preserve_note_text_portions(&mut model);
+        blocks.push(Block::paragraph(model));
+      }
+      NoteBlockChoice::Table(table) => {
+        let mut block = Block::Table(table_model(
+          table,
+          &mut TableModelEnv {
+            styles: context.styles,
+            numbering: context.numbering,
+            images: context.images,
+            hyperlinks: context.hyperlinks,
+            custom_xml_bindings: context.custom_xml_bindings,
+            form_widget_ids: context.form_widget_ids,
+          },
+          TableModelContext {
+            nested_table_level: 1,
+            in_header_footer: false,
+          },
+        ));
+        preserve_note_text_portions_in_block(&mut block);
+        blocks.push(block);
+      }
     }
-    preserve_note_text_portions(&mut model);
-    blocks.push(Block::paragraph(model));
   }
 }
 
@@ -2310,12 +2511,35 @@ fn preserve_note_text_portions(paragraph: &mut Paragraph) {
   }
 }
 
+fn preserve_note_text_portions_in_block(block: &mut Block) {
+  match block {
+    Block::Paragraph(paragraph) => preserve_note_text_portions(paragraph),
+    Block::Table(table) => {
+      for row in &mut table.rows {
+        for cell in &mut row.cells {
+          for block in &mut cell.blocks {
+            preserve_note_text_portions_in_block(block);
+          }
+        }
+      }
+    }
+    Block::Frame(frame) => {
+      for block in &mut frame.blocks {
+        preserve_note_text_portions_in_block(block);
+      }
+    }
+  }
+}
+
 fn table_model(
   table: &w::Table,
   env: &mut TableModelEnv<'_>,
   model_context: TableModelContext,
 ) -> Table {
   let properties = table.table_properties.as_deref();
+  let right_to_left = properties
+    .and_then(|properties| properties.bi_di_visual.as_ref())
+    .is_some_and(|bidi| on_off_only_value(bidi.val));
   let table_style_id = properties
     .and_then(|properties| properties.table_style.as_ref())
     .map(|style| style.val.as_str());
@@ -2331,6 +2555,15 @@ fn table_model(
     .and_then(|properties| properties.table_cell_margin_default.as_deref())
     .map(|margins| table_cell_margin_default_with_base(margins, style_cell_margins))
     .unwrap_or(style_cell_margins);
+  let table_shading = properties
+    .and_then(|properties| properties.shading.as_ref())
+    .map(shading_fill)
+    .or(table_style.table_shading)
+    .flatten();
+  let table_borders = properties
+    .and_then(|properties| properties.table_borders.as_deref())
+    .map(|borders| direct_table_borders_model(table_style.table_borders, borders))
+    .or(table_style.table_borders);
   let rows = table
     .table_choice2
     .iter()
@@ -2353,6 +2586,8 @@ fn table_model(
       form_widget_ids: env.form_widget_ids,
       cell_margins,
       direct_cell_margins,
+      table_shading,
+      table_borders,
       table_style: &table_style,
       table_look,
       row_count,
@@ -2375,7 +2610,7 @@ fn table_model(
     && !(model_context.in_header_footer
       && placement
         .is_some_and(|placement| matches!(placement.vertical_anchor, FrameVerticalAnchor::Page)));
-  Table {
+  let mut model = Table {
     column_widths_pt: table
       .table_grid
       .as_deref()
@@ -2389,6 +2624,11 @@ fn table_model(
     preferred_width_pct: properties
       .and_then(|properties| properties.table_width.as_ref())
       .and_then(table_width_to_percent),
+    layout: properties
+      .and_then(|properties| properties.table_layout.as_ref())
+      .map(table_layout_mode)
+      .or(table_style.layout)
+      .unwrap_or_default(),
     indent_left_pt: properties
       .and_then(|properties| properties.table_indentation.as_ref())
       .and_then(table_indentation_to_points)
@@ -2399,26 +2639,58 @@ fn table_model(
       .map(table_alignment)
       .or(table_style.alignment)
       .unwrap_or_default(),
+    right_to_left,
     align_leading_cell_content: should_align_leading_cell_content(
       model_context,
       env.styles.import_settings.compatibility_mode,
       env.styles.has_styles_part,
     ),
     placement,
+    allow_overlap: table_allows_overlap(properties),
     split_allowed,
     following_text_flow,
     explicit_no_repeat_header,
     starts_after_last_rendered_page_break,
-    borders: properties
-      .and_then(|properties| properties.table_borders.as_deref())
-      .map(|borders| direct_table_borders_model(table_style.table_borders, borders))
-      .or(table_style.table_borders),
+    borders: table_borders,
     cell_spacing_pt: properties
       .and_then(|properties| properties.table_cell_spacing.as_ref())
       .and_then(table_cell_spacing_to_points)
       .or(table_style.cell_spacing_pt)
       .unwrap_or(0.0),
     rows,
+  };
+  if right_to_left {
+    normalize_right_to_left_table(&mut model);
+  }
+  model
+}
+
+fn normalize_right_to_left_table(table: &mut Table) {
+  // ECMA-376 Part 1 §17.4.1: table data stays in logical order, while cells
+  // and every table-level leading/trailing property are displayed right to
+  // left. Normalize the imported model to physical left-to-right order so the
+  // rest of table layout, merging, border conflict resolution, and painting
+  // all operate on one coordinate system.
+  table.column_widths_pt.reverse();
+  table.alignment = match table.alignment {
+    TableAlignment::Left => TableAlignment::Right,
+    TableAlignment::Right => TableAlignment::Left,
+    TableAlignment::Center => TableAlignment::Center,
+  };
+  if let Some(borders) = &mut table.borders {
+    std::mem::swap(&mut borders.left, &mut borders.right);
+  }
+  for row in &mut table.rows {
+    std::mem::swap(&mut row.grid_before, &mut row.grid_after);
+    row.cells.reverse();
+    for cell in &mut row.cells {
+      std::mem::swap(&mut cell.margins.left_pt, &mut cell.margins.right_pt);
+      std::mem::swap(&mut cell.borders.left, &mut cell.borders.right);
+      std::mem::swap(
+        &mut cell.border_suppressions.left,
+        &mut cell.border_suppressions.right,
+      );
+    }
   }
 }
 
@@ -2464,7 +2736,9 @@ pub(super) fn paragraph_starts_after_last_rendered_page_break(inlines: &[InlineI
       InlineItem::Text(run) if !run.text.trim().is_empty() => {
         return saw_last_rendered_page_break;
       }
-      InlineItem::Image(_) | InlineItem::Shape(_) => return saw_last_rendered_page_break,
+      InlineItem::Ruby(_) | InlineItem::Image(_) | InlineItem::Shape(_) => {
+        return saw_last_rendered_page_break;
+      }
       InlineItem::PageBreak | InlineItem::ColumnBreak => return false,
       InlineItem::Text(_)
       | InlineItem::BookmarkStart(_)
@@ -2478,9 +2752,23 @@ pub(super) fn paragraph_starts_after_last_rendered_page_break(inlines: &[InlineI
 }
 
 fn table_position_placement(properties: &w::TablePositionProperties) -> FloatingFramePlacement {
+  let margin_left_pt = properties
+    .left_from_text
+    .as_ref()
+    .and_then(twips_measure_to_points)
+    .unwrap_or(0.0);
   FloatingFramePlacement {
-    horizontal_anchor: frame_horizontal_anchor(properties.horizontal_anchor),
-    vertical_anchor: frame_vertical_anchor(properties.vertical_anchor),
+    // MS-OI29500 §2.1.161(c): Word defaults omitted tblpPr anchors to text
+    // horizontally and margin vertically, rather than the ECMA page/page
+    // defaults.
+    horizontal_anchor: properties
+      .horizontal_anchor
+      .map(|anchor| frame_horizontal_anchor(Some(anchor)))
+      .unwrap_or(FrameHorizontalAnchor::Text),
+    vertical_anchor: properties
+      .vertical_anchor
+      .map(|anchor| frame_vertical_anchor(Some(anchor)))
+      .unwrap_or(FrameVerticalAnchor::Margin),
     horizontal_alignment: properties
       .table_position_x_alignment
       .map(frame_horizontal_alignment),
@@ -2514,12 +2802,14 @@ fn table_position_placement(properties: &w::TablePositionProperties) -> Floating
       .as_ref()
       .and_then(twips_measure_to_points)
       .unwrap_or(0.0),
-    margin_left_pt: properties
-      .left_from_text
-      .as_ref()
-      .and_then(twips_measure_to_points)
-      .unwrap_or(0.0),
+    margin_left_pt,
   }
+}
+
+fn table_allows_overlap(properties: Option<&w::TableProperties>) -> bool {
+  properties
+    .and_then(|properties| properties.table_overlap.as_ref())
+    .is_none_or(|overlap| matches!(overlap.val, w::TableOverlapValues::Overlap))
 }
 
 fn frame_horizontal_anchor(value: Option<w::HorizontalAnchorValues>) -> FrameHorizontalAnchor {
@@ -2584,13 +2874,17 @@ fn table_row_model(
   row_index: usize,
 ) -> TableRow {
   let (grid_before, grid_after) = table_row_grid_properties(row.table_row_properties.as_deref());
+  // ECMA-376 Part 1 §17.4.60 makes tblPrEx properties replace tblPr for the
+  // current row. In particular, the row's tblLook controls which conditional
+  // table-style regions apply to both its row and its cells.
+  let row_table_look = table_row_look(row, context.table_look);
   let row_condition = table_row_conditional_style(row.table_row_properties.as_deref())
     .unwrap_or_else(|| {
-      TableConditionalStyleMask::from_row_position(context.table_look, row_index, context.row_count)
+      TableConditionalStyleMask::from_row_position(row_table_look, row_index, context.row_count)
     });
   let mut row_style = table_row_style_for(
     context.table_style,
-    context.table_look,
+    row_table_look,
     row_index,
     context.row_count,
     row_condition,
@@ -2599,6 +2893,12 @@ fn table_row_model(
     &mut row_style,
     &direct_table_row_style(row.table_row_properties.as_deref()),
   );
+  let row_table_shading = row
+    .table_property_exceptions
+    .as_deref()
+    .and_then(|properties| properties.shading.as_ref())
+    .map(shading_fill)
+    .unwrap_or(context.table_shading);
   let cells = table_row_cells(row);
   let cell_count = cells.len();
   let cells = cells
@@ -2609,10 +2909,11 @@ fn table_row_model(
         cell,
         context,
         row.table_property_exceptions.as_deref(),
+        row_table_shading,
         table_cell_style_for(
           context.table_style,
           TableCellStyleContext {
-            look: context.table_look,
+            look: row_table_look,
             row_index,
             row_count: context.row_count,
             cell_index,
@@ -2636,9 +2937,30 @@ fn table_row_model(
     cell_spacing_pt: row_style.cell_spacing_pt,
     grid_before,
     grid_after,
+    width_before_pt: row_style.width_before_pt,
+    width_after_pt: row_style.width_after_pt,
+    layout: row
+      .table_property_exceptions
+      .as_deref()
+      .and_then(|properties| properties.table_layout.as_ref())
+      .map(table_layout_mode),
+    borders: row
+      .table_property_exceptions
+      .as_deref()
+      .and_then(|properties| properties.table_borders.as_deref())
+      .map(|borders| direct_table_borders_model(context.table_borders, borders)),
     redline_color: None,
     cells,
   }
+}
+
+fn table_row_look(row: &w::TableRow, table_look: TableLookModel) -> TableLookModel {
+  row
+    .table_property_exceptions
+    .as_deref()
+    .and_then(|properties| properties.table_look.as_ref())
+    .map(table_look_model)
+    .unwrap_or(table_look)
 }
 
 fn table_row_cells(row: &w::TableRow) -> Vec<&w::TableCell> {
@@ -2760,6 +3082,7 @@ fn table_cell_model(
   cell: &w::TableCell,
   context: &mut TableImportContext<'_>,
   row_table_exceptions: Option<&w::TablePropertyExceptions>,
+  row_table_shading: Option<RgbColor>,
   style: TableCellStyle,
 ) -> TableCell {
   let properties = cell.table_cell_properties.as_deref();
@@ -2795,7 +3118,37 @@ fn table_cell_model(
         if !context.in_header_footer {
           apply_recovered_table_cell_paragraph_defaults(paragraph, context.styles, &mut model);
         }
-        push_cell_paragraph(&mut blocks, model);
+        let out_of_place_table = paragraph.paragraph_choice.iter().find_map(|choice| {
+          let w::ParagraphChoice::Table(table) = choice else {
+            return None;
+          };
+          Some(table.as_ref())
+        });
+        if let Some(table) = out_of_place_table {
+          let mut table = table_model(
+            table,
+            &mut TableModelEnv {
+              styles: context.styles,
+              numbering: context.numbering,
+              images: context.images,
+              hyperlinks: context.hyperlinks,
+              custom_xml_bindings: context.custom_xml_bindings,
+              form_widget_ids: context.form_widget_ids,
+            },
+            TableModelContext {
+              nested_table_level: 2,
+              in_header_footer: context.in_header_footer,
+            },
+          );
+          if prepend_out_of_place_paragraph_to_nested_table(&mut table, &mut model) {
+            blocks.push(Block::Table(table));
+          } else {
+            push_cell_paragraph(&mut blocks, model);
+            blocks.push(Block::Table(table));
+          }
+        } else {
+          push_cell_paragraph(&mut blocks, model);
+        }
       }
       w::TableCellChoice::Table(table) => blocks.push(Block::Table(table_model(
         table,
@@ -2840,14 +3193,21 @@ fn table_cell_model(
   }
   TableCell {
     blocks,
-    shading: properties
-      .and_then(|properties| properties.shading.as_ref())
-      .and_then(shading_fill)
-      .or(style.shading),
+    shading: resolved_table_cell_shading(
+      properties
+        .and_then(|properties| properties.shading.as_ref())
+        .map(shading_fill),
+      style.shading,
+      row_table_shading,
+    ),
     borders: properties
       .and_then(|properties| properties.table_cell_borders.as_deref())
       .map(|borders| direct_cell_borders_model(style.borders, borders))
       .unwrap_or(style.borders),
+    border_suppressions: properties
+      .and_then(|properties| properties.table_cell_borders.as_deref())
+      .map(cell_border_suppressions)
+      .unwrap_or_default(),
     margins: properties
       .and_then(|properties| properties.table_cell_margin.as_deref())
       .map(|margins| table_cell_margin(margins, row_cell_margins))
@@ -2866,6 +3226,17 @@ fn table_cell_model(
       .and_then(|properties| properties.vertical_merge.as_ref())
       .map(|merge| matches!(merge.val, None | Some(w::MergedCellValues::Continue)))
       .unwrap_or(false),
+    no_wrap: properties
+      .and_then(|properties| properties.no_wrap.as_ref())
+      .map(|no_wrap| on_off_only_value(no_wrap.val))
+      .or(style.no_wrap)
+      .unwrap_or(false),
+    fit_text: properties
+      .and_then(|properties| properties.table_cell_fit_text.as_ref())
+      .is_some_and(|fit_text| on_off_only_value(fit_text.val)),
+    hide_end_mark: properties
+      .and_then(|properties| properties.hide_mark.as_ref())
+      .is_some_and(|hide_mark| on_off_only_value(hide_mark.val)),
     vertical_alignment: properties
       .and_then(|properties| properties.table_cell_vertical_alignment.as_ref())
       .map(table_cell_vertical_alignment)
@@ -2873,6 +3244,54 @@ fn table_cell_model(
       .unwrap_or_default(),
     text_rotation_deg,
   }
+}
+
+fn resolved_table_cell_shading(
+  direct_cell: Option<Option<RgbColor>>,
+  styled_cell: Option<Option<RgbColor>>,
+  row_or_table: Option<RgbColor>,
+) -> Option<RgbColor> {
+  direct_cell.or(styled_cell).unwrap_or(row_or_table)
+}
+
+fn prepend_out_of_place_paragraph_to_nested_table(
+  table: &mut Table,
+  source: &mut Paragraph,
+) -> bool {
+  if source.format.frame.is_some() || source.list_label.is_some() {
+    return false;
+  }
+  let Some(target) = table
+    .rows
+    .first_mut()
+    .and_then(|row| row.cells.first_mut())
+    .and_then(|cell| {
+      cell.blocks.iter_mut().find_map(|block| match block {
+        Block::Paragraph(paragraph) => Some(paragraph),
+        _ => None,
+      })
+    })
+  else {
+    return false;
+  };
+
+  source.inlines.append(&mut target.inlines);
+  target.inlines = std::mem::take(&mut source.inlines);
+  source
+    .footnote_reference_ids
+    .append(&mut target.footnote_reference_ids);
+  target.footnote_reference_ids = std::mem::take(&mut source.footnote_reference_ids);
+  source
+    .endnote_reference_ids
+    .append(&mut target.endnote_reference_ids);
+  target.endnote_reference_ids = std::mem::take(&mut source.endnote_reference_ids);
+  target.starts_after_last_rendered_page_break |= source.starts_after_last_rendered_page_break;
+  #[cfg(test)]
+  {
+    source.runs.append(&mut target.runs);
+    target.runs = std::mem::take(&mut source.runs);
+  }
+  true
 }
 
 fn push_cell_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
@@ -3041,6 +3460,16 @@ fn table_width_to_points(width: &w::TableWidth) -> Option<f32> {
   }
 }
 
+fn row_width_to_points(
+  width: Option<&MeasurementOrPercentValue>,
+  width_type: Option<w::TableWidthUnitValues>,
+) -> Option<f32> {
+  if !matches!(width_type, None | Some(w::TableWidthUnitValues::Dxa)) {
+    return None;
+  }
+  width.and_then(measurement_or_percent_to_points)
+}
+
 fn table_cell_spacing_to_points(spacing: &w::TableCellSpacing) -> Option<f32> {
   if !matches!(spacing.r#type, None | Some(w::TableWidthUnitValues::Dxa)) {
     return None;
@@ -3102,6 +3531,13 @@ fn table_alignment(justification: &w::TableJustification) -> TableAlignment {
     w::TableRowAlignmentValues::Center => TableAlignment::Center,
     w::TableRowAlignmentValues::Right | w::TableRowAlignmentValues::End => TableAlignment::Right,
     w::TableRowAlignmentValues::Left | w::TableRowAlignmentValues::Start => TableAlignment::Left,
+  }
+}
+
+fn table_layout_mode(layout: &w::TableLayout) -> TableLayoutMode {
+  match layout.r#type.unwrap_or(w::TableLayoutValues::Autofit) {
+    w::TableLayoutValues::Fixed => TableLayoutMode::Fixed,
+    w::TableLayoutValues::Autofit => TableLayoutMode::AutoFit,
   }
 }
 
@@ -3202,6 +3638,45 @@ fn cell_borders_model(borders: &w::TableCellBorders) -> CellBordersModel {
       .as_ref()
       .and_then(start_border_style)
       .or_else(|| borders.left_border.as_ref().and_then(left_border_style)),
+  }
+}
+
+fn cell_border_suppressions(borders: &w::TableCellBorders) -> crate::docx::CellBorderSuppressions {
+  fn suppresses(value: w::BorderValues) -> bool {
+    matches!(value, w::BorderValues::Nil | w::BorderValues::None)
+  }
+
+  crate::docx::CellBorderSuppressions {
+    top: borders
+      .top_border
+      .as_ref()
+      .is_some_and(|border| suppresses(border.val)),
+    right: borders
+      .end_border
+      .as_ref()
+      .map(|border| suppresses(border.val))
+      .or_else(|| {
+        borders
+          .right_border
+          .as_ref()
+          .map(|border| suppresses(border.val))
+      })
+      .unwrap_or(false),
+    bottom: borders
+      .bottom_border
+      .as_ref()
+      .is_some_and(|border| suppresses(border.val)),
+    left: borders
+      .start_border
+      .as_ref()
+      .map(|border| suppresses(border.val))
+      .or_else(|| {
+        borders
+          .left_border
+          .as_ref()
+          .map(|border| suppresses(border.val))
+      })
+      .unwrap_or(false),
   }
 }
 
@@ -3561,7 +4036,13 @@ fn merge_paragraph_format(
       .filter(|level| *level <= 8);
   }
 
-  if let Some(frame) = properties.frame_properties() {
+  // ECMA-376 §17.3.1.11 makes the presence of framePr in the current
+  // paragraph's properties the signal that the paragraph belongs to a text
+  // frame. A framePr stored in docDefaults is not that direct signal and
+  // must not turn every paragraph in the document into a frame.
+  if !matches!(properties, ParagraphProps::BaseStyle(_))
+    && let Some(frame) = properties.frame_properties()
+  {
     merge_paragraph_frame_properties(format, frame);
   }
 }
@@ -3877,14 +4358,17 @@ fn paragraph_inlines(
         }
       }
       w::ParagraphChoice::InsertedRun(inserted) => {
-        push_inserted_run(
+        push_inserted_run_or_complex_field(
           inserted,
           &mut inlines,
           base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
+          RunImportContext {
+            styles,
+            images,
+            hyperlinks,
+          },
           None,
+          &mut complex_fields,
         );
       }
       w::ParagraphChoice::DeletedRun(deleted) => {
@@ -3910,14 +4394,17 @@ fn paragraph_inlines(
         );
       }
       w::ParagraphChoice::MoveToRun(moved) => {
-        push_move_to_run(
+        push_move_to_run_or_complex_field(
           moved,
           &mut inlines,
           base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
+          RunImportContext {
+            styles,
+            images,
+            hyperlinks,
+          },
           None,
+          &mut complex_fields,
         );
       }
       w::ParagraphChoice::SdtRun(sdt) => push_sdt_run(
@@ -3948,7 +4435,21 @@ fn paragraph_inlines(
           && !text.is_empty()
         {
           let mut style = base_style.clone();
-          style.font_family = Some(Arc::from("Cambria Math"));
+          style = properties::run_style(
+            shared_math::wordprocessing_math_run_properties(choice),
+            style,
+            styles,
+          );
+          // ECMA-376 Part 1 §22.1.2.61 makes m:mathFont the document-wide
+          // typeface for mathematical text. Per-run w:rPr still supplies
+          // size, color, and other character properties, but its ordinary
+          // rFonts slot does not replace the math font.
+          style.font_family = Some(
+            styles
+              .math_font_family
+              .clone()
+              .unwrap_or_else(|| Arc::from("Cambria Math")),
+          );
           inlines.push(InlineItem::Text(TextRun {
             text,
             style,
@@ -3968,8 +4469,11 @@ fn paragraph_inlines(
   inlines
 }
 
-fn math_paragraph_alignment(paragraph: &w::Paragraph) -> Option<ParagraphAlignment> {
-  paragraph.paragraph_choice.iter().find_map(|choice| {
+fn math_paragraph_alignment(
+  paragraph: &w::Paragraph,
+  display_math_alignment: Option<ParagraphAlignment>,
+) -> Option<ParagraphAlignment> {
+  let explicit = paragraph.paragraph_choice.iter().find_map(|choice| {
     let w::ParagraphChoice::Paragraph(math_paragraph) = choice else {
       return None;
     };
@@ -3979,13 +4483,28 @@ fn math_paragraph_alignment(paragraph: &w::Paragraph) -> Option<ParagraphAlignme
       .and_then(|properties| properties.justification.as_ref())
       .map(|justification| justification.val)
       .unwrap_or(ooxmlsdk::schemas::m::JustificationValues::CenterGroup);
-    Some(match justification {
-      ooxmlsdk::schemas::m::JustificationValues::Left => ParagraphAlignment::Left,
-      ooxmlsdk::schemas::m::JustificationValues::Right => ParagraphAlignment::Right,
-      ooxmlsdk::schemas::m::JustificationValues::Center
-      | ooxmlsdk::schemas::m::JustificationValues::CenterGroup => ParagraphAlignment::Center,
-    })
+    Some(math_justification_alignment(justification))
+  });
+  explicit.or_else(|| {
+    (!paragraph.paragraph_choice.is_empty()
+      && paragraph.paragraph_choice.iter().all(|choice| {
+        shared_math::wordprocessing_math_text(choice).is_some()
+          || matches!(choice, w::ParagraphChoice::WRun(run) if run.run_choice.is_empty())
+      }))
+    .then_some(display_math_alignment)
+    .flatten()
   })
+}
+
+fn math_justification_alignment(
+  justification: ooxmlsdk::schemas::m::JustificationValues,
+) -> ParagraphAlignment {
+  match justification {
+    ooxmlsdk::schemas::m::JustificationValues::Left => ParagraphAlignment::Left,
+    ooxmlsdk::schemas::m::JustificationValues::Right => ParagraphAlignment::Right,
+    ooxmlsdk::schemas::m::JustificationValues::Center
+    | ooxmlsdk::schemas::m::JustificationValues::CenterGroup => ParagraphAlignment::Center,
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -4063,7 +4582,7 @@ fn push_run_or_complex_field(
       w::RunChoice::FieldChar(field_char)
         if field_char.field_char_type == w::FieldCharValues::End =>
       {
-        flush_closed_complex_field(inlines, fields);
+        flush_complex_field(inlines, fields, true);
       }
       w::RunChoice::FieldCode(code) => {
         if let Some(field) = fields.last_mut()
@@ -4103,12 +4622,24 @@ fn run_starts_complex_field(run: &w::Run) -> bool {
   })
 }
 
-fn flush_closed_complex_field(inlines: &mut Vec<InlineItem>, fields: &mut Vec<ComplexFieldState>) {
+fn flush_complex_field(
+  inlines: &mut Vec<InlineItem>,
+  fields: &mut Vec<ComplexFieldState>,
+  closed: bool,
+) {
   let Some(state) = fields.pop() else {
     return;
   };
   let mut resolved = Vec::new();
-  if let Some(kind) = dynamic_field_kind(&state.instr) {
+  if closed && state.instr.trim().is_empty() {
+    // A separator does not make a useful field without field-code content.
+    // Word drops the cached result of that closed malformed field. Keep the
+    // ECMA-376 §17.16.18 recovery below for an unclosed field, whose result
+    // must instead be interpreted as literal text.
+  } else if closed && field_instruction_name(&state.instr).is_some_and(|name| name == "SET") {
+    // ECMA-376 §17.16.5.57 defines SET as assigning a bookmark and gives it
+    // no field value. Its cached result is metadata, not visible document text.
+  } else if let Some(kind) = dynamic_field_kind(&state.instr) {
     push_dynamic_field(
       &mut resolved,
       kind,
@@ -4116,6 +4647,15 @@ fn flush_closed_complex_field(inlines: &mut Vec<InlineItem>, fields: &mut Vec<Co
       state.hyperlink_url.as_deref(),
       field_result_text(&state.result),
     );
+  } else if state.result.is_empty()
+    && fields.is_empty()
+    && let Some(run) = symbol_field_run(
+      &state.instr,
+      state.style.clone(),
+      state.hyperlink_url.as_deref(),
+    )
+  {
+    resolved.push(InlineItem::Text(run));
   } else if state.result.is_empty()
     && field_instruction_name(&state.instr).is_some_and(|name| name == "FORMDROPDOWN")
     && let Some(value) = state.form_drop_down_value
@@ -4146,6 +4686,124 @@ fn field_instruction_name(instr: &str) -> Option<String> {
   field_instruction_tokens(instr)
     .first()
     .map(|name| name.to_ascii_uppercase())
+}
+
+fn symbol_field_run(
+  instr: &str,
+  mut style: TextStyle,
+  hyperlink_url: Option<&str>,
+) -> Option<TextRun> {
+  let tokens = field_instruction_tokens(instr);
+  let name = tokens.first()?.trim_start_matches('\\');
+  if !name.eq_ignore_ascii_case("SYMBOL") {
+    return None;
+  }
+  let code = parse_symbol_field_code(tokens.get(1)?)?;
+  let mut font = None;
+  let mut ansi = false;
+  let mut shift_jis = false;
+  let mut unicode = false;
+  let mut index = 2;
+  while index < tokens.len() {
+    let switch = tokens[index].strip_prefix('\\');
+    match switch {
+      Some(value) if value.eq_ignore_ascii_case("f") => {
+        index += 1;
+        font = tokens.get(index).filter(|value| !value.is_empty()).cloned();
+      }
+      Some(value) if value.eq_ignore_ascii_case("s") => {
+        index += 1;
+        let size = tokens.get(index)?.parse::<f32>().ok()?;
+        if size <= 0.0 {
+          return None;
+        }
+        style.font_size_pt = size;
+        style.complex_font_size_pt = Some(size);
+      }
+      Some(value) if value.eq_ignore_ascii_case("a") => ansi = true,
+      Some(value) if value.eq_ignore_ascii_case("j") => shift_jis = true,
+      Some(value) if value.eq_ignore_ascii_case("u") => unicode = true,
+      // The \h switch requires a non-line-height-bearing text portion. Keep
+      // unsupported instructions cached-only rather than silently changing
+      // paragraph geometry.
+      Some(value) if value.eq_ignore_ascii_case("h") => return None,
+      _ => {}
+    }
+    index += 1;
+  }
+
+  let character = if unicode {
+    // [MS-OI29500] §2.1.489: Word truncates values outside plane zero.
+    char::from_u32(code & 0xFFFF)?
+  } else if shift_jis {
+    decode_symbol_field_character(encoding_rs::SHIFT_JIS, code)?
+  } else if ansi {
+    decode_symbol_field_character(encoding_rs::WINDOWS_1252, code)?
+  } else {
+    let character = shared_symbol::font_symbol_code(font.as_deref(), code)?;
+    if font.as_deref().is_some_and(symbol_transport_font) && code <= u32::from(u8::MAX) {
+      char::from_u32(0xF000 | code)?
+    } else {
+      character
+    }
+  };
+
+  if let Some(font) = font {
+    let font = Arc::<str>::from(font);
+    style.font_family = Some(font.clone());
+    style.east_asia_font_family = Some(font.clone());
+    style.complex_font_family = Some(font.clone());
+    style.symbol_font_family = Some(font);
+  }
+
+  Some(TextRun {
+    text: character.to_string(),
+    style,
+    hyperlink_url: hyperlink_url.map(ToString::to_string),
+    dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
+    style_ref_numbering_text: None,
+    preserve_text_portion: false,
+  })
+}
+
+fn symbol_transport_font(font: &str) -> bool {
+  font.eq_ignore_ascii_case("Symbol")
+    || font
+      .get(font.len().saturating_sub(" symbol".len())..)
+      .is_some_and(|suffix| suffix.eq_ignore_ascii_case(" symbol"))
+    || font.to_ascii_lowercase().contains("wingdings")
+}
+
+fn parse_symbol_field_code(value: &str) -> Option<u32> {
+  value
+    .strip_prefix("0x")
+    .or_else(|| value.strip_prefix("0X"))
+    .map_or_else(
+      || value.parse::<u32>().ok(),
+      |hex| u32::from_str_radix(hex, 16).ok(),
+    )
+}
+
+fn decode_symbol_field_character(
+  encoding: &'static encoding_rs::Encoding,
+  code: u32,
+) -> Option<char> {
+  let bytes = if code <= u32::from(u8::MAX) {
+    vec![code as u8]
+  } else if code <= u32::from(u16::MAX) {
+    vec![(code >> 8) as u8, code as u8]
+  } else {
+    return None;
+  };
+  let (text, had_errors) = encoding.decode_without_bom_handling(&bytes);
+  if had_errors {
+    return None;
+  }
+  let mut characters = text.chars();
+  let character = characters.next()?;
+  characters.next().is_none().then_some(character)
 }
 
 fn form_drop_down_value(field_char: &w::FieldChar) -> Option<String> {
@@ -4183,7 +4841,7 @@ fn flush_unclosed_complex_fields(
   fields: &mut Vec<ComplexFieldState>,
 ) {
   while !fields.is_empty() {
-    flush_closed_complex_field(inlines, fields);
+    flush_complex_field(inlines, fields, false);
   }
 }
 
@@ -4339,6 +4997,11 @@ fn field_result_text(result: &[InlineItem]) -> Option<String> {
   for item in result {
     match item {
       InlineItem::Text(run) => text.push_str(&run.text),
+      InlineItem::Ruby(ruby) => {
+        for run in &ruby.base {
+          text.push_str(&run.text);
+        }
+      }
       InlineItem::PageBreak | InlineItem::ColumnBreak | InlineItem::LastRenderedPageBreak => {}
       InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => {}
       InlineItem::Image(_)
@@ -4409,14 +5072,17 @@ fn push_hyperlink_content(
         hyperlink_url.as_deref(),
         context,
       ),
-      w::HyperlinkChoice::InsertedRun(inserted) => push_inserted_run(
+      w::HyperlinkChoice::InsertedRun(inserted) => push_inserted_run_or_complex_field(
         inserted,
         inlines,
         base_style.clone(),
-        context.styles,
-        context.images,
-        context.hyperlinks,
+        RunImportContext {
+          styles: context.styles,
+          images: context.images,
+          hyperlinks: context.hyperlinks,
+        },
         hyperlink_url.as_deref(),
+        complex_fields,
       ),
       w::HyperlinkChoice::DeletedRun(deleted) => push_deleted_run(
         deleted,
@@ -4436,14 +5102,17 @@ fn push_hyperlink_content(
         context.hyperlinks,
         hyperlink_url.as_deref(),
       ),
-      w::HyperlinkChoice::MoveToRun(moved) => push_move_to_run(
+      w::HyperlinkChoice::MoveToRun(moved) => push_move_to_run_or_complex_field(
         moved,
         inlines,
         base_style.clone(),
-        context.styles,
-        context.images,
-        context.hyperlinks,
+        RunImportContext {
+          styles: context.styles,
+          images: context.images,
+          hyperlinks: context.hyperlinks,
+        },
         hyperlink_url.as_deref(),
+        complex_fields,
       ),
       _ => {}
     }
@@ -4496,14 +5165,17 @@ fn push_custom_xml_run(
           complex_fields,
         )
       }
-      w::CustomXmlRunChoice::InsertedRun(inserted) => push_inserted_run(
+      w::CustomXmlRunChoice::InsertedRun(inserted) => push_inserted_run_or_complex_field(
         inserted,
         inlines,
         base_style.clone(),
-        context.styles,
-        context.images,
-        context.hyperlinks,
+        RunImportContext {
+          styles: context.styles,
+          images: context.images,
+          hyperlinks: context.hyperlinks,
+        },
         hyperlink_url,
+        complex_fields,
       ),
       w::CustomXmlRunChoice::DeletedRun(deleted) => push_deleted_run(
         deleted,
@@ -4523,14 +5195,17 @@ fn push_custom_xml_run(
         context.hyperlinks,
         hyperlink_url,
       ),
-      w::CustomXmlRunChoice::MoveToRun(moved) => push_move_to_run(
+      w::CustomXmlRunChoice::MoveToRun(moved) => push_move_to_run_or_complex_field(
         moved,
         inlines,
         base_style.clone(),
-        context.styles,
-        context.images,
-        context.hyperlinks,
+        RunImportContext {
+          styles: context.styles,
+          images: context.images,
+          hyperlinks: context.hyperlinks,
+        },
         hyperlink_url,
+        complex_fields,
       ),
       w::CustomXmlRunChoice::BookmarkStart(bookmark) if !bookmark.name.is_empty() => {
         inlines.push(InlineItem::BookmarkStart(bookmark.name.to_string()));
@@ -5032,7 +5707,7 @@ fn push_run(
           hyperlink_url,
           &style_ref_keys,
         );
-        push_ruby_base(
+        push_ruby(
           ruby,
           inlines,
           base_style.clone(),
@@ -5190,7 +5865,7 @@ fn run_properties_style_id(properties: &w::RunProperties) -> Option<&str> {
   run_properties_run_style(properties).map(|run_style| run_style.val.as_str())
 }
 
-fn push_ruby_base(
+fn push_ruby(
   ruby: &w::Ruby,
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
@@ -5199,11 +5874,12 @@ fn push_ruby_base(
   hyperlinks: &HyperlinkCatalog,
   hyperlink_url: Option<&str>,
 ) {
+  let mut base_items = Vec::new();
   for choice in &ruby.ruby_base.ruby_base_choice {
     match choice {
       w::RubyBaseChoice::WRun(run) => push_run(
         run,
-        inlines,
+        &mut base_items,
         base_style.clone(),
         styles,
         images,
@@ -5213,7 +5889,7 @@ fn push_ruby_base(
       w::RubyBaseChoice::InsertedRun(inserted) => {
         push_inserted_run(
           inserted,
-          inlines,
+          &mut base_items,
           base_style.clone(),
           styles,
           images,
@@ -5224,7 +5900,7 @@ fn push_ruby_base(
       w::RubyBaseChoice::DeletedRun(deleted) => {
         push_deleted_run(
           deleted,
-          inlines,
+          &mut base_items,
           base_style.clone(),
           styles,
           images,
@@ -5235,7 +5911,7 @@ fn push_ruby_base(
       w::RubyBaseChoice::MoveFromRun(moved) => {
         push_move_from_run(
           moved,
-          inlines,
+          &mut base_items,
           base_style.clone(),
           styles,
           images,
@@ -5246,7 +5922,7 @@ fn push_ruby_base(
       w::RubyBaseChoice::MoveToRun(moved) => {
         push_move_to_run(
           moved,
-          inlines,
+          &mut base_items,
           base_style.clone(),
           styles,
           images,
@@ -5257,6 +5933,120 @@ fn push_ruby_base(
       _ => {}
     }
   }
+
+  let Some(base) = ruby_text_runs(&base_items) else {
+    inlines.extend(base_items);
+    return;
+  };
+  if base.is_empty() {
+    return;
+  }
+
+  let mut guide_items = Vec::new();
+  for choice in &ruby.ruby_content.ruby_content_choice {
+    match choice {
+      w::RubyContentChoice::WRun(run) => push_run(
+        run,
+        &mut guide_items,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::RubyContentChoice::InsertedRun(inserted) => push_inserted_run(
+        inserted,
+        &mut guide_items,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::RubyContentChoice::DeletedRun(deleted) => push_deleted_run(
+        deleted,
+        &mut guide_items,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::RubyContentChoice::MoveFromRun(moved) => push_move_from_run(
+        moved,
+        &mut guide_items,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::RubyContentChoice::MoveToRun(moved) => push_move_to_run(
+        moved,
+        &mut guide_items,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      _ => {}
+    }
+  }
+  let Some(mut guide) = ruby_text_runs(&guide_items) else {
+    inlines.extend(base_items);
+    return;
+  };
+  if guide.is_empty() {
+    inlines.extend(base_items);
+    return;
+  }
+
+  let properties = ruby.ruby_properties.as_ref();
+  let guide_size_pt = properties.phonetic_guide_text_font_size.val.to_points() as f32;
+  if guide_size_pt > 0.0 {
+    for run in &mut guide {
+      // ECMA-376 Part 1 §17.3.3.10: w:rubyPr/w:hps overrides a
+      // disagreeing w:rt run size.
+      run.style.font_size_pt = guide_size_pt;
+      run.style.complex_font_size_pt = Some(guide_size_pt);
+    }
+  }
+  let alignment = match properties.ruby_align.val {
+    w::RubyAlignValues::Center => RubyAlignment::Center,
+    w::RubyAlignValues::DistributeLetter => RubyAlignment::DistributeLetter,
+    w::RubyAlignValues::DistributeSpace => RubyAlignment::DistributeSpace,
+    w::RubyAlignValues::Left => RubyAlignment::Left,
+    w::RubyAlignValues::Right => RubyAlignment::Right,
+    w::RubyAlignValues::RightVertical => RubyAlignment::RightVertical,
+  };
+  inlines.push(InlineItem::Ruby(RubyInline {
+    base,
+    guide,
+    alignment,
+    raise_pt: properties.phonetic_guide_raise.val as f32 / 2.0,
+  }));
+}
+
+fn ruby_text_runs(items: &[InlineItem]) -> Option<Vec<TextRun>> {
+  let mut runs = Vec::new();
+  for item in items {
+    match item {
+      InlineItem::Text(run) => runs.push(run.clone()),
+      InlineItem::BookmarkStart(_)
+      | InlineItem::DrawingGroupStart(_)
+      | InlineItem::DrawingGroupEnd => {}
+      InlineItem::Ruby(_)
+      | InlineItem::Image(_)
+      | InlineItem::Shape(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::LastRenderedPageBreak
+      | InlineItem::PageBreak
+      | InlineItem::ColumnBreak => return None,
+    }
+  }
+  Some(runs)
 }
 
 fn push_sdt_run(
@@ -5270,16 +6060,17 @@ fn push_sdt_run(
     return;
   };
   let start = inlines.len();
-  let picture_content_control = sdt.sdt_properties.as_ref().is_some_and(|properties| {
-    properties
-      .sdt_properties_choice
-      .iter()
-      .any(|choice| matches!(choice, w::SdtPropertiesChoice::SdtContentPicture))
-  });
   let showing_placeholder = sdt
     .sdt_properties
     .as_ref()
     .is_some_and(sdt_showing_placeholder);
+  let picture_content_control = !showing_placeholder
+    && sdt.sdt_properties.as_ref().is_some_and(|properties| {
+      properties
+        .sdt_properties_choice
+        .iter()
+        .any(|choice| matches!(choice, w::SdtPropertiesChoice::SdtContentPicture))
+    });
   let widget_id = sdt
     .sdt_properties
     .as_ref()
@@ -5354,14 +6145,17 @@ fn push_sdt_run(
         context,
       ),
       w::SdtContentRunChoice::InsertedRun(inserted) => {
-        push_inserted_run(
+        push_inserted_run_or_complex_field(
           inserted.as_ref(),
           inlines,
           base_style.clone(),
-          context.styles,
-          context.images,
-          context.hyperlinks,
+          RunImportContext {
+            styles: context.styles,
+            images: context.images,
+            hyperlinks: context.hyperlinks,
+          },
           hyperlink_url,
+          &mut complex_fields,
         );
       }
       w::SdtContentRunChoice::DeletedRun(deleted) => {
@@ -5387,14 +6181,17 @@ fn push_sdt_run(
         );
       }
       w::SdtContentRunChoice::MoveToRun(moved) => {
-        push_move_to_run(
+        push_move_to_run_or_complex_field(
           moved.as_ref(),
           inlines,
           base_style.clone(),
-          context.styles,
-          context.images,
-          context.hyperlinks,
+          RunImportContext {
+            styles: context.styles,
+            images: context.images,
+            hyperlinks: context.hyperlinks,
+          },
           hyperlink_url,
+          &mut complex_fields,
         );
       }
       _ => {}
@@ -5406,6 +6203,9 @@ fn push_sdt_run(
     // content is one DrawingML picture. Writer likewise retains it as a
     // ContentControl text portion containing the frame (SdtHelper.cxx), not
     // as an ordinary bare image. Preserve that ownership for line placement.
+    // Section 17.5.2.39 is a separate state: when `showingPlcHdr` is true,
+    // `sdtContent` is placeholder content rather than the control's regular
+    // current content, so its cached picture keeps ordinary inline placement.
     for inline in &mut inlines[start..] {
       if let InlineItem::Image(image) = inline {
         image.picture_content_control = true;
@@ -5536,6 +6336,86 @@ fn sdt_list_item_display_texts(items: &[w::ListItem]) -> Vec<String> {
         .unwrap_or_default()
     })
     .collect()
+}
+
+fn push_inserted_run_or_complex_field(
+  inserted: &w::InsertedRun,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  context: RunImportContext<'_>,
+  hyperlink_url: Option<&str>,
+  complex_fields: &mut Vec<ComplexFieldState>,
+) {
+  for choice in &inserted.inserted_run_choice {
+    match choice {
+      w::InsertedRunChoice::WRun(run) => push_run_or_complex_field(
+        run,
+        inlines,
+        base_style.clone(),
+        context,
+        hyperlink_url,
+        complex_fields,
+      ),
+      w::InsertedRunChoice::InsertedRun(nested) => push_inserted_run_or_complex_field(
+        nested,
+        inlines,
+        base_style.clone(),
+        context,
+        hyperlink_url,
+        complex_fields,
+      ),
+      w::InsertedRunChoice::DeletedRun(_) | w::InsertedRunChoice::MoveFromRun(_) => {}
+      w::InsertedRunChoice::MoveToRun(moved) => push_move_to_run_or_complex_field(
+        moved,
+        inlines,
+        base_style.clone(),
+        context,
+        hyperlink_url,
+        complex_fields,
+      ),
+      _ => {}
+    }
+  }
+}
+
+fn push_move_to_run_or_complex_field(
+  moved: &w::MoveToRun,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  context: RunImportContext<'_>,
+  hyperlink_url: Option<&str>,
+  complex_fields: &mut Vec<ComplexFieldState>,
+) {
+  for choice in &moved.move_to_run_choice {
+    match choice {
+      w::MoveToRunChoice::WRun(run) => push_run_or_complex_field(
+        run,
+        inlines,
+        base_style.clone(),
+        context,
+        hyperlink_url,
+        complex_fields,
+      ),
+      w::MoveToRunChoice::InsertedRun(inserted) => push_inserted_run_or_complex_field(
+        inserted,
+        inlines,
+        base_style.clone(),
+        context,
+        hyperlink_url,
+        complex_fields,
+      ),
+      w::MoveToRunChoice::DeletedRun(_) | w::MoveToRunChoice::MoveFromRun(_) => {}
+      w::MoveToRunChoice::MoveToRun(nested) => push_move_to_run_or_complex_field(
+        nested,
+        inlines,
+        base_style.clone(),
+        context,
+        hyperlink_url,
+        complex_fields,
+      ),
+      _ => {}
+    }
+  }
 }
 
 fn push_inserted_run(
@@ -5784,6 +6664,9 @@ fn inline_image_impl(
       Some(InlineImage {
         data: image_data.data,
         content_type: image_data.content_type,
+        picture_frame: properties.picture_frame,
+        effects: properties.shape_effects,
+        static3d: properties.static3d,
         width_pt: units::emu_to_points(inline.extent.cx),
         height_pt: units::emu_to_points(inline.extent.cy),
         effect_left_pt: effect_extent_left(inline.effect_extent.as_ref()),
@@ -5821,15 +6704,24 @@ fn inline_image_impl(
             .and_then(|relationship_id| hyperlinks.target(relationship_id))
         })
         .map(ToString::to_string);
+      let effect_extent = DrawingEffectExtent {
+        left_pt: effect_extent_left(anchor.effect_extent.as_ref()),
+        top_pt: effect_extent_top(anchor.effect_extent.as_ref()),
+        right_pt: effect_extent_right(anchor.effect_extent.as_ref()),
+        bottom_pt: effect_extent_bottom(anchor.effect_extent.as_ref()),
+      };
       Some(InlineImage {
         data: image_data.data,
         content_type: image_data.content_type,
+        picture_frame: properties.picture_frame,
+        effects: properties.shape_effects,
+        static3d: properties.static3d,
         width_pt: units::emu_to_points(extent.cx),
         height_pt: units::emu_to_points(extent.cy),
-        effect_left_pt: effect_extent_left(anchor.effect_extent.as_ref()),
-        effect_top_pt: effect_extent_top(anchor.effect_extent.as_ref()),
-        effect_right_pt: effect_extent_right(anchor.effect_extent.as_ref()),
-        effect_bottom_pt: effect_extent_bottom(anchor.effect_extent.as_ref()),
+        effect_left_pt: effect_extent.left_pt,
+        effect_top_pt: effect_extent.top_pt,
+        effect_right_pt: effect_extent.right_pt,
+        effect_bottom_pt: effect_extent.bottom_pt,
         crop: properties.crop,
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
@@ -5842,7 +6734,10 @@ fn inline_image_impl(
         hyperlink_url,
         semantic_metafile_text: false,
         picture_content_control: false,
-        placement: ImagePlacement::Floating(floating_image_placement(anchor)),
+        placement: drawing_placement_with_effect_extent(
+          ImagePlacement::Floating(floating_image_placement(anchor)),
+          effect_extent,
+        ),
       })
     }
   }
@@ -6939,9 +7834,12 @@ fn wordprocessing_group_textbox_frames(
   transform: DrawingMlGroupTransform,
   context: DrawingTextBoxImportContext<'_>,
 ) -> Vec<InlineShape> {
-  let child_transform = drawingml_group_transform_from_properties(&group.group_shape_properties)
-    .map(|xfrm| transform.child(xfrm))
-    .unwrap_or(transform);
+  let child_transform = drawingml_group_transform_from_properties(
+    &group.group_shape_properties,
+    transform.raw_coordinates,
+  )
+  .map(|xfrm| transform.child(xfrm))
+  .unwrap_or(transform);
   group
     .wordprocessing_group_choice
     .iter()
@@ -6962,9 +7860,12 @@ fn wordprocessing_group_shape_textbox_frames(
   transform: DrawingMlGroupTransform,
   context: DrawingTextBoxImportContext<'_>,
 ) -> Vec<InlineShape> {
-  let child_transform = drawingml_group_transform_from_properties(&group.group_shape_properties)
-    .map(|xfrm| transform.child(xfrm))
-    .unwrap_or(transform);
+  let child_transform = drawingml_group_transform_from_properties(
+    &group.group_shape_properties,
+    transform.raw_coordinates,
+  )
+  .map(|xfrm| transform.child(xfrm))
+  .unwrap_or(transform);
   group
     .group_shape_choice
     .iter()
@@ -7107,7 +8008,7 @@ fn wordprocessing_shape_textbox_frame(
     geometry,
     offset_x_pt,
     offset_y_pt,
-    rotation_deg: mapped.rotation_deg,
+    rotation_deg: properties.camera_adjusted_rotation_deg(mapped.rotation_deg),
     flip_horizontal: mapped.flip_horizontal,
     flip_vertical: mapped.flip_vertical,
     fill_color,
@@ -7336,6 +8237,9 @@ fn drawing_graphic_data_choice_shapes(
     a::GraphicDataChoice::WordprocessingCanvas(canvas) => {
       wordprocessing_canvas_shapes(canvas, placement, transform, context)
     }
+    a::GraphicDataChoice::LockedCanvas(canvas) => {
+      drawingml_locked_canvas_shapes(canvas, placement, transform, context)
+    }
     a::GraphicDataChoice::Picture(picture) => {
       drawingml_picture_items(picture, placement, transform, context)
     }
@@ -7350,6 +8254,344 @@ fn drawing_graphic_data_choice_shapes(
       .collect(),
     _ => Vec::new(),
   }
+}
+
+fn drawingml_locked_canvas_shapes(
+  canvas: &lc::LockedCanvas,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  let child_transform = canvas
+    .visual_group_shape_properties
+    .transform_group
+    .as_deref()
+    .map(|model| {
+      let mut xfrm = drawingml_group_transform_from_model(model, transform.raw_coordinates);
+      // A locked canvas is the graphic payload of a WordprocessingML
+      // drawing. Its host wp:extent is the displayed object boundary; the
+      // root grpSpPr/chOff/chExt still declares the child coordinate space.
+      if let Some((width_pt, height_pt)) = transform.fallback_size {
+        xfrm.width_pt = width_pt;
+        xfrm.height_pt = height_pt;
+      }
+      xfrm
+    })
+    .map(|xfrm| transform.child(xfrm))
+    .unwrap_or(transform);
+  let child_context = DrawingShapeImportContext {
+    effect_extent: DrawingEffectExtent::default(),
+    ..context
+  };
+  canvas
+    .locked_canvas_choice
+    .iter()
+    .flat_map(|choice| {
+      drawingml_generic_group_choice_shapes(
+        choice,
+        drawingml_group_child_placement(placement),
+        child_transform,
+        child_context,
+      )
+    })
+    .collect()
+}
+
+fn drawingml_generic_group_shapes(
+  group: &a::GroupShape,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  let child_transform = group
+    .visual_group_shape_properties
+    .transform_group
+    .as_deref()
+    .map(|model| {
+      let mut xfrm = drawingml_group_transform_from_model(model, transform.raw_coordinates);
+      if let Some((left, top, width, height)) = drawingml_locked_canvas_line_group_bounds(group) {
+        // LibreOffice's locked-canvas import restores LineShape position and
+        // size as absolute values after group insertion
+        // (oox/source/drawingml/shape.cxx). Microsoft fixed output likewise
+        // fits the visible line union to the nested group's extent, rather
+        // than retaining unused chOff/chExt margins.
+        xfrm.child_offset_x = left;
+        xfrm.child_offset_y = top;
+        xfrm.child_width = width;
+        xfrm.child_height = height;
+      }
+      xfrm
+    })
+    .map(|xfrm| transform.child(xfrm))
+    .unwrap_or(transform);
+  let child_context = DrawingShapeImportContext {
+    effect_extent: DrawingEffectExtent::default(),
+    ..context
+  };
+  group
+    .group_shape_choice
+    .iter()
+    .flat_map(|choice| {
+      drawingml_generic_group_shape_choice_shapes(
+        choice,
+        drawingml_group_child_placement(placement),
+        child_transform,
+        child_context,
+      )
+    })
+    .collect()
+}
+
+fn drawingml_locked_canvas_line_group_bounds(
+  group: &a::GroupShape,
+) -> Option<(f32, f32, f32, f32)> {
+  let mut bounds: Option<(f32, f32, f32, f32)> = None;
+  for choice in &group.group_shape_choice {
+    let properties = match choice {
+      a::GroupShapeChoice::Shape(shape) => &shape.shape_properties,
+      a::GroupShapeChoice::ConnectionShape(shape) => &shape.shape_properties,
+      _ => return None,
+    };
+    let is_line = matches!(
+      properties.shape_properties_choice1.as_ref(),
+      Some(a::ShapePropertiesChoice::PresetGeometry(geometry))
+        if geometry.preset == a::ShapeTypeValues::Line
+    );
+    if !is_line {
+      return None;
+    }
+    let transform = properties.transform2_d.as_deref()?;
+    let offset = transform.offset.as_ref()?;
+    let extents = transform.extents.as_ref()?;
+    let left = offset.x.to_emu() as f32;
+    let top = offset.y.to_emu() as f32;
+    let right = left + extents.cx.to_emu() as f32;
+    let bottom = top + extents.cy.to_emu() as f32;
+    bounds = Some(match bounds {
+      Some((min_x, min_y, max_x, max_y)) => (
+        min_x.min(left),
+        min_y.min(top),
+        max_x.max(right),
+        max_y.max(bottom),
+      ),
+      None => (left, top, right, bottom),
+    });
+  }
+  let (left, top, right, bottom) = bounds?;
+  let width = right - left;
+  let height = bottom - top;
+  (width > 0.0 && height > 0.0).then_some((left, top, width, height))
+}
+
+fn drawingml_generic_group_choice_shapes(
+  choice: &lc::LockedCanvasChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  match choice {
+    lc::LockedCanvasChoice::Shape(shape) => drawingml_generic_shape_shape(
+      &shape.shape_properties,
+      shape.shape_style.as_deref(),
+      placement,
+      transform,
+      context,
+    )
+    .into_iter()
+    .map(InlineItem::Shape)
+    .collect(),
+    lc::LockedCanvasChoice::ConnectionShape(shape) => drawingml_generic_shape_shape(
+      &shape.shape_properties,
+      shape.shape_style.as_deref(),
+      placement,
+      transform,
+      context,
+    )
+    .into_iter()
+    .map(InlineItem::Shape)
+    .collect(),
+    lc::LockedCanvasChoice::GroupShape(group) => {
+      drawingml_generic_group_shapes(group, placement, transform, context)
+    }
+    _ => Vec::new(),
+  }
+}
+
+fn drawingml_generic_group_shape_choice_shapes(
+  choice: &a::GroupShapeChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  match choice {
+    a::GroupShapeChoice::Shape(shape) => drawingml_generic_shape_shape(
+      &shape.shape_properties,
+      shape.shape_style.as_deref(),
+      placement,
+      transform,
+      context,
+    )
+    .into_iter()
+    .map(InlineItem::Shape)
+    .collect(),
+    a::GroupShapeChoice::ConnectionShape(shape) => drawingml_generic_shape_shape(
+      &shape.shape_properties,
+      shape.shape_style.as_deref(),
+      placement,
+      transform,
+      context,
+    )
+    .into_iter()
+    .map(InlineItem::Shape)
+    .collect(),
+    a::GroupShapeChoice::GroupShape(group) => {
+      drawingml_generic_group_shapes(group, placement, transform, context)
+    }
+    _ => Vec::new(),
+  }
+}
+
+fn drawingml_generic_shape_shape(
+  shape_properties: &a::ShapeProperties,
+  shape_style: Option<&a::ShapeStyle>,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Option<InlineShape> {
+  let properties = DrawingMlShapeProperties::Generic(shape_properties.clone());
+  let has_explicit_fill = properties.fill().is_some();
+  let explicit_fill_color =
+    drawingml_shape_properties_fill_color(&properties, &context.styles.theme_colors);
+  let fill_pattern =
+    drawingml_shape_properties_pattern_fill(&properties, &context.styles.theme_colors);
+  let fill_override =
+    drawingml_shape_properties_common_fill(&properties, &context.styles.theme_colors);
+  let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
+    None
+  } else {
+    explicit_fill_color.or_else(|| {
+      (!has_explicit_fill)
+        .then(|| {
+          shape_style.and_then(|style| {
+            drawingml_fill_reference_color(&style.fill_reference, &context.styles.theme_colors)
+          })
+        })
+        .flatten()
+    })
+  };
+  let fill_image = drawingml_generic_shape_image_fill(shape_properties, context.images);
+  let stroke_override = shape_properties
+    .outline
+    .as_deref()
+    .and_then(|outline| drawingml_outline_common_stroke(outline, &context.styles.theme_colors));
+  let stroke = stroke_override
+    .as_ref()
+    .map(drawingml_border_style_from_common_stroke)
+    .or_else(|| {
+      shape_style.map(|style| {
+        drawingml_line_reference_stroke(
+          &style.line_reference,
+          &context.styles.theme_colors,
+          &context.styles.theme_lines,
+        )
+      })?
+    });
+  let stroke_pattern = shape_properties.outline.as_deref().and_then(|outline| {
+    match outline.outline_choice1.as_ref()? {
+      a::OutlineChoice::PatternFill(fill) => {
+        drawingml_pattern_fill(fill, &context.styles.theme_colors)
+      }
+      _ => None,
+    }
+  });
+  // Generic a:txSp content has independent DrawingML run properties, text
+  // warp, and effects. Word commonly emits it as non-semantic vector
+  // outlines, so it must not be downgraded to default WordprocessingML text.
+  if fill_color.is_none()
+    && fill_pattern.is_none()
+    && fill_override
+      .as_ref()
+      .is_none_or(|fill| matches!(fill, common::Fill::None))
+    && fill_image.is_none()
+    && stroke.is_none()
+    && stroke_override.is_none()
+  {
+    return None;
+  }
+
+  let mut geometry = properties
+    .geometry_kind()
+    .unwrap_or(InlineShapeGeometry::Rectangle);
+  let has_path_geometry = properties.has_path_geometry();
+  if geometry == InlineShapeGeometry::Rectangle && has_path_geometry {
+    geometry = InlineShapeGeometry::Polyline {
+      points: Vec::new(),
+      closed: false,
+    };
+  }
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_geometry_from_shape_properties(
+    Some(&properties),
+    &geometry,
+    transform.raw_coordinates,
+    transform.fallback_size,
+  )?;
+  let mapped = transform.map_rect(
+    offset_x_pt,
+    offset_y_pt,
+    width_pt,
+    height_pt,
+    properties.rotation_deg(),
+    properties.flip_horizontal(),
+    properties.flip_vertical(),
+  );
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
+  if has_path_geometry
+    && let Some(path_geometry) =
+      drawingml_path_geometry_from_properties(&properties, width_pt, height_pt)
+  {
+    geometry = path_geometry;
+  }
+
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    effect_left_pt: context.effect_extent.left_pt,
+    effect_top_pt: context.effect_extent.top_pt,
+    effect_right_pt: context.effect_extent.right_pt,
+    effect_bottom_pt: context.effect_extent.bottom_pt,
+    geometry,
+    offset_x_pt,
+    offset_y_pt,
+    rotation_deg: properties.camera_adjusted_rotation_deg(mapped.rotation_deg),
+    flip_horizontal: mapped.flip_horizontal,
+    flip_vertical: mapped.flip_vertical,
+    fill_color,
+    fill_pattern,
+    fill_override,
+    additional_fill_colors: Vec::new(),
+    fill_image,
+    stroke,
+    stroke_pattern,
+    stroke_override,
+    suppress_zero_relative_background: explicit_fill_color.is_some(),
+    allow_outside_page: false,
+    inline_anchor_after_line: false,
+    placement,
+    chart: None,
+    text_warp: None,
+    text_fill: None,
+    effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
+    static3d: properties.static3d(&context.styles.theme_colors),
+    text_upright: false,
+    text_box_blocks: Vec::new(),
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: false,
+    text_vertical_alignment: TextBoxVerticalAlignment::Top,
+  })
 }
 
 fn wordprocessing_canvas_shapes(
@@ -7394,9 +8636,12 @@ fn wordprocessing_group_shapes(
   transform: DrawingMlGroupTransform,
   context: DrawingShapeImportContext<'_>,
 ) -> Vec<InlineItem> {
-  let child_transform = drawingml_group_transform_from_properties(&group.group_shape_properties)
-    .map(|xfrm| transform.child(xfrm))
-    .unwrap_or(transform);
+  let child_transform = drawingml_group_transform_from_properties(
+    &group.group_shape_properties,
+    transform.raw_coordinates,
+  )
+  .map(|xfrm| transform.child(xfrm))
+  .unwrap_or(transform);
   let child_context = DrawingShapeImportContext {
     effect_extent: DrawingEffectExtent::default(),
     ..context
@@ -7428,9 +8673,12 @@ fn wordprocessing_group_shape_shapes(
   transform: DrawingMlGroupTransform,
   context: DrawingShapeImportContext<'_>,
 ) -> Vec<InlineItem> {
-  let child_transform = drawingml_group_transform_from_properties(&group.group_shape_properties)
-    .map(|xfrm| transform.child(xfrm))
-    .unwrap_or(transform);
+  let child_transform = drawingml_group_transform_from_properties(
+    &group.group_shape_properties,
+    transform.raw_coordinates,
+  )
+  .map(|xfrm| transform.child(xfrm))
+  .unwrap_or(transform);
   let child_context = DrawingShapeImportContext {
     effect_extent: DrawingEffectExtent::default(),
     ..context
@@ -7695,7 +8943,7 @@ fn wordprocessing_shape_shape(
     geometry,
     offset_x_pt,
     offset_y_pt,
-    rotation_deg: mapped.rotation_deg,
+    rotation_deg: properties.camera_adjusted_rotation_deg(mapped.rotation_deg),
     flip_horizontal: mapped.flip_horizontal,
     flip_vertical: mapped.flip_vertical,
     fill_color,
@@ -7742,15 +8990,6 @@ fn drawingml_picture_items(
     context.hyperlinks,
   ) {
     items.push(InlineItem::Image(image));
-  }
-  if let Some(shape) = drawingml_picture_frame(
-    picture,
-    placement,
-    transform,
-    &context.styles.theme_colors,
-    context.images,
-  ) {
-    items.push(InlineItem::Shape(shape));
   }
   items
 }
@@ -7801,10 +9040,12 @@ fn drawingml_diagram_drawing_shapes(
   transform: DrawingMlGroupTransform,
   context: DrawingShapeImportContext<'_>,
 ) -> Vec<InlineItem> {
-  let child_transform =
-    drawingml_group_transform_from_diagram_properties(&drawing.shape_tree.group_shape_properties)
-      .map(|xfrm| transform.child(xfrm))
-      .unwrap_or(transform);
+  let child_transform = drawingml_group_transform_from_diagram_properties(
+    &drawing.shape_tree.group_shape_properties,
+    transform.raw_coordinates,
+  )
+  .map(|xfrm| transform.child(xfrm))
+  .unwrap_or(transform);
   let children = drawing
     .shape_tree
     .shape_tree_choice
@@ -7833,10 +9074,12 @@ fn drawingml_diagram_group_shapes(
   transform: DrawingMlGroupTransform,
   context: DrawingShapeImportContext<'_>,
 ) -> Vec<InlineItem> {
-  let child_transform =
-    drawingml_group_transform_from_diagram_properties(&group.group_shape_properties)
-      .map(|xfrm| transform.child(xfrm))
-      .unwrap_or(transform);
+  let child_transform = drawingml_group_transform_from_diagram_properties(
+    &group.group_shape_properties,
+    transform.raw_coordinates,
+  )
+  .map(|xfrm| transform.child(xfrm))
+  .unwrap_or(transform);
   let children = group
     .group_shape_choice
     .iter()
@@ -8070,7 +9313,7 @@ fn drawingml_diagram_shape_shape(
     geometry,
     offset_x_pt,
     offset_y_pt,
-    rotation_deg: mapped.rotation_deg,
+    rotation_deg: properties.camera_adjusted_rotation_deg(mapped.rotation_deg),
     flip_horizontal: mapped.flip_horizontal,
     flip_vertical: mapped.flip_vertical,
     fill_color,
@@ -8944,6 +10187,7 @@ struct DrawingMlGroupXfrm {
 
 enum DrawingMlShapeProperties {
   Diagram(dsp::ShapeProperties),
+  Generic(a::ShapeProperties),
   Wordprocessing(wps::ShapeProperties),
   Picture(pic::ShapeProperties),
 }
@@ -8959,6 +10203,7 @@ impl DrawingMlShapeProperties {
   fn transform2_d(&self) -> Option<&a::Transform2D> {
     match self {
       Self::Diagram(properties) => properties.transform2_d.as_deref(),
+      Self::Generic(properties) => properties.transform2_d.as_deref(),
       Self::Wordprocessing(properties) => properties.transform2_d.as_deref(),
       Self::Picture(properties) => properties.transform2_d.as_deref(),
     }
@@ -8993,6 +10238,11 @@ impl DrawingMlShapeProperties {
         Some(dsp::ShapePropertiesChoice::PresetGeometry(geometry))
           if geometry.preset == a::ShapeTypeValues::Line
       ),
+      Self::Generic(properties) => matches!(
+        properties.shape_properties_choice1.as_ref(),
+        Some(a::ShapePropertiesChoice::PresetGeometry(geometry))
+          if geometry.preset == a::ShapeTypeValues::Line
+      ),
       Self::Wordprocessing(properties) => matches!(
         properties.shape_properties_choice1.as_ref(),
         Some(wps::ShapePropertiesChoice::PresetGeometry(geometry))
@@ -9018,6 +10268,10 @@ impl DrawingMlShapeProperties {
         dsp::ShapePropertiesChoice::CustomGeometry(geometry) => Some(geometry.as_ref()),
         dsp::ShapePropertiesChoice::PresetGeometry(_) => None,
       },
+      Self::Generic(properties) => match properties.shape_properties_choice1.as_ref()? {
+        a::ShapePropertiesChoice::CustomGeometry(geometry) => Some(geometry.as_ref()),
+        a::ShapePropertiesChoice::PresetGeometry(_) => None,
+      },
       Self::Wordprocessing(properties) => match properties.shape_properties_choice1.as_ref()? {
         wps::ShapePropertiesChoice::CustomGeometry(geometry) => Some(geometry.as_ref()),
         wps::ShapePropertiesChoice::PresetGeometry(_) => None,
@@ -9034,6 +10288,10 @@ impl DrawingMlShapeProperties {
       Self::Diagram(properties) => match properties.shape_properties_choice1.as_ref()? {
         dsp::ShapePropertiesChoice::PresetGeometry(geometry) => Some(geometry.as_ref()),
         dsp::ShapePropertiesChoice::CustomGeometry(_) => None,
+      },
+      Self::Generic(properties) => match properties.shape_properties_choice1.as_ref()? {
+        a::ShapePropertiesChoice::PresetGeometry(geometry) => Some(geometry.as_ref()),
+        a::ShapePropertiesChoice::CustomGeometry(_) => None,
       },
       Self::Wordprocessing(properties) => match properties.shape_properties_choice1.as_ref()? {
         wps::ShapePropertiesChoice::PresetGeometry(geometry) => Some(geometry.as_ref()),
@@ -9056,6 +10314,7 @@ impl DrawingMlShapeProperties {
   fn outline(&self) -> Option<&a::Outline> {
     match self {
       Self::Diagram(properties) => properties.outline.as_deref(),
+      Self::Generic(properties) => properties.outline.as_deref(),
       Self::Wordprocessing(properties) => properties.outline.as_deref(),
       Self::Picture(properties) => properties.outline.as_deref(),
     }
@@ -9076,6 +10335,21 @@ impl DrawingMlShapeProperties {
           Some(DrawingMlFillProperties::Gradient(fill.as_ref()))
         }
         dsp::ShapePropertiesChoice2::PatternFill(fill) => {
+          Some(DrawingMlFillProperties::Pattern(fill.as_ref()))
+        }
+        _ => None,
+      },
+      Self::Generic(properties) => match properties.shape_properties_choice2.as_ref()? {
+        a::ShapePropertiesChoice2::NoFill(_) | a::ShapePropertiesChoice2::GroupFill => {
+          Some(DrawingMlFillProperties::NoFill)
+        }
+        a::ShapePropertiesChoice2::SolidFill(fill) => {
+          Some(DrawingMlFillProperties::Solid(fill.as_ref()))
+        }
+        a::ShapePropertiesChoice2::GradientFill(fill) => {
+          Some(DrawingMlFillProperties::Gradient(fill.as_ref()))
+        }
+        a::ShapePropertiesChoice2::PatternFill(fill) => {
           Some(DrawingMlFillProperties::Pattern(fill.as_ref()))
         }
         _ => None,
@@ -9147,6 +10421,10 @@ impl DrawingMlShapeProperties {
         dsp::ShapePropertiesChoice3::EffectList(list) => Some(resolve_list(list.clone())),
         dsp::ShapePropertiesChoice3::EffectDag(dag) => Some(resolve_dag(dag.clone())),
       },
+      Self::Generic(properties) => match properties.shape_properties_choice3.as_ref()? {
+        a::ShapePropertiesChoice3::EffectList(list) => Some(resolve_list(list.clone())),
+        a::ShapePropertiesChoice3::EffectDag(dag) => Some(resolve_dag(dag.clone())),
+      },
       Self::Wordprocessing(properties) => match properties.shape_properties_choice3.as_ref()? {
         wps::ShapePropertiesChoice3::EffectList(list) => Some(resolve_list(list.clone())),
         wps::ShapePropertiesChoice3::EffectDag(dag) => Some(resolve_dag(dag.clone())),
@@ -9158,9 +10436,52 @@ impl DrawingMlShapeProperties {
     }
   }
 
+  fn camera_adjusted_rotation_deg(&self, mapped_rotation_deg: f32) -> f32 {
+    let (scene, shape) = match self {
+      Self::Diagram(properties) => (
+        properties.scene3_d_type.as_deref(),
+        properties.shape3_d_type.as_deref(),
+      ),
+      Self::Generic(properties) => (
+        properties.scene3_d_type.as_deref(),
+        properties.shape3_d_type.as_deref(),
+      ),
+      Self::Wordprocessing(properties) => (
+        properties.scene3_d_type.as_deref(),
+        properties.shape3_d_type.as_deref(),
+      ),
+      Self::Picture(properties) => (
+        properties.scene3_d_type.as_deref(),
+        properties.shape3_d_type.as_deref(),
+      ),
+    };
+    let Some(scene) = scene else {
+      return mapped_rotation_deg;
+    };
+    if shape.is_some() {
+      // The shared static-3D renderer owns the complete camera transform when
+      // a:sp3d is present.
+      return mapped_rotation_deg;
+    }
+
+    // A scene-only camera still rotates the visible 2-D face. LibreOffice's
+    // Scene3DHelper folds a:xfrm/@rot into the camera revolution before
+    // setting the shape's RotateAngle. Preserve any enclosing group rotation
+    // already present in `mapped_rotation_deg`, while replacing the local
+    // shape rotation with that camera-adjusted face angle.
+    let local_rotation_deg = self.rotation_deg();
+    mapped_rotation_deg
+      - common::drawingml_3d::camera_projection(scene, local_rotation_deg).face_rotation_degrees
+      - local_rotation_deg
+  }
+
   fn static3d(&self, theme_colors: &ThemeColors) -> Option<common::drawingml_3d::Static3dStyle> {
     let (scene, shape) = match self {
       Self::Diagram(properties) => (
+        properties.scene3_d_type.as_ref()?,
+        properties.shape3_d_type.as_ref()?,
+      ),
+      Self::Generic(properties) => (
         properties.scene3_d_type.as_ref()?,
         properties.shape3_d_type.as_ref()?,
       ),
@@ -9357,23 +10678,28 @@ fn drawingml_paragraph_text(paragraph: &a::Paragraph) -> Option<String> {
 
 fn drawingml_group_transform_from_properties(
   properties: &wpg::GroupShapeProperties,
+  raw_coordinates: bool,
 ) -> Option<DrawingMlGroupXfrm> {
   properties
     .transform_group
     .as_deref()
-    .map(drawingml_group_transform_from_model)
+    .map(|transform| drawingml_group_transform_from_model(transform, raw_coordinates))
 }
 
 fn drawingml_group_transform_from_diagram_properties(
   properties: &dsp::GroupShapeProperties,
+  raw_coordinates: bool,
 ) -> Option<DrawingMlGroupXfrm> {
   properties
     .transform_group
     .as_deref()
-    .map(drawingml_group_transform_from_model)
+    .map(|transform| drawingml_group_transform_from_model(transform, raw_coordinates))
 }
 
-fn drawingml_group_transform_from_model(transform: &a::TransformGroup) -> DrawingMlGroupXfrm {
+fn drawingml_group_transform_from_model(
+  transform: &a::TransformGroup,
+  raw_coordinates: bool,
+) -> DrawingMlGroupXfrm {
   let mut group = DrawingMlGroupXfrm::default();
 
   group.rotation_deg = transform
@@ -9389,12 +10715,12 @@ fn drawingml_group_transform_from_model(transform: &a::TransformGroup) -> Drawin
     .as_ref()
     .is_some_and(|value| value.as_bool());
   if let Some(offset) = &transform.offset {
-    group.offset_x_pt = units::emu_to_points(offset.x.to_emu());
-    group.offset_y_pt = units::emu_to_points(offset.y.to_emu());
+    group.offset_x_pt = drawingml_coordinate_to_points(offset.x.to_emu(), raw_coordinates);
+    group.offset_y_pt = drawingml_coordinate_to_points(offset.y.to_emu(), raw_coordinates);
   }
   if let Some(extents) = &transform.extents {
-    group.width_pt = units::emu_to_points(extents.cx.to_emu());
-    group.height_pt = units::emu_to_points(extents.cy.to_emu());
+    group.width_pt = drawingml_coordinate_to_points(extents.cx.to_emu(), raw_coordinates);
+    group.height_pt = drawingml_coordinate_to_points(extents.cy.to_emu(), raw_coordinates);
   }
   if let Some(child_offset) = &transform.child_offset {
     group.child_offset_x = child_offset.x.to_emu() as f32;
@@ -9499,7 +10825,6 @@ fn drawingml_picture_frame(
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
   theme_colors: &ThemeColors,
-  images: &ImageCatalog,
 ) -> Option<InlineShape> {
   let properties = DrawingMlShapeProperties::Picture(
     picture
@@ -9508,14 +10833,39 @@ fn drawingml_picture_frame(
       .cloned()
       .unwrap_or_default(),
   );
-  let geometry = properties
+  let fill_override = drawingml_shape_properties_common_fill(&properties, theme_colors);
+  let fill_color = drawingml_shape_properties_fill_color(&properties, theme_colors);
+  let fill_pattern = drawingml_shape_properties_pattern_fill(&properties, theme_colors);
+  let stroke_override = properties
+    .outline()
+    .and_then(|outline| drawingml_outline_common_stroke(outline, theme_colors));
+  let stroke = stroke_override.as_ref().map(|stroke| BorderStyle {
+    width_pt: stroke.width.0,
+    spacing_pt: 0.0,
+    color: RgbColor {
+      r: stroke.color.r,
+      g: stroke.color.g,
+      b: stroke.color.b,
+    },
+    compound: false,
+    dash_pattern: BorderDashPattern::Solid,
+    shadow: false,
+  });
+  let mut geometry = properties
     .geometry_kind()
     .unwrap_or(InlineShapeGeometry::Rectangle);
+  let has_path_geometry = properties.has_path_geometry();
+  if geometry == InlineShapeGeometry::Rectangle && has_path_geometry {
+    geometry = InlineShapeGeometry::Polyline {
+      points: Vec::new(),
+      closed: false,
+    };
+  }
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_geometry_from_shape_properties(
     Some(&properties),
     &geometry,
     transform.raw_coordinates,
-    None,
+    transform.fallback_size,
   )?;
   let mapped = transform.map_rect(
     offset_x_pt,
@@ -9528,6 +10878,12 @@ fn drawingml_picture_frame(
   );
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
+  if has_path_geometry
+    && let Some(path_geometry) =
+      drawingml_path_geometry_from_properties(&properties, width_pt, height_pt)
+  {
+    geometry = path_geometry;
+  }
 
   Some(InlineShape {
     width_pt,
@@ -9536,20 +10892,20 @@ fn drawingml_picture_frame(
     effect_top_pt: 0.0,
     effect_right_pt: 0.0,
     effect_bottom_pt: 0.0,
-    geometry: InlineShapeGeometry::Rectangle,
+    geometry,
     offset_x_pt,
     offset_y_pt,
-    rotation_deg: mapped.rotation_deg,
+    rotation_deg: properties.camera_adjusted_rotation_deg(mapped.rotation_deg),
     flip_horizontal: mapped.flip_horizontal,
     flip_vertical: mapped.flip_vertical,
-    fill_color: None,
-    fill_pattern: None,
-    fill_override: None,
+    fill_color,
+    fill_pattern,
+    fill_override,
     additional_fill_colors: Vec::new(),
     fill_image: None,
-    stroke: None,
+    stroke,
     stroke_pattern: None,
-    stroke_override: None,
+    stroke_override,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
     inline_anchor_after_line: false,
@@ -9557,8 +10913,8 @@ fn drawingml_picture_frame(
     chart: None,
     text_warp: None,
     text_fill: None,
-    effects: properties.effects(theme_colors, Some(images)),
-    static3d: properties.static3d(theme_colors),
+    effects: None,
+    static3d: None,
     text_upright: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -9617,6 +10973,10 @@ fn drawingml_picture_image(
   Some(InlineImage {
     data: image_data.data,
     content_type: image_data.content_type,
+    picture_frame: drawingml_picture_frame(picture, placement, transform, &styles.theme_colors)
+      .map(Box::new),
+    effects: properties.shape_effects,
+    static3d: properties.static3d,
     width_pt,
     height_pt,
     effect_left_pt: 0.0,
@@ -9624,7 +10984,7 @@ fn drawingml_picture_image(
     effect_right_pt: 0.0,
     effect_bottom_pt: 0.0,
     crop: properties.crop,
-    rotation_deg: mapped.rotation_deg,
+    rotation_deg: shape_properties.camera_adjusted_rotation_deg(mapped.rotation_deg),
     flip_horizontal: mapped.flip_horizontal,
     flip_vertical: mapped.flip_vertical,
     metafile_background_color: None,
@@ -9671,6 +11031,36 @@ fn drawingml_diagram_shape_image_fill(
   images: &ImageCatalog,
 ) -> Option<InlineShapeImageFill> {
   let dsp::ShapePropertiesChoice2::BlipFill(blip_fill) =
+    properties.shape_properties_choice2.as_ref()?
+  else {
+    return None;
+  };
+  let image_properties =
+    drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default(), Some(images))?;
+  let relationship_id = image_properties.relationship_id.as_deref()?;
+  let resource = images.by_relationship_id.get(relationship_id)?;
+  let image_data = image_data_with_effects(resource, &image_properties);
+
+  Some(InlineShapeImageFill {
+    data: image_data.data,
+    content_type: image_data.content_type,
+    crop: image_properties.crop,
+    rotation_deg: image_properties.rotation_deg,
+    flip_horizontal: image_properties.flip_horizontal,
+    flip_vertical: image_properties.flip_vertical,
+    rotate_with_shape: blip_fill
+      .rotate_with_shape
+      .as_ref()
+      .is_some_and(|value| value.as_bool()),
+    mode: drawingml_image_fill_mode(blip_fill),
+  })
+}
+
+fn drawingml_generic_shape_image_fill(
+  properties: &a::ShapeProperties,
+  images: &ImageCatalog,
+) -> Option<InlineShapeImageFill> {
+  let a::ShapePropertiesChoice2::BlipFill(blip_fill) =
     properties.shape_properties_choice2.as_ref()?
   else {
     return None;
@@ -10172,6 +11562,21 @@ fn drawingml_outline_common_stroke(
   };
   common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
   Some(stroke)
+}
+
+fn drawingml_border_style_from_common_stroke(stroke: &common::Stroke<'_>) -> BorderStyle {
+  BorderStyle {
+    width_pt: stroke.width.0,
+    spacing_pt: 0.0,
+    color: RgbColor {
+      r: stroke.color.r,
+      g: stroke.color.g,
+      b: stroke.color.b,
+    },
+    compound: false,
+    dash_pattern: BorderDashPattern::Solid,
+    shadow: false,
+  }
 }
 
 fn drawingml_diagram_shape_stroke(
@@ -10967,6 +12372,15 @@ pub(crate) fn vml_path_geometry(
       .collect::<Option<Vec<_>>>()?;
     match command {
       "m" | "t" => {
+        if command == "m" && values.is_empty() {
+          // ECMA-376 Part 4 §19.1 uses `m,l21600,21600e` for the
+          // canonical VML line shapetype. Office interprets the omitted
+          // absolute moveto pair as the coordinate-space origin.
+          current = (0.0, 0.0);
+          subpath_start = current;
+          commands.push(common::PathCommand::MoveTo(map(current.0, current.1)));
+          continue;
+        }
         if values.len() < 2 || values.len() % 2 != 0 {
           return None;
         }
@@ -11934,13 +13348,21 @@ fn picture_choice_image(choice: &w::PictureChoice, images: &ImageCatalog) -> Opt
 }
 
 fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> Option<InlineImage> {
-  let semantic_metafile_text = object.embedded_object_choice1.iter().any(|choice| {
+  let content_representation = object.embedded_object_choice1.iter().any(|choice| {
     matches!(
       choice,
       w::EmbeddedObjectChoice::OleObject(ole)
-        if ole.prog_id.as_ref().is_some_and(|id| id.as_str().starts_with("PowerPoint.Slide"))
+        if ole.draw_aspect == Some(o::OleDrawAspectValues::Content)
     )
-  });
+  }) || matches!(
+    object.embedded_object_choice2.as_ref(),
+    Some(w::EmbeddedObjectChoice2::ObjectEmbed(embed))
+      if embed.draw_aspect == Some(w::ObjectDrawAspect::Content)
+  ) || matches!(
+    object.embedded_object_choice2.as_ref(),
+    Some(w::EmbeddedObjectChoice2::ObjectLink(link))
+      if link.draw_aspect == Some(w::ObjectDrawAspect::Content)
+  );
   let mut image = object
     .embedded_object_choice1
     .iter()
@@ -11955,7 +13377,12 @@ fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> O
       _ => None,
     })?;
   image.metafile_background_color = embedded_object_metafile_background_color(object);
-  image.semantic_metafile_text |= semantic_metafile_text;
+  // ECMA-376 Part 1 §17.3.3.19 and Annex L.7.2 require the associated
+  // shape/image as the static visual representation when an embedded object
+  // is not loaded. Preserve real EMF/WMF TextOut records from that
+  // representation for PDF text semantics regardless of the OLE server.
+  image.semantic_metafile_text |= content_representation
+    && crate::render::emf_wmf::supports_semantic_text(image.content_type.as_deref());
   Some(image)
 }
 
@@ -12479,6 +13906,29 @@ fn textbox_blocks_with_base(
         clear_shape_text_table_placements(&mut table);
         blocks.push(Block::Table(table));
       }
+      w::TextBoxContentChoice::SdtBlock(sdt) => {
+        let mut sdt_blocks = sdt_block_blocks_with_base(
+          sdt,
+          styles,
+          &mut numbering,
+          images,
+          hyperlinks,
+          SdtBlockControls {
+            custom_xml_bindings: &custom_xml_bindings,
+            form_widget_ids: &mut form_widget_ids,
+            // Text boxes are separate stories: do not apply main-story
+            // recovery defaults to their paragraphs or nested tables.
+            in_header_footer: true,
+          },
+          Some(&base_style),
+        );
+        for block in &mut sdt_blocks {
+          if let Block::Table(table) = block {
+            clear_shape_text_table_placements(table);
+          }
+        }
+        blocks.extend(sdt_blocks);
+      }
       _ => {}
     }
   }
@@ -12568,6 +14018,9 @@ fn vml_image_data(
   Some(InlineImage {
     data: resource.data.clone(),
     content_type: resource.content_type.clone(),
+    picture_frame: None,
+    effects: None,
+    static3d: None,
     width_pt,
     height_pt,
     effect_left_pt: 0.0,
@@ -13066,6 +14519,9 @@ struct DrawingImageProperties {
   hyperlink_relationship_id: Option<String>,
   crop: ImageCrop,
   effects: Vec<ImageEffect>,
+  picture_frame: Option<Box<InlineShape>>,
+  shape_effects: Option<common::DrawingEffectSource>,
+  static3d: Option<common::drawingml_3d::Static3dStyle>,
   rotation_deg: f32,
   flip_horizontal: bool,
   flip_vertical: bool,
@@ -13189,6 +14645,13 @@ fn drawing_picture_image_properties(
 ) -> Option<DrawingImageProperties> {
   let blip_fill = picture.blip_fill.as_deref()?;
   let blip = blip_fill.blip.as_ref()?;
+  let shape_properties = DrawingMlShapeProperties::Picture(
+    picture
+      .shape_properties
+      .as_deref()
+      .cloned()
+      .unwrap_or_default(),
+  );
   let mut properties = DrawingImageProperties {
     relationship_id: blip.embed.clone().or_else(|| blip.link.clone()),
     external_link: blip.embed.is_none() && blip.link.is_some(),
@@ -13202,6 +14665,15 @@ fn drawing_picture_image_properties(
           .as_ref()
       })
       .and_then(|hyperlink| hyperlink.id.clone()),
+    picture_frame: drawingml_picture_frame(
+      picture,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      theme_colors,
+    )
+    .map(Box::new),
+    shape_effects: shape_properties.effects(theme_colors, images),
+    static3d: shape_properties.static3d(theme_colors),
     ..DrawingImageProperties::default()
   };
 
@@ -13455,6 +14927,8 @@ fn drawingml_preset_color_value(value: a::PresetColorValues) -> Option<RgbColor>
 #[derive(Clone, Debug, Default)]
 struct StylesCatalog {
   import_settings: ImportSettings,
+  display_math_alignment: Option<ParagraphAlignment>,
+  math_font_family: Option<Arc<str>>,
   simplified_chinese_ui: bool,
   preserve_word_text_whitespace: bool,
   has_styles_part: bool,
@@ -13626,10 +15100,12 @@ struct RunStyleOverrides {
 #[derive(Clone, Debug, Default)]
 struct TableStyleModel {
   table_borders: Option<TableBordersModel>,
+  table_shading: Option<Option<RgbColor>>,
   cell_margins: Option<CellMargins>,
   cell_spacing_pt: Option<f32>,
   indent_left_pt: Option<f32>,
   alignment: Option<TableAlignment>,
+  layout: Option<TableLayoutMode>,
   whole_row: TableRowStyle,
   conditional_rows: Vec<(w::TableStyleOverrideValues, TableRowStyle)>,
   whole_table: TableCellStyle,
@@ -13643,14 +15119,17 @@ struct TableRowStyle {
   repeat_header: Option<bool>,
   cant_split: Option<bool>,
   cell_spacing_pt: Option<f32>,
+  width_before_pt: Option<f32>,
+  width_after_pt: Option<f32>,
 }
 
 #[derive(Clone, Debug, Default)]
 struct TableCellStyle {
-  shading: Option<RgbColor>,
+  shading: Option<Option<RgbColor>>,
   borders: CellBordersModel,
   margins: Option<CellMargins>,
   vertical_alignment: Option<TableCellVerticalAlignment>,
+  no_wrap: Option<bool>,
   paragraph_format: ParagraphFormat,
   run_style: TextStyle,
   run_overrides: RunStyleOverrides,
@@ -13665,6 +15144,8 @@ struct TableImportContext<'a> {
   form_widget_ids: &'a mut FormWidgetIdAllocator,
   cell_margins: CellMargins,
   direct_cell_margins: bool,
+  table_shading: Option<RgbColor>,
+  table_borders: Option<TableBordersModel>,
   table_style: &'a TableStyleModel,
   table_look: TableLookModel,
   row_count: usize,
@@ -13886,6 +15367,16 @@ impl StylesCatalog {
       }
     }
     reference.resolved()
+  }
+
+  fn numbering_style_num_id(&self, style_id: &str) -> Option<i32> {
+    let style = self.styles.get(style_id)?;
+    if !matches!(style.style_type, Some(w::StyleValues::Numbering)) {
+      return None;
+    }
+    self
+      .paragraph_numbering_reference(Some(style_id))
+      .map(NumberingReference::num_id)
   }
 
   fn run_style_with_base(
@@ -14618,6 +16109,8 @@ fn table_style_model(
         properties.table_cell_spacing.as_ref(),
         properties.table_indentation.as_ref(),
         properties.table_justification.as_ref(),
+        properties.table_layout.as_ref(),
+        properties.shading.as_ref(),
       ),
     );
   }
@@ -14675,6 +16168,9 @@ fn table_style_model(
       .table_style_conditional_formatting_table_properties
       .as_deref()
     {
+      if let Some(shading) = properties.shading.as_ref() {
+        cell_style.shading = Some(shading_fill(shading));
+      }
       merge_table_level_style(&mut model, &conditional_table_level_style(properties));
     }
     if let Some(properties) = conditional
@@ -14698,7 +16194,7 @@ fn table_style_model(
 
 fn style_table_cell_style(properties: &w::StyleTableCellProperties) -> TableCellStyle {
   TableCellStyle {
-    shading: properties.shading.as_ref().and_then(shading_fill),
+    shading: properties.shading.as_ref().map(shading_fill),
     borders: CellBordersModel::default(),
     margins: properties
       .table_cell_margin
@@ -14708,6 +16204,10 @@ fn style_table_cell_style(properties: &w::StyleTableCellProperties) -> TableCell
       .table_cell_vertical_alignment
       .as_ref()
       .map(table_cell_vertical_alignment),
+    no_wrap: properties
+      .no_wrap
+      .as_ref()
+      .map(|no_wrap| on_off_only_value(no_wrap.val)),
     ..Default::default()
   }
 }
@@ -14716,7 +16216,7 @@ fn conditional_table_cell_style(
   properties: &w::TableStyleConditionalFormattingTableCellProperties,
 ) -> TableCellStyle {
   TableCellStyle {
-    shading: properties.shading.as_ref().and_then(shading_fill),
+    shading: properties.shading.as_ref().map(shading_fill),
     borders: properties
       .table_cell_borders
       .as_deref()
@@ -14730,6 +16230,10 @@ fn conditional_table_cell_style(
       .table_cell_vertical_alignment
       .as_ref()
       .map(table_cell_vertical_alignment),
+    no_wrap: properties
+      .no_wrap
+      .as_ref()
+      .map(|no_wrap| on_off_only_value(no_wrap.val)),
     ..Default::default()
   }
 }
@@ -14752,13 +16256,17 @@ fn style_table_level_style(
   spacing: Option<&w::TableCellSpacing>,
   indentation: Option<&w::TableIndentation>,
   justification: Option<&w::TableJustification>,
+  layout: Option<&w::TableLayout>,
+  shading: Option<&w::Shading>,
 ) -> TableStyleModel {
   TableStyleModel {
     table_borders: borders.map(table_borders_model),
+    table_shading: shading.map(shading_fill),
     cell_margins: margins.map(table_cell_margin_default),
     cell_spacing_pt: spacing.and_then(table_cell_spacing_to_points),
     indent_left_pt: indentation.and_then(table_indentation_to_points),
     alignment: justification.map(table_alignment),
+    layout: layout.map(table_layout_mode),
     ..Default::default()
   }
 }
@@ -14772,12 +16280,17 @@ fn conditional_table_level_style(
     properties.table_cell_spacing.as_ref(),
     properties.table_indentation.as_ref(),
     properties.table_justification.as_ref(),
+    None,
+    None,
   )
 }
 
 fn merge_table_level_style(target: &mut TableStyleModel, source: &TableStyleModel) {
   if source.table_borders.is_some() {
     target.table_borders = source.table_borders;
+  }
+  if source.table_shading.is_some() {
+    target.table_shading = source.table_shading;
   }
   if source.cell_margins.is_some() {
     target.cell_margins = source.cell_margins;
@@ -14790,6 +16303,9 @@ fn merge_table_level_style(target: &mut TableStyleModel, source: &TableStyleMode
   }
   if source.alignment.is_some() {
     target.alignment = source.alignment;
+  }
+  if source.layout.is_some() {
+    target.layout = source.layout;
   }
 }
 
@@ -14812,6 +16328,12 @@ fn direct_table_row_style(properties: Option<&w::TableRowProperties>) -> TableRo
       w::TableRowPropertiesChoice::TableCellSpacing(spacing) => {
         style.cell_spacing_pt = table_cell_spacing_to_points(spacing);
       }
+      w::TableRowPropertiesChoice::WidthBeforeTableRow(width) => {
+        style.width_before_pt = row_width_to_points(width.width.as_ref(), width.r#type);
+      }
+      w::TableRowPropertiesChoice::WidthAfterTableRow(width) => {
+        style.width_after_pt = row_width_to_points(width.width.as_ref(), width.r#type);
+      }
       _ => {}
     }
   }
@@ -14832,6 +16354,12 @@ fn style_table_row_style(
       }
       w::TableStyleConditionalFormattingTableRowPropertiesChoice::TableCellSpacing(spacing) => {
         style.cell_spacing_pt = table_cell_spacing_to_points(spacing);
+      }
+      w::TableStyleConditionalFormattingTableRowPropertiesChoice::WidthBeforeTableRow(width) => {
+        style.width_before_pt = row_width_to_points(width.width.as_ref(), width.r#type);
+      }
+      w::TableStyleConditionalFormattingTableRowPropertiesChoice::WidthAfterTableRow(width) => {
+        style.width_after_pt = row_width_to_points(width.width.as_ref(), width.r#type);
       }
       _ => {}
     }
@@ -14867,6 +16395,12 @@ fn merge_table_row_style(target: &mut TableRowStyle, source: &TableRowStyle) {
   if source.cell_spacing_pt.is_some() {
     target.cell_spacing_pt = source.cell_spacing_pt;
   }
+  if source.width_before_pt.is_some() {
+    target.width_before_pt = source.width_before_pt;
+  }
+  if source.width_after_pt.is_some() {
+    target.width_after_pt = source.width_after_pt;
+  }
 }
 
 fn merge_table_cell_style(target: &mut TableCellStyle, source: &TableCellStyle) {
@@ -14881,6 +16415,9 @@ fn merge_table_cell_style(target: &mut TableCellStyle, source: &TableCellStyle) 
   }
   if source.vertical_alignment.is_some() {
     target.vertical_alignment = source.vertical_alignment;
+  }
+  if source.no_wrap.is_some() {
+    target.no_wrap = source.no_wrap;
   }
   merge_format_values(&mut target.paragraph_format, &source.paragraph_format);
   merge_style_values(&mut target.run_style, &source.run_style);
@@ -15334,6 +16871,7 @@ struct NumberingCatalog {
   abstract_nums: HashMap<i32, AbstractNumbering>,
   picture_bullets: HashMap<i32, InlineImage>,
   counters: HashMap<(i32, i32), i32>,
+  active_num_instances: HashMap<(i32, i32), i32>,
 }
 
 #[derive(Clone, Debug)]
@@ -15351,11 +16889,14 @@ struct LevelOverride {
 #[derive(Clone, Debug, Default)]
 struct AbstractNumbering {
   levels: HashMap<i32, NumberingLevel>,
+  style_link: Option<String>,
+  numbering_style_link: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 struct NumberingLevel {
   start: i32,
+  restart_level: Option<i32>,
   format: w::NumberFormatValues,
   custom_format: Option<String>,
   text: String,
@@ -15390,7 +16931,7 @@ impl NumberingCatalog {
     package: &mut WordprocessingDocument,
     main: &MainDocumentPart,
     import_settings: ImportSettings,
-    theme_colors: &ThemeColors,
+    styles: &StylesCatalog,
   ) -> Result<Self> {
     let Some(numbering_part) = main.numbering_definitions_part(package) else {
       return Ok(Self::default());
@@ -15401,7 +16942,7 @@ impl NumberingCatalog {
 
     for picture_bullet in &numbering.numbering_picture_bullet {
       if let Some(image) =
-        numbering_picture_bullet_image(picture_bullet, &numbering_images, theme_colors)
+        numbering_picture_bullet_image(picture_bullet, &numbering_images, &styles.theme_colors)
       {
         catalog
           .picture_bullets
@@ -15410,7 +16951,17 @@ impl NumberingCatalog {
     }
 
     for abstract_num in &numbering.abstract_num {
-      let mut entry = AbstractNumbering::default();
+      let mut entry = AbstractNumbering {
+        style_link: abstract_num
+          .style_link
+          .as_ref()
+          .map(|link| link.val.to_string()),
+        numbering_style_link: abstract_num
+          .numbering_style_link
+          .as_ref()
+          .map(|link| link.val.to_string()),
+        ..Default::default()
+      };
       for level in &abstract_num.level {
         entry.levels.insert(
           level.level_index,
@@ -15451,7 +17002,57 @@ impl NumberingCatalog {
       );
     }
 
+    catalog.resolve_style_linked_abstract_nums(styles);
+
     Ok(catalog)
+  }
+
+  fn resolve_style_linked_abstract_nums(&mut self, styles: &StylesCatalog) {
+    let resolved = self
+      .nums
+      .iter()
+      .map(|(&num_id, instance)| {
+        (
+          num_id,
+          self.resolve_abstract_num_id(instance.abstract_num_id, styles),
+        )
+      })
+      .collect::<Vec<_>>();
+    for (num_id, abstract_num_id) in resolved {
+      if let Some(instance) = self.nums.get_mut(&num_id) {
+        instance.abstract_num_id = abstract_num_id;
+      }
+    }
+  }
+
+  fn resolve_abstract_num_id(&self, abstract_num_id: i32, styles: &StylesCatalog) -> i32 {
+    let mut current = abstract_num_id;
+    let mut visited = HashSet::new();
+    while visited.insert(current) {
+      let Some(link) = self
+        .abstract_nums
+        .get(&current)
+        .and_then(|abstract_num| abstract_num.numbering_style_link.as_deref())
+      else {
+        break;
+      };
+      let from_style = styles
+        .numbering_style_num_id(link)
+        .and_then(|num_id| self.nums.get(&num_id))
+        .map(|instance| instance.abstract_num_id);
+      let from_abstract = self
+        .abstract_nums
+        .iter()
+        .filter_map(|(&id, abstract_num)| {
+          (abstract_num.style_link.as_deref() == Some(link)).then_some(id)
+        })
+        .min();
+      let Some(next) = from_style.or(from_abstract) else {
+        break;
+      };
+      current = next;
+    }
+    current
   }
 
   fn next_label(
@@ -15466,42 +17067,60 @@ impl NumberingCatalog {
     let num_id = reference.num_id();
     let level_index = reference.level_index();
     let instance = self.nums.get(&num_id)?;
-    let abstract_num = self.abstract_nums.get(&instance.abstract_num_id)?;
+    let abstract_num_id = instance.abstract_num_id;
+    let abstract_num = self.abstract_nums.get(&abstract_num_id)?;
     let level_override = instance.overrides.get(&level_index);
     let level = level_override
       .and_then(|override_| override_.level.as_ref())
       .or_else(|| abstract_num.levels.get(&level_index))?;
 
     merge_numbering_format_values(format, &level.format_properties, format_context);
-    let start = level_override
-      .and_then(|override_| override_.start)
-      .unwrap_or(level.start);
-    let counter = {
-      let counter = self
-        .counters
-        .entry((num_id, level_index))
-        .or_insert(start - 1);
+    let start_override = level_override.and_then(|override_| override_.start);
+    let start = start_override.unwrap_or(level.start);
+    let counter_key = (abstract_num_id, level_index);
+    let entering_restart_instance = start_override.is_some()
+      && self.active_num_instances.get(&counter_key).copied() != Some(num_id);
+    self.active_num_instances.insert(counter_key, num_id);
+    let counter = if entering_restart_instance {
+      self.counters.insert(counter_key, start);
+      start
+    } else {
+      let counter = self.counters.entry(counter_key).or_insert(start - 1);
       *counter += 1;
       *counter
     };
     for key_level in (level_index + 1)..=8 {
-      self.counters.remove(&(num_id, key_level));
+      let restart_level = instance
+        .overrides
+        .get(&key_level)
+        .and_then(|override_| override_.level.as_ref())
+        .or_else(|| abstract_num.levels.get(&key_level));
+      if restart_level
+        .is_some_and(|level| !numbering_level_restarts_after(level, key_level, level_index))
+      {
+        continue;
+      }
+      let key = (abstract_num_id, key_level);
+      self.counters.remove(&key);
+      self.active_num_instances.remove(&key);
     }
 
     let mut text = format_numbering_label(
       level,
-      num_id,
+      abstract_num_id,
       level_index,
       counter,
       abstract_num,
+      &instance.overrides,
       &self.counters,
     );
     let suppressed_non_numerical_text = format_numbering_label_suppressing_non_numerical(
       level,
-      num_id,
+      abstract_num_id,
       level_index,
       counter,
       abstract_num,
+      &instance.overrides,
       &self.counters,
     );
     let mut style = base_style;
@@ -15586,7 +17205,9 @@ fn numbering_level_model(level: &w::Level, import_settings: ImportSettings) -> N
       .start_numbering_value
       .as_ref()
       .map(|value| value.val)
-      .unwrap_or(1),
+      // ECMA-376 Part 1 §17.9.25: an omitted w:start begins at zero.
+      .unwrap_or(0),
+    restart_level: level.level_restart.as_ref().map(|restart| restart.val),
     format: level
       .numbering_format
       .as_ref()
@@ -15617,6 +17238,26 @@ fn numbering_level_model(level: &w::Level, import_settings: ImportSettings) -> N
     is_legal: level.is_legal_numbering_style.is_some(),
     format_properties,
     symbol_run_properties: level.numbering_symbol_run_properties.as_deref().cloned(),
+  }
+}
+
+fn numbering_level_restarts_after(
+  level: &NumberingLevel,
+  level_index: i32,
+  used_level_index: i32,
+) -> bool {
+  if used_level_index >= level_index {
+    return false;
+  }
+  match level.restart_level {
+    None => true,
+    Some(0) => false,
+    Some(restart_level) if restart_level > 0 && restart_level <= level_index => {
+      used_level_index < restart_level
+    }
+    // ECMA-376 Part 1 §17.9.10 says an invalid reference to the current or
+    // a lower level is ignored, leaving the ordinary previous-level restart.
+    Some(_) => true,
   }
 }
 
@@ -15683,6 +17324,9 @@ fn numbering_drawing_image(
   Some(InlineImage {
     data: image_data.data,
     content_type: image_data.content_type,
+    picture_frame: properties.picture_frame,
+    effects: properties.shape_effects,
+    static3d: properties.static3d,
     width_pt,
     height_pt,
     effect_left_pt: 0.0,
@@ -15732,10 +17376,11 @@ fn normalize_picture_bullet_image_size(mut image: InlineImage) -> InlineImage {
 
 fn format_numbering_label(
   level: &NumberingLevel,
-  num_id: i32,
+  counter_id: i32,
   level_index: i32,
   value: i32,
   abstract_num: &AbstractNumbering,
+  overrides: &HashMap<i32, LevelOverride>,
   counters: &HashMap<(i32, i32), i32>,
 ) -> String {
   if matches!(level.format, w::NumberFormatValues::Bullet) {
@@ -15748,23 +17393,29 @@ fn format_numbering_label(
     if !text.contains(&placeholder) {
       continue;
     }
+    let referenced_level = overrides
+      .get(&index)
+      .and_then(|override_| override_.level.as_ref())
+      .or_else(|| abstract_num.levels.get(&index));
     let value = if index == level_index {
       value
     } else {
-      counters.get(&(num_id, index)).copied().unwrap_or_else(|| {
-        abstract_num
-          .levels
-          .get(&index)
-          .map(|level| level.start)
-          .unwrap_or(1)
-      })
+      counters
+        .get(&(counter_id, index))
+        .copied()
+        .unwrap_or_else(|| referenced_level.map(|level| level.start).unwrap_or(1))
     };
-    let referenced_level = abstract_num.levels.get(&index);
     text = text.replace(
       &placeholder,
       &referenced_level.map_or_else(
         || value.to_string(),
-        |referenced_level| format_numbering_level_value(value, referenced_level, level.is_legal),
+        |referenced_level| {
+          format_numbering_level_value(
+            value,
+            referenced_level,
+            level.is_legal && index != level_index,
+          )
+        },
       ),
     );
   }
@@ -15773,10 +17424,11 @@ fn format_numbering_label(
 
 fn format_numbering_label_suppressing_non_numerical(
   level: &NumberingLevel,
-  num_id: i32,
+  counter_id: i32,
   level_index: i32,
   value: i32,
   abstract_num: &AbstractNumbering,
+  overrides: &HashMap<i32, LevelOverride>,
   counters: &HashMap<(i32, i32), i32>,
 ) -> String {
   if matches!(level.format, w::NumberFormatValues::Bullet) {
@@ -15796,25 +17448,26 @@ fn format_numbering_label_suppressing_non_numerical(
     {
       chars.next();
       let referenced_index = i32::try_from(index - 1).unwrap_or_default();
+      let referenced_level = overrides
+        .get(&referenced_index)
+        .and_then(|override_| override_.level.as_ref())
+        .or_else(|| abstract_num.levels.get(&referenced_index));
       let referenced_value = if referenced_index == level_index {
         value
       } else {
         counters
-          .get(&(num_id, referenced_index))
+          .get(&(counter_id, referenced_index))
           .copied()
-          .unwrap_or_else(|| {
-            abstract_num
-              .levels
-              .get(&referenced_index)
-              .map(|level| level.start)
-              .unwrap_or(1)
-          })
+          .unwrap_or_else(|| referenced_level.map(|level| level.start).unwrap_or(1))
       };
-      let referenced_level = abstract_num.levels.get(&referenced_index);
       output.push_str(&referenced_level.map_or_else(
         || referenced_value.to_string(),
         |referenced_level| {
-          format_numbering_level_value(referenced_value, referenced_level, level.is_legal)
+          format_numbering_level_value(
+            referenced_value,
+            referenced_level,
+            level.is_legal && referenced_index != level_index,
+          )
         },
       ));
     } else if is_word_numbering_delimiter(ch) {
@@ -16950,6 +18603,43 @@ mod tests {
     TwipsMeasureValue::Twips(value as u64)
   }
 
+  fn scene_with_revolution(revolution: i32) -> a::Scene3DType {
+    a::Scene3DType {
+      camera: Box::new(a::Camera {
+        preset: a::PresetCameraValues::OrthographicFront,
+        rotation: Some(a::Rotation {
+          latitude: 0,
+          longitude: 0,
+          revolution,
+        }),
+        ..a::Camera::default()
+      }),
+      light_rig: Box::new(a::LightRig::default()),
+      ..a::Scene3DType::default()
+    }
+  }
+
+  #[test]
+  fn scene_only_camera_revolution_rotates_the_flat_shape_face() {
+    let properties = DrawingMlShapeProperties::Generic(a::ShapeProperties {
+      scene3_d_type: Some(Box::new(scene_with_revolution(4_800_000))),
+      ..a::ShapeProperties::default()
+    });
+
+    assert!((properties.camera_adjusted_rotation_deg(0.0) + 80.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn shape_3d_keeps_camera_rotation_in_the_static_3d_pipeline() {
+    let properties = DrawingMlShapeProperties::Generic(a::ShapeProperties {
+      scene3_d_type: Some(Box::new(scene_with_revolution(4_800_000))),
+      shape3_d_type: Some(Box::new(a::Shape3DType::default())),
+      ..a::ShapeProperties::default()
+    });
+
+    assert_eq!(properties.camera_adjusted_rotation_deg(12.0), 12.0);
+  }
+
   #[test]
   fn embedded_vml_metafile_uses_the_host_shape_solid_fill_as_its_background() {
     let object = w::EmbeddedObject::from_bytes(
@@ -17032,6 +18722,41 @@ mod tests {
         .flat_map(|path| &path.commands)
         .any(|command| matches!(command, common::PathCommand::CubicTo { .. }))
     );
+  }
+
+  #[test]
+  fn vml_canonical_line_path_defaults_omitted_moveto_to_origin() {
+    let geometry = vml_path_geometry(
+      "m,l21600,21600e",
+      VmlPathGeometryOptions {
+        coordinate_origin: None,
+        coordinate_size: Some("21600,21600"),
+        width_pt: 100.0,
+        height_pt: 0.0,
+        adjustment: None,
+        formulas: None,
+        allow_fill: false,
+        allow_stroke: true,
+        allow_extrusion: false,
+      },
+    )
+    .expect("ECMA-376 canonical VML line path");
+    let InlineShapeGeometry::Path { paths, .. } = geometry else {
+      panic!("expected VML path geometry");
+    };
+    assert!(matches!(
+      paths[0].commands.as_slice(),
+      [
+        common::PathCommand::MoveTo(common::Point {
+          x: common::Pt(0.0),
+          y: common::Pt(0.0)
+        }),
+        common::PathCommand::LineTo(common::Point {
+          x: common::Pt(100.0),
+          y: common::Pt(0.0)
+        })
+      ]
+    ));
   }
 
   #[test]
@@ -17357,8 +19082,20 @@ mod tests {
     assert_eq!(
       html_alt_chunk_paragraphs(
         b"<html><body><p>first &amp; second<br/>line</p><div>third</div></body></html>",
+        Some("text/html; charset=utf-8"),
       ),
       vec!["first & second line", "third"]
+    );
+  }
+
+  #[test]
+  fn html_alt_chunk_uses_html_entities_and_excludes_head_content() {
+    assert_eq!(
+      html_alt_chunk_paragraphs(
+        b"<html><head><title>hidden</title><style>p { color: red; }</style></head><body><p>Milj&ouml;bilaga&nbsp;X</p></body></html>",
+        Some("text/html; charset=utf-8"),
+      ),
+      vec!["Miljöbilaga X"]
     );
   }
 
@@ -17400,7 +19137,63 @@ mod tests {
     .expect("math paragraph");
 
     assert_eq!(
-      math_paragraph_alignment(&paragraph),
+      math_paragraph_alignment(&paragraph, None),
+      Some(ParagraphAlignment::Center)
+    );
+  }
+
+  #[test]
+  fn document_default_frame_properties_do_not_create_text_frames() {
+    let defaults = w::ParagraphPropertiesBaseStyle::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:framePr w:w="0" w:h="0" w:hRule="exact" w:xAlign="left" w:vAnchor="margin"/></w:pPr>"#,
+    )
+    .expect("document default paragraph properties");
+    let mut format = ParagraphFormat::default();
+
+    merge_paragraph_format(
+      &mut format,
+      Some(ParagraphProps::BaseStyle(&defaults)),
+      ImportSettings::default(),
+    );
+
+    assert!(format.frame.is_none());
+  }
+
+  #[test]
+  fn office_math_only_paragraph_uses_document_display_math_alignment() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></w:p>"#,
+    )
+    .expect("display math");
+
+    assert_eq!(
+      math_paragraph_alignment(&paragraph, Some(ParagraphAlignment::Right)),
+      Some(ParagraphAlignment::Right)
+    );
+  }
+
+  #[test]
+  fn inline_math_does_not_override_mixed_paragraph_alignment() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:r><w:t>value </w:t></w:r><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></w:p>"#,
+    )
+    .expect("inline math");
+
+    assert_eq!(
+      math_paragraph_alignment(&paragraph, Some(ParagraphAlignment::Center)),
+      None
+    );
+  }
+
+  #[test]
+  fn empty_word_run_does_not_disable_display_math_alignment() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:r><w:rPr/></w:r><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></w:p>"#,
+    )
+    .expect("display math after empty word run");
+
+    assert_eq!(
+      math_paragraph_alignment(&paragraph, Some(ParagraphAlignment::Center)),
       Some(ParagraphAlignment::Center)
     );
   }
@@ -17413,6 +19206,311 @@ mod tests {
     .expect("row with cell-level content control");
 
     assert_eq!(table_row_cells(&row).len(), 1);
+  }
+
+  #[test]
+  fn numbering_style_link_resolves_through_the_numbering_style_instance() {
+    let styles = StylesCatalog {
+      styles: HashMap::from([(
+        "Numbered".to_string(),
+        StyleEntry {
+          style_type: Some(w::StyleValues::Numbering),
+          paragraph_numbering: Some(Box::new(w::NumberingProperties {
+            numbering_id: Some(w::NumberingId { val: 1 }),
+            ..Default::default()
+          })),
+          ..Default::default()
+        },
+      )]),
+      ..Default::default()
+    };
+    let mut catalog = NumberingCatalog {
+      abstract_nums: HashMap::from([
+        (
+          0,
+          AbstractNumbering {
+            numbering_style_link: Some("Numbered".to_string()),
+            ..Default::default()
+          },
+        ),
+        (
+          1,
+          AbstractNumbering {
+            style_link: Some("Numbered".to_string()),
+            ..Default::default()
+          },
+        ),
+        (2, AbstractNumbering::default()),
+      ]),
+      nums: HashMap::from([
+        (
+          1,
+          NumberingInstance {
+            abstract_num_id: 2,
+            overrides: HashMap::new(),
+          },
+        ),
+        (
+          7,
+          NumberingInstance {
+            abstract_num_id: 0,
+            overrides: HashMap::from([(
+              0,
+              LevelOverride {
+                start: Some(4),
+                level: None,
+              },
+            )]),
+          },
+        ),
+      ]),
+      ..Default::default()
+    };
+
+    catalog.resolve_style_linked_abstract_nums(&styles);
+
+    let instance = &catalog.nums[&7];
+    assert_eq!(instance.abstract_num_id, 2);
+    assert_eq!(instance.overrides[&0].start, Some(4));
+  }
+
+  #[test]
+  fn numbering_style_link_falls_back_to_matching_abstract_style_link() {
+    let mut catalog = NumberingCatalog {
+      abstract_nums: HashMap::from([
+        (
+          0,
+          AbstractNumbering {
+            numbering_style_link: Some("Numbered".to_string()),
+            ..Default::default()
+          },
+        ),
+        (
+          1,
+          AbstractNumbering {
+            style_link: Some("Numbered".to_string()),
+            ..Default::default()
+          },
+        ),
+      ]),
+      nums: HashMap::from([(
+        7,
+        NumberingInstance {
+          abstract_num_id: 0,
+          overrides: HashMap::new(),
+        },
+      )]),
+      ..Default::default()
+    };
+
+    catalog.resolve_style_linked_abstract_nums(&StylesCatalog::default());
+
+    assert_eq!(catalog.nums[&7].abstract_num_id, 1);
+  }
+
+  #[test]
+  fn numbering_start_override_resets_shared_abstract_sequence() {
+    let level = w::Level::from_bytes(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl>"#,
+    )
+    .expect("decimal numbering level");
+    let mut catalog = NumberingCatalog {
+      abstract_nums: HashMap::from([(
+        4,
+        AbstractNumbering {
+          levels: HashMap::from([(0, numbering_level_model(&level, ImportSettings::default()))]),
+          ..Default::default()
+        },
+      )]),
+      nums: HashMap::from([
+        (
+          5,
+          NumberingInstance {
+            abstract_num_id: 4,
+            overrides: HashMap::new(),
+          },
+        ),
+        (
+          6,
+          NumberingInstance {
+            abstract_num_id: 4,
+            overrides: HashMap::from([(
+              0,
+              LevelOverride {
+                start: Some(1),
+                level: None,
+              },
+            )]),
+          },
+        ),
+      ]),
+      ..Default::default()
+    };
+    let styles = StylesCatalog::default();
+    let labels = [5, 5, 6, 5].map(|num_id| {
+      catalog
+        .next_label(
+          NumberingReference {
+            num_id: Some(num_id),
+            level_index: Some(0),
+          },
+          &mut ParagraphFormat::default(),
+          &styles,
+          TextStyle::default(),
+          None,
+          NumberingFormatMergeContext::default(),
+        )
+        .expect("numbering label")
+        .text
+        .expect("text numbering label")
+    });
+
+    assert_eq!(labels, ["1.\t", "2.\t", "1.\t", "2.\t"]);
+  }
+
+  #[test]
+  fn numbering_level_override_replaces_the_abstract_level_format() {
+    let base_level = w::Level::from_bytes(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1"/></w:lvl>"#,
+    )
+    .expect("base numbering level");
+    let override_definition = w::LevelOverride::from_bytes(
+      br#"<w:lvlOverride xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="upperLetter"/><w:lvlText w:val="%1"/></w:lvl></w:lvlOverride>"#,
+    )
+    .expect("numbering level override");
+    let override_level = override_definition
+      .level
+      .as_deref()
+      .expect("full override level");
+    let mut catalog = NumberingCatalog {
+      abstract_nums: HashMap::from([(
+        9,
+        AbstractNumbering {
+          levels: HashMap::from([(
+            0,
+            numbering_level_model(&base_level, ImportSettings::default()),
+          )]),
+          ..Default::default()
+        },
+      )]),
+      nums: HashMap::from([
+        (
+          19,
+          NumberingInstance {
+            abstract_num_id: 9,
+            overrides: HashMap::new(),
+          },
+        ),
+        (
+          22,
+          NumberingInstance {
+            abstract_num_id: 9,
+            overrides: HashMap::from([(
+              0,
+              LevelOverride {
+                start: None,
+                level: Some(numbering_level_model(
+                  override_level,
+                  ImportSettings::default(),
+                )),
+              },
+            )]),
+          },
+        ),
+      ]),
+      ..Default::default()
+    };
+    let styles = StylesCatalog::default();
+    let labels = [19, 22, 22].map(|num_id| {
+      catalog
+        .next_label(
+          NumberingReference {
+            num_id: Some(num_id),
+            level_index: Some(0),
+          },
+          &mut ParagraphFormat::default(),
+          &styles,
+          TextStyle::default(),
+          None,
+          NumberingFormatMergeContext::default(),
+        )
+        .expect("numbering label")
+        .text
+        .expect("text numbering label")
+    });
+
+    assert_eq!(labels, ["1\t", "B\t", "C\t"]);
+  }
+
+  #[test]
+  fn numbering_level_without_start_begins_at_zero() {
+    let level = w::Level::from_bytes(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="1"><w:numFmt w:val="decimal"/><w:lvlText w:val="%2"/></w:lvl>"#,
+    )
+    .expect("numbering level without w:start");
+
+    assert_eq!(
+      numbering_level_model(&level, ImportSettings::default()).start,
+      0
+    );
+  }
+
+  #[test]
+  fn numbering_level_restart_uses_the_authored_higher_level_threshold() {
+    let levels = [
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1"/></w:lvl>"#
+        .as_slice(),
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%2"/></w:lvl>"#
+        .as_slice(),
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="2"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlRestart w:val="1"/><w:lvlText w:val="%3"/></w:lvl>"#
+        .as_slice(),
+    ]
+    .into_iter()
+    .map(|xml| {
+      let level = w::Level::from_bytes(xml).expect("numbering level");
+      (
+        level.level_index,
+        numbering_level_model(&level, ImportSettings::default()),
+      )
+    })
+    .collect();
+    let mut catalog = NumberingCatalog {
+      abstract_nums: HashMap::from([(
+        4,
+        AbstractNumbering {
+          levels,
+          ..Default::default()
+        },
+      )]),
+      nums: HashMap::from([(
+        5,
+        NumberingInstance {
+          abstract_num_id: 4,
+          overrides: HashMap::new(),
+        },
+      )]),
+      ..Default::default()
+    };
+    let styles = StylesCatalog::default();
+    let labels = [0, 1, 2, 1, 2, 0, 2].map(|level_index| {
+      catalog
+        .next_label(
+          NumberingReference {
+            num_id: Some(5),
+            level_index: Some(level_index),
+          },
+          &mut ParagraphFormat::default(),
+          &styles,
+          TextStyle::default(),
+          None,
+          NumberingFormatMergeContext::default(),
+        )
+        .expect("numbering label")
+        .text
+        .expect("text numbering label")
+    });
+
+    assert_eq!(labels, ["1\t", "1\t", "1\t", "2\t", "2\t", "2\t", "1\t"]);
   }
 
   #[test]
@@ -17456,6 +19554,30 @@ mod tests {
   }
 
   #[test]
+  fn legal_numbering_keeps_current_level_format_and_decimalizes_references() {
+    let first = w::Level::from_bytes(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="upperRoman"/><w:lvlText w:val="CH %1"/></w:lvl>"#,
+    )
+    .expect("first numbering level");
+    let second = w::Level::from_bytes(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="decimalZero"/><w:isLgl/><w:lvlText w:val="Sect %1.%2"/></w:lvl>"#,
+    )
+    .expect("legal numbering level");
+    let first = numbering_level_model(&first, ImportSettings::default());
+    let second = numbering_level_model(&second, ImportSettings::default());
+    let abstract_num = AbstractNumbering {
+      levels: HashMap::from([(0, first), (1, second.clone())]),
+      ..Default::default()
+    };
+    let counters = HashMap::from([((7, 0), 1), ((7, 1), 1)]);
+
+    assert_eq!(
+      format_numbering_label(&second, 7, 1, 1, &abstract_num, &HashMap::new(), &counters,),
+      "Sect 1.01\t"
+    );
+  }
+
+  #[test]
   fn styleref_t_switch_preserves_only_number_values_and_delimiters() {
     let first = w::Level::from_bytes(
       br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="Chapter %1.!"/></w:lvl>"#,
@@ -17469,11 +19591,20 @@ mod tests {
     let second = numbering_level_model(&second, ImportSettings::default());
     let abstract_num = AbstractNumbering {
       levels: HashMap::from([(0, first), (1, second.clone())]),
+      ..Default::default()
     };
     let counters = HashMap::from([((7, 0), 2), ((7, 1), 1)]);
 
     assert_eq!(
-      format_numbering_label_suppressing_non_numerical(&second, 7, 1, 1, &abstract_num, &counters,),
+      format_numbering_label_suppressing_non_numerical(
+        &second,
+        7,
+        1,
+        1,
+        &abstract_num,
+        &HashMap::new(),
+        &counters,
+      ),
       ".2\\|a......"
     );
     assert!(matches!(
@@ -18022,6 +20153,116 @@ mod tests {
   }
 
   #[test]
+  fn table_layout_defaults_to_autofit_and_preserves_explicit_fixed() {
+    assert_eq!(
+      table_layout_mode(&w::TableLayout::default()),
+      TableLayoutMode::AutoFit
+    );
+    assert_eq!(
+      table_layout_mode(&w::TableLayout {
+        r#type: Some(w::TableLayoutValues::Fixed),
+      }),
+      TableLayoutMode::Fixed
+    );
+  }
+
+  #[test]
+  fn floating_table_overlap_defaults_to_allowed_and_preserves_never() {
+    assert!(table_allows_overlap(None));
+    assert!(!table_allows_overlap(Some(&w::TableProperties {
+      table_overlap: Some(w::TableOverlap {
+        val: w::TableOverlapValues::Never,
+      }),
+      ..Default::default()
+    })));
+    assert!(table_allows_overlap(Some(&w::TableProperties {
+      table_overlap: Some(w::TableOverlap {
+        val: w::TableOverlapValues::Overlap,
+      }),
+      ..Default::default()
+    })));
+  }
+
+  #[test]
+  fn floating_table_position_uses_word_anchor_defaults() {
+    let placement = table_position_placement(&w::TablePositionProperties {
+      left_from_text: Some(twips(181)),
+      table_position_y: Some(signed_twips(1)),
+      ..Default::default()
+    });
+
+    assert_eq!(placement.horizontal_anchor, FrameHorizontalAnchor::Text);
+    assert_eq!(placement.vertical_anchor, FrameVerticalAnchor::Margin);
+    assert_eq!(placement.horizontal_offset_pt, 0.0);
+    assert!((placement.vertical_offset_pt - 0.05).abs() < 0.001);
+
+    let explicit = table_position_placement(&w::TablePositionProperties {
+      left_from_text: Some(twips(181)),
+      horizontal_anchor: Some(w::HorizontalAnchorValues::Page),
+      table_position_x: Some(signed_twips(5597)),
+      ..Default::default()
+    });
+    assert!((explicit.horizontal_offset_pt - 279.85).abs() < 0.001);
+  }
+
+  #[test]
+  fn table_cell_no_wrap_cascades_from_style_and_direct_false_overrides_it() {
+    let style = style_table_cell_style(&w::StyleTableCellProperties {
+      no_wrap: Some(w::NoWrap { val: None }),
+      ..Default::default()
+    });
+    assert_eq!(style.no_wrap, Some(true));
+
+    let direct = w::TableCellProperties {
+      no_wrap: Some(w::NoWrap {
+        val: Some(false.into()),
+      }),
+      ..Default::default()
+    };
+    assert_eq!(
+      direct
+        .no_wrap
+        .as_ref()
+        .map(|no_wrap| on_off_only_value(no_wrap.val))
+        .or(style.no_wrap),
+      Some(false)
+    );
+  }
+
+  #[test]
+  fn table_cell_shading_overrides_row_exception_and_table_shading() {
+    let table = RgbColor { r: 1, g: 2, b: 3 };
+    let row = RgbColor { r: 4, g: 5, b: 6 };
+    let styled_cell = RgbColor { r: 7, g: 8, b: 9 };
+    let direct_cell = RgbColor {
+      r: 10,
+      g: 11,
+      b: 12,
+    };
+
+    assert_eq!(
+      resolved_table_cell_shading(None, None, Some(table)),
+      Some(table)
+    );
+    assert_eq!(
+      resolved_table_cell_shading(None, None, Some(row)),
+      Some(row)
+    );
+    assert_eq!(
+      resolved_table_cell_shading(None, Some(Some(styled_cell)), Some(row)),
+      Some(styled_cell)
+    );
+    assert_eq!(
+      resolved_table_cell_shading(Some(Some(direct_cell)), Some(Some(styled_cell)), Some(row)),
+      Some(direct_cell)
+    );
+    assert_eq!(
+      resolved_table_cell_shading(Some(None), Some(Some(styled_cell)), Some(row)),
+      None
+    );
+  }
+
+  #[test]
   fn table_cell_margin_overrides_inherit_unspecified_defaults() {
     let margins = table_cell_margin(
       &w::TableCellMargin {
@@ -18061,6 +20302,109 @@ mod tests {
     };
 
     assert_eq!(table_row_grid_properties(Some(&properties)), (1, 2));
+  }
+
+  #[test]
+  fn table_row_look_uses_the_tbl_pr_ex_exception() {
+    let inherited = TableLookModel::default();
+    let row = w::TableRow {
+      table_property_exceptions: Some(Box::new(w::TablePropertyExceptions {
+        table_look: Some(w::TableLook {
+          first_row: Some(ooxmlsdk::simple_type::OnOffValue::Off),
+          first_column: Some(ooxmlsdk::simple_type::OnOffValue::Off),
+          no_horizontal_band: Some(ooxmlsdk::simple_type::OnOffValue::On),
+          no_vertical_band: Some(ooxmlsdk::simple_type::OnOffValue::On),
+          ..Default::default()
+        }),
+        ..Default::default()
+      })),
+      ..Default::default()
+    };
+
+    let resolved = table_row_look(&row, inherited);
+
+    assert!(!resolved.first_row);
+    assert!(!resolved.first_column);
+    assert!(!resolved.horizontal_banding);
+    assert!(!resolved.vertical_banding);
+  }
+
+  #[test]
+  fn bidi_visual_normalizes_the_complete_table_to_physical_order() {
+    let table = w::Table::from_bytes(
+      br#"<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:tblPr>
+          <w:bidiVisual/>
+          <w:jc w:val="left"/>
+          <w:tblInd w:w="240" w:type="dxa"/>
+          <w:tblBorders>
+            <w:left w:val="single" w:sz="4" w:color="000000"/>
+            <w:right w:val="single" w:sz="8" w:color="000000"/>
+          </w:tblBorders>
+        </w:tblPr>
+        <w:tblGrid><w:gridCol w:w="200"/><w:gridCol w:w="400"/></w:tblGrid>
+        <w:tr>
+          <w:trPr><w:gridBefore w:val="1"/><w:gridAfter w:val="2"/></w:trPr>
+          <w:tc>
+            <w:tcPr>
+              <w:tcMar>
+                <w:left w:w="100" w:type="dxa"/>
+                <w:right w:w="200" w:type="dxa"/>
+              </w:tcMar>
+            </w:tcPr>
+            <w:p><w:r><w:t>A</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc>
+        </w:tr>
+      </w:tbl>"#,
+    )
+    .expect("right-to-left table");
+    let styles = StylesCatalog::default();
+    let mut numbering = NumberingCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let bindings = CustomXmlBindings::default();
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+
+    let model = table_model(
+      &table,
+      &mut TableModelEnv {
+        styles: &styles,
+        numbering: &mut numbering,
+        images: &images,
+        hyperlinks: &hyperlinks,
+        custom_xml_bindings: &bindings,
+        form_widget_ids: &mut form_widget_ids,
+      },
+      TableModelContext {
+        nested_table_level: 1,
+        in_header_footer: false,
+      },
+    );
+
+    let cell_text = |cell: &TableCell| {
+      cell
+        .blocks
+        .iter()
+        .filter_map(|block| match block {
+          Block::Paragraph(paragraph) => Some(inline_text(&paragraph.inlines)),
+          _ => None,
+        })
+        .collect::<String>()
+    };
+    assert!(model.right_to_left);
+    assert_eq!(model.alignment, TableAlignment::Right);
+    assert_eq!(model.indent_left_pt, 12.0);
+    assert_eq!(model.column_widths_pt, [20.0, 10.0]);
+    assert_eq!(model.rows[0].grid_before, 2);
+    assert_eq!(model.rows[0].grid_after, 1);
+    assert_eq!(cell_text(&model.rows[0].cells[0]), "B");
+    assert_eq!(cell_text(&model.rows[0].cells[1]), "A");
+    assert_eq!(model.rows[0].cells[1].margins.left_pt, 10.0);
+    assert_eq!(model.rows[0].cells[1].margins.right_pt, 5.0);
+    let borders = model.borders.expect("table borders");
+    assert_eq!(borders.left.expect("physical left border").width_pt, 1.0);
+    assert_eq!(borders.right.expect("physical right border").width_pt, 0.5);
   }
 
   #[test]
@@ -18145,11 +20489,11 @@ mod tests {
 
     assert_eq!(
       first_row.shading,
-      Some(RgbColor {
+      Some(Some(RgbColor {
         r: 0x44,
         g: 0x72,
         b: 0xC4
-      })
+      }))
     );
     assert_eq!(
       first_row.paragraph_format.alignment,
@@ -18166,11 +20510,11 @@ mod tests {
     );
     assert_eq!(
       body_row.shading,
-      Some(RgbColor {
+      Some(Some(RgbColor {
         r: 0xEE,
         g: 0xEE,
         b: 0xEE
-      })
+      }))
     );
   }
 
@@ -18178,7 +20522,7 @@ mod tests {
   fn table_style_column_and_corner_conditions_apply_by_cell_position() {
     fn style(fill: &str) -> TableCellStyle {
       TableCellStyle {
-        shading: Some(parse_hex_color(fill).unwrap()),
+        shading: Some(Some(parse_hex_color(fill).unwrap())),
         ..Default::default()
       }
     }
@@ -18222,19 +20566,19 @@ mod tests {
 
     assert_eq!(
       top_right.shading,
-      Some(RgbColor {
+      Some(Some(RgbColor {
         r: 0xFF,
         g: 0x00,
         b: 0x00
-      })
+      }))
     );
     assert_eq!(
       body_right.shading,
-      Some(RgbColor {
+      Some(Some(RgbColor {
         r: 0x00,
         g: 0xFF,
         b: 0x00
-      })
+      }))
     );
   }
 
@@ -18253,26 +20597,27 @@ mod tests {
       bottom: Some(border(2.0)),
       left: Some(border(2.5)),
     };
-    let merged = direct_cell_borders_model(
-      base,
-      &w::TableCellBorders {
-        top_border: Some(w::TopBorder {
-          val: w::BorderValues::None,
-          ..Default::default()
-        }),
-        right_border: Some(w::RightBorder {
-          val: w::BorderValues::Single,
-          size: Some(24),
-          ..Default::default()
-        }),
+    let direct = w::TableCellBorders {
+      top_border: Some(w::TopBorder {
+        val: w::BorderValues::None,
         ..Default::default()
-      },
-    );
+      }),
+      right_border: Some(w::RightBorder {
+        val: w::BorderValues::Single,
+        size: Some(24),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let merged = direct_cell_borders_model(base, &direct);
+    let suppressions = cell_border_suppressions(&direct);
 
     assert_eq!(merged.top, None);
     assert_eq!(merged.right.unwrap().width_pt, 3.0);
     assert_eq!(merged.bottom, Some(border(2.0)));
     assert_eq!(merged.left, Some(border(2.5)));
+    assert!(suppressions.top);
+    assert!(!suppressions.right);
   }
 
   #[test]
@@ -18341,7 +20686,7 @@ mod tests {
   fn table_cell_cnf_style_masks_apply_writer_corner_conditions() {
     fn style(fill: &str) -> TableCellStyle {
       TableCellStyle {
-        shading: Some(parse_hex_color(fill).unwrap()),
+        shading: Some(Some(parse_hex_color(fill).unwrap())),
         ..Default::default()
       }
     }
@@ -18387,11 +20732,11 @@ mod tests {
 
     assert_eq!(
       styled.shading,
-      Some(RgbColor {
+      Some(Some(RgbColor {
         r: 0xFF,
         g: 0x00,
         b: 0x00
-      })
+      }))
     );
   }
 
@@ -18878,6 +21223,8 @@ mod tests {
       form_widget_ids: &mut form_widget_ids,
       cell_margins: CellMargins::default(),
       direct_cell_margins: false,
+      table_shading: None,
+      table_borders: None,
       table_style: &TableStyleModel::default(),
       table_look: TableLookModel::default(),
       row_count: 1,
@@ -18885,7 +21232,7 @@ mod tests {
       in_header_footer: false,
     };
 
-    let cell = table_cell_model(&cell, &mut context, None, style);
+    let cell = table_cell_model(&cell, &mut context, None, None, style);
 
     let Block::Paragraph(paragraph) = &cell.blocks[0] else {
       panic!("expected paragraph");
@@ -18954,6 +21301,36 @@ mod tests {
         number_format: FieldNumberFormat::UpperLetter,
       })
     );
+  }
+
+  #[test]
+  fn symbol_field_without_cached_result_uses_declared_symbol_font_encoding() {
+    let run = symbol_field_run(
+      r#"\SYMBOL 94 \f "Symbol""#,
+      TextStyle {
+        font_family: Some(Arc::from("Times New Roman")),
+        font_size_pt: 12.0,
+        ..TextStyle::default()
+      },
+      None,
+    )
+    .expect("supported symbol field");
+
+    assert_eq!(run.text, "\u{f05e}");
+    assert_eq!(run.style.font_family.as_deref(), Some("Symbol"));
+    assert_eq!(run.style.symbol_font_family.as_deref(), Some("Symbol"));
+    assert_eq!(run.style.font_size_pt, 12.0);
+  }
+
+  #[test]
+  fn symbol_field_unicode_and_size_switches_override_direct_formatting() {
+    let run = symbol_field_run(r"SYMBOL 0x20ac \u \s 18", TextStyle::default(), None)
+      .expect("supported Unicode symbol field");
+
+    assert_eq!(run.text, "€");
+    assert_eq!(run.style.font_size_pt, 18.0);
+    assert_eq!(run.style.complex_font_size_pt, Some(18.0));
+    assert!(symbol_field_run(r"SYMBOL 65 \h", TextStyle::default(), None).is_none());
   }
 
   #[test]
@@ -19033,6 +21410,69 @@ mod tests {
         bookmark_name: Arc::<str>::from("_Toc123"),
       })
     );
+  }
+
+  #[test]
+  fn closed_field_without_instruction_drops_result_but_unclosed_field_keeps_it() {
+    fn imported_text(xml: &[u8]) -> String {
+      let paragraph = w::Paragraph::from_bytes(xml).expect("complex field paragraph");
+      let mut form_widget_ids = FormWidgetIdAllocator::default();
+      inline_text(&paragraph_inlines(
+        &paragraph,
+        TextStyle::default(),
+        &StylesCatalog::default(),
+        &ImageCatalog::default(),
+        &HyperlinkCatalog::default(),
+        &CustomXmlBindings::default(),
+        &mut form_widget_ids,
+      ))
+    }
+
+    let closed = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>stale result</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#;
+    let unclosed = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>literal result</w:t></w:r></w:p>"#;
+
+    assert_eq!(imported_text(closed), "");
+    assert_eq!(imported_text(unclosed), "literal result");
+  }
+
+  #[test]
+  fn complex_field_instruction_inside_inserted_revision_keeps_its_result() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:ins w:id="1" w:author="editor"><w:r><w:instrText> HYPERLINK "https://www.libreoffice.org/" </w:instrText></w:r></w:ins><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>Libreoffice</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+    )
+    .expect("complex field with inserted instruction");
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+
+    assert_eq!(inline_text(&inlines), "Libreoffice");
+  }
+
+  #[test]
+  fn closed_set_field_has_no_visible_value() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> SET TEST_VAR 99 </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>99</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+    )
+    .expect("SET field paragraph");
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+
+    assert_eq!(inline_text(&inlines), "");
   }
 
   #[test]
@@ -19243,9 +21683,23 @@ mod tests {
   }
 
   #[test]
-  fn ruby_runs_emit_base_text() {
+  fn ruby_runs_import_base_and_phonetic_guide() {
     let mut inlines = Vec::new();
     let ruby = w::Ruby {
+      ruby_properties: Box::new(w::RubyProperties {
+        ruby_align: w::RubyAlign {
+          val: w::RubyAlignValues::DistributeSpace,
+        },
+        phonetic_guide_text_font_size: w::PhoneticGuideTextFontSize { val: hps(11) },
+        phonetic_guide_raise: w::PhoneticGuideRaise { val: 20 },
+        ..Default::default()
+      }),
+      ruby_content: w::RubyContent {
+        ruby_content_choice: vec![w::RubyContentChoice::WRun(Box::new(w::Run {
+          run_choice: vec![w::RunChoice::Text(text("かん"))],
+          ..Default::default()
+        }))],
+      },
       ruby_base: w::RubyBase {
         ruby_base_choice: vec![w::RubyBaseChoice::WRun(Box::new(w::Run {
           run_choice: vec![w::RunChoice::Text(text("漢"))],
@@ -19274,6 +21728,14 @@ mod tests {
     );
 
     assert_eq!(inline_text(&inlines), "Before 漢 after");
+    let InlineItem::Ruby(ruby) = &inlines[1] else {
+      panic!("expected compound ruby inline");
+    };
+    assert_eq!(ruby.base[0].text, "漢");
+    assert_eq!(ruby.guide[0].text, "かん");
+    assert_eq!(ruby.alignment, RubyAlignment::DistributeSpace);
+    assert_eq!(ruby.raise_pt, 10.0);
+    assert_eq!(ruby.guide[0].style.font_size_pt, 5.5);
   }
 
   #[test]
@@ -19322,6 +21784,7 @@ mod tests {
       .find_map(|item| match item {
         InlineItem::Image(image) => Some(image),
         InlineItem::Text(_)
+        | InlineItem::Ruby(_)
         | InlineItem::Shape(_)
         | InlineItem::BookmarkStart(_)
         | InlineItem::FormWidgetStart(_)
@@ -19495,6 +21958,98 @@ mod tests {
   }
 
   #[test]
+  fn drawingml_locked_canvas_imports_nested_generic_line_shapes() {
+    let xml = r#"
+      <lc:lockedCanvas xmlns:lc="http://schemas.openxmlformats.org/drawingml/2006/lockedCanvas"
+                       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <a:nvGrpSpPr><a:cNvPr id="0" name=""/><a:cNvGrpSpPr/></a:nvGrpSpPr>
+        <a:grpSpPr>
+          <a:xfrm>
+            <a:off x="0" y="0"/><a:ext cx="103188" cy="2459038"/>
+            <a:chOff x="381000" y="533400"/><a:chExt cx="103188" cy="2459038"/>
+          </a:xfrm>
+        </a:grpSpPr>
+        <a:grpSp>
+          <a:nvGrpSpPr><a:cNvPr id="1" name="Group"/><a:cNvGrpSpPr/></a:nvGrpSpPr>
+          <a:grpSpPr>
+            <a:xfrm>
+              <a:off x="381000" y="533400"/><a:ext cx="103188" cy="2459038"/>
+              <a:chOff x="1430" y="1412"/><a:chExt cx="163" cy="3873"/>
+            </a:xfrm>
+          </a:grpSpPr>
+          <a:sp>
+            <a:nvSpPr><a:cNvPr id="2" name="Outer line 1"/><a:cNvSpPr/></a:nvSpPr>
+            <a:spPr>
+              <a:xfrm><a:off x="1592" y="1540"/><a:ext cx="1" cy="3582"/></a:xfrm>
+              <a:prstGeom prst="line"><a:avLst/></a:prstGeom>
+              <a:noFill/>
+              <a:ln w="0"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>
+            </a:spPr>
+          </a:sp>
+          <a:sp>
+            <a:nvSpPr><a:cNvPr id="3" name="Outer line 2"/><a:cNvSpPr/></a:nvSpPr>
+            <a:spPr>
+              <a:xfrm flipV="1"><a:off x="1430" y="1540"/><a:ext cx="1" cy="3582"/></a:xfrm>
+              <a:prstGeom prst="line"><a:avLst/></a:prstGeom>
+              <a:noFill/>
+              <a:ln w="0"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>
+            </a:spPr>
+          </a:sp>
+          <a:sp>
+            <a:nvSpPr><a:cNvPr id="4" name="Line"/><a:cNvSpPr/></a:nvSpPr>
+            <a:spPr>
+              <a:xfrm flipV="1"><a:off x="1512" y="1800"/><a:ext cx="0" cy="3088"/></a:xfrm>
+              <a:prstGeom prst="line"><a:avLst/></a:prstGeom>
+              <a:noFill/>
+              <a:ln w="9525"><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></a:ln>
+            </a:spPr>
+          </a:sp>
+        </a:grpSp>
+      </lc:lockedCanvas>
+    "#;
+    let canvas = lc::LockedCanvas::from_bytes(xml.as_bytes()).expect("typed locked canvas");
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let items = drawingml_locked_canvas_shapes(
+      &canvas,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity().with_fallback_size(Some((8.25, 193.5))),
+      DrawingShapeImportContext {
+        effect_extent: DrawingEffectExtent::default(),
+        styles: &styles,
+        images: &images,
+        hyperlinks: &hyperlinks,
+        smartart_text_colors_by_model_id: None,
+      },
+    );
+
+    assert_eq!(items.len(), 3);
+    let shape = items
+      .iter()
+      .filter_map(|item| match item {
+        InlineItem::Shape(shape) => Some(shape),
+        _ => None,
+      })
+      .find(|shape| {
+        shape
+          .stroke
+          .as_ref()
+          .is_some_and(|stroke| stroke.color == RgbColor { r: 255, g: 0, b: 0 })
+      })
+      .expect("red imported generic line shape");
+    assert_eq!(shape.geometry, InlineShapeGeometry::Line);
+    assert!(shape.width_pt.abs() < 0.01);
+    assert!((shape.height_pt - 166.81).abs() < 0.5);
+    assert!((shape.offset_x_pt - 4.15).abs() < 0.2);
+    assert!((shape.offset_y_pt - 14.05).abs() < 0.5);
+    assert_eq!(
+      shape.stroke.as_ref().map(|stroke| stroke.color),
+      Some(RgbColor { r: 255, g: 0, b: 0 })
+    );
+  }
+
+  #[test]
   fn drawingml_wpg_group_effects_wrap_children_once_and_skip_empty_lists() {
     fn group(effect_xml: &str) -> wpg::WordprocessingGroup {
       let xml = format!(
@@ -19628,6 +22183,47 @@ mod tests {
       .collect();
 
     assert_eq!(text, ["Modern text box", "Second line"]);
+  }
+
+  #[test]
+  fn drawing_textboxes_import_block_content_controls() {
+    let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <wps:txbx>
+    <w:txbxContent>
+      <w:sdt>
+        <w:sdtPr><w:date/></w:sdtPr>
+        <w:sdtContent>
+          <w:p><w:r><w:t>Click here to enter a date.</w:t></w:r></w:p>
+        </w:sdtContent>
+      </w:sdt>
+    </w:txbxContent>
+  </wps:txbx>
+</wps:wsp>"#;
+
+    let shape = wps::WordprocessingShape::from_bytes(xml.as_bytes()).expect("typed WPS shape");
+    let content = wordprocessing_shape_textbox_content(&shape).expect("typed textbox content");
+    let blocks = textbox_blocks_with_base(
+      content,
+      TextStyle {
+        font_size_pt: 17.0,
+        ..Default::default()
+      },
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+    );
+    let Block::Paragraph(paragraph) = &blocks[0] else {
+      panic!("content-control paragraph");
+    };
+
+    assert_eq!(
+      inline_text(&paragraph.inlines),
+      "Click here to enter a date."
+    );
+    let InlineItem::Text(run) = &paragraph.inlines[0] else {
+      panic!("content-control text run");
+    };
+    assert_eq!(run.style.font_size_pt, 17.0);
   }
 
   #[test]
@@ -20012,10 +22608,15 @@ mod tests {
   }
 
   fn inline_text(inlines: &[InlineItem]) -> String {
-    inlines
-      .iter()
-      .filter_map(|item| match item {
-        InlineItem::Text(run) => Some(run.text.as_str()),
+    let mut text = String::new();
+    for item in inlines {
+      match item {
+        InlineItem::Text(run) => text.push_str(&run.text),
+        InlineItem::Ruby(ruby) => {
+          for run in &ruby.base {
+            text.push_str(&run.text);
+          }
+        }
         InlineItem::Image(_)
         | InlineItem::Shape(_)
         | InlineItem::BookmarkStart(_)
@@ -20025,9 +22626,10 @@ mod tests {
         | InlineItem::DrawingGroupEnd
         | InlineItem::LastRenderedPageBreak
         | InlineItem::PageBreak
-        | InlineItem::ColumnBreak => None,
-      })
-      .collect()
+        | InlineItem::ColumnBreak => {}
+      }
+    }
+    text
   }
 
   #[test]
@@ -20126,6 +22728,49 @@ mod tests {
       })
       .expect("cell paragraph");
     assert_eq!(paragraph.format.line_height_pt, Some(360.0 / 240.0));
+  }
+
+  #[test]
+  fn table_cell_moves_out_of_place_paragraph_content_into_nested_table() {
+    let table = w::Table::from_bytes(
+      br#"<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tr><w:tc><w:p><w:r><w:t>[outer:A2]</w:t><w:br/></w:r><w:tbl><w:tr><w:tc><w:p><w:r><w:t>[inner:A1]</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:p></w:tc></w:tr></w:tbl>"#,
+    )
+    .expect("table with out-of-place nested table");
+    let styles = StylesCatalog::default();
+    let mut numbering = NumberingCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let bindings = CustomXmlBindings::default();
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let model = table_model(
+      &table,
+      &mut TableModelEnv {
+        styles: &styles,
+        numbering: &mut numbering,
+        images: &images,
+        hyperlinks: &hyperlinks,
+        custom_xml_bindings: &bindings,
+        form_widget_ids: &mut form_widget_ids,
+      },
+      TableModelContext {
+        nested_table_level: 1,
+        in_header_footer: false,
+      },
+    );
+
+    let nested = match model.rows[0].cells[0].blocks.as_slice() {
+      [Block::Table(table)] => table,
+      blocks => panic!("expected repaired nested table, got {blocks:?}"),
+    };
+    let paragraph = nested.rows[0].cells[0]
+      .blocks
+      .iter()
+      .find_map(|block| match block {
+        Block::Paragraph(paragraph) => Some(paragraph),
+        _ => None,
+      })
+      .expect("nested first paragraph");
+    assert_eq!(inline_text(&paragraph.inlines), "[outer:A2]\n[inner:A1]");
   }
 
   #[test]

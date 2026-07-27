@@ -150,10 +150,13 @@ pub(crate) struct Table {
   pub column_widths_pt: Vec<f32>,
   pub preferred_width_pt: Option<f32>,
   pub preferred_width_pct: Option<f32>,
+  pub layout: TableLayoutMode,
   pub indent_left_pt: f32,
   pub alignment: TableAlignment,
+  pub right_to_left: bool,
   pub align_leading_cell_content: bool,
   pub placement: Option<FloatingFramePlacement>,
+  pub allow_overlap: bool,
   pub split_allowed: bool,
   pub following_text_flow: bool,
   pub explicit_no_repeat_header: bool,
@@ -161,6 +164,13 @@ pub(crate) struct Table {
   pub borders: Option<TableBordersModel>,
   pub cell_spacing_pt: f32,
   pub rows: Vec<TableRow>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum TableLayoutMode {
+  #[default]
+  AutoFit,
+  Fixed,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -182,6 +192,10 @@ pub(crate) struct TableRow {
   pub cell_spacing_pt: Option<f32>,
   pub grid_before: usize,
   pub grid_after: usize,
+  pub width_before_pt: Option<f32>,
+  pub width_after_pt: Option<f32>,
+  pub layout: Option<TableLayoutMode>,
+  pub borders: Option<TableBordersModel>,
   pub redline_color: Option<RgbColor>,
 }
 
@@ -190,13 +204,25 @@ pub(crate) struct TableCell {
   pub blocks: Vec<Block>,
   pub shading: Option<RgbColor>,
   pub borders: CellBordersModel,
+  pub border_suppressions: CellBorderSuppressions,
   pub margins: CellMargins,
   pub preferred_width_pt: Option<f32>,
   pub preferred_width_pct: Option<f32>,
   pub grid_span: usize,
   pub vertical_merge_continue: bool,
+  pub no_wrap: bool,
+  pub fit_text: bool,
+  pub hide_end_mark: bool,
   pub vertical_alignment: TableCellVerticalAlignment,
   pub text_rotation_deg: Option<f32>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct CellBorderSuppressions {
+  pub top: bool,
+  pub right: bool,
+  pub bottom: bool,
+  pub left: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -504,6 +530,25 @@ pub(crate) struct TextRun {
   pub preserve_text_portion: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum RubyAlignment {
+  #[default]
+  Center,
+  DistributeLetter,
+  DistributeSpace,
+  Left,
+  Right,
+  RightVertical,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RubyInline {
+  pub base: Vec<TextRun>,
+  pub guide: Vec<TextRun>,
+  pub alignment: RubyAlignment,
+  pub raise_pt: f32,
+}
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct FormWidgetIdAllocator {
   next_id: u32,
@@ -526,6 +571,7 @@ impl FormWidgetIdAllocator {
 #[derive(Clone, Debug)]
 pub(crate) enum InlineItem {
   Text(TextRun),
+  Ruby(RubyInline),
   Image(InlineImage),
   Shape(InlineShape),
   DrawingGroupStart(InlineDrawingGroupEffect),
@@ -549,6 +595,9 @@ pub(crate) struct InlineDrawingGroupEffect {
 pub(crate) struct InlineImage {
   pub data: Arc<[u8]>,
   pub content_type: Option<String>,
+  pub picture_frame: Option<Box<InlineShape>>,
+  pub effects: Option<common::DrawingEffectSource>,
+  pub static3d: Option<common::drawingml_3d::Static3dStyle>,
   pub width_pt: f32,
   pub height_pt: f32,
   pub effect_left_pt: f32,

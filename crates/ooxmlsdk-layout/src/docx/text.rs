@@ -81,7 +81,7 @@ pub(super) fn paragraph_model_with_base<'a>(
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
   format.style_id = style_id.map(Arc::<str>::from);
-  if let Some(alignment) = math_paragraph_alignment(paragraph) {
+  if let Some(alignment) = math_paragraph_alignment(paragraph, styles.display_math_alignment) {
     format.alignment = alignment;
     let adjust = match alignment {
       ParagraphAlignment::Center => ParagraphAdjust::Center,
@@ -209,8 +209,16 @@ pub(super) fn paragraph_model_with_base<'a>(
   paragraph_mark_style.line_vertical_alignment = line_vertical_alignment;
   list_label_style.line_vertical_alignment = line_vertical_alignment;
   for inline in &mut inlines {
-    if let super::InlineItem::Text(run) = inline {
-      run.style.line_vertical_alignment = line_vertical_alignment;
+    match inline {
+      super::InlineItem::Text(run) => {
+        run.style.line_vertical_alignment = line_vertical_alignment;
+      }
+      super::InlineItem::Ruby(ruby) => {
+        for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
+          run.style.line_vertical_alignment = line_vertical_alignment;
+        }
+      }
+      _ => {}
     }
   }
   let (footnote_reference_ids, endnote_reference_ids) = paragraph_note_reference_ids(paragraph);
@@ -221,6 +229,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     .iter()
     .filter_map(|item| match item {
       super::InlineItem::Text(run) => Some(run.clone()),
+      super::InlineItem::Ruby(_) => None,
       super::InlineItem::Image(_) => None,
       super::InlineItem::Shape(_) => None,
       super::InlineItem::BookmarkStart(_) => None,

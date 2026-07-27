@@ -4527,7 +4527,8 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
     family.eq_ignore_ascii_case("Symbol") || family.eq_ignore_ascii_case("SymbolMT")
   });
   let wingdings = font_family.is_some_and(|family| family.eq_ignore_ascii_case("Wingdings"));
-  if !(symbol && (text.contains('\u{f02d}') || text.contains('\u{f0b7}'))
+  if !(symbol
+    && (text.contains('\u{f02d}') || text.contains('\u{f05e}') || text.contains('\u{f0b7}'))
     || wingdings
       && (text.contains('\u{f06c}')
         || text.contains('\u{f06e}')
@@ -4556,6 +4557,7 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
       .chars()
       .map(|character| match character {
         '\u{f02d}' if symbol => '\u{2212}',
+        '\u{f05e}' if symbol => '\u{22a5}',
         '\u{f0b7}' if symbol => '\u{2022}',
         '\u{f06c}' if wingdings => '\u{26ab}',
         '\u{f06e}' if wingdings => '\u{25fc}',
@@ -4962,19 +4964,13 @@ fn normalized_direction(from_x: f32, from_y: f32, to_x: f32, to_y: f32) -> Optio
   (length > f32::EPSILON).then_some((dx / length, dy / length))
 }
 
-fn stroke_end_path(
-  marker: common::StrokeEnd,
-  endpoint: (f32, f32),
-  outward: (f32, f32),
-  line_width: f32,
-) -> Option<krilla::geom::Path> {
+fn stroke_end_dimensions(marker: common::StrokeEnd, line_width: f32) -> (f32, f32) {
   use common::{StrokeEndKind as Kind, StrokeEndSize as Size};
-  if marker.kind == Kind::None {
-    return None;
-  }
-  // `lineproperties.cxx::lclPushMarkerProperties` uses 70 EMU as the minimum
-  // marker baseline and these length/width multipliers.
-  const MIN_MARKER_BASE_PT: f32 = 70.0 / 12_700.0;
+
+  // LibreOffice's DrawingML importer carries line widths in hundredths of a
+  // millimetre here. `lineproperties.cxx::lclPushMarkerProperties` clamps the
+  // marker baseline to 70 of those units before applying these multipliers.
+  const MIN_MARKER_BASE_PT: f32 = 70.0 * 72.0 / 2_540.0;
   let is_open_arrow = marker.kind == Kind::Arrow;
   let factor = |size| match (size, is_open_arrow) {
     (Size::Small, false) => 2.0,
@@ -4985,8 +4981,23 @@ fn stroke_end_path(
     (Size::Large, true) => 5.5,
   };
   let baseline = line_width.max(MIN_MARKER_BASE_PT);
-  let width = factor(marker.width) * baseline;
-  let length = factor(marker.length) * baseline;
+  (
+    factor(marker.width) * baseline,
+    factor(marker.length) * baseline,
+  )
+}
+
+fn stroke_end_path(
+  marker: common::StrokeEnd,
+  endpoint: (f32, f32),
+  outward: (f32, f32),
+  line_width: f32,
+) -> Option<krilla::geom::Path> {
+  use common::StrokeEndKind as Kind;
+  if marker.kind == Kind::None {
+    return None;
+  }
+  let (width, length) = stroke_end_dimensions(marker, line_width);
   let centered = matches!(marker.kind, Kind::Diamond | Kind::Oval);
   let line_half_width = (50.0 * line_width / width).max(1.0);
   let points: &[(f32, f32)] = match marker.kind {
@@ -6273,8 +6284,9 @@ mod tests {
     GlyphId, ImageCrop, ImageItem, PaintDocument, PaintItem, PaintTextPortionKind, TextItem,
     TextMetrics, TextStyle as PaintTextStyle, conversion_font_audit, gamma_correct_gradient_color,
     metafile_render_options_for_image, pdf_metadata, pdf_page_dimension, render,
-    source_range_requires_visible_glyph, symbol_font_semantic_text, text_portion_ranges,
-    text_requires_glyph_outlines, text_stroke_with_fill, text_style_from_common,
+    source_range_requires_visible_glyph, stroke_end_dimensions, symbol_font_semantic_text,
+    text_portion_ranges, text_requires_glyph_outlines, text_stroke_with_fill,
+    text_style_from_common,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -6283,6 +6295,23 @@ mod tests {
   use ooxmlsdk_layout::common::{
     self, Color, DisplayItem, DisplayPage, LayoutDocument, LayoutEngineKind, Pt, TextRun, TextStyle,
   };
+
+  #[test]
+  fn drawingml_marker_dimensions_use_libreoffice_mm100_minimum_baseline() {
+    let marker = common::StrokeEnd {
+      kind: common::StrokeEndKind::Triangle,
+      width: common::StrokeEndSize::Medium,
+      length: common::StrokeEndSize::Medium,
+    };
+
+    let (thin_width, thin_length) = stroke_end_dimensions(marker, 0.75);
+    let libreoffice_medium_minimum = 3.0 * 70.0 * 72.0 / 2_540.0;
+    assert!((thin_width - libreoffice_medium_minimum).abs() < 0.000_1);
+    assert!((thin_length - libreoffice_medium_minimum).abs() < 0.000_1);
+
+    let (thick_width, thick_length) = stroke_end_dimensions(marker, 3.0);
+    assert_eq!((thick_width, thick_length), (9.0, 9.0));
+  }
 
   #[test]
   fn metafile_raster_size_preserves_native_bounds_unless_reduction_is_requested() {
@@ -6815,6 +6844,14 @@ mod tests {
     assert_eq!(
       symbol_font_semantic_text("\u{f02d}", Some("Symbol")),
       "\u{2212}"
+    );
+  }
+
+  #[test]
+  fn symbol_font_perpendicular_uses_standardized_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f05e}", Some("Symbol")),
+      "\u{22a5}"
     );
   }
 

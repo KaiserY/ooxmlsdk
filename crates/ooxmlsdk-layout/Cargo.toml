@@ -15,6 +15,8 @@ readme.workspace = true
 [dependencies]
 color = { workspace = true }
 emfsdk = { workspace = true }
+encoding_rs = { workspace = true }
+html5ever = { workspace = true }
 hypher = { workspace = true }
 icu_segmenter = { workspace = true }
 image = { workspace = true }

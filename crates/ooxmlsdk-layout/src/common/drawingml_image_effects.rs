@@ -122,6 +122,49 @@ pub(crate) struct ImageEffectContainer {
   pub(crate) effects: Vec<ImageEffect>,
 }
 
+/// Separates effect branches that are explicitly composited behind an
+/// unchanged source branch.
+///
+/// ECMA-376 Part 1 §20.1.8.26 defines the fixed `effectLst` output as a
+/// sibling container whose final branch is the main shape. In the unchanged
+/// case `from_effect_list` represents that branch as `Tree(Identity)`, after
+/// glow, outer shadow, and reflection. LibreOffice likewise constructs
+/// picture output as `[shadow primitive, original content]`, and Apache POI
+/// paints the shadow before painting the original shape. Returning only the
+/// preceding sibling branches lets a host preserve vector/image foreground
+/// content instead of needlessly resampling it into the effect raster.
+pub(crate) fn unchanged_foreground_backdrop(
+  container: &ImageEffectContainer,
+) -> Option<ImageEffectContainer> {
+  if container.kind != ImageEffectContainerKind::Sibling {
+    return None;
+  }
+  let (foreground, backdrop) = container.effects.split_last()?;
+  let ImageEffect::Container(foreground) = foreground else {
+    return None;
+  };
+  if foreground.kind != ImageEffectContainerKind::Tree
+    || foreground.effects.as_slice() != [ImageEffect::Identity]
+    || backdrop.is_empty()
+  {
+    return None;
+  }
+  Some(ImageEffectContainer {
+    kind: ImageEffectContainerKind::Sibling,
+    effects: backdrop.to_vec(),
+  })
+}
+
+pub(crate) fn contains_reflection(container: &ImageEffectContainer) -> bool {
+  container.effects.iter().any(|effect| match effect {
+    ImageEffect::Reflection(_) => true,
+    ImageEffect::AlphaModulate(container)
+    | ImageEffect::Container(container)
+    | ImageEffect::Blend { container, .. } => contains_reflection(container),
+    _ => false,
+  })
+}
+
 /// Removes soft-edge effects from a DrawingML effect graph.
 ///
 /// LibreOffice's DrawingML importer applies the Office precedence rule in
@@ -1039,19 +1082,19 @@ fn reflection(effect: &a::Reflection) -> ImageEffect {
     start_opacity: effect
       .start_opacity
       .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
+      .unwrap_or(1.0),
     start_position: effect
       .start_position
       .map(|value| value.as_ratio() as f32)
-      .unwrap_or(1.0),
+      .unwrap_or(0.0),
     end_opacity: effect
       .end_alpha
       .map(|value| value.as_ratio() as f32)
-      .unwrap_or(1.0),
+      .unwrap_or(0.0),
     end_position: effect
       .end_position
       .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
+      .unwrap_or(1.0),
     fade_direction_degrees: effect.fade_direction.unwrap_or(5_400_000) as f32 / 60_000.0,
     distance_px: effect
       .distance
@@ -2836,38 +2879,14 @@ fn reflection_image(
   effect: ImageReflectionEffect,
   content_bounds: PixelBounds,
 ) -> image::RgbaImage {
-  let fade = effect.fade_direction_degrees.to_radians();
-  let fade_x = fade.cos();
-  let fade_y = fade.sin();
   let width = content_bounds.width();
   let height = content_bounds.height();
-  let projections = [
-    0.0,
-    fade_x * width,
-    fade_y * height,
-    fade_x * width + fade_y * height,
-  ];
-  let minimum = projections.iter().copied().fold(f32::INFINITY, f32::min);
-  let maximum = projections
-    .iter()
-    .copied()
-    .fold(f32::NEG_INFINITY, f32::max);
-  let span = (maximum - minimum).max(f32::EPSILON);
-  let mut faded = source.clone();
-  for (x, y, pixel) in faded.enumerate_pixels_mut() {
-    let position = (fade_x * (x as f32 + 0.5 - content_bounds.left)
-      + fade_y * (y as f32 + 0.5 - content_bounds.top)
-      - minimum)
-      / span;
-    let opacity = effect_ramp(
-      position,
-      (effect.start_position, effect.start_opacity),
-      (effect.end_position, effect.end_opacity),
-    );
-    pixel.0[3] = (f32::from(pixel.0[3]) * opacity).round().clamp(0.0, 255.0) as u8;
-  }
-
   let direction = effect.direction_degrees.to_radians();
+  let reflected_bounds =
+    transformed_effect_bounds(content_bounds, effect.transform, effect.alignment).translated(
+      direction.cos() * effect.distance_px,
+      direction.sin() * effect.distance_px,
+    );
   let anchor_x = content_bounds.left + width * effect.alignment.0;
   let anchor_y = content_bounds.top + height * effect.alignment.1;
   let mut transform = effect.transform;
@@ -2875,12 +2894,47 @@ fn reflection_image(
     + direction.cos() * effect.distance_px;
   transform.shift_y_px = anchor_y - transform.skew_y * anchor_x - transform.scale_y * anchor_y
     + direction.sin() * effect.distance_px;
-  let reflected = affine_image(&faded, transform);
-  if effect.blur_radius_px > f32::EPSILON {
+  let reflected = affine_image(source, transform);
+  let mut reflected = if effect.blur_radius_px > f32::EPSILON {
     blur_rgba_premultiplied(&reflected, effect.blur_radius_px)
   } else {
     reflected
+  };
+
+  // MS-OI29500 §20.1.8.50 defines fadeDir as the alpha-gradient direction
+  // relative to the shape. Apply that ramp in the transformed reflection
+  // coordinate space: applying it to the source before a negative `sy`
+  // reverses the near-to-far fade. Office fixed output keeps the start alpha
+  // at the edge nearest the source even for the standard vertically flipped
+  // reflection.
+  let fade = effect.fade_direction_degrees.to_radians();
+  let fade_x = fade.cos();
+  let fade_y = fade.sin();
+  let corners = [
+    (reflected_bounds.left, reflected_bounds.top),
+    (reflected_bounds.right, reflected_bounds.top),
+    (reflected_bounds.right, reflected_bounds.bottom),
+    (reflected_bounds.left, reflected_bounds.bottom),
+  ];
+  let minimum = corners
+    .iter()
+    .map(|(x, y)| fade_x * *x + fade_y * *y)
+    .fold(f32::INFINITY, f32::min);
+  let maximum = corners
+    .iter()
+    .map(|(x, y)| fade_x * *x + fade_y * *y)
+    .fold(f32::NEG_INFINITY, f32::max);
+  let span = (maximum - minimum).max(f32::EPSILON);
+  for (x, y, pixel) in reflected.enumerate_pixels_mut() {
+    let position = (fade_x * (x as f32 + 0.5) + fade_y * (y as f32 + 0.5) - minimum) / span;
+    let opacity = effect_ramp(
+      position,
+      (effect.start_position, effect.start_opacity),
+      (effect.end_position, effect.end_opacity),
+    );
+    pixel.0[3] = (f32::from(pixel.0[3]) * opacity).round().clamp(0.0, 255.0) as u8;
   }
+  reflected
 }
 
 fn effect_ramp(position: f32, first: (f32, f32), second: (f32, f32)) -> f32 {
@@ -3130,13 +3184,65 @@ mod tests {
     ImageEffectTransform, ImageReflectionEffect, ResolvedEffectColor,
     apply_container_to_padded_image, apply_container_to_padded_image_with_sources, apply_to_image,
     container_output_bounds, from_effect_dag, from_effect_list, mso_brightness_contrast_component,
-    rotate_container_with_shape, sample_fill, source_requirements, suppress_soft_edge,
+    reflection, rotate_container_with_shape, sample_fill, source_requirements, suppress_soft_edge,
+    unchanged_foreground_backdrop,
   };
   use crate::model::RgbColor;
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
   use ooxmlsdk::units::DrawingmlPercentageValue;
 
   struct NoColorResolver;
+
+  #[test]
+  fn effect_list_backdrop_can_leave_an_identity_foreground_unrasterized() {
+    let container = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![
+        ImageEffect::OuterShadow {
+          blur_radius_px: 0.0,
+          distance_px: 2.0,
+          direction_degrees: 0.0,
+          transform: ImageEffectTransform {
+            scale_x: 1.0,
+            scale_y: 1.0,
+            skew_x: 0.0,
+            skew_y: 0.0,
+            shift_x_px: 0.0,
+            shift_y_px: 0.0,
+          },
+          alignment: (0.5, 0.5),
+          rotate_with_shape: false,
+          color: ResolvedEffectColor {
+            color: RgbColor { r: 1, g: 2, b: 3 },
+            alpha: 255,
+          },
+        },
+        ImageEffect::Container(ImageEffectContainer {
+          kind: ImageEffectContainerKind::Tree,
+          effects: vec![ImageEffect::Identity],
+        }),
+      ],
+    };
+
+    let backdrop = unchanged_foreground_backdrop(&container).expect("separable backdrop");
+    assert_eq!(backdrop.kind, ImageEffectContainerKind::Sibling);
+    assert!(matches!(
+      backdrop.effects.as_slice(),
+      [ImageEffect::OuterShadow { .. }]
+    ));
+  }
+
+  #[test]
+  fn reflection_uses_schema_alpha_ramp_defaults() {
+    let ImageEffect::Reflection(effect) = reflection(&a::Reflection::default()) else {
+      panic!("reflection effect");
+    };
+
+    assert_eq!(effect.start_opacity, 1.0);
+    assert_eq!(effect.start_position, 0.0);
+    assert_eq!(effect.end_opacity, 0.0);
+    assert_eq!(effect.end_position, 1.0);
+  }
 
   impl ImageEffectColorResolver for NoColorResolver {
     fn alpha_inverse(&self, _: &a::AlphaInverseChoice) -> Option<ResolvedEffectColor> {
@@ -3461,6 +3567,36 @@ mod tests {
       })],
     );
     assert_eq!(reflected.get_pixel(0, 2).0, [10, 20, 30, 255]);
+  }
+
+  #[test]
+  fn vertically_flipped_reflection_fades_away_from_the_source_edge() {
+    let mut reflected = RgbaImage::from_pixel(1, 4, Rgba([10, 20, 30, 255]));
+    apply_to_image(
+      &mut reflected,
+      &[ImageEffect::Reflection(ImageReflectionEffect {
+        blur_radius_px: 0.0,
+        start_opacity: 1.0,
+        start_position: 0.0,
+        end_opacity: 0.0,
+        end_position: 1.0,
+        fade_direction_degrees: 90.0,
+        distance_px: 0.0,
+        direction_degrees: 90.0,
+        transform: ImageEffectTransform {
+          scale_x: 1.0,
+          scale_y: -1.0,
+          skew_x: 0.0,
+          skew_y: 0.0,
+          shift_x_px: 0.0,
+          shift_y_px: 0.0,
+        },
+        alignment: (0.5, 0.5),
+        rotate_with_shape: false,
+      })],
+    );
+
+    assert!(reflected.get_pixel(0, 0).0[3] > reflected.get_pixel(0, 3).0[3]);
   }
 
   #[test]

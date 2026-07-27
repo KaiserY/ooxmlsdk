@@ -53,6 +53,22 @@ pub fn extract_metafile_text_runs(data: &[u8], content_type: Option<&str>) -> Ve
     .collect()
 }
 
+pub fn supports_semantic_text(content_type: Option<&str>) -> bool {
+  content_type.is_some_and(|content_type| {
+    matches!(
+      content_type.to_ascii_lowercase().as_str(),
+      "image/emf"
+        | "image/x-emf"
+        | "application/emf"
+        | "application/x-emf"
+        | "image/wmf"
+        | "image/x-wmf"
+        | "application/wmf"
+        | "application/x-wmf"
+    )
+  })
+}
+
 #[derive(Clone, Debug, Default)]
 struct EmfTextRunMetadata {
   font_family: Option<String>,
@@ -146,4 +162,17 @@ fn emf_text_run_metadata(data: &[u8]) -> Vec<EmfTextRunMetadata> {
     }
   }
   metadata
+}
+
+#[cfg(test)]
+mod tests {
+  use super::supports_semantic_text;
+
+  #[test]
+  fn semantic_text_is_supported_only_for_vector_metafiles() {
+    assert!(supports_semantic_text(Some("image/x-emf")));
+    assert!(supports_semantic_text(Some("APPLICATION/WMF")));
+    assert!(!supports_semantic_text(Some("image/png")));
+    assert!(!supports_semantic_text(None));
+  }
 }

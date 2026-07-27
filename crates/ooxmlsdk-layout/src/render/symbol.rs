@@ -98,6 +98,7 @@ fn symbol_font_symbol(code: u32) -> Option<char> {
     0x58 => 'Ξ',
     0x59 => 'Ψ',
     0x5A => 'Ζ',
+    0x5E => '⊥',
     0x61 => 'α',
     0x62 => 'β',
     0x63 => 'χ',
@@ -254,6 +255,7 @@ mod tests {
   #[test]
   fn adobe_symbol_minus_maps_to_unicode_minus() {
     assert_eq!(font_symbol_code(Some("Symbol"), 0xF02D), Some('−'));
+    assert_eq!(font_symbol_code(Some("Symbol"), 0x5E), Some('⊥'));
   }
 
   #[test]

@@ -45,6 +45,39 @@ pub(crate) fn wordprocessing_math_text(choice: &w::ParagraphChoice) -> Option<St
   Some(text)
 }
 
+pub(crate) fn wordprocessing_math_run_properties(
+  choice: &w::ParagraphChoice,
+) -> Option<&w::RunProperties> {
+  match choice {
+    w::ParagraphChoice::MRun(run) => run.run_properties.as_deref(),
+    w::ParagraphChoice::OfficeMath(math) => math
+      .office_math_choice
+      .iter()
+      .find_map(office_math_choice_run_properties),
+    w::ParagraphChoice::Paragraph(paragraph) => {
+      paragraph
+        .paragraph_choice
+        .iter()
+        .find_map(|choice| match choice {
+          m::ParagraphChoice::MRun(run) => run.run_properties.as_deref(),
+          m::ParagraphChoice::OfficeMath(math) => math
+            .office_math_choice
+            .iter()
+            .find_map(office_math_choice_run_properties),
+          _ => None,
+        })
+    }
+    _ => None,
+  }
+}
+
+fn office_math_choice_run_properties(choice: &m::OfficeMathChoice) -> Option<&w::RunProperties> {
+  match choice {
+    m::OfficeMathChoice::Run(run) => run.run_properties.as_deref(),
+    _ => None,
+  }
+}
+
 fn append_paragraph_text(paragraph: &m::Paragraph, text: &mut String) {
   for choice in &paragraph.paragraph_choice {
     match choice {
@@ -371,6 +404,9 @@ fn math_variant_character(
   script: m::ScriptValues,
   style: m::StyleValues,
 ) -> Option<char> {
+  if script == m::ScriptValues::DoubleStruck {
+    return double_struck_variant_character(character);
+  }
   if script != m::ScriptValues::Roman || style == m::StyleValues::Plain {
     return None;
   }
@@ -393,6 +429,23 @@ fn math_variant_character(
     (m::StyleValues::BoldItalic, 'A'..='Z') => 0x1d468 + offset,
     (m::StyleValues::BoldItalic, 'a'..='z') => 0x1d482 + offset,
     (m::StyleValues::BoldItalic, '0'..='9') => 0x1d7ce + offset,
+    _ => return None,
+  };
+  char::from_u32(codepoint)
+}
+
+fn double_struck_variant_character(character: char) -> Option<char> {
+  let codepoint = match character {
+    'C' => 0x2102,
+    'H' => 0x210d,
+    'N' => 0x2115,
+    'P' => 0x2119,
+    'Q' => 0x211a,
+    'R' => 0x211d,
+    'Z' => 0x2124,
+    'A'..='Z' => 0x1d538 + (character as u32 - 'A' as u32),
+    'a'..='z' => 0x1d552 + (character as u32 - 'a' as u32),
+    '0'..='9' => 0x1d7d8 + (character as u32 - '0' as u32),
     _ => return None,
   };
   char::from_u32(codepoint)
@@ -425,7 +478,7 @@ fn roman_greek_variant_character(character: char, style: m::StyleValues) -> Opti
 
 #[cfg(test)]
 mod tests {
-  use super::{text_math_text, wordprocessing_math_text};
+  use super::{text_math_text, wordprocessing_math_run_properties, wordprocessing_math_text};
   use ooxmlsdk::schemas::{
     schemas_microsoft_com_office_drawing_2010_main::TextMath,
     schemas_openxmlformats_org_wordprocessingml_2006_main as w,
@@ -461,6 +514,33 @@ mod tests {
     assert_eq!(
       wordprocessing_math_text(&paragraph.paragraph_choice[0]).as_deref(),
       Some("rate")
+    );
+  }
+
+  #[test]
+  fn wordprocessing_double_struck_math_maps_ascii_to_unicode() {
+    let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><m:rPr><m:scr m:val="double-struck"/><m:sty m:val="bi"/></m:rPr><m:t>R C z 3</m:t></m:r></m:oMath></w:p>"#;
+    let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
+
+    assert_eq!(
+      wordprocessing_math_text(&paragraph.paragraph_choice[0]).as_deref(),
+      Some("ℝ ℂ 𝕫 𝟛")
+    );
+  }
+
+  #[test]
+  fn wordprocessing_math_exposes_direct_word_run_properties() {
+    let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><w:rPr><w:rFonts w:ascii="Cambria Math"/><w:sz w:val="48"/></w:rPr><m:t>R</m:t></m:r></m:oMath></w:p>"#;
+    let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
+    let properties = wordprocessing_math_run_properties(&paragraph.paragraph_choice[0]).unwrap();
+
+    assert_eq!(
+      properties
+        .run_properties_choice
+        .iter()
+        .filter(|choice| matches!(choice, w::RunPropertiesChoice::FontSize(_)))
+        .count(),
+      1
     );
   }
 

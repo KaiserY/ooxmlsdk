@@ -11,7 +11,8 @@ use crate::model::RgbColor;
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
 use super::text::decode_excel_escaped_text;
 use super::worksheet::{
-  CalcSheet, SheetIdentity, SheetResourceCatalog, WorksheetResourceImportContext,
+  CalcSheet, SheetIdentity, SheetResourceCatalog, SpreadsheetProducerProfile,
+  WorksheetResourceImportContext,
 };
 
 #[derive(Debug)]
@@ -54,7 +55,7 @@ impl WorkbookFragment {
   pub(crate) fn finalize_import(
     &mut self,
     package: &mut SpreadsheetDocument,
-    mso_document: bool,
+    producer: SpreadsheetProducerProfile,
     ui_language: Option<&str>,
   ) -> Result<Vec<CalcSheet>> {
     // WorkbookFragment::finalizeImport imports theme/styles/shared strings
@@ -94,7 +95,7 @@ impl WorkbookFragment {
               shared_strings: &self.shared_strings,
               styles: &self.styles,
               date_1904,
-              mso_document,
+              producer,
             },
           );
         }
@@ -131,7 +132,7 @@ struct WorkbookSheetContext<'a> {
   shared_strings: &'a [SharedStringModel],
   styles: &'a StylesCatalog,
   date_1904: bool,
-  mso_document: bool,
+  producer: SpreadsheetProducerProfile,
 }
 
 fn worksheet_sheet(
@@ -163,7 +164,7 @@ fn worksheet_sheet(
     resources,
     context.shared_strings,
     context.styles,
-    context.mso_document,
+    context.producer,
   );
   Ok(sheet)
 }

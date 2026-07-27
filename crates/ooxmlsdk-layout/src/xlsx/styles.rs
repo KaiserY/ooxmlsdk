@@ -5,9 +5,13 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use std::sync::Arc;
 
 use crate::error::Result;
-use crate::model::{BorderStyle, RgbColor, TextStyle};
+use crate::model::{BorderDashPattern, BorderStyle, RgbColor, TextStyle};
 use crate::pptx::drawingml::color::{ResolvedColor, apply_excel_tint};
-use crate::pptx::drawingml::theme::{ThemeColorScheme, ThemeFontScheme};
+use crate::pptx::drawingml::fill::FillProperties;
+use crate::pptx::drawingml::line::LineProperties;
+use crate::pptx::drawingml::shape_properties::EffectProperties;
+use crate::pptx::drawingml::theme::{ThemeColorScheme, ThemeFontScheme, ThemeFormatScheme};
+use crate::units;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct StylesCatalog {
@@ -18,7 +22,9 @@ pub(crate) struct StylesCatalog {
   pub(crate) fill_records: Vec<FillRecord>,
   pub(crate) border_records: Vec<BorderRecord>,
   pub(crate) differential_format_records: Vec<DifferentialFormatRecord>,
+  pub(crate) table_style_records: Vec<TableStyleRecord>,
   theme_fonts: Option<ThemeFontScheme>,
+  theme_format: Option<ThemeFormatScheme>,
   theme_colors: ThemeColorPalette,
   theme_major_east_asian: Option<Arc<str>>,
   theme_minor_east_asian: Option<Arc<str>>,
@@ -129,6 +135,19 @@ pub(crate) struct DifferentialFormatRecord {
   pub(crate) number_format: Option<NumberFormatRecord>,
 }
 
+#[derive(Clone, Debug, Default)]
+pub(crate) struct TableStyleRecord {
+  pub(crate) name: String,
+  pub(crate) elements: Vec<TableStyleElementRecord>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TableStyleElementRecord {
+  pub(crate) r#type: x::TableStyleValues,
+  pub(crate) size: u32,
+  pub(crate) format_id: Option<u32>,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct AlignmentRecord {
   pub(crate) horizontal: Option<x::HorizontalAlignmentValues>,
@@ -140,6 +159,14 @@ pub(crate) struct AlignmentRecord {
   pub(crate) justify_last_line: bool,
   pub(crate) shrink_to_fit: bool,
   pub(crate) reading_order: Option<u32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct IconSetPrintMetrics {
+  pub(crate) width_pt: f32,
+  pub(crate) height_pt: f32,
+  pub(crate) leading_inset_pt: f32,
+  pub(crate) bottom_inset_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -174,24 +201,41 @@ impl StylesCatalog {
     )))
   }
 
+  pub(crate) fn theme_fill_style(&self, index: u32) -> Option<&FillProperties> {
+    self.theme_format.as_ref()?.get_fill_style(index)
+  }
+
+  pub(crate) fn theme_line_style(&self, index: u32) -> Option<&LineProperties> {
+    self.theme_format.as_ref()?.get_line_style(index)
+  }
+
+  pub(crate) fn theme_effect_style(&self, index: u32) -> Option<&EffectProperties> {
+    self.theme_format.as_ref()?.get_effect_style(index)
+  }
+
   pub(crate) fn from_workbook_part(
     package: &mut SpreadsheetDocument,
     workbook_part: &WorkbookPart,
     ui_language: Option<&str>,
   ) -> Result<Self> {
-    let (theme_fonts, theme_colors) = if let Some(theme_part) = workbook_part.theme_part(package) {
-      let theme = theme_part.root_element(package)?;
-      (
-        Some(ThemeFontScheme::from_dml(&theme.theme_elements.font_scheme)),
-        ThemeColorPalette::from_dml(&theme.theme_elements.color_scheme),
-      )
-    } else {
-      (None, ThemeColorPalette::default())
-    };
+    let (theme_fonts, theme_format, theme_colors) =
+      if let Some(theme_part) = workbook_part.theme_part(package) {
+        let theme = theme_part.root_element(package)?;
+        (
+          Some(ThemeFontScheme::from_dml(&theme.theme_elements.font_scheme)),
+          Some(ThemeFormatScheme::from_dml(
+            &theme.theme_elements.format_scheme,
+          )),
+          ThemeColorPalette::from_dml(&theme.theme_elements.color_scheme),
+        )
+      } else {
+        (None, None, ThemeColorPalette::default())
+      };
     let missing_theme_minor = missing_theme_minor_font(theme_fonts.as_ref(), ui_language);
     let Some(styles_part) = workbook_part.workbook_styles_part(package) else {
       return Ok(Self {
         theme_fonts,
+        theme_format,
         theme_colors,
         missing_theme_minor_from_ui: missing_theme_minor.is_some(),
         theme_minor_east_asian: missing_theme_minor,
@@ -203,6 +247,7 @@ impl StylesCatalog {
     let stylesheet = styles_part.root_element(package)?;
     let mut catalog =
       Self::from_stylesheet(stylesheet, theme_fonts.as_ref(), theme_colors, ui_language);
+    catalog.theme_format = theme_format;
     catalog.missing_theme_minor_from_ui = missing_theme_minor.is_some();
     catalog.theme_minor_east_asian = catalog.theme_minor_east_asian.or(missing_theme_minor);
     Ok(catalog)
@@ -331,7 +376,30 @@ impl StylesCatalog {
             .collect()
         })
         .unwrap_or_default(),
+      table_style_records: stylesheet
+        .table_styles
+        .as_ref()
+        .map(|styles| {
+          styles
+            .table_style
+            .iter()
+            .map(|style| TableStyleRecord {
+              name: style.name.clone(),
+              elements: style
+                .table_style_element
+                .iter()
+                .map(|element| TableStyleElementRecord {
+                  r#type: element.r#type,
+                  size: element.size.unwrap_or(1).max(1),
+                  format_id: element.format_id,
+                })
+                .collect(),
+            })
+            .collect()
+        })
+        .unwrap_or_default(),
       theme_fonts: theme_fonts.cloned(),
+      theme_format: None,
       theme_major_east_asian: theme_fonts
         .and_then(|fonts| fonts.resolve_font_for_language("+mj-ea", ui_language))
         .map(Arc::from),
@@ -556,6 +624,13 @@ impl StylesCatalog {
       .and_then(|fill| fill.color)
   }
 
+  pub(crate) fn table_style(&self, name: &str) -> Option<&TableStyleRecord> {
+    self
+      .table_style_records
+      .iter()
+      .find(|style| style.name == name)
+  }
+
   pub(crate) fn differential_number_format_code(&self, format_id: u32) -> Option<&str> {
     self
       .differential_format_records
@@ -702,6 +777,56 @@ impl StylesCatalog {
       .font_records
       .first()
       .is_some_and(|font| font.scheme != x::FontSchemeValues::default())
+  }
+
+  pub(crate) fn normal_style_uses_calibri_11_minor_theme(&self) -> bool {
+    let Some(normal_font) = self.font_records.first() else {
+      return false;
+    };
+    normal_font
+      .name
+      .as_deref()
+      .is_some_and(|font| font.eq_ignore_ascii_case("Calibri"))
+      && normal_font
+        .size_pt
+        .is_some_and(|size| (size.get() - 11.0).abs() <= f64::EPSILON)
+      && normal_font.scheme == x::FontSchemeValues::Minor
+      && self
+        .theme_fonts
+        .as_ref()
+        .and_then(|fonts| fonts.minor_latin.as_deref())
+        .is_some_and(|font| font.eq_ignore_ascii_case("Calibri"))
+  }
+
+  pub(crate) fn icon_set_print_metrics(&self, font_size_pt: f32) -> IconSetPrintMetrics {
+    let modern_aptos = self
+      .theme_fonts
+      .as_ref()
+      .and_then(|fonts| fonts.minor_latin.as_deref())
+      .is_some_and(|font| font.eq_ignore_ascii_case("Aptos Narrow"));
+    if modern_aptos {
+      // Microsoft 365's Aptos Narrow theme uses the enlarged 24px icon slot
+      // observed in tdf162948: 12.48x12.36pt for a 12pt cell font.
+      let width_pt = units::quantize_points_to_office_print_grid(font_size_pt * 1.04);
+      IconSetPrintMetrics {
+        width_pt,
+        height_pt: (width_pt - units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI).max(0.0),
+        leading_inset_pt: 1.68,
+        bottom_inset_pt: 1.0,
+      }
+    } else {
+      // Legacy Calibri-theme Office output and Calc's ScIconSetInfo both use
+      // the effective cell-font height. Office quantizes 11pt to 11.04pt on
+      // its 600dpi print grid; complex_icon_set and POI's conditional-format
+      // samples also retain the two legacy device insets shown here.
+      let side_pt = units::quantize_points_to_office_print_grid(font_size_pt);
+      IconSetPrintMetrics {
+        width_pt: side_pt,
+        height_pt: side_pt,
+        leading_inset_pt: 1.44,
+        bottom_inset_pt: 1.6,
+      }
+    }
   }
 }
 
@@ -1048,8 +1173,23 @@ fn border_style(
       .and_then(|color| color_from_color(color, indexed_colors, theme_colors))
       .unwrap_or(RgbColor { r: 0, g: 0, b: 0 }),
     compound: matches!(style, x::BorderStyleValues::Double),
+    dash_pattern: border_dash_pattern(style),
     ..BorderStyle::default()
   })
+}
+
+fn border_dash_pattern(style: x::BorderStyleValues) -> BorderDashPattern {
+  match style {
+    x::BorderStyleValues::Dotted => BorderDashPattern::Dotted,
+    x::BorderStyleValues::Dashed | x::BorderStyleValues::MediumDashed => BorderDashPattern::Dashed,
+    x::BorderStyleValues::DashDot
+    | x::BorderStyleValues::MediumDashDot
+    | x::BorderStyleValues::SlantDashDot => BorderDashPattern::DashDot,
+    x::BorderStyleValues::DashDotDot | x::BorderStyleValues::MediumDashDotDot => {
+      BorderDashPattern::DashDotDot
+    }
+    _ => BorderDashPattern::Solid,
+  }
 }
 
 fn border_width_pt(style: x::BorderStyleValues) -> f32 {
@@ -1276,6 +1416,26 @@ mod tests {
   }
 
   #[test]
+  fn excel_border_dash_styles_are_preserved() {
+    assert_eq!(
+      border_dash_pattern(x::BorderStyleValues::Dotted),
+      BorderDashPattern::Dotted
+    );
+    assert_eq!(
+      border_dash_pattern(x::BorderStyleValues::MediumDashed),
+      BorderDashPattern::Dashed
+    );
+    assert_eq!(
+      border_dash_pattern(x::BorderStyleValues::SlantDashDot),
+      BorderDashPattern::DashDot
+    );
+    assert_eq!(
+      border_dash_pattern(x::BorderStyleValues::MediumDashDotDot),
+      BorderDashPattern::DashDotDot
+    );
+  }
+
+  #[test]
   fn rotated_alignment_defaults_match_libreoffice_import() {
     // Alignment::importAlignment and
     // sc/qa/unit/subsequent_export_test2.cxx:testTdf120168.
@@ -1427,5 +1587,35 @@ mod tests {
         .document_font_text_style_for_column_width()
         .is_none()
     );
+  }
+
+  #[test]
+  fn calibri_application_column_profile_requires_the_normal_style_font() {
+    let theme_fonts = ThemeFontScheme {
+      minor_latin: Some("Calibri".to_owned()),
+      ..ThemeFontScheme::default()
+    };
+    let calibri = StylesCatalog {
+      font_records: vec![FontRecord {
+        name: Some(Arc::from("Calibri")),
+        size_pt: Some(OrderedF64::new(11.0)),
+        scheme: x::FontSchemeValues::Minor,
+        ..FontRecord::default()
+      }],
+      theme_fonts: Some(theme_fonts.clone()),
+      ..StylesCatalog::default()
+    };
+    let arial = StylesCatalog {
+      font_records: vec![FontRecord {
+        name: Some(Arc::from("Arial")),
+        size_pt: Some(OrderedF64::new(11.0)),
+        ..FontRecord::default()
+      }],
+      theme_fonts: Some(theme_fonts),
+      ..StylesCatalog::default()
+    };
+
+    assert!(calibri.normal_style_uses_calibri_11_minor_theme());
+    assert!(!arial.normal_style_uses_calibri_11_minor_theme());
   }
 }

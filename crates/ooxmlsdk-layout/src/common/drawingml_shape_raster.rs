@@ -101,6 +101,25 @@ pub(crate) fn rasterize_vector_items_for_effects_at_pixels_per_point(
   })
 }
 
+pub(crate) fn rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  max_pixels_per_point: f32,
+) -> Option<DrawingRaster> {
+  let pixels_per_point = effect_pixels_per_point_with_max(
+    raster_bounds.size.width.0,
+    raster_bounds.size.height.0,
+    max_pixels_per_point,
+  );
+  rasterize_vector_items_for_effects_at_pixels_per_point(
+    items,
+    raster_bounds,
+    effects,
+    pixels_per_point,
+  )
+}
+
 pub(crate) fn rasterize_fill_layer_at_pixels_per_point(
   items: &[DisplayItem<'static>],
   raster_bounds: Rect,
@@ -266,9 +285,17 @@ fn empty_raster(raster_bounds: Rect) -> Option<(RgbaImage, f32)> {
 }
 
 fn effect_pixels_per_point(width_pt: f32, height_pt: f32) -> f32 {
+  effect_pixels_per_point_with_max(width_pt, height_pt, MAX_EFFECT_PIXELS_PER_POINT)
+}
+
+fn effect_pixels_per_point_with_max(
+  width_pt: f32,
+  height_pt: f32,
+  max_pixels_per_point: f32,
+) -> f32 {
   (MAX_EFFECT_RASTER_PIXELS / (width_pt * height_pt))
     .sqrt()
-    .clamp(0.25, MAX_EFFECT_PIXELS_PER_POINT)
+    .clamp(0.25, max_pixels_per_point.max(0.25))
 }
 
 fn rasterize_vector_items_impl(
@@ -1200,7 +1227,8 @@ fn pattern_tile(pattern: PatternFill, pixels_per_point: f32) -> Option<Pixmap> {
 #[cfg(test)]
 mod tests {
   use super::{
-    rasterize_group_items_for_effects, rasterize_vector_items, rasterize_vector_items_for_effects,
+    MAX_EFFECT_RASTER_PIXELS, effect_pixels_per_point_with_max, rasterize_group_items_for_effects,
+    rasterize_vector_items, rasterize_vector_items_for_effects,
   };
   use image::codecs::png::PngEncoder;
   use image::{ColorType, ImageEncoder, Rgba, RgbaImage};
@@ -1224,6 +1252,16 @@ mod tests {
         height: Pt(height),
       },
     }
+  }
+
+  #[test]
+  fn specialized_raster_cap_keeps_the_shared_pixel_budget() {
+    let small = effect_pixels_per_point_with_max(70.0, 72.0, 200.0 / 72.0);
+    assert!((small - 200.0 / 72.0).abs() < 0.001);
+
+    let large = effect_pixels_per_point_with_max(500.0, 500.0, 200.0 / 72.0);
+    assert!(large < 200.0 / 72.0);
+    assert!(500.0 * 500.0 * large * large <= MAX_EFFECT_RASTER_PIXELS + 1.0);
   }
 
   #[test]
@@ -1376,6 +1414,7 @@ mod tests {
       content_type: Cow::Borrowed("image/png"),
       bytes: Arc::from(png),
       metafile_monochrome_dib_palette_override: None,
+      metafile_background_color: None,
       relationship_id: None,
       alt_text: None,
       hyperlink_url: None,

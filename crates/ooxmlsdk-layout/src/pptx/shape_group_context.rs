@@ -397,21 +397,27 @@ impl PPTShapeGroupContext {
     if let Some(style) = &picture.shape_style {
       shape.shape.set_shape_style_refs(style);
     }
-    if let Some(blip_fill) = picture.blip_fill.as_deref()
-      && let Some(blip) = blip_fill.blip.as_ref()
-    {
-      let image_resource = blip
-        .embed
-        .as_deref()
-        .and_then(|relationship_id| slide_persist.image_resources.get(relationship_id))
-        .cloned();
-      shape.shape.set_picture(
-        blip.embed.clone(),
-        blip.link.clone(),
-        image_crop_from_source_rectangle(blip_fill.source_rectangle.as_ref()),
-        blip.blip_choice.clone(),
-        image_resource,
-      );
+    if let Some(blip_fill) = picture.blip_fill.as_deref() {
+      if let Some(blip) = blip_fill.blip.as_ref() {
+        let image_resource = blip
+          .embed
+          .as_deref()
+          .and_then(|relationship_id| slide_persist.image_resources.get(relationship_id))
+          .cloned();
+        shape.shape.set_picture(
+          blip.embed.clone(),
+          blip.link.clone(),
+          image_crop_from_source_rectangle(blip_fill.source_rectangle.as_ref()),
+          blip.blip_choice.clone(),
+          image_resource,
+        );
+      } else {
+        // Apache POI bug 62929 retains an empty p:blipFill as an
+        // XSLFPictureShape with no data, link, or crop. Keep that picture
+        // identity so fixed-output lowering can use Office's missing-picture
+        // visual instead of silently treating the p:pic as an ordinary shape.
+        shape.shape.set_empty_picture_fill();
+      }
     }
     shape.into_shape(slide_persist)
   }

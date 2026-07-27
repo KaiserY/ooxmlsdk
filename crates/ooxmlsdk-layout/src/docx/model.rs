@@ -6,8 +6,8 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
 pub(crate) use crate::model::{
-  BorderStyle, CellBordersModel, DynamicFieldKind, FieldNumberFormat, FormWidget, FormWidgetKind,
-  ImageCrop, LineNumbering, PageSetup, RgbColor, TextStyle,
+  BorderDashPattern, BorderStyle, CellBordersModel, DynamicFieldKind, FieldNumberFormat,
+  FormWidget, FormWidgetKind, ImageCrop, LineNumbering, PageSetup, RgbColor, TextStyle,
 };
 use crate::{common, units};
 
@@ -559,6 +559,7 @@ pub(crate) struct InlineImage {
   pub rotation_deg: f32,
   pub flip_horizontal: bool,
   pub flip_vertical: bool,
+  pub metafile_background_color: Option<[u8; 3]>,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
   pub semantic_metafile_text: bool,

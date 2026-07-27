@@ -410,6 +410,7 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
       rotation_deg: image.rotation_deg,
       flip_horizontal: image.flip_horizontal,
       flip_vertical: image.flip_vertical,
+      metafile_background_color: None,
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
@@ -3314,8 +3315,20 @@ fn border_style(
     spacing_pt: space.unwrap_or(0) as f32,
     color: color.and_then(parse_hex_color).unwrap_or_default(),
     compound: border_value_is_compound(value),
+    dash_pattern: border_value_dash_pattern(value),
     shadow: shadow.is_some_and(ooxmlsdk::simple_type::OnOffValue::as_bool),
   })
+}
+
+fn border_value_dash_pattern(value: w::BorderValues) -> BorderDashPattern {
+  match value {
+    w::BorderValues::Dotted => BorderDashPattern::Dotted,
+    w::BorderValues::Dashed => BorderDashPattern::Dashed,
+    w::BorderValues::DashSmallGap => BorderDashPattern::FineDashed,
+    w::BorderValues::DotDash => BorderDashPattern::DashDot,
+    w::BorderValues::DotDotDash => BorderDashPattern::DashDotDot,
+    _ => BorderDashPattern::Solid,
+  }
 }
 
 fn border_value_is_compound(value: w::BorderValues) -> bool {
@@ -5736,9 +5749,7 @@ fn inline_image_impl(
         &styles.theme_colors,
         Some(images),
       )?;
-      let relationship_id = properties.relationship_id.as_deref()?;
-      let resource = images.by_relationship_id.get(relationship_id)?;
-      let image_data = image_data_with_effects(resource, &properties);
+      let image_data = drawing_image_data(images, &properties)?;
       let hyperlink_url = inline
         .doc_properties
         .hyperlink_on_click
@@ -5765,6 +5776,7 @@ fn inline_image_impl(
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
         flip_vertical: properties.flip_vertical,
+        metafile_background_color: None,
         alt_text: inline.doc_properties.description.clone(),
         hyperlink_url,
         semantic_metafile_text: false,
@@ -5776,9 +5788,7 @@ fn inline_image_impl(
       let extent = &anchor.extent;
       let properties =
         drawing_image_properties(&graphic.graphic_data, &styles.theme_colors, Some(images))?;
-      let relationship_id = properties.relationship_id.as_deref()?;
-      let resource = images.by_relationship_id.get(relationship_id)?;
-      let image_data = image_data_with_effects(resource, &properties);
+      let image_data = drawing_image_data(images, &properties)?;
       let hyperlink_url = anchor
         .doc_properties
         .as_deref()
@@ -5805,6 +5815,7 @@ fn inline_image_impl(
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
         flip_vertical: properties.flip_vertical,
+        metafile_background_color: None,
         alt_text: anchor
           .doc_properties
           .as_ref()
@@ -9596,6 +9607,7 @@ fn drawingml_picture_image(
     rotation_deg: mapped.rotation_deg,
     flip_horizontal: mapped.flip_horizontal,
     flip_vertical: mapped.flip_vertical,
+    metafile_background_color: None,
     alt_text: drawingml_picture_alt_text(picture),
     hyperlink_url,
     semantic_metafile_text: false,
@@ -9872,6 +9884,20 @@ struct ImportedImageData {
   content_type: Option<String>,
 }
 
+fn drawing_image_data(
+  images: &ImageCatalog,
+  properties: &DrawingImageProperties,
+) -> Option<ImportedImageData> {
+  let relationship_id = properties.relationship_id.as_deref()?;
+  if let Some(resource) = images.by_relationship_id.get(relationship_id) {
+    return Some(image_data_with_effects(resource, properties));
+  }
+  properties.external_link.then(|| ImportedImageData {
+    data: Arc::from([]),
+    content_type: None,
+  })
+}
+
 fn image_data_with_effects(
   resource: &package::ImageResource,
   properties: &DrawingImageProperties,
@@ -9991,6 +10017,7 @@ fn drawingml_line_reference_stroke(
     spacing_pt: 0.0,
     color,
     compound: false,
+    dash_pattern: BorderDashPattern::Solid,
     shadow: false,
   })
 }
@@ -10079,6 +10106,7 @@ fn wordprocessing_shape_stroke(
     spacing_pt: 0.0,
     color,
     compound: false,
+    dash_pattern: BorderDashPattern::Solid,
     shadow: false,
   })
 }
@@ -10156,6 +10184,7 @@ fn drawingml_diagram_shape_stroke(
     spacing_pt: 0.0,
     color,
     compound: false,
+    dash_pattern: BorderDashPattern::Solid,
     shadow: false,
   })
 }
@@ -11432,6 +11461,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
         .and_then(parse_vml_color)
         .unwrap_or(RgbColor { r: 0, g: 0, b: 0 }),
       compound: false,
+      dash_pattern: BorderDashPattern::Solid,
       shadow: false,
     })
   } else {
@@ -11570,6 +11600,7 @@ fn vml_inline_shape(
       spacing_pt: 0.0,
       color,
       compound: false,
+      dash_pattern: BorderDashPattern::Solid,
       shadow: false,
     });
   if fill_color.is_none() && fill_image.is_none() && stroke.is_none() {
@@ -11753,7 +11784,38 @@ pub(crate) fn parse_vml_color(value: &str) -> Option<RgbColor> {
 
 fn vml_named_color(value: &str) -> Option<RgbColor> {
   match value.to_ascii_lowercase().as_str() {
+    "aqua" => Some(RgbColor {
+      r: 0,
+      g: 255,
+      b: 255,
+    }),
     "black" => Some(RgbColor { r: 0, g: 0, b: 0 }),
+    "blue" => Some(RgbColor { r: 0, g: 0, b: 255 }),
+    "fuchsia" => Some(RgbColor {
+      r: 255,
+      g: 0,
+      b: 255,
+    }),
+    "gray" => Some(RgbColor {
+      r: 128,
+      g: 128,
+      b: 128,
+    }),
+    "green" => Some(RgbColor { r: 0, g: 128, b: 0 }),
+    "lime" => Some(RgbColor { r: 0, g: 255, b: 0 }),
+    "maroon" => Some(RgbColor { r: 128, g: 0, b: 0 }),
+    "navy" => Some(RgbColor { r: 0, g: 0, b: 128 }),
+    "olive" => Some(RgbColor {
+      r: 128,
+      g: 128,
+      b: 0,
+    }),
+    "purple" => Some(RgbColor {
+      r: 128,
+      g: 0,
+      b: 128,
+    }),
+    "red" => Some(RgbColor { r: 255, g: 0, b: 0 }),
     "silver" => Some(RgbColor {
       r: 192,
       g: 192,
@@ -11871,8 +11933,40 @@ fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> O
       w::EmbeddedObjectChoice::Shape(shape) => shape_image(shape, images),
       _ => None,
     })?;
+  image.metafile_background_color = embedded_object_metafile_background_color(object);
   image.semantic_metafile_text |= semantic_metafile_text;
   Some(image)
+}
+
+fn embedded_object_metafile_background_color(object: &w::EmbeddedObject) -> Option<[u8; 3]> {
+  let shape_types = object
+    .embedded_object_choice1
+    .iter()
+    .filter_map(|choice| match choice {
+      w::EmbeddedObjectChoice::Shapetype(shape_type) => Some(shape_type.as_ref()),
+      _ => None,
+    })
+    .collect::<Vec<_>>();
+  let shape = object
+    .embedded_object_choice1
+    .iter()
+    .find_map(|choice| match choice {
+      w::EmbeddedObjectChoice::Shape(shape) => Some(shape.as_ref()),
+      _ => None,
+    })?;
+  let shape_type = shape.r#type.as_deref().and_then(|reference| {
+    let id = reference.strip_prefix('#').unwrap_or(reference);
+    shape_types
+      .iter()
+      .copied()
+      .rev()
+      .find(|shape_type| shape_type.id.as_deref() == Some(id))
+  });
+  let model = crate::xlsx::object_resources::vml_shape_model(shape, shape_type);
+  match crate::xlsx::vml_shape_common_fill(&model, Affine::IDENTITY) {
+    common::Fill::Solid(color) if color.a == u8::MAX => Some([color.r, color.g, color.b]),
+    _ => None,
+  }
 }
 
 fn push_picture_choice_textboxes(
@@ -12463,6 +12557,7 @@ fn vml_image_data(
     rotation_deg: style.rotation_deg,
     flip_horizontal: style.flip_horizontal,
     flip_vertical: style.flip_vertical,
+    metafile_background_color: None,
     alt_text: alt_text.or_else(|| data.title.clone()),
     hyperlink_url: None,
     semantic_metafile_text: false,
@@ -12945,6 +13040,7 @@ pub(crate) fn vml_measure_to_points(value: &str) -> Option<f32> {
 #[derive(Clone, Debug, Default)]
 struct DrawingImageProperties {
   relationship_id: Option<String>,
+  external_link: bool,
   hyperlink_relationship_id: Option<String>,
   crop: ImageCrop,
   effects: Vec<ImageEffect>,
@@ -13070,8 +13166,10 @@ fn drawing_picture_image_properties(
   images: Option<&ImageCatalog>,
 ) -> Option<DrawingImageProperties> {
   let blip_fill = picture.blip_fill.as_deref()?;
+  let blip = blip_fill.blip.as_ref()?;
   let mut properties = DrawingImageProperties {
-    relationship_id: blip_fill.blip.as_ref()?.embed.clone(),
+    relationship_id: blip.embed.clone().or_else(|| blip.link.clone()),
+    external_link: blip.embed.is_none() && blip.link.is_some(),
     hyperlink_relationship_id: picture
       .non_visual_picture_properties
       .as_deref()
@@ -13123,8 +13221,10 @@ fn drawing_blip_fill_image_properties(
   theme_colors: &ThemeColors,
   images: Option<&ImageCatalog>,
 ) -> Option<DrawingImageProperties> {
+  let blip = blip_fill.blip.as_ref()?;
   let mut properties = DrawingImageProperties {
-    relationship_id: blip_fill.blip.as_ref()?.embed.clone(),
+    relationship_id: blip.embed.clone().or_else(|| blip.link.clone()),
+    external_link: blip.embed.is_none() && blip.link.is_some(),
     ..DrawingImageProperties::default()
   };
 
@@ -15571,6 +15671,7 @@ fn numbering_drawing_image(
     rotation_deg: properties.rotation_deg,
     flip_horizontal: properties.flip_horizontal,
     flip_vertical: properties.flip_vertical,
+    metafile_background_color: None,
     alt_text,
     hyperlink_url: None,
     semantic_metafile_text: false,
@@ -16827,6 +16928,48 @@ mod tests {
   }
 
   #[test]
+  fn embedded_vml_metafile_uses_the_host_shape_solid_fill_as_its_background() {
+    let object = w::EmbeddedObject::from_bytes(
+      br##"<w:object xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        xmlns:v="urn:schemas-microsoft-com:vml">
+        <v:shapetype id="_x0000_t75" filled="f"/>
+        <v:shape type="#_x0000_t75" filled="t" fillcolor="red"/>
+      </w:object>"##,
+    )
+    .expect("embedded VML object");
+
+    assert_eq!(
+      embedded_object_metafile_background_color(&object),
+      Some([255, 0, 0])
+    );
+  }
+
+  #[test]
+  fn vml_named_colors_match_the_office_basic_palette() {
+    for (name, rgb) in [
+      ("aqua", [0, 255, 255]),
+      ("black", [0, 0, 0]),
+      ("blue", [0, 0, 255]),
+      ("fuchsia", [255, 0, 255]),
+      ("gray", [128, 128, 128]),
+      ("green", [0, 128, 0]),
+      ("lime", [0, 255, 0]),
+      ("maroon", [128, 0, 0]),
+      ("navy", [0, 0, 128]),
+      ("olive", [128, 128, 0]),
+      ("purple", [128, 0, 128]),
+      ("red", [255, 0, 0]),
+      ("silver", [192, 192, 192]),
+      ("teal", [0, 128, 128]),
+      ("white", [255, 255, 255]),
+      ("yellow", [255, 255, 0]),
+    ] {
+      let color = parse_vml_color(name).expect("Office VML named color");
+      assert_eq!([color.r, color.g, color.b], rgb, "{name}");
+    }
+  }
+
+  #[test]
   fn vml_path_resolves_formulas_quadrants_and_path_paint_groups() {
     let formulas = v::Formulas::from_bytes(
       br#"<v:formulas xmlns:v="urn:schemas-microsoft-com:vml"><v:f eqn="sum 33030 0 #0"/><v:f eqn="prod #0 4 3"/><v:f eqn="prod @0 1 3"/><v:f eqn="sum @1 0 @2"/></v:formulas>"#,
@@ -17444,6 +17587,22 @@ mod tests {
     assert!((properties.rotation_deg - 90.0).abs() < 0.001);
     assert!(properties.flip_horizontal);
     assert!(properties.flip_vertical);
+  }
+
+  #[test]
+  fn drawing_image_properties_preserve_external_link_placeholders() {
+    let xml = r#"<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><pic:nvPicPr><pic:cNvPr id="1" name="Picture 1"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:link="rId5"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr/></pic:pic>"#;
+
+    let picture = pic::Picture::from_bytes(xml.as_bytes()).expect("picture");
+    let properties = drawing_picture_image_properties(&picture, &ThemeColors::default(), None)
+      .expect("external image properties");
+
+    assert_eq!(properties.relationship_id.as_deref(), Some("rId5"));
+    assert!(properties.external_link);
+    let placeholder =
+      drawing_image_data(&ImageCatalog::default(), &properties).expect("linked placeholder");
+    assert!(placeholder.data.is_empty());
+    assert_eq!(placeholder.content_type, None);
   }
 
   #[test]
@@ -18091,6 +18250,27 @@ mod tests {
     assert_eq!(merged.right.unwrap().width_pt, 3.0);
     assert_eq!(merged.bottom, Some(border(2.0)));
     assert_eq!(merged.left, Some(border(2.5)));
+  }
+
+  #[test]
+  fn word_border_dash_values_are_preserved_as_width_relative_patterns() {
+    let cases = [
+      (w::BorderValues::Dotted, BorderDashPattern::Dotted),
+      (w::BorderValues::Dashed, BorderDashPattern::Dashed),
+      (w::BorderValues::DashSmallGap, BorderDashPattern::FineDashed),
+      (w::BorderValues::DotDash, BorderDashPattern::DashDot),
+      (w::BorderValues::DotDotDash, BorderDashPattern::DashDotDot),
+    ];
+    for (value, expected) in cases {
+      let border = border_style(value, Some(4), None, None, None).unwrap();
+      assert_eq!(border.dash_pattern, expected);
+    }
+
+    let fine = border_style(w::BorderValues::DashSmallGap, Some(4), None, None, None).unwrap();
+    assert_eq!(
+      crate::model::common_stroke_from_border(fine, 1.0).dash,
+      Some(vec![common::Pt(2.0), common::Pt(0.4)])
+    );
   }
 
   #[test]

@@ -9,7 +9,7 @@ use super::styles::{DefinedNamesCatalog, StylesCatalog};
 use super::workbook::WorkbookFragment;
 use super::workbook_catalog::WorkbookCatalog;
 use super::workbook_settings::WorkbookGlobals;
-use super::worksheet::CalcSheet;
+use super::worksheet::{CalcSheet, SpreadsheetProducerProfile};
 
 #[derive(Debug)]
 pub(crate) struct ExcelImport {
@@ -34,11 +34,10 @@ impl ExcelImport {
     let workbook = workbook_part.root_element(package)?.clone();
     let globals = WorkbookGlobals::from_workbook(&workbook);
     let workbook_catalog = WorkbookCatalog::from_workbook_part(package, &workbook_part)?;
-    let mso_document = is_mso_document(package);
+    let producer = spreadsheet_producer_profile(package);
 
     let mut fragment = WorkbookFragment::new(workbook_part, workbook.clone());
-    let mut sheets =
-      fragment.finalize_import(package, mso_document, options.ui_language.as_deref())?;
+    let mut sheets = fragment.finalize_import(package, producer, options.ui_language.as_deref())?;
     super::formula::recalculate_formula_cells(
       &mut sheets,
       &fragment.defined_names,
@@ -66,7 +65,7 @@ impl ExcelImport {
   }
 }
 
-fn is_mso_document(package: &mut SpreadsheetDocument) -> bool {
+fn spreadsheet_producer_profile(package: &mut SpreadsheetDocument) -> SpreadsheetProducerProfile {
   let extended_properties_part = {
     package
       .get_parts_of_type::<
@@ -74,8 +73,19 @@ fn is_mso_document(package: &mut SpreadsheetDocument) -> bool {
       >()
       .next()
   };
-  let application = extended_properties_part
+  let properties = extended_properties_part
     .and_then(|part| part.root_element(package).ok())
+    .cloned();
+  let application = properties
+    .as_ref()
     .and_then(|properties| properties.application.as_deref());
-  application.is_some_and(|value| value.contains("Microsoft"))
+  let excel_major_version = properties
+    .as_ref()
+    .and_then(|properties| properties.application_version.as_deref())
+    .and_then(|version| version.split('.').next())
+    .and_then(|major| major.parse::<u16>().ok());
+  SpreadsheetProducerProfile {
+    mso_document: application.is_some_and(|value| value.contains("Microsoft")),
+    excel_major_version,
+  }
 }

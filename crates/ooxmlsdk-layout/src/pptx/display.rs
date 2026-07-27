@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::ops::Range;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use crate::common::drawingml_geometry::{
   group_child_affine, transform_commands, transform_point, transform_rect_bounds, transform_vector,
@@ -76,6 +76,11 @@ const DEFAULT_TEXT_FONT_SIZE_PT: f32 = 18.0;
 const MINIMUM_TEXT_FONT_SIZE_PT: f32 = 1.0;
 const DEFAULT_TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
 const DEFAULT_TABLE_BORDER_PT: f32 = 0.75;
+const MISSING_PICTURE_BORDER_WIDTH_PT: f32 = 0.14;
+const MISSING_PICTURE_BORDER_INSET_PT: f32 = 0.06;
+const MISSING_PICTURE_ICON_OFFSET_PT: f32 = 0.84;
+const MISSING_PICTURE_ICON_WIDTH_PT: f32 = 1.68;
+const MISSING_PICTURE_ICON_HEIGHT_PT: f32 = 1.92;
 // Microsoft Office fixed-output evidence:
 // - smartart-missing-bullet.pptx scales the synthesized 22.5 pt indent with
 //   the SmartArt font scale;
@@ -184,6 +189,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     text: Cow::Owned(item.text),
     origin: common_point(item.x_pt, item.y_pt),
     line_height: common::Pt(item.line_height_pt),
+    paint_clip: None,
     style: common_text_style(item.style),
     font_id: None,
     color,
@@ -226,6 +232,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
       .unwrap_or(Cow::Borrowed("application/octet-stream")),
     bytes: item.data,
     metafile_monochrome_dib_palette_override: item.metafile_monochrome_dib_palette_override,
+    metafile_background_color: item.metafile_background_color,
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
@@ -3052,6 +3059,7 @@ fn diagram_blip_placeholder_image_item(bounds: shared_diagram::DiagramBounds) ->
     data: transparent_png_1x1()?,
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
+    metafile_background_color: None,
     alt_text: None,
     hyperlink_url: None,
     floating: false,
@@ -4450,6 +4458,7 @@ fn lower_legacy_vml_fill_image(shape: &Shape, offset: DisplayOffset, items: &mut
       data: fill.resource.data.clone(),
       content_type: fill.resource.content_type.clone(),
       metafile_monochrome_dib_palette_override: fill.resource.monochrome_dib_palette_override,
+      metafile_background_color: None,
       alt_text: shape
         .description
         .clone()
@@ -4588,6 +4597,13 @@ fn lower_picture(
   if shape.size.cx <= 0 || shape.size.cy <= 0 {
     return;
   }
+  let unresolved_external_picture = picture.embed_relationship_id.is_none()
+    && picture.link_relationship_id.is_some()
+    && picture.image_resource.is_none();
+  if picture.empty_blip_fill || unresolved_external_picture {
+    lower_empty_blip_fill_placeholder(shape, offset, items);
+    return;
+  }
   let _embed_relationship_id = picture.embed_relationship_id.as_deref();
   let _link_relationship_id = picture.link_relationship_id.as_deref();
   let Some(resource) = picture.image_resource.as_ref() else {
@@ -4656,6 +4672,7 @@ fn lower_picture(
     data,
     content_type,
     metafile_monochrome_dib_palette_override: resource.monochrome_dib_palette_override,
+    metafile_background_color: None,
     alt_text: shape
       .description
       .clone()
@@ -4665,6 +4682,108 @@ fn lower_picture(
     floating: false,
     behind_text: false,
   }));
+}
+
+fn lower_empty_blip_fill_placeholder(
+  shape: &Shape,
+  offset: DisplayOffset,
+  items: &mut Vec<PageItem>,
+) {
+  let frame = TextFrame {
+    x_pt: offset.x_pt(shape.position.x),
+    y_pt: offset.y_pt(shape.position.y),
+    width_pt: offset.width_pt(shape.size.cx),
+    height_pt: offset.height_pt(shape.size.cy),
+  };
+  let inset = MISSING_PICTURE_BORDER_INSET_PT
+    .min(frame.width_pt / 2.0)
+    .min(frame.height_pt / 2.0);
+  let border_frame = TextFrame {
+    x_pt: frame.x_pt + inset,
+    y_pt: frame.y_pt + inset,
+    width_pt: (frame.width_pt - 2.0 * inset).max(0.0),
+    height_pt: (frame.height_pt - 2.0 * inset).max(0.0),
+  };
+  if border_frame.width_pt > 0.0 && border_frame.height_pt > 0.0 {
+    items.push(PageItem::Path(common::PathItem {
+      bounds: transformed_shape_bounds(border_frame, shape),
+      points: Vec::new(),
+      commands: shape_path_commands(shape, border_frame),
+      closed: true,
+      fill: common::Fill::None,
+      stroke: Some(common::Stroke {
+        width: common::Pt(MISSING_PICTURE_BORDER_WIDTH_PT),
+        color: common_rgb(RgbColor { r: 0, g: 0, b: 0 }, 1.0),
+        ..Default::default()
+      }),
+    }));
+  }
+
+  let mut icon_center_x =
+    frame.x_pt + MISSING_PICTURE_ICON_OFFSET_PT + MISSING_PICTURE_ICON_WIDTH_PT / 2.0;
+  let mut icon_center_y =
+    frame.y_pt + MISSING_PICTURE_ICON_OFFSET_PT + MISSING_PICTURE_ICON_HEIGHT_PT / 2.0;
+  let frame_center_x = frame.x_pt + frame.width_pt / 2.0;
+  let frame_center_y = frame.y_pt + frame.height_pt / 2.0;
+  if shape.flip_h {
+    icon_center_x = 2.0 * frame_center_x - icon_center_x;
+  }
+  if shape.flip_v {
+    icon_center_y = 2.0 * frame_center_y - icon_center_y;
+  }
+  let rotation_degrees = shape_visual_rotation_degrees(shape);
+  let rotation_radians = rotation_degrees.to_radians();
+  let cos = rotation_radians.cos();
+  let sin = rotation_radians.sin();
+  let relative_x = icon_center_x - frame_center_x;
+  let relative_y = icon_center_y - frame_center_y;
+  icon_center_x = frame_center_x + relative_x * cos - relative_y * sin;
+  icon_center_y = frame_center_y + relative_x * sin + relative_y * cos;
+
+  items.push(PageItem::Image(ImageItem {
+    x_pt: icon_center_x - MISSING_PICTURE_ICON_WIDTH_PT / 2.0,
+    y_pt: icon_center_y - MISSING_PICTURE_ICON_HEIGHT_PT / 2.0,
+    width_pt: MISSING_PICTURE_ICON_WIDTH_PT,
+    height_pt: MISSING_PICTURE_ICON_HEIGHT_PT,
+    crop: ImageCrop::default(),
+    clip_path: Vec::new(),
+    rotation_deg: rotation_degrees,
+    flip_horizontal: shape.flip_h,
+    flip_vertical: shape.flip_v,
+    data: missing_picture_icon_png(),
+    content_type: Some("image/png".to_string()),
+    metafile_monochrome_dib_palette_override: None,
+    metafile_background_color: None,
+    alt_text: shape
+      .description
+      .clone()
+      .or_else(|| shape.title.clone())
+      .or_else(|| shape.name.clone()),
+    hyperlink_url: shape.hyperlink_url.clone(),
+    floating: false,
+    behind_text: false,
+  }));
+}
+
+fn missing_picture_icon_png() -> Arc<[u8]> {
+  static PNG: OnceLock<Arc<[u8]>> = OnceLock::new();
+  PNG
+    .get_or_init(|| {
+      #[rustfmt::skip]
+      const RGB: [u8; 4 * 5 * 3] = [
+        128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+        128, 128, 128, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        128, 128, 128, 255, 255, 255, 255,   0,   0, 255, 255, 255,
+        128, 128, 128, 255, 204, 204, 255, 255, 255, 255, 255, 255,
+        128, 128, 128, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+      ];
+      let mut png = Cursor::new(Vec::new());
+      PngEncoder::new(&mut png)
+        .write_image(&RGB, 4, 5, ColorType::Rgb8.into())
+        .expect("encoding the fixed missing-picture icon cannot fail");
+      Arc::from(png.into_inner())
+    })
+    .clone()
 }
 
 fn lower_shape_hyperlink(shape: &Shape, offset: DisplayOffset, items: &mut Vec<PageItem>) {
@@ -6065,6 +6184,18 @@ fn finish_shape_effect_raster(
       raster_bounds,
       138.0 / 297.6,
     )
+  } else if context.scene3d.is_some() && context.shape3d.is_some() && !context.children_source {
+    // PowerPoint fixed output consistently stores static picture-3D surfaces
+    // at about 200 DPI (tdf170095, Scene3d_pureImage, and
+    // Scene3d_cropped_image). Retain the shared 250,000-pixel budget so large
+    // objects do not become more expensive; only the small-shape sampling cap
+    // differs from ordinary DrawingML image effects.
+    common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
+      &display_items,
+      raster_bounds,
+      &effects,
+      200.0 / 72.0,
+    )
   } else if context.children_source {
     common::drawingml_shape_raster::rasterize_group_items_for_effects(
       &display_items,
@@ -6184,6 +6315,7 @@ fn finish_shape_effect_raster(
     data: Arc::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
+    metafile_background_color: None,
     alt_text: None,
     hyperlink_url: None,
     floating: false,
@@ -7053,6 +7185,7 @@ fn blip_fill_image_items_from_resource(
     data,
     content_type,
     metafile_monochrome_dib_palette_override: None,
+    metafile_background_color: None,
     alt_text: placement.alt_text,
     hyperlink_url: placement.hyperlink_url,
     floating: false,
@@ -7106,6 +7239,7 @@ fn tiled_blip_fill_image_items(
       data: Arc::clone(&data),
       content_type: content_type.clone(),
       metafile_monochrome_dib_palette_override: None,
+      metafile_background_color: None,
       alt_text: placement.alt_text.clone(),
       hyperlink_url: placement.hyperlink_url.clone(),
       floating: false,
@@ -7757,7 +7891,12 @@ fn apply_text_camera_z_rotation(
   if rotation_deg.abs() <= f32::EPSILON {
     return;
   }
-  let Some((left, top, right, bottom)) = text_items_bounds(items, text_metrics) else {
+  // LibreOffice's SdrTest::test3DRotatedText and
+  // CustomshapesTest::testTdf126060_3D_Z_Rotation rotate scene3d text around
+  // the tight, laid-out text bounds rather than the owning shape or its line
+  // box. Use the same glyph bounds already consumed by character effects;
+  // TextItem::y_pt is the line-box top, not a baseline coordinate.
+  let Some((left, top, right, bottom)) = text_items_ink_bounds(items, text_metrics) else {
     return;
   };
   let center_x = (left + right) / 2.0;
@@ -7927,6 +8066,7 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
       data: Arc::from(png.into_inner()),
       content_type: Some("image/png".to_string()),
       metafile_monochrome_dib_palette_override: None,
+      metafile_background_color: None,
       alt_text: None,
       hyperlink_url: text.hyperlink_url.clone(),
       floating: false,
@@ -8091,7 +8231,7 @@ fn pptx_text_item_ink_bounds(
   bounds
 }
 
-fn text_items_bounds(
+fn text_items_ink_bounds(
   items: &[PageItem],
   text_metrics: &mut TextMetrics,
 ) -> Option<(f32, f32, f32, f32)> {
@@ -8100,11 +8240,9 @@ fn text_items_bounds(
     let PageItem::Text(text) = item else {
       continue;
     };
-    let width_pt = text_metrics.measure_text(&text.text, &text.style);
-    let left = text.x_pt;
-    let top = text.y_pt - text.line_height_pt;
-    let right = text.x_pt + width_pt;
-    let bottom = text.y_pt;
+    let Some((left, top, right, bottom)) = pptx_text_item_ink_bounds(text, text_metrics) else {
+      continue;
+    };
     bounds = Some(match bounds {
       Some((old_left, old_top, old_right, old_bottom)) => (
         old_left.min(left),
@@ -8998,6 +9136,7 @@ fn lower_paragraph(
         }
         apply_character_bullet_size(&mut bullet_style, bullet.size);
         let bullet_line_height = paragraph_style.line_height(&bullet_style, context.options);
+        let bullet_text_height = text_metrics.vertical_metrics(&bullet_style).ink_height_pt();
         // The bullet is positioned relative to the paragraph baseline, but
         // its buSzPct/buSzPts size does not participate in the line's text
         // height. PowerPoint keeps the line spacing based on the paragraph
@@ -9008,14 +9147,21 @@ fn lower_paragraph(
         let bullet_baseline_offset =
           raw_baseline_offset(&bullet_style, bullet_line_height, text_metrics);
         let bullet_y_pt = cursor.y_pt + text_baseline_offset - bullet_baseline_offset;
-        if let Some(graphic) = bullet_graphic_item(
+        if let Some(mut graphic) = bullet_graphic_item(
           &bullet,
           context.image_resources,
           run_x + paragraph_style.indent_pt,
           bullet_y_pt,
-          &bullet_style,
+          bullet_line_height,
+          bullet_text_height,
           context.shape_hyperlink_url,
         ) {
+          graphic.x_pt = picture_bullet_x_pt(
+            graphic.x_pt,
+            graphic.width_pt,
+            text_line.width_pt,
+            alignment,
+          );
           items.push(PageItem::Image(graphic));
         } else {
           push_text_item(
@@ -9041,27 +9187,29 @@ fn lower_paragraph(
         let baseline_offset = common_baseline_offset
           .unwrap_or_else(|| paragraph_style.baseline_offset(style, run_line_height, text_metrics));
         let run_y_pt = cursor.y_pt + baseline_offset - raw_baseline_offset;
-        if line_run.run.kind == TextRunKind::Math {
+        if !line_run.text.is_empty() && line_run.run.kind == TextRunKind::Math {
           push_math_ole_preview_item(items, run_x, run_y_pt, line_run.width_pt, run_line_height);
         }
-        let hyperlink_url = line_run
-          .run
-          .hyperlink_url
-          .clone()
-          .or_else(|| context.shape_hyperlink_url.map(ToString::to_string));
-        push_symbol_split_text_items(
-          items,
-          TextItemPlacement {
-            x_pt: run_x,
-            y_pt: run_y_pt,
-            line_height_pt: run_line_height,
-            rotation_center_pt: context.options.rotation_center_pt,
-          },
-          &line_run.text,
-          style,
-          hyperlink_url,
-          text_metrics,
-        );
+        if !line_run.text.is_empty() {
+          let hyperlink_url = line_run
+            .run
+            .hyperlink_url
+            .clone()
+            .or_else(|| context.shape_hyperlink_url.map(ToString::to_string));
+          push_symbol_split_text_items(
+            items,
+            TextItemPlacement {
+              x_pt: run_x,
+              y_pt: run_y_pt,
+              line_height_pt: run_line_height,
+              rotation_center_pt: context.options.rotation_center_pt,
+            },
+            &line_run.text,
+            style,
+            hyperlink_url,
+            text_metrics,
+          );
+        }
         run_x += line_run.width_pt;
       }
 
@@ -9354,7 +9502,16 @@ fn text_wrap_tokens(text: &str) -> Vec<&str> {
 }
 
 fn trim_text_line_end(line: &mut TextLine<'_>, text_metrics: &mut TextMetrics) {
-  while let Some(run) = line.runs.last_mut() {
+  // PowerPoint discards trailing-space advance but keeps the authored run
+  // formatting in the line metrics. That distinction is visible when a
+  // picture bullet is followed only by a formatted space: fdo90607's 32 pt
+  // runs produce 38.4 pt line spacing in Office fixed output. Retaining the
+  // now-empty run also lets mixed-size trailing spaces select the line height
+  // without emitting a PDF text item.
+  let mut run_index = line.runs.len();
+  while run_index > 0 {
+    run_index -= 1;
+    let run = &mut line.runs[run_index];
     let trimmed_len = run.text.trim_end().len();
     if trimmed_len == run.text.len() {
       break;
@@ -9367,7 +9524,6 @@ fn trim_text_line_end(line: &mut TextLine<'_>, text_metrics: &mut TextMetrics) {
     if !run.text.is_empty() {
       break;
     }
-    line.runs.pop();
   }
 }
 
@@ -9452,6 +9608,7 @@ fn push_text_item(
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
+    paint_clip: None,
     text,
     style,
     rotation_center_pt: placement.rotation_center_pt,
@@ -9568,7 +9725,8 @@ fn bullet_graphic_item(
   image_resources: Option<&HashMap<String, ImageResource>>,
   x_pt: f32,
   y_pt: f32,
-  style: &TextStyle,
+  line_height_pt: f32,
+  natural_text_height_pt: f32,
   shape_hyperlink_url: Option<&str>,
 ) -> Option<ImageItem> {
   let relationship_id = bullet.picture_relationship_id.as_deref()?;
@@ -9579,7 +9737,13 @@ fn bullet_graphic_item(
     sdk_units::mm100_to_points100(i64::from(bullet.graphic_height_100mm?)) as f32 / 100.0;
   Some(ImageItem {
     x_pt,
-    y_pt: y_pt + (line_height(style, 1.0) - height_pt) / 2.0,
+    // LibreOffice exposes PowerPoint's two-height rule in
+    // Outliner::ImpCalcBulletArea: GetHeight() is the resolved paragraph line
+    // height while GetTxtHeight() retains the physical font height. Preserve
+    // that distinction with the resolved paragraph advance and the selected
+    // face's ascent/descent; a proportional line spacing such as
+    // tdf114913's inherited 90% changes only the former.
+    y_pt: picture_bullet_y_pt(y_pt, line_height_pt, natural_text_height_pt, height_pt),
     width_pt,
     height_pt,
     crop: ImageCrop::default(),
@@ -9590,11 +9754,40 @@ fn bullet_graphic_item(
     data: resource.data.clone(),
     content_type: resource.content_type.clone(),
     metafile_monochrome_dib_palette_override: resource.monochrome_dib_palette_override,
+    metafile_background_color: None,
     alt_text: None,
     hyperlink_url: shape_hyperlink_url.map(ToString::to_string),
     floating: false,
     behind_text: false,
   })
+}
+
+fn picture_bullet_y_pt(
+  line_box_top_pt: f32,
+  line_height_pt: f32,
+  natural_text_height_pt: f32,
+  image_height_pt: f32,
+) -> f32 {
+  line_box_top_pt + line_height_pt - (natural_text_height_pt + image_height_pt) / 2.0
+}
+
+fn picture_bullet_x_pt(
+  bullet_x_pt: f32,
+  image_width_pt: f32,
+  visible_line_width_pt: f32,
+  alignment: a::TextAlignmentTypeValues,
+) -> f32 {
+  // When a centered paragraph contains only non-printing text, the picture
+  // bullet is the line's sole visible content. PowerPoint therefore centers
+  // the image itself instead of placing its left edge at the centered text
+  // origin. The Office PDF for fdo90607 exposes this directly: the picture
+  // transform is centered on the slide while each authored 32 pt space has no
+  // printed advance.
+  if alignment == a::TextAlignmentTypeValues::Center && visible_line_width_pt <= f32::EPSILON {
+    bullet_x_pt - image_width_pt / 2.0
+  } else {
+    bullet_x_pt
+  }
 }
 
 fn line_height(style: &TextStyle, line_scale: f32) -> f32 {
@@ -9740,6 +9933,7 @@ fn push_math_ole_preview_item(
     data,
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
+    metafile_background_color: None,
     alt_text: None,
     hyperlink_url: None,
     floating: false,
@@ -11904,6 +12098,7 @@ fn line_stroke(
       spacing_pt: 0.0,
       color: paint.color,
       compound: false,
+      dash_pattern: crate::model::BorderDashPattern::Solid,
       shadow: false,
     },
     opacity: paint.opacity,
@@ -12064,6 +12259,55 @@ mod tests {
   fn character_bullet_uses_one_unicode_code_point() {
     assert_eq!(character_bullet_label("••").as_deref(), Some("•"));
     assert_eq!(character_bullet_label(""), None);
+  }
+
+  #[test]
+  fn picture_bullet_uses_resolved_and_natural_line_heights() {
+    assert!((picture_bullet_y_pt(10.0, 38.4, 38.4, 20.0) - 19.2).abs() < 0.001);
+    assert!((picture_bullet_y_pt(10.0, 30.24, 33.6, 20.0) - 13.44).abs() < 0.001);
+  }
+
+  #[test]
+  fn picture_bullet_is_the_centered_content_of_an_empty_visible_line() {
+    assert_eq!(
+      picture_bullet_x_pt(100.0, 20.0, 0.0, a::TextAlignmentTypeValues::Center),
+      90.0
+    );
+    assert_eq!(
+      picture_bullet_x_pt(100.0, 20.0, 30.0, a::TextAlignmentTypeValues::Center),
+      100.0
+    );
+  }
+
+  #[test]
+  fn trailing_space_keeps_its_style_for_line_height() {
+    let source_run = TextRun {
+      text: " ".to_string(),
+      kind: TextRunKind::Run,
+      hyperlink_url: None,
+      field_type: None,
+      run_properties: None,
+      field_paragraph_properties: None,
+    };
+    let mut line = TextLine {
+      width_pt: 8.0,
+      runs: vec![TextLineRun {
+        run: &source_run,
+        text: " ".to_string(),
+        width_pt: 8.0,
+        style: TextStyle {
+          font_size_pt: 32.0,
+          ..TextStyle::default()
+        },
+      }],
+    };
+
+    trim_text_line_end(&mut line, &mut TextMetrics::new());
+
+    assert!(line.width_pt.abs() < f32::EPSILON);
+    assert_eq!(line.runs.len(), 1);
+    assert!(line.runs[0].text.is_empty());
+    assert_eq!(line.runs[0].style.font_size_pt, 32.0);
   }
 
   #[test]
@@ -12410,5 +12654,16 @@ mod tests {
     assert_eq!(transform.dx.0, 0.0);
     assert_eq!(transform.dy.0, -1.0);
     assert!(!mirror_tile);
+  }
+
+  #[test]
+  fn missing_picture_icon_matches_office_fixed_output_pixels() {
+    let image = image::load_from_memory(&missing_picture_icon_png()).unwrap();
+    assert_eq!(image.dimensions(), (4, 5));
+    let rgb = image.to_rgb8();
+    assert_eq!(rgb.get_pixel(0, 0).0, [128, 128, 128]);
+    assert_eq!(rgb.get_pixel(2, 2).0, [255, 0, 0]);
+    assert_eq!(rgb.get_pixel(1, 3).0, [255, 204, 204]);
+    assert_eq!(rgb.get_pixel(3, 4).0, [255, 255, 255]);
   }
 }

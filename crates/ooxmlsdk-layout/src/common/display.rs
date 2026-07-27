@@ -123,6 +123,10 @@ pub struct TextRun<'doc> {
   pub text: Cow<'doc, str>,
   pub origin: Point,
   pub line_height: Pt,
+  /// Optional page-space paint clip. Text remains present in the PDF content
+  /// stream and semantic layer while glyph ink outside this rectangle is
+  /// suppressed.
+  pub paint_clip: Option<Rect>,
   pub style: TextStyle<'doc>,
   pub font_id: Option<FontId>,
   pub color: Color,
@@ -168,6 +172,8 @@ pub struct ImageItem<'doc> {
   /// Optional caller-specific realization colors for a one-bit WMF DIB
   /// pattern. Ordinary metafiles retain their embedded palettes.
   pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
+  /// Solid fill painted by the host shape behind an EMF/WMF preview.
+  pub metafile_background_color: Option<[u8; 3]>,
   pub relationship_id: Option<Cow<'doc, str>>,
   pub alt_text: Option<Cow<'doc, str>>,
   pub hyperlink_url: Option<Cow<'doc, str>>,

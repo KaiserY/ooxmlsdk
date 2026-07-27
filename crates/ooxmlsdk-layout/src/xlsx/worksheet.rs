@@ -31,6 +31,10 @@ const XLSX_MAX_COLUMN: u32 = 16_384;
 // Microsoft 365 fixed-output geometry for the implicit Calibri 11/x14ac
 // application profile: nine default columns occupy 470.76pt.
 const OFFICE_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT: f32 = 52.306_667;
+// Legacy Calibri 11 theme fixed output uses a 50.05pt implicit column. The
+// repeated icon grid in complex_icon_set and POI's NewStyleConditional-
+// Formattings independently expose the same boundary sequence.
+const OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT: f32 = 50.05;
 // Fixed-format printer leading measured after the 96dpi pixel and dyDescent
 // terms for the Calibri 11 automatic-row profile.
 const OFFICE_AUTOMATIC_ROW_PRINTER_LEADING_PT: f32 = 0.018;
@@ -52,6 +56,12 @@ pub(crate) struct CalcSheet {
   geometry: SheetGeometry,
   cell_positions: HashMap<CellAddress, (usize, usize)>,
   row_positions: Box<[(u32, usize)]>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct SpreadsheetProducerProfile {
+  pub(crate) mso_document: bool,
+  pub(crate) excel_major_version: Option<u16>,
 }
 
 #[derive(Clone, Debug)]
@@ -124,6 +134,8 @@ pub(crate) struct SheetMetrics {
   pub(crate) digit_width_pt: f32,
   pub(crate) default_digit_width_pt: f32,
   indexed_multicomponent_print_grid: bool,
+  modern_excel_implicit_columns: bool,
+  legacy_calibri_implicit_columns: bool,
   pub(crate) columns: Vec<ColumnModel>,
   pub(crate) merged_ranges: Vec<String>,
   pub(crate) hyperlinks: Vec<HyperlinkModel>,
@@ -246,13 +258,13 @@ impl CalcSheet {
     resources: SheetResourceCatalog,
     shared_strings: &[SharedStringModel],
     styles: &StylesCatalog,
-    mso_document: bool,
+    producer: SpreadsheetProducerProfile,
   ) -> Self {
     let page_settings = CalcPageSettings::from_worksheet(&worksheet);
-    let mut metrics = SheetMetrics::from_worksheet(&worksheet, styles, mso_document);
+    let mut metrics = SheetMetrics::from_worksheet(&worksheet, styles, producer);
     metrics.indexed_multicomponent_print_grid =
       resources_have_indexed_multicomponent_scatter(&resources);
-    let rows = worksheet_rows(&worksheet, shared_strings, mso_document);
+    let rows = worksheet_rows(&worksheet, shared_strings, producer.mso_document);
     let geometry = SheetGeometry::new(&metrics, &rows);
     let cell_positions = cell_positions(&rows);
     let row_positions = row_positions(&rows);
@@ -498,6 +510,10 @@ impl CalcSheet {
     self.geometry.row_height_pt(row_index)
   }
 
+  pub(crate) fn default_row_height_pt(&self) -> f32 {
+    self.geometry.default_row_height_pt
+  }
+
   pub(crate) fn cell_at(&self, address: CellAddress) -> Option<&CalcCell> {
     let &(row, cell) = self.cell_positions.get(&address)?;
     self.rows.get(row)?.cells.get(cell)
@@ -554,20 +570,27 @@ impl CalcSheet {
 
 impl SheetGeometry {
   fn new(metrics: &SheetMetrics, rows: &[CalcRow]) -> Self {
-    let default_column_width_pt = if metrics.indexed_multicomponent_print_grid
+    let default_column_width_pt = if (metrics.indexed_multicomponent_print_grid
+      || metrics.modern_excel_implicit_columns)
       && metrics.format.mso_document
       && metrics.format.default_column_width.is_none()
       && metrics.format.base_column_width.is_none()
-      && metrics.format.dy_descent_pt.is_some()
     {
       // ECMA-376 §18.3.1.13 and MS-OI29500 §2.1.116 define the implicit
       // width through the Normal font's maximum digit width plus five device
       // pixels. Excel fixed output keeps that application metric independent
       // of the installed Calibri-compatible fallback: nine default columns in
-      // the modern Calibri 11/x14ac profile occupy 470.76pt (52.306667pt
-      // each). Explicit base/default widths and explicit document fonts retain
-      // the established font-dependent conversion below.
+      // the Excel 16 Calibri 11 profile occupy 470.76pt (52.306667pt each).
+      // AppVersion 14/15 retains the 50.05pt legacy profile below.
+      // Explicit base/default widths and explicit document fonts retain the
+      // established font-dependent conversion.
       OFFICE_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT
+    } else if metrics.legacy_calibri_implicit_columns
+      && metrics.format.mso_document
+      && metrics.format.default_column_width.is_none()
+      && metrics.format.base_column_width.is_none()
+    {
+      OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT
     } else if metrics
       .columns
       .iter()
@@ -894,16 +917,31 @@ impl CellRange {
 }
 
 impl SheetMetrics {
-  fn from_worksheet(worksheet: &x::Worksheet, styles: &StylesCatalog, mso_document: bool) -> Self {
+  fn from_worksheet(
+    worksheet: &x::Worksheet,
+    styles: &StylesCatalog,
+    producer: SpreadsheetProducerProfile,
+  ) -> Self {
+    let mso_document = producer.mso_document;
     // WorksheetFragment imports dimensions, sheetFormatPr, cols,
     // mergeCells, hyperlinks, rowBreaks, and colBreaks before page layout.
-    let digit_width_pt = styles
+    let raw_digit_width_pt = styles
       .document_font_text_style_for_column_width()
       .as_ref()
       .map(measured_digit_width_pt)
       // UnitConverter starts with 1 digit = 2mm. finalizeImport() only
       // replaces it when StylesBuffer::getDefaultFont() finds an XF/font.
       .unwrap_or_else(|| units::millimeters_to_points(CALC_DIGIT_WIDTH_MM));
+    // LO finalizes Unit::Digit from the active output-device XFont. Excel
+    // fixed output likewise quantizes the maximum digit width before applying
+    // the serialized character count. For Aptos Narrow 12 this is 6.36pt on
+    // the 600dpi grid; quantizing only the final column width loses about
+    // 0.4pt for defaultColWidth=11.
+    let digit_width_pt = if mso_document {
+      units::quantize_points_to_office_print_grid(raw_digit_width_pt)
+    } else {
+      raw_digit_width_pt
+    };
     let default_digit_width_pt = if styles.uses_application_default_minor_theme() {
       quantize_digit_width_to_screen_pixel(measured_digit_width_pt(
         &styles.default_font_text_style(),
@@ -941,6 +979,13 @@ impl SheetMetrics {
       digit_width_pt,
       default_digit_width_pt,
       indexed_multicomponent_print_grid: false,
+      modern_excel_implicit_columns: mso_document
+        && producer
+          .excel_major_version
+          .is_some_and(|version| version >= 16)
+        && styles.normal_style_uses_calibri_11_minor_theme(),
+      legacy_calibri_implicit_columns: mso_document
+        && styles.normal_style_uses_calibri_11_minor_theme(),
       columns: worksheet
         .columns
         .iter()
@@ -1295,16 +1340,20 @@ fn automatic_default_row_height_pt(styles: &StylesCatalog, dy_descent_pt: Option
   let natural_height = text_metrics.vertical_metrics(&style).line_height_pt();
   if let Some(dy_descent_pt) = dy_descent_pt.filter(|value| value.is_finite() && *value >= 0.0) {
     // x14ac:dyDescent carries the font-dependent descent that Excel adds to
-    // an automatic row. The remaining leading is one 96dpi worksheet pixel;
-    // unlike a serialized manual height, this device result is not rounded
-    // back to the 0.75pt storage grid.
+    // an automatic row. The remaining leading is one 96dpi worksheet pixel.
+    // The computed height is not rounded back to the 0.75pt storage grid, but
+    // Excel fixed output does truncate it to the 600dpi printer-device grid:
+    // the Aptos Narrow 12 / dyDescent=0.25 fixture is emitted as 13.44pt.
     // The fixed-format printer device contributes a small fractional leading
     // after the screen-pixel and dyDescent terms. Calibri 11 with
     // dyDescent=0.25 resolves to Office's observed 12.48pt automatic row.
-    return natural_height
+    let printer_height = natural_height
       + screen_pixel_width_pt()
       + dy_descent_pt
       + OFFICE_AUTOMATIC_ROW_PRINTER_LEADING_PT;
+    return (printer_height * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH).floor()
+      * units::POINTS_PER_INCH
+      / units::OFFICE_FIXED_OUTPUT_DPI;
   }
   let padded_height = natural_height + 2.0 * screen_pixel_width_pt();
   // MSO row measurements are truncated to the device grid; LO mirrors this
@@ -1527,6 +1576,26 @@ mod tests {
     };
 
     assert_eq!(format.default_column_width_points(6.0), 54.35);
+  }
+
+  #[test]
+  fn excel_16_implicit_columns_use_the_modern_application_profile_without_x14ac() {
+    let mut legacy = SheetMetrics::default();
+    legacy.format.mso_document = true;
+    legacy.legacy_calibri_implicit_columns = true;
+    let legacy_geometry = SheetGeometry::new(&legacy, &[]);
+    assert_eq!(
+      legacy_geometry.column_width_pt(1),
+      OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT
+    );
+
+    let mut modern = legacy;
+    modern.modern_excel_implicit_columns = true;
+    let modern_geometry = SheetGeometry::new(&modern, &[]);
+    assert_eq!(
+      modern_geometry.column_width_pt(1),
+      OFFICE_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT
+    );
   }
 
   #[test]

@@ -485,26 +485,101 @@ impl ResolvedColor {
 }
 
 pub(crate) fn apply_excel_tint(mut color: ResolvedColor, tint: f64) -> ResolvedColor {
-  // oox/source/drawingml/color.cxx Color::addExcelTintTransformation().
-  // SpreadsheetML tint is an HSL luminance transform, not an sRGB blend.
-  let value = (tint.abs() * f64::from(COLOR_PERCENT_MAX))
-    .round()
-    .clamp(0.0, f64::from(COLOR_PERCENT_MAX)) as i32;
-  if tint > 0.0 {
-    apply_hsl_transform(
-      &mut color,
-      ColorTransformationKind::LumMod,
-      COLOR_PERCENT_MAX - value,
-    );
-    apply_hsl_transform(&mut color, ColorTransformationKind::LumOff, value);
-  } else if tint < 0.0 {
-    apply_hsl_transform(
-      &mut color,
-      ColorTransformationKind::LumMod,
-      COLOR_PERCENT_MAX - value,
-    );
+  if tint == 0.0 {
+    return color;
   }
+
+  // ECMA-376 Part 1, 18.3.1.15 defines SpreadsheetML tint in HLS
+  // luminance. Office output follows the integral RGB/HLS conversion from
+  // Microsoft KB Q29240 with the legacy 0..240 HLS range. That integer
+  // boundary is observable in Office PDFs and differs by a few channels from
+  // DrawingML's 0..100000 transformations and a floating-point HSL round trip.
+  let (hue, mut luminance, saturation) = excel_rgb_to_hls(color);
+  let tint = tint.clamp(-1.0, 1.0);
+  if tint < 0.0 {
+    luminance = (f64::from(luminance) * (1.0 + tint)).floor() as i32;
+  } else {
+    luminance = (f64::from(luminance) * (1.0 - tint) + f64::from(EXCEL_HLS_MAX)
+      - f64::from(EXCEL_HLS_MAX) * (1.0 - tint))
+      .floor() as i32;
+  }
+  let resolved = excel_hls_to_rgb(hue, luminance.clamp(0, EXCEL_HLS_MAX), saturation);
+  set_rgb_preserve_alpha(&mut color, resolved);
   color
+}
+
+const EXCEL_HLS_MAX: i32 = 240;
+const EXCEL_RGB_MAX: i32 = 255;
+
+fn excel_rgb_to_hls(color: ResolvedColor) -> (i32, i32, i32) {
+  let red = i32::from(color.r);
+  let green = i32::from(color.g);
+  let blue = i32::from(color.b);
+  let maximum = red.max(green).max(blue);
+  let minimum = red.min(green).min(blue);
+  let luminance = ((maximum + minimum) * EXCEL_HLS_MAX + EXCEL_RGB_MAX) / (2 * EXCEL_RGB_MAX);
+  if maximum == minimum {
+    return (EXCEL_HLS_MAX * 2 / 3, luminance, 0);
+  }
+
+  let spread = maximum - minimum;
+  let saturation = if luminance <= EXCEL_HLS_MAX / 2 {
+    (spread * EXCEL_HLS_MAX + (maximum + minimum) / 2) / (maximum + minimum)
+  } else {
+    (spread * EXCEL_HLS_MAX + (2 * EXCEL_RGB_MAX - maximum - minimum) / 2)
+      / (2 * EXCEL_RGB_MAX - maximum - minimum)
+  };
+  let hue_sector = EXCEL_HLS_MAX / 6;
+  let red_delta = ((maximum - red) * hue_sector + spread / 2) / spread;
+  let green_delta = ((maximum - green) * hue_sector + spread / 2) / spread;
+  let blue_delta = ((maximum - blue) * hue_sector + spread / 2) / spread;
+  let hue = if red == maximum {
+    blue_delta - green_delta
+  } else if green == maximum {
+    EXCEL_HLS_MAX / 3 + red_delta - blue_delta
+  } else {
+    EXCEL_HLS_MAX * 2 / 3 + green_delta - red_delta
+  }
+  .rem_euclid(EXCEL_HLS_MAX);
+  (hue, luminance, saturation)
+}
+
+fn excel_hls_to_rgb(hue: i32, luminance: i32, saturation: i32) -> ResolvedColor {
+  if saturation == 0 {
+    let channel = (luminance * EXCEL_RGB_MAX / EXCEL_HLS_MAX) as u8;
+    return ResolvedColor::new(channel, channel, channel);
+  }
+
+  let magic_2 = if luminance <= EXCEL_HLS_MAX / 2 {
+    (luminance * (EXCEL_HLS_MAX + saturation) + EXCEL_HLS_MAX / 2) / EXCEL_HLS_MAX
+  } else {
+    luminance + saturation - (luminance * saturation + EXCEL_HLS_MAX / 2) / EXCEL_HLS_MAX
+  };
+  let magic_1 = 2 * luminance - magic_2;
+  let channel = |channel_hue| {
+    ((excel_hue_to_rgb(magic_1, magic_2, channel_hue) * EXCEL_RGB_MAX + EXCEL_HLS_MAX / 2)
+      / EXCEL_HLS_MAX) as u8
+  };
+  ResolvedColor::new(
+    channel(hue + EXCEL_HLS_MAX / 3),
+    channel(hue),
+    channel(hue - EXCEL_HLS_MAX / 3),
+  )
+}
+
+fn excel_hue_to_rgb(magic_1: i32, magic_2: i32, hue: i32) -> i32 {
+  let hue = hue.rem_euclid(EXCEL_HLS_MAX);
+  if hue < EXCEL_HLS_MAX / 6 {
+    magic_1 + ((magic_2 - magic_1) * hue + EXCEL_HLS_MAX / 12) / (EXCEL_HLS_MAX / 6)
+  } else if hue < EXCEL_HLS_MAX / 2 {
+    magic_2
+  } else if hue < EXCEL_HLS_MAX * 2 / 3 {
+    magic_1
+      + ((magic_2 - magic_1) * (EXCEL_HLS_MAX * 2 / 3 - hue) + EXCEL_HLS_MAX / 12)
+        / (EXCEL_HLS_MAX / 6)
+  } else {
+    magic_1
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1107,5 +1182,18 @@ mod tests {
     let mut color = ResolvedColor::new(0, 0, 0);
     apply_tint(&mut color, 75_000);
     assert_eq!(color, ResolvedColor::new(0x89, 0x89, 0x89));
+  }
+
+  #[test]
+  fn excel_tint_keeps_luminance_transformations_in_hsl_space() {
+    let color = ResolvedColor::from_hex("1CC5D5").expect("valid theme color");
+    assert_eq!(
+      apply_excel_tint(color, -0.499984740745262),
+      ResolvedColor::from_hex("0E6369").expect("valid Office result")
+    );
+    assert_eq!(
+      apply_excel_tint(color, -0.24994659260841701),
+      ResolvedColor::from_hex("15939D").expect("valid Office result")
+    );
   }
 }

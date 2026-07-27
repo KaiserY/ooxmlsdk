@@ -17,7 +17,42 @@ pub struct BorderStyle {
   pub spacing_pt: f32,
   pub color: RgbColor,
   pub compound: bool,
+  pub dash_pattern: BorderDashPattern,
   pub shadow: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BorderDashPattern {
+  #[default]
+  Solid,
+  Dotted,
+  Dashed,
+  FineDashed,
+  DashDot,
+  DashDotDot,
+}
+
+impl BorderDashPattern {
+  pub(crate) fn common_dash(self, width_pt: f32) -> Option<Vec<common::Pt>> {
+    let multipliers: &[f32] = match self {
+      Self::Solid => return None,
+      Self::Dotted => &[1.0, 1.0],
+      Self::Dashed => &[3.0, 1.0],
+      // Word's fixed-format writer emits a 0.5 pt dashSmallGap border as a
+      // repeating six-pixel mask spanning 2.4 pt: five opaque pixels followed
+      // by one transparent pixel. That is a four-width dash and a 0.8-width
+      // gap. The other patterns match the width-relative GDI+ DashStyle arrays.
+      Self::FineDashed => &[4.0, 0.8],
+      Self::DashDot => &[3.0, 1.0, 1.0, 1.0],
+      Self::DashDotDot => &[3.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    };
+    Some(
+      multipliers
+        .iter()
+        .map(|multiplier| common::Pt(multiplier * width_pt))
+        .collect(),
+    )
+  }
 }
 
 impl Default for BorderStyle {
@@ -27,6 +62,7 @@ impl Default for BorderStyle {
       spacing_pt: 0.0,
       color: RgbColor { r: 0, g: 0, b: 0 },
       compound: false,
+      dash_pattern: BorderDashPattern::Solid,
       shadow: false,
     }
   }
@@ -281,6 +317,7 @@ pub(crate) struct TextItem {
   pub x_pt: f32,
   pub y_pt: f32,
   pub line_height_pt: f32,
+  pub paint_clip: Option<common::Rect>,
   pub text: String,
   pub style: TextStyle,
   pub rotation_center_pt: Option<(f32, f32)>,
@@ -312,6 +349,7 @@ pub(crate) struct ImageItem {
   pub data: Arc<[u8]>,
   pub content_type: Option<String>,
   pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
+  pub metafile_background_color: Option<[u8; 3]>,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
   pub floating: bool,
@@ -458,7 +496,7 @@ pub(crate) fn common_stroke_from_border(
   common::Stroke {
     width: common::Pt(style.width_pt),
     color: common_rgb(style.color, opacity),
-    dash: None,
+    dash: style.dash_pattern.common_dash(style.width_pt),
     source_style_id: None,
     ..Default::default()
   }

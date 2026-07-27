@@ -158,27 +158,13 @@ fn decode_image(
       }
       "image/jpeg" => Image::from_jpeg(raster.data.into(), true).map_err(PdfError::Krilla),
       "image/png" => {
-        if let Some(quality) = export_options
-          .jpeg_quality
-          .filter(|_| !export_options.use_lossless_compression)
-        {
-          let raster = image::load_from_memory_with_format(&raster.data, RasterImageFormat::Png)
-            .map_err(|err| {
-              PdfError::Krilla(format!(
-                "failed to decode EMF/WMF PNG for JPEG export: {err}"
-              ))
-            })?;
-          let jpeg = encode_jpeg(raster, quality)?;
-          return Image::from_jpeg(jpeg.into(), true).map_err(PdfError::Krilla);
-        }
         let image = decode_png_relaxed(&raster.data)
           .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF PNG: {err}")))?;
-        // A generated metafile raster represents scalable GDI output, not
-        // authored pixel art. GDI+ paints image-backed pattern brushes
-        // through Cairo's filtered image path; preserve that downsampling
-        // behavior when the PDF consumer maps our high-DPI raster to the
-        // picture frame.
-        Image::from_custom(image, true).map_err(PdfError::Krilla)
+        // Office fixed output keeps generated metafile previews lossless and
+        // marks their image XObjects `/Interpolate false`. Do not apply the
+        // DOCX photographic-JPEG policy to a GDI replay; it would also discard
+        // a reconstructed soft mask.
+        Image::from_custom(image, false).map_err(PdfError::Krilla)
       }
       content_type => Err(PdfError::Krilla(format!(
         "unsupported EMF/WMF raster content type: {content_type}"

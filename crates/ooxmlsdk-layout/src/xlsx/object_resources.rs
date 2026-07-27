@@ -44,6 +44,9 @@ pub(crate) struct VmlShapeModel {
   pub(crate) id: Option<String>,
   pub(crate) shape_id: Option<String>,
   pub(crate) text: String,
+  pub(crate) text_style: VmlTextStyle,
+  pub(crate) text_horizontal_alignment: Option<String>,
+  pub(crate) text_vertical_alignment: Option<String>,
   pub(crate) style: Option<String>,
   pub(crate) object_type: Option<String>,
   pub(crate) image_relationship_id: Option<String>,
@@ -98,12 +101,24 @@ pub(crate) struct VmlShapeModel {
   pub(crate) end_angle: Option<String>,
   pub(crate) arc_size: Option<String>,
   pub(crate) anchor: Option<VmlClientAnchor>,
+  pub(crate) checked: Option<i64>,
   pub(crate) note_row: Option<u32>,
   pub(crate) note_column: Option<u32>,
   pub(crate) print_object: bool,
   pub(crate) allow_in_cell: bool,
   pub(crate) visible: bool,
   pub(crate) hidden: bool,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct VmlTextStyle {
+  pub(crate) font_family: Option<String>,
+  pub(crate) font_size_twips: Option<i32>,
+  pub(crate) color: Option<String>,
+  pub(crate) bold: bool,
+  pub(crate) italic: bool,
+  pub(crate) underline: bool,
+  pub(crate) strikethrough: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -156,6 +171,9 @@ impl Default for VmlShapeModel {
       id: None,
       shape_id: None,
       text: String::new(),
+      text_style: VmlTextStyle::default(),
+      text_horizontal_alignment: None,
+      text_vertical_alignment: None,
       style: None,
       object_type: None,
       image_relationship_id: None,
@@ -210,6 +228,7 @@ impl Default for VmlShapeModel {
       end_angle: None,
       arc_size: None,
       anchor: None,
+      checked: None,
       note_row: None,
       note_column: None,
       print_object: true,
@@ -1239,6 +1258,58 @@ fn collect_typed_vml_textbox(model: &mut VmlShapeModel, text_box: &vml::TextBox)
     return;
   };
   model.text.push_str(&xml_text_content(xml));
+  collect_first_vml_text_style(&mut model.text_style, xml);
+}
+
+fn collect_first_vml_text_style(style: &mut VmlTextStyle, xml: &[u8]) {
+  let mut reader = quick_xml::Reader::from_reader(xml);
+  reader.config_mut().trim_text(false);
+  let mut found_font = false;
+  let mut in_first_font = false;
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) => {
+        let local_name = event.local_name();
+        match local_name.as_ref() {
+          b"font" if !found_font => {
+            found_font = true;
+            in_first_font = true;
+            for attr in event.attributes().flatten() {
+              let value = String::from_utf8_lossy(attr.value.as_ref()).into_owned();
+              match xml_local_name(attr.key.as_ref()) {
+                b"face" => style.font_family = Some(value),
+                b"size" => style.font_size_twips = value.parse().ok(),
+                b"color" => style.color = Some(value),
+                _ => {}
+              }
+            }
+          }
+          b"b" if !found_font || in_first_font => style.bold = true,
+          b"i" if !found_font || in_first_font => style.italic = true,
+          b"u" if !found_font || in_first_font => style.underline = true,
+          b"s" if !found_font || in_first_font => style.strikethrough = true,
+          _ => {}
+        }
+      }
+      Ok(Event::Empty(event)) if !found_font && event.local_name().as_ref() == b"font" => {
+        found_font = true;
+        for attr in event.attributes().flatten() {
+          let value = String::from_utf8_lossy(attr.value.as_ref()).into_owned();
+          match xml_local_name(attr.key.as_ref()) {
+            b"face" => style.font_family = Some(value),
+            b"size" => style.font_size_twips = value.parse().ok(),
+            b"color" => style.color = Some(value),
+            _ => {}
+          }
+        }
+      }
+      Ok(Event::End(event)) if event.local_name().as_ref() == b"font" && in_first_font => {
+        in_first_font = false;
+      }
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
+    }
+  }
 }
 
 fn xml_text_content(xml: &[u8]) -> String {
@@ -1292,6 +1363,17 @@ fn collect_typed_vml_client_data(model: &mut VmlShapeModel, client_data: &xvml::
       }
       xvml::ClientDataChoice::Visible(value) => {
         model.visible = typed_vml_bool(*value, true);
+      }
+      xvml::ClientDataChoice::Checked(value) => {
+        // ECMA-376 Part 4 §19.4.2.11: 0 is unchecked, 1 checked, and 2
+        // mixed. Preserve the tri-state value instead of reducing it to bool.
+        model.checked = Some(*value);
+      }
+      xvml::ClientDataChoice::HorizontalTextAlignment(value) => {
+        model.text_horizontal_alignment = Some(value.to_string());
+      }
+      xvml::ClientDataChoice::VerticalTextAlignment(value) => {
+        model.text_vertical_alignment = Some(value.to_string());
       }
       xvml::ClientDataChoice::CommentRowTarget(value) => {
         model.note_row = u32::try_from(*value).ok();
@@ -1584,6 +1666,35 @@ mod tests {
     assert_eq!(shapes[2].text, "Nested");
     assert_eq!(shapes[2].id.as_deref(), Some("ToggleButton2"));
     assert_eq!(shapes[2].shape_id.as_deref(), Some("_x0000_s1028"));
+  }
+
+  #[test]
+  fn checkbox_preserves_first_vml_font_alignment_and_tristate() {
+    let shapes = vml_shapes(
+      br##"<xml xmlns:v="urn:schemas-microsoft-com:vml"
+          xmlns:x="urn:schemas-microsoft-com:office:excel">
+        <v:shape>
+          <v:textbox><div><font face="Segoe UI" size="160" color="#123456"><b>Caption</b></font></div></v:textbox>
+          <x:ClientData ObjectType="Checkbox">
+            <x:Anchor>1, 2, 3, 4, 5, 6, 7, 8</x:Anchor>
+            <x:TextHAlign>Right</x:TextHAlign>
+            <x:TextVAlign>Center</x:TextVAlign>
+            <x:Checked>2</x:Checked>
+          </x:ClientData>
+        </v:shape>
+      </xml>"##,
+    );
+
+    assert_eq!(shapes.len(), 1);
+    let shape = &shapes[0];
+    assert_eq!(shape.text, "Caption");
+    assert_eq!(shape.text_style.font_family.as_deref(), Some("Segoe UI"));
+    assert_eq!(shape.text_style.font_size_twips, Some(160));
+    assert_eq!(shape.text_style.color.as_deref(), Some("#123456"));
+    assert!(shape.text_style.bold);
+    assert_eq!(shape.text_horizontal_alignment.as_deref(), Some("Right"));
+    assert_eq!(shape.text_vertical_alignment.as_deref(), Some("Center"));
+    assert_eq!(shape.checked, Some(2));
   }
 
   #[test]

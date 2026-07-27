@@ -590,6 +590,7 @@ fn push_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String, style: Tex
     x_pt: x,
     y_pt: y,
     line_height_pt: style.font_size_pt * 1.2,
+    paint_clip: None,
     text,
     style,
     rotation_center_pt: None,

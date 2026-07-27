@@ -199,6 +199,7 @@ fn model3d_preview_picture(
     crop: ImageCrop::default(),
     blip_choices: blip.blip_choice.iter().map(model3d_blip_choice).collect(),
     image_resource,
+    empty_blip_fill: false,
   })
 }
 
@@ -246,12 +247,14 @@ fn picture_record(picture: &p::Picture, slide_persist: &SlidePersist) -> Option<
     .as_deref()
     .and_then(|relationship_id| slide_persist.image_resources.get(relationship_id))
     .cloned();
+  let empty_blip_fill = blip.embed.is_none() && blip.link.is_none() && image_resource.is_none();
   Some(PictureRecord {
     embed_relationship_id: blip.embed.clone(),
     link_relationship_id: blip.link.clone(),
     crop: image_crop_from_source_rectangle(blip_fill.source_rectangle.as_ref()),
     blip_choices: blip.blip_choice.clone(),
     image_resource,
+    empty_blip_fill,
   })
 }
 

@@ -62,6 +62,13 @@ pub(crate) struct CalcPrintCell<'a> {
   pub(crate) rich_text_runs: &'a [super::workbook::SharedStringRun],
   pub(crate) number_format_state: NumberFormatRenderState,
   pub(crate) formula: bool,
+  pub(crate) icon_set: Option<CalcPrintIconSet>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct CalcPrintIconSet {
+  pub(crate) icon: Option<(super::sheet_conditions::IconSetType, usize)>,
+  pub(crate) show_value: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1607,6 +1614,9 @@ fn print_cells_for_area<'a>(
         import.globals.settings.date_1904,
       );
       let rendered_text = pivot_display_text(sheet, print_address, rendered_text);
+      let icon_set = cell.display_text.parse::<f64>().ok().and_then(|value| {
+        conditional_icon_set(import, sheet, address, value, conditional_eval_cache)
+      });
       physical_cells.push(CalcPrintCell {
         address: print_address,
         text: Cow::Borrowed(cell.display_text.as_str()),
@@ -1616,6 +1626,7 @@ fn print_cells_for_area<'a>(
         rich_text_runs: &cell.rich_text_runs,
         number_format_state,
         formula: cell.formula.is_some(),
+        icon_set,
       });
     }
   };
@@ -1699,6 +1710,7 @@ fn pivot_virtual_print_cells<'a>(
           rich_text_runs: &[],
           number_format_state: NumberFormatRenderState::Raw,
           formula: false,
+          icon_set: None,
         });
       }
     }
@@ -1744,6 +1756,7 @@ fn table_virtual_print_cells<'a>(
           rich_text_runs: &[],
           number_format_state: NumberFormatRenderState::Raw,
           formula: false,
+          icon_set: None,
         });
       }
     }
@@ -1793,11 +1806,190 @@ fn conditional_number_format_code<'a>(
   None
 }
 
+fn conditional_icon_set(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  address: CellAddress,
+  value: f64,
+  cache: &mut ConditionalFormatEvalCache,
+) -> Option<CalcPrintIconSet> {
+  struct Rule<'a> {
+    priority: i32,
+    references: &'a [String],
+    icon_set: &'a super::sheet_conditions::IconSetModel,
+  }
+
+  let mut rules = Vec::new();
+  for format in &sheet
+    .metrics
+    .conditions
+    .extension_conditions
+    .conditional_formats
+  {
+    if !conditional_references_contain_cell(&format.sequence_of_references, address) {
+      continue;
+    }
+    rules.extend(format.rules.iter().filter_map(|rule| {
+      Some(Rule {
+        priority: rule.priority?,
+        references: &format.sequence_of_references,
+        icon_set: rule.icon_set.as_ref()?,
+      })
+    }));
+  }
+  for format in &sheet.metrics.conditions.conditional_formats {
+    if !conditional_format_contains_cell(format, address) {
+      continue;
+    }
+    rules.extend(format.rules.iter().filter_map(|rule| {
+      Some(Rule {
+        priority: rule.priority,
+        references: &format.sequence_of_references,
+        icon_set: rule.icon_set.as_ref()?,
+      })
+    }));
+  }
+  rules.sort_by_key(|rule| rule.priority);
+
+  rules.into_iter().find_map(|rule| {
+    evaluate_icon_set_rule(
+      import,
+      sheet,
+      rule.references,
+      rule.icon_set,
+      address,
+      value,
+      cache,
+    )
+  })
+}
+
+fn evaluate_icon_set_rule(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  references: &[String],
+  icon_set: &super::sheet_conditions::IconSetModel,
+  address: CellAddress,
+  value: f64,
+  cache: &mut ConditionalFormatEvalCache,
+) -> Option<CalcPrintIconSet> {
+  let count = icon_set.icon_set.icon_count();
+  if count == 0 || icon_set.thresholds.len() != count {
+    return None;
+  }
+  let range = conditional_reference_range(references, address)?;
+  let stats = cache.stats_for_range(sheet, range);
+  let minimum = *stats.sorted_values.first()?;
+  let maximum = *stats.sorted_values.last()?;
+  let base = conditional_format_base_address(references, address)?;
+  let thresholds = icon_set
+    .thresholds
+    .iter()
+    .map(|threshold| {
+      Some((
+        icon_set_threshold_value(
+          threshold,
+          IconSetThresholdContext {
+            import,
+            sheet,
+            base,
+            address,
+            minimum,
+            maximum,
+            sorted_values: &stats.sorted_values,
+          },
+        )?,
+        threshold.greater_than_or_equal,
+      ))
+    })
+    .collect::<Option<Vec<_>>>()?;
+  let selected = icon_set_selected_index(value, &thresholds, icon_set.reverse)?;
+  let icon = if let Some(custom) = icon_set.custom_icons.as_ref() {
+    custom.get(selected).copied().flatten().and_then(|icon| {
+      (icon.icon_index < icon.icon_set.icon_count()).then_some((icon.icon_set, icon.icon_index))
+    })
+  } else {
+    Some((icon_set.icon_set, selected))
+  };
+  Some(CalcPrintIconSet {
+    icon,
+    show_value: icon_set.show_value,
+  })
+}
+
+fn icon_set_selected_index(value: f64, thresholds: &[(f64, bool)], reverse: bool) -> Option<usize> {
+  let mut selected = thresholds
+    .iter()
+    .enumerate()
+    .filter(|(_, (threshold, greater_than_or_equal))| {
+      if *greater_than_or_equal {
+        value >= *threshold
+      } else {
+        value > *threshold
+      }
+    })
+    .map(|(index, _)| index)
+    .next_back()?;
+  if reverse {
+    selected = thresholds.len() - 1 - selected;
+  }
+  Some(selected)
+}
+
+struct IconSetThresholdContext<'a> {
+  import: &'a ExcelImport,
+  sheet: &'a CalcSheet,
+  base: CellAddress,
+  address: CellAddress,
+  minimum: f64,
+  maximum: f64,
+  sorted_values: &'a [f64],
+}
+
+fn icon_set_threshold_value(
+  threshold: &super::sheet_conditions::IconSetThresholdModel,
+  context: IconSetThresholdContext<'_>,
+) -> Option<f64> {
+  use super::sheet_conditions::IconSetThresholdType;
+
+  let numeric = || threshold.value.as_deref()?.parse::<f64>().ok();
+  match threshold.threshold_type {
+    IconSetThresholdType::Number => numeric(),
+    IconSetThresholdType::Percent => numeric()
+      .map(|percent| context.minimum + (context.maximum - context.minimum) * percent / 100.0),
+    IconSetThresholdType::Maximum | IconSetThresholdType::AutomaticMaximum => Some(context.maximum),
+    IconSetThresholdType::Minimum | IconSetThresholdType::AutomaticMinimum => Some(context.minimum),
+    IconSetThresholdType::Formula => {
+      let formula = threshold.value.as_deref()?;
+      super::formula::evaluate_relative_formula_as_number(
+        context.import,
+        context.sheet,
+        formula,
+        context.base,
+        context.address,
+      )
+    }
+    IconSetThresholdType::Percentile => {
+      let percentile = numeric()?.clamp(0.0, 100.0) / 100.0;
+      let mut values = context.sorted_values.to_vec();
+      ooxmlsdk_formula::calc::statistics::percentile_sorted(
+        &mut values,
+        percentile,
+        ooxmlsdk_formula::calc::statistics::PercentileKind::Inc,
+      )
+    }
+  }
+}
+
 fn conditional_format_contains_cell(
   format: &super::sheet_conditions::ConditionalFormatModel,
   address: CellAddress,
 ) -> bool {
-  format.sequence_of_references.iter().any(|references| {
+  conditional_references_contain_cell(&format.sequence_of_references, address)
+}
+
+fn conditional_references_contain_cell(references: &[String], address: CellAddress) -> bool {
+  references.iter().any(|references| {
     references
       .split_whitespace()
       .filter_map(CellRange::parse_a1_range)
@@ -3798,5 +3990,17 @@ mod tests {
       rendered_number_text("25396277490", Some("#,##0,,"), None, false).0,
       "25,396"
     );
+  }
+
+  #[test]
+  fn icon_set_threshold_respects_exclusive_gte_and_reverse() {
+    let exclusive_top = [(0.0, true), (0.0, true), (3.0, false)];
+    assert_eq!(icon_set_selected_index(3.0, &exclusive_top, false), Some(1));
+    assert_eq!(icon_set_selected_index(3.1, &exclusive_top, false), Some(2));
+    assert_eq!(icon_set_selected_index(3.0, &exclusive_top, true), Some(1));
+
+    let inclusive_top = [(0.0, true), (0.0, true), (3.0, true)];
+    assert_eq!(icon_set_selected_index(3.0, &inclusive_top, false), Some(2));
+    assert_eq!(icon_set_selected_index(-1.0, &inclusive_top, false), None);
   }
 }

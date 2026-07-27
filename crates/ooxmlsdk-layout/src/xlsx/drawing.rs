@@ -23,6 +23,7 @@ use crate::common;
 use crate::error::Result;
 use crate::model::{ImageCrop, RgbColor};
 use crate::pptx::drawingml::color::{Color, RgbHexColor, SchemeColor};
+use crate::pptx::drawingml::shape::{FontStyleReference, ShapeStyleReference, ShapeStyleRefs};
 use crate::render::chart as shared_chart;
 
 use super::normalize_hyperlink_target;
@@ -35,6 +36,7 @@ pub(crate) struct DrawingResourceCatalog {
   pub(crate) diagrams: DiagramResourceCatalog,
   pub(crate) images: usize,
   pub(crate) image_resources: HashMap<String, ImageResource>,
+  pub(crate) web_extension_fallback_images: HashMap<u32, String>,
   pub(crate) hyperlink_targets: HashMap<String, String>,
   pub(crate) custom_xml_parts: usize,
   pub(crate) web_extensions: usize,
@@ -108,9 +110,11 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) text_bottom_inset_emu: Option<i64>,
   pub(crate) child_objects: usize,
   pub(crate) has_style: bool,
+  pub(crate) shape_style_refs: Option<ShapeStyleRefs>,
   pub(crate) fill_color: Option<Color>,
   pub(crate) fill_pattern: Option<common::PatternFill>,
   pub(crate) fill_gradient: Option<Box<a::GradientFill>>,
+  pub(crate) no_fill: bool,
   pub(crate) use_group_fill: bool,
   pub(crate) line_color: Option<Color>,
   pub(crate) line_pattern: Option<common::PatternFill>,
@@ -291,7 +295,7 @@ impl DrawingResourceCatalog {
     part: &DrawingsPart,
     ui_language: Option<&str>,
   ) -> Result<Self> {
-    let anchors = {
+    let anchors: Vec<DrawingAnchorModel> = {
       let root = part.root_element(package)?;
       root
         .worksheet_drawing_choice
@@ -309,6 +313,8 @@ impl DrawingResourceCatalog {
       .collect::<Vec<_>>();
     let diagrams = DiagramResourceCatalog::from_part(package, part)?;
     let image_resources = collect_image_resources(package, part);
+    let web_extension_fallback_images =
+      collect_web_extension_fallback_images(&anchors, &image_resources);
     let hyperlink_targets = collect_hyperlink_targets(package, part);
     let images = image_resources.len();
     Ok(Self {
@@ -333,10 +339,76 @@ impl DrawingResourceCatalog {
       diagrams,
       images,
       image_resources,
+      web_extension_fallback_images,
       hyperlink_targets,
       custom_xml_parts: part.custom_xml_parts(package).count(),
       web_extensions: part.web_extension_parts(package).count(),
     })
+  }
+}
+
+const WEB_EXTENSION_GRAPHIC_URI: &str =
+  "http://schemas.microsoft.com/office/webextensions/webextension/2010/11";
+
+pub(crate) fn is_web_extension_graphic_frame(object: &DrawingObjectModel) -> bool {
+  object.kind == DrawingObjectKind::GraphicFrame
+    && object.graphic_uri.as_deref() == Some(WEB_EXTENSION_GRAPHIC_URI)
+}
+
+fn collect_web_extension_fallback_images(
+  anchors: &[DrawingAnchorModel],
+  image_resources: &HashMap<String, ImageResource>,
+) -> HashMap<u32, String> {
+  let mut referenced_images = std::collections::HashSet::new();
+  for anchor in anchors {
+    collect_object_image_relationships(&anchor.object, image_resources, &mut referenced_images);
+  }
+  let mut fallback_ids = image_resources
+    .keys()
+    .filter(|relationship_id| !referenced_images.contains(*relationship_id))
+    .cloned()
+    .collect::<Vec<_>>();
+  fallback_ids.sort_by(|left, right| {
+    let left_number = left
+      .strip_prefix("rId")
+      .and_then(|suffix| suffix.parse::<u32>().ok());
+    let right_number = right
+      .strip_prefix("rId")
+      .and_then(|suffix| suffix.parse::<u32>().ok());
+    left_number.cmp(&right_number).then_with(|| left.cmp(right))
+  });
+  let web_extension_ids = anchors
+    .iter()
+    .filter_map(|anchor| {
+      is_web_extension_graphic_frame(&anchor.object)
+        .then_some(anchor.object.id)
+        .flatten()
+    })
+    .collect::<Vec<_>>();
+
+  // Open XML SDK's WebExtension fixture generator emits one fallback `xdr:pic`
+  // image relationship for each `we:webextensionref`. MCE correctly promotes
+  // the supported graphic-frame branch for Microsoft 365, leaving those image
+  // relationships otherwise unreferenced. Only pair them when the one-to-one
+  // invariant holds, so unrelated orphaned package data cannot become visible.
+  if web_extension_ids.len() != fallback_ids.len() {
+    return HashMap::new();
+  }
+  web_extension_ids.into_iter().zip(fallback_ids).collect()
+}
+
+fn collect_object_image_relationships(
+  object: &DrawingObjectModel,
+  image_resources: &HashMap<String, ImageResource>,
+  referenced: &mut std::collections::HashSet<String>,
+) {
+  if let Some(relationship_id) = object.relationship_id.as_ref()
+    && image_resources.contains_key(relationship_id)
+  {
+    referenced.insert(relationship_id.clone());
+  }
+  for child in &object.children {
+    collect_object_image_relationships(child, image_resources, referenced);
   }
 }
 
@@ -709,13 +781,13 @@ impl DrawingObjectModel {
         + shape.text_body.as_deref().map_or(0, xdr_text_body_text_len),
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
-      fill_color: shape_fill_color(&shape.shape_properties)
-        .or_else(|| shape_style_fill_color(shape.shape_style.as_deref())),
+      shape_style_refs: shape.shape_style.as_deref().map(xdr_shape_style_refs),
+      fill_color: shape_fill_color(&shape.shape_properties),
       fill_pattern: shape_fill_pattern(&shape.shape_properties),
       fill_gradient: shape_fill_gradient(&shape.shape_properties),
+      no_fill: shape_no_fill(&shape.shape_properties),
       use_group_fill: shape_uses_group_fill(&shape.shape_properties),
-      line_color: shape_line_color(&shape.shape_properties)
-        .or_else(|| shape_style_line_color(shape.shape_style.as_deref())),
+      line_color: shape_line_color(&shape.shape_properties),
       line_pattern: shape_line_pattern(&shape.shape_properties),
       line_gradient: shape_line_gradient(&shape.shape_properties),
       line_width_emu: shape_line_width_emu(&shape.shape_properties),
@@ -787,9 +859,11 @@ impl DrawingObjectModel {
       text_len: group_shape_text_len(group),
       child_objects: group.group_shape_choice.len(),
       has_style: false,
+      shape_style_refs: None,
       fill_color: group_fill_color(&group.group_shape_properties),
       fill_pattern: group_fill_pattern(&group.group_shape_properties),
       fill_gradient: group_fill_gradient(&group.group_shape_properties),
+      no_fill: group_no_fill(&group.group_shape_properties),
       use_group_fill: group_uses_group_fill(&group.group_shape_properties),
       line_color: None,
       line_pattern: None,
@@ -908,9 +982,11 @@ impl DrawingObjectModel {
       text_warp: None,
       child_objects: frame.graphic.graphic_data.graphic_data_choice.len(),
       has_style: false,
+      shape_style_refs: None,
       fill_color: None,
       fill_pattern: None,
       fill_gradient: None,
+      no_fill: false,
       use_group_fill: false,
       line_color: None,
       line_pattern: None,
@@ -996,13 +1072,13 @@ impl DrawingObjectModel {
       text_warp: None,
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
-      fill_color: shape_fill_color(&shape.shape_properties)
-        .or_else(|| shape_style_fill_color(shape.shape_style.as_deref())),
+      shape_style_refs: shape.shape_style.as_deref().map(xdr_shape_style_refs),
+      fill_color: shape_fill_color(&shape.shape_properties),
       fill_pattern: shape_fill_pattern(&shape.shape_properties),
       fill_gradient: shape_fill_gradient(&shape.shape_properties),
+      no_fill: shape_no_fill(&shape.shape_properties),
       use_group_fill: shape_uses_group_fill(&shape.shape_properties),
-      line_color: shape_line_color(&shape.shape_properties)
-        .or_else(|| shape_style_line_color(shape.shape_style.as_deref())),
+      line_color: shape_line_color(&shape.shape_properties),
       line_pattern: shape_line_pattern(&shape.shape_properties),
       line_gradient: shape_line_gradient(&shape.shape_properties),
       line_width_emu: shape_line_width_emu(&shape.shape_properties),
@@ -1078,9 +1154,11 @@ impl DrawingObjectModel {
       text_warp: None,
       child_objects: 0,
       has_style: picture.shape_style.is_some(),
+      shape_style_refs: picture.shape_style.as_deref().map(xdr_shape_style_refs),
       fill_color: None,
       fill_pattern: None,
       fill_gradient: None,
+      no_fill: false,
       use_group_fill: false,
       line_color: None,
       line_pattern: None,
@@ -1180,9 +1258,11 @@ impl DrawingObjectModel {
       text_warp: None,
       child_objects: 0,
       has_style: false,
+      shape_style_refs: None,
       fill_color: None,
       fill_pattern: None,
       fill_gradient: None,
+      no_fill: false,
       use_group_fill: false,
       line_color: None,
       line_pattern: None,
@@ -1356,6 +1436,7 @@ fn graphic_frame_relationship_id(frame: &xdr::GraphicFrame) -> Option<String> {
       a::GraphicDataChoice::RelationshipIds(relationship_ids) => {
         Some(relationship_ids.data_part.to_string())
       }
+      a::GraphicDataChoice::WebExtensionReference(reference) => Some(reference.r_id.to_string()),
       _ => None,
     })
 }
@@ -1738,6 +1819,13 @@ fn shape_fill_gradient(properties: &xdr::ShapeProperties) -> Option<Box<a::Gradi
   Some(fill.clone())
 }
 
+fn shape_no_fill(properties: &xdr::ShapeProperties) -> bool {
+  matches!(
+    properties.shape_properties_choice2.as_ref(),
+    Some(xdr::ShapePropertiesChoice2::NoFill(_))
+  )
+}
+
 fn shape_uses_group_fill(properties: &xdr::ShapeProperties) -> bool {
   matches!(
     properties.shape_properties_choice2.as_ref(),
@@ -1770,6 +1858,13 @@ fn group_fill_gradient(properties: &xdr::GroupShapeProperties) -> Option<Box<a::
     return None;
   };
   Some(fill.clone())
+}
+
+fn group_no_fill(properties: &xdr::GroupShapeProperties) -> bool {
+  matches!(
+    properties.group_shape_properties_choice1.as_ref(),
+    Some(xdr::GroupShapePropertiesChoice::NoFill(_))
+  )
 }
 
 fn group_uses_group_fill(properties: &xdr::GroupShapeProperties) -> bool {
@@ -1832,14 +1927,41 @@ fn shape_no_line(properties: &xdr::ShapeProperties) -> bool {
     .is_some_and(|choice| matches!(choice, a::OutlineChoice::NoFill(_)))
 }
 
-fn shape_style_fill_color(style: Option<&xdr::ShapeStyle>) -> Option<Color> {
-  let choice = style?.fill_reference.fill_reference_choice.as_ref()?;
-  Color::from_fill_reference_choice(choice)
-}
-
-fn shape_style_line_color(style: Option<&xdr::ShapeStyle>) -> Option<Color> {
-  let choice = style?.line_reference.line_reference_choice.as_ref()?;
-  Color::from_line_reference_choice(choice)
+fn xdr_shape_style_refs(style: &xdr::ShapeStyle) -> ShapeStyleRefs {
+  ShapeStyleRefs {
+    line_reference: ShapeStyleReference {
+      index: style.line_reference.index,
+      placeholder_color: style
+        .line_reference
+        .line_reference_choice
+        .as_ref()
+        .and_then(Color::from_line_reference_choice),
+    },
+    fill_reference: ShapeStyleReference {
+      index: style.fill_reference.index,
+      placeholder_color: style
+        .fill_reference
+        .fill_reference_choice
+        .as_ref()
+        .and_then(Color::from_fill_reference_choice),
+    },
+    effect_reference: ShapeStyleReference {
+      index: style.effect_reference.index,
+      placeholder_color: style
+        .effect_reference
+        .effect_reference_choice
+        .as_ref()
+        .and_then(Color::from_effect_reference_choice),
+    },
+    font_reference: FontStyleReference {
+      index: style.font_reference.index,
+      placeholder_color: style
+        .font_reference
+        .font_reference_choice
+        .as_ref()
+        .and_then(Color::from_font_reference_choice),
+    },
+  }
 }
 
 fn shape_style_font_color(style: Option<&xdr::ShapeStyle>) -> Option<Color> {
@@ -2657,6 +2779,32 @@ mod tests {
   }
 
   #[test]
+  fn shape_style_matrix_references_survive_drawing_import() {
+    let shape = xdr::Shape::from_bytes(
+      br#"<xdr:sp xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:nvSpPr><xdr:cNvPr id="1" name="shape"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr><a:prstGeom prst="rect"/></xdr:spPr><xdr:style><a:lnRef idx="1"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="3"><a:schemeClr val="accent2"/></a:fillRef><a:effectRef idx="2"><a:schemeClr val="accent3"/></a:effectRef><a:fontRef idx="minor"><a:schemeClr val="dk1"/></a:fontRef></xdr:style></xdr:sp>"#,
+    )
+    .expect("shape");
+
+    let model = DrawingObjectModel::from_shape(&shape);
+    let refs = model.shape_style_refs.expect("style references");
+    assert_eq!(refs.line_reference.index, 1);
+    assert_eq!(refs.fill_reference.index, 3);
+    assert_eq!(refs.effect_reference.index, 2);
+    assert!(matches!(
+      refs.fill_reference.placeholder_color,
+      Some(Color::Scheme(SchemeColor {
+        value: a::SchemeColorValues::Accent2,
+        ..
+      }))
+    ));
+    assert!(
+      model.fill_color.is_none(),
+      "theme placeholder color is not a direct solid fill"
+    );
+    assert!(!model.no_fill);
+  }
+
+  #[test]
   fn graphic_frame_relationship_id_distinguishes_chart_reference_qnames() {
     let extended = graphic_frame(
       br#"<a:graphicData xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" uri="http://schemas.microsoft.com/office/drawing/2014/chartex"><cx:chart r:id="rId7"/></a:graphicData>"#,
@@ -2680,6 +2828,48 @@ mod tests {
     assert_eq!(
       graphic_frame_relationship_id(&standard).as_deref(),
       Some("rId8")
+    );
+  }
+
+  #[test]
+  fn web_extension_frames_pair_only_with_the_complete_unused_fallback_set() {
+    let web_extension = |id| DrawingAnchorModel {
+      kind: DrawingAnchorKind::TwoCell,
+      object: DrawingObjectModel {
+        kind: DrawingObjectKind::GraphicFrame,
+        id: Some(id),
+        graphic_uri: Some(WEB_EXTENSION_GRAPHIC_URI.to_string()),
+        ..DrawingObjectModel::unknown()
+      },
+      object_transform: None,
+      from: None,
+      to: None,
+      position: None,
+      extent: None,
+      edit_as: None,
+      lock_with_sheet: true,
+      print_with_sheet: true,
+    };
+    let resource = || ImageResource {
+      data: Arc::from([]),
+      content_type: Some("image/png".to_string()),
+    };
+    let anchors = vec![web_extension(2), web_extension(3)];
+    let resources = HashMap::from([
+      ("rId4".to_string(), resource()),
+      ("rId2".to_string(), resource()),
+    ]);
+
+    assert_eq!(
+      collect_web_extension_fallback_images(&anchors, &resources),
+      HashMap::from([(2, "rId2".to_string()), (3, "rId4".to_string())])
+    );
+
+    let mut incomplete = resources;
+    incomplete.insert("orphan".to_string(), resource());
+    assert!(
+      collect_web_extension_fallback_images(&anchors, &incomplete).is_empty(),
+      "an unrelated orphan image must not be rendered as a WebExtension fallback"
     );
   }
 

@@ -467,6 +467,10 @@ pub(crate) fn apply_static_3d(
           bottom_bevel_px,
           bevel_height_px,
           scene,
+          projection,
+          model_surface,
+          pixels_per_point,
+          back_z_px,
           shape.preset_material,
           true,
         );
@@ -523,6 +527,10 @@ pub(crate) fn apply_static_3d(
       top_bevel_px,
       bevel_height_px,
       scene,
+      projection,
+      model_surface,
+      pixels_per_point,
+      front_z_px,
       shape.preset_material,
       false,
     );
@@ -1911,6 +1919,10 @@ fn composite_bevel(
   width: i32,
   height: f32,
   scene: &a::Scene3DType,
+  projection: Static3dProjection,
+  model_surface: Static3dSurface,
+  pixels_per_point: f32,
+  surface_z: f32,
   material: Option<a::PresetMaterialTypeValues>,
   back_face: bool,
 ) {
@@ -1935,7 +1947,7 @@ fn composite_bevel(
   // observer. The front bevel therefore has a positive-z normal; the back
   // bevel uses the opposite orientation. Rig vectors describe the direction
   // in which light travels and are negated separately by the lighting code.
-  let z = if back_face {
+  let normal_z = if back_face {
     -width as f32
   } else {
     width as f32
@@ -1969,8 +1981,21 @@ fn composite_bevel(
       if distances[3] == distance {
         normal[1] += height;
       }
-      normal[2] = z;
+      normal[2] = normal_z;
       normalize3(&mut normal);
+      let view_direction = surface_view_direction(
+        scene,
+        projection,
+        [
+          x as f32 + 0.5 - (model_surface.left_px + model_surface.width_px * 0.5),
+          y as f32 + 0.5 - (model_surface.top_px + model_surface.height_px * 0.5),
+          surface_z,
+        ],
+        model_surface.width_px.max(1.0),
+        model_surface.height_px.max(1.0),
+        pixels_per_point,
+      );
+      let specular = light_rig_surface_specular(scene, normal, view_direction, material);
       let shade = light_rig_surface_shade(scene, normal).map(|value| {
         let diffuse = value * diffusion;
         if diffuse > 1.0 {
@@ -1983,7 +2008,11 @@ fn composite_bevel(
       let weight = 1.0 - t * t * (3.0 - 2.0 * t);
       let target = destination.get_pixel_mut(x as u32, y as u32);
       for channel in 0..3 {
-        let lit = f32::from(pixel[channel]) * shade[channel];
+        // MS-OI29500's material table feeds the D3D9 fixed-function
+        // specular term additively. Applying diffuse alone makes a bevel on
+        // black picture pixels permanently black, while PowerPoint fixed
+        // output retains the lit rim (tdf170095).
+        let lit = f32::from(pixel[channel]) * shade[channel] + 255.0 * specular[channel];
         target[channel] = (f32::from(pixel[channel]) + (lit - f32::from(pixel[channel])) * weight)
           .round()
           .clamp(0.0, 255.0) as u8;
@@ -2341,6 +2370,39 @@ mod tests {
 
     assert_ne!(image.get_pixel(0, 0), &Rgba([200, 40, 40, 255]));
     assert_eq!(image.get_pixel(3, 3), &Rgba([200, 40, 40, 255]));
+  }
+
+  #[test]
+  fn top_bevel_adds_material_specular_light_to_black_edges() {
+    let mut scene = scene(a::PresetCameraValues::OrthographicFront);
+    scene.light_rig = Box::new(a::LightRig {
+      rig: a::LightRigValues::ThreePoints,
+      direction: a::LightRigDirectionValues::Top,
+      ..a::LightRig::default()
+    });
+    let shape = a::Shape3DType {
+      bevel_top: Some(a::BevelTop {
+        width: Some(CoordinateValue::Emu(25_400)),
+        height: Some(CoordinateValue::Emu(25_400)),
+        preset: Some(a::BevelPresetValues::Circle),
+      }),
+      ..a::Shape3DType::default()
+    };
+    let mut image = RgbaImage::from_pixel(7, 7, Rgba([0, 0, 0, 255]));
+
+    apply_static_3d(
+      &mut image,
+      &scene,
+      camera_projection(&scene, 0.0),
+      &shape,
+      None,
+      None,
+      1.0,
+      None,
+    );
+
+    assert!(image.pixels().any(|pixel| pixel[0] > 0));
+    assert_eq!(image.get_pixel(3, 3), &Rgba([0, 0, 0, 255]));
   }
 
   #[test]

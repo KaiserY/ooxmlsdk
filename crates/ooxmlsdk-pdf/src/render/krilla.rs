@@ -3,7 +3,7 @@ use std::io::Cursor;
 use std::num::NonZeroU16;
 use std::num::NonZeroU32;
 use std::ops::Range;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
@@ -271,7 +271,8 @@ fn render_inner(
     })
   }));
   let mut text_metrics = TextMetrics::new();
-  let paint = PaintDocument::from_layout(document, &mut text_metrics);
+  let paint =
+    PaintDocument::from_layout(document, &mut text_metrics, options.ui_language.as_deref());
   let diagnostics = if observation == RenderObservation::Diagnostics {
     conversion_diagnostics(&paint)
   } else {
@@ -470,6 +471,7 @@ struct TextItem<'doc> {
   x_pt: f32,
   y_pt: f32,
   line_height_pt: f32,
+  paint_clip: Option<PaintClipRect>,
   text: Cow<'doc, str>,
   style: TextStyle<'doc>,
   rotation_center_pt: Option<(f32, f32)>,
@@ -503,6 +505,7 @@ struct ImageItem<'doc> {
   data: Cow<'doc, [u8]>,
   content_type: Option<Cow<'doc, str>>,
   metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
+  metafile_background_color: Option<[u8; 3]>,
   alt_text: Option<Cow<'doc, str>>,
   hyperlink_url: Option<Cow<'doc, str>>,
   semantic_metafile_text: bool,
@@ -537,7 +540,7 @@ struct RectItem {
   stroke_opacity: f32,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct LineItem {
   x1_pt: f32,
   y1_pt: f32,
@@ -545,6 +548,9 @@ struct LineItem {
   y2_pt: f32,
   width_pt: f32,
   color: RgbColor,
+  dash: Option<Vec<f32>>,
+  dash_offset: f32,
+  line_cap: LineCap,
   kind: LineItemKind,
 }
 
@@ -1321,6 +1327,28 @@ struct PaintClipRect {
   height_pt: f32,
 }
 
+fn intersect_paint_clips(
+  left: Option<PaintClipRect>,
+  right: Option<PaintClipRect>,
+) -> Option<PaintClipRect> {
+  match (left, right) {
+    (Some(left), Some(right)) => {
+      let x_pt = left.x_pt.max(right.x_pt);
+      let y_pt = left.y_pt.max(right.y_pt);
+      let right_pt = (left.x_pt + left.width_pt).min(right.x_pt + right.width_pt);
+      let bottom_pt = (left.y_pt + left.height_pt).min(right.y_pt + right.height_pt);
+      Some(PaintClipRect {
+        x_pt,
+        y_pt,
+        width_pt: (right_pt - x_pt).max(0.0),
+        height_pt: (bottom_pt - y_pt).max(0.0),
+      })
+    }
+    (Some(clip), None) | (None, Some(clip)) => Some(clip),
+    (None, None) => None,
+  }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct PaintStrokeLine {
   x1_pt: f32,
@@ -1503,6 +1531,7 @@ impl<'doc> PaintDocument<'doc> {
   fn from_layout(
     document: &'doc common::LayoutDocument<'static>,
     text_metrics: &mut TextMetrics,
+    ui_language: Option<&str>,
   ) -> Self {
     let pages = document
       .pages
@@ -1510,17 +1539,16 @@ impl<'doc> PaintDocument<'doc> {
       .enumerate()
       .map(|(page_index, page)| {
         let source_line_owners = paint_line_owners(document, page_index, page.items.len());
-        let (layout_items, line_owners) = coalesced_writer_text_items(
-          page
-            .items
-            .iter()
-            .enumerate()
-            .filter_map(|(item_index, item)| {
-              page_item_from_common(item)
-                .map(|item| (item, source_line_owners.get(item_index).copied().flatten()))
-            }),
-          text_metrics,
-        );
+        let page_items = page
+          .items
+          .iter()
+          .enumerate()
+          .filter_map(|(item_index, item)| {
+            page_item_from_common(item, ui_language, text_metrics)
+              .map(|item| (item, source_line_owners.get(item_index).copied().flatten()))
+          })
+          .collect::<Vec<_>>();
+        let (layout_items, line_owners) = coalesced_writer_text_items(page_items, text_metrics);
         let (layout_items, line_owners) =
           expand_metafile_semantic_text_items(layout_items, line_owners);
         let common_line_baselines =
@@ -1622,6 +1650,7 @@ fn expand_metafile_semantic_text_items<'doc>(
             x_pt: image.x_pt + run.x * image.width_pt,
             y_pt: image.y_pt + run.y * image.height_pt,
             line_height_pt: (font_size_pt * 1.15).max(1.0),
+            paint_clip: None,
             text: Cow::Owned(run.text),
             style: TextStyle {
               font_family: run.font_family.map(Cow::Owned),
@@ -1678,10 +1707,18 @@ fn expand_metafile_semantic_text_items<'doc>(
   (expanded_items, expanded_owners)
 }
 
-fn page_item_from_common<'doc>(item: &'doc common::DisplayItem<'static>) -> Option<PageItem<'doc>> {
+fn page_item_from_common<'doc>(
+  item: &'doc common::DisplayItem<'static>,
+  ui_language: Option<&str>,
+  text_metrics: &mut TextMetrics,
+) -> Option<PageItem<'doc>> {
   match item {
     common::DisplayItem::Text(text) => Some(PageItem::Text(Box::new(text_item_from_common(text)))),
-    common::DisplayItem::Image(image) => Some(PageItem::Image(image_item_from_common(image))),
+    common::DisplayItem::Image(image) => Some(image_page_item_from_common(
+      image,
+      ui_language,
+      text_metrics,
+    )),
     common::DisplayItem::Group(group) => Some(PageItem::Group {
       mask: group.mask.as_ref().map(image_item_from_common),
       transform: group.transform,
@@ -1690,7 +1727,7 @@ fn page_item_from_common<'doc>(item: &'doc common::DisplayItem<'static>) -> Opti
       items: group
         .items
         .iter()
-        .filter_map(page_item_from_common)
+        .filter_map(|item| page_item_from_common(item, ui_language, text_metrics))
         .collect(),
     }),
     common::DisplayItem::Path(path) => Some(PageItem::Polyline(polyline_from_common(path))),
@@ -1702,6 +1739,123 @@ fn page_item_from_common<'doc>(item: &'doc common::DisplayItem<'static>) -> Opti
     | common::DisplayItem::Clip(_)
     | common::DisplayItem::Transform(_) => None,
   }
+}
+
+fn image_page_item_from_common<'doc>(
+  image: &'doc common::ImageItem<'static>,
+  ui_language: Option<&str>,
+  text_metrics: &mut TextMetrics,
+) -> PageItem<'doc> {
+  let image = image_item_from_common(image);
+  if !image.data.is_empty() {
+    return PageItem::Image(image);
+  }
+
+  let style = missing_linked_image_text_style(ui_language);
+  let text = missing_linked_image_text(ui_language);
+  let text_x_pt = image.x_pt + 3.5;
+  let text_y_pt = image.y_pt + 0.84;
+  let max_width_pt = (image.width_pt - 5.0).max(0.0);
+  let clip = Some(PaintClipRect {
+    x_pt: image.x_pt,
+    y_pt: image.y_pt,
+    width_pt: image.width_pt,
+    height_pt: image.height_pt,
+  });
+  let mut items = Vec::with_capacity(3);
+  items.push(PageItem::Image(image));
+  items.extend(
+    wrap_missing_linked_image_text(text, &style, max_width_pt, text_metrics)
+      .into_iter()
+      .enumerate()
+      .map(|(line_index, text)| {
+        PageItem::Text(Box::new(TextItem {
+          x_pt: text_x_pt,
+          y_pt: text_y_pt + line_index as f32 * 1.2,
+          line_height_pt: 1.2,
+          paint_clip: clip,
+          text: Cow::Owned(text),
+          style: style.clone(),
+          rotation_center_pt: None,
+          hyperlink_url: None,
+          dynamic_field: None,
+          form_widget_id: None,
+          paragraph_bidi: false,
+          word_spacing_pt: 0.0,
+          preserve_text_portion: false,
+          decoration_span_start_x_pt: None,
+          pdf_text_segmentation: common::PdfTextSegmentation::default(),
+          source_path: None,
+          semantic_target_width_pt: None,
+        }))
+      }),
+  );
+  PageItem::Group {
+    mask: None,
+    transform: None,
+    blend_mode: common::BlendMode::Normal,
+    opacity: 1.0,
+    items,
+  }
+}
+
+fn missing_linked_image_text(ui_language: Option<&str>) -> &'static str {
+  if is_simplified_chinese_ui_language(ui_language) {
+    "无法显示链接的图像。该文件可能已被移动、重命名或删除。请验证该链接是否指向正确的文件和位置。"
+  } else {
+    "The linked image cannot be displayed. The file may have been moved, renamed, or deleted. Verify that the link points to the correct file and location."
+  }
+}
+
+fn missing_linked_image_text_style(ui_language: Option<&str>) -> TextStyle<'static> {
+  let font_family = if is_simplified_chinese_ui_language(ui_language) {
+    "SimSun"
+  } else {
+    "Arial"
+  };
+  TextStyle {
+    font_family: Some(Cow::Borrowed(font_family)),
+    east_asia_font_family: Some(Cow::Borrowed(font_family)),
+    font_size_pt: 1.32,
+    line_vertical_alignment: common::LineVerticalAlignment::Top,
+    use_windows_font_metrics: true,
+    wordprocessingml_font_slots: true,
+    pdf_glyph_outlines: true,
+    color: RgbColor { r: 0, g: 0, b: 0 },
+    opacity: 1.0,
+    outline_opacity: 1.0,
+    ..TextStyle::default()
+  }
+}
+
+fn is_simplified_chinese_ui_language(ui_language: Option<&str>) -> bool {
+  let language = ui_language.unwrap_or_default().to_ascii_lowercase();
+  language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans")
+}
+
+fn wrap_missing_linked_image_text(
+  text: &str,
+  style: &TextStyle<'_>,
+  max_width_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> Vec<String> {
+  if max_width_pt <= f32::EPSILON {
+    return Vec::new();
+  }
+  let mut lines = Vec::new();
+  let mut line = String::new();
+  for character in text.chars() {
+    line.push(character);
+    if line.chars().count() > 1 && text_metrics.measure_text(&line, style) > max_width_pt {
+      line.pop();
+      lines.push(std::mem::take(&mut line));
+      line.push(character);
+    }
+  }
+  if !line.is_empty() {
+    lines.push(line);
+  }
+  lines
 }
 
 fn paint_group_item<'doc>(
@@ -1746,6 +1900,12 @@ fn text_item_from_common<'doc>(text: &'doc common::TextRun<'static>) -> TextItem
     x_pt: text.origin.x.0,
     y_pt: text.origin.y.0,
     line_height_pt: text.line_height.0,
+    paint_clip: text.paint_clip.map(|rect| PaintClipRect {
+      x_pt: rect.origin.x.0,
+      y_pt: rect.origin.y.0,
+      width_pt: rect.size.width.0,
+      height_pt: rect.size.height.0,
+    }),
     text: Cow::Borrowed(text.text.as_ref()),
     style: text_style_from_common(&text.style),
     rotation_center_pt: text.rotation_center.map(|point| (point.x.0, point.y.0)),
@@ -1783,6 +1943,7 @@ fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> Imag
     data: Cow::Borrowed(image.bytes.as_ref()),
     content_type: Some(Cow::Borrowed(image.content_type.as_ref())),
     metafile_monochrome_dib_palette_override: image.metafile_monochrome_dib_palette_override,
+    metafile_background_color: image.metafile_background_color,
     alt_text: image
       .alt_text
       .as_ref()
@@ -1831,6 +1992,11 @@ fn rect_item_from_common(rect: &common::RectItem<'static>) -> RectItem {
 }
 
 fn line_item_from_common(line: &common::LineItem<'static>) -> LineItem {
+  let line_cap = match line.stroke.cap {
+    Some(common::StrokeCap::Round) => LineCap::Round,
+    Some(common::StrokeCap::Square) => LineCap::Square,
+    Some(common::StrokeCap::Flat) | None => LineCap::Butt,
+  };
   LineItem {
     x1_pt: line.start.x.0,
     y1_pt: line.start.y.0,
@@ -1838,6 +2004,12 @@ fn line_item_from_common(line: &common::LineItem<'static>) -> LineItem {
     y2_pt: line.end.y.0,
     width_pt: line.stroke.width.0,
     color: rgb(line.stroke.color),
+    dash: line
+      .stroke
+      .resolved_dash()
+      .map(|values| values.into_iter().map(|value| value.0).collect()),
+    dash_offset: line.stroke.dash_offset.0,
+    line_cap,
     kind: match line.kind {
       common::LineKind::Stroke => LineItemKind::Stroke,
       common::LineKind::FilledRect => LineItemKind::FilledRect,
@@ -2132,6 +2304,7 @@ impl<'doc> PaintText<'doc> {
     page_width_pt: f32,
     text_metrics: &mut TextMetrics,
   ) -> Self {
+    let paint_clip = intersect_paint_clips(owner.and_then(|owner| owner.clip), text.paint_clip);
     if let Some(target_width_pt) = text.semantic_target_width_pt {
       let measured_width_pt = text_metrics.measure_text(&text.text, &text.style);
       if measured_width_pt > f32::EPSILON {
@@ -2248,7 +2421,7 @@ impl<'doc> PaintText<'doc> {
         baseline_y,
         width_pt,
         page_width_pt,
-        clip: owner.and_then(|owner| owner.clip),
+        clip: paint_clip,
         glyphs: glyphs.map(|run| run.font_runs),
         highlight,
         underline,
@@ -3045,7 +3218,12 @@ fn draw_paint_item(
     PaintItem::Rect(rect) => draw_rect_item(surface, rect),
     PaintItem::Image(image) => {
       let _alt_text = image.alt_text.as_deref();
-      if is_svg_image(image) {
+      if let Some(color) = image.metafile_background_color {
+        draw_metafile_host_background(surface, image, color);
+      }
+      if image.data.is_empty() {
+        draw_missing_linked_image(surface, image);
+      } else if is_svg_image(image) {
         if images
           .svg(&image.data)
           .map(|tree| draw_svg_item(surface, image, &tree))
@@ -3218,12 +3396,29 @@ fn metafile_render_options_for_image(
       .ceil()
       .clamp(1.0, u32::MAX as f32) as u32
   };
-  let target_size = options.images.reduce_resolution.then(|| {
-    (
+  let target_size = if options.images.reduce_resolution {
+    Some((
       pixels_for_axis(image.width_pt, visible_width),
       pixels_for_axis(image.height_pt, visible_height),
-    )
-  });
+    ))
+  } else {
+    // Word fixed output rasterizes a VML-hosted metafile preview at 200 DPI
+    // and composites its transparent image over the separately painted host
+    // fill. `tdf135653.docx` records a 77.25pt × 49.5pt VML host and Office
+    // emits a 214 × 137 lossless image XObject, the floor of that viewport at
+    // 200 DPI.
+    image.metafile_background_color.map(|_| {
+      let pixels = |points: f32, visible_fraction: f32| {
+        ((points.max(0.0) / visible_fraction) * 200.0 / 72.0)
+          .floor()
+          .clamp(1.0, u32::MAX as f32) as u32
+      };
+      (
+        pixels(image.width_pt, visible_width),
+        pixels(image.height_pt, visible_height),
+      )
+    })
+  };
   ooxmlsdk_layout::render::emf_wmf::RenderOptions {
     // Preserve the authored EMF device bounds by default. Office's fixed
     // output retains that native raster size (including small vector
@@ -3232,6 +3427,8 @@ fn metafile_render_options_for_image(
     target_width_px: target_size.map(|size| size.0),
     target_height_px: target_size.map(|size| size.1),
     max_pixels: Some(dpi.saturating_mul(dpi).saturating_mul(64)),
+    transparent_background: image.metafile_background_color.is_some(),
+    background_color: None,
     monochrome_dib_palette_override: image.metafile_monochrome_dib_palette_override,
     filter_high_frequency_pattern_brushes: true,
   }
@@ -4479,6 +4676,65 @@ fn draw_missing_image(surface: &mut Surface<'_>, image: &ImageItem<'_>) {
   }
 }
 
+fn draw_missing_linked_image(surface: &mut Surface<'_>, image: &ImageItem<'_>) {
+  const FRAME_WIDTH_PT: f32 = 0.14;
+  const FRAME_INSET_PT: f32 = FRAME_WIDTH_PT / 2.0;
+  surface.set_fill(None);
+  surface.set_stroke(Some(Stroke {
+    width: FRAME_WIDTH_PT,
+    paint: rgb::Color::new(0, 0, 0).into(),
+    ..Default::default()
+  }));
+  let mut frame = PathBuilder::new();
+  frame.move_to(image.x_pt + FRAME_INSET_PT, image.y_pt + FRAME_INSET_PT);
+  frame.line_to(
+    image.x_pt + image.width_pt - FRAME_INSET_PT,
+    image.y_pt + FRAME_INSET_PT,
+  );
+  frame.line_to(
+    image.x_pt + image.width_pt - FRAME_INSET_PT,
+    image.y_pt + image.height_pt - FRAME_INSET_PT,
+  );
+  frame.line_to(
+    image.x_pt + FRAME_INSET_PT,
+    image.y_pt + image.height_pt - FRAME_INSET_PT,
+  );
+  frame.close();
+  if let Some(frame) = frame.finish() {
+    surface.draw_path(&frame);
+  }
+
+  if let Some(icon) = missing_linked_image_icon() {
+    surface.push_transform(&Transform::from_translate(
+      image.x_pt + 0.84,
+      image.y_pt + 0.84,
+    ));
+    if let Some(size) = Size::from_wh(1.68, 1.92) {
+      surface.draw_image(icon, size);
+    }
+    surface.pop();
+  }
+}
+
+fn missing_linked_image_icon() -> Option<Image> {
+  static ICON: OnceLock<Option<Image>> = OnceLock::new();
+  ICON
+    .get_or_init(|| {
+      const PIXELS: [u8; 60] = [
+        128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 128, 128, 128, 255, 255, 255, 255, 0, 0, 255, 255, 255, 128,
+        128, 128, 255, 204, 204, 255, 255, 255, 255, 255, 255, 128, 128, 128, 255, 255, 255, 255,
+        255, 255, 255, 255, 255,
+      ];
+      let mut encoded = Cursor::new(Vec::new());
+      PngEncoder::new(&mut encoded)
+        .write_image(&PIXELS, 4, 5, ColorType::Rgb8.into())
+        .ok()?;
+      Image::from_png(encoded.into_inner().into(), false).ok()
+    })
+    .clone()
+}
+
 fn draw_line_item(surface: &mut Surface<'_>, line: &LineItem) {
   let mut path = PathBuilder::new();
   match line.kind {
@@ -4487,6 +4743,11 @@ fn draw_line_item(surface: &mut Surface<'_>, line: &LineItem) {
       surface.set_stroke(Some(Stroke {
         width: line.width_pt,
         paint: rgb::Color::new(line.color.r, line.color.g, line.color.b).into(),
+        line_cap: line.line_cap,
+        dash: line.dash.as_ref().map(|array| StrokeDash {
+          array: array.clone(),
+          offset: line.dash_offset,
+        }),
         ..Default::default()
       }));
       path.move_to(line.x1_pt, line.y1_pt);
@@ -4501,6 +4762,11 @@ fn draw_line_item(surface: &mut Surface<'_>, line: &LineItem) {
       surface.set_stroke(Some(Stroke {
         width: line.width_pt,
         paint: rgb::Color::new(line.color.r, line.color.g, line.color.b).into(),
+        line_cap: line.line_cap,
+        dash: line.dash.as_ref().map(|array| StrokeDash {
+          array: array.clone(),
+          offset: line.dash_offset,
+        }),
         ..Default::default()
       }));
       path.move_to(line.x1_pt, line.y2_pt);
@@ -5496,6 +5762,27 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, pdf_image: 
   });
 }
 
+fn draw_metafile_host_background(surface: &mut Surface<'_>, image: &ImageItem<'_>, color: [u8; 3]) {
+  let mut background = image.clone();
+  background.crop = ImageCrop::default();
+  draw_transformed_image_content(surface, &background, |surface, size| {
+    draw_paint_rect(
+      surface,
+      &PaintRect {
+        x_pt: 0.0,
+        y_pt: 0.0,
+        width_pt: size.width(),
+        height_pt: size.height(),
+        color: RgbColor {
+          r: color[0],
+          g: color[1],
+          b: color[2],
+        },
+      },
+    );
+  });
+}
+
 fn is_svg_image(image: &ImageItem<'_>) -> bool {
   image
     .content_type
@@ -5554,7 +5841,15 @@ fn draw_transformed_image_content(
     pop_count += 1;
   }
 
-  if let Some(clip) = rect_path(0.0, 0.0, width, height) {
+  if image.crop != ImageCrop::default()
+    && let Some(clip) = rect_path(0.0, 0.0, width, height)
+  {
+    // An uncropped bitmap already paints exactly inside its unit-square
+    // XObject bounds. Avoid wrapping every ordinary image in a redundant
+    // rectangular clip: PowerPoint's fixed output likewise emits the direct
+    // image transform, while SVG keeps its own view-box clip in draw_svg().
+    // A non-default source rectangle can extend the scaled source outside the
+    // authored picture frame and therefore still requires this clip.
     surface.push_clip_path(&clip, &krilla::paint::FillRule::NonZero);
     pop_count += 1;
   }
@@ -6008,6 +6303,7 @@ mod tests {
       data: Cow::Borrowed(&[]),
       content_type: Some(Cow::Borrowed("image/emf")),
       metafile_monochrome_dib_palette_override: None,
+      metafile_background_color: None,
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
@@ -6016,12 +6312,24 @@ mod tests {
 
     assert_eq!(native.target_width_px, None);
     assert_eq!(native.target_height_px, None);
+    assert!(!native.transparent_background);
 
     let mut pdf_options = PdfOptions::default();
     pdf_options.images.reduce_resolution = true;
     let reduced = metafile_render_options_for_image(&image, &pdf_options);
     assert_eq!(reduced.target_width_px, Some(600));
     assert_eq!(reduced.target_height_px, Some(150));
+
+    let mut vml_preview = image;
+    vml_preview.width_pt = 77.25;
+    vml_preview.height_pt = 49.5;
+    vml_preview.crop = ImageCrop::default();
+    vml_preview.metafile_background_color = Some([255, 0, 0]);
+    let vml = metafile_render_options_for_image(&vml_preview, &PdfOptions::default());
+    assert_eq!(vml.target_width_px, Some(214));
+    assert_eq!(vml.target_height_px, Some(137));
+    assert!(vml.transparent_background);
+    assert_eq!(vml.background_color, None);
   }
 
   #[test]
@@ -6030,6 +6338,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 0.0,
       line_height_pt: 12.0,
+      paint_clip: None,
       text: "non-business".into(),
       style: PaintTextStyle::default(),
       rotation_center_pt: None,
@@ -6058,6 +6367,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 0.0,
       line_height_pt: 12.0,
+      paint_clip: None,
       text: "\t".into(),
       style: PaintTextStyle {
         underline: true,
@@ -6144,6 +6454,7 @@ mod tests {
         y: Pt(24.0),
       },
       line_height: Pt(14.0),
+      paint_clip: None,
       style: TextStyle {
         font_family: Some("Arial".into()),
         font_size: Pt(11.0),
@@ -6208,7 +6519,7 @@ mod tests {
     };
 
     let mut text_metrics = TextMetrics::new();
-    let mut paint = PaintDocument::from_layout(&document, &mut text_metrics);
+    let mut paint = PaintDocument::from_layout(&document, &mut text_metrics, None);
     let PaintItem::Text(text) = &mut paint.pages[0].items[0] else {
       unreachable!();
     };

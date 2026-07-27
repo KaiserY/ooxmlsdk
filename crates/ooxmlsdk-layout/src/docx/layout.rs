@@ -13,16 +13,16 @@ use unicode_bidi::{BidiInfo, Level};
 
 use crate::common;
 use crate::docx::{
-  Block, BorderStyle, DocxDocument, DynamicFieldKind, FieldNumberFormat, FloatingFrame,
-  FloatingFramePlacement, FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment,
-  FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
-  HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
-  InlineChart, InlineDrawingGroupEffect, InlineItem, InlineShape, InlineShapeGeometry,
-  InlineShapeImageFill, InlineShapeImageFillMode, LineHeightRule, LineNumbering, NoteNumberingSpec,
-  PRESERVED_WORD_TEXT_TAB, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
-  SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
-  TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
-  VerticalImageAlignment, VerticalImageReference,
+  Block, BorderDashPattern, BorderStyle, DocxDocument, DynamicFieldKind, FieldNumberFormat,
+  FloatingFrame, FloatingFramePlacement, FloatingImagePlacement, FrameHeightRule,
+  FrameHorizontalAlignment, FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor,
+  FrameWrapMode, HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode,
+  ImageWrapSide, InlineChart, InlineDrawingGroupEffect, InlineItem, InlineShape,
+  InlineShapeGeometry, InlineShapeImageFill, InlineShapeImageFillMode, LineHeightRule,
+  LineNumbering, NoteNumberingSpec, PRESERVED_WORD_TEXT_TAB, PageSetup, ParagraphAlignment,
+  RgbColor, SectionBreakKind, SectionColumns, TabLeader, TabStop, TabStopAlignment, Table,
+  TableAlignment, TableCell, TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment,
+  TextStyle, VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
 use crate::fonts::effective_font_size_pt;
@@ -765,6 +765,7 @@ pub(crate) struct ImageItem {
   pub flip_vertical: bool,
   pub data: Arc<[u8]>,
   pub content_type: Option<String>,
+  pub metafile_background_color: Option<[u8; 3]>,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
   pub semantic_metafile_text: bool,
@@ -801,6 +802,7 @@ pub(crate) struct LineItem {
   pub y2_pt: f32,
   pub width_pt: f32,
   pub color: RgbColor,
+  pub dash_pattern: BorderDashPattern,
   pub kind: LineItemKind,
 }
 
@@ -1563,6 +1565,7 @@ fn finish_docx_shape_effects(
     flip_vertical: false,
     data: Arc::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
+    metafile_background_color: None,
     alt_text: None,
     hyperlink_url: None,
     semantic_metafile_text: false,
@@ -1676,6 +1679,7 @@ fn finish_docx_group_effects(
     flip_vertical: false,
     data: Arc::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
+    metafile_background_color: None,
     alt_text: None,
     hyperlink_url: None,
     semantic_metafile_text: false,
@@ -1810,6 +1814,7 @@ fn inline_shape_fill_image_items(
       flip_vertical,
       data: fill.data.clone(),
       content_type: fill.content_type.clone(),
+      metafile_background_color: None,
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
@@ -1974,6 +1979,7 @@ fn into_common_text_run(item: TextItem) -> common::TextRun<'static> {
     text: Cow::Owned(item.text),
     origin: common_point(item.x_pt, item.y_pt),
     line_height: common::Pt(item.line_height_pt),
+    paint_clip: None,
     style: common_text_style(item.style),
     font_id: None,
     color,
@@ -2012,6 +2018,7 @@ fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
       .unwrap_or(Cow::Borrowed("application/octet-stream")),
     bytes: item.data,
     metafile_monochrome_dib_palette_override: None,
+    metafile_background_color: item.metafile_background_color,
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
@@ -2035,13 +2042,33 @@ fn into_common_rect_item(item: RectItem) -> common::RectItem<'static> {
 }
 
 fn into_common_line_item(item: LineItem) -> common::LineItem<'static> {
+  let dash = item.dash_pattern.common_dash(item.width_pt);
+  let dash_offset = if item.dash_pattern == BorderDashPattern::FineDashed {
+    let coordinate = if f32::abs(item.x2_pt - item.x1_pt) >= f32::abs(item.y2_pt - item.y1_pt) {
+      item.x1_pt
+    } else {
+      item.y1_pt
+    };
+    let period = dash
+      .as_ref()
+      .map(|values| values.iter().map(|value| value.0).sum::<f32>())
+      .unwrap_or(0.0);
+    common::Pt(if period > f32::EPSILON {
+      coordinate.rem_euclid(period)
+    } else {
+      0.0
+    })
+  } else {
+    common::Pt(0.0)
+  };
   common::LineItem {
     start: common_point(item.x1_pt, item.y1_pt),
     end: common_point(item.x2_pt, item.y2_pt),
     stroke: common::Stroke {
       width: common::Pt(item.width_pt),
       color: common_rgb(item.color, 1.0),
-      dash: None,
+      dash,
+      dash_offset,
       source_style_id: None,
       ..Default::default()
     },
@@ -3611,6 +3638,7 @@ fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mu
         flip_vertical: false,
         data: Arc::from(png.into_inner()),
         content_type: Some("image/png".to_string()),
+        metafile_background_color: None,
         alt_text: None,
         hyperlink_url: text.hyperlink_url.clone(),
         semantic_metafile_text: false,
@@ -6773,6 +6801,7 @@ fn add_note_separator_line(kind: NoteSeparatorKind, setup: PageSetup, current: &
     y2_pt: y + LO_FOOTNOTE_SEPARATOR_STROKE_PT,
     width_pt: LO_FOOTNOTE_SEPARATOR_STROKE_PT,
     color: RgbColor { r: 0, g: 0, b: 0 },
+    dash_pattern: BorderDashPattern::Solid,
     kind: LineItemKind::FilledRect,
   }));
 }
@@ -7898,6 +7927,7 @@ fn apply_column_separators(document: &DocxDocument, pages: &mut [Page], frames: 
           y2_pt: separator_bottom,
           width_pt: 0.2,
           color: RgbColor { r: 0, g: 0, b: 0 },
+          dash_pattern: BorderDashPattern::Solid,
           kind: LineItemKind::FilledRect,
         }));
       }
@@ -9521,6 +9551,7 @@ fn docx_chart_page_items(item: crate::model::PageItem) -> Vec<PageItem> {
       y2_pt: line.y2_pt,
       width_pt: line.width_pt,
       color: line.color,
+      dash_pattern: BorderDashPattern::Solid,
       kind: LineItemKind::Stroke,
     })],
     crate::model::PageItem::Group { items, .. } => {
@@ -11236,9 +11267,9 @@ impl RowFrame<'_, '_> {
         push_styled_line(
           current,
           self.table_frame.left_pt + inset,
-          row_top,
+          horizontal_table_border_center(row_top, border),
           self.table_frame.right_pt - inset,
-          row_top,
+          horizontal_table_border_center(row_top, border),
           border,
         );
       }
@@ -11249,9 +11280,9 @@ impl RowFrame<'_, '_> {
         push_styled_line(
           current,
           self.table_frame.left_pt + inset,
-          row_bottom,
+          horizontal_table_border_center(row_bottom, border),
           self.table_frame.right_pt - inset,
-          row_bottom,
+          horizontal_table_border_center(row_bottom, border),
           border,
         );
       }
@@ -11283,7 +11314,15 @@ impl RowFrame<'_, '_> {
       {
         let (border_left, border_right) =
           self.inset_horizontal_border_for_bounds(left_pt, right_pt, border);
-        push_styled_line(current, border_left, row_top, border_right, row_top, border);
+        let border_y = horizontal_table_border_center(row_top, border);
+        push_styled_line(
+          current,
+          border_left,
+          border_y,
+          border_right,
+          border_y,
+          border,
+        );
       }
 
       let continues_into_next = self
@@ -11299,12 +11338,13 @@ impl RowFrame<'_, '_> {
         let (border_left, border_right) = self.inset_inside_horizontal_border(left_pt, right_pt);
         let (border_left, border_right) =
           self.inset_horizontal_border_for_bounds(border_left, border_right, border);
+        let border_y = horizontal_table_border_center(row_bottom, border);
         push_styled_line(
           current,
           border_left,
-          row_bottom,
+          border_y,
           border_right,
-          row_bottom,
+          border_y,
           border,
         );
       }
@@ -11383,6 +11423,13 @@ impl RowFrame<'_, '_> {
       (right_pt - inset).max(left_pt),
     )
   }
+}
+
+fn horizontal_table_border_center(grid_y: f32, border: BorderStyle) -> f32 {
+  // Writer's table painter places horizontal borders at the beginning of the
+  // cell edge while vertical borders are centered on it. Our renderer accepts
+  // centerlines, so move a horizontal centerline inward by half its width.
+  grid_y + border.width_pt / 2.0
 }
 
 struct CellFrame<'a, 'f> {
@@ -14638,6 +14685,13 @@ impl<'a> TextFrameLayout<'a> {
         advance.text_metrics,
       );
     }
+    align_image_only_inline_object_line(
+      &mut advance.current.items,
+      *advance.line_item_start_index,
+      y,
+      &paragraph_base_line_style(self.paragraph),
+      advance.text_metrics,
+    );
     align_text_baseline_to_inline_object(
       &mut advance.current.items,
       *advance.line_item_start_index,
@@ -15867,6 +15921,7 @@ impl<'a> TextFrameLayout<'a> {
               flip_vertical: image.flip_vertical,
               data: image.data.clone(),
               content_type: image.content_type.clone(),
+              metafile_background_color: image.metafile_background_color,
               alt_text: image.alt_text.clone(),
               hyperlink_url: image.hyperlink_url.clone(),
               semantic_metafile_text: image.semantic_metafile_text,
@@ -16089,6 +16144,7 @@ impl<'a> TextFrameLayout<'a> {
             flip_vertical: image.flip_vertical,
             data: image.data.clone(),
             content_type: image.content_type.clone(),
+            metafile_background_color: image.metafile_background_color,
             alt_text: image.alt_text.clone(),
             hyperlink_url: image.hyperlink_url.clone(),
             semantic_metafile_text: image.semantic_metafile_text,
@@ -16952,6 +17008,13 @@ impl<'a> TextFrameLayout<'a> {
         line_item_start_index,
         y,
         line_right,
+        text_metrics,
+      );
+      align_image_only_inline_object_line(
+        &mut current.items,
+        line_item_start_index,
+        y,
+        &paragraph_base_line_style(paragraph),
         text_metrics,
       );
       align_text_baseline_to_inline_object(
@@ -18315,6 +18378,46 @@ fn align_text_baseline_to_inline_object(
   }
 }
 
+fn align_image_only_inline_object_line(
+  items: &mut [PageItem],
+  start_index: usize,
+  y: f32,
+  paragraph_mark_style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) {
+  let line_items = &mut items[start_index..];
+  let has_text = line_items
+    .iter()
+    .any(|item| matches!(item, PageItem::Text(text) if (text.y_pt - y).abs() < 0.01));
+  if has_text {
+    return;
+  }
+  let has_inline_image = line_items
+    .iter()
+    .any(|item| matches!(item, PageItem::Image(image) if !image.floating));
+  if !has_inline_image {
+    return;
+  }
+
+  // A paragraph containing only an as-character picture still has Word's
+  // implicit paragraph mark. Office places the picture after that mark's
+  // descent has established the line origin: its bottom is the line baseline,
+  // not `y + object_height`. Writer reaches the same result through the dummy
+  // text portion and SwFlyCntPortion::SetBase(). Keep this source-derived
+  // adjustment line-relative; a fixed picture offset is wrong because the
+  // observed displacement changes with the paragraph font.
+  let descent_pt = text_metrics
+    .vertical_metrics(paragraph_mark_style)
+    .descent_pt;
+  for item in line_items {
+    if let PageItem::Image(image) = item
+      && !image.floating
+    {
+      image.y_pt += descent_pt;
+    }
+  }
+}
+
 fn finalize_cjk_punctuation_compression(
   items: &mut [PageItem],
   start_index: usize,
@@ -18598,63 +18701,66 @@ fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border:
     if f32::abs(y2 - y1) < f32::abs(x2 - x1) {
       push_line_item(
         page,
-        x1,
-        y1 - offset,
-        x2,
-        y2 - offset,
+        (x1, y1 - offset),
+        (x2, y2 - offset),
         stroke_width,
         border.color,
+        BorderDashPattern::Solid,
       );
       push_line_item(
         page,
-        x1,
-        y1 + offset,
-        x2,
-        y2 + offset,
+        (x1, y1 + offset),
+        (x2, y2 + offset),
         stroke_width,
         border.color,
+        BorderDashPattern::Solid,
       );
     } else {
       push_line_item(
         page,
-        x1 - offset,
-        y1,
-        x2 - offset,
-        y2,
+        (x1 - offset, y1),
+        (x2 - offset, y2),
         stroke_width,
         border.color,
+        BorderDashPattern::Solid,
       );
       push_line_item(
         page,
-        x1 + offset,
-        y1,
-        x2 + offset,
-        y2,
+        (x1 + offset, y1),
+        (x2 + offset, y2),
         stroke_width,
         border.color,
+        BorderDashPattern::Solid,
       );
     }
     return;
   }
-  push_line_item(page, x1, y1, x2, y2, border.width_pt, border.color);
+  push_line_item(
+    page,
+    (x1, y1),
+    (x2, y2),
+    border.width_pt,
+    border.color,
+    border.dash_pattern,
+  );
 }
 
 fn push_line_item(
   page: &mut Page,
-  x1: f32,
-  y1: f32,
-  x2: f32,
-  y2: f32,
+  start: (f32, f32),
+  end: (f32, f32),
   width: f32,
   color: RgbColor,
+  dash_pattern: BorderDashPattern,
 ) {
   page.items.push(PageItem::Line(LineItem {
-    x1_pt: x1,
-    y1_pt: y1,
-    x2_pt: x2,
-    y2_pt: y2,
+    x1_pt: start.0,
+    y1_pt: start.1,
+    x2_pt: end.0,
+    y2_pt: end.1,
     width_pt: width,
     color,
+    dash_pattern,
     kind: LineItemKind::Stroke,
   }));
 }
@@ -18854,6 +18960,7 @@ mod tests {
         spacing_pt: 0.0,
         color: RgbColor::default(),
         compound: true,
+        dash_pattern: BorderDashPattern::Solid,
         shadow: false,
       },
     );
@@ -18874,6 +18981,37 @@ mod tests {
   }
 
   #[test]
+  fn horizontal_table_border_is_painted_inside_the_cell_edge() {
+    let border = BorderStyle {
+      width_pt: 0.5,
+      ..BorderStyle::default()
+    };
+
+    assert_eq!(horizontal_table_border_center(72.0, border), 72.25);
+  }
+
+  #[test]
+  fn fine_dash_phase_is_anchored_to_the_page_coordinate() {
+    let line = LineItem {
+      x1_pt: 66.6,
+      y1_pt: 72.25,
+      x2_pt: 306.0,
+      y2_pt: 72.25,
+      width_pt: 0.5,
+      color: RgbColor::default(),
+      dash_pattern: BorderDashPattern::FineDashed,
+      kind: LineItemKind::Stroke,
+    };
+
+    let line = into_common_line_item(line);
+    assert_eq!(
+      line.stroke.dash,
+      Some(vec![common::Pt(2.0), common::Pt(0.4)])
+    );
+    assert!((line.stroke.dash_offset.0 - 1.8).abs() < 0.001);
+  }
+
+  #[test]
   fn compound_vertical_border_paints_two_parallel_strokes() {
     let mut page = empty_page(PageSetup::default(), 0);
     push_styled_line(
@@ -18887,6 +19025,7 @@ mod tests {
         spacing_pt: 0.0,
         color: RgbColor::default(),
         compound: true,
+        dash_pattern: BorderDashPattern::Solid,
         shadow: false,
       },
     );
@@ -19998,6 +20137,39 @@ mod tests {
   }
 
   #[test]
+  fn image_only_inline_object_line_keeps_paragraph_mark_descent() {
+    let style = TextStyle::default();
+    let mut items = vec![PageItem::Image(ImageItem {
+      x_pt: 0.0,
+      y_pt: 20.0,
+      width_pt: 12.0,
+      height_pt: 12.0,
+      crop: ImageCrop::default(),
+      clip_path: Vec::new(),
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      data: Arc::from([]),
+      content_type: None,
+      metafile_background_color: None,
+      alt_text: None,
+      hyperlink_url: None,
+      semantic_metafile_text: false,
+      floating: false,
+      behind_text: false,
+    })];
+    let mut text_metrics = TextMetrics::new();
+    let expected_descent = text_metrics.vertical_metrics(&style).descent_pt;
+
+    align_image_only_inline_object_line(&mut items, 0, 20.0, &style, &mut text_metrics);
+
+    let PageItem::Image(image) = &items[0] else {
+      panic!("expected image item");
+    };
+    assert!((image.y_pt - (20.0 + expected_descent)).abs() < 0.001);
+  }
+
+  #[test]
   fn text_on_inline_object_line_uses_object_bottom_as_baseline() {
     let style = TextStyle::default();
     let line_height = 124.0;
@@ -20014,6 +20186,7 @@ mod tests {
         flip_vertical: false,
         data: Arc::from([]),
         content_type: None,
+        metafile_background_color: None,
         alt_text: None,
         hyperlink_url: None,
         semantic_metafile_text: false,

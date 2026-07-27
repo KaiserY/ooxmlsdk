@@ -154,6 +154,7 @@ pub(crate) struct PictureRecord {
   pub(crate) crop: ImageCrop,
   pub(crate) blip_choices: Vec<a::BlipChoice>,
   pub(crate) image_resource: Option<ImageResource>,
+  pub(crate) empty_blip_fill: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -608,12 +609,26 @@ impl Shape {
     blip_choices: Vec<a::BlipChoice>,
     image_resource: Option<ImageResource>,
   ) {
+    let empty_blip_fill =
+      embed_relationship_id.is_none() && link_relationship_id.is_none() && image_resource.is_none();
     self.picture = Some(PictureRecord {
       embed_relationship_id,
       link_relationship_id,
       crop,
       blip_choices,
       image_resource,
+      empty_blip_fill,
+    });
+  }
+
+  pub(crate) fn set_empty_picture_fill(&mut self) {
+    self.picture = Some(PictureRecord {
+      embed_relationship_id: None,
+      link_relationship_id: None,
+      crop: ImageCrop::default(),
+      blip_choices: Vec::new(),
+      image_resource: None,
+      empty_blip_fill: true,
     });
   }
 

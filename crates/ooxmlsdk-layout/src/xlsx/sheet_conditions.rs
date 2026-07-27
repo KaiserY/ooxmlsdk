@@ -36,8 +36,86 @@ pub(crate) struct ConditionalFormatRuleModel {
   pub(crate) formulas: Vec<String>,
   pub(crate) has_color_scale: bool,
   pub(crate) has_data_bar: bool,
-  pub(crate) has_icon_set: bool,
+  pub(crate) icon_set: Option<IconSetModel>,
   pub(crate) has_extensions: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum IconSetType {
+  ThreeArrows,
+  ThreeArrowsGray,
+  ThreeFlags,
+  ThreeTrafficLights1,
+  ThreeTrafficLights2,
+  ThreeSigns,
+  ThreeSymbols,
+  ThreeSymbols2,
+  FourArrows,
+  FourArrowsGray,
+  FourRedToBlack,
+  FourRating,
+  FourTrafficLights,
+  FiveArrows,
+  FiveArrowsGray,
+  FiveRating,
+  FiveQuarters,
+  ThreeStars,
+  ThreeTriangles,
+  FiveBoxes,
+  NoIcons,
+}
+
+impl IconSetType {
+  pub(crate) const fn icon_count(self) -> usize {
+    match self {
+      Self::FourArrows
+      | Self::FourArrowsGray
+      | Self::FourRedToBlack
+      | Self::FourRating
+      | Self::FourTrafficLights => 4,
+      Self::FiveArrows
+      | Self::FiveArrowsGray
+      | Self::FiveRating
+      | Self::FiveQuarters
+      | Self::FiveBoxes => 5,
+      Self::NoIcons => 0,
+      _ => 3,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum IconSetThresholdType {
+  Number,
+  Percent,
+  Maximum,
+  Minimum,
+  Formula,
+  Percentile,
+  AutomaticMinimum,
+  AutomaticMaximum,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct IconSetThresholdModel {
+  pub(crate) threshold_type: IconSetThresholdType,
+  pub(crate) value: Option<String>,
+  pub(crate) greater_than_or_equal: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct IconSetCustomIcon {
+  pub(crate) icon_set: IconSetType,
+  pub(crate) icon_index: usize,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct IconSetModel {
+  pub(crate) icon_set: IconSetType,
+  pub(crate) show_value: bool,
+  pub(crate) reverse: bool,
+  pub(crate) thresholds: Vec<IconSetThresholdModel>,
+  pub(crate) custom_icons: Option<Vec<Option<IconSetCustomIcon>>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -97,7 +175,7 @@ pub(crate) struct ExtendedConditionalFormatRuleModel {
   pub(crate) formulas: Vec<String>,
   pub(crate) has_color_scale: bool,
   pub(crate) has_data_bar: bool,
-  pub(crate) has_icon_set: bool,
+  pub(crate) icon_set: Option<IconSetModel>,
   pub(crate) has_differential_format: bool,
   pub(crate) has_extensions: bool,
 }
@@ -267,8 +345,152 @@ impl ConditionalFormatRuleModel {
         .collect(),
       has_color_scale: rule.color_scale.is_some(),
       has_data_bar: rule.data_bar.is_some(),
-      has_icon_set: rule.icon_set.is_some(),
+      icon_set: rule.icon_set.as_ref().map(IconSetModel::from_base),
       has_extensions: rule.conditional_formatting_rule_extension_list.is_some(),
+    }
+  }
+}
+
+impl IconSetModel {
+  fn from_base(icon_set: &x::IconSet) -> Self {
+    Self {
+      // ECMA-376 CT_IconSet and LibreOffice condformatbuffer.cxx both define
+      // the omitted base-format iconSet attribute as 3TrafficLights1. The x14
+      // extension has a different 3Arrows default and is handled separately.
+      icon_set: icon_set
+        .icon_set_value
+        .unwrap_or(x::IconSetValues::ThreeTrafficLights1)
+        .into(),
+      show_value: icon_set.show_value.is_none_or(|value| value.as_bool()),
+      reverse: icon_set.reverse.is_some_and(|value| value.as_bool()),
+      thresholds: icon_set
+        .conditional_format_value_object
+        .iter()
+        .map(|threshold| IconSetThresholdModel {
+          threshold_type: threshold.r#type.into(),
+          value: threshold.val.clone(),
+          greater_than_or_equal: threshold
+            .greater_than_or_equal
+            .is_none_or(|value| value.as_bool()),
+        })
+        .collect(),
+      custom_icons: None,
+    }
+  }
+
+  fn from_extended(icon_set: &x14::IconSet) -> Self {
+    let custom = icon_set.custom.is_some_and(|value| value.as_bool());
+    Self {
+      icon_set: icon_set.icon_set_types.unwrap_or_default().into(),
+      show_value: icon_set.show_value.is_none_or(|value| value.as_bool()),
+      reverse: icon_set.reverse.is_some_and(|value| value.as_bool()),
+      thresholds: icon_set
+        .conditional_formatting_value_object
+        .iter()
+        .map(|threshold| IconSetThresholdModel {
+          threshold_type: threshold.r#type.into(),
+          value: threshold
+            .formula
+            .clone()
+            .or_else(|| threshold.value.clone()),
+          greater_than_or_equal: threshold
+            .greater_than_or_equal
+            .is_none_or(|value| value.as_bool()),
+        })
+        .collect(),
+      custom_icons: custom.then(|| {
+        icon_set
+          .conditional_formatting_icon
+          .iter()
+          .map(|icon| {
+            let icon_set: IconSetType = icon.icon_set.into();
+            (icon_set != IconSetType::NoIcons).then_some(IconSetCustomIcon {
+              icon_set,
+              icon_index: icon.icon_id as usize,
+            })
+          })
+          .collect()
+      }),
+    }
+  }
+}
+
+impl From<x::IconSetValues> for IconSetType {
+  fn from(value: x::IconSetValues) -> Self {
+    match value {
+      x::IconSetValues::ThreeArrows => Self::ThreeArrows,
+      x::IconSetValues::ThreeArrowsGray => Self::ThreeArrowsGray,
+      x::IconSetValues::ThreeFlags => Self::ThreeFlags,
+      x::IconSetValues::ThreeTrafficLights1 => Self::ThreeTrafficLights1,
+      x::IconSetValues::ThreeTrafficLights2 => Self::ThreeTrafficLights2,
+      x::IconSetValues::ThreeSigns => Self::ThreeSigns,
+      x::IconSetValues::ThreeSymbols => Self::ThreeSymbols,
+      x::IconSetValues::ThreeSymbols2 => Self::ThreeSymbols2,
+      x::IconSetValues::FourArrows => Self::FourArrows,
+      x::IconSetValues::FourArrowsGray => Self::FourArrowsGray,
+      x::IconSetValues::FourRedToBlack => Self::FourRedToBlack,
+      x::IconSetValues::FourRating => Self::FourRating,
+      x::IconSetValues::FourTrafficLights => Self::FourTrafficLights,
+      x::IconSetValues::FiveArrows => Self::FiveArrows,
+      x::IconSetValues::FiveArrowsGray => Self::FiveArrowsGray,
+      x::IconSetValues::FiveRating => Self::FiveRating,
+      x::IconSetValues::FiveQuarters => Self::FiveQuarters,
+    }
+  }
+}
+
+impl From<x14::IconSetTypeValues> for IconSetType {
+  fn from(value: x14::IconSetTypeValues) -> Self {
+    match value {
+      x14::IconSetTypeValues::ThreeArrows => Self::ThreeArrows,
+      x14::IconSetTypeValues::ThreeArrowsGray => Self::ThreeArrowsGray,
+      x14::IconSetTypeValues::ThreeFlags => Self::ThreeFlags,
+      x14::IconSetTypeValues::ThreeTrafficLights1 => Self::ThreeTrafficLights1,
+      x14::IconSetTypeValues::ThreeTrafficLights2 => Self::ThreeTrafficLights2,
+      x14::IconSetTypeValues::ThreeSigns => Self::ThreeSigns,
+      x14::IconSetTypeValues::ThreeSymbols => Self::ThreeSymbols,
+      x14::IconSetTypeValues::ThreeSymbols2 => Self::ThreeSymbols2,
+      x14::IconSetTypeValues::FourArrows => Self::FourArrows,
+      x14::IconSetTypeValues::FourArrowsGray => Self::FourArrowsGray,
+      x14::IconSetTypeValues::FourRedToBlack => Self::FourRedToBlack,
+      x14::IconSetTypeValues::FourRating => Self::FourRating,
+      x14::IconSetTypeValues::FourTrafficLights => Self::FourTrafficLights,
+      x14::IconSetTypeValues::FiveArrows => Self::FiveArrows,
+      x14::IconSetTypeValues::FiveArrowsGray => Self::FiveArrowsGray,
+      x14::IconSetTypeValues::FiveRating => Self::FiveRating,
+      x14::IconSetTypeValues::FiveQuarters => Self::FiveQuarters,
+      x14::IconSetTypeValues::ThreeStars => Self::ThreeStars,
+      x14::IconSetTypeValues::ThreeTriangles => Self::ThreeTriangles,
+      x14::IconSetTypeValues::FiveBoxes => Self::FiveBoxes,
+      x14::IconSetTypeValues::NoIcons => Self::NoIcons,
+    }
+  }
+}
+
+impl From<x::ConditionalFormatValueObjectValues> for IconSetThresholdType {
+  fn from(value: x::ConditionalFormatValueObjectValues) -> Self {
+    match value {
+      x::ConditionalFormatValueObjectValues::Number => Self::Number,
+      x::ConditionalFormatValueObjectValues::Percent => Self::Percent,
+      x::ConditionalFormatValueObjectValues::Max => Self::Maximum,
+      x::ConditionalFormatValueObjectValues::Min => Self::Minimum,
+      x::ConditionalFormatValueObjectValues::Formula => Self::Formula,
+      x::ConditionalFormatValueObjectValues::Percentile => Self::Percentile,
+    }
+  }
+}
+
+impl From<x14::ConditionalFormattingValueObjectTypeValues> for IconSetThresholdType {
+  fn from(value: x14::ConditionalFormattingValueObjectTypeValues) -> Self {
+    match value {
+      x14::ConditionalFormattingValueObjectTypeValues::Numeric => Self::Number,
+      x14::ConditionalFormattingValueObjectTypeValues::Percent => Self::Percent,
+      x14::ConditionalFormattingValueObjectTypeValues::Max => Self::Maximum,
+      x14::ConditionalFormattingValueObjectTypeValues::Min => Self::Minimum,
+      x14::ConditionalFormattingValueObjectTypeValues::Formula => Self::Formula,
+      x14::ConditionalFormattingValueObjectTypeValues::Percentile => Self::Percentile,
+      x14::ConditionalFormattingValueObjectTypeValues::AutoMin => Self::AutomaticMinimum,
+      x14::ConditionalFormattingValueObjectTypeValues::AutoMax => Self::AutomaticMaximum,
     }
   }
 }
@@ -345,7 +567,7 @@ impl ExtendedConditionalFormatRuleModel {
       formulas: rule.formula.to_vec(),
       has_color_scale: rule.color_scale.is_some(),
       has_data_bar: rule.data_bar.is_some(),
-      has_icon_set: rule.icon_set.is_some(),
+      icon_set: rule.icon_set.as_ref().map(IconSetModel::from_extended),
       has_differential_format: rule.differential_type.is_some(),
       has_extensions: rule.extension_list.is_some(),
     }
@@ -480,4 +702,77 @@ fn bool_attr_count<const N: usize>(
     .into_iter()
     .filter(|value| value.is_some_and(|value| value.as_bool()))
     .count()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn base_icon_set_preserves_threshold_inclusivity() {
+    let icon_set = x::IconSet {
+      icon_set_value: Some(x::IconSetValues::ThreeArrows),
+      conditional_format_value_object: vec![
+        x::ConditionalFormatValueObject {
+          r#type: x::ConditionalFormatValueObjectValues::Percent,
+          val: Some("0".to_string()),
+          ..Default::default()
+        },
+        x::ConditionalFormatValueObject {
+          r#type: x::ConditionalFormatValueObjectValues::Number,
+          val: Some("0".to_string()),
+          ..Default::default()
+        },
+        x::ConditionalFormatValueObject {
+          r#type: x::ConditionalFormatValueObjectValues::Number,
+          val: Some("3".to_string()),
+          greater_than_or_equal: Some(ooxmlsdk::simple_type::BooleanValue::Zero),
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let model = IconSetModel::from_base(&icon_set);
+    assert_eq!(model.icon_set, IconSetType::ThreeArrows);
+    assert_eq!(model.thresholds.len(), 3);
+    assert!(model.thresholds[1].greater_than_or_equal);
+    assert!(!model.thresholds[2].greater_than_or_equal);
+  }
+
+  #[test]
+  fn base_icon_set_uses_the_schema_traffic_light_default() {
+    let model = IconSetModel::from_base(&x::IconSet::default());
+    assert_eq!(model.icon_set, IconSetType::ThreeTrafficLights1);
+  }
+
+  #[test]
+  fn extended_custom_icon_set_preserves_no_icon_slots() {
+    let icon_set = x14::IconSet {
+      icon_set_types: Some(x14::IconSetTypeValues::FiveQuarters),
+      custom: Some(ooxmlsdk::simple_type::BooleanValue::One),
+      conditional_formatting_icon: vec![
+        x14::ConditionalFormattingIcon {
+          icon_set: x14::IconSetTypeValues::ThreeArrowsGray,
+          icon_id: 0,
+        },
+        x14::ConditionalFormattingIcon {
+          icon_set: x14::IconSetTypeValues::NoIcons,
+          icon_id: 0,
+        },
+      ],
+      ..Default::default()
+    };
+
+    let model = IconSetModel::from_extended(&icon_set);
+    let custom = model.custom_icons.expect("custom icon map");
+    assert_eq!(
+      custom[0],
+      Some(IconSetCustomIcon {
+        icon_set: IconSetType::ThreeArrowsGray,
+        icon_index: 0,
+      })
+    );
+    assert_eq!(custom[1], None);
+  }
 }

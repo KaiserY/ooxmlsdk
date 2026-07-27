@@ -393,8 +393,9 @@ dependencies = [
  "encoding_rs",
  "fontdb",
  "image",
+ "skrifa 0.43.2",
  "thiserror",
- "ttf-parser",
+ "zeno",
 ]
 
 [[package]]
@@ -2496,6 +2497,12 @@ dependencies = [
  "syn 2.0.119",
  "synstructure",
 ]
+
+[[package]]
+name = "zeno"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6df3dc4292935e51816d896edcd52aa30bc297907c26167fec31e2b0c6a32524"
 
 [[package]]
 name = "zerofrom"

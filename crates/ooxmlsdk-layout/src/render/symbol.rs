@@ -35,7 +35,10 @@ pub(crate) fn font_symbol_transport_text<'a>(font: Option<&str>, text: &'a str) 
     || font
       .get(font.len().saturating_sub(" symbol".len())..)
       .is_some_and(|suffix| suffix.eq_ignore_ascii_case(" symbol"))
-    || font.to_ascii_lowercase().contains("wingdings");
+    || {
+      let font = font.to_ascii_lowercase();
+      font.contains("wingdings") || font.contains("webdings")
+    };
   if !is_symbol_font {
     return Cow::Borrowed(text);
   }
@@ -268,6 +271,16 @@ mod tests {
   fn symbol_font_ascii_uses_pua_transport_code() {
     let text = font_symbol_transport_text(Some("Wingdings"), "q");
     assert_eq!(text, "\u{f071}");
+    assert!(matches!(text, Cow::Owned(_)));
+  }
+
+  #[test]
+  fn webdings_ascii_uses_pua_transport_code() {
+    let text = font_symbol_transport_text(Some("Webdings"), "add text");
+    assert_eq!(
+      text,
+      "\u{f061}\u{f064}\u{f064}\u{f020}\u{f074}\u{f065}\u{f078}\u{f074}"
+    );
     assert!(matches!(text, Cow::Owned(_)));
   }
 }

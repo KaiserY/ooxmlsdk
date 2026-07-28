@@ -150,16 +150,8 @@ fn paragraph_line_height_for_setup(
       // the normal single line height. Use the resolved face metrics for that
       // single-line basis; 115% of the nominal font size is only Writer's
       // compatibility approximation and can differ from Word's font height.
-      let single_line_height = paragraph
-        .inlines
-        .iter()
-        .find_map(|inline| match inline {
-          InlineItem::Text(run) if text_run_affects_line_height(&run.text) => Some(
-            inline_text_height_for_text(&run.style, &run.text, text_metrics),
-          ),
-          _ => None,
-        })
-        .unwrap_or_else(|| inline_text_height(base_line_style, text_metrics));
+      let single_line_height =
+        paragraph_single_line_height(paragraph, base_line_style, text_metrics);
       let line_height = paragraph
         .format
         .line_height_pt
@@ -187,6 +179,135 @@ fn paragraph_line_height_for_setup(
   }
 }
 
+fn paragraph_single_line_height(
+  paragraph: &crate::docx::Paragraph,
+  base_line_style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let visible_text_height = paragraph
+    .inlines
+    .iter()
+    .find_map(|inline| match inline {
+      InlineItem::Text(run) if text_run_affects_line_height(&run.text) => Some(
+        inline_text_height_for_text(&run.style, &run.text, text_metrics),
+      ),
+      _ => None,
+    })
+    .unwrap_or_else(|| inline_text_height(base_line_style, text_metrics));
+
+  if !paragraph.format.justification.is_block() {
+    return visible_text_height;
+  }
+
+  // ECMA-376 Part 1 §17.3.3.1 defines w:br as a special character in the
+  // current run's content. Word's legacy fully-justified Shift+Return path
+  // therefore keeps the run's composite font-slot line box, even when the
+  // visible text in that run is Latin. Limit that behavior to the run which
+  // actually owns a text-wrapping break; automatic wraps remain driven by
+  // their visible-script metrics.
+  paragraph
+    .inlines
+    .iter()
+    .filter_map(|inline| {
+      let InlineItem::Text(run) = inline else {
+        return None;
+      };
+      run.text.contains('\n').then(|| {
+        let metrics =
+          text_metrics.vertical_metrics_for_script(&run.style, ooxmlsdk_fonts::TextScript::Han);
+        metrics.line_height_pt() + run.style.baseline_shift_pt.abs()
+      })
+    })
+    .fold(visible_text_height, f32::max)
+}
+
+fn paragraph_has_automatic_superscript(paragraph: &crate::docx::Paragraph) -> bool {
+  let paragraph_size = paragraph.base_style.font_size_pt;
+  paragraph.inlines.iter().any(|inline| {
+    let InlineItem::Text(run) = inline else {
+      return false;
+    };
+    text_run_affects_line_height(&run.text)
+      && run.style.baseline_shift_pt > 0.0
+      && run.style.font_size_pt < paragraph_size - LAYOUT_EPSILON_PT
+  })
+}
+
+fn word_east_asian_paragraph_mark_single_line_height(
+  paragraph: &crate::docx::Paragraph,
+  compatibility_mode: u16,
+  prior_line_count: usize,
+  text_metrics: &mut TextMetrics,
+) -> Option<f32> {
+  let uses_east_asian_paragraph_mark = if compatibility_mode >= 15 {
+    paragraph.format.justification.adjust == crate::docx::ParagraphAdjust::Start
+  } else {
+    paragraph.format.justification.adjust == crate::docx::ParagraphAdjust::Left
+      && paragraph_has_automatic_superscript(paragraph)
+  };
+  if prior_line_count != 0
+    || !uses_east_asian_paragraph_mark
+    || !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    || paragraph.format.line_height_pt.is_some()
+  {
+    return None;
+  }
+
+  // MS-OI29500 §17.3.2.26 still selects the ascii face for Basic Latin glyphs.
+  // Word nevertheless sizes the implicit paragraph-mark box from the
+  // paragraph's East Asian face for compatibility-mode-15 logical-start text
+  // and for a legacy mixed ordinary/automatic-superscript line. Office fixed
+  // output keeps the Latin glyphs in Liberation Serif while its 17.28pt
+  // baseline step matches the 17.244pt Noto Serif CJK SC line box. The
+  // superscript itself uses the Latin face's OS/2 superscript size and offset;
+  // its presence is the legacy paragraph-mark trigger, not a request to shape
+  // the visible Latin text with the East Asian face.
+  // Keep wrapped lines on their visible-script metrics and preserve the
+  // legacy physical-left path used by older compatibility documents.
+  let metrics = text_metrics
+    .vertical_metrics_for_script(&paragraph.base_style, ooxmlsdk_fonts::TextScript::Han);
+  let line_height = metrics.line_height_pt();
+  (line_height > 0.0).then_some(line_height)
+}
+
+fn paragraph_uses_only_paragraph_mark_baseline_shift(paragraph: &crate::docx::Paragraph) -> bool {
+  let paragraph_shift = paragraph.base_style.baseline_shift_pt;
+  if paragraph_shift.abs() <= f32::EPSILON {
+    return false;
+  }
+  let mut saw_text = false;
+  for inline in &paragraph.inlines {
+    match inline {
+      InlineItem::Text(run) if text_run_affects_line_height(&run.text) => {
+        if (run.style.baseline_shift_pt - paragraph_shift).abs() > LAYOUT_EPSILON_PT {
+          return false;
+        }
+        saw_text = true;
+      }
+      InlineItem::Text(_) | InlineItem::BookmarkStart(_) => {}
+      _ => return false,
+    }
+  }
+  saw_text
+}
+
+fn paragraph_auto_baseline_line_height_cap(
+  paragraph: &crate::docx::Paragraph,
+  base_line_style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> Option<f32> {
+  matches!(paragraph.format.line_height_rule, LineHeightRule::Auto).then(|| {
+    // Writer's LINE_SPACING_AS_GAP_BELOW compatibility path leaves the first
+    // line's glyph baseline in the ordinary line box and owns proportional
+    // excess below the text. Office fixed output does the same: even an
+    // extreme auto multiple keeps the first baseline at the default 115%
+    // position while the full real height still drives following flow.
+    paragraph_single_line_height(paragraph, base_line_style, text_metrics)
+      * LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT
+      / PERCENT_SCALE
+  })
+}
+
 fn grid_auto_line_spacing_multiplier(
   paragraph: &crate::docx::Paragraph,
   setup: PageSetup,
@@ -203,6 +324,27 @@ fn grid_auto_line_spacing_multiplier(
     .format
     .line_height_pt
     .map(|multiple| multiple.max(1.0))
+}
+
+fn doc_grid_character_pitch(
+  paragraph: &crate::docx::Paragraph,
+  setup: PageSetup,
+  text_segmentation: TextSegmentation,
+) -> Option<f32> {
+  if !paragraph.format.snap_to_grid.unwrap_or(true)
+    || !text_segment_uses_document_grid(text_segmentation, setup)
+  {
+    return None;
+  }
+  setup.doc_grid_character_spacing_pt.map(|spacing| {
+    (paragraph_base_line_style(paragraph).font_size_pt + spacing).max(LAYOUT_EPSILON_PT)
+  })
+}
+
+fn grid_character_segment_width(text: &str, pitch_pt: Option<f32>) -> Option<f32> {
+  let pitch_pt = pitch_pt?;
+  let count = text.chars().count();
+  (count > 0 && text.chars().all(cjk_line_character)).then_some(pitch_pt * count as f32)
 }
 
 fn text_segment_uses_document_grid(text_segmentation: TextSegmentation, setup: PageSetup) -> bool {
@@ -247,6 +389,22 @@ fn include_text_height(
   match text_frame.line_height_rule {
     LineHeightRule::Exact => line_height,
     LineHeightRule::Auto | LineHeightRule::AtLeast => line_height.max(text_height),
+  }
+}
+
+fn update_line_text_height(
+  items: &mut [PageItem],
+  start_index: usize,
+  y: f32,
+  line_height_pt: f32,
+) {
+  for item in items.iter_mut().skip(start_index) {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    if (text.y_pt - y).abs() < 0.01 {
+      text.line_height_pt = text.line_height_pt.max(line_height_pt);
+    }
   }
 }
 
@@ -869,6 +1027,7 @@ pub(crate) struct TextItem {
   pub rotation_center_pt: Option<(f32, f32)>,
   pub hyperlink_url: Option<String>,
   pub dynamic_field: Option<DynamicFieldKind>,
+  dynamic_field_line_anchor: Option<DynamicFieldLineAnchor>,
   pub style_ref_keys: Vec<Arc<str>>,
   pub style_ref_text: Option<Arc<str>>,
   pub style_ref_numbering_text: Option<Arc<str>>,
@@ -878,6 +1037,12 @@ pub(crate) struct TextItem {
   pub preserve_text_portion: bool,
   pub decoration_span_start_x_pt: Option<f32>,
   pub pdf_text_segmentation: PdfTextSegmentation,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct DynamicFieldLineAnchor {
+  position_pt: f32,
+  alignment: ParagraphAlignment,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -2852,6 +3017,7 @@ impl<'a> RootFrameLayout<'a> {
         &self.anchor_pages,
         &self.document.footnote_numbering,
         &self.document.endnote_numbering,
+        &mut self.text_metrics,
       );
       mark_decorated_frame_invalidations(
         &mut self.frames,
@@ -2978,6 +3144,7 @@ impl<'a> RootFrameLayout<'a> {
       frame.setup,
       frame.section_index,
       frame.columns,
+      self.current.section_page_index,
       0,
       self.document.default_tab_stop_pt,
     );
@@ -3096,6 +3263,7 @@ impl<'a> RootFrameLayout<'a> {
         self.current.section_index,
         SectionColumns::default(),
         self.current.section_page_index,
+        0,
         self.document.default_tab_stop_pt,
       )
     };
@@ -3414,6 +3582,7 @@ impl<'a> RootFrameLayout<'a> {
       note_setup,
       self.current.section_index,
       SectionColumns::default(),
+      self.current.section_page_index,
       0,
       self.document.default_tab_stop_pt,
     );
@@ -4336,6 +4505,7 @@ fn add_line_numbers_to_page(
         rotation_center_pt: None,
         hyperlink_url: None,
         dynamic_field: None,
+        dynamic_field_line_anchor: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
         style_ref_numbering_text: None,
@@ -6172,10 +6342,11 @@ fn flow_context(
   setup: PageSetup,
   section_index: usize,
   columns: SectionColumns,
+  section_page_index: usize,
   column_index: usize,
   default_tab_stop_pt: f32,
 ) -> FlowContext {
-  let geometry = column_geometry(setup, columns);
+  let geometry = column_geometry(setup, columns, section_page_index);
   let count = geometry.widths.len().max(1);
   let column_index = column_index.min(count - 1);
   let content_left_pt = geometry.lefts[column_index];
@@ -6183,7 +6354,7 @@ fn flow_context(
   FlowContext {
     setup,
     section_index,
-    section_page_index: 0,
+    section_page_index,
     column_index,
     columns,
     content_top_pt: setup.margin_top_pt,
@@ -6206,7 +6377,7 @@ fn flow_context(
 }
 
 fn flow_with_column(flow: FlowContext, column_index: usize) -> FlowContext {
-  let geometry = column_geometry(flow.setup, flow.columns);
+  let geometry = column_geometry(flow.setup, flow.columns, flow.section_page_index);
   let count = geometry.widths.len().max(1);
   let column_index = column_index.min(count - 1);
   FlowContext {
@@ -6224,10 +6395,32 @@ struct ColumnGeometry {
   gaps: Vec<f32>,
 }
 
-fn column_geometry(setup: PageSetup, columns: SectionColumns) -> ColumnGeometry {
+fn effective_horizontal_page_margins(setup: PageSetup, section_page_index: usize) -> (f32, f32) {
+  let even_page = !section_page_index.is_multiple_of(2);
+  let (mut left, mut right) = if setup.mirror_margins && even_page {
+    (setup.margin_right_pt, setup.margin_left_pt)
+  } else {
+    (setup.margin_left_pt, setup.margin_right_pt)
+  };
+  if !setup.gutter_at_top && setup.gutter_pt > 0.0 {
+    if setup.rtl_gutter || (setup.mirror_margins && even_page) {
+      right += setup.gutter_pt;
+    } else {
+      left += setup.gutter_pt;
+    }
+  }
+  (left, right)
+}
+
+fn column_geometry(
+  setup: PageSetup,
+  columns: SectionColumns,
+  section_page_index: usize,
+) -> ColumnGeometry {
   let count = columns.count.max(1);
-  let body_width =
-    (setup.width_pt - setup.margin_left_pt - setup.margin_right_pt).max(DEFAULT_FONT_SIZE_PT);
+  let (margin_left_pt, margin_right_pt) =
+    effective_horizontal_page_margins(setup, section_page_index);
+  let body_width = (setup.width_pt - margin_left_pt - margin_right_pt).max(DEFAULT_FONT_SIZE_PT);
   let (widths, gaps) = if columns.explicit_count == count {
     let raw_gaps = columns
       .explicit_gaps_pt
@@ -6268,7 +6461,7 @@ fn column_geometry(setup: PageSetup, columns: SectionColumns) -> ColumnGeometry 
   };
 
   let mut lefts = Vec::with_capacity(widths.len());
-  let mut x = setup.margin_left_pt;
+  let mut x = margin_left_pt;
   for (index, width) in widths.iter().enumerate() {
     lefts.push(x);
     x += *width;
@@ -6386,7 +6579,7 @@ fn estimated_paragraph_height(
   flow: FlowContext,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
-  paragraph.format.spacing_before_pt
+  paragraph_upper_space(paragraph, text_metrics)
     + estimated_paragraph_content_height(paragraph, flow, text_metrics)
     + paragraph_lower_space(paragraph)
 }
@@ -6414,8 +6607,14 @@ fn estimated_paragraph_content_height(
     default_line_right: content_width,
     paragraph_left: 0.0,
     base_line_height,
+    auto_baseline_line_height_cap: None,
     line_height_rule: paragraph.format.line_height_rule,
     grid_auto_line_spacing_multiplier: grid_auto_line_spacing_multiplier(
+      paragraph,
+      flow.setup,
+      flow.text_segmentation,
+    ),
+    grid_character_pitch_pt: doc_grid_character_pitch(
       paragraph,
       flow.setup,
       flow.text_segmentation,
@@ -6462,7 +6661,8 @@ fn estimated_paragraph_content_height(
             continue;
           }
           has_flow_content = true;
-          let width = text_metrics.measure_text(&segment, &run.style);
+          let width = grid_character_segment_width(&segment, text_frame.grid_character_pitch_pt)
+            .unwrap_or_else(|| text_metrics.measure_text(&segment, &run.style));
           if x + width > content_width && x > 0.0 {
             finish_line(&mut content_height, &mut line_height, &mut line_index);
             x = 0.0;
@@ -6627,7 +6827,7 @@ fn estimated_paragraph_first_line_height(
   text_metrics: &mut TextMetrics,
 ) -> f32 {
   let base_line_style = paragraph_base_line_style(paragraph);
-  paragraph.format.spacing_before_pt
+  paragraph_upper_space(paragraph, text_metrics)
     + paragraph_line_height_for_setup(
       paragraph,
       &base_line_style,
@@ -6683,6 +6883,7 @@ fn paragraph_spacing_before(
   previous: Option<&Block>,
   paragraph: &crate::docx::Paragraph,
   flow: FlowContext,
+  text_metrics: &mut TextMetrics,
 ) -> f32 {
   if previous.is_none()
     && matches!(
@@ -6703,24 +6904,41 @@ fn paragraph_spacing_before(
   if flow.paragraph_spacing_context == ParagraphSpacingContext::SectionStart
     && let Some(Block::Paragraph(previous)) = previous
   {
-    return section_start_spacing_before(previous, paragraph);
+    return section_start_spacing_before(previous, paragraph, text_metrics);
   }
   if let Some(Block::Paragraph(previous)) = previous {
-    return paragraph_spacing_before_after_previous(previous, paragraph);
+    return paragraph_spacing_before_after_previous(previous, paragraph, text_metrics);
   }
-  paragraph.format.spacing_before_pt
+  paragraph_upper_space(paragraph, text_metrics)
+}
+
+fn paragraph_upper_space(
+  paragraph: &crate::docx::Paragraph,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  paragraph
+    .format
+    .spacing_before_lines
+    .map_or(paragraph.format.spacing_before_pt, |lines| {
+      inline_text_height(&paragraph_base_line_style(paragraph), text_metrics) * lines.max(0.0)
+    })
 }
 
 fn paragraph_lower_space(paragraph: &crate::docx::Paragraph) -> f32 {
-  paragraph
-    .format
-    .spacing_after_pt
-    .max(PARAGRAPH_SPACING_AFTER_PT)
+  if paragraph.format.spacing_after_auto == Some(true) {
+    super::OFFICE_AUTOMATIC_PARAGRAPH_SPACING_PT
+  } else {
+    paragraph
+      .format
+      .spacing_after_pt
+      .max(PARAGRAPH_SPACING_AFTER_PT)
+  }
 }
 
 fn paragraph_spacing_before_after_previous(
   previous: &crate::docx::Paragraph,
   paragraph: &crate::docx::Paragraph,
+  text_metrics: &mut TextMetrics,
 ) -> f32 {
   // SwFlowFrame::CalcUpperSpace() collapses normal inter-paragraph spacing to
   // max(previous lower, current upper), with contextual-spacing exceptions for
@@ -6731,23 +6949,26 @@ fn paragraph_spacing_before_after_previous(
       previous.format.contextual_spacing,
       paragraph.format.contextual_spacing,
     ) {
-      (true, true) => return 0.0,
-      (false, true) => return 0.0,
-      (true, false) => return paragraph.format.spacing_before_pt,
+      (true, true) | (false, true) if paragraph.format.spacing_before_lines.is_none() => {
+        return 0.0;
+      }
+      (true, true) | (false, true) => {}
+      (true, false) => return paragraph_upper_space(paragraph, text_metrics),
       (false, false) => {}
     }
   }
-  (paragraph.format.spacing_before_pt - lower).max(0.0)
+  (paragraph_upper_space(paragraph, text_metrics) - lower).max(0.0)
 }
 
 fn section_start_spacing_before(
   previous: &crate::docx::Paragraph,
   paragraph: &crate::docx::Paragraph,
+  text_metrics: &mut TextMetrics,
 ) -> f32 {
   if paragraph.format.contextual_spacing && paragraph_styles_identical(previous, paragraph) {
     return 0.0;
   }
-  (paragraph.format.spacing_before_pt - previous.format.spacing_after_pt).max(0.0)
+  (paragraph_upper_space(paragraph, text_metrics) - previous.format.spacing_after_pt).max(0.0)
 }
 
 fn paragraph_starts_with_last_rendered_page_break(paragraph: &crate::docx::Paragraph) -> bool {
@@ -6850,7 +7071,7 @@ fn layout_document_block(
       }
 
       if !ignore_top_margin_after_page_break && !ignore_top_margin_at_page_start {
-        y += paragraph_spacing_before(previous, paragraph, flow);
+        y += paragraph_spacing_before(previous, paragraph, flow, target.text_metrics);
       }
       y += paragraph_border_layout_extent(paragraph.format.borders.top);
       let ignore_left_indent = paragraph_ignores_left_indent_next_to_floating_table(previous, next);
@@ -8116,6 +8337,7 @@ fn resolve_dynamic_fields(
   anchor_pages: &[AnchorPage],
   footnote_numbering: &[NoteNumberingSpec],
   endnote_numbering: &[NoteNumberingSpec],
+  text_metrics: &mut TextMetrics,
 ) {
   let total_pages = pages.len();
   let page_refs = anchor_pages
@@ -8164,6 +8386,72 @@ fn resolve_dynamic_fields(
           }
         }
         None => {}
+      }
+    }
+    realign_resolved_dynamic_field_lines(&mut page.items, text_metrics);
+    if let Some(adornment) = &mut page.repeating_adornment {
+      realign_resolved_dynamic_field_lines(&mut adornment.items, text_metrics);
+    }
+  }
+}
+
+fn realign_resolved_dynamic_field_lines(items: &mut [PageItem], text_metrics: &mut TextMetrics) {
+  let mut lines = Vec::<(f32, DynamicFieldLineAnchor)>::new();
+  for item in items.iter() {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    let Some(anchor) = text.dynamic_field_line_anchor else {
+      continue;
+    };
+    if !lines.iter().any(|(y, seen)| {
+      (text.y_pt - *y).abs() < 0.01
+        && (anchor.position_pt - seen.position_pt).abs() < 0.01
+        && anchor.alignment == seen.alignment
+    }) {
+      lines.push((text.y_pt, anchor));
+    }
+  }
+
+  for (y, anchor) in lines {
+    let mut min_x = f32::MAX;
+    let mut max_x = f32::MIN;
+    for item in items.iter() {
+      let PageItem::Text(text) = item else {
+        continue;
+      };
+      if (text.y_pt - y).abs() >= 0.01
+        || !text.dynamic_field_line_anchor.is_some_and(|seen| {
+          (anchor.position_pt - seen.position_pt).abs() < 0.01 && anchor.alignment == seen.alignment
+        })
+      {
+        continue;
+      }
+      min_x = min_x.min(text.x_pt);
+      max_x = max_x.max(text.x_pt + text_metrics.measure_text(&text.text, &text.style));
+    }
+    if min_x == f32::MAX || max_x <= min_x {
+      continue;
+    }
+    let current_anchor = match anchor.alignment {
+      ParagraphAlignment::Right => max_x,
+      ParagraphAlignment::Center => (min_x + max_x) / 2.0,
+      ParagraphAlignment::Left | ParagraphAlignment::Justify => continue,
+    };
+    let dx = anchor.position_pt - current_anchor;
+    if dx.abs() <= LAYOUT_EPSILON_PT {
+      continue;
+    }
+    for item in items.iter_mut() {
+      let PageItem::Text(text) = item else {
+        continue;
+      };
+      if (text.y_pt - y).abs() < 0.01
+        && text.dynamic_field_line_anchor.is_some_and(|seen| {
+          (anchor.position_pt - seen.position_pt).abs() < 0.01 && anchor.alignment == seen.alignment
+        })
+      {
+        text.x_pt += dx;
       }
     }
   }
@@ -8448,7 +8736,7 @@ fn apply_column_separators(document: &DocxDocument, pages: &mut [Page], frames: 
       }
       let separator_top = top + ((bottom - top) - DEFAULT_LINE_HEIGHT_PT).max(0.0);
       let separator_bottom = (bottom - LAYOUT_EPSILON_PT).max(separator_top);
-      let geometry = column_geometry(page.setup, columns);
+      let geometry = column_geometry(page.setup, columns, page.section_page_index);
       for column_index in 1..geometry.widths.len() {
         let gap = geometry.gaps.get(column_index - 1).copied().unwrap_or(0.0);
         let x_left = geometry.lefts[column_index] - gap / 2.0;
@@ -9947,6 +10235,7 @@ fn lower_word_pie_chart(
           rotation_center_pt: None,
           hyperlink_url: None,
           dynamic_field: None,
+          dynamic_field_line_anchor: None,
           style_ref_keys: Vec::new(),
           style_ref_text: None,
           style_ref_numbering_text: None,
@@ -10007,6 +10296,7 @@ fn lower_word_pie_chart(
         rotation_center_pt: None,
         hyperlink_url: None,
         dynamic_field: None,
+        dynamic_field_line_anchor: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
         style_ref_numbering_text: None,
@@ -10053,6 +10343,7 @@ fn lower_word_pie_chart(
           rotation_center_pt: None,
           hyperlink_url: None,
           dynamic_field: None,
+          dynamic_field_line_anchor: None,
           style_ref_keys: Vec::new(),
           style_ref_text: None,
           style_ref_numbering_text: None,
@@ -10165,6 +10456,7 @@ fn lower_generic_inline_chart(
       rotation_center_pt: None,
       hyperlink_url: None,
       dynamic_field: None,
+      dynamic_field_line_anchor: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
       style_ref_numbering_text: None,
@@ -10190,6 +10482,7 @@ fn docx_chart_page_items(item: crate::model::PageItem) -> Vec<PageItem> {
       rotation_center_pt: text.rotation_center_pt,
       hyperlink_url: text.hyperlink_url,
       dynamic_field: None,
+      dynamic_field_line_anchor: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
       style_ref_numbering_text: None,
@@ -13975,7 +14268,7 @@ fn table_cell_first_content_line_height(
         };
         return Some(
           line_height
-            + paragraph_spacing_before(None, paragraph, flow)
+            + paragraph_spacing_before(None, paragraph, flow, text_metrics)
             + paragraph_spacing_after(paragraph, next)
             + extra_last_lower,
         );
@@ -14205,10 +14498,21 @@ fn layout_shape_text_box(
     })
     .collect::<Vec<_>>();
   apply_shape_text_warp(&mut items, shape, rect, text_metrics);
-  if !shape.text_upright && shape.rotation_deg.abs() > f32::EPSILON {
-    rotate_shape_text_items(&mut items, rect, shape.rotation_deg);
+  let text_rotation_deg =
+    inline_shape_text_rotation_degrees(shape.rotation_deg, shape.flip_vertical);
+  if !shape.text_upright && text_rotation_deg.abs() > f32::EPSILON {
+    rotate_shape_text_items(&mut items, rect, text_rotation_deg);
   }
   current.items.extend(items);
+}
+
+fn inline_shape_text_rotation_degrees(shape_rotation_deg: f32, flip_vertical: bool) -> f32 {
+  // Word keeps custom-shape text unmirrored. LibreOffice's Word importer
+  // compensates a vertical shape flip with an extra half-turn because its
+  // drawing core otherwise flips the text with the geometry
+  // (sw/source/filter/ww8/ww8par.cxx). Preserve that Word-specific
+  // orientation while leaving the shape geometry transform unchanged.
+  shape_rotation_deg + if flip_vertical { 180.0 } else { 0.0 }
 }
 
 fn rotate_shape_text_items(items: &mut Vec<PageItem>, rect: ShapeTextBoxRect, rotation_deg: f32) {
@@ -14761,7 +15065,7 @@ fn table_cell_paragraph_height(
   let upper = if split_follow_text_frame {
     0.0
   } else {
-    paragraph_spacing_before(previous, paragraph, flow)
+    paragraph_spacing_before(previous, paragraph, flow, text_metrics)
   };
   let mut lower = if split_follow_text_frame {
     0.0
@@ -15440,8 +15744,10 @@ struct TextFrame {
   default_line_right: f32,
   paragraph_left: f32,
   base_line_height: f32,
+  auto_baseline_line_height_cap: Option<f32>,
   line_height_rule: LineHeightRule,
   grid_auto_line_spacing_multiplier: Option<f32>,
+  grid_character_pitch_pt: Option<f32>,
   script_sensitive_line_height: bool,
   compatibility_mode: u16,
 }
@@ -15461,20 +15767,31 @@ impl TextFrame {
       first_line_indent_pt,
     );
     let base_line_style = paragraph_base_line_style(paragraph);
+    let base_line_height = paragraph_line_height_for_setup(
+      paragraph,
+      &base_line_style,
+      flow.setup,
+      flow.text_segmentation,
+      text_metrics,
+    );
+    let available_frame_height = (flow.content_bottom - flow.content_top_pt).max(0.0);
     Self {
       default_line_left,
       first_line_left,
       default_line_right,
       paragraph_left: default_line_left.min(first_line_left),
-      base_line_height: paragraph_line_height_for_setup(
-        paragraph,
-        &base_line_style,
-        flow.setup,
-        flow.text_segmentation,
-        text_metrics,
-      ),
+      base_line_height,
+      auto_baseline_line_height_cap: (base_line_height
+        > available_frame_height + LAYOUT_EPSILON_PT)
+        .then(|| paragraph_auto_baseline_line_height_cap(paragraph, &base_line_style, text_metrics))
+        .flatten(),
       line_height_rule: paragraph.format.line_height_rule,
       grid_auto_line_spacing_multiplier: grid_auto_line_spacing_multiplier(
+        paragraph,
+        flow.setup,
+        flow.text_segmentation,
+      ),
+      grid_character_pitch_pt: doc_grid_character_pitch(
         paragraph,
         flow.setup,
         flow.text_segmentation,
@@ -15482,6 +15799,12 @@ impl TextFrame {
       script_sensitive_line_height: flow.script_sensitive_line_height,
       compatibility_mode: flow.compatibility_mode,
     }
+  }
+
+  fn text_baseline_line_height(self, line_height: f32) -> f32 {
+    self
+      .auto_baseline_line_height_cap
+      .map_or(line_height, |cap| line_height.min(cap))
   }
 }
 
@@ -15499,18 +15822,21 @@ fn resolved_paragraph_indents(
   .flatten()
   .any(|value| value != 0.0);
   let character_unit_pt = needs_character_unit.then(|| {
-    // ECMA-376 Part 1 §17.3.1.12 defines these values in hundredths of a
-    // character unit. Writer represents that unit as FONT_CJK_ADVANCE, so use
-    // the resolved East Asian font's ideographic advance rather than the Latin
-    // average character width. Measuring U+6C34 follows the CSS `ic` reference
-    // glyph and routes shaping through the run's East Asian font slot.
-    let style = paragraph_base_line_style(paragraph);
-    let measured = text_metrics.measure_text("\u{6c34}", &style);
-    if measured > f32::EPSILON {
-      measured
-    } else {
-      effective_font_size_pt(&style, None)
-    }
+    format
+      .character_indent_unit_pt
+      .filter(|unit| unit.is_finite() && *unit > f32::EPSILON)
+      .unwrap_or_else(|| {
+        // Synthetic paragraphs do not pass through WordprocessingML import.
+        // Preserve their previous behavior by deriving the unit from the
+        // effective paragraph line style.
+        let style = paragraph_base_line_style(paragraph);
+        let measured = text_metrics.measure_text("\u{6c34}", &style);
+        if measured > f32::EPSILON {
+          measured
+        } else {
+          effective_font_size_pt(&style, None)
+        }
+      })
   });
   let resolve = |physical_pt: f32, character_units: Option<f32>| {
     character_units
@@ -15518,9 +15844,19 @@ fn resolved_paragraph_indents(
       .zip(character_unit_pt)
       .map_or(physical_pt, |(units, unit_pt)| units * unit_pt)
   };
+  let leading = resolve(format.indent_left_pt, format.indent_left_character_units);
+  let trailing = resolve(format.indent_right_pt, format.indent_right_character_units);
+  let (left, right) = if format.bidi {
+    // Writer's SwBorderAttrs::CalcLeft()/CalcRight() treats the paragraph
+    // "left" margin as before-text and "right" as after-text. Those logical
+    // margins exchange physical sides in an RTL paragraph.
+    (trailing, leading)
+  } else {
+    (leading, trailing)
+  };
   (
-    resolve(format.indent_left_pt, format.indent_left_character_units),
-    resolve(format.indent_right_pt, format.indent_right_character_units),
+    left,
+    right,
     resolve(
       format.first_line_indent_pt,
       format.first_line_indent_character_units,
@@ -15907,7 +16243,7 @@ impl<'a> TextFrameLayout<'a> {
       advance.line_right,
       advance.text_metrics,
     );
-    if advance.justify {
+    if advance.justify && advance.active.frame.grid_character_pitch_pt.is_none() {
       justify_line_items(
         &mut advance.current.items,
         *advance.line_item_start_index,
@@ -16175,8 +16511,17 @@ impl<'a> TextFrameLayout<'a> {
       text_frame.default_line_right,
       &wrap_exclusions,
     );
-    let (mut line_left, mut line_right) =
-      self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
+    // The first line may start before the paragraph's default text origin
+    // when w:hanging is larger than a negative w:left. Use its authored
+    // origin as the wrap-segment boundary; starting from default_line_left
+    // would clamp the hanging line back to the later continuation origin.
+    let (mut line_left, mut line_right) = line_bounds_for_y(
+      line.left_pt,
+      text_frame.default_line_right,
+      y,
+      line_height,
+      &wrap_exclusions,
+    );
     if paragraph.list_label.is_some() {
       line_left = line.left_pt.max(line_left);
     }
@@ -16237,12 +16582,13 @@ impl<'a> TextFrameLayout<'a> {
           first_line_left
         },
         y_pt: y,
-        line_height_pt: line_height,
+        line_height_pt: text_frame.text_baseline_line_height(line_height),
         text: visible_label.to_string(),
         style: list_label_style.clone(),
         rotation_center_pt: None,
         hyperlink_url: paragraph.list_label_hyperlink_url.clone(),
         dynamic_field: None,
+        dynamic_field_line_anchor: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
         // Preserve the number-portion identity through the internal effect
@@ -16579,6 +16925,7 @@ impl<'a> TextFrameLayout<'a> {
             form_widget_id: active_form_widget_ids.last().copied(),
             paragraph_bidi: paragraph.format.bidi,
             preserve_text_portion: run.preserve_text_portion,
+            normalize_baseline_shift: paragraph_uses_only_paragraph_mark_baseline_shift(paragraph),
             segmentation: flow.text_segmentation,
           };
 
@@ -16598,11 +16945,17 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: line_height,
+                  line_height_pt: text_frame.text_baseline_line_height(line_height),
                 },
                 &mut chunk,
                 &run.style,
                 &meta,
+              );
+              update_line_text_height(
+                &mut current.items,
+                start_item_index,
+                y,
+                text_frame.text_baseline_line_height(line_height),
               );
               apply_pending_aligned_tab(
                 current,
@@ -16655,7 +17008,7 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: line_height,
+                  line_height_pt: text_frame.text_baseline_line_height(line_height),
                 },
                 &mut chunk,
                 &run.style,
@@ -16717,7 +17070,7 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: line_height,
+                  line_height_pt: text_frame.text_baseline_line_height(line_height),
                 },
                 &mut chunk,
                 &run.style,
@@ -16739,8 +17092,12 @@ impl<'a> TextFrameLayout<'a> {
               continue;
             }
 
-            let width = text_metrics.measure_text(&segment.text, &run.style);
-            let fit_width = line_fit_width(&segment.text, &run.style, text_metrics);
+            let grid_width =
+              grid_character_segment_width(&segment.text, text_frame.grid_character_pitch_pt);
+            let width =
+              grid_width.unwrap_or_else(|| text_metrics.measure_text(&segment.text, &run.style));
+            let fit_width =
+              grid_width.unwrap_or_else(|| line_fit_width(&segment.text, &run.style, text_metrics));
             let continuation_fit_width = if flow.text_segmentation != TextSegmentation::DrawingLayer
               && segment_index + 1 == segments.len()
             {
@@ -16824,7 +17181,7 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: line_height,
+                  line_height_pt: text_frame.text_baseline_line_height(line_height),
                 },
                 &mut chunk,
                 &run.style,
@@ -16936,7 +17293,7 @@ impl<'a> TextFrameLayout<'a> {
                         TextPlacement {
                           x_pt: chunk_x,
                           y_pt: y,
-                          line_height_pt: line_height,
+                          line_height_pt: text_frame.text_baseline_line_height(line_height),
                         },
                         &mut chunk,
                         &run.style,
@@ -17035,7 +17392,7 @@ impl<'a> TextFrameLayout<'a> {
                     TextPlacement {
                       x_pt: chunk_x,
                       y_pt: y,
-                      line_height_pt: line_height,
+                      line_height_pt: text_frame.text_baseline_line_height(line_height),
                     },
                     &mut chunk,
                     &run.style,
@@ -17134,7 +17491,21 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: line_height,
+                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                },
+                &mut chunk,
+                &run.style,
+                &meta,
+              );
+            } else if grid_width.is_some() {
+              // Retain the glyph's authored metrics, but position the next
+              // East Asian segment at the section's document-grid pitch.
+              flush_text(
+                current,
+                TextPlacement {
+                  x_pt: chunk_x,
+                  y_pt: y,
+                  line_height_pt: text_frame.text_baseline_line_height(line_height),
                 },
                 &mut chunk,
                 &run.style,
@@ -17148,7 +17519,7 @@ impl<'a> TextFrameLayout<'a> {
             TextPlacement {
               x_pt: chunk_x,
               y_pt: y,
-              line_height_pt: line_height,
+              line_height_pt: text_frame.text_baseline_line_height(line_height),
             },
             &mut chunk,
             &run.style,
@@ -18330,6 +18701,20 @@ impl<'a> TextFrameLayout<'a> {
       paragraph_bottom = y;
       y = paragraph_bottom + self.spacing_after_pt;
     } else if emitted {
+      if let Some(single_line_height) = word_east_asian_paragraph_mark_single_line_height(
+        paragraph,
+        flow.compatibility_mode,
+        text_state.line_fragments.len(),
+        text_metrics,
+      ) {
+        line_height = line_height.max(single_line_height);
+        update_line_text_height(
+          &mut current.items,
+          line_item_start_index,
+          y,
+          text_frame.text_baseline_line_height(line_height),
+        );
+      }
       if paragraph.format.bidi {
         reorder_bidi_line_items(&mut current.items, line_item_start_index, y, text_metrics);
       }
@@ -18337,6 +18722,15 @@ impl<'a> TextFrameLayout<'a> {
         &mut current.items,
         line_item_start_index,
         y,
+        line_right,
+        text_metrics,
+      );
+      justify_paragraph_last_line(
+        paragraph.format.justification,
+        &mut current.items,
+        line_item_start_index,
+        y,
+        line_left,
         line_right,
         text_metrics,
       );
@@ -18386,6 +18780,13 @@ impl<'a> TextFrameLayout<'a> {
       paragraph_bottom = y + base_line_height;
       y = paragraph_bottom + self.spacing_after_pt;
     } else {
+      let empty_line_height = word_east_asian_paragraph_mark_single_line_height(
+        paragraph,
+        flow.compatibility_mode,
+        text_state.line_fragments.len(),
+        text_metrics,
+      )
+      .map_or(base_line_height, |height| base_line_height.max(height));
       if flow.setup.line_numbering.is_some() {
         push_page_fragment(
           current,
@@ -18401,14 +18802,14 @@ impl<'a> TextFrameLayout<'a> {
               x_pt: line_left,
               y_pt: y,
               width_pt: (line_right - line_left).max(0.0),
-              height_pt: base_line_height,
+              height_pt: empty_line_height,
             }),
           },
           text_metrics,
         );
-        text_state.finish_paragraph(y, base_line_height, true);
+        text_state.finish_paragraph(y, empty_line_height, true);
       }
-      paragraph_bottom = y + base_line_height;
+      paragraph_bottom = y + empty_line_height;
       y = paragraph_bottom + self.spacing_after_pt;
     }
     debug_assert!(text_state.split_candidates_are_ordered());
@@ -19327,21 +19728,9 @@ fn align_paragraph_items(
   }
 
   for y in line_ys {
-    let mut min_x = f32::MAX;
-    let mut max_x: f32 = 0.0;
-    for item in items.iter() {
-      if let Some(item_y) = item_y(item)
-        && f32::abs(item_y - y) < 0.01
-        && let Some((x, width)) = item_horizontal_bounds(item, text_metrics)
-      {
-        min_x = min_x.min(x);
-        max_x = max_x.max(x + width);
-      }
-    }
-
-    if min_x == f32::MAX || max_x <= min_x {
+    let Some((min_x, max_x)) = line_horizontal_bounds_for_alignment(items, y, text_metrics) else {
       continue;
-    }
+    };
 
     let available = line_right - min_x;
     let line_width = max_x - min_x;
@@ -19350,24 +19739,99 @@ fn align_paragraph_items(
       ParagraphAlignment::Right => (available - line_width).max(0.0),
       ParagraphAlignment::Left | ParagraphAlignment::Justify => 0.0,
     };
-    if offset <= 0.0 {
-      continue;
-    }
-
-    for item in items.iter_mut() {
-      if let Some(item_y) = item_y(item)
-        && f32::abs(item_y - y) < 0.01
-      {
-        shift_item_x(item, offset);
+    if offset > 0.0 {
+      for item in items.iter_mut() {
+        if let Some(item_y) = item_y(item)
+          && f32::abs(item_y - y) < 0.01
+        {
+          shift_item_x(item, offset);
+        }
       }
+    }
+    mark_dynamic_field_line_anchor(items, y, alignment, text_metrics);
+  }
+}
+
+fn line_horizontal_bounds_for_alignment(
+  items: &[PageItem],
+  y: f32,
+  text_metrics: &mut TextMetrics,
+) -> Option<(f32, f32)> {
+  let line_items = items
+    .iter()
+    .filter(|item| item_y(item).is_some_and(|item_y| (item_y - y).abs() < 0.01))
+    .filter_map(|item| {
+      item_horizontal_bounds(item, text_metrics).map(|(x, width)| (item, x, width))
+    })
+    .collect::<Vec<_>>();
+  let full_right = line_items
+    .iter()
+    .map(|(_, x, width)| x + width)
+    .reduce(f32::max)?;
+  let mut min_x = f32::MAX;
+  let mut max_x = f32::MIN;
+  for (item, x, width) in line_items {
+    min_x = min_x.min(x);
+    let visible_width = match item {
+      PageItem::Text(text) if x + width >= full_right - LAYOUT_EPSILON_PT => {
+        let visible = text.text.trim_end_matches(char::is_whitespace);
+        text_metrics.measure_text(visible, &text.style)
+          + visible.matches(' ').count() as f32 * text.word_spacing_pt
+      }
+      _ => width,
+    };
+    max_x = max_x.max(x + visible_width);
+  }
+  (max_x > min_x).then_some((min_x, max_x))
+}
+
+fn mark_dynamic_field_line_anchor(
+  items: &mut [PageItem],
+  y: f32,
+  alignment: ParagraphAlignment,
+  text_metrics: &mut TextMetrics,
+) {
+  let has_dynamic_field = items.iter().any(|item| {
+    matches!(
+      item,
+      PageItem::Text(text)
+        if (text.y_pt - y).abs() < 0.01 && text.dynamic_field.is_some()
+    )
+  });
+  if !has_dynamic_field {
+    return;
+  }
+
+  let Some((min_x, max_x)) = line_horizontal_bounds_for_alignment(items, y, text_metrics) else {
+    return;
+  };
+  let position_pt = match alignment {
+    ParagraphAlignment::Right => max_x,
+    ParagraphAlignment::Center => (min_x + max_x) / 2.0,
+    ParagraphAlignment::Left | ParagraphAlignment::Justify => return,
+  };
+  let anchor = Some(DynamicFieldLineAnchor {
+    position_pt,
+    alignment,
+  });
+  for item in items.iter_mut() {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    if (text.y_pt - y).abs() < 0.01 {
+      text.dynamic_field_line_anchor = anchor;
     }
   }
 }
 
 fn effective_paragraph_alignment(paragraph: &crate::docx::Paragraph) -> ParagraphAlignment {
   match (paragraph.format.justification.adjust, paragraph.format.bidi) {
-    (crate::docx::ParagraphAdjust::Start, true) => ParagraphAlignment::Right,
-    (crate::docx::ParagraphAdjust::End, true) => ParagraphAlignment::Left,
+    (crate::docx::ParagraphAdjust::Left | crate::docx::ParagraphAdjust::Start, true) => {
+      ParagraphAlignment::Right
+    }
+    (crate::docx::ParagraphAdjust::Right | crate::docx::ParagraphAdjust::End, true) => {
+      ParagraphAlignment::Left
+    }
     _ => paragraph.format.alignment,
   }
 }
@@ -19574,6 +20038,7 @@ fn push_tab_leader(
       rotation_center_pt: None,
       hyperlink_url: None,
       dynamic_field: None,
+      dynamic_field_line_anchor: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
       style_ref_numbering_text: None,
@@ -19650,6 +20115,59 @@ fn justify_line_items(
     space_count += visible_text.matches(' ').count();
   }
   if space_count == 0 {
+    let mut cjk_item_count = 0usize;
+    let mut first_cjk_x = None;
+    let mut second_cjk_x = None;
+    let mut last_cjk_x = None;
+    for item in items.iter().skip(start_index) {
+      if item_y(item).is_none_or(|item_y| (item_y - y).abs() >= 0.01) {
+        continue;
+      }
+      let PageItem::Text(text) = item else {
+        return;
+      };
+      let mut characters = text.text.chars();
+      let Some(character) = characters.next() else {
+        continue;
+      };
+      if characters.next().is_some() || !cjk_line_character(character) {
+        return;
+      }
+      first_cjk_x.get_or_insert(text.x_pt);
+      if cjk_item_count == 1 {
+        second_cjk_x = Some(text.x_pt);
+      }
+      last_cjk_x = Some(text.x_pt);
+      cjk_item_count += 1;
+    }
+    if cjk_item_count < 2 {
+      return;
+    }
+    // A linesAndChars document grid materializes each East Asian character
+    // as its own positioned portion. Distributed adjustment expands the
+    // inter-character slots, including the paragraph's final line.
+    let grid_pitch = second_cjk_x.unwrap_or_default() - first_cjk_x.unwrap_or_default();
+    if grid_pitch <= LAYOUT_EPSILON_PT {
+      return;
+    }
+    let grid_columns = ((line_right - line_left) / grid_pitch).floor().max(1.0);
+    let last_grid_x = line_left + (grid_columns - 1.0) * grid_pitch;
+    let extra_per_character =
+      (last_grid_x - last_cjk_x.unwrap_or_default()).max(0.0) / (cjk_item_count - 1) as f32;
+    let mut character_index = 0usize;
+    for item in items.iter_mut().skip(start_index) {
+      if item_y(item).is_none_or(|item_y| (item_y - y).abs() >= 0.01) {
+        continue;
+      }
+      let PageItem::Text(text) = item else {
+        return;
+      };
+      if text.text.is_empty() {
+        continue;
+      }
+      text.x_pt += character_index as f32 * extra_per_character;
+      character_index += 1;
+    }
     return;
   }
 
@@ -19672,6 +20190,20 @@ fn justify_line_items(
     text.x_pt += preceding_space_advance;
     text.word_spacing_pt = extra_per_space;
     preceding_space_advance += text.text.matches(' ').count() as f32 * extra_per_space;
+  }
+}
+
+fn justify_paragraph_last_line(
+  justification: crate::docx::ParagraphJustification,
+  items: &mut [PageItem],
+  start_index: usize,
+  y: f32,
+  line_left: f32,
+  line_right: f32,
+  text_metrics: &mut TextMetrics,
+) {
+  if justification.last_line_adjust == crate::docx::ParagraphAdjust::Block {
+    justify_line_items(items, start_index, y, line_left, line_right, text_metrics);
   }
 }
 
@@ -19969,6 +20501,7 @@ struct TextChunkMeta<'a> {
   form_widget_id: Option<u32>,
   paragraph_bidi: bool,
   preserve_text_portion: bool,
+  normalize_baseline_shift: bool,
   segmentation: TextSegmentation,
 }
 
@@ -19983,15 +20516,24 @@ fn flush_text(
     return;
   }
 
+  let mut style = style.clone();
+  if meta.normalize_baseline_shift {
+    // When the paragraph mark and every printable portion carry the same
+    // automatic escapement, Word owns that displacement in the line box. A
+    // second per-run shift would raise an all-superscript line twice. Mixed
+    // ordinary/superscript lines retain the authored relative shift.
+    style.baseline_shift_pt = 0.0;
+  }
   page.items.push(PageItem::Text(Box::new(TextItem {
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
     text: std::mem::take(chunk),
-    style: style.clone(),
+    style,
     rotation_center_pt: None,
     hyperlink_url: meta.hyperlink_url.map(ToString::to_string),
     dynamic_field: meta.dynamic_field.cloned(),
+    dynamic_field_line_anchor: None,
     style_ref_keys: meta.style_ref_keys.to_vec(),
     style_ref_text: meta.style_ref_text.cloned(),
     style_ref_numbering_text: meta.style_ref_numbering_text.cloned(),
@@ -20045,6 +20587,7 @@ fn push_ruby_text(
     rotation_center_pt: None,
     hyperlink_url: run.hyperlink_url.clone(),
     dynamic_field: run.dynamic_field.clone(),
+    dynamic_field_line_anchor: None,
     style_ref_keys,
     style_ref_text,
     style_ref_numbering_text,
@@ -20331,6 +20874,163 @@ mod tests {
     CellBorderSuppressions, CellBordersModel, CellMargins, Paragraph, ParagraphFormat,
     TableBordersModel, TextRun,
   };
+
+  #[test]
+  fn vertical_shape_flip_compensates_word_text_rotation() {
+    assert_eq!(inline_shape_text_rotation_degrees(180.0, true), 360.0);
+    assert_eq!(inline_shape_text_rotation_degrees(270.0, true), 450.0);
+    assert_eq!(inline_shape_text_rotation_degrees(90.0, false), 90.0);
+  }
+
+  #[test]
+  fn east_asian_document_grid_uses_fixed_character_pitch() {
+    assert_eq!(grid_character_segment_width("中文", Some(24.0)), Some(48.0));
+    assert_eq!(grid_character_segment_width("A", Some(24.0)), None);
+    assert_eq!(grid_character_segment_width("中文", None), None);
+  }
+
+  #[test]
+  fn gutter_follows_binding_side_and_rtl_override() {
+    let setup = PageSetup {
+      margin_left_pt: 72.0,
+      margin_right_pt: 54.0,
+      gutter_pt: 36.0,
+      ..Default::default()
+    };
+    assert_eq!(effective_horizontal_page_margins(setup, 0), (108.0, 54.0));
+
+    let mirrored = PageSetup {
+      mirror_margins: true,
+      ..setup
+    };
+    assert_eq!(
+      effective_horizontal_page_margins(mirrored, 1),
+      (54.0, 108.0)
+    );
+
+    let rtl = PageSetup {
+      rtl_gutter: true,
+      ..setup
+    };
+    assert_eq!(effective_horizontal_page_margins(rtl, 0), (72.0, 90.0));
+
+    let top = PageSetup {
+      gutter_at_top: true,
+      ..setup
+    };
+    assert_eq!(effective_horizontal_page_margins(top, 0), (72.0, 54.0));
+  }
+
+  #[test]
+  fn character_indents_use_the_imported_document_default_unit() {
+    let paragraph = Paragraph {
+      inlines: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle {
+        font_size_pt: 16.0,
+        ..Default::default()
+      },
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        indent_left_character_units: Some(18.44),
+        indent_right_character_units: Some(5.0),
+        first_line_indent_character_units: Some(-1.5),
+        character_indent_unit_pt: Some(10.5),
+        ..Default::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let mut text_metrics = TextMetrics::new();
+
+    let (left, right, first_line) = resolved_paragraph_indents(&paragraph, &mut text_metrics);
+
+    assert!((left - 193.62).abs() < 0.001);
+    assert!((right - 52.5).abs() < 0.001);
+    assert!((first_line + 15.75).abs() < 0.001);
+  }
+
+  #[test]
+  fn rtl_paragraph_exchanges_logical_indents_and_default_alignment() {
+    let paragraph = Paragraph {
+      inlines: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        indent_left_pt: 72.0,
+        indent_right_pt: 7.2,
+        bidi: true,
+        ..Default::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let mut text_metrics = TextMetrics::new();
+
+    let (left, right, first_line) = resolved_paragraph_indents(&paragraph, &mut text_metrics);
+
+    assert!((left - 7.2).abs() < 0.001);
+    assert_eq!(right, 72.0);
+    assert_eq!(first_line, 0.0);
+    assert_eq!(
+      effective_paragraph_alignment(&paragraph),
+      ParagraphAlignment::Right
+    );
+  }
+
+  #[test]
+  fn paragraph_alignment_excludes_wrapped_line_trailing_space() {
+    let style = TextStyle::default();
+    let mut text_metrics = TextMetrics::new();
+    let visible_width = text_metrics.measure_text("word", &style);
+    let mut items = vec![PageItem::Text(Box::new(TextItem {
+      x_pt: 0.0,
+      y_pt: 20.0,
+      line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      text: "word ".to_string(),
+      style,
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      dynamic_field_line_anchor: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+    }))];
+
+    align_paragraph_items(
+      &mut items,
+      ParagraphAlignment::Center,
+      &mut text_metrics,
+      100.0,
+    );
+
+    let PageItem::Text(text) = &items[0] else {
+      panic!("expected text");
+    };
+    assert!((text.x_pt - (100.0 - visible_width) / 2.0).abs() < 0.001);
+  }
 
   #[test]
   fn inline_alignment_translates_an_image_clip_with_the_image() {
@@ -21039,6 +21739,183 @@ mod tests {
   }
 
   #[test]
+  fn extreme_auto_line_spacing_keeps_the_default_text_baseline_box() {
+    let paragraph = Paragraph {
+      inlines: vec![InlineItem::Text(TextRun {
+        text: "Hello".into(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })],
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        line_height_rule: LineHeightRule::Auto,
+        line_height_pt: Some(132.0),
+        ..Default::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let mut text_metrics = TextMetrics::new();
+    let base_style = paragraph_base_line_style(&paragraph);
+    let natural_height = paragraph_single_line_height(&paragraph, &base_style, &mut text_metrics);
+    let frame = TextFrame::new(
+      &paragraph,
+      flow_from_block_area(BlockArea {
+        setup: PageSetup::default(),
+        section_index: 0,
+        section_page_index: 0,
+        column_index: 0,
+        columns: SectionColumns::default(),
+        content_top_pt: 72.0,
+        content_left_pt: 72.0,
+        content_bottom: 720.0,
+        body_content_bottom_pt: 720.0,
+        content_width: 468.0,
+        default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+        compatibility_mode: 15,
+        justify_lines_with_shrinking: false,
+        repeating_slots: RepeatingSlotState::default(),
+      }),
+      &mut text_metrics,
+    );
+
+    assert!(frame.base_line_height > 1_000.0);
+    assert!(
+      (frame.text_baseline_line_height(frame.base_line_height)
+        - natural_height * LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT / PERCENT_SCALE)
+        .abs()
+        < 0.001
+    );
+  }
+
+  #[test]
+  fn paragraph_mark_shift_normalizes_only_an_all_shifted_text_line() {
+    let shifted_style = TextStyle {
+      baseline_shift_pt: 3.3,
+      ..Default::default()
+    };
+    let mut paragraph = Paragraph {
+      inlines: vec![InlineItem::Text(TextRun {
+        text: "superscript".into(),
+        style: shifted_style.clone(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })],
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: shifted_style,
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat::default()),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+
+    assert!(paragraph_uses_only_paragraph_mark_baseline_shift(
+      &paragraph
+    ));
+    paragraph.base_style.baseline_shift_pt = 0.0;
+    assert!(!paragraph_uses_only_paragraph_mark_baseline_shift(
+      &paragraph
+    ));
+  }
+
+  #[test]
+  fn east_asian_paragraph_mark_metrics_require_a_modern_start_or_legacy_superscript() {
+    let mut paragraph = Paragraph {
+      inlines: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        justification: crate::docx::ParagraphJustification {
+          adjust: crate::docx::ParagraphAdjust::Start,
+          ..Default::default()
+        },
+        ..Default::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let mut text_metrics = TextMetrics::new();
+
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(&paragraph, 15, 0, &mut text_metrics)
+        .is_some()
+    );
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(&paragraph, 12, 0, &mut text_metrics)
+        .is_none()
+    );
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(&paragraph, 15, 1, &mut text_metrics)
+        .is_none()
+    );
+
+    paragraph.inlines.push(InlineItem::Text(TextRun {
+      text: "st".into(),
+      style: TextStyle {
+        font_size_pt: 7.15,
+        baseline_shift_pt: 3.63,
+        ..Default::default()
+      },
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      preserve_text_portion: false,
+    }));
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(&paragraph, 12, 0, &mut text_metrics)
+        .is_none()
+    );
+
+    paragraph.format.justification.adjust = crate::docx::ParagraphAdjust::Left;
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(&paragraph, 15, 0, &mut text_metrics)
+        .is_none()
+    );
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(&paragraph, 12, 0, &mut text_metrics)
+        .is_some()
+    );
+  }
+
+  #[test]
   fn table_cell_height_collapses_adjacent_paragraph_spacing() {
     fn table_cell_flow() -> FlowContext {
       FlowContext {
@@ -21574,6 +22451,7 @@ mod tests {
       },
       0,
       SectionColumns::default(),
+      0,
       0,
       DEFAULT_TAB_STOP_PT,
     );
@@ -22267,7 +23145,7 @@ mod tests {
   }
 
   #[test]
-  fn justified_line_distributes_right_margin_glue_across_word_spaces() {
+  fn distributed_paragraph_last_line_reaches_the_right_margin() {
     fn text_item(x_pt: f32, text: &str) -> PageItem {
       PageItem::Text(Box::new(TextItem {
         x_pt,
@@ -22278,6 +23156,7 @@ mod tests {
         rotation_center_pt: None,
         hyperlink_url: None,
         dynamic_field: None,
+        dynamic_field_line_anchor: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
         style_ref_numbering_text: None,
@@ -22301,7 +23180,19 @@ mod tests {
       text_item(first_width, "beta gamma "),
     ];
 
-    justify_line_items(&mut items, 0, 20.0, 0.0, line_right, &mut text_metrics);
+    justify_paragraph_last_line(
+      crate::docx::ParagraphJustification {
+        adjust: crate::docx::ParagraphAdjust::Block,
+        last_line_adjust: crate::docx::ParagraphAdjust::Block,
+        ..Default::default()
+      },
+      &mut items,
+      0,
+      20.0,
+      0.0,
+      line_right,
+      &mut text_metrics,
+    );
 
     let PageItem::Text(first) = &items[0] else {
       panic!("expected text item");
@@ -22313,6 +23204,42 @@ mod tests {
     assert!((second.word_spacing_pt - 6.0).abs() < 0.001);
     assert!((second.x_pt - (first_width + 6.0)).abs() < 0.001);
     assert!((second.x_pt + second_width + second.word_spacing_pt - line_right).abs() < 0.001);
+  }
+
+  #[test]
+  fn distributed_grid_characters_reach_the_last_full_grid_column() {
+    let style = TextStyle::default();
+    let mut text_metrics = TextMetrics::new();
+    let item = |x_pt: f32| {
+      PageItem::Text(Box::new(TextItem {
+        x_pt,
+        y_pt: 20.0,
+        line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        text: "中".to_string(),
+        style: style.clone(),
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        dynamic_field_line_anchor: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        preserve_text_portion: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      }))
+    };
+    let mut items = vec![item(0.0), item(24.0), item(48.0)];
+
+    justify_line_items(&mut items, 0, 20.0, 0.0, 100.0, &mut text_metrics);
+
+    let PageItem::Text(last) = &items[2] else {
+      panic!("expected text item");
+    };
+    assert!((last.x_pt - 72.0).abs() < 0.001);
   }
 
   #[test]
@@ -22348,6 +23275,7 @@ mod tests {
         rotation_center_pt: None,
         hyperlink_url: None,
         dynamic_field: None,
+        dynamic_field_line_anchor: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
         style_ref_numbering_text: None,
@@ -22459,6 +23387,7 @@ mod tests {
       dynamic_field: Some(DynamicFieldKind::PageRef {
         bookmark_name: Arc::<str>::from("_Toc123"),
       }),
+      dynamic_field_line_anchor: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
       style_ref_numbering_text: None,
@@ -22479,12 +23408,56 @@ mod tests {
     }];
     let mut pages = vec![page];
 
-    resolve_dynamic_fields(&mut pages, &anchors, &[], &[]);
+    resolve_dynamic_fields(&mut pages, &anchors, &[], &[], &mut TextMetrics::new());
 
     let PageItem::Text(text) = &pages[0].items[0] else {
       panic!("expected text item");
     };
     assert_eq!(text.text, "9");
+  }
+
+  #[test]
+  fn resolved_page_field_preserves_right_aligned_cached_line_edge() {
+    let mut page = empty_page(PageSetup::default(), 0);
+    page.items.push(PageItem::Text(Box::new(TextItem {
+      x_pt: 0.0,
+      y_pt: 20.0,
+      line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      text: "96".to_string(),
+      style: TextStyle::default(),
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: Some(DynamicFieldKind::Page {
+        number_format: FieldNumberFormat::Decimal,
+      }),
+      dynamic_field_line_anchor: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+    })));
+    let mut text_metrics = TextMetrics::new();
+    align_paragraph_items(
+      &mut page.items,
+      ParagraphAlignment::Right,
+      &mut text_metrics,
+      100.0,
+    );
+    let mut pages = vec![page];
+
+    resolve_dynamic_fields(&mut pages, &[], &[], &[], &mut text_metrics);
+
+    let PageItem::Text(text) = &pages[0].items[0] else {
+      panic!("expected page field");
+    };
+    assert_eq!(text.text, "1");
+    let right = text.x_pt + text_metrics.measure_text(&text.text, &text.style);
+    assert!((right - 100.0).abs() < 0.001);
   }
 
   #[test]
@@ -22504,6 +23477,7 @@ mod tests {
           rotation_center_pt: None,
           hyperlink_url: None,
           dynamic_field: None,
+          dynamic_field_line_anchor: None,
           style_ref_keys: Vec::new(),
           style_ref_text: None,
           style_ref_numbering_text: None,
@@ -22548,6 +23522,7 @@ mod tests {
         rotation_center_pt: None,
         hyperlink_url: Some(url.to_string()),
         dynamic_field: None,
+        dynamic_field_line_anchor: None,
         style_ref_keys: Vec::new(),
         style_ref_text: None,
         style_ref_numbering_text: None,

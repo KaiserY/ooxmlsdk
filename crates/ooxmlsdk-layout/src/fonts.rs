@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use ooxmlsdk_fonts::{
   FeatureValue, FontBytes, FontFallbackChain, FontId, FontRegistry, FontRequest, FontSize,
-  ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun, TextDirection, TextScript,
+  ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun, TextScript,
   script_direction_runs_with_options,
 };
 use rustc_hash::FxHashMap as HashMap;
@@ -478,6 +478,16 @@ impl FontResolver {
       .map(|metrics| metrics.vertical)
   }
 
+  pub(crate) fn vertical_metrics_for_script(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+    script: TextScript,
+  ) -> Option<ooxmlsdk_fonts::VerticalMetrics> {
+    self
+      .font_metrics(style, Some(script))
+      .map(|metrics| metrics.vertical)
+  }
+
   pub fn decoration_metrics(
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
@@ -610,8 +620,10 @@ impl FontResolver {
       request.size_pt =
         FontSize(effective_font_size_pt(style, Some(script_run.script)) * small_caps_scale);
       request.script = Some(script_run.script);
-      let direction = effective_text_direction(style, script_run.direction);
-      let mut options = ShapeOptions::from_request(&request, direction);
+      // w:rtl selects the complex-script run properties, but it must not
+      // reverse a strong LTR Unicode run. Keep the direction discovered from
+      // the text itself; paragraph-level bidi layout owns visual run order.
+      let mut options = ShapeOptions::from_request(&request, script_run.direction);
       options.character_spacing_pt = style.character_spacing_pt();
       options.horizontal_scale = style.horizontal_scale();
       options.small_caps = script_run.small_caps;
@@ -693,17 +705,6 @@ impl FontResolver {
     let face = font_face_data_from_registry_binary(font_id, registry)?;
     self.font_data_cache.insert(font_id.clone(), face.clone());
     self.font_face_data(font_id)
-  }
-}
-
-fn effective_text_direction(
-  style: &(impl FontStyleRef + ?Sized),
-  scanned_direction: TextDirection,
-) -> TextDirection {
-  if style.right_to_left() {
-    TextDirection::RightToLeft
-  } else {
-    scanned_direction
   }
 }
 
@@ -945,12 +946,11 @@ mod tests {
 
   use crate::common::OpenTypeLigatures;
   use crate::docx::TextStyle;
-  use ooxmlsdk_fonts::TextScript;
-
-  use super::{
-    effective_font_size_pt, effective_text_direction, font_request, load_text_face,
-    script_font_family,
+  use ooxmlsdk_fonts::{
+    FontSize, ScriptScanOptions, TextDirection, TextScript, script_direction_runs_with_options,
   };
+
+  use super::{effective_font_size_pt, font_request, load_text_face, script_font_family};
 
   #[test]
   fn kerning_feature_follows_the_wordprocessingml_size_threshold() {
@@ -1036,16 +1036,27 @@ mod tests {
   }
 
   #[test]
-  fn explicit_right_to_left_forces_shaping_direction() {
+  fn explicit_right_to_left_selects_complex_properties_without_reversing_latin() {
     let style = TextStyle {
       right_to_left: Some(true),
+      complex_font_size_pt: Some(18.0),
       ..Default::default()
     };
 
     assert_eq!(
-      effective_text_direction(&style, ooxmlsdk_fonts::TextDirection::LeftToRight),
-      ooxmlsdk_fonts::TextDirection::RightToLeft
+      effective_font_size_pt(&style, Some(TextScript::Latin)),
+      18.0
     );
+    let runs = script_direction_runs_with_options(
+      "placeholder",
+      FontSize(style.font_size_pt),
+      ScriptScanOptions {
+        wordprocessingml_font_slots: true,
+        ..ScriptScanOptions::default()
+      },
+    );
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].direction, TextDirection::LeftToRight);
   }
 
   #[test]

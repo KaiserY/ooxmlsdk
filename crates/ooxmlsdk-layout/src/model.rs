@@ -123,6 +123,9 @@ pub struct TextStyle {
   pub hidden: bool,
   pub rotation_deg: f32,
   pub color: RgbColor,
+  /// Whether the WordprocessingML text color is still automatic and may
+  /// adapt to an inherited run background.
+  pub(crate) color_is_automatic: bool,
   pub opacity: f32,
   pub outline_color: Option<RgbColor>,
   pub outline_opacity: f32,
@@ -171,6 +174,7 @@ impl Default for TextStyle {
       hidden: false,
       rotation_deg: 0.0,
       color: RgbColor { r: 0, g: 0, b: 0 },
+      color_is_automatic: true,
       opacity: 1.0,
       outline_color: None,
       outline_opacity: 1.0,
@@ -204,6 +208,9 @@ pub struct PageSetup {
   pub margin_right_pt: f32,
   pub margin_bottom_pt: f32,
   pub margin_left_pt: f32,
+  pub gutter_pt: f32,
+  pub gutter_at_top: bool,
+  pub rtl_gutter: bool,
   pub mirror_margins: bool,
   pub top_margin_was_negative: bool,
   pub bottom_margin_was_negative: bool,
@@ -214,6 +221,7 @@ pub struct PageSetup {
   pub borders_offset_from_text: bool,
   pub line_numbering: Option<LineNumbering>,
   pub doc_grid_line_pitch_pt: Option<f32>,
+  pub doc_grid_character_spacing_pt: Option<f32>,
   pub adjust_table_line_heights_to_grid: bool,
   pub page_number_start: Option<i32>,
 }
@@ -229,6 +237,9 @@ impl Default for PageSetup {
       margin_right_pt: 72.0,
       margin_bottom_pt: 72.0,
       margin_left_pt: 72.0,
+      gutter_pt: 0.0,
+      gutter_at_top: false,
+      rtl_gutter: false,
       mirror_margins: false,
       top_margin_was_negative: false,
       bottom_margin_was_negative: false,
@@ -239,6 +250,7 @@ impl Default for PageSetup {
       borders_offset_from_text: false,
       line_numbering: None,
       doc_grid_line_pitch_pt: None,
+      doc_grid_character_spacing_pt: None,
       adjust_table_line_heights_to_grid: false,
       page_number_start: None,
     }

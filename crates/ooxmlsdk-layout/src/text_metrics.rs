@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use ooxmlsdk_fonts::TextScript;
 use rustc_hash::FxHashMap as HashMap;
 
 use crate::fonts::{FontFaceData, FontResolver, FontStyleRef};
@@ -222,6 +223,23 @@ impl TextMetrics {
         baseline_offset_pt: metrics.baseline_offset_pt,
       })
       .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt()))
+  }
+
+  pub(crate) fn vertical_metrics_for_script(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+    script: TextScript,
+  ) -> TextVerticalMetrics {
+    self
+      .fonts
+      .vertical_metrics_for_script(style, script)
+      .map(|metrics| TextVerticalMetrics {
+        ascent_pt: metrics.ascent_pt,
+        descent_pt: metrics.descent_pt,
+        line_gap_pt: metrics.line_gap_pt,
+        baseline_offset_pt: metrics.baseline_offset_pt,
+      })
+      .unwrap_or_else(|| self.vertical_metrics(style))
   }
 
   pub fn vertical_metrics_for_text(

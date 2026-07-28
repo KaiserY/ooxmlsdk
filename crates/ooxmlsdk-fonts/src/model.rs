@@ -2700,6 +2700,15 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
     ),
     office_family_fallback("Arial", &["Liberation Sans", "Arimo"]),
     office_family_fallback("Arial Black", &["Arial", "Liberation Sans"]),
+    // AR PL SungtiL GB is the legacy Simplified Chinese Song face written by
+    // older LibreOffice documents. Current LibreOffice's zh-CN CJK_TEXT list
+    // starts with Source Han/Noto Serif CJK SC before SimSun-style fallbacks;
+    // keep the same serif/script identity instead of letting the generic Han
+    // chain substitute a sans face.
+    office_family_fallback(
+      "AR PL SungtiL GB",
+      &["Noto Serif CJK SC", "Source Han Serif SC", "SimSun"],
+    ),
     office_family_fallback("Yu Gothic", &["Noto Sans CJK JP"]),
     office_family_fallback("游ゴシック", &["Yu Gothic", "Noto Sans CJK JP"]),
     office_family_fallback("BIZ UD明朝", &["BIZ UDMincho", "Noto Serif CJK JP"]),
@@ -3659,6 +3668,32 @@ fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
   };
   let underline = face.underline_metrics();
   let strikeout = face.strikeout_metrics();
+  let script = face.tables().os2.map_or_else(
+    || ScriptMetrics {
+      superscript_scale: 1.0,
+      subscript_scale: 1.0,
+      small_caps_scale: 1.0,
+      ..ScriptMetrics::default()
+    },
+    |os2| {
+      let superscript = os2.superscript_metrics();
+      let subscript = os2.subscript_metrics();
+      let scale = |units: i16| {
+        if units > 0 {
+          f32::from(units) / units_per_em
+        } else {
+          1.0
+        }
+      };
+      ScriptMetrics {
+        superscript_scale: scale(superscript.y_size),
+        subscript_scale: scale(subscript.y_size),
+        superscript_offset_pt: to_em(i32::from(superscript.y_offset.max(0))),
+        subscript_offset_pt: to_em(i32::from(subscript.y_offset.max(0))),
+        small_caps_scale: 1.0,
+      }
+    },
+  );
   FontMetrics {
     vertical: VerticalMetrics {
       ascent_pt: ascender,
@@ -3682,12 +3717,7 @@ fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
         .map(|metrics| to_em(i32::from(metrics.thickness)).abs())
         .unwrap_or_default(),
     },
-    script: ScriptMetrics {
-      superscript_scale: 1.0,
-      subscript_scale: 1.0,
-      small_caps_scale: 1.0,
-      ..ScriptMetrics::default()
-    },
+    script,
     em_size,
   }
 }
@@ -4264,6 +4294,25 @@ mod tests {
 
     assert_eq!(resolved.font_id, FontId(Arc::from("dengxian")));
     assert_eq!(resolved.resolved_family, Cow::Borrowed("DengXian"));
+  }
+
+  #[test]
+  fn default_office_policy_keeps_legacy_sungti_on_a_simplified_chinese_serif() {
+    let mut registry = FontRegistry::with_default_policy();
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("noto-serif-cjk-sc", "Noto Serif CJK SC"),
+    );
+
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("AR PL SungtiL GB")),
+      script: Some(TextScript::Han),
+      ..FontRequest::default()
+    };
+    let resolved = registry.resolve(&request).unwrap();
+
+    assert_eq!(resolved.font_id, FontId(Arc::from("noto-serif-cjk-sc")));
+    assert_eq!(resolved.resolved_family, Cow::Borrowed("Noto Serif CJK SC"));
   }
 
   #[test]

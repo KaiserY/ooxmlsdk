@@ -1,11 +1,11 @@
 use super::{
-  LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE, LO_SUBSCRIPT_BASELINE_SHIFT_SCALE,
-  LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE, MIN_ESCAPEMENT_FONT_SIZE_PT, ParagraphFormat,
-  ParagraphProps, RunProps, RunStyleOverrides, StylesCatalog, TextStyle, ThemeColors, ThemeFonts,
-  apply_w14_scheme_transforms, drawingml_text_effect_common_fill,
-  drawingml_text_outline_effect_common_fill, merge_paragraph_format,
-  opacity_from_w14_rgb_transforms, opacity_from_w14_scheme_transforms, parse_hex_color,
-  resolve_run_color, resolve_text_fill, resolve_text_outline,
+  LO_SUBSCRIPT_BASELINE_SHIFT_SCALE, LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE,
+  MIN_ESCAPEMENT_FONT_SIZE_PT, ParagraphFormat, ParagraphProps, RunProps, RunStyleOverrides,
+  StylesCatalog, TextStyle, ThemeColors, ThemeFonts, WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE,
+  apply_w14_scheme_transforms, automatic_text_color_for_background,
+  drawingml_text_effect_common_fill, drawingml_text_outline_effect_common_fill,
+  merge_paragraph_format, opacity_from_w14_rgb_transforms, opacity_from_w14_scheme_transforms,
+  parse_hex_color, resolve_run_color, resolve_text_fill, resolve_text_outline, shading_fill,
 };
 use crate::common;
 use crate::units;
@@ -159,20 +159,33 @@ pub(super) fn merge_run_style(
     style.complex_font_size_pt = Some((size.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
   }
   if let Some(color) = properties.color() {
-    if matches!(&properties, RunProps::Numbering(_))
-      && color
-        .val
-        .as_deref()
-        .is_some_and(|value| value.eq_ignore_ascii_case("auto"))
+    if color
+      .val
+      .as_deref()
+      .is_some_and(|value| value.eq_ignore_ascii_case("auto"))
     {
-      style.color = super::RgbColor {
-        r: 255,
-        g: 255,
-        b: 255,
-      };
+      if matches!(&properties, RunProps::Numbering(_)) {
+        style.color = super::RgbColor {
+          r: 255,
+          g: 255,
+          b: 255,
+        };
+        style.color_is_automatic = false;
+      } else {
+        style.color_is_automatic = true;
+      }
     } else if let Some(rgb) = resolve_run_color(color, theme_colors) {
       style.color = rgb;
+      style.color_is_automatic = false;
     }
+  }
+  if let Some(shading) = properties.shading()
+    && let Some(background) = shading_fill(shading)
+  {
+    // ECMA-376 Part 1 §17.3.2.32 makes run shading a background behind
+    // the run contents. Automatic text remains context-sensitive, and Word
+    // selects the higher-contrast neutral for a dark run background.
+    style.highlight = Some(background);
   }
   if let Some(fill_effect) = properties.text_fill() {
     match drawingml_text_effect_common_fill(fill_effect, theme_colors) {
@@ -180,11 +193,13 @@ pub(super) fn merge_run_style(
         // w14:textFill supersedes w:color. Keep the run for layout and for an
         // independently authored outline, but do not paint its interior.
         style.opacity = 0.0;
+        style.color_is_automatic = false;
       }
       Some(fill @ common::Fill::Gradient(_)) => {
         // Word's fixed-format writer clips the authored gradient to glyph
         // outlines and retains a separate searchable text layer.
         style.pdf_glyph_outlines = true;
+        style.color_is_automatic = false;
         style.opacity = 1.0;
         let mut options = style
           .pdf_glyph_outline_options
@@ -198,6 +213,7 @@ pub(super) fn merge_run_style(
       Some(common::Fill::Solid(_)) | None => {
         if let Some(resolved) = resolve_text_fill(fill_effect, theme_colors) {
           style.color = resolved.color;
+          style.color_is_automatic = false;
           style.opacity = resolved.opacity;
         }
       }
@@ -387,20 +403,20 @@ pub(super) fn merge_run_style(
       w::VerticalPositionValues::Superscript => {
         style.baseline_shift_pt =
           crate::fonts::effective_font_size_pt(style, None) * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
-        style.font_size_pt = (style.font_size_pt * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
+        style.font_size_pt = (style.font_size_pt * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
           .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
-        style.complex_font_size_pt = style
-          .complex_font_size_pt
-          .map(|size| (size * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+        style.complex_font_size_pt = style.complex_font_size_pt.map(|size| {
+          (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT)
+        });
       }
       w::VerticalPositionValues::Subscript => {
         style.baseline_shift_pt =
           crate::fonts::effective_font_size_pt(style, None) * LO_SUBSCRIPT_BASELINE_SHIFT_SCALE;
-        style.font_size_pt = (style.font_size_pt * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
+        style.font_size_pt = (style.font_size_pt * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
           .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
-        style.complex_font_size_pt = style
-          .complex_font_size_pt
-          .map(|size| (size * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+        style.complex_font_size_pt = style.complex_font_size_pt.map(|size| {
+          (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT)
+        });
       }
       w::VerticalPositionValues::Baseline => {
         style.baseline_shift_pt = 0.0;
@@ -409,6 +425,40 @@ pub(super) fn merge_run_style(
   }
   if let Some(highlight) = properties.highlight() {
     style.highlight = highlight_color(highlight.val);
+  }
+  if style.color_is_automatic {
+    style.color = super::RgbColor { r: 0, g: 0, b: 0 };
+  }
+}
+
+pub(super) fn merge_doc_default_run_style(
+  style: &mut TextStyle,
+  properties: Option<&w::RunPropertiesBaseStyle>,
+  theme_fonts: &ThemeFonts,
+  theme_colors: &ThemeColors,
+) {
+  let Some(properties) = properties else {
+    return;
+  };
+  // Word ignores w:position in docDefaults even though the same property is
+  // inherited from ordinary paragraph/character styles. LibreOffice keeps
+  // this distinction in DomainMapper::lcl_sprm() and regression
+  // testTdf140572_docDefault_superscript.
+  let mut effective = properties.clone();
+  effective.position = None;
+  merge_run_style(
+    style,
+    Some(RunProps::BaseStyle(&effective)),
+    theme_fonts,
+    theme_colors,
+  );
+  if style.color_is_automatic
+    && let Some(background) = effective.shading.as_ref().and_then(shading_fill)
+  {
+    // Office adapts automatic text to dark shading inherited from
+    // docDefaults. Direct run shading and w:highlight retain black automatic
+    // text, so this producer behavior stays scoped to its source level.
+    style.color = automatic_text_color_for_background(background);
   }
 }
 

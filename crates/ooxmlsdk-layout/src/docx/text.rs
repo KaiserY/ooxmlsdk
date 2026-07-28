@@ -1,11 +1,14 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use std::sync::Arc;
 
+use crate::fonts::effective_font_size_pt;
+
 use super::{
   CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog,
   NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphAdjust, ParagraphAlignment,
   ParagraphFormat, ParagraphProps, RunStyleOverrides, StylesCatalog, TextRun, TextStyle,
   math_paragraph_alignment, paragraph_inlines, paragraph_note_reference_ids, properties,
+  select_paragraph_numbering,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -81,6 +84,21 @@ pub(super) fn paragraph_model_with_base<'a>(
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
   format.style_id = style_id.map(Arc::<str>::from);
+  if [
+    format.indent_left_character_units,
+    format.indent_right_character_units,
+    format.first_line_indent_character_units,
+  ]
+  .into_iter()
+  .flatten()
+  .any(|value| value != 0.0)
+  {
+    // Word resolves w:*Chars against the document run default, independently
+    // of the effective paragraph/run style. In paraind.docx, Heading2 is 16pt
+    // while rPrDefault is 10.5pt; Microsoft's fixed PDF uses the 10.5pt unit.
+    // Writer also models FONT_CJK_ADVANCE as the bound CJK font height.
+    format.character_indent_unit_pt = Some(effective_font_size_pt(&styles.doc_default_run, None));
+  }
   if let Some(alignment) = math_paragraph_alignment(paragraph, styles.display_math_alignment) {
     format.alignment = alignment;
     let adjust = match alignment {
@@ -100,7 +118,21 @@ pub(super) fn paragraph_model_with_base<'a>(
     .and_then(|properties| properties.numbering_properties())
     .and_then(NumberingReference::from_properties);
   let style_numbering = styles.paragraph_numbering_reference(style_id);
-  let style_numbering_applies = direct_numbering.is_none() && style_numbering.is_some();
+  let (numbering_reference, style_numbering_applies, numbering_cancelled) =
+    select_paragraph_numbering(direct_numbering, style_numbering);
+  if numbering_cancelled {
+    let (left, first_line) = styles.paragraph_indents_without_numbering(style_id);
+    if !numbering_format_context.direct_indent_left {
+      format.indent_left_pt = left.0;
+      format.indent_left_character_units = left.1;
+      format.indent_left_set = true;
+    }
+    if !numbering_format_context.direct_first_line_indent {
+      format.first_line_indent_pt = first_line.0;
+      format.first_line_indent_character_units = first_line.1;
+      format.first_line_indent_set = true;
+    }
+  }
   let style_indent_overrides_numbering = style_numbering_applies && format.indent_left_set;
   let paragraph_mark_run_properties = paragraph
     .paragraph_properties
@@ -116,7 +148,8 @@ pub(super) fn paragraph_model_with_base<'a>(
   // same precedence in SwTextFormatter::NewNumberPortion.
   let numbering_base_style = paragraph_mark_style.clone();
   let style_tab_stop_pt = format.tab_stops.last().map(|stop| stop.position_pt);
-  let numbering_label = direct_numbering.or(style_numbering).and_then(|reference| {
+  let numbering_label = numbering_reference.and_then(|reference| {
+    let matched_style_indent_context = styles.numbering_matched_style_indent_context(style_id);
     numbering.next_label(
       reference,
       &mut format,
@@ -125,6 +158,10 @@ pub(super) fn paragraph_model_with_base<'a>(
       paragraph_mark_run_properties,
       NumberingFormatMergeContext {
         style_numbering: style_numbering_applies,
+        matched_style_indent_left: matched_style_indent_context.matched_style_indent_left,
+        matched_style_indent_right: matched_style_indent_context.matched_style_indent_right,
+        matched_style_first_line_indent: matched_style_indent_context
+          .matched_style_first_line_indent,
         ..numbering_format_context
       },
     )

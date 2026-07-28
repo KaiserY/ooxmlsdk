@@ -110,9 +110,10 @@ const WML_DEFAULT_BORDER_WIDTH_PT: f32 = 0.5;
 const WML_MIN_BORDER_WIDTH_PT: f32 = 0.25;
 const DRAWINGML_DEFAULT_LINE_WIDTH_EMU: i64 = 0;
 const VML_DEFAULT_STROKE_WEIGHT_EMU: i64 = 1;
-// sw/source/writerfilter/dmapper/DomainMapper.cxx. DOCX vertAlign maps to
-// DFLT_ESC_PROP with DFLT_ESC_SUPER / DFLT_ESC_SUB.
-const LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE: f32 = 0.58;
+// Word fixed output scales automatic w:vertAlign superscript/subscript text to
+// 65% of the authored size. Writer maps the same markup to its older 58%
+// DFLT_ESC_PROP; keep that as importer evidence, not the Office PDF metric.
+const WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE: f32 = 0.65;
 const LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE: f32 = 0.33;
 const LO_SUBSCRIPT_BASELINE_SHIFT_SCALE: f32 = -0.08;
 const MIN_ESCAPEMENT_FONT_SIZE_PT: f32 = 1.0;
@@ -123,6 +124,10 @@ const MAX_WORD_TABLE_MARGIN_TWIPS: f32 = 31_680.0;
 // its application defaults. Office-authored Styles parts materialize these as
 // 160 twips after the paragraph and 259/240 automatic line spacing.
 const OFFICE_RECOVERED_PARAGRAPH_AFTER_PT: f32 = 8.0;
+// Writer's OOXML DomainMapper uses the Word binary importer's 280-twip
+// paragraph auto-spacing value in print layout. Word fixed-format output
+// exposes the same 14pt distance.
+const OFFICE_AUTOMATIC_PARAGRAPH_SPACING_PT: f32 = 14.0;
 const OFFICE_RECOVERED_LINE_HEIGHT_MULTIPLE: f32 = 276.0 / 240.0;
 // The Simplified Chinese Word application Table Normal context uses 1.5-line
 // spacing. This is observable in Microsoft's fixed-format output for a
@@ -176,6 +181,7 @@ pub(crate) fn extract(
   let adjust_line_height_in_table = adjust_line_height_in_table(package, &main);
   let split_page_break_and_paragraph_mark = split_page_break_and_paragraph_mark(package, &main);
   let mirror_margins = mirror_margins(package, &main);
+  let gutter_at_top = gutter_at_top(package, &main);
   let document = main.root_element(package)?;
   let mut body_styles = styles.clone();
   body_styles.preserve_word_text_whitespace =
@@ -228,6 +234,7 @@ pub(crate) fn extract(
   for section in &mut sections {
     section.page.background = page_background;
     section.page.mirror_margins = mirror_margins;
+    section.page.gutter_at_top = gutter_at_top;
     section.page.adjust_table_line_heights_to_grid = adjust_line_height_in_table;
   }
   resolve_section_repeating_blocks(
@@ -520,6 +527,19 @@ fn mirror_margins(package: &mut WordprocessingDocument, main: &MainDocumentPart)
     .and_then(|settings| {
       settings
         .mirror_margins
+        .as_ref()
+        .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
+    })
+    .unwrap_or(false)
+}
+
+fn gutter_at_top(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| {
+      settings
+        .gutter_at_top
         .as_ref()
         .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
     })
@@ -3523,7 +3543,19 @@ fn table_indentation_to_points(indentation: &w::TableIndentation) -> Option<f32>
     // ECMA-376 Part 1 §17.4.50 adds tblInd to the leading edge. Unlike cell
     // margins, this offset can be negative: Word uses it to move a leading
     // table into the page margin (for example, -118 twips in n780645.docx).
-    .and_then(measurement_or_percent_to_points)
+    .and_then(measurement_or_percent_to_twips)
+    .map(|twips| {
+      // Word's legacy table-indent path stores the low 16 bits as a signed
+      // twip value. In large-twips.docx, 65000 therefore becomes -536 twips
+      // and moves the table 26.8pt into the leading margin. Keep ordinary
+      // signed and larger modern measurements unchanged.
+      if twips.fract() == 0.0 && (32_768.0..=65_535.0).contains(&twips) {
+        (twips as u16 as i16) as f32
+      } else {
+        twips
+      }
+    })
+    .map(units::twips_to_points)
 }
 
 fn table_alignment(justification: &w::TableJustification) -> TableAlignment {
@@ -3900,10 +3932,22 @@ fn merge_paragraph_format(
     if let Some(before) = spacing.before.as_ref() {
       format.spacing_before_set = true;
       format.spacing_before_pt = signed_twips_measure_to_points(before).unwrap_or(0.0);
+      format.spacing_before_lines = None;
+    }
+    if let Some(before_lines) = spacing.before_lines {
+      format.spacing_before_set = true;
+      format.spacing_before_pt = 0.0;
+      format.spacing_before_lines = Some((before_lines as f32 / 100.0).max(0.0));
     }
     if let Some(after) = spacing.after.as_ref() {
       format.spacing_after_set = true;
       format.spacing_after_pt = signed_twips_measure_to_points(after).unwrap_or(0.0);
+    }
+    if let Some(after_auto_spacing) = spacing.after_auto_spacing {
+      // Preserve explicit false independently from the resolved ordinary
+      // spacing. It cancels inherited automatic spacing without erasing an
+      // inherited or sibling w:after value.
+      format.spacing_after_auto = Some(after_auto_spacing.as_bool());
     }
     if let Some(line) = spacing.line.as_ref() {
       let negative_line = signed_twips_measure_to_twips(line).is_some_and(|value| value < 0.0);
@@ -4009,7 +4053,7 @@ fn merge_paragraph_format(
     // paragraph style, then DomainMapper_Impl::IncorporateTabStop() applies
     // each direct tab. A w:val="clear" entry removes an inherited tab at the
     // same position instead of being ignored.
-    apply_tab_stops(&mut format.tab_stops, tabs);
+    apply_tab_stops(format, tabs);
     format.tab_stops_set = true;
   }
 
@@ -4244,7 +4288,7 @@ fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFramePrope
   }
 }
 
-fn apply_tab_stops(stops: &mut Vec<TabStop>, tabs: &w::Tabs) {
+fn apply_tab_stops(format: &mut ParagraphFormat, tabs: &w::Tabs) {
   for tab in &tabs.tab_stop {
     let Some(position_pt) = signed_twips_measure_to_points(&tab.position)
       .filter(|position| position.is_finite() && *position >= 0.0)
@@ -4252,7 +4296,16 @@ fn apply_tab_stops(stops: &mut Vec<TabStop>, tabs: &w::Tabs) {
       continue;
     };
     if matches!(tab.val, w::TabStopValues::Clear) {
-      stops.retain(|stop| (stop.position_pt - position_pt).abs() >= TAB_STOP_DEDUP_EPSILON_PT);
+      format
+        .tab_stops
+        .retain(|stop| (stop.position_pt - position_pt).abs() >= TAB_STOP_DEDUP_EPSILON_PT);
+      if !format
+        .tab_stop_clear_positions_pt
+        .iter()
+        .any(|clear| (*clear - position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT)
+      {
+        format.tab_stop_clear_positions_pt.push(position_pt);
+      }
       continue;
     }
     let alignment = match tab.val {
@@ -4265,22 +4318,74 @@ fn apply_tab_stops(stops: &mut Vec<TabStop>, tabs: &w::Tabs) {
       }
       w::TabStopValues::Clear | w::TabStopValues::Bar => continue,
     };
-    if let Some(existing) = stops
+    format
+      .tab_stop_clear_positions_pt
+      .retain(|clear| (*clear - position_pt).abs() >= TAB_STOP_DEDUP_EPSILON_PT);
+    if let Some(existing) = format
+      .tab_stops
       .iter_mut()
       .find(|stop| (stop.position_pt - position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT)
     {
       existing.alignment = alignment;
       existing.leader = tab.leader.map(tab_leader).unwrap_or_default();
     } else {
-      stops.push(TabStop {
+      format.tab_stops.push(TabStop {
         position_pt,
         alignment,
         leader: tab.leader.map(tab_leader).unwrap_or_default(),
       });
     }
   }
-  stops.sort_by(|a, b| a.position_pt.total_cmp(&b.position_pt));
-  stops.dedup_by(|a, b| (a.position_pt - b.position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT);
+  format
+    .tab_stops
+    .sort_by(|a, b| a.position_pt.total_cmp(&b.position_pt));
+  format
+    .tab_stops
+    .dedup_by(|a, b| (a.position_pt - b.position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT);
+  format.tab_stop_clear_positions_pt.sort_by(f32::total_cmp);
+  format
+    .tab_stop_clear_positions_pt
+    .dedup_by(|a, b| (*a - *b).abs() < TAB_STOP_DEDUP_EPSILON_PT);
+}
+
+fn merge_tab_stop_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
+  for clear in &values.tab_stop_clear_positions_pt {
+    target
+      .tab_stops
+      .retain(|stop| (stop.position_pt - clear).abs() >= TAB_STOP_DEDUP_EPSILON_PT);
+    if !target
+      .tab_stop_clear_positions_pt
+      .iter()
+      .any(|existing| (*existing - clear).abs() < TAB_STOP_DEDUP_EPSILON_PT)
+    {
+      target.tab_stop_clear_positions_pt.push(*clear);
+    }
+  }
+  for stop in &values.tab_stops {
+    target
+      .tab_stop_clear_positions_pt
+      .retain(|clear| (*clear - stop.position_pt).abs() >= TAB_STOP_DEDUP_EPSILON_PT);
+    if let Some(existing) = target
+      .tab_stops
+      .iter_mut()
+      .find(|existing| (existing.position_pt - stop.position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT)
+    {
+      *existing = *stop;
+    } else {
+      target.tab_stops.push(*stop);
+    }
+  }
+  target
+    .tab_stops
+    .sort_by(|a, b| a.position_pt.total_cmp(&b.position_pt));
+  target
+    .tab_stops
+    .dedup_by(|a, b| (a.position_pt - b.position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT);
+  target.tab_stop_clear_positions_pt.sort_by(f32::total_cmp);
+  target
+    .tab_stop_clear_positions_pt
+    .dedup_by(|a, b| (*a - *b).abs() < TAB_STOP_DEDUP_EPSILON_PT);
+  target.tab_stops_set = true;
 }
 
 fn tab_leader(leader: w::TabStopLeaderCharValues) -> TabLeader {
@@ -4486,7 +4591,10 @@ fn math_paragraph_alignment(
     Some(math_justification_alignment(justification))
   });
   explicit.or_else(|| {
-    (!paragraph.paragraph_choice.is_empty()
+    (paragraph
+      .paragraph_choice
+      .iter()
+      .any(|choice| shared_math::wordprocessing_math_text(choice).is_some())
       && paragraph.paragraph_choice.iter().all(|choice| {
         shared_math::wordprocessing_math_text(choice).is_some()
           || matches!(choice, w::ParagraphChoice::WRun(run) if run.run_choice.is_empty())
@@ -6561,10 +6669,10 @@ fn note_reference_style(style: &TextStyle) -> TextStyle {
   reference_style.baseline_shift_pt =
     crate::fonts::effective_font_size_pt(style, None) * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
   reference_style.font_size_pt =
-    (style.font_size_pt * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
+    (style.font_size_pt * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
   reference_style.complex_font_size_pt = style
     .complex_font_size_pt
-    .map(|size| (size * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+    .map(|size| (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
   reference_style
 }
 
@@ -6599,11 +6707,12 @@ fn flush_run_text(
 }
 
 fn run_display_text(text: String, style: TextStyle) -> String {
-  if style.uppercase {
+  let text = if style.uppercase {
     text.to_uppercase()
   } else {
     text
-  }
+  };
+  shared_symbol::font_symbol_transport_text(style.font_family.as_deref(), &text).into_owned()
 }
 
 fn symbol_text(symbol: &w::SymbolChar) -> Option<char> {
@@ -7607,9 +7716,9 @@ fn wordprocessing_shape_textbox_text_rotation(shape: &wps::WordprocessingShape) 
   let vertical_rotation = match properties.vertical {
     Some(a::TextVerticalValues::Vertical)
     | Some(a::TextVerticalValues::WordArtVertical)
-    | Some(a::TextVerticalValues::EastAsianVetical) => -90.0,
+    | Some(a::TextVerticalValues::EastAsianVetical) => 90.0,
     Some(a::TextVerticalValues::Vertical270) | Some(a::TextVerticalValues::WordArtLeftToRight) => {
-      90.0
+      -90.0
     }
     _ => 0.0,
   };
@@ -7622,7 +7731,7 @@ fn wordprocessing_shape_textbox_text_rotation(shape: &wps::WordprocessingShape) 
   } else {
     properties
       .rotation
-      .map(|value| -(sdk_units::drawingml_angle_to_degrees(value) as f32))
+      .map(|value| sdk_units::drawingml_angle_to_degrees(value) as f32)
       .unwrap_or_default()
   };
   let rotation = vertical_rotation + text_area_rotation;
@@ -7930,7 +8039,7 @@ fn wordprocessing_shape_textbox_frame(
     .as_deref()
     .cloned()
     .unwrap_or_default();
-  let text_box = text_box_frame_from_wordprocessing_shape(
+  let mut text_box = text_box_frame_from_wordprocessing_shape(
     shape,
     content,
     context.base_style,
@@ -7960,6 +8069,16 @@ fn wordprocessing_shape_textbox_frame(
     properties.rotation_deg(),
     properties.flip_horizontal(),
     properties.flip_vertical(),
+  );
+  apply_wordprocessing_shape_preset_text_rectangle(
+    &properties,
+    mapped.width_pt,
+    mapped.height_pt,
+    wordprocessing_shape_textbox_text_rotation(shape).unwrap_or_default(),
+    mapped.rotation_deg,
+    mapped.flip_horizontal,
+    mapped.flip_vertical,
+    &mut text_box,
   );
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
     (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
@@ -8041,6 +8160,121 @@ fn wordprocessing_shape_textbox_frame(
     text_box_auto_fit: auto_fit,
     text_vertical_alignment: text_box.vertical_alignment,
   })
+}
+
+fn apply_wordprocessing_shape_preset_text_rectangle(
+  properties: &DrawingMlShapeProperties,
+  width_pt: f32,
+  height_pt: f32,
+  text_rotation_deg: f32,
+  shape_rotation_deg: f32,
+  flip_horizontal: bool,
+  flip_vertical: bool,
+  frame: &mut TextBoxFrameContent,
+) {
+  let Some(mut insets) = properties
+    .preset_geometry()
+    .and_then(|preset| drawingml_preset_text_rectangle_insets(preset, width_pt, height_pt))
+  else {
+    return;
+  };
+  if flip_horizontal {
+    insets.swap(0, 2);
+  }
+  if flip_vertical {
+    insets.swap(1, 3);
+  }
+  if rotations_cancel(text_rotation_deg, shape_rotation_deg) {
+    // The PDF display model stores the text-body and owning-shape rotations
+    // as one angle. When they cancel, no final rotation transform remains to
+    // carry the preset text rectangle's off-center placement into page
+    // coordinates. Rotate that center bias eagerly; retain the existing
+    // wrapping extent until rotated text rectangles become a first-class
+    // layout primitive.
+    let center_dx = (insets[0] - insets[2]) * 0.5;
+    let center_dy = (insets[1] - insets[3]) * 0.5;
+    let angle = shape_rotation_deg.to_radians();
+    let rotated_dx = center_dx * angle.cos() - center_dy * angle.sin();
+    let rotated_dy = center_dx * angle.sin() + center_dy * angle.cos();
+    insets = [
+      (rotated_dx * 2.0).max(0.0),
+      (rotated_dy * 2.0).max(0.0),
+      (-rotated_dx * 2.0).max(0.0),
+      (-rotated_dy * 2.0).max(0.0),
+    ];
+  }
+  frame.left_pt += insets[0];
+  frame.top_pt += insets[1];
+  frame.right_pt += insets[2];
+  frame.bottom_pt += insets[3];
+}
+
+fn rotations_cancel(left_deg: f32, right_deg: f32) -> bool {
+  let normalized = (left_deg + right_deg).rem_euclid(360.0);
+  normalized.min(360.0 - normalized) <= 0.001
+    && left_deg.abs() > f32::EPSILON
+    && right_deg.abs() > f32::EPSILON
+}
+
+fn drawingml_preset_text_rectangle_insets(
+  preset: &a::PresetGeometry,
+  width_pt: f32,
+  height_pt: f32,
+) -> Option<[f32; 4]> {
+  if width_pt <= 0.0 || height_pt <= 0.0 {
+    return None;
+  }
+  let guide = |index: usize, default: f32| {
+    preset
+      .adjust_value_list
+      .as_ref()
+      .and_then(|list| list.shape_guide.get(index))
+      .and_then(|guide| {
+        guide
+          .formula
+          .strip_prefix("val ")
+          .unwrap_or(guide.formula.as_str())
+          .parse::<f32>()
+          .ok()
+      })
+      .unwrap_or(default)
+  };
+  match preset.preset {
+    a::ShapeTypeValues::RightTriangle => {
+      // presetShapeDefinitions.xml: rect=(wd12, 7h/12, 7w/12, 11h/12).
+      // The asymmetric rectangle keeps text inside the triangular face
+      // instead of centering it in the shape's complete bounding box.
+      Some([
+        width_pt / 12.0,
+        height_pt * 7.0 / 12.0,
+        width_pt * 5.0 / 12.0,
+        height_pt / 12.0,
+      ])
+    }
+    a::ShapeTypeValues::RightArrow => {
+      // ECMA-376 presetShapeDefinitions.xml defines the right-arrow text
+      // rectangle as (l, y1, x1 + dx2, y2), not the complete shape bounds.
+      // This matters after shape rotation: the rectangle is biased toward the
+      // shaft, so its center rotates away from the geometric center.
+      let min_size = width_pt.min(height_pt);
+      let a1 = guide(0, 50_000.0).clamp(0.0, 100_000.0);
+      let a2 = guide(1, 50_000.0).clamp(0.0, 100_000.0 * width_pt / min_size);
+      let dx1 = min_size * a2 / 100_000.0;
+      let x1 = width_pt - dx1;
+      let dy1 = height_pt * a1 / 200_000.0;
+      let y1 = height_pt / 2.0 - dy1;
+      let y2 = height_pt / 2.0 + dy1;
+      let dx2 = y1 * dx1 / (height_pt / 2.0);
+      let right = x1 + dx2;
+      Some([
+        0.0,
+        y1,
+        (width_pt - right).max(0.0),
+        (height_pt - y2).max(0.0),
+      ])
+    }
+    _ => None,
+  }
 }
 
 fn drawing_graphic_data_choice_textbox_content(
@@ -15088,6 +15322,8 @@ struct StyleEntry {
 
 #[derive(Clone, Copy, Debug, Default)]
 struct RunStyleOverrides {
+  font_size_pt: Option<f32>,
+  complex_font_size_pt: Option<f32>,
   bold: Option<bool>,
   italic: Option<bool>,
   underline: Option<bool>,
@@ -15251,13 +15487,12 @@ impl StylesCatalog {
           .map(ParagraphProps::BaseStyle),
         catalog.import_settings,
       );
-      properties::merge_run_style(
+      properties::merge_doc_default_run_style(
         &mut catalog.doc_default_run,
         defaults
           .run_properties_default
           .as_deref()
-          .and_then(|default| default.run_properties_base_style.as_deref())
-          .map(RunProps::BaseStyle),
+          .and_then(|default| default.run_properties_base_style.as_deref()),
         &catalog.theme_fonts,
         &catalog.theme_colors,
       );
@@ -15377,6 +15612,67 @@ impl StylesCatalog {
     self
       .paragraph_numbering_reference(Some(style_id))
       .map(NumberingReference::num_id)
+  }
+
+  fn numbering_matched_style_indent_context(
+    &self,
+    style_id: Option<&str>,
+  ) -> NumberingFormatMergeContext {
+    let style_id = style_id.or(self.default_paragraph_style_id.as_deref());
+    let Some(format) = style_id
+      .and_then(|style_id| self.styles.get(style_id))
+      .map(|entry| &entry.paragraph_format)
+    else {
+      return NumberingFormatMergeContext::default();
+    };
+    NumberingFormatMergeContext {
+      matched_style_indent_left: format.indent_left_set,
+      matched_style_indent_right: format.indent_right_set,
+      matched_style_first_line_indent: format.first_line_indent_set,
+      ..Default::default()
+    }
+  }
+
+  fn paragraph_indents_without_numbering(
+    &self,
+    style_id: Option<&str>,
+  ) -> ((f32, Option<f32>), (f32, Option<f32>)) {
+    let mut left = None;
+    let mut first_line = None;
+    let mut numbered_style_seen = false;
+    let mut current = style_id.or(self.default_paragraph_style_id.as_deref());
+    let mut visited = HashSet::new();
+    while let Some(style_id) = current
+      && visited.insert(style_id)
+      && let Some(entry) = self.styles.get(style_id)
+    {
+      numbered_style_seen |= entry.paragraph_numbering.is_some();
+      if left.is_none() && entry.paragraph_format.indent_left_set {
+        left = Some(if numbered_style_seen {
+          (0.0, None)
+        } else {
+          (
+            entry.paragraph_format.indent_left_pt,
+            entry.paragraph_format.indent_left_character_units,
+          )
+        });
+      }
+      if first_line.is_none() && entry.paragraph_format.first_line_indent_set {
+        first_line = Some(if numbered_style_seen {
+          (0.0, None)
+        } else {
+          (
+            entry.paragraph_format.first_line_indent_pt,
+            entry.paragraph_format.first_line_indent_character_units,
+          )
+        });
+      }
+      if left.is_some() && first_line.is_some() {
+        break;
+      }
+      current = entry.based_on.as_deref();
+    }
+    (left.unwrap_or_default(), first_line.unwrap_or_default())
   }
 
   fn run_style_with_base(
@@ -16431,6 +16727,12 @@ fn merge_run_style_overrides(
   if source.bold.is_some() {
     target.bold = source.bold;
   }
+  if source.font_size_pt.is_some() {
+    target.font_size_pt = source.font_size_pt;
+  }
+  if source.complex_font_size_pt.is_some() {
+    target.complex_font_size_pt = source.complex_font_size_pt;
+  }
   if source.italic.is_some() {
     target.italic = source.italic;
   }
@@ -16499,6 +16801,12 @@ fn run_style_overrides(properties: Option<RunProps<'_>>) -> RunStyleOverrides {
   };
 
   RunStyleOverrides {
+    font_size_pt: properties
+      .font_size()
+      .map(|value| (value.val.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT)),
+    complex_font_size_pt: properties
+      .complex_script_font_size()
+      .map(|value| (value.val.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT)),
     bold: properties
       .bold()
       .and_then(|value| value.val.map(|value| value.as_bool())),
@@ -16529,6 +16837,12 @@ fn run_style_overrides(properties: Option<RunProps<'_>>) -> RunStyleOverrides {
 }
 
 fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides) {
+  if let Some(font_size_pt) = overrides.font_size_pt {
+    style.font_size_pt = font_size_pt;
+  }
+  if let Some(complex_font_size_pt) = overrides.complex_font_size_pt {
+    style.complex_font_size_pt = Some(complex_font_size_pt);
+  }
   if let Some(bold) = overrides.bold {
     style.bold = bold;
   }
@@ -16555,11 +16869,15 @@ fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides
 fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   if values.spacing_before_set || values.spacing_before_pt != 0.0 {
     target.spacing_before_pt = values.spacing_before_pt;
+    target.spacing_before_lines = values.spacing_before_lines;
     target.spacing_before_set = values.spacing_before_set;
   }
   if values.spacing_after_set || values.spacing_after_pt != 0.0 {
     target.spacing_after_pt = values.spacing_after_pt;
     target.spacing_after_set = values.spacing_after_set;
+  }
+  if values.spacing_after_auto.is_some() {
+    target.spacing_after_auto = values.spacing_after_auto;
   }
   if values.line_height_pt.is_some() {
     target.line_height_pt = values.line_height_pt;
@@ -16593,8 +16911,7 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
     target.first_line_indent_set = true;
   }
   if values.tab_stops_set {
-    target.tab_stops.clone_from(&values.tab_stops);
-    target.tab_stops_set = true;
+    merge_tab_stop_values(target, values);
   }
   if values.justification != ParagraphJustification::default() {
     target.justification = values.justification;
@@ -16669,6 +16986,20 @@ impl NumberingReference {
   }
 }
 
+fn select_paragraph_numbering(
+  direct: Option<NumberingReference>,
+  style: Option<NumberingReference>,
+) -> (Option<NumberingReference>, bool, bool) {
+  if direct.is_some_and(|reference| reference.num_id() == 0) {
+    // Word reserves a direct w:numId=0 to stop numbering inherited from the
+    // paragraph style. Writer's DomainMapper handles this separately from an
+    // ordinary numbering instance, even when numbering.xml contains num 0.
+    return (None, false, true);
+  }
+  let style_applies = direct.is_none() && style.is_some();
+  (direct.or(style), style_applies, false)
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 struct NumberingFormatMergeContext {
   direct_indent_left: bool,
@@ -16676,6 +17007,9 @@ struct NumberingFormatMergeContext {
   direct_first_line_indent: bool,
   direct_tab_stops: bool,
   style_numbering: bool,
+  matched_style_indent_left: bool,
+  matched_style_indent_right: bool,
+  matched_style_first_line_indent: bool,
 }
 
 impl NumberingFormatMergeContext {
@@ -16722,6 +17056,9 @@ fn merge_numbering_format_values(
     target.spacing_after_pt = values.spacing_after_pt;
     target.spacing_after_set = values.spacing_after_set;
   }
+  if values.spacing_after_auto.is_some() {
+    target.spacing_after_auto = values.spacing_after_auto;
+  }
   if values.line_height_pt.is_some() {
     target.line_height_pt = values.line_height_pt;
     target.line_height_rule = values.line_height_rule;
@@ -16733,7 +17070,8 @@ fn merge_numbering_format_values(
     target.line_vertical_alignment = values.line_vertical_alignment;
   }
   let protect_indents =
-    (context.direct_indent_left || context.style_numbering) && target.indent_left_set;
+    (context.direct_indent_left || context.style_numbering || context.matched_style_indent_left)
+      && target.indent_left_set;
   if values.indent_left_set && !protect_indents {
     target.indent_left_pt = values.indent_left_pt;
     if values.indent_left_character_units.is_some() {
@@ -16742,7 +17080,8 @@ fn merge_numbering_format_values(
     target.indent_left_set = true;
   }
   let protect_indents =
-    (context.direct_indent_right || context.style_numbering) && target.indent_right_set;
+    (context.direct_indent_right || context.style_numbering || context.matched_style_indent_right)
+      && target.indent_right_set;
   if values.indent_right_set && !protect_indents {
     target.indent_right_pt = values.indent_right_pt;
     if values.indent_right_character_units.is_some() {
@@ -16750,8 +17089,10 @@ fn merge_numbering_format_values(
     }
     target.indent_right_set = true;
   }
-  let protect_indents =
-    (context.direct_first_line_indent || context.style_numbering) && target.first_line_indent_set;
+  let protect_indents = (context.direct_first_line_indent
+    || context.style_numbering
+    || context.matched_style_first_line_indent)
+    && target.first_line_indent_set;
   if values.first_line_indent_set && !protect_indents {
     target.first_line_indent_pt = values.first_line_indent_pt;
     if values.first_line_indent_character_units.is_some() {
@@ -16760,8 +17101,7 @@ fn merge_numbering_format_values(
     target.first_line_indent_set = true;
   }
   if values.tab_stops_set && !(context.direct_tab_stops && target.tab_stops_set) {
-    target.tab_stops.clone_from(&values.tab_stops);
-    target.tab_stops_set = true;
+    merge_tab_stop_values(target, values);
   }
   if values.justification != ParagraphJustification::default() {
     target.justification = values.justification;
@@ -16857,8 +17197,9 @@ fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   if values.hidden {
     target.hidden = true;
   }
-  if values.color != TextStyle::default().color {
+  if !values.color_is_automatic || values.color != TextStyle::default().color {
     target.color = values.color;
+    target.color_is_automatic = false;
   }
   if values.highlight.is_some() {
     target.highlight = values.highlight;
@@ -16897,6 +17238,7 @@ struct AbstractNumbering {
 struct NumberingLevel {
   start: i32,
   restart_level: Option<i32>,
+  paragraph_style_id: Option<String>,
   format: w::NumberFormatValues,
   custom_format: Option<String>,
   text: String,
@@ -17074,6 +17416,23 @@ impl NumberingCatalog {
       .and_then(|override_| override_.level.as_ref())
       .or_else(|| abstract_num.levels.get(&level_index))?;
 
+    let level_matches_paragraph_style =
+      level.paragraph_style_id.as_deref() == format.style_id.as_deref();
+    let format_context = NumberingFormatMergeContext {
+      // ECMA-376 Part 1 §17.9.23 associates this numbering level with the
+      // named paragraph style. When that association matches the effective
+      // style, the level's paragraph properties are the style's numbering
+      // geometry rather than a lower-priority overlay. Direct paragraph
+      // indents remain protected independently.
+      style_numbering: format_context.style_numbering && !level_matches_paragraph_style,
+      matched_style_indent_left: format_context.matched_style_indent_left
+        && level_matches_paragraph_style,
+      matched_style_indent_right: format_context.matched_style_indent_right
+        && level_matches_paragraph_style,
+      matched_style_first_line_indent: format_context.matched_style_first_line_indent
+        && level_matches_paragraph_style,
+      ..format_context
+    };
     merge_numbering_format_values(format, &level.format_properties, format_context);
     let start_override = level_override.and_then(|override_| override_.start);
     let start = start_override.unwrap_or(level.start);
@@ -17130,6 +17489,13 @@ impl NumberingCatalog {
     // additionally clear paragraph bold/italic before their explicit
     // numbering-level run properties are applied.
     style.underline = false;
+    // Word shapes the synthesized numbering portion independently from the
+    // paragraph text. In particular, an inherited w:kern from docDefaults
+    // does not kern textual list labels; only an explicit numbering-level or
+    // paragraph-mark run property can enable it. This distinction is visible
+    // at default-tab boundaries: "Four." and "Nineteen." advance to the next
+    // stop in Word while the following body text retains normal kerning.
+    style.kerning_minimum_size_pt = Some(f32::INFINITY);
     if matches!(level.format, w::NumberFormatValues::Bullet) {
       style.bold = false;
       style.italic = false;
@@ -17208,6 +17574,10 @@ fn numbering_level_model(level: &w::Level, import_settings: ImportSettings) -> N
       // ECMA-376 Part 1 §17.9.25: an omitted w:start begins at zero.
       .unwrap_or(0),
     restart_level: level.level_restart.as_ref().map(|restart| restart.val),
+    paragraph_style_id: level
+      .paragraph_style_id_in_level
+      .as_ref()
+      .map(|style| style.val.to_string()),
     format: level
       .numbering_format
       .as_ref()
@@ -18012,6 +18382,7 @@ run_properties_accessor!(
   w::FontSizeComplexScript
 );
 run_properties_accessor!(run_properties_color, Color, w::Color);
+run_properties_accessor!(run_properties_shading, Shading, w::Shading);
 run_properties_accessor!(run_properties_underline, Underline, w::Underline);
 run_properties_accessor!(run_properties_strike, Strike, w::Strike);
 run_properties_accessor!(run_properties_double_strike, DoubleStrike, w::DoubleStrike);
@@ -18076,6 +18447,7 @@ paragraph_mark_run_properties_accessor!(
   w::FontSizeComplexScript
 );
 paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_color, Color, w::Color);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_shading, Shading, w::Shading);
 paragraph_mark_run_properties_accessor!(
   paragraph_mark_run_properties_underline,
   Underline,
@@ -18232,6 +18604,16 @@ impl<'a> RunProps<'a> {
       Self::BaseStyle(properties) => properties.color.as_ref(),
       Self::Numbering(properties) => properties.color.as_ref(),
       Self::ParagraphMark(properties) => paragraph_mark_run_properties_color(properties),
+    }
+  }
+
+  fn shading(&self) -> Option<&'a w::Shading> {
+    match self {
+      Self::Direct(properties) => run_properties_shading(properties),
+      Self::Style(properties) => properties.shading.as_ref(),
+      Self::BaseStyle(properties) => properties.shading.as_ref(),
+      Self::Numbering(properties) => properties.shading.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_shading(properties),
     }
   }
 
@@ -18516,6 +18898,9 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     if let Some(left) = margin.left.as_ref().and_then(twips_measure_to_points) {
       setup.margin_left_pt = left;
     }
+    if let Some(gutter) = margin.gutter.as_ref().and_then(twips_measure_to_points) {
+      setup.gutter_pt = gutter;
+    }
     if let Some(header) = margin.header.as_ref().and_then(twips_measure_to_points) {
       setup.header_distance_pt = header;
     }
@@ -18538,6 +18923,10 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     .page_number_type
     .as_ref()
     .and_then(|page_number| page_number.start);
+  setup.rtl_gutter = section
+    .gutter_on_right
+    .as_ref()
+    .is_some_and(|value| value.val.is_none_or(|value| value.as_bool()));
   setup.doc_grid_line_pitch_pt = section
     .doc_grid
     .as_ref()
@@ -18552,8 +18941,29 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     .and_then(|grid| grid.line_pitch)
     .filter(|pitch| *pitch > 0)
     .map(|pitch| units::twips_to_points(pitch as f32));
+  setup.doc_grid_character_spacing_pt = section
+    .doc_grid
+    .as_ref()
+    .filter(|grid| {
+      matches!(
+        grid.r#type,
+        Some(w::DocGridValues::LinesAndChars | w::DocGridValues::SnapToChars)
+      )
+    })
+    .and_then(|grid| grid.character_space)
+    .and_then(doc_grid_character_spacing_points);
 
   setup
+}
+
+fn doc_grid_character_spacing_points(value: i64) -> Option<f32> {
+  let value = i32::try_from(value).ok()?;
+  // w:charSpace is Writer's sep.dxtCharSpace: a signed 20.12 fixed-point
+  // number whose integral and fractional parts are measured in points.
+  // LibreOffice decodes the same value in SectionPropertyMap::CloseSectionGroup.
+  let integral = (value & !0x0fff) / 0x1000;
+  let fraction = value & 0x0fff;
+  Some(integral as f32 + fraction as f32 / 0x0fff as f32)
 }
 
 fn default_word_page_setup() -> PageSetup {
@@ -18946,6 +19356,58 @@ mod tests {
   }
 
   #[test]
+  fn direct_numbering_id_zero_stops_style_numbering() {
+    let style = NumberingReference {
+      num_id: Some(5),
+      level_index: Some(1),
+    };
+
+    let (selected, style_applies, cancelled) = select_paragraph_numbering(
+      Some(NumberingReference {
+        num_id: Some(0),
+        level_index: None,
+      }),
+      Some(style),
+    );
+
+    assert_eq!(selected.and_then(|reference| reference.num_id), None);
+    assert!(!style_applies);
+    assert!(cancelled);
+
+    let styles = StylesCatalog {
+      styles: HashMap::from([
+        (
+          "Parent".to_string(),
+          StyleEntry {
+            paragraph_format: ParagraphFormat {
+              indent_left_pt: 28.35,
+              indent_left_set: true,
+              first_line_indent_pt: -28.35,
+              first_line_indent_set: true,
+              ..Default::default()
+            },
+            ..Default::default()
+          },
+        ),
+        (
+          "Child".to_string(),
+          StyleEntry {
+            based_on: Some("Parent".to_string()),
+            paragraph_numbering: Some(Box::default()),
+            ..Default::default()
+          },
+        ),
+      ]),
+      ..Default::default()
+    };
+
+    assert_eq!(
+      styles.paragraph_indents_without_numbering(Some("Child")),
+      ((0.0, None), (0.0, None))
+    );
+  }
+
+  #[test]
   fn character_unit_indents_follow_word_style_hierarchy_rules() {
     let inherited = w::ParagraphProperties::from_bytes(
       br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:ind w:leftChars="300" w:rightChars="200" w:firstLineChars="200"/></w:pPr>"#,
@@ -18999,6 +19461,50 @@ mod tests {
       inherited_format.first_line_indent_character_units,
       Some(0.0)
     );
+  }
+
+  #[test]
+  fn tab_stop_style_overlays_preserve_parent_positions_and_apply_direct_clears() {
+    let parent = w::StyleParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tabs><w:tab w:val="left" w:pos="567"/><w:tab w:val="left" w:pos="1701"/><w:tab w:val="left" w:pos="2835"/><w:tab w:val="left" w:pos="5669"/></w:tabs></w:pPr>"#,
+    )
+    .expect("parent paragraph properties");
+    let child = w::StyleParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tabs><w:tab w:val="left" w:pos="144"/><w:tab w:val="left" w:pos="288"/><w:tab w:val="left" w:pos="432"/></w:tabs></w:pPr>"#,
+    )
+    .expect("child paragraph properties");
+    let direct = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tabs><w:tab w:val="clear" w:pos="144"/><w:tab w:val="clear" w:pos="288"/><w:tab w:val="clear" w:pos="432"/><w:tab w:val="left" w:pos="1440"/></w:tabs></w:pPr>"#,
+    )
+    .expect("direct paragraph properties");
+
+    let mut parent_format = ParagraphFormat::default();
+    merge_paragraph_format(
+      &mut parent_format,
+      Some(ParagraphProps::Style(&parent)),
+      ImportSettings::default(),
+    );
+    let mut child_format = ParagraphFormat::default();
+    merge_paragraph_format(
+      &mut child_format,
+      Some(ParagraphProps::Style(&child)),
+      ImportSettings::default(),
+    );
+    let mut resolved = ParagraphFormat::default();
+    merge_format_values(&mut resolved, &parent_format);
+    merge_format_values(&mut resolved, &child_format);
+    merge_paragraph_format(
+      &mut resolved,
+      Some(ParagraphProps::Direct(&direct)),
+      ImportSettings::default(),
+    );
+
+    let positions = resolved
+      .tab_stops
+      .iter()
+      .map(|stop| stop.position_pt)
+      .collect::<Vec<_>>();
+    assert_eq!(positions, vec![28.35, 72.0, 85.05, 141.75, 283.45]);
   }
 
   #[test]
@@ -19199,6 +19705,19 @@ mod tests {
   }
 
   #[test]
+  fn empty_word_run_alone_does_not_enable_display_math_alignment() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:rPr/></w:r></w:p>"#,
+    )
+    .expect("empty word run");
+
+    assert_eq!(
+      math_paragraph_alignment(&paragraph, Some(ParagraphAlignment::Center)),
+      None
+    );
+  }
+
+  #[test]
   fn table_row_exposes_cells_wrapped_in_content_controls() {
     let row = w::TableRow::from_bytes(
       br#"<w:tr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:sdt><w:sdtContent><w:tc><w:p><w:r><w:t>controlled cell</w:t></w:r></w:p></w:tc></w:sdtContent></w:sdt></w:tr>"#,
@@ -19366,6 +19885,131 @@ mod tests {
     });
 
     assert_eq!(labels, ["1.\t", "2.\t", "1.\t", "2.\t"]);
+  }
+
+  #[test]
+  fn synthesized_numbering_label_does_not_inherit_paragraph_kerning() {
+    let level = w::Level::from_bytes(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="cardinalText"/><w:lvlText w:val="%1."/></w:lvl>"#,
+    )
+    .expect("text numbering level");
+    let mut catalog = NumberingCatalog {
+      abstract_nums: HashMap::from([(
+        4,
+        AbstractNumbering {
+          levels: HashMap::from([(0, numbering_level_model(&level, ImportSettings::default()))]),
+          ..Default::default()
+        },
+      )]),
+      nums: HashMap::from([(
+        5,
+        NumberingInstance {
+          abstract_num_id: 4,
+          overrides: HashMap::new(),
+        },
+      )]),
+      ..Default::default()
+    };
+    let label = catalog
+      .next_label(
+        NumberingReference {
+          num_id: Some(5),
+          level_index: Some(0),
+        },
+        &mut ParagraphFormat::default(),
+        &StylesCatalog::default(),
+        TextStyle {
+          kerning_minimum_size_pt: Some(1.0),
+          ..Default::default()
+        },
+        None,
+        NumberingFormatMergeContext::default(),
+      )
+      .expect("numbering label");
+
+    assert_eq!(label.text.as_deref(), Some("One.\t"));
+    assert_eq!(label.style.kerning_minimum_size_pt, Some(f32::INFINITY));
+  }
+
+  #[test]
+  fn numbering_level_bound_to_paragraph_style_owns_the_style_indent() {
+    let level = w::Level::from_bytes(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:pStyle w:val="Style1"/><w:lvlText w:val="%1."/><w:pPr><w:ind w:left="360" w:hanging="360"/></w:pPr></w:lvl>"#,
+    )
+    .expect("style-bound numbering level");
+    let mut catalog = NumberingCatalog {
+      abstract_nums: HashMap::from([(
+        4,
+        AbstractNumbering {
+          levels: HashMap::from([(0, numbering_level_model(&level, ImportSettings::default()))]),
+          ..Default::default()
+        },
+      )]),
+      nums: HashMap::from([(
+        5,
+        NumberingInstance {
+          abstract_num_id: 4,
+          overrides: HashMap::new(),
+        },
+      )]),
+      ..Default::default()
+    };
+    let mut format = ParagraphFormat {
+      style_id: Some(Arc::from("Style1")),
+      indent_left_pt: 36.0,
+      indent_left_set: true,
+      ..Default::default()
+    };
+
+    catalog
+      .next_label(
+        NumberingReference {
+          num_id: Some(5),
+          level_index: Some(0),
+        },
+        &mut format,
+        &StylesCatalog::default(),
+        TextStyle::default(),
+        None,
+        NumberingFormatMergeContext {
+          style_numbering: true,
+          ..Default::default()
+        },
+      )
+      .expect("numbering label");
+
+    assert_eq!(format.indent_left_pt, 18.0);
+    assert_eq!(format.first_line_indent_pt, -18.0);
+
+    let mut locally_indented_format = ParagraphFormat {
+      style_id: Some(Arc::from("Style1")),
+      indent_left_pt: 0.0,
+      indent_left_set: true,
+      first_line_indent_pt: 0.0,
+      first_line_indent_set: true,
+      ..Default::default()
+    };
+    catalog
+      .next_label(
+        NumberingReference {
+          num_id: Some(5),
+          level_index: Some(0),
+        },
+        &mut locally_indented_format,
+        &StylesCatalog::default(),
+        TextStyle::default(),
+        None,
+        NumberingFormatMergeContext {
+          style_numbering: true,
+          matched_style_indent_left: true,
+          matched_style_first_line_indent: true,
+          ..Default::default()
+        },
+      )
+      .expect("numbering label");
+
+    assert_eq!(locally_indented_format.indent_left_pt, 0.0);
+    assert_eq!(locally_indented_format.first_line_indent_pt, 0.0);
   }
 
   #[test]
@@ -19818,6 +20462,84 @@ mod tests {
   }
 
   #[test]
+  fn direct_run_shading_keeps_automatic_or_explicit_text_black() {
+    let automatic = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:shd w:val="clear" w:fill="880088"/></w:rPr>"#,
+    )
+    .expect("automatically colored shaded run");
+    let mut style = TextStyle::default();
+    properties::merge_run_style(
+      &mut style,
+      Some(RunProps::Direct(&automatic)),
+      &ThemeFonts::default(),
+      &ThemeColors::default(),
+    );
+    assert_eq!(
+      style.highlight,
+      Some(RgbColor {
+        r: 0x88,
+        g: 0,
+        b: 0x88,
+      })
+    );
+    assert_eq!(style.color, RgbColor { r: 0, g: 0, b: 0 });
+    assert!(style.color_is_automatic);
+
+    let explicit = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:color w:val="000000"/><w:shd w:val="clear" w:fill="880088"/></w:rPr>"#,
+    )
+    .expect("explicitly colored shaded run");
+    properties::merge_run_style(
+      &mut style,
+      Some(RunProps::Direct(&explicit)),
+      &ThemeFonts::default(),
+      &ThemeColors::default(),
+    );
+    assert_eq!(style.color, RgbColor { r: 0, g: 0, b: 0 });
+    assert!(!style.color_is_automatic);
+  }
+
+  #[test]
+  fn document_defaults_ignore_run_position_but_keep_other_run_properties() {
+    let defaults = w::RunPropertiesBaseStyle {
+      position: Some(w::Position {
+        val: ooxmlsdk::simple_type::SignedHpsMeasureValue::HalfPoints(18),
+      }),
+      shading: Some(w::Shading {
+        fill: Some("880088".into()),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let mut style = TextStyle::default();
+
+    properties::merge_doc_default_run_style(
+      &mut style,
+      Some(&defaults),
+      &ThemeFonts::default(),
+      &ThemeColors::default(),
+    );
+
+    assert_eq!(style.baseline_shift_pt, 0.0);
+    assert_eq!(
+      style.highlight,
+      Some(RgbColor {
+        r: 0x88,
+        g: 0,
+        b: 0x88,
+      })
+    );
+    assert_eq!(
+      style.color,
+      RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      }
+    );
+  }
+
+  #[test]
   fn wps_textbox_fragment_imports_as_positioned_shape_text() {
     // drawing shape, not as fallback body text.
     let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="857250" cy="742950"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>inside shape</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr lIns="91440" tIns="45720" rIns="91440" bIns="45720" anchor="t"/></wps:wsp>"#;
@@ -20048,6 +20770,19 @@ mod tests {
   }
 
   #[test]
+  fn webdings_run_text_uses_symbol_font_transport_codes() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Webdings")),
+      ..TextStyle::default()
+    };
+
+    assert_eq!(
+      run_display_text("add text".into(), style),
+      "\u{f061}\u{f064}\u{f064}\u{f020}\u{f074}\u{f065}\u{f078}\u{f074}"
+    );
+  }
+
+  #[test]
   fn nested_word_runs_preserve_shape_text() {
     let run = w::Run::from_bytes(
       br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>Test text box</w:t></w:r></w:r>"#,
@@ -20150,6 +20885,12 @@ mod tests {
     };
 
     assert_eq!(table_indentation_to_points(&indentation), Some(-5.9));
+
+    let legacy_wrapped = w::TableIndentation {
+      width: Some(measurement(65_000)),
+      r#type: Some(w::TableWidthUnitValues::Dxa),
+    };
+    assert_eq!(table_indentation_to_points(&legacy_wrapped), Some(-26.8));
   }
 
   #[test]
@@ -21056,6 +21797,38 @@ mod tests {
       assert_eq!(format.line_height_rule, LineHeightRule::Exact);
       assert_eq!(format.line_height_pt, Some(12.0));
     }
+  }
+
+  #[test]
+  fn automatic_paragraph_after_spacing_preserves_explicit_enable_and_disable() {
+    let enabled = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:spacing w:after="160" w:afterAutospacing="on"/></w:pPr>"#,
+    )
+    .expect("paragraph properties");
+    let disabled = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:spacing w:afterAutospacing="off"/></w:pPr>"#,
+    )
+    .expect("paragraph properties");
+    let mut format = ParagraphFormat::default();
+
+    merge_paragraph_format(
+      &mut format,
+      Some(ParagraphProps::Direct(&enabled)),
+      ImportSettings::default(),
+    );
+
+    assert_eq!(format.spacing_after_pt, 8.0);
+    assert_eq!(format.spacing_after_auto, Some(true));
+    assert!(format.spacing_after_set);
+
+    merge_paragraph_format(
+      &mut format,
+      Some(ParagraphProps::Direct(&disabled)),
+      ImportSettings::default(),
+    );
+
+    assert_eq!(format.spacing_after_pt, 8.0);
+    assert_eq!(format.spacing_after_auto, Some(false));
   }
 
   #[test]
@@ -22142,7 +22915,7 @@ mod tests {
     .expect("rotated WPS shape");
     assert_eq!(
       wordprocessing_shape_textbox_text_rotation(&rotated),
-      Some(-90.0)
+      Some(90.0)
     );
 
     let upright = wps::WordprocessingShape::from_bytes(
@@ -22151,8 +22924,59 @@ mod tests {
     .expect("upright WPS shape");
     assert_eq!(
       wordprocessing_shape_textbox_text_rotation(&upright),
+      Some(90.0)
+    );
+  }
+
+  #[test]
+  fn drawingml_textbox_vertical_flow_uses_drawingml_clockwise_angles() {
+    let vertical = wps::WordprocessingShape::from_bytes(
+      br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:bodyPr vert="vert"/></wps:wsp>"#,
+    )
+    .expect("vertical WPS shape");
+    assert_eq!(
+      wordprocessing_shape_textbox_text_rotation(&vertical),
+      Some(90.0)
+    );
+
+    let vertical_270 = wps::WordprocessingShape::from_bytes(
+      br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:bodyPr vert="vert270"/></wps:wsp>"#,
+    )
+    .expect("vertical-270 WPS shape");
+    assert_eq!(
+      wordprocessing_shape_textbox_text_rotation(&vertical_270),
       Some(-90.0)
     );
+  }
+
+  #[test]
+  fn right_arrow_text_rectangle_is_biased_toward_the_shaft() {
+    let preset = a::PresetGeometry::from_bytes(
+      br#"<a:prstGeom xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" prst="rightArrow"><a:avLst/></a:prstGeom>"#,
+    )
+    .expect("right-arrow preset geometry");
+    let insets = drawingml_preset_text_rectangle_insets(&preset, 141.3, 92.4)
+      .expect("right-arrow text rectangle");
+
+    assert!((insets[0] - 0.0).abs() < 0.001);
+    assert!((insets[1] - 23.1).abs() < 0.001);
+    assert!((insets[2] - 23.1).abs() < 0.001);
+    assert!((insets[3] - 23.1).abs() < 0.001);
+    assert!(rotations_cancel(-90.0, 90.0));
+    assert!(rotations_cancel(270.0, 90.0));
+    assert!(!rotations_cancel(90.0, 90.0));
+  }
+
+  #[test]
+  fn right_triangle_text_rectangle_stays_inside_the_face() {
+    let preset = a::PresetGeometry::from_bytes(
+      br#"<a:prstGeom xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" prst="rtTriangle"><a:avLst/></a:prstGeom>"#,
+    )
+    .expect("right-triangle preset geometry");
+    let insets = drawingml_preset_text_rectangle_insets(&preset, 240.0, 120.0)
+      .expect("right-triangle text rectangle");
+
+    assert_eq!(insets, [20.0, 70.0, 100.0, 10.0]);
   }
 
   #[test]
@@ -22268,6 +23092,45 @@ mod tests {
   }
 
   #[test]
+  fn style_chain_preserves_an_explicit_default_sized_font() {
+    let mut catalog = StylesCatalog::default();
+    catalog.styles.insert(
+      "Base".into(),
+      StyleEntry {
+        style_type: Some(w::StyleValues::Paragraph),
+        run_style: TextStyle {
+          font_size_pt: 12.0,
+          complex_font_size_pt: Some(12.0),
+          ..Default::default()
+        },
+        ..Default::default()
+      },
+    );
+    catalog.styles.insert(
+      "Derived".into(),
+      StyleEntry {
+        style_type: Some(w::StyleValues::Paragraph),
+        based_on: Some("Base".into()),
+        run_overrides: RunStyleOverrides {
+          font_size_pt: Some(11.0),
+          complex_font_size_pt: Some(11.0),
+          ..Default::default()
+        },
+        ..Default::default()
+      },
+    );
+
+    let style = catalog.run_style_with_base(
+      Some("Derived"),
+      TextStyle::default(),
+      RunStyleOverrides::default(),
+    );
+
+    assert_eq!(style.font_size_pt, 11.0);
+    assert_eq!(style.complex_font_size_pt, Some(11.0));
+  }
+
+  #[test]
   fn direct_run_preserves_complex_script_formatting_state() {
     let properties = w::RunProperties::from_bytes(
       br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rFonts w:ascii="Latin Face" w:cs="Complex Face"/><w:b/><w:bCs w:val="0"/><w:i w:val="0"/><w:iCs/><w:sz w:val="20"/><w:szCs w:val="40"/><w:cs/><w:rtl/></w:rPr>"#,
@@ -22290,6 +23153,24 @@ mod tests {
     assert_eq!(style.complex_bold, Some(false));
     assert!(!style.italic);
     assert_eq!(style.complex_italic, Some(true));
+  }
+
+  #[test]
+  fn automatic_superscript_uses_word_fixed_output_scale() {
+    let properties = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:sz w:val="20"/><w:szCs w:val="40"/><w:vertAlign w:val="superscript"/></w:rPr>"#,
+    )
+    .expect("run properties");
+
+    let style = properties::run_style(
+      Some(&properties),
+      TextStyle::default(),
+      &StylesCatalog::default(),
+    );
+
+    assert_eq!(style.font_size_pt, 6.5);
+    assert_eq!(style.complex_font_size_pt, Some(13.0));
+    assert!((style.baseline_shift_pt - 3.3).abs() < 0.001);
   }
 
   #[test]
@@ -22457,6 +23338,13 @@ mod tests {
 
     assert_eq!(setup.width_pt, 250.0);
     assert_eq!(setup.height_pt, 400.0);
+  }
+
+  #[test]
+  fn document_grid_character_spacing_decodes_signed_fixed_point() {
+    assert_eq!(doc_grid_character_spacing_points(49_152), Some(12.0));
+    assert!((doc_grid_character_spacing_points(2_048).unwrap() - 0.5).abs() < 0.001);
+    assert!((doc_grid_character_spacing_points(-2_048).unwrap() + 0.5).abs() < 0.001);
   }
 
   #[test]

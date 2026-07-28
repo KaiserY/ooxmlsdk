@@ -1506,7 +1506,12 @@ fn lower_chart(
             POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
+          data_label_styles: Vec::new(),
           gridline_color,
+          value_gridline_width_pt: None,
+          axis_line_width_pt: None,
+          category_major_gridline: None,
+          category_minor_gridline: None,
           series_colors,
           series_point_colors,
           data_label_fill_colors: chart
@@ -1551,6 +1556,7 @@ fn lower_chart(
             .and_then(shared_chart::shape_properties_outline_solid_fill)
             .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
             .map(|paint| paint.color),
+          chart_area_stroke_width_pt: None,
           plot_area_stroke_color: chart_resource
             .chart_space
             .chart
@@ -1560,6 +1566,7 @@ fn lower_chart(
             .and_then(shared_chart::shape_properties_outline_solid_fill)
             .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
             .map(|paint| paint.color),
+          plot_area_stroke_width_pt: None,
         },
       );
       if !chart_items.is_empty() {
@@ -9609,6 +9616,7 @@ fn push_text_item(
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
     paint_clip: None,
+    discard_if_horizontally_clipped: false,
     text,
     style,
     rotation_center_pt: placement.rotation_center_pt,

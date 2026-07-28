@@ -9779,7 +9779,12 @@ fn lower_inline_chart(
         category_label: chart.label_style.clone(),
         value_label: chart.label_style.clone(),
         data_label: chart.data_label_style.clone(),
+        data_label_styles: Vec::new(),
         gridline_color: chart.gridline_color,
+        value_gridline_width_pt: None,
+        axis_line_width_pt: None,
+        category_major_gridline: None,
+        category_minor_gridline: None,
         series_colors: chart.series_colors.clone(),
         series_point_colors: chart.series_point_colors.clone(),
         data_label_fill_colors: model
@@ -9790,7 +9795,9 @@ fn lower_inline_chart(
         chart_area_fill_color: chart.chart_area_fill_color,
         plot_area_fill_color: chart.plot_area_fill_color,
         chart_area_stroke_color: chart.chart_area_stroke_color,
+        chart_area_stroke_width_pt: None,
         plot_area_stroke_color: chart.plot_area_stroke_color,
+        plot_area_stroke_width_pt: None,
       },
     )
     .into_iter()
@@ -10973,7 +10980,9 @@ impl<'a> TableFrameLayout<'a> {
       }
     }
 
-    if !split_row_allowed && self.is_first_non_header_row(row_index) {
+    if !split_row_allowed
+      && self.is_first_non_header_row_for_current_upper(start_row_index, row_index)
+    {
       return Some(TableSplitDecision {
         master_end_row_index: row_index,
         follow_start_row_index: None,
@@ -11432,8 +11441,17 @@ impl<'a> TableFrameLayout<'a> {
     rows_to_move
   }
 
-  fn is_first_non_header_row(&self, row_index: usize) -> bool {
-    row_index == self.frame.repeating_header_count
+  fn is_first_non_header_row_for_current_upper(
+    &self,
+    start_row_index: usize,
+    row_index: usize,
+  ) -> bool {
+    // SwTabFrame::Split() compares pRow with GetFirstNonHeadlineRow() on the
+    // current master/follow frame. `start_row_index` is that frame's first
+    // non-headline row in this flattened model; comparing only with the
+    // document-wide repeat count makes an oversized row at the start of a
+    // follow move forward forever.
+    row_index == start_row_index.max(self.frame.repeating_header_count)
   }
 
   fn row_can_split_at_cut(
@@ -21907,6 +21925,89 @@ mod tests {
       &follow.frame.row_heights
     ));
     assert_eq!(follow.frame.left_pt - master.frame.left_pt, 8.0);
+  }
+
+  #[test]
+  fn oversized_first_row_of_current_follow_is_formatted_in_place() {
+    fn row() -> TableRow {
+      TableRow {
+        cells: vec![TableCell {
+          blocks: Vec::new(),
+          shading: None,
+          borders: CellBordersModel::default(),
+          border_suppressions: CellBorderSuppressions::default(),
+          margins: CellMargins::default(),
+          preferred_width_pt: None,
+          preferred_width_pct: None,
+          grid_span: 1,
+          vertical_merge_continue: false,
+          no_wrap: false,
+          fit_text: false,
+          hide_end_mark: false,
+          vertical_alignment: TableCellVerticalAlignment::Top,
+          text_rotation_deg: None,
+        }],
+        height_pt: Some(200.0),
+        exact_height: false,
+        repeat_header: false,
+        keep_with_next: false,
+        cant_split: false,
+        cell_spacing_pt: None,
+        grid_before: 0,
+        grid_after: 0,
+        width_before_pt: None,
+        width_after_pt: None,
+        layout: None,
+        borders: None,
+        redline_color: None,
+      }
+    }
+
+    let table = Table {
+      column_widths_pt: vec![72.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      layout: TableLayoutMode::Fixed,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      right_to_left: false,
+      align_leading_cell_content: true,
+      placement: Some(FloatingFramePlacement::default()),
+      allow_overlap: false,
+      split_allowed: true,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      starts_after_last_rendered_page_break: false,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: vec![row(), row()],
+    };
+    let area = BlockArea {
+      setup: PageSetup::default(),
+      section_index: 0,
+      section_page_index: 1,
+      column_index: 0,
+      columns: SectionColumns::default(),
+      content_top_pt: 72.0,
+      content_left_pt: 72.0,
+      content_bottom: 172.0,
+      body_content_bottom_pt: 172.0,
+      content_width: 451.0,
+      default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      compatibility_mode: 12,
+      justify_lines_with_shrinking: false,
+      repeating_slots: RepeatingSlotState::default(),
+    };
+    let mut text_metrics = TextMetrics::new();
+    let layout = TableFrameLayout::new(&table, area, false, &mut text_metrics).unwrap();
+
+    let decision = layout
+      .table_split_decision(1, area.content_top_pt, true, true, false, false)
+      .unwrap();
+
+    assert!(!decision.split_row_allowed);
+    assert!(!decision.move_rows_to_follow);
+    assert_eq!(decision.master_end_row_index, 1);
   }
 
   #[test]

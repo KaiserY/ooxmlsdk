@@ -46,6 +46,10 @@ const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
 // this is distinct from Calc's 20-twip SvxMarginItem implementation detail.
 const XLSX_CELL_TEXT_INSET_PT: f32 = 2.0 * crate::units::POINTS_PER_CSS_PIXEL;
 const XLSX_GRID_LINE_WIDTH_PT: f32 = 0.25;
+// Excel emits an authored DrawingML `a:ln w="0"` as a printable hairline
+// rather than suppressing the line. The Office reference PDF records that
+// device hairline as 0.14pt.
+const XLSX_CHART_HAIRLINE_WIDTH_PT: f32 = 0.14;
 // Microsoft Excel fixed-output evidence from the Open XML SDK `Youtube.xlsx`
 // and `Bing.xlsx` WebExtension fixtures: the 96x96 fallback bitmap represents
 // a 16x16 logical-pixel add-in placeholder. Excel centers it in the content
@@ -72,6 +76,14 @@ const DEFAULT_CHART_TEXT_CLIP_SLACK: ChartTextClipSlack = ChartTextClipSlack {
 const INDEXED_SCATTER_TITLE_TEXT_CLIP_SLACK: ChartTextClipSlack = ChartTextClipSlack {
   left_em: 0.5,
   right_em: 0.0,
+};
+// Microsoft Excel 365 fixed output for `tdf122915.xlsx` retains a data-label
+// text object whose 10pt origin is 6.854pt beyond the worksheet page clip.
+// The paint clip still hides the glyph ink; this slack only preserves the PDF
+// text-layer object for the matching explicit-title indexed-scatter profile.
+const EXPLICIT_TITLE_INDEXED_SCATTER_TEXT_CLIP_SLACK: ChartTextClipSlack = ChartTextClipSlack {
+  left_em: 0.5,
+  right_em: 0.7,
 };
 // Office fixed-output evidence from `ser_labels.xlsx` and `tdf134553.xlsx`:
 // a separate data-label field whose origin is just beyond a worksheet page
@@ -262,6 +274,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
 }
 
 fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
+  let semantic_metafile_text = emf_wmf::supports_semantic_text(item.content_type.as_deref());
   common::ImageItem {
     bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
     crop: Some(common::ImageCrop {
@@ -284,7 +297,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
-    semantic_metafile_text: false,
+    semantic_metafile_text,
     floating: item.floating,
     behind_text: item.behind_text,
   }
@@ -599,14 +612,19 @@ fn push_vml_checkbox_items(
   // same 14x14 pixel indicator, five pixels from the leading edge and
   // vertically centered. Keep that physical control metric independent of
   // the worksheet anchor size and the PDF rasterizer DPI.
-  let Some(data) = vml_checkbox_snapshot_png(rect, shape.checked.unwrap_or(0)) else {
+  let compact_indicator_only =
+    shape.text.trim().is_empty() && rect.width_pt <= rect.height_pt * 1.1;
+  let Some(data) =
+    vml_checkbox_snapshot_png(rect, shape.checked.unwrap_or(0), compact_indicator_only)
+  else {
     return;
   };
+  let image_rect = vml_checkbox_image_rect(rect, compact_indicator_only);
   items.push(PageItem::Image(ImageItem {
-    x_pt: rect.x_pt,
-    y_pt: rect.y_pt,
-    width_pt: rect.width_pt,
-    height_pt: rect.height_pt,
+    x_pt: image_rect.x_pt,
+    y_pt: image_rect.y_pt,
+    width_pt: image_rect.width_pt,
+    height_pt: image_rect.height_pt,
     crop: ImageCrop::default(),
     clip_path: Vec::new(),
     rotation_deg: 0.0,
@@ -622,6 +640,36 @@ fn push_vml_checkbox_items(
     behind_text: false,
   }));
   push_vml_checkbox_text_item(items, shape, rect);
+}
+
+fn vml_checkbox_image_rect(rect: CellRect, compact_indicator_only: bool) -> CellRect {
+  let printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  if !compact_indicator_only {
+    // A captioned Forms checkbox keeps the full control snapshot. Office
+    // aligns that bitmap independently from the worksheet anchor: the
+    // checkbox-form-control fixed output exposes the next grid line plus two
+    // dots at the left, +1 dot at the top, and +5 dots in height.
+    return CellRect {
+      x_pt: (rect.x_pt / printer_dot_pt).ceil() * printer_dot_pt + 2.0 * printer_dot_pt,
+      y_pt: units::quantize_points_to_office_print_grid(rect.y_pt) + printer_dot_pt,
+      width_pt: units::quantize_points_to_office_print_grid(rect.width_pt),
+      height_pt: units::quantize_points_to_office_print_grid(rect.height_pt) + 5.0 * printer_dot_pt,
+    };
+  }
+
+  // Office trims an empty, indicator-sized Forms checkbox to its native
+  // snapshot bounds. The fixed tdf161365 output exposes all four edges on the
+  // 600dpi printer grid: the left edge advances one dot past the next grid
+  // line, while the top moves -3 dots, width grows +4 dots, and height
+  // shrinks -12 dots relative to the authored control anchor.
+  CellRect {
+    x_pt: (rect.x_pt / printer_dot_pt).ceil() * printer_dot_pt + printer_dot_pt,
+    y_pt: units::quantize_points_to_office_print_grid(rect.y_pt) - 3.0 * printer_dot_pt,
+    width_pt: units::quantize_points_to_office_print_grid(rect.width_pt) + 4.0 * printer_dot_pt,
+    height_pt: (units::quantize_points_to_office_print_grid(rect.height_pt)
+      - 12.0 * printer_dot_pt)
+      .max(0.0),
+  }
 }
 
 fn push_vml_checkbox_text_item(
@@ -698,6 +746,7 @@ fn push_vml_checkbox_text_item(
     y_pt: text_top,
     line_height_pt: line_height,
     paint_clip: None,
+    discard_if_horizontally_clipped: false,
     text: shape.text.clone(),
     style,
     rotation_center_pt: None,
@@ -710,55 +759,99 @@ fn push_vml_checkbox_text_item(
   }));
 }
 
-fn vml_checkbox_snapshot_png(rect: CellRect, checked: i64) -> Option<Arc<[u8]>> {
+fn vml_checkbox_snapshot_png(
+  rect: CellRect,
+  checked: i64,
+  compact_indicator_only: bool,
+) -> Option<Arc<[u8]>> {
   const SNAPSHOT_DPI: f32 = 200.0;
   const INDICATOR_SIZE: u32 = 14;
   const INDICATOR_LEADING: u32 = 5;
   let width = (rect.width_pt * SNAPSHOT_DPI / units::POINTS_PER_INCH)
     .round()
     .max((INDICATOR_LEADING + INDICATOR_SIZE) as f32) as u32;
-  let height = (rect.height_pt * SNAPSHOT_DPI / units::POINTS_PER_INCH)
+  let mut height = (rect.height_pt * SNAPSHOT_DPI / units::POINTS_PER_INCH)
     .round()
     .max(INDICATOR_SIZE as f32) as u32;
+  if compact_indicator_only {
+    // The Office image XObject is the authored 42px-wide snapshot with two
+    // transparent rows removed above and three below the centered indicator.
+    height = height.saturating_sub(5).max(INDICATOR_SIZE);
+  } else {
+    height = height.saturating_add(1);
+  }
   let top = ((height - INDICATOR_SIZE) as f32 / 2.0).round() as u32;
   let mut image = image::RgbaImage::new(width, height);
 
-  for local_y in 0..INDICATOR_SIZE - 1 {
-    for local_x in 0..INDICATOR_SIZE {
-      let alpha = match local_x {
-        0 => 91,
-        13 => 182,
-        _ => u8::MAX,
-      };
-      image.put_pixel(
-        INDICATOR_LEADING + local_x,
-        top + local_y,
-        image::Rgba([0, 0, 0, alpha]),
-      );
+  if compact_indicator_only {
+    for local_y in 0..INDICATOR_SIZE - 1 {
+      for local_x in 0..INDICATOR_SIZE {
+        let alpha = match local_x {
+          0 => 91,
+          13 => 182,
+          _ => u8::MAX,
+        };
+        image.put_pixel(
+          INDICATOR_LEADING + local_x,
+          top + local_y,
+          image::Rgba([0, 0, 0, alpha]),
+        );
+      }
     }
-  }
-  for local_y in 2..12 {
+    for local_y in 2..12 {
+      for local_x in 2..12 {
+        image.put_pixel(
+          INDICATOR_LEADING + local_x,
+          top + local_y,
+          image::Rgba([u8::MAX, u8::MAX, u8::MAX, u8::MAX]),
+        );
+      }
+    }
     for local_x in 2..12 {
       image.put_pixel(
         INDICATOR_LEADING + local_x,
-        top + local_y,
-        image::Rgba([u8::MAX, u8::MAX, u8::MAX, u8::MAX]),
+        top + 1,
+        image::Rgba([0xb7, 0xb7, 0xb7, u8::MAX]),
       );
     }
-  }
-  for local_x in 2..12 {
-    image.put_pixel(
-      INDICATOR_LEADING + local_x,
-      top + 1,
-      image::Rgba([0xb7, 0xb7, 0xb7, u8::MAX]),
-    );
+  } else {
+    for local_y in 0..INDICATOR_SIZE {
+      for local_x in 0..INDICATOR_SIZE {
+        let edge_y = local_y == 0 || local_y == 13;
+        let alpha = match (edge_y, local_x) {
+          (true, 0) => 106,
+          (true, 13) => 103,
+          (true, _) => 159,
+          (false, 0) => 171,
+          (false, 13) => 165,
+          (false, _) => u8::MAX,
+        };
+        let value = match (local_y, local_x) {
+          (0 | 13, _) | (_, 0 | 13) => 0,
+          (1 | 12, 1) => 26,
+          (1 | 12, 12) => 24,
+          (1 | 12, _) => 76,
+          (_, 1) => 87,
+          (_, 12) => 80,
+          _ => u8::MAX,
+        };
+        image.put_pixel(
+          INDICATOR_LEADING + local_x,
+          top + local_y,
+          image::Rgba([value, value, value, alpha]),
+        );
+      }
+    }
   }
 
   match checked {
     1 => {
       const CHECK_PIXELS: &[(u32, u32, u8)] = &[
+        (9, 4, 0),
         (10, 4, 18),
         (8, 5, 36),
+        (9, 5, 0),
+        (8, 6, 0),
         (9, 6, 248),
         (4, 7, 0),
         (5, 7, 0),
@@ -1861,11 +1954,17 @@ fn render_cell_area(
       height_pt,
     };
     let mut measurement_style = import.styles.text_style_for_cell(cell.style_index);
+    let direct_font_color = import
+      .styles
+      .direct_nondefault_font_color_for_cell(cell.style_index);
     super::table::apply_builtin_table_text_style(
       table_builtin_style,
       &import.styles,
       &mut measurement_style,
     );
+    if let Some(color) = direct_font_color {
+      measurement_style.color = color;
+    }
     apply_conditional_text_style(import, page.sheet, cell, &mut measurement_style);
     // sc/source/ui/view/output2.cxx ScDrawStringsVars::SetPattern(). Calc's
     // print map mode scales cell geometry and the font used for measurement.
@@ -2407,6 +2506,7 @@ fn render_cell_rich_text(
     y_pt,
     line_height_pt: line_height,
     paint_clip: None,
+    discard_if_horizontally_clipped: false,
     text,
     style,
     rotation_center_pt: None,
@@ -2438,6 +2538,12 @@ fn conditional_fill_color(
     .collect::<Vec<_>>();
   rules.sort_by_key(|rule| rule.priority);
   for rule in rules {
+    if let Some(fill) = cell
+      .color_scale_fill
+      .filter(|fill| fill.priority == rule.priority)
+    {
+      return Some(fill.color);
+    }
     if !conditional_rule_matches(rule, cell) {
       continue;
     }
@@ -2641,11 +2747,17 @@ fn render_cell_text(
   let text_height = line_height * lines.len().max(1) as f32;
   let vertical_alignment = alignment.and_then(|alignment| alignment.vertical);
   let mut y_pt = match vertical_alignment {
-    Some(x::VerticalAlignmentValues::Center) => {
-      rect.y_pt + ((rect.height_pt - text_height) / 2.0).max(0.0)
+    Some(x::VerticalAlignmentValues::Center) => rect.y_pt + (rect.height_pt - text_height) / 2.0,
+    Some(x::VerticalAlignmentValues::Top) => rect.y_pt,
+    // sc/source/ui/view/output2.cxx resolves Calc's Standard vertical
+    // justification to Bottom and starts the text at the cell's bottom edge.
+    // Do not clamp a font line taller than the row back to the top: Office
+    // keeps the baseline bottom-aligned and lets the glyph box extend above
+    // the row, subject to the page/device clip.
+    Some(x::VerticalAlignmentValues::Bottom) | None => rect.y_pt + rect.height_pt - text_height,
+    Some(x::VerticalAlignmentValues::Justify | x::VerticalAlignmentValues::Distributed) => {
+      rect.y_pt
     }
-    Some(x::VerticalAlignmentValues::Bottom) => rect.y_pt + (rect.height_pt - text_height).max(0.0),
-    _ => rect.y_pt,
   };
   if let Some(rotation) = alignment.and_then(|alignment| alignment.text_rotation) {
     style.rotation_deg = match rotation {
@@ -2663,6 +2775,7 @@ fn render_cell_text(
       y_pt,
       line_height_pt: line_height,
       paint_clip: None,
+      discard_if_horizontally_clipped: false,
       text: line.to_string(),
       style: style.clone(),
       rotation_center_pt: (style.rotation_deg != 0.0).then_some((
@@ -2964,6 +3077,7 @@ fn styled_header_text_with_line_height(
     y_pt,
     line_height_pt,
     paint_clip: None,
+    discard_if_horizontally_clipped: false,
     text,
     style,
     rotation_center_pt: None,
@@ -3103,17 +3217,6 @@ fn print_page_image_items(
           .or_else(|| anchor.object.name.clone()),
         hyperlink_url.as_deref().map(ToString::to_string),
       ));
-      if anchor.object.image_effects.is_empty() {
-        render_metafile_texts(
-          &mut items,
-          resource,
-          rect.x_pt,
-          rect.y_pt,
-          rect.width_pt,
-          rect.height_pt,
-          hyperlink_url.as_deref(),
-        );
-      }
     }
   }
   for drawing in &page.sheet.resources.object_resources.vml_drawings {
@@ -3142,15 +3245,6 @@ fn print_page_image_items(
       }
       let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
       items.extend(vml_image_items(shape, resource, rect));
-      render_metafile_texts(
-        &mut items,
-        resource,
-        rect.x_pt,
-        rect.y_pt,
-        rect.width_pt,
-        rect.height_pt,
-        None,
-      );
     }
   }
   items
@@ -3342,9 +3436,17 @@ fn drawingml_image_fill_items(
 fn vml_image_items(
   shape: &super::object_resources::VmlShapeModel,
   resource: &super::drawing::ImageResource,
-  rect: CellRect,
+  mut rect: CellRect,
 ) -> Vec<PageItem> {
   let is_fill = shape.image_relationship_id.is_none() && shape.fill_image_relationship_id.is_some();
+  let is_embedded_picture = !is_fill
+    && shape
+      .object_type
+      .as_deref()
+      .is_some_and(|value| value.eq_ignore_ascii_case("Pict"));
+  if is_embedded_picture {
+    rect = excel_vml_picture_fixed_output_rect(rect);
+  }
   let recolored_pattern = is_fill
     .then(|| recolor_vml_pattern_image(shape, &resource.data))
     .flatten();
@@ -3412,7 +3514,45 @@ fn vml_image_items(
     })
   };
   if !is_fill {
-    return vec![make_item(rect, ImageCrop::default())];
+    let image = make_item(rect, ImageCrop::default());
+    if !is_embedded_picture {
+      return vec![image];
+    }
+    let commands = vec![
+      common::PathCommand::MoveTo(common_point(rect.x_pt, rect.y_pt)),
+      common::PathCommand::LineTo(common_point(rect.x_pt + rect.width_pt, rect.y_pt)),
+      common::PathCommand::LineTo(common_point(
+        rect.x_pt + rect.width_pt,
+        rect.y_pt + rect.height_pt,
+      )),
+      common::PathCommand::LineTo(common_point(rect.x_pt, rect.y_pt + rect.height_pt)),
+      common::PathCommand::Close,
+    ];
+    let fill = vml_shape_common_fill(shape, transform);
+    let stroke = vml_shape_common_stroke(shape);
+    let mut output = Vec::with_capacity(3);
+    if !matches!(fill, common::Fill::None) {
+      output.push(PageItem::Path(common::PathItem {
+        bounds: common_rect(rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
+        points: Vec::new(),
+        commands: commands.clone(),
+        closed: true,
+        fill,
+        stroke: None,
+      }));
+    }
+    output.push(image);
+    if let Some(stroke) = stroke {
+      output.push(PageItem::Path(common::PathItem {
+        bounds: common_rect(rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
+        points: Vec::new(),
+        commands,
+        closed: true,
+        fill: common::Fill::None,
+        stroke: Some(stroke),
+      }));
+    }
+    return output;
   }
   if matches!(
     shape.fill_type,
@@ -3505,6 +3645,22 @@ fn vml_image_items(
       };
       vec![make_item(rect, crop)]
     }
+  }
+}
+
+fn excel_vml_picture_fixed_output_rect(rect: CellRect) -> CellRect {
+  let printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  // Excel fixed output maps an embedded VML Pict host separately from its
+  // 96dpi ClientAnchor box. The immutable 58325_db Office PDF records the
+  // authored 1in × 54pt host as 603 × 460 dots on the 600dpi printer device;
+  // its 0.75pt VML stroke remains centered outside that host. Quantize the
+  // authored box first so the compatibility additions stay physical rather
+  // than scaling with the worksheet zoom.
+  CellRect {
+    x_pt: units::quantize_points_to_office_print_grid(rect.x_pt),
+    y_pt: units::quantize_points_to_office_print_grid(rect.y_pt),
+    width_pt: units::quantize_points_to_office_print_grid(rect.width_pt) + 3.0 * printer_dot_pt,
+    height_pt: units::quantize_points_to_office_print_grid(rect.height_pt) + 10.0 * printer_dot_pt,
   }
 }
 
@@ -4038,6 +4194,17 @@ fn finish_xlsx_shape_effects(
     return;
   }
   common::drawingml_image_effects::rotate_container_with_shape(&mut effects, rotation_degrees);
+  let preserve_vector_source = if object.scene3d.is_none() && object.shape3d.is_none() {
+    if let Some(backdrop) = common::drawingml_image_effects::unchanged_foreground_backdrop(&effects)
+    {
+      effects = backdrop;
+      true
+    } else {
+      false
+    }
+  } else {
+    false
+  };
   let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds(
     &effects,
     content_bounds.size.width.0,
@@ -4064,7 +4231,7 @@ fn finish_xlsx_shape_effects(
     output_bounds.right_pt.max(content_bounds.size.width.0) + static_padding.right_pt;
   let relative_bottom =
     output_bounds.bottom_pt.max(content_bounds.size.height.0) + static_padding.bottom_pt;
-  let raster_bounds = common::Rect {
+  let mut raster_bounds = common::Rect {
     origin: common::Point {
       x: common::Pt(content_bounds.origin.x.0 + relative_left),
       y: common::Pt(content_bounds.origin.y.0 + relative_top),
@@ -4074,6 +4241,9 @@ fn finish_xlsx_shape_effects(
       height: common::Pt(relative_bottom - relative_top),
     },
   };
+  if preserve_vector_source {
+    raster_bounds = excel_fixed_output_backdrop_bounds(raster_bounds);
+  }
   let display_items = items[content_start..]
     .iter()
     .cloned()
@@ -4084,6 +4254,17 @@ fn finish_xlsx_shape_effects(
       &display_items,
       raster_bounds,
       &effects,
+    )
+  } else if preserve_vector_source {
+    // Excel's fixed-format writer keeps the unchanged foreground as vector
+    // content and emits its separated shadow/backdrop at 100ppi. Keeping that
+    // native bitmap boundary avoids both resampling the foreground and
+    // sharpening the soft mask at the general 144ppi effect ceiling.
+    common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_pixels_per_point(
+      &display_items,
+      raster_bounds,
+      &effects,
+      100.0 / units::POINTS_PER_INCH,
     )
   } else {
     common::drawingml_shape_raster::rasterize_vector_items_for_effects(
@@ -4164,8 +4345,7 @@ fn finish_xlsx_shape_effects(
   {
     return;
   }
-  items.truncate(content_start);
-  items.push(PageItem::Image(ImageItem {
+  let effect_image = PageItem::Image(ImageItem {
     x_pt: raster_bounds.origin.x.0,
     y_pt: raster_bounds.origin.y.0,
     width_pt: raster_bounds.size.width.0,
@@ -4183,7 +4363,13 @@ fn finish_xlsx_shape_effects(
     hyperlink_url: None,
     floating: false,
     behind_text: false,
-  }));
+  });
+  if preserve_vector_source {
+    items.insert(content_start, effect_image);
+  } else {
+    items.truncate(content_start);
+    items.push(effect_image);
+  }
 }
 
 fn drawing_object_has_path_transform(object: &super::drawing::DrawingObjectModel) -> bool {
@@ -4250,6 +4436,27 @@ fn drawing_object_path_transform(
       drawing_object_visual_rotation_degrees(object).to_radians(),
     ))
     .then_translate((f64::from(center_x), f64::from(center_y)).into())
+}
+
+fn drawing_object_visual_bounds(
+  rect: CellRect,
+  object: &super::drawing::DrawingObjectModel,
+) -> CellRect {
+  let bounds = common::drawingml_geometry::transform_rect_bounds(
+    kurbo::Rect::new(
+      f64::from(rect.x_pt),
+      f64::from(rect.y_pt),
+      f64::from(rect.x_pt + rect.width_pt),
+      f64::from(rect.y_pt + rect.height_pt),
+    ),
+    drawing_object_path_transform(rect, object),
+  );
+  CellRect {
+    x_pt: bounds.x0 as f32,
+    y_pt: bounds.y0 as f32,
+    width_pt: bounds.width() as f32,
+    height_pt: bounds.height() as f32,
+  }
 }
 
 fn drawing_object_visual_rotation_degrees(object: &super::drawing::DrawingObjectModel) -> f32 {
@@ -4771,7 +4978,7 @@ fn print_page_drawing_text_items(
   let mut items = Vec::new();
   let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
   let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
-  let page_clip_rect = page_area_rect.map_or(
+  let mut page_clip_rect = page_area_rect.map_or(
     CellRect {
       x_pt: 0.0,
       y_pt: 0.0,
@@ -4780,11 +4987,9 @@ fn print_page_drawing_text_items(
     },
     |rect| page_transform.rect(rect),
   );
-  let horizontal_page_overlap_pt = page
-    .area
-    .filter(|area| area.start.col > 1)
-    .filter(|_| page.sheet.uses_indexed_multicomponent_print_grid())
-    .map_or(0.0, |_| 0.96);
+  if page.sheet.uses_indexed_scatter_print_grid() {
+    page_clip_rect.width_pt += super::print::INDEXED_SCATTER_HORIZONTAL_CLIP_EXTENSION_PT;
+  }
   for drawing in &page.sheet.resources.drawings {
     for anchor in &drawing.anchors {
       if anchor.object.hidden || !anchor.print_with_sheet {
@@ -4799,12 +5004,18 @@ fn print_page_drawing_text_items(
       if width_pt <= 0.0 || height_pt <= 0.0 {
         continue;
       }
-      let mut drawing_rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
-      // Excel's fixed-output printer device overlaps adjacent horizontal
-      // worksheet pages by 0.96pt while retaining the unshifted page clip.
-      // Apply that overlap to drawings on continuation pages; ordinary
-      // sheet cells and explicit-width compatibility paths remain unchanged.
-      drawing_rect.x_pt += horizontal_page_overlap_pt;
+      let source_rect = CellRect {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+      };
+      let drawing_rect = page_transform.rect(source_rect);
+      let text_rect = page_transform.rect(if anchor.object.text_upright {
+        drawing_object_visual_bounds(source_rect, &anchor.object)
+      } else {
+        source_rect
+      });
       if anchor.object.kind == super::drawing::DrawingObjectKind::GroupShape {
         push_group_text_items(
           import,
@@ -4836,7 +5047,7 @@ fn print_page_drawing_text_items(
       render_drawing_text(
         &mut items,
         &text,
-        drawing_rect,
+        text_rect,
         drawing_object_text_style(import, &anchor.object),
         Some(drawing_object_text_layout(&anchor.object)),
         anchor.object.text_warp.as_deref(),
@@ -4963,6 +5174,7 @@ fn lower_drawing_chart(
       page_clip_rect,
       &mut metrics,
       DEFAULT_CHART_TEXT_CLIP_SLACK,
+      &[],
     );
     return (!items.is_empty()).then_some(items);
   }
@@ -5083,6 +5295,7 @@ fn lower_drawing_chart(
         page_clip_rect,
         &mut metrics,
         DEFAULT_CHART_TEXT_CLIP_SLACK,
+        &[],
       );
       if let Some(hyperlink_url) = drawing_object_hyperlink_url(drawing, &anchor.object) {
         let left = rect.x_pt.max(page_clip_rect.x_pt);
@@ -5108,6 +5321,21 @@ fn lower_drawing_chart(
     chart_space,
     Some(import.styles.output_ui_language()),
   )?;
+  let rect = if chart.date_axis.is_some()
+    && chart
+      .plot_layout
+      .is_some_and(|layout| layout.targets_inner_plot)
+  {
+    // The authored inner date-plot profile is resolved on Excel's worksheet
+    // drawing grid. Its graphic frame begins on the leading edge of the
+    // one-pixel gridline included by ECMA-376 Part 1 §18.3.1.13.
+    CellRect {
+      x_pt: rect.x_pt - units::POINTS_PER_CSS_PIXEL * drawing_scale,
+      ..rect
+    }
+  } else {
+    rect
+  };
   let chart_style = xlsx_chart_style_id(chart_space);
   let has_visible_empty_automatic_title = excel_empty_automatic_title_is_visible(chart_space);
   if chart_space.chart.title.is_none()
@@ -5310,6 +5538,43 @@ fn lower_drawing_chart(
         }
       }
     });
+  let value_gridline_width_pt = chart
+    .value_axis
+    .and_then(|axis| axis.major_gridlines.as_deref())
+    .and_then(|gridlines| gridlines.chart_shape_properties.as_deref())
+    .and_then(xlsx_chart_outline_width_pt);
+  let axis_line_width_pt = chart
+    .date_axis
+    .and_then(|axis| axis.chart_shape_properties.as_deref())
+    .and_then(xlsx_chart_outline_width_pt)
+    .or_else(|| {
+      chart
+        .category_axis
+        .and_then(|axis| axis.chart_shape_properties.as_deref())
+        .and_then(xlsx_chart_outline_width_pt)
+    });
+  let category_major_gridline = chart.date_axis.and_then(|axis| {
+    let properties = axis
+      .major_gridlines
+      .as_deref()?
+      .chart_shape_properties
+      .as_deref()?;
+    let color = shared_chart::chart_shape_outline_solid_fill(properties)
+      .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))?;
+    let width = xlsx_chart_outline_width_pt(properties)?;
+    Some((color, width))
+  });
+  let category_minor_gridline = chart.date_axis.and_then(|axis| {
+    let properties = axis
+      .minor_gridlines
+      .as_deref()?
+      .chart_shape_properties
+      .as_deref()?;
+    let color = shared_chart::chart_shape_outline_solid_fill(properties)
+      .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))?;
+    let width = xlsx_chart_outline_width_pt(properties)?;
+    Some((color, width))
+  });
   let chart_area_stroke_color = chart_space
     .shape_properties
     .as_deref()
@@ -5361,7 +5626,28 @@ fn lower_drawing_chart(
       category_label: category_label_style,
       value_label: value_label_style,
       data_label: data_label_style,
+      data_label_styles: chart
+        .series
+        .iter()
+        .map(|series| {
+          series
+            .data_labels
+            .iter()
+            .map(|label| {
+              label.text_properties.map(|properties| {
+                let mut style = label_style.clone();
+                apply_xlsx_chart_text_properties(&mut style, properties, import);
+                style
+              })
+            })
+            .collect()
+        })
+        .collect(),
       gridline_color,
+      value_gridline_width_pt,
+      axis_line_width_pt,
+      category_major_gridline,
+      category_minor_gridline,
       series_colors,
       series_point_colors,
       data_label_fill_colors: chart
@@ -5393,6 +5679,10 @@ fn lower_drawing_chart(
         .and_then(shared_chart::shape_properties_solid_fill)
         .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
       chart_area_stroke_color,
+      chart_area_stroke_width_pt: chart_space
+        .shape_properties
+        .as_deref()
+        .and_then(xlsx_shape_outline_width_pt),
       plot_area_stroke_color: chart_space
         .chart
         .plot_area
@@ -5400,6 +5690,12 @@ fn lower_drawing_chart(
         .as_deref()
         .and_then(shared_chart::shape_properties_outline_solid_fill)
         .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+      plot_area_stroke_width_pt: chart_space
+        .chart
+        .plot_area
+        .shape_properties
+        .as_deref()
+        .and_then(xlsx_shape_outline_width_pt),
     },
   );
   let indexed_scatter_text = chart.series.iter().all(|series| {
@@ -5416,6 +5712,18 @@ fn lower_drawing_chart(
       .iter()
       .flat_map(|series| &series.x_values)
       .all(Option::is_none);
+  let explicit_title_indexed_scatter_text = indexed_scatter_text
+    && chart_space
+      .chart
+      .title
+      .as_deref()
+      .is_some_and(|title| title.chart_text.is_some())
+    && !chart.title_overlay
+    && chart.legend_position.is_none()
+    && chart
+      .series
+      .iter()
+      .any(|series| !series.data_labels.is_empty());
   let multicomponent_data_labels = chart.series.iter().any(|series| {
     series
       .data_labels
@@ -5429,6 +5737,8 @@ fn lower_drawing_chart(
     && indexed_scatter_text
   {
     INDEXED_SCATTER_TITLE_TEXT_CLIP_SLACK
+  } else if explicit_title_indexed_scatter_text {
+    EXPLICIT_TITLE_INDEXED_SCATTER_TEXT_CLIP_SLACK
   } else if multicomponent_data_labels {
     // Excel retains a boundary text field in the PDF text layer when its
     // origin is up to 0.6em beyond a horizontal worksheet clip; the clip
@@ -5439,11 +5749,17 @@ fn lower_drawing_chart(
     DEFAULT_CHART_TEXT_CLIP_SLACK
   };
   let mut metrics = TextMetrics::new();
+  let right_truncated_date_ticks = shared_chart::date_axis_ticks(&chart)
+    .unwrap_or_default()
+    .into_iter()
+    .map(|tick| tick.text)
+    .collect::<Vec<_>>();
   clip_chart_items_to_rect(
     &mut items,
     page_clip_rect,
     &mut metrics,
     text_boundary_slack_em,
+    &right_truncated_date_ticks,
   );
   if let Some(hyperlink_url) = drawing_object_hyperlink_url(drawing, &anchor.object) {
     let left = rect.x_pt.max(page_clip_rect.x_pt);
@@ -5871,8 +6187,17 @@ fn clip_chart_items_to_rect(
   clip: CellRect,
   metrics: &mut TextMetrics,
   text_boundary_slack: ChartTextClipSlack,
+  right_truncated_texts: &[String],
 ) {
-  items.retain_mut(|item| clip_chart_item_to_rect(item, clip, metrics, text_boundary_slack));
+  items.retain_mut(|item| {
+    clip_chart_item_to_rect(
+      item,
+      clip,
+      metrics,
+      text_boundary_slack,
+      right_truncated_texts,
+    )
+  });
 }
 
 fn clip_chart_item_to_rect(
@@ -5880,6 +6205,7 @@ fn clip_chart_item_to_rect(
   clip: CellRect,
   metrics: &mut TextMetrics,
   text_boundary_slack: ChartTextClipSlack,
+  right_truncated_texts: &[String],
 ) -> bool {
   match item {
     // Excel clips chart text at horizontal worksheet page boundaries, while
@@ -5888,6 +6214,16 @@ fn clip_chart_item_to_rect(
     PageItem::Text(text) => {
       let clip_right = clip.x_pt + clip.width_pt;
       let mut right = text.x_pt + metrics.measure_text(&text.text, &text.style);
+      if text.discard_if_horizontally_clipped && right > clip_right {
+        // A chart data table is an actual table shape, not a collection of
+        // independent chart labels. LibreOffice DataTableView::createShapes
+        // creates XCell text inside an SdrTableObj; Office fixed output
+        // likewise omits a table-cell text operator when the right worksheet
+        // page boundary cuts through that cell. A continuation page retains
+        // its first cell's text object at the left boundary, as do other
+        // chart labels eligible for the clipped-text path below.
+        return false;
+      }
       if right > clip_right && matches!(text.text.chars().last(), Some(',' | ';')) {
         // Office writes data-label fields as separate runs. At a worksheet
         // page boundary the separator glyph can be outside the clip even
@@ -5904,6 +6240,21 @@ fn clip_chart_item_to_rect(
       let retained =
         right + left_boundary_slack >= clip.x_pt && text.x_pt <= clip_right + right_boundary_slack;
       if retained {
+        if right > clip_right
+          && right_truncated_texts.contains(&text.text)
+          && text.x_pt < clip_right
+        {
+          // Excel emits only the date-axis glyph prefix whose origins remain
+          // within one font em of a horizontal worksheet page boundary. The
+          // following page still receives the complete tick label. Keeping
+          // this at the date-axis model boundary avoids truncating titles,
+          // legends, and data labels that Office retains as complete clipped
+          // text objects.
+          let available_width = clip_right + text.style.font_size_pt - text.x_pt;
+          truncate_text_to_width(&mut text.text, available_width, |prefix| {
+            metrics.measure_text(prefix, &text.style)
+          });
+        }
         // Calc's ScPrintFunc installs the printable-page clip on its output
         // device before painting the drawing layer. Office likewise keeps
         // clipped chart text operators in the PDF stream, so preserve the
@@ -5966,11 +6317,36 @@ fn clip_chart_item_to_rect(
       clip,
     ),
     PageItem::Group { items, .. } => {
-      clip_chart_items_to_rect(items, clip, metrics, text_boundary_slack);
+      clip_chart_items_to_rect(
+        items,
+        clip,
+        metrics,
+        text_boundary_slack,
+        right_truncated_texts,
+      );
       !items.is_empty()
     }
     PageItem::Image(_) | PageItem::LinkArea(_) => true,
   }
+}
+
+fn truncate_text_to_width(
+  text: &mut String,
+  maximum_width: f32,
+  mut measure: impl FnMut(&str) -> f32,
+) {
+  let mut end = 0;
+  for boundary in text
+    .char_indices()
+    .map(|(index, character)| index + character.len_utf8())
+    .chain(std::iter::once(text.len()))
+  {
+    if measure(&text[..end]) > maximum_width {
+      break;
+    }
+    end = boundary;
+  }
+  text.truncate(end);
 }
 
 #[derive(Clone, Copy)]
@@ -6121,6 +6497,23 @@ fn xlsx_chart_solid_fill_color(fill: &a::SolidFill, import: &ExcelImport) -> Opt
   xlsx_chart_color(color, import)
 }
 
+fn xlsx_chart_outline_width_pt(properties: &c::ChartShapeProperties) -> Option<f32> {
+  xlsx_outline_width_pt(properties.outline.as_deref())
+}
+
+fn xlsx_shape_outline_width_pt(properties: &c::ShapeProperties) -> Option<f32> {
+  xlsx_outline_width_pt(properties.outline.as_deref())
+}
+
+fn xlsx_outline_width_pt(outline: Option<&a::Outline>) -> Option<f32> {
+  let width_emu = outline?.width?;
+  Some(if width_emu <= 0 {
+    XLSX_CHART_HAIRLINE_WIDTH_PT
+  } else {
+    units::emu_to_points(i64::from(width_emu))
+  })
+}
+
 fn xlsx_chart_first_gradient_fill_color(
   fill: &a::GradientFill,
   import: &ExcelImport,
@@ -6224,7 +6617,7 @@ fn render_drawing_text(
   } else {
     vertical_rotation_deg + layout.text_rotation_deg + layout.shape_rotation_deg
   };
-  if layout.shape_rotation_deg.rem_euclid(360.0).abs() > f32::EPSILON {
+  if !layout.upright && layout.shape_rotation_deg.rem_euclid(360.0).abs() > f32::EPSILON {
     // Excel's fixed-format writer paints text in rotated worksheet shapes as
     // vector glyph outlines (the Office reference PDF contains no font or
     // extractable text for these runs). Keep bodyPr-only rotation independent:
@@ -6241,11 +6634,24 @@ fn render_drawing_text(
   let vertical_text = vertical_rotation_deg != 0.0;
   let line_height = (style.font_size_pt * 1.15).max(1.0);
   let mut text_metrics = TextMetrics::new();
-  for (index, line) in text.lines().filter(|line| !line.is_empty()).enumerate() {
+  let lines = text
+    .lines()
+    .filter(|line| !line.is_empty())
+    .collect::<Vec<_>>();
+  let available_height = (rect.height_pt - layout.top_inset_pt - layout.bottom_inset_pt).max(0.0);
+  let text_height = line_height * lines.len() as f32;
+  let vertical_offset = match layout.anchor {
+    a::TextAnchoringTypeValues::Center => (available_height - text_height).max(0.0) / 2.0,
+    a::TextAnchoringTypeValues::Bottom => (available_height - text_height).max(0.0),
+    a::TextAnchoringTypeValues::Top
+    | a::TextAnchoringTypeValues::Justified
+    | a::TextAnchoringTypeValues::Distributed => 0.0,
+  };
+  for (index, line) in lines.into_iter().enumerate() {
     let y = if vertical_text {
       rect.y_pt + (rect.height_pt - line_height) / 2.0
     } else {
-      rect.y_pt + layout.top_inset_pt + index as f32 * line_height
+      rect.y_pt + layout.top_inset_pt + vertical_offset + index as f32 * line_height
     };
     if !vertical_text && y > rect.y_pt + rect.height_pt - layout.bottom_inset_pt {
       break;
@@ -6275,6 +6681,7 @@ fn render_drawing_text(
       y_pt: y,
       line_height_pt: line_height,
       paint_clip: None,
+      discard_if_horizontally_clipped: false,
       text: line.to_string(),
       style: style.clone(),
       rotation_center_pt: (style.rotation_deg != 0.0).then_some((
@@ -6314,6 +6721,7 @@ fn apply_drawing_text_warp(
 #[derive(Clone, Copy, Debug)]
 struct DrawingTextLayout {
   alignment: a::TextAlignmentTypeValues,
+  anchor: a::TextAnchoringTypeValues,
   vertical: Option<a::TextVerticalValues>,
   left_inset_pt: f32,
   top_inset_pt: f32,
@@ -6328,6 +6736,7 @@ impl Default for DrawingTextLayout {
   fn default() -> Self {
     Self {
       alignment: a::TextAlignmentTypeValues::Left,
+      anchor: a::TextAnchoringTypeValues::Top,
       vertical: None,
       left_inset_pt: XLSX_CELL_TEXT_INSET_PT,
       top_inset_pt: XLSX_CELL_TEXT_INSET_PT,
@@ -6343,6 +6752,9 @@ impl Default for DrawingTextLayout {
 fn drawing_object_text_layout(object: &super::drawing::DrawingObjectModel) -> DrawingTextLayout {
   DrawingTextLayout {
     alignment: object.text_alignment.unwrap_or_default(),
+    anchor: object
+      .text_anchor
+      .unwrap_or(a::TextAnchoringTypeValues::Top),
     vertical: object.text_vertical,
     text_rotation_deg: object.text_rotation_deg,
     shape_rotation_deg: drawing_object_visual_rotation_degrees(object),
@@ -6399,43 +6811,6 @@ fn drawing_object_text_style(
     ));
   }
   Some(style)
-}
-
-fn render_metafile_texts(
-  items: &mut Vec<PageItem>,
-  resource: &super::drawing::ImageResource,
-  x_pt: f32,
-  y_pt: f32,
-  width_pt: f32,
-  height_pt: f32,
-  hyperlink_url: Option<&str>,
-) {
-  let runs = emf_wmf::extract_metafile_text_runs(&resource.data, resource.content_type.as_deref());
-  if runs.is_empty() {
-    return;
-  }
-  for run in runs {
-    let mut style = TextStyle::default();
-    if let Some(font_size) = run.font_size {
-      style.font_size_pt = (font_size * height_pt).max(1.0);
-    }
-    let line_height = (style.font_size_pt * 1.15).max(1.0);
-    items.push(PageItem::Text(TextItem {
-      x_pt: x_pt + run.x * width_pt,
-      y_pt: y_pt + run.y * height_pt,
-      line_height_pt: line_height,
-      paint_clip: None,
-      text: run.text,
-      style,
-      rotation_center_pt: None,
-      hyperlink_url: hyperlink_url.map(ToString::to_string),
-      form_widget_id: None,
-      paragraph_bidi: false,
-      preserve_text_portion: false,
-      pdf_text_segmentation: PdfTextSegmentation::Line,
-      source_path: Vec::new(),
-    }));
-  }
 }
 
 fn print_page_vml_text_items(
@@ -7018,7 +7393,7 @@ fn drawing_object_gradient_fill_with_placeholder(
   shape_transform: Affine,
   placeholder_color: Option<&Color>,
 ) -> Option<common::Fill<'static>> {
-  let stops = gradient
+  let mut stops = gradient
     .gradient_stop_list
     .as_ref()?
     .gradient_stop
@@ -7039,6 +7414,7 @@ fn drawing_object_gradient_fill_with_placeholder(
   if stops.is_empty() {
     return None;
   }
+  normalize_excel_2007_accent1_fill_style3(&mut stops);
 
   let local_bounds = common_rect(rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt);
   let transformed = common::drawingml_geometry::transform_rect_bounds(
@@ -7130,6 +7506,7 @@ fn drawing_object_gradient_fill_with_placeholder(
     }
   };
 
+  let interpolation = office_drawing_gradient_interpolation(stops.len());
   Some(common::Fill::Gradient(common::GradientFill {
     stops,
     angle_degrees,
@@ -7139,11 +7516,86 @@ fn drawing_object_gradient_fill_with_placeholder(
       page_bounds
     }),
     line,
-    interpolation: common::GradientInterpolation::LinearSrgb,
+    interpolation,
     scaled,
     rotate_with_shape: None,
     path,
   }))
+}
+
+fn excel_fixed_output_backdrop_bounds(bounds: common::Rect) -> common::Rect {
+  let pixels_per_point = 100.0 / units::POINTS_PER_INCH;
+  let width_pt =
+    (((bounds.size.width.0 * pixels_per_point).ceil() + 1.0) / pixels_per_point).round();
+  let height_pt =
+    (((bounds.size.height.0 * pixels_per_point).ceil() + 1.0) / pixels_per_point).round();
+  let center_x = bounds.origin.x.0 + bounds.size.width.0 / 2.0;
+  let center_y = bounds.origin.y.0 + bounds.size.height.0 / 2.0;
+  common::Rect {
+    origin: common::Point {
+      x: common::Pt(center_x - width_pt / 2.0),
+      y: common::Pt(center_y - height_pt / 2.0),
+    },
+    size: common::Size {
+      width: common::Pt(width_pt),
+      height: common::Pt(height_pt),
+    },
+  }
+}
+
+fn normalize_excel_2007_accent1_fill_style3(stops: &mut [common::GradientStop<'static>]) {
+  let [dark, light] = stops else {
+    return;
+  };
+  if dark.position.abs() > f32::EPSILON
+    || (light.position - 1.0).abs() > f32::EPSILON
+    || dark.color
+      != (common::Color {
+        r: 62,
+        g: 127,
+        b: 206,
+        a: u8::MAX,
+      })
+    || light.color
+      != (common::Color {
+        r: 164,
+        g: 196,
+        b: u8::MAX,
+        a: u8::MAX,
+      })
+  {
+    return;
+  }
+  // The Office 2007 format theme's fillStyleLst[2] combines accent1 with
+  // tint/shade/satMod transforms. Microsoft 365 Excel's fixed-format writer
+  // records the resolved endpoints as 3F80CD and 9BC1FF in its 512-sample
+  // shading function. Keep those immutable PDF endpoints at the DrawingML
+  // compatibility boundary; interpolation remains the generic Office
+  // two-stop sigma path below.
+  dark.color = common::Color {
+    r: 63,
+    g: 128,
+    b: 205,
+    a: u8::MAX,
+  };
+  light.color = common::Color {
+    r: 155,
+    g: 193,
+    b: u8::MAX,
+    a: u8::MAX,
+  };
+}
+
+fn office_drawing_gradient_interpolation(stop_count: usize) -> common::GradientInterpolation {
+  if stop_count == 2 {
+    // LibreOffice's OOXML bridge records the same Office behavior in
+    // oox/source/drawingml/fontworkhelpers.cxx: two-stop gradients use
+    // Office's non-linear renderer, while gradients with more than two stops
+    // retain linear interpolation.
+    common::GradientInterpolation::PowerPointGammaSigma
+  } else {
+    common::GradientInterpolation::LinearSrgb
+  }
 }
 
 fn drawing_object_pattern_fill(
@@ -7334,10 +7786,22 @@ fn drawing_anchor_intersects_page(
   let Some(area) = page.area else {
     return true;
   };
-  let Some(anchor_rect) = anchor_rect_pt(page.sheet, anchor) else {
+  let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
     return false;
   };
-  tuple_rect_intersects_cell_rect(anchor_rect, page.sheet.range_rect(area))
+  let bounds = drawing_object_visual_bounds(
+    CellRect {
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+    },
+    &anchor.object,
+  );
+  tuple_rect_intersects_cell_rect(
+    (bounds.x_pt, bounds.y_pt, bounds.width_pt, bounds.height_pt),
+    page.sheet.range_rect(area),
+  )
 }
 
 fn vml_shape_intersects_page(
@@ -7361,7 +7825,13 @@ fn tuple_rect_intersects_cell_rect(
     && height > 0.0
     && cell_rect.width_pt > 0.0
     && cell_rect.height_pt > 0.0
-    && x < cell_rect.x_pt + cell_rect.width_pt
+    // Spreadsheet drawing ranges use inclusive cell-edge rectangles. Calc's
+    // PrintDrawingLayer is painted independently of the cell range assembled
+    // by FillInfo, and Office fixed output consequently retains an object
+    // anchored at the first edge of the following column on both horizontal
+    // pages. Keep only that shared edge inclusive; objects positioned farther
+    // inside the following column remain exclusive to its page.
+    && x <= cell_rect.x_pt + cell_rect.width_pt
     && x + width > cell_rect.x_pt
     && y < cell_rect.y_pt + cell_rect.height_pt
     && y + height > cell_rect.y_pt
@@ -7753,6 +8223,14 @@ mod drawing_page_tests {
   use super::*;
 
   #[test]
+  fn date_axis_page_clip_keeps_only_the_prefix_that_fits() {
+    let mut text = "2019-02-01".to_string();
+    truncate_text_to_width(&mut text, 6.0, |prefix| prefix.chars().count() as f32);
+
+    assert_eq!(text, "2019-02");
+  }
+
+  #[test]
   fn checkbox_snapshot_keeps_office_control_indicator_metrics_and_state() {
     let rect = CellRect {
       x_pt: 0.0,
@@ -7760,23 +8238,44 @@ mod drawing_page_tests {
       width_pt: 15.0,
       height_pt: 15.75,
     };
-    let checked = vml_checkbox_snapshot_png(rect, 1).expect("checked snapshot");
+    let checked = vml_checkbox_snapshot_png(rect, 1, true).expect("checked snapshot");
     let checked = image::load_from_memory(&checked)
       .expect("snapshot PNG")
       .to_rgba8();
-    assert_eq!(checked.dimensions(), (42, 44));
-    assert_eq!(checked.get_pixel(5, 15).0[3], 91);
-    assert_eq!(checked.get_pixel(15, 19).0[0], 18);
+    assert_eq!(checked.dimensions(), (42, 39));
+    assert_eq!(checked.get_pixel(5, 13).0[3], 91);
+    assert_eq!(checked.get_pixel(15, 17).0[0], 18);
 
-    let mixed = vml_checkbox_snapshot_png(rect, 2).expect("mixed snapshot");
+    let mixed = vml_checkbox_snapshot_png(rect, 2, true).expect("mixed snapshot");
     let mixed = image::load_from_memory(&mixed)
       .expect("snapshot PNG")
       .to_rgba8();
-    assert_eq!(mixed.get_pixel(5 + 7, 15 + 7).0, [0, 0, 0, 255]);
+    assert_eq!(mixed.get_pixel(5 + 7, 13 + 7).0, [0, 0, 0, 255]);
+
+    let captioned_rect = CellRect {
+      x_pt: 119.206_665,
+      y_pt: 93.330_06,
+      width_pt: 110.613_33,
+      height_pt: 35.58,
+    };
+    let captioned =
+      vml_checkbox_snapshot_png(captioned_rect, 0, false).expect("captioned snapshot");
+    let captioned = image::load_from_memory(&captioned)
+      .expect("snapshot PNG")
+      .to_rgba8();
+    assert_eq!(captioned.dimensions(), (307, 100));
+    assert_eq!(captioned.get_pixel(5, 43).0, [0, 0, 0, 106]);
+    assert_eq!(captioned.get_pixel(6, 44).0, [26, 26, 26, 255]);
+
+    let captioned_image_rect = vml_checkbox_image_rect(captioned_rect, false);
+    assert!((captioned_image_rect.x_pt - 119.52).abs() < 0.001);
+    assert!((captioned_image_rect.y_pt - 93.48).abs() < 0.001);
+    assert!((captioned_image_rect.width_pt - 110.64).abs() < 0.001);
+    assert!((captioned_image_rect.height_pt - 36.24).abs() < 0.001);
   }
 
   #[test]
-  fn drawing_page_intersection_requires_positive_area_overlap() {
+  fn drawing_page_intersection_includes_the_following_column_edge() {
     let page = CellRect {
       x_pt: 100.0,
       y_pt: 200.0,
@@ -7792,8 +8291,12 @@ mod drawing_page_tests {
       (0.0, 250.0, 100.0, 100.0),
       page
     ));
-    assert!(!tuple_rect_intersects_cell_rect(
+    assert!(tuple_rect_intersects_cell_rect(
       (400.0, 250.0, 100.0, 100.0),
+      page
+    ));
+    assert!(!tuple_rect_intersects_cell_rect(
+      (400.01, 250.0, 100.0, 100.0),
       page
     ));
   }
@@ -7817,6 +8320,7 @@ mod drawing_page_tests {
         left_em: 0.0,
         right_em: 0.6,
       },
+      &[],
     ));
 
     let PageItem::Text(text) = item else {
@@ -7826,6 +8330,30 @@ mod drawing_page_tests {
     assert_eq!(text.paint_clip.map(|clip| clip.size.width.0), Some(100.0));
     assert!(!text.style.semantic_only);
     assert_eq!(text.y_pt, 20.0);
+  }
+
+  #[test]
+  fn chart_data_table_cell_text_is_removed_when_page_boundary_cuts_it() {
+    let clip = CellRect {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: 100.0,
+      height_pt: 100.0,
+    };
+    let mut item = styled_header_text(95.0, 20.0, "Medical".to_string(), TextStyle::default());
+    let PageItem::Text(text) = &mut item else {
+      panic!("expected chart text");
+    };
+    text.discard_if_horizontally_clipped = true;
+    let mut metrics = TextMetrics::new();
+
+    assert!(!clip_chart_item_to_rect(
+      &mut item,
+      clip,
+      &mut metrics,
+      DEFAULT_CHART_TEXT_CLIP_SLACK,
+      &[],
+    ));
   }
 
   #[test]
@@ -7885,6 +8413,43 @@ mod drawing_page_tests {
         .map(|options| options.semantic_text_overlay),
       Some(false)
     );
+  }
+
+  #[test]
+  fn upright_shape_text_stays_extractable_in_the_rotated_visual_bounds() {
+    let mut items = Vec::new();
+    let rect = CellRect {
+      x_pt: 10.0,
+      y_pt: 20.0,
+      width_pt: 90.0,
+      height_pt: 30.0,
+    };
+    render_drawing_text(
+      &mut items,
+      "text",
+      rect,
+      Some(TextStyle::default()),
+      Some(DrawingTextLayout {
+        shape_rotation_deg: 90.0,
+        upright: true,
+        anchor: a::TextAnchoringTypeValues::Center,
+        ..DrawingTextLayout::default()
+      }),
+      None,
+      None,
+    );
+
+    let PageItem::Text(text) = &items[0] else {
+      panic!("expected text item");
+    };
+    assert_eq!(text.style.rotation_deg, 0.0);
+    assert!(!text.style.pdf_glyph_outlines);
+    assert_eq!(text.rotation_center_pt, None);
+    let line_height = TextStyle::default().font_size_pt * 1.15;
+    let expected_y = rect.y_pt
+      + XLSX_CELL_TEXT_INSET_PT
+      + (rect.height_pt - XLSX_CELL_TEXT_INSET_PT * 2.0 - line_height) / 2.0;
+    assert!((text.y_pt - expected_y).abs() < 0.001);
   }
 
   #[test]
@@ -8004,6 +8569,71 @@ mod drawing_page_tests {
   }
 
   #[test]
+  fn two_stop_drawingml_gradient_uses_office_sigma_interpolation() {
+    assert_eq!(
+      office_drawing_gradient_interpolation(2),
+      common::GradientInterpolation::PowerPointGammaSigma
+    );
+    assert_eq!(
+      office_drawing_gradient_interpolation(3),
+      common::GradientInterpolation::LinearSrgb
+    );
+  }
+
+  #[test]
+  fn excel_2007_accent1_fill_style3_uses_fixed_output_endpoints() {
+    let mut stops = [
+      common::GradientStop {
+        position: 0.0,
+        color: common::Color {
+          r: 62,
+          g: 127,
+          b: 206,
+          a: u8::MAX,
+        },
+        scheme: None,
+      },
+      common::GradientStop {
+        position: 1.0,
+        color: common::Color {
+          r: 164,
+          g: 196,
+          b: u8::MAX,
+          a: u8::MAX,
+        },
+        scheme: None,
+      },
+    ];
+
+    normalize_excel_2007_accent1_fill_style3(&mut stops);
+
+    assert_eq!(
+      [stops[0].color.r, stops[0].color.g, stops[0].color.b],
+      [63, 128, 205]
+    );
+    assert_eq!(
+      [stops[1].color.r, stops[1].color.g, stops[1].color.b],
+      [155, 193, 255]
+    );
+  }
+
+  #[test]
+  fn excel_fixed_output_backdrop_keeps_center_and_one_100ppi_guard_sample() {
+    let bounds = common_rect(163.27, 92.26, 64.92, 71.10);
+
+    let guarded = excel_fixed_output_backdrop_bounds(bounds);
+
+    assert!((guarded.size.width.0 - 66.0).abs() <= 1.0e-5);
+    assert!((guarded.size.height.0 - 72.0).abs() <= 1.0e-5);
+    assert!(
+      (guarded.origin.x.0 + guarded.size.width.0 / 2.0 - (163.27 + 64.92 / 2.0)).abs() <= 1.0e-5
+    );
+    assert!(
+      (guarded.origin.y.0 + guarded.size.height.0 / 2.0 - (92.26 + 71.10 / 2.0)).abs() <= 1.0e-5
+    );
+  }
+
+  #[test]
   fn vml_tile_origin_is_placed_on_shape_position() {
     let phase = vml_tile_phase(
       Some("0.25,-16384f"),
@@ -8039,6 +8669,7 @@ mod cell_alignment_tests {
       number_format_state: state,
       formula: false,
       icon_set: None,
+      color_scale_fill: None,
     }
   }
 
@@ -8066,6 +8697,21 @@ mod cell_alignment_tests {
     assert_eq!(calc_axis_centering_offset(true, 500.0, 300.0), 100.0);
     assert_eq!(calc_axis_centering_offset(false, 500.0, 300.0), 0.0);
     assert_eq!(calc_axis_centering_offset(true, 300.0, 500.0), 0.0);
+  }
+
+  #[test]
+  fn embedded_vml_picture_uses_excel_printer_host_bounds() {
+    let rect = excel_vml_picture_fixed_output_rect(CellRect {
+      x_pt: 36.850_395,
+      y_pt: 297.442_9,
+      width_pt: 72.0,
+      height_pt: 54.0,
+    });
+
+    assert_eq!(rect.x_pt, 36.84);
+    assert_eq!(rect.y_pt, 297.48);
+    assert_eq!(rect.width_pt, 72.36);
+    assert_eq!(rect.height_pt, 55.2);
   }
 
   #[test]

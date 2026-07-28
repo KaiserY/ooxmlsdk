@@ -318,6 +318,7 @@ pub(crate) struct TextItem {
   pub y_pt: f32,
   pub line_height_pt: f32,
   pub paint_clip: Option<common::Rect>,
+  pub discard_if_horizontally_clipped: bool,
   pub text: String,
   pub style: TextStyle,
   pub rotation_center_pt: Option<(f32, f32)>,

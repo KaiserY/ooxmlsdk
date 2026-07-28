@@ -34,10 +34,22 @@ pub(crate) struct ConditionalFormatRuleModel {
   pub(crate) bottom: bool,
   pub(crate) equal_average: bool,
   pub(crate) formulas: Vec<String>,
-  pub(crate) has_color_scale: bool,
+  pub(crate) color_scale: Option<ColorScaleModel>,
   pub(crate) has_data_bar: bool,
   pub(crate) icon_set: Option<IconSetModel>,
   pub(crate) has_extensions: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ColorScaleModel {
+  pub(crate) points: Vec<ColorScalePointModel>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ColorScalePointModel {
+  pub(crate) threshold_type: IconSetThresholdType,
+  pub(crate) value: Option<String>,
+  pub(crate) color: x::Color,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -343,11 +355,27 @@ impl ConditionalFormatRuleModel {
         .iter()
         .filter_map(|formula| formula.xml_content.clone())
         .collect(),
-      has_color_scale: rule.color_scale.is_some(),
+      color_scale: rule.color_scale.as_ref().map(ColorScaleModel::from_base),
       has_data_bar: rule.data_bar.is_some(),
       icon_set: rule.icon_set.as_ref().map(IconSetModel::from_base),
       has_extensions: rule.conditional_formatting_rule_extension_list.is_some(),
     }
+  }
+}
+
+impl ColorScaleModel {
+  fn from_base(color_scale: &x::ColorScale) -> Self {
+    let points = color_scale
+      .conditional_format_value_object
+      .iter()
+      .zip(&color_scale.color)
+      .map(|(threshold, color)| ColorScalePointModel {
+        threshold_type: threshold.r#type.into(),
+        value: threshold.val.clone(),
+        color: color.clone(),
+      })
+      .collect();
+    Self { points }
   }
 }
 
@@ -744,6 +772,53 @@ mod tests {
   fn base_icon_set_uses_the_schema_traffic_light_default() {
     let model = IconSetModel::from_base(&x::IconSet::default());
     assert_eq!(model.icon_set, IconSetType::ThreeTrafficLights1);
+  }
+
+  #[test]
+  fn base_color_scale_preserves_corresponding_thresholds_and_colors() {
+    let color_scale = x::ColorScale {
+      conditional_format_value_object: vec![
+        x::ConditionalFormatValueObject {
+          r#type: x::ConditionalFormatValueObjectValues::Min,
+          val: Some("0".to_string()),
+          ..Default::default()
+        },
+        x::ConditionalFormatValueObject {
+          r#type: x::ConditionalFormatValueObjectValues::Percentile,
+          val: Some("50".to_string()),
+          ..Default::default()
+        },
+        x::ConditionalFormatValueObject {
+          r#type: x::ConditionalFormatValueObjectValues::Max,
+          val: Some("0".to_string()),
+          ..Default::default()
+        },
+      ],
+      color: vec![
+        x::Color {
+          rgb: Some("FFFF0000".to_string()),
+          ..Default::default()
+        },
+        x::Color {
+          rgb: Some("FFFFFF00".to_string()),
+          ..Default::default()
+        },
+        x::Color {
+          rgb: Some("FF00B050".to_string()),
+          ..Default::default()
+        },
+      ],
+    };
+
+    let model = ColorScaleModel::from_base(&color_scale);
+
+    assert_eq!(model.points.len(), 3);
+    assert_eq!(
+      model.points[1].threshold_type,
+      IconSetThresholdType::Percentile
+    );
+    assert_eq!(model.points[1].value.as_deref(), Some("50"));
+    assert_eq!(model.points[1].color.rgb.as_deref(), Some("FFFFFF00"));
   }
 
   #[test]

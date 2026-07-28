@@ -18,6 +18,9 @@ pub(crate) struct TableResourceCatalog {
   pub(crate) table_type: Option<x::TableValues>,
   pub(crate) header_rows: u32,
   pub(crate) totals_rows: u32,
+  pub(crate) header_row_format_id: Option<u32>,
+  pub(crate) data_format_id: Option<u32>,
+  pub(crate) totals_row_format_id: Option<u32>,
   pub(crate) columns: Vec<TableColumnModel>,
   pub(crate) has_auto_filter: bool,
   pub(crate) has_sort_state: bool,
@@ -34,6 +37,9 @@ pub(crate) struct TableColumnModel {
   pub(crate) totals_row_function: Option<x::TotalsRowFunctionValues>,
   pub(crate) totals_row_label: Option<String>,
   pub(crate) query_table_field_id: Option<u32>,
+  pub(crate) header_row_format_id: Option<u32>,
+  pub(crate) data_format_id: Option<u32>,
+  pub(crate) totals_row_format_id: Option<u32>,
   pub(crate) has_calculated_formula: bool,
   pub(crate) has_totals_formula: bool,
   pub(crate) has_xml_column_properties: bool,
@@ -64,6 +70,9 @@ impl TableResourceCatalog {
       table_type: table.table_type,
       header_rows: table.header_row_count.unwrap_or(1),
       totals_rows: table.totals_row_count.unwrap_or(0),
+      header_row_format_id: table.header_row_format_id,
+      data_format_id: table.data_format_id,
+      totals_row_format_id: table.totals_row_format_id,
       columns: table
         .table_columns
         .table_column
@@ -89,7 +98,7 @@ pub(crate) struct BuiltinTableCellStyle {
   pub(crate) text_color: Option<RgbColor>,
   pub(crate) bold: bool,
   pub(crate) borders: BorderRecord,
-  differential_format_ids: [Option<u32>; 12],
+  differential_format_ids: [Option<u32>; 16],
 }
 
 pub(crate) fn builtin_table_style_for_address(
@@ -109,85 +118,159 @@ pub(crate) fn builtin_table_style_for_address(
   let Some(name) = table.style.name.as_deref() else {
     return BuiltinTableCellStyle::default();
   };
-  if let Some(style) = styles.table_style(name) {
-    return custom_table_style(table, styles, style, range, address);
+  let mut result = if let Some(style) = styles.table_style(name) {
+    custom_table_style(table, styles, style, range, address)
+  } else {
+    match name {
+      "TableStyleLight1" => light1_style(table, styles, range, address),
+      "TableStyleLight2" => light_accent_outline_style(table, styles, range, address, 4),
+      "TableStyleLight3" => light_accent_outline_style(table, styles, range, address, 5),
+      "TableStyleLight4" => light_accent_outline_style(table, styles, range, address, 6),
+      "TableStyleLight5" => light_accent_outline_style(table, styles, range, address, 7),
+      "TableStyleLight6" => light_accent_outline_style(table, styles, range, address, 8),
+      "TableStyleLight7" => light_accent_outline_style(table, styles, range, address, 9),
+      "TableStyleLight8" => light_accent_grid_style(table, styles, range, address, 1),
+      "TableStyleLight9" => light_accent_grid_style(table, styles, range, address, 4),
+      "TableStyleLight10" => light_accent_grid_style(table, styles, range, address, 5),
+      "TableStyleLight11" => light_accent_grid_style(table, styles, range, address, 6),
+      "TableStyleLight12" => light_accent_grid_style(table, styles, range, address, 7),
+      "TableStyleLight13" => light_accent_grid_style(table, styles, range, address, 8),
+      "TableStyleLight14" => light_accent_grid_style(table, styles, range, address, 9),
+      "TableStyleLight15" => light_tinted_grid_style(table, styles, range, address, 1),
+      "TableStyleLight16" => light_tinted_grid_style(table, styles, range, address, 4),
+      "TableStyleLight17" => light_tinted_grid_style(table, styles, range, address, 5),
+      "TableStyleLight18" => light_tinted_grid_style(table, styles, range, address, 6),
+      "TableStyleLight19" => light_tinted_grid_style(table, styles, range, address, 7),
+      "TableStyleLight20" => light_tinted_grid_style(table, styles, range, address, 8),
+      "TableStyleLight21" => light_tinted_grid_style(table, styles, range, address, 9),
+      "TableStyleMedium1" => medium_header_fill_style(
+        table,
+        styles,
+        range,
+        address,
+        1,
+        Some((0, -0.149_998_474_074_526_2)),
+      ),
+      "TableStyleMedium2" => medium2_style(table, styles, range, address),
+      "TableStyleMedium3" => medium_header_fill_style(
+        table,
+        styles,
+        range,
+        address,
+        5,
+        Some((5, 0.799_981_688_894_314_4)),
+      ),
+      "TableStyleMedium4" => medium_header_fill_style(
+        table,
+        styles,
+        range,
+        address,
+        6,
+        Some((6, 0.799_981_688_894_314_4)),
+      ),
+      "TableStyleMedium5" => medium_header_fill_style(
+        table,
+        styles,
+        range,
+        address,
+        7,
+        Some((7, 0.799_981_688_894_314_4)),
+      ),
+      "TableStyleMedium6" => medium_header_fill_style(
+        table,
+        styles,
+        range,
+        address,
+        8,
+        Some((8, 0.799_981_688_894_314_4)),
+      ),
+      "TableStyleMedium7" => medium_header_fill_style(
+        table,
+        styles,
+        range,
+        address,
+        9,
+        Some((9, 0.799_981_688_894_314_4)),
+      ),
+      "TableStyleMedium9" => medium9_style(table, styles, range, address),
+      "TableStyleMedium21" => medium_dark_header_style(table, styles, range, address, 9),
+      "TableStyleMedium24" => medium_tinted_grid_style(table, styles, range, address, 5),
+      "TableStyleDark11" => dark_split_accent_style(table, styles, range, address, 8, 9),
+      _ => BuiltinTableCellStyle::default(),
+    }
+  };
+  merge_direct_table_differentials(&mut result, table, styles, range, address);
+  result
+}
+
+fn merge_direct_table_differentials(
+  result: &mut BuiltinTableCellStyle,
+  table: &TableResourceCatalog,
+  styles: &StylesCatalog,
+  range: CellRange,
+  address: CellAddress,
+) {
+  // ECMA-376 18.5.1.2 and 18.5.1.3 assign these DXFs to the
+  // header/data/totals regions. Apply the table record first and the
+  // column-specific record second.
+  let table_format_id = if is_header(table, range, address) {
+    table.header_row_format_id
+  } else if is_total(table, range, address) {
+    table.totals_row_format_id
+  } else {
+    table.data_format_id
+  };
+  if let Some(format_id) = table_format_id {
+    merge_direct_cell_differential(result, styles, format_id);
   }
-  match name {
-    "TableStyleLight1" => light1_style(table, styles, range, address),
-    "TableStyleLight2" => light_accent_outline_style(table, styles, range, address, 4),
-    "TableStyleLight3" => light_accent_outline_style(table, styles, range, address, 5),
-    "TableStyleLight4" => light_accent_outline_style(table, styles, range, address, 6),
-    "TableStyleLight5" => light_accent_outline_style(table, styles, range, address, 7),
-    "TableStyleLight6" => light_accent_outline_style(table, styles, range, address, 8),
-    "TableStyleLight7" => light_accent_outline_style(table, styles, range, address, 9),
-    "TableStyleLight8" => light_accent_grid_style(table, styles, range, address, 1),
-    "TableStyleLight9" => light_accent_grid_style(table, styles, range, address, 4),
-    "TableStyleLight10" => light_accent_grid_style(table, styles, range, address, 5),
-    "TableStyleLight11" => light_accent_grid_style(table, styles, range, address, 6),
-    "TableStyleLight12" => light_accent_grid_style(table, styles, range, address, 7),
-    "TableStyleLight13" => light_accent_grid_style(table, styles, range, address, 8),
-    "TableStyleLight14" => light_accent_grid_style(table, styles, range, address, 9),
-    "TableStyleLight15" => light_tinted_grid_style(table, styles, range, address, 1),
-    "TableStyleLight16" => light_tinted_grid_style(table, styles, range, address, 4),
-    "TableStyleLight17" => light_tinted_grid_style(table, styles, range, address, 5),
-    "TableStyleLight18" => light_tinted_grid_style(table, styles, range, address, 6),
-    "TableStyleLight19" => light_tinted_grid_style(table, styles, range, address, 7),
-    "TableStyleLight20" => light_tinted_grid_style(table, styles, range, address, 8),
-    "TableStyleLight21" => light_tinted_grid_style(table, styles, range, address, 9),
-    "TableStyleMedium1" => medium_header_fill_style(
-      table,
-      styles,
-      range,
-      address,
-      1,
-      Some((0, -0.149_998_474_074_526_2)),
-    ),
-    "TableStyleMedium2" => medium2_style(table, styles, range, address),
-    "TableStyleMedium3" => medium_header_fill_style(
-      table,
-      styles,
-      range,
-      address,
-      5,
-      Some((5, 0.799_981_688_894_314_4)),
-    ),
-    "TableStyleMedium4" => medium_header_fill_style(
-      table,
-      styles,
-      range,
-      address,
-      6,
-      Some((6, 0.799_981_688_894_314_4)),
-    ),
-    "TableStyleMedium5" => medium_header_fill_style(
-      table,
-      styles,
-      range,
-      address,
-      7,
-      Some((7, 0.799_981_688_894_314_4)),
-    ),
-    "TableStyleMedium6" => medium_header_fill_style(
-      table,
-      styles,
-      range,
-      address,
-      8,
-      Some((8, 0.799_981_688_894_314_4)),
-    ),
-    "TableStyleMedium7" => medium_header_fill_style(
-      table,
-      styles,
-      range,
-      address,
-      9,
-      Some((9, 0.799_981_688_894_314_4)),
-    ),
-    "TableStyleMedium9" => medium9_style(table, styles, range, address),
-    "TableStyleMedium21" => medium_dark_header_style(table, styles, range, address, 9),
-    "TableStyleMedium24" => medium_tinted_grid_style(table, styles, range, address, 5),
-    "TableStyleDark11" => dark_split_accent_style(table, styles, range, address, 8, 9),
-    _ => BuiltinTableCellStyle::default(),
+
+  let Some(column) = address
+    .col
+    .checked_sub(range.start.col)
+    .and_then(|offset| table.columns.get(offset as usize))
+  else {
+    return;
+  };
+  let column_format_id = if is_header(table, range, address) {
+    column.header_row_format_id
+  } else if is_total(table, range, address) {
+    column.totals_row_format_id
+  } else {
+    column.data_format_id
+  };
+  if let Some(format_id) = column_format_id {
+    merge_direct_cell_differential(result, styles, format_id);
+  }
+}
+
+fn merge_direct_cell_differential(
+  result: &mut BuiltinTableCellStyle,
+  styles: &StylesCatalog,
+  format_id: u32,
+) {
+  if let Some(slot) = result
+    .differential_format_ids
+    .iter_mut()
+    .find(|slot| slot.is_none())
+  {
+    *slot = Some(format_id);
+  }
+  if let Some(fill) = styles.differential_fill_color(format_id) {
+    result.fill = Some(fill);
+  }
+  if let Some(border) = styles.differential_borders(format_id) {
+    if border.left.is_some() {
+      result.borders.left = border.left;
+    }
+    if border.right.is_some() {
+      result.borders.right = border.right;
+    }
+    if border.top.is_some() {
+      result.borders.top = border.top;
+    }
+    if border.bottom.is_some() {
+      result.borders.bottom = border.bottom;
+    }
   }
 }
 
@@ -965,6 +1048,9 @@ impl TableColumnModel {
       totals_row_function: column.totals_row_function,
       totals_row_label: column.totals_row_label.clone(),
       query_table_field_id: column.query_table_field_id,
+      header_row_format_id: column.header_row_differential_formatting_id,
+      data_format_id: column.data_format_id,
+      totals_row_format_id: column.totals_row_differential_formatting_id,
       has_calculated_formula: column.calculated_column_formula.is_some(),
       has_totals_formula: column.totals_row_formula.is_some(),
       has_xml_column_properties: column.xml_column_properties.is_some(),
@@ -1009,6 +1095,9 @@ mod tests {
       table_type: None,
       header_rows: 1,
       totals_rows: 1,
+      header_row_format_id: None,
+      data_format_id: None,
+      totals_row_format_id: None,
       columns: Vec::new(),
       has_auto_filter: true,
       has_sort_state: false,
@@ -1094,6 +1183,55 @@ mod tests {
       CellAddress { col: 2, row: 4 },
     );
     assert_eq!(second_stripe.fill, Some(red));
+  }
+
+  #[test]
+  fn direct_column_differential_follows_table_differential() {
+    let red = RgbColor { r: 255, g: 0, b: 0 };
+    let blue = RgbColor { r: 0, g: 0, b: 255 };
+    let mut styles = StylesCatalog::default();
+    styles.differential_format_records = vec![
+      DifferentialFormatRecord {
+        fill: Some(FillRecord { color: Some(red) }),
+        ..DifferentialFormatRecord::default()
+      },
+      DifferentialFormatRecord {
+        fill: Some(FillRecord { color: Some(blue) }),
+        ..DifferentialFormatRecord::default()
+      },
+    ];
+    let mut table = custom_table("TableStyleMedium21");
+    table.data_format_id = Some(0);
+    table.columns = (1..=3)
+      .map(|id| TableColumnModel {
+        id,
+        name: format!("Column{id}"),
+        unique_name: None,
+        totals_row_function: None,
+        totals_row_label: None,
+        query_table_field_id: None,
+        header_row_format_id: None,
+        data_format_id: (id == 2).then_some(1),
+        totals_row_format_id: None,
+        has_calculated_formula: false,
+        has_totals_formula: false,
+        has_xml_column_properties: false,
+        has_extensions: false,
+      })
+      .collect();
+
+    let first_column = builtin_table_style_for_address(
+      std::slice::from_ref(&table),
+      &styles,
+      CellAddress { col: 1, row: 3 },
+    );
+    assert_eq!(first_column.fill, Some(red));
+    let second_column = builtin_table_style_for_address(
+      std::slice::from_ref(&table),
+      &styles,
+      CellAddress { col: 2, row: 3 },
+    );
+    assert_eq!(second_column.fill, Some(blue));
   }
 
   #[test]

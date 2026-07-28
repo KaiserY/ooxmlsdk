@@ -52,7 +52,6 @@ pub(crate) struct ImageResource {
 pub(crate) struct DrawingAnchorModel {
   pub(crate) kind: DrawingAnchorKind,
   pub(crate) object: DrawingObjectModel,
-  pub(crate) object_transform: Option<((i64, i64), (i64, i64))>,
   pub(crate) from: Option<DrawingMarkerModel>,
   pub(crate) to: Option<DrawingMarkerModel>,
   pub(crate) position: Option<(i64, i64)>,
@@ -100,6 +99,7 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) text_bold: Option<bool>,
   pub(crate) text_italic: Option<bool>,
   pub(crate) text_alignment: Option<a::TextAlignmentTypeValues>,
+  pub(crate) text_anchor: Option<a::TextAnchoringTypeValues>,
   pub(crate) text_vertical: Option<a::TextVerticalValues>,
   pub(crate) text_rotation_deg: f32,
   pub(crate) text_upright: bool,
@@ -453,10 +453,6 @@ impl DrawingAnchorModel {
     match choice {
       xdr::WorksheetDrawingChoice::TwoCellAnchor(anchor) => Self {
         kind: DrawingAnchorKind::TwoCell,
-        object_transform: anchor
-          .two_cell_anchor_choice
-          .as_ref()
-          .and_then(two_cell_object_transform),
         object: anchor
           .two_cell_anchor_choice
           .as_ref()
@@ -480,10 +476,6 @@ impl DrawingAnchorModel {
       },
       xdr::WorksheetDrawingChoice::OneCellAnchor(anchor) => Self {
         kind: DrawingAnchorKind::OneCell,
-        object_transform: anchor
-          .one_cell_anchor_choice
-          .as_ref()
-          .and_then(one_cell_object_transform),
         object: anchor
           .one_cell_anchor_choice
           .as_ref()
@@ -507,10 +499,6 @@ impl DrawingAnchorModel {
       },
       xdr::WorksheetDrawingChoice::AbsoluteAnchor(anchor) => Self {
         kind: DrawingAnchorKind::Absolute,
-        object_transform: anchor
-          .absolute_anchor_choice
-          .as_ref()
-          .and_then(absolute_object_transform),
         object: anchor
           .absolute_anchor_choice
           .as_ref()
@@ -538,7 +526,6 @@ impl DrawingAnchorModel {
           text_len: 0,
           ..DrawingObjectModel::unknown()
         },
-        object_transform: None,
         from: None,
         to: None,
         position: None,
@@ -549,68 +536,6 @@ impl DrawingAnchorModel {
       },
     }
   }
-}
-
-fn two_cell_object_transform(
-  choice: &xdr::TwoCellAnchorChoice,
-) -> Option<((i64, i64), (i64, i64))> {
-  match choice {
-    xdr::TwoCellAnchorChoice::Shape(shape) => {
-      shape_transform(shape.shape_properties.transform2_d.as_deref())
-    }
-    xdr::TwoCellAnchorChoice::GroupShape(_) | xdr::TwoCellAnchorChoice::GraphicFrame(_) => None,
-    xdr::TwoCellAnchorChoice::ConnectionShape(shape) => {
-      shape_transform(shape.shape_properties.transform2_d.as_deref())
-    }
-    xdr::TwoCellAnchorChoice::Picture(_) => None,
-    xdr::TwoCellAnchorChoice::ContentPart(_) | xdr::TwoCellAnchorChoice::AlternateContent(_) => {
-      None
-    }
-  }
-}
-
-fn one_cell_object_transform(
-  choice: &xdr::OneCellAnchorChoice,
-) -> Option<((i64, i64), (i64, i64))> {
-  match choice {
-    xdr::OneCellAnchorChoice::Shape(shape) => {
-      shape_transform(shape.shape_properties.transform2_d.as_deref())
-    }
-    xdr::OneCellAnchorChoice::GroupShape(_) | xdr::OneCellAnchorChoice::GraphicFrame(_) => None,
-    xdr::OneCellAnchorChoice::ConnectionShape(shape) => {
-      shape_transform(shape.shape_properties.transform2_d.as_deref())
-    }
-    xdr::OneCellAnchorChoice::Picture(_) => None,
-    xdr::OneCellAnchorChoice::ContentPart(_) | xdr::OneCellAnchorChoice::AlternateContent(_) => {
-      None
-    }
-  }
-}
-
-fn absolute_object_transform(
-  choice: &xdr::AbsoluteAnchorChoice,
-) -> Option<((i64, i64), (i64, i64))> {
-  match choice {
-    xdr::AbsoluteAnchorChoice::Shape(shape) => {
-      shape_transform(shape.shape_properties.transform2_d.as_deref())
-    }
-    xdr::AbsoluteAnchorChoice::GroupShape(_) | xdr::AbsoluteAnchorChoice::GraphicFrame(_) => None,
-    xdr::AbsoluteAnchorChoice::ConnectionShape(shape) => {
-      shape_transform(shape.shape_properties.transform2_d.as_deref())
-    }
-    xdr::AbsoluteAnchorChoice::Picture(_) => None,
-    xdr::AbsoluteAnchorChoice::ContentPart(_) => None,
-  }
-}
-
-fn shape_transform(transform: Option<&a::Transform2D>) -> Option<((i64, i64), (i64, i64))> {
-  let transform = transform?;
-  let offset = transform.offset.as_ref()?;
-  let extents = transform.extents.as_ref()?;
-  Some((
-    (offset.x.to_emu(), offset.y.to_emu()),
-    (extents.cx.to_emu(), extents.cy.to_emu()),
-  ))
 }
 
 impl DrawingMarkerModel {
@@ -732,6 +657,10 @@ impl DrawingObjectModel {
         .text_body
         .as_deref()
         .and_then(xdr_text_body_first_paragraph_alignment),
+      text_anchor: shape
+        .text_body
+        .as_deref()
+        .and_then(|text_body| text_body.body_properties.anchor),
       text_vertical: shape
         .text_body
         .as_deref()
@@ -848,6 +777,7 @@ impl DrawingObjectModel {
       text_bold: None,
       text_italic: None,
       text_alignment: None,
+      text_anchor: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
@@ -972,6 +902,7 @@ impl DrawingObjectModel {
       text_bold: None,
       text_italic: None,
       text_alignment: None,
+      text_anchor: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
@@ -1062,6 +993,7 @@ impl DrawingObjectModel {
       text_bold: None,
       text_italic: None,
       text_alignment: None,
+      text_anchor: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
@@ -1144,6 +1076,7 @@ impl DrawingObjectModel {
       text_bold: None,
       text_italic: None,
       text_alignment: None,
+      text_anchor: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
@@ -1214,6 +1147,7 @@ impl DrawingObjectModel {
       text_bold: None,
       text_italic: None,
       text_alignment: None,
+      text_anchor: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
@@ -1248,6 +1182,7 @@ impl DrawingObjectModel {
       text_bold: None,
       text_italic: None,
       text_alignment: None,
+      text_anchor: None,
       text_left_inset_emu: None,
       text_top_inset_emu: None,
       text_right_inset_emu: None,
@@ -2722,19 +2657,6 @@ mod tests {
   }
 
   #[test]
-  fn top_level_shape_transform_preserves_absolute_sheet_geometry() {
-    let shape = xdr::Shape::from_bytes(
-      br#"<xdr:sp xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:nvSpPr><xdr:cNvPr id="1" name="shape"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr><a:xfrm><a:off x="4238625" y="641985"/><a:ext cx="1476375" cy="558165"/></a:xfrm></xdr:spPr></xdr:sp>"#,
-    )
-    .expect("shape");
-
-    assert_eq!(
-      shape_transform(shape.shape_properties.transform2_d.as_deref()),
-      Some(((4_238_625, 641_985), (1_476_375, 558_165)))
-    );
-  }
-
-  #[test]
   fn group_fill_and_gradient_outline_survive_drawing_import() {
     let group = xdr::GroupShape::from_bytes(
       br#"<xdr:grpSp xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:nvGrpSpPr><xdr:cNvPr id="1" name="group"/><xdr:cNvGrpSpPr/></xdr:nvGrpSpPr><xdr:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1000000" cy="1000000"/><a:chOff x="0" y="0"/><a:chExt cx="1000000" cy="1000000"/></a:xfrm><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs><a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill></xdr:grpSpPr><xdr:sp><xdr:nvSpPr><xdr:cNvPr id="2" name="child"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="500000" cy="500000"/></a:xfrm><a:prstGeom prst="rect"/><a:grpFill/><a:ln><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="00FF00"/></a:gs><a:gs pos="100000"><a:srgbClr val="000000"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill></a:ln></xdr:spPr></xdr:sp></xdr:grpSp>"#,
@@ -2841,7 +2763,6 @@ mod tests {
         graphic_uri: Some(WEB_EXTENSION_GRAPHIC_URI.to_string()),
         ..DrawingObjectModel::unknown()
       },
-      object_transform: None,
       from: None,
       to: None,
       position: None,

@@ -77,6 +77,9 @@ pub enum ChartSeriesGrouping {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ChartManualLayout {
+  /// `c:layoutTarget="inner"` positions the rectangle bounded by the axes;
+  /// axis labels and a data table remain outside that rectangle.
+  pub targets_inner_plot: bool,
   pub x: Option<f32>,
   pub y: Option<f32>,
   pub width: Option<f32>,
@@ -116,6 +119,10 @@ pub struct ClusteredColumnSeries<'a> {
   /// `false` during shared chart import.
   pub smooth: Option<bool>,
   pub marker: Option<&'a c::Marker>,
+  /// Application-defined marker used when the chart-group style requires
+  /// markers but the series omits `c:marker`. An explicit series marker still
+  /// overrides this value, including `c:symbol="none"`.
+  pub automatic_marker_symbol: Option<c::MarkerStyleValues>,
   /// Whether the series explicitly suppresses its connecting line with
   /// `c:spPr/a:ln/a:noFill`. An omitted outline keeps the chart-style default.
   pub line_hidden: bool,
@@ -134,6 +141,9 @@ pub struct ClusteredColumnDataLabel<'a> {
   pub text_components: Vec<String>,
   pub separator: &'a str,
   pub position: c::DataLabelPositionValues,
+  /// Effective c:dLbls/c:dLbl text properties after applying Office's
+  /// chart-group < series < point override hierarchy.
+  pub text_properties: Option<&'a c::TextProperties>,
   /// Resolved c:dLbls/c:dLbl shape properties after applying Office's
   /// chart-group < series < point override hierarchy.
   pub shape_properties: Option<&'a c::ChartShapeProperties>,
@@ -174,6 +184,10 @@ pub struct ClusteredColumnChart<'a> {
   pub value_axis: Option<&'a c::ValueAxis>,
   pub legend_position: Option<ChartLegendPosition>,
   pub legend_overlay: bool,
+  /// A single cartesian series with c:varyColors enabled exposes one legend
+  /// entry per data point. Office ignores varyColors when multiple series are
+  /// present (MS-OI29500 §21.2.2.227).
+  pub vary_colors_by_point: bool,
   pub visible_legend_indices: Vec<usize>,
   pub legend_layout: Option<ChartManualLayout>,
   pub plot_layout: Option<ChartManualLayout>,
@@ -201,6 +215,11 @@ pub struct PieChartModel<'a> {
   pub vary_colors: bool,
   pub legend_position: Option<ChartLegendPosition>,
   pub legend_overlay: bool,
+  /// Vertical anchoring authored on the legend's `c:txPr/a:bodyPr`.
+  ///
+  /// Automatic legend geometry still belongs to the host layout profile, but
+  /// the text must be positioned inside that geometry according to DrawingML.
+  pub legend_vertical_anchor: Option<a::TextAnchoringTypeValues>,
   pub visible_legend_indices: Vec<usize>,
   pub legend_layout: Option<ChartManualLayout>,
   pub plot_layout: Option<ChartManualLayout>,
@@ -355,6 +374,7 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       is_3d: false,
       smooth: None,
       marker: None,
+      automatic_marker_symbol: None,
       line_hidden: false,
       line_width_pt: series_ref
         .chart_shape_properties
@@ -439,6 +459,16 @@ pub fn clustered_column_chart_for_ui_language<'a>(
     .chain(std::iter::once(categories.len()))
     .max()
     .unwrap_or(0);
+  let vary_colors_by_point = bar_chart.bar_chart_series.len() == 1
+    && bar_chart
+      .vary_colors
+      .as_ref()
+      .is_some_and(|vary| vary.val.is_none_or(|value| value.as_bool()));
+  let legend_entry_count = if vary_colors_by_point {
+    categories.len()
+  } else {
+    bar_chart.bar_chart_series.len()
+  };
 
   Some(ClusteredColumnChart {
     title,
@@ -497,9 +527,10 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       .as_deref()
       .and_then(|legend| legend.overlay.as_ref())
       .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool())),
+    vary_colors_by_point,
     visible_legend_indices: visible_series_legend_indices(
       chart_space.chart.legend.as_deref(),
-      bar_chart.bar_chart_series.len(),
+      legend_entry_count,
     ),
     legend_layout: chart_space
       .chart
@@ -528,6 +559,7 @@ pub fn cartesian_chart_for_ui_language<'a>(
   let mut overlap_percent = 0.0;
   let mut has_high_low_lines = false;
   let mut has_up_down_bars = false;
+  let mut vary_colors_requested = false;
 
   for choice in &chart_space.chart.plot_area.plot_area_choice1 {
     match choice {
@@ -607,19 +639,55 @@ pub fn cartesian_chart_for_ui_language<'a>(
           }
         }
       }
-      c::PlotAreaChoice::ScatterChart(chart) => append_cartesian_series(
-        &mut series,
-        &mut categories,
-        chart.scatter_chart_series.iter().map(scatter_series_ref),
-        chart.data_labels.as_deref(),
-        (
-          ChartSeriesKind::Scatter,
-          ChartSeriesGrouping::Standard,
-          false,
-        ),
-        ui_language,
-      ),
+      c::PlotAreaChoice::ScatterChart(chart) => {
+        let first = series.len();
+        append_cartesian_series(
+          &mut series,
+          &mut categories,
+          chart.scatter_chart_series.iter().map(scatter_series_ref),
+          chart.data_labels.as_deref(),
+          (
+            ChartSeriesKind::Scatter,
+            ChartSeriesGrouping::Standard,
+            false,
+          ),
+          ui_language,
+        );
+        let style = chart
+          .scatter_style
+          .val
+          .unwrap_or(c::ScatterStyleValues::Marker);
+        if matches!(
+          style,
+          c::ScatterStyleValues::LineMarker
+            | c::ScatterStyleValues::Marker
+            | c::ScatterStyleValues::SmoothMarker
+        ) {
+          // ECMA-376 requires markers for these scatter styles. Marker `auto`
+          // is application-defined; Office golden output for built-in chart
+          // style 2 establishes this series-order sequence.
+          const OFFICE_STYLE_2_MARKERS: [c::MarkerStyleValues; 3] = [
+            c::MarkerStyleValues::Circle,
+            c::MarkerStyleValues::Square,
+            c::MarkerStyleValues::Triangle,
+          ];
+          for (index, series) in series[first..].iter_mut().enumerate() {
+            series.automatic_marker_symbol = Some(if chart_style_id(chart_space) == Some(2) {
+              OFFICE_STYLE_2_MARKERS
+                .get(index)
+                .copied()
+                .unwrap_or(c::MarkerStyleValues::Auto)
+            } else {
+              c::MarkerStyleValues::Auto
+            });
+          }
+        }
+      }
       c::PlotAreaChoice::BarChart(chart) => {
+        vary_colors_requested |= chart
+          .vary_colors
+          .as_ref()
+          .is_some_and(|vary| vary.val.is_none_or(|value| value.as_bool()));
         gap_width_percent = f64::from(
           chart
             .gap_width
@@ -652,6 +720,10 @@ pub fn cartesian_chart_for_ui_language<'a>(
         );
       }
       c::PlotAreaChoice::Bar3DChart(chart) => {
+        vary_colors_requested |= chart
+          .vary_colors
+          .as_ref()
+          .is_some_and(|vary| vary.val.is_none_or(|value| value.as_bool()));
         gap_width_percent = f64::from(
           chart
             .gap_width
@@ -792,6 +864,12 @@ pub fn cartesian_chart_for_ui_language<'a>(
     }
   }
   let series_count = series.len();
+  let vary_colors_by_point = vary_colors_requested && series_count == 1;
+  let legend_entry_count = if vary_colors_by_point {
+    categories.len()
+  } else {
+    series_count
+  };
   let cached_category_count = series
     .iter()
     .map(|series| series.values.len())
@@ -862,9 +940,10 @@ pub fn cartesian_chart_for_ui_language<'a>(
       .as_deref()
       .and_then(|legend| legend.overlay.as_ref())
       .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool())),
+    vary_colors_by_point,
     visible_legend_indices: visible_series_legend_indices(
       chart_space.chart.legend.as_deref(),
-      series_count,
+      legend_entry_count,
     ),
     legend_layout: chart_space
       .chart
@@ -877,6 +956,17 @@ pub fn cartesian_chart_for_ui_language<'a>(
     has_high_low_lines,
     has_up_down_bars,
   })
+}
+
+fn chart_style_id(chart_space: &c::ChartSpace) -> Option<u8> {
+  match chart_space.chart_space_choice.as_ref()? {
+    c::ChartSpaceChoice::C14Style(style) => {
+      let style = u16::from(style.val);
+      (101..=148).contains(&style).then_some((style - 100) as u8)
+    }
+    c::ChartSpaceChoice::CStyle(style) => Some(u8::from(style.val.unwrap_or(2))),
+    c::ChartSpaceChoice::AlternateContent(_) => None,
+  }
 }
 
 fn append_cartesian_series<'a>(
@@ -948,6 +1038,7 @@ fn append_cartesian_series<'a>(
         .smooth
         .map(|smooth| smooth.val.is_none_or(|value| value.as_bool())),
       marker: source.marker,
+      automatic_marker_symbol: None,
       line_hidden: source
         .chart_shape_properties
         .is_some_and(chart_shape_properties_has_no_outline),
@@ -1026,6 +1117,8 @@ fn visible_series_legend_indices(legend: Option<&c::Legend>, count: usize) -> Ve
 fn chart_layout(layout: Option<&c::Layout>) -> Option<ChartManualLayout> {
   let manual = layout?.manual_layout.as_deref()?;
   Some(ChartManualLayout {
+    targets_inner_plot: manual.layout_target.as_ref().and_then(|target| target.val)
+      == Some(c::LayoutTargetValues::Inner),
     x: manual.left.as_ref().map(|value| value.val as f32),
     y: manual.top.as_ref().map(|value| value.val as f32),
     width: manual.width.as_ref().map(|value| value.val as f32),
@@ -1290,6 +1383,9 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
     legend_overlay: legend
       .and_then(|legend| legend.overlay.as_ref())
       .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool())),
+    legend_vertical_anchor: legend
+      .and_then(|legend| legend.text_properties.as_deref())
+      .and_then(|properties| properties.body_properties.anchor),
     visible_legend_indices,
     legend_layout: legend.and_then(|legend| chart_layout(legend.layout.as_deref())),
     plot_layout: chart_layout(chart_space.chart.plot_area.layout.as_deref()),
@@ -1476,6 +1572,9 @@ fn resolved_data_labels<'a>(
     .filter_map(|(point_index, value)| {
       let value = value.as_ref().copied()?;
       let mut point_settings = settings;
+      let mut text_properties = series_labels
+        .and_then(data_labels_text_properties)
+        .or_else(|| chart_group_labels.and_then(data_labels_text_properties));
       let percentage_text =
         (percentage_total.abs() > f64::EPSILON).then(|| {
           whole_percentages.as_ref().map_or_else(
@@ -1506,6 +1605,9 @@ fn resolved_data_labels<'a>(
             _ => None,
           })
         {
+          if sequence.text_properties.is_some() {
+            text_properties = sequence.text_properties.as_deref();
+          }
           if let Some(chart_text) = sequence.chart_text.as_deref() {
             // MS-OI29500 §21.2.2.47: when c:tx is present Office ignores
             // the component-selection fields on the same individual label.
@@ -1555,6 +1657,7 @@ fn resolved_data_labels<'a>(
         text_components,
         separator,
         position: point_settings.position,
+        text_properties,
         shape_properties: point_settings.shape_properties,
       })
     })
@@ -2449,14 +2552,28 @@ pub fn fixed_output_texts_for_ui_language(
   push_fixed_chart_title(&mut texts, chart_space, ui_language);
 
   if chart_space.chart.legend.is_some() {
-    let reverse = chart_space.chart.view3_d.is_some();
-    if reverse {
-      for (series_index, series) in chart_series.iter().enumerate().rev() {
-        push_fixed_series_name(&mut texts, *series, series_index + 1, ui_language);
+    let cartesian = cartesian_chart_for_ui_language(chart_space, ui_language);
+    if let Some(chart) = cartesian
+      .as_ref()
+      .filter(|chart| chart.vary_colors_by_point)
+    {
+      for category in chart
+        .visible_legend_indices
+        .iter()
+        .filter_map(|index| chart.categories.get(*index))
+      {
+        push_unique_text(&mut texts, category);
       }
     } else {
-      for (series_index, series) in chart_series.iter().enumerate() {
-        push_fixed_series_name(&mut texts, *series, series_index + 1, ui_language);
+      let reverse = chart_space.chart.view3_d.is_some();
+      if reverse {
+        for (series_index, series) in chart_series.iter().enumerate().rev() {
+          push_fixed_series_name(&mut texts, *series, series_index + 1, ui_language);
+        }
+      } else {
+        for (series_index, series) in chart_series.iter().enumerate() {
+          push_fixed_series_name(&mut texts, *series, series_index + 1, ui_language);
+        }
       }
     }
   }
@@ -3565,7 +3682,7 @@ pub fn chart_shape_outline_solid_fill(
   }
 }
 
-fn chart_shape_properties_has_no_outline(properties: &c::ChartShapeProperties) -> bool {
+pub(crate) fn chart_shape_properties_has_no_outline(properties: &c::ChartShapeProperties) -> bool {
   matches!(
     properties
       .outline
@@ -3764,36 +3881,7 @@ fn chart_uses_1904_date_system(chart_space: &c::ChartSpace) -> bool {
 /// in calendar days, months, or years according to c:majorTimeUnit.
 pub fn date_axis_ticks(chart: &ClusteredColumnChart<'_>) -> Option<Vec<ChartCategoryTick>> {
   let axis = chart.date_axis?;
-  let mut source_minimum = f64::INFINITY;
-  let mut source_maximum = f64::NEG_INFINITY;
-  for value in chart
-    .category_axis_values
-    .iter()
-    .flatten()
-    .copied()
-    .filter(|value| value.is_finite())
-  {
-    source_minimum = source_minimum.min(value);
-    source_maximum = source_maximum.max(value);
-  }
-  if !source_minimum.is_finite() || !source_maximum.is_finite() || source_maximum <= source_minimum
-  {
-    return None;
-  }
-
-  let minimum = axis
-    .scaling
-    .min_axis_value
-    .as_ref()
-    .map_or(source_minimum, |value| value.val);
-  let maximum = axis
-    .scaling
-    .max_axis_value
-    .as_ref()
-    .map_or(source_maximum, |value| value.val);
-  if maximum <= minimum {
-    return None;
-  }
+  let (minimum, maximum) = date_axis_bounds(chart)?;
   let unit_count = axis
     .major_unit
     .as_ref()
@@ -3861,6 +3949,102 @@ pub fn date_axis_ticks(chart: &ClusteredColumnChart<'_>) -> Option<Vec<ChartCate
   (!ticks.is_empty()).then_some(ticks)
 }
 
+/// Builds the minor gridline positions for an OOXML date axis. Like the
+/// major labels, these are calendar ticks rather than cached category points.
+pub fn date_axis_minor_tick_positions(chart: &ClusteredColumnChart<'_>) -> Option<Vec<f64>> {
+  let axis = chart.date_axis?;
+  let (minimum, maximum) = date_axis_bounds(chart)?;
+  let unit_count = axis
+    .minor_unit
+    .as_ref()
+    .map_or(1.0, |unit| unit.val)
+    .round()
+    .max(1.0) as i32;
+  let time_unit = axis
+    .minor_time_unit
+    .as_ref()
+    .and_then(|unit| unit.val)
+    .or_else(|| axis.base_time_unit.as_ref().and_then(|unit| unit.val))
+    .unwrap_or(c::TimeUnitValues::Days);
+  let date_1904 = chart.date_1904;
+  let (mut year, mut month, mut day) = chart_date_from_serial(minimum.ceil() as i64, date_1904)?;
+  match time_unit {
+    c::TimeUnitValues::Days => {}
+    c::TimeUnitValues::Months => {
+      if day != 1 {
+        month += 1;
+        if month > 12 {
+          month = 1;
+          year += 1;
+        }
+      }
+      day = 1;
+    }
+    c::TimeUnitValues::Years => {
+      if month != 1 || day != 1 {
+        year += 1;
+      }
+      month = 1;
+      day = 1;
+    }
+  }
+
+  let mut positions = Vec::new();
+  for _ in 0..10_000 {
+    let serial = chart_date_serial(year, month, day, date_1904)?;
+    if serial > maximum + f64::EPSILON {
+      break;
+    }
+    if serial >= minimum - f64::EPSILON {
+      positions.push((serial - minimum) / (maximum - minimum));
+    }
+    match time_unit {
+      c::TimeUnitValues::Days => {
+        let next = chart_date_from_serial(serial as i64 + i64::from(unit_count), date_1904)?;
+        (year, month, day) = (next.0, next.1, next.2);
+      }
+      c::TimeUnitValues::Months => {
+        let month_index = year * 12 + month - 1 + unit_count;
+        year = month_index.div_euclid(12);
+        month = month_index.rem_euclid(12) + 1;
+      }
+      c::TimeUnitValues::Years => year += unit_count,
+    }
+  }
+  (!positions.is_empty()).then_some(positions)
+}
+
+fn date_axis_bounds(chart: &ClusteredColumnChart<'_>) -> Option<(f64, f64)> {
+  let axis = chart.date_axis?;
+  let mut source_minimum = f64::INFINITY;
+  let mut source_maximum = f64::NEG_INFINITY;
+  for value in chart
+    .category_axis_values
+    .iter()
+    .flatten()
+    .copied()
+    .filter(|value| value.is_finite())
+  {
+    source_minimum = source_minimum.min(value);
+    source_maximum = source_maximum.max(value);
+  }
+  if !source_minimum.is_finite() || !source_maximum.is_finite() || source_maximum <= source_minimum
+  {
+    return None;
+  }
+  let minimum = axis
+    .scaling
+    .min_axis_value
+    .as_ref()
+    .map_or(source_minimum, |value| value.val);
+  let maximum = axis
+    .scaling
+    .max_axis_value
+    .as_ref()
+    .map_or(source_maximum, |value| value.val);
+  (maximum > minimum).then_some((minimum, maximum))
+}
+
 fn chart_date_from_serial(serial: i64, date_1904: bool) -> Option<(i32, i32, i32)> {
   let unix_days = serial - if date_1904 { 24_107 } else { 25_569 };
   let (year, month, day) = civil_from_days(unix_days);
@@ -3888,7 +4072,10 @@ fn days_from_civil(year: i64, month: i32, day: i32) -> Option<i64> {
 fn format_chart_date(year: i32, month: u32, day: u32, format_code: Option<&str>) -> String {
   let code = format_code.unwrap_or("yyyy/m/d").to_ascii_lowercase();
   let separator = if code.contains("\\-") {
-    " - "
+    // ECMA-376 Part 1 §18.8.31: a backslash makes the following
+    // character literal and is not displayed itself. It does not add
+    // whitespace around that character.
+    "-"
   } else if code.contains('-') {
     "-"
   } else if code.contains('.') {
@@ -4598,6 +4785,22 @@ mod tests {
   }
 
   #[test]
+  fn pie_model_preserves_legend_text_vertical_anchor() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea><c:legend><c:legendPos val="b"/><c:txPr><a:bodyPr anchor="ctr"/><a:lstStyle/><a:p/></c:txPr></c:legend></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+
+    let pie = pie_chart_model(&chart_space).expect("pie chart");
+    assert_eq!(
+      pie.legend_vertical_anchor,
+      Some(
+        ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextAnchoringTypeValues::Center
+      )
+    );
+  }
+
+  #[test]
   fn pie_point_custom_text_replaces_the_inherited_value_label() {
     let chart_space = c::ChartSpace::from_bytes(
       br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:dLbls><c:dLbl><c:idx val="1"/><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>custom</a:t></a:r></a:p></c:rich></c:tx><c:showVal val="1"/></c:dLbl><c:showVal val="1"/></c:dLbls><c:cat><c:strLit><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>"#,
@@ -4719,6 +4922,38 @@ mod tests {
   }
 
   #[test]
+  fn single_series_vary_colors_uses_point_legend_entries() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:barChart><c:barDir val="col"/><c:varyColors val="1"/><c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Revenue</c:v></c:tx><c:cat><c:strLit><c:pt idx="0"><c:v>North</c:v></c:pt><c:pt idx="1"><c:v>South</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser></c:barChart></c:plotArea><c:legend><c:legendEntry><c:idx val="1"/><c:delete val="1"/></c:legendEntry></c:legend></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+
+    let chart = clustered_column_chart(&chart_space).expect("clustered chart");
+    assert!(chart.vary_colors_by_point);
+    assert_eq!(chart.visible_legend_indices, [0]);
+    assert_eq!(
+      fixed_output_texts_for_ui_language(&chart_space, None),
+      ["North", "South"]
+    );
+  }
+
+  #[test]
+  fn multiple_series_ignore_vary_colors_for_legend_entries() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:barChart><c:barDir val="col"/><c:varyColors val="1"/><c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Revenue</c:v></c:tx><c:cat><c:strLit><c:pt idx="0"><c:v>North</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser><c:ser><c:idx val="1"/><c:order val="1"/><c:tx><c:v>Costs</c:v></c:tx><c:cat><c:strLit><c:pt idx="0"><c:v>North</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser></c:barChart></c:plotArea><c:legend/></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+
+    let chart = clustered_column_chart(&chart_space).expect("clustered chart");
+    assert!(!chart.vary_colors_by_point);
+    assert_eq!(chart.visible_legend_indices, [0, 1]);
+    assert_eq!(
+      fixed_output_texts_for_ui_language(&chart_space, None),
+      ["North", "Revenue", "Costs"]
+    );
+  }
+
+  #[test]
   fn linear_scale_expands_a_wide_positive_range_to_zero_and_past_border_value() {
     let scale = linear_axis_scale(
       [4.3, 2.5, 3.5, 4.5, 2.4, 4.4, 1.8, 2.8, 2.0, 3.0, 5.0],
@@ -4763,7 +4998,7 @@ mod tests {
   #[test]
   fn date_axis_ticks_follow_calendar_months_and_explicit_bounds() {
     let chart_space = c::ChartSpace::from_bytes(
-      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:date1904 val="0"/><c:chart><c:plotArea><c:lineChart><c:grouping val="standard"/><c:ser><c:idx val="0"/><c:order val="0"/><c:cat><c:numLit><c:formatCode>yyyy\-mm\-dd</c:formatCode><c:pt idx="0"><c:v>43466</c:v></c:pt><c:pt idx="1"><c:v>43646</c:v></c:pt></c:numLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser><c:axId val="1"/><c:axId val="2"/></c:lineChart><c:dateAx><c:axId val="1"/><c:scaling><c:min val="43466"/><c:max val="43586"/></c:scaling><c:axPos val="b"/><c:numFmt formatCode="yyyy\-mm\-dd" sourceLinked="1"/><c:crossAx val="2"/><c:baseTimeUnit val="days"/><c:majorUnit val="1"/><c:majorTimeUnit val="months"/></c:dateAx><c:valAx><c:axId val="2"/><c:scaling/><c:axPos val="l"/><c:crossAx val="1"/></c:valAx></c:plotArea></c:chart></c:chartSpace>"#,
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:date1904 val="0"/><c:chart><c:plotArea><c:lineChart><c:grouping val="standard"/><c:ser><c:idx val="0"/><c:order val="0"/><c:cat><c:numLit><c:formatCode>yyyy\-mm\-dd</c:formatCode><c:pt idx="0"><c:v>43466</c:v></c:pt><c:pt idx="1"><c:v>43646</c:v></c:pt></c:numLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser><c:axId val="1"/><c:axId val="2"/></c:lineChart><c:dateAx><c:axId val="1"/><c:scaling><c:min val="43466"/><c:max val="43586"/></c:scaling><c:axPos val="b"/><c:numFmt formatCode="yyyy\-mm\-dd" sourceLinked="1"/><c:crossAx val="2"/><c:baseTimeUnit val="days"/><c:majorUnit val="1"/><c:majorTimeUnit val="months"/><c:minorUnit val="7"/><c:minorTimeUnit val="days"/></c:dateAx><c:valAx><c:axId val="2"/><c:scaling/><c:axPos val="l"/><c:crossAx val="1"/></c:valAx></c:plotArea></c:chart></c:chartSpace>"#,
     )
     .expect("chart space");
 
@@ -4775,15 +5010,18 @@ mod tests {
         .map(|tick| tick.text.as_str())
         .collect::<Vec<_>>(),
       [
-        "2019 - 01 - 01",
-        "2019 - 02 - 01",
-        "2019 - 03 - 01",
-        "2019 - 04 - 01",
-        "2019 - 05 - 01",
+        "2019-01-01",
+        "2019-02-01",
+        "2019-03-01",
+        "2019-04-01",
+        "2019-05-01",
       ]
     );
     assert_eq!(ticks.first().map(|tick| tick.position), Some(0.0));
     assert_eq!(ticks.last().map(|tick| tick.position), Some(1.0));
+    let minor = super::date_axis_minor_tick_positions(&chart).expect("minor date ticks");
+    assert_eq!(minor.len(), 18);
+    assert!((minor[1] - 7.0 / 120.0).abs() < f64::EPSILON);
   }
 
   #[test]

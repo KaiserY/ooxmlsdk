@@ -86,6 +86,7 @@ fn spreadsheet_producer_profile(package: &mut SpreadsheetDocument) -> Spreadshee
     .and_then(|major| major.parse::<u16>().ok());
   SpreadsheetProducerProfile {
     mso_document: application.is_some_and(|value| value.contains("Microsoft")),
+    macintosh_excel: application.is_some_and(|value| value == "Microsoft Macintosh Excel"),
     excel_major_version,
   }
 }

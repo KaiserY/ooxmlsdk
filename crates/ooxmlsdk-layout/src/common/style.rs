@@ -305,9 +305,9 @@ pub struct RelativeRect {
 pub enum GradientInterpolation {
   #[default]
   LinearSrgb,
-  /// PowerPoint's fixed-format path for transformed DrawingML gradients uses
-  /// the same gamma-correct sigma falloff exposed by the Windows GDI+ linear
-  /// gradient brush.
+  /// Microsoft Office's fixed-format path for a two-stop DrawingML gradient
+  /// uses the same gamma-correct sigma falloff exposed by the Windows GDI+
+  /// linear gradient brush.
   PowerPointGammaSigma,
 }
 

@@ -6,11 +6,15 @@ use super::page_settings::CalcPageSettings;
 use super::pivot::pivot_print_address;
 use super::styles::DefinedNameBuiltin;
 use super::worksheet::{CalcCell, CalcRow, CalcSheet, CellAddress, CellRange, SheetType};
-use crate::model::TextStyle;
+use crate::model::{RgbColor, TextStyle};
 use crate::text_metrics::TextMetrics;
 use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 const ZOOM_MIN: u32 = 10;
+// Excel's indexed-scatter printer profile retains one four-pixel band at the
+// authored 300dpi in each horizontal page clip. The band extends the paint
+// clip; it does not change the column pagination or drawing origin.
+pub(super) const INDEXED_SCATTER_HORIZONTAL_CLIP_EXTENSION_PT: f32 = 0.96;
 const XLSX_MAX_COLUMN: u32 = 16_384;
 const XLSX_MAX_ROW: u32 = 1_048_576;
 const CALC_CELL_TEXT_MARGIN_PT: f32 = 4.0;
@@ -63,12 +67,19 @@ pub(crate) struct CalcPrintCell<'a> {
   pub(crate) number_format_state: NumberFormatRenderState,
   pub(crate) formula: bool,
   pub(crate) icon_set: Option<CalcPrintIconSet>,
+  pub(crate) color_scale_fill: Option<CalcPrintColorScaleFill>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct CalcPrintIconSet {
   pub(crate) icon: Option<(super::sheet_conditions::IconSetType, usize)>,
   pub(crate) show_value: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct CalcPrintColorScaleFill {
+  pub(crate) priority: i32,
+  pub(crate) color: RgbColor,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -122,7 +133,14 @@ impl<'a> CalcPrintDocument<'a> {
       let mut sheet_page_index = 0usize;
       for area in page_areas {
         let cells = area
-          .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
+          .map(|area| {
+            print_cells_for_area(
+              import,
+              sheet,
+              page_cell_scan_area(area),
+              &mut conditional_eval_cache,
+            )
+          })
           .unwrap_or_default();
         let repeated_row_cells = repeat_rows_for_page(area, named_ranges.repeat_rows)
           .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
@@ -173,6 +191,24 @@ impl<'a> CalcPrintDocument<'a> {
     }
     Self { pages }
   }
+}
+
+fn page_cell_scan_area(area: CellRange) -> CellRange {
+  // Calc's FillInfo builds ScCellInfo through nCol2 + 1. Excel fixed output
+  // likewise lays out the first cell of the following column when an
+  // automatic page break leaves unused horizontal space. The page transform
+  // and logical area remain unchanged, so that boundary column is painted at
+  // its sheet position and is repeated from its own origin on the next page.
+  // This is observable for an over-wide column: the boundary cell text can be
+  // visible on both pages even though column pagination itself does not
+  // overlap.
+  CellRange::new(
+    area.start,
+    CellAddress {
+      col: area.end.col.saturating_add(1).min(XLSX_MAX_COLUMN),
+      row: area.end.row,
+    },
+  )
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -640,21 +676,12 @@ fn drawing_anchor_rect_pt(
   sheet: &CalcSheet,
   anchor: &super::drawing::DrawingAnchorModel,
 ) -> Option<(f32, f32, f32, f32)> {
-  // Calc's draw layer uses the shape transform when extending the printable
-  // content range. Rendering still resolves xdr:from/to against sheet
-  // geometry; the two coordinate sets can legitimately differ in imported
-  // files whose cached transform has not been rewritten.
-  if let Some(((x, y), (width, height))) = anchor.object_transform
-    && (width != 0 || height != 0)
-  {
-    return Some((
-      units::emu_to_points(x),
-      units::emu_to_points(y),
-      units::emu_to_points(width),
-      units::emu_to_points(height),
-    ));
-  }
-  match anchor.kind {
+  // ECMA-376 Part 1 20.5.2.1, 20.5.2.24, and 20.5.2.33 make the
+  // SpreadsheetDrawing anchor the sheet-placement owner. Calc likewise
+  // replaces a top-level shape's imported position and size with the anchor
+  // rectangle before adding it to the draw layer. An inner a:xfrm can contain
+  // stale coordinates and must not extend the worksheet print area.
+  let rect = match anchor.kind {
     super::drawing::DrawingAnchorKind::TwoCell => {
       let from = anchor.from.as_ref()?;
       let to = anchor.to.as_ref()?;
@@ -683,7 +710,65 @@ fn drawing_anchor_rect_pt(
         units::emu_to_points(cy),
       ))
     }
+  }?;
+  let (x, y, width, height) = excel_unrotated_drawing_bounds(rect, anchor.object.rotation_deg);
+  Some(rotated_drawing_bounds(
+    x,
+    y,
+    width,
+    height,
+    anchor.object.rotation_deg,
+  ))
+}
+
+fn excel_unrotated_drawing_bounds(
+  (x, y, width, height): (f32, f32, f32, f32),
+  rotation_deg: f32,
+) -> (f32, f32, f32, f32) {
+  // sc/source/filter/oox/drawingfragment.cxx (tdf#83593): Excel rewrites
+  // drawing anchors using a quarter-turn in these angular ranges. Restore the
+  // unrotated center-preserving rectangle before applying the authored angle.
+  let rotation_deg = rotation_deg.rem_euclid(360.0);
+  if (45.0..135.0).contains(&rotation_deg) || (225.0..315.0).contains(&rotation_deg) {
+    let center_x = x + width / 2.0;
+    let center_y = y + height / 2.0;
+    (
+      center_x - height / 2.0,
+      center_y - width / 2.0,
+      height,
+      width,
+    )
+  } else {
+    (x, y, width, height)
   }
+}
+
+fn rotated_drawing_bounds(
+  x: f32,
+  y: f32,
+  width: f32,
+  height: f32,
+  rotation_deg: f32,
+) -> (f32, f32, f32, f32) {
+  // ScDrawLayer::GetPrintArea observes the transformed drawing-layer object,
+  // not the unrotated a:xfrm extent. This matters for imported two-cell
+  // anchors whose from/to markers already enclose a quarter-turned object:
+  // using only the cached a:off/a:ext can suppress an otherwise printable
+  // continuation page. Rotate around DrawingML's shape center and return the
+  // axis-aligned bounds consumed by Calc's print-area cell lookup.
+  let angle = rotation_deg.to_radians();
+  let sin = angle.sin().abs();
+  let cos = angle.cos().abs();
+  let rotated_width = width * cos + height * sin;
+  let rotated_height = width * sin + height * cos;
+  let center_x = x + width / 2.0;
+  let center_y = y + height / 2.0;
+  (
+    center_x - rotated_width / 2.0,
+    center_y - rotated_height / 2.0,
+    rotated_width,
+    rotated_height,
+  )
 }
 
 fn vml_shape_intersects_area(
@@ -1263,11 +1348,11 @@ fn split_range_by_page_metrics(
       }
     })
     .unwrap_or(0.0);
-  let available = ((if split.by_row {
+  let available = (if split.by_row {
     content_size.1
   } else {
     content_size.0
-  }) - repeat_size)
+  } - repeat_size)
     .max(1.0)
     * 100.0
     / split.zoom.max(ZOOM_MIN) as f32;
@@ -1617,6 +1702,9 @@ fn print_cells_for_area<'a>(
       let icon_set = cell.display_text.parse::<f64>().ok().and_then(|value| {
         conditional_icon_set(import, sheet, address, value, conditional_eval_cache)
       });
+      let color_scale_fill = cell.display_text.parse::<f64>().ok().and_then(|value| {
+        conditional_color_scale_fill(import, sheet, address, value, conditional_eval_cache)
+      });
       physical_cells.push(CalcPrintCell {
         address: print_address,
         text: Cow::Borrowed(cell.display_text.as_str()),
@@ -1627,6 +1715,7 @@ fn print_cells_for_area<'a>(
         number_format_state,
         formula: cell.formula.is_some(),
         icon_set,
+        color_scale_fill,
       });
     }
   };
@@ -1711,6 +1800,7 @@ fn pivot_virtual_print_cells<'a>(
           number_format_state: NumberFormatRenderState::Raw,
           formula: false,
           icon_set: None,
+          color_scale_fill: None,
         });
       }
     }
@@ -1757,6 +1847,7 @@ fn table_virtual_print_cells<'a>(
           number_format_state: NumberFormatRenderState::Raw,
           formula: false,
           icon_set: None,
+          color_scale_fill: None,
         });
       }
     }
@@ -1862,6 +1953,148 @@ fn conditional_icon_set(
       cache,
     )
   })
+}
+
+fn conditional_color_scale_fill(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  address: CellAddress,
+  value: f64,
+  cache: &mut ConditionalFormatEvalCache,
+) -> Option<CalcPrintColorScaleFill> {
+  let mut rules = sheet
+    .metrics
+    .conditions
+    .conditional_formats
+    .iter()
+    .filter(|format| conditional_format_contains_cell(format, address))
+    .flat_map(|format| {
+      format.rules.iter().filter_map(|rule| {
+        Some((
+          rule.priority,
+          format.sequence_of_references.as_slice(),
+          rule.color_scale.as_ref()?,
+        ))
+      })
+    })
+    .collect::<Vec<_>>();
+  rules.sort_by_key(|(priority, _, _)| *priority);
+  rules.into_iter().find_map(|(priority, references, scale)| {
+    evaluate_color_scale_rule(import, sheet, references, scale, address, value, cache)
+      .map(|color| CalcPrintColorScaleFill { priority, color })
+  })
+}
+
+fn evaluate_color_scale_rule(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  references: &[String],
+  scale: &super::sheet_conditions::ColorScaleModel,
+  address: CellAddress,
+  value: f64,
+  cache: &mut ConditionalFormatEvalCache,
+) -> Option<RgbColor> {
+  if !(2..=3).contains(&scale.points.len()) || !value.is_finite() {
+    return None;
+  }
+  let range = conditional_reference_range(references, address)?;
+  let stats = cache.stats_for_range(sheet, range);
+  let minimum = *stats.sorted_values.first()?;
+  let maximum = *stats.sorted_values.last()?;
+  let base = conditional_format_base_address(references, address)?;
+  let points = scale
+    .points
+    .iter()
+    .map(|point| {
+      Some((
+        color_scale_threshold_value(
+          import,
+          sheet,
+          point,
+          base,
+          minimum,
+          maximum,
+          &stats.sorted_values,
+        )?,
+        import.styles.spreadsheet_color(&point.color)?,
+      ))
+    })
+    .collect::<Option<Vec<_>>>()?;
+  if points.len() != scale.points.len() {
+    return None;
+  }
+  let segment = points
+    .windows(2)
+    .find(|pair| value <= pair[1].0)
+    .unwrap_or_else(|| &points[points.len() - 2..]);
+  Some(interpolate_color_scale(
+    value,
+    segment[0].0,
+    segment[0].1,
+    segment[1].0,
+    segment[1].1,
+  ))
+}
+
+fn color_scale_threshold_value(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  point: &super::sheet_conditions::ColorScalePointModel,
+  base: CellAddress,
+  minimum: f64,
+  maximum: f64,
+  sorted_values: &[f64],
+) -> Option<f64> {
+  use super::sheet_conditions::IconSetThresholdType;
+
+  let numeric = || point.value.as_deref()?.parse::<f64>().ok();
+  match point.threshold_type {
+    IconSetThresholdType::Number => numeric(),
+    IconSetThresholdType::Percent => {
+      numeric().map(|percent| minimum + (maximum - minimum) * percent / 100.0)
+    }
+    IconSetThresholdType::Maximum | IconSetThresholdType::AutomaticMaximum => Some(maximum),
+    IconSetThresholdType::Minimum | IconSetThresholdType::AutomaticMinimum => Some(minimum),
+    IconSetThresholdType::Formula => super::formula::evaluate_relative_formula_as_number(
+      import,
+      sheet,
+      point.value.as_deref()?,
+      base,
+      base,
+    ),
+    IconSetThresholdType::Percentile => {
+      let percentile = numeric()?.clamp(0.0, 100.0) / 100.0;
+      let mut values = sorted_values.to_vec();
+      ooxmlsdk_formula::calc::statistics::percentile_sorted(
+        &mut values,
+        percentile,
+        ooxmlsdk_formula::calc::statistics::PercentileKind::Inc,
+      )
+    }
+  }
+}
+
+fn interpolate_color_scale(
+  value: f64,
+  lower_value: f64,
+  lower: RgbColor,
+  upper_value: f64,
+  upper: RgbColor,
+) -> RgbColor {
+  let ratio = if upper_value <= lower_value {
+    if value <= lower_value { 0.0 } else { 1.0 }
+  } else {
+    ((value - lower_value) / (upper_value - lower_value)).clamp(0.0, 1.0)
+  };
+  let channel = |lower: u8, upper: u8| {
+    (i32::from(lower) + (ratio * f64::from(i32::from(upper) - i32::from(lower))) as i32)
+      .clamp(0, 255) as u8
+  };
+  RgbColor {
+    r: channel(lower.r, upper.r),
+    g: channel(lower.g, upper.g),
+    b: channel(lower.b, upper.b),
+  }
 }
 
 fn evaluate_icon_set_rule(
@@ -3839,6 +4072,34 @@ mod tests {
   use super::*;
 
   #[test]
+  fn page_cell_scan_includes_one_following_column_without_changing_rows() {
+    let page = CellRange::new(
+      CellAddress { col: 2, row: 3 },
+      CellAddress { col: 7, row: 19 },
+    );
+
+    assert_eq!(
+      page_cell_scan_area(page),
+      CellRange::new(
+        CellAddress { col: 2, row: 3 },
+        CellAddress { col: 8, row: 19 },
+      )
+    );
+  }
+
+  #[test]
+  fn drawing_print_bounds_include_shape_rotation() {
+    let anchor = (10.0, 20.0, 90.0, 30.0);
+    let (x, y, width, height) = excel_unrotated_drawing_bounds(anchor, 90.0);
+    let (x, y, width, height) = rotated_drawing_bounds(x, y, width, height, 90.0);
+
+    assert!((x - 10.0).abs() < 0.001);
+    assert!((y - 20.0).abs() < 0.001);
+    assert!((width - 90.0).abs() < 0.001);
+    assert!((height - 30.0).abs() < 0.001);
+  }
+
+  #[test]
   fn print_titles_start_repeating_only_after_their_source_page() {
     let titles = CellRange::new(
       CellAddress { col: 1, row: 1 },
@@ -4002,5 +4263,22 @@ mod tests {
     let inclusive_top = [(0.0, true), (0.0, true), (3.0, true)];
     assert_eq!(icon_set_selected_index(3.0, &inclusive_top, false), Some(2));
     assert_eq!(icon_set_selected_index(-1.0, &inclusive_top, false), None);
+  }
+
+  #[test]
+  fn color_scale_interpolation_clamps_and_truncates_each_rgb_channel() {
+    let red = RgbColor { r: 255, g: 0, b: 0 };
+    let blue = RgbColor { r: 0, g: 0, b: 255 };
+
+    assert_eq!(interpolate_color_scale(-1.0, 0.0, red, 2.0, blue), red);
+    assert_eq!(
+      interpolate_color_scale(1.0, 0.0, red, 2.0, blue),
+      RgbColor {
+        r: 128,
+        g: 0,
+        b: 127,
+      }
+    );
+    assert_eq!(interpolate_color_scale(3.0, 0.0, red, 2.0, blue), blue);
   }
 }

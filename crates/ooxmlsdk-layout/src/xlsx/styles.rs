@@ -26,6 +26,7 @@ pub(crate) struct StylesCatalog {
   theme_fonts: Option<ThemeFontScheme>,
   theme_format: Option<ThemeFormatScheme>,
   theme_colors: ThemeColorPalette,
+  indexed_colors: Vec<RgbColor>,
   theme_major_east_asian: Option<Arc<str>>,
   theme_minor_east_asian: Option<Arc<str>>,
   missing_theme_minor_from_ui: bool,
@@ -199,6 +200,10 @@ impl StylesCatalog {
       ResolvedColor::new(base.r, base.g, base.b),
       tint,
     )))
+  }
+
+  pub(crate) fn spreadsheet_color(&self, color: &x::Color) -> Option<RgbColor> {
+    color_from_color(color, &self.indexed_colors, &self.theme_colors)
   }
 
   pub(crate) fn theme_fill_style(&self, index: u32) -> Option<&FillProperties> {
@@ -408,6 +413,7 @@ impl StylesCatalog {
         .map(Arc::from),
       missing_theme_minor_from_ui: false,
       theme_colors,
+      indexed_colors,
       builtin_number_format_locale: builtin_number_format_locale(ui_language),
     }
   }
@@ -503,6 +509,25 @@ impl StylesCatalog {
     style.underline = font.underline;
     style.strikethrough = font.strikethrough;
     style
+  }
+
+  pub(crate) fn direct_nondefault_font_color_for_cell(
+    &self,
+    style_index: Option<u32>,
+  ) -> Option<RgbColor> {
+    let format = self.cell_xfs.get(style_index? as usize)?;
+    if !format.apply_font {
+      return None;
+    }
+    let color = format
+      .font_id
+      .and_then(|id| self.font_records.get(id as usize))
+      .and_then(|font| font.color)?;
+    // LibreOffice ScPatternAttr::lcl_populateresult gives a non-default
+    // direct cell font value precedence over table formatting. Black is the
+    // font-color default for table styles, so it deliberately falls through
+    // and lets the table style supply its region color.
+    (color != RgbColor { r: 0, g: 0, b: 0 }).then_some(color)
   }
 
   pub(crate) fn default_font_text_style(&self) -> TextStyle {
@@ -796,6 +821,34 @@ impl StylesCatalog {
         .as_ref()
         .and_then(|fonts| fonts.minor_latin.as_deref())
         .is_some_and(|font| font.eq_ignore_ascii_case("Calibri"))
+  }
+
+  pub(crate) fn normal_style_uses_explicit_calibri_11(&self) -> bool {
+    let Some(normal_font) = self.font_records.first() else {
+      return false;
+    };
+    normal_font
+      .name
+      .as_deref()
+      .is_some_and(|font| font.eq_ignore_ascii_case("Calibri"))
+      && normal_font
+        .size_pt
+        .is_some_and(|size| (size.get() - 11.0).abs() <= f64::EPSILON)
+      && normal_font.scheme == x::FontSchemeValues::None
+  }
+
+  pub(crate) fn normal_style_uses_explicit_verdana_10(&self) -> bool {
+    let Some(normal_font) = self.font_records.first() else {
+      return false;
+    };
+    normal_font
+      .name
+      .as_deref()
+      .is_some_and(|font| font.eq_ignore_ascii_case("Verdana"))
+      && normal_font
+        .size_pt
+        .is_some_and(|size| (size.get() - 10.0).abs() <= f64::EPSILON)
+      && normal_font.scheme == x::FontSchemeValues::None
   }
 
   pub(crate) fn icon_set_print_metrics(&self, font_size_pt: f32) -> IconSetPrintMetrics {
@@ -1507,6 +1560,53 @@ mod tests {
     let style = catalog.default_drawing_text_style();
 
     assert_eq!(style.font_family.as_deref(), Some("Calibri"));
+  }
+
+  #[test]
+  fn nondefault_direct_font_color_has_precedence_over_table_formatting() {
+    let black = RgbColor { r: 0, g: 0, b: 0 };
+    let dark_gray = RgbColor {
+      r: 0x26,
+      g: 0x26,
+      b: 0x26,
+    };
+    let cell_format = |font_id| CellFormatRecord {
+      number_format_id: None,
+      font_id: Some(font_id),
+      fill_id: None,
+      border_id: None,
+      style_xf_id: None,
+      quote_prefix: false,
+      pivot_button: false,
+      apply_number_format: false,
+      apply_font: true,
+      apply_fill: false,
+      apply_border: false,
+      apply_alignment: false,
+      apply_protection: false,
+      has_alignment: false,
+      alignment: None,
+    };
+    let catalog = StylesCatalog {
+      cell_xfs: vec![cell_format(0), cell_format(1)],
+      font_records: vec![
+        FontRecord {
+          color: Some(black),
+          ..FontRecord::default()
+        },
+        FontRecord {
+          color: Some(dark_gray),
+          ..FontRecord::default()
+        },
+      ],
+      ..StylesCatalog::default()
+    };
+
+    assert_eq!(catalog.direct_nondefault_font_color_for_cell(Some(0)), None);
+    assert_eq!(
+      catalog.direct_nondefault_font_color_for_cell(Some(1)),
+      Some(dark_gray)
+    );
   }
 
   #[test]

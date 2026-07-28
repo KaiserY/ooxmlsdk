@@ -52,6 +52,7 @@ pub(crate) struct CartesianLayoutAdjustment {
   pub plot_top_ratio: f32,
   pub plot_bottom_ratio: f32,
   pub tick_left_ratio: f32,
+  pub tick_top_ratio: f32,
   pub plot_left_ratio: f32,
   pub plot_right_ratio: f32,
 }
@@ -84,6 +85,23 @@ pub(crate) const EXCEL_TITLE_ONLY: CartesianLayoutAdjustment = CartesianLayoutAd
   plot_right_ratio: -0.027_7,
   ..ZERO_ADJUSTMENT
 };
+
+/// Excel indexed scatter with an explicit rich title and no legend.
+///
+/// The normalized plot geometry comes from the immutable Microsoft Excel 365
+/// fixed output for LibreOffice `tdf122915.xlsx`. This profile is distinct
+/// from the generic title-only cartesian layout: Office expands the scatter
+/// plot toward both horizontal edges and keeps its top on the automatic
+/// title-band baseline.
+pub(crate) const EXCEL_EXPLICIT_TITLE_INDEXED_SCATTER: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    category_top_ratio: 0.050_221,
+    plot_top_ratio: 0.000_067,
+    tick_top_ratio: 0.000_56,
+    plot_left_ratio: -0.003_063,
+    plot_right_ratio: -0.017_872,
+    ..ZERO_ADJUSTMENT
+  };
 
 /// Pre-2007 empty-overlay automatic-title side-legend profile.
 pub(crate) const EXCEL_LEGACY_EMPTY_OVERLAY_SIDE_LEGEND: CartesianLayoutAdjustment =
@@ -236,6 +254,38 @@ pub(crate) const EXCEL_EXPLICIT_CATEGORY_AUTOMATIC: CartesianLayoutAdjustment =
     plot_right_ratio: 0.000_63,
     ..ZERO_ADJUSTMENT
   };
+
+/// Excel's automatic single-series, vary-colors chart with a data table.
+///
+/// The data table is a chart table shape whose columns stay aligned with the
+/// plotted category slots. The immutable Office fixed output for
+/// `DataTable-MultipleLegendEntriesForOneDataSeries.xlsx` exposes the complete
+/// two-page geometry: value ticks, first/last gridlines, and all six visible
+/// table-column centers on each horizontal page.
+pub(crate) const EXCEL_VARY_COLORS_DATA_TABLE: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    category_top_ratio: 0.030_10,
+    plot_top_ratio: -0.021_77,
+    // `plot_bottom` already follows the adjusted category/table boundary.
+    plot_bottom_ratio: 0.040_02,
+    tick_left_ratio: 0.058_81,
+    // `plot_left` is first derived from the adjusted tick band, so this is
+    // the residual needed to leave the plotted/table boundary at +0.03050.
+    plot_left_ratio: -0.029_57,
+    plot_right_ratio: 0.081_08,
+    ..ZERO_ADJUSTMENT
+  };
+
+/// Residual horizontal placement of the right-side point legend for
+/// `EXCEL_VARY_COLORS_DATA_TABLE`.
+///
+/// This is separate from the plot/table bands because Office keeps the point
+/// legend aligned to the right page's chart-frame band rather than the
+/// horizontally paginated plot area.
+pub(crate) const EXCEL_VARY_COLORS_DATA_TABLE_LEGEND_X_RATIO: f32 = 0.040_74;
+pub(crate) const EXCEL_VARY_COLORS_DATA_TABLE_LEGEND_Y_RATIO: f32 = 0.001_26;
+pub(crate) const EXCEL_VARY_COLORS_DATA_TABLE_LEGEND_MARKER_EM: f32 = 0.50;
+pub(crate) const EXCEL_VARY_COLORS_DATA_TABLE_LEGEND_ENTRY_GAP_EM: f32 = 0.57;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct SideLegendBands {
@@ -576,6 +626,7 @@ const ZERO_ADJUSTMENT: CartesianLayoutAdjustment = CartesianLayoutAdjustment {
   plot_top_ratio: 0.0,
   plot_bottom_ratio: 0.0,
   tick_left_ratio: 0.0,
+  tick_top_ratio: 0.0,
   plot_left_ratio: 0.0,
   plot_right_ratio: 0.0,
 };

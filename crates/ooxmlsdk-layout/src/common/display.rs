@@ -92,6 +92,10 @@ pub struct CompositingGroup<'doc> {
   pub transform: Option<Transform>,
   pub blend_mode: BlendMode,
   pub opacity: f32,
+  /// Allow an otherwise-identity wrapper to paint directly into its parent
+  /// content stream. Most groups remain isolated because that boundary is
+  /// significant to extraction, tagging, and compositing.
+  pub flatten_identity: bool,
   pub items: Vec<DisplayItem<'doc>>,
 }
 
@@ -102,6 +106,7 @@ impl<'doc> CompositingGroup<'doc> {
       transform: None,
       blend_mode: BlendMode::Normal,
       opacity: 1.0,
+      flatten_identity: false,
       items,
     }
   }
@@ -179,6 +184,8 @@ pub struct ImageItem<'doc> {
   pub hyperlink_url: Option<Cow<'doc, str>>,
   /// Whether PDF export should recover semantic text from an EMF/WMF OLE preview.
   pub semantic_metafile_text: bool,
+  /// Whether a DrawingML metafile preview may use its near-native Header.Frame.
+  pub metafile_native_size: bool,
   pub floating: bool,
   pub behind_text: bool,
 }

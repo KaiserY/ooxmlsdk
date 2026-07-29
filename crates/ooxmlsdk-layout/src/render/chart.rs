@@ -964,7 +964,7 @@ fn chart_style_id(chart_space: &c::ChartSpace) -> Option<u8> {
       let style = u16::from(style.val);
       (101..=148).contains(&style).then_some((style - 100) as u8)
     }
-    c::ChartSpaceChoice::CStyle(style) => Some(u8::from(style.val.unwrap_or(2))),
+    c::ChartSpaceChoice::CStyle(style) => Some(style.val.unwrap_or(2)),
     c::ChartSpaceChoice::AlternateContent(_) => None,
   }
 }

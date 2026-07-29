@@ -100,14 +100,8 @@ impl ImageSet {
       return Ok(tree.clone());
     }
     let tree = Arc::new(
-      usvg::Tree::from_data(
-        data,
-        &usvg::Options {
-          fontdb: svg_font_database(),
-          ..usvg::Options::default()
-        },
-      )
-      .map_err(|err| PdfError::Krilla(format!("failed to decode SVG image: {err}")))?,
+      usvg::Tree::from_data(data, svg_options())
+        .map_err(|err| PdfError::Krilla(format!("failed to decode SVG image: {err}")))?,
     );
     self.svgs.insert(key, tree.clone());
     Ok(tree)
@@ -120,15 +114,13 @@ fn image_data_key(data: &[u8]) -> (usize, usize) {
   (data.as_ptr() as usize, data.len())
 }
 
-fn svg_font_database() -> Arc<fontdb::Database> {
-  static FONT_DATABASE: OnceLock<Arc<fontdb::Database>> = OnceLock::new();
-  FONT_DATABASE
-    .get_or_init(|| {
-      let mut database = fontdb::Database::new();
-      database.load_system_fonts();
-      Arc::new(database)
-    })
-    .clone()
+fn svg_options() -> &'static usvg::Options<'static> {
+  static OPTIONS: OnceLock<usvg::Options<'static>> = OnceLock::new();
+  OPTIONS.get_or_init(|| {
+    let mut options = usvg::Options::default();
+    options.fontdb_mut().load_system_fonts();
+    options
+  })
 }
 
 fn decode_image(

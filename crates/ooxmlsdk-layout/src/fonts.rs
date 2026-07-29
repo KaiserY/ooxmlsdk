@@ -4,8 +4,8 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use ooxmlsdk_fonts::{
-  FeatureValue, FontBytes, FontFallbackChain, FontId, FontRegistry, FontRequest, FontSize,
-  ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun, TextScript,
+  FeatureValue, FontBytes, FontFallbackChain, FontFamilyClass, FontId, FontRegistry, FontRequest,
+  FontSize, ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun, TextScript,
   script_direction_runs_with_options,
 };
 use rustc_hash::FxHashMap as HashMap;
@@ -76,6 +76,9 @@ impl Hash for FontFaceData {
 pub trait FontStyleRef {
   fn font_family(&self) -> Option<&str>;
   fn fallback_font_family(&self) -> Option<&str> {
+    None
+  }
+  fn font_family_class(&self) -> Option<FontFamilyClass> {
     None
   }
   fn east_asia_font_family(&self) -> Option<&str> {
@@ -174,6 +177,10 @@ impl FontStyleRef for TextStyle {
 
   fn fallback_font_family(&self) -> Option<&str> {
     self.fallback_font_family.as_deref()
+  }
+
+  fn font_family_class(&self) -> Option<FontFamilyClass> {
+    self.font_family_class
   }
 
   fn east_asia_font_family(&self) -> Option<&str> {
@@ -765,6 +772,7 @@ fn font_request<'a>(
     italic: effective_italic(style, script),
     size_pt: FontSize(effective_font_size_pt(style, script)),
     script,
+    family_class: script_font_family_class(style, script),
     features,
     ..FontRequest::default()
   }
@@ -805,6 +813,24 @@ fn script_fallback_font_family(
   }
 }
 
+fn script_font_family_class(
+  style: &(impl FontStyleRef + ?Sized),
+  script: Option<TextScript>,
+) -> Option<FontFamilyClass> {
+  if let Some(force_complex) = style.complex_script_override() {
+    return (!force_complex)
+      .then(|| style.font_family_class())
+      .flatten();
+  }
+  match script {
+    None
+    | Some(TextScript::Common | TextScript::Latin | TextScript::Cyrillic | TextScript::Greek) => {
+      style.font_family_class()
+    }
+    _ => None,
+  }
+}
+
 fn build_style_font_registry(
   style: &(impl FontStyleRef + ?Sized),
   script: Option<TextScript>,
@@ -813,24 +839,44 @@ fn build_style_font_registry(
     let mut request = font_request(style, script);
     request.script = script;
     let mut registry = FontRegistry::with_default_policy();
-    if let (Some(requested_family), Some(fallback_family)) = (
-      request.family.as_deref(),
-      script_fallback_font_family(style, script),
-    ) && !requested_family.eq_ignore_ascii_case(fallback_family)
-    {
+    if let Some(requested_family) = request.family.as_deref() {
+      let mut families: Vec<Cow<'static, str>> = Vec::new();
+      if let Some(fallback_family) = script_fallback_font_family(style, script)
+        && !requested_family.eq_ignore_ascii_case(fallback_family)
+      {
+        families.push(Cow::Owned(fallback_family.to_string()));
+      }
+      let family_class_fallback = match request.family_class {
+        Some(FontFamilyClass::Serif | FontFamilyClass::OldStyle | FontFamilyClass::Schoolbook) => {
+          Some("Times New Roman")
+        }
+        Some(FontFamilyClass::SansSerif) => Some("Arial"),
+        Some(FontFamilyClass::Fixed) => Some("Courier New"),
+        _ => None,
+      };
+      if let Some(family) = family_class_fallback
+        && !requested_family.eq_ignore_ascii_case(family)
+        && !families
+          .iter()
+          .any(|existing| existing.eq_ignore_ascii_case(family))
+      {
+        families.push(Cow::Borrowed(family));
+      }
       // ECMA-376 Part 1 §21.1.2.5 requires DrawingML font substitution
       // when the requested typeface is unavailable. Keep the requested face
-      // primary, but place the document-scoped substitute before generic
-      // platform fallbacks.
-      registry.book.fallback_chains.insert(
-        0,
-        FontFallbackChain {
-          requested_family: Some(Cow::Owned(requested_family.to_string())),
-          script,
-          language: None,
-          families: vec![Cow::Owned(fallback_family.to_string())],
-        },
-      );
+      // primary, but place document-scoped alternate names and the font-table
+      // family representative before generic platform fallbacks.
+      if !families.is_empty() {
+        registry.book.fallback_chains.insert(
+          0,
+          FontFallbackChain {
+            requested_family: Some(Cow::Owned(requested_family.to_string())),
+            script,
+            language: None,
+            families,
+          },
+        );
+      }
     }
     let registered = registry
       .register_system_query_fonts(&request)
@@ -865,6 +911,7 @@ fn font_face_data_from_registry_binary(
 struct FontFaceKey {
   family: Option<String>,
   fallback_family: Option<String>,
+  family_class: Option<FontFamilyClass>,
   bold: bool,
   italic: bool,
   script: Option<TextScript>,
@@ -875,6 +922,7 @@ impl FontFaceKey {
     Self {
       family: script_font_family(style, script).map(str::to_string),
       fallback_family: script_fallback_font_family(style, script).map(str::to_string),
+      family_class: script_font_family_class(style, script),
       bold: effective_bold(style, script),
       italic: effective_italic(style, script),
       script,
@@ -888,6 +936,7 @@ impl FontFaceKey {
   ) -> bool {
     self.family.as_deref() == script_font_family(style, script)
       && self.fallback_family.as_deref() == script_fallback_font_family(style, script)
+      && self.family_class == script_font_family_class(style, script)
       && self.bold == effective_bold(style, script)
       && self.italic == effective_italic(style, script)
       && self.script == script
@@ -904,6 +953,7 @@ struct FontMetrics {
 struct FontMetricsKey {
   family: Option<String>,
   fallback_family: Option<String>,
+  family_class: Option<FontFamilyClass>,
   bold: bool,
   italic: bool,
   script: Option<TextScript>,
@@ -915,6 +965,7 @@ impl FontMetricsKey {
     Self {
       family: script_font_family(style, script).map(str::to_string),
       fallback_family: script_fallback_font_family(style, script).map(str::to_string),
+      family_class: script_font_family_class(style, script),
       bold: effective_bold(style, script),
       italic: effective_italic(style, script),
       script,
@@ -929,6 +980,7 @@ impl FontMetricsKey {
   ) -> bool {
     self.family.as_deref() == script_font_family(style, script)
       && self.fallback_family.as_deref() == script_fallback_font_family(style, script)
+      && self.family_class == script_font_family_class(style, script)
       && self.bold == effective_bold(style, script)
       && self.italic == effective_italic(style, script)
       && self.script == script
@@ -988,6 +1040,31 @@ mod tests {
     assert_eq!(request.size_pt.0, 20.0);
     assert!(request.bold);
     assert!(!request.italic);
+  }
+
+  #[test]
+  fn latin_font_table_family_class_does_not_leak_into_the_east_asian_slot() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("MetaBook-Roman")),
+      east_asia_font_family: Some(Arc::from("AR PL SungtiL GB")),
+      font_family_class: Some(ooxmlsdk_fonts::FontFamilyClass::Serif),
+      ..Default::default()
+    };
+
+    assert_eq!(
+      font_request(&style, Some(TextScript::Latin)).family_class,
+      Some(ooxmlsdk_fonts::FontFamilyClass::Serif)
+    );
+    assert_eq!(
+      font_request(&style, Some(TextScript::Han))
+        .family
+        .as_deref(),
+      Some("AR PL SungtiL GB")
+    );
+    assert_eq!(
+      font_request(&style, Some(TextScript::Han)).family_class,
+      None
+    );
   }
 
   #[test]

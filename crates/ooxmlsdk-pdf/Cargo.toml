@@ -14,7 +14,6 @@ readme.workspace = true
 
 [dependencies]
 emfsdk = { workspace = true }
-fontdb = { workspace = true }
 hypher = { workspace = true }
 icu_segmenter = { workspace = true }
 image = { workspace = true }
@@ -29,9 +28,9 @@ ooxmlsdk-formula = { workspace = true }
 ooxmlsdk-layout = { workspace = true }
 png = { workspace = true }
 rustc-hash = { workspace = true }
+skrifa = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
-ttf-parser = { workspace = true }
 unicode-bidi = { workspace = true }
 unicode-script = { workspace = true }
 usvg = { workspace = true }

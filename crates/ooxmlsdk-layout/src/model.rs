@@ -72,6 +72,9 @@ impl Default for BorderStyle {
 pub struct TextStyle {
   pub font_family: Option<Arc<str>>,
   pub fallback_font_family: Option<Arc<str>>,
+  /// OOXML font-table family classification used when the named face and its
+  /// explicit alternate names are unavailable.
+  pub font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   pub east_asia_font_family: Option<Arc<str>>,
   pub complex_font_family: Option<Arc<str>>,
   pub symbol_font_family: Option<Arc<str>>,
@@ -139,6 +142,7 @@ impl Default for TextStyle {
     Self {
       font_family: None,
       fallback_font_family: None,
+      font_family_class: None,
       east_asia_font_family: None,
       complex_font_family: None,
       symbol_font_family: None,

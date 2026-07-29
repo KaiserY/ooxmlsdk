@@ -270,6 +270,7 @@ pub(super) fn merge_run_style(
   {
     style.text_glow = Some(common::drawingml_image_effects::WordprocessingTextGlow {
       radius_px: glow.glow_radius.unwrap_or_default() as f32 / 9_525.0,
+      raster_length_scale: 1.0,
       color,
     });
   }
@@ -282,6 +283,7 @@ pub(super) fn merge_run_style(
     style.text_shadow = Some(common::drawingml_image_effects::WordprocessingTextShadow {
       blur_radius_px: shadow.blur_radius.unwrap_or_default() as f32 / 9_525.0,
       distance_px: shadow.distance_from_text.unwrap_or_default() as f32 / 9_525.0,
+      raster_length_scale: 1.0,
       direction_degrees: shadow.direction_angle.unwrap_or_default() as f32 / 60_000.0,
       scale_x: shadow.horizontal_scaling_factor.unwrap_or(100_000) as f32 / 100_000.0,
       scale_y: shadow.vertical_scaling_factor.unwrap_or(100_000) as f32 / 100_000.0,

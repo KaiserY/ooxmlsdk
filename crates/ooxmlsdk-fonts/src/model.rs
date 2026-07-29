@@ -21,8 +21,15 @@ use harfrust::{
   ShaperData, Tag as HarfTag, UnicodeBuffer, script,
 };
 use icu_segmenter::GraphemeClusterSegmenter;
+use skrifa::{
+  FontRef as SkrifaFontRef, GlyphId as SkrifaGlyphId, MetadataProvider,
+  attribute::Style as SkrifaStyle,
+  instance::{LocationRef as SkrifaLocationRef, Size as SkrifaSize},
+  metrics::BoundingBox as SkrifaBoundingBox,
+  raw::TableProvider,
+  string::StringId,
+};
 use smallvec::SmallVec;
-use ttf_parser::{Face as TtfFace, GlyphId, Rect as TtfRect, Tag};
 use unicode_bidi::{Direction as BidiDirection, get_base_direction};
 use unicode_script::{Script as UnicodeScriptValue, UnicodeScript};
 use yoke::{Yoke, Yokeable};
@@ -150,7 +157,7 @@ impl ShapePlanKey {
 #[derive(Yokeable)]
 struct RuntimeFaces<'a> {
   harf: HarfFontRef<'a>,
-  ttf: TtfFace<'a>,
+  skrifa: SkrifaFontRef<'a>,
 }
 
 impl RuntimeFace {
@@ -159,9 +166,9 @@ impl RuntimeFace {
       Yoke::<RuntimeFaces<'static>, Box<FontBytes>>::try_attach_to_cart(Box::new(data), |data| {
         let harf = HarfFontRef::from_index(data.as_slice(), face_index)
           .map_err(|_| FontError::InvalidFace)?;
-        let ttf =
-          TtfFace::parse(data.as_slice(), face_index).map_err(|_| FontError::InvalidFace)?;
-        Ok(RuntimeFaces { harf, ttf })
+        let skrifa = SkrifaFontRef::from_index(data.as_slice(), face_index)
+          .map_err(|_| FontError::InvalidFace)?;
+        Ok(RuntimeFaces { harf, skrifa })
       })?;
     let shaper_data = ShaperData::new(&faces.get().harf);
     Ok(Self {
@@ -176,8 +183,8 @@ impl RuntimeFace {
     &self.faces.get().harf
   }
 
-  fn ttf(&self) -> &TtfFace<'_> {
-    &self.faces.get().ttf
+  fn skrifa(&self) -> &SkrifaFontRef<'_> {
+    &self.faces.get().skrifa
   }
 
   fn shape(&self, buffer: UnicodeBuffer, features: &[HarfFeature]) -> harfrust::GlyphBuffer {
@@ -222,10 +229,11 @@ impl RuntimeFace {
       return *bounds;
     }
 
-    let face = self.ttf();
+    let face = self.skrifa();
     let bounds = face
-      .glyph_bounding_box(GlyphId(glyph_id))
-      .map(|bounds| glyph_bounds_from_ttf_rect(bounds, f32::from(face.units_per_em())));
+      .glyph_metrics(SkrifaSize::new(1.0), SkrifaLocationRef::default())
+      .bounds(SkrifaGlyphId::new(u32::from(glyph_id)))
+      .map(glyph_bounds_from_skrifa);
     self
       .glyph_bounds
       .write()
@@ -350,8 +358,7 @@ impl<'a> FontRegistry<'a> {
       for family in self.fallback_families(request) {
         queries.push(PlatformFontQueryFamily::Name(family.to_owned()));
       }
-      queries.push(PlatformFontQueryFamily::SansSerif);
-      queries.push(PlatformFontQueryFamily::Serif);
+      push_platform_generic_queries(&mut queries, request.family_class);
     } else {
       // Resolve the
       // Office/script fallback chain by family name before asking for the
@@ -360,8 +367,7 @@ impl<'a> FontRegistry<'a> {
       for family in self.fallback_families(request) {
         queries.push(PlatformFontQueryFamily::Name(family.to_owned()));
       }
-      queries.push(PlatformFontQueryFamily::SansSerif);
-      queries.push(PlatformFontQueryFamily::Serif);
+      push_platform_generic_queries(&mut queries, request.family_class);
     }
 
     for query_family in queries {
@@ -763,7 +769,7 @@ impl<'a> FontRegistry<'a> {
         .position(|(index, font)| {
           font_supports_text_cluster(
             font,
-            runtime_faces[index].as_deref().map(RuntimeFace::ttf),
+            runtime_faces[index].as_deref().map(RuntimeFace::skrifa),
             &text[cluster.clone()],
           )
         })
@@ -1010,7 +1016,7 @@ impl<'a> FontRegistry<'a> {
 
   fn face_info_supports_char(&self, face: &FontFaceInfo<'a>, ch: char) -> bool {
     if let Some(parsed) = self.runtime_face_for_font(&face.font_id) {
-      return ttf_face_supports_char(parsed.ttf(), ch);
+      return skrifa_face_supports_char(parsed.skrifa(), ch);
     }
     face.coverage.contains_char(ch)
   }
@@ -1229,43 +1235,47 @@ impl<'a> FontFaceInfo<'a> {
   }
 
   pub fn from_ttf_bytes(id: &str, data: &[u8], face_index: u32) -> Result<Self> {
-    let face = TtfFace::parse(data, face_index).map_err(|_| FontError::InvalidFace)?;
+    let face = SkrifaFontRef::from_index(data, face_index).map_err(|_| FontError::InvalidFace)?;
     let mut family_names = Vec::new();
-    let mut postscript_name = None;
-    let mut style_name = None;
-    for name in face.names() {
-      let Some(value) = name.to_string() else {
-        continue;
-      };
-      match name.name_id {
-        ttf_parser::name_id::FAMILY => push_unique_string(&mut family_names, value),
-        ttf_parser::name_id::TYPOGRAPHIC_FAMILY => push_unique_string(&mut family_names, value),
-        ttf_parser::name_id::POST_SCRIPT_NAME => postscript_name = Some(Cow::Owned(value)),
-        ttf_parser::name_id::SUBFAMILY => style_name = Some(Cow::Owned(value)),
-        _ => {}
+    for name_id in [StringId::FAMILY_NAME, StringId::TYPOGRAPHIC_FAMILY_NAME] {
+      for name in face.localized_strings(name_id) {
+        push_unique_string(&mut family_names, name.to_string());
       }
     }
+    let postscript_name = skrifa_name_by_id(&face, StringId::POSTSCRIPT_NAME).map(Cow::Owned);
+    let style_name = skrifa_name_by_id(&face, StringId::SUBFAMILY_NAME).map(Cow::Owned);
     if family_names.is_empty() {
       family_names.push(Cow::Owned(id.to_string()));
     }
 
-    let pitch = if face.is_monospaced() {
+    let metrics = face.metrics(SkrifaSize::new(1.0), SkrifaLocationRef::default());
+    let axes = face.axes();
+    let pitch = if metrics.is_monospace {
       FontPitch::Fixed
     } else {
       FontPitch::Variable
     };
     let flags = FontFlags {
-      monospace: face.is_monospaced(),
-      color_glyphs: face.tables().colr.is_some() || face.tables().sbix.is_some(),
-      vertical: face.tables().vhea.is_some() || face.tables().vmtx.is_some(),
+      monospace: metrics.is_monospace,
+      color_glyphs: face.colr().is_ok() || face.sbix().is_ok(),
+      vertical: face.vhea().is_ok() || face.vmtx().is_ok(),
       graphite: has_table(&face, b"Silf") || has_table(&face, b"Feat") || has_table(&face, b"Sill"),
-      aat: face.tables().feat.is_some() || face.tables().morx.is_some(),
-      cff2: face.tables().cff2.is_some(),
-      variable: !face.variation_axes().is_empty(),
-      kashida_positions: face.tables().morx.is_none(),
+      aat: face.feat().is_ok() || face.morx().is_ok(),
+      cff2: face.cff2().is_ok(),
+      variable: !axes.is_empty(),
+      kashida_positions: face.morx().is_err(),
       ..FontFlags::default()
     };
-    let metrics = font_metrics_from_ttf(&face, 1.0);
+    let metrics = font_metrics_from_skrifa(&face, 1.0);
+    let attributes = face.attributes();
+    let (weight, stretch) = face
+      .os2()
+      .map_or((FontWeight::Normal, FontStretch::Normal), |os2| {
+        (
+          font_weight_from_opentype(os2.us_weight_class()),
+          font_stretch_from_opentype(os2.us_width_class()),
+        )
+      });
 
     Ok(Self {
       font_id: FontId(Arc::from(id)),
@@ -1273,18 +1283,18 @@ impl<'a> FontFaceInfo<'a> {
       postscript_name,
       style_name,
       family_class: None,
-      weight: font_weight_from_ttf(face.weight().to_number()),
-      slant: font_slant_from_ttf(face.style()),
-      stretch: font_stretch_from_ttf(face.width().to_number()),
+      weight,
+      slant: font_slant_from_skrifa(attributes.style),
+      stretch,
       pitch,
-      coverage: font_coverage_from_ttf(&face),
+      coverage: font_coverage_from_skrifa(&face),
       flags,
-      axes: variation_axes_from_ttf(&face),
-      features: opentype_features_from_ttf(&face),
+      axes: variation_axes_from_skrifa(&face),
+      features: opentype_features_from_skrifa(&face),
       metrics,
-      embedding: font_embedding_policy_from_ttf(&face),
-      embedding_plan: font_embedding_plan_from_ttf(&face),
-      bounds: font_bounds_from_ttf(&face),
+      embedding: font_embedding_policy_from_skrifa(&face),
+      embedding_plan: font_embedding_plan_from_skrifa(&face),
+      bounds: font_bounds_from_skrifa(&face),
       face_index,
     })
   }
@@ -1800,7 +1810,11 @@ impl<'book> ResolvedFont<'book> {
     } else {
       options.size_pt
     };
-    let units_per_em = f32::from(runtime_face.ttf().units_per_em());
+    let units_per_em = runtime_face
+      .skrifa()
+      .head()
+      .map(|head| f32::from(head.units_per_em()))
+      .unwrap_or(1.0);
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(shaped_text.as_ref());
     buffer.guess_segment_properties();
@@ -1898,12 +1912,13 @@ impl<'book> ResolvedFont<'book> {
     glyph_id: u32,
     size: FontSize,
   ) -> Result<Option<GlyphBounds>> {
-    let face = TtfFace::parse(data, self.face_index).map_err(|_| FontError::InvalidFace)?;
-    let units_per_em = f32::from(face.units_per_em());
+    let face =
+      SkrifaFontRef::from_index(data, self.face_index).map_err(|_| FontError::InvalidFace)?;
     Ok(
       face
-        .glyph_bounding_box(GlyphId(glyph_id as u16))
-        .map(|bounds| glyph_bounds_from_ttf_rect(bounds, units_per_em).scaled(size.0)),
+        .glyph_metrics(SkrifaSize::new(size.0), SkrifaLocationRef::default())
+        .bounds(SkrifaGlyphId::new(glyph_id))
+        .map(glyph_bounds_from_skrifa),
     )
   }
 }
@@ -3028,6 +3043,39 @@ enum PlatformFontQueryFamily {
   Name(String),
   SansSerif,
   Serif,
+  Monospace,
+}
+
+fn push_platform_generic_queries(
+  queries: &mut SmallVec<[PlatformFontQueryFamily; 8]>,
+  family_class: Option<FontFamilyClass>,
+) {
+  match family_class {
+    Some(FontFamilyClass::Serif | FontFamilyClass::OldStyle | FontFamilyClass::Schoolbook) => {
+      // ECMA-376 Part 1 §17.18.30 defines `roman` as a proportional serif
+      // family and uses Times New Roman as its representative. Query the
+      // Windows representative before the host's generic serif so Linux
+      // fixed output follows the same document font-table substitution.
+      queries.push(PlatformFontQueryFamily::Name("Times New Roman".to_string()));
+      queries.push(PlatformFontQueryFamily::Serif);
+      queries.push(PlatformFontQueryFamily::SansSerif);
+    }
+    Some(FontFamilyClass::Fixed) => {
+      queries.push(PlatformFontQueryFamily::Name("Courier New".to_string()));
+      queries.push(PlatformFontQueryFamily::Monospace);
+      queries.push(PlatformFontQueryFamily::SansSerif);
+      queries.push(PlatformFontQueryFamily::Serif);
+    }
+    Some(FontFamilyClass::SansSerif) => {
+      queries.push(PlatformFontQueryFamily::Name("Arial".to_string()));
+      queries.push(PlatformFontQueryFamily::SansSerif);
+      queries.push(PlatformFontQueryFamily::Serif);
+    }
+    _ => {
+      queries.push(PlatformFontQueryFamily::SansSerif);
+      queries.push(PlatformFontQueryFamily::Serif);
+    }
+  }
 }
 
 struct PlatformFontSystem {
@@ -3240,6 +3288,9 @@ fn platform_system_query_fonts(
         PlatformFontQueryFamily::Serif => {
           PlatformQueryFamily::Generic(PlatformGenericFamily::Serif)
         }
+        PlatformFontQueryFamily::Monospace => {
+          PlatformQueryFamily::Generic(PlatformGenericFamily::Monospace)
+        }
       };
       let mut query = collection.query(source_cache);
       query.set_families([family]);
@@ -3271,7 +3322,9 @@ fn platform_system_query_fonts(
                 .as_deref()
                 .is_some_and(|name| normalized_family_eq_normalized(name, &normalized))
           }
-          PlatformFontQueryFamily::SansSerif | PlatformFontQueryFamily::Serif => true,
+          PlatformFontQueryFamily::SansSerif
+          | PlatformFontQueryFamily::Serif
+          | PlatformFontQueryFamily::Monospace => true,
         };
         if !matches_requested_family {
           return PlatformQueryStatus::Continue;
@@ -3410,24 +3463,27 @@ fn runtime_face_for_data(data: FontBytes, face_index: u32) -> Option<Arc<Runtime
 
 fn font_supports_char(
   font: &ResolvedFontWithFace<'_, '_>,
-  parsed_face: Option<&TtfFace<'_>>,
+  parsed_face: Option<&SkrifaFontRef<'_>>,
   ch: char,
 ) -> bool {
   if let Some(face) = parsed_face {
-    return ttf_face_supports_char(face, ch);
+    return skrifa_face_supports_char(face, ch);
   }
   font
     .face
     .is_some_and(|face| face.coverage.contains_char(ch))
 }
 
-fn ttf_face_supports_char(face: &TtfFace<'_>, ch: char) -> bool {
-  face.glyph_index(ch).is_some_and(|glyph_id| glyph_id.0 != 0)
+fn skrifa_face_supports_char(face: &SkrifaFontRef<'_>, ch: char) -> bool {
+  face
+    .charmap()
+    .map(ch)
+    .is_some_and(|glyph_id| glyph_id != SkrifaGlyphId::NOTDEF)
 }
 
 fn font_supports_text_cluster(
   font: &ResolvedFontWithFace<'_, '_>,
-  parsed_face: Option<&TtfFace<'_>>,
+  parsed_face: Option<&SkrifaFontRef<'_>>,
   text: &str,
 ) -> bool {
   !text.chars().any(is_private_use_char)
@@ -3634,41 +3690,36 @@ fn stretch_distance(left: FontStretch, right: FontStretch) -> i32 {
   (font_stretch_number(left) - font_stretch_number(right)).abs()
 }
 
-fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
-  let units_per_em = f32::from(face.units_per_em());
+fn font_metrics_from_skrifa(face: &SkrifaFontRef<'_>, em_size: f32) -> FontMetrics {
+  let metrics = face.metrics(SkrifaSize::new(em_size), SkrifaLocationRef::default());
+  let units_per_em = f32::from(metrics.units_per_em.max(1));
   let to_em = |value: i32| value as f32 / units_per_em * em_size;
-  let ascent_units = face.ascender().max(0);
-  let descent_units = (-face.descender()).max(0);
-  let line_gap_units = face.line_gap().max(0);
-  let fallback_gap_units =
-    (i32::from(face.units_per_em()) - i32::from(ascent_units) - i32::from(descent_units)).max(0);
-  let ascender = to_em(i32::from(ascent_units));
-  let descender = to_em(i32::from(descent_units));
+  let ascender = metrics.ascent.max(0.0);
+  let descender = (-metrics.descent).max(0.0);
   // Windows Office lays out the baseline from OS/2 Windows metrics unless
   // the face explicitly opts into typographic metrics. Keep that baseline
   // separate from the natural line box: usWinAscent was designed as a
   // clipping extent and can be larger than the typographic ascender.
-  let baseline_offset = face.tables().os2.map_or(ascender, |os2| {
-    let units = if os2.use_typographic_metrics() {
-      os2.typographic_ascender()
+  let baseline_offset = face.os2().map_or(ascender, |os2| {
+    use skrifa::raw::tables::os2::SelectionFlags;
+    let units = if os2.version() >= 4
+      && os2
+        .fs_selection()
+        .contains(SelectionFlags::USE_TYPO_METRICS)
+    {
+      i32::from(os2.s_typo_ascender())
     } else {
-      os2.windows_ascender()
+      i32::from(os2.us_win_ascent())
     };
     let units = units.max(0);
-    if units == 0 {
-      ascender
-    } else {
-      to_em(i32::from(units))
-    }
+    if units == 0 { ascender } else { to_em(units) }
   });
-  let line_gap = if line_gap_units > 0 {
-    to_em(i32::from(line_gap_units))
+  let line_gap = if metrics.leading > 0.0 {
+    metrics.leading
   } else {
-    to_em(fallback_gap_units)
+    (em_size - ascender - descender).max(0.0)
   };
-  let underline = face.underline_metrics();
-  let strikeout = face.strikeout_metrics();
-  let script = face.tables().os2.map_or_else(
+  let script = face.os2().ok().map_or_else(
     || ScriptMetrics {
       superscript_scale: 1.0,
       subscript_scale: 1.0,
@@ -3676,8 +3727,6 @@ fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
       ..ScriptMetrics::default()
     },
     |os2| {
-      let superscript = os2.superscript_metrics();
-      let subscript = os2.subscript_metrics();
       let scale = |units: i16| {
         if units > 0 {
           f32::from(units) / units_per_em
@@ -3686,10 +3735,10 @@ fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
         }
       };
       ScriptMetrics {
-        superscript_scale: scale(superscript.y_size),
-        subscript_scale: scale(subscript.y_size),
-        superscript_offset_pt: to_em(i32::from(superscript.y_offset.max(0))),
-        subscript_offset_pt: to_em(i32::from(subscript.y_offset.max(0))),
+        superscript_scale: scale(os2.y_superscript_y_size()),
+        subscript_scale: scale(os2.y_subscript_y_size()),
+        superscript_offset_pt: to_em(i32::from(os2.y_superscript_y_offset().max(0))),
+        subscript_offset_pt: to_em(i32::from(os2.y_subscript_y_offset().max(0))),
         small_caps_scale: 1.0,
       }
     },
@@ -3704,17 +3753,21 @@ fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
       ..VerticalMetrics::default()
     },
     decoration: DecorationMetrics {
-      underline_offset_pt: underline
-        .map(|metrics| -to_em(i32::from(metrics.position)))
+      underline_offset_pt: metrics
+        .underline
+        .map(|metrics| -metrics.offset)
         .unwrap_or_default(),
-      underline_thickness_pt: underline
-        .map(|metrics| to_em(i32::from(metrics.thickness)).abs())
+      underline_thickness_pt: metrics
+        .underline
+        .map(|metrics| metrics.thickness.abs())
         .unwrap_or_default(),
-      strikeout_offset_pt: strikeout
-        .map(|metrics| to_em(i32::from(metrics.position)))
+      strikeout_offset_pt: metrics
+        .strikeout
+        .map(|metrics| metrics.offset)
         .unwrap_or_default(),
-      strikeout_thickness_pt: strikeout
-        .map(|metrics| to_em(i32::from(metrics.thickness)).abs())
+      strikeout_thickness_pt: metrics
+        .strikeout
+        .map(|metrics| metrics.thickness.abs())
         .unwrap_or_default(),
     },
     script,
@@ -3722,25 +3775,14 @@ fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
   }
 }
 
-fn font_coverage_from_ttf(face: &TtfFace<'_>) -> FontCoverage {
+fn font_coverage_from_skrifa(face: &SkrifaFontRef<'_>) -> FontCoverage {
   let mut ranges = Vec::new();
-  for subtable in face
-    .tables()
-    .cmap
-    .into_iter()
-    .flat_map(|table| table.subtables)
-  {
-    if subtable.is_unicode() {
-      let mut subtable_ranges = Vec::new();
-      let mut previous = None;
-      subtable.codepoints(|codepoint| {
-        debug_assert!(previous.is_none_or(|previous| previous <= codepoint));
-        previous = Some(codepoint);
-        if char::from_u32(codepoint).is_some_and(|ch| ttf_face_supports_char(face, ch)) {
-          push_coverage_codepoint(&mut subtable_ranges, codepoint);
-        }
-      });
-      merge_coverage_ranges(&mut ranges, subtable_ranges);
+  let mut previous = None;
+  for (codepoint, glyph_id) in face.charmap().mappings() {
+    debug_assert!(previous.is_none_or(|previous| previous <= codepoint));
+    previous = Some(codepoint);
+    if glyph_id != SkrifaGlyphId::NOTDEF && char::from_u32(codepoint).is_some() {
+      push_coverage_codepoint(&mut ranges, codepoint);
     }
   }
   FontCoverage {
@@ -3759,52 +3801,49 @@ fn push_coverage_codepoint(ranges: &mut Vec<Range<u32>>, codepoint: u32) {
   ranges.push(codepoint..codepoint.saturating_add(1));
 }
 
-fn merge_coverage_ranges(ranges: &mut Vec<Range<u32>>, additions: Vec<Range<u32>>) {
-  if additions.is_empty() {
-    return;
-  }
-  if ranges.is_empty() {
-    *ranges = additions;
-    return;
+fn font_embedding_policy_from_skrifa(face: &SkrifaFontRef<'_>) -> FontEmbeddingPolicy {
+  enum Permission {
+    Installable,
+    Restricted,
+    PreviewAndPrint,
+    Editable,
   }
 
-  let current = std::mem::take(ranges);
-  let mut current = current.into_iter().peekable();
-  let mut additions = additions.into_iter().peekable();
-  ranges.reserve(current.len() + additions.len());
-  while current.peek().is_some() || additions.peek().is_some() {
-    let next = match (current.peek(), additions.peek()) {
-      (Some(left), Some(right)) if left.start <= right.start => current.next(),
-      (Some(_), Some(_)) => additions.next(),
-      (Some(_), None) => current.next(),
-      (None, Some(_)) => additions.next(),
-      (None, None) => None,
-    }
-    .expect("a non-empty range iterator has a next item");
-    if let Some(previous) = ranges.last_mut()
-      && next.start <= previous.end
-    {
-      previous.end = previous.end.max(next.end);
+  let permission = face.os2().ok().and_then(|os2| {
+    let bits = os2.fs_type() & 0x000F;
+    if os2.version() <= 2 {
+      Some(if bits == 0 {
+        Permission::Installable
+      } else if bits & 0x0008 != 0 {
+        Permission::Editable
+      } else if bits & 0x0004 != 0 {
+        Permission::PreviewAndPrint
+      } else {
+        Permission::Restricted
+      })
     } else {
-      ranges.push(next);
+      match bits {
+        0 => Some(Permission::Installable),
+        2 => Some(Permission::Restricted),
+        4 => Some(Permission::PreviewAndPrint),
+        8 => Some(Permission::Editable),
+        _ => None,
+      }
     }
-  }
-}
-
-fn font_embedding_policy_from_ttf(face: &TtfFace<'_>) -> FontEmbeddingPolicy {
-  match face.permissions() {
-    Some(ttf_parser::Permissions::Restricted) => FontEmbeddingPolicy {
+  });
+  match permission {
+    Some(Permission::Restricted) => FontEmbeddingPolicy {
       subset_policy: FontSubsetPolicy::DoNotEmbed,
       installable: false,
       restricted: true,
     },
-    Some(ttf_parser::Permissions::Installable) | None => FontEmbeddingPolicy::default(),
-    Some(ttf_parser::Permissions::PreviewAndPrint) => FontEmbeddingPolicy {
+    Some(Permission::Installable) | None => FontEmbeddingPolicy::default(),
+    Some(Permission::PreviewAndPrint) => FontEmbeddingPolicy {
       subset_policy: FontSubsetPolicy::Subset,
       installable: false,
       restricted: false,
     },
-    Some(ttf_parser::Permissions::Editable) => FontEmbeddingPolicy {
+    Some(Permission::Editable) => FontEmbeddingPolicy {
       subset_policy: FontSubsetPolicy::EmbedFull,
       installable: false,
       restricted: false,
@@ -3812,74 +3851,77 @@ fn font_embedding_policy_from_ttf(face: &TtfFace<'_>) -> FontEmbeddingPolicy {
   }
 }
 
-fn font_embedding_plan_from_ttf<'a>(face: &TtfFace<'_>) -> FontEmbeddingPlan<'a> {
+fn font_embedding_plan_from_skrifa<'a>(face: &SkrifaFontRef<'_>) -> FontEmbeddingPlan<'a> {
   FontEmbeddingPlan {
     keep_tables: DEFAULT_PDF_EMBED_TABLES
       .iter()
       .map(|table| Cow::Borrowed(*table))
       .collect(),
-    downgrade_cff2: face.tables().cff2.is_some(),
-    desubroutinize_cff: face.tables().cff.is_some() || face.tables().cff2.is_some(),
-    pin_variation_axes: !face.variation_axes().is_empty(),
+    downgrade_cff2: face.cff2().is_ok(),
+    desubroutinize_cff: face.cff().is_ok() || face.cff2().is_ok(),
+    pin_variation_axes: !face.axes().is_empty(),
   }
 }
 
-fn has_table(face: &TtfFace<'_>, tag: &[u8; 4]) -> bool {
-  face.raw_face().table(Tag::from_bytes(tag)).is_some()
+fn has_table(face: &SkrifaFontRef<'_>, tag: &[u8; 4]) -> bool {
+  face.table_data(skrifa::Tag::new(tag)).is_some()
 }
 
-fn font_bounds_from_ttf(face: &TtfFace<'_>) -> FontBounds {
-  let units_per_em = f32::from(face.units_per_em());
+fn font_bounds_from_skrifa(face: &SkrifaFontRef<'_>) -> FontBounds {
   FontBounds {
-    global: Some(glyph_bounds_from_ttf_rect(
-      face.global_bounding_box(),
-      units_per_em,
-    )),
+    global: face
+      .metrics(SkrifaSize::new(1.0), SkrifaLocationRef::default())
+      .bounds
+      .map(glyph_bounds_from_skrifa),
   }
 }
 
-fn glyph_bounds_from_ttf_rect(bounds: TtfRect, units_per_em: f32) -> GlyphBounds {
+fn glyph_bounds_from_skrifa(bounds: SkrifaBoundingBox) -> GlyphBounds {
   GlyphBounds {
-    x_min_pt: f32::from(bounds.x_min) / units_per_em,
-    y_min_pt: f32::from(bounds.y_min) / units_per_em,
-    x_max_pt: f32::from(bounds.x_max) / units_per_em,
-    y_max_pt: f32::from(bounds.y_max) / units_per_em,
+    x_min_pt: bounds.x_min,
+    y_min_pt: bounds.y_min,
+    x_max_pt: bounds.x_max,
+    y_max_pt: bounds.y_max,
   }
 }
 
-fn variation_axes_from_ttf<'a>(face: &TtfFace<'_>) -> Vec<VariationAxis<'a>> {
+fn variation_axes_from_skrifa<'a>(face: &SkrifaFontRef<'_>) -> Vec<VariationAxis<'a>> {
   face
-    .variation_axes()
-    .into_iter()
-    .filter(|axis| !axis.hidden)
+    .axes()
+    .iter()
+    .filter(|axis| !axis.is_hidden())
     .map(|axis| VariationAxis {
-      tag: Cow::Owned(tag_to_string(axis.tag)),
-      name: ttf_name_by_id(face, axis.name_id).map(Cow::Owned),
-      min: axis.min_value,
-      default: axis.def_value,
-      max: axis.max_value,
+      tag: Cow::Owned(tag_to_string(axis.tag())),
+      name: skrifa_name_by_id(face, axis.name_id()).map(Cow::Owned),
+      min: axis.min_value(),
+      default: axis.default_value(),
+      max: axis.max_value(),
     })
     .collect()
 }
 
-fn opentype_features_from_ttf<'a>(face: &TtfFace<'_>) -> Vec<OpenTypeFeature<'a>> {
+fn opentype_features_from_skrifa<'a>(face: &SkrifaFontRef<'_>) -> Vec<OpenTypeFeature<'a>> {
   let mut features = Vec::new();
-  if let Some(gsub) = face.tables().gsub {
-    for feature in gsub.features {
-      push_opentype_feature(&mut features, feature.tag);
+  if let Ok(gsub) = face.gsub()
+    && let Ok(feature_list) = gsub.feature_list()
+  {
+    for feature in feature_list.feature_records() {
+      push_opentype_feature(&mut features, feature.feature_tag());
     }
   }
-  if let Some(gpos) = face.tables().gpos {
-    for feature in gpos.features {
-      push_opentype_feature(&mut features, feature.tag);
+  if let Ok(gpos) = face.gpos()
+    && let Ok(feature_list) = gpos.feature_list()
+  {
+    for feature in feature_list.feature_records() {
+      push_opentype_feature(&mut features, feature.feature_tag());
     }
   }
-  if let Some(feat) = face.tables().feat {
-    for feature in feat.names {
-      push_named_feature(&mut features, format!("aat:{}", feature.feature));
+  if let Ok(feat) = face.feat() {
+    for feature in feat.names() {
+      push_named_feature(&mut features, format!("aat:{}", feature.feature()));
     }
   }
-  if face.tables().morx.is_some() {
+  if face.morx().is_ok() {
     push_named_feature(&mut features, "aat:morx".to_string());
   }
   if has_table(face, b"Silf") {
@@ -3894,7 +3936,7 @@ fn opentype_features_from_ttf<'a>(face: &TtfFace<'_>) -> Vec<OpenTypeFeature<'a>
   features
 }
 
-fn push_opentype_feature<'a>(features: &mut Vec<OpenTypeFeature<'a>>, tag: Tag) {
+fn push_opentype_feature<'a>(features: &mut Vec<OpenTypeFeature<'a>>, tag: skrifa::Tag) {
   let tag = tag_to_string(tag);
   if !features.iter().any(|feature| feature.tag.as_ref() == tag) {
     features.push(OpenTypeFeature {
@@ -3913,16 +3955,17 @@ fn push_named_feature<'a>(features: &mut Vec<OpenTypeFeature<'a>>, tag: String) 
   }
 }
 
-fn ttf_name_by_id(face: &TtfFace<'_>, name_id: u16) -> Option<String> {
+fn skrifa_name_by_id(face: &SkrifaFontRef<'_>, name_id: StringId) -> Option<String> {
   face
-    .names()
-    .into_iter()
-    .filter(|name| name.name_id == name_id)
-    .find_map(|name| name.to_string())
+    .localized_strings(name_id)
+    .english_or_first()
+    .map(|name| name.to_string())
 }
 
-fn tag_to_string(tag: Tag) -> String {
-  tag.to_string().trim_end().to_string()
+fn tag_to_string(tag: skrifa::Tag) -> String {
+  String::from_utf8_lossy(&tag.to_be_bytes())
+    .trim_end()
+    .to_string()
 }
 
 fn first_strong_text_script(text: &str, wordprocessingml_font_slots: bool) -> Option<TextScript> {
@@ -4195,7 +4238,7 @@ fn font_stretch_number(stretch: FontStretch) -> i32 {
   }
 }
 
-fn font_weight_from_ttf(weight: u16) -> FontWeight {
+fn font_weight_from_opentype(weight: u16) -> FontWeight {
   match weight {
     0..=149 => FontWeight::Thin,
     150..=249 => FontWeight::ExtraLight,
@@ -4209,15 +4252,15 @@ fn font_weight_from_ttf(weight: u16) -> FontWeight {
   }
 }
 
-fn font_slant_from_ttf(style: ttf_parser::Style) -> FontSlant {
+fn font_slant_from_skrifa(style: SkrifaStyle) -> FontSlant {
   match style {
-    ttf_parser::Style::Italic => FontSlant::Italic,
-    ttf_parser::Style::Oblique => FontSlant::Oblique,
-    ttf_parser::Style::Normal => FontSlant::Upright,
+    SkrifaStyle::Italic => FontSlant::Italic,
+    SkrifaStyle::Oblique(_) => FontSlant::Oblique,
+    SkrifaStyle::Normal => FontSlant::Upright,
   }
 }
 
-fn font_stretch_from_ttf(width: u16) -> FontStretch {
+fn font_stretch_from_opentype(width: u16) -> FontStretch {
   match width {
     1 => FontStretch::UltraCondensed,
     2 => FontStretch::ExtraCondensed,
@@ -4450,6 +4493,22 @@ mod tests {
 
     assert_eq!(resolved.font_id, FontId(Arc::from("arial")));
     assert_eq!(resolved.resolved_family, Cow::Borrowed("Arial"));
+  }
+
+  #[test]
+  fn roman_family_class_queries_the_windows_representative_before_host_generics() {
+    let mut queries = SmallVec::new();
+
+    push_platform_generic_queries(&mut queries, Some(FontFamilyClass::Serif));
+
+    assert_eq!(
+      queries.as_slice(),
+      &[
+        PlatformFontQueryFamily::Name("Times New Roman".to_string()),
+        PlatformFontQueryFamily::Serif,
+        PlatformFontQueryFamily::SansSerif,
+      ]
+    );
   }
 
   #[test]
@@ -4728,23 +4787,6 @@ mod tests {
         text_range: 5..6,
       }]
     );
-  }
-
-  #[test]
-  fn coverage_range_merge_coalesces_overlapping_unicode_subtables() {
-    let mut ranges = vec![1..4, 10..12, 20..21];
-    merge_coverage_ranges(&mut ranges, vec![3..6, 8..11, 21..23]);
-
-    assert_eq!(ranges, vec![1..6, 8..12, 20..23]);
-    let coverage = FontCoverage {
-      unicode_ranges: ranges,
-      scripts: BTreeSet::new(),
-    };
-    assert!(coverage.contains_codepoint(1));
-    assert!(coverage.contains_codepoint(11));
-    assert!(coverage.contains_codepoint(22));
-    assert!(!coverage.contains_codepoint(6));
-    assert!(!coverage.contains_codepoint(19));
   }
 
   #[test]

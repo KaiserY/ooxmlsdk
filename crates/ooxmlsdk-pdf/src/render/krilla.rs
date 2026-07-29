@@ -34,6 +34,13 @@ use krilla::text::{Glyph, GlyphId};
 use krilla_svg::{SurfaceExt, SvgSettings};
 use kurbo::{BezPath, PathEl, flatten};
 use rustc_hash::FxHashMap as HashMap;
+use skrifa::{
+  FontRef as SkrifaFontRef, GlyphId as SkrifaGlyphId, MetadataProvider,
+  instance::{LocationRef as SkrifaLocationRef, Size as SkrifaSize},
+  outline::{DrawSettings as SkrifaDrawSettings, OutlinePen as SkrifaOutlinePen},
+  raw::TableProvider as SkrifaTableProvider,
+  string::StringId as SkrifaStringId,
+};
 use smallvec::SmallVec;
 
 use super::fonts::FontSet;
@@ -458,6 +465,7 @@ enum PageItem<'doc> {
     transform: Option<common::Transform>,
     blend_mode: common::BlendMode,
     opacity: f32,
+    flatten_identity: bool,
     items: Vec<PageItem<'doc>>,
   },
   LinkArea(LinkAreaItem<'doc>),
@@ -509,6 +517,7 @@ struct ImageItem<'doc> {
   alt_text: Option<Cow<'doc, str>>,
   hyperlink_url: Option<Cow<'doc, str>>,
   semantic_metafile_text: bool,
+  metafile_native_size: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -749,6 +758,7 @@ enum PaintItem<'doc> {
     transform: Option<common::Transform>,
     blend_mode: common::BlendMode,
     opacity: f32,
+    flatten_identity: bool,
     items: Vec<PaintItem<'doc>>,
   },
   LinkArea(LinkAreaItem<'doc>),
@@ -1206,12 +1216,13 @@ fn font_face_diagnostics(face_data: &FontFaceData) -> PdfFontFaceDiagnostics {
   // Mirrors Krilla's FontInfo identity: face index plus OpenType `head`
   // checksum adjustment and data length distinguish faces without hashing a
   // multi-megabyte font once per glyph run.
-  let checksum_adjustment = ttf_parser::RawFace::parse(data, face_data.index)
+  let parsed_face = SkrifaFontRef::from_index(data, face_data.index);
+  let checksum_adjustment = parsed_face
+    .as_ref()
     .ok()
-    .and_then(|raw| raw.table(ttf_parser::Tag::from_bytes(b"head")))
-    .and_then(|head| head.get(8..12))
-    .map(|bytes| u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]));
-  let face = match ttf_parser::Face::parse(data, face_data.index) {
+    .and_then(|face| face.head().ok())
+    .map(|head| head.checksum_adjustment());
+  let face = match parsed_face {
     Ok(face) => face,
     Err(error) => {
       return PdfFontFaceDiagnostics {
@@ -1233,27 +1244,29 @@ fn font_face_diagnostics(face_data: &FontFaceData) -> PdfFontFaceDiagnostics {
       };
     }
   };
-  let units_per_em = face.units_per_em();
-  let em_divisor = f32::from(units_per_em);
+  let metrics = face.metrics(SkrifaSize::new(1.0), SkrifaLocationRef::default());
+  let units_per_em = metrics.units_per_em;
   let mut family_names = Vec::new();
-  let mut postscript_name = None;
-  let mut style_name = None;
-  for name in face.names() {
-    let Some(value) = name.to_string() else {
-      continue;
-    };
-    match name.name_id {
-      ttf_parser::name_id::FAMILY | ttf_parser::name_id::TYPOGRAPHIC_FAMILY
-        if !family_names.contains(&value) =>
-      {
+  for name_id in [
+    SkrifaStringId::FAMILY_NAME,
+    SkrifaStringId::TYPOGRAPHIC_FAMILY_NAME,
+  ] {
+    for name in face.localized_strings(name_id) {
+      let value = name.to_string();
+      if !family_names.contains(&value) {
         family_names.push(value);
       }
-      ttf_parser::name_id::POST_SCRIPT_NAME => postscript_name = Some(value),
-      ttf_parser::name_id::SUBFAMILY => style_name = Some(value),
-      _ => {}
     }
   }
-  let bounds = face.global_bounding_box();
+  let font_name = |name_id| {
+    face
+      .localized_strings(name_id)
+      .english_or_first()
+      .map(|name| name.to_string())
+  };
+  let postscript_name = font_name(SkrifaStringId::POSTSCRIPT_NAME);
+  let style_name = font_name(SkrifaStringId::SUBFAMILY_NAME);
+  let bounds = metrics.bounds.unwrap_or_default();
   PdfFontFaceDiagnostics {
     font_id: face_data.id().to_string(),
     face_index: face_data.index,
@@ -1264,19 +1277,17 @@ fn font_face_diagnostics(face_data: &FontFaceData) -> PdfFontFaceDiagnostics {
     family_names,
     style_name,
     units_per_em,
-    glyph_count: face.number_of_glyphs(),
-    ascender_em: f32::from(face.ascender()) / em_divisor,
-    descender_em: f32::from(face.descender()) / em_divisor,
-    cap_height_em: face
-      .capital_height()
-      .map(|value| f32::from(value) / em_divisor),
+    glyph_count: metrics.glyph_count,
+    ascender_em: metrics.ascent,
+    descender_em: metrics.descent,
+    cap_height_em: metrics.cap_height,
     global_bounds_em: PdfGlyphBoundsDiagnostics {
-      x_min_em: f32::from(bounds.x_min) / em_divisor,
-      y_min_em: f32::from(bounds.y_min) / em_divisor,
-      x_max_em: f32::from(bounds.x_max) / em_divisor,
-      y_max_em: f32::from(bounds.y_max) / em_divisor,
+      x_min_em: bounds.x_min,
+      y_min_em: bounds.y_min,
+      x_max_em: bounds.x_max,
+      y_max_em: bounds.y_max,
     },
-    monospaced: face.is_monospaced(),
+    monospaced: metrics.is_monospace,
   }
 }
 
@@ -1557,44 +1568,57 @@ impl<'doc> PaintDocument<'doc> {
         let items = layout_items
           .into_iter()
           .enumerate()
-          .map(|(item_index, item)| match item {
-            PageItem::Text(mut text) => {
-              let owner = line_owners.get(item_index).copied().flatten();
-              let metadata = decoration_metadata[item_index];
-              if metadata.suppress {
-                text.style.underline = false;
-                text.style.strikethrough = false;
+          .map(|(item_index, item)| {
+            let owner = line_owners.get(item_index).copied().flatten();
+            let common_line_baseline = common_line_baselines.get(item_index).copied().flatten();
+            match item {
+              PageItem::Text(mut text) => {
+                let metadata = decoration_metadata[item_index];
+                if metadata.suppress {
+                  text.style.underline = false;
+                  text.style.strikethrough = false;
+                }
+                text.decoration_span_start_x_pt = metadata.span_start_x_pt;
+                PaintItem::Text(Box::new(PaintText::from_layout_text(
+                  *text,
+                  owner,
+                  common_line_baseline,
+                  page.setup.size.width.0,
+                  text_metrics,
+                )))
               }
-              text.decoration_span_start_x_pt = metadata.span_start_x_pt;
-              PaintItem::Text(Box::new(PaintText::from_layout_text(
-                *text,
-                owner,
-                common_line_baselines.get(item_index).copied().flatten(),
-                page.setup.size.width.0,
-                text_metrics,
-              )))
+              PageItem::Image(image) => PaintItem::Image(image),
+              PageItem::Group {
+                mask,
+                transform,
+                blend_mode,
+                opacity,
+                flatten_identity,
+                items,
+              } => PaintItem::Group {
+                mask,
+                transform,
+                blend_mode,
+                opacity,
+                flatten_identity,
+                items: items
+                  .into_iter()
+                  .map(|item| {
+                    paint_group_item(
+                      item,
+                      owner,
+                      common_line_baseline,
+                      page.setup.size.width.0,
+                      text_metrics,
+                    )
+                  })
+                  .collect(),
+              },
+              PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area),
+              PageItem::Rect(rect) => PaintItem::Rect(rect),
+              PageItem::Line(line) => PaintItem::Line(line),
+              PageItem::Polyline(polyline) => PaintItem::Polyline(polyline),
             }
-            PageItem::Image(image) => PaintItem::Image(image),
-            PageItem::Group {
-              mask,
-              transform,
-              blend_mode,
-              opacity,
-              items,
-            } => PaintItem::Group {
-              mask,
-              transform,
-              blend_mode,
-              opacity,
-              items: items
-                .into_iter()
-                .map(|item| paint_group_item(item, page.setup.size.width.0, text_metrics))
-                .collect(),
-            },
-            PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area),
-            PageItem::Rect(rect) => PaintItem::Rect(rect),
-            PageItem::Line(line) => PaintItem::Line(line),
-            PageItem::Polyline(polyline) => PaintItem::Polyline(polyline),
           })
           .collect();
         PaintPage {
@@ -1699,6 +1723,7 @@ fn expand_metafile_semantic_text_items<'doc>(
         transform: None,
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
+        flatten_identity: false,
         items: group_items,
       });
     }
@@ -1724,6 +1749,7 @@ fn page_item_from_common<'doc>(
       transform: group.transform,
       blend_mode: group.blend_mode,
       opacity: group.opacity,
+      flatten_identity: group.flatten_identity,
       items: group
         .items
         .iter()
@@ -1795,6 +1821,7 @@ fn image_page_item_from_common<'doc>(
     transform: None,
     blend_mode: common::BlendMode::Normal,
     opacity: 1.0,
+    flatten_identity: false,
     items,
   }
 }
@@ -1860,14 +1887,16 @@ fn wrap_missing_linked_image_text(
 
 fn paint_group_item<'doc>(
   item: PageItem<'doc>,
+  owner: Option<PaintLineOwner>,
+  common_line_baseline: Option<f32>,
   page_width_pt: f32,
   text_metrics: &mut TextMetrics,
 ) -> PaintItem<'doc> {
   match item {
     PageItem::Text(text) => PaintItem::Text(Box::new(PaintText::from_layout_text(
       *text,
-      None,
-      None,
+      owner,
+      common_line_baseline,
       page_width_pt,
       text_metrics,
     ))),
@@ -1877,15 +1906,25 @@ fn paint_group_item<'doc>(
       transform,
       blend_mode,
       opacity,
+      flatten_identity,
       items,
     } => PaintItem::Group {
       mask,
       transform,
       blend_mode,
       opacity,
+      flatten_identity,
       items: items
         .into_iter()
-        .map(|item| paint_group_item(item, page_width_pt, text_metrics))
+        .map(|item| {
+          paint_group_item(
+            item,
+            owner,
+            common_line_baseline,
+            page_width_pt,
+            text_metrics,
+          )
+        })
         .collect(),
     },
     PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area),
@@ -1953,6 +1992,7 @@ fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> Imag
       .as_ref()
       .map(|url| Cow::Borrowed(url.as_ref())),
     semantic_metafile_text: image.semantic_metafile_text,
+    metafile_native_size: image.metafile_native_size,
   }
 }
 
@@ -2191,6 +2231,7 @@ fn coalesced_writer_text_items<'doc>(
         transform,
         blend_mode,
         opacity,
+        flatten_identity,
         items,
       } => {
         output.push(PageItem::Group {
@@ -2198,6 +2239,7 @@ fn coalesced_writer_text_items<'doc>(
           transform,
           blend_mode,
           opacity,
+          flatten_identity,
           items,
         });
       }
@@ -2257,29 +2299,18 @@ fn common_writer_line_baselines(
 ) -> Vec<Option<f32>> {
   let mut baselines = HashMap::<(usize, usize), f32>::default();
   for (item, owner) in items.iter().zip(owners) {
-    let (PageItem::Text(text), Some(owner)) = (item, owner) else {
+    let Some(owner) = owner else {
       continue;
     };
     if !matches!(
       owner.frame_kind,
       FollowFrameKind::Paragraph | FollowFrameKind::Notes
-    ) || text.style.semantic_only
-      || !matches!(
-        text.style.line_vertical_alignment,
-        common::LineVerticalAlignment::Auto | common::LineVerticalAlignment::Baseline
-      )
-    {
+    ) {
       continue;
     }
-    let offset = if text.style.use_windows_font_metrics {
-      text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
-        &text.text,
-        &text.style,
-        text.line_height_pt,
-      )
-    } else {
-      text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
-    } + text.style.baseline_shift_pt;
+    let Some(offset) = writer_item_line_baseline_offset(item, text_metrics) else {
+      continue;
+    };
     baselines
       .entry((owner.frame_index, owner.line_index))
       .and_modify(|baseline| *baseline = baseline.max(offset))
@@ -2294,6 +2325,47 @@ fn common_writer_line_baselines(
         .copied()
     })
     .collect()
+}
+
+fn writer_item_line_baseline_offset(
+  item: &PageItem<'_>,
+  text_metrics: &mut TextMetrics,
+) -> Option<f32> {
+  match item {
+    PageItem::Text(text)
+      if !text.style.semantic_only
+        && matches!(
+          text.style.line_vertical_alignment,
+          common::LineVerticalAlignment::Auto | common::LineVerticalAlignment::Baseline
+        ) =>
+    {
+      Some(
+        if text.style.use_windows_font_metrics {
+          text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+            &text.text,
+            &text.style,
+            text.line_height_pt,
+          )
+        } else {
+          text_metrics.baseline_offset_in_line_for_text(
+            &text.text,
+            &text.style,
+            text.line_height_pt,
+          )
+        } + text.style.baseline_shift_pt,
+      )
+    }
+    PageItem::Group { items, .. } => items
+      .iter()
+      .filter_map(|item| writer_item_line_baseline_offset(item, text_metrics))
+      .reduce(f32::max),
+    PageItem::Text(_)
+    | PageItem::Image(_)
+    | PageItem::LinkArea(_)
+    | PageItem::Rect(_)
+    | PageItem::Line(_)
+    | PageItem::Polyline(_) => None,
+  }
 }
 
 impl<'doc> PaintText<'doc> {
@@ -3262,6 +3334,7 @@ fn draw_paint_item(
       transform,
       blend_mode,
       opacity,
+      flatten_identity,
       items,
     } => {
       draw_compositing_group(
@@ -3271,6 +3344,7 @@ fn draw_paint_item(
           transform: transform.as_ref(),
           blend_mode: *blend_mode,
           opacity: *opacity,
+          flatten_identity: *flatten_identity,
           items,
         },
         fonts,
@@ -3291,6 +3365,7 @@ struct CompositingGroup<'borrow, 'paint> {
   transform: Option<&'borrow common::Transform>,
   blend_mode: common::BlendMode,
   opacity: f32,
+  flatten_identity: bool,
   items: &'borrow [PaintItem<'paint>],
 }
 
@@ -3303,6 +3378,34 @@ fn draw_compositing_group(
   link_annotations: &mut Vec<Annotation>,
   options: &PdfOptions,
 ) -> Result<()> {
+  if group.flatten_identity
+    && group.mask.is_none()
+    && group.transform.is_none()
+    && group.blend_mode == common::BlendMode::Normal
+    && (group.opacity - 1.0).abs() <= f32::EPSILON
+    && group
+      .items
+      .iter()
+      .all(|item| !matches!(item, PaintItem::Group { .. }))
+  {
+    // Source-over leaf paint is associative, so an identity wrapper does not
+    // need an isolated Form XObject. Keeping it flat also preserves Word's
+    // fixed-output sequence for w14 character effects: raster backdrop first,
+    // then ordinary PDF text in the page content stream.
+    for item in group.items {
+      draw_paint_item(
+        surface,
+        item,
+        fonts,
+        images,
+        internal_links,
+        link_annotations,
+        options,
+      )?;
+    }
+    return Ok(());
+  }
+
   let decoded_mask = group.mask.and_then(|mask| {
     let pdf_mask_image = images
       .raster(
@@ -3402,28 +3505,23 @@ fn metafile_render_options_for_image(
       pixels_for_axis(image.height_pt, visible_height),
     ))
   } else {
-    // Word fixed output rasterizes a VML-hosted metafile preview at 200 DPI
-    // and composites its transparent image over the separately painted host
-    // fill. `tdf135653.docx` records a 77.25pt × 49.5pt VML host and Office
-    // emits a 214 × 137 lossless image XObject, the floor of that viewport at
-    // 200 DPI.
-    image.metafile_background_color.map(|_| {
-      let pixels = |points: f32, visible_fraction: f32| {
-        ((points.max(0.0) / visible_fraction) * 200.0 / 72.0)
-          .floor()
-          .clamp(1.0, u32::MAX as f32) as u32
-      };
-      (
-        pixels(image.width_pt, visible_width),
-        pixels(image.height_pt, visible_height),
-      )
-    })
+    // Office fixed output rasterizes vector metafile previews at 200 DPI,
+    // independently of the producer's screen-sized import bitmap. For
+    // example, tdf136841.docx imports as a 76x76 bitmap in LibreOffice but
+    // Word's PDF contains a 157x157 image for the 56.8pt frame. VML-hosted
+    // tdf135653.docx follows the same rule and emits 214x137 pixels. Both use
+    // the floor of the uncropped viewport dimensions.
+    let pixels = |points: f32, visible_fraction: f32| {
+      ((points.max(0.0) / visible_fraction) * 200.0 / 72.0)
+        .floor()
+        .clamp(1.0, u32::MAX as f32) as u32
+    };
+    Some((
+      pixels(image.width_pt, visible_width),
+      pixels(image.height_pt, visible_height),
+    ))
   };
   ooxmlsdk_layout::render::emf_wmf::RenderOptions {
-    // Preserve the authored EMF device bounds by default. Office's fixed
-    // output retains that native raster size (including small vector
-    // previews such as 76x76); max_pixels still bounds pathological headers.
-    // An explicit reduce-resolution request selects the painted-size viewport.
     target_width_px: target_size.map(|size| size.0),
     target_height_px: target_size.map(|size| size.1),
     max_pixels: Some(dpi.saturating_mul(dpi).saturating_mul(64)),
@@ -3976,10 +4074,13 @@ fn draw_unwarped_path_gradient_glyphs(
   if path_gradient_paint(gradient, path_gradient).is_some() {
     return false;
   }
-  let Ok(face) = ttf_parser::Face::parse(face_data.data.as_ref(), face_data.index) else {
+  let Ok(face) = SkrifaFontRef::from_index(face_data.data.as_ref(), face_data.index) else {
     return false;
   };
-  let units_per_em = f32::from(face.units_per_em());
+  let Ok(head) = face.head() else {
+    return false;
+  };
+  let units_per_em = f32::from(head.units_per_em());
   if units_per_em <= f32::EPSILON {
     return false;
   }
@@ -3988,10 +4089,6 @@ fn draw_unwarped_path_gradient_glyphs(
   let mut commands = Vec::new();
   let mut cursor_x = placement.start_x;
   for glyph in glyphs {
-    let Ok(glyph_id) = u16::try_from(glyph.glyph_id.to_u32()) else {
-      cursor_x += glyph.x_advance * placement.font_size_pt;
-      continue;
-    };
     let origin_x = cursor_x + glyph.x_offset * placement.font_size_pt;
     let origin_y = placement.baseline_y - glyph.y_offset * placement.font_size_pt;
     let mut outline = KrillaGlyphOutline {
@@ -4003,7 +4100,15 @@ fn draw_unwarped_path_gradient_glyphs(
       synthetic_italic: face_data.synthetic_italic,
       current: None,
     };
-    let _ = face.outline_glyph(ttf_parser::GlyphId(glyph_id), &mut outline);
+    if let Some(glyph_outline) = face
+      .outline_glyphs()
+      .get(SkrifaGlyphId::new(glyph.glyph_id.to_u32()))
+    {
+      let _ = glyph_outline.draw(
+        SkrifaDrawSettings::unhinted(SkrifaSize::unscaled(), SkrifaLocationRef::default()),
+        &mut outline,
+      );
+    }
     cursor_x += glyph.x_advance * placement.font_size_pt;
   }
   let Some(path) = path.finish() else {
@@ -4047,7 +4152,7 @@ impl KrillaGlyphOutline<'_> {
   }
 }
 
-impl ttf_parser::OutlineBuilder for KrillaGlyphOutline<'_> {
+impl SkrifaOutlinePen for KrillaGlyphOutline<'_> {
   fn move_to(&mut self, x: f32, y: f32) {
     let point = self.point(x, y);
     self.path.move_to(point.x.0, point.y.0);
@@ -4121,10 +4226,13 @@ fn draw_warped_glyphs(
   glyphs: &[PaintGlyph],
   placement: WarpedGlyphPlacement,
 ) -> bool {
-  let Ok(face) = ttf_parser::Face::parse(face_data.data.as_ref(), face_data.index) else {
+  let Ok(face) = SkrifaFontRef::from_index(face_data.data.as_ref(), face_data.index) else {
     return false;
   };
-  let units_per_em = f32::from(face.units_per_em());
+  let Ok(head) = face.head() else {
+    return false;
+  };
+  let units_per_em = f32::from(head.units_per_em());
   if units_per_em <= f32::EPSILON {
     return false;
   }
@@ -4191,14 +4299,20 @@ fn draw_warped_glyphs(
   let mut combined_path = raster_path_gradient.then(PathBuilder::new);
   let mut combined_commands = Vec::new();
   for glyph in glyphs {
-    let mut outline = TtfGlyphOutline::default();
-    let Ok(glyph_id) = u16::try_from(glyph.glyph_id.to_u32()) else {
+    let mut outline = SkrifaGlyphOutline::default();
+    let Some(glyph_outline) = face
+      .outline_glyphs()
+      .get(SkrifaGlyphId::new(glyph.glyph_id.to_u32()))
+    else {
       cursor_x += glyph.x_advance * placement.font_size_pt * placement.horizontal_scale;
       continue;
     };
-    if face
-      .outline_glyph(ttf_parser::GlyphId(glyph_id), &mut outline)
-      .is_none()
+    if glyph_outline
+      .draw(
+        SkrifaDrawSettings::unhinted(SkrifaSize::unscaled(), SkrifaLocationRef::default()),
+        &mut outline,
+      )
+      .is_err()
     {
       cursor_x += glyph.x_advance * placement.font_size_pt * placement.horizontal_scale;
       continue;
@@ -4382,11 +4496,11 @@ fn draw_warped_glyphs(
 }
 
 #[derive(Default)]
-struct TtfGlyphOutline {
+struct SkrifaGlyphOutline {
   path: BezPath,
 }
 
-impl ttf_parser::OutlineBuilder for TtfGlyphOutline {
+impl SkrifaOutlinePen for SkrifaGlyphOutline {
   fn move_to(&mut self, x: f32, y: f32) {
     self.path.move_to((f64::from(x), f64::from(y)));
   }
@@ -5768,9 +5882,44 @@ fn draw_rect_path(surface: &mut Surface<'_>, rect: &RectItem) {
 }
 
 fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, pdf_image: Image) {
+  let adjusted;
+  let image = if let Some((width_pt, height_pt)) = metafile_native_paint_size(image) {
+    adjusted = {
+      let mut adjusted = image.clone();
+      adjusted.width_pt = width_pt;
+      adjusted.height_pt = height_pt;
+      adjusted
+    };
+    &adjusted
+  } else {
+    image
+  };
   draw_transformed_image_content(surface, image, |surface, size| {
     surface.draw_image(pdf_image, size);
   });
+}
+
+fn metafile_native_paint_size(image: &ImageItem<'_>) -> Option<(f32, f32)> {
+  if !image.metafile_native_size
+    || image.metafile_background_color.is_some()
+    || image.crop != ImageCrop::default()
+  {
+    return None;
+  }
+  let physical = ooxmlsdk_layout::render::emf_wmf::metafile_physical_size(
+    &image.data,
+    image.content_type.as_deref(),
+  )?;
+  let width_pixel_pt = physical.width_pt / physical.natural_width_px.max(1) as f32;
+  let height_pixel_pt = physical.height_pt / physical.natural_height_px.max(1) as f32;
+  // Producers commonly round an EMF's 0.01mm Frame when writing DrawingML
+  // extents. Word keeps the authored frame as the clip but paints a
+  // native-size preview when the difference is below one source device
+  // pixel. Larger differences are intentional OOXML resizing and must keep
+  // the authored dimensions.
+  ((image.width_pt - physical.width_pt).abs() <= width_pixel_pt
+    && (image.height_pt - physical.height_pt).abs() <= height_pixel_pt)
+    .then_some((physical.width_pt, physical.height_pt))
 }
 
 fn draw_metafile_host_background(surface: &mut Surface<'_>, image: &ImageItem<'_>, color: [u8; 3]) {
@@ -6314,7 +6463,7 @@ mod tests {
   }
 
   #[test]
-  fn metafile_raster_size_preserves_native_bounds_unless_reduction_is_requested() {
+  fn metafile_raster_size_uses_office_fixed_output_density() {
     let image = ImageItem {
       x_pt: 0.0,
       y_pt: 0.0,
@@ -6336,12 +6485,13 @@ mod tests {
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      metafile_native_size: true,
     };
-    let native = metafile_render_options_for_image(&image, &PdfOptions::default());
+    let fixed_output = metafile_render_options_for_image(&image, &PdfOptions::default());
 
-    assert_eq!(native.target_width_px, None);
-    assert_eq!(native.target_height_px, None);
-    assert!(!native.transparent_background);
+    assert_eq!(fixed_output.target_width_px, Some(400));
+    assert_eq!(fixed_output.target_height_px, Some(100));
+    assert!(!fixed_output.transparent_background);
 
     let mut pdf_options = PdfOptions::default();
     pdf_options.images.reduce_resolution = true;
@@ -6644,6 +6794,54 @@ mod tests {
     assert!(roles.iter().any(|role| role == b"Document"));
     assert!(roles.iter().any(|role| role == b"Part"));
     assert!(roles.iter().any(|role| role == b"P"));
+  }
+
+  #[test]
+  fn identity_leaf_group_stays_in_the_page_content_stream() {
+    let mut document = tagged_test_document();
+    let text = document.pages[0].items.remove(0);
+    document.pages[0]
+      .items
+      .push(DisplayItem::Group(common::CompositingGroup {
+        mask: None,
+        transform: None,
+        blend_mode: common::BlendMode::Normal,
+        opacity: 1.0,
+        flatten_identity: true,
+        items: vec![text],
+      }));
+
+    let bytes = render(&document, &PdfOptions::default()).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let page_id = pdf.get_pages()[&1];
+    let page = pdf.get_dictionary(page_id).unwrap();
+    let resources = resolved_dictionary(&pdf, page.get(b"Resources").unwrap());
+
+    assert!(resources.get(b"XObject").is_err());
+  }
+
+  #[test]
+  fn identity_group_remains_isolated_without_an_explicit_flatten_request() {
+    let mut document = tagged_test_document();
+    let text = document.pages[0].items.remove(0);
+    document.pages[0]
+      .items
+      .push(DisplayItem::Group(common::CompositingGroup {
+        mask: None,
+        transform: None,
+        blend_mode: common::BlendMode::Normal,
+        opacity: 1.0,
+        flatten_identity: false,
+        items: vec![text],
+      }));
+
+    let bytes = render(&document, &PdfOptions::default()).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let page_id = pdf.get_pages()[&1];
+    let page = pdf.get_dictionary(page_id).unwrap();
+    let resources = resolved_dictionary(&pdf, page.get(b"Resources").unwrap());
+
+    assert!(resources.get(b"XObject").is_ok());
   }
 
   #[test]

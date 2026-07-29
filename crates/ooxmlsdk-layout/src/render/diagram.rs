@@ -4543,9 +4543,9 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
     return;
   }
 
-  let direction = if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot {
-    LinearDirection::Top
-  } else if algorithm.child_direction == Some(dgm::ChildDirectionValues::Vertical) {
+  let direction = if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot
+    || algorithm.child_direction == Some(dgm::ChildDirectionValues::Vertical)
+  {
     LinearDirection::Top
   } else if algorithm.child_direction == Some(dgm::ChildDirectionValues::Horizontal)
     && matches!(
@@ -4654,9 +4654,9 @@ fn vertical_shapes_count(node: &DiagramShapeNode) -> usize {
   if node.children.is_empty() {
     return if node.is_connector { 0 } else { 1 };
   }
-  let direction = if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot {
-    LinearDirection::Top
-  } else if algorithm.child_direction == Some(dgm::ChildDirectionValues::Vertical) {
+  let direction = if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot
+    || algorithm.child_direction == Some(dgm::ChildDirectionValues::Vertical)
+  {
     LinearDirection::Top
   } else if algorithm.child_direction == Some(dgm::ChildDirectionValues::Horizontal)
     && matches!(
@@ -5257,7 +5257,6 @@ mod tests {
     dgm::Parameter {
       r#type: kind,
       val: Some(value.to_string()),
-      ..dgm::Parameter::default()
     }
   }
 

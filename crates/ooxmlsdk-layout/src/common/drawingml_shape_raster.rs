@@ -1,4 +1,10 @@
 use image::RgbaImage;
+use skrifa::{
+  FontRef, GlyphId, MetadataProvider,
+  instance::{LocationRef, Size},
+  outline::{DrawSettings, OutlinePen},
+  raw::TableProvider,
+};
 use tiny_skia::{
   Color as SkColor, FillRule, FilterQuality, GradientStop as SkGradientStop, LineCap, LineJoin,
   LinearGradient, Paint, Path, PathBuilder, Pattern, Pixmap, Point as SkPoint,
@@ -35,10 +41,15 @@ pub(crate) fn rescale_drawing_raster(raster: &mut DrawingRaster, pixels_per_poin
   let scale = pixels_per_point / raster.pixels_per_point;
   let width = ((raster.image.width() as f32 * scale).round() as u32).max(1);
   let height = ((raster.image.height() as f32 * scale).round() as u32).max(1);
+  raster.image = image::imageops::resize(
+    &raster.image,
+    width,
+    height,
+    image::imageops::FilterType::Lanczos3,
+  );
   let resize = |image: &RgbaImage| {
     image::imageops::resize(image, width, height, image::imageops::FilterType::Lanczos3)
   };
-  raster.image = resize(&raster.image);
   raster.fill_image = raster.fill_image.as_ref().map(resize);
   raster.line_image = raster.line_image.as_ref().map(resize);
   raster.fill_line_image = raster.fill_line_image.as_ref().map(resize);
@@ -147,6 +158,31 @@ pub(crate) fn rasterize_group_items_for_effects(
   effects: &super::drawingml_image_effects::ImageEffectContainer,
 ) -> Option<DrawingRaster> {
   rasterize_vector_items_for_effects_impl(items, raster_bounds, effects, true)
+}
+
+pub(crate) fn rasterize_group_items_for_effects_at_pixels_per_point(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  pixels_per_point: f32,
+) -> Option<DrawingRaster> {
+  if super::drawingml_image_effects::source_requirements(effects)
+    == super::drawingml_image_effects::ImageEffectSourceRequirements::default()
+  {
+    let (image, pixels_per_point) =
+      rasterize_vector_items_impl_at_pixels_per_point(items, raster_bounds, pixels_per_point)?;
+    return Some(DrawingRaster {
+      image,
+      fill_image: None,
+      line_image: None,
+      fill_line_image: None,
+      children_image: None,
+      pixels_per_point,
+    });
+  }
+  let mut raster = rasterize_group_items_for_effects(items, raster_bounds, effects)?;
+  rescale_drawing_raster(&mut raster, pixels_per_point);
+  Some(raster)
 }
 
 fn rasterize_vector_items_for_effects_impl(
@@ -434,15 +470,14 @@ fn draw_text(
   let mut cursor_x = item.origin.x.0;
   for glyph in &shaped.glyphs {
     let face_data = shaped.font_faces.get(glyph.font_index)?;
-    let face = ttf_parser::Face::parse(face_data.data.as_ref(), face_data.index).ok()?;
-    let units_per_em = f32::from(face.units_per_em());
+    let face = FontRef::from_index(face_data.data.as_ref(), face_data.index).ok()?;
+    let units_per_em = face
+      .head()
+      .map(|head| f32::from(head.units_per_em()))
+      .ok()?;
     if units_per_em <= f32::EPSILON {
       return None;
     }
-    let Ok(glyph_id) = u16::try_from(glyph.glyph_id) else {
-      cursor_x += glyph.x_advance_em * glyph.font_size_pt;
-      continue;
-    };
     let origin_x = cursor_x + glyph.x_offset_em * glyph.font_size_pt;
     let origin_y = baseline_y - glyph.y_offset_em * glyph.font_size_pt;
     let mut outline = RasterGlyphOutline {
@@ -456,7 +491,12 @@ fn draw_text(
       rotation_center: item.rotation_center,
       current: None,
     };
-    let _ = face.outline_glyph(ttf_parser::GlyphId(glyph_id), &mut outline);
+    if let Some(glyph_outline) = face.outline_glyphs().get(GlyphId::new(glyph.glyph_id)) {
+      let _ = glyph_outline.draw(
+        DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
+        &mut outline,
+      );
+    }
     cursor_x += glyph.x_advance_em * glyph.font_size_pt;
     if item
       .text
@@ -615,7 +655,7 @@ impl RasterGlyphOutline<'_> {
   }
 }
 
-impl ttf_parser::OutlineBuilder for RasterGlyphOutline<'_> {
+impl OutlinePen for RasterGlyphOutline<'_> {
   fn move_to(&mut self, x: f32, y: f32) {
     let point = self.point(x, y);
     self.commands.push(PathCommand::MoveTo(point));
@@ -962,15 +1002,17 @@ fn draw_fill(
     }
     Fill::Pattern(pattern) => {
       let tile = pattern_tile(*pattern, page_to_raster.sx)?;
-      let mut paint = Paint::default();
-      paint.anti_alias = true;
-      paint.shader = Pattern::new(
-        tile.as_ref(),
-        SpreadMode::Repeat,
-        FilterQuality::Nearest,
-        1.0,
-        SkTransform::from_translate(bounds.origin.x.0, bounds.origin.y.0),
-      );
+      let paint = Paint {
+        anti_alias: true,
+        shader: Pattern::new(
+          tile.as_ref(),
+          SpreadMode::Repeat,
+          FilterQuality::Nearest,
+          1.0,
+          SkTransform::from_translate(bounds.origin.x.0, bounds.origin.y.0),
+        ),
+        ..Paint::default()
+      };
       pixmap.fill_path(path, &paint, FillRule::EvenOdd, page_to_raster, None);
       Some(())
     }
@@ -1110,15 +1152,17 @@ fn draw_stroke(
     }
   } else if let Some(pattern) = stroke.pattern {
     let tile = pattern_tile(pattern, page_to_raster.sx)?;
-    let mut paint = Paint::default();
-    paint.anti_alias = true;
-    paint.shader = Pattern::new(
-      tile.as_ref(),
-      SpreadMode::Repeat,
-      FilterQuality::Nearest,
-      1.0,
-      SkTransform::from_translate(bounds.origin.x.0, bounds.origin.y.0),
-    );
+    let paint = Paint {
+      anti_alias: true,
+      shader: Pattern::new(
+        tile.as_ref(),
+        SpreadMode::Repeat,
+        FilterQuality::Nearest,
+        1.0,
+        SkTransform::from_translate(bounds.origin.x.0, bounds.origin.y.0),
+      ),
+      ..Paint::default()
+    };
     pixmap.stroke_path(path, &paint, &sk_stroke, page_to_raster, None);
   } else {
     let mut paint = solid_paint(stroke.color);
@@ -1155,15 +1199,16 @@ fn linear_gradient_paint<'a>(
       )
     })
     .collect();
-  let mut paint = Paint::default();
-  paint.shader = LinearGradient::new(
-    SkPoint::from_xy(start.x.0, start.y.0),
-    SkPoint::from_xy(end.x.0, end.y.0),
-    stops,
-    SpreadMode::Pad,
-    SkTransform::identity(),
-  )?;
-  Some(paint)
+  Some(Paint {
+    shader: LinearGradient::new(
+      SkPoint::from_xy(start.x.0, start.y.0),
+      SkPoint::from_xy(end.x.0, end.y.0),
+      stops,
+      SpreadMode::Pad,
+      SkTransform::identity(),
+    )?,
+    ..Paint::default()
+  })
 }
 
 fn linear_gradient_line(
@@ -1378,7 +1423,9 @@ mod tests {
       ],
     };
 
-    assert!(rasterize_vector_items_for_effects(&[item.clone()], bounds, &effects).is_none());
+    assert!(
+      rasterize_vector_items_for_effects(std::slice::from_ref(&item), bounds, &effects).is_none()
+    );
     let raster = rasterize_group_items_for_effects(&[item], bounds, &effects).unwrap();
     assert_eq!(raster.fill_image.unwrap().get_pixel(5, 5).0, [0, 0, 0, 0]);
     assert_eq!(
@@ -1419,6 +1466,7 @@ mod tests {
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      metafile_native_size: false,
       floating: false,
       behind_text: false,
     });
@@ -1505,7 +1553,7 @@ mod tests {
       .image
       .get_pixel(raster.image.width() / 2, raster.image.height() / 2)
       .0;
-    assert!(edge[0] > edge[2]);
-    assert!(center[2] > center[0]);
+    assert!(edge[2] > edge[0]);
+    assert!(center[0] > center[2]);
   }
 }

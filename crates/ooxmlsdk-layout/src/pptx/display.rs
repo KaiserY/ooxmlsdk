@@ -171,6 +171,7 @@ fn common_display_item(item: PageItem) -> common::DisplayItem<'static> {
       transform,
       blend_mode,
       opacity,
+      flatten_identity: false,
       items: items.into_iter().map(common_display_item).collect(),
     }),
     PageItem::LinkArea(item) => common::DisplayItem::LinkArea(common::LinkArea {
@@ -237,6 +238,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
     semantic_metafile_text,
+    metafile_native_size: false,
     floating: item.floating,
     behind_text: item.behind_text,
   }
@@ -2590,19 +2592,22 @@ fn lower_diagram_drawing_shape(
     bounds,
   );
   items.extend(fill_images.into_iter().map(PageItem::Image));
-  let fill = (!diagram_shape_has_blip_fill(&shape.shape_properties)
-    && !diagram_shape_suppresses_fill(&shape.shape_properties))
-  .then(|| {
-    explicit_fill.unwrap_or(common::Fill::Solid(common_rgb(
-      RgbColor {
-        r: 255,
-        g: 255,
-        b: 255,
-      },
-      1.0,
-    )))
-  })
-  .unwrap_or(common::Fill::None);
+  let fill = if !diagram_shape_has_blip_fill(&shape.shape_properties)
+    && !diagram_shape_suppresses_fill(&shape.shape_properties)
+  {
+    {
+      explicit_fill.unwrap_or(common::Fill::Solid(common_rgb(
+        RgbColor {
+          r: 255,
+          g: 255,
+          b: 255,
+        },
+        1.0,
+      )))
+    }
+  } else {
+    common::Fill::None
+  };
   let stroke = shape
     .shape_properties
     .outline
@@ -3737,6 +3742,37 @@ fn diagram_text_transform_bounds(
   transform: &dsp::Transform2D,
   parent_transform: DiagramDrawingTransform,
 ) -> Option<shared_diagram::DiagramBounds> {
+  let (shape_bounds, _preset_bounds, mut text_bounds) =
+    diagram_unrotated_text_transform_bounds(shape, transform)?;
+  let shape_rotation = shape
+    .shape_properties
+    .transform2_d
+    .as_deref()?
+    .rotation
+    .unwrap_or_default() as f32
+    / 60_000.0;
+  let shape_center = (
+    shape_bounds.x + shape_bounds.width / 2.0,
+    shape_bounds.y + shape_bounds.height / 2.0,
+  );
+  (text_bounds.x, text_bounds.y) =
+    rotate_diagram_point((text_bounds.x, text_bounds.y), shape_center, shape_rotation);
+  Some(parent_transform.apply_bounds(
+    text_bounds.x,
+    text_bounds.y,
+    text_bounds.width,
+    text_bounds.height,
+  ))
+}
+
+fn diagram_unrotated_text_transform_bounds(
+  shape: &dsp::Shape,
+  transform: &dsp::Transform2D,
+) -> Option<(
+  shared_diagram::DiagramBounds,
+  shared_diagram::DiagramBounds,
+  shared_diagram::DiagramBounds,
+)> {
   let offset = transform.offset.as_ref()?;
   let extents = transform.extents.as_ref()?;
   let shape_transform = shape.shape_properties.transform2_d.as_deref()?;
@@ -3777,18 +3813,7 @@ fn diagram_text_transform_bounds(
     text_bounds.x += rotated.0 - text_center.0;
     text_bounds.y += rotated.1 - text_center.1;
   }
-  let shape_center = (
-    shape_bounds.x + shape_bounds.width / 2.0,
-    shape_bounds.y + shape_bounds.height / 2.0,
-  );
-  (text_bounds.x, text_bounds.y) =
-    rotate_diagram_point((text_bounds.x, text_bounds.y), shape_center, shape_rotation);
-  Some(parent_transform.apply_bounds(
-    text_bounds.x,
-    text_bounds.y,
-    text_bounds.width,
-    text_bounds.height,
-  ))
+  Some((shape_bounds, preset_bounds, text_bounds))
 }
 
 fn rotate_diagram_point(point: (f32, f32), center: (f32, f32), angle_degrees: f32) -> (f32, f32) {
@@ -3861,13 +3886,36 @@ fn diagram_drawing_text_frame(
     offsets,
     0,
   );
-  let text_distances_100mm = Some(text_distances_from_frame(
-    preset_bounds.x,
-    preset_bounds.y,
-    preset_bounds.width,
-    preset_bounds.height,
-    frame,
-  ));
+  let text_distances_100mm = diagram_unrotated_text_transform_bounds(shape, text_transform).map(
+    |(_shape_bounds, unrotated_preset_bounds, unrotated_text_bounds)| {
+      let unrotated_offsets = TextDistances {
+        left: unrotated_text_bounds.x - unrotated_preset_bounds.x,
+        top: unrotated_text_bounds.y - unrotated_preset_bounds.y,
+        right: unrotated_preset_bounds.width
+          - unrotated_text_bounds.width
+          - (unrotated_text_bounds.x - unrotated_preset_bounds.x),
+        bottom: unrotated_preset_bounds.height
+          - unrotated_text_bounds.height
+          - (unrotated_text_bounds.y - unrotated_preset_bounds.y),
+      };
+      let unrotated_frame = text_body_frame_with_distances(
+        unrotated_preset_bounds.x,
+        unrotated_preset_bounds.y,
+        unrotated_preset_bounds.width,
+        unrotated_preset_bounds.height,
+        text_body,
+        unrotated_offsets,
+        0,
+      );
+      text_distances_from_frame(
+        unrotated_preset_bounds.x,
+        unrotated_preset_bounds.y,
+        unrotated_preset_bounds.width,
+        unrotated_preset_bounds.height,
+        unrotated_frame,
+      )
+    },
+  );
   DiagramDrawingTextFrame {
     frame,
     text_area_x_pt: preset_bounds.x,
@@ -4456,10 +4504,11 @@ fn lower_legacy_vml_fill_image(shape: &Shape, offset: DisplayOffset, items: &mut
       height_pt: frame.height_pt,
       crop,
       clip_path: clip_path.clone(),
-      rotation_deg: fill
-        .rotate_with_shape
-        .then(|| shape_visual_rotation_degrees(shape))
-        .unwrap_or(0.0),
+      rotation_deg: if fill.rotate_with_shape {
+        shape_visual_rotation_degrees(shape)
+      } else {
+        0.0
+      },
       flip_horizontal: fill.rotate_with_shape && shape.flip_h,
       flip_vertical: fill.rotate_with_shape && shape.flip_v,
       data: fill.resource.data.clone(),
@@ -4670,9 +4719,11 @@ fn lower_picture(
     width_pt: frame.width_pt,
     height_pt: frame.height_pt,
     crop,
-    clip_path: custom_geometry
-      .then(|| shape_path_commands(shape, frame))
-      .unwrap_or_default(),
+    clip_path: if custom_geometry {
+      shape_path_commands(shape, frame)
+    } else {
+      Default::default()
+    },
     rotation_deg: shape_visual_rotation_degrees(shape),
     flip_horizontal,
     flip_vertical,
@@ -5718,7 +5769,7 @@ fn lower_shape_bounds(
   let soft_edge_mask = shape
     .scene3d
     .is_none()
-    .then(|| shape.actual_effect_properties.as_ref())
+    .then_some(shape.actual_effect_properties.as_ref())
     .flatten()
     .filter(|_| shape.shape3d.is_none())
     .and_then(|effects| effects.soft_edge.as_ref())
@@ -5850,9 +5901,7 @@ fn lower_shape_bounds(
     finish_shape_effects(
       items,
       shape_content_start,
-      fill_overlay,
-      inner_shadow,
-      soft_edge_mask,
+      (fill_overlay, inner_shadow, soft_edge_mask),
       reflection,
       effect_context,
       legacy_behind_effects,
@@ -5870,9 +5919,7 @@ fn lower_shape_bounds(
     finish_shape_effects(
       items,
       shape_content_start,
-      fill_overlay,
-      inner_shadow,
-      soft_edge_mask,
+      (fill_overlay, inner_shadow, soft_edge_mask),
       reflection,
       effect_context,
       legacy_behind_effects,
@@ -5899,9 +5946,7 @@ fn lower_shape_bounds(
     finish_shape_effects(
       items,
       shape_content_start,
-      fill_overlay,
-      inner_shadow,
-      soft_edge_mask,
+      (fill_overlay, inner_shadow, soft_edge_mask),
       reflection,
       effect_context,
       legacy_behind_effects,
@@ -5940,9 +5985,7 @@ fn lower_shape_bounds(
     finish_shape_effects(
       items,
       shape_content_start,
-      fill_overlay,
-      inner_shadow,
-      soft_edge_mask,
+      (fill_overlay, inner_shadow, soft_edge_mask),
       reflection,
       effect_context,
       legacy_behind_effects,
@@ -5960,9 +6003,7 @@ fn lower_shape_bounds(
   finish_shape_effects(
     items,
     shape_content_start,
-    fill_overlay,
-    inner_shadow,
-    soft_edge_mask,
+    (fill_overlay, inner_shadow, soft_edge_mask),
     reflection,
     effect_context,
     legacy_behind_effects,
@@ -6021,16 +6062,21 @@ struct ShapeEffectRasterContext<'a> {
   children_source: bool,
 }
 
+type ShapeEffectOverlays = (
+  Option<(common::BlendMode, Vec<PageItem>)>,
+  Option<ImageItem>,
+  Option<ImageItem>,
+);
+
 fn finish_shape_effects(
   items: &mut Vec<PageItem>,
   content_start: usize,
-  fill_overlay: Option<(common::BlendMode, Vec<PageItem>)>,
-  inner_shadow: Option<ImageItem>,
-  soft_edge_mask: Option<ImageItem>,
+  overlays: ShapeEffectOverlays,
   reflection: Option<(ImageItem, common::Transform)>,
   effect_context: Option<ShapeEffectRasterContext<'_>>,
   legacy_behind_effects: Vec<PageItem>,
 ) {
+  let (fill_overlay, inner_shadow, soft_edge_mask) = overlays;
   if let Some(context) = effect_context
     && finish_shape_effect_raster(items, content_start, context)
   {
@@ -6266,15 +6312,17 @@ fn finish_shape_effect_raster(
       scene,
       common::drawingml_3d::camera_projection(scene, context.camera_shape_rotation_degrees),
       shape,
-      extrusion_color.or(automatic_extrusion_color),
-      contour_color,
-      raster.pixels_per_point,
-      Some(common::drawingml_3d::Static3dSurface {
-        left_px: (context.bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
-        top_px: (context.bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
-        width_px: context.bounds.size.width.0 * raster.pixels_per_point,
-        height_px: context.bounds.size.height.0 * raster.pixels_per_point,
-      }),
+      common::drawingml_3d::Static3dRenderOptions {
+        extrusion_color: extrusion_color.or(automatic_extrusion_color),
+        contour_color,
+        pixels_per_point: raster.pixels_per_point,
+        model_surface: Some(common::drawingml_3d::Static3dSurface {
+          left_px: (context.bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
+          top_px: (context.bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
+          width_px: context.bounds.size.width.0 * raster.pixels_per_point,
+          height_px: context.bounds.size.height.0 * raster.pixels_per_point,
+        }),
+      },
     );
   }
   if !effects.effects.is_empty() {
@@ -7634,11 +7682,13 @@ fn lower_text_body(
     text_box,
     word_art_target_frame,
     text_body,
-    shape
-      .shape_style_refs
-      .as_ref()
-      .map(|style| &style.font_reference),
-    shape.hyperlink_url.as_deref(),
+    (
+      shape
+        .shape_style_refs
+        .as_ref()
+        .map(|style| &style.font_reference),
+      shape.hyperlink_url.as_deref(),
+    ),
     summary,
     items,
   );
@@ -7675,11 +7725,11 @@ fn lower_text_body_at_with_font_ref(
   frame: TextFrame,
   word_art_target_frame: TextFrame,
   text_body: &TextBody,
-  font_reference: Option<&FontStyleReference>,
-  shape_hyperlink_url: Option<&str>,
+  style_references: (Option<&FontStyleReference>, Option<&str>),
   summary: Option<&mut PptxLayoutSummary>,
   items: &mut Vec<PageItem>,
 ) {
+  let (font_reference, shape_hyperlink_url) = style_references;
   lower_text_body_at_with_style(
     context.import,
     frame,
@@ -8009,15 +8059,17 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
         &style.scene,
         common::drawingml_3d::camera_projection(&style.scene, text.style.rotation_deg),
         &style.shape,
-        style.extrusion_color.or(automatic_extrusion_color),
-        style.contour_color,
-        raster.pixels_per_point,
-        Some(common::drawingml_3d::Static3dSurface {
-          left_px: (ink_left - raster_bounds.origin.x.0) * raster.pixels_per_point,
-          top_px: (ink_top - raster_bounds.origin.y.0) * raster.pixels_per_point,
-          width_px: ink_width * raster.pixels_per_point,
-          height_px: ink_height * raster.pixels_per_point,
-        }),
+        common::drawingml_3d::Static3dRenderOptions {
+          extrusion_color: style.extrusion_color.or(automatic_extrusion_color),
+          contour_color: style.contour_color,
+          pixels_per_point: raster.pixels_per_point,
+          model_surface: Some(common::drawingml_3d::Static3dSurface {
+            left_px: (ink_left - raster_bounds.origin.x.0) * raster.pixels_per_point,
+            top_px: (ink_top - raster_bounds.origin.y.0) * raster.pixels_per_point,
+            width_px: ink_width * raster.pixels_per_point,
+            height_px: ink_height * raster.pixels_per_point,
+          }),
+        },
       );
     }
     if preserve_visible_text && let Some(glow) = simple_text_glow {

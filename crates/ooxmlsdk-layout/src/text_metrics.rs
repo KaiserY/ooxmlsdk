@@ -81,6 +81,8 @@ pub struct ShapedGlyphBounds {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct MeasureStyleKey {
   font_family: Option<Box<str>>,
+  fallback_font_family: Option<Box<str>>,
+  font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   east_asia_font_family: Option<Box<str>>,
   complex_font_family: Option<Box<str>>,
   font_size_bits: u32,
@@ -102,6 +104,8 @@ impl MeasureStyleKey {
   fn from_style(style: &(impl FontStyleRef + ?Sized)) -> Self {
     Self {
       font_family: style.font_family().map(Into::into),
+      fallback_font_family: style.fallback_font_family().map(Into::into),
+      font_family_class: style.font_family_class(),
       east_asia_font_family: style.east_asia_font_family().map(Into::into),
       complex_font_family: style.complex_font_family().map(Into::into),
       font_size_bits: style.font_size_pt().to_bits(),
@@ -122,6 +126,8 @@ impl MeasureStyleKey {
 
   fn matches(&self, style: &(impl FontStyleRef + ?Sized)) -> bool {
     self.font_family.as_deref() == style.font_family()
+      && self.fallback_font_family.as_deref() == style.fallback_font_family()
+      && self.font_family_class == style.font_family_class()
       && self.east_asia_font_family.as_deref() == style.east_asia_font_family()
       && self.complex_font_family.as_deref() == style.complex_font_family()
       && self.font_size_bits == style.font_size_pt().to_bits()

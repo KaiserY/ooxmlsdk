@@ -734,7 +734,7 @@ impl SheetGeometry {
           row
             .height
             .map_or(default_row_height_pt, |height| height as f32)
-            + vertical_dpi.and_then(|_| row.dy_descent_pt).unwrap_or(0.0)
+            + vertical_dpi.and(row.dy_descent_pt).unwrap_or(0.0)
         } else if let Some(line_count) = row.explicit_wrapped_line_count {
           // WorkbookGlobals::finalize calls UpdateAllRowHeights after OOXML
           // import. A cached ht without customHeight is therefore not a
@@ -2000,8 +2000,10 @@ mod tests {
 
   #[test]
   fn excel16_quarter_descent_grid_excludes_drawing_and_other_descent_profiles() {
-    let mut metrics = SheetMetrics::default();
-    metrics.modern_excel_implicit_columns = true;
+    let mut metrics = SheetMetrics {
+      modern_excel_implicit_columns: true,
+      ..SheetMetrics::default()
+    };
     metrics.format.default_row_height = 12.36;
     metrics.format.dy_descent_pt = Some(0.25);
 

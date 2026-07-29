@@ -1192,7 +1192,7 @@ mod tests {
       ResolvedColor::from_hex("0E6369").expect("valid Office result")
     );
     assert_eq!(
-      apply_excel_tint(color, -0.24994659260841701),
+      apply_excel_tint(color, -0.249_946_592_608_417),
       ResolvedColor::from_hex("15939D").expect("valid Office result")
     );
   }

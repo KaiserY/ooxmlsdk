@@ -232,6 +232,7 @@ fn common_display_item(item: PageItem) -> common::DisplayItem<'static> {
       transform,
       blend_mode,
       opacity,
+      flatten_identity: false,
       items: items.into_iter().map(common_display_item).collect(),
     }),
     PageItem::LinkArea(item) => common::DisplayItem::LinkArea(common::LinkArea {
@@ -298,6 +299,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
     semantic_metafile_text,
+    metafile_native_size: false,
     floating: item.floating,
     behind_text: item.behind_text,
   }
@@ -1207,7 +1209,7 @@ fn parse_vml_ratio(value: &str) -> Option<f32> {
   if let Some(value) = value.strip_suffix('%') {
     return Some(value.trim().parse::<f32>().ok()? / 100.0);
   }
-  Some(value.parse::<f32>().ok()?)
+  value.parse::<f32>().ok()
 }
 
 fn parse_vml_ratio_pair(value: &str) -> Option<(f32, f32)> {
@@ -3203,19 +3205,21 @@ fn print_page_image_items(
         xlsx_image_data_with_effects(import, drawing, resource, &anchor.object);
       items.extend(drawingml_image_fill_items(
         &anchor.object,
-        rect,
-        clip_path,
-        drawing_object_visual_rotation_degrees(&anchor.object),
-        anchor.object.flip_horizontal,
-        anchor.object.flip_vertical,
-        image_data,
-        image_content_type,
-        anchor
-          .object
-          .description
-          .clone()
-          .or_else(|| anchor.object.name.clone()),
-        hyperlink_url.as_deref().map(ToString::to_string),
+        DrawingMlImageFillInput {
+          rect,
+          clip_path,
+          authored_rotation_deg: drawing_object_visual_rotation_degrees(&anchor.object),
+          authored_flip_horizontal: anchor.object.flip_horizontal,
+          authored_flip_vertical: anchor.object.flip_vertical,
+          data: image_data,
+          content_type: image_content_type,
+          alt_text: anchor
+            .object
+            .description
+            .clone()
+            .or_else(|| anchor.object.name.clone()),
+          hyperlink_url: hyperlink_url.as_deref().map(ToString::to_string),
+        },
       ));
     }
   }
@@ -3335,26 +3339,27 @@ fn push_group_image_items(
       xlsx_image_data_with_effects(import, drawing, resource, child);
     items.extend(drawingml_image_fill_items(
       child,
-      CellRect {
-        x_pt: center.x as f32 - width_pt / 2.0,
-        y_pt: center.y as f32 - height_pt / 2.0,
-        width_pt,
-        height_pt,
+      DrawingMlImageFillInput {
+        rect: CellRect {
+          x_pt: center.x as f32 - width_pt / 2.0,
+          y_pt: center.y as f32 - height_pt / 2.0,
+          width_pt,
+          height_pt,
+        },
+        clip_path: drawing_object_clip_path_with_transform(child_rect, child, transform),
+        authored_rotation_deg: rotation_deg,
+        authored_flip_horizontal: false,
+        authored_flip_vertical: determinant < 0.0,
+        data: image_data,
+        content_type: image_content_type,
+        alt_text: child.description.clone().or_else(|| child.name.clone()),
+        hyperlink_url: hyperlink_url.as_deref().map(ToString::to_string),
       },
-      drawing_object_clip_path_with_transform(child_rect, child, transform),
-      rotation_deg,
-      false,
-      determinant < 0.0,
-      image_data,
-      image_content_type,
-      child.description.clone().or_else(|| child.name.clone()),
-      hyperlink_url.as_deref().map(ToString::to_string),
     ));
   }
 }
 
-fn drawingml_image_fill_items(
-  object: &super::drawing::DrawingObjectModel,
+struct DrawingMlImageFillInput {
   rect: CellRect,
   clip_path: Vec<common::PathCommand>,
   authored_rotation_deg: f32,
@@ -3364,11 +3369,28 @@ fn drawingml_image_fill_items(
   content_type: Option<String>,
   alt_text: Option<String>,
   hyperlink_url: Option<String>,
+}
+
+fn drawingml_image_fill_items(
+  object: &super::drawing::DrawingObjectModel,
+  input: DrawingMlImageFillInput,
 ) -> Vec<PageItem> {
-  let rotation_deg = object
-    .image_rotate_with_shape
-    .then_some(authored_rotation_deg)
-    .unwrap_or_default();
+  let DrawingMlImageFillInput {
+    rect,
+    clip_path,
+    authored_rotation_deg,
+    authored_flip_horizontal,
+    authored_flip_vertical,
+    data,
+    content_type,
+    alt_text,
+    hyperlink_url,
+  } = input;
+  let rotation_deg = if object.image_rotate_with_shape {
+    authored_rotation_deg
+  } else {
+    Default::default()
+  };
   let flip_horizontal = object.image_rotate_with_shape && authored_flip_horizontal;
   let flip_vertical = object.image_rotate_with_shape && authored_flip_vertical;
   let make_item = |placement: common::drawingml_image_tile::ImageTilePlacement| {
@@ -3459,16 +3481,18 @@ fn vml_image_items(
     Some("image/png".to_string())
   };
   let transform = vml_shape_path_transform(shape.style.as_deref(), rect);
-  let clip_path = is_fill
-    .then(|| {
+  let clip_path = if is_fill {
+    {
       vml_shape_drawing_paths(shape, rect.width_pt, rect.height_pt)
         .unwrap_or_default()
         .into_iter()
         .filter(|path| path.fill_mode != common::DrawingPathFillMode::None)
         .flat_map(|path| common::drawingml_geometry::transform_commands(path.commands, transform))
         .collect::<Vec<_>>()
-    })
-    .unwrap_or_default();
+    }
+  } else {
+    Default::default()
+  };
   let style_rotation = shape
     .style
     .as_deref()
@@ -3809,8 +3833,7 @@ fn print_page_shape_items(
         }));
       }
       finish_xlsx_shape_effects(
-        import,
-        drawing,
+        (import, drawing),
         &mut items,
         item_start,
         &anchor.object,
@@ -3864,8 +3887,7 @@ fn print_page_shape_items(
       }));
     }
     finish_xlsx_shape_effects(
-      import,
-      drawing,
+      (import, drawing),
       &mut items,
       item_start,
       &anchor.object,
@@ -3932,8 +3954,7 @@ fn push_group_shape_items(
     group_transform,
   );
   finish_xlsx_shape_effects(
-    import,
-    drawing,
+    (import, drawing),
     items,
     item_start,
     group,
@@ -4071,8 +4092,7 @@ fn push_drawing_object_shape(
       }));
     }
     finish_xlsx_shape_effects(
-      import,
-      drawing,
+      (import, drawing),
       items,
       item_start,
       object,
@@ -4105,8 +4125,7 @@ fn push_drawing_object_shape(
       .map(|stroke| drawing_object_common_stroke(import, object, stroke, rect, transform, outline)),
   }));
   finish_xlsx_shape_effects(
-    import,
-    drawing,
+    (import, drawing),
     items,
     item_start,
     object,
@@ -4122,8 +4141,7 @@ fn affine_rotation_degrees(transform: Affine) -> f32 {
 }
 
 fn finish_xlsx_shape_effects(
-  import: &ExcelImport,
-  drawing: &super::drawing::DrawingResourceCatalog,
+  resources: (&ExcelImport, &super::drawing::DrawingResourceCatalog),
   items: &mut Vec<PageItem>,
   content_start: usize,
   object: &super::drawing::DrawingObjectModel,
@@ -4131,10 +4149,11 @@ fn finish_xlsx_shape_effects(
   rotation_degrees: f32,
   children_source: bool,
 ) {
+  let (import, drawing) = resources;
   let effect_reference = object
     .shape_effects
     .is_none()
-    .then(|| object.shape_style_refs.as_ref())
+    .then_some(object.shape_style_refs.as_ref())
     .flatten()
     .map(|style| &style.effect_reference);
   let theme_effects = effect_reference.and_then(|reference| {
@@ -4304,15 +4323,17 @@ fn finish_xlsx_shape_effects(
       scene,
       common::drawingml_3d::camera_projection(scene, object.rotation_deg),
       shape,
-      extrusion_color.or(automatic_extrusion_color),
-      contour_color,
-      raster.pixels_per_point,
-      Some(common::drawingml_3d::Static3dSurface {
-        left_px: (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
-        top_px: (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
-        width_px: content_bounds.size.width.0 * raster.pixels_per_point,
-        height_px: content_bounds.size.height.0 * raster.pixels_per_point,
-      }),
+      common::drawingml_3d::Static3dRenderOptions {
+        extrusion_color: extrusion_color.or(automatic_extrusion_color),
+        contour_color,
+        pixels_per_point: raster.pixels_per_point,
+        model_surface: Some(common::drawingml_3d::Static3dSurface {
+          left_px: (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
+          top_px: (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
+          width_px: content_bounds.size.width.0 * raster.pixels_per_point,
+          height_px: content_bounds.size.height.0 * raster.pixels_per_point,
+        }),
+      },
     );
   }
   common::drawingml_image_effects::scale_container_pixel_lengths(

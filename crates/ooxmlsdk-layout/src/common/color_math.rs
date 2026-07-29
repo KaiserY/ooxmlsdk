@@ -70,6 +70,43 @@ pub(crate) fn linear_to_srgb_channel(value: f32) -> f32 {
   Srgb::from_linear_srgb([value, 0.0, 0.0])[0]
 }
 
+pub(crate) fn apply_linear_saturation_mod(rgb: [u8; 3], amount: f32) -> [u8; 3] {
+  let linear = rgb.map(|channel| srgb_to_linear_channel(f32::from(channel) / 255.0));
+  let maximum = linear.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+  let minimum = linear.iter().copied().fold(f32::INFINITY, f32::min);
+  let lightness = (maximum + minimum) * 0.5;
+  let spread = maximum - minimum;
+  let saturation = if spread <= f32::EPSILON {
+    0.0
+  } else {
+    spread / (1.0 - (2.0 * lightness - 1.0).abs()).max(f32::EPSILON)
+  };
+  let saturation = (saturation * amount).clamp(0.0, 1.0);
+  if spread <= f32::EPSILON || saturation <= f32::EPSILON {
+    let channel = normalized_to_u8(linear_to_srgb_channel(lightness));
+    return [channel; 3];
+  }
+  let hue = if maximum == linear[0] {
+    60.0 * ((linear[1] - linear[2]) / spread).rem_euclid(6.0)
+  } else if maximum == linear[1] {
+    60.0 * ((linear[2] - linear[0]) / spread + 2.0)
+  } else {
+    60.0 * ((linear[0] - linear[1]) / spread + 4.0)
+  };
+  let chroma = (1.0 - (2.0 * lightness - 1.0).abs()) * saturation;
+  let secondary = chroma * (1.0 - ((hue / 60.0).rem_euclid(2.0) - 1.0).abs());
+  let offset = lightness - chroma * 0.5;
+  let linear = match hue {
+    value if value < 60.0 => [chroma, secondary, 0.0],
+    value if value < 120.0 => [secondary, chroma, 0.0],
+    value if value < 180.0 => [0.0, chroma, secondary],
+    value if value < 240.0 => [0.0, secondary, chroma],
+    value if value < 300.0 => [secondary, 0.0, chroma],
+    _ => [chroma, 0.0, secondary],
+  };
+  linear.map(|channel| normalized_to_u8(linear_to_srgb_channel(channel + offset)))
+}
+
 pub(crate) fn drawingml_srgb8_to_scrgb(value: u8) -> i32 {
   normalized_to_drawingml_percent(srgb_to_linear_channel(f32::from(value) / 255.0))
 }
@@ -136,5 +173,13 @@ mod tests {
     ] {
       assert_eq!(HslColor::from_srgb8(rgb).to_srgb8(), rgb);
     }
+  }
+
+  #[test]
+  fn linear_saturation_mod_matches_word_group_glow_color_management() {
+    assert_eq!(
+      apply_linear_saturation_mod([0xF7, 0x96, 0x46], 1.75),
+      [0xFE, 0x90, 0x00]
+    );
   }
 }

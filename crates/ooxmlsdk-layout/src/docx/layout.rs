@@ -1010,11 +1010,18 @@ struct PendingFloatingTableFollow {
 pub(crate) enum PageItem {
   Text(Box<TextItem>),
   Image(ImageItem),
+  Group(Vec<PageItem>),
   Rect(RectItem),
   Fill(FillItem),
   Line(LineItem),
-  Path(common::PathItem<'static>),
+  Path(Box<common::PathItem<'static>>),
   Polyline(PolylineItem),
+}
+
+impl PageItem {
+  pub(crate) fn path(path: common::PathItem<'static>) -> Self {
+    Self::Path(Box::new(path))
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -1058,6 +1065,11 @@ pub(crate) struct ImageItem {
   pub y_pt: f32,
   pub width_pt: f32,
   pub height_pt: f32,
+  /// Distance from the visible image bottom to its inline frame baseline.
+  pub inline_baseline_gap_pt: f32,
+  /// Whether this image represents a `wp:inline` object that participates in
+  /// the owning text line's common character baseline.
+  pub inline_baseline_participant: bool,
   pub crop: ImageCrop,
   pub clip_path: Vec<common::PathCommand>,
   pub rotation_deg: f32,
@@ -1069,6 +1081,7 @@ pub(crate) struct ImageItem {
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
   pub semantic_metafile_text: bool,
+  pub metafile_native_size: bool,
   pub floating: bool,
   pub behind_text: bool,
 }
@@ -1694,6 +1707,16 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
   match item {
     PageItem::Text(item) => common::DisplayItem::Text(into_common_text_run(*item)),
     PageItem::Image(item) => common::DisplayItem::Image(into_common_image_item(item)),
+    PageItem::Group(items) => common::DisplayItem::Group(common::CompositingGroup {
+      mask: None,
+      transform: None,
+      blend_mode: common::BlendMode::Normal,
+      opacity: 1.0,
+      // Word's w14 character-effect fixed output keeps the effect raster and
+      // searchable foreground text in the page stream.
+      flatten_identity: true,
+      items: items.into_iter().map(into_common_page_item).collect(),
+    }),
     PageItem::Rect(item) => common::DisplayItem::Rect(into_common_rect_item(item)),
     PageItem::Fill(item) => common::DisplayItem::Rect(common::RectItem {
       bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
@@ -1701,7 +1724,7 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
       stroke: None,
     }),
     PageItem::Line(item) => common::DisplayItem::Line(into_common_line_item(item)),
-    PageItem::Path(item) => common::DisplayItem::Path(item),
+    PageItem::Path(item) => common::DisplayItem::Path(*item),
     PageItem::Polyline(item) => common::DisplayItem::Path(into_common_path_item(item)),
   }
 }
@@ -1798,7 +1821,7 @@ fn push_docx_picture_image(
         )
       });
       if !matches!(fill, common::Fill::None) || stroke.is_some() {
-        items.push(PageItem::Path(common::PathItem {
+        items.push(PageItem::path(common::PathItem {
           bounds: content_bounds,
           points: Vec::new(),
           commands: clip_path,
@@ -1987,15 +2010,17 @@ fn finish_docx_drawing_effects(
       &style.scene,
       common::drawingml_3d::camera_projection(&style.scene, host.rotation_degrees),
       &style.shape,
-      style.extrusion_color.or(automatic_extrusion_color),
-      style.contour_color,
-      raster.pixels_per_point,
-      Some(common::drawingml_3d::Static3dSurface {
-        left_px: (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
-        top_px: (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
-        width_px: content_bounds.size.width.0 * raster.pixels_per_point,
-        height_px: content_bounds.size.height.0 * raster.pixels_per_point,
-      }),
+      common::drawingml_3d::Static3dRenderOptions {
+        extrusion_color: style.extrusion_color.or(automatic_extrusion_color),
+        contour_color: style.contour_color,
+        pixels_per_point: raster.pixels_per_point,
+        model_surface: Some(common::drawingml_3d::Static3dSurface {
+          left_px: (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
+          top_px: (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
+          width_px: content_bounds.size.width.0 * raster.pixels_per_point,
+          height_px: content_bounds.size.height.0 * raster.pixels_per_point,
+        }),
+      },
     );
   }
   let mut scaled_effects = raster_effects.clone();
@@ -2067,6 +2092,8 @@ fn finish_docx_drawing_effects(
     y_pt: effect_item_bounds.origin.y.0,
     width_pt: effect_item_bounds.size.width.0,
     height_pt: effect_item_bounds.size.height.0,
+    inline_baseline_gap_pt: 0.0,
+    inline_baseline_participant: matches!(host.placement, crate::docx::ImagePlacement::Inline),
     crop: ImageCrop::default(),
     clip_path: Vec::new(),
     rotation_deg: 0.0,
@@ -2078,11 +2105,15 @@ fn finish_docx_drawing_effects(
     alt_text: None,
     hyperlink_url: None,
     semantic_metafile_text: false,
+    metafile_native_size: false,
     floating: matches!(host.placement, crate::docx::ImagePlacement::Floating(_)),
     behind_text: false,
   });
   if backdrop_effects.is_some() {
-    items.insert(content_start, effect_item);
+    let mut group_items = Vec::with_capacity(items.len() - content_start + 1);
+    group_items.push(effect_item);
+    group_items.extend(items.drain(content_start..));
+    items.push(PageItem::Group(group_items));
   } else {
     items.truncate(content_start);
     items.push(effect_item);
@@ -2118,6 +2149,10 @@ fn finish_docx_group_effects(
     return;
   }
   common::drawingml_image_effects::rotate_container_with_shape(&mut effects, group.rotation_deg);
+  let backdrop_effects = common::drawingml_image_effects::unchanged_foreground_backdrop(&effects);
+  let raster_effects = backdrop_effects.as_ref().unwrap_or(&effects);
+  let straight_pdf_glow_alpha =
+    backdrop_effects.is_some() && common::drawingml_image_effects::contains_glow(raster_effects);
   let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds(
     &effects,
     content_bounds.size.width.0,
@@ -2144,20 +2179,35 @@ fn finish_docx_group_effects(
     .cloned()
     .map(into_common_page_item)
     .collect::<Vec<_>>();
-  let Some(mut raster) = common::drawingml_shape_raster::rasterize_group_items_for_effects(
-    &display_items,
-    raster_bounds,
-    &effects,
-  ) else {
+  // Word fixed output stores a WPG glow backdrop at 0.4 px/pt (28.8 DPI);
+  // tdf156902_GlowOnGroup.docx is a 162pt x 136.5pt effect surface encoded as
+  // a 65x55 RGB/SMask pair, followed by unchanged vector children.
+  const WORD_GROUP_GLOW_PIXELS_PER_POINT: f32 = 0.4;
+  let raster = if backdrop_effects.is_some() {
+    common::drawingml_shape_raster::rasterize_group_items_for_effects_at_pixels_per_point(
+      &display_items,
+      raster_bounds,
+      raster_effects,
+      WORD_GROUP_GLOW_PIXELS_PER_POINT,
+    )
+  } else {
+    common::drawingml_shape_raster::rasterize_group_items_for_effects(
+      &display_items,
+      raster_bounds,
+      raster_effects,
+    )
+  };
+  let Some(mut raster) = raster else {
     return;
   };
+  let mut raster_effects = raster_effects.clone();
   common::drawingml_image_effects::scale_container_pixel_lengths(
-    &mut effects,
+    &mut raster_effects,
     raster.pixels_per_point / (96.0 / 72.0),
   );
   common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
     &mut raster.image,
-    &effects,
+    &raster_effects,
     -relative_left * raster.pixels_per_point,
     -relative_top * raster.pixels_per_point,
     content_bounds.size.width.0 * raster.pixels_per_point,
@@ -2169,6 +2219,16 @@ fn finish_docx_group_effects(
       children: raster.children_image.as_ref(),
     },
   );
+  if straight_pdf_glow_alpha {
+    // Word stores this WPG glow's RGB preblended against black without a
+    // /Matte entry. A PDF viewer therefore applies the SMask a second time.
+    // Keep Krilla's standards-compliant straight RGB and encode the visible
+    // equivalent in alpha instead of copying the malformed color storage.
+    for pixel in raster.image.pixels_mut() {
+      let alpha = u16::from(pixel.0[3]);
+      pixel.0[3] = ((alpha * alpha + 127) / 255) as u8;
+    }
+  }
   let mut png = Cursor::new(Vec::new());
   if PngEncoder::new(&mut png)
     .write_image(
@@ -2181,12 +2241,18 @@ fn finish_docx_group_effects(
   {
     return;
   }
-  items.truncate(content_start);
-  items.push(PageItem::Image(ImageItem {
-    x_pt: raster_bounds.origin.x.0,
-    y_pt: raster_bounds.origin.y.0,
-    width_pt: raster_bounds.size.width.0,
-    height_pt: raster_bounds.size.height.0,
+  let sample_edge_outset_pt = if straight_pdf_glow_alpha {
+    0.5 / raster.pixels_per_point
+  } else {
+    0.0
+  };
+  let effect_item = PageItem::Image(ImageItem {
+    x_pt: raster_bounds.origin.x.0 - sample_edge_outset_pt,
+    y_pt: raster_bounds.origin.y.0 - sample_edge_outset_pt,
+    width_pt: raster_bounds.size.width.0 + sample_edge_outset_pt * 2.0,
+    height_pt: raster_bounds.size.height.0 + sample_edge_outset_pt * 2.0,
+    inline_baseline_gap_pt: 0.0,
+    inline_baseline_participant: matches!(group.placement, crate::docx::ImagePlacement::Inline),
     crop: ImageCrop::default(),
     clip_path: Vec::new(),
     rotation_deg: 0.0,
@@ -2198,12 +2264,23 @@ fn finish_docx_group_effects(
     alt_text: None,
     hyperlink_url: None,
     semantic_metafile_text: false,
-    floating: matches!(group.placement, crate::docx::ImagePlacement::Floating(_)),
+    metafile_native_size: false,
+    // A separable backdrop is an internal layer of the owning floating
+    // group, not another independently placeable floating object. Marking it
+    // floating lets the page-order pass hoist it after its vector foreground.
+    floating: backdrop_effects.is_none()
+      && matches!(group.placement, crate::docx::ImagePlacement::Floating(_)),
     behind_text: matches!(
       group.placement,
       crate::docx::ImagePlacement::Floating(placement) if placement.behind_text
     ),
-  }));
+  });
+  if backdrop_effects.is_some() {
+    items.insert(content_start, effect_item);
+  } else {
+    items.truncate(content_start);
+    items.push(effect_item);
+  }
 }
 
 fn inline_shape_path_transform(
@@ -2310,10 +2387,11 @@ fn inline_shape_fill_image_items(
   let clip_path =
     inline_shape_image_clip_path(shape, x_pt, y_pt, width_pt, height_pt, shape_transform);
   let rotation_deg = fill.rotation_deg
-    + fill
-      .rotate_with_shape
-      .then_some(shape.rotation_deg)
-      .unwrap_or(0.0);
+    + if fill.rotate_with_shape {
+      shape.rotation_deg
+    } else {
+      0.0
+    };
   let flip_horizontal = fill.flip_horizontal ^ (fill.rotate_with_shape && shape.flip_horizontal);
   let flip_vertical = fill.flip_vertical ^ (fill.rotate_with_shape && shape.flip_vertical);
   let make_item =
@@ -2322,6 +2400,8 @@ fn inline_shape_fill_image_items(
       y_pt,
       width_pt,
       height_pt,
+      inline_baseline_gap_pt: 0.0,
+      inline_baseline_participant: matches!(shape.placement, crate::docx::ImagePlacement::Inline),
       crop,
       clip_path: clip_path.clone(),
       rotation_deg,
@@ -2333,6 +2413,7 @@ fn inline_shape_fill_image_items(
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      metafile_native_size: false,
       floating: matches!(shape.placement, crate::docx::ImagePlacement::Floating(_)),
       behind_text: false,
     };
@@ -2538,6 +2619,7 @@ fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
     semantic_metafile_text: item.semantic_metafile_text,
+    metafile_native_size: item.metafile_native_size,
     floating: item.floating,
     behind_text: item.behind_text,
   }
@@ -4038,7 +4120,6 @@ impl<'a> RootFrameLayout<'a> {
 
 fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mut TextMetrics) {
   for page in pages {
-    let mut semantic_overlays = Vec::new();
     for item in &mut page.items {
       let PageItem::Text(text) = item else {
         continue;
@@ -4060,28 +4141,68 @@ fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mu
         text.style.text_shadow = None;
         continue;
       }
-      let Some(mut effects) = common::drawingml_image_effects::from_wordprocessing_text_effects(
-        text.style.text_glow,
-        text.style.text_shadow,
+      if text.text.trim().is_empty() {
+        continue;
+      }
+      let font_size_pt = effective_font_size_pt(&text.style, None);
+      let text_effect_scale = wordprocessing_text_effect_render_scale(font_size_pt);
+      let render_glow = text.style.text_glow.map(|mut glow| {
+        // Word keeps the authored glow extent for the fixed-output canvas,
+        // while its text glow kernel is normalized by font size.
+        glow.raster_length_scale = text_effect_scale;
+        glow
+      });
+      let render_shadow = text.style.text_shadow.map(|mut shadow| {
+        // Word's fixed-output canvas keeps the authored effect extents, while
+        // the shadow kernel uses the same font-size-dependent coordinate
+        // normalization seen in MSO text glow. Keeping those two coordinate
+        // spaces separate is observable in the PDF XObject bounds.
+        shadow.raster_length_scale = text_effect_scale;
+        shadow
+      });
+      let Some(effects) = common::drawingml_image_effects::from_wordprocessing_text_effects(
+        render_glow,
+        render_shadow,
         text.style.text_reflection,
       ) else {
+        continue;
+      };
+      let Some(mut backdrop_effects) =
+        common::drawingml_image_effects::unchanged_foreground_backdrop(&effects)
+      else {
         continue;
       };
       let width = text_metrics.measure_text(&text.text, &text.style);
       if width <= f32::EPSILON || text.line_height_pt <= f32::EPSILON {
         continue;
       }
+      let baseline_offset = if text.style.use_windows_font_metrics {
+        text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+          &text.text,
+          &text.style,
+          text.line_height_pt,
+        )
+      } else {
+        text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
+      };
+      let mut effect_text = (**text).clone();
+      effect_text.y_pt +=
+        wordprocessing_text_effect_baseline_shift(text.line_height_pt, baseline_offset);
       let Some((ink_left, ink_top, ink_right, ink_bottom)) =
-        text_item_ink_bounds(text, text_metrics)
+        text_item_ink_bounds(&effect_text, text_metrics)
       else {
         continue;
       };
       let ink_width = (ink_right - ink_left).max(f32::EPSILON);
       let ink_height = (ink_bottom - ink_top).max(f32::EPSILON);
+      // DrawingML effects consume the alpha of the main shape. For text that
+      // is the glyph ink, not the run advance or paragraph line box.
       let content_bounds = common_rect(ink_left, ink_top, ink_width, ink_height);
-      let Some(output_bounds) =
-        common::drawingml_image_effects::container_output_bounds(&effects, ink_width, ink_height)
-      else {
+      let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds(
+        &backdrop_effects,
+        ink_width,
+        ink_height,
+      ) else {
         continue;
       };
       let relative_left = output_bounds.left_pt.min(0.0);
@@ -4098,21 +4219,29 @@ fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mu
           height: common::Pt(relative_bottom - relative_top),
         },
       };
-      let common_text = common::DisplayItem::Text(into_common_text_run((**text).clone()));
-      let Some(mut raster) = common::drawingml_shape_raster::rasterize_vector_items_for_effects(
-        std::slice::from_ref(&common_text),
-        raster_bounds,
-        &effects,
-      ) else {
+      let common_text = common::DisplayItem::Text(into_common_text_run(effect_text.clone()));
+      let max_pixels_per_point = wordprocessing_text_effect_max_pixels_per_point(
+        text.style.text_glow,
+        text.style.text_shadow,
+        text.style.text_reflection,
+      );
+      let Some(mut raster) =
+        common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
+          std::slice::from_ref(&common_text),
+          raster_bounds,
+          &backdrop_effects,
+          max_pixels_per_point,
+        )
+      else {
         continue;
       };
       common::drawingml_image_effects::scale_container_pixel_lengths(
-        &mut effects,
+        &mut backdrop_effects,
         raster.pixels_per_point / (96.0 / 72.0),
       );
       common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
         &mut raster.image,
-        &effects,
+        &backdrop_effects,
         -relative_left * raster.pixels_per_point,
         -relative_top * raster.pixels_per_point,
         content_bounds.size.width.0 * raster.pixels_per_point,
@@ -4136,42 +4265,81 @@ fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mu
       {
         continue;
       }
-      let mut semantic_text = (**text).clone();
-      // `semantic_only` text carries an already-resolved baseline (the same
-      // convention used by semantic EMF replay). Word's fixed-output path for
-      // w14 character effects anchors that hidden searchable layer at the
-      // bottom of the run's line box; the visible glyphs remain in the effect
-      // raster at their ordinary font-metric baseline.
-      semantic_text.y_pt += semantic_text.line_height_pt;
-      semantic_text.style.semantic_only = true;
-      semantic_text.style.text_glow = None;
-      semantic_text.style.text_shadow = None;
-      semantic_text.style.text_reflection = None;
-      semantic_overlays.push(PageItem::Text(Box::new(semantic_text)));
-      *item = PageItem::Image(ImageItem {
-        x_pt: raster_bounds.origin.x.0,
-        y_pt: raster_bounds.origin.y.0,
-        width_pt: raster_bounds.size.width.0,
-        height_pt: raster_bounds.size.height.0,
-        crop: ImageCrop::default(),
-        clip_path: Vec::new(),
-        rotation_deg: 0.0,
-        flip_horizontal: false,
-        flip_vertical: false,
-        data: Arc::from(png.into_inner()),
-        content_type: Some("image/png".to_string()),
-        metafile_background_color: None,
-        alt_text: None,
-        hyperlink_url: text.hyperlink_url.clone(),
-        semantic_metafile_text: false,
-        floating: false,
-        behind_text: false,
-      });
+      let mut foreground_text = effect_text;
+      foreground_text.style.text_glow = None;
+      foreground_text.style.text_shadow = None;
+      foreground_text.style.text_reflection = None;
+      *item = PageItem::Group(vec![
+        PageItem::Image(ImageItem {
+          x_pt: raster_bounds.origin.x.0,
+          y_pt: raster_bounds.origin.y.0,
+          width_pt: raster_bounds.size.width.0,
+          height_pt: raster_bounds.size.height.0,
+          inline_baseline_gap_pt: 0.0,
+          inline_baseline_participant: false,
+          crop: ImageCrop::default(),
+          clip_path: Vec::new(),
+          rotation_deg: 0.0,
+          flip_horizontal: false,
+          flip_vertical: false,
+          data: Arc::from(png.into_inner()),
+          content_type: Some("image/png".to_string()),
+          metafile_background_color: None,
+          alt_text: None,
+          hyperlink_url: text.hyperlink_url.clone(),
+          semantic_metafile_text: false,
+          metafile_native_size: false,
+          floating: false,
+          behind_text: false,
+        }),
+        PageItem::Text(Box::new(foreground_text)),
+      ]);
     }
-    // Keep the established frame item ranges immutable. Appending the hidden
-    // searchable layer preserves document order without shifting every later
-    // paragraph/table owner after an effect-bearing run.
-    page.items.extend(semantic_overlays);
+  }
+}
+
+fn wordprocessing_text_effect_baseline_shift(line_height_pt: f32, baseline_offset_pt: f32) -> f32 {
+  // Word lays out glow/shadow/reflection text like an inline effect object:
+  // the effect source and unchanged foreground share the run line-box
+  // baseline. This is also the coordinate emitted by Word's fixed-output
+  // searchable foreground after its raster backdrop.
+  (line_height_pt - baseline_offset_pt).max(0.0)
+}
+
+fn wordprocessing_text_effect_render_scale(font_size_pt: f32) -> f32 {
+  if font_size_pt <= f32::EPSILON {
+    return 1.0;
+  }
+  // Provisional Office fixed-output calibration. Keep this isolated until a
+  // second font-size/radius pair confirms or rejects the mapping.
+  const TEXT_GLOW_SCALE: f32 = 154.39;
+  const TEXT_GLOW_FONT_EXPONENT: f32 = -0.575;
+  let font_size_twips = font_size_pt * 20.0;
+  1.0 / (TEXT_GLOW_SCALE * font_size_twips.powf(TEXT_GLOW_FONT_EXPONENT))
+}
+
+fn wordprocessing_text_effect_max_pixels_per_point(
+  glow: Option<common::drawingml_image_effects::WordprocessingTextGlow>,
+  shadow: Option<common::drawingml_image_effects::WordprocessingTextShadow>,
+  reflection: Option<common::drawingml_image_effects::WordprocessingTextReflection>,
+) -> f32 {
+  const OFFICE_TEXT_EFFECT_DPI: f32 = 200.0;
+  const OFFICE_LARGE_PLAIN_SHADOW_DPI: f32 = 100.0;
+  const LARGE_PLAIN_SHADOW_BLUR_PX: f32 = 50_800.0 / 9_525.0;
+
+  let large_plain_shadow = glow.is_none()
+    && reflection.is_none()
+    && shadow.is_some_and(|shadow| {
+      shadow.blur_radius_px + f32::EPSILON >= LARGE_PLAIN_SHADOW_BLUR_PX
+        && (shadow.scale_x - 1.0).abs() <= f32::EPSILON
+        && (shadow.scale_y - 1.0).abs() <= f32::EPSILON
+        && shadow.skew_x_degrees.abs() <= f32::EPSILON
+        && shadow.skew_y_degrees.abs() <= f32::EPSILON
+    });
+  if large_plain_shadow {
+    OFFICE_LARGE_PLAIN_SHADOW_DPI / 72.0
+  } else {
+    OFFICE_TEXT_EFFECT_DPI / 72.0
   }
 }
 
@@ -4554,6 +4722,7 @@ fn line_number_text_metrics_for_items(
     .iter()
     .find_map(|item| match item {
       PageItem::Text(text) => Some((text.y_pt, text.line_height_pt)),
+      PageItem::Group(items) => line_number_text_metrics_for_items(items, 0, items.len()),
       PageItem::Image(_)
       | PageItem::Rect(_)
       | PageItem::Fill(_)
@@ -5784,6 +5953,7 @@ fn item_line_y(item: &PageItem) -> Option<f32> {
   match item {
     PageItem::Text(text) => Some(text.y_pt),
     PageItem::Image(image) if !image.floating => Some(image.y_pt),
+    PageItem::Group(items) => items.iter().find_map(item_line_y),
     PageItem::Image(_)
     | PageItem::Rect(_)
     | PageItem::Fill(_)
@@ -5810,6 +5980,7 @@ fn item_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Option<(f32, 
       image.x_pt + image.width_pt,
       image.y_pt + image.height_pt,
     )),
+    PageItem::Group(items) => page_items_bounds(items, text_metrics),
     PageItem::Rect(rect) => Some((
       rect.x_pt,
       rect.y_pt,
@@ -5869,6 +6040,7 @@ fn item_vertical_bounds(item: &PageItem) -> (f32, f32) {
   match item {
     PageItem::Text(text) => (text.y_pt, text.y_pt + text.line_height_pt),
     PageItem::Image(image) => (image.y_pt, image.y_pt + image.height_pt),
+    PageItem::Group(items) => page_items_vertical_bounds(items).unwrap_or((0.0, 0.0)),
     PageItem::Rect(rect) => (rect.y_pt, rect.y_pt + rect.height_pt),
     PageItem::Fill(fill) => (fill.y_pt, fill.y_pt + fill.height_pt),
     PageItem::Line(line) => {
@@ -6847,11 +7019,9 @@ fn starts_new_page(kind: SectionBreakKind) -> bool {
   )
 }
 
-fn page_has_body_region_items(page: &Page, flow: FlowContext) -> bool {
-  // Page-break movement is based on body text/frame progress. Header/footer
-  // content and page decorations may already be present on the physical page,
-  // but they must not make body layout create an extra empty body page.
-  page.items.iter().any(|item| match item {
+fn item_is_in_body_region(item: &PageItem, flow: FlowContext) -> bool {
+  match item {
+    PageItem::Group(items) => items.iter().any(|item| item_is_in_body_region(item, flow)),
     PageItem::Text(text) => {
       text.y_pt >= flow.content_top_pt - LAYOUT_EPSILON_PT
         && text.y_pt <= flow.content_bottom + LAYOUT_EPSILON_PT
@@ -6876,7 +7046,17 @@ fn page_has_body_region_items(page: &Page, flow: FlowContext) -> bool {
         && path.bounds.origin.y.0 <= flow.content_bottom + LAYOUT_EPSILON_PT
     }
     PageItem::Fill(_) => false,
-  })
+  }
+}
+
+fn page_has_body_region_items(page: &Page, flow: FlowContext) -> bool {
+  // Page-break movement is based on body text/frame progress. Header/footer
+  // content and page decorations may already be present on the physical page,
+  // but they must not make body layout create an extra empty body page.
+  page
+    .items
+    .iter()
+    .any(|item| item_is_in_body_region(item, flow))
 }
 
 fn paragraph_spacing_before(
@@ -7692,6 +7872,11 @@ fn shift_existing_page_footnotes(page: &mut Page, dy_pt: f32) {
 fn shift_page_item_y(item: &mut PageItem, dy_pt: f32) {
   match item {
     PageItem::Text(text) => text.y_pt += dy_pt,
+    PageItem::Group(items) => {
+      for item in items {
+        shift_page_item_y(item, dy_pt);
+      }
+    }
     PageItem::Image(image) => {
       image.y_pt += dy_pt;
       translate_image_clip_path(image, 0.0, dy_pt);
@@ -7954,8 +8139,7 @@ fn layout_repeating_blocks_into_page(
       text_metrics,
       y,
       flow,
-      index + 1 == blocks.len(),
-      true,
+      (index + 1 == blocks.len(), true),
     );
   }
   y
@@ -9138,8 +9322,7 @@ fn measured_repeating_blocks_height(
       text_metrics,
       y,
       flow,
-      index + 1 == blocks.len(),
-      include_last_compat_spacing,
+      (index + 1 == blocks.len(), include_last_compat_spacing),
     );
   }
   y
@@ -9152,9 +9335,9 @@ fn layout_repeating_block(
   text_metrics: &mut TextMetrics,
   y: f32,
   flow: FlowContext,
-  is_last_repeating_block: bool,
-  include_last_compat_spacing: bool,
+  tail: (bool, bool),
 ) -> f32 {
+  let (is_last_repeating_block, include_last_compat_spacing) = tail;
   match block {
     Block::Paragraph(paragraph) => {
       let spacing_after_pt = if is_last_repeating_block && include_last_compat_spacing {
@@ -9737,6 +9920,7 @@ fn fragment_item_range_has_path(items: &[PageItem], item_start: usize, item_end:
 
 fn page_item_is_path(item: &PageItem) -> bool {
   match item {
+    PageItem::Group(items) => items.iter().any(page_item_is_path),
     PageItem::Rect(rect) => rect.fill_color.is_some() || rect.stroke.is_some(),
     PageItem::Line(_) => true,
     PageItem::Path(path) => !matches!(path.fill, common::Fill::None) || path.stroke.is_some(),
@@ -9850,6 +10034,11 @@ fn translate_page_item(mut item: PageItem, dx_pt: f32, dy_pt: f32) -> PageItem {
       text.y_pt += dy_pt;
       if let Some(span_start) = &mut text.decoration_span_start_x_pt {
         *span_start += dx_pt;
+      }
+    }
+    PageItem::Group(items) => {
+      for item in items {
+        *item = translate_page_item(item.clone(), dx_pt, dy_pt);
       }
     }
     PageItem::Image(image) => {
@@ -14334,6 +14523,9 @@ fn table_cell_first_content_line_height(
 
 fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom: f32) -> bool {
   match item {
+    PageItem::Group(items) => items
+      .iter()
+      .any(|item| table_cell_item_intersects_vertical_bounds(item, top, bottom)),
     PageItem::Text(text) => text.y_pt + text.line_height_pt >= top && text.y_pt <= bottom,
     PageItem::Image(image) => image.y_pt + image.height_pt >= top && image.y_pt <= bottom,
     PageItem::Rect(rect) => rect.y_pt + rect.height_pt >= top && rect.y_pt <= bottom,
@@ -14515,7 +14707,7 @@ fn inline_shape_text_rotation_degrees(shape_rotation_deg: f32, flip_vertical: bo
   shape_rotation_deg + if flip_vertical { 180.0 } else { 0.0 }
 }
 
-fn rotate_shape_text_items(items: &mut Vec<PageItem>, rect: ShapeTextBoxRect, rotation_deg: f32) {
+fn rotate_shape_text_items(items: &mut [PageItem], rect: ShapeTextBoxRect, rotation_deg: f32) {
   let center_x = rect.x + rect.width * 0.5;
   let center_y = rect.y + rect.height * 0.5;
   let transform = Affine::translate((-f64::from(center_x), -f64::from(center_y)))
@@ -14527,6 +14719,7 @@ fn rotate_shape_text_items(items: &mut Vec<PageItem>, rect: ShapeTextBoxRect, ro
   };
   for item in items.iter_mut() {
     match item {
+      PageItem::Group(items) => rotate_shape_text_items(items, rect, rotation_deg),
       PageItem::Text(text) => {
         text.style.rotation_deg += rotation_deg;
         text.rotation_center_pt = Some((center_x, center_y));
@@ -14600,7 +14793,7 @@ fn apply_shape_text_warp(
   ) else {
     return;
   };
-  let mut text_fill = shape.text_fill.clone();
+  let mut text_fill = shape.text_fill.as_deref().cloned();
   if let Some(common::Fill::Gradient(gradient)) = &mut text_fill {
     resolve_inline_shape_gradient_transform(
       gradient,
@@ -14707,7 +14900,7 @@ fn inline_shape_common_fill(
   shape: &crate::docx::InlineShape,
   gradient_transform: Option<Affine>,
 ) -> common::Fill<'static> {
-  let mut fill = shape.fill_override.clone().unwrap_or_else(|| {
+  let mut fill = shape.fill_override.as_deref().cloned().unwrap_or_else(|| {
     shape
       .fill_pattern
       .map(common::Fill::Pattern)
@@ -14837,7 +15030,8 @@ fn inline_shape_common_stroke(
 ) -> common::Stroke<'static> {
   let mut stroke = shape
     .stroke_override
-    .clone()
+    .as_deref()
+    .cloned()
     .unwrap_or_else(|| common_stroke_from_border(border, 1.0));
   stroke.pattern = shape.stroke_pattern;
   if let (Some(gradient), Some(transform)) = (&mut stroke.gradient, gradient_transform) {
@@ -16253,7 +16447,7 @@ impl<'a> TextFrameLayout<'a> {
         advance.text_metrics,
       );
     }
-    align_text_baseline_to_inline_object(
+    align_line_items_to_inline_object_baseline(
       &mut advance.current.items,
       *advance.line_item_start_index,
       y,
@@ -16864,9 +17058,11 @@ impl<'a> TextFrameLayout<'a> {
             paragraph,
             ruby,
             metrics,
-            x,
-            y,
-            line_height,
+            TextPlacement {
+              x_pt: x,
+              y_pt: y,
+              line_height_pt: line_height,
+            },
             flow.text_segmentation,
             text_metrics,
           );
@@ -17597,6 +17793,8 @@ impl<'a> TextFrameLayout<'a> {
               y_pt: image_y,
               width_pt: width,
               height_pt: height,
+              inline_baseline_gap_pt: 0.0,
+              inline_baseline_participant: false,
               crop: image.crop,
               clip_path: Vec::new(),
               rotation_deg: image.rotation_deg,
@@ -17608,6 +17806,7 @@ impl<'a> TextFrameLayout<'a> {
               alt_text: image.alt_text.clone(),
               hyperlink_url: image.hyperlink_url.clone(),
               semantic_metafile_text: image.semantic_metafile_text,
+              metafile_native_size: image.metafile_native_size,
               floating: true,
               behind_text: placement.behind_text,
             };
@@ -17836,6 +18035,8 @@ impl<'a> TextFrameLayout<'a> {
             y_pt: image_top + metrics.content_offset_y_pt + picture_control_descent,
             width_pt: metrics.content_width_pt,
             height_pt: metrics.content_height_pt,
+            inline_baseline_gap_pt: metrics.content_bottom_gap_pt,
+            inline_baseline_participant: true,
             crop: image.crop,
             clip_path: Vec::new(),
             rotation_deg: image.rotation_deg,
@@ -17847,6 +18048,7 @@ impl<'a> TextFrameLayout<'a> {
             alt_text: image.alt_text.clone(),
             hyperlink_url: image.hyperlink_url.clone(),
             semantic_metafile_text: image.semantic_metafile_text,
+            metafile_native_size: image.metafile_native_size,
             floating: false,
             behind_text: false,
           };
@@ -17938,7 +18140,7 @@ impl<'a> TextFrameLayout<'a> {
                 ],
                 shape_transform,
               );
-              current.items.push(PageItem::Path(common::PathItem {
+              current.items.push(PageItem::path(common::PathItem {
                 bounds: shape_bounds,
                 points: Vec::new(),
                 commands,
@@ -17968,7 +18170,7 @@ impl<'a> TextFrameLayout<'a> {
                   )
                 })
                 .collect::<Vec<_>>();
-              current.items.push(PageItem::Path(common::PathItem {
+              current.items.push(PageItem::path(common::PathItem {
                 bounds: shape_bounds,
                 points: transformed_points.clone(),
                 commands: Vec::new(),
@@ -17995,7 +18197,7 @@ impl<'a> TextFrameLayout<'a> {
                 }),
               }));
               for color in &shape.additional_fill_colors {
-                current.items.push(PageItem::Path(common::PathItem {
+                current.items.push(PageItem::path(common::PathItem {
                   bounds: shape_bounds,
                   points: transformed_points.clone(),
                   commands: Vec::new(),
@@ -18042,7 +18244,7 @@ impl<'a> TextFrameLayout<'a> {
                 let closed = commands
                   .iter()
                   .any(|command| matches!(command, common::PathCommand::Close));
-                current.items.push(PageItem::Path(common::PathItem {
+                current.items.push(PageItem::path(common::PathItem {
                   bounds: shape_bounds,
                   points: Vec::new(),
                   commands: commands.clone(),
@@ -18078,7 +18280,7 @@ impl<'a> TextFrameLayout<'a> {
                 }));
                 if path.fill_mode != common::DrawingPathFillMode::None {
                   for color in &shape.additional_fill_colors {
-                    current.items.push(PageItem::Path(common::PathItem {
+                    current.items.push(PageItem::path(common::PathItem {
                       bounds: shape_bounds,
                       points: Vec::new(),
                       commands: commands.clone(),
@@ -18123,7 +18325,7 @@ impl<'a> TextFrameLayout<'a> {
                 ],
                 shape_transform,
               );
-              current.items.push(PageItem::Path(common::PathItem {
+              current.items.push(PageItem::path(common::PathItem {
                 bounds: shape_bounds,
                 points: Vec::new(),
                 commands,
@@ -18176,7 +18378,7 @@ impl<'a> TextFrameLayout<'a> {
                     ],
                     shape_transform,
                   );
-                  current.items.push(PageItem::Path(common::PathItem {
+                  current.items.push(PageItem::path(common::PathItem {
                     bounds: shape_bounds,
                     points: Vec::new(),
                     commands,
@@ -18734,7 +18936,7 @@ impl<'a> TextFrameLayout<'a> {
         line_right,
         text_metrics,
       );
-      align_text_baseline_to_inline_object(
+      align_line_items_to_inline_object_baseline(
         &mut current.items,
         line_item_start_index,
         y,
@@ -20207,7 +20409,7 @@ fn justify_paragraph_last_line(
   }
 }
 
-fn align_text_baseline_to_inline_object(
+fn align_line_items_to_inline_object_baseline(
   items: &mut [PageItem],
   start_index: usize,
   y: f32,
@@ -20217,8 +20419,8 @@ fn align_text_baseline_to_inline_object(
     .iter()
     .skip(start_index)
     .filter_map(|item| match item {
-      PageItem::Image(image) if !image.floating && (image.y_pt - y).abs() < 0.01 => {
-        Some(image.y_pt + image.height_pt)
+      PageItem::Image(image) if image.inline_baseline_participant => {
+        Some(image.y_pt + image.height_pt + image.inline_baseline_gap_pt)
       }
       _ => None,
     })
@@ -20228,29 +20430,40 @@ fn align_text_baseline_to_inline_object(
   };
 
   // ECMA-376 Part 1 §20.4.2.8 makes an inline drawing participate in its
-  // line like a character. Writer's MaxAscentDescent() therefore treats the
-  // object height as ascent and keeps the ordinary font descent below it;
-  // text sharing the line is bottom-aligned to the object's baseline rather
-  // than centered in the enlarged line box.
+  // line like a character. Writer's SwLineLayout::CalcLine() likewise gives
+  // as-character fly portions one shared line ascent/descent. Resolve that
+  // common baseline only after the complete line is known: an earlier short
+  // image must move down when a later image raises the ascent (tdf91122).
   for item in items.iter_mut().skip(start_index) {
-    let PageItem::Text(text) = item else {
-      continue;
-    };
-    if (text.y_pt - y).abs() >= 0.01 {
-      continue;
-    }
-    let baseline_offset = if text.style.use_windows_font_metrics {
-      text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
-        &text.text,
-        &text.style,
-        text.line_height_pt,
-      )
-    } else {
-      text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
-    };
-    let current_baseline = text.y_pt + baseline_offset;
-    if object_baseline > current_baseline {
-      text.y_pt += object_baseline - current_baseline;
+    match item {
+      PageItem::Image(image) if image.inline_baseline_participant => {
+        let offset =
+          object_baseline - (image.y_pt + image.height_pt + image.inline_baseline_gap_pt);
+        if offset > LAYOUT_EPSILON_PT {
+          image.y_pt += offset;
+          translate_image_clip_path(image, 0.0, offset);
+        }
+      }
+      PageItem::Text(text) if (text.y_pt - y).abs() < 0.01 => {
+        let baseline_offset = if text.style.use_windows_font_metrics {
+          text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+            &text.text,
+            &text.style,
+            text.line_height_pt,
+          )
+        } else {
+          text_metrics.baseline_offset_in_line_for_text(
+            &text.text,
+            &text.style,
+            text.line_height_pt,
+          )
+        };
+        let current_baseline = text.y_pt + baseline_offset;
+        if object_baseline > current_baseline {
+          text.y_pt += object_baseline - current_baseline;
+        }
+      }
+      _ => {}
     }
   }
 }
@@ -20317,6 +20530,7 @@ fn item_y(item: &PageItem) -> Option<f32> {
   match item {
     PageItem::Text(text) => Some(text.y_pt),
     PageItem::Image(image) => Some(image.y_pt),
+    PageItem::Group(items) => items.iter().find_map(item_y),
     PageItem::Rect(rect) => Some(rect.y_pt),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
@@ -20333,6 +20547,10 @@ fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Op
         + text.text.matches(' ').count() as f32 * text.word_spacing_pt,
     )),
     PageItem::Image(image) => Some((image.x_pt, image.width_pt)),
+    PageItem::Group(items) => {
+      let (left, _, right, _) = page_items_bounds(items, text_metrics)?;
+      Some((left, right - left))
+    }
     PageItem::Rect(rect) => Some((rect.x_pt, rect.width_pt)),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
@@ -20344,6 +20562,11 @@ fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Op
 fn shift_item_x(item: &mut PageItem, offset: f32) {
   match item {
     PageItem::Text(text) => text.x_pt += offset,
+    PageItem::Group(items) => {
+      for item in items {
+        shift_item_x(item, offset);
+      }
+    }
     PageItem::Image(image) => {
       image.x_pt += offset;
       translate_image_clip_path(image, offset, 0.0);
@@ -20361,6 +20584,11 @@ fn shift_item(item: &mut PageItem, dx: f32, dy: f32) {
     PageItem::Text(text) => {
       text.x_pt += dx;
       text.y_pt += dy;
+    }
+    PageItem::Group(items) => {
+      for item in items {
+        shift_item(item, dx, dy);
+      }
     }
     PageItem::Image(image) => {
       image.x_pt += dx;
@@ -20421,6 +20649,7 @@ struct InlineImageMetrics {
   content_offset_y_pt: f32,
   content_width_pt: f32,
   content_height_pt: f32,
+  content_bottom_gap_pt: f32,
 }
 
 fn inline_image_metrics(image: &crate::docx::InlineImage, max_width_pt: f32) -> InlineImageMetrics {
@@ -20440,6 +20669,7 @@ fn inline_image_metrics(image: &crate::docx::InlineImage, max_width_pt: f32) -> 
     content_offset_y_pt: image.effect_top_pt.max(0.0) * scale,
     content_width_pt: visible_image_width(image) * scale,
     content_height_pt: visible_image_height(image) * scale,
+    content_bottom_gap_pt: image.effect_bottom_pt.max(0.0) * scale,
   }
 }
 
@@ -20617,19 +20847,34 @@ fn ruby_line_start_x(alignment: RubyAlignment, x: f32, line_width: f32, target_w
   }
 }
 
+#[derive(Clone, Copy)]
+struct RubyLineLayout {
+  alignment: RubyAlignment,
+  target_width: f32,
+  baseline_shift_pt: f32,
+  segmentation: TextSegmentation,
+  placement: TextPlacement,
+}
+
 fn push_ruby_horizontal_line(
   page: &mut Page,
   paragraph: &crate::docx::Paragraph,
   runs: &[TextRun],
-  alignment: RubyAlignment,
-  x: f32,
-  y: f32,
-  line_height: f32,
-  target_width: f32,
-  baseline_shift_pt: f32,
-  segmentation: TextSegmentation,
+  layout: RubyLineLayout,
   text_metrics: &mut TextMetrics,
 ) {
+  let RubyLineLayout {
+    alignment,
+    target_width,
+    baseline_shift_pt,
+    segmentation,
+    placement:
+      TextPlacement {
+        x_pt: x,
+        y_pt: y,
+        line_height_pt: line_height,
+      },
+  } = layout;
   let natural_width = text_runs_width(runs, text_metrics);
   let distribute = target_width > natural_width + LAYOUT_EPSILON_PT
     && matches!(
@@ -20674,13 +20919,17 @@ fn push_ruby_horizontal_line(
       page,
       paragraph,
       runs,
-      RubyAlignment::Center,
-      x,
-      y,
-      line_height,
-      target_width,
-      baseline_shift_pt,
-      segmentation,
+      RubyLineLayout {
+        alignment: RubyAlignment::Center,
+        target_width,
+        baseline_shift_pt,
+        segmentation,
+        placement: TextPlacement {
+          x_pt: x,
+          y_pt: y,
+          line_height_pt: line_height,
+        },
+      },
       text_metrics,
     );
     return;
@@ -20726,27 +20975,27 @@ fn push_ruby_items(
   paragraph: &crate::docx::Paragraph,
   ruby: &RubyInline,
   metrics: RubyMetrics,
-  x: f32,
-  y: f32,
-  line_height: f32,
+  placement: TextPlacement,
   segmentation: TextSegmentation,
   text_metrics: &mut TextMetrics,
 ) {
+  let x = placement.x_pt;
+  let y = placement.y_pt;
   push_ruby_horizontal_line(
     page,
     paragraph,
     &ruby.base,
-    ruby.alignment,
-    x,
-    y,
-    line_height,
-    if ruby.alignment == RubyAlignment::RightVertical {
-      metrics.base_width_pt
-    } else {
-      metrics.width_pt
+    RubyLineLayout {
+      alignment: ruby.alignment,
+      target_width: if ruby.alignment == RubyAlignment::RightVertical {
+        metrics.base_width_pt
+      } else {
+        metrics.width_pt
+      },
+      baseline_shift_pt: 0.0,
+      segmentation,
+      placement,
     },
-    0.0,
-    segmentation,
     text_metrics,
   );
 
@@ -20755,13 +21004,13 @@ fn push_ruby_items(
       page,
       paragraph,
       &ruby.guide,
-      ruby.alignment,
-      x,
-      y,
-      line_height,
-      metrics.width_pt,
-      ruby.raise_pt.max(0.0),
-      segmentation,
+      RubyLineLayout {
+        alignment: ruby.alignment,
+        target_width: metrics.width_pt,
+        baseline_shift_pt: ruby.raise_pt.max(0.0),
+        segmentation,
+        placement,
+      },
       text_metrics,
     );
     return;
@@ -20874,6 +21123,119 @@ mod tests {
     CellBorderSuppressions, CellBordersModel, CellMargins, Paragraph, ParagraphFormat,
     TableBordersModel, TextRun,
   };
+
+  fn word_text_shadow(
+    blur_radius_px: f32,
+  ) -> common::drawingml_image_effects::WordprocessingTextShadow {
+    common::drawingml_image_effects::WordprocessingTextShadow {
+      blur_radius_px,
+      distance_px: 0.0,
+      raster_length_scale: 1.0,
+      direction_degrees: 0.0,
+      scale_x: 1.0,
+      scale_y: 1.0,
+      skew_x_degrees: 0.0,
+      skew_y_degrees: 0.0,
+      alignment: (0.0, 0.0),
+      color: common::drawingml_image_effects::ResolvedEffectColor {
+        color: RgbColor { r: 0, g: 0, b: 0 },
+        alpha: u8::MAX,
+      },
+    }
+  }
+
+  #[test]
+  fn word_text_effect_density_preserves_office_plain_shadow_boundary() {
+    let below_boundary = wordprocessing_text_effect_max_pixels_per_point(
+      None,
+      Some(word_text_shadow(41_275.0 / 9_525.0)),
+      None,
+    );
+    let at_boundary = wordprocessing_text_effect_max_pixels_per_point(
+      None,
+      Some(word_text_shadow(50_800.0 / 9_525.0)),
+      None,
+    );
+    let mut transformed = word_text_shadow(190_500.0 / 9_525.0);
+    transformed.scale_y = -0.3;
+    transformed.skew_x_degrees = -13.34;
+    let transformed =
+      wordprocessing_text_effect_max_pixels_per_point(None, Some(transformed), None);
+
+    assert!((below_boundary - 200.0 / 72.0).abs() < f32::EPSILON);
+    assert!((at_boundary - 100.0 / 72.0).abs() < f32::EPSILON);
+    assert!((transformed - 200.0 / 72.0).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn word_text_effect_foreground_uses_the_line_box_baseline() {
+    let line_height = 14.13;
+    let natural_baseline_offset = 9.995;
+    let shift = wordprocessing_text_effect_baseline_shift(line_height, natural_baseline_offset);
+
+    assert!((natural_baseline_offset + shift - line_height).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn word_text_glow_render_radius_tracks_libreoffice_font_size_rule() {
+    let scale_at_11pt = wordprocessing_text_effect_render_scale(11.0);
+    let five_point_at_11pt = 5.0 * 96.0 / 72.0 * scale_at_11pt;
+    let eighteen_point_at_11pt = 18.0 * 96.0 / 72.0 * scale_at_11pt;
+
+    assert!((five_point_at_11pt - 0.9598).abs() < 0.001);
+    assert!((eighteen_point_at_11pt - 3.4552).abs() < 0.001);
+    assert!(
+      wordprocessing_text_effect_render_scale(18.0) > wordprocessing_text_effect_render_scale(9.0)
+    );
+  }
+
+  #[test]
+  fn word_text_effect_scale_normalizes_shadow_lengths_together() {
+    let scale = wordprocessing_text_effect_render_scale(11.0);
+    let blur_radius = 15.0 * 96.0 / 72.0 * scale;
+    let distance = 15.0 * 96.0 / 72.0 * scale;
+
+    assert!((blur_radius - 2.8793).abs() < 0.001);
+    assert!((distance - blur_radius).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn whitespace_word_text_effect_does_not_materialize_a_backdrop() {
+    let mut style = TextStyle::default();
+    style.text_shadow = Some(word_text_shadow(190_500.0 / 9_525.0));
+    let mut page = empty_page(PageSetup::default(), 0);
+    page.items.push(PageItem::Text(Box::new(TextItem {
+      x_pt: 10.0,
+      y_pt: 20.0,
+      line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      text: " ".to_string(),
+      style,
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      dynamic_field_line_anchor: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: true,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+    })));
+
+    materialize_wordprocessing_text_effects(
+      std::slice::from_mut(&mut page),
+      &mut TextMetrics::new(),
+    );
+
+    let PageItem::Text(text) = &page.items[0] else {
+      panic!("whitespace-only effect run must remain ordinary text");
+    };
+    assert_eq!(text.text, " ");
+    assert!(text.style.text_shadow.is_some());
+  }
 
   #[test]
   fn vertical_shape_flip_compensates_word_text_rotation() {
@@ -21039,6 +21401,8 @@ mod tests {
       y_pt: 20.0,
       width_pt: 30.0,
       height_pt: 40.0,
+      inline_baseline_gap_pt: 0.0,
+      inline_baseline_participant: true,
       crop: ImageCrop::default(),
       clip_path: vec![
         common::PathCommand::MoveTo(common_point(10.0, 20.0)),
@@ -21054,6 +21418,7 @@ mod tests {
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      metafile_native_size: false,
       floating: false,
       behind_text: false,
     });
@@ -21098,8 +21463,10 @@ mod tests {
     let metrics = ruby_inline_metrics(&ruby, &mut text_metrics);
     assert!(metrics.height_pt > 18.0);
 
-    let mut setup = PageSetup::default();
-    setup.doc_grid_line_pitch_pt = Some(18.0);
+    let setup = PageSetup {
+      doc_grid_line_pitch_pt: Some(18.0),
+      ..PageSetup::default()
+    };
     let flow = flow_from_block_area(BlockArea {
       setup,
       section_index: 0,
@@ -23243,7 +23610,7 @@ mod tests {
   }
 
   #[test]
-  fn text_on_inline_object_line_uses_object_bottom_as_baseline() {
+  fn only_inline_object_images_set_the_text_line_baseline() {
     let style = TextStyle::default();
     let line_height = 124.0;
     let mut items = vec![
@@ -23252,6 +23619,8 @@ mod tests {
         y_pt: 0.0,
         width_pt: 120.0,
         height_pt: 120.0,
+        inline_baseline_gap_pt: 0.0,
+        inline_baseline_participant: true,
         crop: ImageCrop::default(),
         clip_path: Vec::new(),
         rotation_deg: 0.0,
@@ -23263,6 +23632,7 @@ mod tests {
         alt_text: None,
         hyperlink_url: None,
         semantic_metafile_text: false,
+        metafile_native_size: false,
         floating: false,
         behind_text: false,
       }),
@@ -23289,13 +23659,84 @@ mod tests {
     ];
     let mut text_metrics = TextMetrics::new();
 
-    align_text_baseline_to_inline_object(&mut items, 0, 0.0, &mut text_metrics);
+    let mut floating_backdrop = items.clone();
+    let PageItem::Image(image) = &mut floating_backdrop[0] else {
+      panic!("expected image item");
+    };
+    image.inline_baseline_participant = false;
+    align_line_items_to_inline_object_baseline(&mut floating_backdrop, 0, 0.0, &mut text_metrics);
+    let PageItem::Text(text) = &floating_backdrop[1] else {
+      panic!("expected text item");
+    };
+    assert_eq!(text.y_pt, 0.0);
+
+    align_line_items_to_inline_object_baseline(&mut items, 0, 0.0, &mut text_metrics);
 
     let PageItem::Text(text) = &items[1] else {
       panic!("expected text item");
     };
     let baseline = text.y_pt + text_metrics.baseline_offset_in_line(&style, line_height);
     assert!((baseline - 120.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn inline_images_share_the_tallest_objects_baseline() {
+    let image =
+      |y_pt: f32, height_pt: f32, baseline_gap_pt: f32, clip_path: Vec<common::PathCommand>| {
+        PageItem::Image(ImageItem {
+          x_pt: 0.0,
+          y_pt,
+          width_pt: 10.0,
+          height_pt,
+          inline_baseline_gap_pt: baseline_gap_pt,
+          inline_baseline_participant: true,
+          crop: ImageCrop::default(),
+          clip_path,
+          rotation_deg: 0.0,
+          flip_horizontal: false,
+          flip_vertical: false,
+          data: Arc::from([]),
+          content_type: None,
+          metafile_background_color: None,
+          alt_text: None,
+          hyperlink_url: None,
+          semantic_metafile_text: false,
+          metafile_native_size: false,
+          floating: false,
+          behind_text: false,
+        })
+      };
+    let mut items = vec![
+      image(
+        8.0,
+        4.0,
+        0.0,
+        vec![
+          common::PathCommand::MoveTo(common_point(0.0, 8.0)),
+          common::PathCommand::LineTo(common_point(10.0, 12.0)),
+        ],
+      ),
+      image(0.0, 119.5, 0.5, Vec::new()),
+    ];
+    let mut text_metrics = TextMetrics::new();
+
+    align_line_items_to_inline_object_baseline(&mut items, 0, 0.0, &mut text_metrics);
+
+    let PageItem::Image(short) = &items[0] else {
+      panic!("expected short image");
+    };
+    assert!((short.y_pt - 116.0).abs() < 0.001);
+    assert_eq!(
+      short.clip_path,
+      vec![
+        common::PathCommand::MoveTo(common_point(0.0, 116.0)),
+        common::PathCommand::LineTo(common_point(10.0, 120.0)),
+      ]
+    );
+    let PageItem::Image(tall) = &items[1] else {
+      panic!("expected tall image");
+    };
+    assert_eq!(tall.y_pt, 0.0);
   }
 
   #[test]

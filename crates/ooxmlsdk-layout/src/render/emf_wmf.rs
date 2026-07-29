@@ -1,4 +1,4 @@
-pub use emfsdk::render::{DecodedMetafile, RenderOptions};
+pub use emfsdk::render::{DecodedMetafile, MetafilePhysicalSize, RenderOptions};
 
 #[derive(Clone, Debug)]
 pub struct MetafileTextRun {
@@ -26,6 +26,13 @@ pub fn decode_metafile_as_raster_with_options(
 ) -> Result<Option<DecodedMetafile>, String> {
   emfsdk::render::decode_metafile_as_raster_with_options(data, content_type, options)
     .map_err(|err| err.to_string())
+}
+
+pub fn metafile_physical_size(
+  data: &[u8],
+  content_type: Option<&str>,
+) -> Option<MetafilePhysicalSize> {
+  emfsdk::render::metafile_physical_size(data, content_type)
 }
 
 pub fn extract_metafile_text_runs(data: &[u8], content_type: Option<&str>) -> Vec<MetafileTextRun> {

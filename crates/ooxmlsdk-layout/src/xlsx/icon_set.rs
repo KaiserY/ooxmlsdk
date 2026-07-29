@@ -21,8 +21,10 @@ const GRAY: [u8; 4] = [132, 132, 132, 255];
 const DARK: [u8; 4] = [55, 55, 55, 255];
 const LIGHT: [u8; 4] = [225, 225, 225, 255];
 
+type IconPngCache = HashMap<(IconSetType, usize), Arc<[u8]>>;
+
 pub(super) fn icon_png(icon_set: IconSetType, icon_index: usize) -> Option<Arc<[u8]>> {
-  static ICONS: OnceLock<HashMap<(IconSetType, usize), Arc<[u8]>>> = OnceLock::new();
+  static ICONS: OnceLock<IconPngCache> = OnceLock::new();
   ICONS
     .get_or_init(|| {
       let mut icons = HashMap::new();
@@ -272,7 +274,7 @@ fn draw_flag(pixmap: &mut Pixmap, icon_index: usize) -> Option<()> {
 fn draw_traffic_light(pixmap: &mut Pixmap, icon_set: IconSetType, icon_index: usize) -> Option<()> {
   let color = *[RED, YELLOW, GREEN].get(icon_index)?;
   if icon_set == IconSetType::ThreeTrafficLights2 {
-    rounded_rect(pixmap, 3.0, 2.0, 18.0, 20.0, DARK, DARK, 1.0)?;
+    rounded_rect(pixmap, (3.0, 2.0, 18.0, 20.0), DARK, DARK, 1.0)?;
     circle(pixmap, 12.0, 12.0, 7.0, color, darker(color), 1.0)?;
   } else {
     circle(pixmap, 12.0, 12.0, 9.5, color, darker(color), 1.0)?;
@@ -368,10 +370,7 @@ fn draw_rating(pixmap: &mut Pixmap, count: usize, icon_index: usize) -> Option<(
     let color = if bar < active { GREEN } else { LIGHT };
     rect(
       pixmap,
-      left,
-      21.0 - height,
-      width,
-      height,
+      (left, 21.0 - height, width, height),
       color,
       darker(color),
       0.6,
@@ -420,7 +419,7 @@ fn draw_star(pixmap: &mut Pixmap, icon_index: usize) -> Option<()> {
     Transform::identity(),
   );
   if icon_index == 1 {
-    rect(pixmap, 12.0, 1.0, 11.0, 22.0, LIGHT, LIGHT, 0.0)?;
+    rect(pixmap, (12.0, 1.0, 11.0, 22.0), LIGHT, LIGHT, 0.0)?;
     stroke_path(pixmap, &path, darker(fill), 1.0);
   }
   Some(())
@@ -445,12 +444,18 @@ fn draw_triangle(pixmap: &mut Pixmap, icon_index: usize) -> Option<()> {
 }
 
 fn draw_box(pixmap: &mut Pixmap, icon_index: usize) -> Option<()> {
-  rect(pixmap, 3.0, 3.0, 18.0, 18.0, LIGHT, GRAY, 1.0)?;
+  rect(pixmap, (3.0, 3.0, 18.0, 18.0), LIGHT, GRAY, 1.0)?;
   let fractions = [0.0, 0.25, 0.5, 0.75, 1.0];
   let fraction = *fractions.get(icon_index)?;
   if fraction > f32::EPSILON {
     let height = 16.0 * fraction;
-    rect(pixmap, 4.0, 20.0 - height, 16.0, height, GREEN, GREEN, 0.0)?;
+    rect(
+      pixmap,
+      (4.0, 20.0 - height, 16.0, height),
+      GREEN,
+      GREEN,
+      0.0,
+    )?;
   }
   Some(())
 }
@@ -480,14 +485,12 @@ fn circle(
 
 fn rect(
   pixmap: &mut Pixmap,
-  x: f32,
-  y: f32,
-  width: f32,
-  height: f32,
+  bounds: (f32, f32, f32, f32),
   fill: [u8; 4],
   stroke: [u8; 4],
   stroke_width: f32,
 ) -> Option<()> {
+  let (x, y, width, height) = bounds;
   let path = polygon(&[
     (x, y),
     (x + width, y),
@@ -507,14 +510,12 @@ fn rect(
 
 fn rounded_rect(
   pixmap: &mut Pixmap,
-  x: f32,
-  y: f32,
-  width: f32,
-  height: f32,
+  bounds: (f32, f32, f32, f32),
   fill: [u8; 4],
   stroke: [u8; 4],
   stroke_width: f32,
 ) -> Option<()> {
+  let (x, y, width, height) = bounds;
   let rect = tiny_skia::Rect::from_xywh(x, y, width, height)?;
   let path = PathBuilder::from_rect(rect);
   fill_and_stroke(
@@ -557,8 +558,10 @@ fn fill_path(pixmap: &mut Pixmap, path: &Path, color: [u8; 4], transform: Transf
   if color[3] == 0 {
     return;
   }
-  let mut paint = Paint::default();
-  paint.anti_alias = true;
+  let mut paint = Paint {
+    anti_alias: true,
+    ..Paint::default()
+  };
   paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
   pixmap.fill_path(path, &paint, FillRule::Winding, transform, None);
 }
@@ -574,8 +577,10 @@ fn stroke_path_with_transform(
   width: f32,
   transform: Transform,
 ) {
-  let mut paint = Paint::default();
-  paint.anti_alias = true;
+  let mut paint = Paint {
+    anti_alias: true,
+    ..Paint::default()
+  };
   paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
   let stroke = Stroke {
     width,

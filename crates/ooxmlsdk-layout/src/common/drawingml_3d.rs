@@ -37,6 +37,14 @@ pub(crate) struct Static3dSurface {
   pub(crate) height_px: f32,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Static3dRenderOptions {
+  pub(crate) extrusion_color: Option<Static3dColor>,
+  pub(crate) contour_color: Option<Static3dColor>,
+  pub(crate) pixels_per_point: f32,
+  pub(crate) model_surface: Option<Static3dSurface>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Static3dProjection {
   /// Page-plane movement of one point of positive extrusion depth.
@@ -354,11 +362,14 @@ pub(crate) fn apply_static_3d(
   scene: &a::Scene3DType,
   projection: Static3dProjection,
   shape: &a::Shape3DType,
-  extrusion_color: Option<Static3dColor>,
-  contour_color: Option<Static3dColor>,
-  pixels_per_point: f32,
-  model_surface: Option<Static3dSurface>,
+  options: Static3dRenderOptions,
 ) {
+  let Static3dRenderOptions {
+    extrusion_color,
+    contour_color,
+    pixels_per_point,
+    model_surface,
+  } = options;
   let depth_pt = shape
     .extrusion_height
     .map(|value| value.to_emu() as f32 / EMUS_PER_POINT)
@@ -446,12 +457,14 @@ pub(crate) fn apply_static_3d(
       composite_projected_image(
         &mut back_face,
         &front,
-        projection,
-        back_z_px,
-        bounds,
-        model_surface,
-        pixels_per_point,
-        Some((extrusion, scale_shade(back_lighting, diffusion))),
+        ProjectedImageOptions {
+          projection,
+          z: back_z_px,
+          bounds,
+          model_surface,
+          pixels_per_point,
+          tint: Some((extrusion, scale_shade(back_lighting, diffusion))),
+        },
       );
       if bottom_bevel_px > 0 {
         let bevel_height_px = shape
@@ -464,15 +477,17 @@ pub(crate) fn apply_static_3d(
         composite_bevel(
           &mut back_face,
           &mask,
-          bottom_bevel_px,
-          bevel_height_px,
-          scene,
-          projection,
-          model_surface,
-          pixels_per_point,
-          back_z_px,
-          shape.preset_material,
-          true,
+          BevelOptions {
+            width: bottom_bevel_px,
+            height: bevel_height_px,
+            scene,
+            projection,
+            model_surface,
+            pixels_per_point,
+            surface_z: back_z_px,
+            material: shape.preset_material,
+            back_face: true,
+          },
         );
       }
       composite_image(image, &back_face);
@@ -480,17 +495,19 @@ pub(crate) fn apply_static_3d(
     composite_extrusion_edges(
       image,
       &front,
-      bounds,
-      model_surface,
-      projection,
-      front_z_px,
-      back_z_px,
-      pixels_per_point,
-      steps,
-      extrusion,
-      scene,
-      shape.preset_material,
-      wireframe,
+      ExtrusionEdgeOptions {
+        bounds,
+        model_surface,
+        projection,
+        front_z: front_z_px,
+        back_z: back_z_px,
+        pixels_per_point,
+        steps,
+        tint: extrusion,
+        scene,
+        material: shape.preset_material,
+        wireframe,
+      },
     );
   }
   if contour_px > 0 {
@@ -504,12 +521,14 @@ pub(crate) fn apply_static_3d(
     composite_projected_image(
       &mut silhouette,
       &front,
-      projection,
-      front_z_px,
-      bounds,
-      model_surface,
-      pixels_per_point,
-      None,
+      ProjectedImageOptions {
+        projection,
+        z: front_z_px,
+        bounds,
+        model_surface,
+        pixels_per_point,
+        tint: None,
+      },
     );
     composite_outline(image, &silhouette, contour_px, contour);
   }
@@ -524,15 +543,17 @@ pub(crate) fn apply_static_3d(
     composite_bevel(
       &mut front_face,
       &front,
-      top_bevel_px,
-      bevel_height_px,
-      scene,
-      projection,
-      model_surface,
-      pixels_per_point,
-      front_z_px,
-      shape.preset_material,
-      false,
+      BevelOptions {
+        width: top_bevel_px,
+        height: bevel_height_px,
+        scene,
+        projection,
+        model_surface,
+        pixels_per_point,
+        surface_z: front_z_px,
+        material: shape.preset_material,
+        back_face: false,
+      },
     );
   }
   if wireframe {
@@ -549,23 +570,27 @@ pub(crate) fn apply_static_3d(
     composite_projected_image(
       image,
       &outline,
-      projection,
-      front_z_px,
-      bounds,
-      model_surface,
-      pixels_per_point,
-      None,
+      ProjectedImageOptions {
+        projection,
+        z: front_z_px,
+        bounds,
+        model_surface,
+        pixels_per_point,
+        tint: None,
+      },
     );
   } else {
     composite_projected_image(
       image,
       &front_face,
-      projection,
-      front_z_px,
-      bounds,
-      model_surface,
-      pixels_per_point,
-      None,
+      ProjectedImageOptions {
+        projection,
+        z: front_z_px,
+        bounds,
+        model_surface,
+        pixels_per_point,
+        tint: None,
+      },
     );
   }
 }
@@ -1083,18 +1108,21 @@ fn average_extrusion_color(image: &RgbaImage) -> Static3dColor {
     blue += u64::from(pixel[2]) * weight;
     alpha += weight;
   }
-  let color = if alpha == 0 {
-    RgbColor {
+  let color = match (
+    red.checked_div(alpha),
+    green.checked_div(alpha),
+    blue.checked_div(alpha),
+  ) {
+    (Some(red), Some(green), Some(blue)) => RgbColor {
+      r: red as u8,
+      g: green as u8,
+      b: blue as u8,
+    },
+    _ => RgbColor {
       r: 128,
       g: 128,
       b: 128,
-    }
-  } else {
-    RgbColor {
-      r: (red / alpha) as u8,
-      g: (green / alpha) as u8,
-      b: (blue / alpha) as u8,
-    }
+    },
   };
   Static3dColor { color, alpha: 255 }
 }
@@ -1289,16 +1317,28 @@ fn projected_depth_steps(
   travel.ceil().clamp(1.0, 256.0) as u32
 }
 
-fn composite_projected_image(
-  destination: &mut RgbaImage,
-  source: &RgbaImage,
+struct ProjectedImageOptions {
   projection: Static3dProjection,
   z: f32,
   bounds: (i32, i32, i32, i32),
   model_surface: Static3dSurface,
   pixels_per_point: f32,
   tint: Option<(Static3dColor, [f32; 3])>,
+}
+
+fn composite_projected_image(
+  destination: &mut RgbaImage,
+  source: &RgbaImage,
+  options: ProjectedImageOptions,
 ) {
+  let ProjectedImageOptions {
+    projection,
+    z,
+    bounds,
+    model_surface,
+    pixels_per_point,
+    tint,
+  } = options;
   let (left, top, right, bottom) = bounds;
   let center_x = model_surface.left_px + model_surface.width_px * 0.5;
   let center_y = model_surface.top_px + model_surface.height_px * 0.5;
@@ -1452,9 +1492,7 @@ fn sample_bilinear(image: &RgbaImage, x: f32, y: f32) -> Option<Rgba<u8>> {
   ]))
 }
 
-fn composite_extrusion_edges(
-  destination: &mut RgbaImage,
-  source: &RgbaImage,
+struct ExtrusionEdgeOptions<'a> {
   bounds: (i32, i32, i32, i32),
   model_surface: Static3dSurface,
   projection: Static3dProjection,
@@ -1463,10 +1501,29 @@ fn composite_extrusion_edges(
   pixels_per_point: f32,
   steps: u32,
   tint: Static3dColor,
-  scene: &a::Scene3DType,
+  scene: &'a a::Scene3DType,
   material: Option<a::PresetMaterialTypeValues>,
   wireframe: bool,
+}
+
+fn composite_extrusion_edges(
+  destination: &mut RgbaImage,
+  source: &RgbaImage,
+  options: ExtrusionEdgeOptions<'_>,
 ) {
+  let ExtrusionEdgeOptions {
+    bounds,
+    model_surface,
+    projection,
+    front_z,
+    back_z,
+    pixels_per_point,
+    steps,
+    tint,
+    scene,
+    material,
+    wireframe,
+  } = options;
   let _ = bounds;
   let center_x = model_surface.left_px + model_surface.width_px * 0.5;
   let center_y = model_surface.top_px + model_surface.height_px * 0.5;
@@ -1604,8 +1661,10 @@ fn composite_extrusion_edges(
         let Some(path) = path.finish() else {
           continue;
         };
-        let mut paint = Paint::default();
-        paint.anti_alias = true;
+        let mut paint = Paint {
+          anti_alias: true,
+          ..Paint::default()
+        };
         paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
         side_layer.fill_path(
           &path,
@@ -1913,19 +1972,30 @@ fn is_alpha_boundary(image: &RgbaImage, x: i32, y: i32) -> bool {
   })
 }
 
-fn composite_bevel(
-  destination: &mut RgbaImage,
-  source: &RgbaImage,
+struct BevelOptions<'a> {
   width: i32,
   height: f32,
-  scene: &a::Scene3DType,
+  scene: &'a a::Scene3DType,
   projection: Static3dProjection,
   model_surface: Static3dSurface,
   pixels_per_point: f32,
   surface_z: f32,
   material: Option<a::PresetMaterialTypeValues>,
   back_face: bool,
-) {
+}
+
+fn composite_bevel(destination: &mut RgbaImage, source: &RgbaImage, options: BevelOptions<'_>) {
+  let BevelOptions {
+    width,
+    height,
+    scene,
+    projection,
+    model_surface,
+    pixels_per_point,
+    surface_z,
+    material,
+    back_face,
+  } = options;
   let is_inside = |x: i32, y: i32| -> bool {
     x >= 0
       && y >= 0
@@ -2167,8 +2237,8 @@ mod tests {
   use ooxmlsdk::units::CoordinateValue;
 
   use super::{
-    Static3dColor, apply_static_3d, bevel_terminal_inset, camera_projection, light_rig,
-    output_padding,
+    Static3dColor, Static3dRenderOptions, apply_static_3d, bevel_terminal_inset, camera_projection,
+    light_rig, output_padding,
   };
   use crate::model::RgbColor;
 
@@ -2265,13 +2335,15 @@ mod tests {
       &scene,
       camera_projection(&scene, 0.0),
       &shape,
-      Some(Static3dColor {
-        color: RgbColor { r: 255, g: 0, b: 0 },
-        alpha: 255,
-      }),
-      None,
-      1.0,
-      None,
+      Static3dRenderOptions {
+        extrusion_color: Some(Static3dColor {
+          color: RgbColor { r: 255, g: 0, b: 0 },
+          alpha: 255,
+        }),
+        contour_color: None,
+        pixels_per_point: 1.0,
+        model_surface: None,
+      },
     );
     // The front face is exactly edge-on at +90 degrees, while the extrusion
     // remains a visible side plane.
@@ -2314,10 +2386,12 @@ mod tests {
       &scene,
       camera_projection(&scene, 0.0),
       &shape,
-      None,
-      None,
-      1.0,
-      None,
+      Static3dRenderOptions {
+        extrusion_color: None,
+        contour_color: None,
+        pixels_per_point: 1.0,
+        model_surface: None,
+      },
     );
     assert!(!image.pixels().any(|pixel| pixel[3] != 0));
   }
@@ -2335,10 +2409,12 @@ mod tests {
       &scene,
       camera_projection(&scene, 0.0),
       &shape,
-      None,
-      None,
-      1.0,
-      None,
+      Static3dRenderOptions {
+        extrusion_color: None,
+        contour_color: None,
+        pixels_per_point: 1.0,
+        model_surface: None,
+      },
     );
     assert_eq!(image.get_pixel(2, 2)[3], 0);
     assert_eq!(image.get_pixel(0, 0), &Rgba([0, 0, 0, 255]));
@@ -2362,10 +2438,12 @@ mod tests {
       &scene,
       camera_projection(&scene, 0.0),
       &shape,
-      None,
-      None,
-      1.0,
-      None,
+      Static3dRenderOptions {
+        extrusion_color: None,
+        contour_color: None,
+        pixels_per_point: 1.0,
+        model_surface: None,
+      },
     );
 
     assert_ne!(image.get_pixel(0, 0), &Rgba([200, 40, 40, 255]));
@@ -2375,11 +2453,11 @@ mod tests {
   #[test]
   fn top_bevel_adds_material_specular_light_to_black_edges() {
     let mut scene = scene(a::PresetCameraValues::OrthographicFront);
-    scene.light_rig = Box::new(a::LightRig {
+    *scene.light_rig = a::LightRig {
       rig: a::LightRigValues::ThreePoints,
       direction: a::LightRigDirectionValues::Top,
       ..a::LightRig::default()
-    });
+    };
     let shape = a::Shape3DType {
       bevel_top: Some(a::BevelTop {
         width: Some(CoordinateValue::Emu(25_400)),
@@ -2395,10 +2473,12 @@ mod tests {
       &scene,
       camera_projection(&scene, 0.0),
       &shape,
-      None,
-      None,
-      1.0,
-      None,
+      Static3dRenderOptions {
+        extrusion_color: None,
+        contour_color: None,
+        pixels_per_point: 1.0,
+        model_surface: None,
+      },
     );
 
     assert!(image.pixels().any(|pixel| pixel[0] > 0));

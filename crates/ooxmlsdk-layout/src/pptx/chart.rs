@@ -987,7 +987,7 @@ pub(crate) fn lower_clustered_column_chart(
   }
   let plot_width = plot_right - plot_left;
   let plot_height = plot_bottom - plot_top;
-  let axis_line_width = style.axis_line_width_pt.unwrap_or_else(|| {
+  let axis_line_width = style.axis_line_width_pt.unwrap_or({
     (match style.layout_profile {
       ChartLayoutProfile::Word | ChartLayoutProfile::Excel => 1.0,
       ChartLayoutProfile::PowerPoint => 0.75,
@@ -1104,23 +1104,23 @@ pub(crate) fn lower_clustered_column_chart(
         }));
       }
     }
-    if let Some((color, width_pt)) = style.category_minor_gridline {
-      if let Some(positions) = date_axis_minor_tick_positions(chart) {
-        for position in positions {
-          if position <= f64::EPSILON || position >= 1.0 + f64::EPSILON {
-            continue;
-          }
-          let x = plot_left + position as f32 * plot_width;
-          items.push(PageItem::Line(LineItem {
-            x1_pt: x,
-            y1_pt: plot_top,
-            x2_pt: x,
-            y2_pt: plot_bottom,
-            width_pt,
-            color,
-            kind: LineItemKind::Stroke,
-          }));
+    if let Some((color, width_pt)) = style.category_minor_gridline
+      && let Some(positions) = date_axis_minor_tick_positions(chart)
+    {
+      for position in positions {
+        if position <= f64::EPSILON || position >= 1.0 + f64::EPSILON {
+          continue;
         }
+        let x = plot_left + position as f32 * plot_width;
+        items.push(PageItem::Line(LineItem {
+          x1_pt: x,
+          y1_pt: plot_top,
+          x2_pt: x,
+          y2_pt: plot_bottom,
+          width_pt,
+          color,
+          kind: LineItemKind::Stroke,
+        }));
       }
     }
   }

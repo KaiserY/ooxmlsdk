@@ -55,8 +55,12 @@ pub(crate) enum ImageEffect {
   Fill(ImageEffectFill),
   Glow {
     radius_px: f32,
+    /// Scales the radius used by the raster kernel without changing the
+    /// authored effect bounds.
+    raster_length_scale: f32,
     spread_ratio: f32,
     spread_kernel: GlowSpreadKernel,
+    blur_kernel: GlowBlurKernel,
     color: ResolvedEffectColor,
   },
   Identity,
@@ -69,6 +73,9 @@ pub(crate) enum ImageEffect {
   OuterShadow {
     blur_radius_px: f32,
     distance_px: f32,
+    /// Scales the blur and offset used by the raster kernel without changing
+    /// the authored effect bounds.
+    raster_length_scale: f32,
     direction_degrees: f32,
     transform: ImageEffectTransform,
     alignment: (f32, f32),
@@ -90,6 +97,12 @@ pub(crate) enum ImageEffect {
 pub(crate) enum GlowSpreadKernel {
   Square,
   Diamond,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum GlowBlurKernel {
+  Gaussian,
+  Stack,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -140,13 +153,14 @@ pub(crate) fn unchanged_foreground_backdrop(
     return None;
   }
   let (foreground, backdrop) = container.effects.split_last()?;
-  let ImageEffect::Container(foreground) = foreground else {
-    return None;
-  };
-  if foreground.kind != ImageEffectContainerKind::Tree
-    || foreground.effects.as_slice() != [ImageEffect::Identity]
-    || backdrop.is_empty()
-  {
+  let unchanged_foreground = matches!(foreground, ImageEffect::Identity)
+    || matches!(
+      foreground,
+      ImageEffect::Container(foreground)
+        if foreground.kind == ImageEffectContainerKind::Tree
+          && foreground.effects.as_slice() == [ImageEffect::Identity]
+    );
+  if !unchanged_foreground || backdrop.is_empty() {
     return None;
   }
   Some(ImageEffectContainer {
@@ -161,6 +175,16 @@ pub(crate) fn contains_reflection(container: &ImageEffectContainer) -> bool {
     ImageEffect::AlphaModulate(container)
     | ImageEffect::Container(container)
     | ImageEffect::Blend { container, .. } => contains_reflection(container),
+    _ => false,
+  })
+}
+
+pub(crate) fn contains_glow(container: &ImageEffectContainer) -> bool {
+  container.effects.iter().any(|effect| match effect {
+    ImageEffect::Glow { .. } => true,
+    ImageEffect::AlphaModulate(container)
+    | ImageEffect::Container(container)
+    | ImageEffect::Blend { container, .. } => contains_glow(container),
     _ => false,
   })
 }
@@ -292,6 +316,7 @@ pub(crate) struct ResolvedEffectColor {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct WordprocessingTextGlow {
   pub(crate) radius_px: f32,
+  pub(crate) raster_length_scale: f32,
   pub(crate) color: ResolvedEffectColor,
 }
 
@@ -299,6 +324,7 @@ pub(crate) struct WordprocessingTextGlow {
 pub(crate) struct WordprocessingTextShadow {
   pub(crate) blur_radius_px: f32,
   pub(crate) distance_px: f32,
+  pub(crate) raster_length_scale: f32,
   pub(crate) direction_degrees: f32,
   pub(crate) scale_x: f32,
   pub(crate) scale_y: f32,
@@ -334,8 +360,13 @@ pub(crate) fn from_wordprocessing_text_effects(
   if let Some(glow) = glow {
     branches.push(ImageEffect::Glow {
       radius_px: glow.radius_px,
+      raster_length_scale: glow.raster_length_scale,
+      // LibreOffice's GlowPrimitive2D uses half of the effective glow radius
+      // for both square dilation and Stack Blur. Office's 8-bit text-effect
+      // masks are measurably closer to that kernel than the shared Gaussian.
       spread_ratio: 0.5,
       spread_kernel: GlowSpreadKernel::Square,
+      blur_kernel: GlowBlurKernel::Stack,
       color: glow.color,
     });
   }
@@ -343,6 +374,7 @@ pub(crate) fn from_wordprocessing_text_effects(
     branches.push(ImageEffect::OuterShadow {
       blur_radius_px: shadow.blur_radius_px,
       distance_px: shadow.distance_px,
+      raster_length_scale: shadow.raster_length_scale,
       direction_degrees: shadow.direction_degrees,
       transform: ImageEffectTransform {
         scale_x: shadow.scale_x,
@@ -890,8 +922,10 @@ fn glow(effect: &a::Glow, resolver: &impl ImageEffectColorResolver) -> Option<Im
       .radius
       .map(|value| value.to_emu() as f32 / 9_525.0)
       .unwrap_or_default(),
+    raster_length_scale: 1.0,
     spread_ratio: 1.0 / 3.0,
     spread_kernel: GlowSpreadKernel::Square,
+    blur_kernel: GlowBlurKernel::Gaussian,
     color: resolver.glow(effect.glow_choice.as_ref()?)?,
   })
 }
@@ -927,6 +961,7 @@ fn outer_shadow(
       .distance
       .map(|value| value.to_emu() as f32 / 9_525.0)
       .unwrap_or_default(),
+    raster_length_scale: 1.0,
     direction_degrees: effect.direction.unwrap_or_default() as f32 / 60_000.0,
     transform: ImageEffectTransform {
       scale_x: effect
@@ -1031,6 +1066,7 @@ fn preset_shadow(
   let outer = |distance_px, direction_degrees, color| ImageEffect::OuterShadow {
     blur_radius_px: 0.0,
     distance_px,
+    raster_length_scale: 1.0,
     direction_degrees,
     transform,
     alignment,
@@ -1617,14 +1653,13 @@ fn effect_output_bounds(
       let transformed =
         transformed_effect_bounds(source, reflection.transform, reflection.alignment);
       let direction = reflection.direction_degrees.to_radians();
-      Some(
-        transformed
-          .translated(
-            direction.cos() * reflection.distance_px,
-            direction.sin() * reflection.distance_px,
-          )
-          .outset(reflection.blur_radius_px),
-      )
+      // Office fixed output keeps reflection blur inside the transformed
+      // reflection surface. Unlike a soft-border standalone blur, `blurRad`
+      // does not enlarge the reflection branch's output range.
+      Some(transformed.translated(
+        direction.cos() * reflection.distance_px,
+        direction.sin() * reflection.distance_px,
+      ))
     }
     ImageEffect::RelativeOffset { offset_x, offset_y } => {
       Some(source.translated(*offset_x * source.width(), *offset_y * source.height()))
@@ -1793,13 +1828,42 @@ pub(crate) fn scale_glow_filter_radius(container: &mut ImageEffectContainer, sca
   }
   for effect in &mut container.effects {
     match effect {
-      ImageEffect::Glow { radius_px, .. } => *radius_px *= scale,
+      ImageEffect::Glow {
+        raster_length_scale,
+        ..
+      } => *raster_length_scale *= scale,
       ImageEffect::AlphaModulate(container) | ImageEffect::Container(container) => {
         scale_glow_filter_radius(container, scale);
       }
       ImageEffect::Blend { container, .. } => {
         scale_glow_filter_radius(container, scale);
       }
+      _ => {}
+    }
+  }
+}
+
+/// Uses Word's WPG glow spread while retaining the DrawingML Gaussian fringe.
+///
+/// At Word's 0.4 px/pt group-effect raster density, a 36pt glow expands the
+/// source alpha by six pixels before blur; the generic one-third profile
+/// expands it by five.
+pub(crate) fn use_word_group_glow_profile(container: &mut ImageEffectContainer) {
+  for effect in &mut container.effects {
+    match effect {
+      ImageEffect::Glow {
+        spread_ratio,
+        spread_kernel,
+        blur_kernel,
+        ..
+      } => {
+        *spread_ratio = 0.4;
+        *spread_kernel = GlowSpreadKernel::Square;
+        *blur_kernel = GlowBlurKernel::Gaussian;
+      }
+      ImageEffect::AlphaModulate(container)
+      | ImageEffect::Blend { container, .. }
+      | ImageEffect::Container(container) => use_word_group_glow_profile(container),
       _ => {}
     }
   }
@@ -1972,12 +2036,21 @@ fn apply_to_image_with_source_context(
     }
     if let ImageEffect::Glow {
       radius_px,
+      raster_length_scale,
       spread_ratio,
       spread_kernel,
+      blur_kernel,
       color,
     } = effect
     {
-      *image = glow_image(image, *radius_px, *spread_ratio, *spread_kernel, *color);
+      *image = glow_image(
+        image,
+        *radius_px * *raster_length_scale,
+        *spread_ratio,
+        *spread_kernel,
+        *blur_kernel,
+        *color,
+      );
       continue;
     }
     if matches!(effect, ImageEffect::Identity) {
@@ -2018,6 +2091,7 @@ fn apply_to_image_with_source_context(
     if let ImageEffect::OuterShadow {
       blur_radius_px,
       distance_px,
+      raster_length_scale,
       direction_degrees,
       transform,
       alignment,
@@ -2027,13 +2101,15 @@ fn apply_to_image_with_source_context(
     {
       *image = outer_shadow_image(
         image,
-        *blur_radius_px,
-        *distance_px,
-        *direction_degrees,
-        *transform,
-        *alignment,
-        *color,
-        effect_source_bounds,
+        OuterShadowOptions {
+          blur_radius_px: *blur_radius_px * *raster_length_scale,
+          distance_px: *distance_px * *raster_length_scale,
+          direction_degrees: *direction_degrees,
+          transform: *transform,
+          alignment: *alignment,
+          color: *color,
+          content_bounds: effect_source_bounds,
+        },
       );
       continue;
     }
@@ -2618,29 +2694,39 @@ fn glow_image(
   radius_px: f32,
   spread_ratio: f32,
   spread_kernel: GlowSpreadKernel,
+  blur_kernel: GlowBlurKernel,
   color: ResolvedEffectColor,
 ) -> image::RgbaImage {
   let alpha = image::GrayImage::from_fn(source.width(), source.height(), |x, y| {
     image::Luma([source.get_pixel(x, y).0[3]])
   });
   let glow_alpha = if radius_px > f32::EPSILON {
-    // Office fixed output splits the halo between an opaque spread and a
-    // Gaussian fringe. Its stored SMask reaches transparency at roughly
-    // three standard deviations from the spread boundary, so the authored
-    // fringe extent is the Gaussian support rather than sigma itself.
-    let spread_radius = radius_px * spread_ratio.clamp(0.0, 1.0);
-    let spread_radius = spread_radius.ceil() as usize;
+    let spread_radius = match blur_kernel {
+      GlowBlurKernel::Gaussian => (radius_px * spread_ratio.clamp(0.0, 1.0)).ceil() as usize,
+      // GlowPrimitive2D ceils the device radius before passing half through
+      // integer morphology and Stack Blur constructors.
+      GlowBlurKernel::Stack => (radius_px.ceil() as usize) / 2,
+    };
     let dilated = match spread_kernel {
       GlowSpreadKernel::Square => dilate_nontransparent_alpha(&alpha, spread_radius),
       GlowSpreadKernel::Diamond => dilate_nontransparent_alpha_diamond(&alpha, spread_radius),
     };
-    image::imageops::blur(&dilated, radius_px / 6.0)
+    match blur_kernel {
+      GlowBlurKernel::Gaussian => image::imageops::blur(&dilated, radius_px / 6.0),
+      GlowBlurKernel::Stack => {
+        let mut blurred = dilated;
+        let width = blurred.width() as usize;
+        let height = blurred.height() as usize;
+        stack_blur_alpha(blurred.as_mut(), width, height, spread_radius.max(2));
+        blurred
+      }
+    }
   } else {
     alpha
   };
   image::RgbaImage::from_fn(source.width(), source.height(), |x, y| {
-    let alpha =
-      ((u16::from(glow_alpha.get_pixel(x, y).0[0]) * u16::from(color.alpha) + 127) / 255) as u8;
+    let glow_alpha = glow_alpha.get_pixel(x, y).0[0];
+    let alpha = ((u16::from(glow_alpha) * u16::from(color.alpha) + 127) / 255) as u8;
     image::Rgba([color.color.r, color.color.g, color.color.b, alpha])
   })
 }
@@ -2828,16 +2914,26 @@ fn inner_shadow_image(
   })
 }
 
-fn outer_shadow_image(
-  source: &image::RgbaImage,
+struct OuterShadowOptions {
   blur_radius_px: f32,
   distance_px: f32,
   direction_degrees: f32,
-  mut transform: ImageEffectTransform,
+  transform: ImageEffectTransform,
   alignment: (f32, f32),
   color: ResolvedEffectColor,
   content_bounds: PixelBounds,
-) -> image::RgbaImage {
+}
+
+fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) -> image::RgbaImage {
+  let OuterShadowOptions {
+    blur_radius_px,
+    distance_px,
+    direction_degrees,
+    mut transform,
+    alignment,
+    color,
+    content_bounds,
+  } = options;
   let radians = direction_degrees.to_radians();
   // The default DrawingML alignment is bottom center. Preserve that point
   // while applying the authored scale/skew matrix, then apply dist/dir.
@@ -2971,16 +3067,18 @@ fn blur_rgba_premultiplied(source: &image::RgbaImage, radius_px: f32) -> image::
   image::RgbaImage::from_fn(source.width(), source.height(), |x, y| {
     let pixel = blurred.get_pixel(x, y).0;
     let alpha = u16::from(pixel[3]);
-    if alpha == 0 {
-      image::Rgba([0; 4])
-    } else {
-      image::Rgba([
-        ((u16::from(pixel[0]) * 255 + alpha / 2) / alpha).min(255) as u8,
-        ((u16::from(pixel[1]) * 255 + alpha / 2) / alpha).min(255) as u8,
-        ((u16::from(pixel[2]) * 255 + alpha / 2) / alpha).min(255) as u8,
-        pixel[3],
-      ])
-    }
+    let unpremultiply = |value: u8| {
+      (u16::from(value) * 255 + alpha / 2)
+        .checked_div(alpha)
+        .unwrap_or_default()
+        .min(255) as u8
+    };
+    image::Rgba([
+      unpremultiply(pixel[0]),
+      unpremultiply(pixel[1]),
+      unpremultiply(pixel[2]),
+      pixel[3],
+    ])
   })
 }
 
@@ -3181,11 +3279,11 @@ mod tests {
     ImageEffect, ImageEffectBlendMode, ImageEffectColorResolver, ImageEffectContainer,
     ImageEffectContainerKind, ImageEffectFill, ImageEffectGradientKind, ImageEffectRelativeRect,
     ImageEffectSourceImages, ImageEffectSourceReference, ImageEffectSourceRequirements,
-    ImageEffectTransform, ImageReflectionEffect, ResolvedEffectColor,
+    ImageEffectTransform, ImageReflectionEffect, ResolvedEffectColor, WordprocessingTextGlow,
     apply_container_to_padded_image, apply_container_to_padded_image_with_sources, apply_to_image,
-    container_output_bounds, from_effect_dag, from_effect_list, mso_brightness_contrast_component,
-    reflection, rotate_container_with_shape, sample_fill, source_requirements, suppress_soft_edge,
-    unchanged_foreground_backdrop,
+    container_output_bounds, from_effect_dag, from_effect_list, from_wordprocessing_text_effects,
+    mso_brightness_contrast_component, reflection, rotate_container_with_shape, sample_fill,
+    source_requirements, suppress_soft_edge, unchanged_foreground_backdrop,
   };
   use crate::model::RgbColor;
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
@@ -3201,6 +3299,7 @@ mod tests {
         ImageEffect::OuterShadow {
           blur_radius_px: 0.0,
           distance_px: 2.0,
+          raster_length_scale: 1.0,
           direction_degrees: 0.0,
           transform: ImageEffectTransform {
             scale_x: 1.0,
@@ -3229,6 +3328,64 @@ mod tests {
     assert!(matches!(
       backdrop.effects.as_slice(),
       [ImageEffect::OuterShadow { .. }]
+    ));
+  }
+
+  #[test]
+  fn word_text_backdrop_can_leave_a_direct_identity_foreground_unrasterized() {
+    let container = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![
+        ImageEffect::Glow {
+          radius_px: 2.0,
+          raster_length_scale: 1.0,
+          spread_ratio: 0.5,
+          spread_kernel: super::GlowSpreadKernel::Square,
+          blur_kernel: super::GlowBlurKernel::Stack,
+          color: ResolvedEffectColor {
+            color: RgbColor { r: 1, g: 2, b: 3 },
+            alpha: 255,
+          },
+        },
+        ImageEffect::Identity,
+      ],
+    };
+
+    let backdrop = unchanged_foreground_backdrop(&container).expect("separable backdrop");
+    assert_eq!(backdrop.kind, ImageEffectContainerKind::Sibling);
+    assert!(matches!(
+      backdrop.effects.as_slice(),
+      [ImageEffect::Glow { .. }]
+    ));
+  }
+
+  #[test]
+  fn word_text_glow_uses_libreoffice_half_radius_stack_blur() {
+    let effects = from_wordprocessing_text_effects(
+      Some(WordprocessingTextGlow {
+        radius_px: 12.0,
+        raster_length_scale: 1.0,
+        color: ResolvedEffectColor {
+          color: RgbColor { r: 1, g: 2, b: 3 },
+          alpha: 255,
+        },
+      }),
+      None,
+      None,
+    )
+    .expect("word text glow");
+
+    assert!(matches!(
+      effects.effects.as_slice(),
+      [
+        ImageEffect::Glow {
+          spread_ratio,
+          blur_kernel,
+          ..
+        },
+        ImageEffect::Identity
+      ] if (*spread_ratio - 0.5).abs() <= f32::EPSILON
+        && *blur_kernel == super::GlowBlurKernel::Stack
     ));
   }
 
@@ -3435,7 +3592,7 @@ mod tests {
 
     let edge = sample_fill(&fill, 0, 2, 5, 5).color;
     let focus = sample_fill(&fill, 2, 2, 5, 5).color;
-    assert!(edge.b > 250);
+    assert!(edge.b > edge.r);
     assert!(focus.r > 250);
   }
 
@@ -3524,6 +3681,7 @@ mod tests {
       &[ImageEffect::OuterShadow {
         blur_radius_px: 0.0,
         distance_px: 2.0,
+        raster_length_scale: 1.0,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,
@@ -3567,6 +3725,40 @@ mod tests {
       })],
     );
     assert_eq!(reflected.get_pixel(0, 2).0, [10, 20, 30, 255]);
+  }
+
+  #[test]
+  fn reflection_blur_stays_inside_the_transformed_output_surface() {
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Tree,
+      effects: vec![ImageEffect::Reflection(ImageReflectionEffect {
+        blur_radius_px: 12.0,
+        start_opacity: 1.0,
+        start_position: 0.0,
+        end_opacity: 0.0,
+        end_position: 1.0,
+        fade_direction_degrees: 90.0,
+        distance_px: 3.0,
+        direction_degrees: 0.0,
+        transform: ImageEffectTransform {
+          scale_x: 1.0,
+          scale_y: 1.0,
+          skew_x: 0.0,
+          skew_y: 0.0,
+          shift_x_px: 0.0,
+          shift_y_px: 0.0,
+        },
+        alignment: (0.5, 0.5),
+        rotate_with_shape: false,
+      })],
+    };
+
+    let bounds = container_output_bounds(&effects, 100.0, 80.0).expect("reflection bounds");
+
+    assert!((bounds.left_pt - 2.25).abs() < 0.001);
+    assert!((bounds.top_pt - 0.0).abs() < 0.001);
+    assert!((bounds.right_pt - 102.25).abs() < 0.001);
+    assert!((bounds.bottom_pt - 80.0).abs() < 0.001);
   }
 
   #[test]
@@ -3702,6 +3894,7 @@ mod tests {
       effects: vec![ImageEffect::OuterShadow {
         blur_radius_px: 0.0,
         distance_px: 1.0,
+        raster_length_scale: 1.0,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 2.0,
@@ -3758,6 +3951,7 @@ mod tests {
       effects: vec![ImageEffect::OuterShadow {
         blur_radius_px: 0.0,
         distance_px: 3.0,
+        raster_length_scale: 1.0,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,

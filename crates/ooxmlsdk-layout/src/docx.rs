@@ -429,6 +429,7 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      metafile_native_size: false,
       picture_content_control: false,
       placement: ImagePlacement::Floating(FloatingImagePlacement {
         horizontal_relative_to: HorizontalImageReference::Page,
@@ -6790,6 +6791,7 @@ fn inline_image_impl(
         alt_text: inline.doc_properties.description.clone(),
         hyperlink_url,
         semantic_metafile_text: false,
+        metafile_native_size: true,
         picture_content_control: false,
         placement: ImagePlacement::Inline,
       })
@@ -6842,6 +6844,7 @@ fn inline_image_impl(
           .and_then(|properties| properties.description.clone()),
         hyperlink_url,
         semantic_metafile_text: false,
+        metafile_native_size: true,
         picture_content_control: false,
         placement: drawing_placement_with_effect_extent(
           ImagePlacement::Floating(floating_image_placement(anchor)),
@@ -8062,22 +8065,21 @@ fn wordprocessing_shape_textbox_frame(
       None,
     )?;
   let mapped = transform.map_rect(
-    offset_x_pt,
-    offset_y_pt,
-    shape_width_pt,
-    shape_height_pt,
-    properties.rotation_deg(),
-    properties.flip_horizontal(),
-    properties.flip_vertical(),
+    (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt),
+    (
+      properties.rotation_deg(),
+      properties.flip_horizontal(),
+      properties.flip_vertical(),
+    ),
   );
   apply_wordprocessing_shape_preset_text_rectangle(
     &properties,
-    mapped.width_pt,
-    mapped.height_pt,
-    wordprocessing_shape_textbox_text_rotation(shape).unwrap_or_default(),
-    mapped.rotation_deg,
-    mapped.flip_horizontal,
-    mapped.flip_vertical,
+    (mapped.width_pt, mapped.height_pt),
+    (
+      wordprocessing_shape_textbox_text_rotation(shape).unwrap_or_default(),
+      mapped.rotation_deg,
+    ),
+    (mapped.flip_horizontal, mapped.flip_vertical),
     &mut text_box,
   );
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
@@ -8144,7 +8146,7 @@ fn wordprocessing_shape_textbox_frame(
     placement,
     chart: None,
     text_warp,
-    text_fill,
+    text_fill: text_fill.map(Box::new),
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
     static3d: properties.static3d(&context.styles.theme_colors),
     text_upright: shape
@@ -8164,14 +8166,14 @@ fn wordprocessing_shape_textbox_frame(
 
 fn apply_wordprocessing_shape_preset_text_rectangle(
   properties: &DrawingMlShapeProperties,
-  width_pt: f32,
-  height_pt: f32,
-  text_rotation_deg: f32,
-  shape_rotation_deg: f32,
-  flip_horizontal: bool,
-  flip_vertical: bool,
+  size_pt: (f32, f32),
+  rotations_deg: (f32, f32),
+  flips: (bool, bool),
   frame: &mut TextBoxFrameContent,
 ) {
+  let (width_pt, height_pt) = size_pt;
+  let (text_rotation_deg, shape_rotation_deg) = rotations_deg;
+  let (flip_horizontal, flip_vertical) = flips;
   let Some(mut insets) = properties
     .preset_geometry()
     .and_then(|preset| drawingml_preset_text_rectangle_insets(preset, width_pt, height_pt))
@@ -8770,13 +8772,12 @@ fn drawingml_generic_shape_shape(
     transform.fallback_size,
   )?;
   let mapped = transform.map_rect(
-    offset_x_pt,
-    offset_y_pt,
-    width_pt,
-    height_pt,
-    properties.rotation_deg(),
-    properties.flip_horizontal(),
-    properties.flip_vertical(),
+    (offset_x_pt, offset_y_pt, width_pt, height_pt),
+    (
+      properties.rotation_deg(),
+      properties.flip_horizontal(),
+      properties.flip_vertical(),
+    ),
   );
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
@@ -8802,12 +8803,12 @@ fn drawingml_generic_shape_shape(
     flip_vertical: mapped.flip_vertical,
     fill_color,
     fill_pattern,
-    fill_override,
+    fill_override: fill_override.map(Box::new),
     additional_fill_colors: Vec::new(),
     fill_image,
     stroke,
     stroke_pattern,
-    stroke_override,
+    stroke_override: stroke_override.map(Box::new),
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
     inline_anchor_after_line: false,
@@ -8945,13 +8946,14 @@ fn wrap_wordprocessing_group_effects(
   placement: ImagePlacement,
   context: DrawingShapeImportContext<'_>,
 ) -> Vec<InlineItem> {
-  let Some(effects) = properties
+  let Some(mut effects) = properties
     .group_shape_properties_choice2
     .as_ref()
     .map(|choice| {
       let resolver = DocxImageEffectColorResolver {
         theme_colors: &context.styles.theme_colors,
         images: Some(context.images),
+        word_group_glow: true,
       };
       match choice {
         wpg::GroupShapePropertiesChoice2::EffectList(source) => common::DrawingEffectSource::List {
@@ -8971,6 +8973,17 @@ fn wrap_wordprocessing_group_effects(
   else {
     return children;
   };
+  match &mut effects {
+    common::DrawingEffectSource::List {
+      resolved: Some(value),
+      ..
+    }
+    | common::DrawingEffectSource::Dag {
+      resolved: Some(value),
+      ..
+    } => common::drawingml_image_effects::use_word_group_glow_profile(value),
+    _ => {}
+  }
   let has_runtime_effects = match &effects {
     common::DrawingEffectSource::List {
       resolved: Some(value),
@@ -9150,13 +9163,12 @@ fn wordprocessing_shape_shape(
     transform.fallback_size,
   )?;
   let mapped = transform.map_rect(
-    offset_x_pt,
-    offset_y_pt,
-    width_pt,
-    height_pt,
-    properties.rotation_deg(),
-    properties.flip_horizontal(),
-    properties.flip_vertical(),
+    (offset_x_pt, offset_y_pt, width_pt, height_pt),
+    (
+      properties.rotation_deg(),
+      properties.flip_horizontal(),
+      properties.flip_vertical(),
+    ),
   );
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
@@ -9182,12 +9194,12 @@ fn wordprocessing_shape_shape(
     flip_vertical: mapped.flip_vertical,
     fill_color,
     fill_pattern,
-    fill_override,
+    fill_override: fill_override.map(Box::new),
     additional_fill_colors: Vec::new(),
     fill_image,
     stroke,
     stroke_pattern,
-    stroke_override,
+    stroke_override: stroke_override.map(Box::new),
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
     inline_anchor_after_line: false,
@@ -9349,6 +9361,7 @@ fn wrap_diagram_group_effects(
       let resolver = DocxImageEffectColorResolver {
         theme_colors: &context.styles.theme_colors,
         images: Some(context.images),
+        word_group_glow: false,
       };
       match choice {
         dsp::GroupShapePropertiesChoice2::EffectList(source) => common::DrawingEffectSource::List {
@@ -9521,13 +9534,12 @@ fn drawingml_diagram_shape_shape(
     transform.fallback_size,
   )?;
   let mapped = transform.map_rect(
-    offset_x_pt,
-    offset_y_pt,
-    width_pt,
-    height_pt,
-    properties.rotation_deg(),
-    properties.flip_horizontal(),
-    properties.flip_vertical(),
+    (offset_x_pt, offset_y_pt, width_pt, height_pt),
+    (
+      properties.rotation_deg(),
+      properties.flip_horizontal(),
+      properties.flip_vertical(),
+    ),
   );
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
@@ -9552,12 +9564,12 @@ fn drawingml_diagram_shape_shape(
     flip_vertical: mapped.flip_vertical,
     fill_color,
     fill_pattern,
-    fill_override,
+    fill_override: fill_override.map(Box::new),
     additional_fill_colors: Vec::new(),
     fill_image,
     stroke,
     stroke_pattern,
-    stroke_override,
+    stroke_override: stroke_override.map(Box::new),
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
     inline_anchor_after_line: matches!(placement, ImagePlacement::Inline)
@@ -10350,14 +10362,11 @@ impl DrawingMlGroupTransform {
 
   fn map_rect(
     self,
-    x_pt: f32,
-    y_pt: f32,
-    width_pt: f32,
-    height_pt: f32,
-    rotation_deg: f32,
-    flip_horizontal: bool,
-    flip_vertical: bool,
+    rect: (f32, f32, f32, f32),
+    orientation: (f32, bool, bool),
   ) -> DrawingMlMappedRect {
+    let (x_pt, y_pt, width_pt, height_pt) = rect;
+    let (rotation_deg, flip_horizontal, flip_vertical) = orientation;
     let center = kurbo::Point::new(
       f64::from(x_pt + width_pt * 0.5),
       f64::from(y_pt + height_pt * 0.5),
@@ -10629,6 +10638,7 @@ impl DrawingMlShapeProperties {
         &DocxImageEffectColorResolver {
           theme_colors,
           images,
+          word_group_glow: false,
         },
       );
       common::DrawingEffectSource::Dag {
@@ -10643,6 +10653,7 @@ impl DrawingMlShapeProperties {
         &DocxImageEffectColorResolver {
           theme_colors,
           images,
+          word_group_glow: false,
         },
       );
       common::DrawingEffectSource::List {
@@ -10731,6 +10742,7 @@ impl DrawingMlShapeProperties {
     let resolver = DocxImageEffectColorResolver {
       theme_colors,
       images: None,
+      word_group_glow: false,
     };
     let extrusion_color = shape
       .extrusion_color
@@ -10934,20 +10946,21 @@ fn drawingml_group_transform_from_model(
   transform: &a::TransformGroup,
   raw_coordinates: bool,
 ) -> DrawingMlGroupXfrm {
-  let mut group = DrawingMlGroupXfrm::default();
-
-  group.rotation_deg = transform
-    .rotation
-    .map(|value| sdk_units::drawingml_angle_to_degrees(value) as f32)
-    .unwrap_or_default();
-  group.flip_horizontal = transform
-    .horizontal_flip
-    .as_ref()
-    .is_some_and(|value| value.as_bool());
-  group.flip_vertical = transform
-    .vertical_flip
-    .as_ref()
-    .is_some_and(|value| value.as_bool());
+  let mut group = DrawingMlGroupXfrm {
+    rotation_deg: transform
+      .rotation
+      .map(|value| sdk_units::drawingml_angle_to_degrees(value) as f32)
+      .unwrap_or_default(),
+    flip_horizontal: transform
+      .horizontal_flip
+      .as_ref()
+      .is_some_and(|value| value.as_bool()),
+    flip_vertical: transform
+      .vertical_flip
+      .as_ref()
+      .is_some_and(|value| value.as_bool()),
+    ..DrawingMlGroupXfrm::default()
+  };
   if let Some(offset) = &transform.offset {
     group.offset_x_pt = drawingml_coordinate_to_points(offset.x.to_emu(), raw_coordinates);
     group.offset_y_pt = drawingml_coordinate_to_points(offset.y.to_emu(), raw_coordinates);
@@ -11102,13 +11115,12 @@ fn drawingml_picture_frame(
     transform.fallback_size,
   )?;
   let mapped = transform.map_rect(
-    offset_x_pt,
-    offset_y_pt,
-    width_pt,
-    height_pt,
-    properties.rotation_deg(),
-    properties.flip_horizontal(),
-    properties.flip_vertical(),
+    (offset_x_pt, offset_y_pt, width_pt, height_pt),
+    (
+      properties.rotation_deg(),
+      properties.flip_horizontal(),
+      properties.flip_vertical(),
+    ),
   );
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
@@ -11134,12 +11146,12 @@ fn drawingml_picture_frame(
     flip_vertical: mapped.flip_vertical,
     fill_color,
     fill_pattern,
-    fill_override,
+    fill_override: fill_override.map(Box::new),
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke,
     stroke_pattern: None,
-    stroke_override,
+    stroke_override: stroke_override.map(Box::new),
     suppress_zero_relative_background: false,
     allow_outside_page: false,
     inline_anchor_after_line: false,
@@ -11189,13 +11201,12 @@ fn drawingml_picture_image(
     None,
   )?;
   let mapped = transform.map_rect(
-    offset_x_pt,
-    offset_y_pt,
-    width_pt,
-    height_pt,
-    properties.rotation_deg,
-    properties.flip_horizontal,
-    properties.flip_vertical,
+    (offset_x_pt, offset_y_pt, width_pt, height_pt),
+    (
+      properties.rotation_deg,
+      properties.flip_horizontal,
+      properties.flip_vertical,
+    ),
   );
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
@@ -11225,6 +11236,7 @@ fn drawingml_picture_image(
     alt_text: drawingml_picture_alt_text(picture),
     hyperlink_url,
     semantic_metafile_text: false,
+    metafile_native_size: true,
     picture_content_control: false,
     placement: drawingml_child_placement(placement, offset_x_pt, offset_y_pt),
   })
@@ -12082,8 +12094,8 @@ fn vml_special_shape(
     paths: crate::xlsx::vml_shape_drawing_paths(&model, shape.width_pt, shape.height_pt)?,
     outline: None,
   };
-  shape.fill_override = Some(fill_override);
-  shape.stroke_override = stroke_override;
+  shape.fill_override = Some(Box::new(fill_override));
+  shape.stroke_override = stroke_override.map(Box::new);
   apply_vml_model_wrap(&mut shape, &model);
   if !model.text.is_empty() {
     shape.text_box_blocks = vec![simple_text_block(model.text, TextStyle::default())];
@@ -12232,12 +12244,12 @@ fn vml_shape_shape_with_style(
       .flatten(),
   )?;
   if !has_fill_image {
-    inline.fill_override = Some(crate::xlsx::vml_shape_common_fill(
+    inline.fill_override = Some(Box::new(crate::xlsx::vml_shape_common_fill(
       &common_model,
       Affine::IDENTITY,
-    ));
+    )));
   }
-  inline.stroke_override = crate::xlsx::vml_shape_common_stroke(&common_model);
+  inline.stroke_override = crate::xlsx::vml_shape_common_stroke(&common_model).map(Box::new);
   if let Some(path) = path
     && let Some(geometry) = vml_path_geometry(
       path,
@@ -13159,12 +13171,12 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
     flip_vertical: style.flip_vertical,
     fill_color,
     fill_pattern: None,
-    fill_override: Some(fill_override),
+    fill_override: Some(Box::new(fill_override)),
     additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke,
     stroke_pattern: None,
-    stroke_override,
+    stroke_override: stroke_override.map(Box::new),
     suppress_zero_relative_background: false,
     allow_outside_page: style.absolute_position,
     inline_anchor_after_line: false,
@@ -14269,6 +14281,7 @@ fn vml_image_data(
     alt_text: alt_text.or_else(|| data.title.clone()),
     hyperlink_url: None,
     semantic_metafile_text: false,
+    metafile_native_size: false,
     picture_content_control: false,
     placement: style.placement(),
   })
@@ -14764,6 +14777,7 @@ struct DrawingImageProperties {
 struct DocxImageEffectColorResolver<'a> {
   theme_colors: &'a ThemeColors,
   images: Option<&'a ImageCatalog>,
+  word_group_glow: bool,
 }
 
 impl DocxImageEffectColorResolver<'_> {
@@ -14818,6 +14832,19 @@ impl ImageEffectColorResolver for DocxImageEffectColorResolver<'_> {
   }
 
   fn glow(&self, choice: &a::GlowChoice) -> Option<ResolvedEffectColor> {
+    if self.word_group_glow
+      && let a::GlowChoice::SchemeColor(color) = choice
+      && let [a::SchemeColorChoice::SaturationModulation(modulation)] =
+        color.scheme_color_choice.as_slice()
+    {
+      let base = resolve_drawingml_scheme_color_value(color.val, self.theme_colors)?;
+      let amount = drawingml_percent_to_ratio(&modulation.val)?;
+      let [r, g, b] = color_math::apply_linear_saturation_mod([base.r, base.g, base.b], amount);
+      return Some(ResolvedEffectColor {
+        color: RgbColor { r, g, b },
+        alpha: u8::MAX,
+      });
+    }
     self.resolve(Color::from_glow_choice(choice))
   }
 
@@ -15060,6 +15087,7 @@ fn apply_image_effects_from_blip(
       &DocxImageEffectColorResolver {
         theme_colors,
         images,
+        word_group_glow: false,
       },
     ));
 }
@@ -15173,8 +15201,14 @@ struct StylesCatalog {
   theme_fonts: ThemeFonts,
   theme_colors: ThemeColors,
   theme_lines: ThemeLineStyles,
-  font_substitutions: HashMap<String, Arc<str>>,
+  font_substitutions: HashMap<String, FontSubstitution>,
   styles: HashMap<String, StyleEntry>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct FontSubstitution {
+  alternate_family: Option<Arc<str>>,
+  family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -15717,12 +15751,15 @@ impl StylesCatalog {
     let Some(family) = style.font_family.as_deref() else {
       return;
     };
-    let Some(substitute) = self.font_substitutions.get(&family.to_ascii_lowercase()) else {
+    let Some(substitution) = self.font_substitutions.get(&family.to_ascii_lowercase()) else {
       return;
     };
-    if !family.eq_ignore_ascii_case(substitute) {
+    if let Some(substitute) = &substitution.alternate_family
+      && !family.eq_ignore_ascii_case(substitute)
+    {
       style.fallback_font_family = Some(substitute.clone());
     }
+    style.font_family_class = substitution.family_class;
   }
 
   fn style_ref_keys(&self, style_id: &str) -> Vec<Arc<str>> {
@@ -15776,7 +15813,7 @@ impl StylesCatalog {
 fn load_font_substitutions(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
-) -> HashMap<String, Arc<str>> {
+) -> HashMap<String, FontSubstitution> {
   let Some(font_table_part) = main.font_table_part(package) else {
     return HashMap::new();
   };
@@ -15794,16 +15831,39 @@ fn load_font_substitutions(
       // comma-delimited set used when the primary font is unavailable. The
       // current font request model accepts one document-scoped substitute,
       // so preserve the specified priority by selecting the first name.
-      let substitute = font
+      let alternate_family = font
         .alt_name
-        .as_ref()?
-        .val
-        .as_str()
-        .split(',')
-        .map(str::trim)
-        .find(|name| !name.is_empty())?;
+        .as_ref()
+        .and_then(|alternate| {
+          alternate
+            .val
+            .as_str()
+            .split(',')
+            .map(str::trim)
+            .find(|name| !name.is_empty())
+        })
+        .map(Arc::from);
+      let family_class = font
+        .font_family
+        .as_ref()
+        .and_then(|family| match family.val {
+          w::FontFamilyValues::Roman => Some(ooxmlsdk_fonts::FontFamilyClass::Serif),
+          w::FontFamilyValues::Swiss => Some(ooxmlsdk_fonts::FontFamilyClass::SansSerif),
+          w::FontFamilyValues::Modern => Some(ooxmlsdk_fonts::FontFamilyClass::Fixed),
+          w::FontFamilyValues::Decorative => Some(ooxmlsdk_fonts::FontFamilyClass::Decorative),
+          w::FontFamilyValues::Script => Some(ooxmlsdk_fonts::FontFamilyClass::BrushScript),
+          w::FontFamilyValues::Auto => None,
+        });
       let family = font.name.as_str().trim();
-      (!family.is_empty()).then(|| (family.to_ascii_lowercase(), Arc::from(substitute)))
+      (!family.is_empty() && (alternate_family.is_some() || family_class.is_some())).then(|| {
+        (
+          family.to_ascii_lowercase(),
+          FontSubstitution {
+            alternate_family,
+            family_class,
+          },
+        )
+      })
     })
     .collect()
 }
@@ -17711,6 +17771,7 @@ fn numbering_drawing_image(
     alt_text,
     hyperlink_url: None,
     semantic_metafile_text: false,
+    metafile_native_size: true,
     picture_content_control: false,
     placement: ImagePlacement::Inline,
   })
@@ -20309,6 +20370,32 @@ mod tests {
   }
 
   #[test]
+  fn word_font_table_family_class_reaches_the_font_request_style() {
+    let styles = StylesCatalog {
+      font_substitutions: HashMap::from([(
+        "metabook-roman".to_string(),
+        FontSubstitution {
+          alternate_family: None,
+          family_class: Some(ooxmlsdk_fonts::FontFamilyClass::Serif),
+        },
+      )]),
+      ..StylesCatalog::default()
+    };
+    let mut style = TextStyle {
+      font_family: Some(Arc::from("MetaBook-Roman")),
+      ..TextStyle::default()
+    };
+
+    styles.apply_font_substitution(&mut style);
+
+    assert_eq!(
+      style.font_family_class,
+      Some(ooxmlsdk_fonts::FontFamilyClass::Serif)
+    );
+    assert_eq!(style.fallback_font_family, None);
+  }
+
+  #[test]
   fn word_theme_font_language_selects_supplemental_east_asian_face() {
     let fonts = ThemeFonts {
       major_ascii: Some(Arc::from("Cambria")),
@@ -22479,7 +22566,6 @@ mod tests {
           ..Default::default()
         }))],
       },
-      ..Default::default()
     };
     let run = w::Run {
       run_choice: vec![
@@ -22882,6 +22968,49 @@ mod tests {
         InlineItem::DrawingGroupEnd
       ]
     ));
+    let InlineItem::DrawingGroupStart(group_effect) = &items[0] else {
+      unreachable!("group effects must wrap the child shape");
+    };
+    let resolved = match &group_effect.effects {
+      common::DrawingEffectSource::List {
+        resolved: Some(value),
+        ..
+      } => value,
+      _ => panic!("effect list must resolve for WPG group rendering"),
+    };
+    fn glow_profile(
+      container: &common::drawingml_image_effects::ImageEffectContainer,
+    ) -> Option<(
+      f32,
+      common::drawingml_image_effects::GlowSpreadKernel,
+      common::drawingml_image_effects::GlowBlurKernel,
+    )> {
+      container.effects.iter().find_map(|effect| match effect {
+        common::drawingml_image_effects::ImageEffect::Glow {
+          spread_ratio,
+          spread_kernel,
+          blur_kernel,
+          ..
+        } => Some((*spread_ratio, *spread_kernel, *blur_kernel)),
+        common::drawingml_image_effects::ImageEffect::AlphaModulate(container)
+        | common::drawingml_image_effects::ImageEffect::Container(container)
+        | common::drawingml_image_effects::ImageEffect::Blend { container, .. } => {
+          glow_profile(container)
+        }
+        _ => None,
+      })
+    }
+    let (spread_ratio, spread_kernel, blur_kernel) =
+      glow_profile(resolved).expect("resolved WPG glow");
+    assert!((spread_ratio - 0.4).abs() < f32::EPSILON);
+    assert_eq!(
+      spread_kernel,
+      common::drawingml_image_effects::GlowSpreadKernel::Square
+    );
+    assert_eq!(
+      blur_kernel,
+      common::drawingml_image_effects::GlowBlurKernel::Gaussian
+    );
 
     let empty = group("<a:effectLst/>");
     let items = import(&empty);
@@ -22898,7 +23027,7 @@ mod tests {
       child_height: 100.0,
       ..DrawingMlGroupXfrm::default()
     });
-    let mapped = transform.map_rect(0.0, 0.0, 200.0, 100.0, 0.0, false, false);
+    let mapped = transform.map_rect((0.0, 0.0, 200.0, 100.0), (0.0, false, false));
 
     assert!((mapped.rotation_deg - 90.0).abs() < 0.001);
     assert!((mapped.width_pt - 200.0).abs() < 0.001);

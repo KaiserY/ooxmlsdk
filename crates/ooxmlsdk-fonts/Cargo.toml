@@ -22,8 +22,8 @@ harfrust = { workspace = true }
 icu_segmenter = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"], optional = true }
 smallvec = { workspace = true }
+skrifa = { workspace = true }
 thiserror = { workspace = true }
-ttf-parser = { workspace = true }
 unicode-bidi = { workspace = true }
 unicode-script = { workspace = true }
 yoke = { workspace = true }

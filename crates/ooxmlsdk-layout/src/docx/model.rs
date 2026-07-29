@@ -17,6 +17,7 @@ pub(crate) struct DocxDocument {
   pub line_number_style: TextStyle,
   pub has_styles_part: bool,
   pub default_tab_stop_pt: f32,
+  pub hyphenation: HyphenationSettings,
   pub compatibility_mode: u16,
   pub justify_lines_with_shrinking: bool,
   pub even_and_odd_headers: bool,
@@ -35,6 +36,38 @@ pub(crate) struct DocxDocument {
   pub endnote_numbering: Vec<NoteNumberingSpec>,
   pub title_page: bool,
   pub blocks: Vec<Block>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct HyphenationSettings {
+  pub automatic: bool,
+  pub consecutive_line_limit: u16,
+  pub zone_pt: f32,
+  pub do_not_hyphenate_caps: bool,
+  pub page_bottom: PageBottomHyphenation,
+}
+
+impl Default for HyphenationSettings {
+  fn default() -> Self {
+    Self {
+      automatic: false,
+      consecutive_line_limit: 0,
+      // ECMA-376 Part 1 §17.15.1.53 initializes an omitted zone to
+      // 360 twentieths of a point.
+      zone_pt: 18.0,
+      do_not_hyphenate_caps: false,
+      // [MS-DOCX] makes an omitted useWord2013TrackBottomHyphenation setting
+      // use the Word 2013 behavior: move the whole bottom line.
+      page_bottom: PageBottomHyphenation::MoveLine,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum PageBottomHyphenation {
+  Allow,
+  #[default]
+  MoveLine,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -307,6 +340,7 @@ pub(crate) struct ParagraphFormat {
   pub keep_lines_set: bool,
   pub contextual_spacing: bool,
   pub contextual_spacing_set: bool,
+  pub suppress_auto_hyphens: Option<bool>,
   pub hidden_separator: bool,
   pub outline_text_inlines: Option<usize>,
   pub outline_level: Option<u8>,

@@ -140,7 +140,17 @@ pub(super) fn merge_run_style(
       style.complex_font_family = Some(font_family);
     }
   }
-
+  if let Some(languages) = properties.languages() {
+    if let Some(language) = languages.val.as_deref() {
+      style.language = Some(Arc::<str>::from(language));
+    }
+    if let Some(language) = languages.east_asia.as_deref() {
+      style.east_asia_language = Some(Arc::<str>::from(language));
+    }
+    if let Some(language) = languages.bidi.as_deref() {
+      style.bidi_language = Some(Arc::<str>::from(language));
+    }
+  }
   if let Some(bold) = properties.bold() {
     style.bold = bold.val.is_none_or(|value| value.as_bool());
   }

@@ -157,6 +157,12 @@ pub enum PdfTextSegmentation {
   Line,
   WordLine,
   Portion,
+  /// A visible hyphen inserted by Word's automatic hyphenation engine.
+  ///
+  /// Keep the physical and semantic glyph as a hyphen-minus. PDF text
+  /// extractors identify the line-end discretionary use (PDFium reports it as
+  /// U+0002), while the same glyph at a page boundary remains a literal `-`.
+  AutomaticHyphen,
 }
 
 #[derive(Clone, Debug, PartialEq)]

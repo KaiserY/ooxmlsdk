@@ -1,8 +1,11 @@
 use std::borrow::Cow;
+use std::collections::VecDeque;
 use std::io::Cursor;
 use std::sync::Arc;
 
-use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
+use icu_segmenter::{
+  GraphemeClusterSegmenter, LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions,
+};
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder};
 use kurbo::{Affine, BezPath, Rect as KurboRect, Shape};
@@ -19,9 +22,9 @@ use crate::docx::{
   FrameVerticalAnchor, FrameWrapMode, HorizontalImageAlignment, HorizontalImageReference,
   ImageCrop, ImageWrapMode, ImageWrapSide, InlineChart, InlineDrawingGroupEffect, InlineItem,
   InlineShape, InlineShapeGeometry, InlineShapeImageFill, InlineShapeImageFillMode, LineHeightRule,
-  LineNumbering, NoteNumberingSpec, PRESERVED_WORD_TEXT_TAB, PageSetup, ParagraphAlignment,
-  RgbColor, RubyAlignment, RubyInline, SectionBreakKind, SectionColumns, TabLeader, TabStop,
-  TabStopAlignment, Table, TableAlignment, TableBordersModel, TableCell,
+  LineNumbering, NoteNumberingSpec, PRESERVED_WORD_TEXT_TAB, PageBottomHyphenation, PageSetup,
+  ParagraphAlignment, RgbColor, RubyAlignment, RubyInline, SectionBreakKind, SectionColumns,
+  TabLeader, TabStop, TabStopAlignment, Table, TableAlignment, TableBordersModel, TableCell,
   TableCellVerticalAlignment, TableLayoutMode, TableRow, TextBoxVerticalAlignment, TextRun,
   TextStyle, VerticalImageAlignment, VerticalImageReference, paragraph_is_effectively_empty,
 };
@@ -57,6 +60,7 @@ const TABLE_ROW_MIN_HEIGHT_PT: f32 = LO_MIN_FRAME_SIZE_PT;
 const TABLE_SPACING_AFTER_PT: f32 = 0.0;
 const DEFAULT_ORPHAN_LINES: usize = 2;
 const DEFAULT_WIDOW_LINES: usize = 2;
+const MAX_HYPHENATION_BOTTOM_REFLOWS: u8 = 32;
 const MOVE_BACKWARD_SUPPRESS_THRESHOLD: usize = 20;
 const LAYOUT_LOOP_CONTROL_MAX: usize = 10_000;
 const UNBOUNDED_LAYOUT_EXTENT_PT: f32 = f32::MAX / 4.0;
@@ -1096,6 +1100,7 @@ pub(crate) enum PdfTextSegmentation {
   Line,
   WordLine,
   Portion,
+  AutomaticHyphen,
 }
 
 #[derive(Clone, Debug)]
@@ -1191,6 +1196,8 @@ struct FlowContext {
   layout_cell_bounds: Option<FrameBounds>,
   layout_cell_print_bounds: Option<FrameBounds>,
   default_tab_stop_pt: f32,
+  hyphenation: crate::docx::HyphenationSettings,
+  consecutive_hyphenated_lines: u16,
   compatibility_mode: u16,
   justify_lines_with_shrinking: bool,
   split_page_break_and_paragraph_mark: bool,
@@ -1262,6 +1269,7 @@ struct WrapExclusion {
   bottom_pt: f32,
   side: ImageWrapSide,
   blocks_flow: bool,
+  uses_contour: bool,
   owner: WrapExclusionOwner,
 }
 
@@ -1325,6 +1333,8 @@ struct BlockArea {
   body_content_bottom_pt: f32,
   content_width: f32,
   default_tab_stop_pt: f32,
+  hyphenation: crate::docx::HyphenationSettings,
+  consecutive_hyphenated_lines: u16,
   compatibility_mode: u16,
   justify_lines_with_shrinking: bool,
   repeating_slots: RepeatingSlotState,
@@ -2733,6 +2743,7 @@ fn into_common_text_run(item: TextItem) -> common::TextRun<'static> {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
       PdfTextSegmentation::WordLine => common::PdfTextSegmentation::WordLine,
       PdfTextSegmentation::Portion => common::PdfTextSegmentation::Portion,
+      PdfTextSegmentation::AutomaticHyphen => common::PdfTextSegmentation::AutomaticHyphen,
     },
     source: None,
   }
@@ -3381,6 +3392,7 @@ impl<'a> RootFrameLayout<'a> {
           &mut self.text_metrics,
         ),
         compatibility_mode: self.document.compatibility_mode,
+        hyphenation: self.document.hyphenation,
         justify_lines_with_shrinking: self.document.justify_lines_with_shrinking,
         split_page_break_and_paragraph_mark: self.document.split_page_break_and_paragraph_mark,
         ..flow
@@ -6686,6 +6698,8 @@ fn flow_context(
     layout_cell_bounds: None,
     layout_cell_print_bounds: None,
     default_tab_stop_pt,
+    hyphenation: crate::docx::HyphenationSettings::default(),
+    consecutive_hyphenated_lines: 0,
     compatibility_mode: 12,
     justify_lines_with_shrinking: false,
     split_page_break_and_paragraph_mark: false,
@@ -6990,7 +7004,7 @@ fn estimated_paragraph_content_height(
             x = 0.0;
           }
           if width > content_width && x <= 0.0 && !segment.chars().all(char::is_whitespace) {
-            for text in emergency_break_segments(&segment) {
+            for text in emergency_character_segments(&segment) {
               let width = text_metrics.measure_text(&text, &run.style);
               if width > content_width && text.chars().count() > 1 {
                 for ch in text.chars() {
@@ -7665,6 +7679,8 @@ fn block_area(flow: FlowContext) -> BlockArea {
     body_content_bottom_pt: flow.body_content_bottom_pt,
     content_width: flow.content_width,
     default_tab_stop_pt: flow.default_tab_stop_pt,
+    hyphenation: flow.hyphenation,
+    consecutive_hyphenated_lines: flow.consecutive_hyphenated_lines,
     compatibility_mode: flow.compatibility_mode,
     justify_lines_with_shrinking: flow.justify_lines_with_shrinking,
     repeating_slots: flow.repeating_slots,
@@ -7686,6 +7702,8 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
     layout_cell_bounds: None,
     layout_cell_print_bounds: None,
     default_tab_stop_pt: area.default_tab_stop_pt,
+    hyphenation: area.hyphenation,
+    consecutive_hyphenated_lines: area.consecutive_hyphenated_lines,
     compatibility_mode: area.compatibility_mode,
     justify_lines_with_shrinking: area.justify_lines_with_shrinking,
     split_page_break_and_paragraph_mark: false,
@@ -8207,6 +8225,8 @@ fn repeating_slot_wrap_exclusions_for_page(
       layout_cell_bounds: None,
       layout_cell_print_bounds: None,
       default_tab_stop_pt: document.default_tab_stop_pt,
+      hyphenation: document.hyphenation,
+      consecutive_hyphenated_lines: 0,
       compatibility_mode: document.compatibility_mode,
       justify_lines_with_shrinking: document.justify_lines_with_shrinking,
       split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
@@ -8245,6 +8265,8 @@ fn repeating_slot_wrap_exclusions_for_page(
       layout_cell_bounds: None,
       layout_cell_print_bounds: None,
       default_tab_stop_pt: document.default_tab_stop_pt,
+      hyphenation: document.hyphenation,
+      consecutive_hyphenated_lines: 0,
       compatibility_mode: document.compatibility_mode,
       justify_lines_with_shrinking: document.justify_lines_with_shrinking,
       split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
@@ -8342,6 +8364,7 @@ fn append_vertical_wrap_exclusion(
     bottom_pt,
     side: ImageWrapSide::BothSides,
     blocks_flow: true,
+    uses_contour: false,
     owner: WrapExclusionOwner::Drawing,
   };
   extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &[exclusion]);
@@ -8402,6 +8425,8 @@ fn apply_headers_and_footers(
         layout_cell_bounds: None,
         layout_cell_print_bounds: None,
         default_tab_stop_pt: document.default_tab_stop_pt,
+        hyphenation: document.hyphenation,
+        consecutive_hyphenated_lines: 0,
         compatibility_mode: document.compatibility_mode,
         justify_lines_with_shrinking: document.justify_lines_with_shrinking,
         split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
@@ -8440,6 +8465,8 @@ fn apply_headers_and_footers(
         layout_cell_bounds: None,
         layout_cell_print_bounds: None,
         default_tab_stop_pt: document.default_tab_stop_pt,
+        hyphenation: document.hyphenation,
+        consecutive_hyphenated_lines: 0,
         compatibility_mode: document.compatibility_mode,
         justify_lines_with_shrinking: document.justify_lines_with_shrinking,
         split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
@@ -9668,6 +9695,8 @@ fn measured_repeating_blocks_height(
     layout_cell_bounds: None,
     layout_cell_print_bounds: None,
     default_tab_stop_pt,
+    hyphenation: crate::docx::HyphenationSettings::default(),
+    consecutive_hyphenated_lines: 0,
     compatibility_mode: 12,
     justify_lines_with_shrinking: false,
     split_page_break_and_paragraph_mark: false,
@@ -10330,6 +10359,7 @@ fn append_floating_table_wrap_exclusion(
     bottom_pt: bottom_pt + placement.margin_bottom_pt,
     side: ImageWrapSide::BothSides,
     blocks_flow,
+    uses_contour: false,
     owner: WrapExclusionOwner::FloatingTable,
   };
   page.wrap_exclusions.push(exclusion);
@@ -14427,6 +14457,8 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
       height_pt: (height - top_margin_for_lowers - bottom_margin_for_lowers).max(0.0),
     }),
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+    hyphenation: crate::docx::HyphenationSettings::default(),
+    consecutive_hyphenated_lines: 0,
     compatibility_mode,
     justify_lines_with_shrinking: compatibility_mode >= 15,
     split_page_break_and_paragraph_mark: false,
@@ -14809,6 +14841,8 @@ fn table_cell_first_content_line_height(
           layout_cell_bounds: None,
           layout_cell_print_bounds: None,
           default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+          hyphenation: crate::docx::HyphenationSettings::default(),
+          consecutive_hyphenated_lines: 0,
           compatibility_mode: 12,
           justify_lines_with_shrinking: false,
           split_page_break_and_paragraph_mark: false,
@@ -14844,6 +14878,8 @@ fn table_cell_first_content_line_height(
           body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
           content_width,
           default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+          hyphenation: crate::docx::HyphenationSettings::default(),
+          consecutive_hyphenated_lines: 0,
           compatibility_mode: 12,
           justify_lines_with_shrinking: false,
           repeating_slots: RepeatingSlotState::default(),
@@ -14868,6 +14904,8 @@ fn table_cell_first_content_line_height(
             layout_cell_bounds: None,
             layout_cell_print_bounds: None,
             default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+            hyphenation: crate::docx::HyphenationSettings::default(),
+            consecutive_hyphenated_lines: 0,
             compatibility_mode: 12,
             justify_lines_with_shrinking: false,
             split_page_break_and_paragraph_mark: false,
@@ -14986,6 +15024,8 @@ fn layout_shape_text_box(
     layout_cell_bounds: parent_flow.layout_cell_bounds,
     layout_cell_print_bounds: parent_flow.layout_cell_print_bounds,
     default_tab_stop_pt: parent_flow.default_tab_stop_pt,
+    hyphenation: parent_flow.hyphenation,
+    consecutive_hyphenated_lines: parent_flow.consecutive_hyphenated_lines,
     compatibility_mode: parent_flow.compatibility_mode,
     justify_lines_with_shrinking: parent_flow.justify_lines_with_shrinking,
     split_page_break_and_paragraph_mark: parent_flow.split_page_break_and_paragraph_mark,
@@ -15138,6 +15178,8 @@ fn shape_text_box_auto_fit_height(
     layout_cell_bounds: parent_flow.layout_cell_bounds,
     layout_cell_print_bounds: parent_flow.layout_cell_print_bounds,
     default_tab_stop_pt: parent_flow.default_tab_stop_pt,
+    hyphenation: parent_flow.hyphenation,
+    consecutive_hyphenated_lines: parent_flow.consecutive_hyphenated_lines,
     compatibility_mode: parent_flow.compatibility_mode,
     justify_lines_with_shrinking: parent_flow.justify_lines_with_shrinking,
     split_page_break_and_paragraph_mark: parent_flow.split_page_break_and_paragraph_mark,
@@ -15654,6 +15696,8 @@ fn table_cell_content_height_with_mode(
       height_pt: 0.0,
     }),
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+    hyphenation: crate::docx::HyphenationSettings::default(),
+    consecutive_hyphenated_lines: 0,
     compatibility_mode,
     justify_lines_with_shrinking: compatibility_mode >= 15,
     split_page_break_and_paragraph_mark: false,
@@ -16775,6 +16819,135 @@ struct TextSegment {
   end: usize,
 }
 
+#[derive(Clone, Debug)]
+struct SelectedHyphenationBreak {
+  prefix: String,
+  remainder: TextSegment,
+  kind: super::hyphenation::CandidateKind,
+}
+
+fn select_hyphenation_break(
+  segment: &TextSegment,
+  style: &TextStyle,
+  available_width_pt: f32,
+  allow_discretionary: bool,
+  allow_automatic: bool,
+  do_not_hyphenate_caps: bool,
+  text_metrics: &mut TextMetrics,
+) -> Option<SelectedHyphenationBreak> {
+  if !allow_discretionary || available_width_pt <= LAYOUT_EPSILON_PT {
+    return None;
+  }
+  let hyphen_width_pt = text_metrics.measure_text("-", style);
+  if hyphen_width_pt <= LAYOUT_EPSILON_PT || hyphen_width_pt > available_width_pt {
+    return None;
+  }
+
+  let mut selected = None;
+  for candidate in
+    super::hyphenation::candidates(&segment.text, style, allow_automatic, do_not_hyphenate_caps)
+  {
+    let prefix_source = segment.text.get(..candidate.break_before)?;
+    let remainder_source = segment.text.get(candidate.resume_at..)?;
+    let prefix = super::hyphenation::visible_text(prefix_source);
+    let remainder = super::hyphenation::visible_text(remainder_source);
+    if prefix.is_empty() || remainder.chars().all(char::is_whitespace) {
+      continue;
+    }
+    let prefix_width_pt = text_metrics.measure_text(prefix.as_ref(), style);
+    if prefix_width_pt + hyphen_width_pt > available_width_pt + LAYOUT_EPSILON_PT {
+      continue;
+    }
+    selected = Some(SelectedHyphenationBreak {
+      prefix: prefix.into_owned(),
+      remainder: TextSegment {
+        text: remainder_source.to_string(),
+        start: segment.start + candidate.resume_at,
+        end: segment.end,
+      },
+      kind: candidate.kind,
+    });
+  }
+  selected
+}
+
+fn consecutive_hyphenation_limit_reached(flow: FlowContext) -> bool {
+  flow.hyphenation.consecutive_line_limit != 0
+    && flow.consecutive_hyphenated_lines >= flow.hyphenation.consecutive_line_limit
+}
+
+fn automatic_hyphenation_allowed_on_line(
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+  x: f32,
+  line_left: f32,
+  line_right: f32,
+) -> bool {
+  if !flow.hyphenation.automatic
+    || paragraph.format.suppress_auto_hyphens == Some(true)
+    || flow.text_segmentation == TextSegmentation::DrawingLayer
+    || consecutive_hyphenation_limit_reached(flow)
+  {
+    return false;
+  }
+  x <= line_left + LAYOUT_EPSILON_PT
+    // w:hyphenationZone is the largest end-of-line blank Word accepts before
+    // trying a discretionary break. A gap larger than the zone therefore
+    // enables automatic hyphenation; it is not a minimum amount to preserve.
+    || line_right - x + LAYOUT_EPSILON_PT >= flow.hyphenation.zone_pt
+}
+
+#[derive(Clone, Copy)]
+struct LastRenderedHyphenationBoundary<'a> {
+  left: &'a TextRun,
+  right: &'a TextRun,
+}
+
+fn last_rendered_page_break_hyphenation_boundary(
+  paragraph: &crate::docx::Paragraph,
+  inline_index: usize,
+  flow: FlowContext,
+) -> Option<LastRenderedHyphenationBoundary<'_>> {
+  if !flow.hyphenation.automatic
+    || paragraph.format.suppress_auto_hyphens == Some(true)
+    || consecutive_hyphenation_limit_reached(flow)
+  {
+    return None;
+  }
+  let InlineItem::Text(left) = paragraph.inlines.get(inline_index.checked_sub(1)?)? else {
+    return None;
+  };
+  let InlineItem::Text(right) = paragraph.inlines.get(inline_index + 1)? else {
+    return None;
+  };
+  super::hyphenation::is_automatic_break_at_text_boundary(
+    &left.text,
+    &right.text,
+    &left.style,
+    flow.hyphenation.do_not_hyphenate_caps,
+  )
+  .then_some(LastRenderedHyphenationBoundary { left, right })
+}
+
+fn text_line_is_last_in_flow_slot(
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+  text_frame: TextFrame,
+  y: f32,
+  line_height: f32,
+  line_index: usize,
+  line_has_form_widget: bool,
+) -> bool {
+  let real_height = line_real_height(
+    paragraph,
+    line_height,
+    line_index,
+    text_frame.grid_auto_line_spacing_multiplier,
+    line_has_form_widget,
+  );
+  y + real_height + text_frame.base_line_height > flow.content_bottom + LAYOUT_EPSILON_PT
+}
+
 #[derive(Clone, Copy, Debug)]
 struct ActiveTextFrame {
   flow: FlowContext,
@@ -16793,6 +16966,7 @@ struct TextLineAdvance<'a> {
   justify: bool,
   line_item_start_index: &'a mut usize,
   line_has_form_widget: &'a mut bool,
+  line_ended_with_discretionary_hyphen: &'a mut bool,
 }
 
 struct InlineObjectAdvance<'a> {
@@ -16812,6 +16986,20 @@ struct TextFrameLayout<'a> {
   frame: TextFrame,
   spacing_after_pt: f32,
   widow_rebalance_page_index: Option<usize>,
+  hyphenation_bottom_line_slots: Vec<HyphenationBottomSlot>,
+  hyphenation_reflow_depth: u8,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct HyphenationBottomSlot {
+  page_index: usize,
+  column_index: usize,
+}
+
+#[derive(Clone, Copy)]
+struct ParagraphLayoutPosition {
+  y: f32,
+  anchor_top: f32,
 }
 
 fn can_defer_page_break_for_following_floating_anchor(
@@ -16893,11 +17081,23 @@ impl<'a> TextFrameLayout<'a> {
       frame: TextFrame::new(paragraph, flow, text_metrics),
       spacing_after_pt,
       widow_rebalance_page_index: None,
+      hyphenation_bottom_line_slots: Vec::new(),
+      hyphenation_reflow_depth: 0,
     }
   }
 
   fn with_widow_rebalance_page(mut self, page_index: usize) -> Self {
     self.widow_rebalance_page_index = Some(page_index);
+    self
+  }
+
+  fn with_hyphenation_bottom_line_slots(mut self, slots: Vec<HyphenationBottomSlot>) -> Self {
+    self.hyphenation_bottom_line_slots = slots;
+    self
+  }
+
+  fn with_hyphenation_reflow_depth(mut self, depth: u8) -> Self {
+    self.hyphenation_reflow_depth = depth;
     self
   }
 
@@ -16988,8 +17188,21 @@ impl<'a> TextFrameLayout<'a> {
     *advance.line_has_form_widget = false;
     *line_height = advance.active.frame.base_line_height;
     let mut next_flow = advance.active.flow;
+    next_flow.consecutive_hyphenated_lines = if *advance.line_ended_with_discretionary_hyphen {
+      next_flow.consecutive_hyphenated_lines.saturating_add(1)
+    } else {
+      0
+    };
+    *advance.line_ended_with_discretionary_hyphen = false;
     let mut next_frame = advance.active.frame;
-    let content_bottom = if self.widow_rebalance_page_index == Some(advance.pages.len()) {
+    let reserves_bottom_line = self.widow_rebalance_page_index == Some(advance.pages.len())
+      || self
+        .hyphenation_bottom_line_slots
+        .contains(&HyphenationBottomSlot {
+          page_index: advance.pages.len(),
+          column_index: advance.active.flow.column_index,
+        });
+    let content_bottom = if reserves_bottom_line {
       advance.active.flow.content_bottom - *line_height
     } else {
       advance.active.flow.content_bottom
@@ -17121,8 +17334,10 @@ impl<'a> TextFrameLayout<'a> {
       pages,
       anchor_pages,
       text_metrics,
-      y,
-      paragraph_anchor_top,
+      ParagraphLayoutPosition {
+        y,
+        anchor_top: paragraph_anchor_top,
+      },
       true,
     )
   }
@@ -17133,10 +17348,11 @@ impl<'a> TextFrameLayout<'a> {
     pages: &mut Vec<Page>,
     mut anchor_pages: Option<&mut Vec<AnchorPage>>,
     text_metrics: &mut TextMetrics,
-    mut y: f32,
-    paragraph_anchor_top: f32,
+    position: ParagraphLayoutPosition,
     allow_reflow: bool,
   ) -> (FlowContext, f32) {
+    let mut y = position.y;
+    let paragraph_anchor_top = position.anchor_top;
     let paragraph = self.paragraph;
     let mut flow = self.flow;
     let mut text_frame = self.frame;
@@ -17203,8 +17419,10 @@ impl<'a> TextFrameLayout<'a> {
     );
     // Writer's Word-compatibility `ADD_VERTICAL_FLY_OFFSETS` behavior treats
     // the current paragraph's own upper margin as part of its first-line
-    // collision strip. When a side-wrapped fly crosses that margin and also
-    // reaches the printable line, move the whole paragraph below the fly.
+    // collision strip. A square drawing that crosses that margin and reaches
+    // the printable line moves the whole paragraph below the fly; a
+    // line-specific contour or floating-table exclusion can retain a usable
+    // side segment.
     //
     // This is deliberately separate from ordinary side wrapping: if the fly
     // ends inside the upper margin, the printable line does not intersect it
@@ -17383,8 +17601,10 @@ impl<'a> TextFrameLayout<'a> {
     let mut line_has_tab = false;
     let mut active_form_widget_ids = Vec::new();
     let mut line_has_form_widget = false;
+    let mut line_ended_with_discretionary_hyphen = false;
     let mut tab_over_margin_active = false;
     let mut drawing_group_effects = Vec::<(usize, InlineDrawingGroupEffect)>::new();
+    let mut track_bottom_hyphenation_slots = Vec::<HyphenationBottomSlot>::new();
 
     for (inline_index, item) in paragraph.inlines.iter().enumerate() {
       match item {
@@ -17435,6 +17655,7 @@ impl<'a> TextFrameLayout<'a> {
                     bottom_pt: bottom + placement.margin_bottom_pt,
                     side: placement.wrap_side,
                     blocks_flow: false,
+                    uses_contour: matches!(placement.wrap, ImageWrapMode::Tight),
                     owner: WrapExclusionOwner::Drawing,
                   };
                   wrap_exclusions.push(exclusion);
@@ -17563,6 +17784,7 @@ impl<'a> TextFrameLayout<'a> {
                 justify: justify_wrapped_lines,
                 line_item_start_index: &mut line_item_start_index,
                 line_has_form_widget: &mut line_has_form_widget,
+                line_ended_with_discretionary_hyphen: &mut line_ended_with_discretionary_hyphen,
               },
               y,
               &mut line_height,
@@ -17626,38 +17848,26 @@ impl<'a> TextFrameLayout<'a> {
           }
           let mut chunk = String::new();
           let mut chunk_x = x;
-          let (style_ref_keys, style_ref_text) = if run.style_ref_keys.is_empty() {
-            (
-              paragraph.style_ref_keys.as_slice(),
-              paragraph.style_ref_text.as_ref(),
-            )
-          } else {
-            (run.style_ref_keys.as_slice(), run.style_ref_text.as_ref())
-          };
-          let style_ref_numbering_text = if run.style_ref_keys.is_empty() {
-            paragraph.style_ref_numbering_text.as_ref()
-          } else {
-            run.style_ref_numbering_text.as_ref()
-          };
-          let meta = TextChunkMeta {
-            hyperlink_url: run.hyperlink_url.as_deref(),
-            dynamic_field: run.dynamic_field.as_ref(),
-            style_ref_keys,
-            style_ref_text,
-            style_ref_numbering_text,
-            form_widget_id: active_form_widget_ids.last().copied(),
-            paragraph_bidi: paragraph.format.bidi,
-            preserve_text_portion: run.preserve_text_portion,
-            normalize_baseline_shift: paragraph_uses_only_paragraph_mark_baseline_shift(paragraph),
-            segmentation: flow.text_segmentation,
-          };
+          let meta = text_chunk_meta(
+            paragraph,
+            run,
+            active_form_widget_ids.last().copied(),
+            flow.text_segmentation,
+          );
 
-          let segments = if flow.text_segmentation == TextSegmentation::DrawingLayer {
-            drawing_layer_text_segments_with_offsets(&run.text)
-          } else {
-            text_segments_with_offsets(&run.text)
-          };
-          for (segment_index, segment) in segments.iter().enumerate() {
+          let mut segments = VecDeque::from(
+            if flow.text_segmentation == TextSegmentation::DrawingLayer {
+              drawing_layer_text_segments_with_offsets(&run.text)
+            } else {
+              text_segments_with_offsets(&run.text)
+            },
+          );
+          while let Some(source_segment) = segments.pop_front() {
+            let segment = TextSegment {
+              text: super::hyphenation::visible_text(&source_segment.text).into_owned(),
+              start: source_segment.start,
+              end: source_segment.end,
+            };
             if segment.text == "\n" {
               text_state.set_position(InlineCursor {
                 inline_index,
@@ -17704,6 +17914,7 @@ impl<'a> TextFrameLayout<'a> {
                   justify: false,
                   line_item_start_index: &mut line_item_start_index,
                   line_has_form_widget: &mut line_has_form_widget,
+                  line_ended_with_discretionary_hyphen: &mut line_ended_with_discretionary_hyphen,
                 },
                 y,
                 &mut line_height,
@@ -17821,18 +18032,17 @@ impl<'a> TextFrameLayout<'a> {
               grid_width.unwrap_or_else(|| text_metrics.measure_text(&segment.text, &run.style));
             let fit_width =
               grid_width.unwrap_or_else(|| line_fit_width(&segment.text, &run.style, text_metrics));
-            let continuation_fit_width = if flow.text_segmentation != TextSegmentation::DrawingLayer
-              && segment_index + 1 == segments.len()
-            {
-              cross_run_unbreakable_continuation_width(
-                &paragraph.inlines,
-                inline_index,
-                &segment.text,
-                text_metrics,
-              )
-            } else {
-              0.0
-            };
+            let continuation_fit_width =
+              if flow.text_segmentation != TextSegmentation::DrawingLayer && segments.is_empty() {
+                cross_run_unbreakable_continuation_width(
+                  &paragraph.inlines,
+                  inline_index,
+                  &segment.text,
+                  text_metrics,
+                )
+              } else {
+                0.0
+              };
             let fit_width_with_continuation = fit_width + continuation_fit_width;
             let line_capacity = (line_right - line_left).max(DEFAULT_FONT_SIZE_PT);
             let whitespace = segment.text.chars().all(char::is_whitespace);
@@ -17882,6 +18092,122 @@ impl<'a> TextFrameLayout<'a> {
               );
             if fits_with_shrink {
               line_used_shrink_fit = true;
+            }
+
+            let allow_automatic_hyphenation = continuation_fit_width <= LAYOUT_EPSILON_PT
+              && automatic_hyphenation_allowed_on_line(paragraph, flow, x, line_left, line_right);
+            let allow_discretionary_hyphenation = !consecutive_hyphenation_limit_reached(flow);
+            let selected_hyphenation = (overflows_line
+              && !fits_with_shrink
+              && pending_tab.is_none()
+              && !tab_over_margin_active)
+              .then(|| {
+                select_hyphenation_break(
+                  &source_segment,
+                  &run.style,
+                  (line_right - x).max(0.0),
+                  allow_discretionary_hyphenation,
+                  allow_automatic_hyphenation,
+                  flow.hyphenation.do_not_hyphenate_caps,
+                  text_metrics,
+                )
+              })
+              .flatten();
+            if let Some(selected) = selected_hyphenation {
+              if chunk.is_empty() {
+                chunk_x = x;
+              }
+              chunk.push_str(&selected.prefix);
+              text_state.set_position(InlineCursor {
+                inline_index,
+                text_offset: selected.remainder.start,
+              });
+              if segment_affects_line_height(&selected.prefix) {
+                line_height = include_text_height(
+                  line_height,
+                  text_frame,
+                  &run.style,
+                  &selected.prefix,
+                  text_metrics,
+                );
+              }
+              line_has_form_widget |= meta.form_widget_id.is_some();
+              emitted = true;
+              flush_discretionary_hyphen(
+                current,
+                TextPlacement {
+                  x_pt: chunk_x,
+                  y_pt: y,
+                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                },
+                &mut chunk,
+                &run.style,
+                &meta,
+                selected.kind,
+              );
+              // ECMA-376 §17.15.1.22 counts lines ending in any hyphen.
+              // Writer likewise marks both dictionary and soft-hyphen
+              // portions as EndHyph for its consecutive-line accounting.
+              line_ended_with_discretionary_hyphen = true;
+              let line_is_last_in_slot = text_line_is_last_in_flow_slot(
+                paragraph,
+                flow,
+                text_frame,
+                y,
+                line_height,
+                text_state.line_fragments.len(),
+                line_has_form_widget,
+              );
+              if flow.text_segmentation == TextSegmentation::Body
+                && line_is_last_in_slot
+                && flow.hyphenation.page_bottom == PageBottomHyphenation::MoveLine
+              {
+                track_bottom_hyphenation_slots.push(HyphenationBottomSlot {
+                  page_index: pages.len(),
+                  column_index: flow.column_index,
+                });
+              }
+              apply_pending_aligned_tab(
+                current,
+                &mut pending_tab,
+                text_metrics,
+                y,
+                line_left,
+                line_right,
+              );
+              (flow, text_frame, y, line_left, line_right) = self.advance_line(
+                TextLineAdvance {
+                  current,
+                  pages,
+                  text_metrics: &mut *text_metrics,
+                  wrap_exclusions: &mut wrap_exclusions,
+                  state: &mut text_state,
+                  active: ActiveTextFrame {
+                    flow,
+                    frame: text_frame,
+                  },
+                  line_left,
+                  line_right,
+                  justify: justify_wrapped_lines,
+                  line_item_start_index: &mut line_item_start_index,
+                  line_has_form_widget: &mut line_has_form_widget,
+                  line_ended_with_discretionary_hyphen: &mut line_ended_with_discretionary_hyphen,
+                },
+                y,
+                &mut line_height,
+              );
+              default_line_right = text_frame.default_line_right;
+              paragraph_left = text_frame.paragraph_left;
+              base_line_height = text_frame.base_line_height;
+              x = line_left;
+              chunk_x = x;
+              line_used_shrink_fit = false;
+              line_used_punctuation_fit = false;
+              line_has_tab = false;
+              pending_tab = None;
+              tab_over_margin_active = false;
+              segments.push_front(selected.remainder);
+              continue;
             }
 
             let mut started_new_line = false;
@@ -17957,6 +18283,7 @@ impl<'a> TextFrameLayout<'a> {
                     justify: justify_wrapped_lines,
                     line_item_start_index: &mut line_item_start_index,
                     line_has_form_widget: &mut line_has_form_widget,
+                    line_ended_with_discretionary_hyphen: &mut line_ended_with_discretionary_hyphen,
                   },
                   y,
                   &mut line_height,
@@ -17981,7 +18308,7 @@ impl<'a> TextFrameLayout<'a> {
 
             if fit_width > line_capacity && x <= line_left && !whitespace {
               let mut text_offset = segment.start;
-              for text in emergency_break_segments(&segment.text) {
+              for text in emergency_character_segments(&segment.text) {
                 let width = text_metrics.measure_text(&text, &run.style);
                 let fit_width = line_fit_width(&text, &run.style, text_metrics);
                 if fit_width > line_capacity && text.chars().count() > 1 {
@@ -18046,6 +18373,8 @@ impl<'a> TextFrameLayout<'a> {
                           justify: justify_wrapped_lines,
                           line_item_start_index: &mut line_item_start_index,
                           line_has_form_widget: &mut line_has_form_widget,
+                          line_ended_with_discretionary_hyphen:
+                            &mut line_ended_with_discretionary_hyphen,
                         },
                         y,
                         &mut line_height,
@@ -18145,6 +18474,8 @@ impl<'a> TextFrameLayout<'a> {
                       justify: justify_wrapped_lines,
                       line_item_start_index: &mut line_item_start_index,
                       line_has_form_widget: &mut line_has_form_widget,
+                      line_ended_with_discretionary_hyphen:
+                        &mut line_ended_with_discretionary_hyphen,
                     },
                     y,
                     &mut line_height,
@@ -18274,11 +18605,115 @@ impl<'a> TextFrameLayout<'a> {
         }
         InlineItem::LastRenderedPageBreak => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
-          if flow.text_segmentation == TextSegmentation::Body
+          let mut advanced_for_hyphenation = false;
+          if flow.text_segmentation != TextSegmentation::DrawingLayer
+            && let Some(boundary) =
+              last_rendered_page_break_hyphenation_boundary(paragraph, inline_index, flow)
+          {
+            let right_word_end = boundary
+              .right
+              .text
+              .char_indices()
+              .find_map(|(index, character)| (!character.is_alphabetic()).then_some(index))
+              .unwrap_or(boundary.right.text.len());
+            let continuation_width = text_metrics.measure_text(
+              &boundary.right.text[..right_word_end],
+              &boundary.right.style,
+            );
+            let line_is_last_in_slot = text_line_is_last_in_flow_slot(
+              paragraph,
+              flow,
+              text_frame,
+              y,
+              line_height,
+              text_state.line_fragments.len(),
+              line_has_form_widget,
+            );
+            let continuation_overflows = text_overflows_line(x, continuation_width, line_right);
+            let page_bottom_policy_applies = flow.text_segmentation == TextSegmentation::Body;
+            let page_bottom_policy_allows_break = !page_bottom_policy_applies
+              || !line_is_last_in_slot
+              || flow.hyphenation.page_bottom == PageBottomHyphenation::Allow;
+            let hyphen_width = text_metrics.measure_text("-", &boundary.left.style);
+            if continuation_overflows
+              && page_bottom_policy_allows_break
+              && x + hyphen_width <= line_right + LAYOUT_EPSILON_PT
+            {
+              let mut hyphen = String::new();
+              let meta = text_chunk_meta(
+                paragraph,
+                boundary.left,
+                active_form_widget_ids.last().copied(),
+                flow.text_segmentation,
+              );
+              flush_discretionary_hyphen(
+                current,
+                TextPlacement {
+                  x_pt: x,
+                  y_pt: y,
+                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                },
+                &mut hyphen,
+                &boundary.left.style,
+                &meta,
+                super::hyphenation::CandidateKind::Automatic,
+              );
+              line_ended_with_discretionary_hyphen = true;
+              apply_pending_aligned_tab(
+                current,
+                &mut pending_tab,
+                text_metrics,
+                y,
+                line_left,
+                line_right,
+              );
+              (flow, text_frame, y, line_left, line_right) = self.advance_line(
+                TextLineAdvance {
+                  current,
+                  pages,
+                  text_metrics: &mut *text_metrics,
+                  wrap_exclusions: &mut wrap_exclusions,
+                  state: &mut text_state,
+                  active: ActiveTextFrame {
+                    flow,
+                    frame: text_frame,
+                  },
+                  line_left,
+                  line_right,
+                  justify: justify_wrapped_lines,
+                  line_item_start_index: &mut line_item_start_index,
+                  line_has_form_widget: &mut line_has_form_widget,
+                  line_ended_with_discretionary_hyphen: &mut line_ended_with_discretionary_hyphen,
+                },
+                y,
+                &mut line_height,
+              );
+              default_line_right = text_frame.default_line_right;
+              paragraph_left = text_frame.paragraph_left;
+              base_line_height = text_frame.base_line_height;
+              x = line_left;
+              line_used_shrink_fit = false;
+              line_used_punctuation_fit = false;
+              line_has_tab = false;
+              tab_over_margin_active = false;
+              advanced_for_hyphenation = true;
+            } else if continuation_overflows
+              && page_bottom_policy_applies
+              && line_is_last_in_slot
+              && flow.hyphenation.page_bottom == PageBottomHyphenation::MoveLine
+            {
+              track_bottom_hyphenation_slots.push(HyphenationBottomSlot {
+                page_index: pages.len(),
+                column_index: flow.column_index,
+              });
+            }
+          }
+          let page_bottom_break = !advanced_for_hyphenation
+            && flow.text_segmentation == TextSegmentation::Body
             && emitted
             && page_has_body_region_items(current, flow)
-            && y + line_height > flow.content_bottom - LAYOUT_EPSILON_PT
-          {
+            && y + line_height > flow.content_bottom - LAYOUT_EPSILON_PT;
+          if page_bottom_break {
             // cursor where the previous layout created a page follow. Writer
             // uses that evidence while laying out body text, so keep the
             // following portions on the follow page instead of reflowing the
@@ -18296,6 +18731,7 @@ impl<'a> TextFrameLayout<'a> {
             line_used_punctuation_fit = false;
             line_has_tab = false;
             emitted = false;
+            line_ended_with_discretionary_hyphen = false;
           }
           pending_tab = None;
         }
@@ -18426,6 +18862,7 @@ impl<'a> TextFrameLayout<'a> {
                   bottom_pt: image_y + height + placement.margin_bottom_pt,
                   side: placement.wrap_side,
                   blocks_flow: false,
+                  uses_contour: matches!(placement.wrap, ImageWrapMode::Tight),
                   owner: WrapExclusionOwner::Drawing,
                 };
                 wrap_exclusions.push(exclusion);
@@ -18516,6 +18953,7 @@ impl<'a> TextFrameLayout<'a> {
                 justify: justify_wrapped_lines,
                 line_item_start_index: &mut line_item_start_index,
                 line_has_form_widget: &mut line_has_form_widget,
+                line_ended_with_discretionary_hyphen: &mut line_ended_with_discretionary_hyphen,
               },
               y,
               &mut line_height,
@@ -19183,6 +19621,7 @@ impl<'a> TextFrameLayout<'a> {
                     bottom_pt: shape_y + height + placement.margin_bottom_pt,
                     side: placement.wrap_side,
                     blocks_flow: false,
+                    uses_contour: matches!(placement.wrap, ImageWrapMode::Tight),
                     owner: WrapExclusionOwner::Drawing,
                   };
                   wrap_exclusions.push(exclusion);
@@ -19215,6 +19654,7 @@ impl<'a> TextFrameLayout<'a> {
                         bottom_pt: shape_paint_y + height + placement.margin_bottom_pt,
                         side: ImageWrapSide::Left,
                         blocks_flow: false,
+                        uses_contour: false,
                         owner: WrapExclusionOwner::Drawing,
                       };
                       wrap_exclusions.push(exclusion);
@@ -19310,6 +19750,7 @@ impl<'a> TextFrameLayout<'a> {
                     justify: justify_wrapped_lines,
                     line_item_start_index: &mut line_item_start_index,
                     line_has_form_widget: &mut line_has_form_widget,
+                    line_ended_with_discretionary_hyphen: &mut line_ended_with_discretionary_hyphen,
                   },
                   y,
                   &mut line_height,
@@ -19574,6 +20015,47 @@ impl<'a> TextFrameLayout<'a> {
       paragraph_bottom = y + empty_line_height;
       y = paragraph_bottom + self.spacing_after_pt;
     }
+    track_bottom_hyphenation_slots
+      .retain(|slot| !self.hyphenation_bottom_line_slots.contains(slot));
+    track_bottom_hyphenation_slots.sort_unstable();
+    track_bottom_hyphenation_slots.dedup();
+    if !track_bottom_hyphenation_slots.is_empty()
+      && self.hyphenation_reflow_depth < MAX_HYPHENATION_BOTTOM_REFLOWS
+    {
+      let mut reserved_slots = self.hyphenation_bottom_line_slots.clone();
+      reserved_slots.extend(track_bottom_hyphenation_slots);
+      reserved_slots.sort_unstable();
+      reserved_slots.dedup();
+      restore_text_frame_start_page(
+        current,
+        pages,
+        start_pages_len,
+        start_current,
+        start_page_snapshot.as_ref(),
+        start_pending_snapshot.as_ref(),
+      );
+      if let (Some(anchors), Some(len)) = (anchor_pages.as_deref_mut(), start_anchor_pages_len) {
+        anchors.truncate(len);
+      }
+      return TextFrameLayout::new(paragraph, start_flow, self.spacing_after_pt, text_metrics)
+        .with_hyphenation_bottom_line_slots(reserved_slots)
+        .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth.saturating_add(1))
+        .format_with_reflow(
+          current,
+          pages,
+          anchor_pages,
+          text_metrics,
+          ParagraphLayoutPosition {
+            y: paragraph_top,
+            anchor_top: paragraph_anchor_top,
+          },
+          allow_reflow,
+        );
+    }
+
+    // The paragraph's final line is not followed by a discretionary automatic
+    // hyphen, so it terminates any sequence counted by w:consecutiveHyphenLimit.
+    flow.consecutive_hyphenated_lines = 0;
     debug_assert!(text_state.split_candidates_are_ordered());
     let split_decision = text_state.page_split_decision(
       paragraph.format.keep_lines,
@@ -19610,8 +20092,10 @@ impl<'a> TextFrameLayout<'a> {
               pages,
               anchor_pages,
               text_metrics,
-              follow_y,
-              follow_y,
+              ParagraphLayoutPosition {
+                y: follow_y,
+                anchor_top: follow_y,
+              },
               false,
             );
         }
@@ -19632,13 +20116,17 @@ impl<'a> TextFrameLayout<'a> {
           }
           return TextFrameLayout::new(paragraph, start_flow, self.spacing_after_pt, text_metrics)
             .with_widow_rebalance_page(page_index)
+            .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
+            .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth)
             .format_with_reflow(
               current,
               pages,
               anchor_pages,
               text_metrics,
-              paragraph_top,
-              paragraph_anchor_top,
+              ParagraphLayoutPosition {
+                y: paragraph_top,
+                anchor_top: paragraph_anchor_top,
+              },
               false,
             );
         }
@@ -19838,21 +20326,17 @@ fn drawing_layer_text_segments_with_offsets(text: &str) -> Vec<TextSegment> {
   output
 }
 
-fn emergency_break_segments(text: &str) -> Vec<String> {
-  if text.chars().all(|ch| ch.is_ascii_alphabetic()) && text.chars().count() > 8 {
-    let mut pieces = hypher::hyphenate(text, hypher::Lang::English)
-      .map(str::to_string)
-      .collect::<Vec<_>>();
-    if pieces.len() > 1 {
-      let last = pieces.len() - 1;
-      for piece in &mut pieces[..last] {
-        piece.push('-');
-      }
-      return pieces;
-    }
-  }
-
-  text.chars().map(|ch| ch.to_string()).collect()
+fn emergency_character_segments(text: &str) -> Vec<String> {
+  let mut start = 0;
+  GraphemeClusterSegmenter::new()
+    .segment_str(text)
+    .skip(1)
+    .filter_map(|end| {
+      let segment = text.get(start..end)?.to_owned();
+      start = end;
+      Some(segment)
+    })
+    .collect()
 }
 
 fn line_fit_width(text: &str, style: &TextStyle, text_metrics: &mut TextMetrics) -> f32 {
@@ -20099,9 +20583,9 @@ fn libreoffice_preserves_latin_line_token(text: &str) -> bool {
   // for a break around the current cut position. A Latin token made of letters,
   // numbers and inline punctuation has no internal line break opportunity, even
   // when ICU's generic line segmenter reports punctuation-adjacent boundaries.
-  text
-    .chars()
-    .all(|ch| ch.is_ascii_graphic() && ch != '\n' && ch != '\t')
+  text.chars().all(|ch| {
+    (ch.is_ascii_graphic() || ch == super::hyphenation::SOFT_HYPHEN) && ch != '\n' && ch != '\t'
+  })
 }
 
 fn push_text_line_segment(text: &str, segments: &mut Vec<String>) {
@@ -20378,40 +20862,25 @@ fn shift_first_line_below_upper_margin_exclusions(
     if margin_crossing.is_empty() {
       return y;
     }
-    // Writer's tdf#116486 / tdf#124600 path moves the printable first line
-    // below a side-wrapped drawing when that drawing crosses the paragraph's
-    // upper margin and reaches the print area. Once moved, the drawing ends
-    // above the line and CalcFlyWidth discards the horizontal fly portion.
-    if let Some(exclusion) = margin_crossing
-      .iter()
-      .filter(|exclusion| exclusion.owner == WrapExclusionOwner::Drawing)
-      .min_by(|a, b| {
-        a.bottom_pt
-          .partial_cmp(&b.bottom_pt)
-          .unwrap_or(std::cmp::Ordering::Equal)
-      })
-    {
-      // tdf#116486 moves the paragraph frame, including its authored upper
-      // margin, below the drawing. `y` is already the printable text-area
-      // top, so preserve that margin after moving the frame rather than
-      // collapsing the text directly onto the fly bottom.
-      y = exclusion.bottom_pt + upper_margin_pt;
-      continue;
-    }
-    // Floating tables use a separately materialized anchor/follow frame in
-    // this layout engine. Preserve the side segment when it is usable:
-    // `floattable-nomargins.docx` has 59.35pt of valid right-side width and
-    // must stay on one page. Only an effectively full-width table exclusion
-    // creates the dummy line in this representation.
-    if available_line_bounds_for_y(
+    // SwContourCache::CalcBoundRect() gives tight wrapping a line-specific
+    // contour, so it can retain a horizontal fly portion when usable side
+    // space remains. Floating-table follows have the same explicit side-wrap
+    // contract in this representation. Office's square-wrap behavior is
+    // different here: tdf#124600 moves its first line below the drawing,
+    // while `customshape-position.docx` keeps its heading beside the tight
+    // contour. A full-width contour still creates the dummy line used by
+    // tdf#116486.
+    let preserves_side_segment = margin_crossing.iter().all(|exclusion| {
+      exclusion.owner == WrapExclusionOwner::FloatingTable || exclusion.uses_contour
+    }) && available_line_bounds_for_y(
       default_left,
       default_right,
       margin_top,
       upper_margin_pt + LAYOUT_EPSILON_PT,
       &margin_crossing,
     )
-    .is_some()
-    {
+    .is_some();
+    if preserves_side_segment {
       return y;
     }
     let Some(exclusion) = margin_crossing.iter().min_by(|a, b| {
@@ -20421,7 +20890,14 @@ fn shift_first_line_below_upper_margin_exclusions(
     }) else {
       return y;
     };
-    y = exclusion.bottom_pt;
+    y = if exclusion.owner == WrapExclusionOwner::Drawing {
+      // Drawing-anchored paragraph frames move with their authored upper
+      // margin; floating-table follow frames already materialize that
+      // spacing in their own frame geometry.
+      exclusion.bottom_pt + upper_margin_pt
+    } else {
+      exclusion.bottom_pt
+    };
   }
 }
 
@@ -21290,6 +21766,7 @@ fn force_page_break(
   // sw/qa/core/text/itrform2.cxx:testContentControlHeaderPDFExport.
   let mut next_flow = FlowContext {
     section_page_index: flow.section_page_index + 1,
+    consecutive_hyphenated_lines: 0,
     ..flow
   };
   let next_page_number = pages.len() + 2;
@@ -21343,6 +21820,40 @@ struct TextChunkMeta<'a> {
   segmentation: TextSegmentation,
 }
 
+fn text_chunk_meta<'a>(
+  paragraph: &'a crate::docx::Paragraph,
+  run: &'a TextRun,
+  form_widget_id: Option<u32>,
+  segmentation: TextSegmentation,
+) -> TextChunkMeta<'a> {
+  let (style_ref_keys, style_ref_text, style_ref_numbering_text) = if run.style_ref_keys.is_empty()
+  {
+    (
+      paragraph.style_ref_keys.as_slice(),
+      paragraph.style_ref_text.as_ref(),
+      paragraph.style_ref_numbering_text.as_ref(),
+    )
+  } else {
+    (
+      run.style_ref_keys.as_slice(),
+      run.style_ref_text.as_ref(),
+      run.style_ref_numbering_text.as_ref(),
+    )
+  };
+  TextChunkMeta {
+    hyperlink_url: run.hyperlink_url.as_deref(),
+    dynamic_field: run.dynamic_field.as_ref(),
+    style_ref_keys,
+    style_ref_text,
+    style_ref_numbering_text,
+    form_widget_id,
+    paragraph_bidi: paragraph.format.bidi,
+    preserve_text_portion: run.preserve_text_portion,
+    normalize_baseline_shift: paragraph_uses_only_paragraph_mark_baseline_shift(paragraph),
+    segmentation,
+  }
+}
+
 fn flush_text(
   page: &mut Page,
   placement: TextPlacement,
@@ -21386,6 +21897,44 @@ fn flush_text(
       TextSegmentation::TableCell => PdfTextSegmentation::WordLine,
       TextSegmentation::DrawingLayer => PdfTextSegmentation::Portion,
       TextSegmentation::Notes => PdfTextSegmentation::WordLine,
+    },
+  })));
+}
+
+fn flush_discretionary_hyphen(
+  page: &mut Page,
+  placement: TextPlacement,
+  chunk: &mut String,
+  style: &TextStyle,
+  meta: &TextChunkMeta<'_>,
+  kind: super::hyphenation::CandidateKind,
+) {
+  chunk.push('-');
+  let mut style = style.clone();
+  if meta.normalize_baseline_shift {
+    style.baseline_shift_pt = 0.0;
+  }
+  page.items.push(PageItem::Text(Box::new(TextItem {
+    x_pt: placement.x_pt,
+    y_pt: placement.y_pt,
+    line_height_pt: placement.line_height_pt,
+    text: std::mem::take(chunk),
+    style,
+    rotation_center_pt: None,
+    hyperlink_url: meta.hyperlink_url.map(ToString::to_string),
+    dynamic_field: meta.dynamic_field.cloned(),
+    dynamic_field_line_anchor: None,
+    style_ref_keys: meta.style_ref_keys.to_vec(),
+    style_ref_text: meta.style_ref_text.cloned(),
+    style_ref_numbering_text: meta.style_ref_numbering_text.cloned(),
+    form_widget_id: meta.form_widget_id,
+    paragraph_bidi: meta.paragraph_bidi,
+    word_spacing_pt: 0.0,
+    preserve_text_portion: true,
+    decoration_span_start_x_pt: None,
+    pdf_text_segmentation: match kind {
+      super::hyphenation::CandidateKind::Automatic => PdfTextSegmentation::AutomaticHyphen,
+      super::hyphenation::CandidateKind::Explicit => PdfTextSegmentation::Portion,
     },
   })));
 }
@@ -21732,6 +22281,22 @@ mod tests {
     TableBordersModel, TextRun,
   };
 
+  #[test]
+  fn authored_soft_hyphen_stays_inside_its_word_segment() {
+    assert_eq!(
+      text_segments("at\u{00ad}mosphere"),
+      vec!["at\u{00ad}mosphere"]
+    );
+  }
+
+  #[test]
+  fn emergency_breaks_keep_extended_grapheme_clusters_together() {
+    assert_eq!(
+      emergency_character_segments("a\u{0301}🇨🇳b"),
+      vec!["a\u{0301}", "🇨🇳", "b"]
+    );
+  }
+
   fn word_text_shadow(
     blur_radius_px: f32,
   ) -> common::drawingml_image_effects::WordprocessingTextShadow {
@@ -21859,8 +22424,10 @@ mod tests {
 
   #[test]
   fn whitespace_word_text_effect_does_not_materialize_a_backdrop() {
-    let mut style = TextStyle::default();
-    style.text_shadow = Some(word_text_shadow(190_500.0 / 9_525.0));
+    let style = TextStyle {
+      text_shadow: Some(word_text_shadow(190_500.0 / 9_525.0)),
+      ..TextStyle::default()
+    };
     let mut page = empty_page(PageSetup::default(), 0);
     page.items.push(PageItem::Text(Box::new(TextItem {
       x_pt: 10.0,
@@ -22178,6 +22745,8 @@ mod tests {
       body_content_bottom_pt: 720.0,
       content_width: 468.0,
       default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
       compatibility_mode: 15,
       justify_lines_with_shrinking: false,
       repeating_slots: RepeatingSlotState::default(),
@@ -22228,6 +22797,7 @@ mod tests {
       bottom_pt: 108.0,
       side: ImageWrapSide::BothSides,
       blocks_flow: false,
+      uses_contour: false,
       owner: WrapExclusionOwner::Drawing,
     };
 
@@ -22250,6 +22820,7 @@ mod tests {
       bottom_pt: 120.0,
       side: ImageWrapSide::BothSides,
       blocks_flow: false,
+      uses_contour: false,
       owner: WrapExclusionOwner::Drawing,
     };
 
@@ -22285,6 +22856,7 @@ mod tests {
       bottom_pt: 112.0,
       side: ImageWrapSide::BothSides,
       blocks_flow: false,
+      uses_contour: false,
       owner: WrapExclusionOwner::FloatingTable,
     };
     assert_eq!(
@@ -22322,6 +22894,36 @@ mod tests {
         72.0,
         540.0,
         &[side_wrapped_drawing],
+      ),
+      118.0
+    );
+
+    let side_wrapped_contour = WrapExclusion {
+      uses_contour: true,
+      ..side_wrapped_drawing
+    };
+    assert_eq!(
+      shift_first_line_below_upper_margin_exclusions(
+        100.0,
+        6.0,
+        72.0,
+        540.0,
+        &[side_wrapped_contour],
+      ),
+      100.0
+    );
+
+    let full_width_drawing = WrapExclusion {
+      owner: WrapExclusionOwner::Drawing,
+      ..full_width
+    };
+    assert_eq!(
+      shift_first_line_below_upper_margin_exclusions(
+        100.0,
+        6.0,
+        72.0,
+        540.0,
+        &[full_width_drawing],
       ),
       118.0
     );
@@ -22409,6 +23011,8 @@ mod tests {
       body_content_bottom_pt: 720.0,
       content_width: 468.0,
       default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
       compatibility_mode: 15,
       justify_lines_with_shrinking: false,
       repeating_slots: RepeatingSlotState::default(),
@@ -22513,6 +23117,8 @@ mod tests {
         body_content_bottom_pt: 140.0,
         content_width: 24.0,
         default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+        hyphenation: crate::docx::HyphenationSettings::default(),
+        consecutive_hyphenated_lines: 0,
         compatibility_mode: 14,
         justify_lines_with_shrinking: false,
         repeating_slots: RepeatingSlotState::default(),
@@ -22569,6 +23175,8 @@ mod tests {
       body_content_bottom_pt: 720.0,
       content_width: 468.0,
       default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
       compatibility_mode: 14,
       justify_lines_with_shrinking: false,
       repeating_slots: RepeatingSlotState::default(),
@@ -22627,6 +23235,8 @@ mod tests {
         body_content_bottom_pt: 770.0,
         content_width: 451.35,
         default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+        hyphenation: crate::docx::HyphenationSettings::default(),
+        consecutive_hyphenated_lines: 0,
         compatibility_mode: 15,
         justify_lines_with_shrinking: false,
         repeating_slots: RepeatingSlotState::default(),
@@ -22938,6 +23548,8 @@ mod tests {
         body_content_bottom_pt: 720.0,
         content_width: 468.0,
         default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+        hyphenation: crate::docx::HyphenationSettings::default(),
+        consecutive_hyphenated_lines: 0,
         compatibility_mode: 15,
         justify_lines_with_shrinking: false,
         repeating_slots: RepeatingSlotState::default(),
@@ -23138,6 +23750,8 @@ mod tests {
         layout_cell_bounds: None,
         layout_cell_print_bounds: None,
         default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+        hyphenation: crate::docx::HyphenationSettings::default(),
+        consecutive_hyphenated_lines: 0,
         compatibility_mode: 12,
         justify_lines_with_shrinking: false,
         split_page_break_and_paragraph_mark: false,
@@ -23222,6 +23836,8 @@ mod tests {
         layout_cell_bounds: None,
         layout_cell_print_bounds: None,
         default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+        hyphenation: crate::docx::HyphenationSettings::default(),
+        consecutive_hyphenated_lines: 0,
         compatibility_mode: 12,
         justify_lines_with_shrinking: false,
         split_page_break_and_paragraph_mark: false,
@@ -23303,6 +23919,8 @@ mod tests {
       layout_cell_bounds: None,
       layout_cell_print_bounds: None,
       default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
       compatibility_mode: 12,
       justify_lines_with_shrinking: false,
       split_page_break_and_paragraph_mark: false,
@@ -23895,6 +24513,8 @@ mod tests {
       body_content_bottom_pt: 720.0,
       content_width: 451.0,
       default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
       compatibility_mode: 12,
       justify_lines_with_shrinking: false,
       repeating_slots: RepeatingSlotState::default(),
@@ -23990,6 +24610,8 @@ mod tests {
       body_content_bottom_pt: 720.0,
       content_width: 451.0,
       default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
       compatibility_mode: 12,
       justify_lines_with_shrinking: false,
       repeating_slots: RepeatingSlotState::default(),
@@ -24080,6 +24702,8 @@ mod tests {
       body_content_bottom_pt: 172.0,
       content_width: 451.0,
       default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
       compatibility_mode: 12,
       justify_lines_with_shrinking: false,
       repeating_slots: RepeatingSlotState::default(),
@@ -24882,6 +25506,8 @@ mod tests {
         body_content_bottom_pt: 720.0,
         content_width: 468.0,
         default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+        hyphenation: crate::docx::HyphenationSettings::default(),
+        consecutive_hyphenated_lines: 0,
         compatibility_mode: 15,
         justify_lines_with_shrinking: false,
         repeating_slots: RepeatingSlotState::default(),

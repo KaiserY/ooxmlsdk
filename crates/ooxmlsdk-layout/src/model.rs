@@ -78,6 +78,12 @@ pub struct TextStyle {
   pub east_asia_font_family: Option<Arc<str>>,
   pub complex_font_family: Option<Arc<str>>,
   pub symbol_font_family: Option<Arc<str>>,
+  /// Resolved WordprocessingML `w:lang/@w:val` language tag.
+  pub language: Option<Arc<str>>,
+  /// Resolved WordprocessingML `w:lang/@w:eastAsia` language tag.
+  pub east_asia_language: Option<Arc<str>>,
+  /// Resolved WordprocessingML `w:lang/@w:bidi` language tag.
+  pub bidi_language: Option<Arc<str>>,
   pub font_size_pt: f32,
   pub complex_font_size_pt: Option<f32>,
   /// Complex-script formatting selected by WordprocessingML `w:cs`.
@@ -146,6 +152,9 @@ impl Default for TextStyle {
       east_asia_font_family: None,
       complex_font_family: None,
       symbol_font_family: None,
+      language: None,
+      east_asia_language: None,
+      bidi_language: None,
       font_size_pt: 11.0,
       complex_font_size_pt: None,
       complex_script: None,

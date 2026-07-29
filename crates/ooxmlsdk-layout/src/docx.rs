@@ -1,5 +1,6 @@
 mod custom_xml;
 mod drawing;
+mod hyphenation;
 mod layout;
 mod model;
 mod package;
@@ -57,8 +58,8 @@ pub(crate) use custom_xml::CustomXmlBindings;
 pub(crate) use model::*;
 use package::{AltChunkCatalog, AltChunkResource, HyperlinkCatalog, ImageCatalog};
 use settings::{
-  adjust_line_height_in_table, compatibility_mode, default_tab_stop_pt, no_column_balance,
-  split_page_break_and_paragraph_mark,
+  adjust_line_height_in_table, compatibility_mode, default_tab_stop_pt, hyphenation_settings,
+  no_column_balance, split_page_break_and_paragraph_mark,
 };
 use table::{TableConditionalStyleMask, TableLookModel};
 use text::{ParagraphImportBase, paragraph_model, paragraph_model_with_base};
@@ -177,6 +178,7 @@ pub(crate) fn extract(
   let custom_xml_bindings = CustomXmlBindings::load(package, &main);
   let mut form_widget_ids = FormWidgetIdAllocator::default();
   let default_tab_stop_pt = default_tab_stop_pt(package, &main);
+  let hyphenation = hyphenation_settings(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
   let no_column_balance = no_column_balance(package, &main);
   let adjust_line_height_in_table = adjust_line_height_in_table(package, &main);
@@ -303,6 +305,7 @@ pub(crate) fn extract(
       .character_run_style(Some("LineNumber"), styles.doc_default_run.clone()),
     has_styles_part: styles.has_styles_part,
     default_tab_stop_pt,
+    hyphenation,
     compatibility_mode,
     justify_lines_with_shrinking: import_settings.justify_lines_with_shrinking,
     even_and_odd_headers,
@@ -3910,6 +3913,13 @@ fn merge_paragraph_format(
   if let Some(contextual_spacing) = properties.contextual_spacing() {
     format.contextual_spacing = contextual_spacing.val.is_none_or(|value| value.as_bool());
     format.contextual_spacing_set = true;
+  }
+  if let Some(suppress_auto_hyphens) = properties.suppress_auto_hyphens() {
+    format.suppress_auto_hyphens = Some(
+      suppress_auto_hyphens
+        .val
+        .is_none_or(|value| value.as_bool()),
+    );
   }
   if let Some(snap_to_grid) = properties.snap_to_grid() {
     format.snap_to_grid = Some(snap_to_grid.val.is_none_or(|value| value.as_bool()));
@@ -17360,6 +17370,9 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
     target.contextual_spacing = values.contextual_spacing;
     target.contextual_spacing_set = true;
   }
+  if values.suppress_auto_hyphens.is_some() {
+    target.suppress_auto_hyphens = values.suppress_auto_hyphens;
+  }
   if values.outline_level.is_some() {
     target.outline_level = values.outline_level;
   }
@@ -17550,6 +17563,9 @@ fn merge_numbering_format_values(
     target.contextual_spacing = values.contextual_spacing;
     target.contextual_spacing_set = true;
   }
+  if values.suppress_auto_hyphens.is_some() {
+    target.suppress_auto_hyphens = values.suppress_auto_hyphens;
+  }
   if values.outline_level.is_some() {
     target.outline_level = values.outline_level;
   }
@@ -17561,6 +17577,15 @@ fn merge_numbering_format_values(
 fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   if values.font_family.is_some() {
     target.font_family = values.font_family.clone();
+  }
+  if values.language.is_some() {
+    target.language = values.language.clone();
+  }
+  if values.east_asia_language.is_some() {
+    target.east_asia_language = values.east_asia_language.clone();
+  }
+  if values.bidi_language.is_some() {
+    target.bidi_language = values.bidi_language.clone();
   }
   if (values.font_size_pt - TextStyle::default().font_size_pt).abs() > f32::EPSILON {
     target.font_size_pt = values.font_size_pt;
@@ -18624,6 +18649,16 @@ impl<'a> ParagraphProps<'a> {
     }
   }
 
+  fn suppress_auto_hyphens(&self) -> Option<&'a w::SuppressAutoHyphens> {
+    match self {
+      Self::Direct(properties) => properties.suppress_auto_hyphens.as_ref(),
+      Self::Extended(properties) => properties.suppress_auto_hyphens.as_ref(),
+      Self::Style(properties) => properties.suppress_auto_hyphens.as_ref(),
+      Self::BaseStyle(properties) => properties.suppress_auto_hyphens.as_ref(),
+      Self::Previous(properties) => properties.suppress_auto_hyphens.as_ref(),
+    }
+  }
+
   fn snap_to_grid(&self) -> Option<&'a w::SnapToGrid> {
     match self {
       Self::Direct(properties) => properties.snap_to_grid.as_ref(),
@@ -18833,6 +18868,7 @@ run_properties_accessor!(
   ComplexScript,
   w::ComplexScript
 );
+run_properties_accessor!(run_properties_languages, Languages, w::Languages);
 
 paragraph_mark_run_properties_accessor!(
   paragraph_mark_run_properties_run_style,
@@ -18918,6 +18954,11 @@ paragraph_mark_run_properties_accessor!(
   ComplexScript,
   w::ComplexScript
 );
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_languages,
+  Languages,
+  w::Languages
+);
 
 impl<'a> RunProps<'a> {
   fn run_fonts(&self) -> Option<&'a w::RunFonts> {
@@ -18927,6 +18968,16 @@ impl<'a> RunProps<'a> {
       Self::BaseStyle(properties) => properties.run_fonts.as_ref(),
       Self::Numbering(properties) => properties.run_fonts.first(),
       Self::ParagraphMark(properties) => paragraph_mark_run_properties_run_fonts(properties),
+    }
+  }
+
+  fn languages(&self) -> Option<&'a w::Languages> {
+    match self {
+      Self::Direct(properties) => run_properties_languages(properties),
+      Self::Style(properties) => properties.languages.as_ref(),
+      Self::BaseStyle(properties) => properties.languages.as_ref(),
+      Self::Numbering(properties) => properties.languages.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_languages(properties),
     }
   }
 

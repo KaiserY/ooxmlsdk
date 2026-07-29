@@ -190,6 +190,9 @@ pub(super) fn paragraph_model_with_base<'a>(
   format.list_label_uses_explicit_tab_stop =
     style_indent_overrides_numbering && numbering_list_tab_stop_pt.is_some();
   let has_numbering_label = list_label.is_some() || numbering_image.is_some();
+  let blank_numbering_label = list_label
+    .as_deref()
+    .is_some_and(|label| label.chars().all(char::is_whitespace));
   let list_label_tab_stop_pt = has_numbering_label
     .then(|| {
       // A direct paragraph indent is Word's persisted result of opening and
@@ -202,6 +205,13 @@ pub(super) fn paragraph_model_with_base<'a>(
         numbering_list_tab_stop_pt
       } else {
         style_tab_stop_pt.or(numbering_list_tab_stop_pt)
+      })
+      .or_else(|| {
+        // An empty w:lvlText with the default tab suffix is a real TabLeft
+        // portion, not visible pseudo-numbering. Writer's tdf#148360 layout
+        // and Word fixed output both place the following text at the
+        // numbering level's left indent.
+        (blank_numbering_label && format.indent_left_pt > 0.0).then_some(format.indent_left_pt)
       })
       .or_else(|| {
         (!has_direct_indentation && format.indent_left_pt > 0.0).then_some(

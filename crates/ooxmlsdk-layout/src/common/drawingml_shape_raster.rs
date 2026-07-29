@@ -879,16 +879,98 @@ fn draw_path(
     page_to_raster,
   )?;
   if let Some(stroke) = &item.stroke {
+    let shortened_path = shortened_straight_stroke_path(item, stroke);
     draw_stroke(
       pixmap,
-      &path,
+      shortened_path.as_ref().unwrap_or(&path),
       stroke,
       item.bounds,
       Some(&item.commands),
       page_to_raster,
     )?;
+    draw_stroke_end_markers(pixmap, item, stroke, page_to_raster)?;
   }
   Some(())
+}
+
+fn draw_stroke_end_markers(
+  pixmap: &mut Pixmap,
+  item: &PathItem<'static>,
+  stroke: &Stroke<'static>,
+  page_to_raster: SkTransform,
+) -> Option<()> {
+  let mut paint = solid_paint(stroke.color);
+  paint.anti_alias = true;
+  for polygon in super::drawingml_stroke::stroke_end_marker_polygons(item, stroke) {
+    let [first, rest @ ..] = polygon.as_slice() else {
+      continue;
+    };
+    let mut builder = PathBuilder::new();
+    builder.move_to(first.x.0, first.y.0);
+    for point in rest {
+      builder.line_to(point.x.0, point.y.0);
+    }
+    builder.close();
+    let path = builder.finish()?;
+    pixmap.fill_path(&path, &paint, FillRule::EvenOdd, page_to_raster, None);
+  }
+  for marker in super::drawingml_stroke::stroked_open_arrow_markers(item, stroke) {
+    let [first, middle, last] = marker.points;
+    let mut builder = PathBuilder::new();
+    builder.move_to(first.x.0, first.y.0);
+    builder.line_to(middle.x.0, middle.y.0);
+    builder.line_to(last.x.0, last.y.0);
+    let path = builder.finish()?;
+    let sk_stroke = SkStroke {
+      width: marker.width.0,
+      line_cap: LineCap::Round,
+      line_join: LineJoin::Miter,
+      ..SkStroke::default()
+    };
+    pixmap.stroke_path(&path, &paint, &sk_stroke, page_to_raster, None);
+  }
+  Some(())
+}
+
+fn shortened_straight_stroke_path(
+  item: &PathItem<'static>,
+  stroke: &Stroke<'static>,
+) -> Option<Path> {
+  if item.closed {
+    return None;
+  }
+  let (start, end) = if item.commands.is_empty() {
+    let [start, end] = item.points.as_slice() else {
+      return None;
+    };
+    (*start, *end)
+  } else {
+    let [PathCommand::MoveTo(start), PathCommand::LineTo(end)] = item.commands.as_slice() else {
+      return None;
+    };
+    (*start, *end)
+  };
+  let (head_inset, tail_inset) = super::drawingml_stroke::stroke_end_shaft_insets(stroke);
+  if head_inset <= 0.0 && tail_inset <= 0.0 {
+    return None;
+  }
+  let dx = end.x.0 - start.x.0;
+  let dy = end.y.0 - start.y.0;
+  let length = dx.hypot(dy);
+  if length <= head_inset + tail_inset || length <= f32::EPSILON {
+    return None;
+  }
+  let direction = (dx / length, dy / length);
+  let mut builder = PathBuilder::new();
+  builder.move_to(
+    start.x.0 + direction.0 * head_inset,
+    start.y.0 + direction.1 * head_inset,
+  );
+  builder.line_to(
+    end.x.0 - direction.0 * tail_inset,
+    end.y.0 - direction.1 * tail_inset,
+  );
+  builder.finish()
 }
 
 fn draw_rect(

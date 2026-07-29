@@ -661,6 +661,8 @@ pub(crate) struct InlineShape {
   pub text_inset_right_pt: f32,
   pub text_inset_bottom_pt: f32,
   pub text_box_auto_fit: bool,
+  pub text_box_resizes_height_to_fit: bool,
+  pub text_box_word_wrap: bool,
   pub text_vertical_alignment: TextBoxVerticalAlignment,
 }
 
@@ -752,7 +754,7 @@ pub(crate) struct FloatingImagePlacement {
   pub behind_text: bool,
   pub layout_in_cell: bool,
   pub allow_overlap: bool,
-  pub relative_height: u32,
+  pub paint_order: FloatingPaintOrder,
   pub relative_width_to: Option<HorizontalImageReference>,
   pub relative_width_pct: Option<f32>,
   pub relative_height_to: Option<VerticalImageReference>,
@@ -761,6 +763,14 @@ pub(crate) struct FloatingImagePlacement {
   pub margin_right_pt: f32,
   pub margin_bottom_pt: f32,
   pub margin_left_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum FloatingPaintOrder {
+  #[default]
+  Unspecified,
+  DrawingMlRelativeHeight(u32),
+  VmlZIndex(i32),
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

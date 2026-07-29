@@ -466,6 +466,7 @@ enum PageItem<'doc> {
     blend_mode: common::BlendMode,
     opacity: f32,
     flatten_identity: bool,
+    inherit_text_line_owner: bool,
     items: Vec<PageItem<'doc>>,
   },
   LinkArea(LinkAreaItem<'doc>),
@@ -1594,6 +1595,7 @@ impl<'doc> PaintDocument<'doc> {
                 blend_mode,
                 opacity,
                 flatten_identity,
+                inherit_text_line_owner,
                 items,
               } => PaintItem::Group {
                 mask,
@@ -1601,18 +1603,24 @@ impl<'doc> PaintDocument<'doc> {
                 blend_mode,
                 opacity,
                 flatten_identity,
-                items: items
-                  .into_iter()
-                  .map(|item| {
-                    paint_group_item(
-                      item,
-                      owner,
-                      common_line_baseline,
-                      page.setup.size.width.0,
-                      text_metrics,
-                    )
-                  })
-                  .collect(),
+                items: {
+                  let child_owner = inherit_text_line_owner.then_some(owner).flatten();
+                  let child_line_baseline = inherit_text_line_owner
+                    .then_some(common_line_baseline)
+                    .flatten();
+                  items
+                    .into_iter()
+                    .map(|item| {
+                      paint_group_item(
+                        item,
+                        child_owner,
+                        child_line_baseline,
+                        page.setup.size.width.0,
+                        text_metrics,
+                      )
+                    })
+                    .collect()
+                },
               },
               PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area),
               PageItem::Rect(rect) => PaintItem::Rect(rect),
@@ -1633,14 +1641,29 @@ impl<'doc> PaintDocument<'doc> {
 }
 
 fn pdf_page_dimension(engine_kind: common::LayoutEngineKind, dimension_pt: f32) -> f32 {
-  if engine_kind == common::LayoutEngineKind::Pptx {
-    // PowerPoint's fixed-format writer quantizes presentation MediaBox
-    // dimensions to its 600 dpi print-device grid, with positive half-grid
-    // dimensions rounded upward. Keep the OOXML/layout coordinate space exact
-    // and apply this only at PDF page creation.
-    ooxmlsdk_layout::units::quantize_points_to_office_print_grid(dimension_pt)
-  } else {
-    dimension_pt
+  match engine_kind {
+    common::LayoutEngineKind::Pptx => {
+      // PowerPoint's fixed-format writer quantizes presentation MediaBox
+      // dimensions to its 600 dpi print-device grid, with positive half-grid
+      // dimensions rounded upward. Keep the OOXML/layout coordinate space
+      // exact and apply this only at PDF page creation.
+      ooxmlsdk_layout::units::quantize_points_to_office_print_grid(dimension_pt)
+    }
+    common::LayoutEngineKind::Docx => {
+      let print_grid_position = dimension_pt * ooxmlsdk_layout::units::OFFICE_FIXED_OUTPUT_DPI
+        / ooxmlsdk_layout::units::POINTS_PER_INCH;
+      // Word MediaBoxes use the same 600 dpi grid, but real corpus half-grid
+      // dimensions round in both directions depending on printer/page state
+      // that is not represented by w:pgSz. Preserve an exact half-grid source
+      // dimension instead of choosing a contradicted tie rule. Non-ties have
+      // one nearest device coordinate and can be normalized safely.
+      if (print_grid_position.fract() - 0.5).abs() <= 0.001 {
+        dimension_pt
+      } else {
+        ooxmlsdk_layout::units::quantize_points_to_office_print_grid(dimension_pt)
+      }
+    }
+    _ => dimension_pt,
   }
 }
 
@@ -1651,85 +1674,109 @@ fn expand_metafile_semantic_text_items<'doc>(
   let mut expanded_items = Vec::with_capacity(items.len());
   let mut expanded_owners = Vec::with_capacity(owners.len());
   for (item, owner) in items.into_iter().zip(owners) {
-    let semantic_runs = match &item {
-      PageItem::Image(image)
-        if image.semantic_metafile_text
-          && image.rotation_deg.abs() <= f32::EPSILON
-          && !image.flip_horizontal
-          && !image.flip_vertical
-          && image.crop == ImageCrop::default() =>
-      {
-        ooxmlsdk_layout::render::emf_wmf::extract_metafile_text_runs(
-          &image.data,
-          image.content_type.as_deref(),
-        )
-        .into_iter()
-        .map(|run| {
-          let font_size_pt = run
-            .font_size
-            .map(|size| size * image.height_pt)
-            .unwrap_or(11.0)
-            .max(1.0);
-          PageItem::Text(Box::new(TextItem {
-            x_pt: image.x_pt + run.x * image.width_pt,
-            y_pt: image.y_pt + run.y * image.height_pt,
-            line_height_pt: (font_size_pt * 1.15).max(1.0),
-            paint_clip: None,
-            text: Cow::Owned(run.text),
-            style: TextStyle {
-              font_family: run.font_family.map(Cow::Owned),
-              font_size_pt,
-              bold: run.bold,
-              italic: run.italic,
-              semantic_only: true,
-              ..TextStyle::default()
-            },
-            rotation_center_pt: None,
-            hyperlink_url: None,
-            dynamic_field: None,
-            form_widget_id: None,
-            paragraph_bidi: false,
-            word_spacing_pt: 0.0,
-            preserve_text_portion: false,
-            decoration_span_start_x_pt: None,
-            pdf_text_segmentation: common::PdfTextSegmentation::Line,
-            source_path: None,
-            semantic_target_width_pt: run.width.map(|width| width * image.width_pt),
-          }))
-        })
-        .collect::<Vec<_>>()
+    expanded_items.push(expand_metafile_semantic_text_item(item, owner));
+    expanded_owners.push(owner);
+  }
+  (expanded_items, expanded_owners)
+}
+
+fn expand_metafile_semantic_text_item<'doc>(
+  item: PageItem<'doc>,
+  owner: Option<PaintLineOwner>,
+) -> PageItem<'doc> {
+  match item {
+    PageItem::Group {
+      mask,
+      transform,
+      blend_mode,
+      opacity,
+      flatten_identity,
+      inherit_text_line_owner,
+      items,
+    } => {
+      let child_owner = inherit_text_line_owner.then_some(owner).flatten();
+      let child_count = items.len();
+      let (items, _) = expand_metafile_semantic_text_items(items, vec![child_owner; child_count]);
+      PageItem::Group {
+        mask,
+        transform,
+        blend_mode,
+        opacity,
+        flatten_identity,
+        inherit_text_line_owner,
+        items,
       }
-      PageItem::Image(_)
-      | PageItem::Group { .. }
-      | PageItem::Text(_)
-      | PageItem::LinkArea(_)
-      | PageItem::Rect(_)
-      | PageItem::Line(_)
-      | PageItem::Polyline(_) => Vec::new(),
-    };
-    if semantic_runs.is_empty() {
-      expanded_items.push(item);
-    } else {
-      let mut group_items = Vec::with_capacity(semantic_runs.len() + 1);
-      group_items.push(item);
-      group_items.extend(semantic_runs);
+    }
+    PageItem::Image(image)
+      if image.semantic_metafile_text
+        && image.rotation_deg.abs() <= f32::EPSILON
+        && !image.flip_horizontal
+        && !image.flip_vertical
+        && image.crop == ImageCrop::default() =>
+    {
+      let semantic_runs = ooxmlsdk_layout::render::emf_wmf::extract_metafile_text_runs(
+        &image.data,
+        image.content_type.as_deref(),
+      )
+      .into_iter()
+      .map(|run| {
+        let font_size_pt = run
+          .font_size
+          .map(|size| size * image.height_pt)
+          .unwrap_or(11.0)
+          .max(1.0);
+        PageItem::Text(Box::new(TextItem {
+          x_pt: image.x_pt + run.x * image.width_pt,
+          y_pt: image.y_pt + run.y * image.height_pt,
+          line_height_pt: (font_size_pt * 1.15).max(1.0),
+          paint_clip: None,
+          text: Cow::Owned(run.text),
+          style: TextStyle {
+            font_family: run.font_family.map(Cow::Owned),
+            font_size_pt,
+            bold: run.bold,
+            italic: run.italic,
+            semantic_only: true,
+            ..TextStyle::default()
+          },
+          rotation_center_pt: None,
+          hyperlink_url: None,
+          dynamic_field: None,
+          form_widget_id: None,
+          paragraph_bidi: false,
+          word_spacing_pt: 0.0,
+          preserve_text_portion: false,
+          decoration_span_start_x_pt: None,
+          pdf_text_segmentation: common::PdfTextSegmentation::Line,
+          source_path: None,
+          semantic_target_width_pt: run.width.map(|width| width * image.width_pt),
+        }))
+      })
+      .collect::<Vec<_>>();
+      if semantic_runs.is_empty() {
+        return PageItem::Image(image);
+      }
+
+      let mut items = Vec::with_capacity(semantic_runs.len() + 1);
+      items.push(PageItem::Image(image));
+      items.extend(semantic_runs);
       // Office emits metafile previews as Form XObjects whose visible
       // graphics and searchable text share one form stream. Keeping the
       // semantic overlay in the same isolated group preserves text extraction
       // without exposing producer-specific form text as page-level text style
       // or geometry.
-      expanded_items.push(PageItem::Group {
+      PageItem::Group {
         mask: None,
         transform: None,
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
         flatten_identity: false,
-        items: group_items,
-      });
+        inherit_text_line_owner: true,
+        items,
+      }
     }
-    expanded_owners.push(owner);
+    item => item,
   }
-  (expanded_items, expanded_owners)
 }
 
 fn page_item_from_common<'doc>(
@@ -1750,6 +1797,7 @@ fn page_item_from_common<'doc>(
       blend_mode: group.blend_mode,
       opacity: group.opacity,
       flatten_identity: group.flatten_identity,
+      inherit_text_line_owner: group.inherit_text_line_owner,
       items: group
         .items
         .iter()
@@ -1822,6 +1870,7 @@ fn image_page_item_from_common<'doc>(
     blend_mode: common::BlendMode::Normal,
     opacity: 1.0,
     flatten_identity: false,
+    inherit_text_line_owner: true,
     items,
   }
 }
@@ -1907,6 +1956,7 @@ fn paint_group_item<'doc>(
       blend_mode,
       opacity,
       flatten_identity,
+      inherit_text_line_owner,
       items,
     } => PaintItem::Group {
       mask,
@@ -1914,18 +1964,24 @@ fn paint_group_item<'doc>(
       blend_mode,
       opacity,
       flatten_identity,
-      items: items
-        .into_iter()
-        .map(|item| {
-          paint_group_item(
-            item,
-            owner,
-            common_line_baseline,
-            page_width_pt,
-            text_metrics,
-          )
-        })
-        .collect(),
+      items: {
+        let child_owner = inherit_text_line_owner.then_some(owner).flatten();
+        let child_line_baseline = inherit_text_line_owner
+          .then_some(common_line_baseline)
+          .flatten();
+        items
+          .into_iter()
+          .map(|item| {
+            paint_group_item(
+              item,
+              child_owner,
+              child_line_baseline,
+              page_width_pt,
+              text_metrics,
+            )
+          })
+          .collect()
+      },
     },
     PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area),
     PageItem::Rect(rect) => PaintItem::Rect(rect),
@@ -2232,6 +2288,7 @@ fn coalesced_writer_text_items<'doc>(
         blend_mode,
         opacity,
         flatten_identity,
+        inherit_text_line_owner,
         items,
       } => {
         output.push(PageItem::Group {
@@ -2240,6 +2297,7 @@ fn coalesced_writer_text_items<'doc>(
           blend_mode,
           opacity,
           flatten_identity,
+          inherit_text_line_owner,
           items,
         });
       }
@@ -2355,10 +2413,15 @@ fn writer_item_line_baseline_offset(
         } + text.style.baseline_shift_pt,
       )
     }
-    PageItem::Group { items, .. } => items
+    PageItem::Group {
+      inherit_text_line_owner: true,
+      items,
+      ..
+    } => items
       .iter()
       .filter_map(|item| writer_item_line_baseline_offset(item, text_metrics))
       .reduce(f32::max),
+    PageItem::Group { .. } => None,
     PageItem::Text(_)
     | PageItem::Image(_)
     | PageItem::LinkArea(_)
@@ -4903,7 +4966,10 @@ fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
   }
 
   let mut path = PathBuilder::new();
-  if polyline.commands.is_empty() {
+  if let Some((start, end)) = shortened_straight_polyline_points(polyline) {
+    path.move_to(start.0, start.1);
+    path.line_to(end.0, end.1);
+  } else if polyline.commands.is_empty() {
     let first = polyline.points[0];
     path.move_to(first.x.0, first.y.0);
     for point in &polyline.points[1..] {
@@ -4973,6 +5039,60 @@ fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
   }
 }
 
+fn shortened_straight_polyline_points(
+  polyline: &PolylineItem<'_>,
+) -> Option<((f32, f32), (f32, f32))> {
+  if polyline.closed {
+    return None;
+  }
+  let (start, end) = if polyline.commands.is_empty() {
+    let [start, end] = polyline.points else {
+      return None;
+    };
+    ((start.x.0, start.y.0), (end.x.0, end.y.0))
+  } else {
+    let [
+      common::PathCommand::MoveTo(start),
+      common::PathCommand::LineTo(end),
+    ] = polyline.commands
+    else {
+      return None;
+    };
+    ((start.x.0, start.y.0), (end.x.0, end.y.0))
+  };
+  let stroke = polyline.stroke?;
+  let head_inset = stroke
+    .head_end
+    .filter(|marker| uses_stroked_open_arrow(*marker, stroke.width.0))
+    .map(|_| stroke.width.0)
+    .unwrap_or_default();
+  let tail_inset = stroke
+    .tail_end
+    .filter(|marker| uses_stroked_open_arrow(*marker, stroke.width.0))
+    .map(|_| stroke.width.0)
+    .unwrap_or_default();
+  if head_inset <= 0.0 && tail_inset <= 0.0 {
+    return None;
+  }
+  let dx = end.0 - start.0;
+  let dy = end.1 - start.1;
+  let length = dx.hypot(dy);
+  if length <= head_inset + tail_inset || length <= f32::EPSILON {
+    return None;
+  }
+  let direction = (dx / length, dy / length);
+  Some((
+    (
+      start.0 + direction.0 * head_inset,
+      start.1 + direction.1 * head_inset,
+    ),
+    (
+      end.0 - direction.0 * tail_inset,
+      end.1 - direction.1 * tail_inset,
+    ),
+  ))
+}
+
 fn draw_stroke_end_markers(
   surface: &mut Surface<'_>,
   polyline: &PolylineItem<'_>,
@@ -4989,14 +5109,29 @@ fn draw_stroke_end_markers(
       .tail_end
       .map(|marker| (marker, endpoints.end, endpoints.end_outward)),
   ];
-  surface.set_stroke(None);
-  surface.set_fill(Some(Fill {
-    paint: rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into(),
-    opacity: NormalizedF32::new(opacity(stroke.color)).unwrap_or(NormalizedF32::ZERO),
-    rule: FillRule::NonZero,
-  }));
+  let marker_opacity = NormalizedF32::new(opacity(stroke.color)).unwrap_or(NormalizedF32::ZERO);
   for marker in markers.into_iter().flatten() {
-    if let Some(path) = stroke_end_path(marker.0, marker.1, marker.2, stroke.width.0) {
+    if uses_stroked_open_arrow(marker.0, stroke.width.0) {
+      let Some(path) = stroked_open_arrow_path(marker.0, marker.1, marker.2, stroke.width.0) else {
+        continue;
+      };
+      surface.set_fill(None);
+      surface.set_stroke(Some(Stroke {
+        width: stroke.width.0,
+        paint: rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into(),
+        opacity: marker_opacity,
+        line_cap: LineCap::Round,
+        line_join: LineJoin::Miter,
+        ..Stroke::default()
+      }));
+      surface.draw_path(&path);
+    } else if let Some(path) = stroke_end_path(marker.0, marker.1, marker.2, stroke.width.0) {
+      surface.set_stroke(None);
+      surface.set_fill(Some(Fill {
+        paint: rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into(),
+        opacity: marker_opacity,
+        rule: FillRule::NonZero,
+      }));
       surface.draw_path(&path);
     }
   }
@@ -5078,27 +5213,93 @@ fn normalized_direction(from_x: f32, from_y: f32, to_x: f32, to_y: f32) -> Optio
   (length > f32::EPSILON).then_some((dx / length, dy / length))
 }
 
-fn stroke_end_dimensions(marker: common::StrokeEnd, line_width: f32) -> (f32, f32) {
-  use common::{StrokeEndKind as Kind, StrokeEndSize as Size};
+const MIN_MARKER_BASE_PT: f32 = 70.0 * 72.0 / 2_540.0;
 
-  // LibreOffice's DrawingML importer carries line widths in hundredths of a
-  // millimetre here. `lineproperties.cxx::lclPushMarkerProperties` clamps the
-  // marker baseline to 70 of those units before applying these multipliers.
-  const MIN_MARKER_BASE_PT: f32 = 70.0 * 72.0 / 2_540.0;
-  let is_open_arrow = marker.kind == Kind::Arrow;
-  let factor = |size| match (size, is_open_arrow) {
+fn stroke_end_size_factor(size: common::StrokeEndSize, is_open_arrow: bool) -> f32 {
+  use common::StrokeEndSize as Size;
+  match (size, is_open_arrow) {
     (Size::Small, false) => 2.0,
     (Size::Medium, false) => 3.0,
     (Size::Large, false) => 5.0,
     (Size::Small, true) => 2.5,
     (Size::Medium, true) => 3.5,
     (Size::Large, true) => 5.5,
-  };
+  }
+}
+
+fn uses_stroked_open_arrow(marker: common::StrokeEnd, line_width: f32) -> bool {
+  // Word fixed output uses a round-capped V once the authored line width,
+  // rather than the fixed marker minimum, drives the open-arrow scale.
+  marker.kind == common::StrokeEndKind::Arrow && line_width >= MIN_MARKER_BASE_PT
+}
+
+fn stroke_end_dimensions(marker: common::StrokeEnd, line_width: f32) -> (f32, f32) {
+  use common::{StrokeEndKind as Kind, StrokeEndSize as Size};
+
+  // LibreOffice's DrawingML importer carries line widths in hundredths of a
+  // millimetre here. `lineproperties.cxx::lclPushMarkerProperties` clamps the
+  // marker baseline to 70 of those units before applying these multipliers.
+  let is_open_arrow = marker.kind == Kind::Arrow;
   let baseline = line_width.max(MIN_MARKER_BASE_PT);
+  if marker.kind == Kind::Arrow
+    && marker.width == Size::Medium
+    && marker.length == Size::Medium
+    && !uses_stroked_open_arrow(marker, line_width)
+  {
+    // The LibreOffice marker table supplies the open arrow's minimum
+    // centerline dimensions. Office fixed output additionally includes the
+    // stroke envelope of the two approximately 30-degree arms. Independent
+    // 0.75pt and 2pt Word goldens retain the same projection.
+    return (
+      3.5 * baseline + (3.0_f32.sqrt() / 2.0) * line_width,
+      3.0 * baseline + 0.75 * line_width,
+    );
+  }
   (
-    factor(marker.width) * baseline,
-    factor(marker.length) * baseline,
+    stroke_end_size_factor(marker.width, is_open_arrow) * baseline,
+    stroke_end_size_factor(marker.length, is_open_arrow) * baseline,
   )
+}
+
+fn stroked_open_arrow_path(
+  marker: common::StrokeEnd,
+  endpoint: (f32, f32),
+  outward: (f32, f32),
+  line_width: f32,
+) -> Option<krilla::geom::Path> {
+  if !uses_stroked_open_arrow(marker, line_width) {
+    return None;
+  }
+  let baseline = line_width.max(MIN_MARKER_BASE_PT);
+  let marker_width = stroke_end_size_factor(marker.width, true) * baseline;
+  let marker_length = stroke_end_size_factor(marker.length, true) * baseline;
+  let radius = line_width / 2.0;
+  let half_width = marker_width / 2.0;
+  let base_offset = marker_length + radius;
+  let coefficient = half_width * half_width - radius * radius;
+  let linear = 2.0 * radius * radius * base_offset;
+  let constant = -radius * radius * (half_width * half_width + base_offset * base_offset);
+  let discriminant = linear * linear - 4.0 * coefficient * constant;
+  let miter_inset = if coefficient > f32::EPSILON && discriminant >= 0.0 {
+    (-linear + discriminant.sqrt()) / (2.0 * coefficient)
+  } else {
+    radius
+  };
+  let perpendicular = (-outward.1, outward.0);
+  let point = |back: f32, across: f32| {
+    (
+      endpoint.0 - outward.0 * back + perpendicular.0 * across,
+      endpoint.1 - outward.1 * back + perpendicular.1 * across,
+    )
+  };
+  let left = point(base_offset, -half_width);
+  let apex = point(miter_inset, 0.0);
+  let right = point(base_offset, half_width);
+  let mut path = PathBuilder::new();
+  path.move_to(left.0, left.1);
+  path.line_to(apex.0, apex.1);
+  path.line_to(right.0, right.1);
+  path.finish()
 }
 
 fn stroke_end_path(
@@ -6463,6 +6664,22 @@ mod tests {
   }
 
   #[test]
+  fn medium_open_arrow_uses_centerline_dimensions_for_the_stroked_envelope() {
+    let marker = common::StrokeEnd {
+      kind: common::StrokeEndKind::Arrow,
+      width: common::StrokeEndSize::Medium,
+      length: common::StrokeEndSize::Medium,
+    };
+
+    let (thin_width, thin_length) = stroke_end_dimensions(marker, 0.75);
+    assert!((thin_width - 7.594_401).abs() < 0.000_1);
+    assert!((thin_length - 6.515_256).abs() < 0.000_1);
+
+    let (two_point_width, two_point_length) = stroke_end_dimensions(marker, 2.0);
+    assert_eq!((two_point_width, two_point_length), (7.0, 7.0));
+  }
+
+  #[test]
   fn metafile_raster_size_uses_office_fixed_output_density() {
     let image = ImageItem {
       x_pt: 0.0,
@@ -6808,6 +7025,7 @@ mod tests {
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
         flatten_identity: true,
+        inherit_text_line_owner: true,
         items: vec![text],
       }));
 
@@ -6832,6 +7050,7 @@ mod tests {
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
         flatten_identity: false,
+        inherit_text_line_owner: true,
         items: vec![text],
       }));
 
@@ -6950,7 +7169,15 @@ mod tests {
     assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 446.5) - 446.52).abs() < 0.001);
     assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 793.5) - 793.56).abs() < 0.001);
     assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 595.5) - 595.56).abs() < 0.001);
-    assert_eq!(pdf_page_dimension(LayoutEngineKind::Docx, 793.75), 793.75);
+  }
+
+  #[test]
+  fn word_pdf_page_dimensions_quantize_only_unambiguous_print_grid_positions() {
+    assert!((pdf_page_dimension(LayoutEngineKind::Docx, 595.35) - 595.32).abs() < 0.001);
+    assert!((pdf_page_dimension(LayoutEngineKind::Docx, 842.0) - 842.04).abs() < 0.001);
+    assert_eq!(pdf_page_dimension(LayoutEngineKind::Docx, 612.0), 612.0);
+    assert!((pdf_page_dimension(LayoutEngineKind::Docx, 287.7) - 287.7).abs() < 0.001);
+    assert!((pdf_page_dimension(LayoutEngineKind::Docx, 283.5) - 283.5).abs() < 0.001);
   }
 
   #[test]

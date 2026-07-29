@@ -53,6 +53,12 @@ pub(super) fn run_style(
     &styles.theme_fonts,
     &styles.theme_colors,
   );
+  styles.apply_mapped_reserved_font(
+    &mut style,
+    RunProps::Direct(properties)
+      .run_fonts()
+      .and_then(|fonts| fonts.ascii.as_deref()),
+  );
   styles.apply_font_substitution(&mut style);
   style
 }
@@ -77,6 +83,12 @@ pub(super) fn paragraph_mark_run_style(
     Some(RunProps::ParagraphMark(properties)),
     &styles.theme_fonts,
     &styles.theme_colors,
+  );
+  styles.apply_mapped_reserved_font(
+    &mut style,
+    RunProps::ParagraphMark(properties)
+      .run_fonts()
+      .and_then(|fonts| fonts.ascii.as_deref()),
   );
   styles.apply_font_substitution(&mut style);
   style
@@ -319,7 +331,10 @@ pub(super) fn merge_run_style(
     // ECMA-376 Part 1 §17.3.2.43 scales the character outlines and advances,
     // unlike w:spacing, which only adds pitch. LibreOffice accepts 1..=600
     // and resets an omitted/out-of-range value to 100%.
-    let percentage = scale.val.unwrap_or(100).clamp(1, 600);
+    let percentage = scale
+      .val
+      .filter(|percentage| (1..=600).contains(percentage))
+      .unwrap_or(100);
     style.horizontal_scale = Some(percentage as f32 / 100.0);
   }
   if let Some(kern) = properties.kern() {

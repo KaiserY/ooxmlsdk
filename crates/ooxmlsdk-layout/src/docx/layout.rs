@@ -5,7 +5,7 @@ use std::sync::Arc;
 use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder};
-use kurbo::{Affine, Rect as KurboRect};
+use kurbo::{Affine, BezPath, Rect as KurboRect, Shape};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -14,11 +14,11 @@ use unicode_bidi::{BidiInfo, Level};
 use crate::common;
 use crate::docx::{
   Block, BorderDashPattern, BorderStyle, DocxDocument, DynamicFieldKind, FieldNumberFormat,
-  FloatingFrame, FloatingFramePlacement, FloatingImagePlacement, FrameHeightRule,
-  FrameHorizontalAlignment, FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor,
-  FrameWrapMode, HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode,
-  ImageWrapSide, InlineChart, InlineDrawingGroupEffect, InlineItem, InlineShape,
-  InlineShapeGeometry, InlineShapeImageFill, InlineShapeImageFillMode, LineHeightRule,
+  FloatingFrame, FloatingFramePlacement, FloatingImagePlacement, FloatingPaintOrder,
+  FrameHeightRule, FrameHorizontalAlignment, FrameHorizontalAnchor, FrameVerticalAlignment,
+  FrameVerticalAnchor, FrameWrapMode, HorizontalImageAlignment, HorizontalImageReference,
+  ImageCrop, ImageWrapMode, ImageWrapSide, InlineChart, InlineDrawingGroupEffect, InlineItem,
+  InlineShape, InlineShapeGeometry, InlineShapeImageFill, InlineShapeImageFillMode, LineHeightRule,
   LineNumbering, NoteNumberingSpec, PRESERVED_WORD_TEXT_TAB, PageSetup, ParagraphAlignment,
   RgbColor, RubyAlignment, RubyInline, SectionBreakKind, SectionColumns, TabLeader, TabStop,
   TabStopAlignment, Table, TableAlignment, TableBordersModel, TableCell,
@@ -390,6 +390,40 @@ fn include_text_height(
     LineHeightRule::Exact => line_height,
     LineHeightRule::Auto | LineHeightRule::AtLeast => line_height.max(text_height),
   }
+}
+
+fn include_numbering_label_height(
+  paragraph: &crate::docx::Paragraph,
+  line_height: f32,
+  text_frame: TextFrame,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let Some(label) = paragraph.list_label.as_deref() else {
+    return line_height;
+  };
+  if label.chars().all(char::is_whitespace) {
+    return line_height;
+  }
+  let visible_label = label
+    .strip_suffix('\t')
+    .or_else(|| label.strip_suffix(' '))
+    .unwrap_or(label);
+  if !segment_affects_line_height(visible_label) {
+    return line_height;
+  }
+
+  // Writer creates numbering as a SwNumberPortion with its own font.
+  // SwTextFormatter::CalcAscent() measures that font's height/ascent and the
+  // portion participates in the enclosing SwLineLayout just like ordinary
+  // text. Keep that ownership here instead of deriving every numbered line
+  // from the first printable body run.
+  include_text_height(
+    line_height,
+    text_frame,
+    &paragraph.list_label_style,
+    visible_label,
+    text_metrics,
+  )
 }
 
 fn update_line_text_height(
@@ -1011,6 +1045,11 @@ pub(crate) enum PageItem {
   Text(Box<TextItem>),
   Image(ImageItem),
   Group(Vec<PageItem>),
+  FloatingDrawing {
+    items: Vec<PageItem>,
+    paint_order: FloatingPaintOrder,
+    behind_text: bool,
+  },
   Rect(RectItem),
   Fill(FillItem),
   Line(LineItem),
@@ -1223,6 +1262,13 @@ struct WrapExclusion {
   bottom_pt: f32,
   side: ImageWrapSide,
   blocks_flow: bool,
+  owner: WrapExclusionOwner,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WrapExclusionOwner {
+  Drawing,
+  FloatingTable,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1707,16 +1753,33 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
   match item {
     PageItem::Text(item) => common::DisplayItem::Text(into_common_text_run(*item)),
     PageItem::Image(item) => common::DisplayItem::Image(into_common_image_item(item)),
-    PageItem::Group(items) => common::DisplayItem::Group(common::CompositingGroup {
-      mask: None,
-      transform: None,
-      blend_mode: common::BlendMode::Normal,
-      opacity: 1.0,
-      // Word's w14 character-effect fixed output keeps the effect raster and
-      // searchable foreground text in the page stream.
-      flatten_identity: true,
-      items: items.into_iter().map(into_common_page_item).collect(),
-    }),
+    PageItem::Group(items) => {
+      common::DisplayItem::Group(common::CompositingGroup {
+        mask: None,
+        transform: None,
+        blend_mode: common::BlendMode::Normal,
+        opacity: 1.0,
+        // Word's w14 character-effect fixed output keeps the effect raster and
+        // searchable foreground text in the page stream.
+        flatten_identity: true,
+        inherit_text_line_owner: true,
+        items: items.into_iter().map(into_common_page_item).collect(),
+      })
+    }
+    PageItem::FloatingDrawing { items, .. } => {
+      common::DisplayItem::Group(common::CompositingGroup {
+        mask: None,
+        transform: None,
+        blend_mode: common::BlendMode::Normal,
+        opacity: 1.0,
+        // This wrapper owns drawing-layer paint order only. It must not turn
+        // the floating object's private text frame into part of the anchor
+        // paragraph's PDF line.
+        flatten_identity: true,
+        inherit_text_line_owner: false,
+        items: items.into_iter().map(into_common_page_item).collect(),
+      })
+    }
     PageItem::Rect(item) => common::DisplayItem::Rect(into_common_rect_item(item)),
     PageItem::Fill(item) => common::DisplayItem::Rect(common::RectItem {
       bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
@@ -1775,7 +1838,7 @@ fn push_docx_picture_image(
   mut image_item: ImageItem,
 ) -> (usize, common::Rect) {
   let content_start = items.len();
-  let content_bounds = image_effect_content_bounds(&image_item);
+  let mut content_bounds = image_effect_content_bounds(&image_item);
   if let Some(frame) = image.picture_frame.as_deref() {
     let shape_transform = inline_shape_path_transform(
       frame,
@@ -1793,6 +1856,16 @@ fn push_docx_picture_image(
       shape_transform,
     );
     if !clip_path.is_empty() {
+      if inline_image_contains_reflection(image)
+        && let Some(clip_bounds) = drawing_path_bounds(&clip_path)
+      {
+        // A rotated non-rectangular picture frame does not paint the corners
+        // of its rotated rectangular extent. Office aligns a reflection to
+        // the clipped picture surface, so use the actual curve range as the
+        // effect coordinate space. Rectangular and unrotated round-rectangle
+        // frames retain their existing bounds.
+        content_bounds = clip_bounds;
+      }
       image_item.clip_path.clone_from(&clip_path);
       let fill = inline_shape_common_fill(
         frame,
@@ -1837,6 +1910,47 @@ fn push_docx_picture_image(
   (content_start, content_bounds)
 }
 
+fn inline_image_contains_reflection(image: &crate::docx::InlineImage) -> bool {
+  let effects = image.effects.as_ref().and_then(|source| match source {
+    common::DrawingEffectSource::List {
+      resolved: Some(effects),
+      ..
+    }
+    | common::DrawingEffectSource::Dag {
+      resolved: Some(effects),
+      ..
+    } => Some(effects),
+    _ => None,
+  });
+  effects.is_some_and(common::drawingml_image_effects::contains_reflection)
+}
+
+fn drawing_path_bounds(commands: &[common::PathCommand]) -> Option<common::Rect> {
+  if commands.is_empty() {
+    return None;
+  }
+  let path = BezPath::from_vec(common::drawingml_geometry::mapped_path_elements(
+    commands,
+    common::drawingml_geometry::kurbo_point,
+  ));
+  let bounds = path.bounding_box();
+  if !bounds.x0.is_finite()
+    || !bounds.y0.is_finite()
+    || !bounds.x1.is_finite()
+    || !bounds.y1.is_finite()
+    || bounds.width() <= f64::EPSILON
+    || bounds.height() <= f64::EPSILON
+  {
+    return None;
+  }
+  Some(common_rect(
+    bounds.x0 as f32,
+    bounds.y0 as f32,
+    bounds.width() as f32,
+    bounds.height() as f32,
+  ))
+}
+
 fn image_effect_content_bounds(item: &ImageItem) -> common::Rect {
   let center_x = item.x_pt + item.width_pt / 2.0;
   let center_y = item.y_pt + item.height_pt / 2.0;
@@ -1869,6 +1983,33 @@ struct DocxDrawingEffectHost<'a> {
   placement: crate::docx::ImagePlacement,
 }
 
+fn drawing_effect_content_bounds_with_markers(
+  items: &[PageItem],
+  mut bounds: common::Rect,
+) -> common::Rect {
+  for item in items {
+    let PageItem::Path(path) = item else {
+      continue;
+    };
+    let Some(stroke) = path.stroke.as_ref() else {
+      continue;
+    };
+    let Some(marker_bounds) =
+      common::drawingml_stroke::stroke_end_marker_bounds(path.as_ref(), stroke)
+    else {
+      continue;
+    };
+    let left = bounds.origin.x.0.min(marker_bounds.origin.x.0);
+    let top = bounds.origin.y.0.min(marker_bounds.origin.y.0);
+    let right = (bounds.origin.x.0 + bounds.size.width.0)
+      .max(marker_bounds.origin.x.0 + marker_bounds.size.width.0);
+    let bottom = (bounds.origin.y.0 + bounds.size.height.0)
+      .max(marker_bounds.origin.y.0 + marker_bounds.size.height.0);
+    bounds = common_rect(left, top, right - left, bottom - top);
+  }
+  bounds
+}
+
 fn finish_docx_drawing_effects(
   items: &mut Vec<PageItem>,
   content_start: usize,
@@ -1892,6 +2033,8 @@ fn finish_docx_drawing_effects(
   if items.len() <= content_start {
     return;
   }
+  let content_bounds =
+    drawing_effect_content_bounds_with_markers(&items[content_start..], content_bounds);
   let mut effects =
     effects
       .cloned()
@@ -3090,7 +3233,7 @@ impl<'a> RootFrameLayout<'a> {
         .map(|page| page.items.len())
         .collect::<Vec<_>>();
       apply_page_backgrounds(&mut self.pages);
-      place_floating_images(&mut self.pages);
+      place_floating_images(&mut self.pages, &mut self.frames);
       apply_column_separators(self.document, &mut self.pages, &self.frames);
       apply_headers_and_footers(self.document, &mut self.pages, &mut self.text_metrics);
       apply_page_borders(&mut self.pages);
@@ -4723,6 +4866,7 @@ fn line_number_text_metrics_for_items(
     .find_map(|item| match item {
       PageItem::Text(text) => Some((text.y_pt, text.line_height_pt)),
       PageItem::Group(items) => line_number_text_metrics_for_items(items, 0, items.len()),
+      PageItem::FloatingDrawing { .. } => None,
       PageItem::Image(_)
       | PageItem::Rect(_)
       | PageItem::Fill(_)
@@ -5954,6 +6098,7 @@ fn item_line_y(item: &PageItem) -> Option<f32> {
     PageItem::Text(text) => Some(text.y_pt),
     PageItem::Image(image) if !image.floating => Some(image.y_pt),
     PageItem::Group(items) => items.iter().find_map(item_line_y),
+    PageItem::FloatingDrawing { .. } => None,
     PageItem::Image(_)
     | PageItem::Rect(_)
     | PageItem::Fill(_)
@@ -5980,7 +6125,9 @@ fn item_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Option<(f32, 
       image.x_pt + image.width_pt,
       image.y_pt + image.height_pt,
     )),
-    PageItem::Group(items) => page_items_bounds(items, text_metrics),
+    PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
+      page_items_bounds(items, text_metrics)
+    }
     PageItem::Rect(rect) => Some((
       rect.x_pt,
       rect.y_pt,
@@ -6040,7 +6187,9 @@ fn item_vertical_bounds(item: &PageItem) -> (f32, f32) {
   match item {
     PageItem::Text(text) => (text.y_pt, text.y_pt + text.line_height_pt),
     PageItem::Image(image) => (image.y_pt, image.y_pt + image.height_pt),
-    PageItem::Group(items) => page_items_vertical_bounds(items).unwrap_or((0.0, 0.0)),
+    PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
+      page_items_vertical_bounds(items).unwrap_or((0.0, 0.0))
+    }
     PageItem::Rect(rect) => (rect.y_pt, rect.y_pt + rect.height_pt),
     PageItem::Fill(fill) => (fill.y_pt, fill.y_pt + fill.height_pt),
     PageItem::Line(line) => {
@@ -6794,7 +6943,8 @@ fn estimated_paragraph_content_height(
     script_sensitive_line_height: flow.script_sensitive_line_height,
     compatibility_mode: flow.compatibility_mode,
   };
-  let mut line_height = base_line_height;
+  let mut line_height =
+    include_numbering_label_height(paragraph, base_line_height, text_frame, text_metrics);
   let mut line_index = 0usize;
   let mut content_height = 0.0;
   let mut floating_bottom: f32 = 0.0;
@@ -6916,7 +7066,8 @@ fn estimated_paragraph_content_height(
             relative_floating_width(placement, flow).unwrap_or_else(|| image_frame_width(image));
           let frame_height =
             relative_floating_height(placement, flow).unwrap_or_else(|| image_frame_height(image));
-          let (width, height) = fit_image_to_line(frame_width, frame_height, flow.content_width);
+          let (width, height) =
+            floating_image_layout_size(frame_width, frame_height, placement, flow);
           let (_, image_y) =
             floating_image_position(placement, flow, x, content_height, width, height);
           floating_bottom = floating_bottom.max(image_y + height + placement.margin_bottom_pt);
@@ -7021,7 +7172,9 @@ fn starts_new_page(kind: SectionBreakKind) -> bool {
 
 fn item_is_in_body_region(item: &PageItem, flow: FlowContext) -> bool {
   match item {
-    PageItem::Group(items) => items.iter().any(|item| item_is_in_body_region(item, flow)),
+    PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
+      items.iter().any(|item| item_is_in_body_region(item, flow))
+    }
     PageItem::Text(text) => {
       text.y_pt >= flow.content_top_pt - LAYOUT_EPSILON_PT
         && text.y_pt <= flow.content_bottom + LAYOUT_EPSILON_PT
@@ -7250,6 +7403,10 @@ fn layout_document_block(
         ignore_top_margin_at_page_start = true;
       }
 
+      // `wp:positionV relativeFrom="paragraph"` is imported as Writer's
+      // frame-relative orientation. Its positioning base starts at the
+      // paragraph frame, before the printable text area's upper spacing.
+      let paragraph_anchor_top = y;
       if !ignore_top_margin_after_page_break && !ignore_top_margin_at_page_start {
         y += paragraph_spacing_before(previous, paragraph, flow, target.text_metrics);
       }
@@ -7265,6 +7422,7 @@ fn layout_document_block(
           text_metrics: target.text_metrics,
         },
         y,
+        paragraph_anchor_top,
         paragraph_spacing_after(paragraph, next),
         ignore_left_indent,
       );
@@ -7872,7 +8030,7 @@ fn shift_existing_page_footnotes(page: &mut Page, dy_pt: f32) {
 fn shift_page_item_y(item: &mut PageItem, dy_pt: f32) {
   match item {
     PageItem::Text(text) => text.y_pt += dy_pt,
-    PageItem::Group(items) => {
+    PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
       for item in items {
         shift_page_item_y(item, dy_pt);
       }
@@ -8184,6 +8342,7 @@ fn append_vertical_wrap_exclusion(
     bottom_pt,
     side: ImageWrapSide::BothSides,
     blocks_flow: true,
+    owner: WrapExclusionOwner::Drawing,
   };
   extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &[exclusion]);
 }
@@ -8293,6 +8452,7 @@ fn apply_headers_and_footers(
     );
 
     extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &adornment.wrap_exclusions);
+    order_floating_page_items(&mut adornment.items, None, false);
     page.repeating_adornment = Some(RepeatingAdornment {
       items: adornment.items,
       frame_fragments: adornment.frame_fragments,
@@ -8430,38 +8590,242 @@ fn apply_page_backgrounds(pages: &mut [Page]) {
   }
 }
 
-fn place_floating_images(pages: &mut [Page]) {
-  for page in pages {
-    let mut behind_images = Vec::new();
-    let mut foreground_images = Vec::new();
-    let mut body_items = Vec::with_capacity(page.items.len());
-    let mut background_count = 0;
+fn wrap_floating_page_item_range(
+  items: &mut Vec<PageItem>,
+  item_start: usize,
+  item_end: usize,
+  placement: FloatingImagePlacement,
+  text_segmentation: TextSegmentation,
+) -> (usize, usize) {
+  let item_end = item_end.min(items.len());
+  if item_start >= item_end || text_segmentation == TextSegmentation::TableCell {
+    return (item_start, item_end);
+  }
+  let children = items.drain(item_start..item_end).collect();
+  items.insert(
+    item_start,
+    PageItem::FloatingDrawing {
+      items: children,
+      paint_order: placement.paint_order,
+      behind_text: placement.behind_text,
+    },
+  );
+  (item_start, item_start + 1)
+}
 
-    for item in page.items.drain(..) {
-      if matches!(&item, PageItem::Image(image) if image.floating && image.behind_text) {
-        behind_images.push(item);
-      } else if matches!(&item, PageItem::Image(image) if image.floating) {
-        foreground_images.push(item);
-      } else {
-        if is_page_background_item(&item, page.setup) {
-          background_count += 1;
-        }
-        body_items.push(item);
-      }
-    }
-
-    if behind_images.is_empty() && foreground_images.is_empty() {
-      page.items = body_items;
+fn place_floating_images(pages: &mut [Page], frames: &mut [LayoutFrame]) {
+  for (page_index, page) in pages.iter_mut().enumerate() {
+    let order = order_floating_page_items(&mut page.items, Some(page.setup), false);
+    if order.is_identity() {
       continue;
     }
+    remap_page_item_records(page, &order);
+    for frame in frames
+      .iter_mut()
+      .filter(|frame| frame.page_index == page_index)
+    {
+      remap_layout_frame_item_records(frame, &order);
+    }
+  }
+}
 
-    let mut ordered =
-      Vec::with_capacity(body_items.len() + behind_images.len() + foreground_images.len());
-    ordered.extend(body_items.drain(..background_count));
-    ordered.extend(behind_images);
-    ordered.extend(body_items);
-    ordered.extend(foreground_images);
-    page.items = ordered;
+#[derive(Clone, Debug)]
+struct PageItemOrder {
+  old_to_new: Vec<usize>,
+  detached: Vec<bool>,
+}
+
+impl PageItemOrder {
+  fn is_identity(&self) -> bool {
+    self
+      .old_to_new
+      .iter()
+      .enumerate()
+      .all(|(old, new)| old == *new)
+  }
+
+  fn remap_range(&self, item_start: usize, item_end: usize) -> (usize, usize) {
+    let old_len = self.old_to_new.len();
+    let start = item_start.min(old_len);
+    let end = item_end.min(old_len);
+    if start >= end {
+      let position = self.old_to_new.get(start).copied().unwrap_or(old_len);
+      return (position, position);
+    }
+
+    // A floating drawing is detached from its anchor line when Word moves it
+    // to the page drawing layer. Remap the owning text/table range from the
+    // remaining body items; otherwise a behind-text object moved to the page
+    // front makes that range swallow every intervening frame. A frame made
+    // only from a floating object keeps the object itself as a fallback.
+    let mapped_bounds = |exclude_detached: bool| {
+      (start..end)
+        .filter(|old| !exclude_detached || !self.detached[*old])
+        .map(|old| self.old_to_new[old])
+        .fold(None, |bounds, mapped| {
+          Some(
+            bounds.map_or((mapped, mapped), |(min, max): (usize, usize)| {
+              (min.min(mapped), max.max(mapped))
+            }),
+          )
+        })
+    };
+    let (mapped_start, mapped_end) = mapped_bounds(true)
+      .or_else(|| mapped_bounds(false))
+      .unwrap_or((start, start));
+    (mapped_start, mapped_end.saturating_add(1))
+  }
+}
+
+fn remap_page_item_records(page: &mut Page, order: &PageItemOrder) {
+  for fragment in &mut page.frame_fragments {
+    (fragment.item_start, fragment.item_end) =
+      order.remap_range(fragment.item_start, fragment.item_end);
+  }
+  for influence in &mut page.frame_influences {
+    (influence.item_start, influence.item_end) =
+      order.remap_range(influence.item_start, influence.item_end);
+  }
+  for item_index in &mut page.footnote_item_indices {
+    if let Some(mapped) = order.old_to_new.get(*item_index) {
+      *item_index = *mapped;
+    }
+  }
+}
+
+fn remap_layout_frame_item_records(frame: &mut LayoutFrame, order: &PageItemOrder) {
+  (frame.item_start, frame.item_end) = order.remap_range(frame.item_start, frame.item_end);
+  frame.item_count = frame.item_end.saturating_sub(frame.item_start);
+  for line in &mut frame.lines {
+    (line.item_start, line.item_end) = order.remap_range(line.item_start, line.item_end);
+  }
+  for fragment in &mut frame.fragments {
+    (fragment.item_start, fragment.item_end) =
+      order.remap_range(fragment.item_start, fragment.item_end);
+  }
+  for influence in &mut frame.influences {
+    (influence.item_start, influence.item_end) =
+      order.remap_range(influence.item_start, influence.item_end);
+  }
+}
+
+fn order_floating_page_items(
+  items: &mut Vec<PageItem>,
+  page_setup: Option<PageSetup>,
+  inside_floating_drawing: bool,
+) -> PageItemOrder {
+  for item in items.iter_mut() {
+    match item {
+      // An ordinary group does not change drawing ownership. In particular,
+      // an effect backdrop nested under a FloatingDrawing remains an internal
+      // layer and must not be hoisted as an independently floating image.
+      PageItem::Group(items) => {
+        let _ = order_floating_page_items(items, None, inside_floating_drawing);
+      }
+      PageItem::FloatingDrawing { items, .. } => {
+        let _ = order_floating_page_items(items, None, true);
+      }
+      PageItem::Text(_)
+      | PageItem::Image(_)
+      | PageItem::Rect(_)
+      | PageItem::Fill(_)
+      | PageItem::Line(_)
+      | PageItem::Path(_)
+      | PageItem::Polyline(_) => {}
+    }
+  }
+
+  let old_len = items.len();
+  let mut behind = Vec::<(FloatingPaintOrder, usize, PageItem)>::new();
+  let mut foreground = Vec::<(FloatingPaintOrder, usize, PageItem)>::new();
+  let mut body = Vec::with_capacity(items.len());
+  let mut background_count = 0;
+  let mut detached = vec![false; old_len];
+  for (old_index, item) in items.drain(..).enumerate() {
+    match &item {
+      PageItem::FloatingDrawing {
+        paint_order,
+        behind_text,
+        ..
+      } => {
+        let target = if *behind_text {
+          &mut behind
+        } else {
+          &mut foreground
+        };
+        detached[old_index] = true;
+        target.push((*paint_order, old_index, item));
+      }
+      PageItem::Image(image) if !inside_floating_drawing && image.floating => {
+        let target = if image.behind_text {
+          &mut behind
+        } else {
+          &mut foreground
+        };
+        detached[old_index] = true;
+        target.push((FloatingPaintOrder::Unspecified, old_index, item));
+      }
+      _ => {
+        if page_setup.is_some_and(|setup| is_page_background_item(&item, setup)) {
+          background_count += 1;
+        }
+        body.push((old_index, item));
+      }
+    }
+  }
+
+  if behind.is_empty() && foreground.is_empty() {
+    *items = body.into_iter().map(|(_, item)| item).collect();
+    return PageItemOrder {
+      old_to_new: (0..old_len).collect(),
+      detached,
+    };
+  }
+
+  behind.sort_by_key(|(order, _, _)| floating_paint_order_key(*order));
+  foreground.sort_by_key(|(order, _, _)| floating_paint_order_key(*order));
+  let mut ordered = Vec::with_capacity(body.len() + behind.len() + foreground.len());
+  ordered.extend(body.drain(..background_count));
+  ordered.extend(
+    behind
+      .into_iter()
+      .map(|(_, old_index, item)| (old_index, item)),
+  );
+  ordered.extend(body);
+  ordered.extend(
+    foreground
+      .into_iter()
+      .map(|(_, old_index, item)| (old_index, item)),
+  );
+  let mut old_to_new = vec![0; old_len];
+  for (new_index, (old_index, _)) in ordered.iter().enumerate() {
+    old_to_new[*old_index] = new_index;
+  }
+  *items = ordered.into_iter().map(|(_, item)| item).collect();
+  PageItemOrder {
+    old_to_new,
+    detached,
+  }
+}
+
+fn floating_paint_order_key(order: FloatingPaintOrder) -> (u8, i64) {
+  match order {
+    FloatingPaintOrder::DrawingMlRelativeHeight(value) => {
+      // GraphicImport.cxx normalizes 0, 1, and values above 0x1dff_ffff
+      // to Word's maximum relativeHeight. Equal values retain document
+      // order, so the later object is painted on top.
+      const MAX_DRAWINGML_RELATIVE_HEIGHT: u32 = 0x1dff_ffff;
+      let value = if !(2..=MAX_DRAWINGML_RELATIVE_HEIGHT).contains(&value) {
+        MAX_DRAWINGML_RELATIVE_HEIGHT
+      } else {
+        value
+      };
+      (0, i64::from(value))
+    }
+    // GraphicZOrderHelper places VML z-index objects above DrawingML
+    // relativeHeight objects within the same foreground/background layer.
+    FloatingPaintOrder::VmlZIndex(value) => (1, i64::from(value)),
+    FloatingPaintOrder::Unspecified => (2, 0),
   }
 }
 
@@ -9340,6 +9704,7 @@ fn layout_repeating_block(
   let (is_last_repeating_block, include_last_compat_spacing) = tail;
   match block {
     Block::Paragraph(paragraph) => {
+      let paragraph_anchor_top = y;
       let spacing_after_pt = if is_last_repeating_block && include_last_compat_spacing {
         // SwFlowFrame::CalcLowerSpace(), tdf#128195 branch:
         // the text frame already carries its normal paragraph lower spacing,
@@ -9366,6 +9731,7 @@ fn layout_repeating_block(
           text_metrics,
         },
         y + paragraph.format.spacing_before_pt,
+        paragraph_anchor_top,
         spacing_after_pt,
       );
       y
@@ -9920,7 +10286,9 @@ fn fragment_item_range_has_path(items: &[PageItem], item_start: usize, item_end:
 
 fn page_item_is_path(item: &PageItem) -> bool {
   match item {
-    PageItem::Group(items) => items.iter().any(page_item_is_path),
+    PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
+      items.iter().any(page_item_is_path)
+    }
     PageItem::Rect(rect) => rect.fill_color.is_some() || rect.stroke.is_some(),
     PageItem::Line(_) => true,
     PageItem::Path(path) => !matches!(path.fill, common::Fill::None) || path.stroke.is_some(),
@@ -9962,6 +10330,7 @@ fn append_floating_table_wrap_exclusion(
     bottom_pt: bottom_pt + placement.margin_bottom_pt,
     side: ImageWrapSide::BothSides,
     blocks_flow,
+    owner: WrapExclusionOwner::FloatingTable,
   };
   page.wrap_exclusions.push(exclusion);
 }
@@ -10036,7 +10405,7 @@ fn translate_page_item(mut item: PageItem, dx_pt: f32, dy_pt: f32) -> PageItem {
         *span_start += dx_pt;
       }
     }
-    PageItem::Group(items) => {
+    PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
       for item in items {
         *item = translate_page_item(item.clone(), dx_pt, dy_pt);
       }
@@ -14523,7 +14892,7 @@ fn table_cell_first_content_line_height(
 
 fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom: f32) -> bool {
   match item {
-    PageItem::Group(items) => items
+    PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => items
       .iter()
       .any(|item| table_cell_item_intersects_vertical_bounds(item, top, bottom)),
     PageItem::Text(text) => text.y_pt + text.line_height_pt >= top && text.y_pt <= bottom,
@@ -14587,11 +14956,18 @@ fn layout_shape_text_box(
     return;
   }
 
-  let content_left = rect.x + shape.text_inset_left_pt;
-  let content_top = rect.y + shape.text_inset_top_pt;
-  let content_width =
-    (rect.width - shape.text_inset_left_pt - shape.text_inset_right_pt).max(DEFAULT_FONT_SIZE_PT);
-  let content_bottom = rect.y + rect.height - shape.text_inset_bottom_pt;
+  let border_inset = textbox_content_border_inset(shape);
+  let content_left = rect.x + border_inset + shape.text_inset_left_pt;
+  let content_top = rect.y + border_inset + shape.text_inset_top_pt;
+  let bounded_content_width =
+    (rect.width - border_inset * 2.0 - shape.text_inset_left_pt - shape.text_inset_right_pt)
+      .max(DEFAULT_FONT_SIZE_PT);
+  let content_width = if shape.text_box_word_wrap {
+    bounded_content_width
+  } else {
+    UNBOUNDED_LAYOUT_EXTENT_PT
+  };
+  let content_bottom = rect.y + rect.height - border_inset - shape.text_inset_bottom_pt;
   if content_bottom <= content_top {
     return;
   }
@@ -14695,7 +15071,119 @@ fn layout_shape_text_box(
   if !shape.text_upright && text_rotation_deg.abs() > f32::EPSILON {
     rotate_shape_text_items(&mut items, rect, text_rotation_deg);
   }
+  detach_nested_inline_baseline_participants(&mut items);
   current.items.extend(items);
+}
+
+fn detach_nested_inline_baseline_participants(items: &mut [PageItem]) {
+  // The nested paragraphs have already completed their own line layout.
+  // Their as-character images belong to the textbox's SwTextFrame /
+  // SwFlyCntPortion; the paragraph that owns the outer drawing must not
+  // include those images in its own baseline pass.
+  for item in items {
+    match item {
+      PageItem::Image(image) => image.inline_baseline_participant = false,
+      PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
+        detach_nested_inline_baseline_participants(items)
+      }
+      PageItem::Text(_)
+      | PageItem::Rect(_)
+      | PageItem::Fill(_)
+      | PageItem::Line(_)
+      | PageItem::Path(_)
+      | PageItem::Polyline(_) => {}
+    }
+  }
+}
+
+fn textbox_content_border_inset(shape: &crate::docx::InlineShape) -> f32 {
+  if !shape.text_box_resizes_height_to_fit {
+    return 0.0;
+  }
+  shape
+    .stroke
+    .map(|stroke| stroke.width_pt / 2.0)
+    .unwrap_or_default()
+}
+
+fn shape_text_box_auto_fit_height(
+  parent_flow: FlowContext,
+  shape: &crate::docx::InlineShape,
+  width_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> Option<f32> {
+  if !shape.text_box_resizes_height_to_fit || shape.text_box_blocks.is_empty() {
+    return None;
+  }
+  let border_inset = textbox_content_border_inset(shape);
+  let bounded_content_width =
+    (width_pt - border_inset * 2.0 - shape.text_inset_left_pt - shape.text_inset_right_pt)
+      .max(DEFAULT_FONT_SIZE_PT);
+  let content_width = if shape.text_box_word_wrap {
+    bounded_content_width
+  } else {
+    UNBOUNDED_LAYOUT_EXTENT_PT
+  };
+  let measure_flow = FlowContext {
+    setup: parent_flow.setup,
+    section_index: parent_flow.section_index,
+    section_page_index: parent_flow.section_page_index,
+    column_index: parent_flow.column_index,
+    columns: SectionColumns::default(),
+    content_top_pt: 0.0,
+    content_left_pt: 0.0,
+    content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+    body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
+    content_width,
+    layout_cell_bounds: parent_flow.layout_cell_bounds,
+    layout_cell_print_bounds: parent_flow.layout_cell_print_bounds,
+    default_tab_stop_pt: parent_flow.default_tab_stop_pt,
+    compatibility_mode: parent_flow.compatibility_mode,
+    justify_lines_with_shrinking: parent_flow.justify_lines_with_shrinking,
+    split_page_break_and_paragraph_mark: parent_flow.split_page_break_and_paragraph_mark,
+    repeating_slots: RepeatingSlotState::default(),
+    text_segmentation: TextSegmentation::TableCell,
+    paragraph_spacing_context: ParagraphSpacingContext::Normal,
+    preserve_horizontal_on_advance: false,
+    script_sensitive_line_height: true,
+  };
+  let content_height = shape
+    .text_box_blocks
+    .iter()
+    .map(|block| estimated_block_height(block, measure_flow, text_metrics))
+    .sum::<f32>();
+  Some(
+    (content_height + border_inset * 2.0 + shape.text_inset_top_pt + shape.text_inset_bottom_pt)
+      .max(DEFAULT_LINE_HEIGHT_PT),
+  )
+}
+
+fn shape_text_box_auto_fit_width(
+  shape: &crate::docx::InlineShape,
+  authored_width_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> Option<f32> {
+  if !shape.text_box_resizes_height_to_fit
+    || shape.text_box_word_wrap
+    || shape.text_box_blocks.is_empty()
+  {
+    return None;
+  }
+  // SwTextBoxHelper maps TextWordWrap=false to a MIN-width Writer frame.
+  // Measure the unwrapped content and grow the frame while preserving the
+  // authored anchor. A right-aligned frame consequently grows to the left,
+  // keeping its right text inset fixed.
+  let content_width = shape
+    .text_box_blocks
+    .iter()
+    .map(|block| block_content_width_range(block, authored_width_pt, text_metrics).maximum_pt)
+    .fold(0.0_f32, f32::max);
+  let border_inset = textbox_content_border_inset(shape);
+  Some(
+    authored_width_pt.max(
+      content_width + shape.text_inset_left_pt + shape.text_inset_right_pt + border_inset * 2.0,
+    ),
+  )
 }
 
 fn inline_shape_text_rotation_degrees(shape_rotation_deg: f32, flip_vertical: bool) -> f32 {
@@ -14719,7 +15207,9 @@ fn rotate_shape_text_items(items: &mut [PageItem], rect: ShapeTextBoxRect, rotat
   };
   for item in items.iter_mut() {
     match item {
-      PageItem::Group(items) => rotate_shape_text_items(items, rect, rotation_deg),
+      PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
+        rotate_shape_text_items(items, rect, rotation_deg)
+      }
       PageItem::Text(text) => {
         text.style.rotation_deg += rotation_deg;
         text.rotation_center_pt = Some((center_x, center_y));
@@ -15865,9 +16355,18 @@ fn layout_paragraph(
   flow: FlowContext,
   target: ParagraphLayoutTarget<'_>,
   y: f32,
+  paragraph_anchor_top: f32,
   spacing_after_pt: f32,
 ) -> (FlowContext, f32) {
-  layout_paragraph_with_left_indent_compat(paragraph, flow, target, y, spacing_after_pt, false)
+  layout_paragraph_with_left_indent_compat(
+    paragraph,
+    flow,
+    target,
+    y,
+    paragraph_anchor_top,
+    spacing_after_pt,
+    false,
+  )
 }
 
 fn layout_paragraph_with_left_indent_compat(
@@ -15875,6 +16374,7 @@ fn layout_paragraph_with_left_indent_compat(
   flow: FlowContext,
   target: ParagraphLayoutTarget<'_>,
   y: f32,
+  paragraph_anchor_top: f32,
   spacing_after_pt: f32,
   ignore_left_indent: bool,
 ) -> (FlowContext, f32) {
@@ -15897,6 +16397,7 @@ fn layout_paragraph_with_left_indent_compat(
     target.anchor_pages,
     target.text_metrics,
     y,
+    paragraph_anchor_top,
   )
 }
 
@@ -16613,8 +17114,17 @@ impl<'a> TextFrameLayout<'a> {
     anchor_pages: Option<&mut Vec<AnchorPage>>,
     text_metrics: &mut TextMetrics,
     y: f32,
+    paragraph_anchor_top: f32,
   ) -> (FlowContext, f32) {
-    self.format_with_reflow(current, pages, anchor_pages, text_metrics, y, true)
+    self.format_with_reflow(
+      current,
+      pages,
+      anchor_pages,
+      text_metrics,
+      y,
+      paragraph_anchor_top,
+      true,
+    )
   }
 
   fn format_with_reflow(
@@ -16624,6 +17134,7 @@ impl<'a> TextFrameLayout<'a> {
     mut anchor_pages: Option<&mut Vec<AnchorPage>>,
     text_metrics: &mut TextMetrics,
     mut y: f32,
+    paragraph_anchor_top: f32,
     allow_reflow: bool,
   ) -> (FlowContext, f32) {
     let paragraph = self.paragraph;
@@ -16653,11 +17164,11 @@ impl<'a> TextFrameLayout<'a> {
     let start_anchor_pages_len = anchor_pages.as_ref().map(|anchors| anchors.len());
     let start_flow = flow;
     let paragraph_top = y;
-    // Paragraph-relative drawings use the table paragraph frame origin. Only
-    // line-relative drawings need the table-cell baseline translated back to
-    // a SwLineLayout top (see `floating_anchor_line_top`). In particular,
-    // bottom-aligned table paragraphs keep their aligned frame origin here.
-    let paragraph_anchor_top = y;
+    // Paragraph-relative drawings use the paragraph frame origin supplied by
+    // the owning block. Only line-relative drawings need the table-cell
+    // baseline translated back to a SwLineLayout top (see
+    // `floating_anchor_line_top`). In particular, bottom-aligned table
+    // paragraphs keep their aligned frame origin here.
     let default_line_left = text_frame.default_line_left;
     let first_line_left = text_frame.first_line_left;
     let mut default_line_right = text_frame.default_line_right;
@@ -16681,7 +17192,8 @@ impl<'a> TextFrameLayout<'a> {
     let vml_anchor_line_height =
       libreoffice_empty_paragraph_first_line_height(&paragraph_base_line_style(paragraph));
     let mut base_line_height = text_frame.base_line_height;
-    let mut line_height = line.height_pt;
+    let mut line_height =
+      include_numbering_label_height(paragraph, line.height_pt, text_frame, text_metrics);
     y = dodge_text_wrap_exclusions(
       y,
       line_height,
@@ -16885,6 +17397,21 @@ impl<'a> TextFrameLayout<'a> {
           if let Some((content_start, group)) = drawing_group_effects.pop() {
             let content_bounds = page_items_bounds(&current.items[content_start..], text_metrics);
             finish_docx_group_effects(&mut current.items, content_start, &group, text_metrics);
+            let group_item_end = current.items.len();
+            let (group_item_start, group_item_end) = match group.placement {
+              crate::docx::ImagePlacement::Floating(placement)
+                if drawing_group_effects.is_empty() =>
+              {
+                wrap_floating_page_item_range(
+                  &mut current.items,
+                  content_start,
+                  group_item_end,
+                  placement,
+                  flow.text_segmentation,
+                )
+              }
+              _ => (content_start, group_item_end),
+            };
             if let (
               Some((left, top, right, bottom)),
               crate::docx::ImagePlacement::Floating(placement),
@@ -16897,7 +17424,6 @@ impl<'a> TextFrameLayout<'a> {
                 width_pt: right - left + placement.margin_left_pt + placement.margin_right_pt,
                 height_pt: bottom - top + placement.margin_top_pt + placement.margin_bottom_pt,
               });
-              let item_end = current.items.len();
               match placement.wrap {
                 ImageWrapMode::Square | ImageWrapMode::Tight
                   if !effective_layout_in_cell(placement, flow) =>
@@ -16909,14 +17435,15 @@ impl<'a> TextFrameLayout<'a> {
                     bottom_pt: bottom + placement.margin_bottom_pt,
                     side: placement.wrap_side,
                     blocks_flow: false,
+                    owner: WrapExclusionOwner::Drawing,
                   };
                   wrap_exclusions.push(exclusion);
                   current.wrap_exclusions.push(exclusion);
                   push_page_influence(
                     current,
                     FrameInfluenceKind::FlyWrap,
-                    content_start,
-                    item_end,
+                    group_item_start,
+                    group_item_end,
                     influence_bounds,
                   );
                   (line_left, line_right) =
@@ -16947,8 +17474,8 @@ impl<'a> TextFrameLayout<'a> {
                   push_page_influence(
                     current,
                     FrameInfluenceKind::FlyWrap,
-                    content_start,
-                    item_end,
+                    group_item_start,
+                    group_item_end,
                     influence_bounds,
                   );
                   y = y.max(bottom + placement.margin_bottom_pt);
@@ -17781,7 +18308,8 @@ impl<'a> TextFrameLayout<'a> {
               .unwrap_or_else(|| visible_image_width(image));
             let frame_height = relative_floating_height(placement, flow)
               .unwrap_or_else(|| visible_image_height(image));
-            let (width, height) = fit_image_to_line(frame_width, frame_height, flow.content_width);
+            let (width, height) =
+              floating_image_layout_size(frame_width, frame_height, placement, flow);
             let line_anchor_top =
               floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics);
             let anchor_y =
@@ -17824,6 +18352,18 @@ impl<'a> TextFrameLayout<'a> {
                 stroke_opacity: 0.0,
               }));
             }
+            let image_item_end = current.items.len();
+            let (image_item_start, image_item_end) = if drawing_group_effects.is_empty() {
+              wrap_floating_page_item_range(
+                &mut current.items,
+                image_item_start,
+                image_item_end,
+                placement,
+                flow.text_segmentation,
+              )
+            } else {
+              (image_item_start, image_item_end)
+            };
             let influence_bounds = Some(FrameBounds {
               x_pt: image_x - placement.margin_left_pt,
               y_pt: image_y - placement.margin_top_pt,
@@ -17846,7 +18386,7 @@ impl<'a> TextFrameLayout<'a> {
                     current,
                     FrameInfluenceKind::FlyWrap,
                     image_item_start,
-                    current.items.len(),
+                    image_item_end,
                     influence_bounds,
                   );
                   let previous_y = y;
@@ -17886,6 +18426,7 @@ impl<'a> TextFrameLayout<'a> {
                   bottom_pt: image_y + height + placement.margin_bottom_pt,
                   side: placement.wrap_side,
                   blocks_flow: false,
+                  owner: WrapExclusionOwner::Drawing,
                 };
                 wrap_exclusions.push(exclusion);
                 current.wrap_exclusions.push(exclusion);
@@ -17893,7 +18434,7 @@ impl<'a> TextFrameLayout<'a> {
                   current,
                   FrameInfluenceKind::FlyWrap,
                   image_item_start,
-                  current.items.len(),
+                  image_item_end,
                   influence_bounds,
                 );
                 (line_left, line_right) =
@@ -17916,7 +18457,7 @@ impl<'a> TextFrameLayout<'a> {
                     current,
                     FrameInfluenceKind::FlyWrap,
                     image_item_start,
-                    current.items.len(),
+                    image_item_end,
                     influence_bounds,
                   );
                   let previous_y = y;
@@ -18435,8 +18976,13 @@ impl<'a> TextFrameLayout<'a> {
               if floating_shape_is_zero_relative_background(placement, shape) {
                 continue;
               }
-              let width = relative_floating_width(placement, flow).unwrap_or(shape.width_pt);
-              let height = relative_floating_height(placement, flow).unwrap_or(shape.height_pt);
+              let authored_width =
+                relative_floating_width(placement, flow).unwrap_or(shape.width_pt);
+              let width = shape_text_box_auto_fit_width(shape, authored_width, text_metrics)
+                .unwrap_or(authored_width);
+              let height = shape_text_box_auto_fit_height(flow, shape, width, text_metrics)
+                .or_else(|| relative_floating_height(placement, flow))
+                .unwrap_or(shape.height_pt);
               let line_anchor_top =
                 floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics);
               let anchor_y =
@@ -18496,7 +19042,7 @@ impl<'a> TextFrameLayout<'a> {
                 } else {
                   keep_floating_shape_inside_page(shape_x, shape_paint_y, width, height, flow)
                 };
-              let (shape_item_start, shape_item_end) = place_shape(
+              let (shape_item_start, _) = place_shape(
                 current,
                 flow,
                 text_metrics,
@@ -18526,6 +19072,18 @@ impl<'a> TextFrameLayout<'a> {
                   stroke_opacity: 0.0,
                 }));
               }
+              let shape_item_end = current.items.len();
+              let (shape_item_start, shape_item_end) = if drawing_group_effects.is_empty() {
+                wrap_floating_page_item_range(
+                  &mut current.items,
+                  shape_item_start,
+                  shape_item_end,
+                  placement,
+                  flow.text_segmentation,
+                )
+              } else {
+                (shape_item_start, shape_item_end)
+              };
               let influence_bounds = Some(FrameBounds {
                 x_pt: shape_x - placement.margin_left_pt,
                 y_pt: shape_paint_y - placement.margin_top_pt,
@@ -18625,6 +19183,7 @@ impl<'a> TextFrameLayout<'a> {
                     bottom_pt: shape_y + height + placement.margin_bottom_pt,
                     side: placement.wrap_side,
                     blocks_flow: false,
+                    owner: WrapExclusionOwner::Drawing,
                   };
                   wrap_exclusions.push(exclusion);
                   current.wrap_exclusions.push(exclusion);
@@ -18656,6 +19215,7 @@ impl<'a> TextFrameLayout<'a> {
                         bottom_pt: shape_paint_y + height + placement.margin_bottom_pt,
                         side: ImageWrapSide::Left,
                         blocks_flow: false,
+                        owner: WrapExclusionOwner::Drawing,
                       };
                       wrap_exclusions.push(exclusion);
                       current.wrap_exclusions.push(exclusion);
@@ -19045,7 +19605,15 @@ impl<'a> TextFrameLayout<'a> {
           }
           let (follow_flow, follow_y) = advance_text_frame_flow(start_flow, current, pages);
           return TextFrameLayout::new(paragraph, follow_flow, self.spacing_after_pt, text_metrics)
-            .format_with_reflow(current, pages, anchor_pages, text_metrics, follow_y, false);
+            .format_with_reflow(
+              current,
+              pages,
+              anchor_pages,
+              text_metrics,
+              follow_y,
+              follow_y,
+              false,
+            );
         }
         TextSplitDecision::RebalanceWidow { page_index }
           if can_rebalance_widow_by_reserving_line && !widow_rebalance_has_variable_line_widths =>
@@ -19070,6 +19638,7 @@ impl<'a> TextFrameLayout<'a> {
               anchor_pages,
               text_metrics,
               paragraph_top,
+              paragraph_anchor_top,
               false,
             );
         }
@@ -19080,7 +19649,7 @@ impl<'a> TextFrameLayout<'a> {
       }
     }
 
-    if paragraph.list_label.is_none() && start_item_index <= current.items.len() {
+    if start_item_index <= current.items.len() {
       align_paragraph_items(
         &mut current.items[start_item_index..],
         effective_paragraph_alignment(paragraph),
@@ -19809,13 +20378,31 @@ fn shift_first_line_below_upper_margin_exclusions(
     if margin_crossing.is_empty() {
       return y;
     }
-    // SwTextFormatter::CalcFlyWidth() expands the first-line collision
-    // rectangle into the paragraph's upper margin, but still creates an
-    // ordinary horizontal fly portion when usable space remains beside the
-    // object. Only a full-width (or effectively full-width) intersection
-    // creates a dummy line that moves the paragraph below the fly. Treating
-    // every upper-margin intersection as full-width incorrectly pushes empty
-    // paragraphs below side-wrapped floating tables.
+    // Writer's tdf#116486 / tdf#124600 path moves the printable first line
+    // below a side-wrapped drawing when that drawing crosses the paragraph's
+    // upper margin and reaches the print area. Once moved, the drawing ends
+    // above the line and CalcFlyWidth discards the horizontal fly portion.
+    if let Some(exclusion) = margin_crossing
+      .iter()
+      .filter(|exclusion| exclusion.owner == WrapExclusionOwner::Drawing)
+      .min_by(|a, b| {
+        a.bottom_pt
+          .partial_cmp(&b.bottom_pt)
+          .unwrap_or(std::cmp::Ordering::Equal)
+      })
+    {
+      // tdf#116486 moves the paragraph frame, including its authored upper
+      // margin, below the drawing. `y` is already the printable text-area
+      // top, so preserve that margin after moving the frame rather than
+      // collapsing the text directly onto the fly bottom.
+      y = exclusion.bottom_pt + upper_margin_pt;
+      continue;
+    }
+    // Floating tables use a separately materialized anchor/follow frame in
+    // this layout engine. Preserve the side segment when it is usable:
+    // `floattable-nomargins.docx` has 59.35pt of valid right-side width and
+    // must stay on one page. Only an effectively full-width table exclusion
+    // creates the dummy line in this representation.
     if available_line_bounds_for_y(
       default_left,
       default_right,
@@ -20531,6 +21118,7 @@ fn item_y(item: &PageItem) -> Option<f32> {
     PageItem::Text(text) => Some(text.y_pt),
     PageItem::Image(image) => Some(image.y_pt),
     PageItem::Group(items) => items.iter().find_map(item_y),
+    PageItem::FloatingDrawing { .. } => None,
     PageItem::Rect(rect) => Some(rect.y_pt),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
@@ -20547,7 +21135,7 @@ fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Op
         + text.text.matches(' ').count() as f32 * text.word_spacing_pt,
     )),
     PageItem::Image(image) => Some((image.x_pt, image.width_pt)),
-    PageItem::Group(items) => {
+    PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
       let (left, _, right, _) = page_items_bounds(items, text_metrics)?;
       Some((left, right - left))
     }
@@ -20562,7 +21150,7 @@ fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Op
 fn shift_item_x(item: &mut PageItem, offset: f32) {
   match item {
     PageItem::Text(text) => text.x_pt += offset,
-    PageItem::Group(items) => {
+    PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
       for item in items {
         shift_item_x(item, offset);
       }
@@ -20585,7 +21173,7 @@ fn shift_item(item: &mut PageItem, dx: f32, dy: f32) {
       text.x_pt += dx;
       text.y_pt += dy;
     }
-    PageItem::Group(items) => {
+    PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
       for item in items {
         shift_item(item, dx, dy);
       }
@@ -20623,6 +21211,26 @@ fn fit_image_to_line(width: f32, height: f32, max_width: f32) -> (f32, f32) {
     let scale = max_width / width;
     (width * scale, height * scale)
   }
+}
+
+fn floating_image_layout_size(
+  width: f32,
+  height: f32,
+  placement: FloatingImagePlacement,
+  flow: FlowContext,
+) -> (f32, f32) {
+  // A page-relative behindDoc image in a repeating header/footer is page-layer
+  // artwork, not line content. Word keeps its authored wp:extent, and Writer's
+  // GraphicImport applies CT_PositiveSize2D directly to the imported object.
+  if flow.text_segmentation == TextSegmentation::RepeatingSlot
+    && placement.behind_text
+    && placement.horizontal_relative_to == HorizontalImageReference::Page
+    && placement.vertical_relative_to == VerticalImageReference::Page
+  {
+    return (width.max(0.0), height.max(0.0));
+  }
+
+  fit_image_to_line(width, height, flow.content_width)
 }
 
 fn image_frame_width(image: &crate::docx::InlineImage) -> f32 {
@@ -21145,6 +21753,56 @@ mod tests {
   }
 
   #[test]
+  fn rotated_rounded_picture_clip_has_tighter_reflection_bounds_than_its_frame() {
+    let rounded_rectangle = vec![
+      common::PathCommand::MoveTo(common_point(20.0, 0.0)),
+      common::PathCommand::LineTo(common_point(80.0, 0.0)),
+      common::PathCommand::CubicTo {
+        control1: common_point(91.0457, 0.0),
+        control2: common_point(100.0, 8.9543),
+        end: common_point(100.0, 20.0),
+      },
+      common::PathCommand::LineTo(common_point(100.0, 80.0)),
+      common::PathCommand::CubicTo {
+        control1: common_point(100.0, 91.0457),
+        control2: common_point(91.0457, 100.0),
+        end: common_point(80.0, 100.0),
+      },
+      common::PathCommand::LineTo(common_point(20.0, 100.0)),
+      common::PathCommand::CubicTo {
+        control1: common_point(8.9543, 100.0),
+        control2: common_point(0.0, 91.0457),
+        end: common_point(0.0, 80.0),
+      },
+      common::PathCommand::LineTo(common_point(0.0, 20.0)),
+      common::PathCommand::CubicTo {
+        control1: common_point(0.0, 8.9543),
+        control2: common_point(8.9543, 0.0),
+        end: common_point(20.0, 0.0),
+      },
+      common::PathCommand::Close,
+    ];
+    let unrotated = drawing_path_bounds(&rounded_rectangle).expect("unrotated bounds");
+    assert_eq!(unrotated, common_rect(0.0, 0.0, 100.0, 100.0));
+
+    let transform = Affine::translate((-50.0, -50.0))
+      .then_rotate(30.0_f64.to_radians())
+      .then_translate((50.0, 50.0).into());
+    let rotated_commands =
+      common::drawingml_geometry::transform_commands(rounded_rectangle, transform);
+    let clipped = drawing_path_bounds(&rotated_commands).expect("rotated clip bounds");
+    let frame = common::drawingml_geometry::transform_rect_bounds(
+      KurboRect::new(0.0, 0.0, 100.0, 100.0),
+      transform,
+    );
+
+    assert!(f64::from(clipped.origin.x.0) > frame.x0);
+    assert!(f64::from(clipped.origin.y.0) > frame.y0);
+    assert!(f64::from(clipped.origin.x.0 + clipped.size.width.0) < frame.x1);
+    assert!(f64::from(clipped.origin.y.0 + clipped.size.height.0) < frame.y1);
+  }
+
+  #[test]
   fn word_text_effect_density_preserves_office_plain_shadow_boundary() {
     let below_boundary = wordprocessing_text_effect_max_pixels_per_point(
       None,
@@ -21395,6 +22053,47 @@ mod tests {
   }
 
   #[test]
+  fn centered_numbered_line_translates_label_and_body_as_one_group() {
+    let text_item = |x_pt: f32, text: &str, numbering: bool| {
+      PageItem::Text(Box::new(TextItem {
+        x_pt,
+        y_pt: 20.0,
+        line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        text: text.to_string(),
+        style: TextStyle::default(),
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        dynamic_field_line_anchor: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: numbering.then(|| Arc::from(text)),
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        preserve_text_portion: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      }))
+    };
+    let mut items = vec![text_item(0.0, "•", true), text_item(10.0, "C", false)];
+    let mut text_metrics = TextMetrics::new();
+
+    align_paragraph_items(
+      &mut items,
+      ParagraphAlignment::Center,
+      &mut text_metrics,
+      100.0,
+    );
+
+    let (PageItem::Text(label), PageItem::Text(body)) = (&items[0], &items[1]) else {
+      panic!("expected numbering label and paragraph body");
+    };
+    assert!(label.x_pt > 0.0);
+    assert!((body.x_pt - label.x_pt - 10.0).abs() < 0.001);
+  }
+
+  #[test]
   fn inline_alignment_translates_an_image_clip_with_the_image() {
     let mut item = PageItem::Image(ImageItem {
       x_pt: 10.0,
@@ -21529,6 +22228,7 @@ mod tests {
       bottom_pt: 108.0,
       side: ImageWrapSide::BothSides,
       blocks_flow: false,
+      owner: WrapExclusionOwner::Drawing,
     };
 
     assert_eq!(
@@ -21550,6 +22250,7 @@ mod tests {
       bottom_pt: 120.0,
       side: ImageWrapSide::BothSides,
       blocks_flow: false,
+      owner: WrapExclusionOwner::Drawing,
     };
 
     assert_eq!(
@@ -21576,7 +22277,7 @@ mod tests {
   }
 
   #[test]
-  fn word_upper_margin_moves_first_line_only_for_a_full_width_fly() {
+  fn word_upper_margin_moves_drawing_but_preserves_floating_table_side_wrap() {
     let side_wrapped = WrapExclusion {
       left_pt: 300.0,
       right_pt: 420.0,
@@ -21584,6 +22285,7 @@ mod tests {
       bottom_pt: 112.0,
       side: ImageWrapSide::BothSides,
       blocks_flow: false,
+      owner: WrapExclusionOwner::FloatingTable,
     };
     assert_eq!(
       shift_first_line_below_upper_margin_exclusions(100.0, 6.0, 72.0, 540.0, &[side_wrapped],),
@@ -21607,6 +22309,21 @@ mod tests {
     assert_eq!(
       shift_first_line_below_upper_margin_exclusions(100.0, 6.0, 72.0, 540.0, &[margin_only]),
       100.0
+    );
+
+    let side_wrapped_drawing = WrapExclusion {
+      owner: WrapExclusionOwner::Drawing,
+      ..side_wrapped
+    };
+    assert_eq!(
+      shift_first_line_below_upper_margin_exclusions(
+        100.0,
+        6.0,
+        72.0,
+        540.0,
+        &[side_wrapped_drawing],
+      ),
+      118.0
     );
   }
 
@@ -21813,7 +22530,7 @@ mod tests {
       behind_text: false,
       layout_in_cell: false,
       allow_overlap: true,
-      relative_height: 0,
+      paint_order: FloatingPaintOrder::Unspecified,
       relative_width_to: None,
       relative_width_pct: None,
       relative_height_to: None,
@@ -21868,7 +22585,7 @@ mod tests {
       behind_text: false,
       layout_in_cell: false,
       allow_overlap: true,
-      relative_height: 0,
+      paint_order: FloatingPaintOrder::Unspecified,
       relative_width_to: None,
       relative_width_pct: None,
       relative_height_to: None,
@@ -21883,6 +22600,73 @@ mod tests {
       floating_image_position(placement, flow, 90.0, 109.0, 12.0, 12.0),
       (82.0, 141.0)
     );
+  }
+
+  #[test]
+  fn repeating_page_background_keeps_its_authored_extent() {
+    let flow = FlowContext {
+      text_segmentation: TextSegmentation::RepeatingSlot,
+      content_width: 451.35,
+      ..flow_from_block_area(BlockArea {
+        setup: PageSetup {
+          width_pt: 595.35,
+          height_pt: 842.0,
+          margin_top_pt: 72.0,
+          margin_right_pt: 72.0,
+          margin_bottom_pt: 72.0,
+          margin_left_pt: 72.0,
+          ..Default::default()
+        },
+        section_index: 0,
+        section_page_index: 0,
+        column_index: 0,
+        columns: SectionColumns::default(),
+        content_top_pt: 72.0,
+        content_left_pt: 72.0,
+        content_bottom: 770.0,
+        body_content_bottom_pt: 770.0,
+        content_width: 451.35,
+        default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+        compatibility_mode: 15,
+        justify_lines_with_shrinking: false,
+        repeating_slots: RepeatingSlotState::default(),
+      })
+    };
+    let page_background = FloatingImagePlacement {
+      horizontal_relative_to: HorizontalImageReference::Page,
+      vertical_relative_to: VerticalImageReference::Page,
+      horizontal_alignment: None,
+      vertical_alignment: None,
+      horizontal_offset_pt: 0.0,
+      vertical_offset_pt: 0.0,
+      wrap: ImageWrapMode::None,
+      wrap_side: ImageWrapSide::BothSides,
+      behind_text: true,
+      layout_in_cell: false,
+      allow_overlap: true,
+      paint_order: FloatingPaintOrder::Unspecified,
+      relative_width_to: None,
+      relative_width_pct: None,
+      relative_height_to: None,
+      relative_height_pct: None,
+      margin_top_pt: 0.0,
+      margin_right_pt: 0.0,
+      margin_bottom_pt: 0.0,
+      margin_left_pt: 0.0,
+    };
+
+    assert_eq!(
+      floating_image_layout_size(596.25, 843.55, page_background, flow),
+      (596.25, 843.55)
+    );
+
+    let body_foreground = FloatingImagePlacement {
+      behind_text: false,
+      ..page_background
+    };
+    let (width, height) = floating_image_layout_size(596.25, 843.55, body_foreground, flow);
+    assert!((width - 451.35).abs() < 0.001);
+    assert!((height - 638.55).abs() < 0.01);
   }
 
   #[test]
@@ -22168,6 +22952,61 @@ mod tests {
         .abs()
         < 0.001
     );
+  }
+
+  #[test]
+  fn numbering_label_font_contributes_to_the_first_line_height() {
+    let label_style = TextStyle {
+      font_size_pt: 48.0,
+      ..Default::default()
+    };
+    let paragraph = Paragraph {
+      inlines: vec![InlineItem::Text(TextRun {
+        text: "body".into(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })],
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat::default()),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: Some("•\t".into()),
+      list_label_style: label_style.clone(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let frame = TextFrame {
+      default_line_left: 0.0,
+      first_line_left: 0.0,
+      default_line_right: 100.0,
+      paragraph_left: 0.0,
+      base_line_height: DEFAULT_LINE_HEIGHT_PT,
+      auto_baseline_line_height_cap: None,
+      line_height_rule: LineHeightRule::Auto,
+      grid_auto_line_spacing_multiplier: None,
+      grid_character_pitch_pt: None,
+      script_sensitive_line_height: false,
+      compatibility_mode: 15,
+    };
+    let mut text_metrics = TextMetrics::new();
+    let expected = inline_text_height(&label_style, &mut text_metrics);
+
+    let height =
+      include_numbering_label_height(&paragraph, frame.base_line_height, frame, &mut text_metrics);
+
+    assert!((height - expected.max(frame.base_line_height)).abs() < 0.001);
+    assert!(height > frame.base_line_height);
   }
 
   #[test]
@@ -22574,7 +23413,7 @@ mod tests {
         behind_text: true,
         layout_in_cell: true,
         allow_overlap: true,
-        relative_height: 0,
+        paint_order: FloatingPaintOrder::Unspecified,
         relative_width_to: None,
         relative_width_pct: None,
         relative_height_to: None,
@@ -22596,6 +23435,8 @@ mod tests {
       text_inset_right_pt: 0.0,
       text_inset_bottom_pt: 0.0,
       text_box_auto_fit: false,
+      text_box_resizes_height_to_fit: false,
+      text_box_word_wrap: true,
       text_vertical_alignment: TextBoxVerticalAlignment::Top,
     };
     let mut paragraph = Paragraph {
@@ -23737,6 +24578,275 @@ mod tests {
       panic!("expected tall image");
     };
     assert_eq!(tall.y_pt, 0.0);
+  }
+
+  #[test]
+  fn textbox_inline_image_does_not_join_the_outer_paragraph_baseline() {
+    let image = |y_pt: f32, height_pt: f32| {
+      PageItem::Image(ImageItem {
+        x_pt: 0.0,
+        y_pt,
+        width_pt: 10.0,
+        height_pt,
+        inline_baseline_gap_pt: 0.0,
+        inline_baseline_participant: true,
+        crop: ImageCrop::default(),
+        clip_path: Vec::new(),
+        rotation_deg: 0.0,
+        flip_horizontal: false,
+        flip_vertical: false,
+        data: Arc::from([]),
+        content_type: None,
+        metafile_background_color: None,
+        alt_text: None,
+        hyperlink_url: None,
+        semantic_metafile_text: false,
+        metafile_native_size: false,
+        floating: false,
+        behind_text: false,
+      })
+    };
+    let mut items = vec![image(10.0, 20.0), image(0.0, 120.0)];
+    detach_nested_inline_baseline_participants(&mut items[..1]);
+    let mut text_metrics = TextMetrics::new();
+
+    align_line_items_to_inline_object_baseline(&mut items, 0, 0.0, &mut text_metrics);
+
+    let PageItem::Image(textbox_image) = &items[0] else {
+      panic!("expected textbox image");
+    };
+    assert_eq!(textbox_image.y_pt, 10.0);
+    assert!(!textbox_image.inline_baseline_participant);
+    let PageItem::Image(outer_image) = &items[1] else {
+      panic!("expected outer image");
+    };
+    assert_eq!(outer_image.y_pt, 0.0);
+    assert!(outer_image.inline_baseline_participant);
+  }
+
+  #[test]
+  fn drawingml_relative_height_orders_the_foreground_drawing_layer() {
+    let floating = |id: f32, value: u32, behind_text: bool| PageItem::FloatingDrawing {
+      items: vec![PageItem::Rect(RectItem {
+        x_pt: id,
+        y_pt: 0.0,
+        width_pt: 1.0,
+        height_pt: 1.0,
+        fill_color: None,
+        fill_opacity: 1.0,
+        stroke: None,
+        stroke_opacity: 1.0,
+      })],
+      paint_order: FloatingPaintOrder::DrawingMlRelativeHeight(value),
+      behind_text,
+    };
+    let body = PageItem::Rect(RectItem {
+      x_pt: 100.0,
+      y_pt: 0.0,
+      width_pt: 1.0,
+      height_pt: 1.0,
+      fill_color: None,
+      fill_opacity: 1.0,
+      stroke: None,
+      stroke_opacity: 1.0,
+    });
+    let mut items = vec![
+      floating(9.0, 9, false),
+      body,
+      floating(2.0, 2, false),
+      floating(-1.0, 4, true),
+    ];
+
+    order_floating_page_items(&mut items, None, false);
+
+    let ids = items
+      .iter()
+      .map(|item| match item {
+        PageItem::Rect(rect) => rect.x_pt,
+        PageItem::FloatingDrawing { items, .. } => {
+          let PageItem::Rect(rect) = &items[0] else {
+            panic!("expected drawing marker");
+          };
+          rect.x_pt
+        }
+        _ => panic!("unexpected page item"),
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(ids, vec![-1.0, 100.0, 2.0, 9.0]);
+  }
+
+  #[test]
+  fn floating_paint_order_remaps_text_ranges_without_swallowing_body_frames() {
+    let marker = |x_pt| {
+      PageItem::Rect(RectItem {
+        x_pt,
+        y_pt: 0.0,
+        width_pt: 1.0,
+        height_pt: 1.0,
+        fill_color: None,
+        fill_opacity: 1.0,
+        stroke: None,
+        stroke_opacity: 1.0,
+      })
+    };
+    let mut items = vec![
+      marker(10.0),
+      marker(20.0),
+      PageItem::FloatingDrawing {
+        items: vec![marker(30.0)],
+        paint_order: FloatingPaintOrder::DrawingMlRelativeHeight(2),
+        behind_text: true,
+      },
+    ];
+
+    let order = order_floating_page_items(&mut items, None, false);
+
+    assert_eq!(order.old_to_new, vec![1, 2, 0]);
+    assert_eq!(order.remap_range(0, 1), (1, 2));
+    assert_eq!(
+      order.remap_range(1, 3),
+      (2, 3),
+      "the anchor frame should retain its body item without owning the detached drawing"
+    );
+    assert_eq!(
+      order.remap_range(2, 3),
+      (0, 1),
+      "a drawing-only frame still keeps a usable range"
+    );
+  }
+
+  #[test]
+  fn drawingml_relative_height_normalizes_word_sentinel_values() {
+    const MAX_DRAWINGML_RELATIVE_HEIGHT: u32 = 0x1dff_ffff;
+    let maximum = floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(
+      MAX_DRAWINGML_RELATIVE_HEIGHT,
+    ));
+
+    assert_eq!(
+      floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(0)),
+      maximum
+    );
+    assert_eq!(
+      floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(1)),
+      maximum
+    );
+    assert_eq!(
+      floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(
+        MAX_DRAWINGML_RELATIVE_HEIGHT + 1,
+      )),
+      maximum
+    );
+    assert!(floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(2)) < maximum);
+    assert!(floating_paint_order_key(FloatingPaintOrder::VmlZIndex(i32::MIN)) > maximum);
+  }
+
+  #[test]
+  fn table_cell_floating_drawing_stays_in_its_text_frame_sequence() {
+    let placement = FloatingImagePlacement {
+      horizontal_relative_to: HorizontalImageReference::Column,
+      vertical_relative_to: VerticalImageReference::Paragraph,
+      horizontal_alignment: None,
+      vertical_alignment: None,
+      horizontal_offset_pt: 0.0,
+      vertical_offset_pt: 0.0,
+      wrap: ImageWrapMode::None,
+      wrap_side: ImageWrapSide::BothSides,
+      behind_text: false,
+      layout_in_cell: false,
+      allow_overlap: true,
+      paint_order: FloatingPaintOrder::DrawingMlRelativeHeight(2),
+      relative_width_to: None,
+      relative_width_pct: None,
+      relative_height_to: None,
+      relative_height_pct: None,
+      margin_top_pt: 0.0,
+      margin_right_pt: 0.0,
+      margin_bottom_pt: 0.0,
+      margin_left_pt: 0.0,
+    };
+    let rect = || {
+      PageItem::Rect(RectItem {
+        x_pt: 1.0,
+        y_pt: 2.0,
+        width_pt: 3.0,
+        height_pt: 4.0,
+        fill_color: None,
+        fill_opacity: 1.0,
+        stroke: None,
+        stroke_opacity: 1.0,
+      })
+    };
+    let mut table_items = vec![rect()];
+    assert_eq!(
+      wrap_floating_page_item_range(
+        &mut table_items,
+        0,
+        1,
+        placement,
+        TextSegmentation::TableCell,
+      ),
+      (0, 1)
+    );
+    assert!(matches!(table_items[0], PageItem::Rect(_)));
+
+    let mut body_items = vec![rect()];
+    assert_eq!(
+      wrap_floating_page_item_range(&mut body_items, 0, 1, placement, TextSegmentation::Body,),
+      (0, 1)
+    );
+    assert!(matches!(body_items[0], PageItem::FloatingDrawing { .. }));
+  }
+
+  #[test]
+  fn floating_drawing_keeps_nested_effect_backdrop_before_foreground() {
+    let effect_backdrop = PageItem::Image(ImageItem {
+      x_pt: 1.0,
+      y_pt: 0.0,
+      width_pt: 1.0,
+      height_pt: 1.0,
+      inline_baseline_gap_pt: 0.0,
+      inline_baseline_participant: false,
+      crop: ImageCrop::default(),
+      clip_path: Vec::new(),
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      data: Arc::from([]),
+      content_type: None,
+      metafile_background_color: None,
+      alt_text: None,
+      hyperlink_url: None,
+      semantic_metafile_text: false,
+      metafile_native_size: false,
+      floating: true,
+      behind_text: false,
+    });
+    let foreground = PageItem::Rect(RectItem {
+      x_pt: 2.0,
+      y_pt: 0.0,
+      width_pt: 1.0,
+      height_pt: 1.0,
+      fill_color: None,
+      fill_opacity: 1.0,
+      stroke: None,
+      stroke_opacity: 1.0,
+    });
+    let mut items = vec![PageItem::FloatingDrawing {
+      items: vec![PageItem::Group(vec![effect_backdrop, foreground])],
+      paint_order: FloatingPaintOrder::DrawingMlRelativeHeight(2),
+      behind_text: false,
+    }];
+
+    order_floating_page_items(&mut items, None, false);
+
+    let PageItem::FloatingDrawing { items, .. } = &items[0] else {
+      panic!("expected floating drawing");
+    };
+    let PageItem::Group(items) = &items[0] else {
+      panic!("expected effect group");
+    };
+    assert!(matches!(items[0], PageItem::Image(_)));
+    assert!(matches!(items[1], PageItem::Rect(_)));
   }
 
   #[test]

@@ -96,6 +96,10 @@ pub struct CompositingGroup<'doc> {
   /// content stream. Most groups remain isolated because that boundary is
   /// significant to extraction, tagging, and compositing.
   pub flatten_identity: bool,
+  /// Whether nested text belongs to the enclosing text line for PDF baseline
+  /// and clipping ownership. Drawing-layer ordering containers set this to
+  /// false because their text has already been laid out in its own frame.
+  pub inherit_text_line_owner: bool,
   pub items: Vec<DisplayItem<'doc>>,
 }
 
@@ -107,6 +111,7 @@ impl<'doc> CompositingGroup<'doc> {
       blend_mode: BlendMode::Normal,
       opacity: 1.0,
       flatten_identity: false,
+      inherit_text_line_owner: true,
       items,
     }
   }

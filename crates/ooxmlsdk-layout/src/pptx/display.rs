@@ -172,6 +172,7 @@ fn common_display_item(item: PageItem) -> common::DisplayItem<'static> {
       blend_mode,
       opacity,
       flatten_identity: false,
+      inherit_text_line_owner: true,
       items: items.into_iter().map(common_display_item).collect(),
     }),
     PageItem::LinkArea(item) => common::DisplayItem::LinkArea(common::LinkArea {

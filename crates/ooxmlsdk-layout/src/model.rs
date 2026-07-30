@@ -237,6 +237,8 @@ pub struct PageSetup {
   pub doc_grid_character_spacing_pt: Option<f32>,
   pub adjust_table_line_heights_to_grid: bool,
   pub page_number_start: Option<i32>,
+  /// Display format from WordprocessingML `w:pgNumType/@w:fmt`.
+  pub page_number_format: FieldNumberFormat,
 }
 
 impl Default for PageSetup {
@@ -266,6 +268,7 @@ impl Default for PageSetup {
       doc_grid_character_spacing_pt: None,
       adjust_table_line_heights_to_grid: false,
       page_number_start: None,
+      page_number_format: FieldNumberFormat::Decimal,
     }
   }
 }
@@ -288,6 +291,8 @@ pub enum DynamicFieldKind {
   },
   PageRef {
     bookmark_name: Arc<str>,
+    number_format: FieldNumberFormat,
+    relative_position: bool,
   },
   StyleRef {
     style_name: Arc<str>,
@@ -298,6 +303,8 @@ pub enum DynamicFieldKind {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum FieldNumberFormat {
+  /// Use the numbering format of the page on which the field target lies.
+  PageStyle,
   #[default]
   Decimal,
   LowerRoman,
@@ -358,6 +365,7 @@ pub(crate) struct TextItem {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum PdfTextSegmentation {
   Line,
+  WordLine,
   Portion,
 }
 

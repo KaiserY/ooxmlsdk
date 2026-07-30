@@ -945,7 +945,10 @@ fn preset_color_rgb(value: a::PresetColorValues) -> Option<ResolvedColor> {
   ResolvedColor::from_hex(hex)
 }
 
-fn apply_transformations(color: &mut ResolvedColor, transformations: &[ColorTransformation]) {
+pub(crate) fn apply_transformations(
+  color: &mut ResolvedColor,
+  transformations: &[ColorTransformation],
+) {
   for transformation in transformations {
     let value = transformation.value.unwrap_or(0);
     match transformation.kind {
@@ -1012,29 +1015,17 @@ fn apply_hsl_transform(color: &mut ResolvedColor, kind: ColorTransformationKind,
 }
 
 fn apply_shade(color: &mut ResolvedColor, value: i32) {
-  let value = clamp_percent(value);
-  color.r = crgb_percent_to_channel(mod_value(
-    channel_to_crgb_percent(color.r),
-    value,
-    COLOR_PERCENT_MAX,
-  ));
-  color.g = crgb_percent_to_channel(mod_value(
-    channel_to_crgb_percent(color.g),
-    value,
-    COLOR_PERCENT_MAX,
-  ));
-  color.b = crgb_percent_to_channel(mod_value(
-    channel_to_crgb_percent(color.b),
-    value,
-    COLOR_PERCENT_MAX,
-  ));
+  let [r, g, b] = color_math::drawingml_shade_srgb8([color.r, color.g, color.b], value);
+  color.r = r;
+  color.g = g;
+  color.b = b;
 }
 
 fn apply_tint(color: &mut ResolvedColor, value: i32) {
-  let value = clamp_percent(value);
-  color.r = tint_crgb_channel(color.r, value);
-  color.g = tint_crgb_channel(color.g, value);
-  color.b = tint_crgb_channel(color.b, value);
+  let [r, g, b] = color_math::drawingml_tint_srgb8([color.r, color.g, color.b], value);
+  color.r = r;
+  color.g = g;
+  color.b = b;
 }
 
 fn apply_gray(color: &mut ResolvedColor) {
@@ -1105,13 +1096,6 @@ fn off_crgb_channel(channel: u8, value: i32) -> u8 {
     value,
     COLOR_PERCENT_MAX,
   ))
-}
-
-fn tint_crgb_channel(channel: u8, value: i32) -> u8 {
-  let channel = channel_to_crgb_percent(channel);
-  let tinted = i64::from(COLOR_PERCENT_MAX)
-    - (i64::from(COLOR_PERCENT_MAX - channel) * i64::from(value)) / i64::from(COLOR_PERCENT_MAX);
-  crgb_percent_to_channel(tinted.clamp(0, i64::from(COLOR_PERCENT_MAX)) as i32)
 }
 
 fn mod_value(value: i32, modifier: i32, max: i32) -> i32 {

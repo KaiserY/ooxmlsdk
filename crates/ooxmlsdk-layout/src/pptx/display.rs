@@ -31,7 +31,6 @@ use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder};
 use kurbo::{Affine, Rect as KurboRect};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
-use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex as cx;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
@@ -204,6 +203,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     preserve_text_portion: item.preserve_text_portion,
     pdf_text_segmentation: match item.pdf_text_segmentation {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
+      PdfTextSegmentation::WordLine => common::PdfTextSegmentation::WordLine,
       PdfTextSegmentation::Portion => common::PdfTextSegmentation::Portion,
     },
     source: (!item.source_path.is_empty()).then_some(common::DisplaySource {
@@ -1165,7 +1165,15 @@ fn lower_chart(
     return;
   }
   if let Some(chart_resource) = &record.extended_chart_resource {
-    lower_extended_chart(chart_resource, shape, offset, items);
+    lower_extended_chart(
+      import,
+      slide,
+      chart_resource,
+      shape,
+      offset,
+      ui_language,
+      items,
+    );
     return;
   }
   let Some(chart_resource) = &record.chart_resource else {
@@ -1391,6 +1399,20 @@ fn lower_chart(
           .collect()
       })
       .collect();
+    let surface_band_colors = chart
+      .surface_groups
+      .iter()
+      .map(|group| {
+        group
+          .band_fills
+          .iter()
+          .filter_map(|fill| {
+            display_paint_for_chart(import, slide, chart_resource, fill.fill)
+              .map(|paint| (fill.index, paint.color))
+          })
+          .collect()
+      })
+      .collect();
     if series_colors.len() == chart.series.len() {
       let title_properties = chart_resource
         .chart_space
@@ -1436,6 +1458,11 @@ fn lower_chart(
             })
         });
       let data_label_properties = chart.data_label_text_properties.or(label_properties);
+      let series_label_properties = chart
+        .axis_sets
+        .iter()
+        .find_map(|axes| axes.series_axis?.text_properties.as_deref())
+        .or(label_properties);
       // ECMA-376 Part 1 §21.2.2.216: c:chartSpace/c:txPr supplies
       // the defaults, while title/axis txPr overlays those defaults.
       let chart_text_properties = chart_resource.chart_space.text_properties.as_deref();
@@ -1503,6 +1530,12 @@ fn lower_chart(
             POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
+          series_label: chart_text_style(
+            text_style_context,
+            series_label_properties,
+            POWERPOINT_CHART_LABEL_FALLBACK,
+            None,
+          ),
           data_label: chart_text_style(
             text_style_context,
             data_label_properties,
@@ -1517,6 +1550,7 @@ fn lower_chart(
           category_minor_gridline: None,
           series_colors,
           series_point_colors,
+          surface_band_colors,
           data_label_fill_colors: chart
             .series
             .iter()
@@ -1626,134 +1660,59 @@ fn lower_chart(
 }
 
 fn lower_extended_chart(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
   resource: &super::slide::ExtendedChartResource,
   shape: &Shape,
   offset: DisplayOffset,
+  ui_language: Option<&str>,
   items: &mut Vec<PageItem>,
 ) {
-  let x = offset.x_pt(shape.position.x);
-  let y = offset.y_pt(shape.position.y);
-  let width = offset.width_pt(shape.size.cx);
-  let height = offset.height_pt(shape.size.cy);
-  items.push(PageItem::Rect(RectItem {
-    x_pt: x,
-    y_pt: y,
-    width_pt: width,
-    height_pt: height,
-    fill_color: Some(RgbColor {
-      r: 255,
-      g: 255,
-      b: 255,
-    }),
-    fill_opacity: 1.0,
-    stroke: None,
-    stroke_opacity: 1.0,
-  }));
-  let title = resource
-    .chart_space
-    .chart
-    .chart_title
-    .as_deref()
-    .and_then(|title| title.tx_pr_text_body.as_deref())
-    .map(|body| {
-      body
-        .paragraph
-        .iter()
-        .flat_map(|paragraph| &paragraph.paragraph_choice)
-        .filter_map(|choice| match choice {
-          a::ParagraphChoice::Run(run) => Some(run.text.as_str()),
-          a::ParagraphChoice::Field(field) => field.text.as_deref(),
-          _ => None,
-        })
-        .collect::<String>()
-    })
-    .unwrap_or_default();
-  let values = resource
-    .chart_space
-    .chart_data
-    .as_deref()
-    .into_iter()
-    .flat_map(|data| &data.data)
-    .flat_map(|data| &data.data_choice)
-    .filter_map(|choice| match choice {
-      cx::DataChoice::NumericDimension(dimension)
-        if dimension.r#type == cx::NumericDimensionType::Val =>
-      {
-        Some(dimension.as_ref())
-      }
-      _ => None,
-    })
-    .flat_map(|dimension| {
-      let levels = match dimension.numeric_dimension_choice.as_ref() {
-        Some(cx::NumericDimensionChoice::Sequence(sequence)) => sequence.numeric_level.as_slice(),
-        Some(cx::NumericDimensionChoice::NumericLevel(level)) => {
-          std::slice::from_ref(level.as_ref())
-        }
-        None => &[],
-      };
-      levels
-        .iter()
-        .flat_map(|level| &level.numeric_value)
-        .filter_map(|point| point.xml_content)
-        .collect::<Vec<_>>()
-    })
+  let frame = ChartFrame {
+    x_pt: offset.x_pt(shape.position.x),
+    y_pt: offset.y_pt(shape.position.y),
+    width_pt: offset.width_pt(shape.size.cx),
+    height_pt: offset.height_pt(shape.size.cy),
+  };
+  let font = import
+    .resolve_theme_font_for_language("+mn-lt", ui_language)
+    .unwrap_or("Liberation Sans");
+  let title_style = TextStyle {
+    font_family: Some(Arc::from(font)),
+    font_size_pt: 14.0,
+    bold: true,
+    ..TextStyle::default()
+  };
+  let label_style = TextStyle {
+    font_family: Some(Arc::from(font)),
+    font_size_pt: 9.0,
+    ..TextStyle::default()
+  };
+  let chart_styles = resource
+    .style_resources
+    .iter()
+    .map(|resource| resource.style.clone())
     .collect::<Vec<_>>();
-  if !values.is_empty() {
-    let palette = [
-      RgbColor {
-        r: 68,
-        g: 114,
-        b: 196,
+  let color_styles = resource
+    .color_style_resources
+    .iter()
+    .map(|resource| resource.colors.clone())
+    .collect::<Vec<_>>();
+  items.extend(crate::render::chartex::lower_extended_chart(
+    &resource.chart_space,
+    crate::render::chartex::ChartExRenderOptions {
+      frame,
+      title_style,
+      label_style,
+      ui_language,
+      theme: pptx_chartex_theme(import, slide),
+      resources: crate::render::chartex::ChartExStyleResources {
+        chart_styles: &chart_styles,
+        color_styles: &color_styles,
       },
-      RgbColor {
-        r: 237,
-        g: 125,
-        b: 49,
-      },
-      RgbColor {
-        r: 165,
-        g: 165,
-        b: 165,
-      },
-      RgbColor {
-        r: 255,
-        g: 192,
-        b: 0,
-      },
-      RgbColor {
-        r: 91,
-        g: 155,
-        b: 213,
-      },
-      RgbColor {
-        r: 112,
-        g: 173,
-        b: 71,
-      },
-    ];
-    let maximum = values.iter().copied().fold(0.0_f64, f64::max).max(1.0);
-    let plot_x = x + width * 0.1;
-    let plot_y = y + height * 0.18;
-    let plot_width = width * 0.8;
-    let plot_height = height * 0.68;
-    let slot = plot_width / values.len() as f32;
-    for (index, value) in values.iter().copied().enumerate() {
-      let bar_height = plot_height * (value.max(0.0) / maximum) as f32;
-      items.push(PageItem::Rect(RectItem {
-        x_pt: plot_x + slot * (index as f32 + 0.15),
-        y_pt: plot_y + plot_height - bar_height,
-        width_pt: slot * 0.7,
-        height_pt: bar_height.max(0.5),
-        fill_color: Some(palette[index % palette.len()]),
-        fill_opacity: 1.0,
-        stroke: None,
-        stroke_opacity: 1.0,
-      }));
-    }
-  }
-  if !title.is_empty() {
-    lower_chart_texts(x, y, width, height, vec![title], items);
-  }
+    },
+    None,
+  ));
 }
 
 fn insert_chart_title_blip_fill(
@@ -2093,6 +2052,47 @@ fn chart_theme<'a>(
     .as_deref()
     .and_then(|path| import.get_theme(path))
     .or_else(|| import.get_current_theme_ptr())
+}
+
+fn pptx_chartex_theme(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+) -> crate::render::chartex::ChartExTheme {
+  let defaults = crate::render::chartex::ChartExTheme::default();
+  let Some(theme) = chart_theme(import, slide) else {
+    return defaults;
+  };
+  let resolve = |token: a::SchemeColorValues| {
+    let mapped = shared_chart::scheme_color_token(None, token)?;
+    let color = theme.color_scheme.get_color(mapped)?.clone();
+    let mut resolver = |nested| {
+      let mapped = shared_chart::scheme_color_token(None, nested)?;
+      theme.color_scheme.get_color(mapped).cloned()
+    };
+    let color = color.resolve_rgb(&mut resolver, None)?;
+    Some(RgbColor {
+      r: color.r,
+      g: color.g,
+      b: color.b,
+    })
+  };
+  crate::render::chartex::ChartExTheme {
+    dark1: resolve(a::SchemeColorValues::Dark1).unwrap_or(defaults.dark1),
+    light1: resolve(a::SchemeColorValues::Light1).unwrap_or(defaults.light1),
+    dark2: resolve(a::SchemeColorValues::Dark2).unwrap_or(defaults.dark2),
+    light2: resolve(a::SchemeColorValues::Light2).unwrap_or(defaults.light2),
+    accents: [
+      resolve(a::SchemeColorValues::Accent1).unwrap_or(defaults.accents[0]),
+      resolve(a::SchemeColorValues::Accent2).unwrap_or(defaults.accents[1]),
+      resolve(a::SchemeColorValues::Accent3).unwrap_or(defaults.accents[2]),
+      resolve(a::SchemeColorValues::Accent4).unwrap_or(defaults.accents[3]),
+      resolve(a::SchemeColorValues::Accent5).unwrap_or(defaults.accents[4]),
+      resolve(a::SchemeColorValues::Accent6).unwrap_or(defaults.accents[5]),
+    ],
+    hyperlink: resolve(a::SchemeColorValues::Hyperlink).unwrap_or(defaults.hyperlink),
+    followed_hyperlink: resolve(a::SchemeColorValues::FollowedHyperlink)
+      .unwrap_or(defaults.followed_hyperlink),
+  }
 }
 
 #[derive(Clone, Copy)]

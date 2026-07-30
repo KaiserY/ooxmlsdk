@@ -164,6 +164,17 @@ pub(super) fn split_page_break_and_paragraph_mark(
     .unwrap_or(false)
 }
 
+pub(super) fn update_fields_on_open(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| settings.update_fields_on_open.as_ref())
+    .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
+}
+
 pub(super) fn default_tab_stop_pt(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,

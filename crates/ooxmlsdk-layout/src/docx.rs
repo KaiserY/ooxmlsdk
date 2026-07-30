@@ -8,6 +8,7 @@ mod properties;
 mod settings;
 mod table;
 mod text;
+mod toc;
 
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -56,13 +57,16 @@ use crate::units;
 
 pub(crate) use custom_xml::CustomXmlBindings;
 pub(crate) use model::*;
-use package::{AltChunkCatalog, AltChunkResource, HyperlinkCatalog, ImageCatalog};
+use package::{
+  AltChunkCatalog, AltChunkResource, ExtendedChartResource, HyperlinkCatalog, ImageCatalog,
+};
 use settings::{
   adjust_line_height_in_table, compatibility_mode, default_tab_stop_pt, hyphenation_settings,
-  no_column_balance, split_page_break_and_paragraph_mark,
+  no_column_balance, split_page_break_and_paragraph_mark, update_fields_on_open,
 };
 use table::{TableConditionalStyleMask, TableLookModel};
 use text::{ParagraphImportBase, paragraph_model, paragraph_model_with_base};
+use toc::{paragraph_field_events, refresh_tables_of_contents};
 
 #[derive(Clone, Debug)]
 pub struct DocxLayoutSummary {
@@ -183,6 +187,7 @@ pub(crate) fn extract(
   let no_column_balance = no_column_balance(package, &main);
   let adjust_line_height_in_table = adjust_line_height_in_table(package, &main);
   let split_page_break_and_paragraph_mark = split_page_break_and_paragraph_mark(package, &main);
+  let update_fields_on_open = update_fields_on_open(package, &main);
   let mirror_margins = mirror_margins(package, &main);
   let gutter_at_top = gutter_at_top(package, &main);
   let document = main.root_element(package)?;
@@ -216,6 +221,12 @@ pub(crate) fn extract(
       )
     })
     .unwrap_or_else(|| vec![default_section(Vec::new())]);
+  refresh_tables_of_contents(
+    &mut sections,
+    &body_styles,
+    update_fields_on_open,
+    options.ui_language.as_deref(),
+  );
   if body_styles.uses_office_recovered_paragraph_defaults() {
     for section in &mut sections {
       if section.page.doc_grid_line_pitch_pt.is_none()
@@ -394,6 +405,7 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
       style_ref_numbering_text: None,
       preserve_text_portion: false,
     })],
+    field_events: Vec::new(),
     footnote_reference_ids: Vec::new(),
     endnote_reference_ids: Vec::new(),
     starts_after_last_rendered_page_break: false,
@@ -458,6 +470,7 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
         margin_left_pt: 0.0,
       }),
     })],
+    field_events: Vec::new(),
     footnote_reference_ids: Vec::new(),
     endnote_reference_ids: Vec::new(),
     starts_after_last_rendered_page_break: false,
@@ -1078,6 +1091,7 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     previous
       .endnote_reference_ids
       .append(&mut paragraph.endnote_reference_ids);
+    previous.field_events.append(&mut paragraph.field_events);
     previous.inlines.append(&mut paragraph.inlines);
     return;
   }
@@ -4626,6 +4640,7 @@ struct ComplexFieldState {
   instr: String,
   result: Vec<InlineItem>,
   form_drop_down_value: Option<String>,
+  field_locked: bool,
   in_result: bool,
   style: TextStyle,
   hyperlink_url: Option<String>,
@@ -4681,6 +4696,9 @@ fn push_run_or_complex_field(
           instr: String::new(),
           result: Vec::new(),
           form_drop_down_value: form_drop_down_value(field_char),
+          field_locked: field_char
+            .field_lock
+            .is_some_and(ooxmlsdk::simple_type::OnOffValue::as_bool),
           in_result: false,
           style: style.clone(),
           hyperlink_url: hyperlink_url.map(ToString::to_string),
@@ -4750,6 +4768,11 @@ fn flush_complex_field(
     // Word drops the cached result of that closed malformed field. Keep the
     // ECMA-376 §17.16.18 recovery below for an unclosed field, whose result
     // must instead be interpreted as literal text.
+  } else if closed && state.field_locked {
+    // ECMA-376 Part 1 §17.16.18: fldLock on the begin character prevents
+    // recalculation even when an application explicitly requests an update.
+    // The persisted result is therefore authoritative.
+    resolved = state.result;
   } else if closed && field_instruction_name(&state.instr).is_some_and(|name| name == "SET") {
     // ECMA-376 §17.16.5.57 defines SET as assigning a bookmark and gives it
     // no field value. Its cached result is metadata, not visible document text.
@@ -4964,10 +4987,10 @@ fn dynamic_field_kind(instr: &str) -> Option<DynamicFieldKind> {
   let name = field_instruction_name(instr)?;
   match name.as_str() {
     "PAGE" => Some(DynamicFieldKind::Page {
-      number_format: field_number_format(&tokens[1..]),
+      number_format: field_number_format(&tokens[1..]).unwrap_or(FieldNumberFormat::PageStyle),
     }),
     "NUMPAGES" => Some(DynamicFieldKind::NumPages {
-      number_format: field_number_format(&tokens[1..]),
+      number_format: field_number_format(&tokens[1..]).unwrap_or(FieldNumberFormat::Decimal),
     }),
     "PAGEREF" => page_ref_field_kind(&tokens[1..]),
     "STYLEREF" => style_ref_field_kind(&tokens[1..]),
@@ -4975,36 +4998,36 @@ fn dynamic_field_kind(instr: &str) -> Option<DynamicFieldKind> {
   }
 }
 
-fn field_number_format(tokens: &[String]) -> FieldNumberFormat {
-  tokens
-    .windows(2)
-    .find_map(|tokens| {
-      tokens[0]
-        .eq_ignore_ascii_case(r"\*")
-        .then(|| match tokens[1].as_str() {
-          value if value.eq_ignore_ascii_case("roman") => {
-            if value == "ROMAN" {
-              FieldNumberFormat::UpperRoman
-            } else {
-              FieldNumberFormat::LowerRoman
-            }
+fn field_number_format(tokens: &[String]) -> Option<FieldNumberFormat> {
+  tokens.windows(2).find_map(|tokens| {
+    tokens[0]
+      .eq_ignore_ascii_case(r"\*")
+      .then(|| match tokens[1].as_str() {
+        value if value.eq_ignore_ascii_case("roman") => {
+          if value == "ROMAN" {
+            Some(FieldNumberFormat::UpperRoman)
+          } else {
+            Some(FieldNumberFormat::LowerRoman)
           }
-          value if value.eq_ignore_ascii_case("alphabetic") => {
-            if value == "ALPHABETIC" {
-              FieldNumberFormat::UpperLetter
-            } else {
-              FieldNumberFormat::LowerLetter
-            }
+        }
+        value if value.eq_ignore_ascii_case("alphabetic") => {
+          if value == "ALPHABETIC" {
+            Some(FieldNumberFormat::UpperLetter)
+          } else {
+            Some(FieldNumberFormat::LowerLetter)
           }
-          _ => FieldNumberFormat::Decimal,
-        })
-    })
-    .unwrap_or_default()
+        }
+        value if value.eq_ignore_ascii_case("arabic") => Some(FieldNumberFormat::Decimal),
+        _ => None,
+      })
+      .flatten()
+  })
 }
 
 fn format_field_number(value: usize, format: FieldNumberFormat) -> String {
   let value = i32::try_from(value).unwrap_or(i32::MAX);
   let format = match format {
+    FieldNumberFormat::PageStyle => w::NumberFormatValues::Decimal,
     FieldNumberFormat::Decimal => w::NumberFormatValues::Decimal,
     FieldNumberFormat::LowerRoman => w::NumberFormatValues::LowerRoman,
     FieldNumberFormat::UpperRoman => w::NumberFormatValues::UpperRoman,
@@ -5015,15 +5038,31 @@ fn format_field_number(value: usize, format: FieldNumberFormat) -> String {
 }
 
 fn page_ref_field_kind(tokens: &[String]) -> Option<DynamicFieldKind> {
+  let mut bookmark_name = None;
+  let mut relative_position = false;
+  let mut skip_switch_argument = false;
   for token in tokens {
-    if token.starts_with('\\') {
+    if skip_switch_argument {
+      skip_switch_argument = false;
       continue;
     }
-    return Some(DynamicFieldKind::PageRef {
-      bookmark_name: Arc::<str>::from(token.as_str()),
-    });
+    if let Some(switch) = token.strip_prefix('\\') {
+      if switch.eq_ignore_ascii_case("p") {
+        relative_position = true;
+      } else if matches!(switch, "*" | "#" | "@") {
+        skip_switch_argument = true;
+      }
+      continue;
+    }
+    if bookmark_name.is_none() {
+      bookmark_name = Some(Arc::<str>::from(token.as_str()));
+    }
   }
-  None
+  bookmark_name.map(|bookmark_name| DynamicFieldKind::PageRef {
+    bookmark_name,
+    number_format: field_number_format(tokens).unwrap_or(FieldNumberFormat::PageStyle),
+    relative_position,
+  })
 }
 
 fn style_ref_field_kind(tokens: &[String]) -> Option<DynamicFieldKind> {
@@ -5129,11 +5168,25 @@ fn field_result_text(result: &[InlineItem]) -> Option<String> {
 }
 
 fn hyperlink_url(hyperlink: &w::Hyperlink, hyperlinks: &HyperlinkCatalog) -> Option<String> {
-  hyperlink
+  let target = hyperlink
     .id
     .as_deref()
     .and_then(|relationship_id| hyperlinks.target(relationship_id))
-    .map(ToString::to_string)
+    .map(ToString::to_string);
+  let anchor = hyperlink
+    .anchor
+    .as_deref()
+    .filter(|anchor| !anchor.is_empty());
+  match (target, anchor) {
+    (Some(mut target), Some(anchor)) => {
+      target.push('#');
+      target.push_str(anchor);
+      Some(target)
+    }
+    (Some(target), None) => Some(target),
+    (None, Some(anchor)) => Some(format!("ooxmlsdk-pdf:bookmark:{anchor}")),
+    (None, None) => None,
+  }
 }
 
 fn push_hyperlink_content(
@@ -5516,7 +5569,10 @@ fn push_simple_field(
   base_style: TextStyle,
   context: &mut InlineImportContext<'_>,
 ) {
-  if let Some(kind) = dynamic_field_kind(&field.instruction) {
+  let field_locked = field
+    .field_lock
+    .is_some_and(ooxmlsdk::simple_type::OnOffValue::as_bool);
+  if !field_locked && let Some(kind) = dynamic_field_kind(&field.instruction) {
     push_dynamic_field(
       inlines,
       kind,
@@ -5717,7 +5773,7 @@ fn push_run(
         push_dynamic_field(
           inlines,
           DynamicFieldKind::Page {
-            number_format: FieldNumberFormat::Decimal,
+            number_format: FieldNumberFormat::PageStyle,
           },
           style.clone(),
           hyperlink_url,
@@ -9862,10 +9918,7 @@ fn drawing_chart_shapes(
   drawing: &w::Drawing,
   reference: &c::ChartReference,
   charts_by_relationship_id: &HashMap<String, c::ChartSpace>,
-  extended_charts_by_relationship_id: &HashMap<
-    String,
-    ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex::ChartSpace,
-  >,
+  extended_charts_by_relationship_id: &HashMap<String, ExtendedChartResource>,
   styles: &StylesCatalog,
 ) -> Option<Vec<InlineShape>> {
   let Some(chart_space) = charts_by_relationship_id.get(reference.id.as_str()) else {
@@ -9949,6 +10002,25 @@ fn drawing_chart_shapes(
                 .find(|fill| fill.index as usize == point_index)
                 .and_then(|fill| resolve_drawingml_solid_fill(fill.fill, &styles.theme_colors))
                 .map(|fill| fill.color)
+            })
+            .collect()
+        })
+        .collect()
+    })
+    .unwrap_or_default();
+  let surface_band_colors = cartesian
+    .as_ref()
+    .map(|chart| {
+      chart
+        .surface_groups
+        .iter()
+        .map(|group| {
+          group
+            .band_fills
+            .iter()
+            .filter_map(|fill| {
+              resolve_drawingml_solid_fill(fill.fill, &styles.theme_colors)
+                .map(|resolved| (fill.index, resolved.color))
             })
             .collect()
         })
@@ -10071,13 +10143,61 @@ fn drawing_chart_shapes(
   if let Some(title) = chart_space.chart.title.as_deref() {
     apply_chart_rich_title_properties(&mut title_style, title, styles);
   }
+  let mut legend_style = label_style.clone();
   if let Some(properties) = chart_space
     .chart
     .legend
     .as_deref()
     .and_then(|legend| legend.text_properties.as_deref())
   {
-    apply_chart_text_properties(&mut label_style, properties, styles);
+    apply_chart_text_properties(&mut legend_style, properties, styles);
+  }
+  let mut category_label_style = label_style.clone();
+  if let Some(properties) = cartesian.as_ref().and_then(|chart| {
+    chart
+      .category_axis
+      .and_then(|axis| axis.text_properties.as_deref())
+      .or_else(|| {
+        chart
+          .date_axis
+          .and_then(|axis| axis.text_properties.as_deref())
+      })
+      .or_else(|| {
+        chart
+          .series
+          .iter()
+          .all(|series| {
+            matches!(
+              series.kind,
+              shared_chart::ChartSeriesKind::Scatter | shared_chart::ChartSeriesKind::Bubble
+            )
+          })
+          .then(|| {
+            chart
+              .horizontal_value_axis
+              .and_then(|axis| axis.text_properties.as_deref())
+          })
+          .flatten()
+      })
+  }) {
+    apply_chart_text_properties(&mut category_label_style, properties, styles);
+  }
+  let mut value_label_style = label_style.clone();
+  if let Some(properties) = cartesian
+    .as_ref()
+    .and_then(|chart| chart.value_axis)
+    .and_then(|axis| axis.text_properties.as_deref())
+  {
+    apply_chart_text_properties(&mut value_label_style, properties, styles);
+  }
+  let mut series_label_style = label_style.clone();
+  if let Some(properties) = cartesian.as_ref().and_then(|chart| {
+    chart
+      .axis_sets
+      .iter()
+      .find_map(|axes| axes.series_axis?.text_properties.as_deref())
+  }) {
+    apply_chart_text_properties(&mut series_label_style, properties, styles);
   }
   if let Some(properties) = shared_chart::pie_chart_model(chart_space)
     .and_then(|model| model.data_label_text_properties)
@@ -10089,6 +10209,50 @@ fn drawing_chart_shapes(
   {
     apply_chart_text_properties(&mut data_label_style, properties, styles);
   }
+  let data_label_styles = cartesian
+    .as_ref()
+    .map(|chart| {
+      chart
+        .series
+        .iter()
+        .map(|series| {
+          series
+            .data_labels
+            .iter()
+            .map(|label| {
+              label.text_properties.map(|properties| {
+                let mut style = label_style.clone();
+                apply_chart_text_properties(&mut style, properties, styles);
+                style
+              })
+            })
+            .collect()
+        })
+        .collect()
+    })
+    .unwrap_or_default();
+  let data_label_fill_colors = cartesian
+    .as_ref()
+    .map(|chart| {
+      chart
+        .series
+        .iter()
+        .map(|series| {
+          series
+            .data_labels
+            .iter()
+            .map(|label| {
+              label
+                .shape_properties
+                .and_then(shared_chart::chart_shape_solid_fill)
+                .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
+                .map(|fill| fill.color)
+            })
+            .collect()
+        })
+        .collect()
+    })
+    .unwrap_or_default();
   let ui_language = if styles.simplified_chinese_ui {
     Some("zh-CN".to_string())
   } else {
@@ -10111,38 +10275,147 @@ fn drawing_chart_shapes(
       g: 134,
       b: 134,
     });
+  let value_gridline_width_pt = cartesian
+    .as_ref()
+    .and_then(|chart| chart.value_axis)
+    .and_then(|axis| axis.major_gridlines.as_deref())
+    .and_then(|gridlines| gridlines.chart_shape_properties.as_deref())
+    .and_then(chart_shape_outline_width_pt);
+  let axis_line_width_pt = cartesian
+    .as_ref()
+    .and_then(|chart| {
+      chart
+        .date_axis
+        .and_then(|axis| axis.chart_shape_properties.as_deref())
+        .or_else(|| {
+          chart
+            .category_axis
+            .and_then(|axis| axis.chart_shape_properties.as_deref())
+        })
+        .or_else(|| {
+          chart
+            .horizontal_value_axis
+            .and_then(|axis| axis.chart_shape_properties.as_deref())
+        })
+    })
+    .and_then(chart_shape_outline_width_pt);
+  let category_major_gridline = cartesian.as_ref().and_then(|chart| {
+    let properties = chart
+      .date_axis?
+      .major_gridlines
+      .as_deref()?
+      .chart_shape_properties
+      .as_deref()?;
+    let color = shared_chart::chart_shape_outline_solid_fill(properties)
+      .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))?
+      .color;
+    Some((color, chart_shape_outline_width_pt(properties)?))
+  });
+  let category_minor_gridline = cartesian.as_ref().and_then(|chart| {
+    let properties = chart
+      .date_axis?
+      .minor_gridlines
+      .as_deref()?
+      .chart_shape_properties
+      .as_deref()?;
+    let color = shared_chart::chart_shape_outline_solid_fill(properties)
+      .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))?
+      .color;
+    Some((color, chart_shape_outline_width_pt(properties)?))
+  });
+  let chart_area_stroke_width_pt = chart_space
+    .shape_properties
+    .as_deref()
+    .and_then(shape_properties_outline_width_pt);
+  let plot_area_stroke_width_pt = chart_space
+    .chart
+    .plot_area
+    .shape_properties
+    .as_deref()
+    .and_then(shape_properties_outline_width_pt);
   let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
   shape.chart = Some(Box::new(InlineChart {
     chart_space: Some(Box::new(chart_space.clone())),
     extended_chart_space: None,
+    extended_chart_styles: Vec::new(),
+    extended_chart_color_styles: Vec::new(),
+    extended_chart_theme: crate::render::chartex::ChartExTheme::default(),
     ui_language,
     automatic_title,
     title_style,
-    label_style,
+    label_style: legend_style,
+    category_label_style,
+    value_label_style,
+    series_label_style,
     data_label_style,
+    data_label_styles,
     gridline_color,
+    value_gridline_width_pt,
+    axis_line_width_pt,
+    category_major_gridline,
+    category_minor_gridline,
     series_colors,
     series_point_colors,
+    surface_band_colors,
+    data_label_fill_colors,
     pie_point_colors,
     title_fill_color,
     chart_area_fill_color,
     plot_area_fill_color,
     chart_area_stroke_color,
+    chart_area_stroke_width_pt,
     plot_area_stroke_color,
+    plot_area_stroke_width_pt,
   }));
   Some(vec![shape])
+}
+
+fn chart_shape_outline_width_pt(properties: &c::ChartShapeProperties) -> Option<f32> {
+  properties
+    .outline
+    .as_deref()?
+    .width
+    .map(|width| units::emu_to_points(i64::from(width)))
+}
+
+fn shape_properties_outline_width_pt(properties: &c::ShapeProperties) -> Option<f32> {
+  properties
+    .outline
+    .as_deref()?
+    .width
+    .map(|width| units::emu_to_points(i64::from(width)))
+}
+
+fn chart_ex_theme(colors: &ThemeColors) -> crate::render::chartex::ChartExTheme {
+  let defaults = crate::render::chartex::ChartExTheme::default();
+  crate::render::chartex::ChartExTheme {
+    dark1: colors.dark1.unwrap_or(defaults.dark1),
+    light1: colors.light1.unwrap_or(defaults.light1),
+    dark2: colors.dark2.unwrap_or(defaults.dark2),
+    light2: colors.light2.unwrap_or(defaults.light2),
+    accents: [
+      colors.accent1.unwrap_or(defaults.accents[0]),
+      colors.accent2.unwrap_or(defaults.accents[1]),
+      colors.accent3.unwrap_or(defaults.accents[2]),
+      colors.accent4.unwrap_or(defaults.accents[3]),
+      colors.accent5.unwrap_or(defaults.accents[4]),
+      colors.accent6.unwrap_or(defaults.accents[5]),
+    ],
+    hyperlink: colors.hyperlink.unwrap_or(defaults.hyperlink),
+    followed_hyperlink: colors
+      .followed_hyperlink
+      .unwrap_or(defaults.followed_hyperlink),
+  }
 }
 
 fn drawing_extended_chart_shapes(
   drawing: &w::Drawing,
   relationship_id: &str,
-  charts_by_relationship_id: &HashMap<
-    String,
-    ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex::ChartSpace,
-  >,
+  charts_by_relationship_id: &HashMap<String, ExtendedChartResource>,
   styles: &StylesCatalog,
 ) -> Option<Vec<InlineShape>> {
-  let chart_space = charts_by_relationship_id.get(relationship_id)?;
+  let resource = charts_by_relationship_id.get(relationship_id)?;
+  let chart_space = &resource.chart_space;
   let (width_pt, height_pt, placement) = drawing_chart_extent_and_placement(drawing)?;
   let chart_font = styles
     .theme_fonts
@@ -10162,10 +10435,24 @@ fn drawing_extended_chart_shapes(
   };
   title_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
   label_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
+  let chart_east_asia_font = if styles.simplified_chinese_ui {
+    Some(
+      styles
+        .theme_fonts
+        .resolve_drawingml_typeface_for_language("+mn-ea", Some("zh-CN")),
+    )
+  } else {
+    styles.doc_default_run.east_asia_font_family.clone()
+  };
+  title_style.east_asia_font_family = chart_east_asia_font.clone();
+  label_style.east_asia_font_family = chart_east_asia_font;
   let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
   shape.chart = Some(Box::new(InlineChart {
     chart_space: None,
     extended_chart_space: Some(Box::new(chart_space.clone())),
+    extended_chart_styles: resource.chart_styles.clone(),
+    extended_chart_color_styles: resource.color_styles.clone(),
+    extended_chart_theme: chart_ex_theme(&styles.theme_colors),
     ui_language: styles.simplified_chinese_ui.then(|| "zh-CN".to_string()),
     automatic_title: shared_chart::automatic_chart_title(
       styles.simplified_chinese_ui.then_some("zh-CN"),
@@ -10173,20 +10460,32 @@ fn drawing_extended_chart_shapes(
     .to_string(),
     title_style,
     label_style: label_style.clone(),
+    category_label_style: label_style.clone(),
+    value_label_style: label_style.clone(),
+    series_label_style: label_style.clone(),
     data_label_style: label_style,
+    data_label_styles: Vec::new(),
     gridline_color: RgbColor {
       r: 134,
       g: 134,
       b: 134,
     },
+    value_gridline_width_pt: None,
+    axis_line_width_pt: None,
+    category_major_gridline: None,
+    category_minor_gridline: None,
     series_colors: Vec::new(),
     series_point_colors: Vec::new(),
+    surface_band_colors: Vec::new(),
+    data_label_fill_colors: Vec::new(),
     pie_point_colors: Vec::new(),
     title_fill_color: None,
     chart_area_fill_color: None,
     plot_area_fill_color: None,
     chart_area_stroke_color: None,
+    chart_area_stroke_width_pt: None,
     plot_area_stroke_color: None,
+    plot_area_stroke_width_pt: None,
   }));
   Some(vec![shape])
 }
@@ -19394,6 +19693,12 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     .page_number_type
     .as_ref()
     .and_then(|page_number| page_number.start);
+  setup.page_number_format = section
+    .page_number_type
+    .as_ref()
+    .and_then(|page_number| page_number.format)
+    .map(page_style_field_number_format)
+    .unwrap_or(FieldNumberFormat::Decimal);
   setup.rtl_gutter = section
     .gutter_on_right
     .as_ref()
@@ -19425,6 +19730,16 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     .and_then(doc_grid_character_spacing_points);
 
   setup
+}
+
+fn page_style_field_number_format(format: w::NumberFormatValues) -> FieldNumberFormat {
+  match format {
+    w::NumberFormatValues::LowerRoman => FieldNumberFormat::LowerRoman,
+    w::NumberFormatValues::UpperRoman => FieldNumberFormat::UpperRoman,
+    w::NumberFormatValues::LowerLetter => FieldNumberFormat::LowerLetter,
+    w::NumberFormatValues::UpperLetter => FieldNumberFormat::UpperLetter,
+    _ => FieldNumberFormat::Decimal,
+  }
 }
 
 fn doc_grid_character_spacing_points(value: i64) -> Option<f32> {
@@ -20993,6 +21308,27 @@ mod tests {
 
     assert_eq!(style.east_asia_font_family, Some(Arc::from("DengXian")));
     assert_eq!(style.fallback_font_family, None);
+  }
+
+  #[test]
+  fn chart_axis_text_properties_apply_size_and_transformed_theme_color() {
+    let properties = c::TextProperties::from_bytes(
+      br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"><a:solidFill><a:schemeClr val="tx1"><a:lumMod val="65000"/><a:lumOff val="35000"/></a:schemeClr></a:solidFill></a:defRPr></a:pPr></a:p></c:txPr>"#,
+    )
+    .expect("chart text properties");
+    let mut style = TextStyle::default();
+
+    apply_chart_text_properties(&mut style, &properties, &StylesCatalog::default());
+
+    assert_eq!(style.font_size_pt, 9.0);
+    assert_eq!(
+      style.color,
+      RgbColor {
+        r: 89,
+        g: 89,
+        b: 89
+      }
+    );
   }
 
   #[test]
@@ -22873,7 +23209,7 @@ mod tests {
     assert_eq!(
       run.dynamic_field,
       Some(DynamicFieldKind::Page {
-        number_format: FieldNumberFormat::Decimal,
+        number_format: FieldNumberFormat::PageStyle,
       })
     );
   }
@@ -22930,8 +23266,65 @@ mod tests {
       dynamic_field_kind(r#" PAGEREF "_Toc123" \h "#),
       Some(DynamicFieldKind::PageRef {
         bookmark_name: Arc::<str>::from("_Toc123"),
+        number_format: FieldNumberFormat::PageStyle,
+        relative_position: false,
       })
     );
+  }
+
+  #[test]
+  fn pageref_field_instruction_preserves_relative_and_number_format_switches() {
+    assert_eq!(
+      dynamic_field_kind(r#" PAGEREF "_Toc123" \p \* ROMAN "#),
+      Some(DynamicFieldKind::PageRef {
+        bookmark_name: Arc::<str>::from("_Toc123"),
+        number_format: FieldNumberFormat::UpperRoman,
+        relative_position: true,
+      })
+    );
+    assert_eq!(
+      dynamic_field_kind(r#" PAGEREF \* alphabetic "_Toc456" \h "#),
+      Some(DynamicFieldKind::PageRef {
+        bookmark_name: Arc::<str>::from("_Toc456"),
+        number_format: FieldNumberFormat::LowerLetter,
+        relative_position: false,
+      })
+    );
+  }
+
+  #[test]
+  fn internal_word_hyperlink_uses_the_pdf_bookmark_target_namespace() {
+    let hyperlink = w::Hyperlink {
+      anchor: Some("_Toc123".into()),
+      ..Default::default()
+    };
+    assert_eq!(
+      hyperlink_url(&hyperlink, &HyperlinkCatalog::default()).as_deref(),
+      Some("ooxmlsdk-pdf:bookmark:_Toc123")
+    );
+  }
+
+  #[test]
+  fn locked_pageref_keeps_its_persisted_result() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:fldChar w:fldCharType="begin" w:fldLock="1"/></w:r><w:r><w:instrText>PAGEREF "_Toc123"</w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>27</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+    )
+    .expect("locked complex field paragraph");
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+    let [InlineItem::Text(run)] = inlines.as_slice() else {
+      panic!("expected the persisted field result");
+    };
+    assert_eq!(run.text, "27");
+    assert_eq!(run.dynamic_field, None);
   }
 
   #[test]
@@ -22999,6 +23392,8 @@ mod tests {
       run.dynamic_field,
       Some(DynamicFieldKind::PageRef {
         bookmark_name: Arc::<str>::from("_Toc123"),
+        number_format: FieldNumberFormat::PageStyle,
+        relative_position: false,
       })
     );
   }
@@ -23268,7 +23663,7 @@ mod tests {
     assert_eq!(
       run.dynamic_field,
       Some(DynamicFieldKind::Page {
-        number_format: FieldNumberFormat::Decimal,
+        number_format: FieldNumberFormat::PageStyle,
       })
     );
   }

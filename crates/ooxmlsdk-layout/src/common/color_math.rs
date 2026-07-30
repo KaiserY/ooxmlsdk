@@ -117,6 +117,26 @@ pub(crate) fn drawingml_scrgb_to_srgb8(value: i32) -> u8 {
   )))
 }
 
+pub(crate) fn drawingml_shade_srgb8(rgb: [u8; 3], retention: i32) -> [u8; 3] {
+  let retention = retention.clamp(0, DRAWINGML_PERCENT_SCALE);
+  rgb.map(|channel| {
+    let linear = drawingml_srgb8_to_scrgb(channel);
+    let shaded = i64::from(linear) * i64::from(retention) / i64::from(DRAWINGML_PERCENT_SCALE);
+    drawingml_scrgb_to_srgb8(shaded as i32)
+  })
+}
+
+pub(crate) fn drawingml_tint_srgb8(rgb: [u8; 3], retention: i32) -> [u8; 3] {
+  let retention = retention.clamp(0, DRAWINGML_PERCENT_SCALE);
+  rgb.map(|channel| {
+    let linear = drawingml_srgb8_to_scrgb(channel);
+    let tinted = i64::from(DRAWINGML_PERCENT_SCALE)
+      - i64::from(DRAWINGML_PERCENT_SCALE - linear) * i64::from(retention)
+        / i64::from(DRAWINGML_PERCENT_SCALE);
+    drawingml_scrgb_to_srgb8(tinted as i32)
+  })
+}
+
 pub(crate) fn drawingml_linear_to_srgb_percent(value: i32) -> i32 {
   normalized_to_drawingml_percent(linear_to_srgb_channel(drawingml_percent_to_normalized(
     value,
@@ -181,5 +201,13 @@ mod tests {
       apply_linear_saturation_mod([0xF7, 0x96, 0x46], 1.75),
       [0xFE, 0x90, 0x00]
     );
+  }
+
+  #[test]
+  fn drawingml_shade_and_tint_operate_in_scrgb() {
+    let accent = [0x5B, 0x9B, 0xD5];
+    assert_eq!(drawingml_shade_srgb8(accent, 58_000), [0x46, 0x79, 0xA7]);
+    assert_eq!(drawingml_shade_srgb8(accent, 86_000), [0x55, 0x91, 0xC7]);
+    assert_eq!(drawingml_tint_srgb8(accent, 86_000), [0x84, 0xAE, 0xDC]);
   }
 }

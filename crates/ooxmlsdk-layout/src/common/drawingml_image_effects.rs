@@ -1843,6 +1843,27 @@ pub(crate) fn scale_glow_filter_radius(container: &mut ImageEffectContainer, sca
   }
 }
 
+/// Scales only the outer-shadow blur kernel while retaining the authored
+/// effect bounds. Office fixed output uses this distinction for chart
+/// effects: the XObject canvas still reserves `blurRad`, but its sampled
+/// shadow edge is narrower than that full extent.
+pub(crate) fn scale_outer_shadow_filter_radius(container: &mut ImageEffectContainer, scale: f32) {
+  if !scale.is_finite() || scale <= 0.0 || (scale - 1.0).abs() <= f32::EPSILON {
+    return;
+  }
+  for effect in &mut container.effects {
+    match effect {
+      ImageEffect::OuterShadow { blur_radius_px, .. } => *blur_radius_px *= scale,
+      ImageEffect::AlphaModulate(container)
+      | ImageEffect::Blend { container, .. }
+      | ImageEffect::Container(container) => {
+        scale_outer_shadow_filter_radius(container, scale);
+      }
+      _ => {}
+    }
+  }
+}
+
 /// Uses Word's WPG glow spread while retaining the DrawingML Gaussian fringe.
 ///
 /// At Word's 0.4 px/pt group-effect raster density, a 36pt glow expands the

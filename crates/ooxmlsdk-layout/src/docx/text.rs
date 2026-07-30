@@ -7,8 +7,8 @@ use super::{
   CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog,
   NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphAdjust, ParagraphAlignment,
   ParagraphFormat, ParagraphProps, RunStyleOverrides, StylesCatalog, TextRun, TextStyle,
-  math_paragraph_alignment, paragraph_inlines, paragraph_note_reference_ids, properties,
-  select_paragraph_numbering,
+  math_paragraph_alignment, paragraph_field_events, paragraph_inlines,
+  paragraph_note_reference_ids, properties, select_paragraph_numbering,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -81,9 +81,13 @@ pub(super) fn paragraph_model_with_base<'a>(
       .is_some_and(|properties| properties.tabs().is_some()),
     ..NumberingFormatMergeContext::from_direct_properties(direct_paragraph_properties)
   };
+  let style_outline_level = styles
+    .paragraph_format_with_base(style_id, base.format.clone())
+    .outline_level;
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
   format.style_id = style_id.map(Arc::<str>::from);
+  format.style_outline_level = style_outline_level;
   if [
     format.indent_left_character_units,
     format.indent_right_character_units,
@@ -289,6 +293,7 @@ pub(super) fn paragraph_model_with_base<'a>(
 
   Paragraph {
     inlines,
+    field_events: paragraph_field_events(paragraph),
     footnote_reference_ids,
     endnote_reference_ids,
     starts_after_last_rendered_page_break,

@@ -297,7 +297,7 @@ fn render_inner(
         .to_string(),
     ));
   }
-  let internal_links = InternalLinkTargets::from_paint(&paint);
+  let internal_links = InternalLinkTargets::from_layout(&paint, document);
   debug_assert_eq!(paint.pages.len(), document.pages.len());
   debug_assert!(paint.pages.iter().all(|page| {
     page.width_pt >= 3.0
@@ -1392,8 +1392,20 @@ struct InternalLinkTargets {
 }
 
 impl InternalLinkTargets {
-  fn from_paint(paint: &PaintDocument<'_>) -> Self {
+  fn from_layout(paint: &PaintDocument<'_>, document: &common::LayoutDocument<'static>) -> Self {
     let mut positions = HashMap::default();
+    for anchor in &document.anchor_pages {
+      if anchor.name.is_empty() || anchor.page_index >= paint.pages.len() {
+        continue;
+      }
+      positions
+        .entry(format!("ooxmlsdk-pdf:bookmark:{}", anchor.name))
+        .or_insert(InternalLinkPosition {
+          page_index: anchor.page_index,
+          x_pt: 0.0,
+          y_pt: 0.0,
+        });
+    }
     for (page_index, page) in paint.pages.iter().enumerate() {
       for item in &page.items {
         match item {

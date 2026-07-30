@@ -13,6 +13,7 @@ use ooxmlsdk::parts::{
 };
 use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_drawing_2008_diagram as dsp,
+  schemas_microsoft_com_office_drawing_2012_chart_style as cs,
   schemas_microsoft_com_office_drawing_2014_chartex as cx,
   schemas_openxmlformats_org_drawingml_2006_chart as c,
   schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
@@ -23,10 +24,17 @@ use ooxmlsdk::sdk::{RelatedPart, SdkPart, SdkType};
 pub(super) struct ImageCatalog {
   pub(super) by_relationship_id: HashMap<String, ImageResource>,
   pub(super) charts_by_relationship_id: HashMap<String, c::ChartSpace>,
-  pub(super) extended_charts_by_relationship_id: HashMap<String, cx::ChartSpace>,
+  pub(super) extended_charts_by_relationship_id: HashMap<String, ExtendedChartResource>,
   pub(super) diagram_colors_by_relationship_id: HashMap<String, dgm::ColorsDefinition>,
   pub(super) diagram_data_by_relationship_id: HashMap<String, dgm::DataModelRoot>,
   pub(super) diagram_drawings_by_relationship_id: HashMap<String, dsp::Drawing>,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct ExtendedChartResource {
+  pub(super) chart_space: cx::ChartSpace,
+  pub(super) chart_styles: Vec<cs::ChartStyle>,
+  pub(super) color_styles: Vec<cs::ColorStyle>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -100,68 +108,86 @@ pub(super) struct ImageResource {
 
 impl ImageCatalog {
   pub(super) fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Self {
-    let mut catalog = Self::from_image_parts(package, main.related_parts_of_type(package));
-    let chart_parts = main
+    Self::load_from_part(package, main)
+  }
+
+  pub(super) fn load_from_header(
+    package: &mut WordprocessingDocument,
+    header: &HeaderPart,
+  ) -> Self {
+    Self::load_from_part(package, header)
+  }
+
+  pub(super) fn load_from_footer(
+    package: &mut WordprocessingDocument,
+    footer: &FooterPart,
+  ) -> Self {
+    Self::load_from_part(package, footer)
+  }
+
+  pub(super) fn load_from_footnotes(
+    package: &mut WordprocessingDocument,
+    footnotes: &FootnotesPart,
+  ) -> Self {
+    Self::load_from_part(package, footnotes)
+  }
+
+  pub(super) fn load_from_endnotes(
+    package: &mut WordprocessingDocument,
+    endnotes: &EndnotesPart,
+  ) -> Self {
+    Self::load_from_part(package, endnotes)
+  }
+
+  pub(super) fn load_from_numbering(
+    package: &mut WordprocessingDocument,
+    numbering: &NumberingDefinitionsPart,
+  ) -> Self {
+    Self::load_from_part(package, numbering)
+  }
+
+  fn load_from_part<P>(package: &mut WordprocessingDocument, part: &P) -> Self
+  where
+    P: SdkPart,
+  {
+    let mut catalog = Self::from_image_parts(package, part.related_parts_of_type(package));
+
+    let chart_parts = part
       .related_parts_of_type::<_, ChartPart>(package)
-      .map(|part| (part.relationship_id().to_string(), part.into_part()))
+      .map(|related| (related.relationship_id().to_string(), related.into_part()))
       .collect::<Vec<_>>();
     let (charts, extended_charts) = Self::chart_parts(package, chart_parts);
     catalog.charts_by_relationship_id = charts;
     catalog.extended_charts_by_relationship_id = extended_charts;
-    let extended_chart_parts = main
+
+    let extended_chart_parts = part
       .related_parts_of_type::<_, ExtendedChartPart>(package)
-      .map(|part| (part.relationship_id().to_string(), part.into_part()))
+      .map(|related| (related.relationship_id().to_string(), related.into_part()))
       .collect::<Vec<_>>();
     catalog
       .extended_charts_by_relationship_id
       .extend(Self::extended_chart_parts(package, extended_chart_parts));
-    let diagram_color_parts = main
+
+    let diagram_color_parts = part
       .related_parts_of_type::<_, DiagramColorsPart>(package)
-      .map(|part| (part.relationship_id().to_string(), part.into_part()))
+      .map(|related| (related.relationship_id().to_string(), related.into_part()))
       .collect::<Vec<_>>();
     catalog.diagram_colors_by_relationship_id =
       Self::diagram_color_parts(package, diagram_color_parts);
-    let diagram_data_parts = main
+
+    let diagram_data_parts = part
       .related_parts_of_type::<_, DiagramDataPart>(package)
-      .map(|part| (part.relationship_id().to_string(), part.into_part()))
+      .map(|related| (related.relationship_id().to_string(), related.into_part()))
       .collect::<Vec<_>>();
     catalog.diagram_data_by_relationship_id = Self::diagram_data_parts(package, diagram_data_parts);
-    let diagram_drawing_parts = main
+
+    let diagram_drawing_parts = part
       .related_parts_of_type::<_, DiagramPersistLayoutPart>(package)
-      .map(|part| (part.relationship_id().to_string(), part.into_part()))
+      .map(|related| (related.relationship_id().to_string(), related.into_part()))
       .collect::<Vec<_>>();
     catalog.diagram_drawings_by_relationship_id =
       Self::diagram_drawing_parts(package, diagram_drawing_parts);
     catalog
-  }
-
-  pub(super) fn load_from_header(package: &WordprocessingDocument, header: &HeaderPart) -> Self {
-    Self::from_image_parts(package, header.related_parts_of_type(package))
-  }
-
-  pub(super) fn load_from_footer(package: &WordprocessingDocument, footer: &FooterPart) -> Self {
-    Self::from_image_parts(package, footer.related_parts_of_type(package))
-  }
-
-  pub(super) fn load_from_footnotes(
-    package: &WordprocessingDocument,
-    footnotes: &FootnotesPart,
-  ) -> Self {
-    Self::from_image_parts(package, footnotes.related_parts_of_type(package))
-  }
-
-  pub(super) fn load_from_endnotes(
-    package: &WordprocessingDocument,
-    endnotes: &EndnotesPart,
-  ) -> Self {
-    Self::from_image_parts(package, endnotes.related_parts_of_type(package))
-  }
-
-  pub(super) fn load_from_numbering(
-    package: &WordprocessingDocument,
-    numbering: &NumberingDefinitionsPart,
-  ) -> Self {
-    Self::from_image_parts(package, numbering.related_parts_of_type(package))
   }
 
   fn from_image_parts<'a>(
@@ -199,7 +225,7 @@ impl ImageCatalog {
     chart_parts: impl IntoIterator<Item = (String, ChartPart)> + 'a,
   ) -> (
     HashMap<String, c::ChartSpace>,
-    HashMap<String, cx::ChartSpace>,
+    HashMap<String, ExtendedChartResource>,
   ) {
     let mut classic_by_relationship_id = HashMap::new();
     let mut extended_by_relationship_id = HashMap::new();
@@ -212,7 +238,24 @@ impl ImageCatalog {
         // Some Office producers keep the legacy chart relationship/content
         // type while storing a ChartEx root. Resolve by the typed root after
         // package/MCE selection instead of falling back to the sibling chart.
-        extended_by_relationship_id.insert(relationship_id, chart_space);
+        let chart_style_parts: Vec<_> = chart_part.chart_style_parts(package).collect();
+        let chart_color_style_parts: Vec<_> = chart_part.chart_color_style_parts(package).collect();
+        let chart_styles = chart_style_parts
+          .iter()
+          .filter_map(|part| part.root_element(package).ok().cloned())
+          .collect();
+        let color_styles = chart_color_style_parts
+          .iter()
+          .filter_map(|part| part.root_element(package).ok().cloned())
+          .collect();
+        extended_by_relationship_id.insert(
+          relationship_id,
+          ExtendedChartResource {
+            chart_space,
+            chart_styles,
+            color_styles,
+          },
+        );
       }
     }
     (classic_by_relationship_id, extended_by_relationship_id)
@@ -221,13 +264,31 @@ impl ImageCatalog {
   fn extended_chart_parts<'a>(
     package: &mut WordprocessingDocument,
     chart_parts: impl IntoIterator<Item = (String, ExtendedChartPart)> + 'a,
-  ) -> HashMap<String, cx::ChartSpace> {
+  ) -> HashMap<String, ExtendedChartResource> {
     let mut by_relationship_id = HashMap::new();
     for (relationship_id, chart_part) in chart_parts {
       let Ok(chart_space) = chart_part.root_element(package) else {
         continue;
       };
-      by_relationship_id.insert(relationship_id, chart_space.clone());
+      let chart_space = chart_space.clone();
+      let chart_style_parts: Vec<_> = chart_part.chart_style_parts(package).collect();
+      let chart_color_style_parts: Vec<_> = chart_part.chart_color_style_parts(package).collect();
+      let chart_styles = chart_style_parts
+        .iter()
+        .filter_map(|part| part.root_element(package).ok().cloned())
+        .collect();
+      let color_styles = chart_color_style_parts
+        .iter()
+        .filter_map(|part| part.root_element(package).ok().cloned())
+        .collect();
+      by_relationship_id.insert(
+        relationship_id,
+        ExtendedChartResource {
+          chart_space,
+          chart_styles,
+          color_styles,
+        },
+      );
     }
     by_relationship_id
   }

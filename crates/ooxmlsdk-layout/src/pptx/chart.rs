@@ -3,14 +3,16 @@ use crate::model::{
   TextStyle, common_point, common_rect, common_rgb,
 };
 use crate::render::chart::{
-  ChartLegendPosition, ChartSeriesGrouping, ChartSeriesKind, ChartTitleText, ClusteredColumnChart,
-  PieChartModel, RadialChartKind, clustered_column_slot, date_axis_minor_tick_positions,
-  date_axis_ticks, linear_axis_scale,
+  Chart3DView, ChartLegendPosition, ChartSeriesGrouping, ChartSeriesKind, ChartTitleText,
+  ClusteredColumnChart, LinearAxisScaleOptions, PieChartModel, RadialChartKind, SurfaceChartGroup,
+  clustered_column_slot, date_axis_minor_tick_positions, date_axis_ticks, linear_axis_scale,
+  linear_axis_scale_with_options, value_axis_display_unit, value_axis_display_unit_label_text,
 };
 use crate::text_metrics::TextMetrics;
 use kurbo::BezPath;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+use std::{borrow::Cow, sync::Arc};
 
 use crate::render::chart_layout_profiles as profiles;
 
@@ -20,6 +22,9 @@ const TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
 // LibreOffice chart2 `AreaChart.cxx` passes a fixed 100 mm100 offset to
 // `createDataLabel` after moving a top label above the marker.
 const CARTESIAN_DATA_LABEL_OFFSET_PT: f32 = 72.0 / 25.4;
+// `BarChart.cxx` raises the corresponding offset to 260 mm100 for every
+// non-centered 3-D bar/column label so it clears the projected marker face.
+const BAR_3D_DATA_LABEL_OFFSET_PT: f32 = 2.6 * 72.0 / 25.4;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ChartFrame {
@@ -40,6 +45,7 @@ pub(crate) struct ClusteredColumnStyle {
   pub label: TextStyle,
   pub category_label: TextStyle,
   pub value_label: TextStyle,
+  pub series_label: TextStyle,
   pub data_label: TextStyle,
   pub data_label_styles: Vec<Vec<Option<TextStyle>>>,
   pub gridline_color: RgbColor,
@@ -49,6 +55,9 @@ pub(crate) struct ClusteredColumnStyle {
   pub category_minor_gridline: Option<(RgbColor, f32)>,
   pub series_colors: Vec<RgbColor>,
   pub series_point_colors: Vec<Vec<Option<RgbColor>>>,
+  /// Surface-chart value-band colors keyed by `c:bandFmt/c:idx`, one vector
+  /// per surface plot-area group.
+  pub surface_band_colors: Vec<Vec<(u32, RgbColor)>>,
   pub data_label_fill_colors: Vec<Vec<Option<RgbColor>>>,
   pub chart_area_fill_color: Option<RgbColor>,
   pub plot_area_fill_color: Option<RgbColor>,
@@ -70,6 +79,38 @@ fn radial_host_defaults(profile: ChartLayoutProfile) -> profiles::RadialHostDefa
     ChartLayoutProfile::PowerPoint => profiles::POWERPOINT_RADIAL_DEFAULTS,
     ChartLayoutProfile::Word => profiles::WORD_RADIAL_DEFAULTS,
     ChartLayoutProfile::Excel => profiles::EXCEL_RADIAL_DEFAULTS,
+  }
+}
+
+fn maximum_auto_main_increment_count(
+  profile: ChartLayoutProfile,
+  available_axis_length_pt: f32,
+  label_font_size_pt: f32,
+  has_bubble_series: bool,
+  is_3d: bool,
+) -> usize {
+  // LibreOffice VCartesianAxis::estimateMaximumAutoMainIncrementCount divides
+  // the final axis length by the maximum recorded label shape extent, then
+  // ScaleAutomatism clamps that result to 2..10. DrawingML chart label shapes
+  // include their internal leading/margins; 2 em reproduces that ordinary
+  // vertical extent. Bubble plots reserve an additional marker envelope.
+  match profile {
+    ChartLayoutProfile::Word => {
+      let label_extent = label_font_size_pt.max(1.0)
+        * if has_bubble_series {
+          3.0
+        } else if is_3d {
+          // A sloped 3-D axis uses the label shape's extent along the axis,
+          // not its axis-aligned two-em reservation.
+          1.8
+        } else {
+          2.0
+        };
+      (available_axis_length_pt / label_extent)
+        .floor()
+        .clamp(2.0, 10.0) as usize
+    }
+    ChartLayoutProfile::PowerPoint | ChartLayoutProfile::Excel => 10,
   }
 }
 
@@ -216,37 +257,17 @@ pub(crate) fn lower_clustered_column_chart(
   if category_count == 0 {
     return Vec::new();
   }
-  let scale_values = cartesian_scale_values(chart, category_count);
-  let percent_stacked = chart
-    .series
-    .iter()
-    .all(|series| series.grouping == ChartSeriesGrouping::PercentStacked);
-  let scale = if percent_stacked {
-    Some(crate::render::chart::LinearAxisScale {
-      minimum: chart
-        .value_axis
-        .and_then(|axis| axis.scaling.min_axis_value.as_ref())
-        .map_or(0.0, |value| value.val),
-      maximum: chart
-        .value_axis
-        .and_then(|axis| axis.scaling.max_axis_value.as_ref())
-        .map_or(1.0, |value| value.val),
-      major_unit: chart
-        .value_axis
-        .and_then(|axis| axis.major_unit.as_ref())
-        .map_or(0.1, |value| value.val),
-      logarithmic_base: None,
-      reversed: false,
-    })
-  } else {
-    linear_axis_scale(scale_values, chart.value_axis, 10)
-  };
-  let Some(scale) = scale else {
+  // LibreOffice ChartView performs an initial ten-increment autoscale before
+  // maximum label extents and the final inner plot rectangle are known.
+  // A second, size-dependent pass is performed after the plot is laid out.
+  let axis_scales = cartesian_axis_scales(chart, category_count, 10);
+  let Some(scale) = axis_scales.first().map(|axes| axes.y) else {
     return Vec::new();
   };
   if scale.maximum <= scale.minimum {
     return Vec::new();
   }
+  let percent_stacked = axis_set_is_percent_stacked(chart, 0);
 
   let mut metrics = TextMetrics::new();
   let title_text = match chart.title.as_ref() {
@@ -322,6 +343,7 @@ pub(crate) fn lower_clustered_column_chart(
     || (chart.title_overlay && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic)))
     || has_indexed_scatter_automatic_layout;
   let value_axis_visible = chart.value_axis.is_none_or(value_axis_is_visible);
+  let primary_value_axis_on_right = chart.value_axis.is_some_and(value_axis_is_on_right);
   let value_tick_labels_visible = value_axis_visible
     && !radar_only
     && !horizontal_bar_only
@@ -558,6 +580,17 @@ pub(crate) fn lower_clustered_column_chart(
     + frame.height_pt * excel_title_only_adjustment.category_top_ratio
     + frame.height_pt * excel_untitled_side_adjustment.category_top_ratio
     + frame.height_pt * excel_vary_colors_data_table_adjustment.category_top_ratio;
+  if has_bottom_legend
+    && !horizontal_bar_only
+    && chart.category_axis_title.is_some()
+    && chart.data_table.is_none()
+  {
+    // Office's automatic bottom stack is category labels, category-axis
+    // title, then legend. The title line and its two inter-band half-leading
+    // gaps must be removed from the plot/category budget; otherwise all three
+    // text objects overlap and PDF extraction merges independent lines.
+    category_top -= line_height(&style.label) * 2.25;
+  }
   if has_independent_axis_text_layout {
     // Excel's automatic plot reservation is slightly tighter when both axes
     // carry independent text bodies. Keep that authored-axis profile separate
@@ -650,6 +683,13 @@ pub(crate) fn lower_clustered_column_chart(
           profiles::DEFAULT_TOP_LEGEND_GAP_RATIO
         };
   }
+  if chart.view_3d.is_some() && has_bottom_legend {
+    // VDiagram preserves the projected scene aspect ratio inside the
+    // axis/legend rectangle. With a bottom legend that fit leaves one value
+    // label em above the scene; without it the 3-D back wall intrudes into an
+    // overlay title even though the title itself does not resize the plot.
+    plot_top += style.value_label.font_size_pt;
+  }
   let side_category_gap_ratio = match style.layout_profile {
     ChartLayoutProfile::Excel
       if has_side_legend && !has_layout_title && has_automatic_untitled_layout =>
@@ -724,12 +764,14 @@ pub(crate) fn lower_clustered_column_chart(
     .and_then(|axis| axis.numbering_format.as_ref())
     .map(|format| format.format_code.as_str())
     .or(percent_stacked.then_some("0%"));
+  let value_display_unit = chart.value_axis.map_or(1.0, value_axis_display_unit);
   let tick_labels = scale_tick_labels(
     scale.minimum,
     scale.maximum,
     scale.major_unit,
     value_number_format,
     scale.logarithmic_base,
+    value_display_unit,
   );
   let maximum_tick_width = if value_tick_labels_visible {
     tick_labels
@@ -739,8 +781,61 @@ pub(crate) fn lower_clustered_column_chart(
   } else {
     0.0
   };
+  let secondary_value_tick_sets = axis_scales
+    .iter()
+    .enumerate()
+    .skip(1)
+    .filter_map(|(axis_set_index, axes)| {
+      let axis = axis_set_value_axis(chart, axis_set_index)?;
+      if !value_axis_is_visible(axis)
+        || axis
+          .tick_label_position
+          .as_ref()
+          .is_some_and(|position| position.val == Some(c::TickLabelPositionValues::None))
+        || radar_only
+        || horizontal_bar_only
+      {
+        return None;
+      }
+      let format_code = axis
+        .numbering_format
+        .as_ref()
+        .map(|format| format.format_code.as_str())
+        .or_else(|| axis_set_is_percent_stacked(chart, axis_set_index).then_some("0%"));
+      let labels = scale_tick_labels(
+        axes.y.minimum,
+        axes.y.maximum,
+        axes.y.major_unit,
+        format_code,
+        axes.y.logarithmic_base,
+        value_axis_display_unit(axis),
+      );
+      let width = labels
+        .iter()
+        .map(|(_, label)| metrics.measure_text(label, &style.value_label))
+        .fold(0.0_f32, f32::max);
+      Some((
+        axis_set_index,
+        axis,
+        axes.y,
+        labels,
+        width,
+        value_axis_is_on_right(axis),
+      ))
+    })
+    .collect::<Vec<_>>();
+  let secondary_left_value_axis_band_width = secondary_value_tick_sets
+    .iter()
+    .filter(|(_, _, _, _, _, on_right)| !on_right)
+    .map(|(_, _, _, _, width, _)| *width + frame.height_pt * profiles::DEFAULT_TICK_GAP_RATIO)
+    .sum::<f32>();
+  let secondary_right_value_axis_band_width = secondary_value_tick_sets
+    .iter()
+    .filter(|(_, _, _, _, _, on_right)| *on_right)
+    .map(|(_, _, _, _, width, _)| *width + frame.height_pt * profiles::DEFAULT_TICK_GAP_RATIO)
+    .sum::<f32>();
   let side_legend_width = if has_side_legend {
-    vertical_legend_width(chart, style, &mut metrics)
+    vertical_legend_width(chart, style, scale, &mut metrics)
   } else {
     0.0
   };
@@ -866,7 +961,20 @@ pub(crate) fn lower_clustered_column_chart(
   } else {
     0.0
   };
-  let mut plot_left = tick_left + maximum_tick_width + tick_gap;
+  let primary_value_axis_band_width = maximum_tick_width + tick_gap;
+  let left_value_axis_band_width = secondary_left_value_axis_band_width
+    + if primary_value_axis_on_right {
+      0.0
+    } else {
+      primary_value_axis_band_width
+    };
+  let right_value_axis_band_width = secondary_right_value_axis_band_width
+    + if primary_value_axis_on_right {
+      primary_value_axis_band_width
+    } else {
+      0.0
+    };
+  let mut plot_left = tick_left + left_value_axis_band_width;
   let mut plot_right = frame.x_pt + frame.width_pt
     - if matches!(
       legend_position,
@@ -882,7 +990,8 @@ pub(crate) fn lower_clustered_column_chart(
         } else {
           profiles::DEFAULT_RIGHT_MARGIN_RATIO
         }
-    };
+    }
+    - right_value_axis_band_width;
   if style.layout_profile == ChartLayoutProfile::Excel
     && has_side_legend
     && has_layout_explicit_title
@@ -981,12 +1090,160 @@ pub(crate) fn lower_clustered_column_chart(
       // rectangle excluding axes and axis labels. Keep the automatic
       // label-to-axis gaps, but anchor those outer bands to the authored
       // inner rectangle instead of leaving them at the automatic plot.
-      tick_left = plot_left - maximum_tick_width - tick_gap;
+      if !primary_value_axis_on_right {
+        tick_left = plot_left - maximum_tick_width - tick_gap;
+      }
       category_top = plot_bottom + (category_top - automatic.top - automatic.height);
     }
   }
+  let mut projection_3d = None;
+  if let Some(view) = chart.view_3d {
+    let mut scene_plot = PlotRect {
+      left: plot_left,
+      top: plot_top,
+      width: plot_right - plot_left,
+      height: plot_bottom - plot_top,
+    };
+    if !horizontal_bar_only {
+      // LibreOffice VDiagram::adjustPosAndSize_3d fits the projected scene
+      // while preserving its aspect ratio, then centers that scene in the
+      // available rectangle. Axis text is the stable physical scale for the
+      // residual 2-D band around that scene.
+      let horizontal_inset = style.value_label.font_size_pt * 1.2;
+      let vertical_inset = style.value_label.font_size_pt * 0.25;
+      if scene_plot.width > horizontal_inset * 2.0 {
+        scene_plot.left += horizontal_inset;
+        scene_plot.width -= horizontal_inset * 2.0;
+      }
+      if scene_plot.height > vertical_inset * 2.0 {
+        scene_plot.top += vertical_inset;
+        scene_plot.height -= vertical_inset * 2.0;
+      }
+    }
+    plot_left = scene_plot.left;
+    plot_top = scene_plot.top;
+    plot_right = scene_plot.left + scene_plot.width;
+    plot_bottom = scene_plot.top + scene_plot.height;
+    projection_3d = Some(cartesian_3d_projection(view, scene_plot));
+  }
+  if plot_right <= plot_left || plot_bottom <= plot_top {
+    return Vec::new();
+  }
   let plot_width = plot_right - plot_left;
   let plot_height = plot_bottom - plot_top;
+  let (primary_value_axis_x, primary_value_axis_depth) = projection_3d.map_or(
+    (
+      if primary_value_axis_on_right {
+        plot_right
+      } else {
+        plot_left
+      },
+      0.0,
+    ),
+    |projection| {
+      projection.vertical_edge_for_visual_side(
+        PlotRect {
+          left: plot_left,
+          top: plot_top,
+          width: plot_width,
+          height: plot_height,
+        },
+        primary_value_axis_on_right,
+      )
+    },
+  );
+  let available_value_axis_length = projection_3d.map_or(plot_height, |projection| {
+    projection.vertical_axis_length(
+      PlotRect {
+        left: plot_left,
+        top: plot_top,
+        width: plot_width,
+        height: plot_height,
+      },
+      primary_value_axis_on_right,
+    )
+  });
+  let maximum_auto_increment_count = maximum_auto_main_increment_count(
+    style.layout_profile,
+    available_value_axis_length,
+    style.value_label.font_size_pt,
+    chart
+      .series
+      .iter()
+      .any(|series| series.kind == ChartSeriesKind::Bubble),
+    projection_3d.is_some(),
+  );
+  let axis_scales = cartesian_axis_scales(chart, category_count, maximum_auto_increment_count);
+  let Some(scale) = axis_scales.first().map(|axes| axes.y) else {
+    return Vec::new();
+  };
+  if scale.maximum <= scale.minimum {
+    return Vec::new();
+  }
+  let tick_labels = scale_tick_labels(
+    scale.minimum,
+    scale.maximum,
+    scale.major_unit,
+    value_number_format,
+    scale.logarithmic_base,
+    value_display_unit,
+  );
+  let secondary_value_tick_sets = axis_scales
+    .iter()
+    .enumerate()
+    .skip(1)
+    .filter_map(|(axis_set_index, axes)| {
+      let axis = axis_set_value_axis(chart, axis_set_index)?;
+      if !value_axis_is_visible(axis)
+        || axis
+          .tick_label_position
+          .as_ref()
+          .is_some_and(|position| position.val == Some(c::TickLabelPositionValues::None))
+        || radar_only
+        || horizontal_bar_only
+      {
+        return None;
+      }
+      let format_code = axis
+        .numbering_format
+        .as_ref()
+        .map(|format| format.format_code.as_str())
+        .or_else(|| axis_set_is_percent_stacked(chart, axis_set_index).then_some("0%"));
+      let labels = scale_tick_labels(
+        axes.y.minimum,
+        axes.y.maximum,
+        axes.y.major_unit,
+        format_code,
+        axes.y.logarithmic_base,
+        value_axis_display_unit(axis),
+      );
+      let width = labels
+        .iter()
+        .map(|(_, label)| metrics.measure_text(label, &style.value_label))
+        .fold(0.0_f32, f32::max);
+      Some((
+        axis_set_index,
+        axis,
+        axes.y,
+        labels,
+        width,
+        value_axis_is_on_right(axis),
+      ))
+    })
+    .collect::<Vec<_>>();
+  let painted_category_top = if horizontal_bar_only && chart.data_table.is_some() {
+    projection_3d.map_or(category_top, |projection| {
+      // A horizontal bar chart swaps the category/value coordinate system.
+      // In a 3-D scene Office anchors the bottom value axis and its data
+      // table to the projected back edge, not to the unprojected front
+      // rectangle. Preserve the automatic 2-D gap between plot and table
+      // after moving that edge through the authored view3D transform.
+      let (_, projected_bottom) = projection.project(plot_left, plot_bottom, 1.0);
+      projected_bottom + (category_top - plot_bottom)
+    })
+  } else {
+    category_top
+  };
   let axis_line_width = style.axis_line_width_pt.unwrap_or({
     (match style.layout_profile {
       ChartLayoutProfile::Word | ChartLayoutProfile::Excel => 1.0,
@@ -1044,30 +1301,44 @@ pub(crate) fn lower_clustered_column_chart(
         .unwrap_or(0.75 * style.stroke_scale),
     );
   }
-  if let Some(fill_color) = style.plot_area_fill_color {
-    items.push(PageItem::Rect(RectItem {
-      x_pt: plot_left,
-      y_pt: plot_top,
-      width_pt: plot_width,
-      height_pt: plot_height,
-      fill_color: Some(fill_color),
-      fill_opacity: 1.0,
-      stroke: None,
-      stroke_opacity: 1.0,
-    }));
-  }
-  if let Some(color) = style.plot_area_stroke_color {
-    push_chart_rect_outline(
+  if let Some(projection) = projection_3d {
+    lower_cartesian_3d_walls(
       &mut items,
-      plot_left,
-      plot_top,
-      plot_width,
-      plot_height,
-      color,
-      style
-        .plot_area_stroke_width_pt
-        .unwrap_or(0.75 * style.stroke_scale),
+      PlotRect {
+        left: plot_left,
+        top: plot_top,
+        width: plot_width,
+        height: plot_height,
+      },
+      projection,
+      style,
     );
+  } else {
+    if let Some(fill_color) = style.plot_area_fill_color {
+      items.push(PageItem::Rect(RectItem {
+        x_pt: plot_left,
+        y_pt: plot_top,
+        width_pt: plot_width,
+        height_pt: plot_height,
+        fill_color: Some(fill_color),
+        fill_opacity: 1.0,
+        stroke: None,
+        stroke_opacity: 1.0,
+      }));
+    }
+    if let Some(color) = style.plot_area_stroke_color {
+      push_chart_rect_outline(
+        &mut items,
+        plot_left,
+        plot_top,
+        plot_width,
+        plot_height,
+        color,
+        style
+          .plot_area_stroke_width_pt
+          .unwrap_or(0.75 * style.stroke_scale),
+      );
+    }
   }
   if value_gridlines_visible {
     for (value, _) in &tick_labels {
@@ -1075,15 +1346,70 @@ pub(crate) fn lower_clustered_column_chart(
         continue;
       }
       let y = value_y(*value, scale, plot_top, plot_height);
-      items.push(PageItem::Line(LineItem {
-        x1_pt: plot_left,
-        y1_pt: y,
-        x2_pt: plot_right,
-        y2_pt: y,
-        width_pt: value_gridline_width,
-        color: style.gridline_color,
-        kind: LineItemKind::Stroke,
-      }));
+      if let Some(projection) = projection_3d {
+        let (front_x, front_y) = projection.project(plot_left, y, 0.0);
+        let (back_left_x, back_left_y) = projection.project(plot_left, y, 1.0);
+        let (back_right_x, back_right_y) = projection.project(plot_right, y, 1.0);
+        items.push(PageItem::Line(LineItem {
+          x1_pt: back_left_x,
+          y1_pt: back_left_y,
+          x2_pt: back_right_x,
+          y2_pt: back_right_y,
+          width_pt: value_gridline_width,
+          color: style.gridline_color,
+          kind: LineItemKind::Stroke,
+        }));
+        items.push(PageItem::Line(LineItem {
+          x1_pt: front_x,
+          y1_pt: front_y,
+          x2_pt: back_left_x,
+          y2_pt: back_left_y,
+          width_pt: value_gridline_width,
+          color: style.gridline_color,
+          kind: LineItemKind::Stroke,
+        }));
+      } else {
+        items.push(PageItem::Line(LineItem {
+          x1_pt: plot_left,
+          y1_pt: y,
+          x2_pt: plot_right,
+          y2_pt: y,
+          width_pt: value_gridline_width,
+          color: style.gridline_color,
+          kind: LineItemKind::Stroke,
+        }));
+      }
+    }
+  }
+  for (_, axis, secondary_scale, labels, _, _) in &secondary_value_tick_sets {
+    if axis.major_gridlines.is_none() {
+      continue;
+    }
+    for (value, _) in labels {
+      let y = value_y(*value, *secondary_scale, plot_top, plot_height);
+      if let Some(projection) = projection_3d {
+        let (back_left_x, back_left_y) = projection.project(plot_left, y, 1.0);
+        let (back_right_x, back_right_y) = projection.project(plot_right, y, 1.0);
+        items.push(PageItem::Line(LineItem {
+          x1_pt: back_left_x,
+          y1_pt: back_left_y,
+          x2_pt: back_right_x,
+          y2_pt: back_right_y,
+          width_pt: value_gridline_width,
+          color: style.gridline_color,
+          kind: LineItemKind::Stroke,
+        }));
+      } else {
+        items.push(PageItem::Line(LineItem {
+          x1_pt: plot_left,
+          y1_pt: y,
+          x2_pt: plot_right,
+          y2_pt: y,
+          width_pt: value_gridline_width,
+          color: style.gridline_color,
+          kind: LineItemKind::Stroke,
+        }));
+      }
     }
   }
   if let Some(ticks) = date_ticks.as_ref() {
@@ -1142,14 +1468,19 @@ pub(crate) fn lower_clustered_column_chart(
     lower_horizontal_bar_axes(
       &mut items,
       chart,
-      PlotRect {
-        left: plot_left,
-        top: plot_top,
-        width: plot_width,
-        height: plot_height,
-      },
       &tick_labels,
-      scale,
+      HorizontalAxisGeometry {
+        plot: PlotRect {
+          left: plot_left,
+          top: plot_top,
+          width: plot_width,
+          height: plot_height,
+        },
+        scale,
+        projection_3d,
+        draw_gridlines: true,
+        draw_labels: false,
+      },
       style,
       &mut metrics,
     );
@@ -1167,6 +1498,7 @@ pub(crate) fn lower_clustered_column_chart(
       &mut metrics,
       true,
       false,
+      maximum_auto_increment_count,
     );
   }
 
@@ -1180,10 +1512,25 @@ pub(crate) fn lower_clustered_column_chart(
       width: plot_width,
       height: plot_height,
     },
-    scale,
-    zero_y,
+    &axis_scales,
     category_count,
+    projection_3d,
   );
+  if let Some(projection) = projection_3d {
+    lower_series_axes(
+      &mut items,
+      chart,
+      PlotRect {
+        left: plot_left,
+        top: plot_top,
+        width: plot_width,
+        height: plot_height,
+      },
+      projection,
+      style,
+      &mut metrics,
+    );
+  }
   if chart.has_high_low_lines || chart.has_up_down_bars {
     lower_stock_overlays(
       &mut items,
@@ -1201,11 +1548,18 @@ pub(crate) fn lower_clustered_column_chart(
   }
 
   if category_axis_visible && !radar_only && !horizontal_bar_only {
+    let (axis_start, axis_end) =
+      projection_3d.map_or(((plot_left, zero_y), (plot_right, zero_y)), |projection| {
+        (
+          projection.project(plot_left, zero_y, 0.0),
+          projection.project(plot_right, zero_y, 0.0),
+        )
+      });
     items.push(PageItem::Line(LineItem {
-      x1_pt: plot_left,
-      y1_pt: zero_y,
-      x2_pt: plot_right,
-      y2_pt: zero_y,
+      x1_pt: axis_start.0,
+      y1_pt: axis_start.1,
+      x2_pt: axis_end.0,
+      y2_pt: axis_end.1,
       width_pt: axis_line_width,
       color: style.gridline_color,
       kind: LineItemKind::Stroke,
@@ -1214,11 +1568,18 @@ pub(crate) fn lower_clustered_column_chart(
   if style.layout_profile == ChartLayoutProfile::Word {
     let tick_length = frame.height_pt * 0.012_59;
     if value_axis_visible {
+      let axis_x = primary_value_axis_x;
+      let axis_top = projection_3d.map_or((axis_x, plot_top), |projection| {
+        projection.project(axis_x, plot_top, primary_value_axis_depth)
+      });
+      let axis_zero = projection_3d.map_or((axis_x, zero_y), |projection| {
+        projection.project(axis_x, zero_y, primary_value_axis_depth)
+      });
       items.push(PageItem::Line(LineItem {
-        x1_pt: plot_left,
-        y1_pt: plot_top,
-        x2_pt: plot_left,
-        y2_pt: zero_y,
+        x1_pt: axis_top.0,
+        y1_pt: axis_top.1,
+        x2_pt: axis_zero.0,
+        y2_pt: axis_zero.1,
         width_pt: axis_line_width,
         color: style.gridline_color,
         kind: LineItemKind::Stroke,
@@ -1226,11 +1587,22 @@ pub(crate) fn lower_clustered_column_chart(
       if chart.value_axis.is_none_or(value_axis_has_major_ticks) {
         for (value, _) in &tick_labels {
           let y = value_y(*value, scale, plot_top, plot_height);
+          let point = projection_3d.map_or((axis_x, y), |projection| {
+            projection.project(axis_x, y, primary_value_axis_depth)
+          });
           items.push(PageItem::Line(LineItem {
-            x1_pt: plot_left - tick_length,
-            y1_pt: y,
-            x2_pt: plot_left,
-            y2_pt: y,
+            x1_pt: if primary_value_axis_on_right {
+              point.0
+            } else {
+              point.0 - tick_length
+            },
+            y1_pt: point.1,
+            x2_pt: if primary_value_axis_on_right {
+              point.0 + tick_length
+            } else {
+              point.0
+            },
+            y2_pt: point.1,
             width_pt: axis_line_width,
             color: style.gridline_color,
             kind: LineItemKind::Stroke,
@@ -1260,11 +1632,13 @@ pub(crate) fn lower_clustered_column_chart(
           position
         };
         let x = plot_left + position as f32 * plot_width;
+        let point =
+          projection_3d.map_or((x, zero_y), |projection| projection.project(x, zero_y, 0.0));
         items.push(PageItem::Line(LineItem {
-          x1_pt: x,
-          y1_pt: zero_y,
-          x2_pt: x,
-          y2_pt: zero_y + tick_length,
+          x1_pt: point.0,
+          y1_pt: point.1,
+          x2_pt: point.0,
+          y2_pt: point.1 + tick_length,
           width_pt: axis_line_width,
           color: style.gridline_color,
           kind: LineItemKind::Stroke,
@@ -1272,7 +1646,64 @@ pub(crate) fn lower_clustered_column_chart(
       }
     }
   }
+  let secondary_tick_gap = frame.height_pt * profiles::DEFAULT_TICK_GAP_RATIO;
+  let mut left_axis_offset = if !primary_value_axis_on_right && value_tick_labels_visible {
+    primary_value_axis_band_width
+  } else {
+    0.0
+  };
+  let mut right_axis_offset = if primary_value_axis_on_right && value_tick_labels_visible {
+    primary_value_axis_band_width
+  } else {
+    0.0
+  };
+  for (_, axis, secondary_scale, labels, width, on_right) in &secondary_value_tick_sets {
+    let axis_x = if *on_right {
+      plot_right + right_axis_offset
+    } else {
+      plot_left - left_axis_offset
+    };
+    items.push(PageItem::Line(LineItem {
+      x1_pt: axis_x,
+      y1_pt: plot_top,
+      x2_pt: axis_x,
+      y2_pt: plot_bottom,
+      width_pt: axis_line_width,
+      color: style.gridline_color,
+      kind: LineItemKind::Stroke,
+    }));
+    if value_axis_has_major_ticks(axis) {
+      let tick_length = frame.height_pt * 0.012_59;
+      for (value, _) in labels {
+        let y = value_y(*value, *secondary_scale, plot_top, plot_height);
+        items.push(PageItem::Line(LineItem {
+          x1_pt: if *on_right {
+            axis_x
+          } else {
+            axis_x - tick_length
+          },
+          y1_pt: y,
+          x2_pt: if *on_right {
+            axis_x + tick_length
+          } else {
+            axis_x
+          },
+          y2_pt: y,
+          width_pt: axis_line_width,
+          color: style.gridline_color,
+          kind: LineItemKind::Stroke,
+        }));
+      }
+    }
+    if *on_right {
+      right_axis_offset += *width + secondary_tick_gap;
+    } else {
+      left_axis_offset += *width + secondary_tick_gap;
+    }
+  }
 
+  let defer_data_labels = !scatter_only && !horizontal_bar_only && !radar_only;
+  let mut deferred_data_label_items = Vec::new();
   for (series_index, series) in chart.series.iter().enumerate() {
     for (label_index, label) in series.data_labels.iter().enumerate() {
       let data_label_style = style
@@ -1282,6 +1713,15 @@ pub(crate) fn lower_clustered_column_chart(
         .and_then(Option::as_ref)
         .unwrap_or(&style.data_label);
       let data_label_line_height = line_height(data_label_style);
+      let axes = axis_scales
+        .get(series.axis_set_index)
+        .unwrap_or(&axis_scales[0]);
+      let series_zero_y = value_y(
+        0.0_f64.clamp(axes.y.minimum, axes.y.maximum),
+        axes.y,
+        plot_top,
+        plot_height,
+      );
       let Some(anchor) = data_label_anchor(
         chart,
         series_index,
@@ -1292,12 +1732,25 @@ pub(crate) fn lower_clustered_column_chart(
           width: plot_width,
           height: plot_height,
         },
-        scale,
-        zero_y,
+        *axes,
+        series_zero_y,
         category_count,
       ) else {
         continue;
       };
+      let three_dimensional_label_offset =
+        if series.is_3d && label.position != c::DataLabelPositionValues::Center {
+          BAR_3D_DATA_LABEL_OFFSET_PT
+        } else {
+          0.0
+        };
+      let anchor = project_3d_data_label_category_coordinate(
+        chart,
+        series_index,
+        label.position,
+        anchor,
+        projection_3d,
+      );
       let width = metrics.measure_text(&label.text, data_label_style);
       let (x, y) = match label.position {
         c::DataLabelPositionValues::Center => (
@@ -1333,6 +1786,7 @@ pub(crate) fn lower_clustered_column_chart(
           anchor.x - width * 0.5,
           anchor.y
             - data_label_line_height
+            - three_dimensional_label_offset
             - if has_derived_single_series_side_title_layout {
               frame.height_pt * 0.020_82
             } else {
@@ -1349,7 +1803,7 @@ pub(crate) fn lower_clustered_column_chart(
               .unwrap_or(0.0)
               + CARTESIAN_DATA_LABEL_OFFSET_PT
           } else {
-            0.0
+            three_dimensional_label_offset
           };
           (
             anchor.x - width * 0.5,
@@ -1366,7 +1820,12 @@ pub(crate) fn lower_clustered_column_chart(
       {
         let horizontal_padding = data_label_style.font_size_pt * 0.25;
         let vertical_padding = data_label_style.font_size_pt * 0.26;
-        items.push(PageItem::Rect(RectItem {
+        let target = if defer_data_labels {
+          &mut deferred_data_label_items
+        } else {
+          &mut items
+        };
+        target.push(PageItem::Rect(RectItem {
           x_pt: x - horizontal_padding,
           y_pt: y - vertical_padding,
           width_pt: width + horizontal_padding * 2.0,
@@ -1377,8 +1836,37 @@ pub(crate) fn lower_clustered_column_chart(
           stroke_opacity: 1.0,
         }));
       }
-      push_data_label_text_components(&mut items, &mut metrics, x, y, label, data_label_style);
+      let target = if defer_data_labels {
+        &mut deferred_data_label_items
+      } else {
+        &mut items
+      };
+      push_data_label_text_components(target, &mut metrics, x, y, label, data_label_style);
     }
+  }
+  if horizontal_bar_only {
+    // Horizontal bar data labels are part of the series stream. Office emits
+    // the projected value/category axis text after those labels, while the
+    // grid geometry remains behind the series.
+    lower_horizontal_bar_axes(
+      &mut items,
+      chart,
+      &tick_labels,
+      HorizontalAxisGeometry {
+        plot: PlotRect {
+          left: plot_left,
+          top: plot_top,
+          width: plot_width,
+          height: plot_height,
+        },
+        scale,
+        projection_3d,
+        draw_gridlines: false,
+        draw_labels: true,
+      },
+      style,
+      &mut metrics,
+    );
   }
 
   // Ordinary Office chart streams emit value ticks before categories and
@@ -1389,17 +1877,64 @@ pub(crate) fn lower_clustered_column_chart(
       &mut items,
       &tick_labels,
       ValueTickLabelContext {
-        tick_left,
-        maximum_tick_width,
+        axis_x: primary_value_axis_x,
+        labels_on_right: primary_value_axis_on_right,
+        label_gap: tick_gap
+          + if primary_value_axis_on_right {
+            frame.height_pt * 0.012_59
+          } else {
+            0.0
+          },
         scale,
         plot_top,
         plot_height,
+        axis_depth: primary_value_axis_depth,
         value_label_line_height,
         tick_top_offset: frame.height_pt * excel_title_only_adjustment.tick_top_ratio,
+        projection_3d,
       },
       style,
       &mut metrics,
     );
+  }
+  if chart.data_table.is_none() {
+    let secondary_tick_label_offset = secondary_tick_gap + frame.height_pt * 0.012_59;
+    let mut left_axis_offset = if !primary_value_axis_on_right && value_tick_labels_visible {
+      primary_value_axis_band_width
+    } else {
+      0.0
+    };
+    let mut right_axis_offset = if primary_value_axis_on_right && value_tick_labels_visible {
+      primary_value_axis_band_width
+    } else {
+      0.0
+    };
+    for (_, _, secondary_scale, labels, width, on_right) in &secondary_value_tick_sets {
+      let axis_x = if *on_right {
+        plot_right + right_axis_offset
+      } else {
+        plot_left - left_axis_offset
+      };
+      for (value, label) in labels {
+        let label_width = metrics.measure_text(label, &style.value_label);
+        push_text(
+          &mut items,
+          if *on_right {
+            axis_x + secondary_tick_label_offset
+          } else {
+            axis_x - secondary_tick_label_offset - label_width
+          },
+          value_y(*value, *secondary_scale, plot_top, plot_height) - value_label_line_height / 2.0,
+          label.clone(),
+          style.value_label.clone(),
+        );
+      }
+      if *on_right {
+        right_axis_offset += *width + secondary_tick_gap;
+      } else {
+        left_axis_offset += *width + secondary_tick_gap;
+      }
+    }
   }
   if scatter_only {
     // Excel emits scatter data labels first, followed by value-axis labels
@@ -1419,7 +1954,37 @@ pub(crate) fn lower_clustered_column_chart(
       &mut metrics,
       false,
       true,
+      maximum_auto_increment_count,
     );
+  }
+  let mut painted_category_label_style = style.category_label.clone();
+  if category_tick_labels_visible && let Some(projection) = projection_3d {
+    painted_category_label_style.rotation_deg = chart_3d_category_label_rotation(
+      chart,
+      &category_label_lines,
+      PlotRect {
+        left: plot_left,
+        top: plot_top,
+        width: plot_width,
+        height: plot_height,
+      },
+      zero_y,
+      projection,
+      &style.category_label,
+      &mut metrics,
+    );
+    if painted_category_label_style.rotation_deg.abs() > f32::EPSILON {
+      // Word's fixed-format writer emits automatically rotated 3-D tick
+      // labels as vector glyph outlines (the visible dates in chart-Area are
+      // absent from the PDF text layer). Keep them visible without inventing
+      // a searchable semantic overlay.
+      painted_category_label_style.pdf_glyph_outlines = true;
+      painted_category_label_style.pdf_glyph_outline_options =
+        Some(Arc::new(crate::common::PdfGlyphOutlineOptions {
+          semantic_text_overlay: false,
+          ..crate::common::PdfGlyphOutlineOptions::default()
+        }));
+    }
   }
   if category_tick_labels_visible {
     for (category_index, lines) in category_label_lines.iter().enumerate() {
@@ -1445,12 +2010,128 @@ pub(crate) fn lower_clustered_column_chart(
         )
       };
       for (line_index, line) in lines.iter().enumerate() {
-        let width = metrics.measure_text(line, &style.category_label);
-        let x = center - width / 2.0;
-        let y = category_top + line_index as f32 * category_label_line_height;
-        push_text(&mut items, x, y, line.clone(), style.category_label.clone());
+        let width = metrics.measure_text(line, &painted_category_label_style);
+        let (x, y) = projection_3d.map_or(
+          (
+            center - width / 2.0,
+            category_top + line_index as f32 * category_label_line_height,
+          ),
+          |projection| {
+            let point = projection.project(center, zero_y, 0.0);
+            let label_gap = painted_category_label_style.font_size_pt * 0.45;
+            if painted_category_label_style.rotation_deg.abs() > f32::EPSILON {
+              (
+                point.0 - painted_category_label_style.font_size_pt * 0.15,
+                point.1 + label_gap + line_index as f32 * category_label_line_height,
+              )
+            } else {
+              (
+                point.0 - width / 2.0,
+                point.1 + label_gap + line_index as f32 * category_label_line_height,
+              )
+            }
+          },
+        );
+        push_text(
+          &mut items,
+          x,
+          y,
+          line.clone(),
+          painted_category_label_style.clone(),
+        );
       }
     }
+  }
+  items.append(&mut deferred_data_label_items);
+  if let Some(axis) = chart.value_axis
+    && let Some(label) = value_axis_display_unit_label_text(axis, chart.ui_language.as_deref())
+  {
+    let mut unit_style = style.value_label.clone();
+    // LibreOffice's source-backed OBJECTTYPE_AXISUNIT uses the same automatic
+    // text role as an axis title (ObjectFormatter::spAxisTitleTexts), whose
+    // default is bold. Office fixed output likewise strokes the synthesized
+    // CJK face for an otherwise empty c:dispUnitsLbl.
+    unit_style.bold = true;
+    unit_style.rotation_deg = -90.0;
+    push_text(
+      &mut items,
+      if primary_value_axis_on_right {
+        plot_right + tick_gap + unit_style.font_size_pt
+      } else {
+        plot_left - tick_gap - unit_style.font_size_pt
+      },
+      value_y(
+        (scale.maximum - scale.major_unit).max(scale.minimum),
+        scale,
+        plot_top,
+        plot_height,
+      ) - value_label_line_height / 2.0,
+      label,
+      unit_style,
+    );
+  }
+  let mut left_axis_offset = if !primary_value_axis_on_right && value_tick_labels_visible {
+    primary_value_axis_band_width
+  } else {
+    0.0
+  };
+  let mut right_axis_offset = if primary_value_axis_on_right && value_tick_labels_visible {
+    primary_value_axis_band_width
+  } else {
+    0.0
+  };
+  for (_, axis, secondary_scale, _, width, on_right) in &secondary_value_tick_sets {
+    let axis_x = if *on_right {
+      plot_right + right_axis_offset
+    } else {
+      plot_left - left_axis_offset
+    };
+    if let Some(label) = value_axis_display_unit_label_text(axis, chart.ui_language.as_deref()) {
+      let mut unit_style = style.value_label.clone();
+      unit_style.bold = true;
+      unit_style.rotation_deg = -90.0;
+      push_text(
+        &mut items,
+        if *on_right {
+          axis_x + secondary_tick_gap + unit_style.font_size_pt
+        } else {
+          axis_x - secondary_tick_gap - unit_style.font_size_pt
+        },
+        value_y(
+          (secondary_scale.maximum - secondary_scale.major_unit).max(secondary_scale.minimum),
+          *secondary_scale,
+          plot_top,
+          plot_height,
+        ) - value_label_line_height / 2.0,
+        label,
+        unit_style,
+      );
+    }
+    if *on_right {
+      right_axis_offset += *width + secondary_tick_gap;
+    } else {
+      left_axis_offset += *width + secondary_tick_gap;
+    }
+  }
+  if chart.data_table.is_some() {
+    lower_axis_titles(
+      &mut items,
+      AxisTitleGeometry {
+        frame,
+        plot: PlotRect {
+          left: plot_left,
+          top: plot_top,
+          width: plot_width,
+          height: plot_height,
+        },
+        category_band_top: painted_category_top,
+        data_table_height,
+        projection_3d,
+      },
+      chart,
+      style,
+      &mut metrics,
+    );
   }
   if let Some(data_table) = chart.data_table {
     lower_data_table(
@@ -1459,7 +2140,7 @@ pub(crate) fn lower_clustered_column_chart(
       data_table,
       PlotRect {
         left: plot_left,
-        top: category_top,
+        top: painted_category_top,
         width: plot_width,
         height: data_table_height,
       },
@@ -1471,33 +2152,84 @@ pub(crate) fn lower_clustered_column_chart(
         &mut items,
         &tick_labels,
         ValueTickLabelContext {
-          tick_left,
-          maximum_tick_width,
+          axis_x: primary_value_axis_x,
+          labels_on_right: primary_value_axis_on_right,
+          label_gap: tick_gap
+            + if primary_value_axis_on_right {
+              frame.height_pt * 0.012_59
+            } else {
+              0.0
+            },
           scale,
           plot_top,
           plot_height,
+          axis_depth: primary_value_axis_depth,
           value_label_line_height,
           tick_top_offset: frame.height_pt * excel_title_only_adjustment.tick_top_ratio,
+          projection_3d,
         },
         style,
         &mut metrics,
       );
     }
+    let secondary_tick_label_offset = secondary_tick_gap + frame.height_pt * 0.012_59;
+    let mut left_axis_offset = if !primary_value_axis_on_right && value_tick_labels_visible {
+      primary_value_axis_band_width
+    } else {
+      0.0
+    };
+    let mut right_axis_offset = if primary_value_axis_on_right && value_tick_labels_visible {
+      primary_value_axis_band_width
+    } else {
+      0.0
+    };
+    for (_, _, secondary_scale, labels, width, on_right) in &secondary_value_tick_sets {
+      let axis_x = if *on_right {
+        plot_right + right_axis_offset
+      } else {
+        plot_left - left_axis_offset
+      };
+      for (value, label) in labels {
+        let label_width = metrics.measure_text(label, &style.value_label);
+        push_text(
+          &mut items,
+          if *on_right {
+            axis_x + secondary_tick_label_offset
+          } else {
+            axis_x - secondary_tick_label_offset - label_width
+          },
+          value_y(*value, *secondary_scale, plot_top, plot_height) - value_label_line_height / 2.0,
+          label.clone(),
+          style.value_label.clone(),
+        );
+      }
+      if *on_right {
+        right_axis_offset += *width + secondary_tick_gap;
+      } else {
+        left_axis_offset += *width + secondary_tick_gap;
+      }
+    }
   }
-  lower_axis_titles(
-    &mut items,
-    frame,
-    PlotRect {
-      left: plot_left,
-      top: plot_top,
-      width: plot_width,
-      height: plot_height,
-    },
-    category_top,
-    chart,
-    style,
-    &mut metrics,
-  );
+  if chart.data_table.is_none() {
+    lower_axis_titles(
+      &mut items,
+      AxisTitleGeometry {
+        frame,
+        plot: PlotRect {
+          left: plot_left,
+          top: plot_top,
+          width: plot_width,
+          height: plot_height,
+        },
+        category_band_top: painted_category_top,
+        data_table_height,
+        projection_3d,
+      },
+      chart,
+      style,
+      &mut metrics,
+    );
+  }
   if let Some(title) = title_text {
     let painted_title_top = title_top
       + if style.layout_profile == ChartLayoutProfile::Excel
@@ -1544,7 +2276,7 @@ pub(crate) fn lower_clustered_column_chart(
     );
   }
   if let Some(layout) = chart.legend_layout {
-    lower_manual_legend(&mut items, frame, layout, chart, style);
+    lower_manual_legend(&mut items, frame, layout, chart, style, scale);
   } else {
     match legend_position {
       Some(ChartLegendPosition::Bottom) => lower_horizontal_legend(
@@ -1554,6 +2286,7 @@ pub(crate) fn lower_clustered_column_chart(
         legend_top,
         chart,
         style,
+        scale,
         &mut metrics,
       ),
       Some(ChartLegendPosition::Top) => lower_horizontal_legend(
@@ -1569,6 +2302,7 @@ pub(crate) fn lower_clustered_column_chart(
         },
         chart,
         style,
+        scale,
         &mut metrics,
       ),
       Some(ChartLegendPosition::Left) => lower_vertical_legend(
@@ -1578,6 +2312,7 @@ pub(crate) fn lower_clustered_column_chart(
         false,
         chart,
         style,
+        scale,
       ),
       Some(ChartLegendPosition::Right | ChartLegendPosition::TopRight) => lower_vertical_legend(
         &mut items,
@@ -1600,6 +2335,7 @@ pub(crate) fn lower_clustered_column_chart(
         legend_position == Some(ChartLegendPosition::TopRight),
         chart,
         style,
+        scale,
       ),
       None => {}
     }
@@ -1609,13 +2345,16 @@ pub(crate) fn lower_clustered_column_chart(
 
 #[derive(Clone, Copy)]
 struct ValueTickLabelContext {
-  tick_left: f32,
-  maximum_tick_width: f32,
+  axis_x: f32,
+  labels_on_right: bool,
+  label_gap: f32,
   scale: crate::render::chart::LinearAxisScale,
   plot_top: f32,
   plot_height: f32,
+  axis_depth: f32,
   value_label_line_height: f32,
   tick_top_offset: f32,
+  projection_3d: Option<Chart3DProjection>,
 }
 
 fn lower_cartesian_value_tick_labels(
@@ -1627,15 +2366,167 @@ fn lower_cartesian_value_tick_labels(
 ) {
   for (value, label) in tick_labels {
     let width = metrics.measure_text(label, &style.value_label);
+    let model_y = value_y(*value, context.scale, context.plot_top, context.plot_height);
+    let (axis_x, axis_y) = context
+      .projection_3d
+      .map_or((context.axis_x, model_y), |projection| {
+        projection.project(context.axis_x, model_y, context.axis_depth)
+      });
     push_text(
       items,
-      context.tick_left + context.maximum_tick_width - width,
-      value_y(*value, context.scale, context.plot_top, context.plot_height)
-        - context.value_label_line_height / 2.0
-        + context.tick_top_offset,
+      if context.labels_on_right {
+        axis_x + context.label_gap
+      } else {
+        axis_x - context.label_gap - width
+      },
+      axis_y - context.value_label_line_height / 2.0 + context.tick_top_offset,
       label.clone(),
       style.value_label.clone(),
     );
+  }
+}
+
+fn lower_cartesian_3d_walls(
+  items: &mut Vec<PageItem>,
+  plot: PlotRect,
+  projection: Chart3DProjection,
+  style: &ClusteredColumnStyle,
+) {
+  let front_top_left = projection.project(plot.left, plot.top, 0.0);
+  let front_top_right = projection.project(plot.left + plot.width, plot.top, 0.0);
+  let front_bottom_left = projection.project(plot.left, plot.top + plot.height, 0.0);
+  let front_bottom_right = projection.project(plot.left + plot.width, plot.top + plot.height, 0.0);
+  let back_top_left = projection.project(plot.left, plot.top, 1.0);
+  let back_top_right = projection.project(plot.left + plot.width, plot.top, 1.0);
+  let back_bottom_left = projection.project(plot.left, plot.top + plot.height, 1.0);
+  let back_bottom_right = projection.project(plot.left + plot.width, plot.top + plot.height, 1.0);
+
+  let back_color = style.plot_area_fill_color.unwrap_or(RgbColor {
+    r: 250,
+    g: 250,
+    b: 247,
+  });
+  let outline_color = style.plot_area_stroke_color.unwrap_or(style.gridline_color);
+  let outline_width = style
+    .plot_area_stroke_width_pt
+    .unwrap_or(0.75 * style.stroke_scale);
+  push_chart_polygon(
+    items,
+    &[
+      back_top_left,
+      back_top_right,
+      back_bottom_right,
+      back_bottom_left,
+    ],
+    back_color,
+    Some((outline_color, outline_width)),
+  );
+
+  let (depth_x, _) = projection.depth_vector();
+  let (side_front_top, side_front_bottom, side_back_top, side_back_bottom) = if depth_x >= 0.0 {
+    (
+      front_top_left,
+      front_bottom_left,
+      back_top_left,
+      back_bottom_left,
+    )
+  } else {
+    (
+      front_top_right,
+      front_bottom_right,
+      back_top_right,
+      back_bottom_right,
+    )
+  };
+  push_chart_polygon(
+    items,
+    &[
+      side_front_top,
+      side_back_top,
+      side_back_bottom,
+      side_front_bottom,
+    ],
+    shade_chart_color(back_color, 0.72),
+    Some((outline_color, outline_width)),
+  );
+  push_chart_polygon(
+    items,
+    &[
+      front_bottom_left,
+      back_bottom_left,
+      back_bottom_right,
+      front_bottom_right,
+    ],
+    shade_chart_color(back_color, 0.88),
+    Some((outline_color, outline_width)),
+  );
+}
+
+fn push_chart_polygon(
+  items: &mut Vec<PageItem>,
+  points: &[(f32, f32)],
+  color: RgbColor,
+  stroke: Option<(RgbColor, f32)>,
+) {
+  if points.len() < 3 {
+    return;
+  }
+  let minimum_x = points
+    .iter()
+    .map(|point| point.0)
+    .fold(f32::INFINITY, f32::min);
+  let maximum_x = points
+    .iter()
+    .map(|point| point.0)
+    .fold(f32::NEG_INFINITY, f32::max);
+  let minimum_y = points
+    .iter()
+    .map(|point| point.1)
+    .fold(f32::INFINITY, f32::min);
+  let maximum_y = points
+    .iter()
+    .map(|point| point.1)
+    .fold(f32::NEG_INFINITY, f32::max);
+  items.push(PageItem::Path(crate::common::PathItem {
+    bounds: common_rect(
+      minimum_x,
+      minimum_y,
+      maximum_x - minimum_x,
+      maximum_y - minimum_y,
+    ),
+    points: points.iter().map(|(x, y)| common_point(*x, *y)).collect(),
+    commands: Vec::new(),
+    closed: true,
+    fill: crate::common::Fill::Solid(common_rgb(color, 1.0)),
+    stroke: stroke.map(|(color, width_pt)| crate::common::Stroke {
+      width: crate::common::Pt(width_pt),
+      color: common_rgb(color, 1.0),
+      dash: None,
+      source_style_id: None,
+      ..Default::default()
+    }),
+  }));
+}
+
+fn shade_chart_color(color: RgbColor, factor: f32) -> RgbColor {
+  let channel = |value: u8| (f32::from(value) * factor).round().clamp(0.0, 255.0) as u8;
+  RgbColor {
+    r: channel(color.r),
+    g: channel(color.g),
+    b: channel(color.b),
+  }
+}
+
+fn tint_chart_color(color: RgbColor, factor: f32) -> RgbColor {
+  let channel = |value: u8| {
+    (f32::from(value) + (255.0 - f32::from(value)) * factor)
+      .round()
+      .clamp(0.0, 255.0) as u8
+  };
+  RgbColor {
+    r: channel(color.r),
+    g: channel(color.g),
+    b: channel(color.b),
   }
 }
 
@@ -2391,12 +3282,318 @@ fn single_line_vertical_anchor_offset(
   }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct PlotRect {
   left: f32,
   top: f32,
   width: f32,
   height: f32,
+}
+
+#[derive(Clone, Copy)]
+struct AxisTitleGeometry {
+  frame: ChartFrame,
+  plot: PlotRect,
+  category_band_top: f32,
+  data_table_height: f32,
+  projection_3d: Option<Chart3DProjection>,
+}
+
+#[derive(Clone, Copy)]
+struct HorizontalAxisGeometry {
+  plot: PlotRect,
+  scale: crate::render::chart::LinearAxisScale,
+  projection_3d: Option<Chart3DProjection>,
+  draw_gridlines: bool,
+  draw_labels: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Chart3DProjection {
+  input: PlotRect,
+  rotate_x_rad: f32,
+  rotate_y_rad: f32,
+  model_height: f32,
+  model_depth: f32,
+  camera_distance: Option<f32>,
+  raw_center_x: f32,
+  raw_center_y: f32,
+  scale: f32,
+  screen_center_x: f32,
+  screen_center_y: f32,
+}
+
+impl Chart3DProjection {
+  fn project(self, x: f32, y: f32, depth_ratio: f32) -> (f32, f32) {
+    let model_x = if self.input.width > f32::EPSILON {
+      (x - self.input.left) / self.input.width - 0.5
+    } else {
+      0.0
+    };
+    let model_y = if self.input.height > f32::EPSILON {
+      ((y - self.input.top) / self.input.height - 0.5) * self.model_height
+    } else {
+      0.0
+    };
+    let model_z = (depth_ratio - 0.5) * self.model_depth;
+    let (raw_x, raw_y) = project_chart_model_point(
+      self.rotate_x_rad,
+      self.rotate_y_rad,
+      self.camera_distance,
+      model_x,
+      model_y,
+      model_z,
+    );
+    (
+      self.screen_center_x + (raw_x - self.raw_center_x) * self.scale,
+      self.screen_center_y + (raw_y - self.raw_center_y) * self.scale,
+    )
+  }
+
+  fn x_for_visual_side(self, plot: PlotRect, visual_right: bool, y: f32, depth_ratio: f32) -> f32 {
+    let left_screen_x = self.project(plot.left, y, depth_ratio).0;
+    let right_screen_x = self.project(plot.left + plot.width, y, depth_ratio).0;
+    if (right_screen_x >= left_screen_x) == visual_right {
+      plot.left + plot.width
+    } else {
+      plot.left
+    }
+  }
+
+  fn vertical_edge_for_visual_side(self, plot: PlotRect, visual_right: bool) -> (f32, f32) {
+    let y = plot.top + plot.height * 0.5;
+    let mut selected = (plot.left, 0.0_f32);
+    let mut selected_x = self.project(selected.0, y, selected.1).0;
+    for x in [plot.left, plot.left + plot.width] {
+      for depth in [0.0_f32, 1.0] {
+        let screen_x = self.project(x, y, depth).0;
+        if (visual_right && screen_x > selected_x) || (!visual_right && screen_x < selected_x) {
+          selected = (x, depth);
+          selected_x = screen_x;
+        }
+      }
+    }
+    selected
+  }
+
+  fn vertical_axis_length(self, plot: PlotRect, visual_right: bool) -> f32 {
+    let (x, depth) = self.vertical_edge_for_visual_side(plot, visual_right);
+    let top = self.project(x, plot.top, depth);
+    let bottom = self.project(x, plot.top + plot.height, depth);
+    (bottom.0 - top.0).hypot(bottom.1 - top.1)
+  }
+
+  fn depth_vector(self) -> (f32, f32) {
+    let x = self.input.left + self.input.width * 0.5;
+    let y = self.input.top + self.input.height * 0.5;
+    let front = self.project(x, y, 0.0);
+    let back = self.project(x, y, 1.0);
+    (back.0 - front.0, back.1 - front.1)
+  }
+}
+
+#[derive(Clone, Copy)]
+struct Marker3DContext<'context, 'chart, 'data> {
+  geometry: &'context SeriesGeometryContext<'chart, 'data>,
+  projection: Chart3DProjection,
+  series_index: usize,
+  category_index: usize,
+  color: RgbColor,
+}
+
+#[derive(Clone, Copy)]
+struct MarkerDepth {
+  front: f32,
+  back: f32,
+}
+
+#[derive(Clone, Copy)]
+struct VerticalMarkerBounds {
+  x: f32,
+  width: f32,
+  start_y: f32,
+  end_y: f32,
+}
+
+#[derive(Clone, Copy)]
+struct HorizontalMarkerBounds {
+  start_x: f32,
+  end_x: f32,
+  y: f32,
+  height: f32,
+}
+
+#[derive(Clone, Copy)]
+struct VerticalTaperedBounds {
+  center_x: f32,
+  start_y: f32,
+  end_y: f32,
+  start_half_width: f32,
+  end_half_width: f32,
+}
+
+#[derive(Clone, Copy)]
+struct HorizontalTaperedBounds {
+  start_x: f32,
+  end_x: f32,
+  center_y: f32,
+  start_half_height: f32,
+  end_half_height: f32,
+}
+
+fn cartesian_3d_projection(view: Chart3DView, plot: PlotRect) -> Chart3DProjection {
+  // ECMA-376 §21.2.2.41/§21.2.2.80 express scene depth and an authored
+  // height as percentages of chart width.  An omitted hPercent is not 100%:
+  // LibreOffice VDiagram::adjustAspectRatio3d solves the missing dimension
+  // from the final available rectangle, then adjustPosAndSize_3d uniformly
+  // fits and centers the rotated scene.
+  let model_depth = (view.depth_percent / 100.0).clamp(0.2, 20.0);
+  let rotate_x_rad = view.rotate_x_deg.clamp(-90.0, 90.0).to_radians();
+  let rotate_y_rad = view.rotate_y_deg.rem_euclid(360.0).to_radians();
+  let camera_distance = chart_3d_camera_distance(view);
+  let model_height = if view.height_percent_is_explicit {
+    (view.height_percent / 100.0).clamp(0.05, 5.0)
+  } else {
+    automatic_chart_model_height(
+      plot,
+      rotate_x_rad,
+      rotate_y_rad,
+      camera_distance,
+      model_depth,
+    )
+  };
+  let bounds = projected_chart_model_bounds(
+    rotate_x_rad,
+    rotate_y_rad,
+    camera_distance,
+    model_height,
+    model_depth,
+  );
+  let raw_width = (bounds.2 - bounds.0).max(f32::EPSILON);
+  let raw_height = (bounds.3 - bounds.1).max(f32::EPSILON);
+  let scale = (plot.width / raw_width).min(plot.height / raw_height);
+
+  Chart3DProjection {
+    input: plot,
+    rotate_x_rad,
+    rotate_y_rad,
+    model_height,
+    model_depth,
+    camera_distance,
+    raw_center_x: (bounds.0 + bounds.2) * 0.5,
+    raw_center_y: (bounds.1 + bounds.3) * 0.5,
+    scale,
+    screen_center_x: plot.left + plot.width * 0.5,
+    screen_center_y: plot.top + plot.height * 0.5,
+  }
+}
+
+fn chart_3d_camera_distance(view: Chart3DView) -> Option<f32> {
+  if view.right_angle_axes || view.perspective_half_degrees <= f32::EPSILON {
+    return None;
+  }
+  // LibreOffice View3DConverter maps OOXML's half-degree field to its
+  // 0..100 perspective scale by dividing by two. ThreeDHelper then maps that
+  // scale hyperbolically to a camera distance of 0.75..20 chart volumes.
+  let perspective = (view.perspective_half_degrees / 2.0).clamp(0.0, 100.0);
+  let minimum_distance = 0.75_f32;
+  let maximum_distance = 20.0_f32;
+  let numerator =
+    100.0 * maximum_distance * minimum_distance / (maximum_distance - minimum_distance);
+  let offset = -numerator / maximum_distance;
+  Some(numerator / (perspective - offset))
+}
+
+fn automatic_chart_model_height(
+  plot: PlotRect,
+  rotate_x_rad: f32,
+  rotate_y_rad: f32,
+  camera_distance: Option<f32>,
+  model_depth: f32,
+) -> f32 {
+  let target_aspect = (plot.width / plot.height.max(f32::EPSILON)).max(f32::EPSILON);
+  let aspect = |height| {
+    let bounds = projected_chart_model_bounds(
+      rotate_x_rad,
+      rotate_y_rad,
+      camera_distance,
+      height,
+      model_depth,
+    );
+    (bounds.2 - bounds.0) / (bounds.3 - bounds.1).max(f32::EPSILON)
+  };
+  let mut low = 0.2_f32;
+  let mut high = 5.0_f32;
+  if aspect(low) <= target_aspect {
+    return low;
+  }
+  if aspect(high) >= target_aspect {
+    return high;
+  }
+  for _ in 0..28 {
+    let middle = (low + high) * 0.5;
+    if aspect(middle) > target_aspect {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  (low + high) * 0.5
+}
+
+fn projected_chart_model_bounds(
+  rotate_x_rad: f32,
+  rotate_y_rad: f32,
+  camera_distance: Option<f32>,
+  model_height: f32,
+  model_depth: f32,
+) -> (f32, f32, f32, f32) {
+  let mut minimum_x = f32::INFINITY;
+  let mut minimum_y = f32::INFINITY;
+  let mut maximum_x = f32::NEG_INFINITY;
+  let mut maximum_y = f32::NEG_INFINITY;
+  for x in [-0.5_f32, 0.5] {
+    for y in [-model_height * 0.5, model_height * 0.5] {
+      for z in [-model_depth * 0.5, model_depth * 0.5] {
+        let (projected_x, projected_y) =
+          project_chart_model_point(rotate_x_rad, rotate_y_rad, camera_distance, x, y, z);
+        minimum_x = minimum_x.min(projected_x);
+        minimum_y = minimum_y.min(projected_y);
+        maximum_x = maximum_x.max(projected_x);
+        maximum_y = maximum_y.max(projected_y);
+      }
+    }
+  }
+  (minimum_x, minimum_y, maximum_x, maximum_y)
+}
+
+fn project_chart_model_point(
+  rotate_x_rad: f32,
+  rotate_y_rad: f32,
+  camera_distance: Option<f32>,
+  model_x: f32,
+  model_y_down: f32,
+  model_z: f32,
+) -> (f32, f32) {
+  let (sin_y, cos_y) = rotate_y_rad.sin_cos();
+  let (sin_x, cos_x) = rotate_x_rad.sin_cos();
+  let model_y_up = -model_y_down;
+  let rotated_x = model_x * cos_y + model_z * sin_y;
+  let yaw_depth = -model_x * sin_y + model_z * cos_y;
+  // OOXML's positive rotX is an elevation of the camera, so it is the
+  // inverse of rotating the chart volume around the X axis. This makes the
+  // default back wall rise, while rotY values past 90 degrees correctly make
+  // the same series-depth axis descend on screen.
+  let rotated_y_up = model_y_up * cos_x + yaw_depth * sin_x;
+  let camera_depth = -model_y_up * sin_x + yaw_depth * cos_x;
+  let perspective_scale = camera_distance.map_or(1.0, |distance| {
+    // Positive model depth is the far side of the chart volume.
+    distance / (distance + camera_depth).max(distance * 0.15)
+  });
+  (
+    rotated_x * perspective_scale,
+    -rotated_y_up * perspective_scale,
+  )
 }
 
 struct SeriesGeometryContext<'chart, 'data> {
@@ -2405,33 +3602,197 @@ struct SeriesGeometryContext<'chart, 'data> {
   scale: crate::render::chart::LinearAxisScale,
   zero_y: f32,
   category_count: usize,
+  projection_3d: Option<Chart3DProjection>,
 }
 
 #[derive(Clone, Copy)]
 struct ScatterGeometry {
   plot: PlotRect,
   scale: crate::render::chart::LinearAxisScale,
-  x_extent: Option<(f64, f64)>,
+  x_scale: Option<crate::render::chart::LinearAxisScale>,
   bubble_maximum: f64,
 }
 
-fn cartesian_scale_values(chart: &ClusteredColumnChart<'_>, category_count: usize) -> Vec<f64> {
+#[derive(Clone, Copy, Debug)]
+struct CartesianAxisScales {
+  x: Option<crate::render::chart::LinearAxisScale>,
+  y: crate::render::chart::LinearAxisScale,
+}
+
+fn axis_set_count(chart: &ClusteredColumnChart<'_>) -> usize {
+  chart
+    .series
+    .iter()
+    .map(|series| series.axis_set_index + 1)
+    .chain(std::iter::once(chart.axis_sets.len()))
+    .max()
+    .unwrap_or(1)
+    .max(1)
+}
+
+fn axis_set_value_axis<'chart, 'data>(
+  chart: &'chart ClusteredColumnChart<'data>,
+  axis_set_index: usize,
+) -> Option<&'data c::ValueAxis> {
+  chart
+    .axis_sets
+    .get(axis_set_index)
+    .and_then(|set| set.vertical_value_axis)
+    .or_else(|| (axis_set_index == 0).then_some(chart.value_axis).flatten())
+}
+
+fn axis_set_horizontal_value_axis<'chart, 'data>(
+  chart: &'chart ClusteredColumnChart<'data>,
+  axis_set_index: usize,
+) -> Option<&'data c::ValueAxis> {
+  chart
+    .axis_sets
+    .get(axis_set_index)
+    .and_then(|set| set.horizontal_value_axis)
+    .or_else(|| {
+      (axis_set_index == 0)
+        .then_some(chart.horizontal_value_axis)
+        .flatten()
+    })
+}
+
+fn axis_set_is_percent_stacked(chart: &ClusteredColumnChart<'_>, axis_set_index: usize) -> bool {
+  let mut series = chart
+    .series
+    .iter()
+    .filter(|series| series.axis_set_index == axis_set_index);
+  series.next().is_some_and(|first| {
+    first.grouping == ChartSeriesGrouping::PercentStacked
+      && series.all(|series| series.grouping == ChartSeriesGrouping::PercentStacked)
+  })
+}
+
+fn cartesian_axis_scales(
+  chart: &ClusteredColumnChart<'_>,
+  category_count: usize,
+  maximum_auto_increment_count: usize,
+) -> Vec<CartesianAxisScales> {
+  let mut result = Vec::with_capacity(axis_set_count(chart));
+  for axis_set_index in 0..axis_set_count(chart) {
+    let value_axis = axis_set_value_axis(chart, axis_set_index);
+    let horizontal_bar_axis = chart
+      .series
+      .iter()
+      .filter(|series| series.axis_set_index == axis_set_index)
+      .all(|series| series.kind == ChartSeriesKind::Bar);
+    let y = if axis_set_is_percent_stacked(chart, axis_set_index) {
+      Some(crate::render::chart::LinearAxisScale {
+        minimum: value_axis
+          .and_then(|axis| axis.scaling.min_axis_value.as_ref())
+          .map_or(0.0, |value| value.val),
+        maximum: value_axis
+          .and_then(|axis| axis.scaling.max_axis_value.as_ref())
+          .map_or(1.0, |value| value.val),
+        major_unit: value_axis
+          .and_then(|axis| axis.major_unit.as_ref())
+          .map_or(if horizontal_bar_axis { 0.2 } else { 0.1 }, |value| {
+            value.val
+          }),
+        logarithmic_base: None,
+        reversed: value_axis
+          .and_then(|axis| axis.scaling.orientation.as_ref())
+          .and_then(|orientation| orientation.val)
+          == Some(c::OrientationValues::MaxMin),
+      })
+    } else {
+      linear_axis_scale_with_options(
+        bubble_padded_axis_values(
+          cartesian_scale_values(chart, category_count, axis_set_index),
+          chart
+            .series
+            .iter()
+            .filter(|series| {
+              series.axis_set_index == axis_set_index && series.kind == ChartSeriesKind::Bubble
+            })
+            .flat_map(|series| series.values.iter().flatten().copied()),
+        ),
+        value_axis,
+        if horizontal_bar_axis {
+          maximum_auto_increment_count.min(5)
+        } else {
+          maximum_auto_increment_count
+        },
+        LinearAxisScaleOptions {
+          expand_if_values_close_to_border: !horizontal_bar_axis
+            && !chart
+              .series
+              .iter()
+              .any(|series| series.axis_set_index == axis_set_index && series.is_3d),
+        },
+      )
+    };
+    let y = y.unwrap_or_else(|| crate::render::chart::LinearAxisScale {
+      minimum: value_axis
+        .and_then(|axis| axis.scaling.min_axis_value.as_ref())
+        .map_or(0.0, |value| value.val),
+      maximum: value_axis
+        .and_then(|axis| axis.scaling.max_axis_value.as_ref())
+        .map_or(1.0, |value| value.val),
+      major_unit: value_axis
+        .and_then(|axis| axis.major_unit.as_ref())
+        .map_or(0.1, |value| value.val),
+      logarithmic_base: None,
+      reversed: value_axis
+        .and_then(|axis| axis.scaling.orientation.as_ref())
+        .and_then(|orientation| orientation.val)
+        == Some(c::OrientationValues::MaxMin),
+    });
+    let has_numeric_x = chart.series.iter().any(|series| {
+      series.axis_set_index == axis_set_index
+        && matches!(
+          series.kind,
+          ChartSeriesKind::Scatter | ChartSeriesKind::Bubble
+        )
+    });
+    let x = has_numeric_x
+      .then(|| {
+        linear_axis_scale(
+          bubble_padded_axis_values(
+            scatter_x_axis_values(chart, axis_set_index),
+            chart
+              .series
+              .iter()
+              .filter(|series| {
+                series.axis_set_index == axis_set_index && series.kind == ChartSeriesKind::Bubble
+              })
+              .flat_map(|series| series.x_values.iter().flatten().copied()),
+          ),
+          axis_set_horizontal_value_axis(chart, axis_set_index),
+          maximum_auto_increment_count,
+        )
+      })
+      .flatten();
+    result.push(CartesianAxisScales { x, y });
+  }
+  result
+}
+
+fn cartesian_scale_values(
+  chart: &ClusteredColumnChart<'_>,
+  category_count: usize,
+  axis_set_index: usize,
+) -> Vec<f64> {
   let mut values = chart
     .series
     .iter()
     .filter(|series| {
-      !matches!(
-        series.grouping,
-        ChartSeriesGrouping::Stacked | ChartSeriesGrouping::PercentStacked
-      )
+      series.axis_set_index == axis_set_index
+        && !matches!(
+          series.grouping,
+          ChartSeriesGrouping::Stacked | ChartSeriesGrouping::PercentStacked
+        )
     })
     .flat_map(|series| series.values.iter().flatten().copied())
     .collect::<Vec<_>>();
-  if chart
-    .series
-    .iter()
-    .any(|series| series.grouping == ChartSeriesGrouping::PercentStacked)
-  {
+  if chart.series.iter().any(|series| {
+    series.axis_set_index == axis_set_index
+      && series.grouping == ChartSeriesGrouping::PercentStacked
+  }) {
     values.extend([0.0, 1.0]);
   }
   for kind in [
@@ -2444,11 +3805,11 @@ fn cartesian_scale_values(chart: &ClusteredColumnChart<'_>, category_count: usiz
       let mut positive = 0.0;
       let mut negative = 0.0;
       let mut found = false;
-      for series in chart
-        .series
-        .iter()
-        .filter(|series| series.kind == kind && series.grouping == ChartSeriesGrouping::Stacked)
-      {
+      for series in chart.series.iter().filter(|series| {
+        series.axis_set_index == axis_set_index
+          && series.kind == kind
+          && series.grouping == ChartSeriesGrouping::Stacked
+      }) {
         if let Some(value) = series.values.get(category_index).copied().flatten() {
           found = true;
           if value >= 0.0 {
@@ -2467,39 +3828,82 @@ fn cartesian_scale_values(chart: &ClusteredColumnChart<'_>, category_count: usiz
   values
 }
 
+fn bubble_padded_axis_values(
+  mut axis_values: Vec<f64>,
+  bubble_values: impl IntoIterator<Item = f64>,
+) -> Vec<f64> {
+  // LibreOffice BubbleChart.cxx sizes the largest bubble's diameter to 25% of
+  // the diagram extent. Reserve its 12.5% radius in logical axis space so a
+  // point center cannot sit directly on the plot boundary and clip half of
+  // the marker. Solving `extent = value + extent / 8` gives the 8/7 factor.
+  for value in bubble_values.into_iter().filter(|value| value.is_finite()) {
+    axis_values.push(value * (8.0 / 7.0));
+  }
+  axis_values
+}
+
 fn lower_series_geometry(
   items: &mut Vec<PageItem>,
   chart: &ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
   plot: PlotRect,
-  scale: crate::render::chart::LinearAxisScale,
-  zero_y: f32,
+  axis_scales: &[CartesianAxisScales],
   category_count: usize,
+  projection_3d: Option<Chart3DProjection>,
 ) {
-  let x_extent = linear_axis_scale(scatter_x_axis_values(chart), None, 10)
-    .map(|scale| (scale.minimum, scale.maximum));
+  lower_surface_groups(
+    items,
+    chart,
+    style,
+    plot,
+    axis_scales,
+    category_count,
+    projection_3d,
+  );
+
   let bubble_maximum = chart
     .series
     .iter()
     .flat_map(|series| series.bubble_sizes.iter().flatten().copied())
     .fold(0.0_f64, f64::max);
-  let context = SeriesGeometryContext {
-    chart,
-    plot,
-    scale,
-    zero_y,
-    category_count,
-  };
-  let scatter_geometry = ScatterGeometry {
-    plot,
-    scale,
-    x_extent,
-    bubble_maximum,
-  };
 
-  for (series_index, series) in chart.series.iter().enumerate() {
+  let mut series_indices = (0..chart.series.len()).collect::<Vec<_>>();
+  if projection_3d.is_some() {
+    // Paint far series first so nearer bars and markers occlude them. The
+    // order is independent of legend/text order, which remains the authored
+    // chart-group order.
+    series_indices.sort_by(|left, right| {
+      let left_depth = chart_3d_series_depth_slot(chart, *left).0;
+      let right_depth = chart_3d_series_depth_slot(chart, *right).0;
+      right_depth.total_cmp(&left_depth).then(left.cmp(right))
+    });
+  }
+  for series_index in series_indices {
+    let series = &chart.series[series_index];
     let Some(color) = style.series_colors.get(series_index).copied() else {
       continue;
+    };
+    let axes = axis_scales
+      .get(series.axis_set_index)
+      .unwrap_or(&axis_scales[0]);
+    let context = SeriesGeometryContext {
+      chart,
+      plot,
+      scale: axes.y,
+      zero_y: value_y(
+        0.0_f64.clamp(axes.y.minimum, axes.y.maximum),
+        axes.y,
+        plot.top,
+        plot.height,
+      ),
+      category_count,
+      projection_3d,
+    };
+    let scatter_geometry = ScatterGeometry {
+      plot,
+      scale: axes.y,
+      x_scale: axes.x,
+      bubble_maximum,
     };
     match series.kind {
       ChartSeriesKind::Column => {
@@ -2511,9 +3915,10 @@ fn lower_series_geometry(
       ChartSeriesKind::Line | ChartSeriesKind::Stock => {
         lower_line_series(items, &context, series_index, color, false, style);
       }
-      ChartSeriesKind::Area | ChartSeriesKind::Surface => {
+      ChartSeriesKind::Area => {
         lower_line_series(items, &context, series_index, color, true, style);
       }
+      ChartSeriesKind::Surface => {}
       ChartSeriesKind::Scatter => {
         lower_scatter_series(
           items,
@@ -2549,13 +3954,595 @@ fn lower_series_geometry(
         &style.data_label,
         TrendlineGeometry {
           plot,
-          scale,
+          scale: axes.y,
           category_count,
-          x_extent,
+          x_scale: axes.x,
         },
       );
     }
   }
+}
+
+fn chart_3d_series_depth_slot(chart: &ClusteredColumnChart<'_>, series_index: usize) -> (f32, f32) {
+  let Some(series) = chart.series.get(series_index) else {
+    return (0.0, 0.0);
+  };
+  if !series.is_3d {
+    return (0.0, 0.0);
+  }
+  let shares_one_depth_slot = matches!(
+    series.grouping,
+    ChartSeriesGrouping::Stacked | ChartSeriesGrouping::PercentStacked
+  );
+  let peers = chart
+    .series
+    .iter()
+    .enumerate()
+    .filter(|(_, peer)| {
+      peer.is_3d
+        && peer.axis_set_index == series.axis_set_index
+        && peer.kind == series.kind
+        && peer.grouping == series.grouping
+    })
+    .map(|(index, _)| index)
+    .collect::<Vec<_>>();
+  let slot_count = if shares_one_depth_slot {
+    1
+  } else {
+    peers.len().max(1)
+  };
+  let slot_index = if shares_one_depth_slot {
+    0
+  } else {
+    peers
+      .iter()
+      .position(|index| *index == series_index)
+      .unwrap_or(0)
+  };
+  let outer_distance = (series.gap_depth_percent as f32 / 100.0).clamp(0.0, 6.0);
+  // This is the same slot equation used by LibreOffice's
+  // CategoryPositionHelper: the authored outer distance is split equally
+  // before and after the series collection. In particular gapDepth=150 with
+  // one series yields a centered marker spanning 0.3..0.7, not 0.0..0.4.
+  let marker_depth = 1.0 / (slot_count as f32 + outer_distance);
+  let front = outer_distance * marker_depth * 0.5 + slot_index as f32 * marker_depth;
+  (front, (front + marker_depth).min(1.0))
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SurfaceVertex {
+  x: f32,
+  value: f64,
+  depth_ratio: f32,
+}
+
+fn lower_surface_groups(
+  items: &mut Vec<PageItem>,
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+  plot: PlotRect,
+  axis_scales: &[CartesianAxisScales],
+  category_count: usize,
+  projection_3d: Option<Chart3DProjection>,
+) {
+  for (group_index, group) in chart.surface_groups.iter().enumerate() {
+    let Some(axes) = axis_scales
+      .get(group.axis_set_index)
+      .or_else(|| axis_scales.first())
+    else {
+      continue;
+    };
+    if group.wireframe {
+      lower_surface_wireframe(
+        items,
+        chart,
+        style,
+        group,
+        plot,
+        axes.y,
+        category_count,
+        projection_3d,
+      );
+    } else {
+      lower_filled_surface(
+        items,
+        chart,
+        style,
+        group_index,
+        group,
+        plot,
+        axes.y,
+        category_count,
+        projection_3d,
+      );
+    }
+  }
+}
+
+fn surface_series_depth_ratio(
+  chart: &ClusteredColumnChart<'_>,
+  group: &SurfaceChartGroup<'_>,
+  row_index: usize,
+) -> f32 {
+  let mut ratio = if group.series_count <= 1 {
+    0.5
+  } else {
+    row_index as f32 / (group.series_count - 1) as f32
+  };
+  let reversed = chart
+    .axis_sets
+    .get(group.axis_set_index)
+    .and_then(|axes| axes.series_axis)
+    .and_then(|axis| axis.scaling.orientation.as_ref())
+    .and_then(|orientation| orientation.val)
+    == Some(c::OrientationValues::MaxMin);
+  if reversed {
+    ratio = 1.0 - ratio;
+  }
+  ratio
+}
+
+fn surface_vertex_point(
+  vertex: SurfaceVertex,
+  group: &SurfaceChartGroup<'_>,
+  plot: PlotRect,
+  scale: crate::render::chart::LinearAxisScale,
+  projection_3d: Option<Chart3DProjection>,
+) -> (f32, f32) {
+  if group.is_3d {
+    let y = value_y(vertex.value, scale, plot.top, plot.height);
+    projection_3d.map_or((vertex.x, y), |projection| {
+      projection.project(vertex.x, y, vertex.depth_ratio)
+    })
+  } else {
+    // ECMA-376 §21.2.2.204 defines `surfaceChart` as the 2-D contour
+    // representation: category and series coordinates form the plane while
+    // value bands provide the color.
+    (
+      vertex.x,
+      plot.top + vertex.depth_ratio.clamp(0.0, 1.0) * plot.height,
+    )
+  }
+}
+
+fn lower_surface_wireframe(
+  items: &mut Vec<PageItem>,
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+  group: &SurfaceChartGroup<'_>,
+  plot: PlotRect,
+  scale: crate::render::chart::LinearAxisScale,
+  category_count: usize,
+  projection_3d: Option<Chart3DProjection>,
+) {
+  let series_range =
+    group.first_series_index..group.first_series_index.saturating_add(group.series_count);
+  for (row_index, series_index) in series_range.clone().enumerate() {
+    let Some(series) = chart.series.get(series_index) else {
+      continue;
+    };
+    let depth_ratio = surface_series_depth_ratio(chart, group, row_index);
+    let color = style
+      .series_colors
+      .get(series_index)
+      .copied()
+      .unwrap_or(style.gridline_color);
+    let mut previous = None;
+    for (category_index, value) in series.values.iter().enumerate() {
+      let Some(value) = value.as_ref().copied().filter(|value| value.is_finite()) else {
+        previous = None;
+        continue;
+      };
+      let display_index = category_display_index(chart, category_index, category_count);
+      let point = surface_vertex_point(
+        SurfaceVertex {
+          x: category_point_x(chart, display_index, category_count, plot),
+          value,
+          depth_ratio,
+        },
+        group,
+        plot,
+        scale,
+        projection_3d,
+      );
+      if let Some(previous) = previous {
+        lower_chart_line_segment(items, previous, point, color, 0.75 * style.stroke_scale);
+      }
+      previous = Some(point);
+    }
+  }
+
+  for category_index in 0..category_count {
+    let mut previous = None;
+    for (row_index, series_index) in series_range.clone().enumerate() {
+      let Some(value) = chart
+        .series
+        .get(series_index)
+        .and_then(|series| series.values.get(category_index))
+        .copied()
+        .flatten()
+        .filter(|value| value.is_finite())
+      else {
+        previous = None;
+        continue;
+      };
+      let display_index = category_display_index(chart, category_index, category_count);
+      let point = surface_vertex_point(
+        SurfaceVertex {
+          x: category_point_x(chart, display_index, category_count, plot),
+          value,
+          depth_ratio: surface_series_depth_ratio(chart, group, row_index),
+        },
+        group,
+        plot,
+        scale,
+        projection_3d,
+      );
+      if let Some(previous) = previous {
+        lower_chart_line_segment(
+          items,
+          previous,
+          point,
+          style.gridline_color,
+          0.75 * style.stroke_scale,
+        );
+      }
+      previous = Some(point);
+    }
+  }
+}
+
+fn lower_filled_surface(
+  items: &mut Vec<PageItem>,
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+  group_index: usize,
+  group: &SurfaceChartGroup<'_>,
+  plot: PlotRect,
+  scale: crate::render::chart::LinearAxisScale,
+  category_count: usize,
+  projection_3d: Option<Chart3DProjection>,
+) {
+  if group.series_count < 2 || category_count < 2 {
+    return;
+  }
+  let mut cells = Vec::new();
+  for row_index in 0..group.series_count - 1 {
+    let Some(front_series) = chart.series.get(group.first_series_index + row_index) else {
+      continue;
+    };
+    let Some(back_series) = chart.series.get(group.first_series_index + row_index + 1) else {
+      continue;
+    };
+    let front_depth = surface_series_depth_ratio(chart, group, row_index);
+    let back_depth = surface_series_depth_ratio(chart, group, row_index + 1);
+    for category_index in 0..category_count - 1 {
+      let Some(values) = [
+        front_series.values.get(category_index).copied().flatten(),
+        front_series
+          .values
+          .get(category_index + 1)
+          .copied()
+          .flatten(),
+        back_series
+          .values
+          .get(category_index + 1)
+          .copied()
+          .flatten(),
+        back_series.values.get(category_index).copied().flatten(),
+      ]
+      .into_iter()
+      .collect::<Option<Vec<_>>>() else {
+        continue;
+      };
+      if values.iter().any(|value| !value.is_finite()) {
+        continue;
+      }
+      let first_display_index = category_display_index(chart, category_index, category_count);
+      let second_display_index = category_display_index(chart, category_index + 1, category_count);
+      cells.push([
+        SurfaceVertex {
+          x: category_point_x(chart, first_display_index, category_count, plot),
+          value: values[0],
+          depth_ratio: front_depth,
+        },
+        SurfaceVertex {
+          x: category_point_x(chart, second_display_index, category_count, plot),
+          value: values[1],
+          depth_ratio: front_depth,
+        },
+        SurfaceVertex {
+          x: category_point_x(chart, second_display_index, category_count, plot),
+          value: values[2],
+          depth_ratio: back_depth,
+        },
+        SurfaceVertex {
+          x: category_point_x(chart, first_display_index, category_count, plot),
+          value: values[3],
+          depth_ratio: back_depth,
+        },
+      ]);
+    }
+  }
+  if group.is_3d {
+    cells.sort_by(|left, right| {
+      let left_depth = left.iter().map(|vertex| vertex.depth_ratio).sum::<f32>();
+      let right_depth = right.iter().map(|vertex| vertex.depth_ratio).sum::<f32>();
+      right_depth.total_cmp(&left_depth)
+    });
+  }
+
+  for cell in cells {
+    let minimum_value = cell
+      .iter()
+      .map(|vertex| vertex.value)
+      .fold(f64::INFINITY, f64::min);
+    let maximum_value = cell
+      .iter()
+      .map(|vertex| vertex.value)
+      .fold(f64::NEG_INFINITY, f64::max);
+    let first_band = surface_band_index(minimum_value, scale);
+    let last_band = surface_band_index(maximum_value, scale);
+    for band_index in first_band..=last_band {
+      let mut polygon = cell.to_vec();
+      let lower = scale.minimum + band_index as f64 * scale.major_unit;
+      let upper = (lower + scale.major_unit).min(scale.maximum);
+      polygon = clip_surface_polygon(&polygon, lower, true);
+      polygon = clip_surface_polygon(&polygon, upper, false);
+      if polygon.len() < 3 {
+        continue;
+      }
+      let points = polygon
+        .into_iter()
+        .map(|vertex| surface_vertex_point(vertex, group, plot, scale, projection_3d))
+        .collect::<Vec<_>>();
+      let color = surface_band_color(style, group_index, band_index as u32);
+      push_chart_polygon(
+        items,
+        &points,
+        color,
+        Some((shade_chart_color(color, 0.72), 0.3 * style.stroke_scale)),
+      );
+    }
+  }
+}
+
+fn surface_band_index(value: f64, scale: crate::render::chart::LinearAxisScale) -> usize {
+  if !scale.major_unit.is_finite() || scale.major_unit <= f64::EPSILON {
+    return 0;
+  }
+  let band_count = ((scale.maximum - scale.minimum) / scale.major_unit)
+    .ceil()
+    .max(1.0) as usize;
+  (((value - scale.minimum) / scale.major_unit).floor() as isize)
+    .clamp(0, band_count.saturating_sub(1) as isize) as usize
+}
+
+fn clip_surface_polygon(
+  polygon: &[SurfaceVertex],
+  threshold: f64,
+  keep_above: bool,
+) -> Vec<SurfaceVertex> {
+  let Some(mut previous) = polygon.last().copied() else {
+    return Vec::new();
+  };
+  let inside = |vertex: SurfaceVertex| {
+    if keep_above {
+      vertex.value >= threshold - f64::EPSILON * 16.0
+    } else {
+      vertex.value <= threshold + f64::EPSILON * 16.0
+    }
+  };
+  let mut previous_inside = inside(previous);
+  let mut result = Vec::new();
+  for current in polygon.iter().copied() {
+    let current_inside = inside(current);
+    if current_inside != previous_inside {
+      let value_span = current.value - previous.value;
+      if value_span.abs() > f64::EPSILON {
+        let ratio = ((threshold - previous.value) / value_span).clamp(0.0, 1.0) as f32;
+        result.push(SurfaceVertex {
+          x: previous.x + (current.x - previous.x) * ratio,
+          value: threshold,
+          depth_ratio: previous.depth_ratio + (current.depth_ratio - previous.depth_ratio) * ratio,
+        });
+      }
+    }
+    if current_inside {
+      result.push(current);
+    }
+    previous = current;
+    previous_inside = current_inside;
+  }
+  result
+}
+
+fn surface_band_color(
+  style: &ClusteredColumnStyle,
+  group_index: usize,
+  band_index: u32,
+) -> RgbColor {
+  style
+    .surface_band_colors
+    .get(group_index)
+    .and_then(|colors| {
+      colors
+        .iter()
+        .find_map(|(index, color)| (*index == band_index).then_some(*color))
+    })
+    .or_else(|| {
+      (!style.series_colors.is_empty())
+        .then(|| style.series_colors[band_index as usize % style.series_colors.len()])
+    })
+    .unwrap_or(RgbColor {
+      r: 68,
+      g: 114,
+      b: 196,
+    })
+}
+
+fn lower_series_axes(
+  items: &mut Vec<PageItem>,
+  chart: &ClusteredColumnChart<'_>,
+  plot: PlotRect,
+  projection: Chart3DProjection,
+  style: &ClusteredColumnStyle,
+  metrics: &mut TextMetrics,
+) {
+  for (axis_set_index, axes) in chart.axis_sets.iter().enumerate() {
+    let Some(axis) = axes.series_axis else {
+      continue;
+    };
+    if axis
+      .delete
+      .as_ref()
+      .is_some_and(|delete| delete.val.is_none_or(|value| value.as_bool()))
+    {
+      continue;
+    }
+
+    let surface_group = chart
+      .surface_groups
+      .iter()
+      .find(|group| group.axis_set_index == axis_set_index);
+    let mut labels = if let Some(group) = surface_group {
+      (0..group.series_count)
+        .filter_map(|row_index| {
+          let series_index = group.first_series_index + row_index;
+          chart.series.get(series_index).map(|series| {
+            (
+              series.name.as_str(),
+              surface_series_depth_ratio(chart, group, row_index),
+            )
+          })
+        })
+        .collect::<Vec<_>>()
+    } else {
+      chart
+        .series
+        .iter()
+        .enumerate()
+        .filter(|(_, series)| series.axis_set_index == axis_set_index && series.is_3d)
+        .map(|(series_index, series)| {
+          let (front, back) = chart_3d_series_depth_slot(chart, series_index);
+          (series.name.as_str(), (front + back) * 0.5)
+        })
+        .collect::<Vec<_>>()
+    };
+    labels.dedup_by(|left, right| (left.1 - right.1).abs() <= f32::EPSILON);
+    if labels.is_empty() {
+      continue;
+    }
+
+    let axis_position = axis.axis_position.val;
+    let base = match axis_position {
+      c::AxisPositionValues::Bottom => (
+        projection.x_for_visual_side(plot, false, plot.top + plot.height, 0.0),
+        plot.top + plot.height,
+      ),
+      c::AxisPositionValues::Top => (
+        projection.x_for_visual_side(plot, false, plot.top, 0.0),
+        plot.top,
+      ),
+      c::AxisPositionValues::Left => (
+        projection.x_for_visual_side(plot, false, plot.top + plot.height, 0.0),
+        plot.top + plot.height,
+      ),
+      c::AxisPositionValues::Right => (
+        projection.x_for_visual_side(plot, true, plot.top + plot.height, 0.0),
+        plot.top + plot.height,
+      ),
+    };
+    let start = projection.project(base.0, base.1, 0.0);
+    let end = projection.project(base.0, base.1, 1.0);
+    let axis_width = style.axis_line_width_pt.unwrap_or(0.75) * style.stroke_scale;
+    items.push(PageItem::Line(LineItem {
+      x1_pt: start.0,
+      y1_pt: start.1,
+      x2_pt: end.0,
+      y2_pt: end.1,
+      width_pt: axis_width,
+      color: style.gridline_color,
+      kind: LineItemKind::Stroke,
+    }));
+
+    let labels_visible = axis
+      .tick_label_position
+      .as_ref()
+      .is_none_or(|position| position.val != Some(c::TickLabelPositionValues::None));
+    let maximum_label_width = labels
+      .iter()
+      .map(|(text, _)| metrics.measure_text(text, &style.series_label))
+      .fold(0.0_f32, f32::max);
+    let axis_length = (end.0 - start.0).hypot(end.1 - start.1);
+    let explicit_rhythm = axis
+      .tick_label_skip
+      .as_ref()
+      .map(|skip| skip.val.max(1) as usize);
+    let rhythm = series_axis_label_rhythm(
+      maximum_label_width,
+      axis_length,
+      labels.len(),
+      explicit_rhythm,
+    );
+    let center = (plot.left + plot.width * 0.5, plot.top + plot.height * 0.5);
+    let midpoint = ((start.0 + end.0) * 0.5, (start.1 + end.1) * 0.5);
+    let outward = {
+      let vector = (midpoint.0 - center.0, midpoint.1 - center.1);
+      let length = vector.0.hypot(vector.1);
+      if length > f32::EPSILON {
+        (vector.0 / length, vector.1 / length)
+      } else {
+        (0.0, 1.0)
+      }
+    };
+    let tick_length = style.series_label.font_size_pt * 0.3;
+    for (index, (label, depth_ratio)) in labels.into_iter().enumerate() {
+      let point = projection.project(base.0, base.1, depth_ratio);
+      items.push(PageItem::Line(LineItem {
+        x1_pt: point.0,
+        y1_pt: point.1,
+        x2_pt: point.0 + outward.0 * tick_length,
+        y2_pt: point.1 + outward.1 * tick_length,
+        width_pt: axis_width,
+        color: style.gridline_color,
+        kind: LineItemKind::Stroke,
+      }));
+      if labels_visible && index % rhythm == 0 {
+        let width = metrics.measure_text(label, &style.series_label);
+        push_text(
+          items,
+          point.0 + outward.0 * tick_length * 1.8 - width * 0.5,
+          point.1 + outward.1 * tick_length * 1.8 - line_height(&style.series_label) * 0.5,
+          label.to_string(),
+          style.series_label.clone(),
+        );
+      }
+    }
+  }
+}
+
+fn series_axis_label_rhythm(
+  maximum_label_width: f32,
+  axis_length: f32,
+  label_count: usize,
+  explicit_rhythm: Option<usize>,
+) -> usize {
+  if let Some(rhythm) = explicit_rhythm {
+    return rhythm.max(1);
+  }
+  if label_count <= 1 || maximum_label_width <= 0.0 {
+    return 1;
+  }
+  if axis_length <= f32::EPSILON {
+    return label_count;
+  }
+  // Axis labels occupy centered shapes, so the two endpoint half-widths are
+  // part of the available-axis budget as well. This is the same whole-axis
+  // extent calculation used by VCartesianAxis for automatic label rhythm.
+  let maximum_visible =
+    ((axis_length / (maximum_label_width * 1.05)).floor() as usize).clamp(2, label_count);
+  (label_count - 1).div_ceil(maximum_visible - 1).max(1)
 }
 
 #[derive(Clone, Copy)]
@@ -2563,7 +4550,7 @@ struct TrendlineGeometry {
   plot: PlotRect,
   scale: crate::render::chart::LinearAxisScale,
   category_count: usize,
-  x_extent: Option<(f64, f64)>,
+  x_scale: Option<crate::render::chart::LinearAxisScale>,
 }
 
 fn lower_trendlines(
@@ -2578,7 +4565,7 @@ fn lower_trendlines(
     plot,
     scale,
     category_count,
-    x_extent,
+    x_scale,
   } = geometry;
   let source = series
     .values
@@ -2686,12 +4673,9 @@ fn lower_trendlines(
         series.kind,
         ChartSeriesKind::Scatter | ChartSeriesKind::Bubble
       ) {
-        let (minimum, maximum) = x_extent.unwrap_or((0.0, 1.0));
-        if (maximum - minimum).abs() <= f64::EPSILON {
-          plot.left + plot.width * 0.5
-        } else {
-          plot.left + ((x_value - minimum) / (maximum - minimum)) as f32 * plot.width
-        }
+        x_scale.map_or(plot.left + plot.width * 0.5, |scale| {
+          value_x(x_value, scale, plot)
+        })
       } else {
         category_value_x(chart, x_value as f32, category_count, plot)
       };
@@ -2874,12 +4858,20 @@ fn lower_column_series(
   let peer_count = chart
     .series
     .iter()
-    .filter(|peer| peer.kind == ChartSeriesKind::Column && peer.grouping == series.grouping)
+    .filter(|peer| {
+      peer.axis_set_index == series.axis_set_index
+        && peer.kind == ChartSeriesKind::Column
+        && peer.grouping == series.grouping
+    })
     .count()
     .max(1);
   let peer_index = chart.series[..series_index]
     .iter()
-    .filter(|peer| peer.kind == ChartSeriesKind::Column && peer.grouping == series.grouping)
+    .filter(|peer| {
+      peer.axis_set_index == series.axis_set_index
+        && peer.kind == ChartSeriesKind::Column
+        && peer.grouping == series.grouping
+    })
     .count();
   for (category_index, value) in series.values.iter().enumerate() {
     let Some(value) = value else {
@@ -2887,18 +4879,22 @@ fn lower_column_series(
     };
     let (start_value, end_value) =
       stacked_value_bounds(chart, series_index, category_index, *value);
-    let slot_series_count = if series.grouping == ChartSeriesGrouping::Clustered {
+    let slot_series_count = if series.is_3d {
+      1
+    } else if series.grouping == ChartSeriesGrouping::Clustered {
       peer_count
     } else {
       1
     };
-    let slot_series_index = if series.grouping == ChartSeriesGrouping::Clustered {
+    let slot_series_index = if series.is_3d {
+      0
+    } else if series.grouping == ChartSeriesGrouping::Clustered {
       peer_index
     } else {
       0
     };
     let Some(slot) = clustered_column_slot(
-      category_display_index(chart, category_index, context.category_count),
+      horizontal_bar_category_display_index(chart, category_index, context.category_count),
       slot_series_index,
       context.category_count,
       slot_series_count,
@@ -2926,18 +4922,27 @@ fn lower_column_series(
     let x = context.plot.left + (slot.center - slot.width / 2.0) as f32 * context.plot.width;
     let width = slot.width as f32 * context.plot.width;
     let point_color = chart_point_color(style, series_index, category_index).unwrap_or(color);
-    if series.is_3d {
-      let depth = (width * 0.16).clamp(1.0, 5.0);
-      items.push(PageItem::Rect(RectItem {
-        x_pt: x + depth,
-        y_pt: end_y.min(start_y) - depth,
-        width_pt: width,
-        height_pt: (start_y - end_y).abs(),
-        fill_color: Some(point_color),
-        fill_opacity: 0.62,
-        stroke: None,
-        stroke_opacity: 1.0,
-      }));
+    if series.is_3d
+      && let Some(projection) = context.projection_3d
+    {
+      lower_3d_column_marker(
+        items,
+        Marker3DContext {
+          geometry: context,
+          projection,
+          series_index,
+          category_index,
+          color: point_color,
+        },
+        VerticalMarkerBounds {
+          x,
+          width,
+          start_y,
+          end_y,
+        },
+        (start_value, end_value),
+      );
+      continue;
     }
     items.push(PageItem::Rect(RectItem {
       x_pt: x,
@@ -2952,6 +4957,555 @@ fn lower_column_series(
   }
 }
 
+fn lower_3d_column_marker(
+  items: &mut Vec<PageItem>,
+  marker: Marker3DContext<'_, '_, '_>,
+  bounds: VerticalMarkerBounds,
+  values: (f64, f64),
+) {
+  let series = &marker.geometry.chart.series[marker.series_index];
+  let (front, back) = chart_3d_series_depth_slot(marker.geometry.chart, marker.series_index);
+  let depth = MarkerDepth { front, back };
+  match series.shape_3d {
+    c::ShapeValues::Box => lower_3d_box(
+      items,
+      marker.projection,
+      (bounds.x, bounds.start_y),
+      (bounds.x + bounds.width, bounds.end_y),
+      depth.front,
+      depth.back,
+      marker.color,
+    ),
+    c::ShapeValues::Cylinder => {
+      lower_3d_vertical_cylinder(items, marker.projection, bounds, depth, marker.color)
+    }
+    c::ShapeValues::Cone
+    | c::ShapeValues::ConeToMax
+    | c::ShapeValues::Pyramid
+    | c::ShapeValues::PyramidToMaximum => {
+      let (start_ratio, end_ratio) = marker_taper_ratios(
+        marker.geometry,
+        marker.series_index,
+        marker.category_index,
+        values.0,
+        values.1,
+      );
+      lower_3d_vertical_tapered_marker(
+        items,
+        marker.projection,
+        bounds,
+        (start_ratio, end_ratio),
+        depth,
+        marker.color,
+        matches!(
+          series.shape_3d,
+          c::ShapeValues::Cone | c::ShapeValues::ConeToMax
+        ),
+      );
+    }
+  }
+}
+
+fn lower_3d_bar_marker(
+  items: &mut Vec<PageItem>,
+  marker: Marker3DContext<'_, '_, '_>,
+  bounds: HorizontalMarkerBounds,
+  values: (f64, f64),
+) {
+  let series = &marker.geometry.chart.series[marker.series_index];
+  let (front, back) = chart_3d_series_depth_slot(marker.geometry.chart, marker.series_index);
+  let depth = MarkerDepth { front, back };
+  match series.shape_3d {
+    c::ShapeValues::Box => lower_3d_box(
+      items,
+      marker.projection,
+      (bounds.start_x, bounds.y),
+      (bounds.end_x, bounds.y + bounds.height),
+      depth.front,
+      depth.back,
+      marker.color,
+    ),
+    c::ShapeValues::Cylinder => {
+      lower_3d_horizontal_cylinder(items, marker.projection, bounds, depth, marker.color)
+    }
+    c::ShapeValues::Cone
+    | c::ShapeValues::ConeToMax
+    | c::ShapeValues::Pyramid
+    | c::ShapeValues::PyramidToMaximum => {
+      let (start_ratio, end_ratio) = marker_taper_ratios(
+        marker.geometry,
+        marker.series_index,
+        marker.category_index,
+        values.0,
+        values.1,
+      );
+      lower_3d_horizontal_tapered_marker(
+        items,
+        marker.projection,
+        bounds,
+        (start_ratio, end_ratio),
+        depth,
+        marker.color,
+        matches!(
+          series.shape_3d,
+          c::ShapeValues::Cone | c::ShapeValues::ConeToMax
+        ),
+      );
+    }
+  }
+}
+
+fn marker_taper_ratios(
+  context: &SeriesGeometryContext<'_, '_>,
+  series_index: usize,
+  category_index: usize,
+  start_value: f64,
+  end_value: f64,
+) -> (f32, f32) {
+  let series = &context.chart.series[series_index];
+  let to_axis_maximum = matches!(
+    series.shape_3d,
+    c::ShapeValues::ConeToMax | c::ShapeValues::PyramidToMaximum
+  );
+  let apex_value = if to_axis_maximum {
+    if end_value >= start_value {
+      context.scale.maximum
+    } else {
+      context.scale.minimum
+    }
+  } else if matches!(
+    series.grouping,
+    ChartSeriesGrouping::Stacked | ChartSeriesGrouping::PercentStacked
+  ) {
+    let same_sign_positive = end_value >= 0.0;
+    context
+      .chart
+      .series
+      .iter()
+      .filter(|peer| {
+        peer.axis_set_index == series.axis_set_index
+          && peer.kind == series.kind
+          && peer.grouping == series.grouping
+      })
+      .filter_map(|peer| peer.values.get(category_index).copied().flatten())
+      .filter(|value| (*value >= 0.0) == same_sign_positive)
+      .sum()
+  } else {
+    end_value
+  };
+  let base_value = 0.0_f64.clamp(context.scale.minimum, context.scale.maximum);
+  let range = apex_value - base_value;
+  if range.abs() <= f64::EPSILON {
+    return (1.0, 0.0);
+  }
+  let ratio = |value: f64| ((apex_value - value) / range).abs().clamp(0.0, 1.0) as f32;
+  (ratio(start_value), ratio(end_value))
+}
+
+fn lower_3d_box(
+  items: &mut Vec<PageItem>,
+  projection: Chart3DProjection,
+  corner1: (f32, f32),
+  corner2: (f32, f32),
+  front_depth: f32,
+  back_depth: f32,
+  color: RgbColor,
+) {
+  let left = corner1.0.min(corner2.0);
+  let right = corner1.0.max(corner2.0);
+  let top = corner1.1.min(corner2.1);
+  let bottom = corner1.1.max(corner2.1);
+  let front = [
+    projection.project(left, top, front_depth),
+    projection.project(right, top, front_depth),
+    projection.project(right, bottom, front_depth),
+    projection.project(left, bottom, front_depth),
+  ];
+  let back = [
+    projection.project(left, top, back_depth),
+    projection.project(right, top, back_depth),
+    projection.project(right, bottom, back_depth),
+    projection.project(left, bottom, back_depth),
+  ];
+  let stroke = Some((shade_chart_color(color, 0.68), 0.4));
+  push_chart_polygon(items, &back, shade_chart_color(color, 0.72), stroke);
+  let (depth_x, depth_y) = projection.depth_vector();
+  let side_indices = if depth_x >= 0.0 { (1, 2) } else { (0, 3) };
+  push_chart_polygon(
+    items,
+    &[
+      front[side_indices.0],
+      back[side_indices.0],
+      back[side_indices.1],
+      front[side_indices.1],
+    ],
+    shade_chart_color(color, 0.76),
+    stroke,
+  );
+  let cap_indices = if depth_y <= 0.0 { (0, 1) } else { (3, 2) };
+  push_chart_polygon(
+    items,
+    &[
+      front[cap_indices.0],
+      back[cap_indices.0],
+      back[cap_indices.1],
+      front[cap_indices.1],
+    ],
+    tint_chart_color(color, 0.18),
+    stroke,
+  );
+  push_chart_polygon(items, &front, color, stroke);
+}
+
+fn lower_3d_vertical_cylinder(
+  items: &mut Vec<PageItem>,
+  projection: Chart3DProjection,
+  bounds: VerticalMarkerBounds,
+  depth: MarkerDepth,
+  color: RgbColor,
+) {
+  let center_depth = (depth.front + depth.back) * 0.5;
+  let (left_start_x, start_center_y) = projection.project(bounds.x, bounds.start_y, center_depth);
+  let (right_start_x, _) =
+    projection.project(bounds.x + bounds.width, bounds.start_y, center_depth);
+  let (left_end_x, end_center_y) = projection.project(bounds.x, bounds.end_y, center_depth);
+  let (right_end_x, _) = projection.project(bounds.x + bounds.width, bounds.end_y, center_depth);
+  let center_x = (left_start_x + right_start_x + left_end_x + right_end_x) * 0.25;
+  let radius_x = ((right_start_x - left_start_x).abs() + (right_end_x - left_end_x).abs()) * 0.25;
+  let front_center = projection.project(bounds.x + bounds.width * 0.5, bounds.start_y, depth.front);
+  let back_center = projection.project(bounds.x + bounds.width * 0.5, bounds.start_y, depth.back);
+  let radius_y = ((back_center.1 - front_center.1).abs() * 0.5)
+    .max(bounds.width * 0.075)
+    .min(bounds.width * 0.26);
+  let top_y = start_center_y.min(end_center_y);
+  let bottom_y = start_center_y.max(end_center_y);
+  push_chart_ellipse(
+    items,
+    center_x,
+    bottom_y,
+    radius_x,
+    radius_y,
+    shade_chart_color(color, 0.75),
+    None,
+  );
+  lower_rounded_marker_band(
+    items,
+    center_x - radius_x,
+    top_y,
+    radius_x * 2.0,
+    bottom_y - top_y,
+    true,
+    color,
+  );
+  push_chart_ellipse(
+    items,
+    center_x,
+    top_y,
+    radius_x,
+    radius_y,
+    tint_chart_color(color, 0.24),
+    Some((shade_chart_color(color, 0.66), 0.35)),
+  );
+}
+
+fn lower_3d_horizontal_cylinder(
+  items: &mut Vec<PageItem>,
+  projection: Chart3DProjection,
+  bounds: HorizontalMarkerBounds,
+  depth: MarkerDepth,
+  color: RgbColor,
+) {
+  let center_depth = (depth.front + depth.back) * 0.5;
+  let start = projection.project(bounds.start_x, bounds.y + bounds.height * 0.5, center_depth);
+  let end = projection.project(bounds.end_x, bounds.y + bounds.height * 0.5, center_depth);
+  let (_, top_y) = projection.project(bounds.start_x, bounds.y, center_depth);
+  let (_, bottom_y) = projection.project(bounds.start_x, bounds.y + bounds.height, center_depth);
+  let radius_y = (bottom_y - top_y).abs() * 0.5;
+  let front_center =
+    projection.project(bounds.start_x, bounds.y + bounds.height * 0.5, depth.front);
+  let back_center = projection.project(bounds.start_x, bounds.y + bounds.height * 0.5, depth.back);
+  let radius_x = ((back_center.0 - front_center.0).abs() * 0.5)
+    .max(bounds.height * 0.075)
+    .min(bounds.height * 0.26);
+  let left = start.0.min(end.0);
+  let right = start.0.max(end.0);
+  push_chart_ellipse(
+    items,
+    left,
+    start.1,
+    radius_x,
+    radius_y,
+    shade_chart_color(color, 0.75),
+    None,
+  );
+  lower_rounded_marker_band(
+    items,
+    left,
+    start.1 - radius_y,
+    right - left,
+    radius_y * 2.0,
+    false,
+    color,
+  );
+  push_chart_ellipse(
+    items,
+    right,
+    end.1,
+    radius_x,
+    radius_y,
+    tint_chart_color(color, 0.18),
+    Some((shade_chart_color(color, 0.66), 0.35)),
+  );
+}
+
+fn lower_3d_vertical_tapered_marker(
+  items: &mut Vec<PageItem>,
+  projection: Chart3DProjection,
+  bounds: VerticalMarkerBounds,
+  taper: (f32, f32),
+  depth: MarkerDepth,
+  color: RgbColor,
+  rounded: bool,
+) {
+  let center_x = bounds.x + bounds.width * 0.5;
+  let center_depth = (depth.front + depth.back) * 0.5;
+  let start_half_width = bounds.width * taper.0 * 0.5;
+  let end_half_width = bounds.width * taper.1 * 0.5;
+  let tapered_bounds = VerticalTaperedBounds {
+    center_x,
+    start_y: bounds.start_y,
+    end_y: bounds.end_y,
+    start_half_width,
+    end_half_width,
+  };
+  if rounded {
+    lower_vertical_tapered_bands(items, projection, tapered_bounds, center_depth, color);
+    return;
+  }
+  let front = [
+    projection.project(center_x - start_half_width, bounds.start_y, depth.front),
+    projection.project(center_x + start_half_width, bounds.start_y, depth.front),
+    projection.project(center_x + end_half_width, bounds.end_y, depth.front),
+    projection.project(center_x - end_half_width, bounds.end_y, depth.front),
+  ];
+  let back = [
+    projection.project(center_x - start_half_width, bounds.start_y, depth.back),
+    projection.project(center_x + start_half_width, bounds.start_y, depth.back),
+    projection.project(center_x + end_half_width, bounds.end_y, depth.back),
+    projection.project(center_x - end_half_width, bounds.end_y, depth.back),
+  ];
+  let stroke = Some((shade_chart_color(color, 0.65), 0.4));
+  push_chart_polygon(items, &back, shade_chart_color(color, 0.72), stroke);
+  push_chart_polygon(
+    items,
+    &[front[1], back[1], back[2], front[2]],
+    shade_chart_color(color, 0.76),
+    stroke,
+  );
+  push_chart_polygon(items, &front, color, stroke);
+}
+
+fn lower_3d_horizontal_tapered_marker(
+  items: &mut Vec<PageItem>,
+  projection: Chart3DProjection,
+  bounds: HorizontalMarkerBounds,
+  taper: (f32, f32),
+  depth: MarkerDepth,
+  color: RgbColor,
+  rounded: bool,
+) {
+  let center_y = bounds.y + bounds.height * 0.5;
+  let center_depth = (depth.front + depth.back) * 0.5;
+  let start_half_height = bounds.height * taper.0 * 0.5;
+  let end_half_height = bounds.height * taper.1 * 0.5;
+  let tapered_bounds = HorizontalTaperedBounds {
+    start_x: bounds.start_x,
+    end_x: bounds.end_x,
+    center_y,
+    start_half_height,
+    end_half_height,
+  };
+  if rounded {
+    lower_horizontal_tapered_bands(items, projection, tapered_bounds, center_depth, color);
+    return;
+  }
+  let front = [
+    projection.project(bounds.start_x, center_y - start_half_height, depth.front),
+    projection.project(bounds.end_x, center_y - end_half_height, depth.front),
+    projection.project(bounds.end_x, center_y + end_half_height, depth.front),
+    projection.project(bounds.start_x, center_y + start_half_height, depth.front),
+  ];
+  let back = [
+    projection.project(bounds.start_x, center_y - start_half_height, depth.back),
+    projection.project(bounds.end_x, center_y - end_half_height, depth.back),
+    projection.project(bounds.end_x, center_y + end_half_height, depth.back),
+    projection.project(bounds.start_x, center_y + start_half_height, depth.back),
+  ];
+  let stroke = Some((shade_chart_color(color, 0.65), 0.4));
+  push_chart_polygon(items, &back, shade_chart_color(color, 0.72), stroke);
+  push_chart_polygon(
+    items,
+    &[front[0], back[0], back[1], front[1]],
+    tint_chart_color(color, 0.12),
+    stroke,
+  );
+  push_chart_polygon(items, &front, color, stroke);
+}
+
+fn lower_vertical_tapered_bands(
+  items: &mut Vec<PageItem>,
+  projection: Chart3DProjection,
+  bounds: VerticalTaperedBounds,
+  depth: f32,
+  color: RgbColor,
+) {
+  const BAND_EDGES: [f32; 6] = [-1.0, -0.6, -0.2, 0.2, 0.6, 1.0];
+  const BAND_SHADE: [f32; 5] = [0.72, 0.88, 1.08, 0.96, 0.78];
+  for band in 0..5 {
+    let left = BAND_EDGES[band];
+    let right = BAND_EDGES[band + 1];
+    let points = [
+      projection.project(
+        bounds.center_x + bounds.start_half_width * left,
+        bounds.start_y,
+        depth,
+      ),
+      projection.project(
+        bounds.center_x + bounds.start_half_width * right,
+        bounds.start_y,
+        depth,
+      ),
+      projection.project(
+        bounds.center_x + bounds.end_half_width * right,
+        bounds.end_y,
+        depth,
+      ),
+      projection.project(
+        bounds.center_x + bounds.end_half_width * left,
+        bounds.end_y,
+        depth,
+      ),
+    ];
+    let band_color = if BAND_SHADE[band] <= 1.0 {
+      shade_chart_color(color, BAND_SHADE[band])
+    } else {
+      tint_chart_color(color, BAND_SHADE[band] - 1.0)
+    };
+    push_chart_polygon(items, &points, band_color, None);
+  }
+}
+
+fn lower_horizontal_tapered_bands(
+  items: &mut Vec<PageItem>,
+  projection: Chart3DProjection,
+  bounds: HorizontalTaperedBounds,
+  depth: f32,
+  color: RgbColor,
+) {
+  const BAND_EDGES: [f32; 6] = [-1.0, -0.6, -0.2, 0.2, 0.6, 1.0];
+  const BAND_SHADE: [f32; 5] = [0.72, 0.88, 1.08, 0.96, 0.78];
+  for band in 0..5 {
+    let top = BAND_EDGES[band];
+    let bottom = BAND_EDGES[band + 1];
+    let points = [
+      projection.project(
+        bounds.start_x,
+        bounds.center_y + bounds.start_half_height * top,
+        depth,
+      ),
+      projection.project(
+        bounds.end_x,
+        bounds.center_y + bounds.end_half_height * top,
+        depth,
+      ),
+      projection.project(
+        bounds.end_x,
+        bounds.center_y + bounds.end_half_height * bottom,
+        depth,
+      ),
+      projection.project(
+        bounds.start_x,
+        bounds.center_y + bounds.start_half_height * bottom,
+        depth,
+      ),
+    ];
+    let band_color = if BAND_SHADE[band] <= 1.0 {
+      shade_chart_color(color, BAND_SHADE[band])
+    } else {
+      tint_chart_color(color, BAND_SHADE[band] - 1.0)
+    };
+    push_chart_polygon(items, &points, band_color, None);
+  }
+}
+
+fn lower_rounded_marker_band(
+  items: &mut Vec<PageItem>,
+  x: f32,
+  y: f32,
+  width: f32,
+  height: f32,
+  vertical_gradient: bool,
+  color: RgbColor,
+) {
+  const SHADES: [f32; 5] = [0.72, 0.88, 1.08, 0.96, 0.78];
+  for (index, shade) in SHADES.into_iter().enumerate() {
+    let ratio_start = index as f32 / SHADES.len() as f32;
+    let ratio_end = (index + 1) as f32 / SHADES.len() as f32;
+    let band_color = if shade <= 1.0 {
+      shade_chart_color(color, shade)
+    } else {
+      tint_chart_color(color, shade - 1.0)
+    };
+    let (band_x, band_y, band_width, band_height) = if vertical_gradient {
+      (
+        x + width * ratio_start,
+        y,
+        width * (ratio_end - ratio_start),
+        height,
+      )
+    } else {
+      (
+        x,
+        y + height * ratio_start,
+        width,
+        height * (ratio_end - ratio_start),
+      )
+    };
+    items.push(PageItem::Rect(RectItem {
+      x_pt: band_x,
+      y_pt: band_y,
+      width_pt: band_width,
+      height_pt: band_height,
+      fill_color: Some(band_color),
+      fill_opacity: 1.0,
+      stroke: None,
+      stroke_opacity: 1.0,
+    }));
+  }
+}
+
+fn push_chart_ellipse(
+  items: &mut Vec<PageItem>,
+  center_x: f32,
+  center_y: f32,
+  radius_x: f32,
+  radius_y: f32,
+  color: RgbColor,
+  stroke: Option<(RgbColor, f32)>,
+) {
+  const SEGMENTS: usize = 32;
+  let points = (0..SEGMENTS)
+    .map(|index| {
+      let angle = std::f32::consts::TAU * index as f32 / SEGMENTS as f32;
+      (
+        center_x + radius_x * angle.cos(),
+        center_y + radius_y * angle.sin(),
+      )
+    })
+    .collect::<Vec<_>>();
+  push_chart_polygon(items, &points, color, stroke);
+}
+
 fn lower_bar_series(
   items: &mut Vec<PageItem>,
   context: &SeriesGeometryContext<'_, '_>,
@@ -2964,12 +5518,20 @@ fn lower_bar_series(
   let peer_count = chart
     .series
     .iter()
-    .filter(|peer| peer.kind == ChartSeriesKind::Bar && peer.grouping == series.grouping)
+    .filter(|peer| {
+      peer.axis_set_index == series.axis_set_index
+        && peer.kind == ChartSeriesKind::Bar
+        && peer.grouping == series.grouping
+    })
     .count()
     .max(1);
   let peer_index = chart.series[..series_index]
     .iter()
-    .filter(|peer| peer.kind == ChartSeriesKind::Bar && peer.grouping == series.grouping)
+    .filter(|peer| {
+      peer.axis_set_index == series.axis_set_index
+        && peer.kind == ChartSeriesKind::Bar
+        && peer.grouping == series.grouping
+    })
     .count();
   let zero_x = value_x(
     0.0_f64.clamp(context.scale.minimum, context.scale.maximum),
@@ -2982,12 +5544,16 @@ fn lower_bar_series(
     };
     let (start_value, end_value) =
       stacked_value_bounds(chart, series_index, category_index, *value);
-    let slot_series_count = if series.grouping == ChartSeriesGrouping::Clustered {
+    let slot_series_count = if series.is_3d {
+      1
+    } else if series.grouping == ChartSeriesGrouping::Clustered {
       peer_count
     } else {
       1
     };
-    let slot_series_index = if series.grouping == ChartSeriesGrouping::Clustered {
+    let slot_series_index = if series.is_3d {
+      0
+    } else if series.grouping == ChartSeriesGrouping::Clustered {
       peer_index
     } else {
       0
@@ -3009,11 +5575,35 @@ fn lower_bar_series(
     };
     let end_x = value_x(end_value, context.scale, context.plot);
     let point_color = chart_point_color(style, series_index, category_index).unwrap_or(color);
+    let y = context.plot.top + (slot.center - slot.width / 2.0) as f32 * context.plot.height;
+    let height = slot.width as f32 * context.plot.height;
+    if series.is_3d
+      && let Some(projection) = context.projection_3d
+    {
+      lower_3d_bar_marker(
+        items,
+        Marker3DContext {
+          geometry: context,
+          projection,
+          series_index,
+          category_index,
+          color: point_color,
+        },
+        HorizontalMarkerBounds {
+          start_x,
+          end_x,
+          y,
+          height,
+        },
+        (start_value, end_value),
+      );
+      continue;
+    }
     items.push(PageItem::Rect(RectItem {
       x_pt: start_x.min(end_x),
-      y_pt: context.plot.top + (slot.center - slot.width / 2.0) as f32 * context.plot.height,
+      y_pt: y,
       width_pt: (end_x - start_x).abs(),
-      height_pt: slot.width as f32 * context.plot.height,
+      height_pt: height,
       fill_color: Some(point_color),
       fill_opacity: 1.0,
       stroke: None,
@@ -3035,6 +5625,20 @@ fn lower_line_series(
   let scale = context.scale;
   let category_count = context.category_count;
   let series = &chart.series[series_index];
+  if series.is_3d
+    && let Some(projection) = context.projection_3d
+  {
+    lower_3d_line_or_area_series(
+      items,
+      context,
+      series_index,
+      color,
+      fill_to_axis,
+      style,
+      projection,
+    );
+    return;
+  }
   if series.smooth == Some(true) {
     let mut runs = Vec::new();
     let mut run = Vec::new();
@@ -3189,6 +5793,254 @@ fn lower_line_series(
   }
 }
 
+fn lower_3d_line_or_area_series(
+  items: &mut Vec<PageItem>,
+  context: &SeriesGeometryContext<'_, '_>,
+  series_index: usize,
+  color: RgbColor,
+  fill_to_axis: bool,
+  style: &ClusteredColumnStyle,
+  projection: Chart3DProjection,
+) {
+  let chart = context.chart;
+  let series = &chart.series[series_index];
+  let (front_depth, back_depth) = chart_3d_series_depth_slot(chart, series_index);
+  let stroke = (!series.line_hidden).then_some((
+    shade_chart_color(color, 0.68),
+    (series.line_width_pt.unwrap_or(1.5) * style.stroke_scale * 0.3).clamp(0.25, 1.5),
+  ));
+
+  if fill_to_axis {
+    let mut upper = Vec::new();
+    let mut lower = Vec::new();
+    let mut runs = Vec::new();
+    for (index, value) in series.values.iter().enumerate() {
+      let Some(value) = value.as_ref().copied().filter(|value| value.is_finite()) else {
+        if upper.len() >= 2 {
+          runs.push((std::mem::take(&mut upper), std::mem::take(&mut lower)));
+        } else {
+          upper.clear();
+          lower.clear();
+        }
+        continue;
+      };
+      let (stack_start, stack_end) = stacked_value_bounds(chart, series_index, index, value);
+      let stacked = matches!(
+        series.grouping,
+        ChartSeriesGrouping::Stacked | ChartSeriesGrouping::PercentStacked
+      );
+      let display_index = category_display_index(chart, index, context.category_count);
+      let x = category_point_x(chart, display_index, context.category_count, context.plot);
+      upper.push((
+        x,
+        value_y(
+          if stacked { stack_end } else { value },
+          context.scale,
+          context.plot.top,
+          context.plot.height,
+        ),
+      ));
+      lower.push((
+        x,
+        value_y(
+          if stacked {
+            stack_start
+          } else {
+            // LibreOffice AreaChart::impl_createArea grounds 3-D areas at
+            // the logical minimum, not at the 2-D base value.
+            context.scale.minimum
+          },
+          context.scale,
+          context.plot.top,
+          context.plot.height,
+        ),
+      ));
+    }
+    if upper.len() >= 2 {
+      runs.push((upper, lower));
+    }
+    for (mut upper, lower) in runs {
+      upper.extend(lower.into_iter().rev());
+      lower_3d_extruded_polygon(
+        items,
+        &upper,
+        projection,
+        front_depth,
+        back_depth,
+        color,
+        stroke,
+      );
+    }
+    return;
+  }
+
+  if series.line_hidden {
+    return;
+  }
+  let mut run = Vec::new();
+  let mut runs = Vec::new();
+  for (index, value) in series.values.iter().enumerate() {
+    let Some(value) = value.as_ref().copied().filter(|value| value.is_finite()) else {
+      if run.len() >= 2 {
+        runs.push(std::mem::take(&mut run));
+      } else {
+        run.clear();
+      }
+      continue;
+    };
+    let (_, stack_end) = stacked_value_bounds(chart, series_index, index, value);
+    let point_value = if matches!(
+      series.grouping,
+      ChartSeriesGrouping::Stacked | ChartSeriesGrouping::PercentStacked
+    ) {
+      stack_end
+    } else {
+      value
+    };
+    let display_index = category_display_index(chart, index, context.category_count);
+    run.push((
+      category_point_x(chart, display_index, context.category_count, context.plot),
+      value_y(
+        point_value,
+        context.scale,
+        context.plot.top,
+        context.plot.height,
+      ),
+      index,
+    ));
+  }
+  if run.len() >= 2 {
+    runs.push(run);
+  }
+  for run in runs {
+    let points = if series.smooth == Some(true) {
+      sample_cardinal_chart_line(&run, 12)
+    } else {
+      run.iter().map(|point| (point.0, point.1)).collect()
+    };
+    lower_3d_line_stripes(
+      items,
+      &points,
+      projection,
+      front_depth,
+      back_depth,
+      color,
+      stroke,
+    );
+  }
+}
+
+fn lower_3d_line_stripes(
+  items: &mut Vec<PageItem>,
+  points: &[(f32, f32)],
+  projection: Chart3DProjection,
+  front_depth: f32,
+  back_depth: f32,
+  color: RgbColor,
+  stroke: Option<(RgbColor, f32)>,
+) {
+  for segment in points.windows(2) {
+    let point1_front = projection.project(segment[0].0, segment[0].1, front_depth);
+    let point2_front = projection.project(segment[1].0, segment[1].1, front_depth);
+    let point2_back = projection.project(segment[1].0, segment[1].1, back_depth);
+    let point1_back = projection.project(segment[0].0, segment[0].1, back_depth);
+    // LibreOffice AreaChart::impl_createLine and Stripe.cxx define a 3-D
+    // line segment as p1,p2,p2+depth,p1+depth with filled-series
+    // properties. Preserve that face instead of drawing a projected 2-D
+    // stroke.
+    push_chart_polygon(
+      items,
+      &[point1_front, point2_front, point2_back, point1_back],
+      color,
+      stroke,
+    );
+  }
+}
+
+fn lower_3d_extruded_polygon(
+  items: &mut Vec<PageItem>,
+  polygon: &[(f32, f32)],
+  projection: Chart3DProjection,
+  front_depth: f32,
+  back_depth: f32,
+  color: RgbColor,
+  stroke: Option<(RgbColor, f32)>,
+) {
+  if polygon.len() < 3 {
+    return;
+  }
+  let front = polygon
+    .iter()
+    .map(|point| projection.project(point.0, point.1, front_depth))
+    .collect::<Vec<_>>();
+  let back = polygon
+    .iter()
+    .map(|point| projection.project(point.0, point.1, back_depth))
+    .collect::<Vec<_>>();
+  push_chart_polygon(items, &back, shade_chart_color(color, 0.72), stroke);
+  for index in 0..polygon.len() {
+    let next = (index + 1) % polygon.len();
+    let side_color =
+      if (polygon[next].1 - polygon[index].1).abs() > (polygon[next].0 - polygon[index].0).abs() {
+        shade_chart_color(color, 0.72)
+      } else {
+        tint_chart_color(color, 0.12)
+      };
+    push_chart_polygon(
+      items,
+      &[front[index], front[next], back[next], back[index]],
+      side_color,
+      stroke,
+    );
+  }
+  push_chart_polygon(items, &front, color, stroke);
+}
+
+fn sample_cardinal_chart_line(
+  points: &[(f32, f32, usize)],
+  resolution_per_segment: usize,
+) -> Vec<(f32, f32)> {
+  if points.len() < 2 {
+    return points.iter().map(|point| (point.0, point.1)).collect();
+  }
+  let resolution = resolution_per_segment.max(1);
+  let mut result = vec![(points[0].0, points[0].1)];
+  for index in 0..points.len() - 1 {
+    let start = (points[index].0, points[index].1);
+    let end = (points[index + 1].0, points[index + 1].1);
+    let (control1, control2) = cardinal_cubic_controls(points, index);
+    for step in 1..=resolution {
+      let t = step as f32 / resolution as f32;
+      result.push(cubic_bezier_point(start, control1, control2, end, t));
+    }
+  }
+  result
+}
+
+fn cubic_bezier_point(
+  start: (f32, f32),
+  control1: (f32, f32),
+  control2: (f32, f32),
+  end: (f32, f32),
+  t: f32,
+) -> (f32, f32) {
+  let inverse = 1.0 - t;
+  let start_weight = inverse * inverse * inverse;
+  let control1_weight = 3.0 * inverse * inverse * t;
+  let control2_weight = 3.0 * inverse * t * t;
+  let end_weight = t * t * t;
+  (
+    start.0 * start_weight
+      + control1.0 * control1_weight
+      + control2.0 * control2_weight
+      + end.0 * end_weight,
+    start.1 * start_weight
+      + control1.1 * control1_weight
+      + control2.1 * control2_weight
+      + end.1 * end_weight,
+  )
+}
+
 fn lower_cardinal_cubic_chart_line(
   items: &mut Vec<PageItem>,
   points: &[(f32, f32, usize)],
@@ -3273,7 +6125,6 @@ fn lower_scatter_series(
   bubbles: bool,
   style: &ClusteredColumnStyle,
 ) {
-  let (x_minimum, x_maximum) = geometry.x_extent.unwrap_or((0.0, 1.0));
   let point_for = |index: usize, value: f64| {
     let x_value = series
       .x_values
@@ -3281,12 +6132,11 @@ fn lower_scatter_series(
       .copied()
       .flatten()
       .unwrap_or(index as f64 + 1.0);
-    let x = if (x_maximum - x_minimum).abs() <= f64::EPSILON {
-      geometry.plot.left + geometry.plot.width * 0.5
-    } else {
-      geometry.plot.left
-        + ((x_value - x_minimum) / (x_maximum - x_minimum)) as f32 * geometry.plot.width
-    };
+    let x = geometry
+      .x_scale
+      .map_or(geometry.plot.left + geometry.plot.width * 0.5, |scale| {
+        value_x(x_value, scale, geometry.plot)
+      });
     (
       x,
       value_y(
@@ -3818,44 +6668,107 @@ fn lower_radar_axes(
 fn lower_horizontal_bar_axes(
   items: &mut Vec<PageItem>,
   chart: &ClusteredColumnChart<'_>,
-  plot: PlotRect,
   tick_labels: &[(f64, String)],
-  scale: crate::render::chart::LinearAxisScale,
+  geometry: HorizontalAxisGeometry,
   style: &ClusteredColumnStyle,
   metrics: &mut TextMetrics,
 ) {
+  let HorizontalAxisGeometry {
+    plot,
+    scale,
+    projection_3d,
+    draw_gridlines,
+    draw_labels,
+  } = geometry;
+  let value_axis_visible = chart.value_axis.is_none_or(value_axis_is_visible);
+  let value_labels_visible = value_axis_visible
+    && chart.value_axis.is_none_or(|axis| {
+      axis
+        .tick_label_position
+        .as_ref()
+        .is_none_or(|position| position.val != Some(c::TickLabelPositionValues::None))
+    });
+  let value_gridlines_visible = value_axis_visible
+    && chart
+      .value_axis
+      .is_none_or(|axis| axis.major_gridlines.is_some());
   for (value, label) in tick_labels {
     let x = value_x(*value, scale, plot);
-    items.push(PageItem::Line(LineItem {
-      x1_pt: x,
-      y1_pt: plot.top,
-      x2_pt: x,
-      y2_pt: plot.top + plot.height,
-      width_pt: 0.75,
-      color: style.gridline_color,
-      kind: LineItemKind::Stroke,
-    }));
-    let width = metrics.measure_text(label, &style.label);
-    push_text(
-      items,
-      x - width * 0.5,
-      plot.top + plot.height + style.label.font_size_pt * 0.25,
-      label.clone(),
-      style.label.clone(),
-    );
+    if draw_gridlines && value_gridlines_visible {
+      let ((x1, y1), (x2, y2)) =
+        projection_3d.map_or(((x, plot.top), (x, plot.top + plot.height)), |projection| {
+          (
+            projection.project(x, plot.top, 1.0),
+            projection.project(x, plot.top + plot.height, 1.0),
+          )
+        });
+      items.push(PageItem::Line(LineItem {
+        x1_pt: x1,
+        y1_pt: y1,
+        x2_pt: x2,
+        y2_pt: y2,
+        width_pt: 0.75,
+        color: style.gridline_color,
+        kind: LineItemKind::Stroke,
+      }));
+    }
+    if draw_labels && value_labels_visible {
+      let (axis_x, axis_y) = projection_3d.map_or((x, plot.top + plot.height), |projection| {
+        projection.project(x, plot.top + plot.height, 1.0)
+      });
+      let width = metrics.measure_text(label, &style.value_label);
+      push_text(
+        items,
+        axis_x - width * 0.5,
+        axis_y + style.value_label.font_size_pt * 0.25,
+        label.clone(),
+        style.value_label.clone(),
+      );
+    }
+  }
+  if !draw_labels {
+    return;
+  }
+  let category_labels_visible = chart
+    .category_axis
+    .map(category_axis_is_visible)
+    .or_else(|| chart.date_axis.map(date_axis_is_visible))
+    .unwrap_or(true)
+    && chart
+      .category_axis
+      .map(|axis| {
+        axis
+          .tick_label_position
+          .as_ref()
+          .is_none_or(|position| position.val != Some(c::TickLabelPositionValues::None))
+      })
+      .or_else(|| {
+        chart.date_axis.map(|axis| {
+          axis
+            .tick_label_position
+            .as_ref()
+            .is_none_or(|position| position.val != Some(c::TickLabelPositionValues::None))
+        })
+      })
+      .unwrap_or(true);
+  if !category_labels_visible {
+    return;
   }
   let count = chart.categories.len().max(1);
   for (index, category) in chart.categories.iter().enumerate() {
-    let width = metrics.measure_text(category, &style.label);
-    let display_index = category_display_index(chart, index, count);
+    let width = metrics.measure_text(category, &style.category_label);
+    let display_index = horizontal_bar_category_display_index(chart, index, count);
     let y = plot.top + (display_index as f32 + 0.5) / count as f32 * plot.height
-      - line_height(&style.label) * 0.5;
+      - line_height(&style.category_label) * 0.5;
+    let (axis_x, axis_y) = projection_3d.map_or((plot.left, y), |projection| {
+      projection.project(plot.left, y, 1.0)
+    });
     push_text(
       items,
-      plot.left - width - style.label.font_size_pt * 0.45,
-      y,
+      axis_x - width - style.category_label.font_size_pt * 0.45,
+      axis_y,
       category.clone(),
-      style.label.clone(),
+      style.category_label.clone(),
     );
   }
 }
@@ -3868,20 +6781,54 @@ fn lower_scatter_x_axis(
   metrics: &mut TextMetrics,
   draw_gridlines: bool,
   draw_labels: bool,
+  maximum_auto_increment_count: usize,
 ) {
-  let values = scatter_x_axis_values(chart);
-  let Some(scale) = linear_axis_scale(values, None, 10) else {
+  let values = bubble_padded_axis_values(
+    scatter_x_axis_values(chart, 0),
+    chart
+      .series
+      .iter()
+      .filter(|series| series.kind == ChartSeriesKind::Bubble)
+      .flat_map(|series| series.x_values.iter().flatten().copied()),
+  );
+  let Some(scale) = linear_axis_scale(
+    values,
+    chart.horizontal_value_axis,
+    maximum_auto_increment_count,
+  ) else {
     return;
   };
+  let axis_visible = chart
+    .horizontal_value_axis
+    .is_none_or(value_axis_is_visible);
+  let labels_visible = axis_visible
+    && chart.horizontal_value_axis.is_none_or(|axis| {
+      axis
+        .tick_label_position
+        .as_ref()
+        .is_none_or(|position| position.val != Some(c::TickLabelPositionValues::None))
+    });
+  let gridlines_visible = axis_visible
+    && chart
+      .horizontal_value_axis
+      .is_none_or(|axis| axis.major_gridlines.is_some());
+  let format_code = chart
+    .horizontal_value_axis
+    .and_then(|axis| axis.numbering_format.as_ref())
+    .map(|format| format.format_code.as_str());
+  let display_unit = chart
+    .horizontal_value_axis
+    .map_or(1.0, value_axis_display_unit);
   for (value, label) in scale_tick_labels(
     scale.minimum,
     scale.maximum,
     scale.major_unit,
-    None,
+    format_code,
     scale.logarithmic_base,
+    display_unit,
   ) {
     let x = value_x(value, scale, plot);
-    if draw_gridlines {
+    if draw_gridlines && gridlines_visible {
       items.push(PageItem::Line(LineItem {
         x1_pt: x,
         y1_pt: plot.top,
@@ -3892,7 +6839,7 @@ fn lower_scatter_x_axis(
         kind: LineItemKind::Stroke,
       }));
     }
-    if draw_labels {
+    if draw_labels && labels_visible {
       let width = metrics.measure_text(&label, &style.category_label);
       push_text(
         items,
@@ -3931,15 +6878,16 @@ fn scatter_uses_index_x_values(chart: &ClusteredColumnChart<'_>) -> bool {
   has_x_slots
 }
 
-fn scatter_x_axis_values(chart: &ClusteredColumnChart<'_>) -> Vec<f64> {
+fn scatter_x_axis_values(chart: &ClusteredColumnChart<'_>, axis_set_index: usize) -> Vec<f64> {
   chart
     .series
     .iter()
     .filter(|series| {
-      matches!(
-        series.kind,
-        ChartSeriesKind::Scatter | ChartSeriesKind::Bubble
-      )
+      series.axis_set_index == axis_set_index
+        && matches!(
+          series.kind,
+          ChartSeriesKind::Scatter | ChartSeriesKind::Bubble
+        )
     })
     .flat_map(|series| {
       let point_count = series.x_values.len().max(series.values.len());
@@ -3973,7 +6921,11 @@ fn stacked_value_bounds(
     chart
       .series
       .iter()
-      .filter(|peer| peer.kind == series.kind && peer.grouping == series.grouping)
+      .filter(|peer| {
+        peer.axis_set_index == series.axis_set_index
+          && peer.kind == series.kind
+          && peer.grouping == series.grouping
+      })
       .filter_map(|peer| peer.values.get(category_index).copied().flatten())
       .map(f64::abs)
       .sum::<f64>()
@@ -3983,10 +6935,11 @@ fn stacked_value_bounds(
   };
   let normalized = value / total;
   let mut start = 0.0;
-  for peer in chart.series[..series_index]
-    .iter()
-    .filter(|peer| peer.kind == series.kind && peer.grouping == series.grouping)
-  {
+  for peer in chart.series[..series_index].iter().filter(|peer| {
+    peer.axis_set_index == series.axis_set_index
+      && peer.kind == series.kind
+      && peer.grouping == series.grouping
+  }) {
     if let Some(previous) = peer.values.get(category_index).copied().flatten()
       && previous.signum() == value.signum()
     {
@@ -4036,23 +6989,32 @@ fn data_label_anchor(
   series_index: usize,
   point_index: usize,
   plot: PlotRect,
-  scale: crate::render::chart::LinearAxisScale,
+  axes: CartesianAxisScales,
   zero_y: f32,
   category_count: usize,
 ) -> Option<ChartPointAnchor> {
   let series = chart.series.get(series_index)?;
   let value = series.values.get(point_index).copied().flatten()?;
+  let scale = axes.y;
   match series.kind {
     ChartSeriesKind::Column => {
       let peers = chart
         .series
         .iter()
-        .filter(|peer| peer.kind == series.kind && peer.grouping == series.grouping)
+        .filter(|peer| {
+          peer.axis_set_index == series.axis_set_index
+            && peer.kind == series.kind
+            && peer.grouping == series.grouping
+        })
         .count()
         .max(1);
       let peer_index = chart.series[..series_index]
         .iter()
-        .filter(|peer| peer.kind == series.kind && peer.grouping == series.grouping)
+        .filter(|peer| {
+          peer.axis_set_index == series.axis_set_index
+            && peer.kind == series.kind
+            && peer.grouping == series.grouping
+        })
         .count();
       let clustered = series.grouping == ChartSeriesGrouping::Clustered;
       let slot = clustered_column_slot(
@@ -4080,16 +7042,24 @@ fn data_label_anchor(
       let peers = chart
         .series
         .iter()
-        .filter(|peer| peer.kind == series.kind && peer.grouping == series.grouping)
+        .filter(|peer| {
+          peer.axis_set_index == series.axis_set_index
+            && peer.kind == series.kind
+            && peer.grouping == series.grouping
+        })
         .count()
         .max(1);
       let peer_index = chart.series[..series_index]
         .iter()
-        .filter(|peer| peer.kind == series.kind && peer.grouping == series.grouping)
+        .filter(|peer| {
+          peer.axis_set_index == series.axis_set_index
+            && peer.kind == series.kind
+            && peer.grouping == series.grouping
+        })
         .count();
       let clustered = series.grouping == ChartSeriesGrouping::Clustered;
       let slot = clustered_column_slot(
-        category_display_index(chart, point_index, category_count),
+        horizontal_bar_category_display_index(chart, point_index, category_count),
         if clustered { peer_index } else { 0 },
         category_count,
         if clustered { peers } else { 1 },
@@ -4110,20 +7080,15 @@ fn data_label_anchor(
       })
     }
     ChartSeriesKind::Scatter | ChartSeriesKind::Bubble => {
-      let extent = linear_axis_scale(scatter_x_axis_values(chart), None, 10)
-        .map(|scale| (scale.minimum, scale.maximum))
-        .unwrap_or((0.0, 1.0));
       let x_value = series
         .x_values
         .get(point_index)
         .copied()
         .flatten()
         .unwrap_or(point_index as f64 + 1.0);
-      let x = if (extent.1 - extent.0).abs() <= f64::EPSILON {
-        plot.left + plot.width * 0.5
-      } else {
-        plot.left + ((x_value - extent.0) / (extent.1 - extent.0)) as f32 * plot.width
-      };
+      let x = axes.x.map_or(plot.left + plot.width * 0.5, |scale| {
+        value_x(x_value, scale, plot)
+      });
       let y = value_y(value, scale, plot.top, plot.height);
       Some(ChartPointAnchor {
         x,
@@ -4181,6 +7146,67 @@ fn category_display_index(
   }
 }
 
+fn horizontal_bar_category_display_index(
+  chart: &ClusteredColumnChart<'_>,
+  source_index: usize,
+  category_count: usize,
+) -> usize {
+  // BarChartTypeTemplate swaps X/Y. PlottingPositionHelper then applies the
+  // category orientation to the physical Y scale, whose screen direction is
+  // inverted. Consequently the OOXML default minMax order paints the first
+  // source category at the bottom; explicit maxMin restores source order.
+  if !chart.category_axis_reversed && source_index < category_count {
+    category_count - 1 - source_index
+  } else {
+    source_index
+  }
+}
+
+fn project_3d_data_label_category_coordinate(
+  chart: &ClusteredColumnChart<'_>,
+  series_index: usize,
+  position: c::DataLabelPositionValues,
+  mut anchor: ChartPointAnchor,
+  projection: Option<Chart3DProjection>,
+) -> ChartPointAnchor {
+  let Some(projection) = projection else {
+    return anchor;
+  };
+  let Some(series) = chart.series.get(series_index).filter(|series| series.is_3d) else {
+    return anchor;
+  };
+  let (front, _) = chart_3d_series_depth_slot(chart, series_index);
+  match series.kind {
+    ChartSeriesKind::Column => {
+      // The category coordinate of a 3-D column follows the visible depth
+      // face. Its value coordinate remains in the 2-D label overlay because
+      // BarChart::createDataLabel applies the separate 260 mm100 clearance.
+      anchor.x = projection.project(anchor.x, anchor.y, front).0;
+      anchor.base_x = projection.project(anchor.base_x, anchor.base_y, front).0;
+      if position == c::DataLabelPositionValues::Center {
+        anchor.y = projection.project(anchor.x, anchor.y, front).1;
+        anchor.base_y = projection.project(anchor.base_x, anchor.base_y, front).1;
+      }
+    }
+    ChartSeriesKind::Bar => {
+      anchor.y = projection.project(anchor.x, anchor.y, front).1;
+      anchor.base_y = projection.project(anchor.base_x, anchor.base_y, front).1;
+      if position == c::DataLabelPositionValues::Center {
+        anchor.x = projection.project(anchor.x, anchor.y, front).0;
+        anchor.base_x = projection.project(anchor.base_x, anchor.base_y, front).0;
+      }
+    }
+    ChartSeriesKind::Line
+    | ChartSeriesKind::Area
+    | ChartSeriesKind::Scatter
+    | ChartSeriesKind::Bubble
+    | ChartSeriesKind::Radar
+    | ChartSeriesKind::Stock
+    | ChartSeriesKind::Surface => {}
+  }
+  anchor
+}
+
 fn category_point_x(
   chart: &ClusteredColumnChart<'_>,
   display_index: usize,
@@ -4224,7 +7250,15 @@ fn category_point_x(
         .as_ref()
         .map_or(source_maximum, |value| value.val);
       if minimum.is_finite() && maximum.is_finite() && maximum > minimum {
-        let ratio = (value - minimum) / (maximum - minimum);
+        let mut ratio = (value - minimum) / (maximum - minimum);
+        if chart.category_axis_shifted {
+          // ECMA-376 §21.2.2.32: crossBetween="between" makes date values
+          // occupy category slots just like a textual category axis. The
+          // first/last dates therefore sit half a slot inside the plot rather
+          // than directly on its borders (notably Word stock charts).
+          ratio =
+            (ratio * category_count.saturating_sub(1) as f64 + 0.5) / category_count.max(1) as f64;
+        }
         let ratio = if chart.category_axis_reversed {
           1.0 - ratio
         } else {
@@ -4256,6 +7290,10 @@ fn value_axis_is_visible(axis: &c::ValueAxis) -> bool {
     .delete
     .as_ref()
     .is_none_or(|delete| delete.val.is_some_and(|value| !value.as_bool()))
+}
+
+fn value_axis_is_on_right(axis: &c::ValueAxis) -> bool {
+  axis.axis_position.val == c::AxisPositionValues::Right
 }
 
 fn category_axis_is_visible(axis: &c::CategoryAxis) -> bool {
@@ -4312,6 +7350,71 @@ fn category_axis_text_rotation_is_supported(
       };
       (-5_400_000..=5_400_000).contains(&normalized) || category_count <= 6
     })
+}
+
+fn chart_3d_category_label_rotation(
+  chart: &ClusteredColumnChart<'_>,
+  label_lines: &[Vec<String>],
+  plot: PlotRect,
+  axis_y: f32,
+  projection: Chart3DProjection,
+  style: &TextStyle,
+  metrics: &mut TextMetrics,
+) -> f32 {
+  let authored = chart
+    .category_axis
+    .and_then(|axis| axis.text_properties.as_deref())
+    .or_else(|| {
+      chart
+        .date_axis
+        .and_then(|axis| axis.text_properties.as_deref())
+    })
+    .and_then(|properties| properties.body_properties.rotation)
+    .map(|rotation| {
+      let normalized = rotation.rem_euclid(21_600_000);
+      let normalized = if normalized > 10_800_000 {
+        normalized - 21_600_000
+      } else {
+        normalized
+      };
+      normalized as f32 / 60_000.0
+    })
+    .filter(|rotation| rotation.abs() <= 90.0);
+  if let Some(rotation) = authored {
+    return rotation;
+  }
+  if label_lines.len() <= 1 {
+    return 0.0;
+  }
+
+  // LibreOffice VCartesianAxis first creates the real label shapes, checks
+  // their overlap on the projected axis, then retries at 45 degrees before
+  // increasing the label rhythm. Use the same final-axis geometry here.
+  let maximum_width = label_lines
+    .iter()
+    .flatten()
+    .map(|line| metrics.measure_text(line, style))
+    .fold(0.0_f32, f32::max);
+  let first_x = category_point_x(
+    chart,
+    category_display_index(chart, 0, label_lines.len()),
+    label_lines.len(),
+    plot,
+  );
+  let second_x = category_point_x(
+    chart,
+    category_display_index(chart, 1, label_lines.len()),
+    label_lines.len(),
+    plot,
+  );
+  let first = projection.project(first_x, axis_y, 0.0);
+  let second = projection.project(second_x, axis_y, 0.0);
+  let spacing = (second.0 - first.0).hypot(second.1 - first.1);
+  if maximum_width > spacing * 0.9 {
+    -45.0
+  } else {
+    0.0
+  }
 }
 
 fn wrap_chart_label(
@@ -4374,60 +7477,131 @@ fn apply_manual_layout(
 
 fn lower_axis_titles(
   items: &mut Vec<PageItem>,
-  frame: ChartFrame,
-  plot: PlotRect,
-  category_band_top: f32,
+  geometry: AxisTitleGeometry,
   chart: &ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
   metrics: &mut TextMetrics,
 ) {
+  let AxisTitleGeometry {
+    frame,
+    plot,
+    category_band_top,
+    data_table_height,
+    projection_3d,
+  } = geometry;
+  // OOXML chart styles assign axis titles (and display-unit labels) the
+  // source-backed `spAxisTitleTexts` role, which is bold by default. Keep the
+  // role separate from ordinary axis tick labels and legends.
+  let mut horizontal_title_style = style.label.clone();
+  horizontal_title_style.bold = true;
+  horizontal_title_style.rotation_deg = 0.0;
+  let mut vertical_title_style = horizontal_title_style.clone();
+  vertical_title_style.rotation_deg = -90.0;
+  let horizontal_bar = chart
+    .series
+    .iter()
+    .all(|series| series.kind == ChartSeriesKind::Bar);
   if let Some(title) = chart.value_axis_title.as_deref() {
-    let width = metrics.measure_text(title, &style.label);
-    let x = frame.x_pt + style.label.font_size_pt * 0.2;
-    let y = plot.top + (plot.height - width) * 0.5;
-    items.push(PageItem::Text(TextItem {
-      x_pt: x,
-      y_pt: y,
-      line_height_pt: line_height(&style.label),
-      paint_clip: None,
-      discard_if_horizontally_clipped: false,
-      text: title.to_string(),
-      style: style.label.clone(),
-      rotation_center_pt: Some((x, y)),
-      hyperlink_url: None,
-      form_widget_id: None,
-      paragraph_bidi: false,
-      preserve_text_portion: true,
-      pdf_text_segmentation: PdfTextSegmentation::Line,
-      source_path: Vec::new(),
-    }));
+    if horizontal_bar {
+      let width = metrics.measure_text(title, &horizontal_title_style);
+      let projected_bottom = projection_3d.map_or(plot.top + plot.height, |projection| {
+        projection.project(plot.left, plot.top + plot.height, 1.0).1
+      });
+      let content_bottom = if chart.data_table.is_some() {
+        category_band_top + data_table_height
+      } else {
+        projected_bottom
+      };
+      push_text(
+        items,
+        plot.left + (plot.width - width) * 0.5,
+        content_bottom + line_height(&horizontal_title_style) * 0.8,
+        title.to_string(),
+        horizontal_title_style.clone(),
+      );
+    } else {
+      let width = metrics.measure_text(title, &vertical_title_style);
+      let x = frame.x_pt + vertical_title_style.font_size_pt * 0.2;
+      let y = plot.top + (plot.height + width) * 0.5;
+      items.push(PageItem::Text(TextItem {
+        x_pt: x,
+        y_pt: y,
+        line_height_pt: line_height(&vertical_title_style),
+        paint_clip: None,
+        discard_if_horizontally_clipped: false,
+        text: title.to_string(),
+        style: vertical_title_style.clone(),
+        rotation_center_pt: Some((x, y)),
+        hyperlink_url: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        preserve_text_portion: true,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+        source_path: Vec::new(),
+      }));
+    }
   }
   if let Some(title) = chart.category_axis_title.as_deref() {
-    let width = metrics.measure_text(title, &style.label);
-    push_text(
-      items,
-      plot.left + (plot.width - width) * 0.5,
-      if chart.data_table.is_some() {
-        category_band_top + line_height(&style.label) * 0.05
-      } else {
-        category_band_top + line_height(&style.label)
-      },
-      title.to_string(),
-      style.label.clone(),
-    );
+    if horizontal_bar {
+      let width = metrics.measure_text(title, &vertical_title_style);
+      let maximum_category_width = chart
+        .categories
+        .iter()
+        .map(|category| metrics.measure_text(category, &style.category_label))
+        .fold(0.0_f32, f32::max);
+      let (axis_x, axis_y) = projection_3d
+        .map_or((plot.left, plot.top + plot.height * 0.5), |projection| {
+          projection.project(plot.left, plot.top + plot.height * 0.5, 1.0)
+        });
+      let x = axis_x
+        - maximum_category_width
+        - style.category_label.font_size_pt * 0.45
+        - line_height(&vertical_title_style) * 1.15;
+      let y = axis_y + width * 0.5;
+      items.push(PageItem::Text(TextItem {
+        x_pt: x,
+        y_pt: y,
+        line_height_pt: line_height(&vertical_title_style),
+        paint_clip: None,
+        discard_if_horizontally_clipped: false,
+        text: title.to_string(),
+        style: vertical_title_style.clone(),
+        rotation_center_pt: Some((x, y)),
+        hyperlink_url: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        preserve_text_portion: true,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+        source_path: Vec::new(),
+      }));
+    } else {
+      let width = metrics.measure_text(title, &horizontal_title_style);
+      push_text(
+        items,
+        plot.left + (plot.width - width) * 0.5,
+        if chart.data_table.is_some() {
+          category_band_top + line_height(&horizontal_title_style) * 0.05
+        } else {
+          category_band_top + line_height(&horizontal_title_style) * 1.25
+        },
+        title.to_string(),
+        horizontal_title_style.clone(),
+      );
+    }
   }
   for (index, title) in chart.additional_axis_titles.iter().enumerate() {
-    let width = metrics.measure_text(title, &style.label);
-    let x = frame.x_pt + frame.width_pt - style.label.font_size_pt * (0.4 + index as f32 * 1.25);
-    let y = plot.top + (plot.height - width) * 0.5;
+    let width = metrics.measure_text(title, &vertical_title_style);
+    let x =
+      frame.x_pt + frame.width_pt - vertical_title_style.font_size_pt * (0.4 + index as f32 * 1.25);
+    let y = plot.top + (plot.height + width) * 0.5;
     items.push(PageItem::Text(TextItem {
       x_pt: x,
       y_pt: y,
-      line_height_pt: line_height(&style.label),
+      line_height_pt: line_height(&vertical_title_style),
       paint_clip: None,
       discard_if_horizontally_clipped: false,
       text: title.clone(),
-      style: style.label.clone(),
+      style: vertical_title_style.clone(),
       rotation_center_pt: Some((x, y)),
       hyperlink_url: None,
       form_widget_id: None,
@@ -4532,9 +7706,21 @@ fn lower_data_table(
       style.label.clone(),
     );
   }
-  for (row, series) in chart.series.iter().enumerate() {
+  let mut series_indices = (0..chart.series.len()).collect::<Vec<_>>();
+  if chart
+    .series
+    .iter()
+    .all(|series| series.kind == ChartSeriesKind::Bar)
+  {
+    // LibreOffice VSeriesPlotter::createLegendEntries reverses a swapped
+    // X/Y chart, and its data table consumes the same BarChart slot order.
+    // This keeps table rows aligned with the visible top-to-bottom bars.
+    series_indices.reverse();
+  }
+  for (row, series_index) in series_indices.into_iter().enumerate() {
+    let series = &chart.series[series_index];
     let y = bounds.top + (row + 1) as f32 * row_height;
-    if show_keys && let Some(color) = style.series_colors.get(row).copied() {
+    if show_keys && let Some(color) = style.series_colors.get(series_index).copied() {
       let key_size = style.label.font_size_pt * 0.45;
       items.push(PageItem::Rect(RectItem {
         x_pt: bounds.left - key_size * 1.5,
@@ -4580,12 +7766,13 @@ fn lower_manual_legend(
   layout: crate::render::chart::ChartManualLayout,
   chart: &ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
+  scale: crate::render::chart::LinearAxisScale,
 ) {
   let x = frame.x_pt + layout.x.unwrap_or(0.8) * frame.width_pt;
   let mut y = frame.y_pt + layout.y.unwrap_or(0.1) * frame.height_pt;
   let marker_size = style.label.font_size_pt * 0.55;
   let marker_gap = style.label.font_size_pt * 0.26;
-  for entry in cartesian_legend_entries(chart, style) {
+  for entry in cartesian_legend_entries(chart, style, scale) {
     if let Some(color) = entry.color {
       items.push(PageItem::Rect(RectItem {
         x_pt: x,
@@ -4602,7 +7789,7 @@ fn lower_manual_legend(
       items,
       x + marker_size + marker_gap,
       y,
-      entry.label.to_owned(),
+      entry.label.into_owned(),
       style.label.clone(),
     );
     y += line_height(&style.label) * 1.25;
@@ -4616,6 +7803,7 @@ fn lower_horizontal_legend(
   y: f32,
   chart: &ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
+  scale: crate::render::chart::LinearAxisScale,
   metrics: &mut TextMetrics,
 ) {
   let marker_gap = style.label.font_size_pt * profiles::CARTESIAN_LEGEND_MARKER_GAP_EM;
@@ -4637,7 +7825,7 @@ fn lower_horizontal_legend(
   } else {
     profiles::DEFAULT_HORIZONTAL_CARTESIAN_LEGEND
   };
-  let entries = cartesian_legend_entries(chart, style);
+  let entries = cartesian_legend_entries(chart, style, scale);
   let base_entry_gap =
     style.label.font_size_pt * profiles::DEFAULT_HORIZONTAL_CARTESIAN_LEGEND.entry_gap_em;
   let entry_gap = style.label.font_size_pt * legend_profile.entry_gap_em;
@@ -4647,7 +7835,7 @@ fn lower_horizontal_legend(
       let legend_style = style.label.clone();
       horizontal_legend_key_width(entry.kind, style)
         + marker_gap
-        + metrics.measure_text(entry.label, &legend_style)
+        + metrics.measure_text(entry.label.as_ref(), &legend_style)
     })
     .collect();
   let total_width = widths.iter().sum::<f32>() + entry_gap * entries.len().saturating_sub(1) as f32;
@@ -4692,7 +7880,7 @@ fn lower_horizontal_legend(
       items,
       x + key_width + marker_gap,
       y,
-      entry.label.to_owned(),
+      entry.label.into_owned(),
       legend_style,
     );
     x += width + entry_gap;
@@ -4711,15 +7899,16 @@ fn horizontal_legend_key_width(kind: ChartSeriesKind, style: &ClusteredColumnSty
 fn vertical_legend_width(
   chart: &ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
+  scale: crate::render::chart::LinearAxisScale,
   metrics: &mut TextMetrics,
 ) -> f32 {
   let marker_size = style.label.font_size_pt * 0.55;
   let marker_gap = style.label.font_size_pt * 0.26;
-  cartesian_legend_entries(chart, style)
+  cartesian_legend_entries(chart, style, scale)
     .iter()
     .map(|entry| {
       let legend_style = style.label.clone();
-      marker_size + marker_gap + metrics.measure_text(entry.label, &legend_style)
+      marker_size + marker_gap + metrics.measure_text(entry.label.as_ref(), &legend_style)
     })
     .fold(0.0_f32, f32::max)
 }
@@ -4731,6 +7920,7 @@ fn lower_vertical_legend(
   align_top: bool,
   chart: &ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
+  scale: crate::render::chart::LinearAxisScale,
 ) {
   let marker_size = style.label.font_size_pt
     * if excel_vary_colors_data_table_layout(chart, style) {
@@ -4751,7 +7941,7 @@ fn lower_vertical_legend(
       profiles::POWERPOINT_VERTICAL_LEGEND_ENTRY_GAP_EM
     };
   let line_height = line_height(&style.label);
-  let entries = cartesian_legend_entries(chart, style);
+  let entries = cartesian_legend_entries(chart, style, scale);
   let total_height =
     line_height * entries.len() as f32 + entry_gap * entries.len().saturating_sub(1) as f32;
   let mut y = if align_top {
@@ -4826,16 +8016,16 @@ fn lower_vertical_legend(
       items,
       x + marker_size + marker_gap,
       y,
-      entry.label.to_owned(),
+      entry.label.into_owned(),
       legend_style,
     );
     y += line_height + entry_gap;
   }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct CartesianLegendEntry<'a> {
-  label: &'a str,
+  label: Cow<'a, str>,
   color: Option<RgbColor>,
   kind: ChartSeriesKind,
 }
@@ -4843,7 +8033,33 @@ struct CartesianLegendEntry<'a> {
 fn cartesian_legend_entries<'a>(
   chart: &'a ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
+  scale: crate::render::chart::LinearAxisScale,
 ) -> Vec<CartesianLegendEntry<'a>> {
+  if chart.surface_groups.len() == 1
+    && chart
+      .series
+      .iter()
+      .all(|series| series.kind == ChartSeriesKind::Surface)
+  {
+    let band_count = ((scale.maximum - scale.minimum) / scale.major_unit)
+      .ceil()
+      .max(1.0) as usize;
+    return (0..band_count)
+      .filter_map(|band_index| {
+        let lower = scale.minimum + band_index as f64 * scale.major_unit;
+        let upper = (lower + scale.major_unit).min(scale.maximum);
+        (upper > lower).then(|| CartesianLegendEntry {
+          label: Cow::Owned(format!(
+            "{}-{}",
+            format_axis_value(lower, scale.major_unit),
+            format_axis_value(upper, scale.major_unit)
+          )),
+          color: Some(surface_band_color(style, 0, band_index as u32)),
+          kind: ChartSeriesKind::Surface,
+        })
+      })
+      .collect();
+  }
   if chart.vary_colors_by_point {
     let Some(series) = chart.series.first() else {
       return Vec::new();
@@ -4856,7 +8072,7 @@ fn cartesian_legend_entries<'a>(
           .categories
           .get(*index)
           .map(|category| CartesianLegendEntry {
-            label: category,
+            label: Cow::Borrowed(category),
             color: chart_point_color(style, 0, *index)
               .or_else(|| style.series_colors.first().copied()),
             kind: series.kind,
@@ -4864,17 +8080,50 @@ fn cartesian_legend_entries<'a>(
       })
       .collect();
   }
-  chart
+  let mut entries = chart
     .visible_legend_indices
     .iter()
     .filter_map(|index| {
       chart.series.get(*index).map(|series| CartesianLegendEntry {
-        label: &series.name,
+        label: Cow::Borrowed(&series.name),
         color: style.series_colors.get(*index).copied(),
         kind: series.kind,
       })
     })
-    .collect()
+    .collect::<Vec<_>>();
+  if cartesian_legend_reverses_series(chart) {
+    entries.reverse();
+  }
+  entries
+}
+
+fn cartesian_legend_reverses_series(chart: &ClusteredColumnChart<'_>) -> bool {
+  let horizontal_bar = chart
+    .series
+    .iter()
+    .all(|series| series.kind == ChartSeriesKind::Bar);
+  let stacked = chart.series.iter().all(|series| {
+    matches!(
+      series.grouping,
+      ChartSeriesGrouping::Stacked | ChartSeriesGrouping::PercentStacked
+    )
+  });
+  if horizontal_bar {
+    // LibreOffice VSeriesPlotter reverses swapped-axis legend entries unless
+    // the series stack in the Y direction.
+    !stacked
+  } else {
+    // Side legends follow the visible top-to-bottom stack, which is the
+    // reverse of the authored series order. Top/bottom legends retain the
+    // authored left-to-right sequence.
+    stacked
+      && matches!(
+        chart.legend_position,
+        Some(
+          ChartLegendPosition::Left | ChartLegendPosition::Right | ChartLegendPosition::TopRight
+        )
+      )
+  }
 }
 
 fn value_y(
@@ -4898,7 +8147,13 @@ fn scale_tick_labels(
   unit: f64,
   format_code: Option<&str>,
   logarithmic_base: Option<f64>,
+  display_unit: f64,
 ) -> Vec<(f64, String)> {
+  let display_unit = if display_unit.is_finite() && display_unit > 0.0 {
+    display_unit
+  } else {
+    1.0
+  };
   if let Some(base) = logarithmic_base.filter(|base| *base > 1.0 && minimum > 0.0 && maximum > 0.0)
   {
     let first = minimum.log(base).ceil() as i32;
@@ -4909,8 +8164,8 @@ fn scale_tick_labels(
         (
           value,
           format_code.map_or_else(
-            || crate::render::chart::format_chart_number(value, None),
-            |format| crate::render::chart::format_chart_number(value, Some(format)),
+            || crate::render::chart::format_chart_number(value / display_unit, None),
+            |format| crate::render::chart::format_chart_number(value / display_unit, Some(format)),
           ),
         )
       })
@@ -4923,8 +8178,8 @@ fn scale_tick_labels(
       (
         value,
         format_code.map_or_else(
-          || format_axis_value(value, unit),
-          |format| crate::render::chart::format_chart_number(value, Some(format)),
+          || format_axis_value(value / display_unit, unit / display_unit),
+          |format| crate::render::chart::format_chart_number(value / display_unit, Some(format)),
         ),
       )
     })
@@ -4963,7 +8218,14 @@ fn push_data_label_text_components(
     || label.separator.contains('\r')
     || label.separator.contains('\n')
   {
-    push_text(items, x, y, label.text.clone(), style.clone());
+    push_text_with_segmentation(
+      items,
+      x,
+      y,
+      label.text.clone(),
+      style.clone(),
+      data_label_pdf_text_segmentation(&label.text),
+    );
     return;
   }
 
@@ -4976,7 +8238,15 @@ fn push_data_label_text_components(
     } else {
       format!("{component}{painted_separator}")
     };
-    push_text(items, component_x, y, painted_text, style.clone());
+    let segmentation = data_label_pdf_text_segmentation(&painted_text);
+    push_text_with_segmentation(
+      items,
+      component_x,
+      y,
+      painted_text,
+      style.clone(),
+      segmentation,
+    );
     if !is_last {
       component_x += metrics.measure_text(&format!("{component}{}", label.separator), style);
     }
@@ -4984,6 +8254,17 @@ fn push_data_label_text_components(
 }
 
 fn push_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String, style: TextStyle) {
+  push_text_with_segmentation(items, x, y, text, style, PdfTextSegmentation::Line);
+}
+
+fn push_text_with_segmentation(
+  items: &mut Vec<PageItem>,
+  x: f32,
+  y: f32,
+  text: String,
+  style: TextStyle,
+  pdf_text_segmentation: PdfTextSegmentation,
+) {
   items.push(PageItem::Text(TextItem {
     x_pt: x,
     y_pt: y,
@@ -4997,9 +8278,19 @@ fn push_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String, style: Tex
     form_widget_id: None,
     paragraph_bidi: false,
     preserve_text_portion: true,
-    pdf_text_segmentation: PdfTextSegmentation::Line,
+    pdf_text_segmentation,
     source_path: Vec::new(),
   }));
+}
+
+fn data_label_pdf_text_segmentation(text: &str) -> PdfTextSegmentation {
+  if text.as_bytes().windows(3).any(|window| {
+    matches!(window[0], b'E' | b'e') && window[1] == b'-' && window[2].is_ascii_digit()
+  }) {
+    PdfTextSegmentation::WordLine
+  } else {
+    PdfTextSegmentation::Line
+  }
 }
 
 fn push_data_table_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String, style: TextStyle) {
@@ -5025,17 +8316,91 @@ fn push_data_table_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String,
 mod tests {
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+  use ooxmlsdk::sdk::SdkType;
 
   use super::{
-    cardinal_cubic_controls, category_axis_text_rotation_is_supported, format_axis_value,
-    single_line_vertical_anchor_offset,
+    Chart3DView, ChartLayoutProfile, PlotRect, SurfaceVertex, bubble_padded_axis_values,
+    cardinal_cubic_controls, cartesian_3d_projection, cartesian_legend_reverses_series,
+    category_axis_text_rotation_is_supported, clip_surface_polygon,
+    data_label_pdf_text_segmentation, format_axis_value, lower_3d_extruded_polygon,
+    lower_3d_line_stripes, maximum_auto_main_increment_count, sample_cardinal_chart_line,
+    series_axis_label_rhythm, single_line_vertical_anchor_offset,
   };
+  use crate::model::{PageItem, PdfTextSegmentation, RgbColor};
 
   #[test]
   fn axis_values_do_not_expose_binary_float_artifacts() {
     let value_with_binary_artifact = f64::from_bits(4.4_f64.to_bits() + 1);
     assert_eq!(format_axis_value(value_with_binary_artifact, 0.2), "4.4");
     assert_eq!(format_axis_value(6.0, 1.0), "6");
+  }
+
+  #[test]
+  fn scientific_data_labels_isolate_negative_exponents_but_axis_text_does_not() {
+    assert_eq!(
+      data_label_pdf_text_segmentation("4.3E-09"),
+      PdfTextSegmentation::WordLine
+    );
+    assert_eq!(
+      data_label_pdf_text_segmentation("4.3E+09"),
+      PdfTextSegmentation::Line
+    );
+    assert_eq!(
+      data_label_pdf_text_segmentation("Series-1"),
+      PdfTextSegmentation::Line
+    );
+  }
+
+  #[test]
+  fn word_axes_use_final_plot_length_and_bubble_marker_envelope() {
+    assert_eq!(
+      maximum_auto_main_increment_count(ChartLayoutProfile::Word, 152.25, 10.0, false, false),
+      7
+    );
+    assert_eq!(
+      maximum_auto_main_increment_count(ChartLayoutProfile::Word, 200.0, 10.0, false, false),
+      10
+    );
+    assert_eq!(
+      maximum_auto_main_increment_count(ChartLayoutProfile::Word, 90.0, 10.0, false, true),
+      5
+    );
+    let small_budget =
+      maximum_auto_main_increment_count(ChartLayoutProfile::Word, 152.25, 10.0, true, false);
+    let large_budget =
+      maximum_auto_main_increment_count(ChartLayoutProfile::Word, 252.0, 10.0, true, false);
+    assert_eq!(small_budget, 5);
+    assert_eq!(large_budget, 8);
+
+    let y_values = bubble_padded_axis_values(vec![0.8, 2.7, 3.2], [0.8, 2.7, 3.2]);
+    let small_y = crate::render::chart::linear_axis_scale(y_values.clone(), None, small_budget)
+      .expect("small bubble y axis");
+    let large_y = crate::render::chart::linear_axis_scale(y_values, None, large_budget)
+      .expect("large bubble y axis");
+    assert_eq!((small_y.maximum, small_y.major_unit), (4.0, 1.0));
+    assert_eq!((large_y.maximum, large_y.major_unit), (4.0, 0.5));
+
+    let x_values = bubble_padded_axis_values(vec![0.7, 1.8, 2.6], [0.7, 1.8, 2.6]);
+    let small_x = crate::render::chart::linear_axis_scale(x_values.clone(), None, small_budget)
+      .expect("small bubble x axis");
+    let large_x = crate::render::chart::linear_axis_scale(x_values, None, large_budget)
+      .expect("large bubble x axis");
+    assert_eq!((small_x.maximum, small_x.major_unit), (4.0, 1.0));
+    assert_eq!((large_x.maximum, large_x.major_unit), (3.5, 0.5));
+  }
+
+  #[test]
+  fn side_legend_reverses_a_vertical_stack_but_bottom_legend_does_not() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:lineChart><c:grouping val="stacked"/><c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Series 1</c:v></c:tx><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser><c:ser><c:idx val="1"/><c:order val="1"/><c:tx><c:v>Series 2</c:v></c:tx><c:val><c:numLit><c:pt idx="0"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser><c:axId val="1"/><c:axId val="2"/></c:lineChart></c:plotArea><c:legend><c:legendPos val="r"/></c:legend></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+    let mut chart =
+      crate::render::chart::cartesian_chart_for_ui_language(&chart_space, None).expect("chart");
+
+    assert!(cartesian_legend_reverses_series(&chart));
+    chart.legend_position = Some(crate::render::chart::ChartLegendPosition::Bottom);
+    assert!(!cartesian_legend_reverses_series(&chart));
   }
 
   #[test]
@@ -5053,6 +8418,153 @@ mod tests {
     assert!((control1.1 - 413.64).abs() < 0.001);
     assert!((control2.0 - 97.0).abs() < 0.001);
     assert!((control2.1 - 422.37).abs() < 0.001);
+  }
+
+  #[test]
+  fn three_dimensional_projection_rotates_and_fits_the_complete_scene() {
+    let plot = PlotRect {
+      left: 10.0,
+      top: 20.0,
+      width: 240.0,
+      height: 120.0,
+    };
+    let default = cartesian_3d_projection(
+      Chart3DView {
+        right_angle_axes: true,
+        ..Chart3DView::default()
+      },
+      plot,
+    );
+    let front = default.project(130.0, 80.0, 0.0);
+    let back = default.project(130.0, 80.0, 1.0);
+    assert!(back.0 > front.0);
+    assert!(back.1 < front.1);
+    let left = default.project(plot.left, plot.top + plot.height, 0.0);
+    let right = default.project(plot.left + plot.width, plot.top + plot.height, 0.0);
+    assert!(right.0 > left.0);
+    assert!(right.1 > left.1);
+
+    let reversed = cartesian_3d_projection(
+      Chart3DView {
+        rotate_x_deg: 20.0,
+        rotate_y_deg: 170.0,
+        perspective_half_degrees: 0.0,
+        ..Chart3DView::default()
+      },
+      plot,
+    );
+    let front = reversed.project(130.0, 80.0, 0.0);
+    let back = reversed.project(130.0, 80.0, 1.0);
+    assert!(back.0 > front.0);
+    assert!(back.1 > front.1);
+    assert!(reversed.vertical_axis_length(plot, true) < plot.height);
+  }
+
+  #[test]
+  fn three_dimensional_line_and_area_geometry_are_filled_depth_faces() {
+    let projection = cartesian_3d_projection(
+      Chart3DView {
+        right_angle_axes: true,
+        ..Chart3DView::default()
+      },
+      PlotRect {
+        left: 0.0,
+        top: 0.0,
+        width: 40.0,
+        height: 30.0,
+      },
+    );
+    let color = RgbColor {
+      r: 68,
+      g: 114,
+      b: 196,
+    };
+    let mut line_items = Vec::new();
+    lower_3d_line_stripes(
+      &mut line_items,
+      &[(10.0, 20.0), (30.0, 15.0)],
+      projection,
+      0.25,
+      0.75,
+      color,
+      None,
+    );
+    assert!(matches!(
+      line_items.as_slice(),
+      [PageItem::Path(path)] if path.closed && path.points.len() == 4
+    ));
+
+    let mut area_items = Vec::new();
+    lower_3d_extruded_polygon(
+      &mut area_items,
+      &[(10.0, 20.0), (30.0, 15.0), (30.0, 40.0), (10.0, 40.0)],
+      projection,
+      0.25,
+      0.75,
+      color,
+      None,
+    );
+    // Back + one side for every polygon edge + front.
+    assert_eq!(area_items.len(), 6);
+    assert!(
+      area_items
+        .iter()
+        .all(|item| matches!(item, PageItem::Path(path) if path.closed && path.points.len() == 4))
+    );
+  }
+
+  #[test]
+  fn smooth_three_dimensional_lines_sample_the_same_cardinal_curve() {
+    let points = [(0.0, 0.0, 0), (10.0, 10.0, 1), (20.0, 0.0, 2)];
+    let sampled = sample_cardinal_chart_line(&points, 4);
+
+    assert_eq!(sampled.len(), 9);
+    assert_eq!(sampled.first().copied(), Some((0.0, 0.0)));
+    assert_eq!(sampled.last().copied(), Some((20.0, 0.0)));
+    assert!((sampled[2].1 - 6.25).abs() < 0.001);
+  }
+
+  #[test]
+  fn surface_cells_are_clipped_at_value_band_boundaries() {
+    let cell = [
+      SurfaceVertex {
+        x: 0.0,
+        value: 0.0,
+        depth_ratio: 0.0,
+      },
+      SurfaceVertex {
+        x: 10.0,
+        value: 3.0,
+        depth_ratio: 0.0,
+      },
+      SurfaceVertex {
+        x: 10.0,
+        value: 4.0,
+        depth_ratio: 1.0,
+      },
+      SurfaceVertex {
+        x: 0.0,
+        value: 1.0,
+        depth_ratio: 1.0,
+      },
+    ];
+    let above = clip_surface_polygon(&cell, 1.0, true);
+    let band = clip_surface_polygon(&above, 2.0, false);
+
+    assert!(band.len() >= 3);
+    assert!(
+      band
+        .iter()
+        .all(|point| point.value >= 1.0 && point.value <= 2.0)
+    );
+  }
+
+  #[test]
+  fn series_axis_increases_label_rhythm_when_depth_ticks_overlap() {
+    assert_eq!(series_axis_label_rhythm(25.0, 32.0, 3, None), 2);
+    assert_eq!(series_axis_label_rhythm(25.0, 64.0, 3, None), 2);
+    assert_eq!(series_axis_label_rhythm(25.0, 80.0, 3, None), 1);
+    assert_eq!(series_axis_label_rhythm(25.0, 64.0, 3, Some(3)), 3);
   }
 
   #[test]

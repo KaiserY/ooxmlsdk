@@ -12,6 +12,7 @@ use ooxmlsdk::parts::extended_chart_part::ExtendedChartPart;
 use ooxmlsdk::parts::image_part::ImagePart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
+use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2012_chart_style as cs;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex as cx;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
@@ -167,6 +168,8 @@ pub(crate) struct ChartResourceCatalog {
   pub(crate) relationship_id: Option<String>,
   pub(crate) chart_space: Option<Box<c::ChartSpace>>,
   pub(crate) extended_chart_space: Option<Box<cx::ChartSpace>>,
+  pub(crate) extended_chart_styles: Vec<cs::ChartStyle>,
+  pub(crate) extended_chart_color_styles: Vec<cs::ColorStyle>,
   pub(crate) extended: bool,
   pub(crate) version_len: usize,
   pub(crate) feature_list_len: usize,
@@ -2313,13 +2316,25 @@ impl ChartResourceCatalog {
       let chart_space = part.root_element(package)?;
       Self::from_extended_chart_space(Some(relationship_id), chart_space)
     };
+    let chart_style_parts: Vec<_> = part.chart_style_parts(package).collect();
+    let chart_color_style_parts: Vec<_> = part.chart_color_style_parts(package).collect();
+    let extended_chart_styles = chart_style_parts
+      .iter()
+      .filter_map(|part| part.root_element(package).ok().cloned())
+      .collect::<Vec<_>>();
+    let extended_chart_color_styles = chart_color_style_parts
+      .iter()
+      .filter_map(|part| part.root_element(package).ok().cloned())
+      .collect::<Vec<_>>();
     Ok(Self {
       has_chart_drawing: part.chart_drawing_part(package).is_some(),
       has_embedded_package: part.embedded_package_part(package).is_some(),
       images: part.image_parts(package).count(),
       has_theme_override: part.theme_override_part(package).is_some(),
-      styles: part.chart_style_parts(package).count(),
-      color_styles: part.chart_color_style_parts(package).count(),
+      styles: extended_chart_styles.len(),
+      color_styles: extended_chart_color_styles.len(),
+      extended_chart_styles,
+      extended_chart_color_styles,
       ..model
     })
   }

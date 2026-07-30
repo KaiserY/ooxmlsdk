@@ -1,0 +1,2008 @@
+use super::*;
+
+/// Retain field syntax independently of the visible cached result.  A
+/// WordprocessingML complex field is a document-story construct: its begin,
+/// instruction, separator, and end characters do not have to live in one
+/// paragraph.  In particular, Word writes an outer TOC field whose result is
+/// a sequence of entry paragraphs containing nested PAGEREF fields.
+pub(super) fn paragraph_field_events(paragraph: &w::Paragraph) -> Vec<ParagraphFieldEvent> {
+  let mut events = Vec::new();
+  for choice in &paragraph.paragraph_choice {
+    collect_paragraph_choice(choice, &mut events);
+  }
+  events
+}
+
+fn collect_paragraph_choice(choice: &w::ParagraphChoice, events: &mut Vec<ParagraphFieldEvent>) {
+  match choice {
+    w::ParagraphChoice::WRun(run) => collect_run(run, events),
+    w::ParagraphChoice::SimpleField(field) => collect_simple_field(field, events),
+    w::ParagraphChoice::Hyperlink(hyperlink) => collect_hyperlink(hyperlink, events),
+    w::ParagraphChoice::CustomXmlRun(custom_xml) | w::ParagraphChoice::SmartTagRun(custom_xml) => {
+      collect_custom_xml_run(custom_xml, events)
+    }
+    w::ParagraphChoice::SdtRun(sdt) => collect_sdt_run(sdt, events),
+    w::ParagraphChoice::InsertedRun(inserted) => collect_inserted_run(inserted, events),
+    // Deleted and move-from content is not part of the current document
+    // story.  This mirrors the visible-run importer.
+    w::ParagraphChoice::DeletedRun(_) | w::ParagraphChoice::MoveFromRun(_) => {}
+    w::ParagraphChoice::MoveToRun(moved) => collect_move_to_run(moved, events),
+    w::ParagraphChoice::BookmarkStart(bookmark) => collect_bookmark_start(bookmark, events),
+    w::ParagraphChoice::BookmarkEnd(bookmark) => collect_bookmark_end(bookmark, events),
+    _ => {}
+  }
+}
+
+fn collect_run(run: &w::Run, events: &mut Vec<ParagraphFieldEvent>) {
+  for choice in &run.run_choice {
+    match choice {
+      w::RunChoice::FieldChar(field) => match field.field_char_type {
+        w::FieldCharValues::Begin => events.push(ParagraphFieldEvent::Begin {
+          locked: on_off(field.field_lock),
+          dirty: on_off(field.dirty),
+        }),
+        w::FieldCharValues::Separate => events.push(ParagraphFieldEvent::Separate),
+        w::FieldCharValues::End => events.push(ParagraphFieldEvent::End),
+      },
+      w::RunChoice::FieldCode(code) => {
+        if let Some(text) = code.0.xml_content.as_deref() {
+          events.push(ParagraphFieldEvent::Instruction(text.to_string()));
+        }
+      }
+      w::RunChoice::Run(nested) => collect_run(nested, events),
+      _ => {}
+    }
+  }
+}
+
+fn collect_simple_field(field: &w::SimpleField, events: &mut Vec<ParagraphFieldEvent>) {
+  events.push(ParagraphFieldEvent::Simple {
+    instruction: field.instruction.to_string(),
+    locked: on_off(field.field_lock),
+    dirty: on_off(field.dirty),
+  });
+  for choice in &field.simple_field_choice {
+    match choice {
+      w::SimpleFieldChoice::WRun(run) => collect_run(run, events),
+      w::SimpleFieldChoice::SimpleField(nested) => collect_simple_field(nested, events),
+      w::SimpleFieldChoice::Hyperlink(hyperlink) => collect_hyperlink(hyperlink, events),
+      w::SimpleFieldChoice::CustomXmlRun(custom_xml) => collect_custom_xml_run(custom_xml, events),
+      w::SimpleFieldChoice::SdtRun(sdt) => collect_sdt_run(sdt, events),
+      w::SimpleFieldChoice::InsertedRun(inserted) => collect_inserted_run(inserted, events),
+      w::SimpleFieldChoice::DeletedRun(_) | w::SimpleFieldChoice::MoveFromRun(_) => {}
+      w::SimpleFieldChoice::MoveToRun(moved) => collect_move_to_run(moved, events),
+      w::SimpleFieldChoice::BookmarkStart(bookmark) => collect_bookmark_start(bookmark, events),
+      w::SimpleFieldChoice::BookmarkEnd(bookmark) => collect_bookmark_end(bookmark, events),
+      _ => {}
+    }
+  }
+}
+
+fn collect_hyperlink(hyperlink: &w::Hyperlink, events: &mut Vec<ParagraphFieldEvent>) {
+  for choice in &hyperlink.hyperlink_choice {
+    match choice {
+      w::HyperlinkChoice::WRun(run) => collect_run(run, events),
+      w::HyperlinkChoice::SimpleField(field) => collect_simple_field(field, events),
+      w::HyperlinkChoice::Hyperlink(nested) => collect_hyperlink(nested, events),
+      w::HyperlinkChoice::CustomXmlRun(custom_xml) => collect_custom_xml_run(custom_xml, events),
+      w::HyperlinkChoice::SdtRun(sdt) => collect_sdt_run(sdt, events),
+      w::HyperlinkChoice::InsertedRun(inserted) => collect_inserted_run(inserted, events),
+      w::HyperlinkChoice::DeletedRun(_) | w::HyperlinkChoice::MoveFromRun(_) => {}
+      w::HyperlinkChoice::MoveToRun(moved) => collect_move_to_run(moved, events),
+      w::HyperlinkChoice::BookmarkStart(bookmark) => collect_bookmark_start(bookmark, events),
+      w::HyperlinkChoice::BookmarkEnd(bookmark) => collect_bookmark_end(bookmark, events),
+      _ => {}
+    }
+  }
+}
+
+fn collect_custom_xml_run(custom_xml: &w::CustomXmlRun, events: &mut Vec<ParagraphFieldEvent>) {
+  for choice in &custom_xml.custom_xml_run_choice {
+    match choice {
+      w::CustomXmlRunChoice::WRun(run) => collect_run(run, events),
+      w::CustomXmlRunChoice::SimpleField(field) => collect_simple_field(field, events),
+      w::CustomXmlRunChoice::Hyperlink(hyperlink) => collect_hyperlink(hyperlink, events),
+      w::CustomXmlRunChoice::CustomXmlRun(nested) | w::CustomXmlRunChoice::SmartTagRun(nested) => {
+        collect_custom_xml_run(nested, events)
+      }
+      w::CustomXmlRunChoice::SdtRun(sdt) => collect_sdt_run(sdt, events),
+      w::CustomXmlRunChoice::InsertedRun(inserted) => collect_inserted_run(inserted, events),
+      w::CustomXmlRunChoice::DeletedRun(_) | w::CustomXmlRunChoice::MoveFromRun(_) => {}
+      w::CustomXmlRunChoice::MoveToRun(moved) => collect_move_to_run(moved, events),
+      w::CustomXmlRunChoice::BookmarkStart(bookmark) => collect_bookmark_start(bookmark, events),
+      w::CustomXmlRunChoice::BookmarkEnd(bookmark) => collect_bookmark_end(bookmark, events),
+      _ => {}
+    }
+  }
+}
+
+fn collect_sdt_run(sdt: &w::SdtRun, events: &mut Vec<ParagraphFieldEvent>) {
+  let Some(content) = sdt.sdt_content_run.as_ref() else {
+    return;
+  };
+  for choice in &content.sdt_content_run_choice {
+    match choice {
+      w::SdtContentRunChoice::WRun(run) => collect_run(run, events),
+      w::SdtContentRunChoice::SimpleField(field) => collect_simple_field(field, events),
+      w::SdtContentRunChoice::Hyperlink(hyperlink) => collect_hyperlink(hyperlink, events),
+      w::SdtContentRunChoice::CustomXmlRun(custom_xml) => {
+        collect_custom_xml_run(custom_xml, events)
+      }
+      w::SdtContentRunChoice::SdtRun(nested) => collect_sdt_run(nested, events),
+      w::SdtContentRunChoice::InsertedRun(inserted) => collect_inserted_run(inserted, events),
+      w::SdtContentRunChoice::DeletedRun(_) | w::SdtContentRunChoice::MoveFromRun(_) => {}
+      w::SdtContentRunChoice::MoveToRun(moved) => collect_move_to_run(moved, events),
+      w::SdtContentRunChoice::BookmarkStart(bookmark) => collect_bookmark_start(bookmark, events),
+      w::SdtContentRunChoice::BookmarkEnd(bookmark) => collect_bookmark_end(bookmark, events),
+      _ => {}
+    }
+  }
+}
+
+fn collect_inserted_run(inserted: &w::InsertedRun, events: &mut Vec<ParagraphFieldEvent>) {
+  for choice in &inserted.inserted_run_choice {
+    match choice {
+      w::InsertedRunChoice::WRun(run) => collect_run(run, events),
+      w::InsertedRunChoice::SdtRun(sdt) => collect_sdt_run(sdt, events),
+      w::InsertedRunChoice::InsertedRun(nested) => collect_inserted_run(nested, events),
+      w::InsertedRunChoice::DeletedRun(_) | w::InsertedRunChoice::MoveFromRun(_) => {}
+      w::InsertedRunChoice::MoveToRun(moved) => collect_move_to_run(moved, events),
+      w::InsertedRunChoice::BookmarkStart(bookmark) => collect_bookmark_start(bookmark, events),
+      w::InsertedRunChoice::BookmarkEnd(bookmark) => collect_bookmark_end(bookmark, events),
+      _ => {}
+    }
+  }
+}
+
+fn collect_move_to_run(moved: &w::MoveToRun, events: &mut Vec<ParagraphFieldEvent>) {
+  for choice in &moved.move_to_run_choice {
+    match choice {
+      w::MoveToRunChoice::WRun(run) => collect_run(run, events),
+      w::MoveToRunChoice::SdtRun(sdt) => collect_sdt_run(sdt, events),
+      w::MoveToRunChoice::InsertedRun(inserted) => collect_inserted_run(inserted, events),
+      w::MoveToRunChoice::DeletedRun(_) | w::MoveToRunChoice::MoveFromRun(_) => {}
+      w::MoveToRunChoice::MoveToRun(nested) => collect_move_to_run(nested, events),
+      w::MoveToRunChoice::BookmarkStart(bookmark) => collect_bookmark_start(bookmark, events),
+      w::MoveToRunChoice::BookmarkEnd(bookmark) => collect_bookmark_end(bookmark, events),
+      _ => {}
+    }
+  }
+}
+
+fn collect_bookmark_start(bookmark: &w::BookmarkStart, events: &mut Vec<ParagraphFieldEvent>) {
+  if !bookmark.name.is_empty() {
+    events.push(ParagraphFieldEvent::BookmarkStart {
+      id: bookmark.id.to_string(),
+      name: bookmark.name.to_string(),
+    });
+  }
+}
+
+fn collect_bookmark_end(bookmark: &w::BookmarkEnd, events: &mut Vec<ParagraphFieldEvent>) {
+  events.push(ParagraphFieldEvent::BookmarkEnd {
+    id: bookmark.id.to_string(),
+  });
+}
+
+fn on_off(value: Option<ooxmlsdk::simple_type::OnOffValue>) -> bool {
+  value.is_some_and(ooxmlsdk::simple_type::OnOffValue::as_bool)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct TocLevelRange {
+  start: u8,
+  end: u8,
+}
+
+impl TocLevelRange {
+  const ALL: Self = Self { start: 1, end: 9 };
+
+  fn contains(self, level: u8) -> bool {
+    (self.start..=self.end).contains(&level)
+  }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct TocSpec {
+  outline_levels: Option<TocLevelRange>,
+  use_applied_outline_level: bool,
+  tc_entries: bool,
+  tc_identifier: Option<String>,
+  tc_levels: TocLevelRange,
+  caption_identifier: Option<String>,
+  omit_caption_label_and_number: bool,
+  bookmark_name: Option<String>,
+  custom_style_levels: Vec<(String, u8)>,
+  hyperlinks: bool,
+  no_page_number_levels: Option<TocLevelRange>,
+  page_separator: Option<char>,
+  chapter_sequence: Option<String>,
+  chapter_separator: String,
+  preserve_tabs: bool,
+  preserve_newlines: bool,
+  hide_page_numbers_in_web_layout: bool,
+}
+
+impl Default for TocSpec {
+  fn default() -> Self {
+    Self {
+      outline_levels: None,
+      use_applied_outline_level: false,
+      tc_entries: false,
+      tc_identifier: None,
+      tc_levels: TocLevelRange::ALL,
+      caption_identifier: None,
+      omit_caption_label_and_number: false,
+      bookmark_name: None,
+      custom_style_levels: Vec::new(),
+      hyperlinks: false,
+      no_page_number_levels: None,
+      page_separator: None,
+      chapter_sequence: None,
+      chapter_separator: "-".to_string(),
+      preserve_tabs: false,
+      preserve_newlines: false,
+      hide_page_numbers_in_web_layout: false,
+    }
+  }
+}
+
+impl TocSpec {
+  fn parse(instruction: &str) -> Option<Self> {
+    let tokens = field_instruction_tokens(instruction);
+    if !tokens
+      .first()
+      .is_some_and(|name| name.eq_ignore_ascii_case("TOC"))
+    {
+      return None;
+    }
+
+    let mut spec = Self::default();
+    let mut explicit_source = false;
+    let mut tc_level_seen_before_f = false;
+    let mut index = 1;
+    while index < tokens.len() {
+      let Some(switch) = field_switch(&tokens[index]) else {
+        index += 1;
+        continue;
+      };
+      let switch = switch.to_ascii_lowercase();
+      match switch.as_str() {
+        "h" => spec.hyperlinks = true,
+        "u" => {
+          explicit_source = true;
+          spec.use_applied_outline_level = true;
+        }
+        "w" => spec.preserve_tabs = true,
+        "x" => spec.preserve_newlines = true,
+        "z" => spec.hide_page_numbers_in_web_layout = true,
+        "n" => {
+          spec.no_page_number_levels = Some(
+            next_switch_argument(&tokens, index)
+              .and_then(parse_level_range)
+              .unwrap_or(TocLevelRange::ALL),
+          );
+          index += usize::from(next_switch_argument(&tokens, index).is_some());
+        }
+        "o" => {
+          explicit_source = true;
+          spec.outline_levels = Some(
+            next_switch_argument(&tokens, index)
+              .and_then(parse_level_range)
+              .unwrap_or(TocLevelRange::ALL),
+          );
+          index += usize::from(next_switch_argument(&tokens, index).is_some());
+        }
+        "l" => {
+          if let Some(argument) = next_switch_argument(&tokens, index) {
+            if let Some(range) = parse_level_range(argument) {
+              spec.tc_levels = range;
+            }
+            index += 1;
+          }
+          tc_level_seen_before_f = true;
+        }
+        "f" => {
+          explicit_source = true;
+          spec.tc_entries = true;
+          if tc_level_seen_before_f {
+            // [MS-OI29500] §2.1.509(a): a later \f supersedes an earlier
+            // \l and restores inclusion of every TC level.
+            spec.tc_levels = TocLevelRange::ALL;
+          }
+          if let Some(argument) = next_switch_argument(&tokens, index) {
+            spec.tc_identifier = Some(argument.to_string());
+            index += 1;
+          }
+        }
+        "a" | "c" => {
+          explicit_source = true;
+          if let Some(argument) = next_switch_argument(&tokens, index) {
+            spec.caption_identifier = Some(argument.to_string());
+            index += 1;
+          }
+          spec.omit_caption_label_and_number = switch == "a";
+        }
+        "b" => {
+          if let Some(argument) = next_switch_argument(&tokens, index) {
+            spec.bookmark_name = Some(argument.to_string());
+            index += 1;
+          }
+        }
+        "p" => {
+          if let Some(argument) = next_switch_argument(&tokens, index) {
+            // [MS-OI29500] §2.1.509(b): Word consumes only the first
+            // character, even though ECMA calls this a sequence.
+            spec.page_separator = argument.chars().next();
+            index += 1;
+          }
+        }
+        "s" => {
+          if let Some(argument) = next_switch_argument(&tokens, index) {
+            spec.chapter_sequence = Some(argument.to_string());
+            index += 1;
+          }
+        }
+        "d" => {
+          if let Some(argument) = next_switch_argument(&tokens, index) {
+            spec.chapter_separator = argument.chars().take(15).collect();
+            index += 1;
+          }
+        }
+        "t" => {
+          explicit_source = true;
+          if let Some(argument) = next_switch_argument(&tokens, index) {
+            spec.custom_style_levels = parse_style_level_pairs(argument);
+            index += 1;
+          }
+        }
+        _ => {}
+      }
+      index += 1;
+    }
+
+    // Word and Writer both create a switchless TOC from outline levels.
+    if !explicit_source {
+      spec.outline_levels = Some(TocLevelRange::ALL);
+    }
+    Some(spec)
+  }
+
+  fn suppress_page_number(&self, level: u8) -> bool {
+    self
+      .no_page_number_levels
+      .is_some_and(|range| range.contains(level))
+  }
+}
+
+fn field_switch(token: &str) -> Option<&str> {
+  token
+    .strip_prefix('\\')
+    // Old Word and several upstream fixtures serialize slash switches.
+    .or_else(|| token.strip_prefix('/'))
+    .filter(|switch| !switch.is_empty())
+}
+
+fn next_switch_argument(tokens: &[String], index: usize) -> Option<&str> {
+  tokens
+    .get(index + 1)
+    .filter(|token| field_switch(token).is_none())
+    .map(String::as_str)
+}
+
+fn parse_level_range(value: &str) -> Option<TocLevelRange> {
+  let value = value.trim().trim_matches('"');
+  let (start, end) = value
+    .split_once('-')
+    .map_or((value, value), |(start, end)| (start, end));
+  let start = start.trim().parse::<u8>().ok()?;
+  let end = end.trim().parse::<u8>().ok()?;
+  (start >= 1 && start <= end && end <= 9).then_some(TocLevelRange { start, end })
+}
+
+fn parse_style_level_pairs(value: &str) -> Vec<(String, u8)> {
+  let separator = if value.contains(',') {
+    ','
+  } else if value.contains(';') {
+    ';'
+  } else {
+    return Vec::new();
+  };
+  let components = value.split(separator).map(str::trim).collect::<Vec<_>>();
+  components
+    .chunks_exact(2)
+    .filter_map(|pair| {
+      let style = pair[0].trim_matches('"');
+      let level = pair[1].parse::<u8>().ok()?;
+      (!style.is_empty() && (1..=9).contains(&level)).then(|| (style.to_string(), level))
+    })
+    .collect()
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ParagraphAddress {
+  section_index: usize,
+  path: Vec<StoryPathStep>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum StoryPathStep {
+  Block(usize),
+  TableCell { row_index: usize, cell_index: usize },
+}
+
+impl ParagraphAddress {
+  fn block_index(&self) -> Option<usize> {
+    match self.path.last()? {
+      StoryPathStep::Block(index) => Some(*index),
+      StoryPathStep::TableCell { .. } => None,
+    }
+  }
+
+  fn container_path(&self) -> &[StoryPathStep] {
+    &self.path[..self.path.len().saturating_sub(1)]
+  }
+
+  fn is_top_level(&self) -> bool {
+    matches!(self.path.as_slice(), [StoryPathStep::Block(_)])
+  }
+}
+
+#[derive(Clone, Debug)]
+struct StoryParagraph {
+  address: ParagraphAddress,
+  bookmark_scopes: HashSet<String>,
+  source_bookmarks: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+struct StoryField {
+  start_ordinal: usize,
+  end_ordinal: usize,
+  instruction: String,
+  locked: bool,
+  dirty: bool,
+  separated: bool,
+}
+
+#[derive(Clone, Debug)]
+struct TocSpan {
+  start_ordinal: usize,
+  end_ordinal: usize,
+  locked: bool,
+  dirty: bool,
+  separated: bool,
+  spec: TocSpec,
+}
+
+#[derive(Clone, Debug, Default)]
+struct StoryScan {
+  paragraphs: Vec<StoryParagraph>,
+  fields: Vec<StoryField>,
+  toc_spans: Vec<TocSpan>,
+  bookmark_names: HashSet<String>,
+}
+
+#[derive(Clone, Debug)]
+struct OpenStoryField {
+  start_ordinal: usize,
+  instruction: String,
+  locked: bool,
+  dirty: bool,
+  separated: bool,
+}
+
+fn scan_main_story(sections: &[ImportedSection]) -> StoryScan {
+  let mut scan = StoryScan::default();
+  let mut fields = Vec::<OpenStoryField>::new();
+  let mut active_bookmarks = HashMap::<String, String>::new();
+
+  for (section_index, section) in sections.iter().enumerate() {
+    scan_story_blocks(
+      section_index,
+      &section.blocks,
+      &[],
+      &mut scan,
+      &mut fields,
+      &mut active_bookmarks,
+    );
+  }
+
+  scan.toc_spans = scan
+    .fields
+    .iter()
+    .filter_map(|field| {
+      TocSpec::parse(&field.instruction).map(|spec| TocSpan {
+        start_ordinal: field.start_ordinal,
+        end_ordinal: field.end_ordinal,
+        locked: field.locked,
+        dirty: field.dirty,
+        separated: field.separated,
+        spec,
+      })
+    })
+    .collect();
+  scan
+}
+
+fn scan_story_blocks(
+  section_index: usize,
+  blocks: &[Block],
+  parent_path: &[StoryPathStep],
+  scan: &mut StoryScan,
+  fields: &mut Vec<OpenStoryField>,
+  active_bookmarks: &mut HashMap<String, String>,
+) {
+  for (block_index, block) in blocks.iter().enumerate() {
+    let mut path = parent_path.to_vec();
+    path.push(StoryPathStep::Block(block_index));
+    match block {
+      Block::Paragraph(paragraph) => scan_story_paragraph(
+        ParagraphAddress {
+          section_index,
+          path,
+        },
+        paragraph,
+        scan,
+        fields,
+        active_bookmarks,
+      ),
+      Block::Table(table) => {
+        for (row_index, row) in table.rows.iter().enumerate() {
+          for (cell_index, cell) in row.cells.iter().enumerate() {
+            let mut cell_path = path.clone();
+            cell_path.push(StoryPathStep::TableCell {
+              row_index,
+              cell_index,
+            });
+            scan_story_blocks(
+              section_index,
+              &cell.blocks,
+              &cell_path,
+              scan,
+              fields,
+              active_bookmarks,
+            );
+          }
+        }
+      }
+      // Floating frames and their text boxes are separate Word stories. They
+      // neither supply main-story TOC entries nor extend main-story fields.
+      Block::Frame(_) => {}
+    }
+  }
+}
+
+fn scan_story_paragraph(
+  address: ParagraphAddress,
+  paragraph: &Paragraph,
+  scan: &mut StoryScan,
+  fields: &mut Vec<OpenStoryField>,
+  active_bookmarks: &mut HashMap<String, String>,
+) {
+  let ordinal = scan.paragraphs.len();
+  let mut bookmark_scopes = active_bookmarks.values().cloned().collect::<HashSet<_>>();
+  let mut source_bookmarks = Vec::new();
+
+  for event in &paragraph.field_events {
+    match event {
+      ParagraphFieldEvent::Begin { locked, dirty } => fields.push(OpenStoryField {
+        start_ordinal: ordinal,
+        instruction: String::new(),
+        locked: *locked,
+        dirty: *dirty,
+        separated: false,
+      }),
+      ParagraphFieldEvent::Instruction(text) => {
+        if let Some(field) = fields.last_mut()
+          && !field.separated
+        {
+          field.instruction.push_str(text);
+        }
+      }
+      ParagraphFieldEvent::Separate => {
+        if let Some(field) = fields.last_mut() {
+          field.separated = true;
+        }
+      }
+      ParagraphFieldEvent::End => {
+        if let Some(field) = fields.pop() {
+          scan.fields.push(StoryField {
+            start_ordinal: field.start_ordinal,
+            end_ordinal: ordinal,
+            instruction: field.instruction,
+            locked: field.locked,
+            dirty: field.dirty,
+            separated: field.separated,
+          });
+        }
+      }
+      ParagraphFieldEvent::Simple {
+        instruction,
+        locked,
+        dirty,
+      } => scan.fields.push(StoryField {
+        start_ordinal: ordinal,
+        end_ordinal: ordinal,
+        instruction: instruction.clone(),
+        locked: *locked,
+        dirty: *dirty,
+        separated: true,
+      }),
+      ParagraphFieldEvent::BookmarkStart { id, name } => {
+        scan.bookmark_names.insert(name.clone());
+        bookmark_scopes.insert(name.clone());
+        source_bookmarks.push(name.clone());
+        active_bookmarks.insert(id.clone(), name.clone());
+      }
+      ParagraphFieldEvent::BookmarkEnd { id } => {
+        if let Some(name) = active_bookmarks.remove(id) {
+          // A bookmark that closes within this paragraph still contains part
+          // of that paragraph and remains a valid \b source range for it.
+          bookmark_scopes.insert(name);
+        }
+      }
+    }
+  }
+
+  scan.paragraphs.push(StoryParagraph {
+    address,
+    bookmark_scopes,
+    source_bookmarks,
+  });
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct TcSpec {
+  text: String,
+  identifier: Option<String>,
+  level: u8,
+  omit_page_number: bool,
+}
+
+impl TcSpec {
+  fn parse(instruction: &str) -> Option<Self> {
+    let tokens = field_instruction_tokens(instruction);
+    if !tokens
+      .first()
+      .is_some_and(|name| name.eq_ignore_ascii_case("TC"))
+    {
+      return None;
+    }
+    let mut text = None;
+    let mut identifier = None;
+    let mut level = 1;
+    let mut omit_page_number = false;
+    let mut index = 1;
+    while index < tokens.len() {
+      if let Some(switch) = field_switch(&tokens[index]) {
+        match switch.to_ascii_lowercase().as_str() {
+          "f" => {
+            if let Some(argument) = next_switch_argument(&tokens, index) {
+              identifier = Some(argument.to_string());
+              index += 1;
+            }
+          }
+          "l" => {
+            if let Some(argument) = next_switch_argument(&tokens, index) {
+              if let Ok(value) = argument.parse::<u8>()
+                && (1..=9).contains(&value)
+              {
+                level = value;
+              }
+              index += 1;
+            }
+          }
+          "n" => omit_page_number = true,
+          // General formatting switches have one argument which is not the
+          // TC entry text.
+          "*" | "#" | "@" => {
+            index += usize::from(next_switch_argument(&tokens, index).is_some());
+          }
+          _ => {}
+        }
+      } else if text.is_none() {
+        text = Some(tokens[index].clone());
+      }
+      index += 1;
+    }
+    let text = text?.trim().to_string();
+    (!text.is_empty()).then_some(Self {
+      text,
+      identifier,
+      level,
+      omit_page_number,
+    })
+  }
+}
+
+fn seq_identifier(instruction: &str) -> Option<String> {
+  let tokens = field_instruction_tokens(instruction);
+  if !tokens
+    .first()
+    .is_some_and(|name| name.eq_ignore_ascii_case("SEQ"))
+  {
+    return None;
+  }
+  tokens
+    .iter()
+    .skip(1)
+    .find(|token| field_switch(token).is_none())
+    .cloned()
+}
+
+#[derive(Clone, Debug)]
+struct TocEntrySource {
+  source_ordinal: usize,
+  level: u8,
+  text: String,
+  omit_page_number: bool,
+  chapter_prefix: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct TocReplacement {
+  span: TocSpan,
+  blocks: Vec<Block>,
+}
+
+pub(super) fn refresh_tables_of_contents(
+  sections: &mut [ImportedSection],
+  styles: &StylesCatalog,
+  update_fields_on_open: bool,
+  ui_language: Option<&str>,
+) {
+  let scan = scan_main_story(sections);
+  if scan.toc_spans.is_empty() {
+    return;
+  }
+
+  let mut bookmark_names = scan.bookmark_names.clone();
+  let mut bookmarks_by_source = HashMap::<usize, String>::new();
+  let mut generated_bookmarks = HashMap::<usize, String>::new();
+  let mut next_bookmark_id = 1_u32;
+  let mut replacements = Vec::new();
+
+  for span in &scan.toc_spans {
+    normalize_cached_toc_hyperlink_style(sections, &scan, span, styles);
+    if span.locked
+      || (!span.dirty
+        && !update_fields_on_open
+        && span.separated
+        && toc_span_has_cached_result(sections, &scan, span))
+    {
+      continue;
+    }
+
+    let mut entries = collect_toc_entry_sources(sections, &scan, span);
+    let templates = cached_toc_templates(sections, &scan, span, styles);
+    let page = scan
+      .paragraphs
+      .get(span.start_ordinal)
+      .and_then(|paragraph| sections.get(paragraph.address.section_index))
+      .map(|section| section.page)
+      .unwrap_or_default();
+
+    let mut blocks = Vec::new();
+    for entry in &mut entries {
+      let bookmark_name = bookmarks_by_source
+        .entry(entry.source_ordinal)
+        .or_insert_with(|| {
+          if let Some(existing) = preferred_source_bookmark(&scan, entry.source_ordinal) {
+            return existing.to_string();
+          }
+          let name = loop {
+            let candidate = format!("_Toc{next_bookmark_id:08X}");
+            next_bookmark_id = next_bookmark_id.saturating_add(1);
+            if bookmark_names.insert(candidate.clone()) {
+              break candidate;
+            }
+          };
+          generated_bookmarks.insert(entry.source_ordinal, name.clone());
+          name
+        })
+        .clone();
+      blocks.push(Block::paragraph(build_toc_entry_paragraph(
+        entry,
+        &bookmark_name,
+        &span.spec,
+        templates.get(&entry.level),
+        styles,
+        page,
+      )));
+    }
+
+    if blocks.is_empty() {
+      blocks.push(Block::paragraph(build_empty_toc_result(
+        &span.spec,
+        templates.get(&1),
+        styles,
+        page,
+        ui_language,
+      )));
+    }
+    replacements.push(TocReplacement {
+      span: span.clone(),
+      blocks,
+    });
+  }
+
+  for (ordinal, bookmark_name) in generated_bookmarks {
+    let Some(paragraph) = paragraph_mut(sections, &scan, ordinal) else {
+      continue;
+    };
+    if !paragraph
+      .inlines
+      .iter()
+      .any(|inline| matches!(inline, InlineItem::BookmarkStart(name) if name == &bookmark_name))
+    {
+      paragraph
+        .inlines
+        .insert(0, InlineItem::BookmarkStart(bookmark_name));
+    }
+  }
+
+  replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.span.start_ordinal));
+  for replacement in replacements {
+    replace_toc_span(sections, &scan, replacement);
+  }
+}
+
+fn normalize_cached_toc_hyperlink_style(
+  sections: &mut [ImportedSection],
+  scan: &StoryScan,
+  span: &TocSpan,
+  styles: &StylesCatalog,
+) {
+  for ordinal in span.start_ordinal..=span.end_ordinal {
+    let Some(paragraph) = paragraph_mut(sections, scan, ordinal) else {
+      continue;
+    };
+    let base_style = paragraph.base_style.clone();
+    let hyperlink_style =
+      styles.character_run_style(Some("Hyperlink"), paragraph.base_style.clone());
+    for inline in &mut paragraph.inlines {
+      let InlineItem::Text(run) = inline else {
+        continue;
+      };
+      if !run
+        .hyperlink_url
+        .as_deref()
+        .is_some_and(|url| url.starts_with("ooxmlsdk-pdf:bookmark:"))
+        || !run
+          .style_ref_keys
+          .iter()
+          .any(|key| key.eq_ignore_ascii_case("Hyperlink"))
+      {
+        continue;
+      }
+      // Word's TOC \h result remains an active internal hyperlink, but the
+      // generated entry is painted with its TOC paragraph style rather than
+      // the ordinary blue/underlined Hyperlink character style. Only remove
+      // properties that still equal that character style so direct run
+      // formatting remains authoritative.
+      if run.style.color == hyperlink_style.color
+        && (run.style.opacity - hyperlink_style.opacity).abs() <= f32::EPSILON
+      {
+        run.style.color = base_style.color;
+        run.style.opacity = base_style.opacity;
+        run.style.color_is_automatic = base_style.color_is_automatic;
+      }
+      if run.style.underline == hyperlink_style.underline
+        && run.style.underline_color == hyperlink_style.underline_color
+      {
+        run.style.underline = base_style.underline;
+        run.style.underline_color = base_style.underline_color;
+      }
+    }
+  }
+}
+
+fn toc_span_has_cached_result(
+  sections: &[ImportedSection],
+  scan: &StoryScan,
+  span: &TocSpan,
+) -> bool {
+  (span.start_ordinal..=span.end_ordinal).any(|ordinal| {
+    paragraph(sections, scan, ordinal)
+      .and_then(paragraph_source_text)
+      .is_some_and(|text| !text.trim().is_empty())
+  })
+}
+
+fn collect_toc_entry_sources(
+  sections: &[ImportedSection],
+  scan: &StoryScan,
+  span: &TocSpan,
+) -> Vec<TocEntrySource> {
+  let mut entries = Vec::new();
+
+  for ordinal in 0..scan.paragraphs.len() {
+    if ordinal_inside_any_toc(scan, ordinal)
+      || !paragraph_in_bookmark_scope(scan, ordinal, span.spec.bookmark_name.as_deref())
+    {
+      continue;
+    }
+    let Some(paragraph) = paragraph(sections, scan, ordinal) else {
+      continue;
+    };
+    let Some(level) = paragraph_toc_level(paragraph, &span.spec) else {
+      continue;
+    };
+    let Some(text) = paragraph_source_text(paragraph)
+      .map(|text| normalize_toc_entry_text(text, &span.spec))
+      .filter(|text| !text.is_empty())
+    else {
+      continue;
+    };
+    entries.push(TocEntrySource {
+      source_ordinal: ordinal,
+      level,
+      text,
+      omit_page_number: span.spec.suppress_page_number(level),
+      chapter_prefix: chapter_prefix_for_source(sections, scan, ordinal, &span.spec),
+    });
+  }
+
+  if span.spec.tc_entries {
+    for field in &scan.fields {
+      if ordinal_inside_any_toc(scan, field.start_ordinal)
+        || !paragraph_in_bookmark_scope(
+          scan,
+          field.start_ordinal,
+          span.spec.bookmark_name.as_deref(),
+        )
+      {
+        continue;
+      }
+      let Some(tc) = TcSpec::parse(&field.instruction) else {
+        continue;
+      };
+      if span
+        .spec
+        .tc_identifier
+        .as_deref()
+        .is_some_and(|identifier| tc.identifier.as_deref() != Some(identifier))
+        || !span.spec.tc_levels.contains(tc.level)
+      {
+        continue;
+      }
+      let text = normalize_toc_entry_text(tc.text, &span.spec);
+      if text.is_empty() {
+        continue;
+      }
+      entries.push(TocEntrySource {
+        source_ordinal: field.start_ordinal,
+        level: tc.level,
+        text,
+        omit_page_number: tc.omit_page_number || span.spec.suppress_page_number(tc.level),
+        chapter_prefix: chapter_prefix_for_source(sections, scan, field.start_ordinal, &span.spec),
+      });
+    }
+  }
+
+  if let Some(caption_identifier) = span.spec.caption_identifier.as_deref() {
+    for field in &scan.fields {
+      if ordinal_inside_any_toc(scan, field.start_ordinal)
+        || !paragraph_in_bookmark_scope(
+          scan,
+          field.start_ordinal,
+          span.spec.bookmark_name.as_deref(),
+        )
+        || seq_identifier(&field.instruction).as_deref() != Some(caption_identifier)
+      {
+        continue;
+      }
+      let Some(paragraph) = paragraph(sections, scan, field.start_ordinal) else {
+        continue;
+      };
+      let Some(mut text) = paragraph_source_text(paragraph) else {
+        continue;
+      };
+      if span.spec.omit_caption_label_and_number {
+        text = strip_caption_label_and_number(text, caption_identifier);
+      }
+      let text = normalize_toc_entry_text(text, &span.spec);
+      if text.is_empty() {
+        continue;
+      }
+      entries.push(TocEntrySource {
+        source_ordinal: field.start_ordinal,
+        level: 1,
+        text,
+        omit_page_number: span.spec.suppress_page_number(1),
+        chapter_prefix: chapter_prefix_for_source(sections, scan, field.start_ordinal, &span.spec),
+      });
+    }
+  }
+
+  entries.sort_by(|left, right| {
+    left
+      .source_ordinal
+      .cmp(&right.source_ordinal)
+      .then(left.level.cmp(&right.level))
+  });
+  entries.dedup_by(|left, right| {
+    left.source_ordinal == right.source_ordinal
+      && left.level == right.level
+      && left.text == right.text
+  });
+  entries
+}
+
+fn paragraph_toc_level(paragraph: &Paragraph, spec: &TocSpec) -> Option<u8> {
+  for (style_name, level) in &spec.custom_style_levels {
+    if paragraph
+      .style_ref_keys
+      .iter()
+      .any(|key| key.eq_ignore_ascii_case(style_name))
+    {
+      return Some(*level);
+    }
+  }
+
+  let style_outline_level = paragraph
+    .format
+    .style_outline_level
+    .and_then(|level| level.checked_add(1))
+    .filter(|level| (1..=9).contains(level));
+  if let Some(level) = style_outline_level
+    && spec
+      .outline_levels
+      .is_some_and(|range| range.contains(level))
+  {
+    return Some(level);
+  }
+
+  let applied_outline_level = paragraph
+    .format
+    .outline_level
+    .and_then(|level| level.checked_add(1))
+    .filter(|level| (1..=9).contains(level));
+  if let Some(level) = applied_outline_level
+    && spec.use_applied_outline_level
+  {
+    return Some(level);
+  }
+  None
+}
+
+fn paragraph_source_text(paragraph: &Paragraph) -> Option<String> {
+  if let Some(text) = paragraph.style_ref_text.as_deref()
+    && !text.trim().is_empty()
+  {
+    return Some(text.to_string());
+  }
+  let mut text = String::new();
+  if let Some(label) = paragraph.list_label.as_deref() {
+    text.push_str(label);
+  }
+  for inline in &paragraph.inlines {
+    match inline {
+      InlineItem::Text(run) if !run.style.hidden => text.push_str(&run.text),
+      InlineItem::Ruby(ruby) => {
+        for run in &ruby.base {
+          if !run.style.hidden {
+            text.push_str(&run.text);
+          }
+        }
+      }
+      _ => {}
+    }
+  }
+  (!text.trim().is_empty()).then_some(text)
+}
+
+fn normalize_toc_entry_text(text: String, spec: &TocSpec) -> String {
+  let text = text
+    .chars()
+    .map(|character| match character {
+      '\t' if !spec.preserve_tabs => ' ',
+      '\r' | '\n' if !spec.preserve_newlines => ' ',
+      character => character,
+    })
+    .collect::<String>();
+  if spec.preserve_tabs || spec.preserve_newlines {
+    text.trim().to_string()
+  } else {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+  }
+}
+
+fn strip_caption_label_and_number(mut text: String, identifier: &str) -> String {
+  let trimmed = text.trim_start();
+  if trimmed
+    .get(..identifier.len())
+    .is_some_and(|prefix| prefix.eq_ignore_ascii_case(identifier))
+  {
+    text = trimmed[identifier.len()..].trim_start().to_string();
+  }
+  let first_end = text.find(char::is_whitespace).unwrap_or(text.len());
+  let first = &text[..first_end];
+  if first.chars().any(|character| character.is_ascii_digit()) {
+    text = text[first_end..].trim_start().to_string();
+    text = text
+      .trim_start_matches([':', '.', '-', '–', '—'])
+      .trim_start()
+      .to_string();
+  }
+  text
+}
+
+fn chapter_prefix_for_source(
+  sections: &[ImportedSection],
+  scan: &StoryScan,
+  source_ordinal: usize,
+  spec: &TocSpec,
+) -> Option<String> {
+  let identifier = spec.chapter_sequence.as_deref()?;
+  let has_sequence = scan.fields.iter().any(|field| {
+    field.start_ordinal == source_ordinal
+      && seq_identifier(&field.instruction).as_deref() == Some(identifier)
+  });
+  if !has_sequence {
+    return None;
+  }
+  paragraph(sections, scan, source_ordinal)
+    .and_then(paragraph_source_text)
+    .and_then(|text| {
+      text
+        .split_whitespace()
+        .find(|token| token.chars().any(|character| character.is_ascii_digit()))
+        .map(|token| {
+          token
+            .trim_matches(|character: char| !character.is_alphanumeric())
+            .to_string()
+        })
+    })
+    .filter(|value| !value.is_empty())
+}
+
+fn ordinal_inside_any_toc(scan: &StoryScan, ordinal: usize) -> bool {
+  scan
+    .toc_spans
+    .iter()
+    .any(|span| (span.start_ordinal..=span.end_ordinal).contains(&ordinal))
+}
+
+fn paragraph_in_bookmark_scope(
+  scan: &StoryScan,
+  ordinal: usize,
+  bookmark_name: Option<&str>,
+) -> bool {
+  bookmark_name.is_none_or(|bookmark_name| {
+    scan
+      .paragraphs
+      .get(ordinal)
+      .is_some_and(|paragraph| paragraph.bookmark_scopes.contains(bookmark_name))
+  })
+}
+
+fn preferred_source_bookmark(scan: &StoryScan, ordinal: usize) -> Option<&str> {
+  let bookmarks = &scan.paragraphs.get(ordinal)?.source_bookmarks;
+  bookmarks
+    .iter()
+    .find(|name| name.starts_with("_Toc"))
+    .or_else(|| bookmarks.iter().find(|name| name.as_str() != "_GoBack"))
+    .map(String::as_str)
+}
+
+fn paragraph<'a>(
+  sections: &'a [ImportedSection],
+  scan: &StoryScan,
+  ordinal: usize,
+) -> Option<&'a Paragraph> {
+  let address = &scan.paragraphs.get(ordinal)?.address;
+  let Block::Paragraph(paragraph) =
+    story_block(&sections.get(address.section_index)?.blocks, &address.path)?
+  else {
+    return None;
+  };
+  Some(paragraph)
+}
+
+fn paragraph_mut<'a>(
+  sections: &'a mut [ImportedSection],
+  scan: &StoryScan,
+  ordinal: usize,
+) -> Option<&'a mut Paragraph> {
+  let address = &scan.paragraphs.get(ordinal)?.address;
+  let Block::Paragraph(paragraph) = story_block_mut(
+    &mut sections.get_mut(address.section_index)?.blocks,
+    &address.path,
+  )?
+  else {
+    return None;
+  };
+  Some(paragraph)
+}
+
+fn story_block<'a>(blocks: &'a [Block], path: &[StoryPathStep]) -> Option<&'a Block> {
+  let (StoryPathStep::Block(block_index), remaining) = path.split_first()? else {
+    return None;
+  };
+  let block = blocks.get(*block_index)?;
+  if remaining.is_empty() {
+    return Some(block);
+  }
+  let (
+    StoryPathStep::TableCell {
+      row_index,
+      cell_index,
+    },
+    remaining,
+  ) = remaining.split_first()?
+  else {
+    return None;
+  };
+  let Block::Table(table) = block else {
+    return None;
+  };
+  let cell = table.rows.get(*row_index)?.cells.get(*cell_index)?;
+  story_block(&cell.blocks, remaining)
+}
+
+fn story_block_mut<'a>(blocks: &'a mut [Block], path: &[StoryPathStep]) -> Option<&'a mut Block> {
+  let (StoryPathStep::Block(block_index), remaining) = path.split_first()? else {
+    return None;
+  };
+  let block = blocks.get_mut(*block_index)?;
+  if remaining.is_empty() {
+    return Some(block);
+  }
+  let (
+    StoryPathStep::TableCell {
+      row_index,
+      cell_index,
+    },
+    remaining,
+  ) = remaining.split_first()?
+  else {
+    return None;
+  };
+  let Block::Table(table) = block else {
+    return None;
+  };
+  let cell = table.rows.get_mut(*row_index)?.cells.get_mut(*cell_index)?;
+  story_block_mut(&mut cell.blocks, remaining)
+}
+
+fn story_block_container_mut<'a>(
+  blocks: &'a mut Vec<Block>,
+  path: &[StoryPathStep],
+) -> Option<&'a mut Vec<Block>> {
+  if path.is_empty() {
+    return Some(blocks);
+  }
+  let [
+    StoryPathStep::Block(block_index),
+    StoryPathStep::TableCell {
+      row_index,
+      cell_index,
+    },
+    remaining @ ..,
+  ] = path
+  else {
+    return None;
+  };
+  let Block::Table(table) = blocks.get_mut(*block_index)? else {
+    return None;
+  };
+  let cell = table.rows.get_mut(*row_index)?.cells.get_mut(*cell_index)?;
+  story_block_container_mut(&mut cell.blocks, remaining)
+}
+
+fn cached_toc_templates(
+  sections: &[ImportedSection],
+  scan: &StoryScan,
+  span: &TocSpan,
+  styles: &StylesCatalog,
+) -> HashMap<u8, Paragraph> {
+  let mut templates = HashMap::new();
+  for ordinal in span.start_ordinal..=span.end_ordinal {
+    let Some(paragraph) = paragraph(sections, scan, ordinal) else {
+      continue;
+    };
+    let Some(level) = paragraph
+      .format
+      .style_id
+      .as_deref()
+      .and_then(|style_id| toc_level_for_style(styles, style_id))
+    else {
+      continue;
+    };
+    templates.entry(level).or_insert_with(|| paragraph.clone());
+  }
+  templates
+}
+
+fn toc_level_for_style(styles: &StylesCatalog, style_id: &str) -> Option<u8> {
+  toc_level_from_name(style_id).or_else(|| {
+    styles
+      .styles
+      .get(style_id)
+      .and_then(|entry| entry.name.as_deref())
+      .and_then(toc_level_from_name)
+  })
+}
+
+fn toc_level_from_name(name: &str) -> Option<u8> {
+  let normalized = name
+    .chars()
+    .filter(|character| !character.is_whitespace() && *character != '-' && *character != '_')
+    .flat_map(char::to_lowercase)
+    .collect::<String>();
+  let suffix = normalized
+    .strip_prefix("toc")
+    .or_else(|| normalized.strip_prefix("contents"))?;
+  let level = suffix.parse::<u8>().ok()?;
+  (1..=9).contains(&level).then_some(level)
+}
+
+fn toc_style_id(styles: &StylesCatalog, level: u8) -> String {
+  for candidate in [format!("TOC{level}"), format!("Contents{level}")] {
+    if styles.styles.contains_key(&candidate) {
+      return candidate;
+    }
+  }
+  let mut candidates = styles
+    .styles
+    .iter()
+    .filter_map(|(style_id, entry)| {
+      (toc_level_from_name(style_id) == Some(level)
+        || entry.name.as_deref().and_then(toc_level_from_name) == Some(level))
+      .then_some(style_id)
+    })
+    .cloned()
+    .collect::<Vec<_>>();
+  candidates.sort();
+  candidates
+    .into_iter()
+    .next()
+    .unwrap_or_else(|| format!("TOC{level}"))
+}
+
+fn empty_toc_paragraph(styles: &StylesCatalog, level: u8) -> Paragraph {
+  let style_id = toc_style_id(styles, level);
+  let style_exists = styles.styles.contains_key(&style_id);
+  let mut format = styles.paragraph_format_with_base(Some(&style_id), ParagraphFormat::default());
+  format.style_id = Some(Arc::<str>::from(style_id.as_str()));
+  if !style_exists {
+    // Word's latent TOC styles indent successive levels by 180 twips.
+    format.indent_left_pt = f32::from(level.saturating_sub(1)) * 9.0;
+    format.indent_left_set = true;
+    format.spacing_after_pt = 0.0;
+    format.spacing_after_set = true;
+  }
+  let mut base_style = styles.run_style_with_base(
+    Some(&style_id),
+    TextStyle::default(),
+    RunStyleOverrides::default(),
+  );
+  base_style.line_vertical_alignment = format.line_vertical_alignment.unwrap_or_default();
+  Paragraph {
+    inlines: Vec::new(),
+    field_events: Vec::new(),
+    footnote_reference_ids: Vec::new(),
+    endnote_reference_ids: Vec::new(),
+    starts_after_last_rendered_page_break: false,
+    base_style,
+    #[cfg(test)]
+    runs: Vec::new(),
+    format: Box::new(format),
+    style_ref_keys: styles.style_ref_keys(&style_id),
+    style_ref_text: None,
+    style_ref_numbering_text: None,
+    list_label: None,
+    list_label_style: TextStyle::default(),
+    list_label_hyperlink_url: None,
+    list_label_tab_stop_pt: None,
+  }
+}
+
+fn build_toc_entry_paragraph(
+  entry: &TocEntrySource,
+  bookmark_name: &str,
+  spec: &TocSpec,
+  template: Option<&Paragraph>,
+  styles: &StylesCatalog,
+  page: PageSetup,
+) -> Paragraph {
+  let mut paragraph = template
+    .cloned()
+    .unwrap_or_else(|| empty_toc_paragraph(styles, entry.level));
+  paragraph.inlines.clear();
+  paragraph.field_events.clear();
+  paragraph.footnote_reference_ids.clear();
+  paragraph.endnote_reference_ids.clear();
+  paragraph.starts_after_last_rendered_page_break = false;
+  paragraph.list_label = None;
+  paragraph.list_label_hyperlink_url = None;
+  paragraph.list_label_tab_stop_pt = None;
+  paragraph.style_ref_text = None;
+  paragraph.style_ref_numbering_text = None;
+  #[cfg(test)]
+  paragraph.runs.clear();
+
+  let hyperlink_url = spec
+    .hyperlinks
+    .then(|| format!("ooxmlsdk-pdf:bookmark:{bookmark_name}"));
+  // TOC \h creates a link target without applying the ordinary blue
+  // Hyperlink character appearance in Word's fixed output.
+  let run_style = paragraph.base_style.clone();
+  paragraph.inlines.push(InlineItem::Text(TextRun {
+    text: entry.text.clone(),
+    style: run_style.clone(),
+    hyperlink_url: hyperlink_url.clone(),
+    dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
+    style_ref_numbering_text: None,
+    preserve_text_portion: false,
+  }));
+
+  if !entry.omit_page_number {
+    if let Some(separator) = spec.page_separator {
+      paragraph.inlines.push(InlineItem::Text(TextRun {
+        text: separator.to_string(),
+        style: run_style.clone(),
+        hyperlink_url: hyperlink_url.clone(),
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      }));
+    } else {
+      ensure_toc_page_tab_stop(&mut paragraph, page);
+      paragraph.inlines.push(InlineItem::Text(TextRun {
+        text: "\t".to_string(),
+        style: run_style.clone(),
+        hyperlink_url: hyperlink_url.clone(),
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      }));
+    }
+    if let Some(prefix) = entry.chapter_prefix.as_deref() {
+      paragraph.inlines.push(InlineItem::Text(TextRun {
+        text: format!("{prefix}{}", spec.chapter_separator),
+        style: run_style.clone(),
+        hyperlink_url: hyperlink_url.clone(),
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      }));
+    }
+    paragraph.inlines.push(InlineItem::Text(TextRun {
+      text: "1".to_string(),
+      style: run_style,
+      hyperlink_url,
+      dynamic_field: Some(DynamicFieldKind::PageRef {
+        bookmark_name: Arc::<str>::from(bookmark_name),
+        number_format: FieldNumberFormat::PageStyle,
+        relative_position: false,
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      preserve_text_portion: false,
+    }));
+  }
+  paragraph
+}
+
+fn ensure_toc_page_tab_stop(paragraph: &mut Paragraph, page: PageSetup) {
+  let content_width = (page.width_pt - page.margin_left_pt - page.margin_right_pt).max(1.0);
+  let position_pt =
+    (content_width - paragraph.format.indent_left_pt - paragraph.format.indent_right_pt).max(1.0);
+  if let Some(stop) = paragraph
+    .format
+    .tab_stops
+    .iter_mut()
+    .find(|stop| matches!(stop.alignment, TabStopAlignment::Right))
+  {
+    stop.position_pt = position_pt;
+    stop.leader = TabLeader::Dot;
+  } else {
+    paragraph.format.tab_stops.push(TabStop {
+      position_pt,
+      alignment: TabStopAlignment::Right,
+      leader: TabLeader::Dot,
+    });
+    paragraph
+      .format
+      .tab_stops
+      .sort_by(|left, right| left.position_pt.total_cmp(&right.position_pt));
+  }
+  paragraph.format.tab_stops_set = true;
+}
+
+fn build_empty_toc_result(
+  _spec: &TocSpec,
+  template: Option<&Paragraph>,
+  styles: &StylesCatalog,
+  _page: PageSetup,
+  ui_language: Option<&str>,
+) -> Paragraph {
+  let mut paragraph = template
+    .cloned()
+    .unwrap_or_else(|| empty_toc_paragraph(styles, 1));
+  paragraph.inlines.clear();
+  paragraph.field_events.clear();
+  paragraph.footnote_reference_ids.clear();
+  paragraph.endnote_reference_ids.clear();
+  paragraph.list_label = None;
+  paragraph.list_label_hyperlink_url = None;
+  let language = ui_language
+    .unwrap_or("en-US")
+    .replace('_', "-")
+    .to_ascii_lowercase();
+  let text = if language == "zh-cn" || language.starts_with("zh-hans") {
+    "错误!未找到目录项。"
+  } else if language == "zh-tw" || language.starts_with("zh-hant") {
+    "錯誤! 找不到目錄項目。"
+  } else {
+    "No table of contents entries found."
+  };
+  paragraph.inlines.push(InlineItem::Text(TextRun {
+    text: text.to_string(),
+    style: paragraph.base_style.clone(),
+    hyperlink_url: None,
+    dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
+    style_ref_numbering_text: None,
+    preserve_text_portion: false,
+  }));
+  paragraph
+}
+
+fn replace_toc_span(
+  sections: &mut [ImportedSection],
+  scan: &StoryScan,
+  replacement: TocReplacement,
+) {
+  let Some(start) = scan.paragraphs.get(replacement.span.start_ordinal) else {
+    return;
+  };
+  let Some(end) = scan.paragraphs.get(replacement.span.end_ordinal) else {
+    return;
+  };
+  if start.address.section_index == end.address.section_index
+    && start.address.container_path() == end.address.container_path()
+  {
+    let (Some(start_block_index), Some(end_block_index)) =
+      (start.address.block_index(), end.address.block_index())
+    else {
+      return;
+    };
+    let Some(section) = sections.get_mut(start.address.section_index) else {
+      return;
+    };
+    let Some(blocks) =
+      story_block_container_mut(&mut section.blocks, start.address.container_path())
+    else {
+      return;
+    };
+    if start_block_index <= end_block_index && end_block_index < blocks.len() {
+      blocks.splice(start_block_index..=end_block_index, replacement.blocks);
+    }
+    return;
+  }
+
+  // A complex field may legally cross a section boundary. Preserve all
+  // non-field content on either side, put the rebuilt result in the starting
+  // section, and remove only the intervening field-result blocks.
+  if !start.address.is_top_level() || !end.address.is_top_level() {
+    // A field crossing table-cell or floating-story boundaries is malformed.
+    // Keep its cached result rather than deleting unrelated table structure.
+    return;
+  }
+  let (Some(start_block_index), Some(end_block_index)) =
+    (start.address.block_index(), end.address.block_index())
+  else {
+    return;
+  };
+  if let Some(end_section) = sections.get_mut(end.address.section_index)
+    && end_block_index < end_section.blocks.len()
+  {
+    end_section.blocks.drain(..=end_block_index);
+  }
+  for section_index in start.address.section_index + 1..end.address.section_index {
+    if let Some(section) = sections.get_mut(section_index) {
+      section.blocks.clear();
+    }
+  }
+  if let Some(start_section) = sections.get_mut(start.address.section_index)
+    && start_block_index < start_section.blocks.len()
+  {
+    start_section.blocks.truncate(start_block_index);
+    start_section.blocks.extend(replacement.blocks);
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn test_paragraph(text: &str) -> Paragraph {
+    let styles = StylesCatalog::default();
+    let mut paragraph = empty_toc_paragraph(&styles, 1);
+    paragraph.inlines.push(InlineItem::Text(TextRun {
+      text: text.to_string(),
+      style: paragraph.base_style.clone(),
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      preserve_text_portion: false,
+    }));
+    paragraph.style_ref_text = (!text.is_empty()).then(|| Arc::<str>::from(text));
+    paragraph
+  }
+
+  fn test_table(blocks: Vec<Block>) -> Table {
+    Table {
+      column_widths_pt: vec![300.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      layout: TableLayoutMode::AutoFit,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      right_to_left: false,
+      align_leading_cell_content: false,
+      placement: None,
+      allow_overlap: true,
+      split_allowed: true,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      starts_after_last_rendered_page_break: false,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: vec![TableRow {
+        cells: vec![TableCell {
+          blocks,
+          shading: None,
+          borders: CellBordersModel::default(),
+          border_suppressions: CellBorderSuppressions::default(),
+          margins: CellMargins::default(),
+          preferred_width_pt: None,
+          preferred_width_pct: None,
+          grid_span: 1,
+          vertical_merge_continue: false,
+          no_wrap: false,
+          fit_text: false,
+          hide_end_mark: false,
+          vertical_alignment: TableCellVerticalAlignment::Top,
+          text_rotation_deg: None,
+        }],
+        height_pt: None,
+        exact_height: false,
+        repeat_header: false,
+        keep_with_next: false,
+        cant_split: false,
+        cell_spacing_pt: None,
+        grid_before: 0,
+        grid_after: 0,
+        width_before_pt: None,
+        width_after_pt: None,
+        layout: None,
+        borders: None,
+        redline_color: None,
+      }],
+    }
+  }
+
+  #[test]
+  fn toc_parser_covers_all_ecma_switch_families_and_word_deviations() {
+    let spec = TocSpec::parse(
+      r#" TOC \o "2-4" \u \f A \l "2-3" \h \n "3-4" \p ":-ignored" \s chapter \d "::" \b scope \t "Appendix,1,Side,3" \w \x \z "#,
+    )
+    .unwrap();
+    assert_eq!(
+      spec.outline_levels,
+      Some(TocLevelRange { start: 2, end: 4 })
+    );
+    assert!(spec.use_applied_outline_level);
+    assert!(spec.tc_entries);
+    assert_eq!(spec.tc_identifier.as_deref(), Some("A"));
+    assert_eq!(spec.tc_levels, TocLevelRange { start: 2, end: 3 });
+    assert!(spec.hyperlinks);
+    assert_eq!(
+      spec.no_page_number_levels,
+      Some(TocLevelRange { start: 3, end: 4 })
+    );
+    assert_eq!(spec.page_separator, Some(':'));
+    assert_eq!(spec.chapter_sequence.as_deref(), Some("chapter"));
+    assert_eq!(spec.chapter_separator, "::");
+    assert_eq!(spec.bookmark_name.as_deref(), Some("scope"));
+    assert_eq!(
+      spec.custom_style_levels,
+      vec![("Appendix".to_string(), 1), ("Side".to_string(), 3)]
+    );
+    assert!(spec.preserve_tabs);
+    assert!(spec.preserve_newlines);
+    assert!(spec.hide_page_numbers_in_web_layout);
+  }
+
+  #[test]
+  fn toc_parser_defaults_to_outline_and_later_f_supersedes_l() {
+    let default = TocSpec::parse("TOC").unwrap();
+    assert_eq!(default.outline_levels, Some(TocLevelRange::ALL));
+
+    let spec = TocSpec::parse(r#"TOC \l "3-4" \f C"#).unwrap();
+    assert_eq!(spec.tc_levels, TocLevelRange::ALL);
+    assert_eq!(spec.tc_identifier.as_deref(), Some("C"));
+    assert_eq!(spec.outline_levels, None);
+  }
+
+  #[test]
+  fn toc_parser_accepts_legacy_slash_switches() {
+    let spec = TocSpec::parse("TOC /l 1-3 /f").unwrap();
+    assert!(spec.tc_entries);
+    assert_eq!(spec.tc_levels, TocLevelRange::ALL);
+  }
+
+  #[test]
+  fn dirty_cross_paragraph_toc_is_rebuilt_with_bookmark_and_pageref() {
+    let mut first_cached = test_paragraph("stale first");
+    first_cached.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: false,
+        dirty: true,
+      },
+      ParagraphFieldEvent::Instruction(r#" TOC \o "1-2" \h "#.to_string()),
+      ParagraphFieldEvent::Separate,
+    ];
+    let mut second_cached = test_paragraph("stale second");
+    second_cached.field_events = vec![ParagraphFieldEvent::End];
+    let mut heading = test_paragraph("Current heading");
+    heading.format.style_outline_level = Some(0);
+    heading.format.outline_level = Some(0);
+
+    let mut sections = vec![default_section(vec![
+      Block::paragraph(first_cached),
+      Block::paragraph(second_cached),
+      Block::paragraph(heading),
+    ])];
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("en-US"),
+    );
+
+    assert_eq!(sections[0].blocks.len(), 2);
+    let Block::Paragraph(entry) = &sections[0].blocks[0] else {
+      panic!("expected rebuilt TOC entry");
+    };
+    assert!(matches!(
+      entry.inlines.first(),
+      Some(InlineItem::Text(run)) if run.text == "Current heading"
+        && run.hyperlink_url.as_deref().is_some_and(|url| url.starts_with("ooxmlsdk-pdf:bookmark:"))
+    ));
+    let target = entry
+      .inlines
+      .iter()
+      .find_map(|inline| match inline {
+        InlineItem::Text(TextRun {
+          dynamic_field: Some(DynamicFieldKind::PageRef { bookmark_name, .. }),
+          ..
+        }) => Some(bookmark_name.clone()),
+        _ => None,
+      })
+      .expect("generated PAGEREF");
+    assert!(entry.format.tab_stops.iter().any(|stop| {
+      matches!(stop.alignment, TabStopAlignment::Right) && matches!(stop.leader, TabLeader::Dot)
+    }));
+
+    let Block::Paragraph(source) = &sections[0].blocks[1] else {
+      panic!("expected source heading");
+    };
+    assert!(matches!(
+      source.inlines.first(),
+      Some(InlineItem::BookmarkStart(name)) if name == target.as_ref()
+    ));
+  }
+
+  #[test]
+  fn main_story_toc_includes_heading_inside_nested_table_cell() {
+    let mut cached = test_paragraph("stale");
+    cached.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: false,
+        dirty: true,
+      },
+      ParagraphFieldEvent::Instruction(r#"TOC \o "1-3" \h"#.to_string()),
+      ParagraphFieldEvent::Separate,
+      ParagraphFieldEvent::End,
+    ];
+    let mut heading = test_paragraph("Table heading");
+    heading.format.style_outline_level = Some(0);
+    heading.format.outline_level = Some(0);
+    let nested = test_table(vec![Block::paragraph(heading)]);
+    let table = test_table(vec![Block::Table(nested)]);
+    let mut sections = vec![default_section(vec![
+      Block::paragraph(cached),
+      Block::Table(table),
+    ])];
+
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("en-US"),
+    );
+
+    let Block::Paragraph(entry) = &sections[0].blocks[0] else {
+      panic!("expected rebuilt TOC entry");
+    };
+    assert!(matches!(
+      entry.inlines.first(),
+      Some(InlineItem::Text(run)) if run.text == "Table heading"
+    ));
+    let Block::Table(table) = &sections[0].blocks[1] else {
+      panic!("expected outer table");
+    };
+    let Block::Table(nested) = &table.rows[0].cells[0].blocks[0] else {
+      panic!("expected nested table");
+    };
+    let Block::Paragraph(source) = &nested.rows[0].cells[0].blocks[0] else {
+      panic!("expected nested source paragraph");
+    };
+    assert!(matches!(
+      source.inlines.first(),
+      Some(InlineItem::BookmarkStart(name)) if name.starts_with("_Toc")
+    ));
+  }
+
+  #[test]
+  fn dirty_toc_inside_table_cell_rebuilds_only_its_cell_blocks() {
+    let mut heading = test_paragraph("Outer heading");
+    heading.format.style_outline_level = Some(0);
+    heading.format.outline_level = Some(0);
+    let mut cached = test_paragraph("stale");
+    cached.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: false,
+        dirty: true,
+      },
+      ParagraphFieldEvent::Instruction(r#"TOC \o "1-3""#.to_string()),
+      ParagraphFieldEvent::Separate,
+      ParagraphFieldEvent::End,
+    ];
+    let mut sections = vec![default_section(vec![
+      Block::paragraph(heading),
+      Block::Table(test_table(vec![Block::paragraph(cached)])),
+    ])];
+
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("en-US"),
+    );
+
+    let Block::Table(table) = &sections[0].blocks[1] else {
+      panic!("expected table");
+    };
+    assert_eq!(table.rows[0].cells[0].blocks.len(), 1);
+    let Block::Paragraph(entry) = &table.rows[0].cells[0].blocks[0] else {
+      panic!("expected rebuilt cell TOC");
+    };
+    assert!(matches!(
+      entry.inlines.first(),
+      Some(InlineItem::Text(run)) if run.text == "Outer heading"
+    ));
+  }
+
+  #[test]
+  fn locked_toc_keeps_its_persisted_result_even_when_dirty() {
+    let mut cached = test_paragraph("locked cached result");
+    cached.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: true,
+        dirty: true,
+      },
+      ParagraphFieldEvent::Instruction("TOC".to_string()),
+      ParagraphFieldEvent::Separate,
+      ParagraphFieldEvent::End,
+    ];
+    let mut heading = test_paragraph("Heading");
+    heading.format.style_outline_level = Some(0);
+    heading.format.outline_level = Some(0);
+    let mut sections = vec![default_section(vec![
+      Block::paragraph(cached),
+      Block::paragraph(heading),
+    ])];
+
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      true,
+      Some("en-US"),
+    );
+
+    let Block::Paragraph(cached) = &sections[0].blocks[0] else {
+      panic!("expected cached paragraph");
+    };
+    assert_eq!(
+      paragraph_source_text(cached).as_deref(),
+      Some("locked cached result")
+    );
+    assert_eq!(sections[0].blocks.len(), 2);
+  }
+
+  #[test]
+  fn cached_toc_link_keeps_annotation_but_uses_toc_paragraph_paint() {
+    let styles = StylesCatalog::default();
+    let mut cached = test_paragraph("Linked heading");
+    cached.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: true,
+        dirty: false,
+      },
+      ParagraphFieldEvent::Instruction(r#"TOC \h"#.to_string()),
+      ParagraphFieldEvent::Separate,
+      ParagraphFieldEvent::End,
+    ];
+    let InlineItem::Text(run) = &mut cached.inlines[0] else {
+      panic!("expected cached text");
+    };
+    run.style = styles.character_run_style(Some("Hyperlink"), cached.base_style.clone());
+    run.hyperlink_url = Some("ooxmlsdk-pdf:bookmark:_Toc1".to_string());
+    run.style_ref_keys = vec![Arc::<str>::from("Hyperlink")];
+    assert!(run.style.underline);
+    assert_ne!(run.style.color, cached.base_style.color);
+
+    let mut sections = vec![default_section(vec![Block::paragraph(cached)])];
+    refresh_tables_of_contents(&mut sections, &styles, false, Some("en-US"));
+
+    let Block::Paragraph(cached) = &sections[0].blocks[0] else {
+      panic!("expected cached TOC");
+    };
+    let InlineItem::Text(run) = &cached.inlines[0] else {
+      panic!("expected cached link");
+    };
+    assert_eq!(
+      run.hyperlink_url.as_deref(),
+      Some("ooxmlsdk-pdf:bookmark:_Toc1")
+    );
+    assert_eq!(run.style.color, cached.base_style.color);
+    assert_eq!(run.style.underline, cached.base_style.underline);
+  }
+
+  #[test]
+  fn toc_o_uses_style_outline_while_u_accepts_direct_outline() {
+    let mut direct_outline = test_paragraph("Direct outline");
+    direct_outline.format.style_outline_level = None;
+    direct_outline.format.outline_level = Some(1);
+    let built_in = TocSpec::parse(r#"TOC \o "1-3""#).unwrap();
+    let applied = TocSpec::parse(r#"TOC \u"#).unwrap();
+
+    assert_eq!(paragraph_toc_level(&direct_outline, &built_in), None);
+    assert_eq!(paragraph_toc_level(&direct_outline, &applied), Some(2));
+
+    direct_outline.format.style_outline_level = Some(0);
+    assert_eq!(paragraph_toc_level(&direct_outline, &built_in), Some(1));
+  }
+
+  #[test]
+  fn tc_parser_retains_identifier_level_and_page_suppression() {
+    assert_eq!(
+      TcSpec::parse(r#"TC "Illustration 1" \f i \l 4 \n"#),
+      Some(TcSpec {
+        text: "Illustration 1".to_string(),
+        identifier: Some("i".to_string()),
+        level: 4,
+        omit_page_number: true,
+      })
+    );
+  }
+}

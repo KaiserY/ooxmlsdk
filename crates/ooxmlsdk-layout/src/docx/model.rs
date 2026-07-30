@@ -4,6 +4,10 @@ use std::sync::Arc;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
+use ooxmlsdk::schemas::{
+  schemas_microsoft_com_office_drawing_2012_chart_style as cs,
+  schemas_microsoft_com_office_drawing_2014_chartex as cx,
+};
 
 pub(crate) use crate::model::{
   BorderDashPattern, BorderStyle, CellBordersModel, DynamicFieldKind, FieldNumberFormat,
@@ -162,6 +166,12 @@ pub(crate) enum FrameHeightRule {
 #[derive(Clone, Debug)]
 pub(crate) struct Paragraph {
   pub inlines: Vec<InlineItem>,
+  /// Ordered field/bookmark markers retained from the source paragraph.
+  ///
+  /// Complex Word fields are allowed to start in one paragraph and end in a
+  /// later paragraph (a TOC normally does exactly that), so the inline result
+  /// alone is not enough to reconstruct document-level field ownership.
+  pub field_events: Vec<ParagraphFieldEvent>,
   pub footnote_reference_ids: Vec<i64>,
   pub endnote_reference_ids: Vec<i64>,
   pub starts_after_last_rendered_page_break: bool,
@@ -176,6 +186,29 @@ pub(crate) struct Paragraph {
   pub list_label_style: TextStyle,
   pub list_label_hyperlink_url: Option<String>,
   pub list_label_tab_stop_pt: Option<f32>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum ParagraphFieldEvent {
+  Begin {
+    locked: bool,
+    dirty: bool,
+  },
+  Instruction(String),
+  Separate,
+  End,
+  Simple {
+    instruction: String,
+    locked: bool,
+    dirty: bool,
+  },
+  BookmarkStart {
+    id: String,
+    name: String,
+  },
+  BookmarkEnd {
+    id: String,
+  },
 }
 
 #[derive(Clone, Debug)]
@@ -343,6 +376,10 @@ pub(crate) struct ParagraphFormat {
   pub suppress_auto_hyphens: Option<bool>,
   pub hidden_separator: bool,
   pub outline_text_inlines: Option<usize>,
+  /// Effective outline level supplied by the paragraph style hierarchy,
+  /// before direct paragraph properties are applied. TOC `\o` uses this
+  /// value; `\u` uses the final `outline_level` below.
+  pub style_outline_level: Option<u8>,
   pub outline_level: Option<u8>,
   pub frame: Option<ParagraphFrameProperties>,
 }
@@ -703,22 +740,38 @@ pub(crate) struct InlineShape {
 #[derive(Clone, Debug)]
 pub(crate) struct InlineChart {
   pub chart_space: Option<Box<c::ChartSpace>>,
-  pub extended_chart_space:
-    Option<Box<ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex::ChartSpace>>,
+  pub extended_chart_space: Option<Box<cx::ChartSpace>>,
+  pub extended_chart_styles: Vec<cs::ChartStyle>,
+  pub extended_chart_color_styles: Vec<cs::ColorStyle>,
+  pub extended_chart_theme: crate::render::chartex::ChartExTheme,
   pub ui_language: Option<String>,
   pub automatic_title: String,
   pub title_style: TextStyle,
+  /// Legend and axis-title text. Axis tick labels have independent OOXML
+  /// text bodies and therefore use the role-specific styles below.
   pub label_style: TextStyle,
+  pub category_label_style: TextStyle,
+  pub value_label_style: TextStyle,
+  pub series_label_style: TextStyle,
   pub data_label_style: TextStyle,
+  pub data_label_styles: Vec<Vec<Option<TextStyle>>>,
   pub gridline_color: RgbColor,
+  pub value_gridline_width_pt: Option<f32>,
+  pub axis_line_width_pt: Option<f32>,
+  pub category_major_gridline: Option<(RgbColor, f32)>,
+  pub category_minor_gridline: Option<(RgbColor, f32)>,
   pub series_colors: Vec<RgbColor>,
   pub series_point_colors: Vec<Vec<Option<RgbColor>>>,
+  pub surface_band_colors: Vec<Vec<(u32, RgbColor)>>,
+  pub data_label_fill_colors: Vec<Vec<Option<RgbColor>>>,
   pub pie_point_colors: Vec<RgbColor>,
   pub title_fill_color: Option<RgbColor>,
   pub chart_area_fill_color: Option<RgbColor>,
   pub plot_area_fill_color: Option<RgbColor>,
   pub chart_area_stroke_color: Option<RgbColor>,
+  pub chart_area_stroke_width_pt: Option<f32>,
   pub plot_area_stroke_color: Option<RgbColor>,
+  pub plot_area_stroke_width_pt: Option<f32>,
 }
 
 #[derive(Clone, Debug)]

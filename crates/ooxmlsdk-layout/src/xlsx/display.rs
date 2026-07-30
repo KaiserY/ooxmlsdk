@@ -265,6 +265,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     preserve_text_portion: item.preserve_text_portion,
     pdf_text_segmentation: match item.pdf_text_segmentation {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
+      PdfTextSegmentation::WordLine => common::PdfTextSegmentation::WordLine,
       PdfTextSegmentation::Portion => common::PdfTextSegmentation::Portion,
     },
     source: (!item.source_path.is_empty()).then_some(common::DisplaySource {
@@ -5189,7 +5190,13 @@ fn lower_drawing_chart(
     .chain(drawing.extended_charts.iter())
     .find(|chart| chart.relationship_id.as_deref() == Some(relationship_id))?;
   if let Some(chart_space) = resource.extended_chart_space.as_deref() {
-    let mut items = super::chartex::lower_extended_chart(import, chart_space, rect);
+    let mut items = super::chartex::lower_extended_chart(
+      import,
+      chart_space,
+      rect,
+      &resource.extended_chart_styles,
+      &resource.extended_chart_color_styles,
+    );
     let mut metrics = TextMetrics::new();
     clip_chart_items_to_rect(
       &mut items,
@@ -5428,6 +5435,19 @@ fn lower_drawing_chart(
         .collect()
     })
     .collect();
+  let surface_band_colors = chart
+    .surface_groups
+    .iter()
+    .map(|group| {
+      group
+        .band_fills
+        .iter()
+        .filter_map(|fill| {
+          xlsx_chart_solid_fill_color(fill.fill, import).map(|color| (fill.index, color))
+        })
+        .collect()
+    })
+    .collect();
   let mut title_style = import.styles.default_chart_text_style();
   title_style.font_size_pt = if has_visible_empty_automatic_title {
     18.0
@@ -5518,6 +5538,14 @@ fn lower_drawing_chart(
     .and_then(|axis| axis.text_properties.as_deref())
   {
     apply_xlsx_chart_text_properties(&mut value_label_style, properties, import);
+  }
+  let mut series_label_style = label_style.clone();
+  if let Some(properties) = chart
+    .axis_sets
+    .iter()
+    .find_map(|axes| axes.series_axis?.text_properties.as_deref())
+  {
+    apply_xlsx_chart_text_properties(&mut series_label_style, properties, import);
   }
   let mut data_label_style = label_style.clone();
   if let Some(properties) = chart.data_label_text_properties {
@@ -5647,6 +5675,7 @@ fn lower_drawing_chart(
       label: legend_label_style,
       category_label: category_label_style,
       value_label: value_label_style,
+      series_label: series_label_style,
       data_label: data_label_style,
       data_label_styles: chart
         .series
@@ -5672,6 +5701,7 @@ fn lower_drawing_chart(
       category_minor_gridline,
       series_colors,
       series_point_colors,
+      surface_band_colors,
       data_label_fill_colors: chart
         .series
         .iter()

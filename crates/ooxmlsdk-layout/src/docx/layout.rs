@@ -701,7 +701,7 @@ pub(crate) struct OutlineEntry {
   pub merged_hidden_separator: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AnchorPage {
   pub name: String,
   pub page_index: usize,
@@ -709,6 +709,9 @@ pub(crate) struct AnchorPage {
   pub section_page_index: usize,
   pub physical_page_number: usize,
   pub virtual_page_number: usize,
+  pub page_number_format: FieldNumberFormat,
+  pub x_pt: f32,
+  pub y_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1093,6 +1096,8 @@ pub(crate) struct TextItem {
 struct DynamicFieldLineAnchor {
   position_pt: f32,
   alignment: ParagraphAlignment,
+  field_result_tab: bool,
+  field_result_tab_start_x_pt: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1259,6 +1264,7 @@ struct PendingAlignedTab {
   line_height_pt: f32,
   style: TextStyle,
   item_start_index: usize,
+  field_result_tab: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -2858,7 +2864,7 @@ fn into_common_dynamic_field(field: DynamicFieldKind) -> common::DynamicField<'s
     DynamicFieldKind::NumPages { number_format } => common::DynamicField::NumPages {
       number_format: common_field_number_format(number_format),
     },
-    DynamicFieldKind::PageRef { bookmark_name } => common::DynamicField::PageRef {
+    DynamicFieldKind::PageRef { bookmark_name, .. } => common::DynamicField::PageRef {
       bookmark_name: Cow::Owned(bookmark_name.to_string()),
     },
     DynamicFieldKind::StyleRef {
@@ -2874,6 +2880,10 @@ fn into_common_dynamic_field(field: DynamicFieldKind) -> common::DynamicField<'s
 
 fn common_field_number_format(format: FieldNumberFormat) -> common::FieldNumberFormat {
   match format {
+    // PageStyle is resolved against the current section before this metadata is
+    // consumed. Keep a deterministic fallback for callers that only inspect the
+    // common model.
+    FieldNumberFormat::PageStyle => common::FieldNumberFormat::Decimal,
     FieldNumberFormat::Decimal => common::FieldNumberFormat::Decimal,
     FieldNumberFormat::LowerRoman => common::FieldNumberFormat::LowerRoman,
     FieldNumberFormat::UpperRoman => common::FieldNumberFormat::UpperRoman,
@@ -3086,6 +3096,7 @@ fn localize_line_box(mut line: LineBox, item_offset: usize) -> LineBox {
 
 struct RootFrameLayout<'a> {
   document: &'a DocxDocument,
+  ui_language: Option<String>,
   action: LayoutActionOptions,
   collect_frame_items: bool,
   emit_reflow_diagnostics: bool,
@@ -3165,6 +3176,7 @@ impl<'a> RootFrameLayout<'a> {
   fn new(document: &'a DocxDocument, options: &LayoutOptions) -> Self {
     Self {
       document,
+      ui_language: options.ui_language.clone(),
       action: options.action,
       collect_frame_items: options.diagnostics.collect_debug_records,
       emit_reflow_diagnostics: options.diagnostics.collect_reflow_records,
@@ -3253,6 +3265,7 @@ impl<'a> RootFrameLayout<'a> {
         &self.anchor_pages,
         &self.document.footnote_numbering,
         &self.document.endnote_numbering,
+        self.ui_language.as_deref(),
         &mut self.text_metrics,
       );
       mark_decorated_frame_invalidations(
@@ -4281,6 +4294,7 @@ fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mu
       };
       let collapsed_numbering_shadow = text.style_ref_numbering_text.is_some()
         && text.pdf_text_segmentation == PdfTextSegmentation::Line
+        && text.style.drawingml_text_effects.is_none()
         && text.style.text_glow.is_none()
         && text.style.text_reflection.is_none()
         && text.style.text_shadow.is_some_and(|shadow| {
@@ -4299,27 +4313,29 @@ fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mu
       if text.text.trim().is_empty() {
         continue;
       }
-      let font_size_pt = effective_font_size_pt(&text.style, None);
-      let text_effect_scale = wordprocessing_text_effect_render_scale(font_size_pt);
-      let render_glow = text.style.text_glow.map(|mut glow| {
-        // Word keeps the authored glow extent for the fixed-output canvas,
-        // while its text glow kernel is normalized by font size.
-        glow.raster_length_scale = text_effect_scale;
-        glow
+      let drawingml_effects = text.style.drawingml_text_effects.clone();
+      let effects = drawingml_effects.clone().or_else(|| {
+        let font_size_pt = effective_font_size_pt(&text.style, None);
+        let text_effect_scale = wordprocessing_text_effect_render_scale(font_size_pt);
+        let render_glow = text.style.text_glow.map(|mut glow| {
+          // Word keeps the authored glow extent for the fixed-output canvas,
+          // while its text glow kernel is normalized by font size.
+          glow.raster_length_scale = text_effect_scale;
+          glow
+        });
+        let render_shadow = text.style.text_shadow.map(|mut shadow| {
+          // Word's fixed-output canvas keeps the authored effect extents, while
+          // its text shadow kernel is normalized by the owning font size.
+          shadow.raster_length_scale = text_effect_scale;
+          shadow
+        });
+        common::drawingml_image_effects::from_wordprocessing_text_effects(
+          render_glow,
+          render_shadow,
+          text.style.text_reflection,
+        )
       });
-      let render_shadow = text.style.text_shadow.map(|mut shadow| {
-        // Word's fixed-output canvas keeps the authored effect extents, while
-        // the shadow kernel uses the same font-size-dependent coordinate
-        // normalization seen in MSO text glow. Keeping those two coordinate
-        // spaces separate is observable in the PDF XObject bounds.
-        shadow.raster_length_scale = text_effect_scale;
-        shadow
-      });
-      let Some(effects) = common::drawingml_image_effects::from_wordprocessing_text_effects(
-        render_glow,
-        render_shadow,
-        text.style.text_reflection,
-      ) else {
+      let Some(effects) = effects else {
         continue;
       };
       let Some(mut backdrop_effects) =
@@ -4331,18 +4347,24 @@ fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mu
       if width <= f32::EPSILON || text.line_height_pt <= f32::EPSILON {
         continue;
       }
-      let baseline_offset = if text.style.use_windows_font_metrics {
-        text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
-          &text.text,
-          &text.style,
-          text.line_height_pt,
-        )
-      } else {
-        text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
-      };
       let mut effect_text = (**text).clone();
-      effect_text.y_pt +=
-        wordprocessing_text_effect_baseline_shift(text.line_height_pt, baseline_offset);
+      if drawingml_effects.is_none() {
+        let baseline_offset = if text.style.use_windows_font_metrics {
+          text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+            &text.text,
+            &text.style,
+            text.line_height_pt,
+          )
+        } else {
+          text_metrics.baseline_offset_in_line_for_text(
+            &text.text,
+            &text.style,
+            text.line_height_pt,
+          )
+        };
+        effect_text.y_pt +=
+          wordprocessing_text_effect_baseline_shift(text.line_height_pt, baseline_offset);
+      }
       let Some((ink_left, ink_top, ink_right, ink_bottom)) =
         text_item_ink_bounds(&effect_text, text_metrics)
       else {
@@ -4360,10 +4382,15 @@ fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mu
       ) else {
         continue;
       };
-      let relative_left = output_bounds.left_pt.min(0.0);
-      let relative_top = output_bounds.top_pt.min(0.0);
-      let relative_right = output_bounds.right_pt.max(ink_width);
-      let relative_bottom = output_bounds.bottom_pt.max(ink_height);
+      let drawingml_canvas_padding_pt = if drawingml_effects.is_some() {
+        2.0 / (200.0 / 72.0)
+      } else {
+        0.0
+      };
+      let relative_left = output_bounds.left_pt.min(0.0) - drawingml_canvas_padding_pt;
+      let relative_top = output_bounds.top_pt.min(0.0) - drawingml_canvas_padding_pt;
+      let relative_right = output_bounds.right_pt.max(ink_width) + drawingml_canvas_padding_pt;
+      let relative_bottom = output_bounds.bottom_pt.max(ink_height) + drawingml_canvas_padding_pt;
       let raster_bounds = common::Rect {
         origin: common::Point {
           x: common::Pt(ink_left + relative_left),
@@ -4375,11 +4402,23 @@ fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mu
         },
       };
       let common_text = common::DisplayItem::Text(into_common_text_run(effect_text.clone()));
-      let max_pixels_per_point = wordprocessing_text_effect_max_pixels_per_point(
-        text.style.text_glow,
-        text.style.text_shadow,
-        text.style.text_reflection,
-      );
+      if drawingml_effects.is_some() {
+        common::drawingml_image_effects::scale_outer_shadow_filter_radius(
+          &mut backdrop_effects,
+          wordprocessing_text_effect_render_scale(effective_font_size_pt(&text.style, None)),
+        );
+      }
+      let max_pixels_per_point = if drawingml_effects.is_some() {
+        // Word's fixed-output ChartEx title shadows are emitted at 200 DPI,
+        // while retaining a searchable vector foreground.
+        200.0 / 72.0
+      } else {
+        wordprocessing_text_effect_max_pixels_per_point(
+          text.style.text_glow,
+          text.style.text_shadow,
+          text.style.text_reflection,
+        )
+      };
       let Some(mut raster) =
         common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
           std::slice::from_ref(&common_text),
@@ -4424,6 +4463,7 @@ fn materialize_wordprocessing_text_effects(pages: &mut [Page], text_metrics: &mu
       foreground_text.style.text_glow = None;
       foreground_text.style.text_shadow = None;
       foreground_text.style.text_reflection = None;
+      foreground_text.style.drawingml_text_effects = None;
       *item = PageItem::Group(vec![
         PageItem::Image(ImageItem {
           x_pt: raster_bounds.origin.x.0,
@@ -8912,12 +8952,13 @@ fn resolve_dynamic_fields(
   anchor_pages: &[AnchorPage],
   footnote_numbering: &[NoteNumberingSpec],
   endnote_numbering: &[NoteNumberingSpec],
+  ui_language: Option<&str>,
   text_metrics: &mut TextMetrics,
 ) {
   let total_pages = pages.len();
   let page_refs = anchor_pages
     .iter()
-    .map(|anchor| (anchor.name.as_str(), anchor.virtual_page_number.to_string()))
+    .map(|anchor| (anchor.name.as_str(), anchor))
     .collect::<HashMap<_, _>>();
   let style_ref_candidates = style_ref_candidates_by_page(pages);
   resolve_page_note_numbering(pages, footnote_numbering, endnote_numbering);
@@ -8935,14 +8976,54 @@ fn resolve_dynamic_fields(
       };
       match &text.dynamic_field {
         Some(DynamicFieldKind::Page { number_format }) => {
-          text.text = super::format_field_number(page_number, *number_format);
+          text.text = super::format_field_number(
+            page_number,
+            resolve_page_style_number_format(*number_format, page.setup.page_number_format),
+          );
         }
         Some(DynamicFieldKind::NumPages { number_format }) => {
-          text.text = super::format_field_number(total_pages, *number_format);
+          text.text = super::format_field_number(
+            total_pages,
+            resolve_page_style_number_format(*number_format, page.setup.page_number_format),
+          );
         }
-        Some(DynamicFieldKind::PageRef { bookmark_name }) => {
-          if let Some(page_number) = page_refs.get(bookmark_name.as_ref()) {
-            text.text.clone_from(page_number);
+        Some(DynamicFieldKind::PageRef {
+          bookmark_name,
+          number_format,
+          relative_position,
+        }) => {
+          if let Some(anchor) = page_refs.get(bookmark_name.as_ref()) {
+            let page_number = super::format_field_number(
+              anchor.virtual_page_number,
+              resolve_page_style_number_format(*number_format, anchor.page_number_format),
+            );
+            text.text = if !relative_position {
+              page_number
+            } else if anchor.page_index != page_index {
+              localized_pageref_on_page(ui_language, &page_number)
+            } else {
+              let bookmark_is_above = anchor.y_pt < text.y_pt - LAYOUT_EPSILON_PT
+                || (f32::abs(anchor.y_pt - text.y_pt) <= LAYOUT_EPSILON_PT
+                  && anchor.x_pt <= text.x_pt);
+              localized_pageref_relative(ui_language, bookmark_is_above)
+            };
+          } else {
+            text.text = localized_undefined_bookmark(ui_language);
+            apply_generated_field_error_font(&mut text.style, ui_language);
+            if let Some(mut anchor) = text
+              .dynamic_field_line_anchor
+              .filter(|anchor| anchor.field_result_tab)
+              && let Some(tab_start_x_pt) = anchor.field_result_tab_start_x_pt
+            {
+              // Word replaces the entire cached PAGEREF result when the
+              // bookmark is missing. A tab stored inside that result therefore
+              // no longer sends the generated error to the right TOC tab stop.
+              // Keep the anchor marker so the associated leader is collapsed,
+              // but make its resolved right edge start at the pre-tab cursor.
+              anchor.position_pt =
+                tab_start_x_pt + text_metrics.measure_text(&text.text, &text.style);
+              text.dynamic_field_line_anchor = Some(anchor);
+            }
           }
         }
         Some(DynamicFieldKind::StyleRef {
@@ -8970,6 +9051,111 @@ fn resolve_dynamic_fields(
   }
 }
 
+fn resolve_page_style_number_format(
+  requested: FieldNumberFormat,
+  page_style: FieldNumberFormat,
+) -> FieldNumberFormat {
+  if matches!(requested, FieldNumberFormat::PageStyle) {
+    page_style
+  } else {
+    requested
+  }
+}
+
+fn normalized_field_language(ui_language: Option<&str>) -> String {
+  ui_language
+    .unwrap_or("en-US")
+    .replace('_', "-")
+    .to_ascii_lowercase()
+}
+
+fn localized_undefined_bookmark(ui_language: Option<&str>) -> String {
+  let language = normalized_field_language(ui_language);
+  if language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans") {
+    "错误!未定义书签。".to_string()
+  } else if language == "zh-tw"
+    || language == "zh-hk"
+    || language == "zh-mo"
+    || language.starts_with("zh-hant")
+  {
+    "錯誤！ 書籤未定義。".to_string()
+  } else {
+    "Error! Bookmark not defined.".to_string()
+  }
+}
+
+fn apply_generated_field_error_font(style: &mut TextStyle, ui_language: Option<&str>) {
+  let language = normalized_field_language(ui_language);
+  if language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans") {
+    // Word's localized field-error resource is emitted through the Simplified
+    // Chinese East Asian slot. Keep the field's Latin face for punctuation,
+    // but use the legacy Office SimSun resource face for Chinese glyphs.
+    style.east_asia_font_family = Some(Arc::<str>::from("SimSun"));
+    style.east_asia_language = Some(Arc::<str>::from("zh-CN"));
+    // The resource string is inserted as ordinary field-result text. Direct
+    // outline effects on the stale cached result do not carry across Word's
+    // replacement, though its fill color and Latin punctuation face do.
+    style.outline_color = None;
+    style.outline_opacity = 1.0;
+    style.outline_width_pt = 0.0;
+    // This resource is inserted with the regular face even when the stale
+    // cached result inherited bold from its TOC paragraph. The Office PDF for
+    // tdf64531 embeds regular Lucida Sans Unicode and SimSun for the generated
+    // error while retaining bold paint for the neighbouring cached entry.
+    style.bold = false;
+    style.complex_bold = Some(false);
+    if let Some(options) = style.pdf_glyph_outline_options.as_deref() {
+      let mut options = options.clone();
+      options.outline_fill = None;
+      options.outline_stroke = None;
+      style.pdf_glyph_outline_options = Some(Arc::new(options));
+    }
+  }
+}
+
+fn localized_pageref_relative(ui_language: Option<&str>, bookmark_is_above: bool) -> String {
+  let language = normalized_field_language(ui_language);
+  if language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans") {
+    if bookmark_is_above {
+      "上方"
+    } else {
+      "下方"
+    }
+    .to_string()
+  } else if language == "zh-tw"
+    || language == "zh-hk"
+    || language == "zh-mo"
+    || language.starts_with("zh-hant")
+  {
+    if bookmark_is_above {
+      "上面"
+    } else {
+      "下面"
+    }
+    .to_string()
+  } else {
+    if bookmark_is_above { "above" } else { "below" }.to_string()
+  }
+}
+
+fn localized_pageref_on_page(ui_language: Option<&str>, page_number: &str) -> String {
+  let language = normalized_field_language(ui_language);
+  if language.starts_with("zh") {
+    let page = if language == "zh-tw"
+      || language == "zh-hk"
+      || language == "zh-mo"
+      || language.starts_with("zh-hant")
+    {
+      "頁"
+    } else {
+      "页"
+    };
+    format!("第 {page_number} {page}")
+  } else {
+    format!("on page {page_number}")
+  }
+}
+
 fn realign_resolved_dynamic_field_lines(items: &mut [PageItem], text_metrics: &mut TextMetrics) {
   let mut lines = Vec::<(f32, DynamicFieldLineAnchor)>::new();
   for item in items.iter() {
@@ -8983,6 +9169,8 @@ fn realign_resolved_dynamic_field_lines(items: &mut [PageItem], text_metrics: &m
       (text.y_pt - *y).abs() < 0.01
         && (anchor.position_pt - seen.position_pt).abs() < 0.01
         && anchor.alignment == seen.alignment
+        && anchor.field_result_tab == seen.field_result_tab
+        && anchor.field_result_tab_start_x_pt == seen.field_result_tab_start_x_pt
     }) {
       lines.push((text.y_pt, anchor));
     }
@@ -8997,7 +9185,10 @@ fn realign_resolved_dynamic_field_lines(items: &mut [PageItem], text_metrics: &m
       };
       if (text.y_pt - y).abs() >= 0.01
         || !text.dynamic_field_line_anchor.is_some_and(|seen| {
-          (anchor.position_pt - seen.position_pt).abs() < 0.01 && anchor.alignment == seen.alignment
+          (anchor.position_pt - seen.position_pt).abs() < 0.01
+            && anchor.alignment == seen.alignment
+            && anchor.field_result_tab == seen.field_result_tab
+            && anchor.field_result_tab_start_x_pt == seen.field_result_tab_start_x_pt
         })
       {
         continue;
@@ -9014,22 +9205,80 @@ fn realign_resolved_dynamic_field_lines(items: &mut [PageItem], text_metrics: &m
       ParagraphAlignment::Left | ParagraphAlignment::Justify => continue,
     };
     let dx = anchor.position_pt - current_anchor;
-    if dx.abs() <= LAYOUT_EPSILON_PT {
-      continue;
-    }
-    for item in items.iter_mut() {
-      let PageItem::Text(text) = item else {
-        continue;
-      };
-      if (text.y_pt - y).abs() < 0.01
-        && text.dynamic_field_line_anchor.is_some_and(|seen| {
-          (anchor.position_pt - seen.position_pt).abs() < 0.01 && anchor.alignment == seen.alignment
-        })
-      {
-        text.x_pt += dx;
+    if dx.abs() > LAYOUT_EPSILON_PT {
+      for item in items.iter_mut() {
+        let PageItem::Text(text) = item else {
+          continue;
+        };
+        if (text.y_pt - y).abs() < 0.01
+          && text.dynamic_field_line_anchor.is_some_and(|seen| {
+            (anchor.position_pt - seen.position_pt).abs() < 0.01
+              && anchor.alignment == seen.alignment
+              && anchor.field_result_tab == seen.field_result_tab
+              && anchor.field_result_tab_start_x_pt == seen.field_result_tab_start_x_pt
+          })
+        {
+          text.x_pt += dx;
+        }
       }
     }
   }
+  resize_dynamic_field_tab_leaders(items, text_metrics);
+}
+
+fn resize_dynamic_field_tab_leaders(items: &mut [PageItem], text_metrics: &mut TextMetrics) {
+  let mut replacements = Vec::new();
+  for (field_index, item) in items.iter().enumerate() {
+    let PageItem::Text(field) = item else {
+      continue;
+    };
+    if field.dynamic_field.is_none() || field.dynamic_field_line_anchor.is_none() {
+      continue;
+    }
+    let Some((leader_index, leader, fill_char)) = items[..field_index]
+      .iter()
+      .enumerate()
+      .rev()
+      .find_map(|(index, item)| {
+        let PageItem::Text(leader) = item else {
+          return None;
+        };
+        ((leader.y_pt - field.y_pt).abs() < 0.01)
+          .then(|| tab_leader_text_char(leader).map(|fill_char| (index, leader, fill_char)))
+          .flatten()
+      })
+    else {
+      continue;
+    };
+    let char_width = text_metrics.measure_text(&fill_char.to_string(), &leader.style);
+    if char_width <= LAYOUT_EPSILON_PT {
+      continue;
+    }
+    let count = if field
+      .dynamic_field_line_anchor
+      .is_some_and(|anchor| anchor.field_result_tab)
+    {
+      0
+    } else {
+      ((field.x_pt - leader.x_pt).max(0.0) / char_width).floor() as usize
+    };
+    replacements.push((leader_index, fill_char.to_string().repeat(count)));
+  }
+  for (index, text) in replacements {
+    if let Some(PageItem::Text(item)) = items.get_mut(index) {
+      item.text = text;
+    }
+  }
+}
+
+fn tab_leader_text_char(text: &TextItem) -> Option<char> {
+  if !text.preserve_text_portion || text.text.is_empty() {
+    return None;
+  }
+  let mut characters = text.text.chars();
+  let first = characters.next()?;
+  (matches!(first, '.' | '-' | '_' | '·') && characters.all(|character| character == first))
+    .then_some(first)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -10492,7 +10741,7 @@ fn lower_inline_chart(
   text_metrics: &mut TextMetrics,
 ) -> Vec<PageItem> {
   if let Some(chart_space) = chart.extended_chart_space.as_deref() {
-    return crate::xlsx::chartex::lower_extended_chart_cached(
+    return crate::xlsx::chartex::lower_extended_chart_cached_with_resources(
       chart_space,
       ChartFrame {
         x_pt,
@@ -10502,6 +10751,10 @@ fn lower_inline_chart(
       },
       chart.title_style.clone(),
       chart.label_style.clone(),
+      chart.ui_language.as_deref(),
+      chart.extended_chart_theme,
+      &chart.extended_chart_styles,
+      &chart.extended_chart_color_styles,
     )
     .into_iter()
     .flat_map(docx_chart_page_items)
@@ -10572,7 +10825,11 @@ fn lower_inline_chart(
         label: chart.label_style.clone(),
         data_label: chart.data_label_style.clone(),
         point_colors: chart.pie_point_colors.clone(),
-        data_label_fill_colors: vec![None; model.data_labels.len()],
+        data_label_fill_colors: chart
+          .data_label_fill_colors
+          .first()
+          .cloned()
+          .unwrap_or_else(|| vec![None; model.data_labels.len()]),
         chart_area_fill_color: chart.chart_area_fill_color,
         plot_area_fill_color: chart.plot_area_fill_color,
         chart_area_stroke_color: chart.chart_area_stroke_color,
@@ -10652,28 +10909,26 @@ fn lower_inline_chart(
         title: chart.title_style.clone(),
         title_fill_color: chart.title_fill_color,
         label: chart.label_style.clone(),
-        category_label: chart.label_style.clone(),
-        value_label: chart.label_style.clone(),
+        category_label: chart.category_label_style.clone(),
+        value_label: chart.value_label_style.clone(),
+        series_label: chart.series_label_style.clone(),
         data_label: chart.data_label_style.clone(),
-        data_label_styles: Vec::new(),
+        data_label_styles: chart.data_label_styles.clone(),
         gridline_color: chart.gridline_color,
-        value_gridline_width_pt: None,
-        axis_line_width_pt: None,
-        category_major_gridline: None,
-        category_minor_gridline: None,
+        value_gridline_width_pt: chart.value_gridline_width_pt,
+        axis_line_width_pt: chart.axis_line_width_pt,
+        category_major_gridline: chart.category_major_gridline,
+        category_minor_gridline: chart.category_minor_gridline,
         series_colors: chart.series_colors.clone(),
         series_point_colors: chart.series_point_colors.clone(),
-        data_label_fill_colors: model
-          .series
-          .iter()
-          .map(|series| vec![None; series.data_labels.len()])
-          .collect(),
+        surface_band_colors: chart.surface_band_colors.clone(),
+        data_label_fill_colors: chart.data_label_fill_colors.clone(),
         chart_area_fill_color: chart.chart_area_fill_color,
         plot_area_fill_color: chart.plot_area_fill_color,
         chart_area_stroke_color: chart.chart_area_stroke_color,
-        chart_area_stroke_width_pt: None,
+        chart_area_stroke_width_pt: chart.chart_area_stroke_width_pt,
         plot_area_stroke_color: chart.plot_area_stroke_color,
-        plot_area_stroke_width_pt: None,
+        plot_area_stroke_width_pt: chart.plot_area_stroke_width_pt,
       },
     )
     .into_iter()
@@ -11081,6 +11336,7 @@ fn docx_chart_page_items(item: crate::model::PageItem) -> Vec<PageItem> {
       decoration_span_start_x_pt: None,
       pdf_text_segmentation: match text.pdf_text_segmentation {
         crate::model::PdfTextSegmentation::Line => PdfTextSegmentation::Line,
+        crate::model::PdfTextSegmentation::WordLine => PdfTextSegmentation::WordLine,
         crate::model::PdfTextSegmentation::Portion => PdfTextSegmentation::Portion,
       },
     }))],
@@ -11107,42 +11363,30 @@ fn docx_chart_page_items(item: crate::model::PageItem) -> Vec<PageItem> {
     crate::model::PageItem::Group { items, .. } => {
       items.into_iter().flat_map(docx_chart_page_items).collect()
     }
-    crate::model::PageItem::Path(path) if !path.points.is_empty() => {
-      let fill_color = match path.fill {
-        crate::common::Fill::Solid(color) => Some(RgbColor {
-          r: color.r,
-          g: color.g,
-          b: color.b,
-        }),
-        _ => None,
-      };
-      let stroke = path.stroke.map(|stroke| BorderStyle {
-        width_pt: stroke.width.0,
-        color: RgbColor {
-          r: stroke.color.r,
-          g: stroke.color.g,
-          b: stroke.color.b,
-        },
-        ..BorderStyle::default()
-      });
-      vec![PageItem::Polyline(PolylineItem {
-        x_pt: 0.0,
-        y_pt: 0.0,
-        width_pt: path.bounds.size.width.0,
-        height_pt: path.bounds.size.height.0,
-        points: path
-          .points
-          .into_iter()
-          .map(|point| (point.x.0, point.y.0))
-          .collect(),
-        closed: path.closed,
-        fill_color,
-        stroke,
-      })]
-    }
-    crate::model::PageItem::Image(_)
-    | crate::model::PageItem::LinkArea(_)
-    | crate::model::PageItem::Path(_) => Vec::new(),
+    crate::model::PageItem::Path(path) => vec![PageItem::path(path)],
+    crate::model::PageItem::Image(image) => vec![PageItem::Image(ImageItem {
+      x_pt: image.x_pt,
+      y_pt: image.y_pt,
+      width_pt: image.width_pt,
+      height_pt: image.height_pt,
+      inline_baseline_gap_pt: 0.0,
+      inline_baseline_participant: false,
+      crop: image.crop,
+      clip_path: image.clip_path,
+      rotation_deg: image.rotation_deg,
+      flip_horizontal: image.flip_horizontal,
+      flip_vertical: image.flip_vertical,
+      data: image.data,
+      content_type: image.content_type,
+      metafile_background_color: image.metafile_background_color,
+      alt_text: image.alt_text,
+      hyperlink_url: image.hyperlink_url,
+      semantic_metafile_text: false,
+      metafile_native_size: false,
+      floating: image.floating,
+      behind_text: image.behind_text,
+    })],
+    crate::model::PageItem::LinkArea(_) => Vec::new(),
   }
 }
 
@@ -16450,6 +16694,8 @@ fn record_anchor_page(
   name: &str,
   current: &Page,
   page_index: usize,
+  x_pt: f32,
+  y_pt: f32,
 ) {
   if name.is_empty() {
     return;
@@ -16461,6 +16707,9 @@ fn record_anchor_page(
     section_page_index: current.section_page_index,
     physical_page_number: page_index + 1,
     virtual_page_number: virtual_page_number(current.setup, current.section_page_index, page_index),
+    page_number_format: current.setup.page_number_format,
+    x_pt,
+    y_pt,
   };
   if let Some(existing) = anchor_pages.iter_mut().find(|anchor| anchor.name == name) {
     *existing = anchor;
@@ -17733,7 +17982,7 @@ impl<'a> TextFrameLayout<'a> {
           text_state.set_position(InlineCursor::after_inline(inline_index));
           pending_tab = None;
           if let Some(anchors) = anchor_pages.as_deref_mut() {
-            record_anchor_page(anchors, name, current, pages.len());
+            record_anchor_page(anchors, name, current, pages.len(), x, y);
           }
         }
         InlineItem::Ruby(ruby) => {
@@ -17950,7 +18199,12 @@ impl<'a> TextFrameLayout<'a> {
               );
               let tab_stop = next_tab_stop(
                 x,
-                line_left,
+                // DOCX import sets Writer's TABS_RELATIVE_TO_INDENT=false:
+                // explicit and automatic tab positions are measured from the
+                // text-frame origin, not from w:ind/@w:left. This is visible
+                // in TOC2/TOC3 entries, whose common right tab stays fixed
+                // while the paragraph-style indent shortens the dot leader.
+                flow.content_left_pt,
                 &paragraph.format.tab_stops,
                 flow.default_tab_stop_pt,
               );
@@ -17974,6 +18228,7 @@ impl<'a> TextFrameLayout<'a> {
                   line_height_pt: line_height,
                   style: run.style.clone(),
                   item_start_index: current.items.len(),
+                  field_result_tab: meta.dynamic_field.is_some(),
                 });
               } else {
                 push_tab_leader(
@@ -20649,18 +20904,18 @@ fn libreoffice_forbidden_line_start_after_text(ch: char) -> bool {
 
 fn next_tab_stop(
   x: f32,
-  line_left: f32,
+  tab_origin_left: f32,
   tab_stops: &[TabStop],
   default_tab_stop_pt: f32,
 ) -> ResolvedTabStop {
-  let relative_x = (x - line_left).max(0.0);
+  let relative_x = (x - tab_origin_left).max(0.0);
   if let Some(stop) = tab_stops
     .iter()
     .copied()
     .find(|stop| stop.position_pt > relative_x + LAYOUT_EPSILON_PT)
   {
     return ResolvedTabStop {
-      x_pt: line_left + stop.position_pt,
+      x_pt: tab_origin_left + stop.position_pt,
       alignment: stop.alignment,
       leader: stop.leader,
     };
@@ -20669,11 +20924,11 @@ fn next_tab_stop(
   let default_tab_stop_pt = default_tab_stop_pt.max(DEFAULT_FONT_SIZE_PT);
   ResolvedTabStop {
     // ECMA-376 Part 1 §17.15.1.25 repeats automatic stops across the
-    // displayed paragraph area. Word anchors that grid at the paragraph text
-    // origin: when a long numbering label passes its explicit stop, the next
-    // automatic stop remains a defaultTabStop multiple from line_left rather
-    // than from physical page coordinate zero.
-    x_pt: line_left + ((relative_x / default_tab_stop_pt).floor() + 1.0) * default_tab_stop_pt,
+    // displayed paragraph area. Repeat them from the caller's tabs origin:
+    // ordinary DOCX text uses the frame edge, while the dedicated numbering
+    // fallback can deliberately supply its list-text origin.
+    x_pt: tab_origin_left
+      + ((relative_x / default_tab_stop_pt).floor() + 1.0) * default_tab_stop_pt,
     alignment: TabStopAlignment::Left,
     leader: TabLeader::None,
   }
@@ -21078,6 +21333,8 @@ fn mark_dynamic_field_line_anchor(
   let anchor = Some(DynamicFieldLineAnchor {
     position_pt,
     alignment,
+    field_result_tab: false,
+    field_result_tab_start_x_pt: None,
   });
   for item in items.iter_mut() {
     let PageItem::Text(text) = item else {
@@ -21215,6 +21472,15 @@ fn apply_pending_aligned_tab(
     TabStopAlignment::Right => tab_right - following_width,
   };
   let dx = aligned_left - min_x;
+  mark_aligned_tab_dynamic_field_anchor(
+    &mut page.items,
+    tab.item_start_index,
+    y,
+    tab_right,
+    tab.stop.alignment,
+    tab.field_result_tab,
+    tab.leader_start_x_pt,
+  );
   let leader = tab.stop.leader;
   let leader_start_x = tab.leader_start_x_pt;
   let leader_y = tab.y_pt;
@@ -21262,6 +21528,45 @@ fn apply_pending_aligned_tab(
   *pending_tab = None;
 }
 
+fn mark_aligned_tab_dynamic_field_anchor(
+  items: &mut [PageItem],
+  item_start_index: usize,
+  y: f32,
+  position_pt: f32,
+  alignment: TabStopAlignment,
+  field_result_tab: bool,
+  field_result_tab_start_x_pt: f32,
+) {
+  let alignment = match alignment {
+    TabStopAlignment::Center => ParagraphAlignment::Center,
+    TabStopAlignment::Right => ParagraphAlignment::Right,
+    TabStopAlignment::Left => return,
+  };
+  if !items.iter().skip(item_start_index).any(|item| {
+    matches!(
+      item,
+      PageItem::Text(text)
+        if (text.y_pt - y).abs() < 0.01 && text.dynamic_field.is_some()
+    )
+  }) {
+    return;
+  }
+  let anchor = Some(DynamicFieldLineAnchor {
+    position_pt,
+    alignment,
+    field_result_tab,
+    field_result_tab_start_x_pt: field_result_tab.then_some(field_result_tab_start_x_pt),
+  });
+  for item in items.iter_mut().skip(item_start_index) {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    if (text.y_pt - y).abs() < 0.01 {
+      text.dynamic_field_line_anchor = anchor;
+    }
+  }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct TabLeaderPlacement {
   insert_index: Option<usize>,
@@ -21293,35 +21598,33 @@ fn push_tab_leader(
   if count == 0 {
     return;
   }
-  let items = (0..count).map(|index| {
-    PageItem::Text(Box::new(TextItem {
-      x_pt: placement.start_x + char_width * index as f32,
-      y_pt: placement.y,
-      line_height_pt: placement.line_height,
-      text: fill_char.to_string(),
-      style: style.clone(),
-      rotation_center_pt: None,
-      hyperlink_url: None,
-      dynamic_field: None,
-      dynamic_field_line_anchor: None,
-      style_ref_keys: Vec::new(),
-      style_ref_text: None,
-      style_ref_numbering_text: None,
-      form_widget_id: None,
-      paragraph_bidi: false,
-      word_spacing_pt: 0.0,
-      preserve_text_portion: true,
-      decoration_span_start_x_pt: None,
-      pdf_text_segmentation: PdfTextSegmentation::Portion,
-    }))
-  });
+  let item = PageItem::Text(Box::new(TextItem {
+    x_pt: placement.start_x,
+    y_pt: placement.y,
+    line_height_pt: placement.line_height,
+    text: fill_char.repeat(count),
+    style: style.clone(),
+    rotation_center_pt: None,
+    hyperlink_url: None,
+    dynamic_field: None,
+    dynamic_field_line_anchor: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
+    style_ref_numbering_text: None,
+    form_widget_id: None,
+    paragraph_bidi: false,
+    word_spacing_pt: 0.0,
+    preserve_text_portion: true,
+    decoration_span_start_x_pt: None,
+    pdf_text_segmentation: PdfTextSegmentation::Portion,
+  }));
   if let Some(index) = placement
     .insert_index
     .filter(|index| *index <= page.items.len())
   {
-    page.items.splice(index..index, items);
+    page.items.insert(index, item);
   } else {
-    page.items.extend(items);
+    page.items.push(item);
   }
 }
 
@@ -22512,6 +22815,7 @@ mod tests {
   fn character_indents_use_the_imported_document_default_unit() {
     let paragraph = Paragraph {
       inlines: Vec::new(),
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -22548,6 +22852,7 @@ mod tests {
   fn rtl_paragraph_exchanges_logical_indents_and_default_alignment() {
     let paragraph = Paragraph {
       inlines: Vec::new(),
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -23474,6 +23779,7 @@ mod tests {
         style_ref_numbering_text: None,
         preserve_text_portion: false,
       })],
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -23512,6 +23818,7 @@ mod tests {
         style_ref_numbering_text: None,
         preserve_text_portion: false,
       })],
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -23583,6 +23890,7 @@ mod tests {
         style_ref_numbering_text: None,
         preserve_text_portion: false,
       })],
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -23638,6 +23946,7 @@ mod tests {
         style_ref_numbering_text: None,
         preserve_text_portion: false,
       })],
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -23667,6 +23976,7 @@ mod tests {
   fn east_asian_paragraph_mark_metrics_require_a_modern_start_or_legacy_superscript() {
     let mut paragraph = Paragraph {
       inlines: Vec::new(),
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -23775,6 +24085,7 @@ mod tests {
           style_ref_numbering_text: None,
           preserve_text_portion: false,
         })],
+        field_events: Vec::new(),
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
         starts_after_last_rendered_page_break: false,
@@ -23860,6 +24171,7 @@ mod tests {
         style_ref_numbering_text: None,
         preserve_text_portion: false,
       })],
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -23932,6 +24244,7 @@ mod tests {
     };
     let paragraph = Paragraph {
       inlines: Vec::new(),
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -24062,6 +24375,7 @@ mod tests {
         InlineItem::Text(placeholder_run),
         InlineItem::Shape(floating_shape),
       ],
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -24089,6 +24403,7 @@ mod tests {
   fn grid_auto_line_spacing_expands_only_after_first_line() {
     let paragraph = Paragraph {
       inlines: Vec::new(),
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -24293,6 +24608,7 @@ mod tests {
     };
     let blocks = vec![Block::paragraph(Paragraph {
       inlines: vec![InlineItem::Text(run.clone())],
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -24435,6 +24751,7 @@ mod tests {
       };
       Block::paragraph(Paragraph {
         inlines: vec![InlineItem::Text(run.clone())],
+        field_events: Vec::new(),
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
         starts_after_last_rendered_page_break: false,
@@ -25477,6 +25794,7 @@ mod tests {
   fn short_inline_object_bottom_aligns_to_the_text_baseline() {
     let paragraph = Paragraph {
       inlines: Vec::new(),
+      field_events: Vec::new(),
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
@@ -25545,7 +25863,7 @@ mod tests {
   }
 
   #[test]
-  fn pageref_dynamic_field_resolves_anchor_virtual_page_number() {
+  fn pageref_dynamic_field_uses_target_page_style_unless_explicitly_overridden() {
     let mut page = empty_page(
       PageSetup {
         page_number_start: Some(7),
@@ -25563,6 +25881,8 @@ mod tests {
       hyperlink_url: None,
       dynamic_field: Some(DynamicFieldKind::PageRef {
         bookmark_name: Arc::<str>::from("_Toc123"),
+        number_format: FieldNumberFormat::PageStyle,
+        relative_position: false,
       }),
       dynamic_field_line_anchor: None,
       style_ref_keys: Vec::new(),
@@ -25582,15 +25902,139 @@ mod tests {
       section_page_index: 2,
       physical_page_number: 3,
       virtual_page_number: 9,
+      page_number_format: FieldNumberFormat::UpperRoman,
+      x_pt: 0.0,
+      y_pt: 0.0,
     }];
     let mut pages = vec![page];
 
-    resolve_dynamic_fields(&mut pages, &anchors, &[], &[], &mut TextMetrics::new());
+    resolve_dynamic_fields(
+      &mut pages,
+      &anchors,
+      &[],
+      &[],
+      None,
+      &mut TextMetrics::new(),
+    );
 
     let PageItem::Text(text) = &pages[0].items[0] else {
       panic!("expected text item");
     };
+    assert_eq!(text.text, "IX");
+
+    let PageItem::Text(text) = &mut pages[0].items[0] else {
+      panic!("expected text item");
+    };
+    let DynamicFieldKind::PageRef { number_format, .. } =
+      text.dynamic_field.as_mut().expect("PAGEREF field")
+    else {
+      panic!("expected PAGEREF field");
+    };
+    *number_format = FieldNumberFormat::Decimal;
+    resolve_dynamic_fields(
+      &mut pages,
+      &anchors,
+      &[],
+      &[],
+      None,
+      &mut TextMetrics::new(),
+    );
+    let PageItem::Text(text) = &pages[0].items[0] else {
+      panic!("expected text item");
+    };
     assert_eq!(text.text, "9");
+  }
+
+  #[test]
+  fn pageref_dynamic_field_formats_relative_and_missing_bookmark_results() {
+    let field_item = |x_pt, y_pt, kind| {
+      PageItem::Text(Box::new(TextItem {
+        x_pt,
+        y_pt,
+        line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        text: "cached".to_string(),
+        style: TextStyle::default(),
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: Some(kind),
+        dynamic_field_line_anchor: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        preserve_text_portion: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      }))
+    };
+    let mut page = empty_page(PageSetup::default(), 0);
+    page.items.push(field_item(
+      20.0,
+      30.0,
+      DynamicFieldKind::PageRef {
+        bookmark_name: Arc::<str>::from("same-page"),
+        number_format: FieldNumberFormat::Decimal,
+        relative_position: true,
+      },
+    ));
+    page.items.push(field_item(
+      20.0,
+      50.0,
+      DynamicFieldKind::PageRef {
+        bookmark_name: Arc::<str>::from("missing"),
+        number_format: FieldNumberFormat::Decimal,
+        relative_position: false,
+      },
+    ));
+    page.items.push(field_item(
+      20.0,
+      70.0,
+      DynamicFieldKind::PageRef {
+        bookmark_name: Arc::<str>::from("same-page"),
+        number_format: FieldNumberFormat::UpperRoman,
+        relative_position: false,
+      },
+    ));
+    let anchors = vec![AnchorPage {
+      name: "same-page".to_string(),
+      page_index: 0,
+      section_index: 0,
+      section_page_index: 0,
+      physical_page_number: 1,
+      virtual_page_number: 9,
+      page_number_format: FieldNumberFormat::UpperRoman,
+      x_pt: 10.0,
+      y_pt: 10.0,
+    }];
+    let mut pages = vec![page];
+
+    resolve_dynamic_fields(
+      &mut pages,
+      &anchors,
+      &[],
+      &[],
+      Some("zh-CN"),
+      &mut TextMetrics::new(),
+    );
+
+    let PageItem::Text(missing) = &pages[0].items[1] else {
+      panic!("expected missing-bookmark field");
+    };
+    assert_eq!(
+      missing.style.east_asia_font_family.as_deref(),
+      Some("SimSun")
+    );
+    let texts = pages[0]
+      .items
+      .iter()
+      .filter_map(|item| match item {
+        PageItem::Text(text) => Some(text.text.as_str()),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(texts, ["上方", "错误!未定义书签。", "IX"]);
   }
 
   #[test]
@@ -25627,7 +26071,7 @@ mod tests {
     );
     let mut pages = vec![page];
 
-    resolve_dynamic_fields(&mut pages, &[], &[], &[], &mut text_metrics);
+    resolve_dynamic_fields(&mut pages, &[], &[], &[], None, &mut text_metrics);
 
     let PageItem::Text(text) = &pages[0].items[0] else {
       panic!("expected page field");

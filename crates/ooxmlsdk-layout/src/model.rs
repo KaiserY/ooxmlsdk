@@ -105,6 +105,9 @@ pub struct TextStyle {
   pub horizontal_scale: Option<f32>,
   pub character_spacing_pt: f32,
   pub baseline_shift_pt: f32,
+  /// Layout-only minimum line box for generated resources whose Office UI
+  /// metrics are taller than their embedded glyph bounds.
+  pub(crate) line_height_override_pt: Option<f32>,
   pub line_vertical_alignment: common::LineVerticalAlignment,
   pub semantic_only: bool,
   pub use_windows_font_metrics: bool,
@@ -166,6 +169,7 @@ impl Default for TextStyle {
       horizontal_scale: None,
       character_spacing_pt: 0.0,
       baseline_shift_pt: 0.0,
+      line_height_override_pt: None,
       line_vertical_alignment: common::LineVerticalAlignment::Auto,
       semantic_only: false,
       use_windows_font_metrics: false,
@@ -297,6 +301,7 @@ pub enum DynamicFieldKind {
   StyleRef {
     style_name: Arc<str>,
     from_bottom: bool,
+    numbering_only: bool,
     suppress_non_numerical: bool,
   },
 }

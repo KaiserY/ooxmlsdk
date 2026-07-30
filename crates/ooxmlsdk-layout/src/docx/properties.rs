@@ -38,15 +38,35 @@ pub(super) fn run_style(
   base_style: TextStyle,
   styles: &StylesCatalog,
 ) -> TextStyle {
+  run_style_with_character_style_policy(properties, base_style, styles, true)
+}
+
+pub(super) fn run_style_without_hyperlink_character_style(
+  properties: Option<&w::RunProperties>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+) -> TextStyle {
+  run_style_with_character_style_policy(properties, base_style, styles, false)
+}
+
+fn run_style_with_character_style_policy(
+  properties: Option<&w::RunProperties>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  apply_hyperlink_character_style: bool,
+) -> TextStyle {
   let mut style = base_style;
   let Some(properties) = properties else {
     return style;
   };
 
-  style = styles.character_run_style(
-    super::run_properties_run_style(properties).map(|run_style| run_style.val.as_str()),
-    style,
-  );
+  let character_style_id =
+    super::run_properties_run_style(properties).map(|run_style| run_style.val.as_str());
+  if apply_hyperlink_character_style
+    || !character_style_id.is_some_and(|style_id| styles.is_hyperlink_character_style(style_id))
+  {
+    style = styles.character_run_style(character_style_id, style);
+  }
   merge_run_style(
     &mut style,
     Some(RunProps::Direct(properties)),

@@ -6,9 +6,10 @@ use crate::fonts::effective_font_size_pt;
 use super::{
   CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog,
   NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphAdjust, ParagraphAlignment,
-  ParagraphFormat, ParagraphProps, RunStyleOverrides, StylesCatalog, TextRun, TextStyle,
-  math_paragraph_alignment, paragraph_field_events, paragraph_inlines,
-  paragraph_note_reference_ids, properties, select_paragraph_numbering,
+  ParagraphFormat, ParagraphInlineImport, ParagraphProps, RunStyleOverrides, StylesCatalog,
+  TextRun, TextStyle, math_paragraph_alignment, paragraph_field_events,
+  paragraph_inlines_with_policy, paragraph_note_reference_ids, properties,
+  select_paragraph_numbering,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -175,16 +176,28 @@ pub(super) fn paragraph_model_with_base<'a>(
     style_ref_numbering_text,
     numbering_image,
     mut list_label_style,
+    list_label_justification,
     numbering_list_tab_stop_pt,
     list_label_width_aware_tab,
   ) = numbering_label.map_or_else(
-    || (None, None, None, TextStyle::default(), None, false),
+    || {
+      (
+        None,
+        None,
+        None,
+        TextStyle::default(),
+        w::LevelJustificationValues::Left,
+        None,
+        false,
+      )
+    },
     |label| {
       (
         label.text,
         label.suppressed_non_numerical_text,
         label.image,
         label.style,
+        label.justification,
         label.list_tab_stop_pt,
         label.width_aware_tab,
       )
@@ -193,6 +206,7 @@ pub(super) fn paragraph_model_with_base<'a>(
   format.list_label_width_aware_tab = list_label_width_aware_tab;
   format.list_label_uses_explicit_tab_stop =
     style_indent_overrides_numbering && numbering_list_tab_stop_pt.is_some();
+  format.list_label_justification = list_label_justification;
   let has_numbering_label = list_label.is_some() || numbering_image.is_some();
   let blank_numbering_label = list_label
     .as_deref()
@@ -227,14 +241,17 @@ pub(super) fn paragraph_model_with_base<'a>(
   if list_label.as_deref() == Some("\t") && style_tab_stop_pt.is_some() && !has_direct_indentation {
     list_label = Some(" \t".to_string());
   }
-  let mut inlines = paragraph_inlines(
+  let mut inlines = paragraph_inlines_with_policy(
     paragraph,
     run_style.clone(),
     styles,
     images,
     hyperlinks,
-    custom_xml_bindings,
-    form_widget_ids,
+    ParagraphInlineImport {
+      custom_xml_bindings,
+      form_widget_ids,
+      suppress_toc_hyperlink_style: styles.is_toc_entry_paragraph_style(style_id),
+    },
   );
   if let Some(image) = numbering_image {
     inlines.insert(0, super::InlineItem::Image(image));
@@ -377,7 +394,7 @@ fn text_run_style_ref_keys(item: &super::InlineItem) -> Option<&[Arc<str>]> {
   (!run.style_ref_keys.is_empty() && run.dynamic_field.is_none()).then_some(&run.style_ref_keys)
 }
 
-fn paragraph_mark_is_deleted(paragraph: &w::Paragraph) -> bool {
+pub(super) fn paragraph_mark_is_deleted(paragraph: &w::Paragraph) -> bool {
   paragraph
     .paragraph_properties
     .as_deref()

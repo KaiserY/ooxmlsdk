@@ -2685,6 +2685,9 @@ fn text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionRanges {
   if text.text.is_empty() {
     return PaintTextPortionRanges::new();
   }
+  if let Some(ranges) = office_tab_leader_portion_ranges(text) {
+    return ranges;
+  }
   if text.dynamic_field.is_some() {
     let mut ranges = PaintTextPortionRanges::new();
     ranges.push((PaintTextPortionKind::Field, 0..text.text.len()));
@@ -2761,6 +2764,40 @@ fn text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionRanges {
     ranges.push((kind, start..text.text.len()));
   }
   ranges
+}
+
+const OFFICE_TAB_LEADER_PORTION_CHARACTERS: usize = 32;
+
+fn office_tab_leader_portion_ranges(text: &TextItem<'_>) -> Option<PaintTextPortionRanges> {
+  if !text.preserve_text_portion {
+    return None;
+  }
+  let mut characters = text.text.chars();
+  let fill = characters.next()?;
+  if !matches!(fill, '.' | '-' | '_' | '·')
+    || characters.clone().count() + 1 <= OFFICE_TAB_LEADER_PORTION_CHARACTERS
+    || !characters.all(|character| character == fill)
+  {
+    return None;
+  }
+  // Word fixed output caps a repeated tab-leader text operation at 32
+  // characters. Preserve those portion boundaries: besides matching the
+  // content stream, PDFium exposes them through segment extraction.
+  let kind = if text.hyperlink_url.is_some() {
+    PaintTextPortionKind::Link
+  } else {
+    PaintTextPortionKind::Text
+  };
+  let mut ranges = PaintTextPortionRanges::new();
+  let mut start = 0;
+  for (character_index, (byte_index, _)) in text.text.char_indices().enumerate() {
+    if character_index > 0 && character_index.is_multiple_of(OFFICE_TAB_LEADER_PORTION_CHARACTERS) {
+      ranges.push((kind, start..byte_index));
+      start = byte_index;
+    }
+  }
+  ranges.push((kind, start..text.text.len()));
+  Some(ranges)
 }
 
 fn edge_whitespace_text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionRanges {
@@ -4719,9 +4756,11 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
   if !(symbol
     && (text.contains('\u{f02d}') || text.contains('\u{f05e}') || text.contains('\u{f0b7}'))
     || wingdings
-      && (text.contains('\u{f06c}')
+      && (text.contains('\u{f04a}')
+        || text.contains('\u{f06c}')
         || text.contains('\u{f06e}')
         || text.contains('\u{f071}')
+        || text.contains('\u{f075}')
         || text.contains('\u{f076}')
         || text.contains('\u{f0a7}')
         || text.contains('\u{f0d8}')
@@ -4748,9 +4787,11 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
         '\u{f02d}' if symbol => '\u{2212}',
         '\u{f05e}' if symbol => '\u{22a5}',
         '\u{f0b7}' if symbol => '\u{2022}',
+        '\u{f04a}' if wingdings => '\u{263a}',
         '\u{f06c}' if wingdings => '\u{26ab}',
         '\u{f06e}' if wingdings => '\u{25fc}',
         '\u{f071}' if wingdings => '\u{2751}',
+        '\u{f075}' if wingdings => '\u{25c6}',
         '\u{f076}' if wingdings => '\u{2756}',
         '\u{f0a7}' if wingdings => '\u{25aa}',
         '\u{f0d8}' if wingdings => '\u{27a2}',
@@ -6770,6 +6811,35 @@ mod tests {
   }
 
   #[test]
+  fn office_tab_leaders_split_into_thirty_two_character_pdf_portions() {
+    let item = TextItem {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      line_height_pt: 12.0,
+      paint_clip: None,
+      text: ".".repeat(70).into(),
+      style: PaintTextStyle::default(),
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: true,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: common::PdfTextSegmentation::Portion,
+      source_path: None,
+      semantic_target_width_pt: None,
+    };
+
+    let ranges = text_portion_ranges(&item)
+      .into_iter()
+      .map(|(_, range)| range)
+      .collect::<Vec<_>>();
+    assert_eq!(ranges, vec![0..32, 32..64, 64..70]);
+  }
+
+  #[test]
   fn decorated_tab_remains_a_non_painting_tab_portion() {
     let item = TextItem {
       x_pt: 0.0,
@@ -7201,6 +7271,14 @@ mod tests {
     assert_eq!(
       symbol_font_semantic_text("\u{f06c}", Some("Calibri")),
       "\u{f06c}"
+    );
+  }
+
+  #[test]
+  fn wingdings_smiley_and_black_diamond_use_standardized_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f04a}\u{f075}", Some("Wingdings")),
+      "\u{263a}\u{25c6}"
     );
   }
 

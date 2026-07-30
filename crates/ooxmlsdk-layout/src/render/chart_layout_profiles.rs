@@ -68,6 +68,33 @@ pub(crate) const WORD_EXPLICIT_TITLE_SIDE_LEGEND: CartesianLayoutAdjustment =
     ..ZERO_ADJUSTMENT
   };
 
+/// Word's automatic untitled side-legend plot reservation.
+///
+/// Office's O12 fixed output keeps the category-label band at the generic
+/// Word position, but lifts the plot by roughly a quarter point in a 252pt
+/// chart frame. Keep that residual automatic-layout adjustment independent
+/// from the explicit-title profile above.
+pub(crate) const WORD_UNTITLED_SIDE_LEGEND: CartesianLayoutAdjustment = CartesianLayoutAdjustment {
+  plot_top_ratio: -0.000_853,
+  plot_bottom_ratio: -0.001_166,
+  plot_left_ratio: 0.000_1,
+  ..ZERO_ADJUSTMENT
+};
+
+/// Word's automatic untitled layout when no legend is present.
+///
+/// The ratios are measured from the Office fixed-output plot rectangle of
+/// LibreOffice's tdf139658 regression document. Word reserves a symmetric
+/// horizontal axis band and a smaller vertical band than the generic
+/// no-side-legend defaults, independently of the enclosing chart size.
+pub(crate) const WORD_UNTITLED_NO_LEGEND: CartesianLayoutAdjustment = CartesianLayoutAdjustment {
+  plot_top_ratio: 0.008_651,
+  plot_bottom_ratio: -0.008_336,
+  plot_left_ratio: 0.017_905,
+  plot_right_ratio: -0.017_651,
+  ..ZERO_ADJUSTMENT
+};
+
 /// Excel side-legend charts with an explicit title.
 pub(crate) const EXCEL_EXPLICIT_TITLE_SIDE_LEGEND: CartesianLayoutAdjustment =
   CartesianLayoutAdjustment {

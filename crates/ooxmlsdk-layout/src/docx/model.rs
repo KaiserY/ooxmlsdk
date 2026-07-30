@@ -190,6 +190,10 @@ pub(crate) struct Paragraph {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ParagraphFieldEvent {
+  /// Visible story content. Field scanning uses this marker to distinguish a
+  /// field that owns its boundary paragraphs from one embedded in surrounding
+  /// paragraph text; the content itself remains in `Paragraph::inlines`.
+  Content,
   Begin {
     locked: bool,
     dirty: bool,
@@ -360,6 +364,7 @@ pub(crate) struct ParagraphFormat {
   pub tab_stops_set: bool,
   pub list_label_width_aware_tab: bool,
   pub list_label_uses_explicit_tab_stop: bool,
+  pub list_label_justification: w::LevelJustificationValues,
   pub alignment: ParagraphAlignment,
   pub justification: ParagraphJustification,
   pub bidi: bool,
@@ -374,6 +379,8 @@ pub(crate) struct ParagraphFormat {
   pub contextual_spacing: bool,
   pub contextual_spacing_set: bool,
   pub suppress_auto_hyphens: Option<bool>,
+  pub auto_space_de: Option<bool>,
+  pub auto_space_dn: Option<bool>,
   pub hidden_separator: bool,
   pub outline_text_inlines: Option<usize>,
   /// Effective outline level supplied by the paragraph style hierarchy,
@@ -761,6 +768,7 @@ pub(crate) struct InlineChart {
   pub category_major_gridline: Option<(RgbColor, f32)>,
   pub category_minor_gridline: Option<(RgbColor, f32)>,
   pub series_colors: Vec<RgbColor>,
+  pub series_gradient_fills: Vec<Option<common::GradientFill<'static>>>,
   pub series_point_colors: Vec<Vec<Option<RgbColor>>>,
   pub surface_band_colors: Vec<Vec<(u32, RgbColor)>>,
   pub data_label_fill_colors: Vec<Vec<Option<RgbColor>>>,

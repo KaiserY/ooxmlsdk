@@ -1549,6 +1549,7 @@ fn lower_chart(
           category_major_gridline: None,
           category_minor_gridline: None,
           series_colors,
+          series_gradient_fills: Vec::new(),
           series_point_colors,
           surface_band_colors,
           data_label_fill_colors: chart

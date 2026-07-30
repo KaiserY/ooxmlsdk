@@ -13,6 +13,19 @@ pub(super) fn paragraph_field_events(paragraph: &w::Paragraph) -> Vec<ParagraphF
   events
 }
 
+pub(super) fn body_level_bookmark_names(body: &w::Body) -> HashSet<String> {
+  body
+    .body_choice
+    .iter()
+    .filter_map(|choice| match choice {
+      w::BodyChoice::BookmarkStart(bookmark) if !bookmark.name.is_empty() => {
+        Some(bookmark.name.to_string())
+      }
+      _ => None,
+    })
+    .collect()
+}
+
 fn collect_paragraph_choice(choice: &w::ParagraphChoice, events: &mut Vec<ParagraphFieldEvent>) {
   match choice {
     w::ParagraphChoice::WRun(run) => collect_run(run, events),
@@ -50,7 +63,9 @@ fn collect_run(run: &w::Run, events: &mut Vec<ParagraphFieldEvent>) {
         }
       }
       w::RunChoice::Run(nested) => collect_run(nested, events),
-      _ => {}
+      // Everything else in w:r is visible story content or a visible layout
+      // control (text, tab, break, drawing, note reference, and so on).
+      _ => events.push(ParagraphFieldEvent::Content),
     }
   }
 }
@@ -462,7 +477,8 @@ struct StoryField {
   instruction: String,
   locked: bool,
   dirty: bool,
-  separated: bool,
+  starts_at_paragraph_start: bool,
+  ends_at_paragraph_end: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -471,7 +487,6 @@ struct TocSpan {
   end_ordinal: usize,
   locked: bool,
   dirty: bool,
-  separated: bool,
   spec: TocSpec,
 }
 
@@ -490,6 +505,7 @@ struct OpenStoryField {
   locked: bool,
   dirty: bool,
   separated: bool,
+  starts_at_paragraph_start: bool,
 }
 
 fn scan_main_story(sections: &[ImportedSection]) -> StoryScan {
@@ -517,7 +533,6 @@ fn scan_main_story(sections: &[ImportedSection]) -> StoryScan {
         end_ordinal: field.end_ordinal,
         locked: field.locked,
         dirty: field.dirty,
-        separated: field.separated,
         spec,
       })
     })
@@ -584,14 +599,18 @@ fn scan_story_paragraph(
   let mut bookmark_scopes = active_bookmarks.values().cloned().collect::<HashSet<_>>();
   let mut source_bookmarks = Vec::new();
 
-  for event in &paragraph.field_events {
+  for (event_index, event) in paragraph.field_events.iter().enumerate() {
     match event {
+      ParagraphFieldEvent::Content => {}
       ParagraphFieldEvent::Begin { locked, dirty } => fields.push(OpenStoryField {
         start_ordinal: ordinal,
         instruction: String::new(),
         locked: *locked,
         dirty: *dirty,
         separated: false,
+        starts_at_paragraph_start: !paragraph.field_events[..event_index]
+          .iter()
+          .any(|event| matches!(event, ParagraphFieldEvent::Content)),
       }),
       ParagraphFieldEvent::Instruction(text) => {
         if let Some(field) = fields.last_mut()
@@ -613,7 +632,10 @@ fn scan_story_paragraph(
             instruction: field.instruction,
             locked: field.locked,
             dirty: field.dirty,
-            separated: field.separated,
+            starts_at_paragraph_start: field.starts_at_paragraph_start,
+            ends_at_paragraph_end: !paragraph.field_events[event_index + 1..]
+              .iter()
+              .any(|event| matches!(event, ParagraphFieldEvent::Content)),
           });
         }
       }
@@ -627,7 +649,12 @@ fn scan_story_paragraph(
         instruction: instruction.clone(),
         locked: *locked,
         dirty: *dirty,
-        separated: true,
+        starts_at_paragraph_start: !paragraph.field_events[..event_index]
+          .iter()
+          .any(|event| matches!(event, ParagraphFieldEvent::Content)),
+        ends_at_paragraph_end: !paragraph.field_events[event_index + 1..]
+          .iter()
+          .any(|event| matches!(event, ParagraphFieldEvent::Content)),
       }),
       ParagraphFieldEvent::BookmarkStart { id, name } => {
         scan.bookmark_names.insert(name.clone());
@@ -746,13 +773,40 @@ struct TocReplacement {
   blocks: Vec<Block>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MissingReferenceError {
+  ReferenceSourceNotFound,
+  BookmarkNameNotSpecified,
+}
+
+#[derive(Clone, Debug)]
+struct StoryReplacement {
+  start_ordinal: usize,
+  end_ordinal: usize,
+  blocks: Vec<Block>,
+}
+
 pub(super) fn refresh_tables_of_contents(
   sections: &mut [ImportedSection],
   styles: &StylesCatalog,
   update_fields_on_open: bool,
   ui_language: Option<&str>,
+  body_level_bookmarks: &HashSet<String>,
 ) {
-  let scan = scan_main_story(sections);
+  let mut scan = scan_main_story(sections);
+  scan
+    .bookmark_names
+    .extend(body_level_bookmarks.iter().cloned());
+  let refreshed_references = refresh_missing_reference_fields(sections, &scan, ui_language);
+  let scan = if refreshed_references {
+    let mut refreshed_scan = scan_main_story(sections);
+    refreshed_scan
+      .bookmark_names
+      .extend(body_level_bookmarks.iter().cloned());
+    refreshed_scan
+  } else {
+    scan
+  };
   if scan.toc_spans.is_empty() {
     return;
   }
@@ -765,12 +819,11 @@ pub(super) fn refresh_tables_of_contents(
 
   for span in &scan.toc_spans {
     normalize_cached_toc_hyperlink_style(sections, &scan, span, styles);
-    if span.locked
-      || (!span.dirty
-        && !update_fields_on_open
-        && span.separated
-        && toc_span_has_cached_result(sections, &scan, span))
-    {
+    // ECMA-376 §17.16.18 defines everything after the optional separator as
+    // the current field result. That result may legitimately be empty. Its
+    // absence is not an implicit update request: a TOC is recalculated only
+    // when its begin character is dirty or settings request field updates.
+    if span.locked || (!span.dirty && !update_fields_on_open) {
       continue;
     }
 
@@ -848,6 +901,172 @@ pub(super) fn refresh_tables_of_contents(
   }
 }
 
+fn refresh_missing_reference_fields(
+  sections: &mut [ImportedSection],
+  scan: &StoryScan,
+  ui_language: Option<&str>,
+) -> bool {
+  let mut replacements = scan
+    .fields
+    .iter()
+    .filter_map(|field| {
+      if field.locked || !field.starts_at_paragraph_start || !field.ends_at_paragraph_end {
+        return None;
+      }
+      let error = missing_reference_error(field, &scan.bookmark_names)?;
+      let paragraph = build_missing_reference_result(
+        paragraph(sections, scan, field.start_ordinal)?,
+        error,
+        ui_language,
+      );
+      Some(StoryReplacement {
+        start_ordinal: field.start_ordinal,
+        end_ordinal: field.end_ordinal,
+        blocks: vec![Block::paragraph(paragraph)],
+      })
+    })
+    .collect::<Vec<_>>();
+
+  // Replacing later story ranges first keeps every earlier ParagraphAddress
+  // valid even when a multi-block cached result collapses to one paragraph.
+  replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.start_ordinal));
+  let refreshed = !replacements.is_empty();
+  for replacement in replacements {
+    replace_story_span(sections, scan, replacement);
+  }
+  refreshed
+}
+
+fn missing_reference_error(
+  field: &StoryField,
+  bookmark_names: &HashSet<String>,
+) -> Option<MissingReferenceError> {
+  let tokens = field_instruction_tokens(&field.instruction);
+  let instruction_name = tokens.first()?;
+  let is_ref = instruction_name.eq_ignore_ascii_case("REF");
+  let is_noteref = instruction_name.eq_ignore_ascii_case("NOTEREF");
+  if !is_ref && !is_noteref {
+    return None;
+  }
+
+  let bookmark_name = reference_bookmark_argument(&tokens);
+  if is_noteref && bookmark_name.is_none() {
+    return Some(MissingReferenceError::BookmarkNameNotSpecified);
+  }
+  let bookmark_name = bookmark_name?;
+  (!bookmark_names
+    .iter()
+    .any(|candidate| candidate.eq_ignore_ascii_case(bookmark_name)))
+  .then_some(MissingReferenceError::ReferenceSourceNotFound)
+}
+
+fn reference_bookmark_argument(tokens: &[String]) -> Option<&str> {
+  let mut index = 1;
+  while index < tokens.len() {
+    if let Some(switch) = field_switch(&tokens[index]) {
+      // General formatting switches and REF's delimiter switch consume their
+      // following token. The other REF/NOTEREF switches are flags.
+      index += if matches!(switch.to_ascii_lowercase().as_str(), "*" | "#" | "@" | "d")
+        && next_switch_argument(tokens, index).is_some()
+      {
+        2
+      } else {
+        1
+      };
+      continue;
+    }
+    return Some(tokens[index].as_str());
+  }
+  None
+}
+
+fn build_missing_reference_result(
+  template: &Paragraph,
+  error: MissingReferenceError,
+  ui_language: Option<&str>,
+) -> Paragraph {
+  let mut paragraph = template.clone();
+  let mut style = paragraph
+    .inlines
+    .iter()
+    .find_map(|inline| match inline {
+      InlineItem::Text(run) => Some(run.style.clone()),
+      InlineItem::Ruby(ruby) => ruby.base.first().map(|run| run.style.clone()),
+      _ => None,
+    })
+    .unwrap_or_else(|| paragraph.base_style.clone());
+  super::apply_generated_field_error_font(&mut style, ui_language);
+  apply_generated_reference_error_font(&mut style, ui_language);
+  let text = localized_missing_reference_error(error, ui_language).to_string();
+  let run = TextRun {
+    text: text.clone(),
+    style,
+    hyperlink_url: None,
+    dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
+    style_ref_numbering_text: None,
+    preserve_text_portion: false,
+  };
+
+  paragraph.inlines.clear();
+  paragraph.inlines.push(InlineItem::Text(run.clone()));
+  paragraph.field_events.clear();
+  paragraph.footnote_reference_ids.clear();
+  paragraph.endnote_reference_ids.clear();
+  paragraph.starts_after_last_rendered_page_break = false;
+  paragraph.style_ref_text = Some(Arc::<str>::from(text));
+  paragraph.style_ref_numbering_text = None;
+  #[cfg(test)]
+  {
+    paragraph.runs.clear();
+    paragraph.runs.push(run);
+  }
+  paragraph
+}
+
+fn apply_generated_reference_error_font(style: &mut TextStyle, ui_language: Option<&str>) {
+  let language = ui_language
+    .unwrap_or("en-US")
+    .replace('_', "-")
+    .to_ascii_lowercase();
+  if language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans") {
+    // Unlike the regular PAGEREF missing-bookmark resource, Word's REF and
+    // NOTEREF diagnostics use a bold Arial/SimSun resource pair. ASCII
+    // punctuation is carried by Arial while Han characters use SimSun.
+    let simsun = Arc::<str>::from("SimSun");
+    style.font_family = Some(Arc::<str>::from("Arial"));
+    style.east_asia_font_family = Some(simsun);
+    style.bold = true;
+    style.complex_bold = Some(true);
+    style.underline = false;
+  }
+}
+
+fn localized_missing_reference_error(
+  error: MissingReferenceError,
+  ui_language: Option<&str>,
+) -> &'static str {
+  let language = ui_language
+    .unwrap_or("en-US")
+    .replace('_', "-")
+    .to_ascii_lowercase();
+  let simplified_chinese =
+    language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans");
+  let traditional_chinese = language == "zh-tw"
+    || language == "zh-hk"
+    || language == "zh-mo"
+    || language.starts_with("zh-hant");
+  match (error, simplified_chinese, traditional_chinese) {
+    (MissingReferenceError::ReferenceSourceNotFound, true, _) => "错误!未找到引用源。",
+    (MissingReferenceError::BookmarkNameNotSpecified, true, _) => "错误!未指定书签。",
+    (MissingReferenceError::ReferenceSourceNotFound, _, true) => "錯誤! 找不到參照來源。",
+    (MissingReferenceError::BookmarkNameNotSpecified, _, true) => "錯誤! 未提供書籤名稱。",
+    (MissingReferenceError::ReferenceSourceNotFound, _, _) => "Error! Reference source not found.",
+    (MissingReferenceError::BookmarkNameNotSpecified, _, _) => "Error! No bookmark name given.",
+  }
+}
+
 fn normalize_cached_toc_hyperlink_style(
   sections: &mut [ImportedSection],
   scan: &StoryScan,
@@ -896,18 +1115,6 @@ fn normalize_cached_toc_hyperlink_style(
       }
     }
   }
-}
-
-fn toc_span_has_cached_result(
-  sections: &[ImportedSection],
-  scan: &StoryScan,
-  span: &TocSpan,
-) -> bool {
-  (span.start_ordinal..=span.end_ordinal).any(|ordinal| {
-    paragraph(sections, scan, ordinal)
-      .and_then(paragraph_source_text)
-      .is_some_and(|text| !text.trim().is_empty())
-  })
 }
 
 fn collect_toc_entry_sources(
@@ -1567,10 +1774,26 @@ fn replace_toc_span(
   scan: &StoryScan,
   replacement: TocReplacement,
 ) {
-  let Some(start) = scan.paragraphs.get(replacement.span.start_ordinal) else {
+  replace_story_span(
+    sections,
+    scan,
+    StoryReplacement {
+      start_ordinal: replacement.span.start_ordinal,
+      end_ordinal: replacement.span.end_ordinal,
+      blocks: replacement.blocks,
+    },
+  );
+}
+
+fn replace_story_span(
+  sections: &mut [ImportedSection],
+  scan: &StoryScan,
+  replacement: StoryReplacement,
+) {
+  let Some(start) = scan.paragraphs.get(replacement.start_ordinal) else {
     return;
   };
-  let Some(end) = scan.paragraphs.get(replacement.span.end_ordinal) else {
+  let Some(end) = scan.paragraphs.get(replacement.end_ordinal) else {
     return;
   };
   if start.address.section_index == end.address.section_index
@@ -1629,6 +1852,21 @@ fn replace_toc_span(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  fn refresh_tables_of_contents(
+    sections: &mut [ImportedSection],
+    styles: &StylesCatalog,
+    update_fields_on_open: bool,
+    ui_language: Option<&str>,
+  ) {
+    super::refresh_tables_of_contents(
+      sections,
+      styles,
+      update_fields_on_open,
+      ui_language,
+      &HashSet::new(),
+    );
+  }
 
   fn test_paragraph(text: &str) -> Paragraph {
     let styles = StylesCatalog::default();
@@ -1747,6 +1985,229 @@ mod tests {
     let spec = TocSpec::parse("TOC /l 1-3 /f").unwrap();
     assert!(spec.tc_entries);
     assert_eq!(spec.tc_levels, TocLevelRange::ALL);
+  }
+
+  #[test]
+  fn clean_empty_toc_result_is_preserved_until_an_update_is_requested() {
+    let mut first_cached = test_paragraph("");
+    first_cached.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: false,
+        dirty: false,
+      },
+      ParagraphFieldEvent::Instruction(r#" TOC \o "1-3" \h "#.to_string()),
+      ParagraphFieldEvent::Separate,
+    ];
+    let mut second_cached = test_paragraph("");
+    second_cached.field_events = vec![ParagraphFieldEvent::End];
+    let mut heading = test_paragraph("Current heading");
+    heading.format.style_outline_level = Some(0);
+    heading.format.outline_level = Some(0);
+
+    let sections = vec![default_section(vec![
+      Block::paragraph(first_cached),
+      Block::paragraph(second_cached),
+      Block::paragraph(heading),
+    ])];
+    let mut cached = sections.clone();
+    refresh_tables_of_contents(&mut cached, &StylesCatalog::default(), false, Some("en-US"));
+
+    assert_eq!(cached[0].blocks.len(), 3);
+    assert!(matches!(
+      &cached[0].blocks[2],
+      Block::Paragraph(source)
+        if !matches!(source.inlines.first(), Some(InlineItem::BookmarkStart(_)))
+    ));
+
+    let mut requested = sections;
+    refresh_tables_of_contents(
+      &mut requested,
+      &StylesCatalog::default(),
+      true,
+      Some("en-US"),
+    );
+
+    assert_eq!(requested[0].blocks.len(), 2);
+    assert!(matches!(
+      &requested[0].blocks[0],
+      Block::Paragraph(entry)
+        if paragraph_source_text(entry)
+          .is_some_and(|text| text.starts_with("Current heading"))
+    ));
+    assert!(matches!(
+      &requested[0].blocks[1],
+      Block::Paragraph(source)
+        if matches!(source.inlines.first(), Some(InlineItem::BookmarkStart(_)))
+    ));
+  }
+
+  #[test]
+  fn missing_ref_replaces_a_cross_table_cached_result_without_dropping_neighbors() {
+    let before = test_paragraph("before");
+    let mut field_start = test_paragraph("");
+    field_start.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: false,
+        dirty: false,
+      },
+      ParagraphFieldEvent::Instruction(r#" REF MissingBookmark \h "#.to_string()),
+      ParagraphFieldEvent::Separate,
+    ];
+    let cached_table = test_table(vec![Block::paragraph(test_paragraph("stale table"))]);
+    let mut field_end = test_paragraph("");
+    field_end.field_events = vec![ParagraphFieldEvent::End];
+    let after = test_paragraph("after");
+    let mut sections = vec![default_section(vec![
+      Block::paragraph(before),
+      Block::paragraph(field_start),
+      Block::Table(cached_table),
+      Block::paragraph(field_end),
+      Block::paragraph(after),
+    ])];
+
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("zh-CN"),
+    );
+
+    assert_eq!(sections[0].blocks.len(), 3);
+    assert!(matches!(
+      &sections[0].blocks[0],
+      Block::Paragraph(paragraph)
+        if paragraph_source_text(paragraph).as_deref() == Some("before")
+    ));
+    assert!(matches!(
+      &sections[0].blocks[1],
+      Block::Paragraph(paragraph)
+        if paragraph_source_text(paragraph).as_deref() == Some("错误!未找到引用源。")
+    ));
+    assert!(matches!(
+      &sections[0].blocks[2],
+      Block::Paragraph(paragraph)
+        if paragraph_source_text(paragraph).as_deref() == Some("after")
+    ));
+  }
+
+  #[test]
+  fn missing_ref_replaces_all_cached_paragraphs_inside_one_table_cell() {
+    let mut field_start = test_paragraph("stale first");
+    field_start.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: false,
+        dirty: false,
+      },
+      ParagraphFieldEvent::Instruction(" REF MissingBookmark ".to_string()),
+      ParagraphFieldEvent::Separate,
+      ParagraphFieldEvent::Content,
+    ];
+    let mut field_end = test_paragraph("");
+    field_end.field_events = vec![ParagraphFieldEvent::End];
+    let table = test_table(vec![
+      Block::paragraph(field_start),
+      Block::paragraph(test_paragraph("stale second")),
+      Block::paragraph(field_end),
+    ]);
+    let mut sections = vec![default_section(vec![Block::Table(table)])];
+
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("zh-CN"),
+    );
+
+    let Block::Table(table) = &sections[0].blocks[0] else {
+      panic!("expected table");
+    };
+    assert_eq!(table.rows[0].cells[0].blocks.len(), 1);
+    assert!(matches!(
+      &table.rows[0].cells[0].blocks[0],
+      Block::Paragraph(paragraph)
+        if paragraph_source_text(paragraph).as_deref() == Some("错误!未找到引用源。")
+    ));
+  }
+
+  #[test]
+  fn missing_reference_refresh_preserves_locked_and_embedded_fields() {
+    let mut locked = test_paragraph("locked cache");
+    locked.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: true,
+        dirty: true,
+      },
+      ParagraphFieldEvent::Instruction("REF MissingBookmark".to_string()),
+      ParagraphFieldEvent::Separate,
+      ParagraphFieldEvent::Content,
+      ParagraphFieldEvent::End,
+    ];
+    let mut embedded = test_paragraph("prefix stale suffix");
+    embedded.field_events = vec![
+      ParagraphFieldEvent::Content,
+      ParagraphFieldEvent::Begin {
+        locked: false,
+        dirty: true,
+      },
+      ParagraphFieldEvent::Instruction("REF MissingBookmark".to_string()),
+      ParagraphFieldEvent::Separate,
+      ParagraphFieldEvent::Content,
+      ParagraphFieldEvent::End,
+      ParagraphFieldEvent::Content,
+    ];
+    let mut sections = vec![default_section(vec![
+      Block::paragraph(locked),
+      Block::paragraph(embedded),
+    ])];
+
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      true,
+      Some("zh-CN"),
+    );
+
+    assert_eq!(sections[0].blocks.len(), 2);
+    assert!(matches!(
+      &sections[0].blocks[0],
+      Block::Paragraph(paragraph)
+        if paragraph_source_text(paragraph).as_deref() == Some("locked cache")
+    ));
+    assert!(matches!(
+      &sections[0].blocks[1],
+      Block::Paragraph(paragraph)
+        if paragraph_source_text(paragraph).as_deref() == Some("prefix stale suffix")
+    ));
+  }
+
+  #[test]
+  fn body_level_bookmark_keeps_a_valid_ref_cached_result() {
+    let mut cached = test_paragraph("Text1");
+    cached.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: false,
+        dirty: false,
+      },
+      ParagraphFieldEvent::Instruction(r#" REF BM1 \* MERGEFORMAT "#.to_string()),
+      ParagraphFieldEvent::Separate,
+      ParagraphFieldEvent::Content,
+      ParagraphFieldEvent::End,
+    ];
+    let mut sections = vec![default_section(vec![Block::paragraph(cached)])];
+
+    super::refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("zh-CN"),
+      &HashSet::from(["BM1".to_string()]),
+    );
+
+    assert!(matches!(
+      &sections[0].blocks[0],
+      Block::Paragraph(paragraph)
+        if paragraph_source_text(paragraph).as_deref() == Some("Text1")
+    ));
   }
 
   #[test]

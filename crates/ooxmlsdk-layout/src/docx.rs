@@ -1,6 +1,7 @@
 mod custom_xml;
 mod drawing;
 mod field_datetime;
+mod field_localization;
 mod hyphenation;
 mod layout;
 mod model;
@@ -59,13 +60,16 @@ use crate::render::symbol as shared_symbol;
 use crate::units;
 
 pub(crate) use custom_xml::CustomXmlBindings;
+use field_localization::{
+  FieldMessage, apply_generated_field_message_style, localized_field_message,
+};
 pub(crate) use model::*;
 use package::{
   AltChunkCatalog, AltChunkResource, ExtendedChartResource, HyperlinkCatalog, ImageCatalog,
 };
 use settings::{
-  adjust_line_height_in_table, compatibility_mode, default_tab_stop_pt,
-  do_not_break_wrapped_tables, do_not_expand_shift_return, do_not_use_html_paragraph_auto_spacing,
+  adjust_line_height_in_table, compatibility_mode, do_not_break_wrapped_tables,
+  do_not_expand_shift_return, do_not_use_html_paragraph_auto_spacing, explicit_default_tab_stop_pt,
   hyphenation_settings, no_column_balance, split_page_break_and_paragraph_mark,
   update_fields_on_open,
 };
@@ -111,6 +115,10 @@ const DEFAULT_TAB_STOP_PT: f32 = 36.0;
 // Internal marker for a literal U+0009 preserved inside w:t. U+000B is not
 // legal XML 1.0 document text, so it cannot collide with source content.
 pub(crate) const PRESERVED_WORD_TEXT_TAB: char = '\u{000b}';
+// U+000C is likewise illegal XML 1.0 text. This marker retains the source
+// distinction while routing packages with an explicit w:defaultTabStop
+// through Word's paragraph tab-stop behavior.
+pub(crate) const EXPLICIT_DEFAULT_WORD_TEXT_TAB: char = '\u{000c}';
 // initializes w:cols/@space to 720 twips.
 const DEFAULT_SECTION_COLUMN_GAP_PT: f32 = 720.0 / units::TWIPS_PER_POINT;
 const DEFAULT_TEXTBOX_MIN_WIDTH_PT: f32 = 11.0;
@@ -189,6 +197,7 @@ pub(crate) fn extract(
     field_update_datetime: options.field_update_datetime,
     ..Default::default()
   };
+  let explicit_default_tab_stop_pt = explicit_default_tab_stop_pt(package, &main);
   let mut styles = StylesCatalog::load(
     package,
     &main,
@@ -197,13 +206,14 @@ pub(crate) fn extract(
   )?;
   styles.display_math_alignment = document_math_settings.display_alignment;
   styles.math_font_family = document_math_settings.font_family;
+  styles.literal_text_tabs_use_default_stops = explicit_default_tab_stop_pt.is_some();
   let mut numbering = NumberingCatalog::load(package, &main, import_settings, &styles)?;
   let images = ImageCatalog::load(package, &main);
   let alt_chunks = AltChunkCatalog::load(package, &main);
   let hyperlinks = HyperlinkCatalog::load(package, &main);
   let custom_xml_bindings = CustomXmlBindings::load(package, &main);
   let mut form_widget_ids = FormWidgetIdAllocator::default();
-  let default_tab_stop_pt = default_tab_stop_pt(package, &main);
+  let default_tab_stop_pt = explicit_default_tab_stop_pt.unwrap_or(DEFAULT_TAB_STOP_PT);
   let hyphenation = hyphenation_settings(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
   let no_column_balance = no_column_balance(package, &main);
@@ -752,9 +762,202 @@ struct BodySectionEnv<'a> {
   no_column_balance: bool,
 }
 
+/// WordprocessingML range markers are legal at both inline and block-content
+/// boundaries. LibreOffice's DomainMapper imports either form at the current
+/// global text cursor, while the layout model needs a concrete paragraph to
+/// carry the event and bookmark destination. Keep boundary markers pending
+/// until the next layoutable paragraph; if a container ends first, attach
+/// them to the end of its last paragraph.
+#[derive(Default)]
+struct BlockBoundaryBookmarks {
+  pending: Vec<ParagraphFieldEvent>,
+}
+
+impl BlockBoundaryBookmarks {
+  fn start(&mut self, bookmark: &w::BookmarkStart) {
+    if bookmark.name.is_empty() {
+      return;
+    }
+    self.pending.push(ParagraphFieldEvent::BookmarkStart {
+      id: bookmark.id.to_string(),
+      name: bookmark.name.to_string(),
+    });
+  }
+
+  fn end(&mut self, bookmark: &w::BookmarkEnd, preceding_blocks: &mut [Block]) {
+    self.end_at_paragraph(bookmark, last_block_paragraph_mut(preceding_blocks));
+  }
+
+  fn end_at_paragraph(
+    &mut self,
+    bookmark: &w::BookmarkEnd,
+    preceding_paragraph: Option<&mut Paragraph>,
+  ) {
+    let event = ParagraphFieldEvent::BookmarkEnd {
+      id: bookmark.id.to_string(),
+    };
+    if !self.pending.is_empty() {
+      // Adjacent start/end markers form a point bookmark at the next block
+      // boundary. Preserve their document order until a paragraph exists.
+      self.pending.push(event);
+    } else if let Some(paragraph) = preceding_paragraph {
+      paragraph.field_events.push(event);
+    } else {
+      self.pending.push(event);
+    }
+  }
+
+  fn attach_to_paragraph_start(&mut self, paragraph: &mut Paragraph) {
+    if self.pending.is_empty() {
+      return;
+    }
+    let events = std::mem::take(&mut self.pending);
+    let anchor_names = block_boundary_anchor_names(&events);
+    paragraph.field_events.splice(0..0, events);
+
+    // A block boundary followed by a paragraph-leading hard break belongs to
+    // the page on which that paragraph's first rendered content starts. This
+    // is observable through PAGEREF (tdf#154478/tdf#154481).
+    let anchor_index = paragraph
+      .inlines
+      .iter()
+      .take_while(|inline| {
+        matches!(
+          inline,
+          InlineItem::PageBreak | InlineItem::ColumnBreak | InlineItem::LastRenderedPageBreak
+        )
+      })
+      .count();
+    paragraph.inlines.splice(
+      anchor_index..anchor_index,
+      anchor_names.into_iter().map(InlineItem::BookmarkStart),
+    );
+  }
+
+  fn attach_to_new_blocks(&mut self, blocks: &mut [Block]) {
+    if self.pending.is_empty() {
+      return;
+    }
+    if let Some(paragraph) = first_block_paragraph_mut(blocks) {
+      self.attach_to_paragraph_start(paragraph);
+    }
+  }
+
+  fn finish(&mut self, blocks: &mut [Block]) {
+    self.finish_at_paragraph(last_block_paragraph_mut(blocks));
+  }
+
+  fn finish_at_paragraph(&mut self, paragraph: Option<&mut Paragraph>) {
+    if self.pending.is_empty() {
+      return;
+    }
+    let Some(paragraph) = paragraph else {
+      return;
+    };
+    let events = std::mem::take(&mut self.pending);
+    let anchor_names = block_boundary_anchor_names(&events);
+    paragraph.field_events.extend(events);
+    paragraph
+      .inlines
+      .extend(anchor_names.into_iter().map(InlineItem::BookmarkStart));
+  }
+
+  fn is_empty(&self) -> bool {
+    self.pending.is_empty()
+  }
+}
+
+fn block_boundary_anchor_names(events: &[ParagraphFieldEvent]) -> Vec<String> {
+  events
+    .iter()
+    .filter_map(|event| match event {
+      ParagraphFieldEvent::BookmarkStart { name, .. } => Some(name.clone()),
+      _ => None,
+    })
+    .collect()
+}
+
+fn first_block_paragraph_mut(blocks: &mut [Block]) -> Option<&mut Paragraph> {
+  for block in blocks {
+    match block {
+      Block::Paragraph(paragraph) => return Some(paragraph),
+      Block::Table(table) => {
+        for row in &mut table.rows {
+          for cell in &mut row.cells {
+            if let Some(paragraph) = first_block_paragraph_mut(&mut cell.blocks) {
+              return Some(paragraph);
+            }
+          }
+        }
+      }
+      Block::Frame(frame) => {
+        if let Some(paragraph) = first_block_paragraph_mut(&mut frame.blocks) {
+          return Some(paragraph);
+        }
+      }
+    }
+  }
+  None
+}
+
+fn last_block_paragraph_mut(blocks: &mut [Block]) -> Option<&mut Paragraph> {
+  for block in blocks.iter_mut().rev() {
+    match block {
+      Block::Paragraph(paragraph) => return Some(paragraph),
+      Block::Table(table) => {
+        for row in table.rows.iter_mut().rev() {
+          for cell in row.cells.iter_mut().rev() {
+            if let Some(paragraph) = last_block_paragraph_mut(&mut cell.blocks) {
+              return Some(paragraph);
+            }
+          }
+        }
+      }
+      Block::Frame(frame) => {
+        if let Some(paragraph) = last_block_paragraph_mut(&mut frame.blocks) {
+          return Some(paragraph);
+        }
+      }
+    }
+  }
+  None
+}
+
+fn first_table_row_paragraph_mut(rows: &mut [TableRow]) -> Option<&mut Paragraph> {
+  for row in rows {
+    for cell in &mut row.cells {
+      if let Some(paragraph) = first_block_paragraph_mut(&mut cell.blocks) {
+        return Some(paragraph);
+      }
+    }
+  }
+  None
+}
+
+fn last_table_row_paragraph_mut(rows: &mut [TableRow]) -> Option<&mut Paragraph> {
+  for row in rows.iter_mut().rev() {
+    for cell in row.cells.iter_mut().rev() {
+      if let Some(paragraph) = last_block_paragraph_mut(&mut cell.blocks) {
+        return Some(paragraph);
+      }
+    }
+  }
+  None
+}
+
+fn last_table_cell_paragraph_mut(cells: &mut [TableCell]) -> Option<&mut Paragraph> {
+  for cell in cells.iter_mut().rev() {
+    if let Some(paragraph) = last_block_paragraph_mut(&mut cell.blocks) {
+      return Some(paragraph);
+    }
+  }
+  None
+}
+
 fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection> {
   let mut sections = Vec::new();
   let mut current_blocks = Vec::new();
+  let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
   let mut previous_properties = None;
   let mut pending_drop_cap_text = None;
   let mut pending_out_of_place_breaks = Vec::new();
@@ -853,14 +1056,8 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
             promote_preceding_table_to_anchored_frame(&mut current_blocks, &model);
           }
         }
-        if paragraph_is_effectively_empty(&model)
-          && model.field_events.is_empty()
-          && section_properties.is_none()
-          && current_blocks
-            .last()
-            .is_some_and(|block| matches!(block, Block::Table(table) if table.placement.is_none()))
-        {
-          continue;
+        if !section_metadata_only {
+          boundary_bookmarks.attach_to_paragraph_start(&mut model);
         }
         if let Some(section_properties) = section_properties {
           if !section_metadata_only {
@@ -895,6 +1092,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
             in_header_footer: false,
           },
         ));
+        boundary_bookmarks.attach_to_new_blocks(std::slice::from_mut(&mut block));
         if prepend_out_of_place_breaks_to_first_character_group(
           std::slice::from_mut(&mut block),
           &pending_out_of_place_breaks,
@@ -910,7 +1108,9 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
         let Some(resource) = alt_chunks.by_relationship_id.get(relationship_id) else {
           continue;
         };
+        let block_start = current_blocks.len();
         current_blocks.extend(alt_chunk_blocks(resource, styles.doc_default_run.clone()));
+        boundary_bookmarks.attach_to_new_blocks(&mut current_blocks[block_start..]);
       }
       w::BodyChoice::SdtBlock(sdt) => {
         let mut blocks = sdt_block_blocks(
@@ -919,12 +1119,36 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
           numbering,
           images,
           hyperlinks,
-          SdtBlockControls {
+          BlockContentControls {
             custom_xml_bindings,
             form_widget_ids,
             in_header_footer: false,
           },
         );
+        boundary_bookmarks.attach_to_new_blocks(&mut blocks);
+        if prepend_out_of_place_breaks_to_first_character_group(
+          &mut blocks,
+          &pending_out_of_place_breaks,
+        ) {
+          pending_out_of_place_breaks.clear();
+        }
+        current_blocks.extend(blocks);
+      }
+      w::BodyChoice::CustomXmlBlock(custom_xml) => {
+        let mut blocks = custom_xml_block_blocks_with_base(
+          custom_xml,
+          styles,
+          numbering,
+          images,
+          hyperlinks,
+          BlockContentControls {
+            custom_xml_bindings,
+            form_widget_ids,
+            in_header_footer: false,
+          },
+          None,
+        );
+        boundary_bookmarks.attach_to_new_blocks(&mut blocks);
         if prepend_out_of_place_breaks_to_first_character_group(
           &mut blocks,
           &pending_out_of_place_breaks,
@@ -940,10 +1164,21 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
         // character in its first populated cell (tdf#108714 Office golden).
         pending_out_of_place_breaks.push(br.clone());
       }
+      w::BodyChoice::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
+      w::BodyChoice::BookmarkEnd(bookmark) => boundary_bookmarks.end(bookmark, &mut current_blocks),
       _ => {}
     }
   }
 
+  if !boundary_bookmarks.is_empty() {
+    if current_blocks.is_empty()
+      && let Some(section) = sections.last_mut()
+    {
+      boundary_bookmarks.finish(&mut section.blocks);
+    } else {
+      boundary_bookmarks.finish(&mut current_blocks);
+    }
+  }
   if body.section_properties.is_some() || sections.is_empty() || !current_blocks.is_empty() {
     close_section(
       &mut sections,
@@ -1184,21 +1419,19 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
   if let Some(frame) = paragraph.format.frame {
     paragraph.format.frame = None;
     if let Some(Block::Frame(previous)) = blocks.last_mut()
-      && paragraph_belongs_to_frame(previous, frame, &paragraph)
+      && paragraph_belongs_to_frame(previous, frame)
     {
       previous.blocks.push(Block::paragraph(paragraph));
       return;
     }
-    let fill_color = paragraph.format.shading;
-    let borders = paragraph.format.borders;
     blocks.push(Block::Frame(FloatingFrame {
       blocks: vec![Block::paragraph(paragraph)],
       width_pt: frame.width_pt,
       height_pt: frame.height_pt,
       height_rule: frame.height_rule,
       placement: frame.placement,
-      fill_color,
-      borders,
+      outer_fill_color: None,
+      outer_borders: ParagraphBordersModel::default(),
     }));
     return;
   }
@@ -1285,8 +1518,8 @@ fn promote_preceding_table_to_anchored_frame(blocks: &mut Vec<Block>, anchor: &P
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
     placement: frame.placement,
-    fill_color: anchor.format.shading,
-    borders: anchor.format.borders,
+    outer_fill_color: anchor.format.shading,
+    outer_borders: anchor.format.borders,
   }));
 }
 
@@ -1305,17 +1538,11 @@ fn flatten_promoted_table_cell_frames(table: &mut Table) {
   }
 }
 
-fn paragraph_belongs_to_frame(
-  frame: &FloatingFrame,
-  properties: ParagraphFrameProperties,
-  paragraph: &Paragraph,
-) -> bool {
+fn paragraph_belongs_to_frame(frame: &FloatingFrame, properties: ParagraphFrameProperties) -> bool {
   frame.width_pt == properties.width_pt
     && frame.height_pt == properties.height_pt
     && frame.height_rule == properties.height_rule
     && frame.placement == properties.placement
-    && frame.fill_color == paragraph.format.shading
-    && frame.borders == paragraph.format.borders
 }
 
 fn paragraph_mark_is_hidden(paragraph: &w::Paragraph) -> bool {
@@ -1349,7 +1576,10 @@ fn paragraph_body_is_effectively_empty(paragraph: &Paragraph) -> bool {
     && paragraph.inlines.iter().all(|inline| match inline {
       InlineItem::Text(run) => run.text.trim().is_empty(),
       InlineItem::PositionalTab(_) => true,
-      InlineItem::Ruby(_) | InlineItem::Image(_) | InlineItem::Shape(_) => false,
+      InlineItem::Ruby(_)
+      | InlineItem::Image(_)
+      | InlineItem::Shape(_)
+      | InlineItem::LegacyFormCheckBox(_) => false,
       InlineItem::BookmarkStart(_) => true,
       InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
       InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => true,
@@ -1392,6 +1622,7 @@ fn paragraph_drop_cap_text(paragraph: &Paragraph) -> Option<String> {
       InlineItem::PositionalTab(_) => None,
       InlineItem::Image(_)
       | InlineItem::Shape(_)
+      | InlineItem::LegacyFormCheckBox(_)
       | InlineItem::BookmarkStart(_)
       | InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
@@ -1685,10 +1916,17 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
   }
 }
 
-struct SdtBlockControls<'a> {
+struct BlockContentControls<'a> {
   custom_xml_bindings: &'a CustomXmlBindings,
   form_widget_ids: &'a mut FormWidgetIdAllocator,
   in_header_footer: bool,
+}
+
+#[derive(Clone, Debug, Default)]
+struct BlockContentParagraphBase {
+  format: ParagraphFormat,
+  run_style: TextStyle,
+  run_overrides: RunStyleOverrides,
 }
 
 fn sdt_block_blocks(
@@ -1697,7 +1935,7 @@ fn sdt_block_blocks(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
-  controls: SdtBlockControls<'_>,
+  controls: BlockContentControls<'_>,
 ) -> Vec<Block> {
   sdt_block_blocks_with_base(sdt, styles, numbering, images, hyperlinks, controls, None)
 }
@@ -1708,10 +1946,10 @@ fn sdt_block_blocks_with_base(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
-  controls: SdtBlockControls<'_>,
-  paragraph_base_style: Option<&TextStyle>,
+  controls: BlockContentControls<'_>,
+  paragraph_base: Option<&BlockContentParagraphBase>,
 ) -> Vec<Block> {
-  let SdtBlockControls {
+  let BlockContentControls {
     custom_xml_bindings,
     form_widget_ids,
     in_header_footer,
@@ -1724,42 +1962,29 @@ fn sdt_block_blocks_with_base(
     .sdt_properties
     .as_ref()
     .and_then(|properties| sdt_bound_replacement(custom_xml_bindings, properties));
-  let mut blocks = content
-    .sdt_content_block_choice
-    .iter()
-    .filter_map(|choice| match choice {
+  let mut blocks = Vec::new();
+  let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
+  for choice in &content.sdt_content_block_choice {
+    let block_start = blocks.len();
+    match choice {
       w::SdtContentBlockChoice::Paragraph(paragraph) => {
-        let mut model = if let Some(base_style) = paragraph_base_style {
-          paragraph_model_with_base(
-            paragraph.as_ref(),
-            styles,
-            numbering,
-            images,
-            hyperlinks,
-            form_widget_ids,
-            ParagraphImportBase {
-              run_style: base_style.clone(),
-              custom_xml_bindings: Some(custom_xml_bindings),
-              ..Default::default()
-            },
-          )
-        } else {
-          paragraph_model(
-            paragraph.as_ref(),
+        let mut model = block_content_paragraph_model(
+          paragraph,
+          BlockContentParagraphEnv {
             styles,
             numbering,
             images,
             hyperlinks,
             custom_xml_bindings,
             form_widget_ids,
-          )
-        };
-        if !in_header_footer {
-          apply_recovered_body_paragraph_defaults(paragraph, styles, &mut model);
-        }
-        Some(vec![Block::paragraph(model)])
+            in_header_footer,
+            paragraph_base,
+          },
+        );
+        boundary_bookmarks.attach_to_paragraph_start(&mut model);
+        blocks.push(Block::paragraph(model));
       }
-      w::SdtContentBlockChoice::Table(table) => Some(vec![Block::Table(table_model(
+      w::SdtContentBlockChoice::Table(table) => blocks.push(Block::Table(table_model(
         table.as_ref(),
         &mut TableModelEnv {
           styles,
@@ -1773,28 +1998,198 @@ fn sdt_block_blocks_with_base(
           nested_table_level: 1,
           in_header_footer,
         },
-      ))]),
-      w::SdtContentBlockChoice::SdtBlock(sdt) => Some(sdt_block_blocks_with_base(
-        sdt.as_ref(),
-        styles,
-        numbering,
-        images,
-        hyperlinks,
-        SdtBlockControls {
-          custom_xml_bindings,
-          form_widget_ids: &mut *form_widget_ids,
-          in_header_footer,
-        },
-        paragraph_base_style,
-      )),
-      _ => None,
-    })
-    .flatten()
-    .collect::<Vec<_>>();
+      ))),
+      w::SdtContentBlockChoice::SdtBlock(sdt) => {
+        blocks.extend(sdt_block_blocks_with_base(
+          sdt.as_ref(),
+          styles,
+          numbering,
+          images,
+          hyperlinks,
+          BlockContentControls {
+            custom_xml_bindings,
+            form_widget_ids: &mut *form_widget_ids,
+            in_header_footer,
+          },
+          paragraph_base,
+        ));
+      }
+      w::SdtContentBlockChoice::CustomXmlBlock(custom_xml) => {
+        blocks.extend(custom_xml_block_blocks_with_base(
+          custom_xml,
+          styles,
+          numbering,
+          images,
+          hyperlinks,
+          BlockContentControls {
+            custom_xml_bindings,
+            form_widget_ids: &mut *form_widget_ids,
+            in_header_footer,
+          },
+          paragraph_base,
+        ));
+      }
+      w::SdtContentBlockChoice::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
+      w::SdtContentBlockChoice::BookmarkEnd(bookmark) => {
+        boundary_bookmarks.end(bookmark, &mut blocks)
+      }
+      _ => {}
+    }
+    boundary_bookmarks.attach_to_new_blocks(&mut blocks[block_start..]);
+  }
+  boundary_bookmarks.finish(&mut blocks);
   if let Some(value) = bound_value {
     replace_sdt_block_text(&mut blocks, value);
   }
   blocks
+}
+
+fn custom_xml_block_blocks_with_base(
+  custom_xml: &w::CustomXmlBlock,
+  styles: &StylesCatalog,
+  numbering: &mut NumberingCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  controls: BlockContentControls<'_>,
+  paragraph_base: Option<&BlockContentParagraphBase>,
+) -> Vec<Block> {
+  let BlockContentControls {
+    custom_xml_bindings,
+    form_widget_ids,
+    in_header_footer,
+  } = controls;
+  let mut blocks = Vec::new();
+  let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
+  for choice in &custom_xml.custom_xml_block_choice {
+    let block_start = blocks.len();
+    match choice {
+      w::CustomXmlBlockChoice::Paragraph(paragraph) => {
+        let mut model = block_content_paragraph_model(
+          paragraph,
+          BlockContentParagraphEnv {
+            styles,
+            numbering,
+            images,
+            hyperlinks,
+            custom_xml_bindings,
+            form_widget_ids,
+            in_header_footer,
+            paragraph_base,
+          },
+        );
+        boundary_bookmarks.attach_to_paragraph_start(&mut model);
+        blocks.push(Block::paragraph(model));
+      }
+      w::CustomXmlBlockChoice::Table(table) => blocks.push(Block::Table(table_model(
+        table,
+        &mut TableModelEnv {
+          styles,
+          numbering,
+          images,
+          hyperlinks,
+          custom_xml_bindings,
+          form_widget_ids,
+        },
+        TableModelContext {
+          nested_table_level: 1,
+          in_header_footer,
+        },
+      ))),
+      w::CustomXmlBlockChoice::SdtBlock(sdt) => blocks.extend(sdt_block_blocks_with_base(
+        sdt,
+        styles,
+        numbering,
+        images,
+        hyperlinks,
+        BlockContentControls {
+          custom_xml_bindings,
+          form_widget_ids: &mut *form_widget_ids,
+          in_header_footer,
+        },
+        paragraph_base,
+      )),
+      w::CustomXmlBlockChoice::CustomXmlBlock(nested) => {
+        blocks.extend(custom_xml_block_blocks_with_base(
+          nested,
+          styles,
+          numbering,
+          images,
+          hyperlinks,
+          BlockContentControls {
+            custom_xml_bindings,
+            form_widget_ids: &mut *form_widget_ids,
+            in_header_footer,
+          },
+          paragraph_base,
+        ));
+      }
+      w::CustomXmlBlockChoice::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
+      w::CustomXmlBlockChoice::BookmarkEnd(bookmark) => {
+        boundary_bookmarks.end(bookmark, &mut blocks)
+      }
+      _ => {}
+    }
+    boundary_bookmarks.attach_to_new_blocks(&mut blocks[block_start..]);
+  }
+  boundary_bookmarks.finish(&mut blocks);
+  blocks
+}
+
+struct BlockContentParagraphEnv<'a> {
+  styles: &'a StylesCatalog,
+  numbering: &'a mut NumberingCatalog,
+  images: &'a ImageCatalog,
+  hyperlinks: &'a HyperlinkCatalog,
+  custom_xml_bindings: &'a CustomXmlBindings,
+  form_widget_ids: &'a mut FormWidgetIdAllocator,
+  in_header_footer: bool,
+  paragraph_base: Option<&'a BlockContentParagraphBase>,
+}
+
+fn block_content_paragraph_model(
+  paragraph: &w::Paragraph,
+  env: BlockContentParagraphEnv<'_>,
+) -> Paragraph {
+  let BlockContentParagraphEnv {
+    styles,
+    numbering,
+    images,
+    hyperlinks,
+    custom_xml_bindings,
+    form_widget_ids,
+    in_header_footer,
+    paragraph_base,
+  } = env;
+  let mut model = if let Some(base) = paragraph_base {
+    paragraph_model_with_base(
+      paragraph,
+      styles,
+      numbering,
+      images,
+      hyperlinks,
+      form_widget_ids,
+      ParagraphImportBase {
+        format: base.format.clone(),
+        run_style: base.run_style.clone(),
+        run_overrides: base.run_overrides,
+        custom_xml_bindings: Some(custom_xml_bindings),
+      },
+    )
+  } else {
+    paragraph_model(
+      paragraph,
+      styles,
+      numbering,
+      images,
+      hyperlinks,
+      custom_xml_bindings,
+      form_widget_ids,
+    )
+  };
+  if !in_header_footer {
+    apply_recovered_body_paragraph_defaults(paragraph, styles, &mut model);
+  }
+  model
 }
 
 fn replace_sdt_block_text(blocks: &mut [Block], value: String) {
@@ -1911,55 +2306,74 @@ fn header_blocks(
   let hyperlinks = HyperlinkCatalog::load(package, &header_part);
   let header = header_part.root_element(package).ok()?;
   let mut numbering = NumberingCatalog::default();
-  Some(
-    header
-      .header_choice
-      .iter()
-      .filter_map(|choice| match choice {
-        w::HeaderChoice::Paragraph(paragraph) => {
-          let model = paragraph_model(
-            paragraph,
-            styles,
-            &mut numbering,
-            &images,
-            &hyperlinks,
-            custom_xml_bindings,
-            form_widget_ids,
-          );
-          Some(vec![Block::paragraph(model)])
-        }
-        w::HeaderChoice::Table(table) => Some(vec![Block::Table(table_model(
-          table,
-          &mut TableModelEnv {
-            styles,
-            numbering: &mut numbering,
-            images: &images,
-            hyperlinks: &hyperlinks,
-            custom_xml_bindings,
-            form_widget_ids,
-          },
-          TableModelContext {
-            nested_table_level: 1,
-            in_header_footer: true,
-          },
-        ))]),
-        w::HeaderChoice::SdtBlock(sdt) => Some(sdt_block_blocks(
-          sdt,
+  let mut blocks = Vec::new();
+  let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
+  for choice in &header.header_choice {
+    let block_start = blocks.len();
+    match choice {
+      w::HeaderChoice::Paragraph(paragraph) => {
+        let mut model = paragraph_model(
+          paragraph,
           styles,
           &mut numbering,
           &images,
           &hyperlinks,
-          SdtBlockControls {
+          custom_xml_bindings,
+          form_widget_ids,
+        );
+        boundary_bookmarks.attach_to_paragraph_start(&mut model);
+        blocks.push(Block::paragraph(model));
+      }
+      w::HeaderChoice::Table(table) => blocks.push(Block::Table(table_model(
+        table,
+        &mut TableModelEnv {
+          styles,
+          numbering: &mut numbering,
+          images: &images,
+          hyperlinks: &hyperlinks,
+          custom_xml_bindings,
+          form_widget_ids,
+        },
+        TableModelContext {
+          nested_table_level: 1,
+          in_header_footer: true,
+        },
+      ))),
+      w::HeaderChoice::SdtBlock(sdt) => blocks.extend(sdt_block_blocks(
+        sdt,
+        styles,
+        &mut numbering,
+        &images,
+        &hyperlinks,
+        BlockContentControls {
+          custom_xml_bindings,
+          form_widget_ids,
+          in_header_footer: true,
+        },
+      )),
+      w::HeaderChoice::CustomXmlBlock(custom_xml) => {
+        blocks.extend(custom_xml_block_blocks_with_base(
+          custom_xml,
+          styles,
+          &mut numbering,
+          &images,
+          &hyperlinks,
+          BlockContentControls {
             custom_xml_bindings,
             form_widget_ids,
             in_header_footer: true,
           },
-        )),
-        _ => None,
-      })
-      .flatten()
-      .collect(),
-  )
+          None,
+        ));
+      }
+      w::HeaderChoice::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
+      w::HeaderChoice::BookmarkEnd(bookmark) => boundary_bookmarks.end(bookmark, &mut blocks),
+      _ => {}
+    }
+    boundary_bookmarks.attach_to_new_blocks(&mut blocks[block_start..]);
+  }
+  boundary_bookmarks.finish(&mut blocks);
+  Some(blocks)
 }
 
 fn referenced_header_blocks(
@@ -2010,55 +2424,74 @@ fn footer_blocks(
   let hyperlinks = HyperlinkCatalog::load(package, &footer_part);
   let footer = footer_part.root_element(package).ok()?;
   let mut numbering = NumberingCatalog::default();
-  Some(
-    footer
-      .footer_choice
-      .iter()
-      .filter_map(|choice| match choice {
-        w::FooterChoice::Paragraph(paragraph) => {
-          let model = paragraph_model(
-            paragraph,
-            styles,
-            &mut numbering,
-            &images,
-            &hyperlinks,
-            custom_xml_bindings,
-            form_widget_ids,
-          );
-          Some(vec![Block::paragraph(model)])
-        }
-        w::FooterChoice::Table(table) => Some(vec![Block::Table(table_model(
-          table,
-          &mut TableModelEnv {
-            styles,
-            numbering: &mut numbering,
-            images: &images,
-            hyperlinks: &hyperlinks,
-            custom_xml_bindings,
-            form_widget_ids,
-          },
-          TableModelContext {
-            nested_table_level: 1,
-            in_header_footer: true,
-          },
-        ))]),
-        w::FooterChoice::SdtBlock(sdt) => Some(sdt_block_blocks(
-          sdt,
+  let mut blocks = Vec::new();
+  let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
+  for choice in &footer.footer_choice {
+    let block_start = blocks.len();
+    match choice {
+      w::FooterChoice::Paragraph(paragraph) => {
+        let mut model = paragraph_model(
+          paragraph,
           styles,
           &mut numbering,
           &images,
           &hyperlinks,
-          SdtBlockControls {
+          custom_xml_bindings,
+          form_widget_ids,
+        );
+        boundary_bookmarks.attach_to_paragraph_start(&mut model);
+        blocks.push(Block::paragraph(model));
+      }
+      w::FooterChoice::Table(table) => blocks.push(Block::Table(table_model(
+        table,
+        &mut TableModelEnv {
+          styles,
+          numbering: &mut numbering,
+          images: &images,
+          hyperlinks: &hyperlinks,
+          custom_xml_bindings,
+          form_widget_ids,
+        },
+        TableModelContext {
+          nested_table_level: 1,
+          in_header_footer: true,
+        },
+      ))),
+      w::FooterChoice::SdtBlock(sdt) => blocks.extend(sdt_block_blocks(
+        sdt,
+        styles,
+        &mut numbering,
+        &images,
+        &hyperlinks,
+        BlockContentControls {
+          custom_xml_bindings,
+          form_widget_ids,
+          in_header_footer: true,
+        },
+      )),
+      w::FooterChoice::CustomXmlBlock(custom_xml) => {
+        blocks.extend(custom_xml_block_blocks_with_base(
+          custom_xml,
+          styles,
+          &mut numbering,
+          &images,
+          &hyperlinks,
+          BlockContentControls {
             custom_xml_bindings,
             form_widget_ids,
             in_header_footer: true,
           },
-        )),
-        _ => None,
-      })
-      .flatten()
-      .collect(),
-  )
+          None,
+        ));
+      }
+      w::FooterChoice::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
+      w::FooterChoice::BookmarkEnd(bookmark) => boundary_bookmarks.end(bookmark, &mut blocks),
+      _ => {}
+    }
+    boundary_bookmarks.attach_to_new_blocks(&mut blocks[block_start..]);
+  }
+  boundary_bookmarks.finish(&mut blocks);
+  Some(blocks)
 }
 
 fn referenced_footer_blocks(
@@ -2433,6 +2866,14 @@ fn footnotes(
             Some(NoteBlockChoice::Paragraph(paragraph.as_ref()))
           }
           w::FootnoteChoice::Table(table) => Some(NoteBlockChoice::Table(table.as_ref())),
+          w::FootnoteChoice::SdtBlock(sdt) => Some(NoteBlockChoice::SdtBlock(sdt.as_ref())),
+          w::FootnoteChoice::CustomXmlBlock(custom_xml) => {
+            Some(NoteBlockChoice::CustomXmlBlock(custom_xml.as_ref()))
+          }
+          w::FootnoteChoice::BookmarkStart(bookmark) => {
+            Some(NoteBlockChoice::BookmarkStart(bookmark))
+          }
+          w::FootnoteChoice::BookmarkEnd(bookmark) => Some(NoteBlockChoice::BookmarkEnd(bookmark)),
           _ => None,
         }),
       &mut context,
@@ -2489,6 +2930,14 @@ fn endnotes(
             Some(NoteBlockChoice::Paragraph(paragraph.as_ref()))
           }
           w::EndnoteChoice::Table(table) => Some(NoteBlockChoice::Table(table.as_ref())),
+          w::EndnoteChoice::SdtBlock(sdt) => Some(NoteBlockChoice::SdtBlock(sdt.as_ref())),
+          w::EndnoteChoice::CustomXmlBlock(custom_xml) => {
+            Some(NoteBlockChoice::CustomXmlBlock(custom_xml.as_ref()))
+          }
+          w::EndnoteChoice::BookmarkStart(bookmark) => {
+            Some(NoteBlockChoice::BookmarkStart(bookmark))
+          }
+          w::EndnoteChoice::BookmarkEnd(bookmark) => Some(NoteBlockChoice::BookmarkEnd(bookmark)),
           _ => None,
         }),
       &mut context,
@@ -2537,6 +2986,10 @@ struct NoteImportContext<'a> {
 enum NoteBlockChoice<'a> {
   Paragraph(&'a w::Paragraph),
   Table(&'a w::Table),
+  SdtBlock(&'a w::SdtBlock),
+  CustomXmlBlock(&'a w::CustomXmlBlock),
+  BookmarkStart(&'a w::BookmarkStart),
+  BookmarkEnd(&'a w::BookmarkEnd),
 }
 
 fn append_note_blocks<'a>(
@@ -2546,6 +2999,7 @@ fn append_note_blocks<'a>(
   context: &mut NoteImportContext<'_>,
 ) {
   let mut is_first_paragraph = true;
+  let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
   for choice in choices {
     match choice {
       NoteBlockChoice::Paragraph(paragraph) => {
@@ -2563,6 +3017,7 @@ fn append_note_blocks<'a>(
           prepend_note_marker(&mut model, &label, marker_style);
           is_first_paragraph = false;
         }
+        boundary_bookmarks.attach_to_paragraph_start(&mut model);
         preserve_note_text_portions(&mut model);
         blocks.push(Block::paragraph(model));
       }
@@ -2583,10 +3038,61 @@ fn append_note_blocks<'a>(
           },
         ));
         preserve_note_text_portions_in_block(&mut block);
+        boundary_bookmarks.attach_to_new_blocks(std::slice::from_mut(&mut block));
         blocks.push(block);
       }
+      NoteBlockChoice::SdtBlock(sdt) => {
+        let mut nested = sdt_block_blocks(
+          sdt,
+          context.styles,
+          context.numbering,
+          context.images,
+          context.hyperlinks,
+          BlockContentControls {
+            custom_xml_bindings: context.custom_xml_bindings,
+            form_widget_ids: context.form_widget_ids,
+            in_header_footer: false,
+          },
+        );
+        if is_first_paragraph && let Some(paragraph) = first_block_paragraph_mut(&mut nested) {
+          prepend_note_marker(paragraph, &label, None);
+          is_first_paragraph = false;
+        }
+        for block in &mut nested {
+          preserve_note_text_portions_in_block(block);
+        }
+        boundary_bookmarks.attach_to_new_blocks(&mut nested);
+        blocks.extend(nested);
+      }
+      NoteBlockChoice::CustomXmlBlock(custom_xml) => {
+        let mut nested = custom_xml_block_blocks_with_base(
+          custom_xml,
+          context.styles,
+          context.numbering,
+          context.images,
+          context.hyperlinks,
+          BlockContentControls {
+            custom_xml_bindings: context.custom_xml_bindings,
+            form_widget_ids: context.form_widget_ids,
+            in_header_footer: false,
+          },
+          None,
+        );
+        if is_first_paragraph && let Some(paragraph) = first_block_paragraph_mut(&mut nested) {
+          prepend_note_marker(paragraph, &label, None);
+          is_first_paragraph = false;
+        }
+        for block in &mut nested {
+          preserve_note_text_portions_in_block(block);
+        }
+        boundary_bookmarks.attach_to_new_blocks(&mut nested);
+        blocks.extend(nested);
+      }
+      NoteBlockChoice::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
+      NoteBlockChoice::BookmarkEnd(bookmark) => boundary_bookmarks.end(bookmark, blocks),
     }
   }
+  boundary_bookmarks.finish(blocks);
 }
 
 fn note_marker_run_style(
@@ -2669,6 +3175,104 @@ fn preserve_note_text_portions_in_block(block: &mut Block) {
   }
 }
 
+#[derive(Clone, Copy)]
+enum TableRowFlowItem<'a> {
+  Row(&'a w::TableRow),
+  BookmarkStart(&'a w::BookmarkStart),
+  BookmarkEnd(&'a w::BookmarkEnd),
+}
+
+fn table_row_flow(table: &w::Table) -> Vec<TableRowFlowItem<'_>> {
+  let mut items = Vec::new();
+  for choice in &table.table_choice1 {
+    match choice {
+      w::TableChoice::BookmarkStart(bookmark) => {
+        items.push(TableRowFlowItem::BookmarkStart(bookmark))
+      }
+      w::TableChoice::BookmarkEnd(bookmark) => items.push(TableRowFlowItem::BookmarkEnd(bookmark)),
+      _ => {}
+    }
+  }
+  for choice in &table.table_choice2 {
+    collect_table_row_choice(choice, &mut items);
+  }
+  items
+}
+
+fn collect_table_row_choice<'a>(
+  choice: &'a w::TableChoice2,
+  items: &mut Vec<TableRowFlowItem<'a>>,
+) {
+  match choice {
+    w::TableChoice2::TableRow(row) if !table_row_is_deleted(row) => {
+      items.push(TableRowFlowItem::Row(row))
+    }
+    w::TableChoice2::CustomXmlRow(custom_xml) => {
+      collect_custom_xml_rows(custom_xml, items);
+    }
+    w::TableChoice2::SdtRow(sdt) => collect_sdt_rows(sdt, items),
+    w::TableChoice2::BookmarkStart(bookmark) => {
+      items.push(TableRowFlowItem::BookmarkStart(bookmark))
+    }
+    w::TableChoice2::BookmarkEnd(bookmark) => items.push(TableRowFlowItem::BookmarkEnd(bookmark)),
+    _ => {}
+  }
+}
+
+fn collect_custom_xml_rows<'a>(
+  custom_xml: &'a w::CustomXmlRow,
+  items: &mut Vec<TableRowFlowItem<'a>>,
+) {
+  for choice in &custom_xml.custom_xml_row_choice {
+    match choice {
+      w::CustomXmlRowChoice::TableRow(row) if !table_row_is_deleted(row) => {
+        items.push(TableRowFlowItem::Row(row))
+      }
+      w::CustomXmlRowChoice::CustomXmlRow(nested) => collect_custom_xml_rows(nested, items),
+      w::CustomXmlRowChoice::SdtRow(sdt) => collect_sdt_rows(sdt, items),
+      w::CustomXmlRowChoice::BookmarkStart(bookmark) => {
+        items.push(TableRowFlowItem::BookmarkStart(bookmark))
+      }
+      w::CustomXmlRowChoice::BookmarkEnd(bookmark) => {
+        items.push(TableRowFlowItem::BookmarkEnd(bookmark))
+      }
+      _ => {}
+    }
+  }
+}
+
+fn collect_sdt_rows<'a>(sdt: &'a w::SdtRow, items: &mut Vec<TableRowFlowItem<'a>>) {
+  if let Some(content) = sdt.sdt_content_row.as_ref() {
+    for choice in &content.sdt_content_row_choice {
+      match choice {
+        w::SdtContentRowChoice::TableRow(row) if !table_row_is_deleted(row) => {
+          items.push(TableRowFlowItem::Row(row))
+        }
+        w::SdtContentRowChoice::CustomXmlRow(custom_xml) => {
+          collect_custom_xml_rows(custom_xml, items)
+        }
+        w::SdtContentRowChoice::SdtRow(nested) => collect_sdt_rows(nested, items),
+        w::SdtContentRowChoice::BookmarkStart(bookmark) => {
+          items.push(TableRowFlowItem::BookmarkStart(bookmark))
+        }
+        w::SdtContentRowChoice::BookmarkEnd(bookmark) => {
+          items.push(TableRowFlowItem::BookmarkEnd(bookmark))
+        }
+        _ => {}
+      }
+    }
+  }
+  for choice in &sdt.sdt_row_choice {
+    match choice {
+      w::SdtRowChoice::BookmarkStart(bookmark) => {
+        items.push(TableRowFlowItem::BookmarkStart(bookmark))
+      }
+      w::SdtRowChoice::BookmarkEnd(bookmark) => items.push(TableRowFlowItem::BookmarkEnd(bookmark)),
+      _ => {}
+    }
+  }
+}
+
 fn table_model(
   table: &w::Table,
   env: &mut TableModelEnv<'_>,
@@ -2702,16 +3306,16 @@ fn table_model(
     .and_then(|properties| properties.table_borders.as_deref())
     .map(|borders| direct_table_borders_model(table_style.table_borders, borders))
     .or(table_style.table_borders);
-  let rows = table
-    .table_choice2
+  let row_flow = table_row_flow(table);
+  let source_rows = row_flow
     .iter()
-    .filter_map(|choice| match choice {
-      w::TableChoice2::TableRow(row) if !table_row_is_deleted(row) => Some(row.as_ref()),
+    .filter_map(|item| match item {
+      TableRowFlowItem::Row(row) => Some(*row),
       _ => None,
     })
     .collect::<Vec<_>>();
-  let row_count = rows.len();
-  let explicit_no_repeat_header = rows.first().is_some_and(|row| {
+  let row_count = source_rows.len();
+  let explicit_no_repeat_header = source_rows.first().is_some_and(|row| {
     direct_table_row_style(row.table_row_properties.as_deref()).repeat_header == Some(false)
   });
   let rows = {
@@ -2732,11 +3336,25 @@ fn table_model(
       nested_table_level: model_context.nested_table_level,
       in_header_footer: model_context.in_header_footer,
     };
+    let mut rows = Vec::with_capacity(row_count);
+    let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
+    for item in row_flow {
+      match item {
+        TableRowFlowItem::Row(row) => {
+          let mut model = table_row_model(row, &mut context, rows.len());
+          if let Some(paragraph) = first_table_row_paragraph_mut(std::slice::from_mut(&mut model)) {
+            boundary_bookmarks.attach_to_paragraph_start(paragraph);
+          }
+          rows.push(model);
+        }
+        TableRowFlowItem::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
+        TableRowFlowItem::BookmarkEnd(bookmark) => {
+          boundary_bookmarks.end_at_paragraph(bookmark, last_table_row_paragraph_mut(&mut rows))
+        }
+      }
+    }
+    boundary_bookmarks.finish_at_paragraph(last_table_row_paragraph_mut(&mut rows));
     rows
-      .iter()
-      .enumerate()
-      .map(|(row_index, row)| table_row_model(row, &mut context, row_index))
-      .collect::<Vec<_>>()
   };
   let starts_after_last_rendered_page_break = table_starts_after_last_rendered_page_break(&rows);
   let placement = properties
@@ -2789,6 +3407,7 @@ fn table_model(
       env.styles.import_settings.compatibility_mode,
       env.styles.has_styles_part,
     ),
+    in_header_footer: model_context.in_header_footer,
     placement,
     allow_overlap: table_allows_overlap(properties),
     split_allowed,
@@ -2881,7 +3500,10 @@ pub(super) fn paragraph_starts_after_last_rendered_page_break(inlines: &[InlineI
         return saw_last_rendered_page_break;
       }
       InlineItem::PositionalTab(_) => {}
-      InlineItem::Ruby(_) | InlineItem::Image(_) | InlineItem::Shape(_) => {
+      InlineItem::Ruby(_)
+      | InlineItem::Image(_)
+      | InlineItem::Shape(_)
+      | InlineItem::LegacyFormCheckBox(_) => {
         return saw_last_rendered_page_break;
       }
       InlineItem::PageBreak | InlineItem::ColumnBreak => return false,
@@ -2995,7 +3617,7 @@ fn frame_vertical_alignment(value: w::VerticalAlignmentValues) -> FrameVerticalA
 }
 
 fn frame_wrap_mode(value: Option<w::TextWrappingValues>) -> FrameWrapMode {
-  match value.unwrap_or_default() {
+  match value.unwrap_or(w::TextWrappingValues::Around) {
     w::TextWrappingValues::Auto => FrameWrapMode::Auto,
     w::TextWrappingValues::Around => FrameWrapMode::Around,
     w::TextWrappingValues::Tight => FrameWrapMode::Tight,
@@ -3052,37 +3674,51 @@ fn table_row_model(
     .and_then(|properties| properties.shading.as_ref())
     .map(shading_fill)
     .unwrap_or(context.table_shading);
-  let cells = table_row_cells(row);
-  let cell_count = cells.len();
-  let cells = cells
+  let cell_flow = table_cell_flow(row);
+  let cell_count = cell_flow
     .iter()
-    .enumerate()
-    .map(|(cell_index, source)| {
-      table_cell_model(
-        source.cell,
-        source.sdt_properties,
-        context,
-        row.table_property_exceptions.as_deref(),
-        row_table_shading,
-        table_cell_style_for(
-          context.table_style,
-          TableCellStyleContext {
-            look: row_table_look,
-            row_index,
-            row_count: context.row_count,
-            cell_index,
-            cell_count,
-            row_condition,
-            cell_condition: source
-              .cell
-              .table_cell_properties
-              .as_deref()
-              .and_then(table_cell_conditional_style),
-          },
-        ),
-      )
-    })
-    .collect::<Vec<_>>();
+    .filter(|item| matches!(item, TableCellFlowItem::Cell(_)))
+    .count();
+  let mut cells = Vec::with_capacity(cell_count);
+  let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
+  for item in cell_flow {
+    match item {
+      TableCellFlowItem::Cell(source) => {
+        let mut model = table_cell_model(
+          source.cell,
+          source.sdt_properties,
+          context,
+          row.table_property_exceptions.as_deref(),
+          row_table_shading,
+          table_cell_style_for(
+            context.table_style,
+            TableCellStyleContext {
+              look: row_table_look,
+              row_index,
+              row_count: context.row_count,
+              cell_index: cells.len(),
+              cell_count,
+              row_condition,
+              cell_condition: source
+                .cell
+                .table_cell_properties
+                .as_deref()
+                .and_then(table_cell_conditional_style),
+            },
+          ),
+        );
+        if let Some(paragraph) = first_block_paragraph_mut(&mut model.blocks) {
+          boundary_bookmarks.attach_to_paragraph_start(paragraph);
+        }
+        cells.push(model);
+      }
+      TableCellFlowItem::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
+      TableCellFlowItem::BookmarkEnd(bookmark) => {
+        boundary_bookmarks.end_at_paragraph(bookmark, last_table_cell_paragraph_mut(&mut cells))
+      }
+    }
+  }
+  boundary_bookmarks.finish_at_paragraph(last_table_cell_paragraph_mut(&mut cells));
   TableRow {
     height_pt: row_style.height_pt,
     exact_height: row_style.exact_height.unwrap_or(false),
@@ -3124,29 +3760,55 @@ struct TableRowCellSource<'a> {
   sdt_properties: Option<&'a w::SdtProperties>,
 }
 
-fn table_row_cells(row: &w::TableRow) -> Vec<TableRowCellSource<'_>> {
-  let mut cells = Vec::new();
+#[derive(Clone, Copy)]
+enum TableCellFlowItem<'a> {
+  Cell(TableRowCellSource<'a>),
+  BookmarkStart(&'a w::BookmarkStart),
+  BookmarkEnd(&'a w::BookmarkEnd),
+}
+
+fn table_cell_flow(row: &w::TableRow) -> Vec<TableCellFlowItem<'_>> {
+  let mut items = Vec::new();
   for choice in &row.table_row_choice {
     match choice {
-      w::TableRowChoice::TableCell(cell) => cells.push(TableRowCellSource {
-        cell: cell.as_ref(),
-        sdt_properties: None,
-      }),
-      w::TableRowChoice::SdtCell(sdt) => collect_sdt_cells(sdt, None, &mut cells),
+      w::TableRowChoice::TableCell(cell) => {
+        items.push(TableCellFlowItem::Cell(TableRowCellSource {
+          cell,
+          sdt_properties: None,
+        }))
+      }
+      w::TableRowChoice::CustomXmlCell(custom_xml) => {
+        collect_custom_xml_cells(custom_xml, None, &mut items)
+      }
+      w::TableRowChoice::SdtCell(sdt) => collect_sdt_cells(sdt, None, &mut items),
+      w::TableRowChoice::BookmarkStart(bookmark) => {
+        items.push(TableCellFlowItem::BookmarkStart(bookmark))
+      }
+      w::TableRowChoice::BookmarkEnd(bookmark) => {
+        items.push(TableCellFlowItem::BookmarkEnd(bookmark))
+      }
       _ => {}
     }
   }
-  cells
+  items
+}
+
+#[cfg(test)]
+fn table_row_cells(row: &w::TableRow) -> Vec<TableRowCellSource<'_>> {
+  table_cell_flow(row)
+    .into_iter()
+    .filter_map(|item| match item {
+      TableCellFlowItem::Cell(source) => Some(source),
+      TableCellFlowItem::BookmarkStart(_) | TableCellFlowItem::BookmarkEnd(_) => None,
+    })
+    .collect()
 }
 
 fn collect_sdt_cells<'a>(
   sdt: &'a w::SdtCell,
   inherited_properties: Option<&'a w::SdtProperties>,
-  cells: &mut Vec<TableRowCellSource<'a>>,
+  items: &mut Vec<TableCellFlowItem<'a>>,
 ) {
-  let Some(content) = sdt.sdt_content_cell.as_ref() else {
-    return;
-  };
   // ECMA-376 Part 1 §17.5.2.33 defines cell-level `sdtContent` as a cache
   // updated from its data binding. Preserve the nearest text/date SDT
   // properties while exposing the contained physical table cell.
@@ -3155,13 +3817,65 @@ fn collect_sdt_cells<'a>(
     .as_ref()
     .filter(|properties| sdt_supports_bound_text(properties))
     .or(inherited_properties);
-  for choice in &content.sdt_content_cell_choice {
+  if let Some(content) = sdt.sdt_content_cell.as_ref() {
+    for choice in &content.sdt_content_cell_choice {
+      match choice {
+        w::SdtContentCellChoice::TableCell(cell) => {
+          items.push(TableCellFlowItem::Cell(TableRowCellSource {
+            cell,
+            sdt_properties: properties,
+          }))
+        }
+        w::SdtContentCellChoice::CustomXmlCell(custom_xml) => {
+          collect_custom_xml_cells(custom_xml, properties, items)
+        }
+        w::SdtContentCellChoice::SdtCell(nested) => collect_sdt_cells(nested, properties, items),
+        w::SdtContentCellChoice::BookmarkStart(bookmark) => {
+          items.push(TableCellFlowItem::BookmarkStart(bookmark))
+        }
+        w::SdtContentCellChoice::BookmarkEnd(bookmark) => {
+          items.push(TableCellFlowItem::BookmarkEnd(bookmark))
+        }
+        _ => {}
+      }
+    }
+  }
+  for choice in &sdt.sdt_cell_choice {
     match choice {
-      w::SdtContentCellChoice::TableCell(cell) => cells.push(TableRowCellSource {
-        cell: cell.as_ref(),
-        sdt_properties: properties,
-      }),
-      w::SdtContentCellChoice::SdtCell(nested) => collect_sdt_cells(nested, properties, cells),
+      w::SdtCellChoice::BookmarkStart(bookmark) => {
+        items.push(TableCellFlowItem::BookmarkStart(bookmark))
+      }
+      w::SdtCellChoice::BookmarkEnd(bookmark) => {
+        items.push(TableCellFlowItem::BookmarkEnd(bookmark))
+      }
+      _ => {}
+    }
+  }
+}
+
+fn collect_custom_xml_cells<'a>(
+  custom_xml: &'a w::CustomXmlCell,
+  inherited_properties: Option<&'a w::SdtProperties>,
+  items: &mut Vec<TableCellFlowItem<'a>>,
+) {
+  for choice in &custom_xml.custom_xml_cell_choice {
+    match choice {
+      w::CustomXmlCellChoice::TableCell(cell) => {
+        items.push(TableCellFlowItem::Cell(TableRowCellSource {
+          cell,
+          sdt_properties: inherited_properties,
+        }))
+      }
+      w::CustomXmlCellChoice::CustomXmlCell(nested) => {
+        collect_custom_xml_cells(nested, inherited_properties, items)
+      }
+      w::CustomXmlCellChoice::SdtCell(sdt) => collect_sdt_cells(sdt, inherited_properties, items),
+      w::CustomXmlCellChoice::BookmarkStart(bookmark) => {
+        items.push(TableCellFlowItem::BookmarkStart(bookmark))
+      }
+      w::CustomXmlCellChoice::BookmarkEnd(bookmark) => {
+        items.push(TableCellFlowItem::BookmarkEnd(bookmark))
+      }
       _ => {}
     }
   }
@@ -3280,7 +3994,13 @@ fn table_cell_model(
     .and_then(|exceptions| exceptions.table_cell_margin_default.as_deref())
     .map(|margins| table_cell_margin_default_with_base(margins, base_margins))
     .unwrap_or(base_margins);
+  let block_paragraph_base = BlockContentParagraphBase {
+    format: style.paragraph_format.clone(),
+    run_style: style.run_style.clone(),
+    run_overrides: style.run_overrides,
+  };
   let mut blocks = Vec::new();
+  let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
   let mut pending_out_of_place_breaks = Vec::new();
   for choice in &cell.table_cell_choice {
     let block_start = blocks.len();
@@ -3303,6 +4023,7 @@ fn table_cell_model(
         if !context.in_header_footer {
           apply_recovered_table_cell_paragraph_defaults(paragraph, context.styles, &mut model);
         }
+        boundary_bookmarks.attach_to_paragraph_start(&mut model);
         let out_of_place_table = paragraph.paragraph_choice.iter().find_map(|choice| {
           let w::ParagraphChoice::Table(table) = choice else {
             return None;
@@ -3350,21 +4071,40 @@ fn table_cell_model(
           in_header_footer: context.in_header_footer,
         },
       ))),
-      w::TableCellChoice::SdtBlock(sdt) => blocks.extend(sdt_block_blocks(
+      w::TableCellChoice::SdtBlock(sdt) => blocks.extend(sdt_block_blocks_with_base(
         sdt,
         context.styles,
         context.numbering,
         context.images,
         context.hyperlinks,
-        SdtBlockControls {
+        BlockContentControls {
           custom_xml_bindings: context.custom_xml_bindings,
           form_widget_ids: context.form_widget_ids,
           in_header_footer: context.in_header_footer,
         },
+        Some(&block_paragraph_base),
       )),
+      w::TableCellChoice::CustomXmlBlock(custom_xml) => {
+        blocks.extend(custom_xml_block_blocks_with_base(
+          custom_xml,
+          context.styles,
+          context.numbering,
+          context.images,
+          context.hyperlinks,
+          BlockContentControls {
+            custom_xml_bindings: context.custom_xml_bindings,
+            form_widget_ids: context.form_widget_ids,
+            in_header_footer: context.in_header_footer,
+          },
+          Some(&block_paragraph_base),
+        ));
+      }
+      w::TableCellChoice::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
+      w::TableCellChoice::BookmarkEnd(bookmark) => boundary_bookmarks.end(bookmark, &mut blocks),
       w::TableCellChoice::Break(br) => pending_out_of_place_breaks.push(br.clone()),
       _ => {}
     }
+    boundary_bookmarks.attach_to_new_blocks(&mut blocks[block_start..]);
     if prepend_out_of_place_breaks_to_first_character_group(
       &mut blocks[block_start..],
       &pending_out_of_place_breaks,
@@ -3372,6 +4112,7 @@ fn table_cell_model(
       pending_out_of_place_breaks.clear();
     }
   }
+  boundary_bookmarks.finish(&mut blocks);
   if let Some(value) = sdt_properties
     .and_then(|properties| sdt_bound_replacement(context.custom_xml_bindings, properties))
   {
@@ -3495,21 +4236,19 @@ fn push_cell_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
   };
   paragraph.format.frame = None;
   if let Some(Block::Frame(previous)) = blocks.last_mut()
-    && paragraph_belongs_to_frame(previous, frame, &paragraph)
+    && paragraph_belongs_to_frame(previous, frame)
   {
     previous.blocks.push(Block::paragraph(paragraph));
     return;
   }
-  let fill_color = paragraph.format.shading;
-  let borders = paragraph.format.borders;
   blocks.push(Block::Frame(FloatingFrame {
     blocks: vec![Block::paragraph(paragraph)],
     width_pt: frame.width_pt,
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
     placement: frame.placement,
-    fill_color,
-    borders,
+    outer_fill_color: None,
+    outer_borders: ParagraphBordersModel::default(),
   }));
 }
 
@@ -3915,12 +4654,17 @@ fn direct_cell_borders_model(
   base
 }
 
-fn paragraph_borders_model(borders: &w::ParagraphBorders) -> CellBordersModel {
-  CellBordersModel {
+fn paragraph_borders_model(borders: &w::ParagraphBorders) -> ParagraphBordersModel {
+  ParagraphBordersModel {
     top: borders.top_border.as_ref().and_then(top_border_style),
     right: borders.right_border.as_ref().and_then(right_border_style),
     bottom: borders.bottom_border.as_ref().and_then(bottom_border_style),
     left: borders.left_border.as_ref().and_then(left_border_style),
+    between: borders
+      .between_border
+      .as_ref()
+      .and_then(between_border_style),
+    bar: borders.bar_border.as_ref().and_then(bar_border_style),
   }
 }
 
@@ -3969,6 +4713,8 @@ border_style_fn!(start_border_style, w::StartBorder);
 border_style_fn!(end_border_style, w::EndBorder);
 border_style_fn!(inside_horizontal_border_style, w::InsideHorizontalBorder);
 border_style_fn!(inside_vertical_border_style, w::InsideVerticalBorder);
+border_style_fn!(between_border_style, w::BetweenBorder);
+border_style_fn!(bar_border_style, w::BarBorder);
 border_override_fn!(top_border_override, w::TopBorder);
 border_override_fn!(right_border_override, w::RightBorder);
 border_override_fn!(bottom_border_override, w::BottomBorder);
@@ -4897,6 +5643,7 @@ fn math_justification_alignment(
 struct ComplexFieldState {
   instr: String,
   result: Vec<InlineItem>,
+  form_check_box: Option<LegacyFormCheckBox>,
   form_drop_down_value: Option<String>,
   form_date_time_tokens: Option<Vec<String>>,
   field_locked: bool,
@@ -4967,6 +5714,11 @@ fn push_run_or_complex_field(
         fields.push(ComplexFieldState {
           instr: String::new(),
           result: Vec::new(),
+          form_check_box: legacy_form_check_box(
+            field_char,
+            style.clone(),
+            hyperlink_url.map(ToString::to_string),
+          ),
           form_drop_down_value: form_drop_down_value(field_char),
           form_date_time_tokens: form_date_time_tokens(field_char),
           field_locked: field_char
@@ -5038,20 +5790,39 @@ fn flush_complex_field(
   let field_hyperlink_url = closed
     .then(|| complex_field_hyperlink_url(&state.instr))
     .flatten();
+  let instruction_name = field_instruction_name(&state.instr);
   let mut resolved = Vec::new();
   if closed && state.instr.trim().is_empty() {
     // A separator does not make a useful field without field-code content.
     // Word drops the cached result of that closed malformed field. Keep the
     // ECMA-376 §17.16.18 recovery below for an unclosed field, whose result
     // must instead be interpreted as literal text.
+  } else if closed && !field_result_is_visible(&state.instr) {
+    // ASK and SET assign a value to a bookmark rather than displaying one.
+    // This remains true for locked fields: fldLock controls recalculation,
+    // not whether the field type contributes visible document content.
+  } else if closed
+    && !fields.is_empty()
+    && instruction_name
+      .as_deref()
+      .is_some_and(|name| matches!(name, "FORMCHECKBOX" | "FORMDROPDOWN"))
+  {
+    // [MS-OI29500] §2.1.473 and §2.1.474: Word displays no result when
+    // either legacy form field is nested inside another field. This applies
+    // even when the nested field carries a persisted result.
+  } else if closed
+    && instruction_name.as_deref() == Some("FORMCHECKBOX")
+    && let Some(check_box) = state.form_check_box
+  {
+    // ECMA-376 Part 1 §17.16.5.20: the visible value is the checkbox
+    // described by ffData, not a cached text result. fldLock controls field
+    // recalculation and does not replace that form control with stale text.
+    resolved.push(InlineItem::LegacyFormCheckBox(check_box));
   } else if closed && state.field_locked {
     // ECMA-376 Part 1 §17.16.18: fldLock on the begin character prevents
     // recalculation even when an application explicitly requests an update.
     // The persisted result is therefore authoritative.
     resolved = state.result;
-  } else if closed && field_instruction_name(&state.instr).is_some_and(|name| name == "SET") {
-    // ECMA-376 §17.16.5.57 defines SET as assigning a bookmark and gives it
-    // no field value. Its cached result is metadata, not visible document text.
   } else if closed
     && let Some(text) =
       refreshed_form_date_time_field(state.form_date_time_tokens.as_deref(), &state.style, styles)
@@ -5101,7 +5872,7 @@ fn flush_complex_field(
   {
     resolved.push(InlineItem::Text(run));
   } else if state.result.is_empty()
-    && field_instruction_name(&state.instr).is_some_and(|name| name == "FORMDROPDOWN")
+    && instruction_name.as_deref() == Some("FORMDROPDOWN")
     && let Some(value) = state.form_drop_down_value
   {
     resolved.push(InlineItem::Text(TextRun {
@@ -5135,6 +5906,10 @@ fn field_instruction_name(instr: &str) -> Option<String> {
   field_instruction_tokens(instr)
     .first()
     .map(|name| name.to_ascii_uppercase())
+}
+
+fn field_result_is_visible(instr: &str) -> bool {
+  !field_instruction_name(instr).is_some_and(|name| matches!(name.as_str(), "ASK" | "SET"))
 }
 
 fn complex_field_hyperlink_url(instr: &str) -> Option<String> {
@@ -5190,6 +5965,11 @@ fn apply_field_hyperlink_url(result: &mut [InlineItem], url: &str) {
         for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
           run.hyperlink_url.get_or_insert_with(|| url.to_string());
         }
+      }
+      InlineItem::LegacyFormCheckBox(check_box) => {
+        check_box
+          .hyperlink_url
+          .get_or_insert_with(|| url.to_string());
       }
       InlineItem::Image(_)
       | InlineItem::Shape(_)
@@ -5351,6 +6131,66 @@ fn form_drop_down_value(field_char: &w::FieldChar) -> Option<String> {
   entries
     .get(usize::try_from(selected_index).ok()?)
     .map(|entry| entry.val.to_string())
+}
+
+fn legacy_form_check_box(
+  field_char: &w::FieldChar,
+  mut style: TextStyle,
+  hyperlink_url: Option<String>,
+) -> Option<LegacyFormCheckBox> {
+  let w::FieldCharChoice::FormFieldData(form_field) = field_char.field_char_choice.as_ref()? else {
+    return None;
+  };
+  let check_box = form_field
+    .form_field_data_choice
+    .iter()
+    .find_map(|choice| match choice {
+      w::FormFieldDataChoice::CheckBox(check_box) => Some(check_box.as_ref()),
+      _ => None,
+    })?;
+
+  match check_box.check_box_choice.as_ref()? {
+    w::CheckBoxChoice::FormFieldSize(size) => {
+      let size_pt = size.val.to_points() as f32;
+      if !size_pt.is_finite() || size_pt <= 0.0 {
+        return None;
+      }
+      // ECMA-376 Part 1 §17.16.29: an exact checkbox size overrides the
+      // point size supplied by the run's style hierarchy.
+      style.font_size_pt = size_pt;
+      style.complex_font_size_pt = Some(size_pt);
+    }
+    w::CheckBoxChoice::AutomaticallySizeFormField(_) => {
+      // ECMA-376 Part 1 §17.16.30: sizeAuto uses the point size applied to
+      // the field character through the normal style hierarchy.
+    }
+  }
+
+  let checked = check_box
+    .checked
+    .as_ref()
+    .map(|checked| {
+      checked
+        .val
+        .map_or(true, ooxmlsdk::simple_type::OnOffValue::as_bool)
+    })
+    .or_else(|| {
+      check_box
+        .default_check_box_form_field_state
+        .as_ref()
+        .map(|default| {
+          default
+            .val
+            .map_or(true, ooxmlsdk::simple_type::OnOffValue::as_bool)
+        })
+    })
+    .unwrap_or(false);
+
+  Some(LegacyFormCheckBox {
+    checked,
+    style,
+    hyperlink_url,
+  })
 }
 
 fn form_date_time_tokens(field_char: &w::FieldChar) -> Option<Vec<String>> {
@@ -5609,17 +6449,10 @@ fn push_localized_missing_style_ref(
   mut style: TextStyle,
   hyperlink_url: Option<&str>,
 ) {
-  // Microsoft Word's Simplified Chinese STYLEREF diagnostic is a bold UI
-  // resource. It uses DengXian for Chinese while preserving the field's Latin
-  // face for the embedded style name and punctuation.
-  style.east_asia_font_family = Some(office_default_font_family(Some("zh-CN")));
-  style.east_asia_language = Some(Arc::<str>::from("zh-CN"));
-  style.bold = true;
-  style.complex_bold = Some(true);
-  style.line_height_override_pt =
-    Some(style.font_size_pt * WORD_ZH_STYLE_REF_ERROR_LINE_HEIGHT_PER_FONT_SIZE);
+  let message = FieldMessage::MissingStyle(style_name);
+  apply_generated_field_message_style(&mut style, message, Some("zh-CN"));
   inlines.push(InlineItem::Text(TextRun {
-    text: format!("错误!使用“开始”选项卡将 {style_name} 应用于要在此处显示的文字。"),
+    text: localized_field_message(message, Some("zh-CN")),
     style,
     hyperlink_url: hyperlink_url.map(ToString::to_string),
     dynamic_field: None,
@@ -5628,34 +6461,6 @@ fn push_localized_missing_style_ref(
     style_ref_numbering_text: None,
     preserve_text_portion: false,
   }));
-}
-
-fn apply_generated_field_error_font(style: &mut TextStyle, ui_language: Option<&str>) {
-  let language = ui_language
-    .unwrap_or("en-US")
-    .replace('_', "-")
-    .to_ascii_lowercase();
-  if language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans") {
-    // Word's localized field-error resource is emitted through the Simplified
-    // Chinese East Asian slot. Keep the field's Latin face for punctuation,
-    // but use the legacy Office SimSun resource face for Chinese glyphs.
-    style.east_asia_font_family = Some(Arc::<str>::from("SimSun"));
-    style.east_asia_language = Some(Arc::<str>::from("zh-CN"));
-    // Direct outline effects and bold from the stale cached result do not
-    // carry across Word's generated replacement. Its fill color and Latin
-    // punctuation face do.
-    style.outline_color = None;
-    style.outline_opacity = 1.0;
-    style.outline_width_pt = 0.0;
-    style.bold = false;
-    style.complex_bold = Some(false);
-    if let Some(options) = style.pdf_glyph_outline_options.as_deref() {
-      let mut options = options.clone();
-      options.outline_fill = None;
-      options.outline_stroke = None;
-      style.pdf_glyph_outline_options = Some(Arc::new(options));
-    }
-  }
 }
 
 fn field_result_text(result: &[InlineItem]) -> Option<String> {
@@ -5673,6 +6478,7 @@ fn field_result_text(result: &[InlineItem]) -> Option<String> {
       InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => {}
       InlineItem::Image(_)
       | InlineItem::Shape(_)
+      | InlineItem::LegacyFormCheckBox(_)
       | InlineItem::BookmarkStart(_)
       | InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_) => {}
@@ -6089,6 +6895,10 @@ fn push_simple_field(
   base_style: TextStyle,
   context: &mut InlineImportContext<'_>,
 ) {
+  if !field_result_is_visible(&field.instruction) {
+    return;
+  }
+
   let field_locked = field
     .field_lock
     .is_some_and(ooxmlsdk::simple_type::OnOffValue::as_bool);
@@ -6263,6 +7073,7 @@ fn push_run_with_character_style_policy(
       hyperlink_url,
       &style_ref_keys,
       styles.preserve_word_text_whitespace,
+      styles.literal_text_tabs_use_default_stops,
     );
     return;
   }
@@ -6271,10 +7082,20 @@ fn push_run_with_character_style_policy(
   for choice in &run.run_choice {
     match choice {
       w::RunChoice::Text(text_node) => {
-        append_word_text(&mut text, text_node, styles.preserve_word_text_whitespace);
+        append_word_text(
+          &mut text,
+          text_node,
+          styles.preserve_word_text_whitespace,
+          styles.literal_text_tabs_use_default_stops,
+        );
       }
       w::RunChoice::DeletedText(text_node) => {
-        append_word_text(&mut text, text_node, styles.preserve_word_text_whitespace);
+        append_word_text(
+          &mut text,
+          text_node,
+          styles.preserve_word_text_whitespace,
+          styles.literal_text_tabs_use_default_stops,
+        );
       }
       w::RunChoice::TabChar => text.push('\t'),
       w::RunChoice::CarriageReturn => text.push('\n'),
@@ -6519,11 +7340,16 @@ fn push_hidden_style_ref_run(
   hyperlink_url: Option<&str>,
   style_ref_keys: &[Arc<str>],
   inherited_space_preserve: bool,
+  literal_text_tabs_use_default_stops: bool,
 ) {
   if style_ref_keys.is_empty() {
     return;
   }
-  let text = hidden_run_text(run, inherited_space_preserve);
+  let text = hidden_run_text(
+    run,
+    inherited_space_preserve,
+    literal_text_tabs_use_default_stops,
+  );
   let text = text.trim();
   if text.is_empty() {
     return;
@@ -6540,15 +7366,29 @@ fn push_hidden_style_ref_run(
   }));
 }
 
-fn hidden_run_text(run: &w::Run, inherited_space_preserve: bool) -> String {
+fn hidden_run_text(
+  run: &w::Run,
+  inherited_space_preserve: bool,
+  literal_text_tabs_use_default_stops: bool,
+) -> String {
   let mut text = String::new();
   for choice in &run.run_choice {
     match choice {
       w::RunChoice::Text(text_node) => {
-        append_word_text(&mut text, text_node, inherited_space_preserve);
+        append_word_text(
+          &mut text,
+          text_node,
+          inherited_space_preserve,
+          literal_text_tabs_use_default_stops,
+        );
       }
       w::RunChoice::DeletedText(text_node) => {
-        append_word_text(&mut text, text_node, inherited_space_preserve);
+        append_word_text(
+          &mut text,
+          text_node,
+          inherited_space_preserve,
+          literal_text_tabs_use_default_stops,
+        );
       }
       w::RunChoice::TabChar | w::RunChoice::PositionalTab(_) => text.push('\t'),
       w::RunChoice::CarriageReturn => text.push('\n'),
@@ -6584,7 +7424,12 @@ fn word_text_value(text: &w::TextType, inherited_space_preserve: bool) -> Option
   })
 }
 
-fn append_word_text(output: &mut String, text: &w::TextType, inherited_space_preserve: bool) {
+fn append_word_text(
+  output: &mut String,
+  text: &w::TextType,
+  inherited_space_preserve: bool,
+  literal_text_tabs_use_default_stops: bool,
+) {
   let Some(content) = word_text_value(text, inherited_space_preserve) else {
     return;
   };
@@ -6594,12 +7439,17 @@ fn append_word_text(output: &mut String, text: &w::TextType, inherited_space_pre
   while let Some(ch) = chars.next() {
     if ch == '\t' {
       // A U+0009 inside w:t is text, not the semantic tab represented by
-      // w:tab (§17.3.3.32). Word places a preserved literal tab on its own
-      // 420-twip text grid; without xml:space="preserve", it is one ordinary
-      // internal whitespace character. Keep w:tab as '\t' so the paragraph
-      // tab-stop machinery remains separate.
+      // w:tab (§17.3.3.32). Without xml:space="preserve", it is one ordinary
+      // internal whitespace character. For preserved text Word uses an
+      // explicit w:defaultTabStop when the Settings part supplies one; a
+      // package without that setting recovers the application's separate
+      // 420-twip text grid.
       output.push(if preserve {
-        PRESERVED_WORD_TEXT_TAB
+        if literal_text_tabs_use_default_stops {
+          EXPLICIT_DEFAULT_WORD_TEXT_TAB
+        } else {
+          PRESERVED_WORD_TEXT_TAB
+        }
       } else {
         ' '
       });
@@ -6807,6 +7657,7 @@ fn ruby_text_runs(items: &[InlineItem]) -> Option<Vec<TextRun>> {
       InlineItem::Ruby(_)
       | InlineItem::Image(_)
       | InlineItem::Shape(_)
+      | InlineItem::LegacyFormCheckBox(_)
       | InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
       | InlineItem::LastRenderedPageBreak
@@ -7080,7 +7931,7 @@ fn simple_glossary_placeholder_text(body: &w::DocPartBody) -> Option<String> {
     let w::ParagraphChoice::WRun(run) = choice else {
       return None;
     };
-    text.push_str(&hidden_run_text(run, false));
+    text.push_str(&hidden_run_text(run, false, false));
   }
   (!text.is_empty()).then_some(text)
 }
@@ -8164,6 +9015,21 @@ fn drawingml_w14_gradient_fill_colors(
     .collect()
 }
 
+fn word_fixed_gradient_interpolation(
+  stops: &[common::GradientStop<'_>],
+) -> common::GradientInterpolation {
+  if stops.len() == 2 && stops.iter().all(|stop| stop.color.a == u8::MAX) {
+    // LibreOffice records Office's opaque two-stop non-linear rendering in
+    // `oox/source/drawingml/fontworkhelpers.cxx` (tdf#128795). The Office
+    // golden `testColorGradientWithTransparency.docx` is the complementary
+    // counterexample: once stop alpha is authored, Word linearly interpolates
+    // both RGB and opacity.
+    common::GradientInterpolation::PowerPointGammaSigma
+  } else {
+    common::GradientInterpolation::LinearSrgb
+  }
+}
+
 fn drawingml_w14_gradient_fill(
   fill: &w14::GradientFillProperties,
   theme_colors: &ThemeColors,
@@ -8198,6 +9064,7 @@ fn drawingml_w14_gradient_fill(
   if stops.is_empty() {
     return None;
   }
+  let interpolation = word_fixed_gradient_interpolation(&stops);
   let (angle_degrees, scaled, path) = match fill.gradient_fill_properties_choice.as_ref()? {
     w14::GradientFillPropertiesChoice::LinearShadeProperties(linear) => (
       Some(linear.angle.unwrap_or_default() as f32 / 60_000.0),
@@ -8211,10 +9078,10 @@ fn drawingml_w14_gradient_fill(
         .fill_to_rectangle
         .as_ref()
         .map(|rect| common::RelativeRect {
-          left: rect.left.unwrap_or(50_000) as f32 / 100_000.0,
-          top: rect.top.unwrap_or(50_000) as f32 / 100_000.0,
-          right: rect.right.unwrap_or(50_000) as f32 / 100_000.0,
-          bottom: rect.bottom.unwrap_or(50_000) as f32 / 100_000.0,
+          left: rect.left.unwrap_or_default() as f32 / 100_000.0,
+          top: rect.top.unwrap_or_default() as f32 / 100_000.0,
+          right: rect.right.unwrap_or_default() as f32 / 100_000.0,
+          bottom: rect.bottom.unwrap_or_default() as f32 / 100_000.0,
         })
         .unwrap_or(common::RelativeRect {
           left: 0.5,
@@ -8244,7 +9111,7 @@ fn drawingml_w14_gradient_fill(
     angle_degrees,
     definition_bounds: None,
     line: None,
-    interpolation: common::GradientInterpolation::LinearSrgb,
+    interpolation,
     scaled,
     rotate_with_shape: Some(true),
     path,
@@ -10646,7 +11513,8 @@ fn drawing_chart_shapes(
     chart_space,
     styles.simplified_chinese_ui.then_some("zh-CN"),
   );
-  let series_count = shared_chart::series(chart_space).len();
+  let series = shared_chart::series(chart_space);
+  let series_count = series.len();
   let series_colors = (0..series_count)
     .map(|index| {
       cartesian
@@ -10659,47 +11527,45 @@ fn drawing_chart_shapes(
         .unwrap_or(fallback_series_colors[index % fallback_series_colors.len()])
     })
     .collect();
-  let series_gradient_fills = shared_chart::series(chart_space)
-    .into_iter()
+  let series_styles = series
+    .iter()
     .map(|series| {
-      let fill = series
-        .chart_shape_properties?
-        .chart_shape_properties_choice2
-        .as_ref()?;
-      let c::ChartShapePropertiesChoice2::GradientFill(fill) = fill else {
-        return None;
-      };
-      match drawingml_gradient_fill(fill, &styles.theme_colors)? {
-        common::Fill::Gradient(gradient) => Some(gradient),
-        common::Fill::None
-        | common::Fill::Solid(_)
-        | common::Fill::Theme(_)
-        | common::Fill::Image { .. }
-        | common::Fill::Pattern(_) => None,
+      drawingml_chart_shape_common_style(series.chart_shape_properties, &styles.theme_colors)
+    })
+    .collect::<Vec<_>>();
+  let series_point_styles = series
+    .iter()
+    .enumerate()
+    .map(|(series_index, series)| {
+      let point_count = cartesian
+        .as_ref()
+        .and_then(|chart| chart.series.get(series_index))
+        .map_or_else(
+          || {
+            series
+              .data_points
+              .iter()
+              .filter_map(|point| usize::try_from(point.index.val).ok())
+              .max()
+              .map_or(0, |index| index + 1)
+          },
+          |series| series.values.len(),
+        );
+      let mut point_styles = vec![None; point_count];
+      for point in series.data_points {
+        let Ok(index) = usize::try_from(point.index.val) else {
+          continue;
+        };
+        if index < point_styles.len() {
+          point_styles[index] = Some(drawingml_chart_shape_common_style(
+            point.chart_shape_properties.as_deref(),
+            &styles.theme_colors,
+          ));
+        }
       }
+      point_styles
     })
-    .collect();
-  let series_point_colors = cartesian
-    .as_ref()
-    .map(|chart| {
-      chart
-        .series
-        .iter()
-        .map(|series| {
-          (0..series.values.len())
-            .map(|point_index| {
-              series
-                .data_point_fills
-                .iter()
-                .find(|fill| fill.index as usize == point_index)
-                .and_then(|fill| resolve_drawingml_solid_fill(fill.fill, &styles.theme_colors))
-                .map(|fill| fill.color)
-            })
-            .collect()
-        })
-        .collect()
-    })
-    .unwrap_or_default();
+    .collect::<Vec<_>>();
   let surface_band_colors = cartesian
     .as_ref()
     .map(|chart| {
@@ -10746,34 +11612,39 @@ fn drawing_chart_shapes(
         .collect()
     })
     .unwrap_or_default();
-  let chart_area_fill_color = chart_space
-    .shape_properties
-    .as_deref()
-    .and_then(shared_chart::shape_properties_solid_fill)
-    .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
-    .map(|fill| fill.color);
-  let plot_area_fill_color = chart_space
-    .chart
-    .plot_area
-    .shape_properties
-    .as_deref()
-    .and_then(shared_chart::shape_properties_solid_fill)
-    .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
-    .map(|fill| fill.color);
-  let chart_area_stroke_color = chart_space
-    .shape_properties
-    .as_deref()
-    .and_then(shared_chart::shape_properties_outline_solid_fill)
-    .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
-    .map(|fill| fill.color);
-  let plot_area_stroke_color = chart_space
-    .chart
-    .plot_area
-    .shape_properties
-    .as_deref()
-    .and_then(shared_chart::shape_properties_outline_solid_fill)
-    .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
-    .map(|fill| fill.color);
+  let pie_point_styles = shared_chart::pie_chart_model(chart_space)
+    .map(|pie| {
+      let inherited = series_styles.first().cloned().unwrap_or_default();
+      let points = series_point_styles.first();
+      (0..pie.values.len())
+        .map(|index| {
+          let point = points
+            .and_then(|points| points.get(index))
+            .and_then(Option::as_ref);
+          common::ShapeStyle {
+            fill: point
+              .map_or(&inherited.fill, |point| {
+                point.fill.resolve_over(&inherited.fill)
+              })
+              .clone(),
+            stroke: point
+              .map_or(&inherited.stroke, |point| {
+                point.stroke.resolve_over(&inherited.stroke)
+              })
+              .clone(),
+          }
+        })
+        .collect()
+    })
+    .unwrap_or_default();
+  let chart_area_style = drawingml_chart_area_common_style(
+    chart_space.shape_properties.as_deref(),
+    &styles.theme_colors,
+  );
+  let plot_area_style = drawingml_chart_area_common_style(
+    chart_space.chart.plot_area.shape_properties.as_deref(),
+    &styles.theme_colors,
+  );
   let title_fill_color = chart_space
     .chart
     .title
@@ -11015,16 +11886,6 @@ fn drawing_chart_shapes(
       .color;
     Some((color, chart_shape_outline_width_pt(properties)?))
   });
-  let chart_area_stroke_width_pt = chart_space
-    .shape_properties
-    .as_deref()
-    .and_then(shape_properties_outline_width_pt);
-  let plot_area_stroke_width_pt = chart_space
-    .chart
-    .plot_area
-    .shape_properties
-    .as_deref()
-    .and_then(shape_properties_outline_width_pt);
   let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
   apply_drawing_effect_extent_to_shape(&mut shape, effect_extent);
   shape.chart = Some(Box::new(InlineChart {
@@ -11048,31 +11909,20 @@ fn drawing_chart_shapes(
     category_major_gridline,
     category_minor_gridline,
     series_colors,
-    series_gradient_fills,
-    series_point_colors,
+    series_styles,
+    series_point_styles,
     surface_band_colors,
     data_label_fill_colors,
     pie_point_colors,
+    pie_point_styles,
     title_fill_color,
-    chart_area_fill_color,
-    plot_area_fill_color,
-    chart_area_stroke_color,
-    chart_area_stroke_width_pt,
-    plot_area_stroke_color,
-    plot_area_stroke_width_pt,
+    chart_area_style,
+    plot_area_style,
   }));
   Some(vec![shape])
 }
 
 fn chart_shape_outline_width_pt(properties: &c::ChartShapeProperties) -> Option<f32> {
-  properties
-    .outline
-    .as_deref()?
-    .width
-    .map(|width| units::emu_to_points(i64::from(width)))
-}
-
-fn shape_properties_outline_width_pt(properties: &c::ShapeProperties) -> Option<f32> {
   properties
     .outline
     .as_deref()?
@@ -11172,18 +12022,15 @@ fn drawing_extended_chart_shapes(
     category_major_gridline: None,
     category_minor_gridline: None,
     series_colors: Vec::new(),
-    series_gradient_fills: Vec::new(),
-    series_point_colors: Vec::new(),
+    series_styles: Vec::new(),
+    series_point_styles: Vec::new(),
     surface_band_colors: Vec::new(),
     data_label_fill_colors: Vec::new(),
     pie_point_colors: Vec::new(),
+    pie_point_styles: Vec::new(),
     title_fill_color: None,
-    chart_area_fill_color: None,
-    plot_area_fill_color: None,
-    chart_area_stroke_color: None,
-    chart_area_stroke_width_pt: None,
-    plot_area_stroke_color: None,
-    plot_area_stroke_width_pt: None,
+    chart_area_style: common::ShapeStyle::default(),
+    plot_area_style: common::ShapeStyle::default(),
   }));
   Some(vec![shape])
 }
@@ -12606,63 +13453,29 @@ fn drawingml_gradient_fill(
   if stops.is_empty() {
     return None;
   }
+  let interpolation = word_fixed_gradient_interpolation(&stops);
   let (angle_degrees, scaled, path) = match fill.gradient_fill_choice.as_ref()? {
     a::GradientFillChoice::LinearGradientFill(linear) => (
       Some(linear.angle.unwrap_or_default() as f32 / 60_000.0),
       linear.scaled.as_ref().is_some_and(|value| value.as_bool()),
       None,
     ),
-    a::GradientFillChoice::PathGradientFill(path) => {
-      let fill_to = path
-        .fill_to_rectangle
-        .as_ref()
-        .map(|rect| common::RelativeRect {
-          left: rect
-            .left
-            .as_ref()
-            .map_or(0.5, |value| value.as_ratio() as f32),
-          top: rect
-            .top
-            .as_ref()
-            .map_or(0.5, |value| value.as_ratio() as f32),
-          right: rect
-            .right
-            .as_ref()
-            .map_or(0.5, |value| value.as_ratio() as f32),
-          bottom: rect
-            .bottom
-            .as_ref()
-            .map_or(0.5, |value| value.as_ratio() as f32),
-        })
-        .unwrap_or(common::RelativeRect {
-          left: 0.5,
-          top: 0.5,
-          right: 0.5,
-          bottom: 0.5,
-        });
-      let kind = match path.path.unwrap_or(a::PathShadeValues::Shape) {
-        a::PathShadeValues::Shape => common::GradientPathKind::Shape,
-        a::PathShadeValues::Circle => common::GradientPathKind::Circle,
-        a::PathShadeValues::Rectangle => common::GradientPathKind::Rectangle,
-      };
-      (
-        None,
-        false,
-        Some(common::GradientPath {
-          kind,
-          fill_to,
-          transform: common::Transform::default(),
-          mirror_tile: false,
-        }),
-      )
-    }
+    a::GradientFillChoice::PathGradientFill(path) => (
+      None,
+      false,
+      Some(common::drawingml_gradient::resolve_path_gradient(
+        fill,
+        path,
+        common::Transform::default(),
+      )),
+    ),
   };
   Some(common::Fill::Gradient(common::GradientFill {
     stops,
     angle_degrees,
     definition_bounds: None,
     line: None,
-    interpolation: common::GradientInterpolation::LinearSrgb,
+    interpolation,
     scaled,
     rotate_with_shape: Some(
       fill
@@ -12689,6 +13502,122 @@ fn drawingml_shape_properties_common_fill(
       drawingml_pattern_fill(fill, theme_colors).map(common::Fill::Pattern)
     }
   }
+}
+
+fn drawingml_blip_common_fill(fill: &a::BlipFill) -> common::Fill<'static> {
+  let relationship_id = fill.blip.as_deref().and_then(|blip| {
+    blip
+      .embed
+      .as_deref()
+      .or(blip.link.as_deref())
+      .map(|id| Cow::Owned(id.to_string()))
+  });
+  common::Fill::Image {
+    relationship_id,
+    tile: matches!(fill.blip_fill_choice, Some(a::BlipFillChoice::Tile(_))),
+  }
+}
+
+fn drawingml_chart_shape_common_style(
+  properties: Option<&c::ChartShapeProperties>,
+  theme_colors: &ThemeColors,
+) -> common::ShapeStyle<'static> {
+  let Some(properties) = properties else {
+    return common::ShapeStyle::default();
+  };
+  let fill = match properties.chart_shape_properties_choice2.as_ref() {
+    None => common::ShapeStyleValue::Unspecified,
+    Some(c::ChartShapePropertiesChoice2::NoFill(_)) => common::ShapeStyleValue::NoPaint,
+    Some(c::ChartShapePropertiesChoice2::SolidFill(fill)) => resolve_drawingml_solid_fill(
+      fill,
+      theme_colors,
+    )
+    .map_or(common::ShapeStyleValue::Unspecified, |paint| {
+      common::ShapeStyleValue::Paint(common::Fill::Solid(common_rgb(paint.color, paint.opacity)))
+    }),
+    Some(c::ChartShapePropertiesChoice2::GradientFill(fill)) => {
+      drawingml_gradient_fill(fill, theme_colors).map_or(
+        common::ShapeStyleValue::Unspecified,
+        common::ShapeStyleValue::Paint,
+      )
+    }
+    Some(c::ChartShapePropertiesChoice2::PatternFill(fill)) => {
+      drawingml_pattern_fill(fill, theme_colors)
+        .map_or(common::ShapeStyleValue::Unspecified, |fill| {
+          common::ShapeStyleValue::Paint(common::Fill::Pattern(fill))
+        })
+    }
+    Some(c::ChartShapePropertiesChoice2::BlipFill(fill)) => {
+      common::ShapeStyleValue::Paint(drawingml_blip_common_fill(fill))
+    }
+  };
+  let stroke = match properties.outline.as_deref() {
+    None => common::ShapeStyleValue::Unspecified,
+    Some(outline)
+      if matches!(
+        outline.outline_choice1.as_ref(),
+        Some(a::OutlineChoice::NoFill(_))
+      ) =>
+    {
+      common::ShapeStyleValue::NoPaint
+    }
+    Some(outline) => drawingml_outline_common_stroke(outline, theme_colors).map_or(
+      common::ShapeStyleValue::Unspecified,
+      common::ShapeStyleValue::Paint,
+    ),
+  };
+  common::ShapeStyle { fill, stroke }
+}
+
+fn drawingml_chart_area_common_style(
+  properties: Option<&c::ShapeProperties>,
+  theme_colors: &ThemeColors,
+) -> common::ShapeStyle<'static> {
+  let Some(properties) = properties else {
+    return common::ShapeStyle::default();
+  };
+  let fill = match properties.shape_properties_choice2.as_ref() {
+    None | Some(c::ShapePropertiesChoice2::GroupFill) => common::ShapeStyleValue::Unspecified,
+    Some(c::ShapePropertiesChoice2::NoFill(_)) => common::ShapeStyleValue::NoPaint,
+    Some(c::ShapePropertiesChoice2::SolidFill(fill)) => resolve_drawingml_solid_fill(
+      fill,
+      theme_colors,
+    )
+    .map_or(common::ShapeStyleValue::Unspecified, |paint| {
+      common::ShapeStyleValue::Paint(common::Fill::Solid(common_rgb(paint.color, paint.opacity)))
+    }),
+    Some(c::ShapePropertiesChoice2::GradientFill(fill)) => {
+      drawingml_gradient_fill(fill, theme_colors).map_or(
+        common::ShapeStyleValue::Unspecified,
+        common::ShapeStyleValue::Paint,
+      )
+    }
+    Some(c::ShapePropertiesChoice2::PatternFill(fill)) => {
+      drawingml_pattern_fill(fill, theme_colors)
+        .map_or(common::ShapeStyleValue::Unspecified, |fill| {
+          common::ShapeStyleValue::Paint(common::Fill::Pattern(fill))
+        })
+    }
+    Some(c::ShapePropertiesChoice2::BlipFill(fill)) => {
+      common::ShapeStyleValue::Paint(drawingml_blip_common_fill(fill))
+    }
+  };
+  let stroke = match properties.outline.as_deref() {
+    None => common::ShapeStyleValue::Unspecified,
+    Some(outline)
+      if matches!(
+        outline.outline_choice1.as_ref(),
+        Some(a::OutlineChoice::NoFill(_))
+      ) =>
+    {
+      common::ShapeStyleValue::NoPaint
+    }
+    Some(outline) => drawingml_outline_common_stroke(outline, theme_colors).map_or(
+      common::ShapeStyleValue::Unspecified,
+      common::ShapeStyleValue::Paint,
+    ),
+  };
+  common::ShapeStyle { fill, stroke }
 }
 
 fn resolve_drawingml_foreground_color(
@@ -15579,10 +16508,16 @@ fn textbox_blocks_with_base(
   let mut numbering = NumberingCatalog::default();
   let mut form_widget_ids = FormWidgetIdAllocator::default();
   let custom_xml_bindings = CustomXmlBindings::default();
+  let paragraph_base = BlockContentParagraphBase {
+    run_style: base_style.clone(),
+    ..Default::default()
+  };
+  let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
   for choice in &content.text_box_content_choice {
+    let block_start = blocks.len();
     match choice {
       w::TextBoxContentChoice::Paragraph(paragraph) => {
-        let paragraph = paragraph_model_with_base(
+        let mut paragraph = paragraph_model_with_base(
           paragraph,
           styles,
           &mut numbering,
@@ -15595,6 +16530,7 @@ fn textbox_blocks_with_base(
             ..Default::default()
           },
         );
+        boundary_bookmarks.attach_to_paragraph_start(&mut paragraph);
         blocks.push(Block::paragraph(paragraph));
       }
       w::TextBoxContentChoice::Table(table) => {
@@ -15623,14 +16559,14 @@ fn textbox_blocks_with_base(
           &mut numbering,
           images,
           hyperlinks,
-          SdtBlockControls {
+          BlockContentControls {
             custom_xml_bindings: &custom_xml_bindings,
             form_widget_ids: &mut form_widget_ids,
             // Text boxes are separate stories: do not apply main-story
             // recovery defaults to their paragraphs or nested tables.
             in_header_footer: true,
           },
-          Some(&base_style),
+          Some(&paragraph_base),
         );
         for block in &mut sdt_blocks {
           if let Block::Table(table) = block {
@@ -15639,9 +16575,36 @@ fn textbox_blocks_with_base(
         }
         blocks.extend(sdt_blocks);
       }
+      w::TextBoxContentChoice::CustomXmlBlock(custom_xml) => {
+        let mut custom_xml_blocks = custom_xml_block_blocks_with_base(
+          custom_xml,
+          styles,
+          &mut numbering,
+          images,
+          hyperlinks,
+          BlockContentControls {
+            custom_xml_bindings: &custom_xml_bindings,
+            form_widget_ids: &mut form_widget_ids,
+            in_header_footer: true,
+          },
+          Some(&paragraph_base),
+        );
+        for block in &mut custom_xml_blocks {
+          if let Block::Table(table) = block {
+            clear_shape_text_table_placements(table);
+          }
+        }
+        blocks.extend(custom_xml_blocks);
+      }
+      w::TextBoxContentChoice::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
+      w::TextBoxContentChoice::BookmarkEnd(bookmark) => {
+        boundary_bookmarks.end(bookmark, &mut blocks)
+      }
       _ => {}
     }
+    boundary_bookmarks.attach_to_new_blocks(&mut blocks[block_start..]);
   }
+  boundary_bookmarks.finish(&mut blocks);
   blocks
 }
 
@@ -16708,6 +17671,7 @@ struct StylesCatalog {
   math_font_family: Option<Arc<str>>,
   simplified_chinese_ui: bool,
   preserve_word_text_whitespace: bool,
+  literal_text_tabs_use_default_stops: bool,
   has_styles_part: bool,
   has_default_paragraph_properties: bool,
   doc_default_paragraph: ParagraphFormat,
@@ -16892,7 +17856,9 @@ struct RunStyleOverrides {
   complex_font_size_pt: Option<f32>,
   vertical_alignment: Option<w::VerticalPositionValues>,
   bold: Option<bool>,
+  complex_bold: Option<bool>,
   italic: Option<bool>,
+  complex_italic: Option<bool>,
   underline: Option<bool>,
   strikethrough: Option<bool>,
   uppercase: Option<bool>,
@@ -17293,8 +18259,10 @@ impl StylesCatalog {
     for entry in self.style_chain(Some(style_id)) {
       if matches!(entry.style_type, Some(w::StyleValues::Character)) {
         matched = true;
+        let inherited_style = style.clone();
         merge_style_values(&mut style, &entry.run_style);
         apply_run_style_overrides(&mut style, entry.run_overrides);
+        apply_character_style_toggle_overrides(&mut style, &inherited_style, entry.run_overrides);
         if entry.run_overrides.vertical_alignment.is_some() {
           vertical_alignment = entry.run_overrides.vertical_alignment;
         }
@@ -18489,6 +19457,9 @@ fn merge_run_style_overrides(
   if source.bold.is_some() {
     target.bold = source.bold;
   }
+  if source.complex_bold.is_some() {
+    target.complex_bold = source.complex_bold;
+  }
   if source.font_size_pt.is_some() {
     target.font_size_pt = source.font_size_pt;
   }
@@ -18500,6 +19471,9 @@ fn merge_run_style_overrides(
   }
   if source.italic.is_some() {
     target.italic = source.italic;
+  }
+  if source.complex_italic.is_some() {
+    target.complex_italic = source.complex_italic;
   }
   if source.underline.is_some() {
     target.underline = source.underline;
@@ -18596,30 +19570,36 @@ fn run_style_overrides(properties: Option<RunProps<'_>>) -> RunStyleOverrides {
     vertical_alignment: properties.vertical_text_alignment().map(|value| value.val),
     bold: properties
       .bold()
-      .and_then(|value| value.val.map(|value| value.as_bool())),
+      .map(|value| value.val.is_none_or(|value| value.as_bool())),
+    complex_bold: properties
+      .bold_complex_script()
+      .map(|value| value.val.is_none_or(|value| value.as_bool())),
     italic: properties
       .italic()
-      .and_then(|value| value.val.map(|value| value.as_bool())),
+      .map(|value| value.val.is_none_or(|value| value.as_bool())),
+    complex_italic: properties
+      .italic_complex_script()
+      .map(|value| value.val.is_none_or(|value| value.as_bool())),
     underline: properties
       .underline()
       .map(|value| !matches!(value.val, Some(w::UnderlineValues::None))),
     strikethrough: properties
       .double_strike()
-      .and_then(|value| value.val.map(|value| value.as_bool()))
+      .map(|value| value.val.is_none_or(|value| value.as_bool()))
       .or_else(|| {
         properties
           .strike()
-          .and_then(|value| value.val.map(|value| value.as_bool()))
+          .map(|value| value.val.is_none_or(|value| value.as_bool()))
       }),
     uppercase: properties
       .caps()
-      .and_then(|value| value.val.map(|value| value.as_bool())),
+      .map(|value| value.val.is_none_or(|value| value.as_bool())),
     small_caps: properties
       .small_caps()
       .map(|value| value.val.is_none_or(|value| value.as_bool())),
     hidden: properties
       .vanish()
-      .and_then(|value| value.val.map(|value| value.as_bool())),
+      .map(|value| value.val.is_none_or(|value| value.as_bool())),
     legacy_outline: properties
       .outline()
       .map(|value| value.val.is_none_or(|value| value.as_bool())),
@@ -18658,8 +19638,14 @@ fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides
   if let Some(bold) = overrides.bold {
     style.bold = bold;
   }
+  if let Some(complex_bold) = overrides.complex_bold {
+    style.complex_bold = Some(complex_bold);
+  }
   if let Some(italic) = overrides.italic {
     style.italic = italic;
+  }
+  if let Some(complex_italic) = overrides.complex_italic {
+    style.complex_italic = Some(complex_italic);
   }
   if let Some(underline) = overrides.underline {
     style.underline = underline;
@@ -18695,6 +19681,84 @@ fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides
     } else if style.legacy_relief == LegacyTextRelief::Engraved {
       style.legacy_relief = LegacyTextRelief::None;
     }
+  }
+}
+
+fn apply_character_style_toggle_overrides(
+  style: &mut TextStyle,
+  inherited: &TextStyle,
+  overrides: RunStyleOverrides,
+) {
+  // ECMA-376 Part 1 §17.7.3 makes these properties toggles when they are
+  // contributed by a character style: authored true reverses the inherited
+  // state, while authored false clears it. Direct run formatting remains an
+  // absolute override and is applied later by properties::merge_run_style.
+  fn apply_bool(target: &mut bool, inherited: bool, authored: Option<bool>) {
+    if let Some(authored) = authored {
+      *target = authored && !inherited;
+    }
+  }
+
+  apply_bool(&mut style.bold, inherited.bold, overrides.bold);
+  if let Some(authored) = overrides.complex_bold {
+    style.complex_bold = Some(authored && !inherited.complex_bold.unwrap_or(false));
+  }
+  apply_bool(&mut style.italic, inherited.italic, overrides.italic);
+  if let Some(authored) = overrides.complex_italic {
+    style.complex_italic = Some(authored && !inherited.complex_italic.unwrap_or(false));
+  }
+  apply_bool(
+    &mut style.strikethrough,
+    inherited.strikethrough,
+    overrides.strikethrough,
+  );
+  apply_bool(
+    &mut style.uppercase,
+    inherited.uppercase,
+    overrides.uppercase,
+  );
+  apply_bool(
+    &mut style.small_caps,
+    inherited.small_caps,
+    overrides.small_caps,
+  );
+  apply_bool(&mut style.hidden, inherited.hidden, overrides.hidden);
+  apply_bool(
+    &mut style.legacy_outline,
+    inherited.legacy_outline,
+    overrides.legacy_outline,
+  );
+  apply_bool(
+    &mut style.legacy_shadow,
+    inherited.legacy_shadow,
+    overrides.legacy_shadow,
+  );
+
+  if overrides.legacy_emboss.is_some() || overrides.legacy_imprint.is_some() {
+    let mut relief = inherited.legacy_relief;
+    if let Some(authored) = overrides.legacy_emboss {
+      if authored {
+        relief = if relief == LegacyTextRelief::Embossed {
+          LegacyTextRelief::None
+        } else {
+          LegacyTextRelief::Embossed
+        };
+      } else if relief == LegacyTextRelief::Embossed {
+        relief = LegacyTextRelief::None;
+      }
+    }
+    if let Some(authored) = overrides.legacy_imprint {
+      if authored {
+        relief = if relief == LegacyTextRelief::Engraved {
+          LegacyTextRelief::None
+        } else {
+          LegacyTextRelief::Engraved
+        };
+      } else if relief == LegacyTextRelief::Engraved {
+        relief = LegacyTextRelief::None;
+      }
+    }
+    style.legacy_relief = relief;
   }
 }
 
@@ -18759,7 +19823,7 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   if values.shading.is_some() {
     target.shading = values.shading;
   }
-  if values.borders != CellBordersModel::default() {
+  if !values.borders.is_empty() {
     target.borders = values.borders;
   }
   if values.page_break_before_set {
@@ -18969,7 +20033,7 @@ fn merge_numbering_format_values(
   if values.shading.is_some() {
     target.shading = values.shading;
   }
-  if values.borders != CellBordersModel::default() {
+  if !values.borders.is_empty() {
     target.borders = values.borders;
   }
   if values.page_break_before_set {
@@ -19056,6 +20120,9 @@ fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   }
   if values.baseline_shift_pt.abs() > f32::EPSILON {
     target.baseline_shift_pt = values.baseline_shift_pt;
+  }
+  if values.wordprocessingml_field_bold_override.is_some() {
+    target.wordprocessingml_field_bold_override = values.wordprocessingml_field_bold_override;
   }
   if values.bold {
     target.bold = true;
@@ -19485,6 +20552,11 @@ impl NumberingCatalog {
     // additionally clear paragraph bold/italic before their explicit
     // numbering-level run properties are applied.
     style.underline = false;
+    // Word does not propagate paragraph small-caps formatting to synthesized
+    // numbering text. LibreOffice mirrors that exception in
+    // sw/source/core/text/txtfld.cxx, while an explicit w:lvl/w:rPr/w:smallCaps
+    // remains authoritative for the number itself.
+    style.small_caps = false;
     // Word shapes the synthesized numbering portion independently from the
     // paragraph text. In particular, an inherited w:kern from docDefaults
     // does not kern textual list labels; only an explicit numbering-level or
@@ -19507,6 +20579,7 @@ impl NumberingCatalog {
     );
     if paragraph_mark_run_properties.is_some() {
       style = properties::paragraph_mark_run_style(paragraph_mark_run_properties, style, styles);
+      style.small_caps = false;
       properties::merge_run_style(
         &mut style,
         level
@@ -21118,6 +22191,10 @@ fn parse_hex_color(value: &str) -> Option<RgbColor> {
   if value.eq_ignore_ascii_case("auto") {
     return None;
   }
+  // CT_HexColor normally carries bare hexadecimal digits, but Word accepts
+  // producer output with one CSS-style leading '#'. Retain that recovery
+  // without broadening malformed digit counts.
+  let value = value.strip_prefix('#').unwrap_or(value);
 
   let expanded;
   let hex = if value.len() == 3 {
@@ -21379,6 +22456,179 @@ mod tests {
   }
 
   #[test]
+  fn sdt_block_boundary_bookmark_targets_content_after_a_leading_page_break() {
+    let sdt = w::SdtBlock::from_bytes(
+      br#"<w:sdt xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:sdtContent><w:bookmarkStart w:id="2" w:name="_TocBoundary" w:displacedByCustomXml="prev"/><w:p><w:r><w:br w:type="page"/></w:r><w:r><w:t>Heading</w:t></w:r><w:bookmarkEnd w:id="2"/></w:p></w:sdtContent></w:sdt>"#,
+    )
+    .expect("block content control");
+    let mut numbering = NumberingCatalog::default();
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+
+    let blocks = sdt_block_blocks(
+      &sdt,
+      &StylesCatalog::default(),
+      &mut numbering,
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      BlockContentControls {
+        custom_xml_bindings: &CustomXmlBindings::default(),
+        form_widget_ids: &mut form_widget_ids,
+        in_header_footer: false,
+      },
+    );
+
+    let [Block::Paragraph(paragraph)] = blocks.as_slice() else {
+      panic!("one SDT paragraph");
+    };
+    assert!(matches!(
+      paragraph.field_events.as_slice(),
+      [
+        ParagraphFieldEvent::BookmarkStart { id, name },
+        ParagraphFieldEvent::Content,
+        ParagraphFieldEvent::Content,
+        ParagraphFieldEvent::BookmarkEnd { id: end_id },
+      ] if id == "2" && name == "_TocBoundary" && end_id == "2"
+    ));
+    assert!(matches!(
+      paragraph.inlines.as_slice(),
+      [
+        InlineItem::PageBreak,
+        InlineItem::BookmarkStart(name),
+        InlineItem::Text(run),
+      ] if name == "_TocBoundary" && run.text == "Heading"
+    ));
+  }
+
+  #[test]
+  fn table_row_and_cell_boundary_bookmarks_preserve_document_order() {
+    let table = w::Table::from_bytes(
+      br#"<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:bookmarkStart w:id="10" w:name="TableBoundary"/>
+        <w:tblGrid><w:gridCol w:w="4000"/></w:tblGrid>
+        <w:customXml w:uri="urn:row" w:element="row">
+          <w:bookmarkStart w:id="11" w:name="RowBoundary"/>
+          <w:sdt>
+            <w:sdtContent>
+              <w:tr>
+                <w:bookmarkStart w:id="12" w:name="CellBoundary"/>
+                <w:customXml w:uri="urn:cell" w:element="cell">
+                  <w:sdt>
+                    <w:sdtContent>
+                      <w:tc><w:p><w:r><w:t>controlled cell</w:t></w:r></w:p></w:tc>
+                    </w:sdtContent>
+                  </w:sdt>
+                </w:customXml>
+                <w:bookmarkEnd w:id="12"/>
+              </w:tr>
+            </w:sdtContent>
+          </w:sdt>
+          <w:bookmarkEnd w:id="11"/>
+        </w:customXml>
+        <w:bookmarkEnd w:id="10"/>
+      </w:tbl>"#,
+    )
+    .expect("table with nested boundary bookmarks");
+    let mut numbering = NumberingCatalog::default();
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let model = table_model(
+      &table,
+      &mut TableModelEnv {
+        styles: &StylesCatalog::default(),
+        numbering: &mut numbering,
+        images: &ImageCatalog::default(),
+        hyperlinks: &HyperlinkCatalog::default(),
+        custom_xml_bindings: &CustomXmlBindings::default(),
+        form_widget_ids: &mut form_widget_ids,
+      },
+      TableModelContext {
+        nested_table_level: 1,
+        in_header_footer: false,
+      },
+    );
+
+    let [Block::Paragraph(paragraph)] = model.rows[0].cells[0].blocks.as_slice() else {
+      panic!("one controlled table-cell paragraph");
+    };
+    assert!(matches!(
+      paragraph.field_events.as_slice(),
+      [
+        ParagraphFieldEvent::BookmarkStart {
+          id: table_id,
+          name: table_name,
+        },
+        ParagraphFieldEvent::BookmarkStart {
+          id: row_id,
+          name: row_name,
+        },
+        ParagraphFieldEvent::BookmarkStart {
+          id: cell_id,
+          name: cell_name,
+        },
+        ParagraphFieldEvent::Content,
+        ParagraphFieldEvent::BookmarkEnd { id: cell_end },
+        ParagraphFieldEvent::BookmarkEnd { id: row_end },
+        ParagraphFieldEvent::BookmarkEnd { id: table_end },
+      ] if table_id == "10"
+        && table_name == "TableBoundary"
+        && row_id == "11"
+        && row_name == "RowBoundary"
+        && cell_id == "12"
+        && cell_name == "CellBoundary"
+        && cell_end == "12"
+        && row_end == "11"
+        && table_end == "10"
+    ));
+    assert!(matches!(
+      paragraph.inlines.as_slice(),
+      [
+        InlineItem::BookmarkStart(table_name),
+        InlineItem::BookmarkStart(row_name),
+        InlineItem::BookmarkStart(cell_name),
+        InlineItem::Text(run),
+      ] if table_name == "TableBoundary"
+        && row_name == "RowBoundary"
+        && cell_name == "CellBoundary"
+        && run.text == "controlled cell"
+    ));
+  }
+
+  #[test]
+  fn custom_xml_block_preserves_nested_sdt_content_and_boundary_bookmark() {
+    let custom_xml = w::CustomXmlBlock::from_bytes(
+      br#"<w:customXml xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:uri="urn:block" w:element="block"><w:bookmarkStart w:id="21" w:name="CustomXmlBoundary"/><w:sdt><w:sdtContent><w:p><w:r><w:t>nested content</w:t></w:r></w:p></w:sdtContent></w:sdt><w:bookmarkEnd w:id="21"/></w:customXml>"#,
+    )
+    .expect("custom XML block with nested content control");
+    let mut numbering = NumberingCatalog::default();
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let blocks = custom_xml_block_blocks_with_base(
+      &custom_xml,
+      &StylesCatalog::default(),
+      &mut numbering,
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      BlockContentControls {
+        custom_xml_bindings: &CustomXmlBindings::default(),
+        form_widget_ids: &mut form_widget_ids,
+        in_header_footer: false,
+      },
+      None,
+    );
+
+    let [Block::Paragraph(paragraph)] = blocks.as_slice() else {
+      panic!("one nested custom XML paragraph");
+    };
+    assert_eq!(inline_text(&paragraph.inlines), "nested content");
+    assert!(matches!(
+      paragraph.field_events.as_slice(),
+      [
+        ParagraphFieldEvent::BookmarkStart { id, name },
+        ParagraphFieldEvent::Content,
+        ParagraphFieldEvent::BookmarkEnd { id: end_id },
+      ] if id == "21" && name == "CustomXmlBoundary" && end_id == "21"
+    ));
+  }
+
+  #[test]
   fn deleted_paragraph_mark_combines_current_text_with_the_following_paragraph() {
     let mut first = merge_test_paragraph("master.");
     first.format.deleted_separator = true;
@@ -21402,6 +22652,102 @@ mod tests {
     assert_eq!(text, "master.Basketball");
     assert!(!paragraph.format.deleted_separator);
     assert_eq!(paragraph.format.outline_text_inlines, None);
+  }
+
+  #[test]
+  fn adjacent_framepr_paragraphs_group_by_frame_attributes_not_paragraph_decoration() {
+    let frame = ParagraphFrameProperties {
+      width_pt: Some(238.4),
+      height_pt: Some(197.05),
+      height_rule: FrameHeightRule::Exact,
+      placement: FloatingFramePlacement {
+        horizontal_anchor: FrameHorizontalAnchor::Page,
+        horizontal_offset_pt: 97.0,
+        vertical_offset_pt: 22.1,
+        ..Default::default()
+      },
+      drop_cap: false,
+    };
+    let mut first = merge_test_paragraph("bordered");
+    first.format.frame = Some(frame);
+    first.format.shading = Some(RgbColor {
+      r: 0xe5,
+      g: 0xdf,
+      b: 0xec,
+    });
+    first.format.borders.top = Some(BorderStyle::default());
+
+    let mut second = merge_test_paragraph("shaded");
+    second.format.frame = Some(frame);
+    second.format.shading = Some(RgbColor {
+      r: 0x8d,
+      g: 0xb3,
+      b: 0xe2,
+    });
+
+    let mut third = merge_test_paragraph("differently bordered");
+    third.format.frame = Some(frame);
+    third.format.borders.bottom = Some(BorderStyle {
+      color: RgbColor {
+        r: 0xe3,
+        g: 0x6c,
+        b: 0x0a,
+      },
+      ..BorderStyle::default()
+    });
+
+    let mut blocks = Vec::new();
+    push_body_paragraph(&mut blocks, first);
+    push_body_paragraph(&mut blocks, second);
+    push_body_paragraph(&mut blocks, third);
+
+    let [Block::Frame(group)] = blocks.as_slice() else {
+      panic!("tdf154703 framePr paragraphs must form one text frame");
+    };
+    assert_eq!(group.blocks.len(), 3);
+    assert!(group.outer_fill_color.is_none());
+    assert!(group.outer_borders.is_empty());
+    let [
+      Block::Paragraph(first),
+      Block::Paragraph(second),
+      Block::Paragraph(third),
+    ] = group.blocks.as_slice()
+    else {
+      panic!("the frame must retain all three decorated paragraphs");
+    };
+    assert!(first.format.borders.top.is_some());
+    assert_ne!(first.format.shading, second.format.shading);
+    assert!(third.format.borders.bottom.is_some());
+  }
+
+  #[test]
+  fn omitted_framepr_wrap_defaults_to_around_while_explicit_auto_is_retained() {
+    assert_eq!(frame_wrap_mode(None), FrameWrapMode::Around);
+    assert_eq!(
+      frame_wrap_mode(Some(w::TextWrappingValues::Auto)),
+      FrameWrapMode::Auto
+    );
+  }
+
+  #[test]
+  fn paragraph_border_model_retains_between_and_legacy_bar() {
+    let source = w::ParagraphBorders::from_bytes(
+      br#"<w:pBdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:top w:val="single" w:sz="6" w:space="1" w:color="000000"/>
+        <w:between w:val="double" w:sz="12" w:space="9" w:color="112233"/>
+        <w:bar w:val="dashed" w:sz="8" w:space="2" w:color="445566"/>
+      </w:pBdr>"#,
+    )
+    .expect("paragraph borders");
+
+    let borders = paragraph_borders_model(&source);
+
+    assert_eq!(borders.top.expect("top").width_pt, 0.75);
+    assert!(borders.between.expect("between").compound);
+    assert_eq!(
+      borders.bar.expect("bar").dash_pattern,
+      BorderDashPattern::Dashed
+    );
   }
 
   #[test]
@@ -22184,6 +23530,19 @@ mod tests {
   }
 
   #[test]
+  fn word_hex_color_recovers_one_hash_prefix() {
+    assert_eq!(
+      parse_hex_color("#004080"),
+      Some(RgbColor {
+        r: 0x00,
+        g: 0x40,
+        b: 0x80,
+      })
+    );
+    assert_eq!(parse_hex_color("#f00ff"), None);
+  }
+
+  #[test]
   fn word_text_literal_tabs_remain_distinct_from_tab_elements() {
     let default_text = w::TextType {
       xml_content: Some("\tA\t\tline\t".to_string()),
@@ -22194,14 +23553,21 @@ mod tests {
       space: Some(xml::SpaceProcessingModeValues::Preserve),
     };
     let mut output = String::new();
-    append_word_text(&mut output, &default_text, false);
+    append_word_text(&mut output, &default_text, false, false);
     assert_eq!(output, "A  line");
 
     output.clear();
-    append_word_text(&mut output, &preserved_text, false);
+    append_word_text(&mut output, &preserved_text, false, false);
     assert_eq!(
       output,
       format!("{0}A{0}{0}line{0}", PRESERVED_WORD_TEXT_TAB)
+    );
+
+    output.clear();
+    append_word_text(&mut output, &preserved_text, false, true);
+    assert_eq!(
+      output,
+      format!("{0}A{0}{0}line{0}", EXPLICIT_DEFAULT_WORD_TEXT_TAB)
     );
   }
 
@@ -22212,7 +23578,7 @@ mod tests {
       space: Some(xml::SpaceProcessingModeValues::Preserve),
     };
     let mut output = String::new();
-    append_word_text(&mut output, &preserved_text, false);
+    append_word_text(&mut output, &preserved_text, false, false);
     assert_eq!(output, "before after last");
   }
 
@@ -22807,6 +24173,161 @@ mod tests {
 
     assert_eq!(label.text.as_deref(), Some("One.\t"));
     assert_eq!(label.style.kerning_minimum_size_pt, Some(f32::INFINITY));
+  }
+
+  #[test]
+  fn synthesized_numbering_ignores_inherited_small_caps_but_honors_level_small_caps() {
+    // Source: LibreOffice sw/source/core/text/txtfld.cxx explicitly removes
+    // paragraph small-caps from Word numbering. A w:lvl/w:rPr property still
+    // belongs to the synthesized numbering text itself.
+    let labels = [
+      (
+        br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="cardinalText"/><w:lvlText w:val="%1."/></w:lvl>"#
+          .as_slice(),
+        false,
+      ),
+      (
+        br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="cardinalText"/><w:lvlText w:val="%1."/><w:rPr><w:smallCaps/></w:rPr></w:lvl>"#
+          .as_slice(),
+        true,
+      ),
+    ]
+    .into_iter()
+    .map(|(xml, expected_small_caps)| {
+      let level = w::Level::from_bytes(xml).expect("numbering level");
+      let mut catalog = NumberingCatalog {
+        abstract_nums: HashMap::from([(
+          4,
+          AbstractNumbering {
+            levels: HashMap::from([(0, numbering_level_model(&level, ImportSettings::default()))]),
+            ..Default::default()
+          },
+        )]),
+        nums: HashMap::from([(
+          5,
+          NumberingInstance {
+            abstract_num_id: 4,
+            overrides: HashMap::new(),
+          },
+        )]),
+        ..Default::default()
+      };
+      let label = catalog
+        .next_label(
+          NumberingReference {
+            num_id: Some(5),
+            level_index: Some(0),
+          },
+          &mut ParagraphFormat::default(),
+          &StylesCatalog::default(),
+          TextStyle {
+            small_caps: true,
+            ..Default::default()
+          },
+          None,
+          NumberingFormatMergeContext::default(),
+        )
+        .expect("numbering label");
+      (label.style.small_caps, expected_small_caps)
+    })
+    .collect::<Vec<_>>();
+
+    assert_eq!(labels, [(false, false), (true, true)]);
+  }
+
+  fn paragraph_mark_character_style_numbering_model(level_xml: &[u8]) -> Paragraph {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:rPr><w:rStyle w:val="Emphasis"/></w:rPr></w:pPr><w:r><w:t>Body</w:t></w:r></w:p>"#,
+    )
+    .expect("numbered paragraph with paragraph-mark character style");
+    let level = w::Level::from_bytes(level_xml).expect("numbering level");
+    let styles = StylesCatalog {
+      styles: HashMap::from([(
+        "Emphasis".to_string(),
+        StyleEntry {
+          style_type: Some(w::StyleValues::Character),
+          run_style: TextStyle {
+            color: RgbColor {
+              r: 0xff,
+              g: 0,
+              b: 0,
+            },
+            color_is_automatic: false,
+            ..Default::default()
+          },
+          run_overrides: RunStyleOverrides {
+            italic: Some(true),
+            ..Default::default()
+          },
+          ..Default::default()
+        },
+      )]),
+      ..Default::default()
+    };
+    let mut numbering = NumberingCatalog {
+      abstract_nums: HashMap::from([(
+        1,
+        AbstractNumbering {
+          levels: HashMap::from([(0, numbering_level_model(&level, ImportSettings::default()))]),
+          ..Default::default()
+        },
+      )]),
+      nums: HashMap::from([(
+        1,
+        NumberingInstance {
+          abstract_num_id: 1,
+          overrides: HashMap::new(),
+        },
+      )]),
+      ..Default::default()
+    };
+
+    paragraph_model(
+      &paragraph,
+      &styles,
+      &mut numbering,
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut FormWidgetIdAllocator::default(),
+    )
+  }
+
+  #[test]
+  fn paragraph_mark_character_style_is_applied_once_to_numbering() {
+    let model = paragraph_mark_character_style_numbering_model(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl>"#,
+    );
+
+    assert_eq!(model.list_label.as_deref(), Some("1.\t"));
+    assert!(model.list_label_style.italic);
+    assert_eq!(
+      model.list_label_style.color,
+      RgbColor {
+        r: 0xff,
+        g: 0,
+        b: 0
+      }
+    );
+    assert!(!model.runs[0].style.italic);
+    assert_eq!(model.runs[0].style.color, RgbColor { r: 0, g: 0, b: 0 });
+  }
+
+  #[test]
+  fn numbering_level_format_remains_authoritative_over_paragraph_mark_style() {
+    let model = paragraph_mark_character_style_numbering_model(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:rPr><w:i w:val="0"/><w:color w:val="0000ff"/></w:rPr></w:lvl>"#,
+    );
+
+    assert!(!model.list_label_style.italic);
+    assert_eq!(
+      model.list_label_style.color,
+      RgbColor {
+        r: 0,
+        g: 0,
+        b: 0xff
+      }
+    );
   }
 
   #[test]
@@ -26436,6 +27957,228 @@ mod tests {
   }
 
   #[test]
+  fn ask_field_assigns_its_cached_value_without_displaying_it() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:r><w:t>A</w:t></w:r>
+        <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+        <w:r><w:instrText> ASK foo "What is foo?" </w:instrText></w:r>
+        <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+        <w:bookmarkStart w:id="0" w:name="foo"/>
+        <w:r><w:t>bar</w:t></w:r>
+        <w:bookmarkEnd w:id="0"/>
+        <w:r><w:fldChar w:fldCharType="end"/></w:r>
+        <w:r><w:t>B</w:t></w:r>
+        <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+        <w:r><w:instrText> REF foo </w:instrText></w:r>
+        <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+        <w:r><w:t>bar</w:t></w:r>
+        <w:r><w:fldChar w:fldCharType="end"/></w:r>
+        <w:r><w:t>C</w:t></w:r>
+      </w:p>"#,
+    )
+    .expect("ASK followed by REF");
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+
+    assert_eq!(inline_text(&inlines), "ABbarC");
+    assert!(
+      inlines
+        .iter()
+        .any(|inline| matches!(inline, InlineItem::BookmarkStart(name) if name == "foo"))
+    );
+  }
+
+  #[test]
+  fn simple_ask_and_set_fields_are_non_displaying_even_when_locked() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:fldSimple w:instr=" ask foo &quot;What is foo?&quot; " w:fldLock="1">
+          <w:r><w:t>ask cached value</w:t></w:r>
+        </w:fldSimple>
+        <w:fldSimple w:instr=" SET foo bar " w:fldLock="1">
+          <w:r><w:t>set cached value</w:t></w:r>
+        </w:fldSimple>
+        <w:fldSimple w:instr=" REF foo " w:fldLock="1">
+          <w:r><w:t>visible reference</w:t></w:r>
+        </w:fldSimple>
+      </w:p>"#,
+    )
+    .expect("simple non-displaying fields");
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+
+    assert_eq!(inline_text(&inlines), "visible reference");
+  }
+
+  #[test]
+  fn legacy_form_check_box_uses_checked_then_default_and_exact_or_auto_size() {
+    let parse = |xml: &[u8], style: TextStyle| {
+      let field = w::FieldChar::from_bytes(xml).expect("legacy checkbox field character");
+      legacy_form_check_box(&field, style, None).expect("valid legacy checkbox")
+    };
+    let namespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+    let checked_overrides_default = parse(
+      format!(
+        r#"<w:fldChar xmlns:w="{namespace}" w:fldCharType="begin"><w:ffData><w:checkBox><w:sizeAuto/><w:default w:val="1"/><w:checked w:val="0"/></w:checkBox></w:ffData></w:fldChar>"#
+      )
+      .as_bytes(),
+      TextStyle::default(),
+    );
+    assert!(!checked_overrides_default.checked);
+
+    let default_state = parse(
+      format!(
+        r#"<w:fldChar xmlns:w="{namespace}" w:fldCharType="begin"><w:ffData><w:checkBox><w:sizeAuto/><w:default w:val="1"/></w:checkBox></w:ffData></w:fldChar>"#
+      )
+      .as_bytes(),
+      TextStyle::default(),
+    );
+    assert!(default_state.checked);
+
+    let omitted_state = parse(
+      format!(
+        r#"<w:fldChar xmlns:w="{namespace}" w:fldCharType="begin"><w:ffData><w:checkBox><w:sizeAuto/></w:checkBox></w:ffData></w:fldChar>"#
+      )
+      .as_bytes(),
+      TextStyle::default(),
+    );
+    assert!(!omitted_state.checked);
+
+    let present_on_off_element = parse(
+      format!(
+        r#"<w:fldChar xmlns:w="{namespace}" w:fldCharType="begin"><w:ffData><w:checkBox><w:sizeAuto/><w:checked/></w:checkBox></w:ffData></w:fldChar>"#
+      )
+      .as_bytes(),
+      TextStyle::default(),
+    );
+    assert!(present_on_off_element.checked);
+
+    let mut exact_base = TextStyle {
+      font_size_pt: 9.0,
+      complex_font_size_pt: Some(8.0),
+      ..Default::default()
+    };
+    let exact = parse(
+      format!(
+        r#"<w:fldChar xmlns:w="{namespace}" w:fldCharType="begin"><w:ffData><w:checkBox><w:size w:val="28"/></w:checkBox></w:ffData></w:fldChar>"#
+      )
+      .as_bytes(),
+      exact_base.clone(),
+    );
+    assert_eq!(exact.style.font_size_pt, 14.0);
+    assert_eq!(exact.style.complex_font_size_pt, Some(14.0));
+
+    exact_base.font_size_pt = 11.0;
+    let automatic = parse(
+      format!(
+        r#"<w:fldChar xmlns:w="{namespace}" w:fldCharType="begin"><w:ffData><w:checkBox><w:sizeAuto/></w:checkBox></w:ffData></w:fldChar>"#
+      )
+      .as_bytes(),
+      exact_base.clone(),
+    );
+    assert_eq!(automatic.style.font_size_pt, exact_base.font_size_pt);
+    assert_eq!(
+      automatic.style.complex_font_size_pt,
+      exact_base.complex_font_size_pt
+    );
+  }
+
+  #[test]
+  fn top_level_legacy_checkbox_replaces_cached_text_but_requires_ff_data() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:r><w:fldChar w:fldCharType="begin"><w:ffData><w:checkBox><w:sizeAuto/><w:default w:val="1"/></w:checkBox></w:ffData></w:fldChar></w:r>
+        <w:r><w:instrText> FORMCHECKBOX </w:instrText></w:r>
+        <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+        <w:r><w:t>cached square</w:t></w:r>
+        <w:r><w:fldChar w:fldCharType="end"/></w:r>
+      </w:p>"#,
+    )
+    .expect("top-level legacy checkbox");
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+
+    let [InlineItem::LegacyFormCheckBox(check_box)] = inlines.as_slice() else {
+      panic!("expected one semantic legacy checkbox");
+    };
+    assert!(check_box.checked);
+
+    let invalid = w::FieldChar::from_bytes(
+      br#"<w:fldChar xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fldCharType="begin"/>"#,
+    )
+    .expect("field character without ffData");
+    assert!(legacy_form_check_box(&invalid, TextStyle::default(), None).is_none());
+  }
+
+  #[test]
+  fn nested_legacy_form_fields_display_no_result() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+        <w:r><w:instrText> FORMTEXT </w:instrText></w:r>
+        <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+        <w:r><w:t>before</w:t></w:r>
+        <w:r><w:fldChar w:fldCharType="begin"><w:ffData><w:checkBox><w:sizeAuto/><w:checked w:val="1"/></w:checkBox></w:ffData></w:fldChar></w:r>
+        <w:r><w:instrText> FORMCHECKBOX </w:instrText></w:r>
+        <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+        <w:r><w:t>cached checkbox</w:t></w:r>
+        <w:r><w:fldChar w:fldCharType="end"/></w:r>
+        <w:r><w:fldChar w:fldCharType="begin"><w:ffData><w:ddList><w:result w:val="1"/><w:listEntry w:val="first"/><w:listEntry w:val="second"/></w:ddList></w:ffData></w:fldChar></w:r>
+        <w:r><w:instrText> FORMDROPDOWN </w:instrText></w:r>
+        <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+        <w:r><w:t>cached dropdown</w:t></w:r>
+        <w:r><w:fldChar w:fldCharType="end"/></w:r>
+        <w:r><w:t>after</w:t></w:r>
+        <w:r><w:fldChar w:fldCharType="end"/></w:r>
+      </w:p>"#,
+    )
+    .expect("nested legacy form fields");
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+
+    assert_eq!(inline_text(&inlines), "beforeafter");
+    assert!(
+      !inlines
+        .iter()
+        .any(|inline| matches!(inline, InlineItem::LegacyFormCheckBox(_)))
+    );
+  }
+
+  #[test]
   fn empty_form_drop_down_field_uses_selected_list_entry() {
     let styles = StylesCatalog::default();
     let images = ImageCatalog::default();
@@ -26851,6 +28594,7 @@ mod tests {
         InlineItem::Text(_)
         | InlineItem::PositionalTab(_)
         | InlineItem::Ruby(_)
+        | InlineItem::LegacyFormCheckBox(_)
         | InlineItem::Shape(_)
         | InlineItem::BookmarkStart(_)
         | InlineItem::FormWidgetStart(_)
@@ -27454,6 +29198,148 @@ mod tests {
     assert!(!style.bold);
     assert!(style.italic);
     assert!(!style.underline);
+  }
+
+  #[test]
+  fn character_style_toggle_properties_reverse_inherited_values() {
+    let mut catalog = StylesCatalog::default();
+    catalog.styles.insert(
+      "CapsEffects".into(),
+      StyleEntry {
+        style_type: Some(w::StyleValues::Character),
+        run_overrides: RunStyleOverrides {
+          bold: Some(true),
+          complex_bold: Some(true),
+          italic: Some(true),
+          complex_italic: Some(true),
+          strikethrough: Some(true),
+          uppercase: Some(true),
+          hidden: Some(true),
+          legacy_outline: Some(true),
+          legacy_shadow: Some(true),
+          legacy_emboss: Some(true),
+          ..Default::default()
+        },
+        ..Default::default()
+      },
+    );
+    catalog.styles.insert(
+      "SmallCapsImprint".into(),
+      StyleEntry {
+        style_type: Some(w::StyleValues::Character),
+        run_overrides: RunStyleOverrides {
+          small_caps: Some(true),
+          legacy_imprint: Some(true),
+          ..Default::default()
+        },
+        ..Default::default()
+      },
+    );
+
+    let caps = catalog.character_run_style(
+      Some("CapsEffects"),
+      TextStyle {
+        bold: true,
+        complex_bold: Some(true),
+        italic: true,
+        complex_italic: Some(true),
+        strikethrough: true,
+        uppercase: true,
+        hidden: true,
+        legacy_outline: true,
+        legacy_shadow: true,
+        legacy_relief: LegacyTextRelief::Embossed,
+        ..Default::default()
+      },
+    );
+    assert!(!caps.bold);
+    assert_eq!(caps.complex_bold, Some(false));
+    assert!(!caps.italic);
+    assert_eq!(caps.complex_italic, Some(false));
+    assert!(!caps.strikethrough);
+    assert!(!caps.uppercase);
+    assert!(!caps.hidden);
+    assert!(!caps.legacy_outline);
+    assert!(!caps.legacy_shadow);
+    assert_eq!(caps.legacy_relief, LegacyTextRelief::None);
+
+    let small_caps = catalog.character_run_style(
+      Some("SmallCapsImprint"),
+      TextStyle {
+        small_caps: true,
+        legacy_relief: LegacyTextRelief::Engraved,
+        ..Default::default()
+      },
+    );
+    assert!(!small_caps.small_caps);
+    assert_eq!(small_caps.legacy_relief, LegacyTextRelief::None);
+  }
+
+  #[test]
+  fn character_style_toggle_properties_enable_against_plain_text() {
+    let catalog = StylesCatalog {
+      styles: HashMap::from([
+        (
+          "Caps".into(),
+          StyleEntry {
+            style_type: Some(w::StyleValues::Character),
+            run_overrides: RunStyleOverrides {
+              bold: Some(true),
+              complex_bold: Some(true),
+              italic: Some(true),
+              complex_italic: Some(true),
+              uppercase: Some(true),
+              ..Default::default()
+            },
+            ..Default::default()
+          },
+        ),
+        (
+          "SmallCaps".into(),
+          StyleEntry {
+            style_type: Some(w::StyleValues::Character),
+            run_overrides: RunStyleOverrides {
+              small_caps: Some(true),
+              ..Default::default()
+            },
+            ..Default::default()
+          },
+        ),
+      ]),
+      ..Default::default()
+    };
+
+    let caps = catalog.character_run_style(Some("Caps"), TextStyle::default());
+    assert!(caps.bold);
+    assert_eq!(caps.complex_bold, Some(true));
+    assert!(caps.italic);
+    assert_eq!(caps.complex_italic, Some(true));
+    assert!(caps.uppercase);
+
+    let small_caps = catalog.character_run_style(Some("SmallCaps"), TextStyle::default());
+    assert!(small_caps.small_caps);
+  }
+
+  #[test]
+  fn style_toggle_overrides_preserve_omitted_true_values() {
+    let properties = w::StyleRunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:b/><w:bCs/><w:i/><w:iCs/><w:caps/><w:smallCaps/><w:strike/><w:outline/><w:shadow/><w:emboss/><w:imprint/><w:vanish/></w:rPr>"#,
+    )
+    .expect("style run properties");
+    let overrides = run_style_overrides(Some(RunProps::Style(&properties)));
+
+    assert_eq!(overrides.bold, Some(true));
+    assert_eq!(overrides.complex_bold, Some(true));
+    assert_eq!(overrides.italic, Some(true));
+    assert_eq!(overrides.complex_italic, Some(true));
+    assert_eq!(overrides.strikethrough, Some(true));
+    assert_eq!(overrides.uppercase, Some(true));
+    assert_eq!(overrides.small_caps, Some(true));
+    assert_eq!(overrides.hidden, Some(true));
+    assert_eq!(overrides.legacy_outline, Some(true));
+    assert_eq!(overrides.legacy_shadow, Some(true));
+    assert_eq!(overrides.legacy_emboss, Some(true));
+    assert_eq!(overrides.legacy_imprint, Some(true));
   }
 
   #[test]
@@ -28166,6 +30052,7 @@ mod tests {
         }
         InlineItem::Image(_)
         | InlineItem::Shape(_)
+        | InlineItem::LegacyFormCheckBox(_)
         | InlineItem::BookmarkStart(_)
         | InlineItem::FormWidgetStart(_)
         | InlineItem::FormWidgetEnd(_)
@@ -28417,6 +30304,46 @@ mod tests {
   }
 
   #[test]
+  fn body_retains_an_authored_empty_paragraph_after_a_table() {
+    let document = w::Document::from_bytes(
+      br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
+    )
+    .expect("document with an empty paragraph after a table");
+    let styles = StylesCatalog::default();
+    let mut numbering = NumberingCatalog::default();
+    let images = ImageCatalog::default();
+    let alt_chunks = AltChunkCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let bindings = CustomXmlBindings::default();
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+
+    let sections = body_sections(
+      document.body.as_deref().expect("document body"),
+      BodySectionEnv {
+        styles: &styles,
+        numbering: &mut numbering,
+        images: &images,
+        alt_chunks: &alt_chunks,
+        hyperlinks: &hyperlinks,
+        custom_xml_bindings: &bindings,
+        form_widget_ids: &mut form_widget_ids,
+        no_column_balance: false,
+      },
+    );
+
+    let [
+      Block::Table(_),
+      Block::Paragraph(empty),
+      Block::Paragraph(after),
+    ] = sections[0].blocks.as_slice()
+    else {
+      panic!("the authored empty paragraph must remain between the table and following text");
+    };
+    assert!(paragraph_is_effectively_empty(empty));
+    assert_eq!(inline_text(&after.inlines), "after");
+  }
+
+  #[test]
   fn missing_theme_uses_current_office_scheme_colors() {
     let colors = ThemeColors::default();
 
@@ -28482,6 +30409,105 @@ mod tests {
     assert!((120..=135).contains(&gradient.stops[0].color.a));
     assert!(gradient.stops[1].color.b > gradient.stops[1].color.r);
     assert_eq!(gradient.rotate_with_shape, Some(false));
+    assert_eq!(
+      gradient.interpolation,
+      common::GradientInterpolation::LinearSrgb
+    );
+  }
+
+  #[test]
+  fn wordart_path_gradient_distinguishes_missing_attributes_from_missing_focus() {
+    let fill = w14::GradientFillProperties::from_bytes(
+      br#"<w14:gradFill xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w14:gsLst><w14:gs w14:pos="0"><w14:srgbClr w14:val="FFFFFF"/></w14:gs><w14:gs w14:pos="100000"><w14:srgbClr w14:val="5B9BD5"/></w14:gs></w14:gsLst><w14:path w14:path="circle"><w14:fillToRect w14:r="100000" w14:b="100000"/></w14:path></w14:gradFill>"#,
+    )
+    .expect("Word 2010 gradient");
+
+    let common::Fill::Gradient(gradient) =
+      drawingml_w14_gradient_fill(&fill, &ThemeColors::default()).expect("resolved gradient")
+    else {
+      panic!("expected gradient fill");
+    };
+    let path = gradient.path.expect("path geometry");
+
+    assert_eq!(
+      gradient.interpolation,
+      common::GradientInterpolation::PowerPointGammaSigma
+    );
+    assert_eq!(
+      path.fill_to,
+      common::RelativeRect {
+        left: 0.0,
+        top: 0.0,
+        right: 1.0,
+        bottom: 1.0,
+      }
+    );
+  }
+
+  #[test]
+  fn chart_plot_style_preserves_path_gradient_geometry() {
+    let properties = c::ShapeProperties::from_bytes(
+      br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="FFFFFF"/></a:gs><a:gs pos="100000"><a:srgbClr val="5B9BD5"/></a:gs></a:gsLst><a:path path="circle"><a:fillToRect r="100000" b="100000"/></a:path><a:tileRect l="-100000" t="-100000"/></a:gradFill></c:spPr>"#,
+    )
+    .expect("chart plot shape properties");
+
+    let style = drawingml_chart_area_common_style(Some(&properties), &ThemeColors::default());
+    let common::ShapeStyleValue::Paint(common::Fill::Gradient(gradient)) = style.fill else {
+      panic!("expected path gradient");
+    };
+
+    assert_eq!(gradient.stops.len(), 2);
+    assert_eq!(
+      gradient.interpolation,
+      common::GradientInterpolation::PowerPointGammaSigma
+    );
+    assert_eq!(gradient.stops[0].color.r, 0xFF);
+    assert_eq!(gradient.stops[1].color.b, 0xD5);
+    let path = gradient.path.expect("path geometry");
+    assert_eq!(path.kind, common::GradientPathKind::Circle);
+    assert_eq!(
+      path.fill_to,
+      common::RelativeRect {
+        left: 0.5,
+        top: 0.5,
+        right: 0.5,
+        bottom: 0.5,
+      }
+    );
+    assert_eq!(path.transform.m11, 2.0);
+    assert_eq!(path.transform.m22, 2.0);
+    assert_eq!(path.transform.dx.0, -1.0);
+    assert_eq!(path.transform.dy.0, -1.0);
+  }
+
+  #[test]
+  fn chart_series_style_preserves_outline_width_color_and_preset_dash() {
+    let properties = c::ChartShapeProperties::from_bytes(
+      br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:solidFill><a:srgbClr val="4F81BD"/></a:solidFill><a:ln w="76200"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill><a:prstDash val="sysDash"/></a:ln></c:spPr>"#,
+    )
+    .expect("chart series shape properties");
+
+    let style = drawingml_chart_shape_common_style(Some(&properties), &ThemeColors::default());
+    let common::ShapeStyleValue::Paint(common::Fill::Solid(fill)) = style.fill else {
+      panic!("expected solid series fill");
+    };
+    assert_eq!((fill.r, fill.g, fill.b), (0x4F, 0x81, 0xBD));
+    let common::ShapeStyleValue::Paint(stroke) = style.stroke else {
+      panic!("expected series outline");
+    };
+    assert!((stroke.width.0 - 6.0).abs() < 0.001);
+    assert_eq!(
+      (stroke.color.r, stroke.color.g, stroke.color.b),
+      (0xC0, 0, 0)
+    );
+    assert_eq!(
+      stroke.preset_dash,
+      Some(common::StrokeDashPreset::SystemDash)
+    );
+    assert_eq!(
+      stroke.resolved_dash(),
+      Some(vec![common::Pt(18.0), common::Pt(6.0)])
+    );
   }
 
   #[test]

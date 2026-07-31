@@ -4309,56 +4309,22 @@ fn resolved_common_gradient(
       None,
     ),
     a::GradientFillChoice::PathGradientFill(path) => {
-      let fill_to = path
-        .fill_to_rectangle
-        .as_ref()
-        .map(|rect| crate::common::RelativeRect {
-          left: rect
-            .left
-            .map(|value| value.as_ratio() as f32)
-            .unwrap_or(0.5),
-          top: rect.top.map(|value| value.as_ratio() as f32).unwrap_or(0.5),
-          right: rect
-            .right
-            .map(|value| value.as_ratio() as f32)
-            .unwrap_or(0.5),
-          bottom: rect
-            .bottom
-            .map(|value| value.as_ratio() as f32)
-            .unwrap_or(0.5),
-        })
-        .unwrap_or(crate::common::RelativeRect {
-          left: 0.5,
-          top: 0.5,
-          right: 0.5,
-          bottom: 0.5,
-        });
-      let kind = match path.path.unwrap_or(a::PathShadeValues::Shape) {
-        a::PathShadeValues::Shape => crate::common::GradientPathKind::Shape,
-        a::PathShadeValues::Circle => crate::common::GradientPathKind::Circle,
-        a::PathShadeValues::Rectangle => crate::common::GradientPathKind::Rectangle,
-      };
-      let mut transform = crate::common::Transform {
-        m11: bounds.width,
-        m12: 0.0,
-        m21: 0.0,
-        m22: bounds.height,
-        dx: crate::common::Pt(bounds.x),
-        dy: crate::common::Pt(bounds.y),
-      };
-      if kind == crate::common::GradientPathKind::Circle {
-        transform = crate::common::office_circle_gradient_transform(transform);
+      let mut path = crate::common::drawingml_gradient::resolve_path_gradient(
+        fill,
+        path,
+        crate::common::Transform {
+          m11: bounds.width,
+          m12: 0.0,
+          m21: 0.0,
+          m22: bounds.height,
+          dx: crate::common::Pt(bounds.x),
+          dy: crate::common::Pt(bounds.y),
+        },
+      );
+      if path.kind == crate::common::GradientPathKind::Circle {
+        path.transform = crate::common::office_circle_gradient_transform(path.transform);
       }
-      (
-        None,
-        false,
-        Some(crate::common::GradientPath {
-          kind,
-          fill_to,
-          transform,
-          mirror_tile: false,
-        }),
-      )
+      (None, false, Some(path))
     }
   };
   Some(crate::common::GradientFill {

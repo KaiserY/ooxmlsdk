@@ -153,8 +153,13 @@ pub(crate) struct FloatingFrame {
   pub height_pt: Option<f32>,
   pub height_rule: FrameHeightRule,
   pub placement: FloatingFramePlacement,
-  pub fill_color: Option<RgbColor>,
-  pub borders: CellBordersModel,
+  /// Decoration supplied by a non-content anchor paragraph.
+  ///
+  /// Ordinary `framePr` paragraphs retain their own `pBdr`/`shd` because
+  /// adjacent paragraphs can share one frame while carrying different
+  /// paragraph decoration.
+  pub outer_fill_color: Option<RgbColor>,
+  pub outer_borders: ParagraphBordersModel,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -227,6 +232,7 @@ pub(crate) struct Table {
   pub alignment: TableAlignment,
   pub right_to_left: bool,
   pub align_leading_cell_content: bool,
+  pub in_header_footer: bool,
   pub placement: Option<FloatingFramePlacement>,
   pub allow_overlap: bool,
   pub split_allowed: bool,
@@ -338,6 +344,22 @@ pub(crate) struct TableBordersModel {
   pub inside_vertical: Option<BorderStyle>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct ParagraphBordersModel {
+  pub top: Option<BorderStyle>,
+  pub right: Option<BorderStyle>,
+  pub bottom: Option<BorderStyle>,
+  pub left: Option<BorderStyle>,
+  pub between: Option<BorderStyle>,
+  pub bar: Option<BorderStyle>,
+}
+
+impl ParagraphBordersModel {
+  pub(crate) fn is_empty(self) -> bool {
+    self == Self::default()
+  }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ParagraphFormat {
   pub style_id: Option<Arc<str>>,
@@ -374,7 +396,7 @@ pub(crate) struct ParagraphFormat {
   pub justification: ParagraphJustification,
   pub bidi: bool,
   pub shading: Option<RgbColor>,
-  pub borders: CellBordersModel,
+  pub borders: ParagraphBordersModel,
   pub page_break_before: bool,
   pub page_break_before_set: bool,
   pub keep_with_next: bool,
@@ -678,6 +700,7 @@ pub(crate) enum InlineItem {
   Text(TextRun),
   PositionalTab(PositionalTab),
   Ruby(RubyInline),
+  LegacyFormCheckBox(LegacyFormCheckBox),
   Image(InlineImage),
   Shape(InlineShape),
   DrawingGroupStart(InlineDrawingGroupEffect),
@@ -688,6 +711,13 @@ pub(crate) enum InlineItem {
   LastRenderedPageBreak,
   PageBreak,
   ColumnBreak,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct LegacyFormCheckBox {
+  pub checked: bool,
+  pub style: TextStyle,
+  pub hyperlink_url: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -792,18 +822,15 @@ pub(crate) struct InlineChart {
   pub category_major_gridline: Option<(RgbColor, f32)>,
   pub category_minor_gridline: Option<(RgbColor, f32)>,
   pub series_colors: Vec<RgbColor>,
-  pub series_gradient_fills: Vec<Option<common::GradientFill<'static>>>,
-  pub series_point_colors: Vec<Vec<Option<RgbColor>>>,
+  pub series_styles: Vec<common::ShapeStyle<'static>>,
+  pub series_point_styles: Vec<Vec<Option<common::ShapeStyle<'static>>>>,
   pub surface_band_colors: Vec<Vec<(u32, RgbColor)>>,
   pub data_label_fill_colors: Vec<Vec<Option<RgbColor>>>,
   pub pie_point_colors: Vec<RgbColor>,
+  pub pie_point_styles: Vec<common::ShapeStyle<'static>>,
   pub title_fill_color: Option<RgbColor>,
-  pub chart_area_fill_color: Option<RgbColor>,
-  pub plot_area_fill_color: Option<RgbColor>,
-  pub chart_area_stroke_color: Option<RgbColor>,
-  pub chart_area_stroke_width_pt: Option<f32>,
-  pub plot_area_stroke_color: Option<RgbColor>,
-  pub plot_area_stroke_width_pt: Option<f32>,
+  pub chart_area_style: common::ShapeStyle<'static>,
+  pub plot_area_style: common::ShapeStyle<'static>,
 }
 
 #[derive(Clone, Debug)]

@@ -17,18 +17,19 @@ use unicode_script::{Script, UnicodeScript};
 
 use crate::common;
 use crate::docx::{
-  Block, BorderDashPattern, BorderStyle, DocxDocument, DynamicFieldKind, FieldNumberFormat,
-  FloatingFrame, FloatingFramePlacement, FloatingImagePlacement, FloatingPaintOrder,
-  FrameHeightRule, FrameHorizontalAlignment, FrameHorizontalAnchor, FrameVerticalAlignment,
-  FrameVerticalAnchor, FrameWrapMode, HorizontalImageAlignment, HorizontalImageReference,
-  ImageCrop, ImageWrapMode, ImageWrapSide, InlineChart, InlineDrawingGroupEffect, InlineItem,
-  InlineShape, InlineShapeGeometry, InlineShapeImageFill, InlineShapeImageFillMode,
-  LegacyTextRelief, LineHeightRule, LineNumbering, NoteNumberingSpec, PRESERVED_WORD_TEXT_TAB,
-  PageBottomHyphenation, PageSetup, ParagraphAlignment, PositionalTab, PositionalTabBase, RgbColor,
-  RubyAlignment, RubyInline, SectionBreakKind, SectionColumns, TabLeader, TabStop,
-  TabStopAlignment, Table, TableAlignment, TableBordersModel, TableCell,
-  TableCellVerticalAlignment, TableLayoutMode, TableRow, TextBoxVerticalAlignment, TextRun,
-  TextStyle, VerticalImageAlignment, VerticalImageReference, paragraph_is_effectively_empty,
+  Block, BorderDashPattern, BorderStyle, DocxDocument, DynamicFieldKind,
+  EXPLICIT_DEFAULT_WORD_TEXT_TAB, FieldNumberFormat, FloatingFrame, FloatingFramePlacement,
+  FloatingImagePlacement, FloatingPaintOrder, FrameHeightRule, FrameHorizontalAlignment,
+  FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
+  HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
+  InlineChart, InlineDrawingGroupEffect, InlineItem, InlineShape, InlineShapeGeometry,
+  InlineShapeImageFill, InlineShapeImageFillMode, LegacyTextRelief, LineHeightRule, LineNumbering,
+  NoteNumberingSpec, PRESERVED_WORD_TEXT_TAB, PageBottomHyphenation, PageSetup, ParagraphAlignment,
+  PositionalTab, PositionalTabBase, RgbColor, RubyAlignment, RubyInline, SectionBreakKind,
+  SectionColumns, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment, TableBordersModel,
+  TableCell, TableCellVerticalAlignment, TableLayoutMode, TableRow, TextBoxVerticalAlignment,
+  TextRun, TextStyle, VerticalImageAlignment, VerticalImageReference,
+  paragraph_is_effectively_empty,
 };
 use crate::error::Result;
 use crate::fonts::effective_font_size_pt;
@@ -46,13 +47,17 @@ use crate::render::chart_layout_profiles as chart_profiles;
 use crate::text_metrics::TextMetrics;
 use crate::units;
 
+use super::field_localization::{
+  FieldMessage, apply_generated_field_message_style, localized_field_message,
+};
+
 // Word document defaults used by LibreOffice import/export are 11pt text,
 // 0.5in tab stops, and widow/orphan control of two lines.
 const PARAGRAPH_SPACING_AFTER_PT: f32 = 0.0;
 const DEFAULT_TAB_STOP_PT: f32 = 36.0;
-// Word uses a separate 420-twip grid for literal U+0009 characters preserved
-// inside w:t. This is distinct from w:defaultTabStop, whose default is 720
-// twips and applies to the semantic w:tab element.
+// Without an explicit w:defaultTabStop, Word recovers a separate 420-twip
+// application grid for literal U+0009 characters preserved inside w:t.
+// Import maps a literal tab to this marker only on that omitted-setting path.
 const PRESERVED_WORD_TEXT_TAB_STOP_PT: f32 = 21.0;
 const DEFAULT_FONT_SIZE_PT: f32 = 11.0;
 const DEFAULT_LINE_HEIGHT_PT: f32 = 14.0;
@@ -86,6 +91,15 @@ const LO_PLACEHOLDER_FLOATING_LINE_HEIGHT_PER_FONT_SIZE: f32 = 0.484;
 const WORD_LEGACY_OUTLINE_WIDTH_PT: f32 = 0.14;
 const WORD_LEGACY_RELIEF_OFFSET_PT: f32 = 0.96;
 const WORD_FIXED_OUTPUT_DPI: f32 = 600.0;
+// Word fixed output snaps the legacy field glyph to its 600-DPI printer grid.
+// The independent 10-point Arial (checkboxes.docx), 11-point Calibri
+// (n766477.docx), and colored 10-point Open Sans fallback (tdf92472.docx)
+// counterexamples agree on these grid widths while retaining different
+// font-metric portion sizes and the authored run color.
+const WORD_LEGACY_FORM_CHECK_BOX_OUTER_INSET_DOTS: f32 = 6.5;
+const WORD_LEGACY_FORM_CHECK_BOX_BORDER_DOTS: f32 = 6.0;
+const WORD_LEGACY_FORM_CHECK_BOX_MARK_DOTS: f32 = 4.0;
+const WORD_LEGACY_FORM_CHECK_BOX_MARK_OVERHANG_DOTS: f32 = 1.0;
 const WORD_LEGACY_SHADOW_OFFSET_PER_FONT_SIZE: f32 = 0.04;
 const WORD_LEGACY_EFFECT_BLACK: RgbColor = RgbColor { r: 0, g: 0, b: 0 };
 const WORD_LEGACY_EFFECT_GRAY: RgbColor = RgbColor {
@@ -118,6 +132,7 @@ fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
     InlineItem::Text(_) => None,
     InlineItem::PositionalTab(_) => None,
     InlineItem::Ruby(ruby) => ruby.base.first().map(|run| run.style.clone()),
+    InlineItem::LegacyFormCheckBox(check_box) => Some(check_box.style.clone()),
     InlineItem::Image(_)
     | InlineItem::Shape(_)
     | InlineItem::DrawingGroupStart(_)
@@ -495,11 +510,14 @@ fn update_line_text_height(
   line_height_pt: f32,
 ) {
   for item in items.iter_mut().skip(start_index) {
-    let PageItem::Text(text) = item else {
-      continue;
-    };
-    if (text.y_pt - y).abs() < 0.01 {
-      text.line_height_pt = text.line_height_pt.max(line_height_pt);
+    match item {
+      PageItem::Text(text) if (text.y_pt - y).abs() < 0.01 => {
+        text.line_height_pt = text.line_height_pt.max(line_height_pt);
+      }
+      PageItem::LegacyFormCheckBox(check_box) if (check_box.y_pt - y).abs() < 0.01 => {
+        check_box.line_height_pt = check_box.line_height_pt.max(line_height_pt);
+      }
+      _ => {}
     }
   }
 }
@@ -603,6 +621,7 @@ fn paragraph_has_only_inline_drawing_content(paragraph: &crate::docx::Paragraph)
       | InlineItem::LastRenderedPageBreak => {}
       InlineItem::Text(_)
       | InlineItem::Ruby(_)
+      | InlineItem::LegacyFormCheckBox(_)
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak
       | InlineItem::Image(_)
@@ -1137,6 +1156,7 @@ struct PendingFloatingTableFollow {
 pub(crate) enum PageItem {
   Text(Box<TextItem>),
   Image(ImageItem),
+  LegacyFormCheckBox(LegacyFormCheckBoxItem),
   Group(Vec<PageItem>),
   FloatingDrawing {
     items: Vec<PageItem>,
@@ -1148,6 +1168,19 @@ pub(crate) enum PageItem {
   Line(LineItem),
   Path(Box<common::PathItem<'static>>),
   Polyline(PolylineItem),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct LegacyFormCheckBoxItem {
+  x_pt: f32,
+  y_pt: f32,
+  line_height_pt: f32,
+  size_pt: f32,
+  checked: bool,
+  style: TextStyle,
+  hyperlink_url: Option<String>,
+  rotation_deg: f32,
+  rotation_center_pt: Option<(f32, f32)>,
 }
 
 impl PageItem {
@@ -1190,6 +1223,7 @@ struct DynamicFieldAlignedTab {
   start_x_pt: f32,
   inside_field_result: bool,
   leader_layout: TabLeaderLayout,
+  logical_repeat_width_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1362,6 +1396,37 @@ struct PendingAlignedTab {
   field_result_tab: bool,
 }
 
+fn aligned_tab_provisional_line_right(
+  pending_tab: Option<&PendingAlignedTab>,
+  line_right: f32,
+) -> f32 {
+  let Some(tab) = pending_tab else {
+    return line_right;
+  };
+  if tab.stop.x_pt > line_right + LAYOUT_EPSILON_PT {
+    // A compatibility tab beyond the text margin deliberately activates the
+    // existing tab-over-margin path, whose following portions do not wrap at
+    // the paragraph edge.
+    return line_right;
+  }
+
+  // Center/right tabs are formatted in two phases. SwTabPortion::PreFormat()
+  // first leaves the following portions enough provisional room to wrap;
+  // PostFormat() then shifts only the portions which fit on this line back to
+  // the authored alignment point. Our provisional items start at the tab
+  // point, so mirror that available width to its right while line breaking.
+  let leading_capacity = (tab.stop.x_pt - tab.leader_start_x_pt).max(0.0);
+  let capacity = match tab.stop.alignment {
+    TabStopAlignment::Right => leading_capacity,
+    TabStopAlignment::Center => {
+      let trailing_capacity = (line_right - tab.stop.x_pt).max(0.0);
+      2.0 * leading_capacity.min(trailing_capacity)
+    }
+    TabStopAlignment::Left => 0.0,
+  };
+  tab.stop.x_pt + capacity
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct WrapExclusion {
   left_pt: f32,
@@ -1377,6 +1442,7 @@ struct WrapExclusion {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum WrapExclusionOwner {
   Drawing,
+  ParagraphFrame,
   FloatingTable,
 }
 
@@ -1865,6 +1931,7 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
   match item {
     PageItem::Text(item) => common::DisplayItem::Text(into_common_text_run(*item)),
     PageItem::Image(item) => common::DisplayItem::Image(into_common_image_item(item)),
+    PageItem::LegacyFormCheckBox(item) => into_common_legacy_form_check_box(item),
     PageItem::Group(items) => {
       common::DisplayItem::Group(common::CompositingGroup {
         mask: None,
@@ -1902,6 +1969,94 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
     PageItem::Path(item) => common::DisplayItem::Path(*item),
     PageItem::Polyline(item) => common::DisplayItem::Path(into_common_path_item(item)),
   }
+}
+
+fn into_common_legacy_form_check_box(item: LegacyFormCheckBoxItem) -> common::DisplayItem<'static> {
+  let printer_dot_pt = units::POINTS_PER_INCH / WORD_FIXED_OUTPUT_DPI;
+  let outer_inset_pt = WORD_LEGACY_FORM_CHECK_BOX_OUTER_INSET_DOTS * printer_dot_pt;
+  let border_width_pt = WORD_LEGACY_FORM_CHECK_BOX_BORDER_DOTS * printer_dot_pt;
+  let mark_width_pt = WORD_LEGACY_FORM_CHECK_BOX_MARK_DOTS * printer_dot_pt;
+  let mark_overhang_pt = WORD_LEGACY_FORM_CHECK_BOX_MARK_OVERHANG_DOTS * printer_dot_pt;
+  let box_top_pt = item.y_pt + (item.line_height_pt - item.size_pt).max(0.0) / 2.0;
+  let rectangle_inset_pt = outer_inset_pt + border_width_pt / 2.0;
+  let rectangle_size_pt = (item.size_pt - outer_inset_pt * 2.0 - border_width_pt).max(0.0);
+  let rectangle_left_pt = item.x_pt + rectangle_inset_pt;
+  let rectangle_top_pt = box_top_pt + rectangle_inset_pt;
+  let color = common_rgb(item.style.color, item.style.opacity);
+  let mut items = Vec::with_capacity(if item.checked { 4 } else { 2 });
+
+  if !item.style.hidden && rectangle_size_pt > LAYOUT_EPSILON_PT {
+    items.push(common::DisplayItem::Rect(common::RectItem {
+      bounds: common_rect(
+        rectangle_left_pt,
+        rectangle_top_pt,
+        rectangle_size_pt,
+        rectangle_size_pt,
+      ),
+      fill: common::Fill::None,
+      stroke: Some(common::Stroke {
+        width: common::Pt(border_width_pt),
+        color,
+        ..Default::default()
+      }),
+    }));
+    if item.checked {
+      let mark_left_pt = rectangle_left_pt - mark_overhang_pt;
+      let mark_top_pt = rectangle_top_pt - mark_overhang_pt;
+      let mark_right_pt = rectangle_left_pt + rectangle_size_pt + mark_overhang_pt;
+      let mark_bottom_pt = rectangle_top_pt + rectangle_size_pt + mark_overhang_pt;
+      let stroke = common::Stroke {
+        width: common::Pt(mark_width_pt),
+        color,
+        ..Default::default()
+      };
+      items.push(common::DisplayItem::Line(common::LineItem {
+        start: common_point(mark_left_pt, mark_top_pt),
+        end: common_point(mark_right_pt, mark_bottom_pt),
+        stroke: stroke.clone(),
+        kind: common::LineKind::Stroke,
+      }));
+      items.push(common::DisplayItem::Line(common::LineItem {
+        start: common_point(mark_right_pt, mark_top_pt),
+        end: common_point(mark_left_pt, mark_bottom_pt),
+        stroke,
+        kind: common::LineKind::Stroke,
+      }));
+    }
+  }
+  if let Some(target) = item.hyperlink_url {
+    items.push(common::DisplayItem::LinkArea(common::LinkArea {
+      bounds: common_rect(item.x_pt, box_top_pt, item.size_pt, item.size_pt),
+      target: Cow::Owned(target),
+    }));
+  }
+
+  let transform = item
+    .rotation_center_pt
+    .filter(|_| item.rotation_deg.abs() > f32::EPSILON)
+    .map(|(center_x, center_y)| {
+      let affine = Affine::translate((-f64::from(center_x), -f64::from(center_y)))
+        .then_rotate(f64::from(item.rotation_deg.to_radians()))
+        .then_translate((f64::from(center_x), f64::from(center_y)).into());
+      let [m11, m12, m21, m22, dx, dy] = affine.as_coeffs();
+      common::Transform {
+        m11: m11 as f32,
+        m12: m12 as f32,
+        m21: m21 as f32,
+        m22: m22 as f32,
+        dx: common::Pt(dx as f32),
+        dy: common::Pt(dy as f32),
+      }
+    });
+  common::DisplayItem::Group(common::CompositingGroup {
+    mask: None,
+    transform,
+    blend_mode: common::BlendMode::Normal,
+    opacity: 1.0,
+    flatten_identity: true,
+    inherit_text_line_owner: true,
+    items,
+  })
 }
 
 fn finish_docx_shape_effects(
@@ -3742,6 +3897,7 @@ impl<'a> RootFrameLayout<'a> {
         pages: &mut self.pages,
         anchor_pages: Some(&mut self.anchor_pages),
         text_metrics: &mut self.text_metrics,
+        paragraph_decoration_outer_bottom_pt: None,
       },
       self.y,
     );
@@ -4037,6 +4193,7 @@ impl<'a> RootFrameLayout<'a> {
           pages: &mut self.pages,
           anchor_pages: None,
           text_metrics: &mut self.text_metrics,
+          paragraph_decoration_outer_bottom_pt: None,
         },
         self.y,
       );
@@ -4400,6 +4557,7 @@ fn materialize_legacy_wordprocessing_text_effects_in_items(
         continue;
       }
       PageItem::Image(_)
+      | PageItem::LegacyFormCheckBox(_)
       | PageItem::Rect(_)
       | PageItem::Fill(_)
       | PageItem::Line(_)
@@ -4505,6 +4663,12 @@ fn legacy_wordprocessing_effect_foreground(mut foreground: TextItem, outline: bo
     let outline_color = foreground.style.color;
     let outline_opacity = foreground.style.opacity;
     foreground.style.pdf_glyph_outlines = true;
+    foreground.style.pdf_glyph_outline_options = Some(Arc::new(common::PdfGlyphOutlineOptions {
+      // Word marks the painted outline as an artifact and retains one
+      // invisible semantic text layer for search and accessibility.
+      semantic_text_overlay: true,
+      ..Default::default()
+    }));
     foreground.style.outline_color = Some(outline_color);
     foreground.style.outline_opacity = outline_opacity;
     foreground.style.outline_width_pt = WORD_LEGACY_OUTLINE_WIDTH_PT;
@@ -4592,7 +4756,10 @@ fn legacy_wordprocessing_effect_artifact(
   artifact.style.color_is_automatic = false;
   artifact.style.opacity = 1.0;
   artifact.style.semantic_only = false;
-  artifact.style.pdf_glyph_outlines = false;
+  // Office marks legacy shadow/relief paint layers as PDF artifacts. Krilla
+  // has no painted-text artifact role, so emit the same glyph geometry as
+  // vector outlines; only the authored foreground remains searchable.
+  artifact.style.pdf_glyph_outlines = true;
   artifact.style.pdf_glyph_outline_options = None;
   artifact.style.outline_color = None;
   artifact.style.outline_opacity = 1.0;
@@ -4645,6 +4812,7 @@ fn materialize_wordprocessing_text_effects_in_items(
         continue;
       }
       PageItem::Image(_)
+      | PageItem::LegacyFormCheckBox(_)
       | PageItem::Rect(_)
       | PageItem::Fill(_)
       | PageItem::Line(_)
@@ -4923,6 +5091,7 @@ fn paragraph_outline_text(paragraph: &crate::docx::Paragraph) -> String {
         InlineItem::PositionalTab(_) => None,
         InlineItem::Image(_)
         | InlineItem::Shape(_)
+        | InlineItem::LegacyFormCheckBox(_)
         | InlineItem::DrawingGroupStart(_)
         | InlineItem::DrawingGroupEnd
         | InlineItem::BookmarkStart(_)
@@ -5299,6 +5468,7 @@ fn line_number_text_metrics_for_items(
     .iter()
     .find_map(|item| match item {
       PageItem::Text(text) => Some((text.y_pt, text.line_height_pt)),
+      PageItem::LegacyFormCheckBox(check_box) => Some((check_box.y_pt, check_box.line_height_pt)),
       PageItem::Group(items) => line_number_text_metrics_for_items(items, 0, items.len()),
       PageItem::FloatingDrawing { .. } => None,
       PageItem::Image(_)
@@ -6547,6 +6717,7 @@ fn restart_plan_for_page_invalidations(
 fn item_line_y(item: &PageItem) -> Option<f32> {
   match item {
     PageItem::Text(text) => Some(text.y_pt),
+    PageItem::LegacyFormCheckBox(check_box) => Some(check_box.y_pt),
     PageItem::Image(image) if !image.floating => Some(image.y_pt),
     PageItem::Group(items) => items.iter().find_map(item_line_y),
     PageItem::FloatingDrawing { .. } => None,
@@ -6570,6 +6741,12 @@ fn item_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Option<(f32, 
         text.y_pt + text.line_height_pt,
       ))
     }
+    PageItem::LegacyFormCheckBox(check_box) => Some((
+      check_box.x_pt,
+      check_box.y_pt,
+      check_box.x_pt + check_box.size_pt,
+      check_box.y_pt + check_box.line_height_pt,
+    )),
     PageItem::Image(image) => Some((
       image.x_pt,
       image.y_pt,
@@ -6637,6 +6814,9 @@ fn page_items_bounds(
 fn item_vertical_bounds(item: &PageItem) -> (f32, f32) {
   match item {
     PageItem::Text(text) => (text.y_pt, text.y_pt + text.line_height_pt),
+    PageItem::LegacyFormCheckBox(check_box) => {
+      (check_box.y_pt, check_box.y_pt + check_box.line_height_pt)
+    }
     PageItem::Image(image) => (image.y_pt, image.y_pt + image.height_pt),
     PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
       page_items_vertical_bounds(items).unwrap_or((0.0, 0.0))
@@ -7518,6 +7698,18 @@ fn estimated_paragraph_content_height(
           line_height = line_height.max(ruby_height);
         }
       }
+      InlineItem::LegacyFormCheckBox(check_box) => {
+        let size_pt = inline_text_height(&check_box.style, text_metrics);
+        has_flow_content = true;
+        if x + size_pt > content_width && x > 0.0 {
+          finish_line(&mut content_height, &mut line_height);
+          x = 0.0;
+        }
+        x += size_pt.min(content_width);
+        if !matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
+          line_height = line_height.max(size_pt);
+        }
+      }
       InlineItem::BookmarkStart(_) => {}
       InlineItem::Image(image) => {
         if let crate::docx::ImagePlacement::Floating(placement) = image.placement
@@ -7669,6 +7861,10 @@ fn item_is_in_body_region(item: &PageItem, flow: FlowContext) -> bool {
     PageItem::Text(text) => {
       text.y_pt >= flow.content_top_pt - LAYOUT_EPSILON_PT
         && text.y_pt <= flow.content_bottom + LAYOUT_EPSILON_PT
+    }
+    PageItem::LegacyFormCheckBox(check_box) => {
+      check_box.y_pt >= flow.content_top_pt - LAYOUT_EPSILON_PT
+        && check_box.y_pt <= flow.content_bottom + LAYOUT_EPSILON_PT
     }
     PageItem::Image(image) => {
       image.y_pt >= flow.content_top_pt - LAYOUT_EPSILON_PT
@@ -7870,6 +8066,56 @@ struct LayoutBlockTarget<'a> {
   pages: &'a mut Vec<Page>,
   anchor_pages: Option<&'a mut Vec<AnchorPage>>,
   text_metrics: &'a mut TextMetrics,
+  paragraph_decoration_outer_bottom_pt: Option<f32>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ParagraphBorderContext {
+  joins_previous: bool,
+  joins_next: bool,
+}
+
+impl ParagraphBorderContext {
+  fn for_blocks(
+    previous: Option<&Block>,
+    paragraph: &crate::docx::Paragraph,
+    next: Option<&Block>,
+  ) -> Self {
+    let borders = paragraph.format.borders;
+    if borders.is_empty() {
+      return Self::default();
+    }
+    Self {
+      joins_previous: block_paragraph(previous)
+        .is_some_and(|previous| previous.format.borders == borders),
+      joins_next: block_paragraph(next).is_some_and(|next| next.format.borders == borders),
+    }
+  }
+
+  fn top(self, paragraph: &crate::docx::Paragraph) -> Option<BorderStyle> {
+    (!self.joins_previous)
+      .then_some(paragraph.format.borders.top)
+      .flatten()
+  }
+
+  fn bottom(self, paragraph: &crate::docx::Paragraph) -> Option<BorderStyle> {
+    if self.joins_next {
+      paragraph.format.borders.between.map(|mut border| {
+        // ECMA-376 Part 1 §17.3.1.5: `between/@space` is ignored.
+        border.spacing_pt = 0.0;
+        border
+      })
+    } else {
+      paragraph.format.borders.bottom
+    }
+  }
+}
+
+fn block_paragraph(block: Option<&Block>) -> Option<&crate::docx::Paragraph> {
+  let Block::Paragraph(paragraph) = block? else {
+    return None;
+  };
+  Some(paragraph)
 }
 
 fn layout_document_block(
@@ -7882,6 +8128,7 @@ fn layout_document_block(
 ) -> (FlowContext, f32) {
   match block {
     Block::Paragraph(paragraph) => {
+      let border_context = ParagraphBorderContext::for_blocks(previous, paragraph, next);
       let mut ignore_top_margin_at_page_start = false;
       if let Some(frame) = paragraph_frame(paragraph) {
         note_body_content_frame(target.current, flow);
@@ -7922,7 +8169,7 @@ fn layout_document_block(
       if !ignore_top_margin_after_page_break && !ignore_top_margin_at_page_start {
         y += paragraph_spacing_before(previous, paragraph, flow, target.text_metrics);
       }
-      y += paragraph_border_layout_extent(paragraph.format.borders.top);
+      y += paragraph_border_layout_extent(border_context.top(paragraph));
       let ignore_left_indent = paragraph_ignores_left_indent_next_to_floating_table(previous, next);
       let (paragraph_flow, y) = layout_paragraph_with_left_indent_compat(
         paragraph,
@@ -7937,8 +8184,10 @@ fn layout_document_block(
         paragraph_anchor_top,
         paragraph_spacing_after(paragraph, next),
         ignore_left_indent,
+        border_context,
+        target.paragraph_decoration_outer_bottom_pt,
       );
-      let y = y + paragraph_border_layout_extent(paragraph.format.borders.bottom);
+      let y = y + paragraph_border_layout_extent(border_context.bottom(paragraph));
       (
         FlowContext {
           content_width: flow.content_width,
@@ -8026,8 +8275,8 @@ fn paragraph_frame(paragraph: &crate::docx::Paragraph) -> Option<FloatingFrame> 
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
     placement: frame.placement,
-    fill_color: paragraph.format.shading,
-    borders: paragraph.format.borders,
+    outer_fill_color: None,
+    outer_borders: crate::docx::ParagraphBordersModel::default(),
   })
 }
 
@@ -8042,22 +8291,6 @@ fn layout_floating_frame(
   let width = floating_frame_width(frame, flow, text_metrics);
   let height = frame_height_for_width(frame, flow, text_metrics, width);
   let (x, frame_y) = paragraph_frame_position(frame.placement, flow, y, width, height);
-  let frame_stroke = frame
-    .borders
-    .top
-    .or(frame.borders.left)
-    .or(frame.borders.right)
-    .or(frame.borders.bottom);
-  current.items.push(PageItem::Rect(RectItem {
-    x_pt: x,
-    y_pt: frame_y,
-    width_pt: width,
-    height_pt: height,
-    fill_color: frame.fill_color,
-    fill_opacity: 1.0,
-    stroke: frame_stroke.or_else(|| frame.fill_color.is_none().then_some(BorderStyle::default())),
-    stroke_opacity: if frame_stroke.is_some() { 1.0 } else { 0.0 },
-  }));
   let frame_flow = FlowContext {
     content_top_pt: frame_y,
     content_left_pt: x,
@@ -8082,6 +8315,10 @@ fn layout_floating_frame(
       .checked_sub(1)
       .and_then(|index| frame.blocks.get(index));
     let next = frame.blocks.get(index + 1);
+    let paragraph_decoration_outer_bottom_pt = (index + 1 == frame.blocks.len()
+      && matches!(block, Block::Paragraph(_))
+      && matches!(frame.height_rule, FrameHeightRule::Exact))
+    .then_some(frame_y + height);
     let (_, next_y) = layout_document_block(
       previous,
       block,
@@ -8092,19 +8329,53 @@ fn layout_floating_frame(
         pages: &mut frame_pages,
         anchor_pages: None,
         text_metrics: &mut *text_metrics,
+        paragraph_decoration_outer_bottom_pt,
       },
       block_y,
     );
     block_y = next_y;
   }
+  let rendered_height = if matches!(frame.height_rule, FrameHeightRule::Exact) {
+    height
+  } else {
+    height.max(block_y - frame_y)
+  };
   let visible_page = frame_pages.into_iter().next().unwrap_or(frame_page);
+  let frame_stroke = frame
+    .outer_borders
+    .top
+    .or(frame.outer_borders.left)
+    .or(frame.outer_borders.right)
+    .or(frame.outer_borders.bottom);
+  if frame.outer_fill_color.is_some() || frame_stroke.is_some() {
+    current.items.push(PageItem::Rect(RectItem {
+      x_pt: x,
+      y_pt: frame_y,
+      width_pt: width,
+      height_pt: rendered_height,
+      fill_color: frame.outer_fill_color,
+      fill_opacity: 1.0,
+      stroke: frame_stroke,
+      stroke_opacity: 1.0,
+    }));
+  }
   current
     .items
     .extend(visible_page.items.into_iter().filter(|item| {
       !matches!(frame.height_rule, FrameHeightRule::Exact)
         || table_cell_item_intersects_vertical_bounds(item, frame_y, frame_y + height)
     }));
-  let occupied_bottom = frame_y + height.max(block_y - frame_y) + frame.placement.margin_bottom_pt;
+  append_paragraph_frame_wrap_exclusion(
+    current,
+    frame.placement,
+    FrameBounds {
+      x_pt: x,
+      y_pt: frame_y,
+      width_pt: width,
+      height_pt: rendered_height,
+    },
+  );
+  let occupied_bottom = frame_y + rendered_height + frame.placement.margin_bottom_pt;
   if floating_frame_blocks_flow(frame) {
     (flow, y.max(occupied_bottom))
   } else {
@@ -8133,6 +8404,19 @@ fn floating_frame_width(
   }
 
   let available_width = default_floating_frame_width(frame.placement, flow);
+  if frame
+    .blocks
+    .iter()
+    .any(block_has_width_filling_paragraph_decoration)
+  {
+    // Paragraph shading and pBdr occupy the paragraph box rather than only
+    // the glyph advance. With an automatic frame width this makes the
+    // rendered content line consume the available text-frame width. Office
+    // fixed output demonstrates both forms independently:
+    // `tdf164500_framePrBeforeTable.docx` (shading) and
+    // Apache POI `checkboxes.docx` (paragraph borders).
+    return available_width;
+  }
   // ECMA-376 Part 1 §17.3.1.11 defines an omitted w as the maximum
   // content-line width. Writer imports the same state as a zero-width
   // SizeType::MIN frame, allowing its fly to grow around the content.
@@ -8144,6 +8428,19 @@ fn floating_frame_width(
     .max(DEFAULT_FONT_SIZE_PT)
 }
 
+fn block_has_width_filling_paragraph_decoration(block: &Block) -> bool {
+  match block {
+    Block::Paragraph(paragraph) => {
+      paragraph.format.shading.is_some() || !paragraph.format.borders.is_empty()
+    }
+    Block::Frame(frame) => frame
+      .blocks
+      .iter()
+      .any(block_has_width_filling_paragraph_decoration),
+    Block::Table(_) => false,
+  }
+}
+
 fn frame_content_height(
   frame: &FloatingFrame,
   flow: FlowContext,
@@ -8152,7 +8449,22 @@ fn frame_content_height(
   frame
     .blocks
     .iter()
-    .map(|block| estimated_block_height(block, flow, text_metrics))
+    .enumerate()
+    .map(|(index, block)| {
+      let previous = index
+        .checked_sub(1)
+        .and_then(|index| frame.blocks.get(index));
+      let next = frame.blocks.get(index + 1);
+      let Block::Paragraph(paragraph) = block else {
+        return estimated_block_height(block, flow, text_metrics);
+      };
+      let border_context = ParagraphBorderContext::for_blocks(previous, paragraph, next);
+      paragraph_spacing_before(previous, paragraph, flow, text_metrics)
+        + paragraph_border_layout_extent(border_context.top(paragraph))
+        + estimated_paragraph_content_height(paragraph, flow, text_metrics)
+        + paragraph_border_layout_extent(border_context.bottom(paragraph))
+        + paragraph_spacing_after(paragraph, next)
+    })
     .sum::<f32>()
     .max(DEFAULT_LINE_HEIGHT_PT)
 }
@@ -8464,6 +8776,7 @@ fn measured_note_blocks_height(
         pages: &mut discarded_pages,
         anchor_pages: None,
         text_metrics: &mut *text_metrics,
+        paragraph_decoration_outer_bottom_pt: None,
       },
       y,
     );
@@ -8548,6 +8861,7 @@ fn footnote_boss_format(
           pages: target.pages,
           anchor_pages: None,
           text_metrics: &mut *target.text_metrics,
+          paragraph_decoration_outer_bottom_pt: None,
         },
         y,
       );
@@ -8574,6 +8888,7 @@ fn shift_existing_page_footnotes(page: &mut Page, dy_pt: f32) {
 fn shift_page_item_y(item: &mut PageItem, dy_pt: f32) {
   match item {
     PageItem::Text(text) => text.y_pt += dy_pt,
+    PageItem::LegacyFormCheckBox(check_box) => check_box.y_pt += dy_pt,
     PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
       for item in items {
         shift_page_item_y(item, dy_pt);
@@ -9215,7 +9530,10 @@ fn block_has_visible_body_content(block: &Block) -> bool {
   match block {
     Block::Paragraph(paragraph) => paragraph.inlines.iter().any(|inline| match inline {
       InlineItem::Text(run) => !run.text.trim().is_empty(),
-      InlineItem::Ruby(_) | InlineItem::Image(_) | InlineItem::Shape(_) => true,
+      InlineItem::Ruby(_)
+      | InlineItem::Image(_)
+      | InlineItem::Shape(_)
+      | InlineItem::LegacyFormCheckBox(_) => true,
       InlineItem::PositionalTab(_) => false,
       InlineItem::BookmarkStart(_) => false,
       InlineItem::FormWidgetStart(_)
@@ -9385,6 +9703,7 @@ fn order_floating_page_items(
       }
       PageItem::Text(_)
       | PageItem::Image(_)
+      | PageItem::LegacyFormCheckBox(_)
       | PageItem::Rect(_)
       | PageItem::Fill(_)
       | PageItem::Line(_)
@@ -9627,15 +9946,22 @@ fn resolve_dynamic_field_text(
         text.text = if !relative_position {
           page_number
         } else if anchor.page_index != context.page_index {
-          localized_pageref_on_page(context.ui_language, &page_number)
+          localized_field_message(
+            FieldMessage::PageRefOnPage(&page_number),
+            context.ui_language,
+          )
         } else {
           let bookmark_is_above = anchor.y_pt < text.y_pt - LAYOUT_EPSILON_PT
             || (f32::abs(anchor.y_pt - text.y_pt) <= LAYOUT_EPSILON_PT && anchor.x_pt <= text.x_pt);
-          localized_pageref_relative(context.ui_language, bookmark_is_above)
+          localized_field_message(
+            FieldMessage::PageRefRelative { bookmark_is_above },
+            context.ui_language,
+          )
         };
       } else {
-        text.text = localized_undefined_bookmark(context.ui_language);
-        super::apply_generated_field_error_font(&mut text.style, context.ui_language);
+        let message = FieldMessage::UndefinedBookmark;
+        text.text = localized_field_message(message, context.ui_language);
+        apply_generated_field_message_style(&mut text.style, message, context.ui_language);
         if let Some(mut anchor) = text.dynamic_field_line_anchor.filter(|anchor| {
           anchor
             .aligned_tab
@@ -9673,8 +9999,9 @@ fn resolve_dynamic_field_text(
       ) {
         text.text = value;
       } else {
-        text.text = localized_missing_style(context.ui_language, style_name);
-        apply_generated_style_ref_error_font(&mut text.style, context.ui_language);
+        let message = FieldMessage::MissingStyle(style_name);
+        text.text = localized_field_message(message, context.ui_language);
+        apply_generated_field_message_style(&mut text.style, message, context.ui_language);
       }
     }
     None => {}
@@ -9689,104 +10016,6 @@ fn resolve_page_style_number_format(
     page_style
   } else {
     requested
-  }
-}
-
-fn normalized_field_language(ui_language: Option<&str>) -> String {
-  ui_language
-    .unwrap_or("en-US")
-    .replace('_', "-")
-    .to_ascii_lowercase()
-}
-
-fn localized_undefined_bookmark(ui_language: Option<&str>) -> String {
-  let language = normalized_field_language(ui_language);
-  if language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans") {
-    "错误!未定义书签。".to_string()
-  } else if language == "zh-tw"
-    || language == "zh-hk"
-    || language == "zh-mo"
-    || language.starts_with("zh-hant")
-  {
-    "錯誤！ 書籤未定義。".to_string()
-  } else {
-    "Error! Bookmark not defined.".to_string()
-  }
-}
-
-fn localized_missing_style(ui_language: Option<&str>, style_name: &str) -> String {
-  let language = normalized_field_language(ui_language);
-  if language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans") {
-    format!("错误!使用“开始”选项卡将 {style_name} 应用于要在此处显示的文字。")
-  } else if language == "zh-tw"
-    || language == "zh-hk"
-    || language == "zh-mo"
-    || language.starts_with("zh-hant")
-  {
-    format!("錯誤!請使用 [常用] 索引標籤將 {style_name} 套用到您想要在此顯示的文字。")
-  } else {
-    format!(
-      "Error! Use the Home tab to apply {style_name} to the text that you want to appear here."
-    )
-  }
-}
-
-fn apply_generated_style_ref_error_font(style: &mut TextStyle, ui_language: Option<&str>) {
-  let language = normalized_field_language(ui_language);
-  if language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans") {
-    // Word's localized STYLEREF diagnostic is a bold UI resource. Unlike the
-    // missing-bookmark resource above, it uses the current Office UI face for
-    // Chinese while retaining the field's Latin face for the embedded style
-    // name and punctuation.
-    style.east_asia_font_family = Some(super::office_default_font_family(ui_language));
-    style.east_asia_language = Some(Arc::<str>::from("zh-CN"));
-    style.bold = true;
-    style.complex_bold = Some(true);
-    style.line_height_override_pt =
-      Some(style.font_size_pt * super::WORD_ZH_STYLE_REF_ERROR_LINE_HEIGHT_PER_FONT_SIZE);
-  }
-}
-
-fn localized_pageref_relative(ui_language: Option<&str>, bookmark_is_above: bool) -> String {
-  let language = normalized_field_language(ui_language);
-  if language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans") {
-    if bookmark_is_above {
-      "上方"
-    } else {
-      "下方"
-    }
-    .to_string()
-  } else if language == "zh-tw"
-    || language == "zh-hk"
-    || language == "zh-mo"
-    || language.starts_with("zh-hant")
-  {
-    if bookmark_is_above {
-      "上面"
-    } else {
-      "下面"
-    }
-    .to_string()
-  } else {
-    if bookmark_is_above { "above" } else { "below" }.to_string()
-  }
-}
-
-fn localized_pageref_on_page(ui_language: Option<&str>, page_number: &str) -> String {
-  let language = normalized_field_language(ui_language);
-  if language.starts_with("zh") {
-    let page = if language == "zh-tw"
-      || language == "zh-hk"
-      || language == "zh-mo"
-      || language.starts_with("zh-hant")
-    {
-      "頁"
-    } else {
-      "页"
-    };
-    format!("第 {page_number} {page}")
-  } else {
-    format!("on page {page_number}")
   }
 }
 
@@ -9881,8 +10110,8 @@ fn resize_dynamic_field_tab_leaders(items: &mut [PageItem], text_metrics: &mut T
     else {
       continue;
     };
-    let repeat_width = tab_leader_repeat_width(fill_char, &leader.style, text_metrics);
-    if repeat_width <= LAYOUT_EPSILON_PT {
+    let paint_repeat_width = tab_leader_repeat_width(fill_char, &leader.style, text_metrics);
+    if paint_repeat_width <= LAYOUT_EPSILON_PT {
       continue;
     }
     let anchor = field
@@ -9901,12 +10130,19 @@ fn resize_dynamic_field_tab_leaders(items: &mut [PageItem], text_metrics: &mut T
     let leader_layout = anchor
       .aligned_tab
       .map_or(TabLeaderLayout::NaturalStart, |tab| tab.leader_layout);
+    let logical_repeat_width = anchor
+      .aligned_tab
+      .map_or(paint_repeat_width, |tab| tab.logical_repeat_width_pt);
+    if logical_repeat_width <= LAYOUT_EPSILON_PT {
+      continue;
+    }
     let start_x_pt = anchor.aligned_tab.map_or(leader.x_pt, |tab| tab.start_x_pt);
     let boundary_slot = tab_leader_boundary_slot_pt(
       fill_char,
       &leader.style,
-      repeat_width,
+      paint_repeat_width,
       leader_layout,
+      field.style.wordprocessingml_generated_field_diagnostic,
       text_metrics,
     );
     let count = if anchor
@@ -9917,14 +10153,14 @@ fn resize_dynamic_field_tab_leaders(items: &mut [PageItem], text_metrics: &mut T
     } else {
       tab_leader_repeat_count(
         (aligned_content_x - start_x_pt - boundary_slot).max(0.0),
-        repeat_width,
+        logical_repeat_width,
         leader_layout,
       )
     };
     let x_pt = match leader_layout {
       TabLeaderLayout::NaturalStart => start_x_pt + boundary_slot / 2.0,
       TabLeaderLayout::OfficeLegacyPrintGridEnd | TabLeaderLayout::Office2013PrintGridEnd => {
-        aligned_content_x - count as f32 * repeat_width
+        aligned_content_x - count as f32 * logical_repeat_width
       }
     };
     replacements.push((leader_index, x_pt, fill_char.to_string().repeat(count)));
@@ -11322,11 +11558,45 @@ fn page_item_is_path(item: &PageItem) -> bool {
       items.iter().any(page_item_is_path)
     }
     PageItem::Rect(rect) => rect.fill_color.is_some() || rect.stroke.is_some(),
+    PageItem::LegacyFormCheckBox(check_box) => !check_box.style.hidden,
     PageItem::Line(_) => true,
     PageItem::Path(path) => !matches!(path.fill, common::Fill::None) || path.stroke.is_some(),
     PageItem::Polyline(polyline) => polyline.fill_color.is_some() || polyline.stroke.is_some(),
     PageItem::Text(_) | PageItem::Image(_) | PageItem::Fill(_) => false,
   }
+}
+
+fn append_paragraph_frame_wrap_exclusion(
+  page: &mut Page,
+  placement: FloatingFramePlacement,
+  bounds: FrameBounds,
+) {
+  let blocks_flow = frame_wrap_blocks_flow(placement.wrap);
+  // ECMA-376 Part 1 §17.3.1.11 limits hSpace to `wrap="around"`;
+  // vSpace is the minimum separation above and below every text frame.
+  let horizontal_space = if matches!(placement.wrap, FrameWrapMode::Around) {
+    (placement.margin_left_pt, placement.margin_right_pt)
+  } else {
+    (0.0, 0.0)
+  };
+  page.wrap_exclusions.push(WrapExclusion {
+    left_pt: if blocks_flow {
+      0.0
+    } else {
+      bounds.x_pt - horizontal_space.0
+    },
+    right_pt: if blocks_flow {
+      page.setup.width_pt
+    } else {
+      bounds.x_pt + bounds.width_pt + horizontal_space.1
+    },
+    top_pt: bounds.y_pt - placement.margin_top_pt,
+    bottom_pt: bounds.y_pt + bounds.height_pt + placement.margin_bottom_pt,
+    side: ImageWrapSide::BothSides,
+    blocks_flow,
+    uses_contour: false,
+    owner: WrapExclusionOwner::ParagraphFrame,
+  });
 }
 
 fn append_floating_table_wrap_exclusion(
@@ -11436,6 +11706,14 @@ fn translate_page_item(mut item: PageItem, dx_pt: f32, dy_pt: f32) -> PageItem {
       text.y_pt += dy_pt;
       if let Some(span_start) = &mut text.decoration_span_start_x_pt {
         *span_start += dx_pt;
+      }
+    }
+    PageItem::LegacyFormCheckBox(check_box) => {
+      check_box.x_pt += dx_pt;
+      check_box.y_pt += dy_pt;
+      if let Some((center_x, center_y)) = &mut check_box.rotation_center_pt {
+        *center_x += dx_pt;
+        *center_y += dy_pt;
       }
     }
     PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
@@ -11579,15 +11857,14 @@ fn lower_inline_chart(
         label: chart.label_style.clone(),
         data_label: chart.data_label_style.clone(),
         point_colors: chart.pie_point_colors.clone(),
+        point_styles: chart.pie_point_styles.clone(),
         data_label_fill_colors: chart
           .data_label_fill_colors
           .first()
           .cloned()
           .unwrap_or_else(|| vec![None; model.data_labels.len()]),
-        chart_area_fill_color: chart.chart_area_fill_color,
-        plot_area_fill_color: chart.plot_area_fill_color,
-        chart_area_stroke_color: chart.chart_area_stroke_color,
-        plot_area_stroke_color: chart.plot_area_stroke_color,
+        chart_area_style: chart.chart_area_style.clone(),
+        plot_area_style: chart.plot_area_style.clone(),
       },
     )
     .into_iter()
@@ -11626,10 +11903,10 @@ fn lower_inline_chart(
       series.name.clone_from(name);
     }
   }
-  let frame_stroke = (!chart_space
-    .shape_properties
-    .as_deref()
-    .is_some_and(shared_chart::shape_properties_has_no_outline))
+  let frame_stroke = matches!(
+    chart.chart_area_style.stroke,
+    common::ShapeStyleValue::Unspecified
+  )
   .then_some(BorderStyle {
     width_pt: 0.14,
     color: RgbColor { r: 0, g: 0, b: 0 },
@@ -11674,16 +11951,12 @@ fn lower_inline_chart(
         category_major_gridline: chart.category_major_gridline,
         category_minor_gridline: chart.category_minor_gridline,
         series_colors: chart.series_colors.clone(),
-        series_gradient_fills: chart.series_gradient_fills.clone(),
-        series_point_colors: chart.series_point_colors.clone(),
+        series_styles: chart.series_styles.clone(),
+        series_point_styles: chart.series_point_styles.clone(),
         surface_band_colors: chart.surface_band_colors.clone(),
         data_label_fill_colors: chart.data_label_fill_colors.clone(),
-        chart_area_fill_color: chart.chart_area_fill_color,
-        plot_area_fill_color: chart.plot_area_fill_color,
-        chart_area_stroke_color: chart.chart_area_stroke_color,
-        chart_area_stroke_width_pt: chart.chart_area_stroke_width_pt,
-        plot_area_stroke_color: chart.plot_area_stroke_color,
-        plot_area_stroke_width_pt: chart.plot_area_stroke_width_pt,
+        chart_area_style: chart.chart_area_style.clone(),
+        plot_area_style: chart.plot_area_style.clone(),
       },
     )
     .into_iter()
@@ -14089,6 +14362,7 @@ impl CellFrame<'_, '_> {
     layout_table_cell(TableCellLayout {
       cell: self.cell,
       table_following_text_flow: self.table.following_text_flow,
+      in_header_footer: self.table.in_header_footer,
       word_floating_table_cell: self.table.placement.is_some(),
       escape_following_text_flow_pages: true,
       setup: self.table_frame.block.setup,
@@ -14371,6 +14645,7 @@ fn blocks_contain_following_text_flow_cell_floating(blocks: &[Block]) -> bool {
       ),
       InlineItem::Text(_)
       | InlineItem::Ruby(_)
+      | InlineItem::LegacyFormCheckBox(_)
       | InlineItem::PositionalTab(_)
       | InlineItem::BookmarkStart(_)
       | InlineItem::FormWidgetStart(_)
@@ -14968,6 +15243,11 @@ fn paragraph_content_width_range(
         current_line += width;
         minimum = minimum.max(width);
       }
+      InlineItem::LegacyFormCheckBox(check_box) => {
+        let width = inline_text_height(&check_box.style, text_metrics);
+        current_line += width;
+        minimum = minimum.max(width);
+      }
       InlineItem::Image(image)
         if matches!(image.placement, crate::docx::ImagePlacement::Inline) =>
       {
@@ -15153,7 +15433,10 @@ fn table_left_position(
       } else {
         0.0
       };
-      content_left + table.indent_left_pt.min(available) - leading_cell_margin
+      // ECMA-376 Part 1 §17.4.50 offsets the leading table edge by tblInd.
+      // Word retains that offset when the declared grid already fills or
+      // exceeds the text area, allowing the trailing edge to overflow.
+      content_left + table.indent_left_pt - leading_cell_margin
     }
     TableAlignment::Center => content_left + available / 2.0,
     TableAlignment::Right if table.right_to_left => {
@@ -15384,6 +15667,7 @@ fn spanned_cell_width(cell: &TableCell, column_widths: &[f32], grid_index: &mut 
 struct TableCellLayout<'a> {
   cell: &'a TableCell,
   table_following_text_flow: bool,
+  in_header_footer: bool,
   word_floating_table_cell: bool,
   escape_following_text_flow_pages: bool,
   setup: PageSetup,
@@ -15402,10 +15686,27 @@ struct TableCellLayout<'a> {
   use_cached_break_inside_block: bool,
 }
 
+fn table_cell_initial_baseline_offset(
+  in_header_footer: bool,
+  style: &TextStyle,
+  line_height: f32,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  if in_header_footer {
+    // Repeating-slot layout already positions the header/footer stream at
+    // w:header/w:footer. Word starts a table cell's line box at that edge;
+    // pre-adding the ascent here would apply the first baseline twice.
+    0.0
+  } else {
+    text_metrics.baseline_offset_in_line_with_windows_metrics(style, line_height)
+  }
+}
+
 fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
   let TableCellLayout {
     cell,
     table_following_text_flow,
+    in_header_footer,
     word_floating_table_cell,
     escape_following_text_flow_pages,
     setup,
@@ -15448,8 +15749,12 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
   // path uses the Windows ascent here ([MS-DOCX] usePre2018iOSMacLayout); using
   // only the OS/2 typographic ascent puts Calibri table text above the Office
   // baseline even though the row box itself is correct.
-  let first_line_baseline_offset =
-    text_metrics.baseline_offset_in_line_with_windows_metrics(&first_line_style, first_line_height);
+  let first_line_baseline_offset = table_cell_initial_baseline_offset(
+    in_header_footer,
+    &first_line_style,
+    first_line_height,
+    text_metrics,
+  );
   let split_fragment =
     content_offset > LAYOUT_EPSILON_PT || content_height > height + LAYOUT_EPSILON_PT;
   let top_margin_for_lowers = row_top_margin_pt.max(cell.margins.top_pt);
@@ -15587,6 +15892,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
           pages,
           anchor_pages: None,
           text_metrics: &mut *text_metrics,
+          paragraph_decoration_outer_bottom_pt: None,
         },
         text_y,
       );
@@ -15631,6 +15937,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
         pages: &mut discarded_pages,
         anchor_pages: None,
         text_metrics: &mut *text_metrics,
+        paragraph_decoration_outer_bottom_pt: None,
       },
       text_y,
     );
@@ -15879,6 +16186,7 @@ fn paragraph_inlines_are_layout_empty(inlines: &[InlineItem]) -> bool {
     InlineItem::Text(run) => run.text.trim().is_empty(),
     InlineItem::PositionalTab(_) => true,
     InlineItem::Ruby(_) => false,
+    InlineItem::LegacyFormCheckBox(_) => false,
     InlineItem::BookmarkStart(_) => true,
     InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
     InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => true,
@@ -16029,6 +16337,9 @@ fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom:
     PageItem::Text(text) => {
       text.y_pt >= top - LAYOUT_EPSILON_PT && text.y_pt < bottom - LAYOUT_EPSILON_PT
     }
+    PageItem::LegacyFormCheckBox(check_box) => {
+      check_box.y_pt >= top - LAYOUT_EPSILON_PT && check_box.y_pt < bottom - LAYOUT_EPSILON_PT
+    }
     PageItem::Image(image) => {
       image.y_pt + image.height_pt > top + LAYOUT_EPSILON_PT
         && image.y_pt < bottom - LAYOUT_EPSILON_PT
@@ -16053,6 +16364,10 @@ fn shape_text_box_item_intersects_vertical_bounds(item: &PageItem, top: f32, bot
     PageItem::Text(text) => {
       text.y_pt + text.line_height_pt >= top - LAYOUT_EPSILON_PT
         && text.y_pt <= bottom + LAYOUT_EPSILON_PT
+    }
+    PageItem::LegacyFormCheckBox(check_box) => {
+      check_box.y_pt + check_box.line_height_pt >= top - LAYOUT_EPSILON_PT
+        && check_box.y_pt <= bottom + LAYOUT_EPSILON_PT
     }
     PageItem::Image(image) => {
       image.y_pt + image.height_pt > top + LAYOUT_EPSILON_PT
@@ -16110,6 +16425,7 @@ fn blocks_contain_page_owned_cell_floating(blocks: &[Block]) -> bool {
       ),
       InlineItem::Text(_)
       | InlineItem::Ruby(_)
+      | InlineItem::LegacyFormCheckBox(_)
       | InlineItem::PositionalTab(_)
       | InlineItem::BookmarkStart(_)
       | InlineItem::FormWidgetStart(_)
@@ -16240,6 +16556,7 @@ fn layout_shape_text_box(
         pages: &mut discarded_pages,
         anchor_pages: None,
         text_metrics: &mut *text_metrics,
+        paragraph_decoration_outer_bottom_pt: None,
       },
       text_cursor_y,
     );
@@ -16289,6 +16606,7 @@ fn detach_nested_inline_baseline_participants(items: &mut [PageItem]) {
         detach_nested_inline_baseline_participants(items)
       }
       PageItem::Text(_)
+      | PageItem::LegacyFormCheckBox(_)
       | PageItem::Rect(_)
       | PageItem::Fill(_)
       | PageItem::Line(_)
@@ -16419,6 +16737,10 @@ fn rotate_shape_text_items(items: &mut [PageItem], rect: ShapeTextBoxRect, rotat
       PageItem::Text(text) => {
         text.style.rotation_deg += rotation_deg;
         text.rotation_center_pt = Some((center_x, center_y));
+      }
+      PageItem::LegacyFormCheckBox(check_box) => {
+        check_box.rotation_deg += rotation_deg;
+        check_box.rotation_center_pt = Some((center_x, center_y));
       }
       PageItem::Image(image) => {
         let (image_center_x, image_center_y) = rotate_xy(
@@ -17655,6 +17977,8 @@ fn layout_paragraph(
     paragraph_anchor_top,
     spacing_after_pt,
     false,
+    ParagraphBorderContext::default(),
+    None,
   )
 }
 
@@ -17666,6 +17990,8 @@ fn layout_paragraph_with_left_indent_compat(
   paragraph_anchor_top: f32,
   spacing_after_pt: f32,
   ignore_left_indent: bool,
+  border_context: ParagraphBorderContext,
+  paragraph_decoration_outer_bottom_pt: Option<f32>,
 ) -> (FlowContext, f32) {
   let compatible_paragraph = ignore_left_indent.then(|| {
     let mut paragraph = paragraph.clone();
@@ -17680,14 +18006,17 @@ fn layout_paragraph_with_left_indent_compat(
     content_width: paragraph_content_width(flow.content_width, indent_left_pt, indent_right_pt),
     ..flow
   };
-  TextFrameLayout::new(paragraph, flow, spacing_after_pt, target.text_metrics).format(
-    target.current,
-    target.pages,
-    target.anchor_pages,
-    target.text_metrics,
-    y,
-    paragraph_anchor_top,
-  )
+  TextFrameLayout::new(paragraph, flow, spacing_after_pt, target.text_metrics)
+    .with_border_context(border_context)
+    .with_decoration_outer_bottom(paragraph_decoration_outer_bottom_pt)
+    .format(
+      target.current,
+      target.pages,
+      target.anchor_pages,
+      target.text_metrics,
+      y,
+      paragraph_anchor_top,
+    )
 }
 
 fn record_anchor_page(
@@ -18436,6 +18765,8 @@ struct TextFrameLayout<'a> {
   flow: FlowContext,
   frame: TextFrame,
   spacing_after_pt: f32,
+  border_context: ParagraphBorderContext,
+  decoration_outer_bottom_pt: Option<f32>,
   widow_rebalance_page_index: Option<usize>,
   hyphenation_bottom_line_slots: Vec<HyphenationBottomSlot>,
   hyphenation_reflow_depth: u8,
@@ -18481,7 +18812,7 @@ fn can_defer_page_break_for_following_floating_anchor(
       InlineItem::LastRenderedPageBreak => None,
       InlineItem::Text(run) if run.text.trim().is_empty() => None,
       InlineItem::PositionalTab(_) => None,
-      InlineItem::Ruby(_) => Some(usize::MAX),
+      InlineItem::Ruby(_) | InlineItem::LegacyFormCheckBox(_) => Some(usize::MAX),
       InlineItem::BookmarkStart(_)
       | InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
@@ -18508,7 +18839,7 @@ fn can_defer_page_break_for_following_floating_anchor(
         InlineItem::LastRenderedPageBreak => true,
         InlineItem::Text(run) => run.text.trim().is_empty(),
         InlineItem::PositionalTab(_) => true,
-        InlineItem::Ruby(_) => false,
+        InlineItem::Ruby(_) | InlineItem::LegacyFormCheckBox(_) => false,
         InlineItem::BookmarkStart(_)
         | InlineItem::FormWidgetStart(_)
         | InlineItem::FormWidgetEnd(_)
@@ -18535,9 +18866,11 @@ fn page_break_has_following_content(inlines: &[InlineItem], next_inline_index: u
       | InlineItem::DrawingGroupStart(_)
       | InlineItem::DrawingGroupEnd => None,
       InlineItem::PageBreak | InlineItem::ColumnBreak => Some(false),
-      InlineItem::Text(_) | InlineItem::Ruby(_) | InlineItem::Image(_) | InlineItem::Shape(_) => {
-        Some(true)
-      }
+      InlineItem::Text(_)
+      | InlineItem::Ruby(_)
+      | InlineItem::LegacyFormCheckBox(_)
+      | InlineItem::Image(_)
+      | InlineItem::Shape(_) => Some(true),
     })
     .unwrap_or(false)
 }
@@ -18560,10 +18893,22 @@ impl<'a> TextFrameLayout<'a> {
       flow,
       frame: TextFrame::new(paragraph, flow, text_metrics),
       spacing_after_pt,
+      border_context: ParagraphBorderContext::default(),
+      decoration_outer_bottom_pt: None,
       widow_rebalance_page_index: None,
       hyphenation_bottom_line_slots: Vec::new(),
       hyphenation_reflow_depth: 0,
     }
+  }
+
+  fn with_border_context(mut self, context: ParagraphBorderContext) -> Self {
+    self.border_context = context;
+    self
+  }
+
+  fn with_decoration_outer_bottom(mut self, bottom_pt: Option<f32>) -> Self {
+    self.decoration_outer_bottom_pt = bottom_pt;
+    self
   }
 
   fn with_widow_rebalance_page(mut self, page_index: usize) -> Self {
@@ -19323,6 +19668,7 @@ impl<'a> TextFrameLayout<'a> {
                 insert_index: None,
                 leader: tab_stop.leader,
                 layout: TabLeaderLayout::NaturalStart,
+                reserve_natural_boundary: false,
                 start_x: leader_start_x,
                 end_x: tab_stop.x_pt,
                 y,
@@ -19362,9 +19708,9 @@ impl<'a> TextFrameLayout<'a> {
           }
 
           let metrics = ruby_inline_metrics(ruby, text_metrics);
-          if text_overflows_line(x, metrics.width_pt, line_right)
+          let fit_line_right = aligned_tab_provisional_line_right(pending_tab.as_ref(), line_right);
+          if text_overflows_line(x, metrics.width_pt, fit_line_right)
             && x > line_left
-            && pending_tab.is_none()
             && !tab_over_margin_active
           {
             apply_pending_aligned_tab(
@@ -19423,6 +19769,115 @@ impl<'a> TextFrameLayout<'a> {
             text_metrics,
           );
           x += metrics.width_pt;
+          text_state.set_position(InlineCursor::after_inline(inline_index));
+          apply_pending_aligned_tab(
+            current,
+            &mut pending_tab,
+            text_metrics,
+            y,
+            line_left,
+            line_right,
+          );
+          emitted = true;
+        }
+        InlineItem::LegacyFormCheckBox(check_box) => {
+          auto_script_spacing.reset();
+          ended_with_explicit_page_break = false;
+          flow_blocking_floating_only = false;
+          if pending_text_page_break {
+            (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
+              flow,
+              current,
+              pages,
+              text_metrics,
+              &mut wrap_exclusions,
+              true,
+            );
+            default_line_right = text_frame.default_line_right;
+            paragraph_left = text_frame.paragraph_left;
+            base_line_height = text_frame.base_line_height;
+            x = line_left;
+            line_item_start_index = current.items.len();
+            line_has_form_widget = false;
+            pending_text_page_break = false;
+            line_used_shrink_fit = false;
+            line_used_punctuation_fit = false;
+            line_has_tab = false;
+          }
+
+          // SwFieldFormCheckboxPortion::Format owns one square character
+          // portion whose width and height are the effective text height.
+          // ECMA-376 §17.16.29/§17.16.30 selects the point size on the
+          // imported style; the font metrics select the resulting portion.
+          let size_pt = inline_text_height(&check_box.style, text_metrics);
+          let fit_line_right = aligned_tab_provisional_line_right(pending_tab.as_ref(), line_right);
+          if text_overflows_line(x, size_pt, fit_line_right)
+            && x > line_left
+            && !tab_over_margin_active
+          {
+            apply_pending_aligned_tab(
+              current,
+              &mut pending_tab,
+              text_metrics,
+              y,
+              line_left,
+              line_right,
+            );
+            (flow, text_frame, y, line_left, line_right) = self.advance_line(
+              TextLineAdvance {
+                current,
+                pages,
+                text_metrics: &mut *text_metrics,
+                wrap_exclusions: &mut wrap_exclusions,
+                state: &mut text_state,
+                active: ActiveTextFrame {
+                  flow,
+                  frame: text_frame,
+                },
+                line_left,
+                line_right,
+                justify: justify_wrapped_lines,
+                line_item_start_index: &mut line_item_start_index,
+                line_has_form_widget: &mut line_has_form_widget,
+                line_ended_with_discretionary_hyphen: &mut line_ended_with_discretionary_hyphen,
+              },
+              y,
+              &mut line_height,
+            );
+            default_line_right = text_frame.default_line_right;
+            paragraph_left = text_frame.paragraph_left;
+            base_line_height = text_frame.base_line_height;
+            x = line_left;
+            line_used_shrink_fit = false;
+            line_used_punctuation_fit = false;
+            line_has_tab = false;
+            pending_tab = None;
+            tab_over_margin_active = false;
+          }
+          if !matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
+            line_height = line_height.max(size_pt);
+          }
+          let baseline_line_height = text_frame.text_baseline_line_height(line_height);
+          update_line_text_height(
+            &mut current.items,
+            line_item_start_index,
+            y,
+            baseline_line_height,
+          );
+          current
+            .items
+            .push(PageItem::LegacyFormCheckBox(LegacyFormCheckBoxItem {
+              x_pt: x,
+              y_pt: y,
+              line_height_pt: baseline_line_height,
+              size_pt,
+              checked: check_box.checked,
+              style: check_box.style.clone(),
+              hyperlink_url: check_box.hyperlink_url.clone(),
+              rotation_deg: 0.0,
+              rotation_center_pt: None,
+            }));
+          x += size_pt;
           text_state.set_position(InlineCursor::after_inline(inline_index));
           apply_pending_aligned_tab(
             current,
@@ -19550,7 +20005,9 @@ impl<'a> TextFrameLayout<'a> {
               emitted = true;
               continue;
             }
-            if segment.text == "\t" {
+            let explicit_default_word_text_tab =
+              segment.text.starts_with(EXPLICIT_DEFAULT_WORD_TEXT_TAB);
+            if segment.text == "\t" || explicit_default_word_text_tab {
               auto_script_spacing.reset();
               text_state.set_position(InlineCursor {
                 inline_index,
@@ -19575,14 +20032,19 @@ impl<'a> TextFrameLayout<'a> {
                 line_left,
                 line_right,
               );
-              let tab_stop = next_tab_stop(
+              let tab_stop = next_tab_stop_with_default_origin(
                 x,
-                // DOCX import sets Writer's TABS_RELATIVE_TO_INDENT=false:
-                // explicit and automatic tab positions are measured from the
-                // text-frame origin, not from w:ind/@w:left. This is visible
-                // in TOC2/TOC3 entries, whose common right tab stays fixed
-                // while the paragraph-style indent shortens the dot leader.
+                // DOCX explicit stops stay relative to the text-frame origin;
+                // this keeps the common TOC right stop fixed as entry indents
+                // deepen. A literal w:t tab using an explicit Settings grid
+                // falls back to automatic stops from the paragraph indent,
+                // matching Word's hanging-indent placement.
                 flow.content_left_pt,
+                if explicit_default_word_text_tab {
+                  default_line_left
+                } else {
+                  flow.content_left_pt
+                },
                 &paragraph.format.tab_stops,
                 flow.default_tab_stop_pt,
               );
@@ -19616,6 +20078,7 @@ impl<'a> TextFrameLayout<'a> {
                     insert_index: None,
                     leader: tab_stop.leader,
                     layout: TabLeaderLayout::NaturalStart,
+                    reserve_natural_boundary: false,
                     start_x: leader_start_x,
                     end_x: tab_stop.x_pt,
                     y,
@@ -19701,7 +20164,8 @@ impl<'a> TextFrameLayout<'a> {
                 0.0
               };
             let fit_width_with_continuation = fit_width + continuation_fit_width;
-            let line_capacity = (line_right - line_left).max(DEFAULT_FONT_SIZE_PT);
+            let fit_line_right =
+              aligned_tab_provisional_line_right(pending_tab.as_ref(), line_right);
             let whitespace = segment.text.chars().all(char::is_whitespace);
 
             let only_char = segment
@@ -19713,7 +20177,7 @@ impl<'a> TextFrameLayout<'a> {
               && line_natural_overflows_with_cjk_compression(
                 CjkLineFit {
                   x: x + leading_script_spacing,
-                  line_right,
+                  line_right: fit_line_right,
                   items: &current.items,
                   item_start: line_item_start_index,
                   chunk: &chunk,
@@ -19725,8 +20189,9 @@ impl<'a> TextFrameLayout<'a> {
             let blocks_second_extra_character = natural_overflow
               && line_used_punctuation_fit
               && only_char.is_none_or(|ch| !cjk_cannot_start_line(ch));
-            let overflows_line = text_overflows_line(x, fit_width_with_continuation, line_right)
-              || blocks_second_extra_character;
+            let overflows_line =
+              text_overflows_line(x, fit_width_with_continuation, fit_line_right)
+                || blocks_second_extra_character;
             let fits_with_shrink = overflows_line
               && shrink_justified_lines
               && !line_used_shrink_fit
@@ -19738,12 +20203,12 @@ impl<'a> TextFrameLayout<'a> {
                   x,
                   width: fit_width_with_continuation,
                   text: &segment.text,
-                  line_right,
+                  line_right: fit_line_right,
                   items: &current.items,
                   item_start: line_item_start_index,
                   chunk: &chunk,
                   style: &run.style,
-                  minimum_word_spacing_pct: justification.word_spacing.minimum_pct,
+                  word_spacing: justification.word_spacing,
                 },
                 text_metrics,
               );
@@ -19752,7 +20217,13 @@ impl<'a> TextFrameLayout<'a> {
             }
 
             let allow_automatic_hyphenation = continuation_fit_width <= LAYOUT_EPSILON_PT
-              && automatic_hyphenation_allowed_on_line(paragraph, flow, x, line_left, line_right);
+              && automatic_hyphenation_allowed_on_line(
+                paragraph,
+                flow,
+                x,
+                line_left,
+                fit_line_right,
+              );
             let allow_discretionary_hyphenation = !consecutive_hyphenation_limit_reached(flow);
             let selected_hyphenation = (overflows_line
               && !fits_with_shrink
@@ -19762,7 +20233,7 @@ impl<'a> TextFrameLayout<'a> {
                 select_hyphenation_break(
                   &source_segment,
                   &run.style,
-                  (line_right - x - leading_script_spacing).max(0.0),
+                  (fit_line_right - x - leading_script_spacing).max(0.0),
                   allow_discretionary_hyphenation,
                   allow_automatic_hyphenation,
                   flow.hyphenation.do_not_hyphenate_caps,
@@ -19893,12 +20364,7 @@ impl<'a> TextFrameLayout<'a> {
             }
 
             let mut started_new_line = false;
-            if overflows_line
-              && !fits_with_shrink
-              && x > line_left
-              && pending_tab.is_none()
-              && !tab_over_margin_active
-            {
+            if overflows_line && !fits_with_shrink && x > line_left && !tab_over_margin_active {
               let next_wrap_segment = next_wrap_line_segment_for_y(
                 text_frame.default_line_left,
                 text_frame.default_line_right,
@@ -19991,6 +20457,11 @@ impl<'a> TextFrameLayout<'a> {
               }
             }
 
+            let fit_line_right =
+              aligned_tab_provisional_line_right(pending_tab.as_ref(), line_right);
+            let line_capacity = (fit_line_right
+              - if pending_tab.is_some() { x } else { line_left })
+            .max(DEFAULT_FONT_SIZE_PT);
             if fit_width > line_capacity && x <= line_left && !whitespace {
               if leading_script_spacing > LAYOUT_EPSILON_PT {
                 flush_text(
@@ -20021,7 +20492,10 @@ impl<'a> TextFrameLayout<'a> {
                       && line_natural_overflows_with_cjk_compression(
                         CjkLineFit {
                           x,
-                          line_right,
+                          line_right: aligned_tab_provisional_line_right(
+                            pending_tab.as_ref(),
+                            line_right,
+                          ),
                           items: &current.items,
                           item_start: line_item_start_index,
                           chunk: &chunk,
@@ -20034,8 +20508,11 @@ impl<'a> TextFrameLayout<'a> {
                       natural_overflow && line_used_punctuation_fit && !cjk_cannot_start_line(ch);
                     text_offset += text.len();
 
-                    let starts_new_line = (text_overflows_line(x, fit_width, line_right)
-                      || blocks_second_extra_character)
+                    let starts_new_line = (text_overflows_line(
+                      x,
+                      fit_width,
+                      aligned_tab_provisional_line_right(pending_tab.as_ref(), line_right),
+                    ) || blocks_second_extra_character)
                       && x > line_left;
                     if starts_new_line {
                       flush_text(
@@ -20130,7 +20607,10 @@ impl<'a> TextFrameLayout<'a> {
                   && line_natural_overflows_with_cjk_compression(
                     CjkLineFit {
                       x,
-                      line_right,
+                      line_right: aligned_tab_provisional_line_right(
+                        pending_tab.as_ref(),
+                        line_right,
+                      ),
                       items: &current.items,
                       item_start: line_item_start_index,
                       chunk: &chunk,
@@ -20144,8 +20624,11 @@ impl<'a> TextFrameLayout<'a> {
                   && only_char.is_none_or(|ch| !cjk_cannot_start_line(ch));
                 text_offset += text.len();
 
-                let starts_new_line = (text_overflows_line(x, fit_width, line_right)
-                  || blocks_second_extra_character)
+                let starts_new_line = (text_overflows_line(
+                  x,
+                  fit_width,
+                  aligned_tab_provisional_line_right(pending_tab.as_ref(), line_right),
+                ) || blocks_second_extra_character)
                   && x > line_left;
                 if starts_new_line {
                   flush_text(
@@ -21851,6 +22334,8 @@ impl<'a> TextFrameLayout<'a> {
         anchors.truncate(len);
       }
       return TextFrameLayout::new(paragraph, start_flow, self.spacing_after_pt, text_metrics)
+        .with_border_context(self.border_context)
+        .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
         .with_hyphenation_bottom_line_slots(reserved_slots)
         .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth.saturating_add(1))
         .format_with_reflow(
@@ -21909,6 +22394,8 @@ impl<'a> TextFrameLayout<'a> {
           }
           let (follow_flow, follow_y) = advance_text_frame_flow(start_flow, current, pages);
           return TextFrameLayout::new(paragraph, follow_flow, self.spacing_after_pt, text_metrics)
+            .with_border_context(self.border_context)
+            .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
             .format_with_reflow(
               current,
               pages,
@@ -21937,6 +22424,8 @@ impl<'a> TextFrameLayout<'a> {
             anchors.truncate(len);
           }
           return TextFrameLayout::new(paragraph, start_flow, self.spacing_after_pt, text_metrics)
+            .with_border_context(self.border_context)
+            .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
             .with_widow_rebalance_page(page_index)
             .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
             .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth)
@@ -21973,11 +22462,13 @@ impl<'a> TextFrameLayout<'a> {
         ParagraphDecoration {
           start_item_index,
           paragraph,
+          border_context: self.border_context,
           flow,
           x: paragraph_left,
           y: paragraph_top,
           width: default_line_right - paragraph_left,
           height: paragraph_bottom - paragraph_top,
+          outer_bottom_pt: self.decoration_outer_bottom_pt,
         },
       );
     }
@@ -22021,7 +22512,11 @@ fn text_segments(text: &str) -> Vec<String> {
   let mut start = 0;
 
   for (index, ch) in text.char_indices() {
-    if ch != '\n' && ch != '\t' && ch != PRESERVED_WORD_TEXT_TAB {
+    if ch != '\n'
+      && ch != '\t'
+      && ch != PRESERVED_WORD_TEXT_TAB
+      && ch != EXPLICIT_DEFAULT_WORD_TEXT_TAB
+    {
       continue;
     }
 
@@ -22149,7 +22644,11 @@ fn drawing_layer_text_segments_with_offsets(text: &str) -> Vec<TextSegment> {
   let mut start = 0usize;
 
   for (index, ch) in text.char_indices() {
-    if ch == '\n' || ch == '\t' || ch == PRESERVED_WORD_TEXT_TAB {
+    if ch == '\n'
+      || ch == '\t'
+      || ch == PRESERVED_WORD_TEXT_TAB
+      || ch == EXPLICIT_DEFAULT_WORD_TEXT_TAB
+    {
       if start < index {
         output.push(TextSegment {
           text: text[start..index].to_string(),
@@ -22333,14 +22832,57 @@ struct LineShrinkFit<'a> {
   item_start: usize,
   chunk: &'a str,
   style: &'a TextStyle,
-  minimum_word_spacing_pct: u16,
+  word_spacing: crate::docx::JustificationWordSpacing,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SmartJustifyComparison {
+  original_x_pt: f32,
+  candidate_right_pt: f32,
+  line_right_pt: f32,
+  normal_space_count: usize,
+  terminal_space_count: usize,
+  shrink_space_count: usize,
+  space_width_pt: f32,
+  minimum_ratio: f32,
+  maximum_ratio: f32,
+}
+
+fn smart_justify_prefers_shrinking(comparison: SmartJustifyComparison) -> bool {
+  let overflow = comparison.candidate_right_pt - comparison.line_right_pt;
+  if overflow <= 0.0
+    || comparison.normal_space_count == 0
+    || comparison.shrink_space_count == 0
+    || comparison.space_width_pt <= f32::EPSILON
+  {
+    return false;
+  }
+
+  let original_printable_right =
+    comparison.original_x_pt - comparison.terminal_space_count as f32 * comparison.space_width_pt;
+  let normal_space = comparison.space_width_pt
+    + (comparison.line_right_pt - original_printable_right).max(0.0)
+      / comparison.normal_space_count as f32;
+  let shrunk_space = comparison.space_width_pt - overflow / comparison.shrink_space_count as f32;
+  if shrunk_space <= comparison.space_width_pt * comparison.minimum_ratio {
+    return false;
+  }
+
+  let expansion_weight = 1.0 / 1.7;
+  let z0 = comparison.space_width_pt / shrunk_space;
+  let z1 = (comparison.space_width_pt
+    + (normal_space - comparison.space_width_pt) * expansion_weight)
+    / comparison.space_width_pt;
+  let normal_ratio = normal_space / comparison.space_width_pt;
+  normal_ratio > comparison.maximum_ratio || z1 >= z0
 }
 
 fn line_fits_with_word_space_shrink(
   fit: LineShrinkFit<'_>,
   text_metrics: &mut TextMetrics,
 ) -> bool {
-  let overflow = fit.x + fit.width - fit.line_right;
+  let candidate_right = fit.x + fit.width;
+  let overflow = candidate_right - fit.line_right;
   if overflow <= 0.0 {
     return true;
   }
@@ -22352,41 +22894,56 @@ fn line_fits_with_word_space_shrink(
     }
   }
   space_counter.push_text(fit.chunk);
-  // Writer's second line-break guess includes the extra separator that
-  // becomes internal when shrinking admits the next word (tdf#158776).
-  // Without the candidate segment, the existing terminal blank is removed
-  // from the shrink budget even though it will no longer end the line.
-  space_counter.push_text(fit.text);
-  let space_count = space_counter.non_terminal_space_count();
-  if space_count == 0 {
+  let normal_space_count = space_counter.non_terminal_space_count();
+  if normal_space_count == 0 {
     return false;
   }
+  let terminal_space_count = space_counter.trailing_spaces;
+
+  // Writer's second Guess() receives the original line's space count plus
+  // the separator which becomes internal when it admits the candidate word.
+  // Keep that candidate count separate from the original-break count used
+  // to compare normal expansion with shrinking.
+  let mut candidate_space_counter = space_counter;
+  candidate_space_counter.push_text(fit.text);
+  let shrink_space_count = candidate_space_counter.non_terminal_space_count();
+  if shrink_space_count == 0 {
+    return false;
+  }
+
   let mut print_grid_style = fit.style.clone();
   round_style_to_word_print_grid(&mut print_grid_style);
   let space_width = text_metrics.measure_text(" ", &print_grid_style);
   if space_width <= f32::EPSILON {
     return false;
   }
-  let minimum_ratio = fit.minimum_word_spacing_pct as f32 / PERCENT_SCALE;
-  let shrinkability = space_count as f32 * space_width * (1.0 - minimum_ratio);
+
+  let word_spacing = fit.word_spacing;
+  let minimum_ratio = word_spacing.minimum_pct as f32 / PERCENT_SCALE;
+  let shrinkability = shrink_space_count as f32 * space_width * (1.0 - minimum_ratio);
   if overflow > shrinkability {
     return false;
   }
 
-  let spaces = space_count as f32;
-  let normal_space = space_width + (fit.line_right - fit.x).max(0.0) / spaces;
-  let shrunk_space = space_width - overflow / spaces;
-  if shrunk_space <= space_width * minimum_ratio {
-    return false;
-  }
-
-  let expansion_weight = 1.0 / 1.7;
-  let z0 = space_width / shrunk_space;
-  let z1 = (space_width + (normal_space - space_width) * expansion_weight) / space_width;
-  z1 >= z0
+  let maximum_ratio = word_spacing.maximum_pct as f32 / PERCENT_SCALE;
+  // SwTextPortion::Format_() first avoids an original break whose expanded
+  // spaces exceed the paragraph's maximum, then falls back to its weighted
+  // expanded-vs-shrunk comparison. Both decisions are part of the same
+  // compatibility-mode-15 line-break policy.
+  smart_justify_prefers_shrinking(SmartJustifyComparison {
+    original_x_pt: fit.x,
+    candidate_right_pt: candidate_right,
+    line_right_pt: fit.line_right,
+    normal_space_count,
+    terminal_space_count,
+    shrink_space_count,
+    space_width_pt: space_width,
+    minimum_ratio,
+    maximum_ratio,
+  })
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 struct LineSpaceCounter {
   spaces: usize,
   trailing_spaces: usize,
@@ -22404,7 +22961,7 @@ impl LineSpaceCounter {
     }
   }
 
-  fn non_terminal_space_count(self) -> usize {
+  fn non_terminal_space_count(&self) -> usize {
     self.spaces.saturating_sub(self.trailing_spaces)
   }
 }
@@ -22519,6 +23076,22 @@ fn next_tab_stop(
   tab_stops: &[TabStop],
   default_tab_stop_pt: f32,
 ) -> ResolvedTabStop {
+  next_tab_stop_with_default_origin(
+    x,
+    tab_origin_left,
+    tab_origin_left,
+    tab_stops,
+    default_tab_stop_pt,
+  )
+}
+
+fn next_tab_stop_with_default_origin(
+  x: f32,
+  tab_origin_left: f32,
+  default_tab_origin_left: f32,
+  tab_stops: &[TabStop],
+  default_tab_stop_pt: f32,
+) -> ResolvedTabStop {
   let relative_x = (x - tab_origin_left).max(0.0);
   if let Some(stop) = tab_stops
     .iter()
@@ -22533,13 +23106,20 @@ fn next_tab_stop(
   }
 
   let default_tab_stop_pt = default_tab_stop_pt.max(DEFAULT_FONT_SIZE_PT);
+  let default_relative_x = (x - default_tab_origin_left).max(0.0);
+  let default_offset_pt = if (default_tab_origin_left - tab_origin_left).abs() > LAYOUT_EPSILON_PT
+    && x < default_tab_origin_left - LAYOUT_EPSILON_PT
+  {
+    0.0
+  } else {
+    ((default_relative_x / default_tab_stop_pt).floor() + 1.0) * default_tab_stop_pt
+  };
   ResolvedTabStop {
     // ECMA-376 Part 1 §17.15.1.25 repeats automatic stops across the
-    // displayed paragraph area. Repeat them from the caller's tabs origin:
-    // ordinary DOCX text uses the frame edge, while the dedicated numbering
-    // fallback can deliberately supply its list-text origin.
-    x_pt: tab_origin_left
-      + ((relative_x / default_tab_stop_pt).floor() + 1.0) * default_tab_stop_pt,
+    // displayed paragraph area. Most callers repeat them from the same origin
+    // as explicit stops. Preserved w:t tabs with an explicit Settings grid
+    // keep Word's distinct paragraph-indent origin for the automatic fallback.
+    x_pt: default_tab_origin_left + default_offset_pt,
     alignment: TabStopAlignment::Left,
     leader: TabLeader::None,
   }
@@ -22769,7 +23349,10 @@ fn shift_first_line_below_upper_margin_exclusions(
     // contour. A full-width contour still creates the dummy line used by
     // tdf#116486.
     let preserves_side_segment = margin_crossing.iter().all(|exclusion| {
-      exclusion.owner == WrapExclusionOwner::FloatingTable || exclusion.uses_contour
+      matches!(
+        exclusion.owner,
+        WrapExclusionOwner::ParagraphFrame | WrapExclusionOwner::FloatingTable
+      ) || exclusion.uses_contour
     }) && available_line_bounds_for_y(
       default_left,
       default_right,
@@ -22802,32 +23385,65 @@ fn shift_first_line_below_upper_margin_exclusions(
 struct ParagraphDecoration<'a> {
   start_item_index: usize,
   paragraph: &'a crate::docx::Paragraph,
+  border_context: ParagraphBorderContext,
   flow: FlowContext,
   x: f32,
   y: f32,
   width: f32,
   height: f32,
+  outer_bottom_pt: Option<f32>,
 }
 
 fn decorate_paragraph(page: &mut Page, decoration: ParagraphDecoration<'_>) {
   let ParagraphDecoration {
     start_item_index,
     paragraph,
+    border_context,
     flow,
     x,
     y,
     width,
     height,
+    outer_bottom_pt,
   } = decoration;
-  let padding = 2.0;
-  let x = x - padding;
-  let y = y - padding;
-  let width = width + padding * 2.0;
-  let height = height + padding * 2.0;
+  // Word extends the paragraph decoration box horizontally beyond the text
+  // frame before applying pBdr distances. Its fixed-output coordinates are
+  // consistently about 1.5 pt in the Apache POI `checkboxes.docx` and
+  // LibreOffice `tdf154703_framePr.docx` counterexamples. Vertically, the
+  // decoration starts at the line-layout bounds with no corresponding inset.
+  let horizontal_padding_pt = 1.5;
+  let box_left = x - horizontal_padding_pt;
+  let box_top = y;
+  let box_right = x + width + horizontal_padding_pt;
+  let mut box_bottom = y + height;
+  let top = border_context.top(paragraph);
+  let bottom = border_context.bottom(paragraph);
+  if let Some(outer_bottom_pt) = outer_bottom_pt {
+    box_bottom = box_bottom.max(outer_bottom_pt - paragraph_border_layout_extent(bottom));
+  }
 
   if let Some(color) = paragraph.format.shading {
-    let (x, y, width, height) =
-      table_cell_paragraph_shading_bounds(flow).unwrap_or((x, y, width, height));
+    // ECMA-376 Part 1 §17.3.1.24 defines pBdr/@space from the text
+    // contents to the border. Word therefore paints paragraph shading
+    // through that space, up to the inner edge of each effective border.
+    let shading_left = paragraph
+      .format
+      .borders
+      .left
+      .map_or(box_left, |border| box_left - border.spacing_pt);
+    let shading_right = paragraph
+      .format
+      .borders
+      .right
+      .map_or(box_right, |border| box_right + border.spacing_pt);
+    let shading_top = top.map_or(box_top, |border| box_top - border.spacing_pt);
+    let shading_bottom = bottom.map_or(box_bottom, |border| box_bottom + border.spacing_pt);
+    let (x, y, width, height) = table_cell_paragraph_shading_bounds(flow).unwrap_or((
+      shading_left,
+      shading_top,
+      shading_right - shading_left,
+      shading_bottom - shading_top,
+    ));
     page.items.insert(
       start_item_index,
       PageItem::Fill(FillItem {
@@ -22840,17 +23456,30 @@ fn decorate_paragraph(page: &mut Page, decoration: ParagraphDecoration<'_>) {
     );
   }
 
-  if let Some(border) = paragraph.format.borders.top {
-    push_styled_line(page, x, y, x + width, y, border);
+  let left_x = paragraph.format.borders.left.map_or(box_left, |border| {
+    box_left - border.spacing_pt - border.width_pt / 2.0
+  });
+  let right_x = paragraph.format.borders.right.map_or(box_right, |border| {
+    box_right + border.spacing_pt + border.width_pt / 2.0
+  });
+  let top_y = top.map_or(box_top, |border| {
+    box_top - border.spacing_pt - border.width_pt / 2.0
+  });
+  let bottom_y = bottom.map_or(box_bottom, |border| {
+    box_bottom + border.spacing_pt + border.width_pt / 2.0
+  });
+
+  if let Some(border) = top {
+    push_styled_line(page, left_x, top_y, right_x, top_y, border);
   }
   if let Some(border) = paragraph.format.borders.right {
-    push_styled_line(page, x + width, y, x + width, y + height, border);
+    push_styled_line(page, right_x, top_y, right_x, bottom_y, border);
   }
-  if let Some(border) = paragraph.format.borders.bottom {
-    push_styled_line(page, x, y + height, x + width, y + height, border);
+  if let Some(border) = bottom {
+    push_styled_line(page, left_x, bottom_y, right_x, bottom_y, border);
   }
   if let Some(border) = paragraph.format.borders.left {
-    push_styled_line(page, x, y, x, y + height, border);
+    push_styled_line(page, left_x, top_y, left_x, bottom_y, border);
   }
 }
 
@@ -23324,6 +23953,14 @@ fn apply_pending_aligned_tab(
     TabStopAlignment::Right => tab_right - following_width,
   };
   let dx = aligned_left - min_x;
+  let leader = tab.stop.leader;
+  let leader_style = tab.style.clone();
+  let logical_repeat_width_pt = tab_leader_fill_char(leader)
+    .and_then(|fill| fill.chars().next())
+    .map_or(0.0, |fill_char| {
+      tab_leader_metrics(fill_char, &leader_style, tab.leader_layout, text_metrics)
+        .logical_repeat_width_pt
+    });
   mark_aligned_tab_dynamic_field_anchor(
     &mut page.items,
     tab.item_start_index,
@@ -23334,14 +23971,21 @@ fn apply_pending_aligned_tab(
       start_x_pt: tab.leader_start_x_pt,
       inside_field_result: tab.field_result_tab,
       leader_layout: tab.leader_layout,
+      logical_repeat_width_pt,
     },
   );
-  let leader = tab.stop.leader;
   let leader_start_x = tab.leader_start_x_pt;
   let leader_y = tab.y_pt;
   let leader_line_height = tab.line_height_pt;
-  let leader_style = tab.style.clone();
   let item_start_index = tab.item_start_index;
+  let reserve_natural_boundary = page.items.iter().skip(item_start_index).any(|item| {
+    matches!(
+      item,
+      PageItem::Text(text)
+        if (text.y_pt - y).abs() < 0.01
+          && text.style.wordprocessingml_generated_field_diagnostic
+    )
+  });
   if dx.abs() <= LAYOUT_EPSILON_PT {
     push_tab_leader(
       page,
@@ -23349,6 +23993,7 @@ fn apply_pending_aligned_tab(
         insert_index: Some(item_start_index),
         leader,
         layout: tab.leader_layout,
+        reserve_natural_boundary,
         start_x: leader_start_x,
         end_x: aligned_left,
         y: leader_y,
@@ -23374,6 +24019,7 @@ fn apply_pending_aligned_tab(
       insert_index: Some(item_start_index),
       leader,
       layout: tab.leader_layout,
+      reserve_natural_boundary,
       start_x: leader_start_x,
       end_x: aligned_left,
       y: leader_y,
@@ -23427,6 +24073,7 @@ struct TabLeaderPlacement {
   insert_index: Option<usize>,
   leader: TabLeader,
   layout: TabLeaderLayout,
+  reserve_natural_boundary: bool,
   start_x: f32,
   end_x: f32,
   y: f32,
@@ -23467,8 +24114,8 @@ fn tab_leader_repeat_count(
       width_pt,
       units::quantize_points_to_office_print_grid(natural_repeat_width_pt),
     ),
-    // Word 2013+ compatibility layout counts aligned-tab leaders with the
-    // fixed-output printer advance. For 11pt Calibri, a natural 2.776855pt
+    // Word 2013+ compatibility output counts aligned-tab leaders with the
+    // fixed-output printer advance. For 11pt Calibri, the natural 2.776855pt
     // dot advances by 23 device pixels (2.76pt) in the Office PDF stream.
     TabLeaderLayout::Office2013PrintGridEnd => {
       // The same stream reserves a 10-device-pixel trailing slot before the
@@ -23489,6 +24136,12 @@ fn tab_leader_repeat_count(
 
 const OFFICE_SYNTHETIC_BOLD_TAB_LEADER_TRACKING_EM: f32 = 0.014;
 
+struct TabLeaderMetrics {
+  paint_style: TextStyle,
+  logical_repeat_width_pt: f32,
+  paint_repeat_width_pt: f32,
+}
+
 fn synthetic_bold_tab_leader_tracking_pt(font_size_pt: f32, synthetic_bold: bool) -> f32 {
   if synthetic_bold {
     font_size_pt * OFFICE_SYNTHETIC_BOLD_TAB_LEADER_TRACKING_EM
@@ -23497,11 +24150,12 @@ fn synthetic_bold_tab_leader_tracking_pt(font_size_pt: f32, synthetic_bold: bool
   }
 }
 
-fn tab_leader_style(
+fn tab_leader_metrics(
   fill_char: char,
   style: &TextStyle,
+  layout: TabLeaderLayout,
   text_metrics: &mut TextMetrics,
-) -> TextStyle {
+) -> TabLeaderMetrics {
   let mut style = style.clone();
   // Writer's SwTabPortion::Paint and Word fixed output both shape fill
   // characters with kerning even when ordinary text at this size has w:kern
@@ -23516,18 +24170,35 @@ fn tab_leader_style(
   // The 12pt Lucida Sans Unicode TOC stream records this as `0.168 Tc`.
   style.character_spacing_pt +=
     synthetic_bold_tab_leader_tracking_pt(style.font_size_pt, synthetic_bold);
-  if !synthetic_bold && style.fallback_font_family.is_some() {
-    // Office emits printer-substituted legacy leaders on whole 600dpi
-    // advances. Adjust tracking on the resolved face so both shaping and the
-    // fixed-output stream use the same advance (the Calibri fallback in
-    // testPageref.docx resolves from 3.0293pt to 3.0pt).
+  let logical_repeat_width_pt = tab_leader_repeat_width(fill_char, &style, text_metrics);
+  if layout == TabLeaderLayout::Office2013PrintGridEnd
+    || (!synthetic_bold && style.fallback_font_family.is_some())
+  {
+    // Office emits Word 2013+ aligned-tab leaders and printer-substituted
+    // legacy leaders on whole 600dpi advances. Adjust tracking on the
+    // resolved face so both shaping and the fixed-output stream use the same
+    // advance. In particular, the Calibri mode-15 stream records `-0.0221
+    // Tc`, reducing its natural 2.776855pt dot advance to 2.76pt; the Calibri
+    // fallback in testPageref.docx similarly resolves from 3.0293pt to 3.0pt.
     let single_width = text_metrics.measure_text(&fill, &style);
     let pair_width = text_metrics.measure_text(&format!("{fill_char}{fill_char}"), &style);
     let repeat_width = (pair_width - single_width).max(LAYOUT_EPSILON_PT);
     style.character_spacing_pt +=
       units::quantize_points_to_office_print_grid(repeat_width) - repeat_width;
   }
-  style
+  let paint_repeat_width_pt = tab_leader_repeat_width(fill_char, &style, text_metrics);
+  TabLeaderMetrics {
+    paint_style: style,
+    // Only Word 2013+ separates layout and fixed-output advances. The
+    // printer-substituted legacy path already uses its adjusted face advance
+    // for both count and paint.
+    logical_repeat_width_pt: if layout == TabLeaderLayout::Office2013PrintGridEnd {
+      logical_repeat_width_pt
+    } else {
+      paint_repeat_width_pt
+    },
+    paint_repeat_width_pt,
+  }
 }
 
 fn tab_leader_repeat_width(
@@ -23547,6 +24218,7 @@ fn tab_leader_boundary_slot_pt(
   style: &TextStyle,
   repeat_width_pt: f32,
   layout: TabLeaderLayout,
+  reserve_natural_boundary: bool,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
   if layout != TabLeaderLayout::NaturalStart {
@@ -23559,7 +24231,7 @@ fn tab_leader_boundary_slot_pt(
   // Word's legacy start-anchored fixed-output stream leaves one fill advance
   // for the two explicit spaces surrounding a synthetic or printer-
   // substituted leader. Split that slot across both edges below.
-  if synthetic_bold || style.fallback_font_family.is_some() {
+  if reserve_natural_boundary || synthetic_bold || style.fallback_font_family.is_some() {
     repeat_width_pt
   } else {
     0.0
@@ -23580,21 +24252,23 @@ fn push_tab_leader(
     return;
   }
   let fill_char = fill_char.chars().next().expect("tab leader fill character");
-  let style = tab_leader_style(fill_char, style, text_metrics);
-  let repeat_width = tab_leader_repeat_width(fill_char, &style, text_metrics);
-  if repeat_width <= LAYOUT_EPSILON_PT {
+  let metrics = tab_leader_metrics(fill_char, style, placement.layout, text_metrics);
+  if metrics.logical_repeat_width_pt <= LAYOUT_EPSILON_PT
+    || metrics.paint_repeat_width_pt <= LAYOUT_EPSILON_PT
+  {
     return;
   }
   let boundary_slot = tab_leader_boundary_slot_pt(
     fill_char,
-    &style,
-    repeat_width,
+    &metrics.paint_style,
+    metrics.paint_repeat_width_pt,
     placement.layout,
+    placement.reserve_natural_boundary,
     text_metrics,
   );
   let count = tab_leader_repeat_count(
     (width - boundary_slot).max(0.0),
-    repeat_width,
+    metrics.logical_repeat_width_pt,
     placement.layout,
   );
   if count == 0 {
@@ -23603,7 +24277,7 @@ fn push_tab_leader(
   let x_pt = match placement.layout {
     TabLeaderLayout::NaturalStart => placement.start_x + boundary_slot / 2.0,
     TabLeaderLayout::OfficeLegacyPrintGridEnd | TabLeaderLayout::Office2013PrintGridEnd => {
-      placement.end_x - count as f32 * repeat_width
+      placement.end_x - count as f32 * metrics.logical_repeat_width_pt
     }
   };
   let item = PageItem::Text(Box::new(TextItem {
@@ -23611,7 +24285,7 @@ fn push_tab_leader(
     y_pt: placement.y,
     line_height_pt: placement.line_height,
     text: fill_char.to_string().repeat(count),
-    style,
+    style: metrics.paint_style,
     rotation_center_pt: None,
     hyperlink_url: None,
     dynamic_field: None,
@@ -23903,6 +24577,7 @@ fn finalize_cjk_punctuation_compression(
 fn item_y(item: &PageItem) -> Option<f32> {
   match item {
     PageItem::Text(text) => Some(text.y_pt),
+    PageItem::LegacyFormCheckBox(check_box) => Some(check_box.y_pt),
     PageItem::Image(image) => Some(image.y_pt),
     PageItem::Group(items) => items.iter().find_map(item_y),
     PageItem::FloatingDrawing { .. } => None,
@@ -23922,6 +24597,7 @@ fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Op
         + text.text.matches(' ').count() as f32 * text.word_spacing_pt,
     )),
     PageItem::Image(image) => Some((image.x_pt, image.width_pt)),
+    PageItem::LegacyFormCheckBox(check_box) => Some((check_box.x_pt, check_box.size_pt)),
     PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
       let (left, _, right, _) = page_items_bounds(items, text_metrics)?;
       Some((left, right - left))
@@ -23937,6 +24613,7 @@ fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Op
 fn shift_item_x(item: &mut PageItem, offset: f32) {
   match item {
     PageItem::Text(text) => text.x_pt += offset,
+    PageItem::LegacyFormCheckBox(check_box) => check_box.x_pt += offset,
     PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
       for item in items {
         shift_item_x(item, offset);
@@ -23959,6 +24636,14 @@ fn shift_item(item: &mut PageItem, dx: f32, dy: f32) {
     PageItem::Text(text) => {
       text.x_pt += dx;
       text.y_pt += dy;
+    }
+    PageItem::LegacyFormCheckBox(check_box) => {
+      check_box.x_pt += dx;
+      check_box.y_pt += dy;
+      if let Some((center_x, center_y)) = &mut check_box.rotation_center_pt {
+        *center_x += dx;
+        *center_y += dy;
+      }
     }
     PageItem::Group(items) | PageItem::FloatingDrawing { items, .. } => {
       for item in items {
@@ -24668,8 +25353,8 @@ fn push_line_item(
 mod tests {
   use super::*;
   use crate::docx::{
-    CellBorderSuppressions, CellBordersModel, CellMargins, Paragraph, ParagraphFormat,
-    TableBordersModel, TextRun,
+    CellBorderSuppressions, CellBordersModel, CellMargins, Paragraph, ParagraphBordersModel,
+    ParagraphFormat, TableBordersModel, TextRun,
   };
 
   fn legacy_effect_test_text(style: TextStyle) -> TextItem {
@@ -24696,10 +25381,120 @@ mod tests {
   }
 
   #[test]
+  fn legacy_form_checkbox_uses_word_printer_grid_geometry_and_run_color() {
+    let style = TextStyle {
+      color: RgbColor {
+        r: 0x33,
+        g: 0x44,
+        b: 0x55,
+      },
+      opacity: 0.6,
+      ..Default::default()
+    };
+    let display = into_common_legacy_form_check_box(LegacyFormCheckBoxItem {
+      x_pt: 10.0,
+      y_pt: 20.0,
+      line_height_pt: 14.4,
+      size_pt: 11.52,
+      checked: true,
+      style: style.clone(),
+      hyperlink_url: None,
+      rotation_deg: 0.0,
+      rotation_center_pt: None,
+    });
+    let common::DisplayItem::Group(group) = display else {
+      panic!("legacy checkbox must remain one semantic graphics group");
+    };
+    assert!(group.transform.is_none());
+    let [
+      common::DisplayItem::Rect(rect),
+      common::DisplayItem::Line(first_mark),
+      common::DisplayItem::Line(second_mark),
+    ] = group.items.as_slice()
+    else {
+      panic!("checked legacy checkbox must contain a border and two mark strokes");
+    };
+    let stroke = rect.stroke.as_ref().expect("checkbox border");
+    assert!((stroke.width.0 - 0.72).abs() < LAYOUT_EPSILON_PT);
+    assert_eq!(stroke.color, common_rgb(style.color, style.opacity));
+    assert!((rect.bounds.origin.x.0 - 11.14).abs() < LAYOUT_EPSILON_PT);
+    assert!((rect.bounds.origin.y.0 - 22.58).abs() < LAYOUT_EPSILON_PT);
+    assert!((rect.bounds.size.width.0 - 9.24).abs() < LAYOUT_EPSILON_PT);
+    assert!((rect.bounds.size.height.0 - 9.24).abs() < LAYOUT_EPSILON_PT);
+    assert!((first_mark.stroke.width.0 - 0.48).abs() < LAYOUT_EPSILON_PT);
+    assert_eq!(first_mark.stroke.color, stroke.color);
+    assert_eq!(second_mark.stroke, first_mark.stroke);
+    assert!((first_mark.start.x.0 - 11.02).abs() < LAYOUT_EPSILON_PT);
+    assert!((first_mark.start.y.0 - 22.46).abs() < LAYOUT_EPSILON_PT);
+    assert!((first_mark.end.x.0 - 20.5).abs() < LAYOUT_EPSILON_PT);
+    assert!((first_mark.end.y.0 - 31.94).abs() < LAYOUT_EPSILON_PT);
+  }
+
+  #[test]
+  fn legacy_form_checkbox_rotates_with_shape_text() {
+    let mut item = PageItem::LegacyFormCheckBox(LegacyFormCheckBoxItem {
+      x_pt: 20.0,
+      y_pt: 30.0,
+      line_height_pt: 12.0,
+      size_pt: 12.0,
+      checked: false,
+      style: TextStyle::default(),
+      hyperlink_url: None,
+      rotation_deg: 0.0,
+      rotation_center_pt: None,
+    });
+    let rect = ShapeTextBoxRect {
+      x: 10.0,
+      y: 20.0,
+      width: 40.0,
+      height: 60.0,
+    };
+    rotate_shape_text_items(std::slice::from_mut(&mut item), rect, 90.0);
+
+    let PageItem::LegacyFormCheckBox(check_box) = &item else {
+      unreachable!();
+    };
+    assert_eq!(check_box.rotation_deg, 90.0);
+    assert_eq!(check_box.rotation_center_pt, Some((30.0, 50.0)));
+
+    let common::DisplayItem::Group(group) = into_common_page_item(item) else {
+      panic!("rotated legacy checkbox must lower to a transformed group");
+    };
+    let transform = group.transform.expect("shape text rotation");
+    assert!(transform.m11.abs() < LAYOUT_EPSILON_PT);
+    assert!((transform.m12 - 1.0).abs() < LAYOUT_EPSILON_PT);
+    assert!((transform.m21 + 1.0).abs() < LAYOUT_EPSILON_PT);
+    assert!(transform.m22.abs() < LAYOUT_EPSILON_PT);
+  }
+
+  #[test]
   fn soft_break_justification_defaults_on_and_compatibility_can_disable_it() {
     assert!(justify_soft_break_line(true, false));
     assert!(!justify_soft_break_line(true, true));
     assert!(!justify_soft_break_line(false, false));
+  }
+
+  #[test]
+  fn preserved_text_tab_automatic_grid_starts_at_the_paragraph_indent() {
+    let before_indent = next_tab_stop_with_default_origin(98.0, 72.0, 144.0, &[], 36.0);
+    let after_indent = next_tab_stop_with_default_origin(145.0, 72.0, 144.0, &[], 36.0);
+    let ordinary = next_tab_stop(98.0, 72.0, &[], 36.0);
+
+    assert!((before_indent.x_pt - 144.0).abs() < LAYOUT_EPSILON_PT);
+    assert!((after_indent.x_pt - 180.0).abs() < LAYOUT_EPSILON_PT);
+    assert!((ordinary.x_pt - 108.0).abs() < LAYOUT_EPSILON_PT);
+  }
+
+  #[test]
+  fn header_footer_table_cell_does_not_preapply_the_first_baseline() {
+    let style = TextStyle::default();
+    let mut text_metrics = TextMetrics::new();
+
+    assert_eq!(
+      table_cell_initial_baseline_offset(true, &style, 14.0, &mut text_metrics),
+      0.0
+    );
+    assert!(table_cell_initial_baseline_offset(false, &style, 14.0, &mut text_metrics) > 0.0);
   }
 
   #[test]
@@ -24880,7 +25675,7 @@ mod tests {
       Some("2".to_string())
     );
     assert_eq!(
-      localized_missing_style(Some("zh-CN"), "Heading 1"),
+      localized_field_message(FieldMessage::MissingStyle("Heading 1"), Some("zh-CN")),
       "错误!使用“开始”选项卡将 Heading 1 应用于要在此处显示的文字。"
     );
   }
@@ -25161,6 +25956,13 @@ mod tests {
       panic!("outline-only text stays one vector text item");
     };
     assert!(text.style.pdf_glyph_outlines);
+    assert!(
+      text
+        .style
+        .pdf_glyph_outline_options
+        .as_deref()
+        .is_some_and(|options| options.semantic_text_overlay)
+    );
     assert_eq!(text.style.opacity, 0.0);
     assert_eq!(text.style.outline_color, Some(authored_color));
     assert!((text.style.outline_width_pt - WORD_LEGACY_OUTLINE_WIDTH_PT).abs() < f32::EPSILON);
@@ -25196,12 +25998,15 @@ mod tests {
       _ => panic!("relief layer must remain PDF text"),
     };
     assert_eq!(text(0).style.color, WORD_LEGACY_EFFECT_GRAY);
+    assert!(text(0).style.pdf_glyph_outlines);
     assert_eq!(text(0).x_pt, 10.0 + WORD_LEGACY_RELIEF_OFFSET_PT);
     assert_eq!(text(0).y_pt, 20.0 + WORD_LEGACY_RELIEF_OFFSET_PT);
     assert_eq!(text(1).style.color, WORD_LEGACY_EFFECT_BLACK);
+    assert!(text(1).style.pdf_glyph_outlines);
     assert_eq!(text(1).x_pt, 10.0 - WORD_LEGACY_RELIEF_OFFSET_PT);
     assert_eq!(text(1).y_pt, 20.0 - WORD_LEGACY_RELIEF_OFFSET_PT);
     assert_eq!(text(2).style.color, authored_color);
+    assert!(!text(2).style.pdf_glyph_outlines);
     assert_eq!(text(2).x_pt, 10.0);
     assert_eq!(text(2).y_pt, 20.0);
     assert_eq!(text(0).hyperlink_url, None);
@@ -25242,6 +26047,7 @@ mod tests {
       panic!("first layer is shadow text");
     };
     assert_eq!(shadow.style.color, WORD_LEGACY_SHADOW_GRAY);
+    assert!(shadow.style.pdf_glyph_outlines);
     assert!((shadow.x_pt - 10.36).abs() < 0.001);
     assert!((shadow.y_pt - 20.36).abs() < 0.001);
   }
@@ -25276,7 +26082,9 @@ mod tests {
     assert_eq!([text(0).text.as_str(), text(1).text.as_str()], ["A", "A"]);
     assert_eq!([text(2).text.as_str(), text(3).text.as_str()], ["B", "B"]);
     assert_eq!(text(0).style.color, WORD_LEGACY_SHADOW_GRAY);
+    assert!(text(0).style.pdf_glyph_outlines);
     assert_eq!(text(1).style.color, authored_color);
+    assert!(!text(1).style.pdf_glyph_outlines);
     assert_eq!(text(2).style.color, WORD_LEGACY_SHADOW_GRAY);
     assert_eq!(text(3).style.color, authored_color);
     assert!(text(2).x_pt > text(0).x_pt);
@@ -25496,6 +26304,7 @@ mod tests {
         insert_index: None,
         leader: TabLeader::Dot,
         layout: TabLeaderLayout::Office2013PrintGridEnd,
+        reserve_natural_boundary: false,
         start_x,
         end_x,
         y: 20.0,
@@ -25508,13 +26317,21 @@ mod tests {
     let PageItem::Text(leader) = &page.items[0] else {
       panic!("expected tab leader");
     };
+    let modern_repeat_width = tab_leader_repeat_width('.', &leader.style, &mut text_metrics);
     let modern_count = tab_leader_repeat_count(
       end_x - start_x,
       dot_width,
       TabLeaderLayout::Office2013PrintGridEnd,
     );
     assert_eq!(leader.text.chars().count(), modern_count);
+    assert!(
+      (modern_repeat_width - units::quantize_points_to_office_print_grid(dot_width)).abs() < 0.001
+    );
     assert!((leader.x_pt - (end_x - dot_width * modern_count as f32)).abs() < 0.001);
+    let expected_paint_end = end_x - (dot_width - modern_repeat_width) * modern_count as f32;
+    assert!(
+      (leader.x_pt + modern_repeat_width * modern_count as f32 - expected_paint_end).abs() < 0.001
+    );
 
     push_tab_leader(
       &mut page,
@@ -25522,6 +26339,7 @@ mod tests {
         insert_index: None,
         leader: TabLeader::Dot,
         layout: TabLeaderLayout::OfficeLegacyPrintGridEnd,
+        reserve_natural_boundary: false,
         start_x,
         end_x,
         y: 30.0,
@@ -25547,6 +26365,7 @@ mod tests {
         insert_index: None,
         leader: TabLeader::Dot,
         layout: TabLeaderLayout::NaturalStart,
+        reserve_natural_boundary: false,
         start_x,
         end_x,
         y: 40.0,
@@ -25558,11 +26377,36 @@ mod tests {
     let PageItem::Text(leader) = &page.items[2] else {
       panic!("expected start-anchored tab leader");
     };
+    let natural_repeat_width = tab_leader_repeat_width('.', &leader.style, &mut text_metrics);
     assert_eq!(
       leader.text.chars().count(),
-      tab_leader_repeat_count(end_x - start_x, dot_width, TabLeaderLayout::NaturalStart)
+      tab_leader_repeat_count(end_x - start_x, dot_width, TabLeaderLayout::NaturalStart,)
     );
+    assert!((natural_repeat_width - dot_width).abs() < 0.001);
     assert!((leader.x_pt - start_x).abs() < 0.001);
+    let natural_count = leader.text.chars().count();
+
+    push_tab_leader(
+      &mut page,
+      TabLeaderPlacement {
+        insert_index: None,
+        leader: TabLeader::Dot,
+        layout: TabLeaderLayout::NaturalStart,
+        reserve_natural_boundary: true,
+        start_x,
+        end_x,
+        y: 50.0,
+        line_height: DEFAULT_LINE_HEIGHT_PT,
+      },
+      &TextStyle::default(),
+      &mut text_metrics,
+    );
+    let PageItem::Text(reserved) = &page.items[3] else {
+      panic!("expected boundary-reserved leader");
+    };
+    assert_eq!(reserved.text.chars().count() + 1, natural_count);
+    assert!((reserved.x_pt - (start_x + dot_width / 2.0)).abs() < 0.001);
+
     assert_eq!(
       tab_leader_repeat_count(
         units::quantize_points_to_office_print_grid(dot_width) * 0.99,
@@ -25602,6 +26446,7 @@ mod tests {
         insert_index: None,
         leader: TabLeader::Dot,
         layout: TabLeaderLayout::Office2013PrintGridEnd,
+        reserve_natural_boundary: false,
         start_x: tab_start_x,
         end_x: field_x,
         y: 20.0,
@@ -25617,6 +26462,7 @@ mod tests {
         start_x_pt: tab_start_x,
         inside_field_result: false,
         leader_layout: TabLeaderLayout::Office2013PrintGridEnd,
+        logical_repeat_width_pt: dot_width,
       }),
     };
     page.items.push(PageItem::Text(Box::new(TextItem {
@@ -25669,6 +26515,7 @@ mod tests {
     let PageItem::Text(leader) = &page.items[0] else {
       panic!("expected tab leader");
     };
+    let painted_repeat_width = tab_leader_repeat_width('.', &leader.style, &mut text_metrics);
     let expected_count = tab_leader_repeat_count(
       field_x - tab_start_x,
       dot_width,
@@ -25676,6 +26523,14 @@ mod tests {
     );
     assert_eq!(leader.text.chars().count(), expected_count);
     assert!((leader.x_pt + dot_width * leader.text.chars().count() as f32 - field_x).abs() < 0.001);
+    let expected_paint_end =
+      field_x - (dot_width - painted_repeat_width) * leader.text.chars().count() as f32;
+    assert!(
+      (leader.x_pt + painted_repeat_width * leader.text.chars().count() as f32
+        - expected_paint_end)
+        .abs()
+        < 0.001
+    );
   }
 
   #[test]
@@ -25914,6 +26769,83 @@ mod tests {
   }
 
   #[test]
+  fn paragraph_frame_wrap_uses_around_spacing_and_blocks_none_not_beside() {
+    let setup = PageSetup {
+      width_pt: 612.0,
+      ..PageSetup::default()
+    };
+    let bounds = FrameBounds {
+      x_pt: 200.0,
+      y_pt: 80.0,
+      width_pt: 100.0,
+      height_pt: 40.0,
+    };
+    let placement = FloatingFramePlacement {
+      wrap: FrameWrapMode::Around,
+      margin_top_pt: 8.0,
+      margin_right_pt: 12.0,
+      margin_bottom_pt: 16.0,
+      margin_left_pt: 10.0,
+      ..Default::default()
+    };
+    let mut page = empty_page(setup, 0);
+
+    append_paragraph_frame_wrap_exclusion(&mut page, placement, bounds);
+
+    let [around] = page.wrap_exclusions.as_slice() else {
+      panic!("one paragraph-frame exclusion");
+    };
+    assert_eq!(
+      (
+        around.left_pt,
+        around.right_pt,
+        around.top_pt,
+        around.bottom_pt,
+      ),
+      (190.0, 312.0, 72.0, 136.0)
+    );
+    assert!(!around.blocks_flow);
+    assert_eq!(around.owner, WrapExclusionOwner::ParagraphFrame);
+    assert_eq!(
+      dodge_text_wrap_exclusions(80.0, 12.0, 72.0, 540.0, page.wrap_exclusions.as_slice()),
+      80.0
+    );
+
+    for wrap in [FrameWrapMode::None, FrameWrapMode::NotBeside] {
+      page.wrap_exclusions.clear();
+      append_paragraph_frame_wrap_exclusion(
+        &mut page,
+        FloatingFramePlacement { wrap, ..placement },
+        bounds,
+      );
+      let [blocking] = page.wrap_exclusions.as_slice() else {
+        panic!("one blocking paragraph-frame exclusion");
+      };
+      assert_eq!((blocking.left_pt, blocking.right_pt), (0.0, 612.0));
+      assert!(blocking.blocks_flow);
+      assert_eq!(
+        dodge_text_wrap_exclusions(80.0, 12.0, 72.0, 540.0, page.wrap_exclusions.as_slice(),),
+        136.0
+      );
+    }
+
+    page.wrap_exclusions.clear();
+    append_paragraph_frame_wrap_exclusion(
+      &mut page,
+      FloatingFramePlacement {
+        wrap: FrameWrapMode::Tight,
+        ..placement
+      },
+      bounds,
+    );
+    let [tight] = page.wrap_exclusions.as_slice() else {
+      panic!("one tight paragraph-frame exclusion");
+    };
+    assert_eq!((tight.left_pt, tight.right_pt), (200.0, 300.0));
+    assert_eq!((tight.top_pt, tight.bottom_pt), (72.0, 136.0));
+  }
+
+  #[test]
   fn both_sides_wrap_exposes_left_then_right_segments_on_one_line() {
     let exclusion = WrapExclusion {
       left_pt: 100.0,
@@ -26058,6 +26990,7 @@ mod tests {
       alignment: TableAlignment::Left,
       right_to_left: false,
       align_leading_cell_content: false,
+      in_header_footer: false,
       placement: Some(FloatingFramePlacement::default()),
       allow_overlap: true,
       split_allowed: true,
@@ -26212,7 +27145,7 @@ mod tests {
       style_ref_numbering_text: None,
       preserve_text_portion: false,
     };
-    let frame = FloatingFrame {
+    let mut frame = FloatingFrame {
       blocks: vec![Block::paragraph(Paragraph {
         inlines: vec![InlineItem::Text(run.clone())],
         field_events: Vec::new(),
@@ -26234,8 +27167,8 @@ mod tests {
       height_pt: None,
       height_rule: FrameHeightRule::Auto,
       placement: FloatingFramePlacement::default(),
-      fill_color: None,
-      borders: CellBordersModel::default(),
+      outer_fill_color: None,
+      outer_borders: ParagraphBordersModel::default(),
     };
     let setup = PageSetup {
       width_pt: 612.0,
@@ -26272,6 +27205,235 @@ mod tests {
 
     assert!((width - expected).abs() < 0.001);
     assert!(width < flow.content_width);
+
+    {
+      let Block::Paragraph(paragraph) = &mut frame.blocks[0] else {
+        unreachable!("test frame contains one paragraph");
+      };
+      paragraph.format.shading = Some(RgbColor {
+        r: 0xff,
+        g: 0xc0,
+        b: 0x00,
+      });
+    }
+    assert_eq!(
+      floating_frame_width(&frame, flow, &mut text_metrics),
+      flow.content_width
+    );
+
+    {
+      let Block::Paragraph(paragraph) = &mut frame.blocks[0] else {
+        unreachable!("test frame contains one paragraph");
+      };
+      paragraph.format.shading = None;
+      paragraph.format.borders.top = Some(BorderStyle::default());
+    }
+    assert_eq!(
+      floating_frame_width(&frame, flow, &mut text_metrics),
+      flow.content_width
+    );
+  }
+
+  #[test]
+  fn paragraph_border_grouping_compares_the_complete_resolved_border_set() {
+    fn paragraph(borders: ParagraphBordersModel) -> Paragraph {
+      Paragraph {
+        inlines: Vec::new(),
+        field_events: Vec::new(),
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: TextStyle::default(),
+        runs: Vec::new(),
+        format: Box::new(ParagraphFormat {
+          borders,
+          ..Default::default()
+        }),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        list_label: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      }
+    }
+
+    let edge = BorderStyle {
+      width_pt: 0.75,
+      spacing_pt: 1.0,
+      ..Default::default()
+    };
+    let between = BorderStyle {
+      color: RgbColor {
+        r: 0x11,
+        g: 0x22,
+        b: 0x33,
+      },
+      width_pt: 1.5,
+      spacing_pt: 9.0,
+      ..Default::default()
+    };
+    let borders = ParagraphBordersModel {
+      top: Some(edge),
+      right: Some(edge),
+      bottom: Some(edge),
+      left: Some(edge),
+      between: Some(between),
+      bar: None,
+    };
+    let blocks = vec![
+      Block::paragraph(paragraph(borders)),
+      Block::paragraph(paragraph(borders)),
+      Block::paragraph(paragraph(borders)),
+    ];
+    let Block::Paragraph(middle) = &blocks[1] else {
+      unreachable!("test block is a paragraph");
+    };
+    let middle_context = ParagraphBorderContext::for_blocks(blocks.first(), middle, blocks.get(2));
+    assert!(middle_context.joins_previous);
+    assert!(middle_context.joins_next);
+    assert!(middle_context.top(middle).is_none());
+    let effective_between = middle_context.bottom(middle).expect("between border");
+    assert_eq!(effective_between.color, between.color);
+    assert_eq!(effective_between.width_pt, between.width_pt);
+    assert_eq!(effective_between.spacing_pt, 0.0);
+
+    let first_context = ParagraphBorderContext::for_blocks(
+      None,
+      block_paragraph(blocks.first()).unwrap(),
+      blocks.get(1),
+    );
+    assert_eq!(
+      first_context.top(block_paragraph(blocks.first()).unwrap()),
+      Some(edge)
+    );
+    assert_eq!(
+      first_context
+        .bottom(block_paragraph(blocks.first()).unwrap())
+        .map(|border| border.spacing_pt),
+      Some(0.0)
+    );
+
+    let mut different_between = borders;
+    different_between.between = Some(BorderStyle {
+      width_pt: 2.0,
+      ..between
+    });
+    let different = Block::paragraph(paragraph(different_between));
+    let context = ParagraphBorderContext::for_blocks(
+      blocks.first(),
+      block_paragraph(blocks.get(1)).unwrap(),
+      Some(&different),
+    );
+    assert!(context.joins_previous);
+    assert!(!context.joins_next);
+    assert_eq!(
+      context.bottom(block_paragraph(blocks.get(1)).unwrap()),
+      Some(edge)
+    );
+  }
+
+  #[test]
+  fn paragraph_shading_fills_border_space_and_exact_frame_remainder() {
+    let border = |spacing_pt| BorderStyle {
+      width_pt: 3.0,
+      spacing_pt,
+      ..Default::default()
+    };
+    let paragraph = Paragraph {
+      inlines: Vec::new(),
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        shading: Some(RgbColor {
+          r: 0xcc,
+          g: 0xcc,
+          b: 0xff,
+        }),
+        borders: ParagraphBordersModel {
+          top: Some(border(10.0)),
+          right: Some(border(31.0)),
+          bottom: Some(border(0.0)),
+          left: Some(border(31.0)),
+          between: None,
+          bar: None,
+        },
+        ..Default::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let setup = PageSetup::default();
+    let flow = flow_from_block_area(BlockArea {
+      setup,
+      section_index: 0,
+      section_page_index: 0,
+      column_index: 0,
+      columns: SectionColumns::default(),
+      content_top_pt: 72.0,
+      content_left_pt: 72.0,
+      content_bottom: setup.height_pt - 72.0,
+      body_content_bottom_pt: setup.height_pt - 72.0,
+      content_width: setup.width_pt - 144.0,
+      default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
+      compatibility_mode: 15,
+      justify_lines_with_shrinking: false,
+      do_not_expand_shift_return: false,
+      repeating_slots: RepeatingSlotState::default(),
+    });
+    let mut page = empty_page(setup, 0);
+
+    decorate_paragraph(
+      &mut page,
+      ParagraphDecoration {
+        start_item_index: 0,
+        paragraph: &paragraph,
+        border_context: ParagraphBorderContext::default(),
+        flow,
+        x: 97.0,
+        y: 90.0,
+        width: 238.4,
+        height: 50.0,
+        outer_bottom_pt: Some(275.0),
+      },
+    );
+
+    let PageItem::Fill(fill) = page.items[0] else {
+      panic!("paragraph shading was not painted");
+    };
+    assert!((fill.x_pt - 64.5).abs() < 0.001);
+    assert!((fill.y_pt - 80.0).abs() < 0.001);
+    assert!((fill.width_pt - 303.4).abs() < 0.001);
+    assert!((fill.y_pt + fill.height_pt - 272.0).abs() < 0.001);
+
+    let lines = page
+      .items
+      .iter()
+      .filter_map(|item| match item {
+        PageItem::Line(line) => Some(line),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(lines.len(), 4);
+    assert!((lines[0].x1_pt - 63.0).abs() < 0.001);
+    assert!((lines[0].x2_pt - 369.4).abs() < 0.001);
+    assert!((lines[0].y1_pt - 78.5).abs() < 0.001);
+    assert!((lines[2].y1_pt - 273.5).abs() < 0.001);
+    assert!((lines[2].y1_pt + lines[2].width_pt / 2.0 - 275.0).abs() < 0.001);
+    assert!((lines[1].y2_pt - 273.5).abs() < 0.001);
+    assert!((lines[3].y2_pt - 273.5).abs() < 0.001);
   }
 
   #[test]
@@ -26834,6 +27996,7 @@ mod tests {
       alignment: TableAlignment::Left,
       right_to_left: false,
       align_leading_cell_content: true,
+      in_header_footer: false,
       placement: None,
       allow_overlap: true,
       split_allowed: false,
@@ -28072,6 +29235,7 @@ mod tests {
       alignment: TableAlignment::Left,
       right_to_left: false,
       align_leading_cell_content: true,
+      in_header_footer: false,
       placement: None,
       allow_overlap: true,
       split_allowed: false,
@@ -28088,6 +29252,10 @@ mod tests {
       table_column_widths(&table, 2, 451.0, false, &mut text_metrics),
       [231.0, 231.0]
     );
+
+    let mut indented = table;
+    indented.indent_left_pt = 3.0;
+    assert_eq!(table_left_position(&indented, 72.0, 468.0, 468.0), 75.0);
   }
 
   #[test]
@@ -28101,6 +29269,7 @@ mod tests {
       alignment: TableAlignment::Left,
       right_to_left: false,
       align_leading_cell_content: false,
+      in_header_footer: false,
       placement: None,
       allow_overlap: true,
       split_allowed: false,
@@ -28151,6 +29320,7 @@ mod tests {
       alignment: TableAlignment::Right,
       right_to_left: true,
       align_leading_cell_content: false,
+      in_header_footer: false,
       placement: None,
       allow_overlap: true,
       split_allowed: false,
@@ -28208,6 +29378,7 @@ mod tests {
       alignment: TableAlignment::Left,
       right_to_left: false,
       align_leading_cell_content: true,
+      in_header_footer: false,
       placement: None,
       allow_overlap: true,
       split_allowed: false,
@@ -28306,6 +29477,7 @@ mod tests {
       alignment: TableAlignment::Left,
       right_to_left: false,
       align_leading_cell_content: true,
+      in_header_footer: false,
       placement: None,
       allow_overlap: true,
       split_allowed: true,
@@ -28429,6 +29601,7 @@ mod tests {
       alignment: TableAlignment::Left,
       right_to_left: false,
       align_leading_cell_content: true,
+      in_header_footer: false,
       placement: Some(FloatingFramePlacement::default()),
       allow_overlap: false,
       split_allowed: true,
@@ -28505,6 +29678,7 @@ mod tests {
       alignment: TableAlignment::Left,
       right_to_left: false,
       align_leading_cell_content: true,
+      in_header_footer: false,
       placement: None,
       allow_overlap: true,
       split_allowed: false,
@@ -28620,6 +29794,7 @@ mod tests {
       alignment: TableAlignment::Left,
       right_to_left: false,
       align_leading_cell_content: true,
+      in_header_footer: false,
       placement: None,
       allow_overlap: true,
       split_allowed: false,
@@ -28708,26 +29883,48 @@ mod tests {
   fn justified_line_shrink_counts_separator_before_candidate_word() {
     let mut text_metrics = TextMetrics::new();
     let style = TextStyle::default();
-    let candidate = "gamma ";
-    let candidate_width = line_fit_width(candidate, &style, &mut text_metrics);
     let space_width = text_metrics.measure_text(" ", &style);
     let line_right = 100.0;
     let overflow = space_width * 0.4;
 
-    assert!(line_fits_with_word_space_shrink(
-      LineShrinkFit {
-        x: line_right - candidate_width + overflow,
-        width: candidate_width,
-        text: candidate,
-        line_right,
-        items: &[],
-        item_start: 0,
-        chunk: "alpha beta ",
-        style: &style,
-        minimum_word_spacing_pct: 75,
-      },
-      &mut text_metrics,
-    ));
+    assert!(smart_justify_prefers_shrinking(SmartJustifyComparison {
+      original_x_pt: 90.0,
+      candidate_right_pt: line_right + overflow,
+      line_right_pt: line_right,
+      normal_space_count: 1,
+      terminal_space_count: 1,
+      shrink_space_count: 2,
+      space_width_pt: space_width,
+      minimum_ratio: 0.75,
+      maximum_ratio: 1.33,
+    }));
+  }
+
+  #[test]
+  fn justified_line_shrink_avoids_exceeding_maximum_expanded_word_spacing() {
+    let mut text_metrics = TextMetrics::new();
+    let style = TextStyle::default();
+    let space_width = text_metrics.measure_text(" ", &style);
+    let line_right = 100.0;
+    let original_internal_spaces = 4.0;
+    let terminal_separator_width = space_width;
+    let expanded_space = space_width * 1.34;
+    let original_printable_right =
+      line_right - original_internal_spaces * (expanded_space - space_width);
+    let x = original_printable_right + terminal_separator_width;
+    let overflow = space_width;
+
+    assert!(smart_justify_prefers_shrinking(SmartJustifyComparison {
+      original_x_pt: x,
+      candidate_right_pt: line_right + overflow,
+      line_right_pt: line_right,
+      normal_space_count: original_internal_spaces as usize,
+      terminal_space_count: 1,
+      shrink_space_count: 5,
+      space_width_pt: space_width,
+      minimum_ratio: 0.75,
+      maximum_ratio: 1.33,
+    }));
   }
 
   #[test]

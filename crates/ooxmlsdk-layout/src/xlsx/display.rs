@@ -33,7 +33,8 @@ use super::print::{CalcPrintDocument, CalcPrintPage};
 use super::worksheet::{CalcSheet, CellAddress, CellRange, CellRect};
 use crate::pptx::chart::{
   ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, RadialChartStyle,
-  lower_clustered_column_chart, lower_radial_chart,
+  lower_clustered_column_chart, lower_radial_chart, solid_chart_point_styles,
+  solid_chart_shape_style,
 };
 use crate::pptx::drawingml::color::{Color, RgbHexColor};
 use crate::pptx::drawingml::fill::FillKind;
@@ -5290,31 +5291,38 @@ fn lower_drawing_chart(
         label: label_style.clone(),
         data_label: label_style,
         point_colors,
+        point_styles: Vec::new(),
         data_label_fill_colors,
-        chart_area_fill_color: chart_space
-          .shape_properties
-          .as_deref()
-          .and_then(shared_chart::shape_properties_solid_fill)
-          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
-        plot_area_fill_color: chart_space
-          .chart
-          .plot_area
-          .shape_properties
-          .as_deref()
-          .and_then(shared_chart::shape_properties_solid_fill)
-          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
-        chart_area_stroke_color: chart_space
-          .shape_properties
-          .as_deref()
-          .and_then(shared_chart::shape_properties_outline_solid_fill)
-          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
-        plot_area_stroke_color: chart_space
-          .chart
-          .plot_area
-          .shape_properties
-          .as_deref()
-          .and_then(shared_chart::shape_properties_outline_solid_fill)
-          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+        chart_area_style: solid_chart_shape_style(
+          chart_space
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_solid_fill)
+            .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+          chart_space
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_outline_solid_fill)
+            .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+            .map(|color| (color, 0.75)),
+        ),
+        plot_area_style: solid_chart_shape_style(
+          chart_space
+            .chart
+            .plot_area
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_solid_fill)
+            .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+          chart_space
+            .chart
+            .plot_area
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_outline_solid_fill)
+            .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+            .map(|color| (color, 0.75)),
+        ),
       },
     );
     if !items.is_empty() {
@@ -5700,8 +5708,8 @@ fn lower_drawing_chart(
       category_major_gridline,
       category_minor_gridline,
       series_colors,
-      series_gradient_fills: Vec::new(),
-      series_point_colors,
+      series_styles: Vec::new(),
+      series_point_styles: solid_chart_point_styles(series_point_colors),
       surface_band_colors,
       data_label_fill_colors: chart
         .series
@@ -5719,36 +5727,51 @@ fn lower_drawing_chart(
             .collect()
         })
         .collect(),
-      chart_area_fill_color: chart_space
-        .shape_properties
-        .as_deref()
-        .and_then(shared_chart::shape_properties_solid_fill)
-        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
-      plot_area_fill_color: chart_space
-        .chart
-        .plot_area
-        .shape_properties
-        .as_deref()
-        .and_then(shared_chart::shape_properties_solid_fill)
-        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
-      chart_area_stroke_color,
-      chart_area_stroke_width_pt: chart_space
-        .shape_properties
-        .as_deref()
-        .and_then(xlsx_shape_outline_width_pt),
-      plot_area_stroke_color: chart_space
-        .chart
-        .plot_area
-        .shape_properties
-        .as_deref()
-        .and_then(shared_chart::shape_properties_outline_solid_fill)
-        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
-      plot_area_stroke_width_pt: chart_space
-        .chart
-        .plot_area
-        .shape_properties
-        .as_deref()
-        .and_then(xlsx_shape_outline_width_pt),
+      chart_area_style: solid_chart_shape_style(
+        chart_space
+          .shape_properties
+          .as_deref()
+          .and_then(shared_chart::shape_properties_solid_fill)
+          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+        chart_area_stroke_color.map(|color| {
+          (
+            color,
+            chart_space
+              .shape_properties
+              .as_deref()
+              .and_then(xlsx_shape_outline_width_pt)
+              .unwrap_or(0.75 * drawing_scale),
+          )
+        }),
+      ),
+      plot_area_style: solid_chart_shape_style(
+        chart_space
+          .chart
+          .plot_area
+          .shape_properties
+          .as_deref()
+          .and_then(shared_chart::shape_properties_solid_fill)
+          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+        chart_space
+          .chart
+          .plot_area
+          .shape_properties
+          .as_deref()
+          .and_then(shared_chart::shape_properties_outline_solid_fill)
+          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+          .map(|color| {
+            (
+              color,
+              chart_space
+                .chart
+                .plot_area
+                .shape_properties
+                .as_deref()
+                .and_then(xlsx_shape_outline_width_pt)
+                .unwrap_or(0.75 * drawing_scale),
+            )
+          }),
+      ),
     },
   );
   let indexed_scatter_text = chart.series.iter().all(|series| {
@@ -7504,58 +7527,17 @@ fn drawing_object_gradient_fill_with_placeholder(
       (Some(angle), line, scaled, None)
     }
     a::GradientFillChoice::PathGradientFill(path) => {
-      let fill_to = path
-        .fill_to_rectangle
-        .as_ref()
-        .map(|rect| common::RelativeRect {
-          left: rect
-            .left
-            .as_ref()
-            .map(|value| value.as_ratio() as f32)
-            .unwrap_or(0.5),
-          top: rect
-            .top
-            .as_ref()
-            .map(|value| value.as_ratio() as f32)
-            .unwrap_or(0.5),
-          right: rect
-            .right
-            .as_ref()
-            .map(|value| value.as_ratio() as f32)
-            .unwrap_or(0.5),
-          bottom: rect
-            .bottom
-            .as_ref()
-            .map(|value| value.as_ratio() as f32)
-            .unwrap_or(0.5),
-        })
-        .unwrap_or(common::RelativeRect {
-          left: 0.5,
-          top: 0.5,
-          right: 0.5,
-          bottom: 0.5,
-        });
-      let kind = match path.path.unwrap_or(a::PathShadeValues::Shape) {
-        a::PathShadeValues::Shape => common::GradientPathKind::Shape,
-        a::PathShadeValues::Circle => common::GradientPathKind::Circle,
-        a::PathShadeValues::Rectangle => common::GradientPathKind::Rectangle,
-      };
       let gradient_transform = if follows_shape {
         xlsx_gradient_transform(local_bounds, shape_transform)
       } else {
         xlsx_gradient_transform(page_bounds, Affine::IDENTITY)
       };
-      (
-        None,
-        None,
-        false,
-        Some(common::GradientPath {
-          kind,
-          fill_to,
-          transform: gradient_transform,
-          mirror_tile: false,
-        }),
-      )
+      let mut path =
+        common::drawingml_gradient::resolve_path_gradient(gradient, path, gradient_transform);
+      if path.kind == common::GradientPathKind::Circle {
+        path.transform = common::office_circle_gradient_transform(path.transform);
+      }
+      (None, None, false, Some(path))
     }
   };
 

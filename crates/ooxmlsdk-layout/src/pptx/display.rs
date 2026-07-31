@@ -41,7 +41,8 @@ use unicode_script::{Script, UnicodeScript};
 
 use super::chart::{
   ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, RadialChartStyle,
-  lower_clustered_column_chart, lower_radial_chart,
+  lower_clustered_column_chart, lower_radial_chart, solid_chart_point_styles,
+  solid_chart_shape_style,
 };
 use super::drawingml::color::{Color, SchemeColor};
 use super::drawingml::fill::{FillKind, FillProperties};
@@ -1259,6 +1260,7 @@ fn lower_chart(
           None,
         ),
         point_colors,
+        point_styles: Vec::new(),
         data_label_fill_colors: chart
           .data_labels
           .iter()
@@ -1272,38 +1274,42 @@ fn lower_chart(
               })
           })
           .collect(),
-        chart_area_fill_color: chart_resource
-          .chart_space
-          .shape_properties
-          .as_deref()
-          .and_then(shared_chart::shape_properties_solid_fill)
-          .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-          .map(|paint| paint.color),
-        plot_area_fill_color: chart_resource
-          .chart_space
-          .chart
-          .plot_area
-          .shape_properties
-          .as_deref()
-          .and_then(shared_chart::shape_properties_solid_fill)
-          .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-          .map(|paint| paint.color),
-        chart_area_stroke_color: chart_resource
-          .chart_space
-          .shape_properties
-          .as_deref()
-          .and_then(shared_chart::shape_properties_outline_solid_fill)
-          .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-          .map(|paint| paint.color),
-        plot_area_stroke_color: chart_resource
-          .chart_space
-          .chart
-          .plot_area
-          .shape_properties
-          .as_deref()
-          .and_then(shared_chart::shape_properties_outline_solid_fill)
-          .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-          .map(|paint| paint.color),
+        chart_area_style: solid_chart_shape_style(
+          chart_resource
+            .chart_space
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_solid_fill)
+            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+            .map(|paint| paint.color),
+          chart_resource
+            .chart_space
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_outline_solid_fill)
+            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+            .map(|paint| (paint.color, 0.75)),
+        ),
+        plot_area_style: solid_chart_shape_style(
+          chart_resource
+            .chart_space
+            .chart
+            .plot_area
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_solid_fill)
+            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+            .map(|paint| paint.color),
+          chart_resource
+            .chart_space
+            .chart
+            .plot_area
+            .shape_properties
+            .as_deref()
+            .and_then(shared_chart::shape_properties_outline_solid_fill)
+            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+            .map(|paint| (paint.color, 0.75)),
+        ),
       },
     );
     if !chart_items.is_empty() {
@@ -1549,8 +1555,8 @@ fn lower_chart(
           category_major_gridline: None,
           category_minor_gridline: None,
           series_colors,
-          series_gradient_fills: Vec::new(),
-          series_point_colors,
+          series_styles: Vec::new(),
+          series_point_styles: solid_chart_point_styles(series_point_colors),
           surface_band_colors,
           data_label_fill_colors: chart
             .series
@@ -1571,40 +1577,42 @@ fn lower_chart(
                 .collect()
             })
             .collect(),
-          chart_area_fill_color: chart_resource
-            .chart_space
-            .shape_properties
-            .as_deref()
-            .and_then(shared_chart::shape_properties_solid_fill)
-            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-            .map(|paint| paint.color),
-          plot_area_fill_color: chart_resource
-            .chart_space
-            .chart
-            .plot_area
-            .shape_properties
-            .as_deref()
-            .and_then(shared_chart::shape_properties_solid_fill)
-            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-            .map(|paint| paint.color),
-          chart_area_stroke_color: chart_resource
-            .chart_space
-            .shape_properties
-            .as_deref()
-            .and_then(shared_chart::shape_properties_outline_solid_fill)
-            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-            .map(|paint| paint.color),
-          chart_area_stroke_width_pt: None,
-          plot_area_stroke_color: chart_resource
-            .chart_space
-            .chart
-            .plot_area
-            .shape_properties
-            .as_deref()
-            .and_then(shared_chart::shape_properties_outline_solid_fill)
-            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-            .map(|paint| paint.color),
-          plot_area_stroke_width_pt: None,
+          chart_area_style: solid_chart_shape_style(
+            chart_resource
+              .chart_space
+              .shape_properties
+              .as_deref()
+              .and_then(shared_chart::shape_properties_solid_fill)
+              .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+              .map(|paint| paint.color),
+            chart_resource
+              .chart_space
+              .shape_properties
+              .as_deref()
+              .and_then(shared_chart::shape_properties_outline_solid_fill)
+              .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+              .map(|paint| (paint.color, 0.75)),
+          ),
+          plot_area_style: solid_chart_shape_style(
+            chart_resource
+              .chart_space
+              .chart
+              .plot_area
+              .shape_properties
+              .as_deref()
+              .and_then(shared_chart::shape_properties_solid_fill)
+              .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+              .map(|paint| paint.color),
+            chart_resource
+              .chart_space
+              .chart
+              .plot_area
+              .shape_properties
+              .as_deref()
+              .and_then(shared_chart::shape_properties_outline_solid_fill)
+              .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
+              .map(|paint| (paint.color, 0.75)),
+          ),
         },
       );
       if !chart_items.is_empty() {
@@ -3238,24 +3246,9 @@ fn gradient_fill_for_optional_slide(
       None,
     ),
     a::GradientFillChoice::PathGradientFill(path) => {
-      let fill_to = path
-        .fill_to_rectangle
-        .as_ref()
-        .map(path_gradient_fill_to_rect)
-        .unwrap_or(common::RelativeRect {
-          left: 0.5,
-          top: 0.5,
-          right: 0.5,
-          bottom: 0.5,
-        });
-      let kind = match path.path.unwrap_or(a::PathShadeValues::Shape) {
-        a::PathShadeValues::Shape => common::GradientPathKind::Shape,
-        a::PathShadeValues::Circle => common::GradientPathKind::Circle,
-        a::PathShadeValues::Rectangle => common::GradientPathKind::Rectangle,
-      };
-      let (fill_to, mut transform, mirror_tile) = resolved_path_gradient_tile(
+      let mut path = common::drawingml_gradient::resolve_path_gradient(
         fill,
-        fill_to,
+        path,
         common::Transform {
           m11: bounds.width,
           m12: 0.0,
@@ -3265,19 +3258,10 @@ fn gradient_fill_for_optional_slide(
           dy: common::Pt(bounds.y),
         },
       );
-      if kind == common::GradientPathKind::Circle {
-        transform = common::office_circle_gradient_transform(transform);
+      if path.kind == common::GradientPathKind::Circle {
+        path.transform = common::office_circle_gradient_transform(path.transform);
       }
-      (
-        None,
-        false,
-        Some(common::GradientPath {
-          kind,
-          fill_to,
-          transform,
-          mirror_tile,
-        }),
-      )
+      (None, false, Some(path))
     }
   };
   Some(common::Fill::Gradient(common::GradientFill {
@@ -6770,41 +6754,19 @@ fn shape_gradient_path(
         )
       }
       a::GradientFillChoice::PathGradientFill(path) => {
-        let fill_to = path
-          .fill_to_rectangle
-          .as_ref()
-          .map(path_gradient_fill_to_rect)
-          .unwrap_or(common::RelativeRect {
-            // MS-OI29500 §20.1.8 defines the Office hard-coded default for
-            // all four path-gradient focus insets as 50%.
-            left: 0.5,
-            top: 0.5,
-            right: 0.5,
-            bottom: 0.5,
-          });
-        let kind = match path.path.unwrap_or(a::PathShadeValues::Shape) {
-          a::PathShadeValues::Shape => common::GradientPathKind::Shape,
-          a::PathShadeValues::Circle => common::GradientPathKind::Circle,
-          a::PathShadeValues::Rectangle => common::GradientPathKind::Rectangle,
-        };
-        let (fill_to, mut transform, mirror_tile) = resolved_path_gradient_tile(
+        let mut path = common::drawingml_gradient::resolve_path_gradient(
           gradient,
-          fill_to,
+          path,
           path_gradient_transform(frame, shape, follows_shape_transform),
         );
-        if kind == common::GradientPathKind::Circle {
-          transform = common::office_circle_gradient_transform(transform);
+        if path.kind == common::GradientPathKind::Circle {
+          path.transform = common::office_circle_gradient_transform(path.transform);
         }
         (
           None,
           None,
           false,
-          Some(common::GradientPath {
-            kind,
-            fill_to,
-            transform,
-            mirror_tile,
-          }),
+          Some(path),
           common::GradientInterpolation::LinearSrgb,
         )
       }
@@ -6841,68 +6803,6 @@ fn shape_gradient_path(
       })
       .collect(),
   )
-}
-
-fn path_gradient_fill_to_rect(rect: &a::FillToRectangle) -> common::RelativeRect {
-  common::RelativeRect {
-    left: drawingml_percent_ratio(rect.left.as_ref()),
-    top: drawingml_percent_ratio(rect.top.as_ref()),
-    right: drawingml_percent_ratio(rect.right.as_ref()),
-    bottom: drawingml_percent_ratio(rect.bottom.as_ref()),
-  }
-}
-
-fn path_gradient_tile_rect(rect: &a::TileRectangle) -> common::RelativeRect {
-  common::RelativeRect {
-    left: drawingml_percent_ratio(rect.left.as_ref()),
-    top: drawingml_percent_ratio(rect.top.as_ref()),
-    right: drawingml_percent_ratio(rect.right.as_ref()),
-    bottom: drawingml_percent_ratio(rect.bottom.as_ref()),
-  }
-}
-
-fn resolved_path_gradient_tile(
-  gradient: &a::GradientFill,
-  fill_to_shape: common::RelativeRect,
-  shape_transform: common::Transform,
-) -> (common::RelativeRect, common::Transform, bool) {
-  let Some(tile) = gradient
-    .tile_rectangle
-    .as_ref()
-    .map(path_gradient_tile_rect)
-  else {
-    return (fill_to_shape, shape_transform, false);
-  };
-  let tile_width = 1.0 - tile.left - tile.right;
-  let tile_height = 1.0 - tile.top - tile.bottom;
-  if tile_width.abs() <= f32::EPSILON || tile_height.abs() <= f32::EPSILON {
-    return (fill_to_shape, shape_transform, false);
-  }
-
-  // ECMA-376 Part 1 §20.1.8.59 maps the gradient to tileRect, while
-  // MS-OI29500 §20.1.8.31(b) makes Office's fillToRect relative to the
-  // owning shape rather than that tile. Convert the focus rectangle into the
-  // tile's unit coordinates before handing it to the common path sampler.
-  let fill_to = common::RelativeRect {
-    left: (fill_to_shape.left - tile.left) / tile_width,
-    top: (fill_to_shape.top - tile.top) / tile_height,
-    right: (fill_to_shape.right - tile.right) / tile_width,
-    bottom: (fill_to_shape.bottom - tile.bottom) / tile_height,
-  };
-  let transform = common::Transform {
-    m11: shape_transform.m11 * tile_width,
-    m12: shape_transform.m12 * tile_width,
-    m21: shape_transform.m21 * tile_height,
-    m22: shape_transform.m22 * tile_height,
-    dx: common::Pt(
-      shape_transform.dx.0 + shape_transform.m11 * tile.left + shape_transform.m21 * tile.top,
-    ),
-    dy: common::Pt(
-      shape_transform.dy.0 + shape_transform.m12 * tile.left + shape_transform.m22 * tile.top,
-    ),
-  };
-  let mirror_tile = tile.left > 0.0 || tile.top > 0.0 || tile.right > 0.0 || tile.bottom > 0.0;
-  (fill_to, transform, mirror_tile)
 }
 
 fn path_gradient_transform(
@@ -11739,21 +11639,11 @@ fn drawingml_text_gradient_fill(
       && let Some(a::GradientFillChoice::PathGradientFill(source_path)) =
         source.gradient_fill_choice.as_ref()
     {
-      let fill_to_shape = source_path
-        .fill_to_rectangle
-        .as_ref()
-        .map(path_gradient_fill_to_rect)
-        .unwrap_or(common::RelativeRect {
-          left: 0.5,
-          top: 0.5,
-          right: 0.5,
-          bottom: 0.5,
-        });
-      let (fill_to, transform, mirror_tile) =
-        resolved_path_gradient_tile(source, fill_to_shape, common::Transform::default());
-      path.fill_to = fill_to;
-      path.transform = transform;
-      path.mirror_tile = mirror_tile;
+      *path = common::drawingml_gradient::resolve_path_gradient(
+        source,
+        source_path,
+        common::Transform::default(),
+      );
     }
     let constant_path_color = gradient.path.is_some()
       && gradient.stops.first().is_some_and(|first| {
@@ -12691,19 +12581,22 @@ mod tests {
       }),
       ..Default::default()
     };
-    let (focus, transform, mirror_tile) = resolved_path_gradient_tile(
+    let path = a::PathGradientFill {
+      fill_to_rectangle: Some(a::FillToRectangle {
+        left: Some(DrawingmlPercentageValue::Decimal(100_000)),
+        bottom: Some(DrawingmlPercentageValue::Decimal(100_000)),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let resolved = common::drawingml_gradient::resolve_path_gradient(
       &gradient,
-      common::RelativeRect {
-        left: 1.0,
-        top: 0.0,
-        right: 0.0,
-        bottom: 1.0,
-      },
+      &path,
       common::Transform::default(),
     );
 
     assert_eq!(
-      focus,
+      resolved.fill_to,
       common::RelativeRect {
         left: 0.5,
         top: 0.5,
@@ -12711,11 +12604,11 @@ mod tests {
         bottom: 0.5,
       }
     );
-    assert_eq!(transform.m11, 2.0);
-    assert_eq!(transform.m22, 2.0);
-    assert_eq!(transform.dx.0, 0.0);
-    assert_eq!(transform.dy.0, -1.0);
-    assert!(!mirror_tile);
+    assert_eq!(resolved.transform.m11, 2.0);
+    assert_eq!(resolved.transform.m22, 2.0);
+    assert_eq!(resolved.transform.dx.0, 0.0);
+    assert_eq!(resolved.transform.dy.0, -1.0);
+    assert!(!resolved.mirror_tile);
   }
 
   #[test]

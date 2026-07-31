@@ -1,11 +1,136 @@
 use kurbo::{PathEl, Point as KurboPoint, flatten};
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+use ooxmlsdk::simple_type::DrawingmlPercentageValue;
 
 use super::{
   Color, GradientFill, GradientInterpolation, GradientPath, GradientPathKind, GradientStop,
-  PathCommand, Transform,
+  PathCommand, Rect, RelativeRect, Transform,
 };
 
 const PATH_GRADIENT_BINARY_STEPS: usize = 10;
+const OFFICE_DEFAULT_PATH_FOCUS: RelativeRect = RelativeRect {
+  left: 0.5,
+  top: 0.5,
+  right: 0.5,
+  bottom: 0.5,
+};
+
+/// Resolves shared DrawingML path-gradient defaults and tile geometry.
+///
+/// ISO/IEC 29500 gives each attribute on a present `CT_RelativeRect` a
+/// schema default of zero. Office's shape-property merge defaults are a
+/// separate layer: when `fillToRect` itself is absent, all four focus insets
+/// are 50%. Keeping those cases distinct is observable in presets such as
+/// "From Top Left Corner", which writes only `r` and `b`.
+pub(crate) fn resolve_path_gradient(
+  source: &a::GradientFill,
+  path: &a::PathGradientFill,
+  shape_transform: Transform,
+) -> GradientPath {
+  let fill_to_shape = path
+    .fill_to_rectangle
+    .as_ref()
+    .map(|rect| {
+      drawingml_relative_rect(
+        rect.left.as_ref(),
+        rect.top.as_ref(),
+        rect.right.as_ref(),
+        rect.bottom.as_ref(),
+      )
+    })
+    .unwrap_or(OFFICE_DEFAULT_PATH_FOCUS);
+  let tile = source.tile_rectangle.as_ref().map(|rect| {
+    drawingml_relative_rect(
+      rect.left.as_ref(),
+      rect.top.as_ref(),
+      rect.right.as_ref(),
+      rect.bottom.as_ref(),
+    )
+  });
+  let kind = match path.path.unwrap_or(a::PathShadeValues::Shape) {
+    a::PathShadeValues::Shape => GradientPathKind::Shape,
+    a::PathShadeValues::Circle => GradientPathKind::Circle,
+    a::PathShadeValues::Rectangle => GradientPathKind::Rectangle,
+  };
+  let (fill_to, transform, mirror_tile) =
+    resolve_path_gradient_tile(fill_to_shape, tile, shape_transform);
+  GradientPath {
+    kind,
+    fill_to,
+    transform,
+    mirror_tile,
+  }
+}
+
+/// Binds a path-gradient transform expressed in owning-shape unit space to
+/// final page bounds. This composes rather than replaces the transform so an
+/// authored `tileRect` remains observable after deferred host layout.
+pub(crate) fn bind_path_transform_to_bounds(normalized: Transform, bounds: Rect) -> Transform {
+  Transform {
+    m11: bounds.size.width.0 * normalized.m11,
+    m12: bounds.size.height.0 * normalized.m12,
+    m21: bounds.size.width.0 * normalized.m21,
+    m22: bounds.size.height.0 * normalized.m22,
+    dx: super::Pt(bounds.origin.x.0 + bounds.size.width.0 * normalized.dx.0),
+    dy: super::Pt(bounds.origin.y.0 + bounds.size.height.0 * normalized.dy.0),
+  }
+}
+
+fn drawingml_relative_rect(
+  left: Option<&DrawingmlPercentageValue>,
+  top: Option<&DrawingmlPercentageValue>,
+  right: Option<&DrawingmlPercentageValue>,
+  bottom: Option<&DrawingmlPercentageValue>,
+) -> RelativeRect {
+  let ratio = |value: Option<&DrawingmlPercentageValue>| {
+    value.map(|value| value.as_ratio() as f32).unwrap_or(0.0)
+  };
+  RelativeRect {
+    left: ratio(left),
+    top: ratio(top),
+    right: ratio(right),
+    bottom: ratio(bottom),
+  }
+}
+
+fn resolve_path_gradient_tile(
+  fill_to_shape: RelativeRect,
+  tile: Option<RelativeRect>,
+  shape_transform: Transform,
+) -> (RelativeRect, Transform, bool) {
+  let Some(tile) = tile else {
+    return (fill_to_shape, shape_transform, false);
+  };
+  let tile_width = 1.0 - tile.left - tile.right;
+  let tile_height = 1.0 - tile.top - tile.bottom;
+  if tile_width.abs() <= f32::EPSILON || tile_height.abs() <= f32::EPSILON {
+    return (fill_to_shape, shape_transform, false);
+  }
+
+  // ISO/IEC 29500-1 §20.1.8.59 maps the gradient to tileRect. Office keeps
+  // fillToRect anchored to the owning shape, so convert the focus rectangle
+  // to tile-unit coordinates before handing it to the common path sampler.
+  let fill_to = RelativeRect {
+    left: (fill_to_shape.left - tile.left) / tile_width,
+    top: (fill_to_shape.top - tile.top) / tile_height,
+    right: (fill_to_shape.right - tile.right) / tile_width,
+    bottom: (fill_to_shape.bottom - tile.bottom) / tile_height,
+  };
+  let transform = Transform {
+    m11: shape_transform.m11 * tile_width,
+    m12: shape_transform.m12 * tile_width,
+    m21: shape_transform.m21 * tile_height,
+    m22: shape_transform.m22 * tile_height,
+    dx: super::Pt(
+      shape_transform.dx.0 + shape_transform.m11 * tile.left + shape_transform.m21 * tile.top,
+    ),
+    dy: super::Pt(
+      shape_transform.dy.0 + shape_transform.m12 * tile.left + shape_transform.m22 * tile.top,
+    ),
+  };
+  let mirror_tile = tile.left > 0.0 || tile.top > 0.0 || tile.right > 0.0 || tile.bottom > 0.0;
+  (fill_to, transform, mirror_tile)
+}
 
 pub(crate) fn resolved_stops(gradient: &GradientFill<'static>) -> Vec<GradientStop<'static>> {
   if gradient.interpolation != GradientInterpolation::PowerPointGammaSigma
@@ -248,5 +373,58 @@ fn gamma_correct_color(start: Color, end: Color, blend: f32) -> Color {
     a: (f32::from(start.a) + (f32::from(end.a) - f32::from(start.a)) * blend)
       .round()
       .clamp(0.0, 255.0) as u8,
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn present_relative_rect_uses_schema_defaults_before_tile_mapping() {
+    let source = a::GradientFill {
+      tile_rectangle: Some(a::TileRectangle {
+        left: Some(DrawingmlPercentageValue::Decimal(-100_000)),
+        top: Some(DrawingmlPercentageValue::Decimal(-100_000)),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let path = a::PathGradientFill {
+      path: Some(a::PathShadeValues::Circle),
+      fill_to_rectangle: Some(a::FillToRectangle {
+        right: Some(DrawingmlPercentageValue::Decimal(100_000)),
+        bottom: Some(DrawingmlPercentageValue::Decimal(100_000)),
+        ..Default::default()
+      }),
+    };
+
+    let resolved = resolve_path_gradient(&source, &path, Transform::default());
+
+    assert_eq!(
+      resolved.fill_to,
+      RelativeRect {
+        left: 0.5,
+        top: 0.5,
+        right: 0.5,
+        bottom: 0.5,
+      }
+    );
+    assert_eq!(resolved.transform.m11, 2.0);
+    assert_eq!(resolved.transform.m22, 2.0);
+    assert_eq!(resolved.transform.dx.0, -1.0);
+    assert_eq!(resolved.transform.dy.0, -1.0);
+    assert!(!resolved.mirror_tile);
+  }
+
+  #[test]
+  fn absent_fill_to_rect_uses_office_shape_property_default() {
+    let resolved = resolve_path_gradient(
+      &a::GradientFill::default(),
+      &a::PathGradientFill::default(),
+      Transform::default(),
+    );
+
+    assert_eq!(resolved.fill_to, OFFICE_DEFAULT_PATH_FOCUS);
   }
 }

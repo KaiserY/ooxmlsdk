@@ -25,9 +25,12 @@ A bookmark is defined by a pair of markers:
 | `<w:bookmarkStart>` | CT_Bookmark | Opens the named range; carries the `w:name` |
 | `<w:bookmarkEnd>` | CT_MarkupRange | Closes the range; `w:id` matches bookmarkStart |
 
-Both appear as **paragraph-level children** (inside `<w:p>` via
-`ParagraphChoice`) or **body-level children** (direct children of `<w:body>`
-via `BodyChoice`).
+Both can appear inline inside `<w:p>` or at a block-content boundary. Valid
+block parents include `<w:body>`, header/footer and note stories,
+`<w:txbxContent>`, `<w:sdtContent>`, `<w:customXml>`, and table/row/cell
+content (`<w:tbl>`, `<w:tr>`, and `<w:tc>`). A consumer therefore must retain
+their global document position even when no paragraph directly owns the
+marker.
 
 ---
 
@@ -120,6 +123,27 @@ position) to mark a single insertion point rather than a range:
 </w:p>
 ```
 
+### Block-boundary bookmark
+
+A range marker can be a direct child of a block container rather than a
+paragraph. The following start is at the insertion position immediately
+before the first paragraph content:
+
+```xml
+<w:sdtContent>
+  <w:bookmarkStart w:id="13" w:name="_TocBoundary"
+                   w:displacedByCustomXml="prev"/>
+  <w:p>
+    <w:r><w:t>Heading</w:t></w:r>
+    <w:bookmarkEnd w:id="13"/>
+  </w:p>
+</w:sdtContent>
+```
+
+`w:displacedByCustomXml` records whether custom-XML markup displaced the range
+marker toward the previous or next position. It does not make the bookmark
+container-local and does not change how `REF` or `PAGEREF` resolves its name.
+
 ---
 
 ## 5. Hyperlinks Targeting Bookmarks
@@ -190,9 +214,10 @@ references and are uncommon in general documents.
    different bookmarks. The `w:anchor` value on a hyperlink must match the
    case exactly.
 
-8. **`bookmarkStart` must precede all run content it covers.** As a paragraph
-   child, `bookmarkStart` should appear before the first run of the bookmarked
-   text. Word may silently reorder out-of-sequence markers on save.
+8. **`bookmarkStart` must precede all content it covers.** Within a paragraph
+   it should appear before the first covered run; at a block boundary it
+   precedes the first covered paragraph, table, row, or cell. Word may silently
+   reorder out-of-sequence markers on save.
 
 9. **Zero-width (point) bookmarks are valid and common.** TOC entries often
    use adjacent `bookmarkStart`/`bookmarkEnd` with no content between them.

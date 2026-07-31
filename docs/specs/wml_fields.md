@@ -2,7 +2,8 @@
 
 **Source authority:** ECMA-376 5th edition Part 1 §17.16 (fields), §17.13.4
 (hyperlinks); ISO/IEC 29500:2016 Part 1 §17.16; XSD in
-`schemas/OfficeOpenXML-XMLSchema-Transitional/wml.xsd`.
+`schemas/OfficeOpenXML-XMLSchema-Transitional/wml.xsd`; Microsoft
+`[MS-OI29500]` implementation notes for Word-specific deviations.
 
 ---
 
@@ -138,6 +139,8 @@ Leading and trailing spaces are conventional. Switches start with `\`.
 | `TITLE` | ` TITLE ` | Document title (from core properties) |
 | `AUTHOR` | ` AUTHOR ` | Document author |
 | `FILENAME` | ` FILENAME \p ` | File name (\p includes full path) |
+| `ASK` | ` ASK customer "Customer name?" ` | Assign the response to a bookmark; does not display it |
+| `SET` | ` SET customer "Contoso" ` | Assign text to a bookmark; does not display it |
 
 ### Reference and TOC fields
 
@@ -159,6 +162,53 @@ Leading and trailing spaces are conventional. Switches start with `\`.
 | `\#` | Numeric picture: `\# "0.00"` |
 | `\!` | Lock result format |
 | `\h` | Hyperlink (in PAGEREF, REF) |
+
+### Legacy `FORMCHECKBOX` and `FORMDROPDOWN`
+
+A legacy `FORMCHECKBOX` is a complex field whose `begin` character owns
+`w:ffData/w:checkBox`. It is not represented by the cached result text or by a
+Unicode box character:
+
+```xml
+<w:r>
+  <w:fldChar w:fldCharType="begin">
+    <w:ffData>
+      <w:checkBox>
+        <w:sizeAuto/>
+        <w:default w:val="0"/>
+        <w:checked w:val="1"/>
+      </w:checkBox>
+    </w:ffData>
+  </w:fldChar>
+</w:r>
+<w:r><w:instrText xml:space="preserve"> FORMCHECKBOX </w:instrText></w:r>
+<w:r><w:fldChar w:fldCharType="separate"/></w:r>
+<w:r><w:fldChar w:fldCharType="end"/></w:r>
+```
+
+ECMA-376 Part 1 §17.16.5.20 and the transitional XSD require the form-field
+data and one checkbox sizing choice:
+
+- `w:size/@w:val` is an exact half-point size and overrides the normal run
+  style hierarchy.
+- `w:sizeAuto` retains the effective point size from the run and paragraph
+  style hierarchy.
+- `w:checked` is the current state. When it is absent, `w:default` supplies
+  the state; when both are absent, the state is unchecked. A present empty
+  `ST_OnOff` element means true.
+- A `FORMCHECKBOX` without valid `w:ffData/w:checkBox` does not create a
+  checkbox control.
+
+The layout model keeps this as one square character portion. LibreOffice
+`SwFieldFormCheckboxPortion::Format()` is supplemental source evidence for
+using the effective font text height as both the portion width and height.
+Word fixed output then paints a vector rectangle and, for the checked state,
+two diagonal strokes on its 600-DPI printer grid. The paint inherits the run
+color and opacity; the implementation does not substitute a font glyph.
+
+`[MS-OI29500]` §2.1.473 and §2.1.474 specify a Word deviation for nested
+legacy form fields: a `FORMCHECKBOX` or `FORMDROPDOWN` nested inside another
+field displays no result, even if the package contains a persisted result.
 
 ---
 
@@ -286,6 +336,11 @@ recent unclosed `begin`.
     properties on the runs between `separate` and `end` control how the cached
     value is rendered. Run properties on instruction runs (between `begin` and
     `separate`) are usually kept minimal.
+
+11. **ASK and SET do not display their cached result.** They assign a value to
+    a bookmark. Insert a subsequent `REF` field when that value should appear
+    in the document. `w:fldLock` prevents recalculation; it does not turn ASK
+    or SET into a displaying field.
 
 ---
 

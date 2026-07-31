@@ -2,7 +2,9 @@
 
 **Source authority:** ECMA-376 5th edition Part 1 §17.3.1 (paragraph), §17.3.3
 (run properties), ISO/IEC 29500:2016 Part 1 §17.3; XSD in
-`schemas/OfficeOpenXML-XMLSchema-Transitional/wml.xsd`.
+`schemas/OfficeOpenXML-XMLSchema-Transitional/wml.xsd`; Microsoft
+`[MS-OI29500]` implementation notes. LibreOffice Writer layout and
+`writerfilter/dmapper` are supplemental implementation evidence.
 
 ---
 
@@ -199,7 +201,49 @@ precedence in bidi paragraphs.
 
 ---
 
-## 6. Paragraph Borders (`<w:pBdr>`)
+## 6. Text Frames (`<w:framePr>`)
+
+The presence of `framePr` makes the paragraph part of a positioned text
+frame. Adjacent paragraphs belong to one frame when their complete resolved
+`framePr` attribute sets are identical. Their paragraph properties are not
+frame identity: each paragraph keeps its own `pBdr`, shading, spacing, and
+text formatting inside the shared frame. This distinction is observable in
+Office fixed output for `tdf154703_framePr.docx`, whose three differently
+decorated paragraphs occupy one frame.
+
+The frame is logically anchored relative to the next following paragraph
+which is not itself in a text frame. Important sizing and positioning rules:
+
+- `w` is an exact width in twips. When it is omitted, the width is determined
+  from the maximum rendered content-line width.
+- `h` is interpreted through `hRule`: `auto`, `atLeast`, or `exact`.
+  `[MS-OI29500]` records that Word treats an omitted `hRule` as `atLeast`
+  when a nonzero `h` is present, and as automatic otherwise.
+- In an exact-height frame, the final paragraph owns the remaining vertical
+  decoration area: its side borders continue to the frame bottom and its
+  bottom border closes at that boundary. This does not stretch the paragraph's
+  text or line spacing.
+- Word defaults omitted `hAnchor` and `vAnchor` to `text`, rather than the
+  ECMA `page` defaults, and evaluates horizontal anchoring from the left edge.
+- An omitted `wrap` means `around`. Explicit `auto` remains
+  application-defined and is not equivalent to omission.
+- `around`, `tight`, and `through` allow non-frame text to use remaining line
+  space. `none` and `notBeside` move intersecting non-frame text to the next
+  nonintersecting line.
+- `hSpace` is a left/right separation only for `wrap="around"` and is ignored
+  for the other wrap modes. `vSpace` is the top/bottom separation for all
+  modes.
+- `xAlign` supersedes `x`. `yAlign` supersedes `y`, except that `yAlign` is
+  ignored when `vAnchor="text"`.
+
+Two independent guards are useful when changing frame grouping:
+`tdf127622_framePr.docx` resolves adjacent style and direct formatting to one
+shared frame, while `tdf105035_framePrB.docx` retains distinct frames because
+their frame definitions differ.
+
+---
+
+## 7. Paragraph Borders (`<w:pBdr>`)
 
 **Type:** CT_PBdr — contains up to 6 border child elements.
 
@@ -220,8 +264,8 @@ precedence in bidi paragraphs.
 | `left` | Left border |
 | `bottom` | Bottom border |
 | `right` | Right border |
-| `between` | Border between consecutive paragraphs sharing this style |
-| `bar` | Vertical bar on the far edge of the page margin |
+| `between` | Border between adjoining paragraphs whose complete border sets are identical |
+| `bar` | Legacy border on the inside edge when the section uses mirrored margins |
 
 ### CT_Border attributes
 
@@ -261,9 +305,19 @@ precedence in bidi paragraphs.
 | `outset` | Outset |
 | `inset` | Inset |
 
+`between` grouping compares all six possible paragraph-border values, not
+only the two `between` children. If the complete sets differ, the first
+paragraph uses its `bottom` border and the second uses its `top` border. If
+they are identical, the `between` border is painted at the bottom of the
+first paragraph; its `space` attribute is ignored. `bar` exists for legacy
+compatibility and ECMA-376 explicitly permits consumers to remove or ignore
+it. Paragraph shading fills the authored `space` between the text-side
+decoration box and each effective border, stopping at the border's inner edge.
+The border width itself remains outside the shaded area.
+
 ---
 
-## 7. Shading (`<w:shd>`)
+## 8. Shading (`<w:shd>`)
 
 **Type:** CT_Shd  
 Applies a background pattern and/or fill colour to the paragraph.
@@ -305,7 +359,7 @@ Applies a background pattern and/or fill colour to the paragraph.
 
 ---
 
-## 8. Keep / Break Control Properties
+## 9. Keep / Break Control Properties
 
 These are all CT_OnOff (no required attributes; presence = on, `w:val="0"` or
 `w:val="false"` = explicit off — see wml_runs.md §CT_OnOff semantics).
@@ -321,7 +375,7 @@ These are all CT_OnOff (no required attributes; presence = on, `w:val="0"` or
 
 ---
 
-## 9. Outline Level (`<w:outlineLvl>`)
+## 10. Outline Level (`<w:outlineLvl>`)
 
 **Type:** CT_DecimalNumber  
 **Attribute:** `w:val` (required integer 0–8)
@@ -336,7 +390,7 @@ contents generation, and `<w:bookmarkStart>` heading anchors.
 
 ---
 
-## 10. Property Ordering and Inheritance
+## 11. Property Ordering and Inheritance
 
 **Within `<w:pPr>`:** the child sequence must follow the CT_PPrBase order
 (§2 above). Validators reject out-of-sequence children. The most common subset
@@ -358,7 +412,7 @@ pBdr → shd → tabs → spacing → ind → contextualSpacing → jc → outli
 
 ---
 
-## 11. Round-Trip Gotchas
+## 12. Round-Trip Gotchas
 
 1. **Twips vs. other units.** `before`, `after`, and `line` accept CSS-style
    strings in some contexts (`"1.5cm"`, `"0.5in"`) but the canonical XML
@@ -394,16 +448,22 @@ pBdr → shd → tabs → spacing → ind → contextualSpacing → jc → outli
    18, 24 (3 pt). Unlike WML run `sz` (half-points) or DrawingML `sz`
    (hundredths-of-a-point), border `sz` is eighths-of-a-point.
 
-9. **`pBdr between` and `bar` are uncommon.** `between` applies between two
-   consecutive paragraphs only when both have identical `between` borders.
-   `bar` is a full-height vertical bar in the gutter margin.
+9. **`pBdr between` compares the complete border set.** It applies only when
+   every possible paragraph-border value on adjoining paragraphs is
+   identical; its own `space` value is ignored. `bar` is a legacy inside-edge
+   border for mirrored margins and may be ignored by consumers.
 
 10. **`jc="both"` is "justified"**, not "centre-aligned". Centres in the x-axis
     sense is `jc="center"`.
 
+11. **An empty `w:p` is still a paragraph.** Its implicit paragraph mark owns
+    run formatting and line height. Do not discard it merely because it
+    follows a table; Office output for Apache POI `checkboxes.docx` retains
+    that authored blank line.
+
 ---
 
-## 12. Minimal Valid Structures
+## 13. Minimal Valid Structures
 
 ### Justified paragraph with spacing
 ```xml
@@ -455,7 +515,7 @@ pBdr → shd → tabs → spacing → ind → contextualSpacing → jc → outli
 
 ---
 
-## 13. Fixture Plan
+## 14. Fixture Plan
 
 | ID | File | Properties covered |
 |----|------|-------------------|

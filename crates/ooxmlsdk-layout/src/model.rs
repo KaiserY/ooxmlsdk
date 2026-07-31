@@ -146,6 +146,18 @@ pub struct TextStyle {
   pub(crate) drawingml_text_effects: Option<common::drawingml_image_effects::ImageEffectContainer>,
   /// DrawingML `a:bodyPr/a:scene3d` plus `a:sp3d` text extrusion.
   pub(crate) drawingml_text_static3d: Option<common::drawingml_3d::Static3dStyle>,
+  /// Direct WordprocessingML `w:b` state applicable to generated field text.
+  ///
+  /// This is distinct from `bold`: a generated Word field diagnostic supplies
+  /// its own bold default, but explicit result-run or paragraph-mark
+  /// `w:b w:val="false"` suppresses that resource formatting.
+  pub(crate) wordprocessingml_field_bold_override: Option<bool>,
+  /// Whether this run contains an application-generated field diagnostic.
+  ///
+  /// Word's legacy aligned-tab paint reserves the field portion's boundary
+  /// advance before repeating a leader; persisted numeric results do not use
+  /// that diagnostic boundary policy.
+  pub(crate) wordprocessingml_generated_field_diagnostic: bool,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,
@@ -206,6 +218,8 @@ impl Default for TextStyle {
       legacy_relief: LegacyTextRelief::None,
       drawingml_text_effects: None,
       drawingml_text_static3d: None,
+      wordprocessingml_field_bold_override: None,
+      wordprocessingml_generated_field_diagnostic: false,
       bold: false,
       italic: false,
       underline: false,

@@ -147,11 +147,13 @@ pub(super) fn paragraph_model_with_base<'a>(
     properties::paragraph_mark_run_style(paragraph_mark_run_properties, run_style.clone(), styles);
   let has_direct_indentation = numbering_format_context.has_direct_indentation();
   // ECMA-376 Part 1 §17.9.24 makes w:lvl/w:rPr an overlay for numbering
-  // text. With no explicit overlay, Word/Writer build the number portion from
-  // the current paragraph font; this is why a numbered Heading 1 carries its
-  // Times New Roman bold style into "Article 1.". LibreOffice implements the
-  // same precedence in SwTextFormatter::NewNumberPortion.
-  let numbering_base_style = paragraph_mark_style.clone();
+  // text. Word/Writer start the number portion from the paragraph font, then
+  // apply w:pPr/w:rPr separately to the synthesized number. Keep that
+  // paragraph-mark layer unresolved here: NumberingCatalog applies it once
+  // after the numbering-level overlay and restores explicit level properties.
+  // Passing paragraph_mark_style would apply a referenced character style
+  // twice, incorrectly reversing its toggle properties on the second pass.
+  let numbering_base_style = run_style.clone();
   let style_tab_stop_pt = format.tab_stops.last().map(|stop| stop.position_pt);
   let numbering_label = numbering_reference.and_then(|reference| {
     let matched_style_indent_context = styles.numbering_matched_style_indent_context(style_id);
@@ -253,6 +255,19 @@ pub(super) fn paragraph_model_with_base<'a>(
       suppress_toc_hyperlink_style: styles.is_toc_entry_paragraph_style(style_id),
     },
   );
+  if let Some(bold_override) = paragraph_mark_style.wordprocessingml_field_bold_override {
+    for inline in &mut inlines {
+      let super::InlineItem::Text(run) = inline else {
+        continue;
+      };
+      if run.dynamic_field.is_some() && run.style.wordprocessingml_field_bold_override.is_none() {
+        // Word applies direct paragraph-mark formatting to application-
+        // generated field diagnostics, while ordinary persisted result text
+        // continues to use its own run/style cascade.
+        run.style.wordprocessingml_field_bold_override = Some(bold_override);
+      }
+    }
+  }
   if let Some(image) = numbering_image {
     inlines.insert(0, super::InlineItem::Image(image));
   }
@@ -289,6 +304,9 @@ pub(super) fn paragraph_model_with_base<'a>(
           run.style.line_vertical_alignment = line_vertical_alignment;
         }
       }
+      super::InlineItem::LegacyFormCheckBox(check_box) => {
+        check_box.style.line_vertical_alignment = line_vertical_alignment;
+      }
       _ => {}
     }
   }
@@ -302,6 +320,7 @@ pub(super) fn paragraph_model_with_base<'a>(
       super::InlineItem::Text(run) => Some(run.clone()),
       super::InlineItem::PositionalTab(_) => None,
       super::InlineItem::Ruby(_) => None,
+      super::InlineItem::LegacyFormCheckBox(_) => None,
       super::InlineItem::Image(_) => None,
       super::InlineItem::Shape(_) => None,
       super::InlineItem::BookmarkStart(_) => None,

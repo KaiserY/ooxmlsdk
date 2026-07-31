@@ -797,7 +797,10 @@ pub(super) fn refresh_tables_of_contents(
   scan
     .bookmark_names
     .extend(body_level_bookmarks.iter().cloned());
-  let refreshed_references = refresh_missing_reference_fields(sections, &scan, ui_language);
+  let resolved_page_references =
+    resolve_layout_stable_page_reference_fields(sections, &scan, ui_language);
+  let refreshed_reference_spans = refresh_missing_reference_fields(sections, &scan, ui_language);
+  let refreshed_references = resolved_page_references || refreshed_reference_spans;
   let scan = if refreshed_references {
     let mut refreshed_scan = scan_main_story(sections);
     refreshed_scan
@@ -901,6 +904,57 @@ pub(super) fn refresh_tables_of_contents(
   }
 }
 
+fn resolve_layout_stable_page_reference_fields(
+  sections: &mut [ImportedSection],
+  scan: &StoryScan,
+  ui_language: Option<&str>,
+) -> bool {
+  let mut resolved = false;
+  for ordinal in 0..scan.paragraphs.len() {
+    let Some(paragraph) = paragraph_mut(sections, scan, ordinal) else {
+      continue;
+    };
+    for inline in &mut paragraph.inlines {
+      let InlineItem::Text(run) = inline else {
+        continue;
+      };
+      resolved |= resolve_layout_stable_page_reference_run(run, &scan.bookmark_names, ui_language);
+    }
+    #[cfg(test)]
+    for run in &mut paragraph.runs {
+      resolve_layout_stable_page_reference_run(run, &scan.bookmark_names, ui_language);
+    }
+  }
+  resolved
+}
+
+fn resolve_layout_stable_page_reference_run(
+  run: &mut TextRun,
+  bookmark_names: &HashSet<String>,
+  ui_language: Option<&str>,
+) -> bool {
+  let Some(DynamicFieldKind::PageRef { bookmark_name, .. }) = run.dynamic_field.as_ref() else {
+    return false;
+  };
+  if bookmark_names
+    .iter()
+    .any(|candidate| candidate.eq_ignore_ascii_case(bookmark_name))
+  {
+    return false;
+  }
+
+  // Bookmark existence is document structure, not pagination state. Resolve
+  // this replacement before line formatting so a long localized diagnostic
+  // can wrap and participate in center/right tab formatting. The dynamic
+  // field importer stores the complete cached result in this run, including
+  // any field-owned tab, so replacing the run also removes that stale tab.
+  let message = FieldMessage::UndefinedBookmark;
+  run.text = localized_field_message(message, ui_language);
+  apply_generated_field_message_style(&mut run.style, message, ui_language);
+  run.dynamic_field = None;
+  true
+}
+
 fn refresh_missing_reference_fields(
   sections: &mut [ImportedSection],
   scan: &StoryScan,
@@ -995,9 +1049,12 @@ fn build_missing_reference_result(
       _ => None,
     })
     .unwrap_or_else(|| paragraph.base_style.clone());
-  super::apply_generated_field_error_font(&mut style, ui_language);
-  apply_generated_reference_error_font(&mut style, ui_language);
-  let text = localized_missing_reference_error(error, ui_language).to_string();
+  let message = match error {
+    MissingReferenceError::ReferenceSourceNotFound => FieldMessage::ReferenceSourceNotFound,
+    MissingReferenceError::BookmarkNameNotSpecified => FieldMessage::BookmarkNameNotSpecified,
+  };
+  apply_generated_field_message_style(&mut style, message, ui_language);
+  let text = localized_field_message(message, ui_language);
   let run = TextRun {
     text: text.clone(),
     style,
@@ -1023,48 +1080,6 @@ fn build_missing_reference_result(
     paragraph.runs.push(run);
   }
   paragraph
-}
-
-fn apply_generated_reference_error_font(style: &mut TextStyle, ui_language: Option<&str>) {
-  let language = ui_language
-    .unwrap_or("en-US")
-    .replace('_', "-")
-    .to_ascii_lowercase();
-  if language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans") {
-    // Unlike the regular PAGEREF missing-bookmark resource, Word's REF and
-    // NOTEREF diagnostics use a bold Arial/SimSun resource pair. ASCII
-    // punctuation is carried by Arial while Han characters use SimSun.
-    let simsun = Arc::<str>::from("SimSun");
-    style.font_family = Some(Arc::<str>::from("Arial"));
-    style.east_asia_font_family = Some(simsun);
-    style.bold = true;
-    style.complex_bold = Some(true);
-    style.underline = false;
-  }
-}
-
-fn localized_missing_reference_error(
-  error: MissingReferenceError,
-  ui_language: Option<&str>,
-) -> &'static str {
-  let language = ui_language
-    .unwrap_or("en-US")
-    .replace('_', "-")
-    .to_ascii_lowercase();
-  let simplified_chinese =
-    language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans");
-  let traditional_chinese = language == "zh-tw"
-    || language == "zh-hk"
-    || language == "zh-mo"
-    || language.starts_with("zh-hant");
-  match (error, simplified_chinese, traditional_chinese) {
-    (MissingReferenceError::ReferenceSourceNotFound, true, _) => "错误!未找到引用源。",
-    (MissingReferenceError::BookmarkNameNotSpecified, true, _) => "错误!未指定书签。",
-    (MissingReferenceError::ReferenceSourceNotFound, _, true) => "錯誤! 找不到參照來源。",
-    (MissingReferenceError::BookmarkNameNotSpecified, _, true) => "錯誤! 未提供書籤名稱。",
-    (MissingReferenceError::ReferenceSourceNotFound, _, _) => "Error! Reference source not found.",
-    (MissingReferenceError::BookmarkNameNotSpecified, _, _) => "Error! No bookmark name given.",
-  }
 }
 
 fn normalize_cached_toc_hyperlink_style(
@@ -1745,19 +1760,9 @@ fn build_empty_toc_result(
   paragraph.endnote_reference_ids.clear();
   paragraph.list_label = None;
   paragraph.list_label_hyperlink_url = None;
-  let language = ui_language
-    .unwrap_or("en-US")
-    .replace('_', "-")
-    .to_ascii_lowercase();
-  let text = if language == "zh-cn" || language.starts_with("zh-hans") {
-    "错误!未找到目录项。"
-  } else if language == "zh-tw" || language.starts_with("zh-hant") {
-    "錯誤! 找不到目錄項目。"
-  } else {
-    "No table of contents entries found."
-  };
+  let text = localized_field_message(FieldMessage::EmptyTableOfContents, ui_language);
   paragraph.inlines.push(InlineItem::Text(TextRun {
-    text: text.to_string(),
+    text,
     style: paragraph.base_style.clone(),
     hyperlink_url: None,
     dynamic_field: None,
@@ -1895,6 +1900,7 @@ mod tests {
       alignment: TableAlignment::Left,
       right_to_left: false,
       align_leading_cell_content: false,
+      in_header_footer: false,
       placement: None,
       allow_overlap: true,
       split_allowed: true,
@@ -2207,6 +2213,112 @@ mod tests {
       &sections[0].blocks[0],
       Block::Paragraph(paragraph)
         if paragraph_source_text(paragraph).as_deref() == Some("Text1")
+    ));
+  }
+
+  #[test]
+  fn missing_pageref_is_resolved_before_layout_without_consuming_an_outer_tab() {
+    let page_ref_run = |text: &str, bookmark_name: &str| {
+      InlineItem::Text(TextRun {
+        text: text.to_string(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: Some(DynamicFieldKind::PageRef {
+          bookmark_name: Arc::<str>::from(bookmark_name),
+          number_format: FieldNumberFormat::Decimal,
+          relative_position: false,
+        }),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+
+    // tdf64531 stores its tab inside the missing PAGEREF result. Word replaces
+    // that complete result, so the generated diagnostic must not retain it.
+    let mut field_owned_tab = test_paragraph("");
+    field_owned_tab.inlines.clear();
+    field_owned_tab
+      .inlines
+      .push(page_ref_run("\t2", "MissingFieldOwnedTab"));
+
+    // fdo78654 has the TOC tab before PAGEREF. That tab is paragraph content
+    // and must survive while only the cached field result is replaced.
+    let mut outer_tab = test_paragraph("Heading\t");
+    outer_tab
+      .inlines
+      .push(page_ref_run("48", "MissingAfterOuterTab"));
+
+    let mut valid = test_paragraph("");
+    valid.inlines.clear();
+    valid.inlines.push(page_ref_run("7", "present"));
+    let mut target = test_paragraph("Target");
+    target
+      .inlines
+      .insert(0, InlineItem::BookmarkStart("Present".to_string()));
+    target.field_events = vec![
+      ParagraphFieldEvent::BookmarkStart {
+        id: "1".to_string(),
+        name: "Present".to_string(),
+      },
+      ParagraphFieldEvent::Content,
+      ParagraphFieldEvent::BookmarkEnd {
+        id: "1".to_string(),
+      },
+    ];
+
+    let mut sections = vec![default_section(vec![
+      Block::paragraph(field_owned_tab),
+      Block::paragraph(outer_tab),
+      Block::paragraph(valid),
+      Block::paragraph(target),
+    ])];
+
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("zh-CN"),
+    );
+
+    let Block::Paragraph(field_owned_tab) = &sections[0].blocks[0] else {
+      panic!("expected field-owned-tab paragraph");
+    };
+    let InlineItem::Text(result) = &field_owned_tab.inlines[0] else {
+      panic!("expected resolved PAGEREF result");
+    };
+    assert_eq!(result.text, "错误!未定义书签。");
+    assert_eq!(
+      result.style.east_asia_font_family.as_deref(),
+      Some("SimSun")
+    );
+    assert!(result.dynamic_field.is_none());
+
+    let Block::Paragraph(outer_tab) = &sections[0].blocks[1] else {
+      panic!("expected outer-tab paragraph");
+    };
+    assert!(matches!(
+      &outer_tab.inlines[0],
+      InlineItem::Text(run) if run.text == "Heading\t"
+    ));
+    assert!(matches!(
+      &outer_tab.inlines[1],
+      InlineItem::Text(run)
+        if run.text == "错误!未定义书签。" && run.dynamic_field.is_none()
+    ));
+
+    let Block::Paragraph(valid) = &sections[0].blocks[2] else {
+      panic!("expected valid PAGEREF paragraph");
+    };
+    assert!(matches!(
+      &valid.inlines[0],
+      InlineItem::Text(run)
+        if run.text == "7"
+          && matches!(
+            run.dynamic_field.as_ref(),
+            Some(DynamicFieldKind::PageRef { .. })
+          )
     ));
   }
 

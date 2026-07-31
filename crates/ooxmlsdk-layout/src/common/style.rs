@@ -56,6 +56,38 @@ pub struct Stroke<'doc> {
   pub source_style_id: Option<Cow<'doc, str>>,
 }
 
+/// One authored DrawingML shape-style component after host color resolution.
+///
+/// `Unspecified` is deliberately distinct from `NoPaint`: chart series and
+/// data points inherit omitted fill/outline components from their parent
+/// style, while an explicit `a:noFill` suppresses that inherited paint.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) enum ShapeStyleValue<T> {
+  #[default]
+  Unspecified,
+  NoPaint,
+  Paint(T),
+}
+
+impl<T> ShapeStyleValue<T> {
+  pub(crate) fn resolve_over<'a>(&'a self, inherited: &'a Self) -> &'a Self {
+    if matches!(self, Self::Unspecified) {
+      inherited
+    } else {
+      self
+    }
+  }
+}
+
+/// Resolved, inheritance-aware fill and outline authored on a DrawingML
+/// `spPr` wrapper. Hosts retain this pair instead of flattening chart paint
+/// to one solid RGB value during import.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct ShapeStyle<'doc> {
+  pub fill: ShapeStyleValue<Fill<'doc>>,
+  pub stroke: ShapeStyleValue<Stroke<'doc>>,
+}
+
 impl Stroke<'_> {
   /// Returns the authored physical dash array, expanding a DrawingML preset
   /// relative to the resolved line width when necessary.

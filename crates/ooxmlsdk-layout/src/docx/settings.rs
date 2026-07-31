@@ -228,10 +228,10 @@ pub(super) fn update_fields_on_open(
     .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
 }
 
-pub(super) fn default_tab_stop_pt(
+pub(super) fn explicit_default_tab_stop_pt(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
-) -> f32 {
+) -> Option<f32> {
   main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
@@ -242,7 +242,6 @@ pub(super) fn default_tab_stop_pt(
         .and_then(|stop| twips_measure_to_points(&stop.val))
     })
     .filter(|value| value.is_finite() && *value > 0.0)
-    .unwrap_or(DEFAULT_TAB_STOP_PT)
 }
 
 #[cfg(test)]

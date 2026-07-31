@@ -127,6 +127,10 @@ pub(super) fn merge_run_style(
   let Some(properties) = properties else {
     return;
   };
+  let records_field_formatting = matches!(
+    &properties,
+    RunProps::Direct(_) | RunProps::ParagraphMark(_)
+  );
 
   if let Some(fonts) = properties.run_fonts() {
     // LibreOffice maps DOCX rFonts into separate Writer character properties:
@@ -180,7 +184,11 @@ pub(super) fn merge_run_style(
     }
   }
   if let Some(bold) = properties.bold() {
-    style.bold = bold.val.is_none_or(|value| value.as_bool());
+    let bold = bold.val.is_none_or(|value| value.as_bool());
+    style.bold = bold;
+    if records_field_formatting {
+      style.wordprocessingml_field_bold_override = Some(bold);
+    }
   }
   if let Some(bold) = properties.bold_complex_script() {
     style.complex_bold = Some(bold.val.is_none_or(|value| value.as_bool()));

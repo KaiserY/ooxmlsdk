@@ -1800,12 +1800,14 @@ impl<'book> ResolvedFont<'book> {
     let small_caps =
       options.script.is_none_or(small_caps_supported_for_script) && options.small_caps;
     let has_lowercase = small_caps && text.chars().any(char::is_lowercase);
+    let reduced_small_caps_segment =
+      small_caps && (has_lowercase || text.chars().all(char::is_whitespace));
     let (shaped_text, small_caps_ranges) = if has_lowercase {
       small_caps_shaped_text(text)
     } else {
       (Cow::Borrowed(text), Vec::new())
     };
-    let shape_size = if has_lowercase {
+    let shape_size = if reduced_small_caps_segment {
       FontSize(options.size_pt.0 * 0.8)
     } else {
       options.size_pt
@@ -1998,30 +2000,38 @@ fn small_caps_script_direction_runs(
 ) -> Vec<FontScriptRun> {
   let mut runs = Vec::new();
   let mut start = 0usize;
-  let mut active_upper = None::<bool>;
-  for (index, ch) in text.char_indices() {
-    let is_upper = ch.is_uppercase() && !ch.is_lowercase();
-    if let Some(active) = active_upper
-      && active != is_upper
+  let mut active_reduced = None::<bool>;
+  for range in grapheme_clusters(text) {
+    let cluster = &text[range.clone()];
+    // ISO/IEC 29500-1 §17.3.2.33 limits the synthesized form to lowercase
+    // letters and leaves non-alphabetic characters unchanged. Word's fixed
+    // output also keeps digits and punctuation at the authored size, while
+    // whitespace uses the reduced advance of the surrounding small-cap text.
+    // Classify a complete grapheme so a lowercase base and its combining
+    // marks are never shaped at different sizes.
+    let reduced =
+      cluster.chars().any(char::is_lowercase) || cluster.chars().all(char::is_whitespace);
+    if let Some(active) = active_reduced
+      && active != reduced
     {
       push_small_caps_case_run(
         text,
-        start..index,
+        start..range.start,
         active,
         size_pt,
         app_script,
         wordprocessingml_font_slots,
         &mut runs,
       );
-      start = index;
+      start = range.start;
     }
-    active_upper = Some(is_upper);
+    active_reduced = Some(reduced);
   }
   if start < text.len() {
     push_small_caps_case_run(
       text,
       start..text.len(),
-      active_upper.unwrap_or(false),
+      active_reduced.unwrap_or(false),
       size_pt,
       app_script,
       wordprocessingml_font_slots,
@@ -2034,7 +2044,7 @@ fn small_caps_script_direction_runs(
 fn push_small_caps_case_run(
   source: &str,
   range: Range<usize>,
-  upper_run: bool,
+  reduced_run: bool,
   size_pt: FontSize,
   app_script: TextScript,
   wordprocessingml_font_slots: bool,
@@ -2044,7 +2054,7 @@ fn push_small_caps_case_run(
     &source[range.clone()],
     range.start,
     size_pt,
-    !upper_run,
+    reduced_run,
     app_script,
     wordprocessingml_font_slots,
   );

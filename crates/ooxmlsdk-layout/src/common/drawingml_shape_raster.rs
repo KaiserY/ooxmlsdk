@@ -599,21 +599,11 @@ fn resolve_text_raster_fill(fill: &mut Fill<'static>, bounds: Rect) {
   if let Some(path) = &mut gradient.path
     && unresolved
   {
-    path.transform = text_path_gradient_transform(path.transform, bounds);
+    path.transform =
+      super::drawingml_gradient::bind_path_transform_to_bounds(path.transform, bounds);
     if path.kind == super::GradientPathKind::Circle {
       path.transform = super::office_circle_gradient_transform(path.transform);
     }
-  }
-}
-
-fn text_path_gradient_transform(normalized: super::Transform, bounds: Rect) -> super::Transform {
-  super::Transform {
-    m11: bounds.size.width.0 * normalized.m11,
-    m12: bounds.size.height.0 * normalized.m12,
-    m21: bounds.size.width.0 * normalized.m21,
-    m22: bounds.size.height.0 * normalized.m22,
-    dx: super::Pt(bounds.origin.x.0 + bounds.size.width.0 * normalized.dx.0),
-    dy: super::Pt(bounds.origin.y.0 + bounds.size.height.0 * normalized.dy.0),
   }
 }
 

@@ -95,6 +95,31 @@ pub(crate) const WORD_UNTITLED_NO_LEGEND: CartesianLayoutAdjustment = CartesianL
   ..ZERO_ADJUSTMENT
 };
 
+/// Word's automatic two-dimensional cartesian layout with a non-overlay title
+/// and bottom legend.
+///
+/// The shared bands are measured from the immutable Office fixed output for
+/// `tdf91250.docx`, `tdf131288.docx`, `tdf125337.docx`, and
+/// `Chart_Plot_BorderLine_Style.docx`. Those documents cover automatic and
+/// explicit titles, Latin and East Asian title faces, one and three series,
+/// and line and column plots. Title-script and physical-font-height residuals
+/// are added by the lowering code; the remaining plot, axis, category, and
+/// legend bands are invariant across that matrix.
+pub(crate) const WORD_TITLED_BOTTOM_LEGEND: CartesianLayoutAdjustment = CartesianLayoutAdjustment {
+  category_top_ratio: -0.021_274,
+  plot_top_ratio: 0.005_444,
+  plot_bottom_ratio: -0.007_901,
+  tick_left_ratio: 0.010_897,
+  plot_left_ratio: 0.007_022,
+  plot_right_ratio: -0.017_651,
+  ..ZERO_ADJUSTMENT
+};
+
+/// DrawingML's automatic East Asian title box reserves additional leading
+/// beyond an otherwise equal-height Latin title. Any physical line-height
+/// excess of the selected East Asian face is added separately in points.
+pub(crate) const WORD_BOTTOM_LEGEND_EAST_ASIAN_TITLE_EXTRA_RATIO: f32 = 0.004_405;
+
 /// Excel side-legend charts with an explicit title.
 pub(crate) const EXCEL_EXPLICIT_TITLE_SIDE_LEGEND: CartesianLayoutAdjustment =
   CartesianLayoutAdjustment {
@@ -400,6 +425,8 @@ pub(crate) const DEFAULT_RIGHT_MARGIN_RATIO: f32 = 0.026;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct HorizontalCartesianLegendProfile {
   pub entry_gap_em: f32,
+  pub marker_gap_em: f32,
+  pub line_key_width_em: f32,
   pub x_offset_height_ratio: f32,
   pub y_offset_height_ratio: f32,
 }
@@ -407,30 +434,56 @@ pub(crate) struct HorizontalCartesianLegendProfile {
 pub(crate) const DEFAULT_HORIZONTAL_CARTESIAN_LEGEND: HorizontalCartesianLegendProfile =
   HorizontalCartesianLegendProfile {
     entry_gap_em: 0.94,
+    marker_gap_em: CARTESIAN_LEGEND_MARKER_GAP_EM,
+    line_key_width_em: CARTESIAN_LINE_LEGEND_KEY_WIDTH_EM,
     x_offset_height_ratio: 0.0,
     y_offset_height_ratio: 0.0,
+  };
+pub(crate) const WORD_TITLED_BOTTOM_CARTESIAN_LEGEND: HorizontalCartesianLegendProfile =
+  HorizontalCartesianLegendProfile {
+    entry_gap_em: 1.318_7,
+    marker_gap_em: 0.23,
+    line_key_width_em: 2.133_3,
+    x_offset_height_ratio: 0.0,
+    y_offset_height_ratio: -0.006_944,
+  };
+pub(crate) const WORD_AUTOMATIC_TITLE_BOTTOM_COLUMN_LEGEND: HorizontalCartesianLegendProfile =
+  HorizontalCartesianLegendProfile {
+    entry_gap_em: 1.095_4,
+    marker_gap_em: 0.237_4,
+    line_key_width_em: CARTESIAN_LINE_LEGEND_KEY_WIDTH_EM,
+    x_offset_height_ratio: -0.006_016,
+    y_offset_height_ratio: -0.006_944,
   };
 pub(crate) const EXCEL_TITLED_INDEXED_SCATTER_LEGEND: HorizontalCartesianLegendProfile =
   HorizontalCartesianLegendProfile {
     entry_gap_em: 2.43,
+    marker_gap_em: CARTESIAN_LEGEND_MARKER_GAP_EM,
+    line_key_width_em: CARTESIAN_LINE_LEGEND_KEY_WIDTH_EM,
     x_offset_height_ratio: -0.008_5,
     y_offset_height_ratio: 0.004_16,
   };
 pub(crate) const EXCEL_EXPLICIT_BOTTOM_COLUMN_LEGEND: HorizontalCartesianLegendProfile =
   HorizontalCartesianLegendProfile {
     entry_gap_em: 0.681_4,
+    marker_gap_em: CARTESIAN_LEGEND_MARKER_GAP_EM,
+    line_key_width_em: CARTESIAN_LINE_LEGEND_KEY_WIDTH_EM,
     x_offset_height_ratio: -0.010_35,
     y_offset_height_ratio: -0.009_93,
   };
 pub(crate) const EXCEL_UNTITLED_BOTTOM_COLUMN_LEGEND: HorizontalCartesianLegendProfile =
   HorizontalCartesianLegendProfile {
     entry_gap_em: 0.681_4,
+    marker_gap_em: CARTESIAN_LEGEND_MARKER_GAP_EM,
+    line_key_width_em: CARTESIAN_LINE_LEGEND_KEY_WIDTH_EM,
     x_offset_height_ratio: -0.006_09,
     y_offset_height_ratio: -0.005_91,
   };
 pub(crate) const EXCEL_UNTITLED_BOTTOM_LINE_LEGEND: HorizontalCartesianLegendProfile =
   HorizontalCartesianLegendProfile {
     entry_gap_em: 0.94,
+    marker_gap_em: CARTESIAN_LEGEND_MARKER_GAP_EM,
+    line_key_width_em: CARTESIAN_LINE_LEGEND_KEY_WIDTH_EM,
     x_offset_height_ratio: -0.009_21,
     y_offset_height_ratio: -0.009_93,
   };

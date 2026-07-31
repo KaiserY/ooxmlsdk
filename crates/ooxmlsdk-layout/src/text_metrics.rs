@@ -539,12 +539,13 @@ mod tests {
 
   #[test]
   fn shaped_text_preserves_synthesized_small_caps_run_sizes() {
-    // LibreOffice sw/source/core/txtnode/fntcap.cxx renders synthesized
-    // small capitals with a reduced font height. PDF must retain the shaped
-    // run size instead of reshaping the original lowercase text.
+    // LibreOffice sw/source/core/txtnode/fntcap.cxx renders lowercase small
+    // capitals at 80%, while ISO/IEC 29500-1 §17.3.2.33 leaves
+    // non-alphabetic characters unchanged. PDF must retain both shaped sizes
+    // instead of reshaping the original lowercase text.
     let mut style = test_style();
     style.small_caps = true;
-    let shaped = shape_text("Aa", &style).expect("small-caps shaped text");
+    let shaped = shape_text("Aa,1", &style).expect("small-caps shaped text");
 
     assert!(
       shaped
@@ -557,6 +558,13 @@ mod tests {
         .glyphs
         .iter()
         .any(|glyph| glyph.font_size_pt < style.font_size.0)
+    );
+    assert!(
+      shaped
+        .glyphs
+        .iter()
+        .filter(|glyph| glyph.text_range.start >= 2)
+        .all(|glyph| (glyph.font_size_pt - style.font_size.0).abs() < 0.01)
     );
   }
 

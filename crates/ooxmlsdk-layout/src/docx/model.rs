@@ -11,7 +11,8 @@ use ooxmlsdk::schemas::{
 
 pub(crate) use crate::model::{
   BorderDashPattern, BorderStyle, CellBordersModel, DynamicFieldKind, FieldNumberFormat,
-  FormWidget, FormWidgetKind, ImageCrop, LineNumbering, PageSetup, RgbColor, TextStyle,
+  FormWidget, FormWidgetKind, ImageCrop, LegacyTextRelief, LineNumbering, PageSetup, RgbColor,
+  TextStyle,
 };
 use crate::{common, units};
 
@@ -24,6 +25,7 @@ pub(crate) struct DocxDocument {
   pub hyphenation: HyphenationSettings,
   pub compatibility_mode: u16,
   pub justify_lines_with_shrinking: bool,
+  pub do_not_expand_shift_return: bool,
   pub even_and_odd_headers: bool,
   pub split_page_break_and_paragraph_mark: bool,
   pub form_widgets: Vec<FormWidget>,
@@ -341,8 +343,11 @@ pub(crate) struct ParagraphFormat {
   pub style_id: Option<Arc<str>>,
   pub spacing_before_pt: f32,
   pub spacing_before_lines: Option<f32>,
+  pub spacing_before_auto: Option<bool>,
+  pub spacing_before_auto_pt: Option<f32>,
   pub spacing_after_pt: f32,
   pub spacing_after_auto: Option<bool>,
+  pub spacing_after_auto_pt: Option<f32>,
   pub spacing_before_set: bool,
   pub spacing_after_set: bool,
   pub line_height_pt: Option<f32>,
@@ -376,12 +381,15 @@ pub(crate) struct ParagraphFormat {
   pub keep_with_next_set: bool,
   pub keep_lines: bool,
   pub keep_lines_set: bool,
+  pub widow_control: Option<bool>,
   pub contextual_spacing: bool,
   pub contextual_spacing_set: bool,
   pub suppress_auto_hyphens: Option<bool>,
+  pub suppress_line_numbers: Option<bool>,
   pub auto_space_de: Option<bool>,
   pub auto_space_dn: Option<bool>,
   pub hidden_separator: bool,
+  pub deleted_separator: bool,
   pub outline_text_inlines: Option<usize>,
   /// Effective outline level supplied by the paragraph style hierarchy,
   /// before direct paragraph properties are applied. TOC `\o` uses this
@@ -513,6 +521,21 @@ pub(crate) enum TabLeader {
   Underscore,
   Heavy,
   MiddleDot,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PositionalTab {
+  pub alignment: TabStopAlignment,
+  pub relative_to: PositionalTabBase,
+  pub leader: TabLeader,
+  pub style: TextStyle,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum PositionalTabBase {
+  #[default]
+  Margin,
+  Indent,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -653,6 +676,7 @@ impl FormWidgetIdAllocator {
 #[derive(Clone, Debug)]
 pub(crate) enum InlineItem {
   Text(TextRun),
+  PositionalTab(PositionalTab),
   Ruby(RubyInline),
   Image(InlineImage),
   Shape(InlineShape),

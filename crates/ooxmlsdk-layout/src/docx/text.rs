@@ -281,6 +281,9 @@ pub(super) fn paragraph_model_with_base<'a>(
       super::InlineItem::Text(run) => {
         run.style.line_vertical_alignment = line_vertical_alignment;
       }
+      super::InlineItem::PositionalTab(tab) => {
+        tab.style.line_vertical_alignment = line_vertical_alignment;
+      }
       super::InlineItem::Ruby(ruby) => {
         for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
           run.style.line_vertical_alignment = line_vertical_alignment;
@@ -297,6 +300,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     .iter()
     .filter_map(|item| match item {
       super::InlineItem::Text(run) => Some(run.clone()),
+      super::InlineItem::PositionalTab(_) => None,
       super::InlineItem::Ruby(_) => None,
       super::InlineItem::Image(_) => None,
       super::InlineItem::Shape(_) => None,

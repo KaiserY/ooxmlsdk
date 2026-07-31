@@ -495,6 +495,10 @@ pub struct TextStyle<'doc> {
   pub complex_font_size: Option<Pt>,
   pub complex_script: Option<bool>,
   pub right_to_left: Option<bool>,
+  /// Resolved Unicode bidi level for a directionally uniform text portion.
+  /// Unlike `right_to_left`, this affects shaping only and does not select
+  /// WordprocessingML complex-script formatting.
+  pub resolved_bidi_level: Option<u8>,
   pub complex_bold: Option<bool>,
   pub complex_italic: Option<bool>,
   pub kerning_minimum_size: Option<Pt>,
@@ -533,6 +537,14 @@ pub struct TextStyle<'doc> {
   pub underline_color: Option<Color>,
 }
 
+impl TextStyle<'_> {
+  /// Unicode bidi level resolved by the owning paragraph layout, when this
+  /// text portion contains only one shaping direction.
+  pub fn resolved_bidi_level(&self) -> Option<u8> {
+    self.resolved_bidi_level
+  }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PdfGlyphOutlineOptions {
   pub semantic_text_overlay: bool,
@@ -560,9 +572,9 @@ pub struct PdfGlyphOutlineOptions {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextWarp {
   pub source_bounds: Rect,
-  /// Authored text-body paint coordinate space. Preset warp paths use the
-  /// outer shape geometry, while Office keeps WordArt gradient and pattern
-  /// brushes in the inset text-body frame.
+  /// Host-provided paint coordinate space. This is independent of the
+  /// destination warp rectangle because Word, PowerPoint, and Excel can bind
+  /// WordArt gradient or pattern coordinates to different shape/text frames.
   pub paint_bounds: Rect,
   pub boundaries: Vec<Vec<PathCommand>>,
 }

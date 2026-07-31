@@ -30,6 +30,7 @@ pub use diagnostics::{
 };
 pub use error::{PdfError, Result};
 pub use ooxmlsdk_layout::docx::{DocxLayoutLineSummary, DocxLayoutRowSummary, DocxLayoutSummary};
+pub use ooxmlsdk_layout::options::FieldUpdateDateTime;
 pub use ooxmlsdk_layout::pptx::{
   PptxBulletParagraphSummary, PptxDrawShapeSummary, PptxLayoutSummary,
   PptxSmartArtTextShapeSummary, PptxTextShapeSummary,

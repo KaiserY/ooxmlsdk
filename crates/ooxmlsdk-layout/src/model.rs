@@ -68,6 +68,14 @@ impl Default for BorderStyle {
   }
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum LegacyTextRelief {
+  #[default]
+  None,
+  Embossed,
+  Engraved,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
   pub font_family: Option<Arc<str>>,
@@ -92,6 +100,10 @@ pub struct TextStyle {
   /// Right-to-left run override selected by WordprocessingML `w:rtl`.
   /// `None` leaves direction and script selection to the Unicode content.
   pub right_to_left: Option<bool>,
+  /// Resolved Unicode bidi level for one directionally uniform laid-out
+  /// portion. This controls glyph order and mirroring without selecting the
+  /// WordprocessingML complex-script formatting attached to `w:rtl`.
+  pub(crate) resolved_bidi_level: Option<u8>,
   pub complex_bold: Option<bool>,
   pub complex_italic: Option<bool>,
   /// Minimum WordprocessingML font size at which OpenType kerning is active.
@@ -120,6 +132,14 @@ pub struct TextStyle {
   pub(crate) text_glow: Option<common::drawingml_image_effects::WordprocessingTextGlow>,
   pub(crate) text_shadow: Option<common::drawingml_image_effects::WordprocessingTextShadow>,
   pub(crate) text_reflection: Option<common::drawingml_image_effects::WordprocessingTextReflection>,
+  /// Resolved legacy WordprocessingML `w:outline` toggle. This remains
+  /// separate from DrawingML/w14 outlines until fixed-output materialization
+  /// because Word uses a distinct one-pixel glyph contour.
+  pub(crate) legacy_outline: bool,
+  /// Resolved legacy WordprocessingML `w:shadow` toggle.
+  pub(crate) legacy_shadow: bool,
+  /// Resolved legacy WordprocessingML `w:emboss`/`w:imprint` relief.
+  pub(crate) legacy_relief: LegacyTextRelief,
   /// Resolved DrawingML `a:effectLst`/`a:effectDag` attached to character
   /// properties. This remains on the implementation-side style until the
   /// owning text body materializes the visible glyph raster.
@@ -162,6 +182,7 @@ impl Default for TextStyle {
       complex_font_size_pt: None,
       complex_script: None,
       right_to_left: None,
+      resolved_bidi_level: None,
       complex_bold: None,
       complex_italic: None,
       kerning_minimum_size_pt: None,
@@ -180,6 +201,9 @@ impl Default for TextStyle {
       text_glow: None,
       text_shadow: None,
       text_reflection: None,
+      legacy_outline: false,
+      legacy_shadow: false,
+      legacy_relief: LegacyTextRelief::None,
       drawingml_text_effects: None,
       drawingml_text_static3d: None,
       bold: false,
@@ -487,6 +511,7 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     complex_font_size: style.complex_font_size_pt.map(common::Pt),
     complex_script: style.complex_script,
     right_to_left: style.right_to_left,
+    resolved_bidi_level: style.resolved_bidi_level,
     complex_bold: style.complex_bold,
     complex_italic: style.complex_italic,
     kerning_minimum_size: style.kerning_minimum_size_pt.map(common::Pt),

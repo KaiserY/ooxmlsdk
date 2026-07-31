@@ -89,6 +89,7 @@ struct MeasureStyleKey {
   complex_font_size_bits: Option<u32>,
   complex_script_override: Option<bool>,
   right_to_left: bool,
+  resolved_bidi_level: Option<u8>,
   character_spacing_bits: u32,
   horizontal_scale_bits: u32,
   bold: bool,
@@ -113,6 +114,7 @@ impl MeasureStyleKey {
       complex_font_size_bits: style.complex_font_size_pt().map(f32::to_bits),
       complex_script_override: style.complex_script_override(),
       right_to_left: style.right_to_left(),
+      resolved_bidi_level: style.resolved_bidi_level(),
       character_spacing_bits: style.character_spacing_pt().to_bits(),
       horizontal_scale_bits: style.horizontal_scale().to_bits(),
       bold: style.bold(),
@@ -136,6 +138,7 @@ impl MeasureStyleKey {
       && self.complex_font_size_bits == style.complex_font_size_pt().map(f32::to_bits)
       && self.complex_script_override == style.complex_script_override()
       && self.right_to_left == style.right_to_left()
+      && self.resolved_bidi_level == style.resolved_bidi_level()
       && self.character_spacing_bits == style.character_spacing_pt().to_bits()
       && self.horizontal_scale_bits == style.horizontal_scale().to_bits()
       && self.bold == style.bold()

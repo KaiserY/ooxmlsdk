@@ -1,5 +1,5 @@
 use super::{
-  LO_SUBSCRIPT_BASELINE_SHIFT_SCALE, LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE,
+  LO_SUBSCRIPT_BASELINE_SHIFT_SCALE, LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE, LegacyTextRelief,
   MIN_ESCAPEMENT_FONT_SIZE_PT, ParagraphFormat, ParagraphProps, RunProps, RunStyleOverrides,
   StylesCatalog, TextStyle, ThemeColors, ThemeFonts, WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE,
   apply_w14_scheme_transforms, automatic_text_color_for_background,
@@ -150,6 +150,7 @@ pub(super) fn merge_run_style(
     {
       style.east_asia_font_family = Some(font_family);
     }
+    let has_complex_theme_reference = fonts.complex_script_theme.is_some();
     if let Some(font_family) = fonts
       .complex_script
       .as_deref()
@@ -158,6 +159,13 @@ pub(super) fn merge_run_style(
       .or_else(|| theme_fonts.resolve(fonts.complex_script_theme))
     {
       style.complex_font_family = Some(font_family);
+    } else if has_complex_theme_reference {
+      // ECMA-376 Part 1 §17.15.1.88 resolves a bidi theme token through
+      // w:themeFontLang/@w:bidi and otherwise through the theme's a:cs face.
+      // If that lookup is empty, [MS-OI29500] §2.1.87(c) supplies Word's
+      // application-defined rFonts default instead of retaining another
+      // slot's face or an inherited complex-script face.
+      style.complex_font_family = Some(Arc::from("Times New Roman"));
     }
   }
   if let Some(languages) = properties.languages() {
@@ -182,6 +190,28 @@ pub(super) fn merge_run_style(
   }
   if let Some(italic) = properties.italic_complex_script() {
     style.complex_italic = Some(italic.val.is_none_or(|value| value.as_bool()));
+  }
+  if let Some(outline) = properties.outline() {
+    style.legacy_outline = outline.val.is_none_or(|value| value.as_bool());
+  }
+  if let Some(shadow) = properties.shadow() {
+    style.legacy_shadow = shadow.val.is_none_or(|value| value.as_bool());
+  }
+  if let Some(emboss) = properties.emboss() {
+    let enabled = emboss.val.is_none_or(|value| value.as_bool());
+    if enabled {
+      style.legacy_relief = LegacyTextRelief::Embossed;
+    } else if style.legacy_relief == LegacyTextRelief::Embossed {
+      style.legacy_relief = LegacyTextRelief::None;
+    }
+  }
+  if let Some(imprint) = properties.imprint() {
+    let enabled = imprint.val.is_none_or(|value| value.as_bool());
+    if enabled {
+      style.legacy_relief = LegacyTextRelief::Engraved;
+    } else if style.legacy_relief == LegacyTextRelief::Engraved {
+      style.legacy_relief = LegacyTextRelief::None;
+    }
   }
   if let Some(complex_script) = properties.complex_script() {
     style.complex_script = Some(complex_script.val.is_none_or(|value| value.as_bool()));
@@ -446,35 +476,42 @@ pub(super) fn merge_run_style(
     style.hidden = vanish.val.is_none_or(|value| value.as_bool());
   }
   if let Some(vertical_alignment) = properties.vertical_text_alignment() {
-    match vertical_alignment.val {
-      w::VerticalPositionValues::Superscript => {
-        style.baseline_shift_pt =
-          crate::fonts::effective_font_size_pt(style, None) * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
-        style.font_size_pt = (style.font_size_pt * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
-          .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
-        style.complex_font_size_pt = style.complex_font_size_pt.map(|size| {
-          (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT)
-        });
-      }
-      w::VerticalPositionValues::Subscript => {
-        style.baseline_shift_pt =
-          crate::fonts::effective_font_size_pt(style, None) * LO_SUBSCRIPT_BASELINE_SHIFT_SCALE;
-        style.font_size_pt = (style.font_size_pt * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
-          .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
-        style.complex_font_size_pt = style.complex_font_size_pt.map(|size| {
-          (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT)
-        });
-      }
-      w::VerticalPositionValues::Baseline => {
-        style.baseline_shift_pt = 0.0;
-      }
-    }
+    apply_vertical_text_alignment(style, vertical_alignment.val);
   }
   if let Some(highlight) = properties.highlight() {
     style.highlight = highlight_color(highlight.val);
   }
   if style.color_is_automatic {
     style.color = super::RgbColor { r: 0, g: 0, b: 0 };
+  }
+}
+
+pub(super) fn apply_vertical_text_alignment(
+  style: &mut TextStyle,
+  vertical_alignment: w::VerticalPositionValues,
+) {
+  match vertical_alignment {
+    w::VerticalPositionValues::Superscript => {
+      style.baseline_shift_pt =
+        crate::fonts::effective_font_size_pt(style, None) * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
+      style.font_size_pt = (style.font_size_pt * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
+        .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
+      style.complex_font_size_pt = style
+        .complex_font_size_pt
+        .map(|size| (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+    }
+    w::VerticalPositionValues::Subscript => {
+      style.baseline_shift_pt =
+        crate::fonts::effective_font_size_pt(style, None) * LO_SUBSCRIPT_BASELINE_SHIFT_SCALE;
+      style.font_size_pt = (style.font_size_pt * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
+        .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
+      style.complex_font_size_pt = style
+        .complex_font_size_pt
+        .map(|size| (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+    }
+    w::VerticalPositionValues::Baseline => {
+      style.baseline_shift_pt = 0.0;
+    }
   }
 }
 

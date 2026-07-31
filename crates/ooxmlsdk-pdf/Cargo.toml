@@ -32,5 +32,6 @@ skrifa = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
 unicode-bidi = { workspace = true }
+unicode-bidi-mirroring = { workspace = true }
 unicode-script = { workspace = true }
 usvg = { workspace = true }

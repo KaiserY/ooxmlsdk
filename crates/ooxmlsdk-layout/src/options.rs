@@ -4,8 +4,24 @@ pub struct LayoutOptions {
   /// BCP 47 user-interface language used for application-generated labels,
   /// such as an automatic chart title that is not persisted in the package.
   pub ui_language: Option<String>,
+  /// Local civil time to use when an application explicitly refreshes
+  /// unlocked WordprocessingML DATE, TIME, PRINTDATE, and SAVEDATE fields.
+  ///
+  /// Leaving this unset preserves the package's cached field results.
+  pub field_update_datetime: Option<FieldUpdateDateTime>,
   pub action: LayoutActionOptions,
   pub diagnostics: LayoutDiagnosticsOptions,
+}
+
+/// Deterministic local civil time supplied for WordprocessingML field updates.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FieldUpdateDateTime {
+  pub year: u16,
+  pub month: u8,
+  pub day: u8,
+  pub hour: u8,
+  pub minute: u8,
+  pub second: u8,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

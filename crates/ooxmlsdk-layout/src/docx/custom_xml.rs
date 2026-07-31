@@ -5,6 +5,7 @@ use quick_xml::events::Event;
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CustomXmlBindings {
   entries: Vec<CustomXmlBindingEntry>,
+  glossary_placeholders: HashMap<String, w::DocPartBody>,
 }
 
 #[derive(Clone, Debug)]
@@ -35,7 +36,61 @@ impl CustomXmlBindings {
         xml: xml.to_owned(),
       });
     }
-    Self { entries }
+    let glossary_placeholders = main
+      .glossary_document_part(package)
+      .and_then(|part| part.root_element(package).ok())
+      .and_then(|glossary| glossary.doc_parts.as_ref())
+      .into_iter()
+      .flat_map(|parts| &parts.doc_part)
+      .filter(|part| {
+        part
+          .doc_part_properties
+          .as_deref()
+          .and_then(|properties| properties.doc_part_types.as_ref())
+          .is_some_and(|types| {
+            types
+              .doc_part_type
+              .iter()
+              .any(|part_type| matches!(part_type.val, w::DocPartValues::SdtPlaceholder))
+          })
+      })
+      .filter_map(|part| {
+        let name = part
+          .doc_part_properties
+          .as_deref()?
+          .doc_part_name
+          .as_ref()?
+          .val
+          .as_str();
+        let body = part.doc_part_body.as_deref()?;
+        (!name.is_empty()).then(|| (name.to_owned(), body.clone()))
+      })
+      .collect();
+    Self {
+      entries,
+      glossary_placeholders,
+    }
+  }
+
+  #[cfg(test)]
+  pub(super) fn from_test_xml(store_item_id: Option<&str>, xml: &str) -> Self {
+    Self {
+      entries: vec![CustomXmlBindingEntry {
+        store_item_id: store_item_id.map(str::to_owned),
+        xml: xml.to_owned(),
+      }],
+      glossary_placeholders: HashMap::new(),
+    }
+  }
+
+  #[cfg(test)]
+  pub(super) fn with_test_placeholder(mut self, name: &str, body: w::DocPartBody) -> Self {
+    self.glossary_placeholders.insert(name.to_owned(), body);
+    self
+  }
+
+  pub(super) fn glossary_placeholder(&self, name: &str) -> Option<&w::DocPartBody> {
+    self.glossary_placeholders.get(name)
   }
 
   pub(super) fn value_for_sdt(&self, properties: &w::SdtProperties) -> Option<String> {

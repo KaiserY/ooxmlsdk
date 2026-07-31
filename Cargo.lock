@@ -1475,6 +1475,7 @@ dependencies = [
  "smallvec",
  "thiserror",
  "unicode-bidi",
+ "unicode-bidi-mirroring",
  "unicode-script",
  "usvg",
 ]

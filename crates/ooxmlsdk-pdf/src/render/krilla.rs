@@ -607,6 +607,7 @@ struct TextStyle<'doc> {
   complex_font_size_pt: Option<f32>,
   complex_script: Option<bool>,
   right_to_left: Option<bool>,
+  resolved_bidi_level: Option<u8>,
   kerning_minimum_size_pt: Option<f32>,
   ligatures: Option<common::OpenTypeLigatures>,
   horizontal_scale: Option<f32>,
@@ -679,6 +680,10 @@ impl FontStyleRef for TextStyle<'_> {
 
   fn right_to_left(&self) -> bool {
     self.right_to_left == Some(true)
+  }
+
+  fn resolved_bidi_level(&self) -> Option<u8> {
+    self.resolved_bidi_level
   }
 
   fn complex_bold(&self) -> Option<bool> {
@@ -2161,6 +2166,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     complex_font_size_pt: style.complex_font_size.map(|size| size.0),
     complex_script: style.complex_script,
     right_to_left: style.right_to_left,
+    resolved_bidi_level: style.resolved_bidi_level(),
     kerning_minimum_size_pt: style.kerning_minimum_size.map(|size| size.0),
     ligatures: style.ligatures,
     horizontal_scale: style.horizontal_scale,
@@ -3848,8 +3854,14 @@ fn draw_text_item(
   link_annotations: &mut Vec<Annotation>,
 ) -> Result<()> {
   let item = &text.item;
-  let glyph_semantic_text =
-    symbol_font_semantic_text(&item.text, item.style.font_family.as_deref());
+  let bidi_semantic_text =
+    bidi_mirrored_semantic_text(&item.text, item.style.resolved_bidi_level());
+  let small_caps_semantic_text =
+    word_small_caps_semantic_text(bidi_semantic_text.as_ref(), item.style.small_caps);
+  let glyph_semantic_text = symbol_font_semantic_text(
+    small_caps_semantic_text.as_ref(),
+    item.style.font_family.as_deref(),
+  );
   for portion in &text.portions {
     let semantic_clipped = if item.style.semantic_only {
       push_paint_clip(
@@ -4742,10 +4754,60 @@ fn text_requires_glyph_outlines(style: &TextStyle<'_>) -> bool {
   // Office's fixed-format writers convert translucent glyphs to paths. This
   // preserves the alpha compositing result without exposing those glyphs as
   // PDF text; both Word's w14:textFill alpha and PowerPoint's DrawingML alpha
-  // use that path. Opaque text remains real PDF text for search/accessibility.
+  // use that path. Explicit glyph-outline rendering must remain active when
+  // the authored fill is `noFill`: the independently visible text outline is
+  // still painted as vector glyph geometry. Opaque ordinary text remains real
+  // PDF text for search/accessibility.
   !style.semantic_only
-    && style.opacity > f32::EPSILON
-    && (style.opacity < 1.0 - f32::EPSILON || style.pdf_glyph_outlines)
+    && (style.pdf_glyph_outlines
+      || (style.opacity > f32::EPSILON && style.opacity < 1.0 - f32::EPSILON))
+}
+
+fn word_small_caps_semantic_text(text: &str, small_caps: bool) -> Cow<'_, str> {
+  if !small_caps || !text.chars().any(char::is_lowercase) {
+    return Cow::Borrowed(text);
+  }
+
+  let mut uppercase = String::with_capacity(text.len());
+  for character in text.chars() {
+    let mapped = character.to_uppercase().collect::<String>();
+    if mapped.len() != character.len_utf8() {
+      // Glyph clusters still address the original UTF-8 ranges. Keep the
+      // source text when a case mapping would move those boundaries; a
+      // future explicit semantic-range map can cover that uncommon case.
+      return Cow::Borrowed(text);
+    }
+    uppercase.push_str(&mapped);
+  }
+
+  // ECMA-376 Part 1 §17.3.2.33 keeps the OOXML Unicode unchanged while
+  // displaying lowercase letters as smaller capitals. Word's fixed-format
+  // writer exposes those displayed capitals through PDF ToUnicode. Preserve
+  // the source text in layout and shaping, and change only the PDF semantic
+  // mapping after glyph selection.
+  Cow::Owned(uppercase)
+}
+
+fn bidi_mirrored_semantic_text(text: &str, resolved_level: Option<u8>) -> Cow<'_, str> {
+  if !resolved_level.is_some_and(|level| level % 2 == 1) {
+    return Cow::Borrowed(text);
+  }
+
+  let mut changed = false;
+  let mirrored = text
+    .chars()
+    .map(|character| {
+      unicode_bidi_mirroring::get_mirrored(character)
+        .filter(|mirrored| mirrored.len_utf8() == character.len_utf8())
+        .inspect(|_| changed = true)
+        .unwrap_or(character)
+    })
+    .collect::<String>();
+  if changed {
+    Cow::Owned(mirrored)
+  } else {
+    Cow::Borrowed(text)
+  }
 }
 
 fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Cow<'a, str> {
@@ -6685,11 +6747,11 @@ mod tests {
 
   use super::{
     GlyphId, ImageCrop, ImageItem, PaintDocument, PaintItem, PaintTextPortionKind, TextItem,
-    TextMetrics, TextStyle as PaintTextStyle, conversion_font_audit, gamma_correct_gradient_color,
-    metafile_render_options_for_image, pdf_metadata, pdf_page_dimension, render,
-    source_range_requires_visible_glyph, stroke_end_dimensions, symbol_font_semantic_text,
-    text_portion_ranges, text_requires_glyph_outlines, text_stroke_with_fill,
-    text_style_from_common,
+    TextMetrics, TextStyle as PaintTextStyle, bidi_mirrored_semantic_text, conversion_font_audit,
+    gamma_correct_gradient_color, metafile_render_options_for_image, pdf_metadata,
+    pdf_page_dimension, render, source_range_requires_visible_glyph, stroke_end_dimensions,
+    symbol_font_semantic_text, text_portion_ranges, text_requires_glyph_outlines,
+    text_stroke_with_fill, text_style_from_common, word_small_caps_semantic_text,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -6880,6 +6942,9 @@ mod tests {
 
     style.opacity = 0.0;
     assert!(!text_requires_glyph_outlines(&style));
+
+    style.pdf_glyph_outlines = true;
+    assert!(text_requires_glyph_outlines(&style));
 
     style.opacity = 0.74;
     style.semantic_only = true;
@@ -7260,6 +7325,27 @@ mod tests {
     assert_eq!(pdf_page_dimension(LayoutEngineKind::Docx, 612.0), 612.0);
     assert!((pdf_page_dimension(LayoutEngineKind::Docx, 287.7) - 287.7).abs() < 0.001);
     assert!((pdf_page_dimension(LayoutEngineKind::Docx, 283.5) - 283.5).abs() < 0.001);
+  }
+
+  #[test]
+  fn odd_bidi_levels_expose_mirrored_glyphs_in_pdf_semantic_text() {
+    assert_eq!(bidi_mirrored_semantic_text("(", Some(1)), ")");
+    assert_eq!(bidi_mirrored_semantic_text(")", Some(1)), "(");
+    assert_eq!(bidi_mirrored_semantic_text("(plain)", Some(2)), "(plain)");
+    assert_eq!(bidi_mirrored_semantic_text("plain", Some(1)), "plain");
+  }
+
+  #[test]
+  fn word_small_caps_expose_displayed_capitals_in_pdf_semantic_text() {
+    assert_eq!(
+      word_small_caps_semantic_text("Xxxx Xxxx", true),
+      "XXXX XXXX"
+    );
+    assert_eq!(
+      word_small_caps_semantic_text("Xxxx Xxxx", false),
+      "Xxxx Xxxx"
+    );
+    assert_eq!(word_small_caps_semantic_text("ı", true), "ı");
   }
 
   #[test]

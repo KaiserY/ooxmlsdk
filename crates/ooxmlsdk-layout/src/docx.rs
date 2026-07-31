@@ -1,5 +1,6 @@
 mod custom_xml;
 mod drawing;
+mod field_datetime;
 mod hyphenation;
 mod layout;
 mod model;
@@ -48,7 +49,9 @@ use crate::common::drawingml_image_effects::{
 };
 use crate::error::Result;
 use crate::model::common_rgb;
-use crate::options::{LayoutActionOptions, LayoutDiagnosticsOptions, LayoutOptions};
+use crate::options::{
+  FieldUpdateDateTime, LayoutActionOptions, LayoutDiagnosticsOptions, LayoutOptions,
+};
 use crate::pptx::drawingml::color::{Color, RgbHexColor};
 use crate::render::chart as shared_chart;
 use crate::render::math as shared_math;
@@ -61,8 +64,10 @@ use package::{
   AltChunkCatalog, AltChunkResource, ExtendedChartResource, HyperlinkCatalog, ImageCatalog,
 };
 use settings::{
-  adjust_line_height_in_table, compatibility_mode, default_tab_stop_pt, hyphenation_settings,
-  no_column_balance, split_page_break_and_paragraph_mark, update_fields_on_open,
+  adjust_line_height_in_table, compatibility_mode, default_tab_stop_pt,
+  do_not_break_wrapped_tables, do_not_expand_shift_return, do_not_use_html_paragraph_auto_spacing,
+  hyphenation_settings, no_column_balance, split_page_break_and_paragraph_mark,
+  update_fields_on_open,
 };
 use table::{TableConditionalStyleMask, TableLookModel};
 use text::{
@@ -136,6 +141,10 @@ const OFFICE_RECOVERED_PARAGRAPH_AFTER_PT: f32 = 8.0;
 // paragraph auto-spacing value in print layout. Word fixed-format output
 // exposes the same 14pt distance.
 const OFFICE_AUTOMATIC_PARAGRAPH_SPACING_PT: f32 = 14.0;
+// ECMA-376 Part 4 §14.8.3.15 fixes HTML automatic paragraph spacing at
+// 5pt before and 10pt after when w:doNotUseHTMLParagraphAutoSpacing is enabled.
+const OFFICE_FIXED_AUTOMATIC_PARAGRAPH_BEFORE_PT: f32 = 5.0;
+const OFFICE_FIXED_AUTOMATIC_PARAGRAPH_AFTER_PT: f32 = 10.0;
 const OFFICE_RECOVERED_LINE_HEIGHT_MULTIPLE: f32 = 276.0 / 240.0;
 // The Simplified Chinese Word application Table Normal context uses 1.5-line
 // spacing. This is observable in Microsoft's fixed-format output for a
@@ -153,6 +162,10 @@ const OFFICE_AUTOMATIC_LINE_NUMBER_DISTANCE_PT: f32 = 18.0;
 struct ImportSettings {
   compatibility_mode: u16,
   justify_lines_with_shrinking: bool,
+  fixed_html_paragraph_auto_spacing: bool,
+  do_not_break_wrapped_tables: bool,
+  do_not_expand_shift_return: bool,
+  field_update_datetime: Option<FieldUpdateDateTime>,
   exchange_left_right: bool,
   use_literal_direction: bool,
 }
@@ -163,10 +176,17 @@ pub(crate) fn extract(
 ) -> Result<DocxDocument> {
   let main = package.main_document_part()?;
   let compatibility_mode = compatibility_mode(package, &main);
+  let fixed_html_paragraph_auto_spacing = do_not_use_html_paragraph_auto_spacing(package, &main);
+  let do_not_break_wrapped_tables = do_not_break_wrapped_tables(package, &main);
+  let do_not_expand_shift_return = do_not_expand_shift_return(package, &main);
   let document_math_settings = document_math_settings(package, &main);
   let import_settings = ImportSettings {
     compatibility_mode,
     justify_lines_with_shrinking: compatibility_mode >= 15,
+    fixed_html_paragraph_auto_spacing,
+    do_not_break_wrapped_tables,
+    do_not_expand_shift_return,
+    field_update_datetime: options.field_update_datetime,
     ..Default::default()
   };
   let mut styles = StylesCatalog::load(
@@ -327,6 +347,7 @@ pub(crate) fn extract(
     hyphenation,
     compatibility_mode,
     justify_lines_with_shrinking: import_settings.justify_lines_with_shrinking,
+    do_not_expand_shift_return: import_settings.do_not_expand_shift_return,
     even_and_odd_headers,
     split_page_break_and_paragraph_mark,
     form_widgets,
@@ -369,6 +390,7 @@ pub fn layout_anchor_pages(
   let anchor_options = LayoutOptions {
     source_file_name: None,
     ui_language: options.ui_language.clone(),
+    field_update_datetime: options.field_update_datetime,
     action: LayoutActionOptions {
       paint: false,
       ..options.action
@@ -772,6 +794,8 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
           pending_out_of_place_breaks.clear();
         }
         model.format.hidden_separator = paragraph_mark_is_hidden(paragraph);
+        model.format.deleted_separator =
+          section_properties.is_none() && paragraph_mark_joins_following(paragraph);
         if paragraph_has_drop_cap_frame(&model) {
           pending_drop_cap_text = paragraph_drop_cap_text(&model);
           continue;
@@ -1137,13 +1161,16 @@ fn push_alt_chunk_paragraph(paragraphs: &mut Vec<String>, text: &mut String) {
 
 fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
   if let Some(Block::Paragraph(previous)) = blocks.last_mut()
-    && previous.format.hidden_separator
+    && (previous.format.hidden_separator || previous.format.deleted_separator)
   {
-    previous
-      .format
-      .outline_text_inlines
-      .get_or_insert(previous.inlines.len());
+    if previous.format.hidden_separator {
+      previous
+        .format
+        .outline_text_inlines
+        .get_or_insert(previous.inlines.len());
+    }
     previous.format.hidden_separator = paragraph.format.hidden_separator;
+    previous.format.deleted_separator = paragraph.format.deleted_separator;
     previous
       .footnote_reference_ids
       .append(&mut paragraph.footnote_reference_ids);
@@ -1300,6 +1327,18 @@ fn paragraph_mark_is_hidden(paragraph: &w::Paragraph) -> bool {
     .is_some_and(|vanish| vanish.val.is_none_or(|value| value.as_bool()))
 }
 
+fn paragraph_mark_joins_following(paragraph: &w::Paragraph) -> bool {
+  // ECMA-376 Part 1 §17.13.5.15: deleting the paragraph mark removes
+  // the delimiter and combines this paragraph's current contents with the
+  // following paragraph. An inserted or move-source mark is a distinct
+  // revision state and is intentionally not inferred from w:del.
+  paragraph
+    .paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
+    .is_some_and(|properties| properties.deleted.is_some())
+}
+
 fn paragraph_is_effectively_empty(paragraph: &Paragraph) -> bool {
   paragraph.list_label.is_none() && paragraph_body_is_effectively_empty(paragraph)
 }
@@ -1309,6 +1348,7 @@ fn paragraph_body_is_effectively_empty(paragraph: &Paragraph) -> bool {
     && paragraph.endnote_reference_ids.is_empty()
     && paragraph.inlines.iter().all(|inline| match inline {
       InlineItem::Text(run) => run.text.trim().is_empty(),
+      InlineItem::PositionalTab(_) => true,
       InlineItem::Ruby(_) | InlineItem::Image(_) | InlineItem::Shape(_) => false,
       InlineItem::BookmarkStart(_) => true,
       InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
@@ -1349,6 +1389,7 @@ fn paragraph_drop_cap_text(paragraph: &Paragraph) -> Option<String> {
     .filter_map(|inline| match inline {
       InlineItem::Text(run) => Some(run.text.as_str()),
       InlineItem::Ruby(ruby) => ruby.base.first().map(|run| run.text.as_str()),
+      InlineItem::PositionalTab(_) => None,
       InlineItem::Image(_)
       | InlineItem::Shape(_)
       | InlineItem::BookmarkStart(_)
@@ -1682,19 +1723,7 @@ fn sdt_block_blocks_with_base(
   let bound_value = sdt
     .sdt_properties
     .as_ref()
-    .filter(|properties| {
-      properties.sdt_properties_choice.iter().any(|choice| {
-        matches!(
-          choice,
-          w::SdtPropertiesChoice::SdtContentText(_) | w::SdtPropertiesChoice::SdtContentDate(_)
-        )
-      })
-    })
-    .and_then(|properties| {
-      custom_xml_bindings
-        .value_for_sdt(properties)
-        .map(|value| sdt_bound_display_text(properties, value))
-    });
+    .and_then(|properties| sdt_bound_replacement(custom_xml_bindings, properties));
   let mut blocks = content
     .sdt_content_block_choice
     .iter()
@@ -2391,12 +2420,9 @@ fn footnotes(
     append_note_blocks(
       &mut blocks,
       NoteLabel::new(
-        format!(
-          "{} ",
-          labels
-            .get(&footnote.id)
-            .map_or_else(|| footnote.id.to_string(), Clone::clone)
-        ),
+        labels
+          .get(&footnote.id)
+          .map_or_else(|| footnote.id.to_string(), Clone::clone),
         Some(note_backlink_url("footnote", footnote.id)),
       ),
       footnote
@@ -2450,12 +2476,9 @@ fn endnotes(
     append_note_blocks(
       &mut blocks,
       NoteLabel::new(
-        format!(
-          "{} ",
-          labels
-            .get(&endnote.id)
-            .map_or_else(|| endnote.id.to_string(), Clone::clone)
-        ),
+        labels
+          .get(&endnote.id)
+          .map_or_else(|| endnote.id.to_string(), Clone::clone),
         Some(note_backlink_url("endnote", endnote.id)),
       ),
       endnote
@@ -2719,7 +2742,13 @@ fn table_model(
   let placement = properties
     .and_then(|properties| properties.table_position_properties.as_ref())
     .map(table_position_placement);
-  let split_allowed = placement.is_some();
+  // ECMA-376 Part 4 §14.8.3.10 makes this a document-level compatibility
+  // boundary: floating tables split by default, but an enabled
+  // doNotBreakWrappedTables keeps the whole fly on one page. LibreOffice
+  // SwFlyFrame::IsFlySplitAllowed() applies the same setting before any
+  // master/follow table is created.
+  let split_allowed =
+    placement.is_some() && !env.styles.import_settings.do_not_break_wrapped_tables;
   let following_text_flow = placement.is_some()
     && (model_context.nested_table_level >= 2 || model_context.in_header_footer)
     && !(model_context.in_header_footer
@@ -2851,6 +2880,7 @@ pub(super) fn paragraph_starts_after_last_rendered_page_break(inlines: &[InlineI
       InlineItem::Text(run) if !run.text.trim().is_empty() => {
         return saw_last_rendered_page_break;
       }
+      InlineItem::PositionalTab(_) => {}
       InlineItem::Ruby(_) | InlineItem::Image(_) | InlineItem::Shape(_) => {
         return saw_last_rendered_page_break;
       }
@@ -2975,11 +3005,19 @@ fn frame_wrap_mode(value: Option<w::TextWrappingValues>) -> FrameWrapMode {
   }
 }
 
-fn frame_height_rule(value: Option<w::HeightRuleValues>) -> FrameHeightRule {
-  match value.unwrap_or_default() {
-    w::HeightRuleValues::Auto => FrameHeightRule::Auto,
-    w::HeightRuleValues::AtLeast => FrameHeightRule::AtLeast,
-    w::HeightRuleValues::Exact => FrameHeightRule::Exact,
+fn frame_height_rule(
+  value: Option<w::HeightRuleValues>,
+  height_pt: Option<f32>,
+) -> FrameHeightRule {
+  match value {
+    Some(w::HeightRuleValues::Auto) => FrameHeightRule::Auto,
+    Some(w::HeightRuleValues::AtLeast) => FrameHeightRule::AtLeast,
+    Some(w::HeightRuleValues::Exact) => FrameHeightRule::Exact,
+    // [MS-OI29500] Part 1 §17.3.1.11(f): unlike the ECMA `auto`
+    // default, Word treats an omitted hRule as `atLeast` when the authored
+    // frame height is non-zero. An omitted/zero height remains automatic.
+    None if height_pt.is_some_and(|height| height > 0.0) => FrameHeightRule::AtLeast,
+    None => FrameHeightRule::Auto,
   }
 }
 
@@ -3019,9 +3057,10 @@ fn table_row_model(
   let cells = cells
     .iter()
     .enumerate()
-    .map(|(cell_index, cell)| {
+    .map(|(cell_index, source)| {
       table_cell_model(
-        cell,
+        source.cell,
+        source.sdt_properties,
         context,
         row.table_property_exceptions.as_deref(),
         row_table_shading,
@@ -3034,7 +3073,8 @@ fn table_row_model(
             cell_index,
             cell_count,
             row_condition,
-            cell_condition: cell
+            cell_condition: source
+              .cell
               .table_cell_properties
               .as_deref()
               .and_then(table_cell_conditional_style),
@@ -3078,26 +3118,50 @@ fn table_row_look(row: &w::TableRow, table_look: TableLookModel) -> TableLookMod
     .unwrap_or(table_look)
 }
 
-fn table_row_cells(row: &w::TableRow) -> Vec<&w::TableCell> {
+#[derive(Clone, Copy)]
+struct TableRowCellSource<'a> {
+  cell: &'a w::TableCell,
+  sdt_properties: Option<&'a w::SdtProperties>,
+}
+
+fn table_row_cells(row: &w::TableRow) -> Vec<TableRowCellSource<'_>> {
   let mut cells = Vec::new();
   for choice in &row.table_row_choice {
     match choice {
-      w::TableRowChoice::TableCell(cell) => cells.push(cell.as_ref()),
-      w::TableRowChoice::SdtCell(sdt) => collect_sdt_cells(sdt, &mut cells),
+      w::TableRowChoice::TableCell(cell) => cells.push(TableRowCellSource {
+        cell: cell.as_ref(),
+        sdt_properties: None,
+      }),
+      w::TableRowChoice::SdtCell(sdt) => collect_sdt_cells(sdt, None, &mut cells),
       _ => {}
     }
   }
   cells
 }
 
-fn collect_sdt_cells<'a>(sdt: &'a w::SdtCell, cells: &mut Vec<&'a w::TableCell>) {
+fn collect_sdt_cells<'a>(
+  sdt: &'a w::SdtCell,
+  inherited_properties: Option<&'a w::SdtProperties>,
+  cells: &mut Vec<TableRowCellSource<'a>>,
+) {
   let Some(content) = sdt.sdt_content_cell.as_ref() else {
     return;
   };
+  // ECMA-376 Part 1 §17.5.2.33 defines cell-level `sdtContent` as a cache
+  // updated from its data binding. Preserve the nearest text/date SDT
+  // properties while exposing the contained physical table cell.
+  let properties = sdt
+    .sdt_properties
+    .as_ref()
+    .filter(|properties| sdt_supports_bound_text(properties))
+    .or(inherited_properties);
   for choice in &content.sdt_content_cell_choice {
     match choice {
-      w::SdtContentCellChoice::TableCell(cell) => cells.push(cell.as_ref()),
-      w::SdtContentCellChoice::SdtCell(nested) => collect_sdt_cells(nested, cells),
+      w::SdtContentCellChoice::TableCell(cell) => cells.push(TableRowCellSource {
+        cell: cell.as_ref(),
+        sdt_properties: properties,
+      }),
+      w::SdtContentCellChoice::SdtCell(nested) => collect_sdt_cells(nested, properties, cells),
       _ => {}
     }
   }
@@ -3195,6 +3259,7 @@ fn table_cell_style_for(
 
 fn table_cell_model(
   cell: &w::TableCell,
+  sdt_properties: Option<&w::SdtProperties>,
   context: &mut TableImportContext<'_>,
   row_table_exceptions: Option<&w::TablePropertyExceptions>,
   row_table_shading: Option<RgbColor>,
@@ -3306,6 +3371,11 @@ fn table_cell_model(
     ) {
       pending_out_of_place_breaks.clear();
     }
+  }
+  if let Some(value) = sdt_properties
+    .and_then(|properties| sdt_bound_replacement(context.custom_xml_bindings, properties))
+  {
+    replace_sdt_block_text(&mut blocks, value);
   }
   let text_rotation_deg = properties.and_then(table_cell_text_rotation_degrees);
   if let Some(rotation_deg) = text_rotation_deg {
@@ -4015,6 +4085,9 @@ fn merge_paragraph_format(
     format.keep_lines = keep_lines.val.is_none_or(|value| value.as_bool());
     format.keep_lines_set = true;
   }
+  if let Some(widow_control) = properties.widow_control() {
+    format.widow_control = Some(widow_control.val.is_none_or(|value| value.as_bool()));
+  }
   if let Some(contextual_spacing) = properties.contextual_spacing() {
     format.contextual_spacing = contextual_spacing.val.is_none_or(|value| value.as_bool());
     format.contextual_spacing_set = true;
@@ -4022,6 +4095,13 @@ fn merge_paragraph_format(
   if let Some(suppress_auto_hyphens) = properties.suppress_auto_hyphens() {
     format.suppress_auto_hyphens = Some(
       suppress_auto_hyphens
+        .val
+        .is_none_or(|value| value.as_bool()),
+    );
+  }
+  if let Some(suppress_line_numbers) = properties.suppress_line_numbers() {
+    format.suppress_line_numbers = Some(
+      suppress_line_numbers
         .val
         .is_none_or(|value| value.as_bool()),
     );
@@ -4056,6 +4136,19 @@ fn merge_paragraph_format(
       format.spacing_before_pt = 0.0;
       format.spacing_before_lines = Some((before_lines as f32 / 100.0).max(0.0));
     }
+    if let Some(before_auto_spacing) = spacing.before_auto_spacing {
+      // Preserve explicit false independently from the resolved ordinary
+      // spacing. It cancels inherited automatic spacing without erasing an
+      // inherited or sibling w:before value.
+      let enabled = before_auto_spacing.as_bool();
+      format.spacing_before_auto = Some(enabled);
+      format.spacing_before_auto_pt =
+        enabled.then_some(if import_settings.fixed_html_paragraph_auto_spacing {
+          OFFICE_FIXED_AUTOMATIC_PARAGRAPH_BEFORE_PT
+        } else {
+          OFFICE_AUTOMATIC_PARAGRAPH_SPACING_PT
+        });
+    }
     if let Some(after) = spacing.after.as_ref() {
       format.spacing_after_set = true;
       format.spacing_after_pt = signed_twips_measure_to_points(after).unwrap_or(0.0);
@@ -4064,7 +4157,14 @@ fn merge_paragraph_format(
       // Preserve explicit false independently from the resolved ordinary
       // spacing. It cancels inherited automatic spacing without erasing an
       // inherited or sibling w:after value.
-      format.spacing_after_auto = Some(after_auto_spacing.as_bool());
+      let enabled = after_auto_spacing.as_bool();
+      format.spacing_after_auto = Some(enabled);
+      format.spacing_after_auto_pt =
+        enabled.then_some(if import_settings.fixed_html_paragraph_auto_spacing {
+          OFFICE_FIXED_AUTOMATIC_PARAGRAPH_AFTER_PT
+        } else {
+          OFFICE_AUTOMATIC_PARAGRAPH_SPACING_PT
+        });
     }
     if let Some(line) = spacing.line.as_ref() {
       let negative_line = signed_twips_measure_to_twips(line).is_some_and(|value| value < 0.0);
@@ -4302,7 +4402,7 @@ fn merge_paragraph_frame_properties(format: &mut ParagraphFormat, frame: &w::Fra
     merged.height_pt = frame.height.as_ref().and_then(twips_measure_to_points);
   }
   if frame.height_type.is_some() {
-    merged.height_rule = frame_height_rule(frame.height_type);
+    merged.height_rule = frame_height_rule(frame.height_type, merged.height_pt);
   }
   if frame.horizontal_position.is_some() {
     merged.placement.horizontal_anchor = frame_horizontal_anchor(frame.horizontal_position);
@@ -4362,6 +4462,7 @@ fn merge_paragraph_frame_properties(format: &mut ParagraphFormat, frame: &w::Fra
 }
 
 fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFrameProperties {
+  let height_pt = frame.height.as_ref().and_then(twips_measure_to_points);
   let horizontal_space = frame
     .horizontal_space
     .as_ref()
@@ -4374,8 +4475,8 @@ fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFramePrope
     .unwrap_or(0.0);
   ParagraphFrameProperties {
     width_pt: frame.width.as_ref().and_then(twips_measure_to_points),
-    height_pt: frame.height.as_ref().and_then(twips_measure_to_points),
-    height_rule: frame_height_rule(frame.height_type),
+    height_pt,
+    height_rule: frame_height_rule(frame.height_type, height_pt),
     drop_cap: matches!(
       frame.drop_cap,
       Some(w::DropCapLocationValues::Drop | w::DropCapLocationValues::Margin)
@@ -4513,6 +4614,28 @@ fn tab_leader(leader: w::TabStopLeaderCharValues) -> TabLeader {
     w::TabStopLeaderCharValues::Heavy => TabLeader::Heavy,
     w::TabStopLeaderCharValues::MiddleDot => TabLeader::MiddleDot,
     w::TabStopLeaderCharValues::None => TabLeader::None,
+  }
+}
+
+fn positional_tab(tab: &w::PositionalTab, style: TextStyle) -> PositionalTab {
+  PositionalTab {
+    alignment: match tab.alignment {
+      w::AbsolutePositionTabAlignmentValues::Left => TabStopAlignment::Left,
+      w::AbsolutePositionTabAlignmentValues::Center => TabStopAlignment::Center,
+      w::AbsolutePositionTabAlignmentValues::Right => TabStopAlignment::Right,
+    },
+    relative_to: match tab.relative_to {
+      w::AbsolutePositionTabPositioningBaseValues::Margin => PositionalTabBase::Margin,
+      w::AbsolutePositionTabPositioningBaseValues::Indent => PositionalTabBase::Indent,
+    },
+    leader: match tab.leader {
+      w::AbsolutePositionTabLeaderCharValues::None => TabLeader::None,
+      w::AbsolutePositionTabLeaderCharValues::Dot => TabLeader::Dot,
+      w::AbsolutePositionTabLeaderCharValues::Hyphen => TabLeader::Hyphen,
+      w::AbsolutePositionTabLeaderCharValues::Underscore => TabLeader::Underscore,
+      w::AbsolutePositionTabLeaderCharValues::MiddleDot => TabLeader::MiddleDot,
+    },
+    style,
   }
 }
 
@@ -4775,6 +4898,7 @@ struct ComplexFieldState {
   instr: String,
   result: Vec<InlineItem>,
   form_drop_down_value: Option<String>,
+  form_date_time_tokens: Option<Vec<String>>,
   field_locked: bool,
   in_result: bool,
   style: TextStyle,
@@ -4844,6 +4968,7 @@ fn push_run_or_complex_field(
           instr: String::new(),
           result: Vec::new(),
           form_drop_down_value: form_drop_down_value(field_char),
+          form_date_time_tokens: form_date_time_tokens(field_char),
           field_locked: field_char
             .field_lock
             .is_some_and(ooxmlsdk::simple_type::OnOffValue::as_bool),
@@ -4927,6 +5052,16 @@ fn flush_complex_field(
   } else if closed && field_instruction_name(&state.instr).is_some_and(|name| name == "SET") {
     // ECMA-376 §17.16.5.57 defines SET as assigning a bookmark and gives it
     // no field value. Its cached result is metadata, not visible document text.
+  } else if closed
+    && let Some(text) =
+      refreshed_form_date_time_field(state.form_date_time_tokens.as_deref(), &state.style, styles)
+  {
+    let style = field_result_style(&state.result).unwrap_or(state.style);
+    push_resolved_field_text(&mut resolved, text, style, state.hyperlink_url.as_deref());
+  } else if closed && let Some(text) = refreshed_date_time_field(&state.instr, &state.style, styles)
+  {
+    let style = field_result_style(&state.result).unwrap_or(state.style);
+    push_resolved_field_text(&mut resolved, text, style, state.hyperlink_url.as_deref());
   } else if let Some(kind) = dynamic_field_kind(&state.instr) {
     if let DynamicFieldKind::StyleRef { style_name, .. } = &kind
       && styles.style_ref_name_requires_localized_error(style_name)
@@ -4938,10 +5073,20 @@ fn flush_complex_field(
         state.hyperlink_url.as_deref(),
       );
     } else {
+      // ECMA-376 Part 1 §17.16.4.3.3 makes \* MERGEFORMAT preserve the
+      // existing field-result run/paragraph structure when an application
+      // replaces the result text.  In particular, the generated PAGE value
+      // must retain direct/theme formatting authored on its cached result
+      // rather than inheriting the field-begin character's formatting.
+      let style = if field_uses_merge_format(&state.instr) {
+        field_result_style(&state.result).unwrap_or(state.style)
+      } else {
+        state.style
+      };
       push_dynamic_field(
         &mut resolved,
         kind,
-        state.style,
+        style,
         state.hyperlink_url.as_deref(),
         field_result_text(&state.result),
       );
@@ -4975,10 +5120,12 @@ fn flush_complex_field(
   if let Some(url) = field_hyperlink_url.as_deref() {
     apply_field_hyperlink_url(&mut resolved, url);
   }
-  if let Some(parent) = fields.last_mut()
-    && parent.in_result
-  {
-    parent.result.extend(resolved);
+  if let Some(parent) = fields.last_mut() {
+    if parent.in_result {
+      parent.result.extend(resolved);
+    } else if parent.form_date_time_tokens.is_none() {
+      inlines.extend(resolved);
+    }
   } else {
     inlines.extend(resolved);
   }
@@ -5038,6 +5185,7 @@ fn apply_field_hyperlink_url(result: &mut [InlineItem], url: &str) {
       InlineItem::Text(run) => {
         run.hyperlink_url.get_or_insert_with(|| url.to_string());
       }
+      InlineItem::PositionalTab(_) => {}
       InlineItem::Ruby(ruby) => {
         for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
           run.hyperlink_url.get_or_insert_with(|| url.to_string());
@@ -5205,6 +5353,30 @@ fn form_drop_down_value(field_char: &w::FieldChar) -> Option<String> {
     .map(|entry| entry.val.to_string())
 }
 
+fn form_date_time_tokens(field_char: &w::FieldChar) -> Option<Vec<String>> {
+  let w::FieldCharChoice::FormFieldData(form_field) = field_char.field_char_choice.as_ref()? else {
+    return None;
+  };
+  let text_input = form_field
+    .form_field_data_choice
+    .iter()
+    .find_map(|choice| match choice {
+      w::FormFieldDataChoice::TextInput(text_input) => Some(text_input.as_ref()),
+      _ => None,
+    })?;
+  let field_name = match text_input.text_box_form_field_type.as_ref()?.val {
+    w::TextBoxFormFieldValues::CurrentDate => "DATE",
+    w::TextBoxFormFieldValues::CurrentTime => "TIME",
+    _ => return None,
+  };
+  let mut tokens = vec![field_name.to_string()];
+  if let Some(picture) = text_input.format.as_ref() {
+    tokens.push(r"\@".to_string());
+    tokens.push(picture.val.to_string());
+  }
+  Some(tokens)
+}
+
 fn flush_unclosed_complex_fields(
   inlines: &mut Vec<InlineItem>,
   fields: &mut Vec<ComplexFieldState>,
@@ -5231,6 +5403,28 @@ fn dynamic_field_kind(instr: &str) -> Option<DynamicFieldKind> {
   }
 }
 
+fn refreshed_date_time_field(
+  instr: &str,
+  style: &TextStyle,
+  styles: &StylesCatalog,
+) -> Option<String> {
+  let value = styles.import_settings.field_update_datetime?;
+  let tokens = field_instruction_tokens(instr);
+  field_datetime::format_date_time_field(&tokens, style.language.as_deref(), value)
+}
+
+fn refreshed_form_date_time_field(
+  tokens: Option<&[String]>,
+  style: &TextStyle,
+  styles: &StylesCatalog,
+) -> Option<String> {
+  field_datetime::format_date_time_field(
+    tokens?,
+    style.language.as_deref(),
+    styles.import_settings.field_update_datetime?,
+  )
+}
+
 fn field_number_format(tokens: &[String]) -> Option<FieldNumberFormat> {
   tokens.windows(2).find_map(|tokens| {
     tokens[0]
@@ -5255,6 +5449,12 @@ fn field_number_format(tokens: &[String]) -> Option<FieldNumberFormat> {
       })
       .flatten()
   })
+}
+
+fn field_uses_merge_format(instr: &str) -> bool {
+  field_instruction_tokens(instr)
+    .windows(2)
+    .any(|tokens| tokens[0] == r"\*" && tokens[1].eq_ignore_ascii_case("MERGEFORMAT"))
 }
 
 fn format_field_number(value: usize, format: FieldNumberFormat) -> String {
@@ -5385,6 +5585,24 @@ fn push_dynamic_field(
   }));
 }
 
+fn push_resolved_field_text(
+  inlines: &mut Vec<InlineItem>,
+  text: String,
+  style: TextStyle,
+  hyperlink_url: Option<&str>,
+) {
+  inlines.push(InlineItem::Text(TextRun {
+    text,
+    style,
+    hyperlink_url: hyperlink_url.map(ToString::to_string),
+    dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
+    style_ref_numbering_text: None,
+    preserve_text_portion: false,
+  }));
+}
+
 fn push_localized_missing_style_ref(
   inlines: &mut Vec<InlineItem>,
   style_name: &str,
@@ -5445,6 +5663,7 @@ fn field_result_text(result: &[InlineItem]) -> Option<String> {
   for item in result {
     match item {
       InlineItem::Text(run) => text.push_str(&run.text),
+      InlineItem::PositionalTab(_) => text.push('\t'),
       InlineItem::Ruby(ruby) => {
         for run in &ruby.base {
           text.push_str(&run.text);
@@ -5873,20 +6092,27 @@ fn push_simple_field(
   let field_locked = field
     .field_lock
     .is_some_and(ooxmlsdk::simple_type::OnOffValue::as_bool);
-  if !field_locked && let Some(kind) = dynamic_field_kind(&field.instruction) {
-    let (result_text, result_style) =
-      simple_field_result_text_and_style(field, base_style.clone(), context);
-    let style = result_style.unwrap_or(base_style);
-    if let DynamicFieldKind::StyleRef { style_name, .. } = &kind
-      && context
-        .styles
-        .style_ref_name_requires_localized_error(style_name)
-    {
-      push_localized_missing_style_ref(inlines, style_name, style, None);
-    } else {
-      push_dynamic_field(inlines, kind, style, None, result_text);
+  if !field_locked {
+    let refreshed_date_time =
+      refreshed_date_time_field(&field.instruction, &base_style, context.styles);
+    let dynamic_kind = dynamic_field_kind(&field.instruction);
+    if refreshed_date_time.is_some() || dynamic_kind.is_some() {
+      let (result_text, result_style) =
+        simple_field_result_text_and_style(field, base_style.clone(), context);
+      let style = result_style.unwrap_or(base_style);
+      if let Some(text) = refreshed_date_time {
+        push_resolved_field_text(inlines, text, style, None);
+      } else if let Some(DynamicFieldKind::StyleRef { style_name, .. }) = dynamic_kind.as_ref()
+        && context
+          .styles
+          .style_ref_name_requires_localized_error(style_name)
+      {
+        push_localized_missing_style_ref(inlines, style_name, style, None);
+      } else if let Some(kind) = dynamic_kind {
+        push_dynamic_field(inlines, kind, style, None, result_text);
+      }
+      return;
     }
-    return;
   }
 
   for choice in &field.simple_field_choice {
@@ -5961,12 +6187,16 @@ fn simple_field_result_text_and_style(
       _ => {}
     }
   }
-  let style = result.iter().find_map(|inline| match inline {
+  let style = field_result_style(&result);
+  (field_result_text(&result), style)
+}
+
+fn field_result_style(result: &[InlineItem]) -> Option<TextStyle> {
+  result.iter().find_map(|inline| match inline {
     InlineItem::Text(run) => Some(run.style.clone()),
     InlineItem::Ruby(ruby) => ruby.base.first().map(|run| run.style.clone()),
     _ => None,
-  });
-  (field_result_text(&result), style)
+  })
 }
 
 fn push_run(
@@ -6218,7 +6448,19 @@ fn push_run_with_character_style_policy(
           inlines.push(InlineItem::Image(image));
         }
       }
-      w::RunChoice::PositionalTab(_) => text.push('\t'),
+      w::RunChoice::PositionalTab(tab) => {
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
+        inlines.push(InlineItem::PositionalTab(positional_tab(
+          tab,
+          style.clone(),
+        )));
+      }
       w::RunChoice::AlternateContent(_) => {}
       w::RunChoice::Ruby(ruby) => {
         flush_run_text(
@@ -6558,6 +6800,7 @@ fn ruby_text_runs(items: &[InlineItem]) -> Option<Vec<TextRun>> {
   for item in items {
     match item {
       InlineItem::Text(run) => runs.push(run.clone()),
+      InlineItem::PositionalTab(_) => return None,
       InlineItem::BookmarkStart(_)
       | InlineItem::DrawingGroupStart(_)
       | InlineItem::DrawingGroupEnd => {}
@@ -6604,20 +6847,11 @@ fn push_sdt_run(
   if let Some(widget_id) = widget_id {
     inlines.push(InlineItem::FormWidgetStart(widget_id));
   }
-  if let Some(value) = sdt.sdt_properties.as_ref().and_then(|properties| {
-    if !properties.sdt_properties_choice.iter().any(|choice| {
-      matches!(
-        choice,
-        w::SdtPropertiesChoice::SdtContentText(_) | w::SdtPropertiesChoice::SdtContentDate(_)
-      )
-    }) {
-      return None;
-    }
-    context
-      .custom_xml_bindings
-      .value_for_sdt(properties)
-      .map(|value| sdt_bound_display_text(properties, value))
-  }) {
+  if let Some(value) = sdt
+    .sdt_properties
+    .as_ref()
+    .and_then(|properties| sdt_bound_replacement(context.custom_xml_bindings, properties))
+  {
     inlines.push(InlineItem::Text(TextRun {
       text: value,
       style: base_style,
@@ -6783,6 +7017,85 @@ fn sdt_bound_display_text(properties: &w::SdtProperties, value: String) -> Strin
   format_sdt_date(date_format, year, month, day).unwrap_or(value)
 }
 
+fn sdt_supports_bound_text(properties: &w::SdtProperties) -> bool {
+  properties.sdt_properties_choice.iter().any(|choice| {
+    matches!(
+      choice,
+      w::SdtPropertiesChoice::SdtContentText(_) | w::SdtPropertiesChoice::SdtContentDate(_)
+    )
+  })
+}
+
+fn sdt_bound_replacement(
+  custom_xml_bindings: &CustomXmlBindings,
+  properties: &w::SdtProperties,
+) -> Option<String> {
+  if !sdt_supports_bound_text(properties) {
+    return None;
+  }
+  let value = custom_xml_bindings.value_for_sdt(properties)?;
+  if value.is_empty()
+    && sdt_has_data_binding(properties)
+    && let Some(name) = sdt_placeholder_doc_part(properties)
+    && let Some(body) = custom_xml_bindings.glossary_placeholder(name)
+    && let Some(text) = simple_glossary_placeholder_text(body)
+  {
+    // ECMA-376 Part 1 §17.5.2.25 requires an empty mapped XML element to
+    // display the named placeholder from a bbPlcHdr Glossary Document entry.
+    // Keep this distinct from the Word deviations in [MS-OI29500]
+    // §§2.1.195 and 2.1.199, which delay or suppress a placeholder selected
+    // only because run contents are empty.
+    return Some(text);
+  }
+  sdt_bound_replacement_text(properties, value)
+}
+
+fn sdt_has_data_binding(properties: &w::SdtProperties) -> bool {
+  properties
+    .sdt_properties_choice
+    .iter()
+    .any(|choice| matches!(choice, w::SdtPropertiesChoice::WDataBinding(_)))
+}
+
+fn sdt_placeholder_doc_part(properties: &w::SdtProperties) -> Option<&str> {
+  properties
+    .sdt_properties_choice
+    .iter()
+    .find_map(|choice| match choice {
+      w::SdtPropertiesChoice::SdtPlaceholder(placeholder) => placeholder
+        .doc_part_reference
+        .as_ref()
+        .map(|reference| reference.val.as_str())
+        .filter(|name| !name.is_empty()),
+      _ => None,
+    })
+}
+
+fn simple_glossary_placeholder_text(body: &w::DocPartBody) -> Option<String> {
+  let [w::DocPartBodyChoice::Paragraph(paragraph)] = body.doc_part_body_choice.as_slice() else {
+    return None;
+  };
+  let mut text = String::new();
+  for choice in &paragraph.paragraph_choice {
+    let w::ParagraphChoice::WRun(run) = choice else {
+      return None;
+    };
+    text.push_str(&hidden_run_text(run, false));
+  }
+  (!text.is_empty()).then_some(text)
+}
+
+fn sdt_bound_replacement_text(properties: &w::SdtProperties, value: String) -> Option<String> {
+  // ECMA-376 Part 1 §17.5.2.25 makes an empty mapped XML element a
+  // placeholder condition. Section 17.5.2.39 says that a true
+  // `showingPlcHdr` marks the cached `sdtContent` as that placeholder, so keep
+  // the cache instead of replacing it with an empty bound value.
+  if value.is_empty() && sdt_showing_placeholder(properties) {
+    return None;
+  }
+  Some(sdt_bound_display_text(properties, value))
+}
+
 fn format_sdt_date(format: &str, year: &str, month: u8, day: u8) -> Option<String> {
   let mut output = String::new();
   let mut chars = format.chars().peekable();
@@ -6817,13 +7130,21 @@ fn sdt_showing_placeholder(properties: &w::SdtProperties) -> bool {
   properties
     .sdt_properties_choice
     .iter()
-    .any(|choice| matches!(choice, w::SdtPropertiesChoice::ShowingPlaceholder(_)))
+    .any(|choice| match choice {
+      // The common boolean definition in §17.17.4 defaults an omitted `val`
+      // to true. Keep the transitional `on`/`off` spellings supported by the
+      // SDK's typed OnOffValue as well.
+      w::SdtPropertiesChoice::ShowingPlaceholder(placeholder) => {
+        placeholder.val.is_none_or(|value| value.as_bool())
+      }
+      _ => false,
+    })
 }
 
 fn sdt_form_widget(properties: &w::SdtProperties) -> Option<(FormWidgetKind, Vec<String>)> {
   let mut kind = None;
   let mut entries = Vec::new();
-  let mut showing_placeholder = false;
+  let showing_placeholder = sdt_showing_placeholder(properties);
   for choice in &properties.sdt_properties_choice {
     match choice {
       w::SdtPropertiesChoice::SdtContentComboBox(combo_box) => {
@@ -6839,9 +7160,6 @@ fn sdt_form_widget(properties: &w::SdtProperties) -> Option<(FormWidgetKind, Vec
       }
       w::SdtPropertiesChoice::SdtContentRichText | w::SdtPropertiesChoice::SdtContentText(_) => {
         kind = Some(FormWidgetKind::Text);
-      }
-      w::SdtPropertiesChoice::ShowingPlaceholder(_) => {
-        showing_placeholder = true;
       }
       _ => {}
     }
@@ -9494,6 +9812,7 @@ fn wrap_wordprocessing_group_effects(
       let resolver = DocxImageEffectColorResolver {
         theme_colors: &context.styles.theme_colors,
         images: Some(context.images),
+        placeholder_color: None,
         word_group_glow: true,
       };
       match choice {
@@ -9719,25 +10038,17 @@ fn wordprocessing_shape_shape(
   {
     geometry = path_geometry;
   }
-  let is_degenerate_straight_connector = properties.preset_geometry().is_some_and(|preset| {
-    preset.preset == a::ShapeTypeValues::StraightConnector1
-      && ((width_pt <= 0.0 && height_pt > 0.0) || (height_pt <= 0.0 && width_pt > 0.0))
-  });
   let effects = properties
     .effects(&context.styles.theme_colors, Some(context.images))
     .or_else(|| {
-      is_degenerate_straight_connector
-        .then(|| {
-          shape.shape_style.as_ref().and_then(|style| {
-            drawingml_effect_reference_effects(
-              &style.effect_reference,
-              &context.styles.theme_effects,
-              &context.styles.theme_colors,
-              Some(context.images),
-            )
-          })
-        })
-        .flatten()
+      shape.shape_style.as_ref().and_then(|style| {
+        drawingml_effect_reference_effects(
+          &style.effect_reference,
+          &context.styles.theme_effects,
+          &context.styles.theme_colors,
+          Some(context.images),
+        )
+      })
     });
 
   Some(InlineShape {
@@ -9924,6 +10235,7 @@ fn wrap_diagram_group_effects(
       let resolver = DocxImageEffectColorResolver {
         theme_colors: &context.styles.theme_colors,
         images: Some(context.images),
+        placeholder_color: None,
         word_group_glow: false,
       };
       match choice {
@@ -11486,6 +11798,7 @@ impl DrawingMlShapeProperties {
         &DocxImageEffectColorResolver {
           theme_colors,
           images,
+          placeholder_color: None,
           word_group_glow: false,
         },
       );
@@ -11501,6 +11814,7 @@ impl DrawingMlShapeProperties {
         &DocxImageEffectColorResolver {
           theme_colors,
           images,
+          placeholder_color: None,
           word_group_glow: false,
         },
       );
@@ -11590,6 +11904,7 @@ impl DrawingMlShapeProperties {
     let resolver = DocxImageEffectColorResolver {
       theme_colors,
       images: None,
+      placeholder_color: None,
       word_group_glow: false,
     };
     let extrusion_color = shape
@@ -12635,6 +12950,10 @@ fn drawingml_effect_reference_effects(
   let resolver = DocxImageEffectColorResolver {
     theme_colors,
     images,
+    placeholder_color: reference
+      .effect_reference_choice
+      .as_ref()
+      .and_then(Color::from_effect_reference_choice),
     word_group_glow: false,
   };
   match style.effect_style_choice.as_ref()? {
@@ -15957,12 +16276,17 @@ struct DrawingImageProperties {
 struct DocxImageEffectColorResolver<'a> {
   theme_colors: &'a ThemeColors,
   images: Option<&'a ImageCatalog>,
+  placeholder_color: Option<Color>,
   word_group_glow: bool,
 }
 
 impl DocxImageEffectColorResolver<'_> {
   fn resolve(&self, color: Option<Color>) -> Option<ResolvedEffectColor> {
-    let color = docx_image_color(color?, self.theme_colors)?;
+    let color = docx_image_color_with_placeholder(
+      color?,
+      self.theme_colors,
+      self.placeholder_color.as_ref(),
+    )?;
     Some(ResolvedEffectColor {
       color: RgbColor {
         r: color.r,
@@ -16269,12 +16593,21 @@ fn apply_image_effects_from_blip(
       &DocxImageEffectColorResolver {
         theme_colors,
         images,
+        placeholder_color: None,
         word_group_glow: false,
       },
     ));
 }
 
 fn docx_image_color(color: Color, theme_colors: &ThemeColors) -> Option<common::Color> {
+  docx_image_color_with_placeholder(color, theme_colors, None)
+}
+
+fn docx_image_color_with_placeholder(
+  color: Color,
+  theme_colors: &ThemeColors,
+  placeholder_color: Option<&Color>,
+) -> Option<common::Color> {
   let mut scheme_resolver = |value| {
     let color = resolve_drawingml_scheme_color_value(value, theme_colors)?;
     Some(Color::RgbHex(RgbHexColor {
@@ -16282,7 +16615,7 @@ fn docx_image_color(color: Color, theme_colors: &ThemeColors) -> Option<common::
       transformations: Vec::new(),
     }))
   };
-  let color = color.resolve_rgb(&mut scheme_resolver, None)?;
+  let color = color.resolve_rgb(&mut scheme_resolver, placeholder_color)?;
   Some(common::Color {
     r: color.r,
     g: color.g,
@@ -16557,6 +16890,7 @@ struct StyleEntry {
 struct RunStyleOverrides {
   font_size_pt: Option<f32>,
   complex_font_size_pt: Option<f32>,
+  vertical_alignment: Option<w::VerticalPositionValues>,
   bold: Option<bool>,
   italic: Option<bool>,
   underline: Option<bool>,
@@ -16564,6 +16898,10 @@ struct RunStyleOverrides {
   uppercase: Option<bool>,
   small_caps: Option<bool>,
   hidden: Option<bool>,
+  legacy_outline: Option<bool>,
+  legacy_shadow: Option<bool>,
+  legacy_emboss: Option<bool>,
+  legacy_imprint: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -16787,6 +17125,7 @@ impl StylesCatalog {
       );
       entry.run_overrides =
         run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
+      normalize_relative_run_style(&mut entry.run_style, entry.run_overrides);
       entry.table_style = table_style_model(
         style,
         &catalog.theme_fonts,
@@ -16928,10 +17267,17 @@ impl StylesCatalog {
     let mut style = self.doc_default_run.clone();
     merge_style_values(&mut style, &base_style);
     apply_run_style_overrides(&mut style, base_overrides);
+    let mut vertical_alignment = base_overrides.vertical_alignment;
     let style_id = style_id.or(self.default_paragraph_style_id.as_deref());
     for entry in self.style_chain(style_id) {
       merge_style_values(&mut style, &entry.run_style);
       apply_run_style_overrides(&mut style, entry.run_overrides);
+      if entry.run_overrides.vertical_alignment.is_some() {
+        vertical_alignment = entry.run_overrides.vertical_alignment;
+      }
+    }
+    if let Some(vertical_alignment) = vertical_alignment {
+      properties::apply_vertical_text_alignment(&mut style, vertical_alignment);
     }
     self.apply_font_substitution(&mut style);
     style
@@ -16943,15 +17289,22 @@ impl StylesCatalog {
     };
     let mut style = base_style;
     let mut matched = false;
+    let mut vertical_alignment = None;
     for entry in self.style_chain(Some(style_id)) {
       if matches!(entry.style_type, Some(w::StyleValues::Character)) {
         matched = true;
         merge_style_values(&mut style, &entry.run_style);
         apply_run_style_overrides(&mut style, entry.run_overrides);
+        if entry.run_overrides.vertical_alignment.is_some() {
+          vertical_alignment = entry.run_overrides.vertical_alignment;
+        }
       }
     }
     if !matched {
       merge_builtin_character_style(&mut style, style_id);
+    }
+    if let Some(vertical_alignment) = vertical_alignment {
+      properties::apply_vertical_text_alignment(&mut style, vertical_alignment);
     }
     self.apply_font_substitution(&mut style);
     style
@@ -17839,6 +18192,10 @@ fn table_style_model(
   );
   model.whole_table.run_overrides =
     run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
+  normalize_relative_run_style(
+    &mut model.whole_table.run_style,
+    model.whole_table.run_overrides,
+  );
   for conditional in &style.table_style_properties {
     let mut cell_style = TableCellStyle::default();
     merge_paragraph_format(
@@ -17864,6 +18221,7 @@ fn table_style_model(
         .as_deref()
         .map(RunProps::BaseStyle),
     );
+    normalize_relative_run_style(&mut cell_style.run_style, cell_style.run_overrides);
     if let Some(properties) = conditional
       .table_style_conditional_formatting_table_properties
       .as_deref()
@@ -18137,6 +18495,9 @@ fn merge_run_style_overrides(
   if source.complex_font_size_pt.is_some() {
     target.complex_font_size_pt = source.complex_font_size_pt;
   }
+  if source.vertical_alignment.is_some() {
+    target.vertical_alignment = source.vertical_alignment;
+  }
   if source.italic.is_some() {
     target.italic = source.italic;
   }
@@ -18154,6 +18515,18 @@ fn merge_run_style_overrides(
   }
   if source.hidden.is_some() {
     target.hidden = source.hidden;
+  }
+  if source.legacy_outline.is_some() {
+    target.legacy_outline = source.legacy_outline;
+  }
+  if source.legacy_shadow.is_some() {
+    target.legacy_shadow = source.legacy_shadow;
+  }
+  if source.legacy_emboss.is_some() {
+    target.legacy_emboss = source.legacy_emboss;
+  }
+  if source.legacy_imprint.is_some() {
+    target.legacy_imprint = source.legacy_imprint;
   }
   target
 }
@@ -18220,6 +18593,7 @@ fn run_style_overrides(properties: Option<RunProps<'_>>) -> RunStyleOverrides {
     complex_font_size_pt: properties
       .complex_script_font_size()
       .map(|value| (value.val.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT)),
+    vertical_alignment: properties.vertical_text_alignment().map(|value| value.val),
     bold: properties
       .bold()
       .and_then(|value| value.val.map(|value| value.as_bool())),
@@ -18246,7 +18620,32 @@ fn run_style_overrides(properties: Option<RunProps<'_>>) -> RunStyleOverrides {
     hidden: properties
       .vanish()
       .and_then(|value| value.val.map(|value| value.as_bool())),
+    legacy_outline: properties
+      .outline()
+      .map(|value| value.val.is_none_or(|value| value.as_bool())),
+    legacy_shadow: properties
+      .shadow()
+      .map(|value| value.val.is_none_or(|value| value.as_bool())),
+    legacy_emboss: properties
+      .emboss()
+      .map(|value| value.val.is_none_or(|value| value.as_bool())),
+    legacy_imprint: properties
+      .imprint()
+      .map(|value| value.val.is_none_or(|value| value.as_bool())),
   }
+}
+
+fn normalize_relative_run_style(style: &mut TextStyle, overrides: RunStyleOverrides) {
+  if overrides.vertical_alignment.is_none() {
+    return;
+  }
+  // w:vertAlign is relative to the effective size after the complete style
+  // cascade. Style entries are cached before their paragraph/run base is
+  // known, so retain the authored size overrides separately and defer the
+  // automatic escapement transform until the style is applied.
+  style.font_size_pt = TextStyle::default().font_size_pt;
+  style.complex_font_size_pt = None;
+  style.baseline_shift_pt = 0.0;
 }
 
 fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides) {
@@ -18277,6 +18676,26 @@ fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides
   if let Some(hidden) = overrides.hidden {
     style.hidden = hidden;
   }
+  if let Some(outline) = overrides.legacy_outline {
+    style.legacy_outline = outline;
+  }
+  if let Some(shadow) = overrides.legacy_shadow {
+    style.legacy_shadow = shadow;
+  }
+  if let Some(emboss) = overrides.legacy_emboss {
+    if emboss {
+      style.legacy_relief = LegacyTextRelief::Embossed;
+    } else if style.legacy_relief == LegacyTextRelief::Embossed {
+      style.legacy_relief = LegacyTextRelief::None;
+    }
+  }
+  if let Some(imprint) = overrides.legacy_imprint {
+    if imprint {
+      style.legacy_relief = LegacyTextRelief::Engraved;
+    } else if style.legacy_relief == LegacyTextRelief::Engraved {
+      style.legacy_relief = LegacyTextRelief::None;
+    }
+  }
 }
 
 fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
@@ -18285,12 +18704,17 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
     target.spacing_before_lines = values.spacing_before_lines;
     target.spacing_before_set = values.spacing_before_set;
   }
+  if values.spacing_before_auto.is_some() {
+    target.spacing_before_auto = values.spacing_before_auto;
+    target.spacing_before_auto_pt = values.spacing_before_auto_pt;
+  }
   if values.spacing_after_set || values.spacing_after_pt != 0.0 {
     target.spacing_after_pt = values.spacing_after_pt;
     target.spacing_after_set = values.spacing_after_set;
   }
   if values.spacing_after_auto.is_some() {
     target.spacing_after_auto = values.spacing_after_auto;
+    target.spacing_after_auto_pt = values.spacing_after_auto_pt;
   }
   if values.line_height_pt.is_some() {
     target.line_height_pt = values.line_height_pt;
@@ -18350,12 +18774,18 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
     target.keep_lines = values.keep_lines;
     target.keep_lines_set = true;
   }
+  if values.widow_control.is_some() {
+    target.widow_control = values.widow_control;
+  }
   if values.contextual_spacing_set {
     target.contextual_spacing = values.contextual_spacing;
     target.contextual_spacing_set = true;
   }
   if values.suppress_auto_hyphens.is_some() {
     target.suppress_auto_hyphens = values.suppress_auto_hyphens;
+  }
+  if values.suppress_line_numbers.is_some() {
+    target.suppress_line_numbers = values.suppress_line_numbers;
   }
   if values.auto_space_de.is_some() {
     target.auto_space_de = values.auto_space_de;
@@ -18474,12 +18904,17 @@ fn merge_numbering_format_values(
     target.spacing_before_pt = values.spacing_before_pt;
     target.spacing_before_set = values.spacing_before_set;
   }
+  if values.spacing_before_auto.is_some() {
+    target.spacing_before_auto = values.spacing_before_auto;
+    target.spacing_before_auto_pt = values.spacing_before_auto_pt;
+  }
   if values.spacing_after_set || values.spacing_after_pt != 0.0 {
     target.spacing_after_pt = values.spacing_after_pt;
     target.spacing_after_set = values.spacing_after_set;
   }
   if values.spacing_after_auto.is_some() {
     target.spacing_after_auto = values.spacing_after_auto;
+    target.spacing_after_auto_pt = values.spacing_after_auto_pt;
   }
   if values.line_height_pt.is_some() {
     target.line_height_pt = values.line_height_pt;
@@ -18549,12 +18984,18 @@ fn merge_numbering_format_values(
     target.keep_lines = values.keep_lines;
     target.keep_lines_set = true;
   }
+  if values.widow_control.is_some() {
+    target.widow_control = values.widow_control;
+  }
   if values.contextual_spacing_set {
     target.contextual_spacing = values.contextual_spacing;
     target.contextual_spacing_set = true;
   }
   if values.suppress_auto_hyphens.is_some() {
     target.suppress_auto_hyphens = values.suppress_auto_hyphens;
+  }
+  if values.suppress_line_numbers.is_some() {
+    target.suppress_line_numbers = values.suppress_line_numbers;
   }
   if values.auto_space_de.is_some() {
     target.auto_space_de = values.auto_space_de;
@@ -18637,6 +19078,15 @@ fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   if values.hidden {
     target.hidden = true;
   }
+  if values.legacy_outline {
+    target.legacy_outline = true;
+  }
+  if values.legacy_shadow {
+    target.legacy_shadow = true;
+  }
+  if values.legacy_relief != LegacyTextRelief::None {
+    target.legacy_relief = values.legacy_relief;
+  }
   if !values.color_is_automatic || values.color != TextStyle::default().color {
     target.color = values.color;
     target.color_is_automatic = false;
@@ -18714,6 +19164,65 @@ struct NumberingLabel {
 struct NumberingCounterState {
   counters: HashMap<(i32, i32), i32>,
   initialized_start_overrides: HashSet<(i32, i32)>,
+}
+
+fn finalize_numbering_symbol_transport_style(
+  style: &mut TextStyle,
+  inherited_style: &TextStyle,
+  format: w::NumberFormatValues,
+  symbol_run_properties: Option<&w::NumberingSymbolRunProperties>,
+  text: &mut String,
+) {
+  if !matches!(format, w::NumberFormatValues::Bullet) {
+    return;
+  }
+
+  let declared_symbol_font = symbol_run_properties
+    .and_then(|properties| properties.run_fonts.first())
+    .and_then(|fonts| {
+      fonts
+        .ascii
+        .as_deref()
+        .filter(|font| symbol_transport_font(font))
+        .or_else(|| {
+          fonts
+            .high_ansi
+            .as_deref()
+            .filter(|font| symbol_transport_font(font))
+        })
+    });
+  if text
+    .chars()
+    .any(|character| (0xF000..=0xF0FF).contains(&(character as u32)))
+    && let Some(font) = declared_symbol_font
+  {
+    // ECMA-376 Part 1 §17.9.24 applies the numbering-level rPr specifically
+    // to lvlText and keeps it separate from paragraph runs. The normative
+    // Numbering Definitions example declares a Symbol bullet through only
+    // rFonts@ascii/@hAnsi. Preserve that explicit numbering-only face when
+    // paragraph-mark w:rtl/w:cs would otherwise select an inherited complex
+    // slot for the legacy U+F0XX symbol transport character.
+    let font = Arc::<str>::from(font);
+    style.font_family = Some(font.clone());
+    style.complex_font_family = Some(font.clone());
+    style.symbol_font_family = Some(font);
+  }
+
+  if style
+    .font_family
+    .as_deref()
+    .is_some_and(|font| font.eq_ignore_ascii_case("Symbol"))
+    && text.contains('\u{f094}')
+  {
+    // Word's legacy list transport uses F094 for a black square even
+    // though Microsoft's Symbol cmap has no U+F094. Let the paragraph font
+    // (and normal fallback chain) paint the Unicode square.
+    *text = text.replace('\u{f094}', "■");
+    style.font_family = inherited_style.font_family.clone();
+    style.fallback_font_family = inherited_style.fallback_font_family.clone();
+    style.complex_font_family = inherited_style.complex_font_family.clone();
+    style.symbol_font_family = None;
+  }
 }
 
 impl NumberingCatalog {
@@ -19008,21 +19517,13 @@ impl NumberingCatalog {
         &styles.theme_colors,
       );
     }
-    if matches!(level.format, w::NumberFormatValues::Bullet)
-      && style
-        .font_family
-        .as_deref()
-        .is_some_and(|font| font.eq_ignore_ascii_case("Symbol"))
-      && text.contains('\u{f094}')
-    {
-      // Word's legacy list transport uses F094 for a black square even
-      // though Microsoft's Symbol cmap has no U+F094. Let the paragraph font
-      // (and normal fallback chain) paint the Unicode square.
-      text = text.replace('\u{f094}', "■");
-      style.font_family = inherited_bullet_style.font_family;
-      style.fallback_font_family = inherited_bullet_style.fallback_font_family;
-      style.symbol_font_family = None;
-    }
+    finalize_numbering_symbol_transport_style(
+      &mut style,
+      &inherited_bullet_style,
+      level.format,
+      level.symbol_run_properties.as_ref(),
+      &mut text,
+    );
     let picture_bullet = level.picture_bullet_id.is_some();
     let image = level
       .picture_bullet_id
@@ -19895,6 +20396,16 @@ impl<'a> ParagraphProps<'a> {
     }
   }
 
+  fn widow_control(&self) -> Option<&'a w::WidowControl> {
+    match self {
+      Self::Direct(properties) => properties.widow_control.as_ref(),
+      Self::Extended(properties) => properties.widow_control.as_ref(),
+      Self::Style(properties) => properties.widow_control.as_ref(),
+      Self::BaseStyle(properties) => properties.widow_control.as_ref(),
+      Self::Previous(properties) => properties.widow_control.as_ref(),
+    }
+  }
+
   fn contextual_spacing(&self) -> Option<&'a w::ContextualSpacing> {
     match self {
       Self::Direct(properties) => properties.contextual_spacing.as_ref(),
@@ -19912,6 +20423,16 @@ impl<'a> ParagraphProps<'a> {
       Self::Style(properties) => properties.suppress_auto_hyphens.as_ref(),
       Self::BaseStyle(properties) => properties.suppress_auto_hyphens.as_ref(),
       Self::Previous(properties) => properties.suppress_auto_hyphens.as_ref(),
+    }
+  }
+
+  fn suppress_line_numbers(&self) -> Option<&'a w::SuppressLineNumbers> {
+    match self {
+      Self::Direct(properties) => properties.suppress_line_numbers.as_ref(),
+      Self::Extended(properties) => properties.suppress_line_numbers.as_ref(),
+      Self::Style(properties) => properties.suppress_line_numbers.as_ref(),
+      Self::BaseStyle(properties) => properties.suppress_line_numbers.as_ref(),
+      Self::Previous(properties) => properties.suppress_line_numbers.as_ref(),
     }
   }
 
@@ -20117,6 +20638,10 @@ run_properties_accessor!(run_properties_shading, Shading, w::Shading);
 run_properties_accessor!(run_properties_underline, Underline, w::Underline);
 run_properties_accessor!(run_properties_strike, Strike, w::Strike);
 run_properties_accessor!(run_properties_double_strike, DoubleStrike, w::DoubleStrike);
+run_properties_accessor!(run_properties_outline, Outline, w::Outline);
+run_properties_accessor!(run_properties_shadow, Shadow, w::Shadow);
+run_properties_accessor!(run_properties_emboss, Emboss, w::Emboss);
+run_properties_accessor!(run_properties_imprint, Imprint, w::Imprint);
 run_properties_accessor!(run_properties_caps, Caps, w::Caps);
 run_properties_accessor!(run_properties_small_caps, SmallCaps, w::SmallCaps);
 run_properties_accessor!(run_properties_vanish, Vanish, w::Vanish);
@@ -20191,6 +20716,10 @@ paragraph_mark_run_properties_accessor!(
   DoubleStrike,
   w::DoubleStrike
 );
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_outline, Outline, w::Outline);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_shadow, Shadow, w::Shadow);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_emboss, Emboss, w::Emboss);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_imprint, Imprint, w::Imprint);
 paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_caps, Caps, w::Caps);
 paragraph_mark_run_properties_accessor!(
   paragraph_mark_run_properties_small_caps,
@@ -20391,6 +20920,46 @@ impl<'a> RunProps<'a> {
       Self::BaseStyle(properties) => properties.double_strike.as_ref(),
       Self::Numbering(properties) => properties.double_strike.as_ref(),
       Self::ParagraphMark(properties) => paragraph_mark_run_properties_double_strike(properties),
+    }
+  }
+
+  fn outline(&self) -> Option<&'a w::Outline> {
+    match self {
+      Self::Direct(properties) => run_properties_outline(properties),
+      Self::Style(properties) => properties.outline.as_ref(),
+      Self::BaseStyle(properties) => properties.outline.as_ref(),
+      Self::Numbering(properties) => properties.outline.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_outline(properties),
+    }
+  }
+
+  fn shadow(&self) -> Option<&'a w::Shadow> {
+    match self {
+      Self::Direct(properties) => run_properties_shadow(properties),
+      Self::Style(properties) => properties.shadow.as_ref(),
+      Self::BaseStyle(properties) => properties.shadow.as_ref(),
+      Self::Numbering(properties) => properties.shadow.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_shadow(properties),
+    }
+  }
+
+  fn emboss(&self) -> Option<&'a w::Emboss> {
+    match self {
+      Self::Direct(properties) => run_properties_emboss(properties),
+      Self::Style(properties) => properties.emboss.as_ref(),
+      Self::BaseStyle(properties) => properties.emboss.as_ref(),
+      Self::Numbering(properties) => properties.emboss.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_emboss(properties),
+    }
+  }
+
+  fn imprint(&self) -> Option<&'a w::Imprint> {
+    match self {
+      Self::Direct(properties) => run_properties_imprint(properties),
+      Self::Style(properties) => properties.imprint.as_ref(),
+      Self::BaseStyle(properties) => properties.imprint.as_ref(),
+      Self::Numbering(properties) => properties.imprint.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_imprint(properties),
     }
   }
 
@@ -20749,13 +21318,17 @@ fn default_word_page_setup_with_size(mut setup: PageSetup) -> PageSetup {
 }
 
 fn line_numbering_model(properties: &w::LineNumberType) -> Option<LineNumbering> {
-  let count_by = properties.count_by.unwrap_or(1);
+  // ECMA-376 Part 1 §17.6.8 disables line numbering when countBy is absent.
+  let count_by = properties.count_by?;
   if count_by <= 0 {
     return None;
   }
   Some(LineNumbering {
     count_by,
-    start: properties.start.unwrap_or(1),
+    // [MS-OI29500] §2.1.215 defines Word's start value as the number of
+    // logical line numbers skipped on every restart. Keep that authored skip
+    // count here; layout starts at start + 1.
+    start: properties.start.unwrap_or(0),
     distance_pt: properties
       .distance
       .as_ref()
@@ -20774,6 +21347,61 @@ mod tests {
 
   fn twips(value: u32) -> TwipsMeasureValue {
     TwipsMeasureValue::Twips(value as u64)
+  }
+
+  fn merge_test_paragraph(text: &str) -> Paragraph {
+    Paragraph {
+      inlines: vec![InlineItem::Text(TextRun {
+        text: text.into(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })],
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat::default()),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    }
+  }
+
+  #[test]
+  fn deleted_paragraph_mark_combines_current_text_with_the_following_paragraph() {
+    let mut first = merge_test_paragraph("master.");
+    first.format.deleted_separator = true;
+    let second = merge_test_paragraph("Basketball");
+    let mut blocks = Vec::new();
+
+    push_body_paragraph(&mut blocks, first);
+    push_body_paragraph(&mut blocks, second);
+
+    let [Block::Paragraph(paragraph)] = blocks.as_slice() else {
+      panic!("one combined paragraph");
+    };
+    let text = paragraph
+      .inlines
+      .iter()
+      .filter_map(|inline| match inline {
+        InlineItem::Text(run) => Some(run.text.as_str()),
+        _ => None,
+      })
+      .collect::<String>();
+    assert_eq!(text, "master.Basketball");
+    assert!(!paragraph.format.deleted_separator);
+    assert_eq!(paragraph.format.outline_text_inlines, None);
   }
 
   #[test]
@@ -21172,15 +21800,19 @@ mod tests {
   }
 
   #[test]
-  fn word_automatic_line_number_distance_is_eighteen_points() {
+  fn word_line_numbering_preserves_skip_count_and_automatic_distance() {
     let automatic = w::LineNumberType::from_bytes(
       br#"<w:lnNumType xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:countBy="1"/>"#,
     )
     .expect("automatic line numbering");
     let explicit = w::LineNumberType::from_bytes(
-      br#"<w:lnNumType xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:countBy="1" w:distance="720"/>"#,
+      br#"<w:lnNumType xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:countBy="3" w:start="1" w:distance="720"/>"#,
     )
     .expect("explicit line-number distance");
+    let disabled = w::LineNumberType::from_bytes(
+      br#"<w:lnNumType xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+    )
+    .expect("disabled line numbering");
 
     assert_eq!(
       line_numbering_model(&automatic)
@@ -21188,12 +21820,11 @@ mod tests {
         .distance_pt,
       18.0
     );
-    assert_eq!(
-      line_numbering_model(&explicit)
-        .expect("line numbering")
-        .distance_pt,
-      36.0
-    );
+    let explicit = line_numbering_model(&explicit).expect("line numbering");
+    assert_eq!(explicit.count_by, 3);
+    assert_eq!(explicit.start, 1);
+    assert_eq!(explicit.distance_pt, 36.0);
+    assert_eq!(line_numbering_model(&disabled), None);
   }
 
   #[test]
@@ -21668,6 +22299,40 @@ mod tests {
   }
 
   #[test]
+  fn word_nonzero_frame_height_defaults_to_at_least() {
+    fn imported_height_rule(xml: &[u8]) -> FrameHeightRule {
+      let properties =
+        w::ParagraphProperties::from_bytes(xml).expect("direct paragraph properties");
+      let mut format = ParagraphFormat::default();
+      merge_paragraph_format(
+        &mut format,
+        Some(ParagraphProps::Direct(&properties)),
+        ImportSettings::default(),
+      );
+      format.frame.expect("text frame").height_rule
+    }
+
+    assert_eq!(
+      imported_height_rule(
+        br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:framePr w:h="1440"/></w:pPr>"#,
+      ),
+      FrameHeightRule::AtLeast
+    );
+    assert_eq!(
+      imported_height_rule(
+        br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:framePr w:h="0"/></w:pPr>"#,
+      ),
+      FrameHeightRule::Auto
+    );
+    assert_eq!(
+      imported_height_rule(
+        br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:framePr w:h="1440" w:hRule="auto"/></w:pPr>"#,
+      ),
+      FrameHeightRule::Auto
+    );
+  }
+
+  #[test]
   fn office_math_only_paragraph_uses_document_display_math_alignment() {
     let paragraph = w::Paragraph::from_bytes(
       br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></w:p>"#,
@@ -21727,6 +22392,44 @@ mod tests {
     .expect("row with cell-level content control");
 
     assert_eq!(table_row_cells(&row).len(), 1);
+  }
+
+  #[test]
+  fn cell_level_content_control_refreshes_its_cached_text_from_data_binding() {
+    const CORE_PROPERTIES_ID: &str = "{6C3C8BC8-F283-45AE-878A-BAB7291924A1}";
+    let table = w::Table::from_bytes(
+      format!(
+        r#"<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tblGrid><w:gridCol w:w="4000"/></w:tblGrid><w:tr><w:sdt><w:sdtPr><w:dataBinding w:xpath="/cp:coreProperties[1]/dc:title[1]" w:storeItemID="{CORE_PROPERTIES_ID}"/><w:text/></w:sdtPr><w:sdtContent><w:tc><w:p><w:r><w:t>cached title</w:t></w:r></w:p></w:tc></w:sdtContent></w:sdt></w:tr></w:tbl>"#
+      )
+      .as_bytes(),
+    )
+    .expect("table with a data-bound cell content control");
+    let bindings = CustomXmlBindings::from_test_xml(
+      Some(CORE_PROPERTIES_ID),
+      r#"<cp:coreProperties xmlns:cp="urn:core" xmlns:dc="urn:dc"><dc:title>Bound title</dc:title></cp:coreProperties>"#,
+    );
+    let mut numbering = NumberingCatalog::default();
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let model = table_model(
+      &table,
+      &mut TableModelEnv {
+        styles: &StylesCatalog::default(),
+        numbering: &mut numbering,
+        images: &ImageCatalog::default(),
+        hyperlinks: &HyperlinkCatalog::default(),
+        custom_xml_bindings: &bindings,
+        form_widget_ids: &mut form_widget_ids,
+      },
+      TableModelContext {
+        nested_table_level: 1,
+        in_header_footer: false,
+      },
+    );
+
+    let [Block::Paragraph(paragraph)] = model.rows[0].cells[0].blocks.as_slice() else {
+      panic!("expected the controlled table cell paragraph");
+    };
+    assert_eq!(inline_text(&paragraph.inlines), "Bound title");
   }
 
   #[test]
@@ -22635,6 +23338,123 @@ mod tests {
   }
 
   #[test]
+  fn numbering_symbol_font_remains_authoritative_under_paragraph_rtl() {
+    let properties = w::NumberingSymbolRunProperties {
+      run_fonts: vec![w::RunFonts {
+        ascii: Some("Symbol".into()),
+        high_ansi: Some("Symbol".into()),
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let inherited = TextStyle {
+      font_family: Some(Arc::from("Calibri")),
+      complex_font_family: Some(Arc::from("Times New Roman")),
+      right_to_left: Some(true),
+      ..Default::default()
+    };
+    let mut style = TextStyle {
+      font_family: Some(Arc::from("Symbol")),
+      ..inherited.clone()
+    };
+    let mut text = "\u{f0b7}".to_string();
+
+    finalize_numbering_symbol_transport_style(
+      &mut style,
+      &inherited,
+      w::NumberFormatValues::Bullet,
+      Some(&properties),
+      &mut text,
+    );
+
+    assert_eq!(style.font_family.as_deref(), Some("Symbol"));
+    assert_eq!(style.complex_font_family.as_deref(), Some("Symbol"));
+    assert_eq!(style.symbol_font_family.as_deref(), Some("Symbol"));
+    assert_eq!(style.right_to_left, Some(true));
+    assert_eq!(text, "\u{f0b7}");
+  }
+
+  #[test]
+  fn numbering_symbol_transport_override_requires_matching_direct_evidence() {
+    let symbol_properties = w::NumberingSymbolRunProperties {
+      run_fonts: vec![w::RunFonts {
+        ascii: Some("Symbol".into()),
+        high_ansi: Some("Symbol".into()),
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let ordinary_properties = w::NumberingSymbolRunProperties {
+      run_fonts: vec![w::RunFonts {
+        ascii: Some("Calibri".into()),
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let inherited = TextStyle {
+      font_family: Some(Arc::from("Calibri")),
+      complex_font_family: Some(Arc::from("Times New Roman")),
+      ..Default::default()
+    };
+
+    for (format, properties, mut text) in [
+      (
+        w::NumberFormatValues::Decimal,
+        &symbol_properties,
+        "\u{f0b7}".to_string(),
+      ),
+      (
+        w::NumberFormatValues::Bullet,
+        &symbol_properties,
+        "•".to_string(),
+      ),
+      (
+        w::NumberFormatValues::Bullet,
+        &ordinary_properties,
+        "\u{f0b7}".to_string(),
+      ),
+    ] {
+      let mut style = TextStyle {
+        font_family: Some(Arc::from("Symbol")),
+        ..inherited.clone()
+      };
+      finalize_numbering_symbol_transport_style(
+        &mut style,
+        &inherited,
+        format,
+        Some(properties),
+        &mut text,
+      );
+      assert_eq!(
+        style.complex_font_family.as_deref(),
+        Some("Times New Roman")
+      );
+      assert_eq!(style.symbol_font_family, None);
+    }
+
+    let mut style = TextStyle {
+      font_family: Some(Arc::from("Symbol")),
+      complex_font_family: Some(Arc::from("Times New Roman")),
+      ..Default::default()
+    };
+    let mut text = "\u{f094}".to_string();
+    finalize_numbering_symbol_transport_style(
+      &mut style,
+      &inherited,
+      w::NumberFormatValues::Bullet,
+      Some(&symbol_properties),
+      &mut text,
+    );
+    assert_eq!(text, "■");
+    assert_eq!(style.font_family.as_deref(), Some("Calibri"));
+    assert_eq!(
+      style.complex_font_family.as_deref(),
+      Some("Times New Roman")
+    );
+    assert_eq!(style.symbol_font_family, None);
+  }
+
+  #[test]
   fn office_default_font_follows_simplified_chinese_ui_language() {
     assert_eq!(
       office_default_font_family(Some("zh-CN")).as_ref(),
@@ -22686,6 +23506,82 @@ mod tests {
     let omitted = word_doc_default_run_seed(false);
     assert_eq!(omitted.font_size_pt, 11.0);
     assert_eq!(omitted.complex_font_size_pt, None);
+  }
+
+  #[test]
+  fn legacy_word_text_effect_toggles_override_inherited_values() {
+    let properties = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:outline/><w:shadow w:val="0"/><w:emboss/><w:imprint w:val="false"/></w:rPr>"#,
+    )
+    .expect("legacy text effect run properties");
+    let base = TextStyle {
+      legacy_shadow: true,
+      legacy_relief: LegacyTextRelief::Engraved,
+      ..TextStyle::default()
+    };
+
+    let style = properties::run_style(Some(&properties), base, &StylesCatalog::default());
+
+    assert!(style.legacy_outline);
+    assert!(!style.legacy_shadow);
+    assert_eq!(style.legacy_relief, LegacyTextRelief::Embossed);
+  }
+
+  #[test]
+  fn legacy_word_text_effects_survive_style_chains_and_can_be_cleared() {
+    let styles = StylesCatalog {
+      styles: HashMap::from([
+        (
+          "Base".to_string(),
+          StyleEntry {
+            run_style: TextStyle {
+              legacy_shadow: true,
+              legacy_relief: LegacyTextRelief::Engraved,
+              ..TextStyle::default()
+            },
+            ..StyleEntry::default()
+          },
+        ),
+        (
+          "Inherited".to_string(),
+          StyleEntry {
+            based_on: Some("Base".to_string()),
+            ..StyleEntry::default()
+          },
+        ),
+        (
+          "Cleared".to_string(),
+          StyleEntry {
+            based_on: Some("Inherited".to_string()),
+            run_overrides: RunStyleOverrides {
+              legacy_outline: Some(true),
+              legacy_shadow: Some(false),
+              legacy_imprint: Some(false),
+              ..RunStyleOverrides::default()
+            },
+            ..StyleEntry::default()
+          },
+        ),
+      ]),
+      ..StylesCatalog::default()
+    };
+
+    let inherited = styles.run_style_with_base(
+      Some("Inherited"),
+      TextStyle::default(),
+      RunStyleOverrides::default(),
+    );
+    assert!(inherited.legacy_shadow);
+    assert_eq!(inherited.legacy_relief, LegacyTextRelief::Engraved);
+
+    let cleared = styles.run_style_with_base(
+      Some("Cleared"),
+      TextStyle::default(),
+      RunStyleOverrides::default(),
+    );
+    assert!(cleared.legacy_outline);
+    assert!(!cleared.legacy_shadow);
+    assert_eq!(cleared.legacy_relief, LegacyTextRelief::None);
   }
 
   #[test]
@@ -22774,6 +23670,62 @@ mod tests {
       fonts.resolve(Some(w::ThemeFontValues::MajorEastAsia)),
       Some(Arc::from("SimSun"))
     );
+  }
+
+  #[test]
+  fn unresolved_complex_theme_font_uses_word_application_default() {
+    let unresolved = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rFonts w:cstheme="minorBidi"/></w:rPr>"#,
+    )
+    .expect("run properties");
+    let inherited = TextStyle {
+      font_family: Some(Arc::from("Calibri")),
+      complex_font_family: Some(Arc::from("Inherited Complex")),
+      ..TextStyle::default()
+    };
+
+    let unresolved_style = properties::run_style(
+      Some(&unresolved),
+      inherited.clone(),
+      &StylesCatalog::default(),
+    );
+    assert_eq!(
+      unresolved_style.complex_font_family.as_deref(),
+      Some("Times New Roman")
+    );
+    assert_eq!(unresolved_style.font_family.as_deref(), Some("Calibri"));
+
+    let no_complex_reference = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rFonts w:hint="cs"/></w:rPr>"#,
+    )
+    .expect("run properties");
+    let inherited_style = properties::run_style(
+      Some(&no_complex_reference),
+      inherited,
+      &StylesCatalog::default(),
+    );
+    assert_eq!(
+      inherited_style.complex_font_family.as_deref(),
+      Some("Inherited Complex")
+    );
+  }
+
+  #[test]
+  fn resolved_complex_theme_font_precedes_word_application_default() {
+    let properties = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rFonts w:cstheme="minorBidi"/></w:rPr>"#,
+    )
+    .expect("run properties");
+    let styles = StylesCatalog {
+      theme_fonts: ThemeFonts {
+        minor_bidi: Some(Arc::from("David")),
+        ..ThemeFonts::default()
+      },
+      ..StylesCatalog::default()
+    };
+
+    let style = properties::run_style(Some(&properties), TextStyle::default(), &styles);
+    assert_eq!(style.complex_font_family.as_deref(), Some("David"));
   }
 
   #[test]
@@ -23348,6 +24300,90 @@ mod tests {
         })
       ] if (*end_y - 106.843).abs() < 0.001
     ));
+  }
+
+  #[test]
+  fn wps_shape_inherits_theme_effect_reference_and_direct_effect_list_clears_it() {
+    let effect_styles = a::EffectStyleList::from_bytes(
+      br#"<a:effectStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:effectStyle><a:effectLst><a:outerShdw blurRad="40000" dist="20000" dir="5400000" rotWithShape="0"><a:schemeClr val="phClr"><a:alpha val="50000"/></a:schemeClr></a:outerShdw></a:effectLst></a:effectStyle></a:effectStyleLst>"#,
+    )
+    .expect("typed theme effect styles");
+    let styles = StylesCatalog {
+      theme_colors: ThemeColors {
+        accent1: Some(RgbColor {
+          r: 79,
+          g: 129,
+          b: 189,
+        }),
+        ..Default::default()
+      },
+      theme_effects: ThemeEffectStyles {
+        styles: effect_styles.effect_style,
+      },
+      ..Default::default()
+    };
+    let import = |direct_effects: &str| {
+      let xml = format!(
+        r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:prstGeom prst="star5"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="336699"/></a:solidFill>{direct_effects}</wps:spPr><wps:style><a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="0"><a:schemeClr val="accent1"/></a:fillRef><a:effectRef idx="1"><a:schemeClr val="accent1"/></a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></wps:style></wps:wsp>"#
+      );
+      let wordprocessing_shape =
+        wps::WordprocessingShape::from_bytes(xml.as_bytes()).expect("typed WPS star");
+      wordprocessing_shape_shape(
+        &wordprocessing_shape,
+        ImagePlacement::Inline,
+        DrawingMlGroupTransform::identity(),
+        DrawingShapeImportContext {
+          effect_extent: DrawingEffectExtent::default(),
+          styles: &styles,
+          images: &ImageCatalog::default(),
+          hyperlinks: &HyperlinkCatalog::default(),
+          smartart_text_colors_by_model_id: None,
+        },
+      )
+      .expect("WPS star")
+    };
+
+    let inherited = import("");
+    let inherited_effects = match inherited.effects.as_ref() {
+      Some(common::DrawingEffectSource::List {
+        resolved: Some(value),
+        ..
+      }) => value,
+      _ => panic!("theme effect list must resolve for an ordinary WPS shape"),
+    };
+    let shadow_color = inherited_effects
+      .effects
+      .iter()
+      .find_map(|effect| match effect {
+        common::drawingml_image_effects::ImageEffect::OuterShadow { color, .. } => Some(*color),
+        _ => None,
+      })
+      .expect("theme outer shadow");
+    assert_eq!(
+      shadow_color,
+      ResolvedEffectColor {
+        color: RgbColor {
+          r: 79,
+          g: 129,
+          b: 189,
+        },
+        alpha: 127,
+      },
+      "theme phClr must use the effectRef color"
+    );
+
+    let cleared = import("<a:effectLst/>");
+    let cleared_effects = match cleared.effects.as_ref() {
+      Some(common::DrawingEffectSource::List {
+        resolved: Some(value),
+        ..
+      }) => value,
+      _ => panic!("direct empty effect list must remain authoritative"),
+    };
+    assert!(
+      cleared_effects.effects.is_empty(),
+      "direct shape effects override the referenced theme effect"
+    );
   }
 
   #[test]
@@ -24308,8 +25344,10 @@ mod tests {
       keep_with_next_set: true,
       keep_lines: true,
       keep_lines_set: true,
+      widow_control: Some(true),
       contextual_spacing: true,
       contextual_spacing_set: true,
+      suppress_line_numbers: Some(true),
       ..Default::default()
     };
 
@@ -24319,7 +25357,9 @@ mod tests {
         page_break_before_set: true,
         keep_with_next_set: true,
         keep_lines_set: true,
+        widow_control: Some(false),
         contextual_spacing_set: true,
+        suppress_line_numbers: Some(false),
         ..Default::default()
       },
     );
@@ -24327,7 +25367,36 @@ mod tests {
     assert!(!format.page_break_before);
     assert!(!format.keep_with_next);
     assert!(!format.keep_lines);
+    assert_eq!(format.widow_control, Some(false));
     assert!(!format.contextual_spacing);
+    assert_eq!(format.suppress_line_numbers, Some(false));
+  }
+
+  #[test]
+  fn line_number_suppression_preserves_explicit_enable_and_disable() {
+    let enabled = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:suppressLineNumbers/></w:pPr>"#,
+    )
+    .expect("enabled line-number suppression");
+    let disabled = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:suppressLineNumbers w:val="false"/></w:pPr>"#,
+    )
+    .expect("disabled line-number suppression");
+    let mut format = ParagraphFormat::default();
+
+    merge_paragraph_format(
+      &mut format,
+      Some(ParagraphProps::Direct(&enabled)),
+      ImportSettings::default(),
+    );
+    assert_eq!(format.suppress_line_numbers, Some(true));
+
+    merge_paragraph_format(
+      &mut format,
+      Some(ParagraphProps::Direct(&disabled)),
+      ImportSettings::default(),
+    );
+    assert_eq!(format.suppress_line_numbers, Some(false));
   }
 
   #[test]
@@ -24487,13 +25556,13 @@ mod tests {
   }
 
   #[test]
-  fn automatic_paragraph_after_spacing_preserves_explicit_enable_and_disable() {
+  fn automatic_paragraph_spacing_preserves_explicit_enable_and_disable() {
     let enabled = w::ParagraphProperties::from_bytes(
-      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:spacing w:after="160" w:afterAutospacing="on"/></w:pPr>"#,
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:spacing w:before="80" w:beforeAutospacing="on" w:after="160" w:afterAutospacing="on"/></w:pPr>"#,
     )
     .expect("paragraph properties");
     let disabled = w::ParagraphProperties::from_bytes(
-      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:spacing w:afterAutospacing="off"/></w:pPr>"#,
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:spacing w:beforeAutospacing="off" w:afterAutospacing="off"/></w:pPr>"#,
     )
     .expect("paragraph properties");
     let mut format = ParagraphFormat::default();
@@ -24504,8 +25573,19 @@ mod tests {
       ImportSettings::default(),
     );
 
+    assert_eq!(format.spacing_before_pt, 4.0);
+    assert_eq!(format.spacing_before_auto, Some(true));
+    assert_eq!(
+      format.spacing_before_auto_pt,
+      Some(OFFICE_AUTOMATIC_PARAGRAPH_SPACING_PT)
+    );
+    assert!(format.spacing_before_set);
     assert_eq!(format.spacing_after_pt, 8.0);
     assert_eq!(format.spacing_after_auto, Some(true));
+    assert_eq!(
+      format.spacing_after_auto_pt,
+      Some(OFFICE_AUTOMATIC_PARAGRAPH_SPACING_PT)
+    );
     assert!(format.spacing_after_set);
 
     merge_paragraph_format(
@@ -24514,8 +25594,30 @@ mod tests {
       ImportSettings::default(),
     );
 
+    assert_eq!(format.spacing_before_pt, 4.0);
+    assert_eq!(format.spacing_before_auto, Some(false));
+    assert_eq!(format.spacing_before_auto_pt, None);
     assert_eq!(format.spacing_after_pt, 8.0);
     assert_eq!(format.spacing_after_auto, Some(false));
+    assert_eq!(format.spacing_after_auto_pt, None);
+
+    merge_paragraph_format(
+      &mut format,
+      Some(ParagraphProps::Direct(&enabled)),
+      ImportSettings {
+        fixed_html_paragraph_auto_spacing: true,
+        ..Default::default()
+      },
+    );
+
+    assert_eq!(
+      format.spacing_before_auto_pt,
+      Some(OFFICE_FIXED_AUTOMATIC_PARAGRAPH_BEFORE_PT)
+    );
+    assert_eq!(
+      format.spacing_after_auto_pt,
+      Some(OFFICE_FIXED_AUTOMATIC_PARAGRAPH_AFTER_PT)
+    );
   }
 
   #[test]
@@ -24692,7 +25794,7 @@ mod tests {
       in_header_footer: false,
     };
 
-    let cell = table_cell_model(&cell, &mut context, None, None, style);
+    let cell = table_cell_model(&cell, None, &mut context, None, None, style);
 
     let Block::Paragraph(paragraph) = &cell.blocks[0] else {
       panic!("expected paragraph");
@@ -24775,6 +25877,143 @@ mod tests {
       panic!("expected dynamic field text");
     };
     assert_eq!(run.style.font_family.as_deref(), Some("Courier New"));
+  }
+
+  #[test]
+  fn date_field_refresh_is_typed_opt_in_and_respects_field_lock() {
+    fn import_field(field: &w::SimpleField, styles: &StylesCatalog) -> TextRun {
+      let images = ImageCatalog::default();
+      let hyperlinks = HyperlinkCatalog::default();
+      let custom_xml_bindings = CustomXmlBindings::default();
+      let mut form_widget_ids = FormWidgetIdAllocator::default();
+      let mut context = InlineImportContext {
+        styles,
+        images: &images,
+        hyperlinks: &hyperlinks,
+        custom_xml_bindings: &custom_xml_bindings,
+        form_widget_ids: &mut form_widget_ids,
+        suppress_toc_hyperlink_style: false,
+      };
+      let mut inlines = Vec::new();
+      push_simple_field(
+        field,
+        &mut inlines,
+        TextStyle {
+          language: Some(Arc::<str>::from("en-US")),
+          ..TextStyle::default()
+        },
+        &mut context,
+      );
+      let [InlineItem::Text(run)] = inlines.as_slice() else {
+        panic!("expected one date field result");
+      };
+      run.clone()
+    }
+
+    let unlocked = w::SimpleField::from_bytes(
+      br#"<w:fldSimple xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:instr=" DATE \* MERGEFORMAT "><w:r><w:t>2/15/2008</w:t></w:r></w:fldSimple>"#,
+    )
+    .expect("unlocked DATE field");
+    let locked = w::SimpleField::from_bytes(
+      br#"<w:fldSimple xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:instr=" DATE \* MERGEFORMAT " w:fldLock="true"><w:r><w:t>2/15/2008</w:t></w:r></w:fldSimple>"#,
+    )
+    .expect("locked DATE field");
+    let print_date = w::SimpleField::from_bytes(
+      br#"<w:fldSimple xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:instr=" PRINTDATE \* MERGEFORMAT "><w:r><w:t>1/23/4567 8:9:10 PM</w:t></w:r></w:fldSimple>"#,
+    )
+    .expect("unlocked PRINTDATE field");
+    let locked_print_date = w::SimpleField::from_bytes(
+      br#"<w:fldSimple xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:instr=" PRINTDATE \* MERGEFORMAT " w:fldLock="true"><w:r><w:t>1/23/4567 8:9:10 PM</w:t></w:r></w:fldSimple>"#,
+    )
+    .expect("locked PRINTDATE field");
+    let create_date = w::SimpleField::from_bytes(
+      br#"<w:fldSimple xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:instr=" CREATEDATE \* MERGEFORMAT "><w:r><w:t>7/7/2020 10:11:00 AM</w:t></w:r></w:fldSimple>"#,
+    )
+    .expect("CREATEDATE field");
+    let updating_styles = StylesCatalog {
+      import_settings: ImportSettings {
+        field_update_datetime: Some(FieldUpdateDateTime {
+          year: 2026,
+          month: 7,
+          day: 12,
+          hour: 15,
+          minute: 21,
+          second: 43,
+        }),
+        ..Default::default()
+      },
+      ..Default::default()
+    };
+
+    assert_eq!(import_field(&unlocked, &updating_styles).text, "7/12/2026");
+    assert_eq!(import_field(&locked, &updating_styles).text, "2/15/2008");
+    assert_eq!(
+      import_field(&print_date, &updating_styles).text,
+      "7/12/2026 3:21:00 PM"
+    );
+    assert_eq!(
+      import_field(&locked_print_date, &updating_styles).text,
+      "1/23/4567 8:9:10 PM"
+    );
+    assert_eq!(
+      import_field(&create_date, &updating_styles).text,
+      "7/7/2020 10:11:00 AM"
+    );
+    assert_eq!(
+      import_field(&unlocked, &StylesCatalog::default()).text,
+      "2/15/2008"
+    );
+  }
+
+  #[test]
+  fn current_date_formtext_refreshes_the_outer_result_once() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:r><w:fldChar w:fldCharType="begin"><w:ffData><w:textInput><w:type w:val="currentDate"/><w:format w:val="M/d/yyyy h:mm:ss am/pm"/></w:textInput></w:ffData></w:fldChar></w:r>
+        <w:r><w:instrText xml:space="preserve"> FORMTEXT </w:instrText></w:r>
+        <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+        <w:r><w:instrText xml:space="preserve"> TIME \@ "M/d/yyyy h:mm:ss am/pm" </w:instrText></w:r>
+        <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+        <w:r><w:instrText>10/23/2018 11:12:43 AM</w:instrText></w:r>
+        <w:r><w:fldChar w:fldCharType="end"/></w:r>
+        <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+        <w:r><w:t>10/22/2018 5:19:27 PM</w:t></w:r>
+        <w:r><w:fldChar w:fldCharType="end"/></w:r>
+      </w:p>"#,
+    )
+    .expect("nested current-date FORMTEXT");
+    let styles = StylesCatalog {
+      import_settings: ImportSettings {
+        field_update_datetime: Some(FieldUpdateDateTime {
+          year: 2026,
+          month: 7,
+          day: 12,
+          hour: 20,
+          minute: 19,
+          second: 54,
+        }),
+        ..Default::default()
+      },
+      ..Default::default()
+    };
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle {
+        language: Some(Arc::<str>::from("en-GB")),
+        ..TextStyle::default()
+      },
+      &styles,
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+
+    assert_eq!(
+      field_result_text(&inlines).as_deref(),
+      Some("7/12/2026 8:19:54 PM")
+    );
   }
 
   #[test]
@@ -25063,6 +26302,70 @@ mod tests {
   }
 
   #[test]
+  fn complex_page_mergeformat_preserves_cached_result_style() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> PAGE \* MERGEFORMAT </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>7</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+    )
+    .expect("PAGE field with MERGEFORMAT");
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+
+    let [InlineItem::Text(run)] = inlines.as_slice() else {
+      panic!("expected one dynamic PAGE result");
+    };
+    assert_eq!(run.text, "7");
+    assert!(run.style.bold);
+    assert_eq!(
+      run.dynamic_field,
+      Some(DynamicFieldKind::Page {
+        number_format: FieldNumberFormat::PageStyle,
+      })
+    );
+    assert!(field_uses_merge_format(r" PAGE \* mergeformat "));
+    assert!(!field_uses_merge_format(" PAGE "));
+  }
+
+  #[test]
+  fn positional_tab_retains_its_absolute_positioning_contract() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>left</w:t><w:ptab w:alignment="right" w:relativeTo="margin" w:leader="dot"/><w:t>right</w:t></w:r></w:p>"#,
+    )
+    .expect("paragraph with positional tab");
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+
+    let [
+      InlineItem::Text(left),
+      InlineItem::PositionalTab(tab),
+      InlineItem::Text(right),
+    ] = inlines.as_slice()
+    else {
+      panic!("expected text, positional tab, text");
+    };
+    assert_eq!(left.text, "left");
+    assert_eq!(right.text, "right");
+    assert_eq!(tab.alignment, TabStopAlignment::Right);
+    assert_eq!(tab.relative_to, PositionalTabBase::Margin);
+    assert_eq!(tab.leader, TabLeader::Dot);
+  }
+
+  #[test]
   fn closed_field_without_instruction_drops_result_but_unclosed_field_keeps_it() {
     fn imported_text(xml: &[u8]) -> String {
       let paragraph = w::Paragraph::from_bytes(xml).expect("complex field paragraph");
@@ -25213,6 +26516,100 @@ mod tests {
         expected
       );
     }
+  }
+
+  #[test]
+  fn showing_placeholder_uses_common_boolean_semantics() {
+    for (attribute, expected) in [
+      ("", true),
+      (r#" w:val="1""#, true),
+      (r#" w:val="true""#, true),
+      (r#" w:val="on""#, true),
+      (r#" w:val="0""#, false),
+      (r#" w:val="false""#, false),
+      (r#" w:val="off""#, false),
+    ] {
+      let properties = w::SdtProperties::from_bytes(
+        format!(
+          r#"<w:sdtPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:showingPlcHdr{attribute}/></w:sdtPr>"#
+        )
+        .as_bytes(),
+      )
+      .expect("placeholder content control properties");
+
+      assert_eq!(
+        sdt_showing_placeholder(&properties),
+        expected,
+        "{attribute}"
+      );
+      assert_eq!(
+        sdt_form_widget(&properties).is_some(),
+        expected,
+        "{attribute}"
+      );
+    }
+
+    assert!(!sdt_showing_placeholder(&w::SdtProperties::default()));
+  }
+
+  #[test]
+  fn empty_bound_value_keeps_cached_text_only_for_a_showing_placeholder() {
+    for (attribute, expected) in [
+      ("", None),
+      (r#" w:val="true""#, None),
+      (r#" w:val="false""#, Some("")),
+    ] {
+      let properties = w::SdtProperties::from_bytes(
+        format!(
+          r#"<w:sdtPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:showingPlcHdr{attribute}/><w:text/></w:sdtPr>"#
+        )
+        .as_bytes(),
+      )
+      .expect("bound placeholder content control properties");
+
+      assert_eq!(
+        sdt_bound_replacement_text(&properties, String::new()).as_deref(),
+        expected,
+        "{attribute}"
+      );
+    }
+
+    assert_eq!(
+      sdt_bound_replacement_text(&w::SdtProperties::default(), String::new()).as_deref(),
+      Some("")
+    );
+  }
+
+  #[test]
+  fn empty_data_binding_uses_its_named_simple_glossary_placeholder() {
+    const CORE_PROPERTIES_ID: &str = "{6C3C8BC8-F283-45AE-878A-BAB7291924A1}";
+    let properties = w::SdtProperties::from_bytes(
+      format!(
+        r#"<w:sdtPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:placeholder><w:docPart w:val="TitlePlaceholder"/></w:placeholder><w:dataBinding w:xpath="/cp:coreProperties[1]/dc:title[1]" w:storeItemID="{CORE_PROPERTIES_ID}"/><w:text/></w:sdtPr>"#
+      )
+      .as_bytes(),
+    )
+    .expect("data-bound content control with a named placeholder");
+    let placeholder = w::DocPartBody::from_bytes(
+      br#"<w:docPartBody xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>[Type the document title]</w:t></w:r></w:p></w:docPartBody>"#,
+    )
+    .expect("simple glossary placeholder");
+    let bindings = CustomXmlBindings::from_test_xml(
+      Some(CORE_PROPERTIES_ID),
+      r#"<cp:coreProperties xmlns:cp="urn:core" xmlns:dc="urn:dc"><dc:title/></cp:coreProperties>"#,
+    )
+    .with_test_placeholder("TitlePlaceholder", placeholder);
+
+    assert_eq!(
+      sdt_bound_replacement(&bindings, &properties).as_deref(),
+      Some("[Type the document title]")
+    );
+
+    let showing_only = w::SdtProperties::from_bytes(
+      br#"<w:sdtPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:placeholder><w:docPart w:val="TitlePlaceholder"/></w:placeholder><w:showingPlcHdr/><w:text/></w:sdtPr>"#,
+    )
+    .expect("showing-placeholder content control without a data binding");
+    assert_eq!(sdt_bound_replacement(&bindings, &showing_only), None);
   }
 
   #[test]
@@ -25452,6 +26849,7 @@ mod tests {
       .find_map(|item| match item {
         InlineItem::Image(image) => Some(image),
         InlineItem::Text(_)
+        | InlineItem::PositionalTab(_)
         | InlineItem::Ruby(_)
         | InlineItem::Shape(_)
         | InlineItem::BookmarkStart(_)
@@ -26098,6 +27496,43 @@ mod tests {
   }
 
   #[test]
+  fn character_style_superscript_resolves_after_the_effective_base_size() {
+    let mut cached_style = TextStyle {
+      // Style loading initially sees the document-default 11pt base.
+      font_size_pt: 11.0 * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE,
+      baseline_shift_pt: 11.0 * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE,
+      ..Default::default()
+    };
+    let overrides = RunStyleOverrides {
+      vertical_alignment: Some(w::VerticalPositionValues::Superscript),
+      ..Default::default()
+    };
+    normalize_relative_run_style(&mut cached_style, overrides);
+
+    let mut catalog = StylesCatalog::default();
+    catalog.styles.insert(
+      "FootnoteReference".into(),
+      StyleEntry {
+        style_type: Some(w::StyleValues::Character),
+        run_style: cached_style,
+        run_overrides: overrides,
+        ..Default::default()
+      },
+    );
+
+    let style = catalog.character_run_style(
+      Some("FootnoteReference"),
+      TextStyle {
+        font_size_pt: 10.0,
+        ..Default::default()
+      },
+    );
+
+    assert_eq!(style.font_size_pt, 6.5);
+    assert!((style.baseline_shift_pt - 3.3).abs() < 0.001);
+  }
+
+  #[test]
   fn direct_run_preserves_complex_script_formatting_state() {
     let properties = w::RunProperties::from_bytes(
       br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rFonts w:ascii="Latin Face" w:cs="Complex Face"/><w:b/><w:bCs w:val="0"/><w:i w:val="0"/><w:iCs/><w:sz w:val="20"/><w:szCs w:val="40"/><w:cs/><w:rtl/></w:rPr>"#,
@@ -26723,6 +28158,7 @@ mod tests {
     for item in inlines {
       match item {
         InlineItem::Text(run) => text.push_str(&run.text),
+        InlineItem::PositionalTab(_) => text.push('\t'),
         InlineItem::Ruby(ruby) => {
           for run in &ruby.base {
             text.push_str(&run.text);
@@ -26779,7 +28215,11 @@ mod tests {
         _ => None,
       })
       .expect("table row");
-    let cell = table_row_cells(row).into_iter().next().expect("table cell");
+    let cell = table_row_cells(row)
+      .into_iter()
+      .next()
+      .expect("table cell")
+      .cell;
 
     assert_eq!(
       cell

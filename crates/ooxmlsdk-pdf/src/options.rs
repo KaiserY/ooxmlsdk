@@ -18,6 +18,11 @@ pub struct PdfOptions {
   /// BCP 47 user-interface language for generated document labels.
   pub ui_language: Option<String>,
 
+  /// Local civil time used to refresh unlocked WordprocessingML DATE, TIME,
+  /// PRINTDATE, and SAVEDATE fields. When absent, persisted field results
+  /// remain authoritative.
+  pub field_update_datetime: Option<ooxmlsdk_layout::options::FieldUpdateDateTime>,
+
   pub general: PdfGeneralOptions,
   pub images: PdfImageOptions,
   pub links: PdfLinkOptions,
@@ -38,6 +43,7 @@ impl Default for PdfOptions {
       jpeg_quality: None,
       source_file_name: None,
       ui_language: None,
+      field_update_datetime: None,
       general: PdfGeneralOptions::default(),
       images: PdfImageOptions::default(),
       links: PdfLinkOptions::default(),
@@ -96,6 +102,7 @@ impl PdfOptions {
     ooxmlsdk_layout::options::LayoutOptions {
       source_file_name: self.source_file_name.clone(),
       ui_language: self.ui_language.clone(),
+      field_update_datetime: self.field_update_datetime,
       ..Default::default()
     }
   }

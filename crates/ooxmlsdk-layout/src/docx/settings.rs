@@ -147,6 +147,59 @@ pub(super) fn adjust_line_height_in_table(
     .unwrap_or(false)
 }
 
+pub(super) fn do_not_use_html_paragraph_auto_spacing(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| {
+      settings
+        .compatibility
+        .iter()
+        .find_map(|compat| compat.do_not_use_html_paragraph_auto_spacing.as_ref())
+        .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
+    })
+    .unwrap_or(false)
+}
+
+pub(super) fn do_not_break_wrapped_tables(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .is_some_and(|settings| do_not_break_wrapped_tables_value(&settings))
+}
+
+pub(super) fn do_not_expand_shift_return(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .is_some_and(|settings| do_not_expand_shift_return_value(&settings))
+}
+
+fn do_not_break_wrapped_tables_value(settings: &w::Settings) -> bool {
+  settings
+    .compatibility
+    .iter()
+    .find_map(|compatibility| compatibility.do_not_break_wrapped_tables.as_ref())
+    .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
+}
+
+fn do_not_expand_shift_return_value(settings: &w::Settings) -> bool {
+  settings
+    .compatibility
+    .iter()
+    .find_map(|compatibility| compatibility.do_not_expand_shift_return.as_ref())
+    .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
+}
+
 pub(super) fn split_page_break_and_paragraph_mark(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
@@ -196,7 +249,8 @@ pub(super) fn default_tab_stop_pt(
 mod tests {
   use super::{
     MICROSOFT_WORD_COMPATIBILITY_URI, PageBottomHyphenation, compatibility_setting_value,
-    page_bottom_hyphenation, parse_compatibility_on_off, w,
+    do_not_break_wrapped_tables_value, do_not_expand_shift_return_value, page_bottom_hyphenation,
+    parse_compatibility_on_off, w,
   };
 
   #[test]
@@ -256,5 +310,45 @@ mod tests {
     };
 
     assert_eq!(compatibility_setting_value(&settings, name), Some(false));
+  }
+
+  #[test]
+  fn do_not_break_wrapped_tables_honors_on_off_and_omission() {
+    let settings = |value: Option<Option<ooxmlsdk::simple_type::OnOffValue>>| w::Settings {
+      compatibility: vec![w::Compatibility {
+        do_not_break_wrapped_tables: value.map(|val| w::DoNotBreakWrappedTables { val }),
+        ..w::Compatibility::default()
+      }],
+      ..w::Settings::default()
+    };
+
+    assert!(do_not_break_wrapped_tables_value(&settings(Some(None))));
+    assert!(do_not_break_wrapped_tables_value(&settings(Some(Some(
+      ooxmlsdk::simple_type::OnOffValue::True,
+    )))));
+    assert!(!do_not_break_wrapped_tables_value(&settings(Some(Some(
+      ooxmlsdk::simple_type::OnOffValue::False,
+    )))));
+    assert!(!do_not_break_wrapped_tables_value(&settings(None)));
+  }
+
+  #[test]
+  fn do_not_expand_shift_return_honors_on_off_and_omission() {
+    let settings = |value: Option<Option<ooxmlsdk::simple_type::OnOffValue>>| w::Settings {
+      compatibility: vec![w::Compatibility {
+        do_not_expand_shift_return: value.map(|val| w::DoNotExpandShiftReturn { val }),
+        ..w::Compatibility::default()
+      }],
+      ..w::Settings::default()
+    };
+
+    assert!(do_not_expand_shift_return_value(&settings(Some(None))));
+    assert!(do_not_expand_shift_return_value(&settings(Some(Some(
+      ooxmlsdk::simple_type::OnOffValue::True,
+    )))));
+    assert!(!do_not_expand_shift_return_value(&settings(Some(Some(
+      ooxmlsdk::simple_type::OnOffValue::False,
+    )))));
+    assert!(!do_not_expand_shift_return_value(&settings(None)));
   }
 }

@@ -5,8 +5,8 @@ use std::time::Instant;
 
 use ooxmlsdk_fonts::{
   FeatureValue, FontBytes, FontFallbackChain, FontFamilyClass, FontId, FontRegistry, FontRequest,
-  FontSize, ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun, TextScript,
-  script_direction_runs_with_options,
+  FontSize, ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun, TextDirection,
+  TextScript, script_direction_runs_with_options,
 };
 use rustc_hash::FxHashMap as HashMap;
 
@@ -96,6 +96,9 @@ pub trait FontStyleRef {
   }
   fn right_to_left(&self) -> bool {
     false
+  }
+  fn resolved_bidi_level(&self) -> Option<u8> {
+    None
   }
   fn complex_bold(&self) -> Option<bool> {
     None
@@ -213,6 +216,10 @@ impl FontStyleRef for TextStyle {
     self.right_to_left == Some(true)
   }
 
+  fn resolved_bidi_level(&self) -> Option<u8> {
+    self.resolved_bidi_level
+  }
+
   fn complex_bold(&self) -> Option<bool> {
     self.complex_bold
   }
@@ -301,6 +308,10 @@ impl FontStyleRef for common::TextStyle<'_> {
 
   fn right_to_left(&self) -> bool {
     self.right_to_left == Some(true)
+  }
+
+  fn resolved_bidi_level(&self) -> Option<u8> {
+    self.resolved_bidi_level
   }
 
   fn complex_bold(&self) -> Option<bool> {
@@ -627,10 +638,20 @@ impl FontResolver {
       request.size_pt =
         FontSize(effective_font_size_pt(style, Some(script_run.script)) * small_caps_scale);
       request.script = Some(script_run.script);
-      // w:rtl selects the complex-script run properties, but it must not
-      // reverse a strong LTR Unicode run. Keep the direction discovered from
-      // the text itself; paragraph-level bidi layout owns visual run order.
-      let mut options = ShapeOptions::from_request(&request, script_run.direction);
+      // w:rtl selects complex-script run properties, while ECMA-376 Part 1
+      // Annex I.7 delegates visual order and mirroring to the resolved Unicode
+      // bidi levels. Keep those inputs separate: an automatic odd level must
+      // mirror neutral glyphs without switching to szCs/bCs/iCs/rFonts@cs.
+      let direction = style
+        .resolved_bidi_level()
+        .map_or(script_run.direction, |level| {
+          if level % 2 == 0 {
+            TextDirection::LeftToRight
+          } else {
+            TextDirection::RightToLeft
+          }
+        });
+      let mut options = ShapeOptions::from_request(&request, direction);
       options.character_spacing_pt = style.character_spacing_pt();
       options.horizontal_scale = style.horizontal_scale();
       options.small_caps = script_run.small_caps;
@@ -1002,7 +1023,9 @@ mod tests {
     FontSize, ScriptScanOptions, TextDirection, TextScript, script_direction_runs_with_options,
   };
 
-  use super::{effective_font_size_pt, font_request, load_text_face, script_font_family};
+  use super::{
+    effective_font_size_pt, font_request, load_text_face, script_font_family, shape_text_runs,
+  };
 
   #[test]
   fn kerning_feature_follows_the_wordprocessingml_size_threshold() {
@@ -1134,6 +1157,33 @@ mod tests {
     );
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].direction, TextDirection::LeftToRight);
+  }
+
+  #[test]
+  fn resolved_bidi_level_mirrors_glyphs_without_selecting_complex_formatting() {
+    let rtl_style = TextStyle {
+      font_size_pt: 10.0,
+      complex_font_size_pt: Some(20.0),
+      resolved_bidi_level: Some(1),
+      ..Default::default()
+    };
+    assert_eq!(
+      effective_font_size_pt(&rtl_style, Some(TextScript::Common)),
+      10.0
+    );
+    let rtl = shape_text_runs("(", &rtl_style).expect("RTL opening parenthesis");
+    assert_eq!(rtl.len(), 1);
+    assert_eq!(rtl[0].direction, TextDirection::RightToLeft);
+    assert_eq!(rtl[0].glyphs[0].source_char, Some('('));
+
+    let ltr_style = TextStyle {
+      resolved_bidi_level: Some(0),
+      ..rtl_style
+    };
+    let ltr = shape_text_runs(")", &ltr_style).expect("LTR closing parenthesis");
+    assert_eq!(ltr.len(), 1);
+    assert_eq!(ltr[0].direction, TextDirection::LeftToRight);
+    assert_eq!(rtl[0].glyphs[0].glyph_id, ltr[0].glyphs[0].glyph_id);
   }
 
   #[test]

@@ -613,6 +613,8 @@ struct TextStyle<'doc> {
   horizontal_scale: Option<f32>,
   character_spacing_pt: f32,
   baseline_shift_pt: f32,
+  automatic_escapement_font_size_pt: Option<f32>,
+  automatic_escapement_complex_font_size_pt: Option<f32>,
   line_vertical_alignment: common::LineVerticalAlignment,
   use_windows_font_metrics: bool,
   wordprocessingml_font_slots: bool,
@@ -700,6 +702,12 @@ impl FontStyleRef for TextStyle<'_> {
 
   fn baseline_shift_pt(&self) -> f32 {
     self.baseline_shift_pt
+  }
+
+  fn automatic_escapement_font_sizes_pt(&self) -> Option<(f32, Option<f32>)> {
+    self
+      .automatic_escapement_font_size_pt
+      .map(|size| (size, self.automatic_escapement_complex_font_size_pt))
   }
 
   fn bold(&self) -> bool {
@@ -1567,7 +1575,7 @@ impl<'doc> PaintDocument<'doc> {
       .iter()
       .enumerate()
       .map(|(page_index, page)| {
-        let source_line_owners = paint_line_owners(document, page_index, page.items.len());
+        let source_line_owners = paint_line_owners(document, page_index, &page.items);
         let page_items = page
           .items
           .iter()
@@ -2172,6 +2180,10 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     horizontal_scale: style.horizontal_scale,
     character_spacing_pt: style.character_spacing.0,
     baseline_shift_pt: style.baseline_shift.0,
+    automatic_escapement_font_size_pt: style.automatic_escapement_font_size.map(|size| size.0),
+    automatic_escapement_complex_font_size_pt: style
+      .automatic_escapement_complex_font_size
+      .map(|size| size.0),
     line_vertical_alignment: style.line_vertical_alignment,
     use_windows_font_metrics: style.use_windows_font_metrics,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
@@ -2940,8 +2952,9 @@ fn same_paint_line_owner(left: Option<PaintLineOwner>, right: Option<PaintLineOw
 fn paint_line_owners(
   document: &common::LayoutDocument<'static>,
   page_index: usize,
-  item_count: usize,
+  items: &[common::DisplayItem<'static>],
 ) -> Vec<Option<PaintLineOwner>> {
+  let item_count = items.len();
   let mut owners = vec![None; item_count];
   for (frame_index, frame) in document
     .frames
@@ -2958,21 +2971,56 @@ fn paint_line_owners(
       // into the paragraph margin; SwTextPainter only installs a line clip
       // for an undersized/clipping frame. Table cells are the exception: the
       // cell fragment owns a real print rectangle and clips its inline text.
-      let clip_bounds = (frame_kind == FollowFrameKind::Table).then(|| {
-        frame
-          .fragments
-          .iter()
-          .filter(|fragment| fragment.kind == common::FrameFragmentKind::TableCell)
-          .filter(|fragment| {
-            fragment.item_range.start < line.item_range.end
-              && line.item_range.start < fragment.item_range.end
-          })
-          .min_by_key(|fragment| fragment.item_range.end - fragment.item_range.start)
-          .and_then(|fragment| fragment.bounds)
-          .unwrap_or(line.bounds)
-      });
-      for owner in owners.iter_mut().take(end).skip(start) {
+      for (item_index, owner) in owners.iter_mut().enumerate().take(end).skip(start) {
         if owner.is_none() {
+          let clip_bounds = (frame_kind == FollowFrameKind::Table).then(|| {
+            // One physical baseline can contain text from several adjacent
+            // cells, and a nested table can add another cell hierarchy at
+            // that same baseline. Select the narrowest fragment which owns
+            // this item, rather than one fragment for the complete line;
+            // otherwise the chosen cell clips every sibling's text while
+            // leaving it only in the semantic PDF layer.
+            let item_origin = match &items[item_index] {
+              common::DisplayItem::Text(text) => Some((text.origin.x.0, text.origin.y.0)),
+              common::DisplayItem::Glyphs(glyphs) => Some((glyphs.origin.x.0, glyphs.origin.y.0)),
+              _ => None,
+            };
+            frame
+              .fragments
+              .iter()
+              .filter(|fragment| fragment.kind == common::FrameFragmentKind::TableCell)
+              .filter(|fragment| {
+                if let Some((x_pt, y_pt)) = item_origin {
+                  // Nested table fragments are folded into their outer table
+                  // frame, so a same-baseline item can outlive an imprecise
+                  // flattened item range. Its page-space origin remains an
+                  // unambiguous owner: prefer the smallest cell containing
+                  // that origin.
+                  fragment.bounds.is_some_and(|bounds| {
+                    x_pt + f32::EPSILON >= bounds.origin.x.0
+                      && x_pt <= bounds.origin.x.0 + bounds.size.width.0 + f32::EPSILON
+                      && y_pt + f32::EPSILON >= bounds.origin.y.0
+                      && y_pt <= bounds.origin.y.0 + bounds.size.height.0 + f32::EPSILON
+                  })
+                } else {
+                  fragment.item_range.start <= item_index && item_index < fragment.item_range.end
+                }
+              })
+              .min_by(|left, right| {
+                let left_range = left.item_range.end - left.item_range.start;
+                let right_range = right.item_range.end - right.item_range.start;
+                left_range.cmp(&right_range).then_with(|| {
+                  let area = |fragment: &common::FrameFragment| {
+                    fragment.bounds.map_or(f32::INFINITY, |bounds| {
+                      bounds.size.width.0 * bounds.size.height.0
+                    })
+                  };
+                  area(left).total_cmp(&area(right))
+                })
+              })
+              .and_then(|fragment| fragment.bounds)
+              .unwrap_or(line.bounds)
+          });
           *owner = Some(PaintLineOwner {
             frame_index,
             line_index,
@@ -5692,11 +5740,21 @@ fn drawingml_pattern_paint(
 
   Pattern {
     stream: stream_builder.finish(),
-    transform: Transform::from_translate(origin_x, origin_y),
+    // Office keeps the preset hatch brush in page/world coordinates. Snap to
+    // an equivalent global tile boundary near the path so separate shapes do
+    // not restart the 8x8 mask at their own top-left corners.
+    transform: Transform::from_translate(
+      drawingml_pattern_origin(origin_x),
+      drawingml_pattern_origin(origin_y),
+    ),
     width: DRAWINGML_PATTERN_TILE_PT,
     height: DRAWINGML_PATTERN_TILE_PT,
   }
   .into()
+}
+
+fn drawingml_pattern_origin(value: f32) -> f32 {
+  (value / DRAWINGML_PATTERN_TILE_PT).floor() * DRAWINGML_PATTERN_TILE_PT
 }
 
 fn pattern_color_fill(color: common::Color) -> Fill {
@@ -6271,13 +6329,18 @@ fn is_svg_image(image: &ImageItem<'_>) -> bool {
 
 fn draw_svg_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, tree: &usvg::Tree) {
   draw_transformed_image_content(surface, image, |surface, size| {
+    let embeds_text = image.content_type.as_deref().is_some_and(|content_type| {
+      content_type.eq_ignore_ascii_case("application/vnd.ooxmlsdk.office-math+xml")
+    });
     surface.draw_svg(
       tree,
       size,
       SvgSettings {
         // An OOXML picture is one semantic image. Keeping SVG text as paths
-        // avoids leaking decorative image text into PDF text extraction.
-        embed_text: false,
+        // avoids leaking decorative image text into PDF text extraction. The
+        // internal Office Math surface is document content, so retain its
+        // searchable text while preserving two-dimensional placement.
+        embed_text: embeds_text,
         ..SvgSettings::default()
       },
     );

@@ -1081,7 +1081,10 @@ fn draw_fill(
           SpreadMode::Repeat,
           FilterQuality::Nearest,
           1.0,
-          SkTransform::from_translate(bounds.origin.x.0, bounds.origin.y.0),
+          SkTransform::from_translate(
+            drawingml_pattern_origin(bounds.origin.x.0),
+            drawingml_pattern_origin(bounds.origin.y.0),
+          ),
         ),
         ..Paint::default()
       };
@@ -1231,7 +1234,10 @@ fn draw_stroke(
         SpreadMode::Repeat,
         FilterQuality::Nearest,
         1.0,
-        SkTransform::from_translate(bounds.origin.x.0, bounds.origin.y.0),
+        SkTransform::from_translate(
+          drawingml_pattern_origin(bounds.origin.x.0),
+          drawingml_pattern_origin(bounds.origin.y.0),
+        ),
       ),
       ..Paint::default()
     };
@@ -1339,6 +1345,10 @@ fn pattern_tile(pattern: PatternFill, pixels_per_point: f32) -> Option<Pixmap> {
     }
   }
   Some(pixmap)
+}
+
+fn drawingml_pattern_origin(value: f32) -> f32 {
+  (value / DRAWINGML_PATTERN_TILE_PT).floor() * DRAWINGML_PATTERN_TILE_PT
 }
 
 #[cfg(test)]

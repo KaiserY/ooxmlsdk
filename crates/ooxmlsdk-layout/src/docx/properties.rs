@@ -229,14 +229,20 @@ pub(super) fn merge_run_style(
   }
   if let Some(font_size) = properties.font_size() {
     let size = font_size.val;
-    style.font_size_pt = (size.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
+    set_font_size_preserving_automatic_escapement(
+      style,
+      (size.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT),
+    );
   }
   if let Some(font_size) = properties.complex_script_font_size() {
     let size = font_size.val;
     // imports w:szCs as CharHeightComplex. Keep it separate from Western
     // CharHeight so Latin shaping width remains source-backed, while layout
     // line height can still see the complex-script font height.
-    style.complex_font_size_pt = Some((size.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+    set_complex_font_size_preserving_automatic_escapement(
+      style,
+      (size.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT),
+    );
   }
   if let Some(color) = properties.color() {
     if color
@@ -500,27 +506,89 @@ pub(super) fn apply_vertical_text_alignment(
 ) {
   match vertical_alignment {
     w::VerticalPositionValues::Superscript => {
-      style.baseline_shift_pt =
-        crate::fonts::effective_font_size_pt(style, None) * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
-      style.font_size_pt = (style.font_size_pt * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
-        .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
-      style.complex_font_size_pt = style
-        .complex_font_size_pt
-        .map(|size| (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+      apply_automatic_escapement(style, LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE);
     }
     w::VerticalPositionValues::Subscript => {
-      style.baseline_shift_pt =
-        crate::fonts::effective_font_size_pt(style, None) * LO_SUBSCRIPT_BASELINE_SHIFT_SCALE;
-      style.font_size_pt = (style.font_size_pt * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
-        .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
-      style.complex_font_size_pt = style
-        .complex_font_size_pt
-        .map(|size| (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+      apply_automatic_escapement(style, LO_SUBSCRIPT_BASELINE_SHIFT_SCALE);
     }
     w::VerticalPositionValues::Baseline => {
       style.baseline_shift_pt = 0.0;
+      style.automatic_escapement_font_size_pt = None;
+      style.automatic_escapement_complex_font_size_pt = None;
     }
   }
+}
+
+fn apply_automatic_escapement(style: &mut TextStyle, baseline_shift_scale: f32) {
+  // LibreOffice's SwSubFont stores the unscaled height/ascent separately:
+  // automatic escapement reduces the glyph, but CalcEscHeight returns the
+  // original height for line formatting. Reapplying an inherited
+  // w:vertAlign must likewise start from that original size, not shrink it a
+  // second time.
+  let original_font_size = style
+    .automatic_escapement_font_size_pt
+    .unwrap_or(style.font_size_pt);
+  let original_complex_font_size = if style.automatic_escapement_font_size_pt.is_some() {
+    style.automatic_escapement_complex_font_size_pt
+  } else {
+    style.complex_font_size_pt
+  };
+  let effective_original_size =
+    if style.complex_script == Some(true) || style.right_to_left == Some(true) {
+      original_complex_font_size.unwrap_or(original_font_size)
+    } else {
+      original_font_size
+    };
+
+  style.automatic_escapement_font_size_pt = Some(original_font_size);
+  style.automatic_escapement_complex_font_size_pt = original_complex_font_size;
+  style.baseline_shift_pt = effective_original_size * baseline_shift_scale;
+  style.font_size_pt =
+    (original_font_size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
+  style.complex_font_size_pt = original_complex_font_size
+    .map(|size| (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+}
+
+pub(super) fn set_font_size_preserving_automatic_escapement(
+  style: &mut TextStyle,
+  font_size_pt: f32,
+) {
+  if style.automatic_escapement_font_size_pt.is_none() {
+    style.font_size_pt = font_size_pt;
+    return;
+  }
+  style.automatic_escapement_font_size_pt = Some(font_size_pt);
+  reapply_automatic_escapement(style);
+}
+
+pub(super) fn set_complex_font_size_preserving_automatic_escapement(
+  style: &mut TextStyle,
+  font_size_pt: f32,
+) {
+  if style.automatic_escapement_font_size_pt.is_none() {
+    style.complex_font_size_pt = Some(font_size_pt);
+    return;
+  }
+  style.automatic_escapement_complex_font_size_pt = Some(font_size_pt);
+  reapply_automatic_escapement(style);
+}
+
+fn reapply_automatic_escapement(style: &mut TextStyle) {
+  let shift_scale = if style.baseline_shift_pt < 0.0 {
+    LO_SUBSCRIPT_BASELINE_SHIFT_SCALE
+  } else {
+    LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE
+  };
+  // Restore the unscaled values before calling the common transform; this
+  // covers a direct w:sz/w:szCs override layered on an inherited character-
+  // style w:vertAlign (tdf82173_endnoteStyle).
+  style.font_size_pt = style
+    .automatic_escapement_font_size_pt
+    .unwrap_or(style.font_size_pt);
+  style.complex_font_size_pt = style.automatic_escapement_complex_font_size_pt;
+  style.automatic_escapement_font_size_pt = None;
+  style.automatic_escapement_complex_font_size_pt = None;
+  apply_automatic_escapement(style, shift_scale);
 }
 
 pub(super) fn merge_doc_default_run_style(

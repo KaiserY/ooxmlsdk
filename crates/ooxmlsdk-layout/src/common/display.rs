@@ -508,6 +508,11 @@ pub struct TextStyle<'doc> {
   pub horizontal_scale: Option<f32>,
   pub character_spacing: Pt,
   pub baseline_shift: Pt,
+  /// Original font size used by an automatic WordprocessingML
+  /// superscript/subscript line box while the painted glyph stays reduced.
+  pub automatic_escapement_font_size: Option<Pt>,
+  /// Complex-script counterpart of `automatic_escapement_font_size`.
+  pub automatic_escapement_complex_font_size: Option<Pt>,
   pub line_vertical_alignment: LineVerticalAlignment,
   /// Retain searchable/taggable text without painting visible glyphs.
   pub semantic_only: bool,

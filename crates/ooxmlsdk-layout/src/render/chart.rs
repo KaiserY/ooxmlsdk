@@ -119,6 +119,15 @@ pub enum ChartSeriesGrouping {
   PercentStacked,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ChartLayoutMode {
+  /// Offset or size relative to the element's automatic rectangle.
+  #[default]
+  Factor,
+  /// Coordinate or far edge relative to the complete chart frame.
+  Edge,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ChartManualLayout {
   /// `c:layoutTarget="inner"` positions the rectangle bounded by the axes;
@@ -128,6 +137,10 @@ pub struct ChartManualLayout {
   pub y: Option<f32>,
   pub width: Option<f32>,
   pub height: Option<f32>,
+  pub x_mode: ChartLayoutMode,
+  pub y_mode: ChartLayoutMode,
+  pub width_mode: ChartLayoutMode,
+  pub height_mode: ChartLayoutMode,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1592,6 +1605,10 @@ fn visible_series_legend_indices(legend: Option<&c::Legend>, count: usize) -> Ve
 
 fn chart_layout(layout: Option<&c::Layout>) -> Option<ChartManualLayout> {
   let manual = layout?.manual_layout.as_deref()?;
+  let mode = |value: Option<c::LayoutModeValues>| match value {
+    Some(c::LayoutModeValues::Edge) => ChartLayoutMode::Edge,
+    Some(c::LayoutModeValues::Factor) | None => ChartLayoutMode::Factor,
+  };
   Some(ChartManualLayout {
     targets_inner_plot: manual.layout_target.as_ref().and_then(|target| target.val)
       == Some(c::LayoutTargetValues::Inner),
@@ -1599,6 +1616,10 @@ fn chart_layout(layout: Option<&c::Layout>) -> Option<ChartManualLayout> {
     y: manual.top.as_ref().map(|value| value.val as f32),
     width: manual.width.as_ref().map(|value| value.val as f32),
     height: manual.height.as_ref().map(|value| value.val as f32),
+    x_mode: mode(manual.left_mode.as_ref().and_then(|value| value.val)),
+    y_mode: mode(manual.top_mode.as_ref().and_then(|value| value.val)),
+    width_mode: mode(manual.width_mode.as_ref().and_then(|value| value.val)),
+    height_mode: mode(manual.height_mode.as_ref().and_then(|value| value.val)),
   })
 }
 

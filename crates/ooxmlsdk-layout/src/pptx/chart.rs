@@ -99,11 +99,9 @@ fn maximum_auto_main_increment_count(
   match profile {
     ChartLayoutProfile::Word => {
       if is_3d {
-        // VCartesianAxis::estimateMaximumAutoMainIncrementCount() keeps the
-        // default budget of ten while no label shape extent has been recorded.
-        // Word's legacy 3-D chart layout resolves the scale at that stage:
-        // the projected axis length must not be divided by an invented
-        // axis-aligned label box (chart.docx, 3d-bar-label.docx).
+        // Word resolves ordinary 3-D value axes before projected label
+        // extents are stable. Keep the unmeasured ten-increment ceiling;
+        // family-specific scale rules can still lower it below.
         return 10;
       }
       let label_extent = label_font_size_pt.max(1.0) * if has_bubble_series { 3.0 } else { 1.2 };
@@ -1283,17 +1281,24 @@ pub(crate) fn lower_clustered_column_chart(
         )
       },
     );
-  let available_value_axis_length = projection_3d.map_or(plot_height, |projection| {
-    projection.vertical_axis_length(
-      PlotRect {
-        left: plot_left,
-        top: plot_top,
-        width: plot_width,
-        height: plot_height,
-      },
-      primary_value_axis_on_right,
-    )
-  });
+  let available_value_axis_length = if radar_only {
+    // A radar value axis runs from the center to the outer polygon. Its label
+    // budget is therefore the radius, not the full plot height used by a
+    // cartesian value axis.
+    plot_width.min(plot_height) * 0.46
+  } else {
+    projection_3d.map_or(plot_height, |projection| {
+      projection.vertical_axis_length(
+        PlotRect {
+          left: plot_left,
+          top: plot_top,
+          width: plot_width,
+          height: plot_height,
+        },
+        primary_value_axis_on_right,
+      )
+    })
+  };
   let maximum_auto_increment_count = maximum_auto_main_increment_count(
     style.layout_profile,
     available_value_axis_length,
@@ -3965,6 +3970,15 @@ fn cartesian_axis_scales(
           == Some(c::OrientationValues::MaxMin),
       })
     } else {
+      let maximum_auto_increment_count = if chart.series.iter().any(|series| {
+        series.axis_set_index == axis_set_index
+          && series.kind == ChartSeriesKind::Area
+          && series.grouping == ChartSeriesGrouping::Stacked
+      }) {
+        maximum_auto_increment_count.min(5)
+      } else {
+        maximum_auto_increment_count
+      };
       linear_axis_scale_with_options(
         bubble_padded_axis_values(
           cartesian_scale_values(chart, category_count, axis_set_index),
@@ -7046,6 +7060,38 @@ fn lower_radar_axes(
       }));
     }
   }
+  let value_labels_visible = chart.value_axis.is_none_or(|axis| {
+    value_axis_is_visible(axis)
+      && axis
+        .tick_label_position
+        .as_ref()
+        .is_none_or(|position| position.val != Some(c::TickLabelPositionValues::None))
+  });
+  if value_labels_visible {
+    let format_code = chart
+      .value_axis
+      .and_then(|axis| axis.numbering_format.as_ref())
+      .map(|format| format.format_code.as_str());
+    let display_unit = chart.value_axis.map_or(1.0, value_axis_display_unit);
+    for (value, label) in scale_tick_labels(
+      scale.minimum,
+      scale.maximum,
+      scale.major_unit,
+      format_code,
+      scale.logarithmic_base,
+      display_unit,
+    ) {
+      let ratio = ((value - scale.minimum) / (scale.maximum - scale.minimum)).clamp(0.0, 1.0);
+      let width = metrics.measure_text(&label, &style.value_label);
+      push_text(
+        items,
+        center.0 - width - style.value_label.font_size_pt * 0.22,
+        center.1 - radius * ratio as f32 - line_height(&style.value_label) * 0.5,
+        label,
+        style.value_label.clone(),
+      );
+    }
+  }
   for index in 0..count {
     let display_index = category_display_index(chart, index, count);
     let angle = std::f32::consts::TAU * display_index as f32 / count as f32;
@@ -7897,20 +7943,32 @@ fn apply_manual_layout(
   automatic: PlotRect,
   layout: crate::render::chart::ChartManualLayout,
 ) -> PlotRect {
+  use crate::render::chart::ChartLayoutMode;
+
   let left = layout
     .x
-    .map_or(automatic.left, |value| frame.x_pt + value * frame.width_pt);
-  let top = layout
-    .y
-    .map_or(automatic.top, |value| frame.y_pt + value * frame.height_pt);
+    .map_or(automatic.left, |value| match layout.x_mode {
+      ChartLayoutMode::Factor => automatic.left + value * frame.width_pt,
+      ChartLayoutMode::Edge => frame.x_pt + value * frame.width_pt,
+    });
+  let top = layout.y.map_or(automatic.top, |value| match layout.y_mode {
+    ChartLayoutMode::Factor => automatic.top + value * frame.height_pt,
+    ChartLayoutMode::Edge => frame.y_pt + value * frame.height_pt,
+  });
   let width = layout
     .width
-    .map_or(automatic.width, |value| value * frame.width_pt)
-    .max(0.0);
+    .map_or(automatic.width, |value| match layout.width_mode {
+      ChartLayoutMode::Factor => value * frame.width_pt,
+      ChartLayoutMode::Edge => frame.x_pt + value * frame.width_pt - left,
+    });
   let height = layout
     .height
-    .map_or(automatic.height, |value| value * frame.height_pt)
-    .max(0.0);
+    .map_or(automatic.height, |value| match layout.height_mode {
+      ChartLayoutMode::Factor => value * frame.height_pt,
+      ChartLayoutMode::Edge => frame.y_pt + value * frame.height_pt - top,
+    });
+  let width = width.max(0.0);
+  let height = height.max(0.0);
   PlotRect {
     left,
     top,
@@ -8217,11 +8275,42 @@ fn lower_manual_legend(
   style: &ClusteredColumnStyle,
   scale: crate::render::chart::LinearAxisScale,
 ) {
-  let x = frame.x_pt + layout.x.unwrap_or(0.8) * frame.width_pt;
-  let mut y = frame.y_pt + layout.y.unwrap_or(0.1) * frame.height_pt;
+  let bounds = apply_manual_layout(
+    frame,
+    PlotRect {
+      left: frame.x_pt + frame.width_pt * 0.8,
+      top: frame.y_pt + frame.height_pt * 0.1,
+      width: frame.width_pt * 0.2,
+      height: frame.height_pt * 0.8,
+    },
+    layout,
+  );
   let marker_size = style.label.font_size_pt * 0.55;
   let marker_gap = style.label.font_size_pt * 0.26;
-  for entry in cartesian_legend_entries(chart, style, scale) {
+  let entries = cartesian_legend_entries(chart, style, scale);
+  if entries.is_empty() || bounds.width <= 0.0 || bounds.height <= 0.0 {
+    return;
+  }
+  let mut metrics = TextMetrics::new();
+  let entry_widths = entries
+    .iter()
+    .map(|entry| {
+      marker_size + marker_gap + metrics.measure_text(entry.label.as_ref(), &style.label)
+    })
+    .collect::<Vec<_>>();
+  let maximum_entry_width = entry_widths.iter().copied().fold(0.0_f32, f32::max);
+  let column_count =
+    ((bounds.width / maximum_entry_width.max(1.0)).floor() as usize).clamp(1, entries.len());
+  let row_count = entries.len().div_ceil(column_count);
+  let cell_width = bounds.width / column_count as f32;
+  let cell_height = bounds.height / row_count as f32;
+  let label_line_height = line_height(&style.label);
+  for (index, (entry, entry_width)) in entries.into_iter().zip(entry_widths).enumerate() {
+    let column = index % column_count;
+    let row = index / column_count;
+    let x = bounds.left + column as f32 * cell_width + (cell_width - entry_width).max(0.0) * 0.5;
+    let y =
+      bounds.top + row as f32 * cell_height + (cell_height - label_line_height).max(0.0) * 0.5;
     push_cartesian_legend_key(
       items,
       x,
@@ -8238,7 +8327,6 @@ fn lower_manual_legend(
       entry.label.into_owned(),
       style.label.clone(),
     );
-    y += line_height(&style.label) * 1.25;
   }
 }
 
@@ -8980,7 +9068,7 @@ mod tests {
   }
 
   #[test]
-  fn word_axes_use_final_plot_length_3d_default_and_bubble_marker_envelope() {
+  fn word_axes_use_final_plot_length_and_bubble_marker_envelope() {
     assert_eq!(
       maximum_auto_main_increment_count(ChartLayoutProfile::Word, 152.25, 10.0, false, false),
       10

@@ -1616,6 +1616,7 @@ fn empty_toc_paragraph(styles: &StylesCatalog, level: u8) -> Paragraph {
     style_ref_text: None,
     style_ref_numbering_text: None,
     list_label: None,
+    list_label_image: None,
     list_label_style: TextStyle::default(),
     list_label_hyperlink_url: None,
     list_label_tab_stop_pt: None,

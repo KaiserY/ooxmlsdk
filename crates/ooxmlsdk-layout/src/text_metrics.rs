@@ -2,8 +2,109 @@ use std::sync::Arc;
 
 use ooxmlsdk_fonts::TextScript;
 use rustc_hash::FxHashMap as HashMap;
+use skrifa::raw::{FontRef, TableProvider, types::Tag};
 
 use crate::fonts::{FontFaceData, FontResolver, FontStyleRef};
+
+/// Font-style view used only for automatic WordprocessingML escapement line
+/// metrics. Shaping and painting keep the reduced size on the underlying
+/// style; Writer likewise keeps the original ascent/height solely for line
+/// formatting.
+struct AutomaticEscapementMetricsStyle<'a, S: ?Sized> {
+  style: &'a S,
+  font_size_pt: f32,
+  complex_font_size_pt: Option<f32>,
+}
+
+impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<'_, S> {
+  fn font_family(&self) -> Option<&str> {
+    self.style.font_family()
+  }
+
+  fn fallback_font_family(&self) -> Option<&str> {
+    self.style.fallback_font_family()
+  }
+
+  fn font_family_class(&self) -> Option<ooxmlsdk_fonts::FontFamilyClass> {
+    self.style.font_family_class()
+  }
+
+  fn east_asia_font_family(&self) -> Option<&str> {
+    self.style.east_asia_font_family()
+  }
+
+  fn complex_font_family(&self) -> Option<&str> {
+    self.style.complex_font_family()
+  }
+
+  fn font_size_pt(&self) -> f32 {
+    self.font_size_pt
+  }
+
+  fn complex_font_size_pt(&self) -> Option<f32> {
+    self.complex_font_size_pt
+  }
+
+  fn complex_script_override(&self) -> Option<bool> {
+    self.style.complex_script_override()
+  }
+
+  fn right_to_left(&self) -> bool {
+    self.style.right_to_left()
+  }
+
+  fn resolved_bidi_level(&self) -> Option<u8> {
+    self.style.resolved_bidi_level()
+  }
+
+  fn complex_bold(&self) -> Option<bool> {
+    self.style.complex_bold()
+  }
+
+  fn complex_italic(&self) -> Option<bool> {
+    self.style.complex_italic()
+  }
+
+  fn character_spacing_pt(&self) -> f32 {
+    self.style.character_spacing_pt()
+  }
+
+  fn baseline_shift_pt(&self) -> f32 {
+    self.style.baseline_shift_pt()
+  }
+
+  fn bold(&self) -> bool {
+    self.style.bold()
+  }
+
+  fn italic(&self) -> bool {
+    self.style.italic()
+  }
+
+  fn small_caps(&self) -> bool {
+    self.style.small_caps()
+  }
+
+  fn kerning_enabled(&self) -> bool {
+    self.style.kerning_enabled()
+  }
+
+  fn ligatures(&self) -> Option<crate::common::OpenTypeLigatures> {
+    self.style.ligatures()
+  }
+
+  fn horizontal_scale(&self) -> f32 {
+    self.style.horizontal_scale()
+  }
+
+  fn wordprocessingml_font_slots(&self) -> bool {
+    self.style.wordprocessingml_font_slots()
+  }
+
+  fn cjk_punctuation_compression_ratio(&self) -> f32 {
+    self.style.cjk_punctuation_compression_ratio()
+  }
+}
 
 // Last-resort vertical metrics when no usable font face can be loaded. Keep
 // this out of horizontal measurement: LibreOffice and Typst both shape with
@@ -55,6 +156,74 @@ pub struct TextDecorationMetrics {
   pub underline_width_pt: f32,
   pub strikethrough_offset_pt: f32,
   pub strikethrough_width_pt: f32,
+}
+
+/// OpenType MATH constants scaled to the requested text size.
+///
+/// The `read-fonts` version re-exported by `skrifa` deliberately exposes an
+/// untyped MATH table, so this reads the fixed MathConstants prefix directly
+/// from the font-defined binary layout.  Values fall back to the OpenType
+/// recommendations when the selected face has no usable MATH table.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct MathFontMetrics {
+  pub script_scale: f32,
+  pub script_script_scale: f32,
+  pub display_operator_min_height_pt: f32,
+  pub axis_height_pt: f32,
+  pub subscript_shift_down_pt: f32,
+  pub superscript_shift_up_pt: f32,
+  pub sub_superscript_gap_min_pt: f32,
+  pub space_after_script_pt: f32,
+  pub upper_limit_gap_min_pt: f32,
+  pub lower_limit_gap_min_pt: f32,
+  pub fraction_numerator_shift_up_pt: f32,
+  pub fraction_denominator_shift_down_pt: f32,
+  pub fraction_numerator_gap_min_pt: f32,
+  pub fraction_rule_thickness_pt: f32,
+  pub fraction_denominator_gap_min_pt: f32,
+  pub overbar_vertical_gap_pt: f32,
+  pub overbar_rule_thickness_pt: f32,
+  pub underbar_vertical_gap_pt: f32,
+  pub underbar_rule_thickness_pt: f32,
+  pub radical_vertical_gap_pt: f32,
+  pub radical_rule_thickness_pt: f32,
+  pub radical_extra_ascender_pt: f32,
+  pub radical_kern_before_degree_pt: f32,
+  pub radical_kern_after_degree_pt: f32,
+  pub radical_degree_bottom_raise_percent: f32,
+}
+
+impl MathFontMetrics {
+  fn recommended(font_size_pt: f32) -> Self {
+    let em = font_size_pt.max(1.0);
+    Self {
+      script_scale: 0.8,
+      script_script_scale: 0.6,
+      display_operator_min_height_pt: em * 1.3,
+      axis_height_pt: em * 0.25,
+      subscript_shift_down_pt: em * 0.2,
+      superscript_shift_up_pt: em * 0.36,
+      sub_superscript_gap_min_pt: em * 0.2,
+      space_after_script_pt: em * 0.05,
+      upper_limit_gap_min_pt: em * 0.12,
+      lower_limit_gap_min_pt: em * 0.12,
+      fraction_numerator_shift_up_pt: em * 0.4,
+      fraction_denominator_shift_down_pt: em * 0.4,
+      fraction_numerator_gap_min_pt: em * 0.12,
+      fraction_rule_thickness_pt: (em * 0.04).max(0.4),
+      fraction_denominator_gap_min_pt: em * 0.12,
+      overbar_vertical_gap_pt: em * 0.08,
+      overbar_rule_thickness_pt: (em * 0.04).max(0.4),
+      underbar_vertical_gap_pt: em * 0.08,
+      underbar_rule_thickness_pt: (em * 0.04).max(0.4),
+      radical_vertical_gap_pt: em * 0.08,
+      radical_rule_thickness_pt: (em * 0.04).max(0.4),
+      radical_extra_ascender_pt: em * 0.08,
+      radical_kern_before_degree_pt: em * 0.04,
+      radical_kern_after_degree_pt: -em * 0.1,
+      radical_degree_bottom_raise_percent: 60.0,
+    }
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -291,12 +460,26 @@ impl TextMetrics {
       .unwrap_or_else(|| approximate_decoration_metrics(style.font_size_pt()))
   }
 
+  pub(crate) fn math_font_metrics(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> MathFontMetrics {
+    let fallback = MathFontMetrics::recommended(style.font_size_pt());
+    self
+      .fonts
+      .with_cached_text_face(style, |face| {
+        math_font_metrics_from_face(face, style.font_size_pt())
+      })
+      .flatten()
+      .unwrap_or(fallback)
+  }
+
   pub fn baseline_offset_in_line(
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
     line_height_pt: f32,
   ) -> f32 {
-    baseline_offset_in_line_from_metrics(self.vertical_metrics(style), style, line_height_pt)
+    baseline_offset_in_line_from_metrics(self.line_vertical_metrics(style), style, line_height_pt)
   }
 
   pub fn baseline_offset_in_line_for_text(
@@ -306,7 +489,7 @@ impl TextMetrics {
     line_height_pt: f32,
   ) -> f32 {
     baseline_offset_in_line_from_metrics(
-      self.vertical_metrics_for_text(text, style),
+      self.line_vertical_metrics_for_text(text, style),
       style,
       line_height_pt,
     )
@@ -318,7 +501,7 @@ impl TextMetrics {
     line_height_pt: f32,
   ) -> f32 {
     baseline_offset_in_line_with_windows_metrics_from_metrics(
-      self.vertical_metrics(style),
+      self.line_vertical_metrics(style),
       style,
       line_height_pt,
     )
@@ -331,14 +514,20 @@ impl TextMetrics {
     line_height_pt: f32,
   ) -> f32 {
     baseline_offset_in_line_with_windows_metrics_from_metrics(
-      self.vertical_metrics_for_text(text, style),
+      self.line_vertical_metrics_for_text(text, style),
       style,
       line_height_pt,
     )
   }
 
   pub fn inline_text_box_height(&mut self, style: &(impl FontStyleRef + ?Sized)) -> f32 {
-    self.vertical_metrics(style).line_height_pt() + style.baseline_shift_pt().abs()
+    let automatic_escapement = style.automatic_escapement_font_sizes_pt().is_some();
+    self.line_vertical_metrics(style).line_height_pt()
+      + if automatic_escapement {
+        0.0
+      } else {
+        style.baseline_shift_pt().abs()
+      }
   }
 
   pub fn inline_text_box_height_for_text(
@@ -346,12 +535,123 @@ impl TextMetrics {
     text: &str,
     style: &(impl FontStyleRef + ?Sized),
   ) -> f32 {
+    let automatic_escapement = style.automatic_escapement_font_sizes_pt().is_some();
+    self.line_text_height(text, style)
+      + if automatic_escapement {
+        0.0
+      } else {
+        style.baseline_shift_pt().abs()
+      }
+  }
+
+  fn line_vertical_metrics(&mut self, style: &(impl FontStyleRef + ?Sized)) -> TextVerticalMetrics {
+    let Some((font_size_pt, complex_font_size_pt)) = style.automatic_escapement_font_sizes_pt()
+    else {
+      return self.vertical_metrics(style);
+    };
+    self.vertical_metrics(&AutomaticEscapementMetricsStyle {
+      style,
+      font_size_pt,
+      complex_font_size_pt,
+    })
+  }
+
+  fn line_vertical_metrics_for_text(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> TextVerticalMetrics {
+    let Some((font_size_pt, complex_font_size_pt)) = style.automatic_escapement_font_sizes_pt()
+    else {
+      return self.vertical_metrics_for_text(text, style);
+    };
+    self.vertical_metrics_for_text(
+      text,
+      &AutomaticEscapementMetricsStyle {
+        style,
+        font_size_pt,
+        complex_font_size_pt,
+      },
+    )
+  }
+
+  fn line_text_height(&mut self, text: &str, style: &(impl FontStyleRef + ?Sized)) -> f32 {
+    let Some((font_size_pt, complex_font_size_pt)) = style.automatic_escapement_font_sizes_pt()
+    else {
+      return self
+        .fonts
+        .max_text_line_height(text, style)
+        .unwrap_or_else(|| self.vertical_metrics(style).line_height_pt());
+    };
+    let metrics_style = AutomaticEscapementMetricsStyle {
+      style,
+      font_size_pt,
+      complex_font_size_pt,
+    };
     self
       .fonts
-      .max_text_line_height(text, style)
-      .unwrap_or_else(|| self.vertical_metrics(style).line_height_pt())
-      + style.baseline_shift_pt().abs()
+      .max_text_line_height(text, &metrics_style)
+      .unwrap_or_else(|| self.vertical_metrics(&metrics_style).line_height_pt())
   }
+}
+
+fn math_font_metrics_from_face(face: &FontFaceData, font_size_pt: f32) -> Option<MathFontMetrics> {
+  let font = FontRef::from_index(face.data.as_ref(), face.index).ok()?;
+  let units_per_em = f32::from(font.head().ok()?.units_per_em()).max(1.0);
+  let table = font.table_data(Tag::new(b"MATH"))?;
+  let bytes = table.as_bytes();
+  let constants_offset = usize::from(be_u16(bytes, 4)?);
+  let scale = font_size_pt.max(1.0) / units_per_em;
+  let value = |index: usize| -> Option<f32> {
+    be_i16(
+      bytes,
+      constants_offset.checked_add(8 + index.checked_mul(4)?)?,
+    )
+    .map(|value| f32::from(value) * scale)
+  };
+  let percentage = |offset: usize| -> Option<f32> {
+    be_i16(bytes, constants_offset.checked_add(offset)?)
+      .map(|value| f32::from(value) / 100.0)
+      .filter(|value| *value > 0.0 && *value <= 1.0)
+  };
+
+  Some(MathFontMetrics {
+    script_scale: percentage(0).unwrap_or(0.8),
+    script_script_scale: percentage(2).unwrap_or(0.6),
+    display_operator_min_height_pt: f32::from(be_u16(bytes, constants_offset + 6)?) * scale,
+    axis_height_pt: value(1)?,
+    subscript_shift_down_pt: value(4)?,
+    superscript_shift_up_pt: value(7)?,
+    sub_superscript_gap_min_pt: value(11)?,
+    space_after_script_pt: value(13)?,
+    upper_limit_gap_min_pt: value(14)?,
+    lower_limit_gap_min_pt: value(16)?,
+    fraction_numerator_shift_up_pt: value(28)?,
+    fraction_denominator_shift_down_pt: value(30)?,
+    fraction_numerator_gap_min_pt: value(32)?,
+    fraction_rule_thickness_pt: value(34)?.max(0.2),
+    fraction_denominator_gap_min_pt: value(35)?,
+    overbar_vertical_gap_pt: value(39)?,
+    overbar_rule_thickness_pt: value(40)?.max(0.2),
+    underbar_vertical_gap_pt: value(42)?,
+    underbar_rule_thickness_pt: value(43)?.max(0.2),
+    radical_vertical_gap_pt: value(45)?,
+    radical_rule_thickness_pt: value(47)?.max(0.2),
+    radical_extra_ascender_pt: value(48)?,
+    radical_kern_before_degree_pt: value(49)?,
+    radical_kern_after_degree_pt: value(50)?,
+    radical_degree_bottom_raise_percent: f32::from(be_u16(bytes, constants_offset + 212)?),
+  })
+}
+
+fn be_u16(bytes: &[u8], offset: usize) -> Option<u16> {
+  let value = bytes.get(offset..offset.checked_add(2)?)?;
+  Some(u16::from_be_bytes([value[0], value[1]]))
+}
+
+fn be_i16(bytes: &[u8], offset: usize) -> Option<i16> {
+  let value = bytes.get(offset..offset.checked_add(2)?)?;
+  Some(i16::from_be_bytes([value[0], value[1]]))
 }
 
 fn baseline_offset_in_line_from_metrics(

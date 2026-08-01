@@ -4,10 +4,10 @@ use std::sync::Arc;
 use crate::fonts::effective_font_size_pt;
 
 use super::{
-  CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog,
-  NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphAdjust, ParagraphAlignment,
-  ParagraphFormat, ParagraphInlineImport, ParagraphProps, RunStyleOverrides, StylesCatalog,
-  TextRun, TextStyle, math_paragraph_alignment, paragraph_field_events,
+  CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, ListLabelImage,
+  NumberingCatalog, NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphAdjust,
+  ParagraphAlignment, ParagraphFormat, ParagraphInlineImport, ParagraphProps, RunStyleOverrides,
+  StylesCatalog, TextRun, TextStyle, math_paragraph_alignment, paragraph_field_events,
   paragraph_inlines_with_policy, paragraph_note_reference_ids, properties,
   select_paragraph_numbering,
 };
@@ -177,6 +177,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     mut list_label,
     style_ref_numbering_text,
     numbering_image,
+    numbering_image_replacement_text,
     mut list_label_style,
     list_label_justification,
     numbering_list_tab_stop_pt,
@@ -184,6 +185,7 @@ pub(super) fn paragraph_model_with_base<'a>(
   ) = numbering_label.map_or_else(
     || {
       (
+        None,
         None,
         None,
         None,
@@ -198,6 +200,7 @@ pub(super) fn paragraph_model_with_base<'a>(
         label.text,
         label.suppressed_non_numerical_text,
         label.image,
+        label.image_replacement_text,
         label.style,
         label.justification,
         label.list_tab_stop_pt,
@@ -234,9 +237,14 @@ pub(super) fn paragraph_model_with_base<'a>(
         (blank_numbering_label && format.indent_left_pt > 0.0).then_some(format.indent_left_pt)
       })
       .or_else(|| {
-        (!has_direct_indentation && format.indent_left_pt > 0.0).then_some(
-          format.indent_left_pt + format.first_line_indent_pt.max(format.indent_left_pt) * 4.0,
-        )
+        // The legacy large-tab fallback models text pseudo-numbering. A
+        // picture bullet is a fixed numbering-margin portion; when the level
+        // has no authored num tab its body starts at the ordinary left
+        // indent, not four indents beyond it.
+        (!has_direct_indentation && numbering_image.is_none() && format.indent_left_pt > 0.0)
+          .then_some(
+            format.indent_left_pt + format.first_line_indent_pt.max(format.indent_left_pt) * 4.0,
+          )
       })
     })
     .flatten();
@@ -267,9 +275,6 @@ pub(super) fn paragraph_model_with_base<'a>(
         run.style.wordprocessingml_field_bold_override = Some(bold_override);
       }
     }
-  }
-  if let Some(image) = numbering_image {
-    inlines.insert(0, super::InlineItem::Image(image));
   }
   fill_character_style_ref_texts(&mut inlines);
   let style_ref_keys = style_id
@@ -311,6 +316,21 @@ pub(super) fn paragraph_model_with_base<'a>(
     }
   }
   let (footnote_reference_ids, endnote_reference_ids) = paragraph_note_reference_ids(paragraph);
+  let mut list_label_image = numbering_image.and_then(|image| {
+    let replacement_text = numbering_image_replacement_text?;
+    (!replacement_text.is_empty()).then_some(ListLabelImage {
+      image,
+      replacement_text,
+    })
+  });
+  if !has_direct_indentation && let Some(legacy_image) = list_label_image.take() {
+    // A style-owned legacy list keeps its graphic in the number portion's
+    // inline line box. Direct paragraph indentation switches Word to the
+    // fixed label-alignment margin model handled by `list_label_image`.
+    for _ in 0..legacy_image.replacement_text.chars().count() {
+      inlines.insert(0, super::InlineItem::Image(legacy_image.image.clone()));
+    }
+  }
   let starts_after_last_rendered_page_break =
     super::paragraph_starts_after_last_rendered_page_break(&inlines);
   #[cfg(test)]
@@ -345,6 +365,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     style_ref_text,
     style_ref_numbering_text: style_ref_numbering_text.map(Arc::<str>::from),
     list_label,
+    list_label_image,
     list_label_style,
     list_label_hyperlink_url: None,
     list_label_tab_stop_pt,

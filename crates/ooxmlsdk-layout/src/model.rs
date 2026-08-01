@@ -117,6 +117,11 @@ pub struct TextStyle {
   pub horizontal_scale: Option<f32>,
   pub character_spacing_pt: f32,
   pub baseline_shift_pt: f32,
+  /// Original WordprocessingML font size retained for the line box when
+  /// automatic `w:vertAlign` shrinks and shifts the painted glyph.
+  pub(crate) automatic_escapement_font_size_pt: Option<f32>,
+  /// Complex-script counterpart of `automatic_escapement_font_size_pt`.
+  pub(crate) automatic_escapement_complex_font_size_pt: Option<f32>,
   /// Layout-only minimum line box for generated resources whose Office UI
   /// metrics are taller than their embedded glyph bounds.
   pub(crate) line_height_override_pt: Option<f32>,
@@ -202,6 +207,8 @@ impl Default for TextStyle {
       horizontal_scale: None,
       character_spacing_pt: 0.0,
       baseline_shift_pt: 0.0,
+      automatic_escapement_font_size_pt: None,
+      automatic_escapement_complex_font_size_pt: None,
       line_height_override_pt: None,
       line_vertical_alignment: common::LineVerticalAlignment::Auto,
       semantic_only: false,
@@ -533,6 +540,10 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     horizontal_scale: style.horizontal_scale,
     character_spacing: common::Pt(style.character_spacing_pt),
     baseline_shift: common::Pt(style.baseline_shift_pt),
+    automatic_escapement_font_size: style.automatic_escapement_font_size_pt.map(common::Pt),
+    automatic_escapement_complex_font_size: style
+      .automatic_escapement_complex_font_size_pt
+      .map(common::Pt),
     line_vertical_alignment: style.line_vertical_alignment,
     semantic_only: style.semantic_only,
     use_windows_font_metrics: style.use_windows_font_metrics,

@@ -4,6 +4,7 @@ mod field_datetime;
 mod field_localization;
 mod hyphenation;
 mod layout;
+mod math;
 mod model;
 mod package;
 mod properties;
@@ -131,10 +132,18 @@ const WML_DEFAULT_BORDER_WIDTH_PT: f32 = 0.5;
 const WML_MIN_BORDER_WIDTH_PT: f32 = 0.25;
 const DRAWINGML_DEFAULT_LINE_WIDTH_EMU: i64 = 0;
 const VML_DEFAULT_STROKE_WEIGHT_EMU: i64 = 1;
+// Writer exposes an inline legacy VML group through the drawing-layer snap
+// rectangle used by SwFlyCntPortion, not just the authored CSS width. A
+// stroked child which reaches the group's leading edge expands that snap
+// rectangle by one exported fixed-output step (floattable-nested-rowspan).
+const LO_VML_INLINE_GROUP_EDGE_BOUND_PT: f32 = 0.72;
 // Word fixed output scales automatic w:vertAlign superscript/subscript text to
 // 65% of the authored size. Writer maps the same markup to its older 58%
 // DFLT_ESC_PROP; keep that as importer evidence, not the Office PDF metric.
 const WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE: f32 = 0.65;
+// Writer's automatic escapement model uses a 33% superscript displacement.
+// Keep the displacement separate from the original-size line metrics: Word's
+// fixed output resolves those metrics against a shared logical baseline.
 const LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE: f32 = 0.33;
 const LO_SUBSCRIPT_BASELINE_SHIFT_SCALE: f32 = -0.08;
 const MIN_ESCAPEMENT_FONT_SIZE_PT: f32 = 1.0;
@@ -299,6 +308,7 @@ pub(crate) fn extract(
   );
   let (footnote_labels, endnote_labels, footnote_numbering, endnote_numbering) =
     note_reference_labels(package, &main, &sections);
+  let footnote_positions = footnote_positions(package, &main, &sections);
   let footnotes = footnotes(
     package,
     &main,
@@ -347,11 +357,14 @@ pub(crate) fn extract(
     .map(|section| section.title_page)
     .unwrap_or(false);
   let form_widgets = form_widget_ids.into_widgets();
+  let note_separator_style =
+    styles.run_style_with_base(None, TextStyle::default(), RunStyleOverrides::default());
 
   Ok(DocxDocument {
     page,
     line_number_style: styles
       .character_run_style(Some("LineNumber"), styles.doc_default_run.clone()),
+    note_separator_style,
     has_styles_part: styles.has_styles_part,
     default_tab_stop_pt,
     hyphenation,
@@ -369,6 +382,7 @@ pub(crate) fn extract(
     footnote_blocks,
     footnotes,
     footnote_numbering,
+    footnote_positions,
     endnote_blocks,
     endnotes,
     endnote_numbering,
@@ -457,6 +471,7 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
     style_ref_text: None,
     style_ref_numbering_text: None,
     list_label: None,
+    list_label_image: None,
     list_label_style: TextStyle::default(),
     list_label_hyperlink_url: None,
     list_label_tab_stop_pt: None,
@@ -473,10 +488,13 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
       static3d: None,
       width_pt: page.width_pt,
       height_pt: page.height_pt,
+      inline_offset_x_pt: 0.0,
+      inline_offset_y_pt: 0.0,
       effect_left_pt: 0.0,
       effect_top_pt: 0.0,
       effect_right_pt: 0.0,
       effect_bottom_pt: 0.0,
+      inline_baseline_gap_pt: None,
       crop: image.crop,
       rotation_deg: image.rotation_deg,
       flip_horizontal: image.flip_horizontal,
@@ -492,6 +510,7 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
         vertical_relative_to: VerticalImageReference::Page,
         horizontal_alignment: None,
         vertical_alignment: None,
+        alignment_extent: None,
         horizontal_offset_pt: 0.0,
         vertical_offset_pt: 0.0,
         wrap: ImageWrapMode::None,
@@ -522,6 +541,7 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
     style_ref_text: None,
     style_ref_numbering_text: None,
     list_label: None,
+    list_label_image: None,
     list_label_style: TextStyle::default(),
     list_label_hyperlink_url: None,
     list_label_tab_stop_pt: None,
@@ -1417,9 +1437,10 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     return;
   }
   if let Some(frame) = paragraph.format.frame {
+    let suppress_overlap = paragraph.format.suppress_overlap == Some(true);
     paragraph.format.frame = None;
     if let Some(Block::Frame(previous)) = blocks.last_mut()
-      && paragraph_belongs_to_frame(previous, frame)
+      && paragraph_belongs_to_frame(previous, frame, suppress_overlap)
     {
       previous.blocks.push(Block::paragraph(paragraph));
       return;
@@ -1430,6 +1451,7 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
       height_pt: frame.height_pt,
       height_rule: frame.height_rule,
       placement: frame.placement,
+      suppress_overlap,
       outer_fill_color: None,
       outer_borders: ParagraphBordersModel::default(),
     }));
@@ -1518,6 +1540,7 @@ fn promote_preceding_table_to_anchored_frame(blocks: &mut Vec<Block>, anchor: &P
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
     placement: frame.placement,
+    suppress_overlap: anchor.format.suppress_overlap == Some(true),
     outer_fill_color: anchor.format.shading,
     outer_borders: anchor.format.borders,
   }));
@@ -1538,11 +1561,16 @@ fn flatten_promoted_table_cell_frames(table: &mut Table) {
   }
 }
 
-fn paragraph_belongs_to_frame(frame: &FloatingFrame, properties: ParagraphFrameProperties) -> bool {
+fn paragraph_belongs_to_frame(
+  frame: &FloatingFrame,
+  properties: ParagraphFrameProperties,
+  suppress_overlap: bool,
+) -> bool {
   frame.width_pt == properties.width_pt
     && frame.height_pt == properties.height_pt
     && frame.height_rule == properties.height_rule
     && frame.placement == properties.placement
+    && frame.suppress_overlap == suppress_overlap
 }
 
 fn paragraph_mark_is_hidden(paragraph: &w::Paragraph) -> bool {
@@ -2591,6 +2619,33 @@ fn note_reference_labels(
   )
 }
 
+fn footnote_positions(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+  sections: &[ImportedSection],
+) -> Vec<w::FootnotePositionValues> {
+  let document_default = main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| settings.footnote_document_wide_properties.as_deref())
+    .and_then(|properties| properties.footnote_position.as_ref())
+    .map(|position| position.val)
+    .unwrap_or(w::FootnotePositionValues::PageBottom);
+
+  sections
+    .iter()
+    .map(|section| {
+      section
+        .section_properties
+        .as_ref()
+        .and_then(|properties| properties.footnote_properties.as_deref())
+        .and_then(|properties| properties.footnote_position.as_ref())
+        .map(|position| position.val)
+        .unwrap_or(document_default)
+    })
+    .collect()
+}
+
 fn footnote_document_numbering_spec(
   properties: &w::FootnoteDocumentWideProperties,
 ) -> NoteNumberingSpec {
@@ -3136,7 +3191,12 @@ fn prepend_note_marker(
     0,
     InlineItem::Text(TextRun {
       text: label.text.clone(),
-      style: note_reference_style(&base_style),
+      // The note-body marker follows the run which owns w:footnoteRef or
+      // w:endnoteRef. Word-authored files normally attach the superscript
+      // character style to that run explicitly; forcing automatic
+      // superscript here incorrectly changes producers which deliberately
+      // leave the marker at the note paragraph's text size.
+      style: base_style,
       hyperlink_url: label.hyperlink_url.clone(),
       dynamic_field: None,
       style_ref_keys: Vec::new(),
@@ -4047,6 +4107,11 @@ fn table_cell_model(
             },
           );
           if prepend_out_of_place_paragraph_to_nested_table(&mut table, &mut model) {
+            // The repaired paragraph already owns the outer cell's text
+            // origin. Align the nested first-cell content to that origin
+            // instead of charging the recovered content a second leading
+            // cell margin (tdf#111550).
+            table.align_leading_cell_content = true;
             blocks.push(Block::Table(table));
           } else {
             push_cell_paragraph(&mut blocks, model);
@@ -4234,9 +4299,10 @@ fn push_cell_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     blocks.push(Block::paragraph(paragraph));
     return;
   };
+  let suppress_overlap = paragraph.format.suppress_overlap == Some(true);
   paragraph.format.frame = None;
   if let Some(Block::Frame(previous)) = blocks.last_mut()
-    && paragraph_belongs_to_frame(previous, frame)
+    && paragraph_belongs_to_frame(previous, frame, suppress_overlap)
   {
     previous.blocks.push(Block::paragraph(paragraph));
     return;
@@ -4247,6 +4313,7 @@ fn push_cell_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
     placement: frame.placement,
+    suppress_overlap,
     outer_fill_color: None,
     outer_borders: ParagraphBordersModel::default(),
   }));
@@ -4851,6 +4918,9 @@ fn merge_paragraph_format(
         .val
         .is_none_or(|value| value.as_bool()),
     );
+  }
+  if let Some(suppress_overlap) = properties.suppress_overlap() {
+    format.suppress_overlap = Some(suppress_overlap.val.is_none_or(|value| value.as_bool()));
   }
   if let Some(auto_space_de) = properties.auto_space_de() {
     format.auto_space_de = Some(auto_space_de.val.is_none_or(|value| value.as_bool()));
@@ -5560,6 +5630,10 @@ fn paragraph_inlines_with_policy(
         );
       }
       choice => {
+        if let Some(image) = math::wordprocessing_math_image(choice, &base_style, styles) {
+          inlines.push(InlineItem::Image(image));
+          continue;
+        }
         if let Some(text) = shared_math::wordprocessing_math_text(choice)
           && !text.is_empty()
         {
@@ -8255,13 +8329,10 @@ fn note_reference_style(style: &TextStyle) -> TextStyle {
     return style.clone();
   }
   let mut reference_style = style.clone();
-  reference_style.baseline_shift_pt =
-    crate::fonts::effective_font_size_pt(style, None) * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
-  reference_style.font_size_pt =
-    (style.font_size_pt * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
-  reference_style.complex_font_size_pt = style
-    .complex_font_size_pt
-    .map(|size| (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+  properties::apply_vertical_text_alignment(
+    &mut reference_style,
+    w::VerticalPositionValues::Superscript,
+  );
   reference_style
 }
 
@@ -8372,10 +8443,13 @@ fn inline_image_impl(
         static3d: properties.static3d,
         width_pt: units::emu_to_points(inline.extent.cx),
         height_pt: units::emu_to_points(inline.extent.cy),
+        inline_offset_x_pt: 0.0,
+        inline_offset_y_pt: 0.0,
         effect_left_pt: effect_extent_left(inline.effect_extent.as_ref()),
         effect_top_pt: effect_extent_top(inline.effect_extent.as_ref()),
         effect_right_pt: effect_extent_right(inline.effect_extent.as_ref()),
         effect_bottom_pt: effect_extent_bottom(inline.effect_extent.as_ref()),
+        inline_baseline_gap_pt: None,
         crop,
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
@@ -8427,10 +8501,13 @@ fn inline_image_impl(
         static3d: properties.static3d,
         width_pt: units::emu_to_points(extent.cx),
         height_pt: units::emu_to_points(extent.cy),
+        inline_offset_x_pt: 0.0,
+        inline_offset_y_pt: 0.0,
         effect_left_pt: effect_extent.left_pt,
         effect_top_pt: effect_extent.top_pt,
         effect_right_pt: effect_extent.right_pt,
         effect_bottom_pt: effect_extent.bottom_pt,
+        inline_baseline_gap_pt: None,
         crop,
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
@@ -8510,6 +8587,7 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
     vertical_alignment: simple_position
       .map(|_| None)
       .unwrap_or_else(|| vertical_position.and_then(vertical_position_alignment)),
+    alignment_extent: None,
     horizontal_offset_pt: simple_position
       .map(|position| units::emu_to_points(position.x.to_emu()))
       .or_else(|| horizontal_position.and_then(horizontal_position_offset))
@@ -9680,7 +9758,7 @@ fn wordprocessing_group_textbox_frames(
     .flat_map(|choice| {
       wordprocessing_group_choice_textbox_frames(
         choice,
-        drawingml_group_child_placement(placement),
+        drawingml_group_child_placement(placement, transform.fallback_size),
         child_transform,
         context.clone(),
       )
@@ -9706,7 +9784,7 @@ fn wordprocessing_group_shape_textbox_frames(
     .flat_map(|choice| {
       wordprocessing_group_shape_choice_textbox_frames(
         choice,
-        drawingml_group_child_placement(placement),
+        drawingml_group_child_placement(placement, transform.fallback_size),
         child_transform,
         context.clone(),
       )
@@ -10249,7 +10327,7 @@ fn drawingml_locked_canvas_shapes(
     .flat_map(|choice| {
       drawingml_generic_group_choice_shapes(
         choice,
-        drawingml_group_child_placement(placement),
+        drawingml_group_child_placement(placement, transform.fallback_size),
         child_transform,
         child_context,
       )
@@ -10294,7 +10372,7 @@ fn drawingml_generic_group_shapes(
     .flat_map(|choice| {
       drawingml_generic_group_shape_choice_shapes(
         choice,
-        drawingml_group_child_placement(placement),
+        drawingml_group_child_placement(placement, transform.fallback_size),
         child_transform,
         child_context,
       )
@@ -10613,7 +10691,7 @@ fn wordprocessing_group_shapes(
     .flat_map(|choice| {
       wordprocessing_group_choice_shapes(
         choice,
-        drawingml_group_child_placement(placement),
+        drawingml_group_child_placement(placement, transform.fallback_size),
         child_transform,
         child_context,
       )
@@ -10650,7 +10728,7 @@ fn wordprocessing_group_shape_shapes(
     .flat_map(|choice| {
       wordprocessing_group_shape_choice_shapes(
         choice,
-        drawingml_group_child_placement(placement),
+        drawingml_group_child_placement(placement, transform.fallback_size),
         child_transform,
         child_context,
       )
@@ -11040,7 +11118,7 @@ fn drawingml_diagram_drawing_shapes(
     .flat_map(|choice| {
       drawingml_diagram_shape_tree_choice_shapes(
         choice,
-        drawingml_group_child_placement(placement),
+        drawingml_group_child_placement(placement, transform.fallback_size),
         child_transform,
         context,
       )
@@ -11073,7 +11151,7 @@ fn drawingml_diagram_group_shapes(
     .flat_map(|choice| {
       drawingml_diagram_group_choice_shapes(
         choice,
-        drawingml_group_child_placement(placement),
+        drawingml_group_child_placement(placement, transform.fallback_size),
         child_transform,
         context,
       )
@@ -12876,9 +12954,28 @@ fn wrap_polygon_point(x: i64, y: i64, width_pt: f32, height_pt: f32) -> (f32, f3
   )
 }
 
-fn drawingml_group_child_placement(placement: ImagePlacement) -> ImagePlacement {
+fn drawingml_group_child_placement(
+  placement: ImagePlacement,
+  host_extent_pt: Option<(f32, f32)>,
+) -> ImagePlacement {
   match placement {
     ImagePlacement::Floating(mut placement) => {
+      // wp:positionH/wp:positionV align the grouped object described by the
+      // host wp:extent. a:chOff/a:chExt only map each child's coordinates
+      // inside that object; aligning every child by its own mapped size moves
+      // narrow or short children to the wrong edge of the page.
+      if placement.alignment_extent.is_none()
+        && let Some((width_pt, height_pt)) = host_extent_pt
+      {
+        placement.alignment_extent = Some(FloatingAlignmentExtent {
+          width_pt,
+          height_pt,
+          relative_width_to: placement.relative_width_to,
+          relative_width_pct: placement.relative_width_pct,
+          relative_height_to: placement.relative_height_to,
+          relative_height_pct: placement.relative_height_pct,
+        });
+      }
       placement.relative_width_to = None;
       placement.relative_width_pct = None;
       placement.relative_height_to = None;
@@ -13264,10 +13361,21 @@ fn drawingml_picture_image(
     static3d: properties.static3d,
     width_pt,
     height_pt,
+    inline_offset_x_pt: if matches!(placement, ImagePlacement::Inline) {
+      offset_x_pt
+    } else {
+      0.0
+    },
+    inline_offset_y_pt: if matches!(placement, ImagePlacement::Inline) {
+      offset_y_pt
+    } else {
+      0.0
+    },
     effect_left_pt: 0.0,
     effect_top_pt: 0.0,
     effect_right_pt: 0.0,
     effect_bottom_pt: 0.0,
+    inline_baseline_gap_pt: None,
     crop,
     rotation_deg: shape_properties.camera_adjusted_rotation_deg(mapped.rotation_deg),
     flip_horizontal: mapped.flip_horizontal,
@@ -13795,8 +13903,10 @@ fn drawingml_child_placement(
   match placement {
     ImagePlacement::Inline => ImagePlacement::Inline,
     ImagePlacement::Floating(mut floating) => {
-      floating.horizontal_alignment = None;
-      floating.vertical_alignment = None;
+      if floating.alignment_extent.is_none() {
+        floating.horizontal_alignment = None;
+        floating.vertical_alignment = None;
+      }
       floating.horizontal_offset_pt += offset_x_pt;
       floating.vertical_offset_pt += offset_y_pt;
       ImagePlacement::Floating(floating)
@@ -15573,6 +15683,9 @@ fn vml_inline_group_frame(group: &v::Group) -> Option<InlineShape> {
   // those declarations do not remove the root group box from line flow.
   frame.placement = ImagePlacement::Inline;
   frame.allow_outside_page = false;
+  frame.width_pt += VmlGroupTransform::from_group(group)
+    .map(|transform| transform.inline_leading_pt)
+    .unwrap_or(0.0);
   Some(frame)
 }
 
@@ -16499,11 +16612,25 @@ fn textbox_blocks(
 
 fn textbox_blocks_with_base(
   content: &w::TextBoxContent,
-  base_style: TextStyle,
+  mut base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Vec<Block> {
+  // w:txbxContent starts a separate text story. Keep the anchor run's
+  // transferable character formatting (for example its explicit color), but
+  // do not let a relative baseline transform leak across the story boundary.
+  // In tdf166511.docx the anchor paragraph is superscript while the textbox
+  // has its own 6.5 pt runs; carrying the automatic-escapement state shrinks
+  // those runs a second time to 65% of their authored size.
+  if let Some(font_size_pt) = base_style.automatic_escapement_font_size_pt {
+    base_style.font_size_pt = font_size_pt;
+    base_style.complex_font_size_pt = base_style.automatic_escapement_complex_font_size_pt;
+  }
+  base_style.baseline_shift_pt = 0.0;
+  base_style.automatic_escapement_font_size_pt = None;
+  base_style.automatic_escapement_complex_font_size_pt = None;
+
   let mut blocks = Vec::new();
   let mut numbering = NumberingCatalog::default();
   let mut form_widget_ids = FormWidgetIdAllocator::default();
@@ -16696,10 +16823,13 @@ fn vml_image_data(
     static3d: None,
     width_pt,
     height_pt,
+    inline_offset_x_pt: 0.0,
+    inline_offset_y_pt: 0.0,
     effect_left_pt: 0.0,
     effect_top_pt: 0.0,
     effect_right_pt: 0.0,
     effect_bottom_pt: 0.0,
+    inline_baseline_gap_pt: None,
     crop: vml_image_crop(data),
     rotation_deg: style.rotation_deg,
     flip_horizontal: style.flip_horizontal,
@@ -16740,6 +16870,7 @@ struct VmlImageStyle {
 #[derive(Clone, Copy, Debug)]
 struct VmlGroupTransform {
   affine: Affine,
+  inline_leading_pt: f32,
 }
 
 impl VmlGroupTransform {
@@ -16747,11 +16878,21 @@ impl VmlGroupTransform {
     Self {
       affine: Affine::translate((-f64::from(origin_x), -f64::from(origin_y)))
         .then_scale_non_uniform(f64::from(scale_x), f64::from(scale_y)),
+      inline_leading_pt: 0.0,
     }
   }
 
   fn from_group(group: &v::Group) -> Option<Self> {
-    Self::from_group_with_style(group, group.style.as_deref())
+    let mut transform = Self::from_group_with_style(group, group.style.as_deref())?;
+    if !vml_group_has_explicit_floating_position(group.style.as_deref())
+      && group
+        .group_choice
+        .iter()
+        .any(|choice| vml_group_stroked_child_touches_leading_edge(choice, transform))
+    {
+      transform.inline_leading_pt = LO_VML_INLINE_GROUP_EDGE_BOUND_PT;
+    }
+    Some(transform)
   }
 
   fn from_group_with_style(group: &v::Group, group_style: Option<&str>) -> Option<Self> {
@@ -16830,7 +16971,13 @@ impl VmlGroupTransform {
       "position:absolute".to_string(),
       format!(
         "margin-left:{}pt",
-        parent.horizontal_offset_pt + child.horizontal_offset_pt
+        parent.horizontal_offset_pt
+          + child.horizontal_offset_pt
+          + if inline_group {
+            self.inline_leading_pt
+          } else {
+            0.0
+          }
       ),
       format!(
         "margin-top:{}pt",
@@ -16854,6 +17001,78 @@ impl VmlGroupTransform {
     }
     Some(output.join(";"))
   }
+}
+
+fn vml_group_stroked_child_touches_leading_edge(
+  choice: &v::GroupChoice,
+  transform: VmlGroupTransform,
+) -> bool {
+  let (model, style) = match choice {
+    v::GroupChoice::Arc(shape) => (
+      crate::xlsx::object_resources::vml_arc_model(shape),
+      shape.style.as_deref(),
+    ),
+    v::GroupChoice::Curve(shape) => (
+      crate::xlsx::object_resources::vml_curve_model(shape),
+      shape.style.as_deref(),
+    ),
+    v::GroupChoice::Line(shape) => (
+      crate::xlsx::object_resources::vml_line_model(shape),
+      shape.style.as_deref(),
+    ),
+    v::GroupChoice::Oval(shape) => (
+      crate::xlsx::object_resources::vml_oval_model(shape),
+      shape.style.as_deref(),
+    ),
+    v::GroupChoice::PolyLine(shape) => (
+      crate::xlsx::object_resources::vml_polyline_model(shape),
+      shape.style.as_deref(),
+    ),
+    v::GroupChoice::Rectangle(shape) => (
+      crate::xlsx::object_resources::vml_rectangle_model(shape),
+      shape.style.as_deref(),
+    ),
+    v::GroupChoice::RoundRectangle(shape) => (
+      crate::xlsx::object_resources::vml_round_rectangle_model(shape),
+      shape.style.as_deref(),
+    ),
+    // A custom v:shape can inherit `stroked` from an out-of-line shapetype.
+    // Count it only when the child itself explicitly authors the stroke;
+    // otherwise an unresolved picture-frame type would create false padding.
+    v::GroupChoice::Shape(shape) => {
+      let model = crate::xlsx::object_resources::vml_shape_model(shape, None);
+      if model.stroked_authored != Some(true) {
+        return false;
+      }
+      (model, shape.style.as_deref())
+    }
+    _ => return false,
+  };
+  if !model.stroked
+    || model
+      .stroke_weight
+      .as_deref()
+      .and_then(vml_measure_to_points)
+      .is_some_and(|width| width <= f32::EPSILON)
+  {
+    return false;
+  }
+  let Some(style) = style.filter(|style| {
+    style.split(';').any(|declaration| {
+      declaration.split_once(':').is_some_and(|(name, _)| {
+        matches!(
+          name.trim().to_ascii_lowercase().as_str(),
+          "left" | "margin-left"
+        )
+      })
+    })
+  }) else {
+    return false;
+  };
+  let Some(style) = transform.child_style(Some(style)) else {
+    return false;
+  };
+  vml_image_style(Some(&style)).horizontal_offset_pt <= f32::EPSILON
 }
 
 pub(crate) fn vml_group_child_style(
@@ -16942,6 +17161,7 @@ impl VmlImageStyle {
         vertical_relative_to: self.vertical_relative_to,
         horizontal_alignment: self.horizontal_alignment,
         vertical_alignment: self.vertical_alignment,
+        alignment_extent: None,
         horizontal_offset_pt: self.horizontal_offset_pt,
         vertical_offset_pt: self.vertical_offset_pt,
         wrap: self.wrap,
@@ -19626,14 +19846,16 @@ fn normalize_relative_run_style(style: &mut TextStyle, overrides: RunStyleOverri
   style.font_size_pt = TextStyle::default().font_size_pt;
   style.complex_font_size_pt = None;
   style.baseline_shift_pt = 0.0;
+  style.automatic_escapement_font_size_pt = None;
+  style.automatic_escapement_complex_font_size_pt = None;
 }
 
 fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides) {
   if let Some(font_size_pt) = overrides.font_size_pt {
-    style.font_size_pt = font_size_pt;
+    properties::set_font_size_preserving_automatic_escapement(style, font_size_pt);
   }
   if let Some(complex_font_size_pt) = overrides.complex_font_size_pt {
-    style.complex_font_size_pt = Some(complex_font_size_pt);
+    properties::set_complex_font_size_preserving_automatic_escapement(style, complex_font_size_pt);
   }
   if let Some(bold) = overrides.bold {
     style.bold = bold;
@@ -19851,6 +20073,9 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   if values.suppress_line_numbers.is_some() {
     target.suppress_line_numbers = values.suppress_line_numbers;
   }
+  if values.suppress_overlap.is_some() {
+    target.suppress_overlap = values.suppress_overlap;
+  }
   if values.auto_space_de.is_some() {
     target.auto_space_de = values.auto_space_de;
   }
@@ -20061,6 +20286,9 @@ fn merge_numbering_format_values(
   if values.suppress_line_numbers.is_some() {
     target.suppress_line_numbers = values.suppress_line_numbers;
   }
+  if values.suppress_overlap.is_some() {
+    target.suppress_overlap = values.suppress_overlap;
+  }
   if values.auto_space_de.is_some() {
     target.auto_space_de = values.auto_space_de;
   }
@@ -20120,6 +20348,11 @@ fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   }
   if values.baseline_shift_pt.abs() > f32::EPSILON {
     target.baseline_shift_pt = values.baseline_shift_pt;
+  }
+  if values.automatic_escapement_font_size_pt.is_some() {
+    target.automatic_escapement_font_size_pt = values.automatic_escapement_font_size_pt;
+    target.automatic_escapement_complex_font_size_pt =
+      values.automatic_escapement_complex_font_size_pt;
   }
   if values.wordprocessingml_field_bold_override.is_some() {
     target.wordprocessingml_field_bold_override = values.wordprocessingml_field_bold_override;
@@ -20221,6 +20454,7 @@ struct NumberingLabel {
   text: Option<String>,
   suppressed_non_numerical_text: Option<String>,
   image: Option<InlineImage>,
+  image_replacement_text: Option<String>,
   style: TextStyle,
   justification: w::LevelJustificationValues,
   list_tab_stop_pt: Option<f32>,
@@ -20498,7 +20732,6 @@ impl NumberingCatalog {
         self.counters.insert(parent_key, parent_start);
         clear_numbering_counters_restarted_after(
           &mut self.counters,
-          instance,
           abstract_num,
           abstract_num_id,
           parent_level_index,
@@ -20521,7 +20754,6 @@ impl NumberingCatalog {
     };
     clear_numbering_counters_restarted_after(
       &mut self.counters,
-      instance,
       abstract_num,
       abstract_num_id,
       level_index,
@@ -20598,6 +20830,12 @@ impl NumberingCatalog {
       &mut text,
     );
     let picture_bullet = level.picture_bullet_id.is_some();
+    let image_replacement_text = picture_bullet.then(|| {
+      text
+        .strip_suffix(numbering_suffix_text(level.suffix))
+        .unwrap_or(&text)
+        .to_string()
+    });
     let image = level
       .picture_bullet_id
       .and_then(|id| self.picture_bullets.get(&id).cloned());
@@ -20608,6 +20846,7 @@ impl NumberingCatalog {
       text: (!picture_bullet).then_some(text),
       suppressed_non_numerical_text: (!picture_bullet).then_some(suppressed_non_numerical_text),
       image,
+      image_replacement_text,
       style,
       justification: level.justification,
       list_tab_stop_pt: level.list_tab_stop_pt,
@@ -20704,17 +20943,16 @@ fn numbering_level_restarts_after(
 
 fn clear_numbering_counters_restarted_after(
   counters: &mut HashMap<(i32, i32), i32>,
-  instance: &NumberingInstance,
   abstract_num: &AbstractNumbering,
   abstract_num_id: i32,
   used_level_index: i32,
 ) {
   for key_level in (used_level_index + 1)..=8 {
-    let restart_level = instance
-      .overrides
-      .get(&key_level)
-      .and_then(|override_| override_.level.as_ref())
-      .or_else(|| abstract_num.levels.get(&key_level));
+    // MS-OI29500 §2.1.282: Word ignores lvlRestart when it is carried by the
+    // lvl child of a numbering-instance override. Restart ownership remains
+    // with the abstract level; an absent abstract level falls back to the
+    // ordinary previous-level restart below.
+    let restart_level = abstract_num.levels.get(&key_level);
     if restart_level
       .is_some_and(|level| !numbering_level_restarts_after(level, key_level, used_level_index))
     {
@@ -20793,10 +21031,13 @@ fn numbering_drawing_image(
     static3d: properties.static3d,
     width_pt,
     height_pt,
+    inline_offset_x_pt: 0.0,
+    inline_offset_y_pt: 0.0,
     effect_left_pt: 0.0,
     effect_top_pt: 0.0,
     effect_right_pt: 0.0,
     effect_bottom_pt: 0.0,
+    inline_baseline_gap_pt: None,
     crop: properties.crop,
     rotation_deg: properties.rotation_deg,
     flip_horizontal: properties.flip_horizontal,
@@ -21506,6 +21747,16 @@ impl<'a> ParagraphProps<'a> {
       Self::Style(properties) => properties.suppress_line_numbers.as_ref(),
       Self::BaseStyle(properties) => properties.suppress_line_numbers.as_ref(),
       Self::Previous(properties) => properties.suppress_line_numbers.as_ref(),
+    }
+  }
+
+  fn suppress_overlap(&self) -> Option<&'a w::SuppressOverlap> {
+    match self {
+      Self::Direct(properties) => properties.suppress_overlap.as_ref(),
+      Self::Extended(properties) => properties.suppress_overlap.as_ref(),
+      Self::Style(properties) => properties.suppress_overlap.as_ref(),
+      Self::BaseStyle(properties) => properties.suppress_overlap.as_ref(),
+      Self::Previous(properties) => properties.suppress_overlap.as_ref(),
     }
   }
 
@@ -22449,6 +22700,7 @@ mod tests {
       style_ref_text: None,
       style_ref_numbering_text: None,
       list_label: None,
+      list_label_image: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
       list_label_tab_stop_pt: None,

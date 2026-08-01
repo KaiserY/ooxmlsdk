@@ -326,6 +326,12 @@ fn append_superscript_text(value: &m::Superscript, text: &mut String) {
   append_super_argument_text(&value.super_argument, text);
 }
 
+pub(crate) fn math_run_text(run: &m::Run) -> String {
+  let mut text = String::new();
+  append_run_text(run, &mut text);
+  text
+}
+
 fn append_run_text(run: &m::Run, text: &mut String) {
   let (script, style, normal_text) = math_run_variant(run.math_run_properties.as_deref());
   for choice in &run.run_choice {

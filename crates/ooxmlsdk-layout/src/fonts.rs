@@ -108,6 +108,9 @@ pub trait FontStyleRef {
   }
   fn character_spacing_pt(&self) -> f32;
   fn baseline_shift_pt(&self) -> f32;
+  fn automatic_escapement_font_sizes_pt(&self) -> Option<(f32, Option<f32>)> {
+    None
+  }
   fn bold(&self) -> bool;
   fn italic(&self) -> bool;
   fn small_caps(&self) -> bool;
@@ -236,6 +239,12 @@ impl FontStyleRef for TextStyle {
     self.baseline_shift_pt
   }
 
+  fn automatic_escapement_font_sizes_pt(&self) -> Option<(f32, Option<f32>)> {
+    self
+      .automatic_escapement_font_size_pt
+      .map(|size| (size, self.automatic_escapement_complex_font_size_pt))
+  }
+
   fn bold(&self) -> bool {
     self.bold
   }
@@ -328,6 +337,17 @@ impl FontStyleRef for common::TextStyle<'_> {
 
   fn baseline_shift_pt(&self) -> f32 {
     self.baseline_shift.0
+  }
+
+  fn automatic_escapement_font_sizes_pt(&self) -> Option<(f32, Option<f32>)> {
+    self.automatic_escapement_font_size.map(|size| {
+      (
+        size.0,
+        self
+          .automatic_escapement_complex_font_size
+          .map(|size| size.0),
+      )
+    })
   }
 
   fn bold(&self) -> bool {

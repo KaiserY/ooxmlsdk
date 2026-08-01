@@ -42,57 +42,14 @@ fn chart_text_blocks(
       )
     };
     for text in texts {
-      for segment in chart_visible_text_segments(text) {
-        let mut style = text_style_with_color(styles, color);
-        if vertical_axis_labels.iter().any(|label| label == &segment) {
-          style.rotation_deg = -90.0;
-        }
-        blocks.push(chart_text_block(segment, style));
+      let mut style = text_style_with_color(styles, color);
+      if vertical_axis_labels.iter().any(|label| label == &text) {
+        style.rotation_deg = -90.0;
       }
+      blocks.push(simple_text_block(text, style));
     }
   }
   blocks
-}
-
-fn chart_text_block(text: String, style: TextStyle) -> Block {
-  let mut block = simple_text_block(text.clone(), style);
-  if text == "datalabel2"
-    && let Block::Paragraph(paragraph) = &mut block
-  {
-    paragraph.format.indent_left_pt = 55.85;
-  }
-  block
-}
-
-fn chart_visible_text_segments(text: String) -> Vec<String> {
-  if text == "Horizontal, long axis title which breaks" {
-    return vec![text.clone(), text];
-  }
-
-  if text.contains("really really long data label") {
-    return chart_word_segments(text, 6);
-  }
-
-  if !(text.contains("flows out of the chart area") || text.contains("axis title box")) {
-    return vec![text];
-  }
-
-  chart_word_segments(text, 11)
-}
-
-fn chart_word_segments(text: String, segment_count: usize) -> Vec<String> {
-  let words = text.split_whitespace().collect::<Vec<_>>();
-  if words.len() <= segment_count {
-    return vec![text];
-  }
-
-  let mut segments = words
-    .iter()
-    .take(segment_count - 1)
-    .map(|word| (*word).to_string())
-    .collect::<Vec<_>>();
-  segments.push(words[(segment_count - 1)..].join(" "));
-  segments
 }
 
 fn chart_vertical_multilevel_axis_labels(chart_space: &c::ChartSpace) -> Vec<String> {

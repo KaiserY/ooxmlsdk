@@ -20,6 +20,7 @@ use crate::{common, units};
 pub(crate) struct DocxDocument {
   pub page: PageSetup,
   pub line_number_style: TextStyle,
+  pub note_separator_style: TextStyle,
   pub has_styles_part: bool,
   pub default_tab_stop_pt: f32,
   pub hyphenation: HyphenationSettings,
@@ -37,6 +38,7 @@ pub(crate) struct DocxDocument {
   pub footnote_blocks: Vec<Block>,
   pub footnotes: BTreeMap<i64, Vec<Block>>,
   pub footnote_numbering: Vec<NoteNumberingSpec>,
+  pub footnote_positions: Vec<w::FootnotePositionValues>,
   pub endnote_blocks: Vec<Block>,
   pub endnotes: BTreeMap<i64, Vec<Block>>,
   pub endnote_numbering: Vec<NoteNumberingSpec>,
@@ -153,6 +155,7 @@ pub(crate) struct FloatingFrame {
   pub height_pt: Option<f32>,
   pub height_rule: FrameHeightRule,
   pub placement: FloatingFramePlacement,
+  pub suppress_overlap: bool,
   /// Decoration supplied by a non-content anchor paragraph.
   ///
   /// Ordinary `framePr` paragraphs retain their own `pBdr`/`shd` because
@@ -190,9 +193,17 @@ pub(crate) struct Paragraph {
   pub style_ref_text: Option<Arc<str>>,
   pub style_ref_numbering_text: Option<Arc<str>>,
   pub list_label: Option<String>,
+  pub list_label_image: Option<ListLabelImage>,
   pub list_label_style: TextStyle,
   pub list_label_hyperlink_url: Option<String>,
   pub list_label_tab_stop_pt: Option<f32>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ListLabelImage {
+  pub image: InlineImage,
+  /// The visible `w:lvlText` characters replaced by instances of the image.
+  pub replacement_text: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -408,6 +419,7 @@ pub(crate) struct ParagraphFormat {
   pub contextual_spacing_set: bool,
   pub suppress_auto_hyphens: Option<bool>,
   pub suppress_line_numbers: Option<bool>,
+  pub suppress_overlap: Option<bool>,
   pub auto_space_de: Option<bool>,
   pub auto_space_dn: Option<bool>,
   pub hidden_separator: bool,
@@ -736,10 +748,18 @@ pub(crate) struct InlineImage {
   pub static3d: Option<common::drawingml_3d::Static3dStyle>,
   pub width_pt: f32,
   pub height_pt: f32,
+  /// Child-space offset inside an inline DrawingML group or canvas.
+  pub inline_offset_x_pt: f32,
+  pub inline_offset_y_pt: f32,
   pub effect_left_pt: f32,
   pub effect_top_pt: f32,
   pub effect_right_pt: f32,
   pub effect_bottom_pt: f32,
+  /// Distance from the visible object's bottom edge to its inline baseline.
+  ///
+  /// Ordinary pictures derive this from `effectExtent`; Office Math uses a
+  /// negative value because its baseline lies above scripts below the axis.
+  pub inline_baseline_gap_pt: Option<f32>,
   pub crop: ImageCrop,
   pub rotation_deg: f32,
   pub flip_horizontal: bool,
@@ -893,6 +913,9 @@ pub(crate) struct FloatingImagePlacement {
   pub vertical_relative_to: VerticalImageReference,
   pub horizontal_alignment: Option<HorizontalImageAlignment>,
   pub vertical_alignment: Option<VerticalImageAlignment>,
+  /// The shared host extent used by `wp:align` for children of a DrawingML
+  /// group. Child geometry still keeps its own mapped width and height.
+  pub alignment_extent: Option<FloatingAlignmentExtent>,
   pub horizontal_offset_pt: f32,
   pub vertical_offset_pt: f32,
   pub wrap: ImageWrapMode,
@@ -909,6 +932,16 @@ pub(crate) struct FloatingImagePlacement {
   pub margin_right_pt: f32,
   pub margin_bottom_pt: f32,
   pub margin_left_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct FloatingAlignmentExtent {
+  pub width_pt: f32,
+  pub height_pt: f32,
+  pub relative_width_to: Option<HorizontalImageReference>,
+  pub relative_width_pct: Option<f32>,
+  pub relative_height_to: Option<VerticalImageReference>,
+  pub relative_height_pct: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

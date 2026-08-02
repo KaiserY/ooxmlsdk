@@ -38,6 +38,14 @@ pub(crate) use display::{
 };
 pub use model::*;
 
+pub(crate) fn format_spreadsheet_number(value: f64, format_code: &str) -> String {
+  // DrawingML chart `c:numFmt` uses the same format-code language as
+  // SpreadsheetML cells. Keep one parser for digit placeholders, grouping,
+  // literal/currency sections, percentages, scaling commas and scientific
+  // notation so DOCX, PPTX and XLSX charts cannot drift from worksheet text.
+  print::rendered_number_text(&value.to_string(), Some(format_code), None, false).0
+}
+
 pub fn layout(
   package: &mut SpreadsheetDocument,
   options: &LayoutOptions,

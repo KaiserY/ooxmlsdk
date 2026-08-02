@@ -836,6 +836,7 @@ pub(crate) struct InlineChart {
   pub series_label_style: TextStyle,
   pub data_label_style: TextStyle,
   pub data_label_styles: Vec<Vec<Option<TextStyle>>>,
+  pub data_label_rich_text_styles: Vec<Vec<Vec<TextStyle>>>,
   pub gridline_color: RgbColor,
   pub value_gridline_width_pt: Option<f32>,
   pub axis_line_width_pt: Option<f32>,

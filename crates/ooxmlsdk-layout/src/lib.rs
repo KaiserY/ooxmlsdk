@@ -2,6 +2,8 @@ pub mod common;
 pub mod docx;
 pub mod error;
 pub mod fonts;
+#[doc(hidden)]
+pub mod localization;
 mod model;
 pub mod options;
 pub mod pptx;

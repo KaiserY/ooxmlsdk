@@ -18,6 +18,15 @@ pub struct PdfOptions {
   /// BCP 47 user-interface language for generated document labels.
   pub ui_language: Option<String>,
 
+  /// BCP 47 locale for locale-dependent number, date, currency, and value
+  /// formatting. This does not select translated application labels.
+  pub format_locale: Option<String>,
+
+  /// BCP 47 language for document authoring defaults and the PDF document
+  /// language. This does not select translated application labels or value
+  /// formatting conventions.
+  pub default_document_language: Option<String>,
+
   /// Local civil time used to refresh unlocked WordprocessingML DATE, TIME,
   /// PRINTDATE, and SAVEDATE fields. When absent, persisted field results
   /// remain authoritative.
@@ -43,6 +52,8 @@ impl Default for PdfOptions {
       jpeg_quality: None,
       source_file_name: None,
       ui_language: None,
+      format_locale: None,
+      default_document_language: None,
       field_update_datetime: None,
       general: PdfGeneralOptions::default(),
       images: PdfImageOptions::default(),
@@ -102,9 +113,20 @@ impl PdfOptions {
     ooxmlsdk_layout::options::LayoutOptions {
       source_file_name: self.source_file_name.clone(),
       ui_language: self.ui_language.clone(),
+      format_locale: self.format_locale.clone(),
+      default_document_language: self.default_document_language.clone(),
       field_update_datetime: self.field_update_datetime,
       ..Default::default()
     }
+  }
+
+  pub(crate) fn canonical_document_language(&self) -> Option<String> {
+    ooxmlsdk_layout::localization::canonical_office_locale_tag(
+      self.default_document_language.as_deref(),
+    )
+    .or_else(|| {
+      ooxmlsdk_layout::localization::canonical_office_locale_tag(self.ui_language.as_deref())
+    })
   }
 }
 

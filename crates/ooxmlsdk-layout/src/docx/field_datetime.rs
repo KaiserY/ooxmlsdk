@@ -1,3 +1,4 @@
+use crate::localization::canonical_locale;
 use crate::options::FieldUpdateDateTime;
 
 const ENGLISH_MONTHS_SHORT: [&str; 12] = [
@@ -67,28 +68,28 @@ pub(super) fn format_date_time_field(
 
 fn default_date_picture(language: Option<&str>) -> Option<&'static str> {
   language
-    .map_or(true, |language| {
-      language.eq_ignore_ascii_case("en-US") || language.eq_ignore_ascii_case("en")
-    })
+    .is_none_or(english_us_or_unspecified_region)
     .then_some("M/d/yyyy")
 }
 
 fn default_time_picture(language: Option<&str>) -> Option<&'static str> {
   language
-    .map_or(true, |language| {
-      language.eq_ignore_ascii_case("en-US") || language.eq_ignore_ascii_case("en")
-    })
+    .is_none_or(english_us_or_unspecified_region)
     .then_some("h:mm:ss am/pm")
 }
 
 fn default_document_date_time_picture(language: Option<&str>) -> Option<&'static str> {
-  match language?.to_ascii_lowercase().as_str() {
-    // Word's no-picture PRINTDATE/SAVEDATE result follows w:lang. Keep this
-    // deliberately bounded to the locales demonstrated by the upstream
-    // field fixtures and Office golden output.
-    "en-us" => Some("M/d/yyyy h:mm:ss am/pm"),
-    "en-gb" => Some("dd/MM/yyyy HH:mm:ss"),
-    "en-in" => Some("dd-MM-yyyy HH:mm:ss"),
+  let locale = canonical_locale(language?)?;
+  if locale.id.language.as_str() != "en" {
+    return None;
+  }
+  // Word's no-picture PRINTDATE/SAVEDATE result follows w:lang. Keep this
+  // deliberately bounded to the locales demonstrated by the upstream field
+  // fixtures and Office golden output.
+  match locale.id.region.map(|region| region.to_string()).as_deref() {
+    Some("US") => Some("M/d/yyyy h:mm:ss am/pm"),
+    Some("GB") => Some("dd/MM/yyyy HH:mm:ss"),
+    Some("IN") => Some("dd-MM-yyyy HH:mm:ss"),
     _ => None,
   }
 }
@@ -201,8 +202,18 @@ fn format_number(value: u16, count: usize, padded_count: usize) -> Option<String
 }
 
 fn english_language(language: Option<&str>) -> bool {
-  language.map_or(true, |language| {
-    language.eq_ignore_ascii_case("en") || language.to_ascii_lowercase().starts_with("en-")
+  language.is_none_or(|language| {
+    canonical_locale(language).is_some_and(|locale| locale.id.language.as_str() == "en")
+  })
+}
+
+fn english_us_or_unspecified_region(language: &str) -> bool {
+  canonical_locale(language).is_some_and(|locale| {
+    locale.id.language.as_str() == "en"
+      && locale
+        .id
+        .region
+        .is_none_or(|region| region.as_str() == "US")
   })
 }
 

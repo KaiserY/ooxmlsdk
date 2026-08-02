@@ -6,6 +6,7 @@ use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
 use crate::error::Result;
+use crate::localization::OfficeLocaleContext;
 use crate::model::RgbColor;
 
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
@@ -56,11 +57,11 @@ impl WorkbookFragment {
     &mut self,
     package: &mut SpreadsheetDocument,
     producer: SpreadsheetProducerProfile,
-    ui_language: Option<&str>,
+    locales: &OfficeLocaleContext,
   ) -> Result<Vec<CalcSheet>> {
     // WorkbookFragment::finalizeImport imports theme/styles/shared strings
     // before creating all sheet globals/fragments in workbook sheet order.
-    self.styles = StylesCatalog::from_workbook_part(package, &self.workbook_part, ui_language)?;
+    self.styles = StylesCatalog::from_workbook_part(package, &self.workbook_part, locales)?;
     self.shared_strings = shared_strings(package, &self.workbook_part)?;
     self.defined_names = DefinedNamesCatalog::from_workbook(&self.workbook);
     let date_1904 = self

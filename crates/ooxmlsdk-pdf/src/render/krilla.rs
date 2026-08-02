@@ -363,7 +363,7 @@ fn render_inner(
   let mut fonts = FontSet::new();
   let mut images = ImageSet::default();
   let tagging_enabled = options.general.tagged_pdf || options.general.pdf_ua_compliance;
-  let mut tag_tree = TagTree::new().with_lang(options.ui_language.clone());
+  let mut tag_tree = TagTree::new().with_lang(options.canonical_document_language());
 
   for (page_index, page) in paint.pages.iter().enumerate() {
     let mut settings = PageSettings::from_wh(page.width_pt, page.height_pt)
@@ -1901,19 +1901,12 @@ fn image_page_item_from_common<'doc>(
 }
 
 fn missing_linked_image_text(ui_language: Option<&str>) -> &'static str {
-  if is_simplified_chinese_ui_language(ui_language) {
-    "无法显示链接的图像。该文件可能已被移动、重命名或删除。请验证该链接是否指向正确的文件和位置。"
-  } else {
-    "The linked image cannot be displayed. The file may have been moved, renamed, or deleted. Verify that the link points to the correct file and location."
-  }
+  ooxmlsdk_layout::localization::office_missing_linked_image_resource(ui_language).text
 }
 
 fn missing_linked_image_text_style(ui_language: Option<&str>) -> TextStyle<'static> {
-  let font_family = if is_simplified_chinese_ui_language(ui_language) {
-    "SimSun"
-  } else {
-    "Arial"
-  };
+  let font_family =
+    ooxmlsdk_layout::localization::office_missing_linked_image_resource(ui_language).font_family;
   TextStyle {
     font_family: Some(Cow::Borrowed(font_family)),
     east_asia_font_family: Some(Cow::Borrowed(font_family)),
@@ -1927,11 +1920,6 @@ fn missing_linked_image_text_style(ui_language: Option<&str>) -> TextStyle<'stat
     outline_opacity: 1.0,
     ..TextStyle::default()
   }
-}
-
-fn is_simplified_chinese_ui_language(ui_language: Option<&str>) -> bool {
-  let language = ui_language.unwrap_or_default().to_ascii_lowercase();
-  language == "zh-cn" || language == "zh-sg" || language.starts_with("zh-hans")
 }
 
 fn wrap_missing_linked_image_text(
@@ -6569,8 +6557,8 @@ fn pdf_metadata(options: &PdfOptions) -> Metadata {
   if let Some(producer) = &options.metadata.producer {
     metadata = metadata.producer(producer.clone());
   }
-  if let Some(language) = &options.ui_language {
-    metadata = metadata.language(language.clone());
+  if let Some(language) = options.canonical_document_language() {
+    metadata = metadata.language(language);
   }
   metadata
 }

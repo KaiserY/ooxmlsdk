@@ -5,6 +5,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use std::sync::Arc;
 
 use crate::error::Result;
+use crate::localization::{OfficeLocaleContext, OfficeResourceLocale};
 use crate::model::{BorderDashPattern, BorderStyle, RgbColor, TextStyle};
 use crate::pptx::drawingml::color::{ResolvedColor, apply_excel_tint};
 use crate::pptx::drawingml::fill::FillProperties;
@@ -29,8 +30,9 @@ pub(crate) struct StylesCatalog {
   indexed_colors: Vec<RgbColor>,
   theme_major_east_asian: Option<Arc<str>>,
   theme_minor_east_asian: Option<Arc<str>>,
-  missing_theme_minor_from_ui: bool,
+  missing_theme_minor_from_document_language: bool,
   builtin_number_format_locale: BuiltinNumberFormatLocale,
+  locales: OfficeLocaleContext,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -184,11 +186,12 @@ impl OrderedF64 {
 }
 
 impl StylesCatalog {
-  pub(crate) fn output_ui_language(&self) -> &'static str {
-    match self.builtin_number_format_locale {
-      BuiltinNumberFormatLocale::EnglishUs => "en-US",
-      BuiltinNumberFormatLocale::ChineseSimplified => "zh-CN",
-    }
+  pub(crate) fn has_explicit_ui_language(&self) -> bool {
+    self.locales.ui_language().is_some()
+  }
+
+  pub(crate) fn output_ui_language(&self) -> &str {
+    self.locales.ui_language_or_default()
   }
 
   pub(crate) fn theme_color(&self, index: u32, tint: f64) -> Option<RgbColor> {
@@ -221,7 +224,7 @@ impl StylesCatalog {
   pub(crate) fn from_workbook_part(
     package: &mut SpreadsheetDocument,
     workbook_part: &WorkbookPart,
-    ui_language: Option<&str>,
+    locales: &OfficeLocaleContext,
   ) -> Result<Self> {
     let (theme_fonts, theme_format, theme_colors) =
       if let Some(theme_part) = workbook_part.theme_part(package) {
@@ -236,24 +239,28 @@ impl StylesCatalog {
       } else {
         (None, None, ThemeColorPalette::default())
       };
-    let missing_theme_minor = missing_theme_minor_font(theme_fonts.as_ref(), ui_language);
+    let missing_theme_minor = missing_theme_minor_font(
+      theme_fonts.as_ref(),
+      locales.default_document_resource_locale(),
+    );
     let Some(styles_part) = workbook_part.workbook_styles_part(package) else {
       return Ok(Self {
         theme_fonts,
         theme_format,
         theme_colors,
-        missing_theme_minor_from_ui: missing_theme_minor.is_some(),
+        missing_theme_minor_from_document_language: missing_theme_minor.is_some(),
         theme_minor_east_asian: missing_theme_minor,
-        builtin_number_format_locale: builtin_number_format_locale(ui_language),
+        builtin_number_format_locale: builtin_number_format_locale(locales),
+        locales: locales.clone(),
         ..Self::default()
       });
     };
 
     let stylesheet = styles_part.root_element(package)?;
     let mut catalog =
-      Self::from_stylesheet(stylesheet, theme_fonts.as_ref(), theme_colors, ui_language);
+      Self::from_stylesheet(stylesheet, theme_fonts.as_ref(), theme_colors, locales);
     catalog.theme_format = theme_format;
-    catalog.missing_theme_minor_from_ui = missing_theme_minor.is_some();
+    catalog.missing_theme_minor_from_document_language = missing_theme_minor.is_some();
     catalog.theme_minor_east_asian = catalog.theme_minor_east_asian.or(missing_theme_minor);
     Ok(catalog)
   }
@@ -262,8 +269,9 @@ impl StylesCatalog {
     stylesheet: &x::Stylesheet,
     theme_fonts: Option<&ThemeFontScheme>,
     theme_colors: ThemeColorPalette,
-    ui_language: Option<&str>,
+    locales: &OfficeLocaleContext,
   ) -> Self {
+    let document_language = locales.default_document_language();
     let indexed_colors = stylesheet
       .colors
       .as_ref()
@@ -406,15 +414,16 @@ impl StylesCatalog {
       theme_fonts: theme_fonts.cloned(),
       theme_format: None,
       theme_major_east_asian: theme_fonts
-        .and_then(|fonts| fonts.resolve_font_for_language("+mj-ea", ui_language))
+        .and_then(|fonts| fonts.resolve_font_for_language("+mj-ea", document_language))
         .map(Arc::from),
       theme_minor_east_asian: theme_fonts
-        .and_then(|fonts| fonts.resolve_font_for_language("+mn-ea", ui_language))
+        .and_then(|fonts| fonts.resolve_font_for_language("+mn-ea", document_language))
         .map(Arc::from),
-      missing_theme_minor_from_ui: false,
+      missing_theme_minor_from_document_language: false,
       theme_colors,
       indexed_colors,
-      builtin_number_format_locale: builtin_number_format_locale(ui_language),
+      builtin_number_format_locale: builtin_number_format_locale(locales),
+      locales: locales.clone(),
     }
   }
 
@@ -533,7 +542,7 @@ impl StylesCatalog {
   pub(crate) fn default_font_text_style(&self) -> TextStyle {
     let mut style = TextStyle::default();
     let Some(font) = self.font_records.first() else {
-      if self.missing_theme_minor_from_ui
+      if self.missing_theme_minor_from_document_language
         && let Some(font_family) = &self.theme_minor_east_asian
       {
         style.font_family = Some(Arc::clone(font_family));
@@ -602,7 +611,7 @@ impl StylesCatalog {
   pub(crate) fn document_font_text_style_for_column_width(&self) -> Option<TextStyle> {
     let mut style = TextStyle::default();
     let font = self.font_records.first()?;
-    if self.missing_theme_minor_from_ui {
+    if self.missing_theme_minor_from_document_language {
       if let Some(name) = &font.name {
         style.font_family = Some(Arc::clone(name));
       }
@@ -794,7 +803,7 @@ impl StylesCatalog {
   }
 
   pub(crate) fn uses_application_default_minor_theme(&self) -> bool {
-    self.missing_theme_minor_from_ui
+    self.missing_theme_minor_from_document_language
   }
 
   pub(crate) fn default_font_uses_theme(&self) -> bool {
@@ -834,6 +843,20 @@ impl StylesCatalog {
       && normal_font
         .size_pt
         .is_some_and(|size| (size.get() - 11.0).abs() <= f64::EPSILON)
+      && normal_font.scheme == x::FontSchemeValues::None
+  }
+
+  pub(crate) fn normal_style_uses_explicit_arial_10(&self) -> bool {
+    let Some(normal_font) = self.font_records.first() else {
+      return false;
+    };
+    normal_font
+      .name
+      .as_deref()
+      .is_some_and(|font| font.eq_ignore_ascii_case("Arial"))
+      && normal_font
+        .size_pt
+        .is_some_and(|size| (size.get() - 10.0).abs() <= f64::EPSILON)
       && normal_font.scheme == x::FontSchemeValues::None
   }
 
@@ -883,9 +906,8 @@ impl StylesCatalog {
   }
 }
 
-fn builtin_number_format_locale(ui_language: Option<&str>) -> BuiltinNumberFormatLocale {
-  let language = ui_language.unwrap_or_default().to_ascii_lowercase();
-  if language == "zh-cn" || language == "zh-hans" || language.starts_with("zh-hans-cn-") {
+fn builtin_number_format_locale(locales: &OfficeLocaleContext) -> BuiltinNumberFormatLocale {
+  if locales.format_locale_is_simplified_chinese() {
     BuiltinNumberFormatLocale::ChineseSimplified
   } else {
     BuiltinNumberFormatLocale::EnglishUs
@@ -894,7 +916,7 @@ fn builtin_number_format_locale(ui_language: Option<&str>) -> BuiltinNumberForma
 
 fn missing_theme_minor_font(
   theme_fonts: Option<&ThemeFontScheme>,
-  ui_language: Option<&str>,
+  document_resource_locale: OfficeResourceLocale,
 ) -> Option<Arc<str>> {
   if theme_fonts.is_some() {
     return None;
@@ -903,7 +925,8 @@ fn missing_theme_minor_font(
   // OOXML package omits theme1.xml. Microsoft documents DengXian as the
   // Simplified Chinese Office default; retain stored Latin names for every
   // explicit non-theme font and for all other locales.
-  (builtin_number_format_locale(ui_language) == BuiltinNumberFormatLocale::ChineseSimplified)
+  document_resource_locale
+    .is_simplified_chinese()
     .then(|| Arc::from("DengXian"))
 }
 
@@ -1538,9 +1561,13 @@ mod tests {
   }
 
   #[test]
-  fn builtin_short_date_format_follows_the_output_ui_language() {
+  fn builtin_short_date_format_follows_the_format_locale() {
     let simplified_chinese = StylesCatalog {
-      builtin_number_format_locale: builtin_number_format_locale(Some("zh-CN")),
+      builtin_number_format_locale: builtin_number_format_locale(&OfficeLocaleContext::new(
+        None,
+        Some("zh-CN"),
+        None,
+      )),
       ..StylesCatalog::default()
     };
     let english = StylesCatalog::default();
@@ -1612,8 +1639,11 @@ mod tests {
   #[test]
   fn missing_theme_uses_the_simplified_chinese_office_minor_font() {
     let catalog = StylesCatalog {
-      theme_minor_east_asian: missing_theme_minor_font(None, Some("zh-CN")),
-      missing_theme_minor_from_ui: true,
+      theme_minor_east_asian: missing_theme_minor_font(
+        None,
+        OfficeResourceLocale::SimplifiedChinese,
+      ),
+      missing_theme_minor_from_document_language: true,
       ..StylesCatalog::default()
     };
     let themed_font = FontRecord {
@@ -1634,14 +1664,17 @@ mod tests {
     assert_eq!(themed_style.font_family.as_deref(), Some("DengXian"));
     assert_eq!(explicit_style.font_family.as_deref(), Some("Calibri"));
     assert!(catalog.uses_application_default_minor_theme());
-    assert_eq!(missing_theme_minor_font(None, Some("en-US")), None);
+    assert_eq!(
+      missing_theme_minor_font(None, OfficeResourceLocale::English),
+      None
+    );
   }
 
   #[test]
   fn workbook_without_a_styles_part_uses_the_application_default_font() {
     let catalog = StylesCatalog {
       theme_minor_east_asian: Some(Arc::from("DengXian")),
-      missing_theme_minor_from_ui: true,
+      missing_theme_minor_from_document_language: true,
       ..StylesCatalog::default()
     };
 
@@ -1660,7 +1693,7 @@ mod tests {
         ..FontRecord::default()
       }],
       theme_minor_east_asian: Some(Arc::from("DengXian")),
-      missing_theme_minor_from_ui: true,
+      missing_theme_minor_from_document_language: true,
       ..StylesCatalog::default()
     };
 

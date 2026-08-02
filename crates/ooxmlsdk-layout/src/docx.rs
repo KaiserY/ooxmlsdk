@@ -50,6 +50,7 @@ use crate::common::drawingml_image_effects::{
   ImageEffect, ImageEffectColorResolver, ResolvedEffectColor,
 };
 use crate::error::Result;
+use crate::localization::{OfficeLocaleContext, OfficeResourceLocale, OfficeStringCatalog};
 use crate::model::common_rgb;
 use crate::options::{
   FieldUpdateDateTime, LayoutActionOptions, LayoutDiagnosticsOptions, LayoutOptions,
@@ -207,12 +208,12 @@ pub(crate) fn extract(
     ..Default::default()
   };
   let explicit_default_tab_stop_pt = explicit_default_tab_stop_pt(package, &main);
-  let mut styles = StylesCatalog::load(
-    package,
-    &main,
-    import_settings,
+  let locales = OfficeLocaleContext::new(
     options.ui_language.as_deref(),
-  )?;
+    options.format_locale.as_deref(),
+    options.default_document_language.as_deref(),
+  );
+  let mut styles = StylesCatalog::load(package, &main, import_settings, &locales)?;
   styles.display_math_alignment = document_math_settings.display_alignment;
   styles.math_font_family = document_math_settings.font_family;
   styles.literal_text_tabs_use_default_stops = explicit_default_tab_stop_pt.is_some();
@@ -271,7 +272,7 @@ pub(crate) fn extract(
     &mut sections,
     &body_styles,
     update_fields_on_open,
-    options.ui_language.as_deref(),
+    body_styles.locales.ui_language(),
     &body_level_bookmarks,
   );
   if body_styles.uses_office_recovered_paragraph_defaults() {
@@ -414,6 +415,8 @@ pub fn layout_anchor_pages(
   let anchor_options = LayoutOptions {
     source_file_name: None,
     ui_language: options.ui_language.clone(),
+    format_locale: options.format_locale.clone(),
+    default_document_language: options.default_document_language.clone(),
     field_update_datetime: options.field_update_datetime,
     action: LayoutActionOptions {
       paint: false,
@@ -11587,10 +11590,8 @@ fn drawing_chart_shapes(
       b: 70,
     },
   ];
-  let cartesian = shared_chart::cartesian_chart_for_ui_language(
-    chart_space,
-    styles.simplified_chinese_ui.then_some("zh-CN"),
-  );
+  let cartesian =
+    shared_chart::cartesian_chart_for_ui_language(chart_space, styles.locales.ui_language());
   let series = shared_chart::series(chart_space);
   let series_count = series.len();
   let series_colors = (0..series_count)
@@ -11756,12 +11757,15 @@ fn drawing_chart_shapes(
   };
   title_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
   label_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
-  let chart_east_asia_font = if styles.simplified_chinese_ui {
-    Some(
-      styles
-        .theme_fonts
-        .resolve_drawingml_typeface_for_language("+mn-ea", Some("zh-CN")),
-    )
+  let chart_east_asia_font = if styles
+    .locales
+    .default_document_resource_locale()
+    .is_chinese()
+  {
+    Some(styles.theme_fonts.resolve_drawingml_typeface_for_language(
+      "+mn-ea",
+      styles.locales.default_document_language(),
+    ))
   } else {
     styles.doc_default_run.east_asia_font_family.clone()
   };
@@ -11850,28 +11854,19 @@ fn drawing_chart_shapes(
   {
     apply_chart_text_properties(&mut data_label_style, properties, styles);
   }
-  let data_label_styles = cartesian
-    .as_ref()
-    .map(|chart| {
-      chart
-        .series
-        .iter()
-        .map(|series| {
-          series
-            .data_labels
-            .iter()
-            .map(|label| {
-              label.text_properties.map(|properties| {
-                let mut style = label_style.clone();
-                apply_chart_text_properties(&mut style, properties, styles);
-                style
-              })
-            })
-            .collect()
-        })
-        .collect()
-    })
-    .unwrap_or_default();
+  let (data_label_styles, data_label_rich_text_styles) = if let Some(chart) = cartesian.as_ref() {
+    chart
+      .series
+      .iter()
+      .map(|series| chart_data_label_host_styles(&series.data_labels, &data_label_style, styles))
+      .unzip()
+  } else if let Some(chart) = shared_chart::pie_chart_model(chart_space) {
+    let (label_styles, rich_text_styles) =
+      chart_data_label_host_styles(&chart.data_labels, &data_label_style, styles);
+    (vec![label_styles], vec![rich_text_styles])
+  } else {
+    (Vec::new(), Vec::new())
+  };
   let data_label_fill_colors = cartesian
     .as_ref()
     .map(|chart| {
@@ -11894,15 +11889,8 @@ fn drawing_chart_shapes(
         .collect()
     })
     .unwrap_or_default();
-  let ui_language = if styles.simplified_chinese_ui {
-    Some("zh-CN".to_string())
-  } else {
-    chart_space
-      .editing_language
-      .as_ref()
-      .map(|language| language.val.to_string())
-  };
-  let automatic_title = shared_chart::automatic_chart_title(ui_language.as_deref()).to_string();
+  let ui_language = styles.locales.ui_language().map(str::to_owned);
+  let automatic_title = styles.locales.strings().chart_title().to_string();
   let gridline_color = cartesian
     .as_ref()
     .and_then(|chart| chart.value_axis)
@@ -11981,6 +11969,7 @@ fn drawing_chart_shapes(
     series_label_style,
     data_label_style,
     data_label_styles,
+    data_label_rich_text_styles,
     gridline_color,
     value_gridline_width_pt,
     axis_line_width_pt,
@@ -12059,12 +12048,15 @@ fn drawing_extended_chart_shapes(
   };
   title_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
   label_style.fallback_font_family = styles.doc_default_run.fallback_font_family.clone();
-  let chart_east_asia_font = if styles.simplified_chinese_ui {
-    Some(
-      styles
-        .theme_fonts
-        .resolve_drawingml_typeface_for_language("+mn-ea", Some("zh-CN")),
-    )
+  let chart_east_asia_font = if styles
+    .locales
+    .default_document_resource_locale()
+    .is_chinese()
+  {
+    Some(styles.theme_fonts.resolve_drawingml_typeface_for_language(
+      "+mn-ea",
+      styles.locales.default_document_language(),
+    ))
   } else {
     styles.doc_default_run.east_asia_font_family.clone()
   };
@@ -12078,11 +12070,8 @@ fn drawing_extended_chart_shapes(
     extended_chart_styles: resource.chart_styles.clone(),
     extended_chart_color_styles: resource.color_styles.clone(),
     extended_chart_theme: chart_ex_theme(&styles.theme_colors),
-    ui_language: styles.simplified_chinese_ui.then(|| "zh-CN".to_string()),
-    automatic_title: shared_chart::automatic_chart_title(
-      styles.simplified_chinese_ui.then_some("zh-CN"),
-    )
-    .to_string(),
+    ui_language: styles.locales.ui_language().map(str::to_owned),
+    automatic_title: shared_chart::automatic_chart_title(styles.locales.ui_language()).to_string(),
     title_style,
     label_style: label_style.clone(),
     category_label_style: label_style.clone(),
@@ -12090,6 +12079,7 @@ fn drawing_extended_chart_shapes(
     series_label_style: label_style.clone(),
     data_label_style: label_style,
     data_label_styles: Vec::new(),
+    data_label_rich_text_styles: Vec::new(),
     gridline_color: RgbColor {
       r: 134,
       g: 134,
@@ -12173,6 +12163,39 @@ fn apply_chart_rich_title_properties(
   }
 }
 
+fn chart_data_label_host_styles(
+  labels: &[shared_chart::ClusteredColumnDataLabel<'_>],
+  base_style: &TextStyle,
+  styles: &StylesCatalog,
+) -> (Vec<Option<TextStyle>>, Vec<Vec<TextStyle>>) {
+  let mut label_styles = Vec::with_capacity(labels.len());
+  let mut rich_text_styles = Vec::with_capacity(labels.len());
+  for label in labels {
+    let mut label_style = base_style.clone();
+    if let Some(properties) = label.text_properties {
+      apply_chart_text_properties(&mut label_style, properties, styles);
+    }
+    label_styles.push(label.text_properties.is_some().then(|| label_style.clone()));
+    rich_text_styles.push(
+      label
+        .rich_text_runs
+        .iter()
+        .map(|run| {
+          let mut style = label_style.clone();
+          if let Some(properties) = run.paragraph_default_run_properties {
+            apply_chart_default_run_properties(&mut style, properties, styles);
+          }
+          if let Some(properties) = run.run_properties {
+            apply_chart_run_properties(&mut style, properties, styles);
+          }
+          style
+        })
+        .collect(),
+    );
+  }
+  (label_styles, rich_text_styles)
+}
+
 fn apply_chart_default_run_properties(
   style: &mut TextStyle,
   properties: &a::DefaultRunProperties,
@@ -12203,7 +12226,7 @@ fn apply_chart_default_run_properties(
   {
     style.east_asia_font_family = Some(styles.theme_fonts.resolve_drawingml_typeface_for_language(
       typeface,
-      styles.simplified_chinese_ui.then_some("zh-CN"),
+      styles.locales.default_document_language(),
     ));
   }
   if let Some(a::DefaultRunPropertiesChoice::SolidFill(fill)) =
@@ -12245,7 +12268,7 @@ fn apply_chart_run_properties(
   {
     style.east_asia_font_family = Some(styles.theme_fonts.resolve_drawingml_typeface_for_language(
       typeface,
-      styles.simplified_chinese_ui.then_some("zh-CN"),
+      styles.locales.default_document_language(),
     ));
   }
   if let Some(a::RunPropertiesChoice::SolidFill(fill)) = properties.run_properties_choice1.as_ref()
@@ -17889,6 +17912,7 @@ struct StylesCatalog {
   import_settings: ImportSettings,
   display_math_alignment: Option<ParagraphAlignment>,
   math_font_family: Option<Arc<str>>,
+  locales: OfficeLocaleContext,
   simplified_chinese_ui: bool,
   preserve_word_text_whitespace: bool,
   literal_text_tabs_use_default_stops: bool,
@@ -18166,7 +18190,7 @@ impl StylesCatalog {
     package: &mut WordprocessingDocument,
     main: &MainDocumentPart,
     import_settings: ImportSettings,
-    ui_language: Option<&str>,
+    locales: &OfficeLocaleContext,
   ) -> Result<Self> {
     let theme = ThemeData::load(package, main);
     let font_substitutions = load_font_substitutions(package, main);
@@ -18174,7 +18198,8 @@ impl StylesCatalog {
     let Some(styles_part) = main.style_definitions_part(package) else {
       let mut catalog = Self {
         import_settings,
-        simplified_chinese_ui: is_simplified_chinese_ui_language(ui_language),
+        locales: locales.clone(),
+        simplified_chinese_ui: locales.resource_locale().is_simplified_chinese(),
         theme_fonts: theme.fonts,
         theme_colors: theme.colors,
         theme_lines: theme.lines,
@@ -18196,7 +18221,9 @@ impl StylesCatalog {
       // for WordprocessingML.
       catalog.doc_default_run.ligatures = Some(common::OpenTypeLigatures::default());
       if catalog.doc_default_run.font_family.is_none() {
-        catalog.doc_default_run.font_family = Some(office_default_font_family(ui_language));
+        catalog.doc_default_run.font_family = Some(office_default_font_family_for_resource_locale(
+          locales.default_document_resource_locale(),
+        ));
       }
       return Ok(catalog);
     };
@@ -18217,7 +18244,8 @@ impl StylesCatalog {
       .is_some();
     let mut catalog = Self {
       import_settings,
-      simplified_chinese_ui: is_simplified_chinese_ui_language(ui_language),
+      locales: locales.clone(),
+      simplified_chinese_ui: locales.resource_locale().is_simplified_chinese(),
       has_styles_part: true,
       has_default_paragraph_properties,
       doc_default_run: word_doc_default_run_seed(has_default_run_properties),
@@ -18336,7 +18364,9 @@ impl StylesCatalog {
           Some(if has_default_run_properties && !has_default_run_fonts {
             Arc::from("Times New Roman")
           } else {
-            office_default_font_family(ui_language)
+            office_default_font_family_for_resource_locale(
+              catalog.locales.default_document_resource_locale(),
+            )
           })
         });
     }
@@ -18727,11 +18757,13 @@ fn font_substitution_from_table_entry(font: &w::Font) -> Option<(String, FontSub
   })
 }
 
-fn office_default_font_family(ui_language: Option<&str>) -> Arc<str> {
+fn office_default_font_family_for_resource_locale(
+  resource_locale: OfficeResourceLocale,
+) -> Arc<str> {
   // Microsoft documents DengXian as the Office 2016+ default font for the
   // Simplified Chinese editions of Word, Excel, and PowerPoint. Keep this
   // fallback below explicit document styles and theme fonts.
-  if is_simplified_chinese_ui_language(ui_language) {
+  if resource_locale.is_simplified_chinese() {
     Arc::from("DengXian")
   } else {
     Arc::from("Calibri")
@@ -18751,11 +18783,9 @@ fn word_doc_default_run_seed(has_default_run_properties: bool) -> TextStyle {
 }
 
 fn is_simplified_chinese_ui_language(ui_language: Option<&str>) -> bool {
-  let language = ui_language.unwrap_or_default().to_ascii_lowercase();
-  language == "zh-cn"
-    || language == "zh-sg"
-    || language == "zh-hans"
-    || language.starts_with("zh-hans-")
+  OfficeStringCatalog::for_ui_language(ui_language)
+    .resource_locale()
+    .is_simplified_chinese()
 }
 
 struct StyleChain<'a> {
@@ -18954,7 +18984,7 @@ impl ThemeFonts {
     let script = language.and_then(theme_language_script)?;
     fonts
       .iter()
-      .find(|(candidate, _)| candidate.eq_ignore_ascii_case(script))
+      .find(|(candidate, _)| candidate.eq_ignore_ascii_case(script.as_ref()))
       .map(|(_, typeface)| Arc::clone(typeface))
   }
 }
@@ -18972,34 +19002,8 @@ fn theme_supplemental_fonts(fonts: &[a::SupplementalFont]) -> Vec<(Arc<str>, Arc
     .collect()
 }
 
-fn theme_language_script(language: &str) -> Option<&'static str> {
-  let language = language.to_ascii_lowercase();
-  if language == "zh-hant"
-    || language.starts_with("zh-hant-")
-    || language == "zh-tw"
-    || language == "zh-hk"
-    || language == "zh-mo"
-  {
-    Some("Hant")
-  } else if language == "zh"
-    || language.starts_with("zh-hans")
-    || language == "zh-cn"
-    || language == "zh-sg"
-  {
-    Some("Hans")
-  } else if language == "ja" || language.starts_with("ja-") {
-    Some("Jpan")
-  } else if language == "ko" || language.starts_with("ko-") {
-    Some("Hang")
-  } else if language == "ar" || language.starts_with("ar-") {
-    Some("Arab")
-  } else if language == "he" || language.starts_with("he-") {
-    Some("Hebr")
-  } else if language == "th" || language.starts_with("th-") {
-    Some("Thai")
-  } else {
-    None
-  }
+fn theme_language_script(language: &str) -> Option<Arc<str>> {
+  crate::localization::drawingml_theme_script(language)
 }
 
 impl ThemeLineStyles {
@@ -25228,21 +25232,19 @@ mod tests {
   }
 
   #[test]
-  fn office_default_font_follows_simplified_chinese_ui_language() {
+  fn office_default_font_follows_simplified_chinese_document_language() {
     assert_eq!(
-      office_default_font_family(Some("zh-CN")).as_ref(),
+      office_default_font_family_for_resource_locale(OfficeResourceLocale::SimplifiedChinese)
+        .as_ref(),
       "DengXian"
     );
     assert_eq!(
-      office_default_font_family(Some("zh-Hans-SG")).as_ref(),
-      "DengXian"
-    );
-    assert_eq!(
-      office_default_font_family(Some("zh-TW")).as_ref(),
+      office_default_font_family_for_resource_locale(OfficeResourceLocale::TraditionalChinese)
+        .as_ref(),
       "Calibri"
     );
     assert_eq!(
-      office_default_font_family(Some("en-US")).as_ref(),
+      office_default_font_family_for_resource_locale(OfficeResourceLocale::English).as_ref(),
       "Calibri"
     );
   }
@@ -25502,7 +25504,7 @@ mod tests {
   }
 
   #[test]
-  fn drawingml_east_asian_theme_font_uses_the_output_ui_language_as_fallback() {
+  fn drawingml_east_asian_theme_font_uses_the_document_language_as_fallback() {
     let fonts = ThemeFonts {
       minor_supplemental: vec![
         (Arc::from("Hans"), Arc::from("DengXian")),
@@ -25524,6 +25526,7 @@ mod tests {
     )
     .expect("chart text properties");
     let styles = StylesCatalog {
+      locales: OfficeLocaleContext::new(Some("en-US"), None, Some("zh-CN")),
       simplified_chinese_ui: true,
       theme_fonts: ThemeFonts {
         minor_supplemental: vec![(Arc::from("Hans"), Arc::from("DengXian"))],

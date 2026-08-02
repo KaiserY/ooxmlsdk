@@ -100,13 +100,6 @@ impl Stroke<'_> {
       return Some(dash.clone());
     }
     let preset = self.preset_dash?;
-    if preset == StrokeDashPreset::SystemDot && self.cap == Some(StrokeCap::Round) {
-      // A round cap extends half a line width beyond both ends of every dash
-      // segment. PowerPoint therefore lowers a round-capped `sysDot` to a
-      // zero-length segment followed by a two-width gap: the cap turns the
-      // segment into a one-width circle while preserving the two-width cycle.
-      return Some(vec![Pt(0.0), Pt(2.0 * self.width.0)]);
-    }
     let multipliers: &[f32] = match preset {
       StrokeDashPreset::Solid => return None,
       StrokeDashPreset::Dot => &[1.0, 3.0],
@@ -120,10 +113,28 @@ impl Stroke<'_> {
       StrokeDashPreset::SystemDashDot => &[3.0, 1.0, 1.0, 1.0],
       StrokeDashPreset::SystemDashDotDot => &[3.0, 1.0, 1.0, 1.0, 1.0, 1.0],
     };
+    let cap_is_part_of_preset = matches!(self.cap, Some(StrokeCap::Round | StrokeCap::Square));
     Some(
       multipliers
         .iter()
-        .map(|multiplier| Pt(multiplier * self.width.0))
+        .enumerate()
+        .map(|(index, multiplier)| {
+          let multiplier = if cap_is_part_of_preset {
+            // Office preset dash lengths already include round and square
+            // caps. PDF/Kurbo add those caps around the authored centreline,
+            // so mirror LibreOffice's 99%-of-width compensation here. The
+            // small residual avoids a zero-length dash being reinterpreted
+            // as a full-width dash by consumers such as LibreOffice.
+            if index % 2 == 0 {
+              multiplier - 0.99
+            } else {
+              multiplier + 0.99
+            }
+          } else {
+            *multiplier
+          };
+          Pt(multiplier * self.width.0)
+        })
         .collect(),
     )
   }
@@ -186,7 +197,10 @@ mod tests {
       ..Stroke::default()
     };
 
-    assert_eq!(stroke.resolved_dash(), Some(vec![Pt(0.0), Pt(3.6)]));
+    assert_eq!(
+      stroke.resolved_dash(),
+      Some(vec![Pt((1.0 - 0.99) * 1.8), Pt((1.0 + 0.99) * 1.8)])
+    );
   }
 
   #[test]

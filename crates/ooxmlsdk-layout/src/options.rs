@@ -4,6 +4,20 @@ pub struct LayoutOptions {
   /// BCP 47 user-interface language used for application-generated labels,
   /// such as an automatic chart title that is not persisted in the package.
   pub ui_language: Option<String>,
+  /// BCP 47 locale used for locale-dependent number, date, currency, and
+  /// other value formatting. This is intentionally independent from the
+  /// Office user-interface language.
+  ///
+  /// When absent, the user-interface language remains the compatibility
+  /// fallback for callers of the pre-existing API.
+  pub format_locale: Option<String>,
+  /// BCP 47 language used for document authoring defaults, including a
+  /// missing Office theme's script-specific fonts and the PDF document
+  /// language. This is independent from translated application resources.
+  ///
+  /// When absent, the user-interface language remains the compatibility
+  /// fallback for callers of the pre-existing API.
+  pub default_document_language: Option<String>,
   /// Local civil time to use when an application explicitly refreshes
   /// unlocked WordprocessingML DATE, TIME, PRINTDATE, and SAVEDATE fields.
   ///

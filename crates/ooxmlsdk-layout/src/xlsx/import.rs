@@ -1,6 +1,7 @@
 use std::sync::OnceLock;
 
 use crate::error::Result;
+use crate::localization::OfficeLocaleContext;
 use crate::options::LayoutOptions;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 
@@ -35,9 +36,14 @@ impl ExcelImport {
     let globals = WorkbookGlobals::from_workbook(&workbook);
     let workbook_catalog = WorkbookCatalog::from_workbook_part(package, &workbook_part)?;
     let producer = spreadsheet_producer_profile(package);
+    let locales = OfficeLocaleContext::new(
+      options.ui_language.as_deref(),
+      options.format_locale.as_deref(),
+      options.default_document_language.as_deref(),
+    );
 
     let mut fragment = WorkbookFragment::new(workbook_part, workbook.clone());
-    let mut sheets = fragment.finalize_import(package, producer, options.ui_language.as_deref())?;
+    let mut sheets = fragment.finalize_import(package, producer, &locales)?;
     super::formula::recalculate_formula_cells(
       &mut sheets,
       &fragment.defined_names,
@@ -87,6 +93,7 @@ fn spreadsheet_producer_profile(package: &mut SpreadsheetDocument) -> Spreadshee
   SpreadsheetProducerProfile {
     mso_document: application.is_some_and(|value| value.contains("Microsoft")),
     macintosh_excel: application.is_some_and(|value| value == "Microsoft Macintosh Excel"),
+    libreoffice_document: application.is_some_and(|value| value.contains("LibreOffice")),
     excel_major_version,
   }
 }

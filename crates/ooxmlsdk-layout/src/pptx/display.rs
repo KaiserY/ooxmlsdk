@@ -14,6 +14,7 @@ use crate::common::{self, DebugProperty, DebugRecord, DebugShape, DebugValue, Po
 use crate::common::{
   drawingml_custom_geometry as custom_geometry, drawingml_preset_geometry as preset_geometry,
 };
+use crate::localization::OfficeLocaleContext;
 use crate::model::{
   BorderStyle, ImageCrop, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PageSetup,
   PdfTextSegmentation, RectItem, RgbColor, RgbColor as LayoutRgbColor, TextItem, TextStyle,
@@ -41,8 +42,7 @@ use unicode_script::{Script, UnicodeScript};
 
 use super::chart::{
   ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, RadialChartStyle,
-  lower_clustered_column_chart, lower_radial_chart, solid_chart_point_styles,
-  solid_chart_shape_style,
+  lower_clustered_column_chart, lower_radial_chart,
 };
 use super::drawingml::color::{Color, SchemeColor};
 use super::drawingml::fill::{FillKind, FillProperties};
@@ -96,6 +96,11 @@ pub(crate) fn lower_to_layout_document(
   import: &PowerPointImport,
   options: &LayoutOptions,
 ) -> common::LayoutDocument<'static> {
+  let locales = OfficeLocaleContext::new(
+    options.ui_language.as_deref(),
+    options.format_locale.as_deref(),
+    options.default_document_language.as_deref(),
+  );
   let pages = import
     .draw_pages
     .iter()
@@ -104,13 +109,7 @@ pub(crate) fn lower_to_layout_document(
     .map(|(page_index, slide)| {
       (
         slide.size.to_page_setup(),
-        lower_slide_items_with_summary(
-          import,
-          slide,
-          page_index,
-          options.ui_language.as_deref(),
-          None,
-        ),
+        lower_slide_items_with_summary(import, slide, page_index, &locales, None),
       )
     })
     .collect();
@@ -315,8 +314,9 @@ pub(crate) fn inspect_layout_summary(import: &PowerPointImport) -> PptxLayoutSum
   };
   collect_draw_shape_summaries(import, &mut summary);
   collect_master_text_shapes(import, &mut summary);
+  let locales = OfficeLocaleContext::default();
   for (page_index, slide) in import.draw_pages.iter().enumerate() {
-    let _ = lower_slide_items_with_summary(import, slide, page_index, None, Some(&mut summary));
+    let _ = lower_slide_items_with_summary(import, slide, page_index, &locales, Some(&mut summary));
   }
   summary
 }
@@ -685,7 +685,7 @@ fn lower_slide_items_with_summary(
   import: &PowerPointImport,
   slide: &SlidePersist,
   page_index: usize,
-  ui_language: Option<&str>,
+  locales: &OfficeLocaleContext,
   summary: Option<&mut PptxLayoutSummary>,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
@@ -703,7 +703,7 @@ fn lower_slide_items_with_summary(
       import,
       slide,
       page_index,
-      ui_language,
+      locales,
       inherited_scene3d: None,
     },
     &slide.shapes,
@@ -906,7 +906,7 @@ fn lower_shape(
   let PptxLoweringContext {
     import,
     slide,
-    ui_language,
+    locales,
     ..
   } = context;
   let enabled_slide_number_field = inherited_slide_number_field_is_enabled(slide, shape);
@@ -971,7 +971,7 @@ fn lower_shape(
   if shape.service_name == ShapeService::Chart
     && let Some(record) = &shape.graphic_data
   {
-    lower_chart(import, slide, shape, offset, record, ui_language, items);
+    lower_chart(import, slide, shape, offset, record, locales, items);
   }
 
   if shape.frame_type == super::drawingml::shape::FrameType::Diagram
@@ -1159,22 +1159,16 @@ fn lower_chart(
   shape: &Shape,
   offset: DisplayOffset,
   record: &GraphicDataRecord,
-  ui_language: Option<&str>,
+  locales: &OfficeLocaleContext,
   items: &mut Vec<PageItem>,
 ) {
+  let ui_language = locales.ui_language();
+  let default_document_language = locales.default_document_language();
   if shape.size.cx <= 0 || shape.size.cy <= 0 {
     return;
   }
   if let Some(chart_resource) = &record.extended_chart_resource {
-    lower_extended_chart(
-      import,
-      slide,
-      chart_resource,
-      shape,
-      offset,
-      ui_language,
-      items,
-    );
+    lower_extended_chart(import, slide, chart_resource, shape, offset, locales, items);
     return;
   }
   let Some(chart_resource) = &record.chart_resource else {
@@ -1187,26 +1181,36 @@ fn lower_chart(
 
   if let Some(mut chart) = shared_chart::pie_chart_model(&chart_resource.chart_space) {
     if chart.title.is_none()
-      && shared_chart::has_powerpoint_automatic_title_placeholder(&chart_resource.chart_space.chart)
+      && shared_chart::has_powerpoint_generic_title_placeholder(&chart_resource.chart_space.chart)
     {
       chart.title = Some(shared_chart::ChartTitleText::Automatic);
     }
     let chart_text_properties = chart_resource.chart_space.text_properties.as_deref();
     let title = chart_resource.chart_space.chart.title.as_deref();
     let title_properties = title.and_then(|title| title.text_properties.as_deref());
-    let label_properties = chart.data_label_text_properties.or_else(|| {
-      chart_resource
-        .chart_space
-        .chart
-        .legend
-        .as_deref()
-        .and_then(|legend| legend.text_properties.as_deref())
-    });
-    let text_style_context = ChartTextStyleContext {
+    let legend_properties = chart_resource
+      .chart_space
+      .chart
+      .legend
+      .as_deref()
+      .and_then(|legend| legend.text_properties.as_deref());
+    let data_label_properties = chart.data_label_text_properties;
+    let title_text_style_context = ChartTextStyleContext {
       import,
       slide,
       default_properties: chart_text_properties,
-      ui_language,
+      theme_language: if matches!(
+        chart.title.as_ref(),
+        Some(shared_chart::ChartTitleText::Automatic)
+      ) {
+        ui_language
+      } else {
+        default_document_language
+      },
+    };
+    let label_text_style_context = ChartTextStyleContext {
+      theme_language: default_document_language,
+      ..title_text_style_context
     };
     let point_colors = (0..chart.values.len())
       .map(|index| {
@@ -1230,6 +1234,46 @@ fn lower_chart(
           })
       })
       .collect();
+    let inherited_point_style =
+      pptx_chart_shape_style(import, slide, chart_resource, chart.series_shape_properties);
+    let point_styles = (0..chart.values.len())
+      .map(|index| {
+        let point_style = chart
+          .data_points
+          .iter()
+          .find(|point| usize::try_from(point.index.val).ok() == Some(index))
+          .map(|point| {
+            pptx_chart_shape_style(
+              import,
+              slide,
+              chart_resource,
+              point.chart_shape_properties.as_deref(),
+            )
+          })
+          .unwrap_or_default();
+        common::ShapeStyle {
+          fill: point_style
+            .fill
+            .resolve_over(&inherited_point_style.fill)
+            .clone(),
+          stroke: point_style
+            .stroke
+            .resolve_over(&inherited_point_style.stroke)
+            .clone(),
+        }
+      })
+      .collect();
+    let data_label_style = chart_text_style(
+      label_text_style_context,
+      data_label_properties,
+      POWERPOINT_CHART_LABEL_FALLBACK,
+      None,
+    );
+    let (data_label_styles, data_label_rich_text_styles) = chart_data_label_host_styles(
+      label_text_style_context,
+      &chart.data_labels,
+      &data_label_style,
+    );
     let mut chart_items = lower_radial_chart(
       ChartFrame {
         x_pt: x,
@@ -1242,25 +1286,22 @@ fn lower_chart(
       &RadialChartStyle {
         layout_profile: ChartLayoutProfile::PowerPoint,
         title: chart_text_style(
-          text_style_context,
+          title_text_style_context,
           title_properties,
           POWERPOINT_CHART_TITLE_FALLBACK,
           title,
         ),
-        label: chart_text_style(
-          text_style_context,
-          label_properties,
+        legend: chart_text_style(
+          label_text_style_context,
+          legend_properties,
           POWERPOINT_CHART_LABEL_FALLBACK,
           None,
         ),
-        data_label: chart_text_style(
-          text_style_context,
-          label_properties,
-          POWERPOINT_CHART_LABEL_FALLBACK,
-          None,
-        ),
+        data_label: data_label_style,
+        data_label_styles,
+        data_label_rich_text_styles,
         point_colors,
-        point_styles: Vec::new(),
+        point_styles,
         data_label_fill_colors: chart
           .data_labels
           .iter()
@@ -1274,41 +1315,22 @@ fn lower_chart(
               })
           })
           .collect(),
-        chart_area_style: solid_chart_shape_style(
-          chart_resource
-            .chart_space
-            .shape_properties
-            .as_deref()
-            .and_then(shared_chart::shape_properties_solid_fill)
-            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-            .map(|paint| paint.color),
-          chart_resource
-            .chart_space
-            .shape_properties
-            .as_deref()
-            .and_then(shared_chart::shape_properties_outline_solid_fill)
-            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-            .map(|paint| (paint.color, 0.75)),
+        chart_area_style: pptx_chart_area_shape_style(
+          import,
+          slide,
+          chart_resource,
+          chart_resource.chart_space.shape_properties.as_deref(),
         ),
-        plot_area_style: solid_chart_shape_style(
+        plot_area_style: pptx_chart_area_shape_style(
+          import,
+          slide,
+          chart_resource,
           chart_resource
             .chart_space
             .chart
             .plot_area
             .shape_properties
-            .as_deref()
-            .and_then(shared_chart::shape_properties_solid_fill)
-            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-            .map(|paint| paint.color),
-          chart_resource
-            .chart_space
-            .chart
-            .plot_area
-            .shape_properties
-            .as_deref()
-            .and_then(shared_chart::shape_properties_outline_solid_fill)
-            .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-            .map(|paint| (paint.color, 0.75)),
+            .as_deref(),
         ),
       },
     );
@@ -1341,7 +1363,12 @@ fn lower_chart(
     if chart.title.is_none()
       && shared_chart::has_powerpoint_automatic_title_placeholder(&chart_resource.chart_space.chart)
     {
-      chart.title = Some(shared_chart::ChartTitleText::Automatic);
+      chart.title = chart
+        .series
+        .first()
+        .filter(|series| chart.series.len() == 1 && series.has_nonempty_explicit_name)
+        .map(|series| shared_chart::ChartTitleText::Explicit(series.name.clone()))
+        .or(Some(shared_chart::ChartTitleText::Automatic));
     }
     let series_colors = chart
       .series
@@ -1389,22 +1416,51 @@ fn lower_chart(
           )
       })
       .collect::<Vec<_>>();
-    let series_point_colors = chart
+    let series_styles = chart
+      .series
+      .iter()
+      .map(|series| pptx_chart_shape_style(import, slide, chart_resource, series.shape_properties))
+      .collect::<Vec<_>>();
+    let series_point_styles = chart
       .series
       .iter()
       .map(|series| {
         (0..series.values.len())
           .map(|point_index| {
             series
-              .data_point_fills
+              .data_points
               .iter()
-              .find(|fill| fill.index as usize == point_index)
-              .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill.fill))
-              .map(|paint| paint.color)
+              .find(|point| usize::try_from(point.index.val).ok() == Some(point_index))
+              .map(|point| {
+                pptx_chart_shape_style(
+                  import,
+                  slide,
+                  chart_resource,
+                  point.chart_shape_properties.as_deref(),
+                )
+              })
           })
           .collect()
       })
-      .collect();
+      .collect::<Vec<_>>();
+    let trendline_styles = chart
+      .series
+      .iter()
+      .map(|series| {
+        series
+          .trendlines
+          .iter()
+          .map(|trendline| {
+            pptx_chart_shape_style(
+              import,
+              slide,
+              chart_resource,
+              trendline.chart_shape_properties.as_deref(),
+            )
+          })
+          .collect()
+      })
+      .collect::<Vec<_>>();
     let surface_band_colors = chart
       .surface_groups
       .iter()
@@ -1463,6 +1519,12 @@ fn lower_chart(
               _ => None,
             })
         });
+      let legend_properties = chart_resource
+        .chart_space
+        .chart
+        .legend
+        .as_deref()
+        .and_then(|legend| legend.text_properties.as_deref());
       let data_label_properties = chart.data_label_text_properties.or(label_properties);
       let series_label_properties = chart
         .axis_sets
@@ -1472,12 +1534,40 @@ fn lower_chart(
       // ECMA-376 Part 1 §21.2.2.216: c:chartSpace/c:txPr supplies
       // the defaults, while title/axis txPr overlays those defaults.
       let chart_text_properties = chart_resource.chart_space.text_properties.as_deref();
-      let text_style_context = ChartTextStyleContext {
+      let title_text_style_context = ChartTextStyleContext {
         import,
         slide,
         default_properties: chart_text_properties,
-        ui_language,
+        theme_language: if matches!(
+          chart.title.as_ref(),
+          Some(shared_chart::ChartTitleText::Automatic)
+        ) {
+          ui_language
+        } else {
+          default_document_language
+        },
       };
+      let label_text_style_context = ChartTextStyleContext {
+        theme_language: default_document_language,
+        ..title_text_style_context
+      };
+      let data_label_style = chart_text_style(
+        label_text_style_context,
+        data_label_properties,
+        POWERPOINT_CHART_LABEL_FALLBACK,
+        None,
+      );
+      let (data_label_styles, data_label_rich_text_styles): (Vec<_>, Vec<_>) = chart
+        .series
+        .iter()
+        .map(|series| {
+          chart_data_label_host_styles(
+            label_text_style_context,
+            &series.data_labels,
+            &data_label_style,
+          )
+        })
+        .unzip();
       let gridline_color = chart
         .value_axis
         .and_then(|axis| axis.major_gridlines.as_deref())
@@ -1507,56 +1597,65 @@ fn lower_chart(
           layout_profile: ChartLayoutProfile::PowerPoint,
           modern_excel_profile: false,
           stroke_scale: 1.0,
-          has_explicit_title: matches!(
-            chart.title,
-            Some(shared_chart::ChartTitleText::Explicit(_))
+          automatic_line_width_pt: powerpoint_chart_automatic_line_width_pt(
+            import,
+            &chart_resource.chart_space,
           ),
+          has_explicit_title: chart_resource
+            .chart_space
+            .chart
+            .title
+            .as_deref()
+            .is_some_and(|title| title.chart_text.is_some()),
           title: chart_text_style(
-            text_style_context,
+            title_text_style_context,
             title_properties,
             POWERPOINT_CHART_TITLE_FALLBACK,
             title,
           ),
           title_fill_color,
           label: chart_text_style(
-            text_style_context,
+            label_text_style_context,
             label_properties,
             POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
+          legend: chart_text_style(
+            label_text_style_context,
+            legend_properties,
+            POWERPOINT_CHART_LABEL_FALLBACK,
+            None,
+          ),
           category_label: chart_text_style(
-            text_style_context,
+            label_text_style_context,
             label_properties,
             POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
           value_label: chart_text_style(
-            text_style_context,
+            label_text_style_context,
             label_properties,
             POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
           series_label: chart_text_style(
-            text_style_context,
+            label_text_style_context,
             series_label_properties,
             POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
-          data_label: chart_text_style(
-            text_style_context,
-            data_label_properties,
-            POWERPOINT_CHART_LABEL_FALLBACK,
-            None,
-          ),
-          data_label_styles: Vec::new(),
+          data_label: data_label_style,
+          data_label_styles,
+          data_label_rich_text_styles,
           gridline_color,
           value_gridline_width_pt: None,
           axis_line_width_pt: None,
           category_major_gridline: None,
           category_minor_gridline: None,
           series_colors,
-          series_styles: Vec::new(),
-          series_point_styles: solid_chart_point_styles(series_point_colors),
+          series_styles,
+          trendline_styles,
+          series_point_styles,
           surface_band_colors,
           data_label_fill_colors: chart
             .series
@@ -1577,41 +1676,22 @@ fn lower_chart(
                 .collect()
             })
             .collect(),
-          chart_area_style: solid_chart_shape_style(
-            chart_resource
-              .chart_space
-              .shape_properties
-              .as_deref()
-              .and_then(shared_chart::shape_properties_solid_fill)
-              .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-              .map(|paint| paint.color),
-            chart_resource
-              .chart_space
-              .shape_properties
-              .as_deref()
-              .and_then(shared_chart::shape_properties_outline_solid_fill)
-              .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-              .map(|paint| (paint.color, 0.75)),
+          chart_area_style: pptx_chart_area_shape_style(
+            import,
+            slide,
+            chart_resource,
+            chart_resource.chart_space.shape_properties.as_deref(),
           ),
-          plot_area_style: solid_chart_shape_style(
+          plot_area_style: pptx_chart_area_shape_style(
+            import,
+            slide,
+            chart_resource,
             chart_resource
               .chart_space
               .chart
               .plot_area
               .shape_properties
-              .as_deref()
-              .and_then(shared_chart::shape_properties_solid_fill)
-              .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-              .map(|paint| paint.color),
-            chart_resource
-              .chart_space
-              .chart
-              .plot_area
-              .shape_properties
-              .as_deref()
-              .and_then(shared_chart::shape_properties_outline_solid_fill)
-              .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
-              .map(|paint| (paint.color, 0.75)),
+              .as_deref(),
           ),
         },
       );
@@ -1674,26 +1754,45 @@ fn lower_extended_chart(
   resource: &super::slide::ExtendedChartResource,
   shape: &Shape,
   offset: DisplayOffset,
-  ui_language: Option<&str>,
+  locales: &OfficeLocaleContext,
   items: &mut Vec<PageItem>,
 ) {
+  let ui_language = locales.ui_language();
+  let default_document_language = locales.default_document_language();
   let frame = ChartFrame {
     x_pt: offset.x_pt(shape.position.x),
     y_pt: offset.y_pt(shape.position.y),
     width_pt: offset.width_pt(shape.size.cx),
     height_pt: offset.height_pt(shape.size.cy),
   };
-  let font = import
-    .resolve_theme_font_for_language("+mn-lt", ui_language)
-    .unwrap_or("Liberation Sans");
+  // A missing ChartEx title is an application-generated UI resource. Its
+  // fallback face follows that resource language; cached labels and values
+  // remain document content and use the authoring-language theme fallback.
+  let theme = chart_theme(import, slide);
+  let resolve_font = |placeholder, language| {
+    theme
+      .and_then(|theme| {
+        theme
+          .font_scheme
+          .resolve_font_for_language(placeholder, language)
+      })
+      .or_else(|| import.resolve_theme_font_for_language(placeholder, language))
+  };
+  let title_language = ui_language.or(default_document_language);
+  let title_font = resolve_font("+mn-lt", title_language).unwrap_or("Liberation Sans");
+  let label_font = resolve_font("+mn-lt", default_document_language).unwrap_or("Liberation Sans");
+  let title_east_asia_font = resolve_font("+mn-ea", title_language);
+  let label_east_asia_font = resolve_font("+mn-ea", default_document_language);
   let title_style = TextStyle {
-    font_family: Some(Arc::from(font)),
+    font_family: Some(Arc::from(title_font)),
+    east_asia_font_family: title_east_asia_font.map(Arc::from),
     font_size_pt: 14.0,
     bold: true,
     ..TextStyle::default()
   };
   let label_style = TextStyle {
-    font_family: Some(Arc::from(font)),
+    font_family: Some(Arc::from(label_font)),
+    east_asia_font_family: label_east_asia_font.map(Arc::from),
     font_size_pt: 9.0,
     ..TextStyle::default()
   };
@@ -1710,6 +1809,7 @@ fn lower_extended_chart(
   items.extend(crate::render::chartex::lower_extended_chart(
     &resource.chart_space,
     crate::render::chartex::ChartExRenderOptions {
+      host: crate::render::chartex::ChartExHost::PowerPoint,
       frame,
       title_style,
       label_style,
@@ -1788,7 +1888,7 @@ struct ChartTextStyleContext<'a> {
   import: &'a PowerPointImport,
   slide: &'a SlidePersist,
   default_properties: Option<&'a c::TextProperties>,
-  ui_language: Option<&'a str>,
+  theme_language: Option<&'a str>,
 }
 
 #[derive(Clone, Copy)]
@@ -1852,7 +1952,7 @@ fn chart_text_style(
     font_family: Some(Arc::from(
       context
         .import
-        .resolve_theme_font_for_language("+mn-lt", context.ui_language)
+        .resolve_theme_font_for_language("+mn-lt", context.theme_language)
         .unwrap_or("Liberation Sans"),
     )),
     font_size_pt: fallback.size_pt,
@@ -1933,7 +2033,7 @@ fn chart_text_style(
   }
   if let Some(typeface) = context
     .import
-    .resolve_theme_font_for_language("+mn-ea", context.ui_language)
+    .resolve_theme_font_for_language("+mn-ea", context.theme_language)
   {
     style.east_asia_font_family = Some(Arc::from(typeface));
   }
@@ -1945,6 +2045,57 @@ fn chart_text_style(
   }
   style.font_size_pt = units::quantize_points_to_office_print_grid(style.font_size_pt);
   style
+}
+
+fn chart_data_label_host_styles(
+  context: ChartTextStyleContext<'_>,
+  labels: &[shared_chart::ClusteredColumnDataLabel<'_>],
+  base_style: &TextStyle,
+) -> (Vec<Option<TextStyle>>, Vec<Vec<TextStyle>>) {
+  let mut label_styles = Vec::with_capacity(labels.len());
+  let mut rich_text_styles = Vec::with_capacity(labels.len());
+  for label in labels {
+    let label_style = label.text_properties.map_or_else(
+      || base_style.clone(),
+      |properties| {
+        chart_text_style(
+          context,
+          Some(properties),
+          POWERPOINT_CHART_LABEL_FALLBACK,
+          None,
+        )
+      },
+    );
+    label_styles.push(label.text_properties.is_some().then(|| label_style.clone()));
+    rich_text_styles.push(
+      label
+        .rich_text_runs
+        .iter()
+        .map(|run| {
+          let mut style = label_style.clone();
+          if let Some(properties) = run.paragraph_default_run_properties {
+            apply_default_run_properties(
+              context.import,
+              Some(context.slide),
+              properties,
+              &mut style,
+            );
+          }
+          if let Some(properties) = run.run_properties {
+            apply_drawingml_run_properties(
+              context.import,
+              Some(context.slide),
+              properties,
+              &mut style,
+            );
+          }
+          style.font_size_pt = units::quantize_points_to_office_print_grid(style.font_size_pt);
+          style
+        })
+        .collect(),
+    );
+  }
+  (label_styles, rich_text_styles)
 }
 
 fn display_color_for_chart_series(
@@ -2031,17 +2182,26 @@ fn display_paint_for_chart(
   chart_resource: &ChartResource,
   fill: &a::SolidFill,
 ) -> Option<DisplayPaint> {
-  let theme = chart_theme(import, slide)?;
-  let color_map = chart_resource.chart_space.color_map_override.as_deref();
   let color = fill
     .solid_fill_choice
     .as_ref()
     .and_then(Color::from_solid_fill_choice)?;
+  display_paint_for_chart_color(import, slide, chart_resource, &color)
+}
+
+fn display_paint_for_chart_color(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  color: &Color,
+) -> Option<DisplayPaint> {
+  let theme = chart_theme(import, slide)?;
+  let color_map = chart_resource.chart_space.color_map_override.as_deref();
   let mut scheme_resolver = |token| {
     let mapped = shared_chart::scheme_color_token(color_map, token)?;
     theme.color_scheme.get_color(mapped).cloned()
   };
-  let color = color.resolve_rgb(&mut scheme_resolver, None)?;
+  let color = color.clone().resolve_rgb(&mut scheme_resolver, None)?;
   Some(DisplayPaint {
     color: RgbColor {
       r: color.r,
@@ -2050,6 +2210,264 @@ fn display_paint_for_chart(
     },
     opacity: color_opacity(color.alpha),
   })
+}
+
+fn pptx_chart_shape_style(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  properties: Option<&c::ChartShapeProperties>,
+) -> common::ShapeStyle<'static> {
+  let Some(properties) = properties else {
+    return common::ShapeStyle::default();
+  };
+  let fill = match properties.chart_shape_properties_choice2.as_ref() {
+    None => common::ShapeStyleValue::Unspecified,
+    Some(c::ChartShapePropertiesChoice2::NoFill(_)) => common::ShapeStyleValue::NoPaint,
+    Some(c::ChartShapePropertiesChoice2::SolidFill(fill)) => display_paint_for_chart(
+      import,
+      slide,
+      chart_resource,
+      fill,
+    )
+    .map_or(common::ShapeStyleValue::Unspecified, |paint| {
+      common::ShapeStyleValue::Paint(common::Fill::Solid(common_rgb(paint.color, paint.opacity)))
+    }),
+    Some(c::ChartShapePropertiesChoice2::GradientFill(fill)) => {
+      pptx_chart_gradient_fill(import, slide, chart_resource, fill).map_or(
+        common::ShapeStyleValue::Unspecified,
+        common::ShapeStyleValue::Paint,
+      )
+    }
+    Some(c::ChartShapePropertiesChoice2::PatternFill(fill)) => {
+      pptx_chart_pattern_fill(import, slide, chart_resource, fill)
+        .map_or(common::ShapeStyleValue::Unspecified, |fill| {
+          common::ShapeStyleValue::Paint(common::Fill::Pattern(fill))
+        })
+    }
+    Some(c::ChartShapePropertiesChoice2::BlipFill(fill)) => {
+      common::ShapeStyleValue::Paint(pptx_chart_blip_fill(fill))
+    }
+  };
+  common::ShapeStyle {
+    fill,
+    stroke: pptx_chart_outline_style(import, slide, chart_resource, properties.outline.as_deref()),
+  }
+}
+
+fn pptx_chart_area_shape_style(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  properties: Option<&c::ShapeProperties>,
+) -> common::ShapeStyle<'static> {
+  let Some(properties) = properties else {
+    return common::ShapeStyle::default();
+  };
+  let fill = match properties.shape_properties_choice2.as_ref() {
+    None | Some(c::ShapePropertiesChoice2::GroupFill) => common::ShapeStyleValue::Unspecified,
+    Some(c::ShapePropertiesChoice2::NoFill(_)) => common::ShapeStyleValue::NoPaint,
+    Some(c::ShapePropertiesChoice2::SolidFill(fill)) => display_paint_for_chart(
+      import,
+      slide,
+      chart_resource,
+      fill,
+    )
+    .map_or(common::ShapeStyleValue::Unspecified, |paint| {
+      common::ShapeStyleValue::Paint(common::Fill::Solid(common_rgb(paint.color, paint.opacity)))
+    }),
+    Some(c::ShapePropertiesChoice2::GradientFill(fill)) => {
+      pptx_chart_gradient_fill(import, slide, chart_resource, fill).map_or(
+        common::ShapeStyleValue::Unspecified,
+        common::ShapeStyleValue::Paint,
+      )
+    }
+    Some(c::ShapePropertiesChoice2::PatternFill(fill)) => {
+      pptx_chart_pattern_fill(import, slide, chart_resource, fill)
+        .map_or(common::ShapeStyleValue::Unspecified, |fill| {
+          common::ShapeStyleValue::Paint(common::Fill::Pattern(fill))
+        })
+    }
+    Some(c::ShapePropertiesChoice2::BlipFill(fill)) => {
+      common::ShapeStyleValue::Paint(pptx_chart_blip_fill(fill))
+    }
+  };
+  common::ShapeStyle {
+    fill,
+    stroke: pptx_chart_outline_style(import, slide, chart_resource, properties.outline.as_deref()),
+  }
+}
+
+fn powerpoint_chart_automatic_line_width_pt(
+  import: &PowerPointImport,
+  chart_space: &c::ChartSpace,
+) -> f32 {
+  let subtle_theme_width = import
+    .get_theme_line_style(1)
+    .and_then(|line| line.width_emu)
+    .map(units::emu_to_points)
+    .unwrap_or(0.75);
+  subtle_theme_width * shared_chart::automatic_linear_series_line_width_scale(chart_space)
+}
+
+fn pptx_chart_outline_style(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  outline: Option<&a::Outline>,
+) -> common::ShapeStyleValue<common::Stroke<'static>> {
+  let Some(outline) = outline else {
+    return common::ShapeStyleValue::Unspecified;
+  };
+  let (color, pattern, gradient) = match outline.outline_choice1.as_ref() {
+    Some(a::OutlineChoice::NoFill(_)) => return common::ShapeStyleValue::NoPaint,
+    Some(a::OutlineChoice::SolidFill(fill)) => {
+      let Some(paint) = display_paint_for_chart(import, slide, chart_resource, fill) else {
+        return common::ShapeStyleValue::Unspecified;
+      };
+      (common_rgb(paint.color, paint.opacity), None, None)
+    }
+    Some(a::OutlineChoice::PatternFill(fill)) => {
+      let Some(pattern) = pptx_chart_pattern_fill(import, slide, chart_resource, fill) else {
+        return common::ShapeStyleValue::Unspecified;
+      };
+      (pattern.foreground, Some(pattern), None)
+    }
+    Some(a::OutlineChoice::GradientFill(fill)) => {
+      let Some(common::Fill::Gradient(gradient)) =
+        pptx_chart_gradient_fill(import, slide, chart_resource, fill)
+      else {
+        return common::ShapeStyleValue::Unspecified;
+      };
+      let color = gradient
+        .stops
+        .first()
+        .map(|stop| stop.color)
+        .unwrap_or_default();
+      (color, None, Some(gradient))
+    }
+    None => return common::ShapeStyleValue::Unspecified,
+  };
+  let mut stroke = common::Stroke {
+    width: common::Pt(
+      outline
+        .width
+        .map(|width| units::emu_to_points(i64::from(width)))
+        .unwrap_or(0.75),
+    ),
+    color,
+    pattern,
+    gradient,
+    ..Default::default()
+  };
+  common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+  common::ShapeStyleValue::Paint(stroke)
+}
+
+fn pptx_chart_gradient_fill(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  fill: &a::GradientFill,
+) -> Option<common::Fill<'static>> {
+  let mut stops = fill
+    .gradient_stop_list
+    .as_ref()?
+    .gradient_stop
+    .iter()
+    .filter_map(|stop| {
+      let color = Color::from_gradient_stop_choice(stop.gradient_stop_choice.as_ref()?)?;
+      let paint = display_paint_for_chart_color(import, slide, chart_resource, &color)?;
+      Some(common::GradientStop {
+        position: stop.position.as_ratio() as f32,
+        color: common_rgb(paint.color, paint.opacity),
+        scheme: None,
+      })
+    })
+    .collect::<Vec<_>>();
+  super::gradient::normalize_powerpoint_gradient_stops(&mut stops);
+  if stops.is_empty() {
+    return None;
+  }
+  let (angle_degrees, scaled, path) = match fill.gradient_fill_choice.as_ref()? {
+    a::GradientFillChoice::LinearGradientFill(linear) => (
+      Some(linear.angle.unwrap_or_default() as f32 / 60_000.0),
+      linear.scaled.as_ref().is_some_and(|value| value.as_bool()),
+      None,
+    ),
+    a::GradientFillChoice::PathGradientFill(path) => (
+      None,
+      false,
+      Some(common::drawingml_gradient::resolve_path_gradient(
+        fill,
+        path,
+        common::Transform::default(),
+      )),
+    ),
+  };
+  Some(common::Fill::Gradient(common::GradientFill {
+    stops,
+    angle_degrees,
+    definition_bounds: None,
+    line: None,
+    interpolation: common::GradientInterpolation::LinearSrgb,
+    scaled,
+    rotate_with_shape: fill.rotate_with_shape.as_ref().map(|value| value.as_bool()),
+    path,
+  }))
+}
+
+fn pptx_chart_pattern_fill(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  fill: &a::PatternFill,
+) -> Option<common::PatternFill> {
+  let foreground = fill
+    .foreground_color
+    .as_ref()
+    .and_then(|color| color.foreground_color_choice.as_ref())
+    .and_then(Color::from_foreground_color_choice)
+    .and_then(|color| display_paint_for_chart_color(import, slide, chart_resource, &color))
+    .map(|paint| common_rgb(paint.color, paint.opacity))
+    .unwrap_or(common::Color {
+      r: 0,
+      g: 0,
+      b: 0,
+      a: u8::MAX,
+    });
+  let background = fill
+    .background_color
+    .as_ref()
+    .and_then(|color| color.background_color_choice.as_ref())
+    .and_then(Color::from_background_color_choice)
+    .and_then(|color| display_paint_for_chart_color(import, slide, chart_resource, &color))
+    .map(|paint| common_rgb(paint.color, paint.opacity))
+    .unwrap_or(common::Color {
+      r: u8::MAX,
+      g: u8::MAX,
+      b: u8::MAX,
+      a: u8::MAX,
+    });
+  Some(common::PatternFill {
+    hatch_style: common::drawingml_pattern::hatch_style(fill.preset),
+    foreground,
+    background,
+  })
+}
+
+fn pptx_chart_blip_fill(fill: &a::BlipFill) -> common::Fill<'static> {
+  let relationship_id = fill.blip.as_deref().and_then(|blip| {
+    blip
+      .embed
+      .as_deref()
+      .or(blip.link.as_deref())
+      .map(|id| Cow::Owned(id.to_string()))
+  });
+  common::Fill::Image {
+    relationship_id,
+    tile: matches!(fill.blip_fill_choice, Some(a::BlipFillChoice::Tile(_))),
+  }
 }
 
 fn chart_theme<'a>(
@@ -2109,7 +2527,7 @@ struct PptxLoweringContext<'a> {
   import: &'a PowerPointImport,
   slide: &'a SlidePersist,
   page_index: usize,
-  ui_language: Option<&'a str>,
+  locales: &'a OfficeLocaleContext,
   inherited_scene3d: Option<&'a a::Scene3DType>,
 }
 
@@ -11322,6 +11740,15 @@ fn apply_run_properties(
   let Some(properties) = run.run_properties.as_deref() else {
     return;
   };
+  apply_drawingml_run_properties(import, slide, properties, style);
+}
+
+fn apply_drawingml_run_properties(
+  import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
+  properties: &a::RunProperties,
+  style: &mut TextStyle,
+) {
   apply_run_common(
     import,
     RunCommon {

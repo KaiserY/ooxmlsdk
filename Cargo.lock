@@ -1434,6 +1434,7 @@ dependencies = [
  "encoding_rs",
  "html5ever",
  "hypher",
+ "icu_locale",
  "icu_segmenter",
  "image",
  "kurbo",

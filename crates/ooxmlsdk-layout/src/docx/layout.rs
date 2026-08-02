@@ -12497,6 +12497,7 @@ fn lower_inline_chart(
       chart.title_style.clone(),
       chart.label_style.clone(),
       chart.ui_language.as_deref(),
+      crate::render::chartex::ChartExHost::Word,
       chart.extended_chart_theme,
       &chart.extended_chart_styles,
       &chart.extended_chart_color_styles,
@@ -12567,8 +12568,14 @@ fn lower_inline_chart(
       &RadialChartStyle {
         layout_profile: ChartLayoutProfile::Word,
         title: chart.title_style.clone(),
-        label: chart.label_style.clone(),
+        legend: chart.label_style.clone(),
         data_label: chart.data_label_style.clone(),
+        data_label_styles: chart.data_label_styles.first().cloned().unwrap_or_default(),
+        data_label_rich_text_styles: chart
+          .data_label_rich_text_styles
+          .first()
+          .cloned()
+          .unwrap_or_default(),
         point_colors: chart.pie_point_colors.clone(),
         point_styles: chart.pie_point_styles.clone(),
         data_label_fill_colors: chart
@@ -12649,15 +12656,18 @@ fn lower_inline_chart(
         layout_profile: ChartLayoutProfile::Word,
         modern_excel_profile: false,
         stroke_scale: 1.0,
+        automatic_line_width_pt: 1.5,
         has_explicit_title: matches!(model.title, Some(shared_chart::ChartTitleText::Explicit(_))),
         title: chart.title_style.clone(),
         title_fill_color: chart.title_fill_color,
         label: chart.label_style.clone(),
+        legend: chart.label_style.clone(),
         category_label: chart.category_label_style.clone(),
         value_label: chart.value_label_style.clone(),
         series_label: chart.series_label_style.clone(),
         data_label: chart.data_label_style.clone(),
         data_label_styles: chart.data_label_styles.clone(),
+        data_label_rich_text_styles: chart.data_label_rich_text_styles.clone(),
         gridline_color: chart.gridline_color,
         value_gridline_width_pt: chart.value_gridline_width_pt,
         axis_line_width_pt: chart.axis_line_width_pt,
@@ -12665,6 +12675,7 @@ fn lower_inline_chart(
         category_minor_gridline: chart.category_minor_gridline,
         series_colors: chart.series_colors.clone(),
         series_styles: chart.series_styles.clone(),
+        trendline_styles: Vec::new(),
         series_point_styles: chart.series_point_styles.clone(),
         surface_band_colors: chart.surface_band_colors.clone(),
         data_label_fill_colors: chart.data_label_fill_colors.clone(),

@@ -130,8 +130,31 @@ impl<'a> CalcPrintDocument<'a> {
         scale.top_down,
         &mut text_metrics,
       );
+      let drawing_only_implicit_range = named_ranges.resolved_print_areas.is_empty()
+        && areas
+          .iter()
+          .copied()
+          .all(|area| print_area_is_empty(import, sheet, area, &mut text_metrics));
+      let page_states = page_areas
+        .iter()
+        .map(|area| {
+          let drawing_summary = drawing_summary_for_area(sheet, *area);
+          let empty = area
+            .is_some_and(|area| print_area_is_empty(import, sheet, area, &mut text_metrics))
+            && drawing_summary.anchors == 0
+            && drawing_summary.charts == 0;
+          (drawing_summary, empty)
+        })
+        .collect::<Vec<_>>();
+      let last_implicit_printable_page = drawing_only_implicit_range
+        .then(|| page_states.iter().rposition(|(_, empty)| !empty))
+        .flatten();
       let mut sheet_page_index = 0usize;
-      for area in page_areas {
+      for (page_area_index, (area, (drawing_summary, empty))) in page_areas
+        .into_iter()
+        .zip(page_states.into_iter())
+        .enumerate()
+      {
         let cells = area
           .map(|area| {
             print_cells_for_area(
@@ -152,17 +175,23 @@ impl<'a> CalcPrintDocument<'a> {
           repeat_corner_for_page(area, named_ranges.repeat_rows, named_ranges.repeat_columns)
             .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
             .unwrap_or_default();
-        let drawing_summary = drawing_summary_for_area(sheet, area);
         // ScPrintFunc::DoPrint. Empty sheet page ranges are hidden by
         // ScDocument::IsPrintEmpty before PrintPage is called; header/footer
         // content is painted only for page ranges that survive that test. A
         // workbook made entirely of header/footer-only empty visible sheets
         // still emits one page; otherwise later empty sheets keep being hidden.
-        let empty = area
-          .is_some_and(|area| print_area_is_empty(import, sheet, area, &mut text_metrics))
-          && drawing_summary.anchors == 0
-          && drawing_summary.charts == 0;
-        if scale.skip_empty && empty && !(keep_header_footer_only_page && sheet_page_index == 0) {
+        // Excel differs from Calc's bSkipEmpty path for a drawing-only
+        // implicit sheet range: completely blank pages ahead of a distant
+        // drawing are retained. Do not extend this to sheets with cell
+        // content: those keep their established per-page empty suppression.
+        // Empty trailing pages and independent empty sheets remain hidden.
+        let implicit_page_ahead_of_content = last_implicit_printable_page
+          .is_some_and(|last_printable| page_area_index < last_printable);
+        if scale.skip_empty
+          && empty
+          && !implicit_page_ahead_of_content
+          && !(keep_header_footer_only_page && sheet_page_index == 0)
+        {
           continue;
         }
         pages.push(CalcPrintPage {
@@ -194,14 +223,10 @@ impl<'a> CalcPrintDocument<'a> {
 }
 
 fn page_cell_scan_area(area: CellRange) -> CellRange {
-  // Calc's FillInfo builds ScCellInfo through nCol2 + 1. Excel fixed output
-  // likewise lays out the first cell of the following column when an
-  // automatic page break leaves unused horizontal space. The page transform
-  // and logical area remain unchanged, so that boundary column is painted at
-  // its sheet position and is repeated from its own origin on the next page.
-  // This is observable for an over-wide column: the boundary cell text can be
-  // visible on both pages even though column pagination itself does not
-  // overlap.
+  // Calc's FillInfo builds ScCellInfo through nCol2 + 1 so the logical page
+  // can resolve occupied neighbours and text overflowing back from the first
+  // following column. ScOutputData still owns paint only through mnX2; display
+  // keeps the extra column as scan context rather than ordinary page content.
   CellRange::new(
     area.start,
     CellAddress {
@@ -1089,6 +1114,20 @@ fn print_area_is_empty(
       }
     }
   }
+  if sheet
+    .metrics
+    .merged_ranges
+    .iter()
+    .filter_map(|reference| CellRange::parse_a1_range(reference))
+    .any(|merged| merged.intersects(area))
+  {
+    // An authored merged range owns its complete rectangular print extent,
+    // even when its anchor has no text or visible fill. This is narrower than
+    // treating every styled blank cell as printable: repeated font/date-style
+    // tails remain skippable, while a merge that crosses an automatic page
+    // break retains that page in Excel fixed output.
+    return false;
+  }
   if sheet_area_has_left_text_overflow(import, sheet, area, text_metrics) {
     return false;
   }
@@ -1698,7 +1737,12 @@ fn print_cells_for_area<'a>(
         cell.data_type,
         import.globals.settings.date_1904,
       );
-      let rendered_text = pivot_display_text(sheet, print_address, rendered_text);
+      let rendered_text = pivot_display_text(
+        sheet,
+        print_address,
+        rendered_text,
+        import.styles.has_explicit_ui_language(),
+      );
       let icon_set = cell.display_text.parse::<f64>().ok().and_then(|value| {
         conditional_icon_set(import, sheet, address, value, conditional_eval_cache)
       });
@@ -2419,7 +2463,21 @@ impl ConditionalFormatEvalCache {
   }
 }
 
-fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> String {
+fn pivot_display_text(
+  sheet: &CalcSheet,
+  address: CellAddress,
+  text: String,
+  preserve_excel_cache: bool,
+) -> String {
+  if preserve_excel_cache {
+    // The Office golden path opens workbooks read-only through Workbooks.Open.
+    // Excel does not refresh PivotTable reports through that API, so the
+    // worksheet's persisted captions and member text remain authoritative.
+    // In particular, UI culture is not permission to translate cached labels.
+    // Keep the no-UI branch below as the established LibreOffice DataPilot
+    // compatibility path used by mapped visible-output fixtures.
+    return text;
+  }
   if let Some(text) = pivot_page_field_display_text(sheet, address) {
     return text;
   }

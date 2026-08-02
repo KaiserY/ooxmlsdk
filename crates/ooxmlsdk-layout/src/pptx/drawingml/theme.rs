@@ -211,7 +211,7 @@ impl ThemeFontScheme {
     };
     supplemental_fonts
       .iter()
-      .find(|(candidate, _)| candidate.eq_ignore_ascii_case(script))
+      .find(|(candidate, _)| candidate.eq_ignore_ascii_case(script.as_ref()))
       .map(|(_, typeface)| typeface.as_str())
   }
 }
@@ -224,28 +224,8 @@ fn supplemental_fonts(fonts: &[a::SupplementalFont]) -> Vec<(String, String)> {
     .collect()
 }
 
-fn language_script(language: &str) -> Option<&'static str> {
-  let language = language.to_ascii_lowercase();
-  if language == "zh-hant"
-    || language.starts_with("zh-hant-")
-    || language == "zh-tw"
-    || language == "zh-hk"
-    || language == "zh-mo"
-  {
-    Some("Hant")
-  } else if language == "zh"
-    || language.starts_with("zh-hans")
-    || language == "zh-cn"
-    || language == "zh-sg"
-  {
-    Some("Hans")
-  } else if language == "ja" || language.starts_with("ja-") {
-    Some("Jpan")
-  } else if language == "ko" || language.starts_with("ko-") {
-    Some("Hang")
-  } else {
-    None
-  }
+fn language_script(language: &str) -> Option<std::sync::Arc<str>> {
+  crate::localization::drawingml_theme_script(language)
 }
 
 impl ThemeColorEntry {
@@ -434,6 +414,9 @@ mod tests {
         ("Hans".to_string(), "SimSun".to_string()),
         ("Hant".to_string(), "PMingLiU".to_string()),
         ("Jpan".to_string(), "Yu Gothic".to_string()),
+        ("Hang".to_string(), "Malgun Gothic".to_string()),
+        ("Viet".to_string(), "Arial".to_string()),
+        ("Uigh".to_string(), "Microsoft Uighur".to_string()),
       ],
       ..Default::default()
     };
@@ -449,6 +432,18 @@ mod tests {
     assert_eq!(
       scheme.resolve_font_for_language("+mn-ea", Some("ja-JP")),
       Some("Yu Gothic")
+    );
+    assert_eq!(
+      scheme.resolve_font_for_language("+mn-ea", Some("ko-KR")),
+      Some("Malgun Gothic")
+    );
+    assert_eq!(
+      scheme.resolve_font_for_language("+mn-ea", Some("vi-VN")),
+      Some("Arial")
+    );
+    assert_eq!(
+      scheme.resolve_font_for_language("+mn-ea", Some("ug-CN")),
+      Some("Microsoft Uighur")
     );
   }
 }

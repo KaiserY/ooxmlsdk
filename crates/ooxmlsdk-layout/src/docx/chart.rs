@@ -25,7 +25,7 @@ fn chart_text_blocks(
     let typed_chart = shared_chart::pie_chart_model(chart_space).is_some()
       || shared_chart::cartesian_chart_for_ui_language(
         chart_space,
-        styles.simplified_chinese_ui.then_some("zh-CN"),
+        styles.locales.ui_language(),
       )
       .is_some();
     let vertical_axis_labels = chart_vertical_multilevel_axis_labels(chart_space);
@@ -38,7 +38,7 @@ fn chart_text_blocks(
     } else {
       shared_chart::fixed_output_texts_for_ui_language(
         chart_space,
-        styles.simplified_chinese_ui.then_some("zh-CN"),
+        styles.locales.ui_language(),
       )
     };
     for text in texts {

@@ -57,6 +57,62 @@ pub(crate) struct CartesianLayoutAdjustment {
   pub plot_right_ratio: f32,
 }
 
+/// PowerPoint's legacy empty-title container resolved from the sole series.
+///
+/// Apache POI's bar/line/radar/scatter fixtures share the same 480x320pt
+/// chart frame and immutable Microsoft Office fixed output. The ordinary
+/// line and indexed-scatter plots share this residual axis rectangle after
+/// the generated series title is reserved.
+pub(crate) const POWERPOINT_DERIVED_SERIES_TITLE_SIDE_LEGEND: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    category_top_ratio: -0.003_025,
+    plot_top_ratio: -0.005_282,
+    plot_bottom_ratio: -0.002_813,
+    tick_left_ratio: 0.002_16,
+    plot_left_ratio: 0.005_262,
+    plot_right_ratio: -0.021_514,
+    ..ZERO_ADJUSTMENT
+  };
+
+/// PowerPoint's generated-title layout with a bottom legend.
+///
+/// `tdf148117.pptx` carries an empty title container with no `c:layout`,
+/// `autoTitleDeleted=0`, and no manual plot layout. PowerPoint therefore supplies the localized UI
+/// title and uses a different title-to-plot reservation from an authored
+/// title. These residual frame ratios are measured from its immutable Office
+/// fixed output; the category and plot-bottom values remain independent
+/// because the lower axis-label band moves by a smaller amount than the plot.
+pub(crate) const POWERPOINT_GENERATED_TITLE_BOTTOM_LEGEND: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    title_top_ratio: -0.004_441,
+    category_top_ratio: 0.000_502,
+    plot_top_ratio: 0.006_816,
+    plot_bottom_ratio: -0.000_274,
+    ..ZERO_ADJUSTMENT
+  };
+
+/// The swapped axes of the matching horizontal-bar fixture use a taller plot
+/// band and a narrower horizontal value-axis span than line/scatter charts.
+pub(crate) const POWERPOINT_DERIVED_SERIES_TITLE_HORIZONTAL_BAR: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    plot_top_ratio: -0.024_28,
+    plot_bottom_ratio: 0.014_47,
+    plot_left_ratio: 0.009_34,
+    plot_right_ratio: -0.036_59,
+    ..ZERO_ADJUSTMENT
+  };
+
+/// A single-entry side legend is centered in PowerPoint's residual plot band,
+/// not in the complete chart frame, for the legacy derived-title profile.
+pub(crate) const POWERPOINT_DERIVED_SERIES_TITLE_LEGEND_Y_RATIO: f32 = 0.051_91;
+
+/// Length of an automatic major tick in PowerPoint's fixed chart output.
+///
+/// The POI chart family emits 5.71pt outward ticks for both category and
+/// value axes. This remains a physical distance rather than a plot ratio,
+/// matching LibreOffice's `AXIS2D_TICKLENGTH` fixed-distance model.
+pub(crate) const POWERPOINT_AUTOMATIC_MAJOR_TICK_LENGTH_PT: f32 = 5.71;
+
 /// Word side-legend charts with an explicit title.
 ///
 /// The ratios are stable across the solid, gradient, and bitmap title-fill
@@ -229,6 +285,23 @@ pub(crate) const EXCEL_MODERN_SINGLE_SERIES_TITLE: CartesianLayoutAdjustment =
     ..ZERO_ADJUSTMENT
   };
 
+/// Modern Excel single-series scatter with a derived title and no legend.
+///
+/// Scatter reserves a four-sided numeric-axis band distinct from the compact
+/// column profile above. The normalized inner rectangle is measured from the
+/// immutable Office fixed output for LibreOffice
+/// `tdf135184RoundLineCap.xlsx`; its explicit 0..4 and 0..10 axes also keep
+/// this profile independent of autoscale differences in error-bar charts.
+pub(crate) const EXCEL_MODERN_SINGLE_SERIES_SCATTER_TITLE: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    category_top_ratio: 0.009_776,
+    plot_top_ratio: -0.008_636,
+    plot_bottom_ratio: -0.025_627,
+    plot_left_ratio: 0.007_904,
+    plot_right_ratio: -0.012_711,
+    ..ZERO_ADJUSTMENT
+  };
+
 pub(crate) const EXCEL_LEGACY_SINGLE_SERIES_TITLE: CartesianLayoutAdjustment =
   CartesianLayoutAdjustment {
     category_top_ratio: 0.025_8,
@@ -306,6 +379,26 @@ pub(crate) const EXCEL_EXPLICIT_CATEGORY_AUTOMATIC: CartesianLayoutAdjustment =
     plot_right_ratio: 0.000_63,
     ..ZERO_ADJUSTMENT
   };
+
+/// Excel's legacy shifted-category column layout with an empty side legend.
+///
+/// LibreOffice `tdf130657.xlsx` preserves a right-legend container but has no
+/// series title, and omits `c:crossBetween`. Excel therefore lays out a wider,
+/// lower inner plot than its ordinary explicit-category automatic profile.
+/// The ratios are measured from the immutable Office fixed output; the local
+/// LibreOffice regression independently requires shifted category positions
+/// for the missing-crossBetween form.
+pub(crate) const EXCEL_SHIFTED_CATEGORY_EMPTY_SIDE_LEGEND: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    category_top_ratio: 0.015_547,
+    plot_top_ratio: 0.012_224,
+    plot_bottom_ratio: 0.023_379,
+    plot_left_ratio: 0.005_286,
+    plot_right_ratio: 0.015,
+    ..ZERO_ADJUSTMENT
+  };
+
+pub(crate) const EXCEL_SHIFTED_CATEGORY_EMPTY_SIDE_LEGEND_TICK_GAP_RATIO: f32 = 0.034_84;
 
 /// Excel's automatic single-series, vary-colors chart with a data table.
 ///
@@ -418,6 +511,12 @@ pub(crate) const DEFAULT_TICK_LEFT_RATIO: f32 = 0.015;
 
 pub(crate) const POWERPOINT_TITLED_BOTTOM_TICK_GAP_RATIO: f32 = 0.032_3;
 pub(crate) const DEFAULT_TICK_GAP_RATIO: f32 = 0.026;
+/// Value-label gap outside an authored modern Excel scatter inner plot.
+///
+/// `layoutTarget="inner"` excludes the axes and their labels. Office fixed
+/// output for LibreOffice `fdo70609.xlsx` keeps an 8.32pt label-to-axis band
+/// on a 195.84pt chart frame, independently of the authored inner rectangle.
+pub(crate) const EXCEL_MANUAL_INNER_SCATTER_TICK_GAP_RATIO: f32 = 0.042_5;
 pub(crate) const POWERPOINT_TITLED_BOTTOM_RIGHT_MARGIN_RATIO: f32 = 0.030_1;
 pub(crate) const WORD_HIDDEN_VALUE_RIGHT_MARGIN_RATIO: f32 = 0.041;
 pub(crate) const DEFAULT_RIGHT_MARGIN_RATIO: f32 = 0.026;
@@ -457,11 +556,15 @@ pub(crate) const WORD_AUTOMATIC_TITLE_BOTTOM_COLUMN_LEGEND: HorizontalCartesianL
   };
 pub(crate) const EXCEL_TITLED_INDEXED_SCATTER_LEGEND: HorizontalCartesianLegendProfile =
   HorizontalCartesianLegendProfile {
-    entry_gap_em: 2.43,
+    // Office gives scatter legends a full line key, then uses the ordinary
+    // one-em inter-entry band.  The former 2.43em value folded the missing
+    // line-key width into the gap; keeping both made the second entry 13.4pt
+    // too far right in the immutable `dispBlanksAs_2013.xlsx` fixed output.
+    entry_gap_em: 0.94,
     marker_gap_em: CARTESIAN_LEGEND_MARKER_GAP_EM,
     line_key_width_em: CARTESIAN_LINE_LEGEND_KEY_WIDTH_EM,
     x_offset_height_ratio: -0.008_5,
-    y_offset_height_ratio: 0.004_16,
+    y_offset_height_ratio: -0.009_49,
   };
 pub(crate) const EXCEL_EXPLICIT_BOTTOM_COLUMN_LEGEND: HorizontalCartesianLegendProfile =
   HorizontalCartesianLegendProfile {
@@ -594,6 +697,7 @@ pub(crate) struct RadialHostDefaults {
   pub side_legend_width_em: f32,
   pub radius_height_basis_scale: f32,
   pub radius_scale: f32,
+  pub titled_bottom_legend_radius_scale: f32,
   pub compact_radius_scale: f32,
   pub explosion_scale: f32,
   pub legend_marker_em: f32,
@@ -609,6 +713,7 @@ pub(crate) const POWERPOINT_RADIAL_DEFAULTS: RadialHostDefaults = RadialHostDefa
   side_legend_width_em: 1.765_4,
   radius_height_basis_scale: 1.35,
   radius_scale: 0.40,
+  titled_bottom_legend_radius_scale: 0.40,
   compact_radius_scale: 0.346,
   explosion_scale: 0.24,
   legend_marker_em: 0.55,
@@ -619,11 +724,52 @@ pub(crate) const POWERPOINT_RADIAL_DEFAULTS: RadialHostDefaults = RadialHostDefa
   side_legend_center_offset_em: 0.923_3,
 };
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Pie3DProjectionProfile {
+  /// Horizontal radius relative to the host's radial plot basis.
+  pub radius_x_scale: f32,
+  /// Residual multiplier after projecting a circular top by `sin(rotX)`.
+  pub vertical_tilt_scale: f32,
+  /// Default visible extrusion relative to the automatic plot height at the
+  /// canonical 30-degree X rotation.
+  pub depth_height_scale: f32,
+  /// Vertical residual after centering the complete top-plus-side scene.
+  pub center_y_offset_height_ratio: f32,
+  /// Series/point explosion displacement relative to the fitted radius.
+  /// The scene radius is reduced by the same outward extent so the complete
+  /// exploded pie remains inside the automatic plot rectangle.
+  pub explosion_scale: f32,
+  /// Residual safety inset applied after the explosion envelope is fitted.
+  pub exploded_geometry_scale: f32,
+  /// Vertical scene-centre correction used only by an exploded pie.
+  pub exploded_center_y_offset_height_ratio: f32,
+}
+
+/// PowerPoint's automatic 3-D pie scene.
+///
+/// The strict Open XML `3D Pie-O12-PPT-Charts.pptx` reference has an authored
+/// `rotX=30`, `perspective=30` view and no `hPercent`. Its immutable Office
+/// fixed output rasterizes only the 3-D plot at 200 ppi while retaining the
+/// title and legend as vectors. The plot measures a 180.1pt horizontal radius,
+/// 85.3pt projected vertical radius, and 41.6pt visible extrusion inside the
+/// same automatic chart bands used by the vector host. These normalized
+/// values define the scene profile; they are not PDF-image dimensions.
+pub(crate) const POWERPOINT_PIE_3D_PROJECTION: Pie3DProjectionProfile = Pie3DProjectionProfile {
+  radius_x_scale: 0.468_8,
+  vertical_tilt_scale: 0.947,
+  depth_height_scale: 0.146_2,
+  center_y_offset_height_ratio: -0.011_86,
+  explosion_scale: 0.95,
+  exploded_geometry_scale: 0.98,
+  exploded_center_y_offset_height_ratio: -0.004_75,
+};
+
 pub(crate) const WORD_RADIAL_DEFAULTS: RadialHostDefaults = RadialHostDefaults {
   title_height_scale: 1.5,
   side_legend_width_em: 2.2,
   radius_height_basis_scale: 1.35,
   radius_scale: 0.42,
+  titled_bottom_legend_radius_scale: 0.42,
   compact_radius_scale: 0.42,
   explosion_scale: 0.24,
   legend_marker_em: 0.55,
@@ -639,6 +785,7 @@ pub(crate) const EXCEL_RADIAL_DEFAULTS: RadialHostDefaults = RadialHostDefaults 
   side_legend_width_em: 2.12,
   radius_height_basis_scale: 1.0,
   radius_scale: 0.445,
+  titled_bottom_legend_radius_scale: 0.420_5,
   compact_radius_scale: 0.347,
   explosion_scale: 0.9,
   legend_marker_em: 0.477_7,
@@ -653,6 +800,17 @@ pub(crate) const RADIAL_TITLE_TOP_RATIO: f32 = 0.025;
 pub(crate) const EXCEL_BOTTOM_LEGEND_TITLE_OFFSET_EM: f32 = 0.317;
 pub(crate) const EXCEL_TITLED_BOTTOM_LEGEND_HEIGHT_SCALE: f32 = 0.938_5;
 pub(crate) const EXCEL_UNTITLED_BOTTOM_LEGEND_HEIGHT_SCALE: f32 = 1.281_5;
+
+/// Fixed inset used before PowerPoint lays out an automatic pie diagram.
+///
+/// `chart2/source/view/main/ChartView.cxx` uses 350 hundredths of a
+/// millimetre on every side for pie charts instead of its ordinary 2% page
+/// inset, establishing that this is a fixed-distance policy. The immutable
+/// PowerPoint output for the 3x3 frame-size matrix in
+/// `PieChartWithAutomaticLayout_SizeAndPosition.pptx` resolves that host
+/// distance to exactly 11pt; the remaining diagram is then reduced to a
+/// centred 1:1 rectangle.
+pub(crate) const POWERPOINT_AUTOMATIC_PIE_FIXED_INSET_PT: f32 = 11.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct BestFitSectorProfile {

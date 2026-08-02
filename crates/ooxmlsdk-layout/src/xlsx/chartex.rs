@@ -4,7 +4,8 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex as cx;
 use crate::model::{PageItem, TextStyle};
 use crate::pptx::chart::ChartFrame;
 use crate::render::chartex::{
-  self as shared_chartex, ChartExRenderOptions, ChartExStyleResources, ChartExTheme, FormulaMatrix,
+  self as shared_chartex, ChartExHost, ChartExRenderOptions, ChartExStyleResources, ChartExTheme,
+  FormulaMatrix,
 };
 
 use super::import::ExcelImport;
@@ -27,6 +28,7 @@ pub(crate) fn lower_extended_chart(
   shared_chartex::lower_extended_chart(
     chart_space,
     ChartExRenderOptions {
+      host: ChartExHost::Excel,
       frame: ChartFrame {
         x_pt: frame.x_pt,
         y_pt: frame.y_pt,
@@ -53,6 +55,7 @@ pub(crate) fn lower_extended_chart_cached_with_resources(
   title_style: TextStyle,
   label_style: TextStyle,
   ui_language: Option<&str>,
+  host: ChartExHost,
   theme: ChartExTheme,
   chart_styles: &[cs::ChartStyle],
   color_styles: &[cs::ColorStyle],
@@ -60,6 +63,7 @@ pub(crate) fn lower_extended_chart_cached_with_resources(
   shared_chartex::lower_extended_chart(
     chart_space,
     ChartExRenderOptions {
+      host,
       frame,
       title_style,
       label_style,

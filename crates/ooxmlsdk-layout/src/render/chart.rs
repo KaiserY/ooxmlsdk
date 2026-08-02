@@ -1,6 +1,9 @@
+use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2012_chart as c15;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+use std::borrow::Cow;
 
+use crate::localization::{ChartDisplayUnit, OfficeStringCatalog};
 use crate::{render::math::text_math_text, units};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -156,6 +159,22 @@ pub enum RadialChartKind {
 pub struct ClusteredColumnSeries<'a> {
   pub name: String,
   pub has_explicit_name: bool,
+  /// Whether c:tx carries a non-empty cached or literal series title.
+  ///
+  /// A present but empty c:tx still affects host layout, so it cannot replace
+  /// `has_explicit_name`. It must not, however, promote a generated Row/Column
+  /// fallback into an automatic chart title.
+  pub has_nonempty_explicit_name: bool,
+  /// Authored series shape properties retained for host color resolution.
+  ///
+  /// Keeping the typed `c:spPr` here preserves DrawingML line semantics such
+  /// as preset dashes, caps, and joins; reducing it to a solid color and width
+  /// during shared import loses visible chart geometry.
+  pub shape_properties: Option<&'a c::ChartShapeProperties>,
+  /// Authored point overrides retained in index form.  A `c:dPt` may carry
+  /// any DrawingML fill/outline, including an explicit `a:noFill`; reducing
+  /// this list to solid RGB values loses both inheritance and line paint.
+  pub data_points: &'a [c::DataPoint],
   /// Formula backing the numeric values, when the chart uses a worksheet
   /// reference. Renderers normally use the embedded cache, but spreadsheet
   /// hosts need the reference when `plotVisOnly=0` asks for hidden cells that
@@ -164,6 +183,10 @@ pub struct ClusteredColumnSeries<'a> {
   pub values: Vec<Option<f64>>,
   pub number_format_code: Option<&'a str>,
   pub x_values: Vec<Option<f64>>,
+  /// Cached number format for a scatter/bubble X-value sequence.  Numeric X
+  /// and Y axes can both be `c:valAx`, but `sourceLinked` resolves them from
+  /// different data roles.
+  pub x_number_format_code: Option<&'a str>,
   pub bubble_sizes: Vec<Option<f64>>,
   pub solid_fill: Option<&'a a::SolidFill>,
   pub data_point_fills: Vec<ChartDataPointFill<'a>>,
@@ -208,15 +231,42 @@ pub struct ClusteredColumnDataLabel<'a> {
   /// labels intentionally keep this unset because their field semantics are
   /// already resolved by the producer.
   pub value_component_index: Option<usize>,
+  /// Resolved DrawingML runs for an individual `c:dLbl/c:tx/c:rich` label.
+  /// Paragraph and explicit break boundaries are retained as line indices;
+  /// direct and paragraph-default properties remain separate so each host can
+  /// resolve its own theme fonts and colors without flattening the shared
+  /// chart model.
+  pub rich_text_runs: Vec<ChartDataLabelTextRun<'a>>,
   pub value_format_code: Option<&'a str>,
   pub separator: &'a str,
   pub position: c::DataLabelPositionValues,
+  /// Individual `c:dLbl/c:layout/c:manualLayout` position. Group and series
+  /// `c:dLbls` do not own this rectangle.
+  pub layout: Option<ChartManualLayout>,
+  /// Office 2013 `c15:layout` state. Unlike the compatibility `c:layout`, its
+  /// manual layout can retain only `w`/`h`; PowerPoint uses those dimensions
+  /// as the data-label text frame even when position remains automatic.
+  pub text_frame_layout: Option<ChartManualLayout>,
   /// Effective c:dLbls/c:dLbl text properties after applying Office's
   /// chart-group < series < point override hierarchy.
   pub text_properties: Option<&'a c::TextProperties>,
+  /// Effective DrawingML text-body properties. An individual rich `c:tx`
+  /// owns its text body and therefore overrides the inherited `c:txPr`
+  /// body. Retaining this separately lets host layout include the complete
+  /// label box (including schema-default insets) instead of measuring only
+  /// the painted glyphs.
+  pub text_body_properties: Option<&'a a::BodyProperties>,
   /// Resolved c:dLbls/c:dLbl shape properties after applying Office's
   /// chart-group < series < point override hierarchy.
   pub shape_properties: Option<&'a c::ChartShapeProperties>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChartDataLabelTextRun<'a> {
+  pub text: String,
+  pub line_index: usize,
+  pub paragraph_default_run_properties: Option<&'a a::DefaultRunProperties>,
+  pub run_properties: Option<&'a a::RunProperties>,
 }
 
 #[derive(Clone, Debug)]
@@ -239,6 +289,13 @@ pub struct ClusteredColumnChart<'a> {
   pub ui_language: Option<String>,
   pub title: Option<ChartTitleText>,
   pub title_overlay: bool,
+  pub title_layout: Option<ChartManualLayout>,
+  /// Whether `c:title/c:layout` was authored, even when it contains no
+  /// `c:manualLayout`. Office distinguishes that automatic-layout marker
+  /// from a title with no layout element at all.
+  pub title_layout_container_present: bool,
+  /// Independent DrawingML text-body rotation in degrees.
+  pub title_rotation_deg: f32,
   /// Vertical anchoring authored on a rich chart title's `a:bodyPr`.
   ///
   /// Keeping this separate from the extracted title string lets host
@@ -292,16 +349,28 @@ pub struct ClusteredColumnChart<'a> {
 #[derive(Clone, Debug)]
 pub struct PieChartModel<'a> {
   pub kind: RadialChartKind,
+  /// Camera and scene parameters for `c:pie3DChart`.
+  ///
+  /// A 3-D pie is not the 2-D ellipse plus an arbitrary shadow: `c:view3D`
+  /// controls its projected top face and visible extrusion. Retain the view
+  /// here so every host can lower the same authored scene semantics.
+  pub view_3d: Option<Chart3DView>,
   pub title: Option<ChartTitleText>,
+  pub title_layout: Option<ChartManualLayout>,
+  pub title_rotation_deg: f32,
   pub series_name: String,
   pub categories: Vec<String>,
   pub values: Vec<Option<f64>>,
+  pub series_shape_properties: Option<&'a c::ChartShapeProperties>,
+  pub data_points: &'a [c::DataPoint],
   pub series_solid_fill: Option<&'a a::SolidFill>,
   pub data_point_fills: Vec<ChartDataPointFill<'a>>,
   pub first_slice_angle_deg: f64,
   pub hole_size_percent: f64,
   pub series_explosion_percent: f64,
-  pub point_explosion_percent: Vec<f64>,
+  /// Point-level `c:dPt/c:explosion` overrides. `None` is distinct from an
+  /// authored zero: an absent point override inherits the series explosion.
+  pub point_explosion_percent: Vec<Option<f64>>,
   pub secondary_indices: Vec<usize>,
   pub secondary_size_percent: f64,
   pub vary_colors: bool,
@@ -312,6 +381,9 @@ pub struct PieChartModel<'a> {
   /// Automatic legend geometry still belongs to the host layout profile, but
   /// the text must be positioned inside that geometry according to DrawingML.
   pub legend_vertical_anchor: Option<a::TextAnchoringTypeValues>,
+  /// DrawingML text-body geometry authored for the legend. Manual legends
+  /// need these insets when wrapping entries and determining row capacity.
+  pub legend_text_body_properties: Option<&'a a::BodyProperties>,
   pub visible_legend_indices: Vec<usize>,
   pub legend_layout: Option<ChartManualLayout>,
   pub plot_layout: Option<ChartManualLayout>,
@@ -359,27 +431,11 @@ pub struct ChartCategoryTick {
 }
 
 pub fn automatic_chart_title(ui_language: Option<&str>) -> &'static str {
-  let language = ui_language.unwrap_or("en").to_ascii_lowercase();
-  if language == "zh-tw" || language == "zh-hk" || language == "zh-mo" || language == "zh-hant" {
-    "圖表標題"
-  } else if language == "zh" || language == "zh-cn" || language == "zh-sg" || language == "zh-hans"
-  {
-    "图表标题"
-  } else {
-    "Chart Title"
-  }
+  OfficeStringCatalog::for_ui_language(ui_language).chart_title()
 }
 
 pub fn automatic_series_title(ui_language: Option<&str>, series_index: usize) -> String {
-  let language = ui_language.unwrap_or("en").to_ascii_lowercase();
-  if language == "zh-tw" || language == "zh-hk" || language == "zh-mo" || language == "zh-hant" {
-    format!("數列 {series_index}")
-  } else if language == "zh" || language == "zh-cn" || language == "zh-sg" || language == "zh-hans"
-  {
-    format!("系列 {series_index}")
-  } else {
-    format!("Series {series_index}")
-  }
+  OfficeStringCatalog::for_ui_language(ui_language).chart_series_title(series_index)
 }
 
 /// Extracts the first ordinary two-dimensional clustered column chart.
@@ -420,10 +476,12 @@ pub fn clustered_column_chart_for_ui_language<'a>(
   let mut categories = Vec::new();
   for (series_index, source) in bar_chart.bar_chart_series.iter().enumerate() {
     let series_ref = bar_series_ref(source);
-    let name = series_ref
+    let explicit_name = series_ref
       .series_text
       .map(series_text_value)
-      .filter(|value| !value.is_empty())
+      .filter(|value| !value.is_empty());
+    let name = explicit_name
+      .clone()
       .unwrap_or_else(|| default_series_label(series_ref, series_index + 1, ui_language));
     let source_categories = source
       .category_axis_data
@@ -469,10 +527,14 @@ pub fn clustered_column_chart_for_ui_language<'a>(
     series.push(ClusteredColumnSeries {
       name,
       has_explicit_name: series_ref.series_text.is_some(),
+      has_nonempty_explicit_name: explicit_name.is_some(),
+      shape_properties: series_ref.chart_shape_properties,
+      data_points: &source.data_point,
       value_formula: series_value_formula(series_ref),
       values,
       number_format_code: series_number_format_code(series_ref),
       x_values: Vec::new(),
+      x_number_format_code: None,
       bubble_sizes: Vec::new(),
       solid_fill,
       data_point_fills,
@@ -593,6 +655,13 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       .as_deref()
       .and_then(|title| title.overlay.as_ref())
       .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool())),
+    title_layout: chart_title_layout(&chart_space.chart),
+    title_layout_container_present: chart_space
+      .chart
+      .title
+      .as_deref()
+      .is_some_and(|title| title.layout.is_some()),
+    title_rotation_deg: chart_title_rotation_degrees(&chart_space.chart),
     title_vertical_anchor: chart_title_vertical_anchor(&chart_space.chart),
     has_automatic_title_marker: chart_space.chart.auto_title_deleted.is_some(),
     cached_category_count,
@@ -1308,6 +1377,13 @@ pub fn cartesian_chart_for_ui_language<'a>(
       .as_deref()
       .and_then(|title| title.overlay.as_ref())
       .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool())),
+    title_layout: chart_title_layout(&chart_space.chart),
+    title_layout_container_present: chart_space
+      .chart
+      .title
+      .as_deref()
+      .is_some_and(|title| title.layout.is_some()),
+    title_rotation_deg: chart_title_rotation_degrees(&chart_space.chart),
     title_vertical_anchor: chart_title_vertical_anchor(&chart_space.chart),
     has_automatic_title_marker: chart_space.chart.auto_title_deleted.is_some(),
     cached_category_count,
@@ -1365,7 +1441,7 @@ pub fn cartesian_chart_for_ui_language<'a>(
   })
 }
 
-fn chart_style_id(chart_space: &c::ChartSpace) -> Option<u8> {
+pub(crate) fn chart_style_id(chart_space: &c::ChartSpace) -> Option<u8> {
   match chart_space.chart_space_choice.as_ref()? {
     c::ChartSpaceChoice::C14Style(style) => {
       let style = u16::from(style.val);
@@ -1373,6 +1449,19 @@ fn chart_style_id(chart_space: &c::ChartSpace) -> Option<u8> {
     }
     c::ChartSpaceChoice::CStyle(style) => Some(style.val.unwrap_or(2)),
     c::ChartSpaceChoice::AlternateContent(_) => None,
+  }
+}
+
+pub(crate) fn automatic_linear_series_line_width_scale(chart_space: &c::ChartSpace) -> f32 {
+  // LibreOffice ObjectFormatter::spLinearSeriesLines maps the classic 1..48
+  // chart styles to a percentage of the theme's subtle line. c14 styles
+  // 101..148 are the corresponding modern aliases and chart_style_id()
+  // normalizes them back to that range.
+  match chart_style_id(chart_space).unwrap_or(2) {
+    1..=8 => 3.0,
+    25..=32 => 7.0,
+    9..=24 | 33..=48 => 5.0,
+    _ => 3.0,
   }
 }
 
@@ -1388,10 +1477,12 @@ fn append_cartesian_series<'a>(
   let (kind, grouping, is_3d) = series_spec;
   for source in sources {
     let series_index = target.len() + 1;
-    let name = source
+    let explicit_name = source
       .series_text
       .map(series_text_value)
-      .filter(|value| !value.is_empty())
+      .filter(|value| !value.is_empty());
+    let name = explicit_name
+      .clone()
       .unwrap_or_else(|| default_series_label(source, series_index, ui_language));
     let source_categories = source
       .category_axis_data
@@ -1416,8 +1507,12 @@ fn append_cartesian_series<'a>(
     target.push(ClusteredColumnSeries {
       name: name.clone(),
       has_explicit_name: source.series_text.is_some(),
+      has_nonempty_explicit_name: explicit_name.is_some(),
+      shape_properties: source.chart_shape_properties,
+      data_points: source.data_points,
       value_formula: series_value_formula(source),
       x_values: chart_series_x_numeric_values(source),
+      x_number_format_code: series_x_number_format_code(source),
       bubble_sizes: bubble_sizes.clone(),
       solid_fill: source.chart_shape_properties.and_then(|properties| {
         chart_shape_solid_fill(properties).or_else(|| chart_shape_outline_solid_fill(properties))
@@ -1604,7 +1699,10 @@ fn visible_series_legend_indices(legend: Option<&c::Legend>, count: usize) -> Ve
 }
 
 fn chart_layout(layout: Option<&c::Layout>) -> Option<ChartManualLayout> {
-  let manual = layout?.manual_layout.as_deref()?;
+  chart_manual_layout(layout?.manual_layout.as_deref()?)
+}
+
+fn chart_manual_layout(manual: &c::ManualLayout) -> Option<ChartManualLayout> {
   let mode = |value: Option<c::LayoutModeValues>| match value {
     Some(c::LayoutModeValues::Edge) => ChartLayoutMode::Edge,
     Some(c::LayoutModeValues::Factor) | None => ChartLayoutMode::Factor,
@@ -1621,6 +1719,89 @@ fn chart_layout(layout: Option<&c::Layout>) -> Option<ChartManualLayout> {
     width_mode: mode(manual.width_mode.as_ref().and_then(|value| value.val)),
     height_mode: mode(manual.height_mode.as_ref().and_then(|value| value.val)),
   })
+}
+
+/// Office treats title and individual data-label manual layouts as positions,
+/// not resizable plot rectangles. MS-OI29500 §21.2.2.78/229 ignores `h` and
+/// `w` for those owners and §21.2.2.104 requires `x` and `y` together.
+fn chart_text_layout(layout: Option<&c::Layout>) -> Option<ChartManualLayout> {
+  chart_manual_text_layout(layout?.manual_layout.as_deref()?)
+}
+
+fn chart_manual_text_layout(manual: &c::ManualLayout) -> Option<ChartManualLayout> {
+  let mut layout = chart_manual_layout(manual)?;
+  let x = layout.x?;
+  let y = layout.y?;
+  let valid_coordinate = |value: f32, mode: ChartLayoutMode| {
+    value.is_finite()
+      && match mode {
+        ChartLayoutMode::Edge => (0.0..=1.0).contains(&value),
+        ChartLayoutMode::Factor => (-1.0..=1.0).contains(&value),
+      }
+  };
+  if !valid_coordinate(x, layout.x_mode) || !valid_coordinate(y, layout.y_mode) {
+    return None;
+  }
+  layout.targets_inner_plot = false;
+  layout.width = None;
+  layout.height = None;
+  Some(layout)
+}
+
+fn data_label_text_layout(
+  label: &c::DataLabel,
+  legacy_layout: Option<&c::Layout>,
+) -> Option<ChartManualLayout> {
+  // Office 2013 introduced c15:layout specifically for a data label or its
+  // parent dLbls object. Its presence is the current layout state; an empty
+  // extension therefore means automatic placement and supersedes a legacy
+  // c:layout retained for older consumers. PowerPoint emits both forms in
+  // percentage-number-formats.pptx, and its fixed output follows the empty
+  // c15 form rather than applying the stale legacy offset.
+  if let Some(layout) = data_label_extension_layout(label) {
+    let Some(manual) = layout.manual_layout.as_deref() else {
+      return None;
+    };
+    if manual.left.is_some() || manual.top.is_some() {
+      return chart_manual_text_layout(manual);
+    }
+    if manual.width.is_some() || manual.height.is_some() {
+      // PowerPoint 2013+ splits a manually sized label across the two
+      // compatibility representations: c15:layout carries the current w/h,
+      // while c:layout retains the x/y factor offset from the automatic
+      // position. tdf146487 is a fixed-output counterexample to treating the
+      // legacy coordinates as stale when the modern layout is non-empty.
+      return chart_text_layout(legacy_layout);
+    }
+    return None;
+  }
+  chart_text_layout(legacy_layout)
+}
+
+fn data_label_extension_layout(label: &c::DataLabel) -> Option<&c15::Layout> {
+  label
+    .d_lbl_extension_list
+    .as_ref()
+    .into_iter()
+    .flat_map(|list| &list.d_lbl_extension)
+    .flat_map(|extension| &extension.d_lbl_extension_choice)
+    .find_map(|choice| match choice {
+      c::DLblExtensionChoice::Layout(layout) => Some(layout.as_ref()),
+      _ => None,
+    })
+}
+
+fn data_labels_extension_layout(labels: &c::DataLabels) -> Option<&c15::Layout> {
+  labels
+    .d_lbls_extension_list
+    .as_ref()
+    .into_iter()
+    .flat_map(|list| &list.d_lbls_extension)
+    .flat_map(|extension| &extension.d_lbls_extension_choice)
+    .find_map(|choice| match choice {
+      c::DLblsExtensionChoice::Layout(layout) => Some(layout.as_ref()),
+      _ => None,
+    })
 }
 
 /// Returns the clustered-column subset whose complete plot and chart-area
@@ -1739,10 +1920,12 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
   }
   categories.truncate(values.len());
   let series_ref = pie_series_ref(series);
-  let series_name = series_ref
+  let explicit_series_name = series_ref
     .series_text
     .map(series_text_value)
-    .filter(|value| !value.is_empty())
+    .filter(|value| !value.is_empty());
+  let series_name = explicit_series_name
+    .clone()
     .unwrap_or_else(|| default_series_label(series_ref, 1, None));
   let title = match chart_title_text(&chart_space.chart) {
     None
@@ -1752,12 +1935,13 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
         .as_deref()
         .is_some_and(|title| explicit_title_text(title).is_none())
         && chart_automatic_title_is_visible(&chart_space.chart)
-        && !series_name.is_empty() =>
+        && explicit_series_name.is_some() =>
     {
       // LibreOffice ChartSpaceConverter::convertFromModel derives the
-      // automatic chart title from the effective series title. Pie-family
+      // automatic chart title from an authored series title. Pie-family
       // charts paint only their first series, so later cached series do not
-      // prevent that first title from becoming the automatic title.
+      // prevent that first title from becoming the automatic title. Office
+      // does not promote the generated Row/Column fallback to a chart title.
       Some(ChartTitleText::Explicit(series_name.clone()))
     }
     title => title,
@@ -1838,13 +2022,13 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
     });
   }
 
-  let mut point_explosion_percent = vec![0.0; values.len()];
+  let mut point_explosion_percent = vec![None; values.len()];
   for point in &series.data_point {
     if let (Ok(index), Some(explosion)) =
       (usize::try_from(point.index.val), point.explosion.as_ref())
       && let Some(target) = point_explosion_percent.get_mut(index)
     {
-      *target = f64::from(explosion.val);
+      *target = Some(f64::from(explosion.val));
     }
   }
   let secondary_indices = of_pie
@@ -1853,10 +2037,15 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
 
   Some(PieChartModel {
     kind: radial_kind,
+    view_3d: (radial_kind == RadialChartKind::Pie3D).then(|| chart_3d_view(&chart_space.chart)),
     title,
+    title_layout: chart_title_layout(&chart_space.chart),
+    title_rotation_deg: chart_title_rotation_degrees(&chart_space.chart),
     series_name,
     categories,
     values,
+    series_shape_properties: series.chart_shape_properties.as_deref(),
+    data_points: &series.data_point,
     series_solid_fill: series
       .chart_shape_properties
       .as_deref()
@@ -1883,6 +2072,9 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
     legend_vertical_anchor: legend
       .and_then(|legend| legend.text_properties.as_deref())
       .and_then(|properties| properties.body_properties.anchor),
+    legend_text_body_properties: legend
+      .and_then(|legend| legend.text_properties.as_deref())
+      .map(|properties| properties.body_properties.as_ref()),
     visible_legend_indices,
     legend_layout: legend.and_then(|legend| chart_layout(legend.layout.as_deref())),
     plot_layout: chart_layout(chart_space.chart.plot_area.layout.as_deref()),
@@ -2041,15 +2233,9 @@ fn resolved_data_labels<'a>(
     .iter()
     .flatten()
     .all(|value| value.is_finite() && *value >= 0.0);
-  let whole_percentages = (settings.show_percent
-    && defaults.supports_percent
-    && percentage_values_are_valid
-    && series_labels
-      .or(chart_group_labels)
-      .and_then(data_labels_format_code)
-      .is_none()
-    && percentage_total > f64::EPSILON)
-    .then(|| largest_remainder_percentages(values, percentage_total));
+  let whole_percentages =
+    (defaults.supports_percent && percentage_values_are_valid && percentage_total > f64::EPSILON)
+      .then(|| largest_remainder_percentages(values, percentage_total));
 
   let mut point_labels = vec![None; values.len()];
   if let Some(labels) = series_labels {
@@ -2069,26 +2255,19 @@ fn resolved_data_labels<'a>(
     .filter_map(|(point_index, value)| {
       let value = value.as_ref().copied()?;
       let mut point_settings = settings;
+      let mut point_layout = None;
+      let mut text_frame_layout = settings.text_frame_layout;
       let mut text_properties = series_labels
         .and_then(data_labels_text_properties)
         .or_else(|| chart_group_labels.and_then(data_labels_text_properties));
-      let percentage_text =
-        (percentage_total.abs() > f64::EPSILON).then(|| {
-          whole_percentages.as_ref().map_or_else(
-            || {
-              format_chart_number(
-                value / percentage_total,
-                series_labels
-                  .or(chart_group_labels)
-                  .and_then(data_labels_format_code)
-                  .or(Some("0%")),
-              )
-            },
-            |percentages| format!("{}%", percentages[point_index] as i32),
-          )
-        });
-      let mut custom_text = None;
+      let mut custom_chart_text = None;
       if let Some(label) = point_labels[point_index] {
+        if let Some(layout) = data_label_extension_layout(label) {
+          text_frame_layout = layout
+            .manual_layout
+            .as_deref()
+            .and_then(chart_manual_layout);
+        }
         if label.data_label_choice.iter().any(|choice| {
           matches!(choice, c::DataLabelChoice::Delete(delete) if delete.val.is_none_or(|value| value.as_bool()))
         }) {
@@ -2102,24 +2281,17 @@ fn resolved_data_labels<'a>(
             _ => None,
           })
         {
+          point_layout = data_label_text_layout(label, sequence.layout.as_deref());
           if sequence.text_properties.is_some() {
             text_properties = sequence.text_properties.as_deref();
           }
           if let Some(chart_text) = sequence.chart_text.as_deref() {
             // MS-OI29500 §21.2.2.47: when c:tx is present Office ignores
             // the component-selection fields on the same individual label.
-            custom_text = Some(data_label_chart_text(
-              chart_text,
-              series_name,
-              categories.get(point_index).map(String::as_str),
-              value,
-              point_settings.value_format_code,
-              percentage_text.as_deref(),
-              bubble_sizes
-                .and_then(|sizes| sizes.get(point_index))
-                .copied()
-                .flatten(),
-            ));
+            // Position, number format, and shape properties remain the
+            // presentation state of that custom text.
+            custom_chart_text = Some(chart_text);
+            apply_data_label_sequence_presentation_settings(&mut point_settings, sequence);
           } else {
             apply_data_label_sequence_settings(&mut point_settings, sequence);
           }
@@ -2129,6 +2301,51 @@ fn resolved_data_labels<'a>(
       if point_settings.deleted {
         return None;
       }
+      let text_body_properties = custom_chart_text
+        .and_then(|chart_text| match chart_text.chart_text_choice.as_ref() {
+          Some(c::ChartTextChoice::RichText(rich)) => Some(rich.body_properties.as_ref()),
+          Some(c::ChartTextChoice::StringReference(_))
+          | Some(c::ChartTextChoice::StringLiteral(_))
+          | None => None,
+        })
+        .or_else(|| text_properties.map(|properties| properties.body_properties.as_ref()));
+      let percentage_text = (point_settings.show_percent
+        && percentage_total.abs() > f64::EPSILON)
+        .then(|| {
+          point_settings.percentage_format_code.map_or_else(
+            || {
+              whole_percentages.as_ref().map_or_else(
+                || format_chart_number(value / percentage_total, Some("0%")),
+                |percentages| format!("{}%", percentages[point_index] as i32),
+              )
+            },
+            |format| {
+              if percentage_format_has_fractional_placeholder(format) {
+                format_chart_number(value / percentage_total, Some(format))
+              } else {
+                whole_percentages.as_ref().map_or_else(
+                  || format_chart_number(value / percentage_total, Some(format)),
+                  |percentages| format!("{}%", percentages[point_index] as i32),
+                )
+              }
+            },
+          )
+        });
+      let custom_text = custom_chart_text.map(|chart_text| {
+        data_label_chart_text(
+          chart_text,
+          point_labels[point_index],
+          series_name,
+          categories.get(point_index).map(String::as_str),
+          value,
+          point_settings.value_format_code,
+          percentage_text.as_deref(),
+          bubble_sizes
+            .and_then(|sizes| sizes.get(point_index))
+            .copied()
+            .flatten(),
+        )
+      });
       let value_component_index = (custom_text.is_none() && point_settings.show_value).then(|| {
         usize::from(point_settings.show_series_name && !series_name.is_empty())
           + usize::from(
@@ -2138,38 +2355,86 @@ fn resolved_data_labels<'a>(
                 .is_some_and(|category| !category.is_empty()),
           )
       });
-      let (text, text_components, separator) = match custom_text {
-        Some(text) if !text.is_empty() => (text.clone(), vec![text], ""),
+      let (text, text_components, separator, rich_text_runs) = match custom_text {
+        Some(text) if !text.text.is_empty() => {
+          (text.text, text.lines, "\n", text.rich_text_runs)
+        }
         Some(_) => return None,
-        None => compose_clustered_column_data_label(
-          point_settings,
-          series_name,
-          categories.get(point_index).map(String::as_str),
-          value,
-          point_settings.value_format_code,
-          bubble_sizes
-            .and_then(|sizes| sizes.get(point_index))
-            .copied()
-            .flatten(),
-          point_settings
-            .show_percent
-            .then_some(percentage_text.clone())
-            .flatten(),
-        )?,
+        None => {
+          let (text, components, separator) = compose_clustered_column_data_label(
+            point_settings,
+            series_name,
+            categories.get(point_index).map(String::as_str),
+            value,
+            point_settings.value_format_code,
+            bubble_sizes
+              .and_then(|sizes| sizes.get(point_index))
+              .copied()
+              .flatten(),
+            point_settings
+              .show_percent
+              .then_some(percentage_text.clone())
+              .flatten(),
+          )?;
+          (text, components, separator, Vec::new())
+        }
       };
       Some(ClusteredColumnDataLabel {
         point_index,
         text,
         text_components,
         value_component_index,
+        rich_text_runs,
         value_format_code: point_settings.value_format_code,
         separator,
         position: point_settings.position,
+        layout: point_layout,
+        text_frame_layout,
         text_properties,
+        text_body_properties,
         shape_properties: point_settings.shape_properties,
       })
     })
     .collect()
+}
+
+fn percentage_format_has_fractional_placeholder(format_code: &str) -> bool {
+  let mut quoted = false;
+  let mut bracketed = false;
+  let mut escaped = false;
+  let mut after_decimal = false;
+  let mut chars = format_code.chars();
+  while let Some(character) = chars.next() {
+    if escaped {
+      escaped = false;
+      continue;
+    }
+    if quoted {
+      if character == '"' {
+        quoted = false;
+      }
+      continue;
+    }
+    if bracketed {
+      if character == ']' {
+        bracketed = false;
+      }
+      continue;
+    }
+    match character {
+      '"' => quoted = true,
+      '[' => bracketed = true,
+      '\\' => escaped = true,
+      '_' | '*' => {
+        let _ = chars.next();
+      }
+      ';' | '%' => break,
+      '.' => after_decimal = true,
+      '0' | '#' | '?' if after_decimal => return true,
+      _ => {}
+    }
+  }
+  false
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2184,8 +2449,10 @@ struct ClusteredColumnDataLabelSettings<'a> {
   separator_explicit: bool,
   use_pie_separator_default: bool,
   value_format_code: Option<&'a str>,
+  percentage_format_code: Option<&'a str>,
   position: c::DataLabelPositionValues,
   shape_properties: Option<&'a c::ChartShapeProperties>,
+  text_frame_layout: Option<ChartManualLayout>,
 }
 
 impl Default for ClusteredColumnDataLabelSettings<'_> {
@@ -2201,7 +2468,9 @@ impl Default for ClusteredColumnDataLabelSettings<'_> {
       separator_explicit: false,
       use_pie_separator_default: false,
       value_format_code: None,
+      percentage_format_code: None,
       shape_properties: None,
+      text_frame_layout: None,
       // MS-OI29500 §21.2.2.48 specifies OutsideEnd as the Office default
       // for a clustered bar/column chart when c:dLblPos is omitted.
       position: c::DataLabelPositionValues::OutsideEnd,
@@ -2216,6 +2485,12 @@ fn apply_data_labels_settings<'a>(
   let Some(labels) = labels else {
     return;
   };
+  if let Some(layout) = data_labels_extension_layout(labels) {
+    settings.text_frame_layout = layout
+      .manual_layout
+      .as_deref()
+      .and_then(chart_manual_layout);
+  }
   match labels.data_labels_choice.as_ref() {
     Some(c::DataLabelsChoice::Delete(delete)) => {
       settings.deleted = delete.val.is_none_or(|value| value.as_bool());
@@ -2297,7 +2572,16 @@ fn apply_data_labels_sequence_settings<'a>(
     settings.separator_explicit = true;
   }
   if let Some(format) = sequence.numbering_format.as_ref() {
-    settings.value_format_code = Some(format.format_code.as_str());
+    let format = format.format_code.as_str();
+    if settings.use_pie_separator_default && settings.show_percent {
+      settings.percentage_format_code = Some(if format.eq_ignore_ascii_case("General") {
+        "0%"
+      } else {
+        format
+      });
+    } else {
+      settings.value_format_code = Some(format);
+    }
   }
   if let Some(position) = sequence.data_label_position.as_ref() {
     settings.position = position.val;
@@ -2345,8 +2629,24 @@ fn apply_data_label_sequence_settings<'a>(
     settings.separator = separator;
     settings.separator_explicit = true;
   }
+  apply_data_label_sequence_presentation_settings(settings, sequence);
+}
+
+fn apply_data_label_sequence_presentation_settings<'a>(
+  settings: &mut ClusteredColumnDataLabelSettings<'a>,
+  sequence: &'a c::DataLabelChoiceSequence,
+) {
   if let Some(format) = sequence.numbering_format.as_ref() {
-    settings.value_format_code = Some(format.format_code.as_str());
+    let format = format.format_code.as_str();
+    if settings.use_pie_separator_default && settings.show_percent {
+      settings.percentage_format_code = Some(if format.eq_ignore_ascii_case("General") {
+        "0%"
+      } else {
+        format
+      });
+    } else {
+      settings.value_format_code = Some(format);
+    }
   }
   if let Some(position) = sequence.data_label_position.as_ref() {
     settings.position = position.val;
@@ -2415,77 +2715,210 @@ fn largest_remainder_percentages(values: &[Option<f64>], total: f64) -> Vec<f64>
   }
   let mut percentages = values
     .iter()
-    .map(|value| value.map(|value| value / total * 100.0).unwrap_or(0.0))
+    .map(|value| {
+      value.map_or((0.0, 0.0), |value| {
+        let scaled = value * 100.0;
+        let floor = (scaled / total).floor();
+        // Compare equivalent unnormalised remainders. Computing `fract()`
+        // after division can erase the source distinction between OOXML
+        // decimals such as 8.1999999999999993 and 1.2 when their sum rounds
+        // to 14.0. Multiplication/subtraction retains that evidence while an
+        // exact tie (for example three equal values) still uses point order.
+        (floor, scaled - floor * total)
+      })
+    })
     .collect::<Vec<_>>();
   let mut remaining = 100_i64
     - percentages
       .iter()
-      .map(|value| value.floor() as i64)
+      .map(|(floor, _)| *floor as i64)
       .sum::<i64>();
   let mut order = (0..percentages.len()).collect::<Vec<_>>();
   order.sort_by(|left, right| {
     percentages[*right]
-      .fract()
-      .total_cmp(&percentages[*left].fract())
+      .1
+      .total_cmp(&percentages[*left].1)
       .then_with(|| left.cmp(right))
   });
   for index in order {
-    let floor = percentages[index].floor();
-    percentages[index] = floor + f64::from(remaining > 0);
+    percentages[index].0 += f64::from(remaining > 0);
     remaining -= i64::from(remaining > 0);
   }
-  percentages
+  percentages.into_iter().map(|(value, _)| value).collect()
 }
 
-fn data_label_chart_text(
-  chart_text: &c::ChartText,
+struct ResolvedDataLabelChartText<'a> {
+  text: String,
+  lines: Vec<String>,
+  rich_text_runs: Vec<ChartDataLabelTextRun<'a>>,
+}
+
+fn data_label_chart_text<'a>(
+  chart_text: &'a c::ChartText,
+  data_label: Option<&'a c::DataLabel>,
   series_name: &str,
   category_name: Option<&str>,
   value: f64,
   value_format_code: Option<&str>,
   percentage: Option<&str>,
   bubble_size: Option<f64>,
-) -> String {
+) -> ResolvedDataLabelChartText<'a> {
   let Some(c::ChartTextChoice::RichText(rich)) = chart_text.chart_text_choice.as_ref() else {
     let mut values = Vec::new();
     push_chart_text(&mut values, chart_text);
-    return values.join(" ");
+    let text = values.join(" ");
+    return ResolvedDataLabelChartText {
+      lines: vec![text.clone()],
+      text,
+      rich_text_runs: Vec::new(),
+    };
   };
-  let mut result = String::new();
-  for paragraph in &rich.paragraph {
+  let mut rich_text_runs = Vec::new();
+  let mut line_index = 0;
+  for (paragraph_index, paragraph) in rich.paragraph.iter().enumerate() {
+    if paragraph_index > 0 {
+      line_index += 1;
+    }
+    let paragraph_default_run_properties = paragraph
+      .paragraph_properties
+      .as_deref()
+      .and_then(|properties| properties.default_run_properties.as_deref());
     for choice in &paragraph.paragraph_choice {
       match choice {
-        a::ParagraphChoice::Run(run) => result.push_str(&run.text),
+        a::ParagraphChoice::Run(run) => push_data_label_rich_text_run(
+          &mut rich_text_runs,
+          &mut line_index,
+          &run.text,
+          paragraph_default_run_properties,
+          run.run_properties.as_deref(),
+        ),
         a::ParagraphChoice::Field(field) => {
-          match field
-            .r#type
-            .as_deref()
-            .map(str::to_ascii_uppercase)
-            .as_deref()
-          {
-            Some("VALUE") => result.push_str(&format_chart_number(value, value_format_code)),
-            Some("SERIESNAME") => result.push_str(series_name),
-            Some("CATEGORYNAME") => result.push_str(category_name.unwrap_or_default()),
-            Some("PERCENTAGE") => result.push_str(percentage.unwrap_or_default()),
-            Some("BUBBLESIZE") => {
-              if let Some(value) = bubble_size {
-                result.push_str(&general_chart_number(value));
-              }
+          let cached_cell_reference =
+            data_label.and_then(|label| data_label_field_cache_value(label, &field.id));
+          let resolved = if let Some(value) = cached_cell_reference {
+            Cow::Borrowed(value)
+          } else {
+            match field
+              .r#type
+              .as_deref()
+              .map(str::to_ascii_uppercase)
+              .as_deref()
+            {
+              Some("VALUE") => Cow::Owned(format_chart_number(value, value_format_code)),
+              Some("SERIESNAME") => Cow::Borrowed(series_name),
+              Some("CATEGORYNAME") => Cow::Borrowed(category_name.unwrap_or_default()),
+              Some("PERCENTAGE") => Cow::Borrowed(percentage.unwrap_or_default()),
+              Some("BUBBLESIZE") => bubble_size.map_or_else(
+                || Cow::Borrowed(""),
+                |value| Cow::Owned(general_chart_number(value)),
+              ),
+              _ => Cow::Borrowed(field.text.as_deref().unwrap_or_default()),
             }
-            _ => {
-              if let Some(text) = field.text.as_deref() {
-                result.push_str(text);
-              }
-            }
+          };
+          push_data_label_rich_text_run(
+            &mut rich_text_runs,
+            &mut line_index,
+            &resolved,
+            paragraph_default_run_properties,
+            field.run_properties.as_deref(),
+          );
+        }
+        a::ParagraphChoice::Break(line_break) => {
+          line_index += 1;
+          if line_break.run_properties.is_some() {
+            // The break carries the following line's character properties in
+            // DrawingML. Retain no empty paint run; the next authored run owns
+            // visible text and resolves its own direct properties.
           }
         }
-        a::ParagraphChoice::Break(_) => result.push('\n'),
-        a::ParagraphChoice::TextMath(math) => result.push_str(&text_math_text(math)),
+        a::ParagraphChoice::TextMath(math) => push_data_label_rich_text_run(
+          &mut rich_text_runs,
+          &mut line_index,
+          &text_math_text(math),
+          paragraph_default_run_properties,
+          None,
+        ),
         a::ParagraphChoice::AlternateContent(_) => {}
       }
     }
   }
-  result.trim().to_string()
+  let line_count = rich_text_runs
+    .iter()
+    .map(|run| run.line_index)
+    .max()
+    .map_or(1, |index| index + 1);
+  let mut lines = vec![String::new(); line_count];
+  for run in &rich_text_runs {
+    lines[run.line_index].push_str(&run.text);
+  }
+  let text = lines.join("\n").trim().to_string();
+  ResolvedDataLabelChartText {
+    text,
+    lines,
+    rich_text_runs,
+  }
+}
+
+fn push_data_label_rich_text_run<'a>(
+  runs: &mut Vec<ChartDataLabelTextRun<'a>>,
+  line_index: &mut usize,
+  text: &str,
+  paragraph_default_run_properties: Option<&'a a::DefaultRunProperties>,
+  run_properties: Option<&'a a::RunProperties>,
+) {
+  let mut segment = String::new();
+  let mut characters = text.chars().peekable();
+  while let Some(character) = characters.next() {
+    if character == '\r' || character == '\n' {
+      if !segment.is_empty() {
+        runs.push(ChartDataLabelTextRun {
+          text: std::mem::take(&mut segment),
+          line_index: *line_index,
+          paragraph_default_run_properties,
+          run_properties,
+        });
+      }
+      if character == '\r' && characters.peek() == Some(&'\n') {
+        characters.next();
+      }
+      *line_index += 1;
+    } else {
+      segment.push(character);
+    }
+  }
+  if !segment.is_empty() {
+    runs.push(ChartDataLabelTextRun {
+      text: segment,
+      line_index: *line_index,
+      paragraph_default_run_properties,
+      run_properties,
+    });
+  }
+}
+
+fn data_label_field_cache_value<'a>(label: &'a c::DataLabel, field_id: &str) -> Option<&'a str> {
+  label
+    .d_lbl_extension_list
+    .as_ref()
+    .into_iter()
+    .flat_map(|list| &list.d_lbl_extension)
+    .flat_map(|extension| &extension.d_lbl_extension_choice)
+    .find_map(|choice| match choice {
+      c::DLblExtensionChoice::DataLabelFieldTable(table) => table
+        .data_label_field_table_entry
+        .iter()
+        .find(|entry| entry.text_field_guid.eq_ignore_ascii_case(field_id))
+        .and_then(|entry| entry.data_label_field_table_cache.as_deref())
+        .and_then(|cache| {
+          cache
+            .string_point
+            .iter()
+            .find(|point| point.index == 0)
+            .or_else(|| cache.string_point.first())
+        })
+        .map(|point| point.numeric_value.as_str()),
+      _ => None,
+    })
 }
 
 fn general_chart_number(value: f64) -> String {
@@ -2664,7 +3097,7 @@ pub(crate) fn linear_axis_scale_with_options(
     {
       maximum += major_unit;
     }
-    let increment_count = ((maximum - minimum) / major_unit).floor() as usize;
+    let increment_count = axis_interval_count(minimum, maximum, major_unit, usize::MAX);
     if increment_count <= max_increments || !automatic_unit {
       return Some(restore_scale(LinearAxisScale {
         minimum,
@@ -3035,10 +3468,18 @@ pub fn fixed_output_texts_for_ui_language(
       continue;
     };
     let display_unit = value_axis_display_unit(axis);
-    let format_code = axis
-      .numbering_format
-      .as_ref()
-      .map(|format| format.format_code.as_str());
+    let uses_x_sequence = value_axis_uses_x_sequence(chart_space, axis.axis_id.val);
+    let format_code = effective_axis_number_format_code(
+      Some(axis),
+      mode == ChartValueMode::PercentStacked,
+      axis_series.iter().copied().map(|series| {
+        if uses_x_sequence {
+          series_x_number_format_code(series)
+        } else {
+          series_number_format_code(series)
+        }
+      }),
+    );
     for value in axis_tick_values(scale) {
       push_unique_text(
         &mut texts,
@@ -3200,11 +3641,7 @@ fn push_fixed_axis_title(
 }
 
 fn automatic_axis_title(ui_language: Option<&str>) -> &'static str {
-  if ui_language.is_some_and(is_chinese_ui_language) {
-    "坐标轴标题"
-  } else {
-    "Axis Title"
-  }
+  OfficeStringCatalog::for_ui_language(ui_language).chart_axis_title()
 }
 
 fn push_fixed_category_texts(
@@ -3438,6 +3875,27 @@ fn series_number_format_code(series: ChartSeriesRef<'_>) -> Option<&str> {
   None
 }
 
+fn series_x_number_format_code(series: ChartSeriesRef<'_>) -> Option<&str> {
+  let values = series.x_values?;
+  match values.x_values_choice.as_ref() {
+    Some(c::XValuesChoice::NumberReference(reference)) => reference
+      .numbering_cache
+      .as_deref()
+      .and_then(|cache| cache.format_code.as_ref())
+      .and_then(|format| format.xml_content.as_deref()),
+    Some(c::XValuesChoice::NumberLiteral(literal)) => literal
+      .format_code
+      .as_ref()
+      .and_then(|format| format.xml_content.as_deref()),
+    Some(
+      c::XValuesChoice::StringReference(_)
+      | c::XValuesChoice::StringLiteral(_)
+      | c::XValuesChoice::MultiLevelStringReference(_),
+    )
+    | None => None,
+  }
+}
+
 fn data_labels_format_code(labels: &c::DataLabels) -> Option<&str> {
   match labels.data_labels_choice.as_ref() {
     Some(c::DataLabelsChoice::Sequence(sequence)) => sequence
@@ -3481,12 +3939,38 @@ fn axis_tick_values(scale: LinearAxisScale) -> Vec<f64> {
   {
     return Vec::new();
   }
-  let count = ((scale.maximum - scale.minimum) / scale.major_unit)
-    .floor()
-    .clamp(0.0, 1_000.0) as usize;
+  let count = axis_interval_count(scale.minimum, scale.maximum, scale.major_unit, 1_000);
   (0..=count)
     .map(|index| scale.minimum + scale.major_unit * index as f64)
     .collect()
+}
+
+/// Counts complete axis intervals while tolerating the binary representation
+/// error of decimal OOXML units such as 0.005. Without the near-integer snap,
+/// a nominal 0.00%-5.00% axis can lose its final 5.00% tick because the raw
+/// quotient is 9.999999999999998.
+pub(crate) fn axis_interval_count(
+  minimum: f64,
+  maximum: f64,
+  unit: f64,
+  maximum_count: usize,
+) -> usize {
+  if !minimum.is_finite()
+    || !maximum.is_finite()
+    || !unit.is_finite()
+    || unit <= 0.0
+    || maximum <= minimum
+  {
+    return 0;
+  }
+  let raw = (maximum - minimum) / unit;
+  let nearest = raw.round();
+  let stable = if (raw - nearest).abs() <= 1.0e-10 * raw.abs().max(1.0) {
+    nearest
+  } else {
+    raw.floor()
+  };
+  stable.clamp(0.0, maximum_count as f64) as usize
 }
 
 pub(crate) fn value_axis_display_unit(axis: &c::ValueAxis) -> f64 {
@@ -3514,6 +3998,116 @@ pub(crate) fn value_axis_display_unit(axis: &c::ValueAxis) -> f64 {
   }
 }
 
+/// Resolves the visible number format of a vertical numeric axis.
+///
+/// `c:numFmt/@sourceLinked` defaults to true in the Office/LibreOffice import
+/// model. In that state the axis format comes from the attached value-y data
+/// sequence, not from the fallback `formatCode` carried by the axis itself.
+/// LibreOffice `AxisHelper::getExplicitNumberFormatKeyForAxis` selects the
+/// most frequent attached sequence format and has a separate percent-scale
+/// branch; keeping that decision here makes every OOXML host use one rule.
+pub(crate) fn vertical_axis_number_format_code<'chart, 'data>(
+  chart: &'chart ClusteredColumnChart<'data>,
+  axis_set_index: usize,
+) -> Option<&'data str> {
+  let axis = chart
+    .axis_sets
+    .get(axis_set_index)
+    .and_then(|set| set.vertical_value_axis)
+    .or_else(|| (axis_set_index == 0).then_some(chart.value_axis).flatten());
+  let percent_stacked = chart
+    .series
+    .iter()
+    .filter(|series| series.axis_set_index == axis_set_index)
+    .all(|series| series.grouping == ChartSeriesGrouping::PercentStacked)
+    && chart
+      .series
+      .iter()
+      .any(|series| series.axis_set_index == axis_set_index);
+  effective_axis_number_format_code(
+    axis,
+    percent_stacked,
+    chart
+      .series
+      .iter()
+      .filter(move |series| series.axis_set_index == axis_set_index)
+      .map(|series| series.number_format_code),
+  )
+}
+
+/// Resolves the source-linked format for a scatter/bubble X value axis.
+pub(crate) fn horizontal_axis_number_format_code<'chart, 'data>(
+  chart: &'chart ClusteredColumnChart<'data>,
+  axis_set_index: usize,
+) -> Option<&'data str> {
+  let axis = chart
+    .axis_sets
+    .get(axis_set_index)
+    .and_then(|set| set.horizontal_value_axis)
+    .or_else(|| {
+      (axis_set_index == 0)
+        .then_some(chart.horizontal_value_axis)
+        .flatten()
+    });
+  effective_axis_number_format_code(
+    axis,
+    false,
+    chart
+      .series
+      .iter()
+      .filter(move |series| series.axis_set_index == axis_set_index)
+      .map(|series| series.x_number_format_code),
+  )
+}
+
+fn effective_axis_number_format_code<'a>(
+  axis: Option<&'a c::ValueAxis>,
+  percent_scale: bool,
+  source_formats: impl Iterator<Item = Option<&'a str>>,
+) -> Option<&'a str> {
+  let numbering_format = axis.and_then(|axis| axis.numbering_format.as_ref());
+  let authored = numbering_format
+    .map(|format| format.format_code.as_str())
+    .filter(|format| !format.is_empty());
+  let source_linked = numbering_format.is_none_or(|format| {
+    format
+      .source_linked
+      .is_none_or(|source_linked| source_linked.as_bool())
+  });
+  if !source_linked {
+    return authored;
+  }
+  if percent_scale {
+    return Some("0%");
+  }
+  most_frequent_number_format(source_formats).or(authored)
+}
+
+fn most_frequent_number_format<'a>(
+  formats: impl Iterator<Item = Option<&'a str>>,
+) -> Option<&'a str> {
+  let mut counts = Vec::<(&'a str, usize)>::new();
+  let mut best = None;
+  let mut best_count = 0usize;
+  for format in formats.flatten().filter(|format| !format.is_empty()) {
+    let count = if let Some((_, count)) = counts
+      .iter_mut()
+      .find(|(candidate, _)| *candidate == format)
+    {
+      *count += 1;
+      *count
+    } else {
+      counts.push((format, 1));
+      1
+    };
+    if count > best_count {
+      best = Some(format);
+      best_count = count;
+    }
+  }
+  best
+}
+
 pub(crate) fn value_axis_display_unit_label_text(
   axis: &c::ValueAxis,
   ui_language: Option<&str>,
@@ -3529,29 +4123,21 @@ pub(crate) fn value_axis_display_unit_label_text(
   let c::DisplayUnitsChoice::BuiltInUnit(unit) = units.display_units_choice.as_ref()? else {
     return None;
   };
-  let chinese = ui_language.is_some_and(is_chinese_ui_language);
+  let strings = OfficeStringCatalog::for_ui_language(ui_language);
   Some(
-    match (unit.val.unwrap_or_default(), chinese) {
-      (c::BuiltInUnitValues::Hundreds, true) => "百",
-      (c::BuiltInUnitValues::Thousands, true) => "千",
-      (c::BuiltInUnitValues::TenThousands, true) => "万",
-      (c::BuiltInUnitValues::HundredThousands, true) => "十万",
-      (c::BuiltInUnitValues::Millions, true) => "百万",
-      (c::BuiltInUnitValues::TenMillions, true) => "千万",
-      (c::BuiltInUnitValues::HundredMillions, true) => "亿",
-      (c::BuiltInUnitValues::Billions, true) => "十亿",
-      (c::BuiltInUnitValues::Trillions, true) => "万亿",
-      (c::BuiltInUnitValues::Hundreds, false) => "Hundreds",
-      (c::BuiltInUnitValues::Thousands, false) => "Thousands",
-      (c::BuiltInUnitValues::TenThousands, false) => "Ten Thousands",
-      (c::BuiltInUnitValues::HundredThousands, false) => "Hundred Thousands",
-      (c::BuiltInUnitValues::Millions, false) => "Millions",
-      (c::BuiltInUnitValues::TenMillions, false) => "Ten Millions",
-      (c::BuiltInUnitValues::HundredMillions, false) => "Hundred Millions",
-      (c::BuiltInUnitValues::Billions, false) => "Billions",
-      (c::BuiltInUnitValues::Trillions, false) => "Trillions",
-    }
-    .to_string(),
+    strings
+      .chart_display_unit(match unit.val.unwrap_or_default() {
+        c::BuiltInUnitValues::Hundreds => ChartDisplayUnit::Hundreds,
+        c::BuiltInUnitValues::Thousands => ChartDisplayUnit::Thousands,
+        c::BuiltInUnitValues::TenThousands => ChartDisplayUnit::TenThousands,
+        c::BuiltInUnitValues::HundredThousands => ChartDisplayUnit::HundredThousands,
+        c::BuiltInUnitValues::Millions => ChartDisplayUnit::Millions,
+        c::BuiltInUnitValues::TenMillions => ChartDisplayUnit::TenMillions,
+        c::BuiltInUnitValues::HundredMillions => ChartDisplayUnit::HundredMillions,
+        c::BuiltInUnitValues::Billions => ChartDisplayUnit::Billions,
+        c::BuiltInUnitValues::Trillions => ChartDisplayUnit::Trillions,
+      })
+      .to_string(),
   )
 }
 
@@ -3622,6 +4208,25 @@ fn series_for_value_axis(chart_space: &c::ChartSpace, axis_id: i32) -> Vec<Chart
     }
   }
   result
+}
+
+fn value_axis_uses_x_sequence(chart_space: &c::ChartSpace, axis_id: i32) -> bool {
+  chart_space
+    .chart
+    .plot_area
+    .plot_area_choice1
+    .iter()
+    .any(|choice| match choice {
+      c::PlotAreaChoice::ScatterChart(chart) => chart
+        .axis_id
+        .first()
+        .is_some_and(|axis| axis.val == axis_id),
+      c::PlotAreaChoice::BubbleChart(chart) => chart
+        .axis_id
+        .first()
+        .is_some_and(|axis| axis.val == axis_id),
+      _ => false,
+    })
 }
 
 fn has_axis(axis_ids: &[c::AxisId], axis_id: i32) -> bool {
@@ -3821,21 +4426,78 @@ fn indexed_numeric_values(points: &[c::NumericPoint]) -> Vec<Option<f64>> {
 pub(crate) fn format_chart_number(value: f64, format_code: Option<&str>) -> String {
   let value = if value.abs() < 1.0e-15 { 0.0 } else { value };
   let code = format_code.unwrap_or("General");
-  if code.contains('%') {
-    let decimals = format_decimal_places(code.split('%').next().unwrap_or(code));
-    return format!("{:.*}%", decimals, value * 100.0);
-  }
-  let uppercase_code = code.to_ascii_uppercase();
-  if uppercase_code.contains("E+")
-    || uppercase_code.contains("E-")
-    || (value != 0.0 && value.abs() < 1.0e-4)
-  {
-    return format_chart_scientific(value, format_decimal_places(code));
-  }
-  if code != "General" && code.contains('.') {
-    return format!("{:.*}", format_decimal_places(code), value);
+  if !is_general_chart_number_format(code) {
+    let uppercase_code = code.to_ascii_uppercase();
+    if uppercase_code.contains("E+") || uppercase_code.contains("E-") {
+      return format_chart_scientific(value, format_decimal_places(code));
+    }
+    let code = chart_number_format_without_cell_alignment(code);
+    return crate::xlsx::format_spreadsheet_number(value, &code);
   }
   general_chart_number(value)
+}
+
+fn is_general_chart_number_format(code: &str) -> bool {
+  // Spreadsheet producers may persist the localized name of built-in format
+  // zero. LibreOffice's complete locale-data set currently resolves that
+  // keyword to this finite set; its scanner accepts the localized name and
+  // English `General` interchangeably. Leading NatNum/locale modifiers do
+  // not change the underlying General format.
+  let mut keyword = code.split(';').next().unwrap_or(code).trim();
+  while let Some(rest) = keyword.strip_prefix('[')
+    && let Some(end) = rest.find(']')
+  {
+    keyword = rest[end + 1..].trim_start();
+  }
+  const GENERAL_KEYWORDS: &[&str] = &[
+    "General",
+    "Standard",
+    "Standaard",
+    "Yleinen",
+    "Geral",
+    "Estandar",
+    "Estandarra",
+    "Bendras",
+    "Kadaywan",
+    "Skoueriek",
+    "Општо",
+    "عادی",
+    "常规",
+  ];
+  GENERAL_KEYWORDS
+    .iter()
+    .any(|candidate| keyword.eq_ignore_ascii_case(candidate))
+}
+
+fn chart_number_format_without_cell_alignment(code: &str) -> std::borrow::Cow<'_, str> {
+  if !code.contains(['_', '*']) {
+    return std::borrow::Cow::Borrowed(code);
+  }
+  let mut normalized = String::with_capacity(code.len());
+  let mut chars = code.chars();
+  let mut in_quotes = false;
+  while let Some(ch) = chars.next() {
+    match ch {
+      '"' => {
+        in_quotes = !in_quotes;
+        normalized.push(ch);
+      }
+      '\\' => {
+        normalized.push(ch);
+        if let Some(literal) = chars.next() {
+          normalized.push(literal);
+        }
+      }
+      '_' | '*' if !in_quotes => {
+        // These directives reserve/repeat a following character to align a
+        // worksheet cell. A chart label is an independently sized text shape,
+        // so Office drops both the directive and its fill character.
+        chars.next();
+      }
+      _ => normalized.push(ch),
+    }
+  }
+  std::borrow::Cow::Owned(normalized)
 }
 
 fn format_decimal_places(code: &str) -> usize {
@@ -3961,7 +4623,8 @@ fn default_series_label(
   // uses the localized STR_ROW_LABEL/STR_COLUMN_LABEL defaults when imported
   // chart data has no explicit series label. OOXML bar charts with a horizontal
   // value range map each series to a data row.
-  if ui_language.is_some_and(is_chinese_ui_language) {
+  let strings = OfficeStringCatalog::for_ui_language(ui_language);
+  if strings.resource_locale().is_chinese() {
     return automatic_series_title(ui_language, series_index);
   }
   if let Some(formula) = series_value_formula(series)
@@ -3969,21 +4632,9 @@ fn default_series_label(
     && range.start_col == range.end_col
     && range.start_row != range.end_row
   {
-    return format!("Column {series_index}");
+    return strings.chart_column_title(series_index);
   }
-  format!("Row {series_index}")
-}
-
-fn is_chinese_ui_language(language: &str) -> bool {
-  let language = language.to_ascii_lowercase();
-  language == "zh"
-    || language == "zh-cn"
-    || language == "zh-sg"
-    || language == "zh-hans"
-    || language == "zh-tw"
-    || language == "zh-hk"
-    || language == "zh-mo"
-    || language == "zh-hant"
+  strings.chart_row_title(series_index)
 }
 
 fn series_value_formula(series: ChartSeriesRef<'_>) -> Option<&str> {
@@ -4283,6 +4934,34 @@ fn chart_title_vertical_anchor(chart: &c::Chart) -> Option<a::TextAnchoringTypeV
   rich.body_properties.anchor
 }
 
+fn chart_title_layout(chart: &c::Chart) -> Option<ChartManualLayout> {
+  chart
+    .title
+    .as_deref()
+    .and_then(|title| chart_text_layout(title.layout.as_deref()))
+}
+
+fn chart_title_rotation_degrees(chart: &c::Chart) -> f32 {
+  let Some(rotation) = chart
+    .title
+    .as_deref()
+    .and_then(|title| title.chart_text.as_deref())
+    .and_then(|text| match text.chart_text_choice.as_ref()? {
+      c::ChartTextChoice::RichText(rich) => rich.body_properties.rotation,
+      c::ChartTextChoice::StringReference(_) | c::ChartTextChoice::StringLiteral(_) => None,
+    })
+  else {
+    return 0.0;
+  };
+  let normalized = rotation.rem_euclid(21_600_000);
+  let normalized = if normalized > 10_800_000 {
+    normalized - 21_600_000
+  } else {
+    normalized
+  };
+  normalized as f32 / 60_000.0
+}
+
 fn explicit_title_text(title: &c::Title) -> Option<String> {
   let mut values = Vec::new();
   push_chart_text(&mut values, title.chart_text.as_deref()?);
@@ -4296,15 +4975,24 @@ fn title_text_or_automatic(title: &c::Title, ui_language: Option<&str>) -> Optio
 
 pub fn has_powerpoint_automatic_title_placeholder(chart: &c::Chart) -> bool {
   // PowerPoint distinguishes a bare empty title from its generated insertion
-  // placeholder. The latter carries title text properties even though c:tx
-  // has not been populated yet; a c:layout child is producer-dependent and
-  // is absent from valid Office fixed-output examples. Word and Excel do not
-  // paint this editing placeholder, so this remains host-specific.
-  chart
-    .title
-    .as_deref()
-    .is_some_and(|title| title.chart_text.is_none() && title.text_properties.is_some())
-    && chart_automatic_title_is_visible(chart)
+  // placeholder. Newer producers retain title text properties even though
+  // c:tx has not been populated yet, while older POI/Office chart parts retain
+  // only an empty c:layout. LibreOffice ChartSpaceConverter::convertFromModel
+  // resolves either authored title container from the sole series title.
+  // Word and Excel do not share every editing-placeholder rule, so keep this
+  // policy host-specific.
+  chart.title.as_deref().is_some_and(|title| {
+    title.chart_text.is_none() && (title.text_properties.is_some() || title.layout.is_some())
+  }) && chart_automatic_title_is_visible(chart)
+}
+
+pub fn has_powerpoint_generic_title_placeholder(chart: &c::Chart) -> bool {
+  chart.title.as_deref().is_some_and(|title| {
+    title.chart_text.is_none()
+      && title.text_properties.is_some()
+      && title.chart_shape_properties.is_none()
+      && title.overlay.is_none()
+  }) && chart_automatic_title_is_visible(chart)
 }
 
 pub fn has_word_automatic_title_placeholder(chart: &c::Chart) -> bool {

@@ -41,6 +41,12 @@ const OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT: f32 = 50.05;
 // width; keep it independent from the unhinted PDF glyph advance.
 const OFFICE_CALIBRI_11_EXPLICIT_DIGIT_WIDTH_PT: f32 =
   47.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+// Excel fixed output resolves LibreOffice-authored Arial 10 column widths on
+// its 600dpi printer device. MS-OI29500 §2.1.598 defines col@width through
+// the Normal style's maximum digit width; the immutable Office geometry for
+// the LibreOffice chart family resolves that Arial maximum to 46 device dots.
+const OFFICE_ARIAL_10_EXPLICIT_DIGIT_WIDTH_PT: f32 =
+  46.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
 // Excel 12 for Mac fixed output retains the worksheet's legacy screen grid
 // for a Verdana 10 Normal style. The serialized baseColWidth=10 is 91.76
 // screen pixels including the five pixels required by ECMA-376
@@ -73,6 +79,7 @@ pub(crate) struct CalcSheet {
 pub(crate) struct SpreadsheetProducerProfile {
   pub(crate) mso_document: bool,
   pub(crate) macintosh_excel: bool,
+  pub(crate) libreoffice_document: bool,
   pub(crate) excel_major_version: Option<u16>,
 }
 
@@ -173,6 +180,7 @@ pub(crate) struct SheetFormatModel {
   dy_descent_pt: Option<f32>,
   mso_document: bool,
   recalculate_uncalibrated_letter_rows: bool,
+  recalculate_explicit_font_rows: bool,
 }
 
 impl Default for SheetFormatModel {
@@ -189,6 +197,7 @@ impl Default for SheetFormatModel {
       dy_descent_pt: None,
       mso_document: false,
       recalculate_uncalibrated_letter_rows: false,
+      recalculate_explicit_font_rows: false,
     }
   }
 }
@@ -284,7 +293,15 @@ impl CalcSheet {
       .drawings
       .iter()
       .any(|drawing| !drawing.anchors.is_empty());
-    apply_excel16_quarter_descent_row_printer_grid(&mut metrics, has_sheet_drawing);
+    let has_extended_chart = resources
+      .drawings
+      .iter()
+      .any(|drawing| !drawing.extended_charts.is_empty());
+    apply_excel16_quarter_descent_row_printer_grid(
+      &mut metrics,
+      has_sheet_drawing && !has_extended_chart,
+    );
+    apply_excel16_chartex_implicit_row_printer_grid(&mut metrics, has_extended_chart);
     let rows = worksheet_rows(&worksheet, shared_strings, styles, producer.mso_document);
     let authored_date_chart_printer_grid = resources
       .drawings
@@ -741,7 +758,9 @@ impl SheetGeometry {
           // manual size. For an explicitly line-broken wrapText cell, Calc's
           // optimal height is one default text line per retained paragraph.
           default_row_height_pt * line_count as f32
-        } else if metrics.format.recalculate_uncalibrated_letter_rows {
+        } else if metrics.format.recalculate_uncalibrated_letter_rows
+          || metrics.format.recalculate_explicit_font_rows
+        {
           // ECMA-376 Part 1 §18.3.1.73: ht is only a custom row
           // measurement when customHeight is true. Producers may retain a
           // cached automatic height while leaving customHeight false.
@@ -972,12 +991,38 @@ fn apply_excel16_quarter_descent_row_printer_grid(
   // 600dpi printer grid for this quarter-pixel descent profile. Cell-only
   // Excel 16 sheets such as refupdate.xlsx and hashIncompatible.xlsx advance
   // automatic rows by 12.48pt, one printer dot beyond the 12.36pt Calibri 11
-  // minor-theme font result. A worksheet drawing retains its anchor
+  // minor-theme font result. An ordinary worksheet drawing retains its anchor
   // compatibility grid unless the existing indexed-scatter printer profile
   // explicitly selects this device path; applying the dot to every drawing
-  // anchor changes unrelated VML form-control placement.
+  // anchor changes unrelated VML form-control placement. Office 2016 ChartEx
+  // is the counterexample: its two-cell anchors and the surrounding cells both
+  // use this printer row grid (funnel1.xlsx and color_funnel.xlsx), so the
+  // caller does not classify a sheet containing ChartEx as a compatibility-
+  // grid drawing.
   metrics.format.default_row_height +=
     f64::from(units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI);
+}
+
+fn apply_excel16_chartex_implicit_row_printer_grid(
+  metrics: &mut SheetMetrics,
+  has_extended_chart: bool,
+) {
+  let calibri_minor_implicit_row = (metrics.format.default_row_height - 12.75).abs() <= 1.0e-6;
+  if !has_extended_chart
+    || !metrics.modern_excel_implicit_columns
+    || metrics.format.custom_height
+    || metrics.format.dy_descent_pt.is_some()
+    || !calibri_minor_implicit_row
+  {
+    return;
+  }
+  // Excel 16 ChartEx workbooks without x14ac:dyDescent are a distinct fixed-
+  // output producer profile. SimpleHistogram.xlsx advances its implicit rows
+  // by 12.48pt on the 600dpi printer grid even though sheetFormatPr records
+  // the nominal 15pt row. Restrict this to a Calibri-minor ChartEx sheet: an
+  // ordinary two-cell drawing without dyDescent retains the 12.75pt screen-
+  // compatibility row grid.
+  metrics.format.default_row_height = 12.48;
 }
 
 impl CalcCell {
@@ -1113,7 +1158,20 @@ impl SheetMetrics {
       // UnitConverter starts with 1 digit = 2mm. finalizeImport() only
       // replaces it when StylesBuffer::getDefaultFont() finds an XF/font.
       .unwrap_or_else(|| units::millimeters_to_points(CALC_DIGIT_WIDTH_MM));
-    let digit_width_pt = if mso_document
+    let libreoffice_arial10_1161_printer_grid = producer.libreoffice_document
+      && styles.normal_style_uses_explicit_arial_10()
+      && worksheet
+        .columns
+        .iter()
+        .flat_map(|columns| &columns.column)
+        .any(|column| {
+          column
+            .width
+            .is_some_and(|width| (width - 11.61).abs() <= 1.0e-6)
+        });
+    let digit_width_pt = if libreoffice_arial10_1161_printer_grid {
+      OFFICE_ARIAL_10_EXPLICIT_DIGIT_WIDTH_PT
+    } else if mso_document
       && producer
         .excel_major_version
         .is_some_and(|version| version >= 14)
@@ -1174,6 +1232,7 @@ impl SheetMetrics {
       .page_setup
       .as_ref()
       .is_some_and(|setup| setup.paper_size == Some(1) && setup.id.is_none());
+    format.recalculate_explicit_font_rows = libreoffice_arial10_1161_printer_grid;
     if !format.custom_height {
       format.default_row_height = if styles.default_font_uses_theme() {
         automatic_default_row_height_pt(styles, format.dy_descent_pt)
@@ -1183,6 +1242,7 @@ impl SheetMetrics {
           .is_some_and(|version| version >= 14)
         && format.dy_descent_pt.is_some()
         || format.recalculate_uncalibrated_letter_rows
+        || format.recalculate_explicit_font_rows
       {
         // MS-XLSX §2.5.3 makes dyDescent the explicit font-baseline input for
         // the automatic-row path. Recalculate that Excel 14+ profile just as
@@ -1308,6 +1368,7 @@ impl SheetFormatModel {
       dy_descent_pt: format.dy_descent.map(|value| value as f32),
       mso_document,
       recalculate_uncalibrated_letter_rows: false,
+      recalculate_explicit_font_rows: false,
     }
   }
 

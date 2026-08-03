@@ -79,6 +79,7 @@ pub(crate) struct CalcSheet {
 pub(crate) struct SpreadsheetProducerProfile {
   pub(crate) mso_document: bool,
   pub(crate) macintosh_excel: bool,
+  pub(crate) excel_online: bool,
   pub(crate) libreoffice_document: bool,
   pub(crate) excel_major_version: Option<u16>,
   pub(crate) lowest_edited_version: Option<u16>,
@@ -288,7 +289,7 @@ impl CalcSheet {
     styles: &StylesCatalog,
     producer: SpreadsheetProducerProfile,
   ) -> Self {
-    let page_settings = CalcPageSettings::from_worksheet(&worksheet);
+    let page_settings = CalcPageSettings::from_worksheet(&worksheet, producer.mso_document);
     let mut metrics = SheetMetrics::from_worksheet(&worksheet, styles, producer);
     metrics.indexed_scatter_print_grid = resources_have_indexed_scatter_print_grid(&resources);
     let has_sheet_drawing = resources
@@ -1259,11 +1260,13 @@ impl SheetMetrics {
         });
     }
     format.mso_document = mso_document;
-    format.recalculate_uncalibrated_letter_rows = worksheet
-      .page_setup
-      .as_ref()
-      .is_some_and(|setup| setup.paper_size == Some(1) && setup.id.is_none());
-    format.recalculate_explicit_font_rows = libreoffice_arial10_1161_printer_grid;
+    format.recalculate_uncalibrated_letter_rows =
+      worksheet.page_setup.as_ref().is_some_and(|setup| {
+        setup.id.is_none()
+          && (setup.paper_size == Some(1) || producer.excel_online && setup.paper_size.is_none())
+      });
+    format.recalculate_explicit_font_rows =
+      libreoffice_arial10_1161_printer_grid || producer.excel_online && !format.custom_height;
     if !format.custom_height {
       format.default_row_height = if styles.default_font_uses_theme() {
         automatic_default_row_height_pt(styles, format.dy_descent_pt)

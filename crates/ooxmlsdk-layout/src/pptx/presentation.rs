@@ -8,6 +8,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
 use crate::error::Result;
 
+use super::drawingml::text_body::TextBody;
 use super::drawingml::text_list_style::TextListStyle;
 use super::drawingml::theme::{ThemeColorScheme, ThemeFontScheme, ThemeFormatScheme};
 use super::import::PowerPointImport;
@@ -158,6 +159,11 @@ impl PresentationFragmentHandler {
         .unwrap_or_else(|| "<slideMaster>".to_string());
       let mut persist = SlidePersist::new_master(path, self.slide_size);
       persist.theme_path = self.import_master_theme(package, import, &master_part)?;
+      persist.theme_text_body_defaults = persist
+        .theme_path
+        .as_deref()
+        .and_then(|path| import.get_theme(path))
+        .and_then(|theme| theme.text_body_defaults.clone());
       persist.import_image_parts(package, &master_part);
       persist.import_media_reference_parts(package, &master_part);
       persist.import_hyperlink_reference_parts(package, &master_part);
@@ -222,6 +228,7 @@ impl PresentationFragmentHandler {
         persist.other_text_style = layout_persist.other_text_style.clone();
         persist.header_footer = layout_persist.header_footer.clone();
         persist.theme_path = layout_persist.theme_path.clone();
+        persist.theme_text_body_defaults = layout_persist.theme_text_body_defaults.clone();
         persist.inherit_related_part_resources_from(layout_persist);
       }
     }
@@ -333,6 +340,7 @@ impl PresentationFragmentHandler {
       persist.other_text_style = master_persist.other_text_style.clone();
       persist.header_footer = master_persist.header_footer.clone();
       persist.theme_path = master_persist.theme_path.clone();
+      persist.theme_text_body_defaults = master_persist.theme_text_body_defaults.clone();
       persist.inherit_related_part_resources_from(master_persist);
     }
     persist.import_image_parts(package, &layout_part);
@@ -407,6 +415,7 @@ impl PresentationFragmentHandler {
         persist.notes_text_style = notes_master_persist.notes_text_style.clone();
         persist.other_text_style = notes_master_persist.other_text_style.clone();
         persist.theme_path = notes_master_persist.theme_path.clone();
+        persist.theme_text_body_defaults = notes_master_persist.theme_text_body_defaults.clone();
         persist.header_footer = notes_master_persist.header_footer.clone();
         persist.inherit_related_part_resources_from(notes_master_persist);
       }
@@ -441,6 +450,11 @@ impl PresentationFragmentHandler {
     }
     let mut persist = SlidePersist::new_notes_master(path, self.notes_size);
     persist.theme_path = self.import_notes_master_theme(package, import, &notes_master_part)?;
+    persist.theme_text_body_defaults = persist
+      .theme_path
+      .as_deref()
+      .and_then(|path| import.get_theme(path))
+      .and_then(|theme| theme.text_body_defaults.clone());
     persist.import_image_parts(package, &notes_master_part);
     persist.import_media_reference_parts(package, &notes_master_part);
     persist.import_graphic_frame_related_parts(package, &notes_master_part)?;
@@ -479,6 +493,7 @@ impl PresentationFragmentHandler {
       ThemeColorScheme::from_dml(&theme.theme_elements.color_scheme),
       ThemeFontScheme::from_dml(&theme.theme_elements.font_scheme),
       ThemeFormatScheme::from_dml(&theme.theme_elements.format_scheme),
+      TextBody::from_theme_object_defaults(theme.object_defaults.as_deref()),
     );
     Ok(Some(path))
   }
@@ -506,6 +521,7 @@ impl PresentationFragmentHandler {
       ThemeColorScheme::from_dml(&theme.theme_elements.color_scheme),
       ThemeFontScheme::from_dml(&theme.theme_elements.font_scheme),
       ThemeFormatScheme::from_dml(&theme.theme_elements.format_scheme),
+      TextBody::from_theme_object_defaults(theme.object_defaults.as_deref()),
     );
     Ok(Some(path))
   }

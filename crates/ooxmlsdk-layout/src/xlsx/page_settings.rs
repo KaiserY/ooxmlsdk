@@ -130,6 +130,7 @@ pub(crate) struct CalcPageSettings {
   pub(crate) margin_footer_in: f64,
   pub(crate) paper_size: u32,
   pub(crate) explicit_paper_size: bool,
+  implicit_microsoft_letter_canvas: bool,
   pub(crate) valid_printer_settings: bool,
   pub(crate) fit_to_page: bool,
   pub(crate) scale: u32,
@@ -180,6 +181,7 @@ impl Default for CalcPageSettings {
       margin_footer_in: 0.3,
       paper_size: MsPaperSize::Letter as u32,
       explicit_paper_size: false,
+      implicit_microsoft_letter_canvas: false,
       valid_printer_settings: true,
       fit_to_page: false,
       scale: DEFAULT_PRINT_SCALE_PERCENT,
@@ -199,7 +201,7 @@ impl Default for CalcPageSettings {
 }
 
 impl CalcPageSettings {
-  pub(crate) fn from_worksheet(worksheet: &x::Worksheet) -> Self {
+  pub(crate) fn from_worksheet(worksheet: &x::Worksheet, microsoft_office: bool) -> Self {
     let mut settings = Self::default();
     if let Some(margins) = &worksheet.page_margins {
       settings.apply_margins(margins);
@@ -217,6 +219,17 @@ impl CalcPageSettings {
       settings.apply_print_options(print_options);
     }
     settings.header_footer = HeaderFooterModel::from_worksheet(worksheet);
+    // Microsoft Excel writes a pageSetup element for an initialized print
+    // canvas but may omit both paperSize and the devMode printer-settings
+    // relation. SpreadsheetML's paperSize default is Letter; Office fixed
+    // output maps that uncalibrated canvas onto the active default page. A
+    // worksheet with no pageSetup is the counterexample and retains the native
+    // default page. This profile is emitted by both desktop and online Excel.
+    settings.implicit_microsoft_letter_canvas = microsoft_office
+      && worksheet
+        .page_setup
+        .as_ref()
+        .is_some_and(|setup| setup.paper_size.is_none() && setup.id.is_none());
     settings
   }
 
@@ -345,11 +358,19 @@ impl CalcPageSettings {
     // explicit Letter setup has no printer-settings relationship. Excel maps
     // the Letter worksheet canvas onto that default page at 95%; documents
     // without an explicit paper request remain native A4 at 100%.
-    if self.explicit_paper_size
+    if (self.explicit_paper_size || self.implicit_microsoft_letter_canvas)
       && self.paper_size == MsPaperSize::Letter as u32
       && self.valid_printer_settings
     {
       OFFICE_LETTER_TO_DEFAULT_A4_SCALE_PERCENT
+    } else {
+      DEFAULT_PRINT_SCALE_PERCENT
+    }
+  }
+
+  pub(crate) fn fixed_output_paper_scale_percent(&self, has_chart: bool) -> u32 {
+    if has_chart || self.implicit_microsoft_letter_canvas {
+      self.printer_default_paper_scale_percent()
     } else {
       DEFAULT_PRINT_SCALE_PERCENT
     }

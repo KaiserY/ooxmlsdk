@@ -5,7 +5,7 @@ use ooxmlsdk::parts::pivot_table_part::PivotTablePart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
-use super::print::rendered_number_text;
+use super::print::rendered_number_text_for_locale;
 use super::styles::BorderRecord;
 use super::styles::StylesCatalog;
 use super::styles::TableStyleRecord;
@@ -49,6 +49,14 @@ pub(crate) struct PivotTableModel {
   pub(crate) compact: bool,
   pub(crate) row_grand_totals: bool,
   pub(crate) column_grand_totals: bool,
+  pub(crate) data_caption: String,
+  pub(crate) grand_total_caption: Option<String>,
+  pub(crate) row_header_caption: Option<String>,
+  pub(crate) column_header_caption: Option<String>,
+  pub(crate) missing_caption: Option<String>,
+  pub(crate) show_missing: bool,
+  pub(crate) error_caption: Option<String>,
+  pub(crate) show_error: bool,
   pub(crate) row_field_indexes: Vec<i32>,
   pub(crate) column_field_indexes: Vec<i32>,
   pub(crate) row_field_names: Vec<String>,
@@ -135,23 +143,32 @@ pub(crate) struct PivotBuiltinCellStyle {
   pub(crate) text_color: Option<RgbColor>,
   pub(crate) bold: bool,
   pub(crate) left_align: bool,
+  pub(crate) indent_level: u32,
   pub(crate) borders: BorderRecord,
   differential_format_ids: [Option<u32>; 28],
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct PivotRenderGeometry {
-  whole_range: CellRange,
-  table_range: CellRange,
-  result_range: CellRange,
-  data_start: CellAddress,
+pub(crate) struct PivotRenderGeometry {
+  pub(crate) whole_range: CellRange,
+  pub(crate) table_range: CellRange,
+  pub(crate) result_range: CellRange,
+  pub(crate) data_start: CellAddress,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct PivotFormatLineData {
   line: u32,
   position: u32,
+  field_position: usize,
+  indent_level: u32,
   fields: Vec<PivotFormatFieldData>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct PivotRowFieldLayout {
+  column_offset: u32,
+  indent_level: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -313,7 +330,17 @@ pub(crate) fn pivot_builtin_style_for_address(
     style.bold = true;
   }
   style.left_align |= pivot_label_line_at_address(pivot, geometry, address);
+  style.indent_level = pivot_label_indent_level_at_address(pivot, geometry, address);
   style
+}
+
+impl PivotBuiltinCellStyle {
+  pub(crate) fn text_indent_pt(self) -> f32 {
+    // sc/source/core/data/dpoutput.cxx::ScDPOutput::outputRowHeader reserves
+    // 13 logical screen pixels for every packed row-field level and for the
+    // expand/collapse affordance on a non-terminal field.
+    self.indent_level as f32 * 13.0 * crate::units::POINTS_PER_CSS_PIXEL
+  }
 }
 
 pub(crate) fn apply_builtin_pivot_text_style(
@@ -433,7 +460,7 @@ const PIVOT_STYLE_PRECEDENCE: [x::TableStyleValues; 28] = [
   x::TableStyleValues::ThirdRowSubheading,
 ];
 
-fn pivot_render_geometry(pivot: &PivotTableModel) -> PivotRenderGeometry {
+pub(crate) fn pivot_render_geometry(pivot: &PivotTableModel) -> PivotRenderGeometry {
   if pivot.refresh_on_load {
     return PivotRenderGeometry {
       whole_range: pivot.output_geometry.whole_range,
@@ -670,13 +697,13 @@ fn pivot_style_element_region(
     | x::TableStyleValues::SecondColumnSubheading
     | x::TableStyleValues::ThirdColumnSubheading => {
       let level = pivot_style_level(element_type);
-      pivot_column_style_line(pivot, geometry, address, false, level).map(single_column)
+      pivot_column_subheading_cell(pivot, geometry, address, level)
     }
     x::TableStyleValues::FirstRowSubheading
     | x::TableStyleValues::SecondRowSubheading
     | x::TableStyleValues::ThirdRowSubheading => {
       let level = pivot_style_level(element_type);
-      pivot_row_style_line(pivot, geometry, address, false, level).map(single_row)
+      pivot_row_subheading_cell(pivot, geometry, address, level)
     }
     _ => None,
   }?;
@@ -804,21 +831,102 @@ fn pivot_column_style_line(
   })
 }
 
-fn pivot_format_line_style_level(line: &PivotFormatLineData, subtotal: bool) -> Option<usize> {
-  let field = line.fields.iter().position(|field| {
-    if subtotal {
-      field.subtotal
-    } else {
-      field.is_set && !field.is_member && !field.subtotal && !field.grand_total
+fn pivot_row_subheading_cell(
+  pivot: &PivotTableModel,
+  geometry: PivotRenderGeometry,
+  address: CellAddress,
+  style_level: usize,
+) -> Option<CellRange> {
+  pivot.format_row_lines.iter().find_map(|line| {
+    let row = pivot_shifted_axis_line(
+      line.line,
+      pivot.output_geometry.data_start.row,
+      geometry.data_start.row,
+    );
+    let col = pivot_shifted_axis_line(
+      line.position,
+      pivot.output_geometry.table_start.col,
+      geometry.table_range.start.col,
+    );
+    if row != address.row || pivot_format_line_style_level(line, false) != Some(style_level) {
+      return None;
     }
-  })?;
-  Some(if field == 0 {
-    0
-  } else if field % 2 == 1 {
-    1
-  } else {
-    2
+    let nested_block_heading = line
+      .fields
+      .iter()
+      .skip(line.field_position.saturating_add(1))
+      .all(|field| field.continues);
+    let region = if nested_block_heading {
+      CellRange::new(
+        CellAddress { col, row },
+        CellAddress {
+          col: geometry.table_range.end.col,
+          row,
+        },
+      )
+    } else {
+      CellRange::single(CellAddress { col, row })
+    };
+    region.contains(address).then_some(region)
   })
+}
+
+fn pivot_column_subheading_cell(
+  pivot: &PivotTableModel,
+  geometry: PivotRenderGeometry,
+  address: CellAddress,
+  style_level: usize,
+) -> Option<CellRange> {
+  pivot.format_column_lines.iter().find_map(|line| {
+    let col = pivot_shifted_axis_line(
+      line.line,
+      pivot.output_geometry.data_start.col,
+      geometry.data_start.col,
+    );
+    let row = pivot_shifted_axis_line(
+      line.position,
+      pivot.output_geometry.table_start.row,
+      geometry.table_range.start.row,
+    );
+    if col != address.col || pivot_format_line_style_level(line, false) != Some(style_level) {
+      return None;
+    }
+    let nested_block_heading = line
+      .fields
+      .iter()
+      .skip(line.field_position.saturating_add(1))
+      .all(|field| field.continues);
+    let region = if nested_block_heading {
+      CellRange::new(
+        CellAddress { col, row },
+        CellAddress {
+          col,
+          row: geometry.table_range.end.row,
+        },
+      )
+    } else {
+      CellRange::single(CellAddress { col, row })
+    };
+    region.contains(address).then_some(region)
+  })
+}
+
+fn pivot_format_line_style_level(line: &PivotFormatLineData, subtotal: bool) -> Option<usize> {
+  let field = if subtotal {
+    line.fields.iter().position(|field| field.subtotal)?
+  } else {
+    let field = line.fields.get(line.field_position)?;
+    // ECMA-376 Part 1 §18.8.46/47 calls these regions a subheading, not a
+    // generic member label. A terminal row/column field has no subordinate
+    // field to head and therefore remains in the ordinary first-column/header
+    // region. This also mirrors ScDPOutput's hierarchy boundary: only a member
+    // followed by another field opens a nested output block.
+    if !field.is_member || line.field_position + 1 >= line.fields.len() {
+      return None;
+    }
+    line.field_position
+  };
+  Some(field.min(2))
 }
 
 fn pivot_shifted_axis_line(line: u32, imported_start: u32, rendered_start: u32) -> u32 {
@@ -907,12 +1015,14 @@ fn merge_preset_border(
 ) {
   match border {
     super::pivot_style::PresetBorderSide::Inherit => {}
+    super::pivot_style::PresetBorderSide::NoLine => *target = None,
     super::pivot_style::PresetBorderSide::Line(line) => {
       let Some(color) = styles.theme_color(line.color.theme, line.color.tint) else {
         return;
       };
       let (width_pt, compound) = match line.weight {
         super::pivot_style::PresetBorderWeight::Thin => (1.0, false),
+        super::pivot_style::PresetBorderWeight::Medium => (2.0, false),
         super::pivot_style::PresetBorderWeight::Double => (2.0, true),
       };
       *target = Some(BorderStyle {
@@ -987,6 +1097,48 @@ fn pivot_label_line_at_address(
         geometry.table_range.start.row,
       ) == address.row
   })
+}
+
+fn pivot_label_indent_level_at_address(
+  pivot: &PivotTableModel,
+  geometry: PivotRenderGeometry,
+  address: CellAddress,
+) -> u32 {
+  let row_indent = pivot
+    .format_row_lines
+    .iter()
+    .find(|line| {
+      pivot_shifted_axis_line(
+        line.line,
+        pivot.output_geometry.data_start.row,
+        geometry.data_start.row,
+      ) == address.row
+        && pivot_shifted_axis_line(
+          line.position,
+          pivot.output_geometry.table_start.col,
+          geometry.table_range.start.col,
+        ) == address.col
+    })
+    .map_or(0, |line| line.indent_level);
+  if row_indent > 0 {
+    return row_indent;
+  }
+  pivot
+    .format_column_lines
+    .iter()
+    .find(|line| {
+      pivot_shifted_axis_line(
+        line.line,
+        pivot.output_geometry.data_start.col,
+        geometry.data_start.col,
+      ) == address.col
+        && pivot_shifted_axis_line(
+          line.position,
+          pivot.output_geometry.table_start.row,
+          geometry.table_range.start.row,
+        ) == address.row
+    })
+    .map_or(0, |line| line.indent_level)
 }
 
 fn pivot_grand_total_row_at_address(
@@ -1584,6 +1736,8 @@ impl PivotTableModel {
     let output_geometry = pivot_output_geometry(definition, &printable_location_reference);
     let row_field_indexes = row_field_indexes(definition.row_fields.as_ref());
     let column_field_indexes = column_field_indexes(definition.column_fields.as_ref());
+    let row_field_layouts = pivot_row_field_layouts(definition);
+    let show_drill = definition.show_drill.is_none_or(|value| value.as_bool());
     let format_item_names = cache_field_items.clone();
     let format_row_lines = pivot_format_axis_lines(
       definition
@@ -1594,6 +1748,8 @@ impl PivotTableModel {
       &format_item_names,
       &output_geometry,
       PivotFormatAxis::Row,
+      &row_field_layouts,
+      show_drill,
     );
     let format_column_lines = pivot_format_axis_lines(
       definition
@@ -1604,6 +1760,8 @@ impl PivotTableModel {
       &format_item_names,
       &output_geometry,
       PivotFormatAxis::Column,
+      &[],
+      show_drill,
     );
     let builtin_frame_ranges = pivot_builtin_frame_ranges(
       definition,
@@ -1707,6 +1865,29 @@ impl PivotTableModel {
       column_grand_totals: definition
         .column_grand_totals
         .is_none_or(|value| value.as_bool()),
+      data_caption: decode_excel_escaped_text(&definition.data_caption),
+      grand_total_caption: definition
+        .grand_total_caption
+        .as_deref()
+        .map(decode_excel_escaped_text),
+      row_header_caption: definition
+        .row_header_caption
+        .as_deref()
+        .map(decode_excel_escaped_text),
+      column_header_caption: definition
+        .column_header_caption
+        .as_deref()
+        .map(decode_excel_escaped_text),
+      missing_caption: definition
+        .missing_caption
+        .as_deref()
+        .map(decode_excel_escaped_text),
+      show_missing: definition.show_missing.is_some_and(|value| value.as_bool()),
+      error_caption: definition
+        .error_caption
+        .as_deref()
+        .map(decode_excel_escaped_text),
+      show_error: definition.show_error.is_some_and(|value| value.as_bool()),
       row_field_indexes,
       column_field_indexes,
       row_field_names: row_field_names(definition.row_fields.as_ref(), &cache_field_names),
@@ -1734,6 +1915,7 @@ impl PivotTableModel {
           cache_field_grouped: &cache_field_grouped,
           source_field_number_format_codes: &source_field_number_format_codes,
           date_1904: context.date_1904,
+          format_locale: context.styles.output_format_locale(),
         },
       ),
       page_field_models: page_field_models(definition, &cache_field_names, &cache_field_items),
@@ -2217,37 +2399,106 @@ fn pivot_format_axis_lines(
   item_names: &[Vec<String>],
   geometry: &PivotOutputGeometry,
   axis: PivotFormatAxis,
+  row_field_layouts: &[PivotRowFieldLayout],
+  show_drill: bool,
 ) -> Vec<PivotFormatLineData> {
-  let Some(items) = items else {
+  let Some(items) = items.filter(|_| !field_indexes.is_empty()) else {
     return Vec::new();
   };
   items
     .iter()
     .enumerate()
     .map(|(index, item)| {
-      let (line, position) = match axis {
+      let field_position = match axis {
+        PivotFormatAxis::Row => pivot_format_row_field_position(item, field_indexes),
+        PivotFormatAxis::Column => pivot_format_column_field_position(item, field_indexes),
+      };
+      let fields = pivot_format_item_fields(item, field_indexes, item_names);
+      let (line, position, indent_level) = match axis {
         PivotFormatAxis::Row => {
-          let field_position = pivot_format_row_field_position(item, field_indexes);
+          let layout = usize::try_from(field_position)
+            .ok()
+            .and_then(|position| row_field_layouts.get(position))
+            .copied()
+            .unwrap_or_default();
+          let member = usize::try_from(field_position)
+            .ok()
+            .and_then(|position| fields.get(position))
+            .is_some_and(|field| field.is_member && !field.subtotal);
           (
             geometry.data_start.row + index as u32,
-            geometry.table_start.col + field_position,
+            geometry.table_start.col + layout.column_offset,
+            if member { layout.indent_level } else { 0 },
           )
         }
         PivotFormatAxis::Column => {
-          let field_position = pivot_format_column_field_position(item, field_indexes);
+          let member = usize::try_from(field_position)
+            .ok()
+            .and_then(|position| fields.get(position))
+            .is_some_and(|field| field.is_member && !field.subtotal);
           (
             geometry.data_start.col + index as u32,
             geometry.table_start.row + geometry.header_rows + field_position,
+            u32::from(
+              member
+                && show_drill
+                && usize::try_from(field_position)
+                  .ok()
+                  .is_some_and(|position| position + 1 < field_indexes.len()),
+            ),
           )
         }
       };
       PivotFormatLineData {
         line,
         position,
-        fields: pivot_format_item_fields(item, field_indexes, item_names),
+        field_position: usize::try_from(field_position).unwrap_or(usize::MAX),
+        indent_level,
+        fields,
       }
     })
     .collect()
+}
+
+fn pivot_row_field_layouts(definition: &x::PivotTableDefinition) -> Vec<PivotRowFieldLayout> {
+  let Some(row_fields) = definition.row_fields.as_ref() else {
+    return Vec::new();
+  };
+  let show_drill = definition.show_drill.is_none_or(|value| value.as_bool());
+  let mut column_offset = 0u32;
+  let mut packed_indent = 0u32;
+  let field_count = row_fields.field.len();
+  row_fields
+    .field
+    .iter()
+    .enumerate()
+    .map(|(position, field)| {
+      let last = position + 1 == field_count;
+      let layout = PivotRowFieldLayout {
+        column_offset,
+        indent_level: packed_indent + u32::from(show_drill && !last),
+      };
+      if pivot_row_field_is_compact(definition, field) {
+        packed_indent = packed_indent.saturating_add(1);
+      } else {
+        column_offset = column_offset.saturating_add(1);
+        packed_indent = 0;
+      }
+      layout
+    })
+    .collect()
+}
+
+fn pivot_row_field_is_compact(definition: &x::PivotTableDefinition, field: &x::Field) -> bool {
+  usize::try_from(field.index)
+    .ok()
+    .and_then(|index| {
+      definition
+        .pivot_fields
+        .as_ref()
+        .and_then(|fields| fields.pivot_field.get(index))
+    })
+    .is_some_and(|field| field.compact.is_none_or(|value| value.as_bool()))
 }
 
 fn pivot_builtin_frame_ranges(
@@ -2640,6 +2891,7 @@ struct PivotCountOverrideContext<'a> {
   cache_field_grouped: &'a [bool],
   source_field_number_format_codes: &'a [Option<String>],
   date_1904: bool,
+  format_locale: Option<&'a str>,
 }
 
 fn pivot_count_data_cell_text_overrides(
@@ -2697,6 +2949,7 @@ fn pivot_count_data_cell_text_overrides(
     context.cache_field_grouped,
     context.source_field_number_format_codes,
     context.date_1904,
+    context.format_locale,
   );
   let row_items = pivot_count_row_items(
     definition,
@@ -2903,6 +3156,7 @@ fn pivot_cache_page_filters(
   cache_field_grouped: &[bool],
   source_field_number_format_codes: &[Option<String>],
   date_1904: bool,
+  format_locale: Option<&str>,
 ) -> Vec<PivotPageRecordFilter> {
   let Some(page_fields) = definition.page_fields.as_ref() else {
     return Vec::new();
@@ -2937,6 +3191,7 @@ fn pivot_cache_page_filters(
           .get(field_index)
           .and_then(Option::as_deref),
         date_1904,
+        format_locale,
       );
       let visible_filter = visible_items.map(|items| PivotPageRecordFilter {
         field_index,
@@ -2959,10 +3214,16 @@ fn pivot_field_source_visible_items(
   cache_items: Option<&[PivotCacheItemValue]>,
   number_format_code: Option<&str>,
   date_1904: bool,
+  format_locale: Option<&str>,
 ) -> Option<Vec<PivotCacheItemValue>> {
   let items = pivot_field.items.as_ref()?;
-  let mut source_members =
-    pivot_source_field_members(source_cache, field_index, number_format_code, date_1904);
+  let mut source_members = pivot_source_field_members(
+    source_cache,
+    field_index,
+    number_format_code,
+    date_1904,
+    format_locale,
+  );
   if source_members.is_empty() {
     return None;
   }
@@ -2974,7 +3235,7 @@ fn pivot_field_source_visible_items(
     let Some(value) = pivot_item_cache_value(item, cache_items) else {
       continue;
     };
-    let text = pivot_member_display_text(&value, number_format_code, date_1904);
+    let text = pivot_member_display_text(&value, number_format_code, date_1904, format_locale);
     if let Some(member) = source_members
       .iter_mut()
       .rev()
@@ -3005,6 +3266,7 @@ fn pivot_source_field_members(
   field_index: usize,
   number_format_code: Option<&str>,
   date_1904: bool,
+  format_locale: Option<&str>,
 ) -> Vec<PivotSourceFieldMember> {
   let mut values = Vec::new();
   for row in &source_cache.rows {
@@ -3020,7 +3282,7 @@ fn pivot_source_field_members(
   values
     .into_iter()
     .map(|value| PivotSourceFieldMember {
-      display_text: pivot_member_display_text(&value, number_format_code, date_1904),
+      display_text: pivot_member_display_text(&value, number_format_code, date_1904, format_locale),
       value,
       visible: true,
     })
@@ -3031,13 +3293,28 @@ fn pivot_member_display_text(
   value: &PivotCacheItemValue,
   number_format_code: Option<&str>,
   date_1904: bool,
+  format_locale: Option<&str>,
 ) -> String {
   match value {
     PivotCacheItemValue::Value(value) => {
-      rendered_number_text(&value.to_string(), number_format_code, None, date_1904).0
+      rendered_number_text_for_locale(
+        &value.to_string(),
+        number_format_code,
+        None,
+        date_1904,
+        format_locale,
+      )
+      .0
     }
     PivotCacheItemValue::DateTime { serial, .. } => {
-      rendered_number_text(&serial.to_string(), number_format_code, None, date_1904).0
+      rendered_number_text_for_locale(
+        &serial.to_string(),
+        number_format_code,
+        None,
+        date_1904,
+        format_locale,
+      )
+      .0
     }
     _ => value.text(),
   }
@@ -3354,8 +3631,14 @@ fn pivot_output_geometry(
   }
 }
 
-fn pivot_header_layout(_definition: &x::PivotTableDefinition) -> bool {
-  false
+fn pivot_header_layout(definition: &x::PivotTableDefinition) -> bool {
+  // Excel writes `location/@firstHeaderRow=2` for the grid-header layout
+  // when there is no column field.  LibreOffice's XLS exporter derives that
+  // value directly from ScDPObject::GetHeaderLayout(), while ScDPOutput adds
+  // the second header row only for an empty column axis.  Treating every
+  // imported PivotTable as the one-row standard layout moves refreshed row
+  // labels and the result matrix up by one row.
+  definition.location.first_header_row > 1 && pivot_column_field_count(definition) == 0
 }
 
 fn pivot_columns_for_row_fields(definition: &x::PivotTableDefinition) -> u32 {

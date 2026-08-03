@@ -12614,6 +12614,7 @@ fn lower_inline_chart(
           .first()
           .cloned()
           .unwrap_or_else(|| vec![None; model.data_labels.len()]),
+        leader_line_style: chart.leader_line_style.clone(),
         chart_area_style: chart.chart_area_style.clone(),
         plot_area_style: chart.plot_area_style.clone(),
       },
@@ -12728,11 +12729,16 @@ fn lower_inline_chart(
         series_point_colors: chart.series_point_colors.clone(),
         series_styles: chart.series_styles.clone(),
         trendline_styles: chart.trendline_styles.clone(),
+        error_bar_styles: chart.error_bar_styles.clone(),
+        group_decoration_styles: chart.group_decoration_styles.clone(),
         series_point_styles: chart.series_point_styles.clone(),
         surface_band_colors: chart.surface_band_colors.clone(),
         data_label_fill_colors: chart.data_label_fill_colors.clone(),
         chart_area_style: chart.chart_area_style.clone(),
         plot_area_style: chart.plot_area_style.clone(),
+        floor_style: chart.floor_style.clone(),
+        side_wall_style: chart.side_wall_style.clone(),
+        back_wall_style: chart.back_wall_style.clone(),
       },
     )
     .into_iter()

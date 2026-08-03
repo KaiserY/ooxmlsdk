@@ -3,13 +3,13 @@ use crate::model::{
   TextStyle, common_point, common_rect, common_rgb,
 };
 use crate::render::chart::{
-  Chart3DView, ChartCategoryTick, ChartLegendPosition, ChartSeriesGrouping, ChartSeriesKind,
-  ChartTitleText, ClusteredColumnChart, LinearAxisScaleOptions, PieChartModel, RadialChartKind,
-  SurfaceChartGroup, axis_interval_count, clustered_column_slot, date_axis_data_position,
-  date_axis_minor_tick_positions_with_maximum_auto_increment_count, date_axis_ticks,
-  date_axis_ticks_with_maximum_auto_increment_count, horizontal_axis_number_format_code,
-  linear_axis_scale_with_options, trendline_legend_title, value_axis_display_unit,
-  value_axis_display_unit_label_text, vertical_axis_number_format_code,
+  Chart3DView, ChartCategoryTick, ChartErrorBarValues, ChartLegendPosition, ChartSeriesGrouping,
+  ChartSeriesKind, ChartTitleText, ClusteredColumnChart, LinearAxisScaleOptions, PieChartModel,
+  RadialChartKind, SurfaceChartGroup, axis_interval_count, clustered_column_slot,
+  date_axis_data_position, date_axis_minor_tick_positions_with_maximum_auto_increment_count,
+  date_axis_ticks, date_axis_ticks_with_maximum_auto_increment_count,
+  horizontal_axis_number_format_code, linear_axis_scale_with_options, trendline_legend_title,
+  value_axis_display_unit, value_axis_display_unit_label_text, vertical_axis_number_format_code,
 };
 use crate::text_metrics::TextMetrics;
 use kurbo::BezPath;
@@ -86,6 +86,12 @@ pub(crate) struct ClusteredColumnStyle {
   pub series_point_colors: Vec<Vec<Option<RgbColor>>>,
   pub series_styles: Vec<crate::common::ShapeStyle<'static>>,
   pub trendline_styles: Vec<Vec<crate::common::ShapeStyle<'static>>>,
+  /// Host-resolved line formatting for each series' `c:errBars` records,
+  /// retaining X/Y order independently from trendline and series paint.
+  pub error_bar_styles: Vec<Vec<crate::common::ShapeStyle<'static>>>,
+  /// Host-resolved chart-group decorations in the same order as
+  /// `ClusteredColumnChart::group_decorations`.
+  pub group_decoration_styles: Vec<CartesianChartGroupDecorationStyle>,
   pub series_point_styles: Vec<Vec<Option<crate::common::ShapeStyle<'static>>>>,
   /// Surface-chart value-band colors keyed by `c:bandFmt/c:idx`, one vector
   /// per surface plot-area group.
@@ -93,6 +99,20 @@ pub(crate) struct ClusteredColumnStyle {
   pub data_label_fill_colors: Vec<Vec<Option<RgbColor>>>,
   pub chart_area_style: crate::common::ShapeStyle<'static>,
   pub plot_area_style: crate::common::ShapeStyle<'static>,
+  /// Host-resolved formatting for the three authored c:chart 3-D planes.
+  /// These are independent of c:plotArea/c:spPr: Office permits every plane
+  /// to carry its own fill and outline, including an explicit noFill.
+  pub floor_style: crate::common::ShapeStyle<'static>,
+  pub side_wall_style: crate::common::ShapeStyle<'static>,
+  pub back_wall_style: crate::common::ShapeStyle<'static>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct CartesianChartGroupDecorationStyle {
+  pub drop_lines: crate::common::ShapeStyle<'static>,
+  pub high_low_lines: crate::common::ShapeStyle<'static>,
+  pub up_bars: crate::common::ShapeStyle<'static>,
+  pub down_bars: crate::common::ShapeStyle<'static>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -115,21 +135,48 @@ fn maximum_auto_main_increment_count(
   label_shape_extent_pt: f32,
 ) -> usize {
   // LibreOffice VCartesianAxis::estimateMaximumAutoMainIncrementCount divides
-  // the final axis length by the maximum recorded label shape extent, then
-  // ScaleAutomatism clamps that result to 2..10. Axis tick labels are
-  // auto-growing text shapes built from character properties; DrawingML text
-  // body insets belong to authored text boxes and are not mapped into these
-  // generated shapes. Bubble marker bounds expand the numeric data domain
-  // before this pass; they are not part of the label extent either.
+  // the final center-to-center label line by the maximum recorded label shape
+  // extent, then ScaleAutomatism clamps that result to 2..10. The first and
+  // last generated shapes each occupy half an extent at the ends of the full
+  // axis line, so their centers are one complete extent closer together.
+  // Axis tick labels are auto-growing text shapes built from character
+  // properties; DrawingML text body insets belong to authored text boxes and
+  // are not mapped into these generated shapes. Bubble marker bounds expand
+  // the numeric data domain before this pass; they are not part of the label
+  // extent either.
   let label_shape_extent_pt = label_shape_extent_pt.max(1.0);
-  // LibreOffice divides the available axis length directly by the maximum
-  // generated label extent. Do not subtract an extra endpoint margin here:
-  // it is not part of VCartesianAxis::estimateMaximumAutoMainIncrementCount
-  // and makes a 90 pt axis with a 12 pt label choose six intervals instead
-  // of the source-backed seven.
-  (available_axis_length_pt.max(0.0) / label_shape_extent_pt)
+  ((available_axis_length_pt - label_shape_extent_pt).max(0.0) / label_shape_extent_pt)
     .floor()
     .clamp(2.0, 10.0) as usize
+}
+
+fn suppress_duplicate_formatted_tick_budget(
+  physical_budget: usize,
+  tick_labels: &[(f64, String)],
+) -> usize {
+  // LibreOffice VCartesianAxis::estimateMaximumAutoMainIncrementCount also
+  // protects against a number format collapsing adjacent numeric ticks to the
+  // same visible string (tdf#48041).  The longest equal-label run determines
+  // how far the scale must be thinned; date axes have their own time-unit
+  // estimator and do not enter this helper.
+  let mut longest_run = 1_usize;
+  let mut current_run = 0_usize;
+  let mut previous = None::<&str>;
+  for (_, label) in tick_labels {
+    if previous == Some(label.as_str()) {
+      current_run += 1;
+    } else {
+      current_run = 1;
+      previous = Some(label);
+    }
+    longest_run = longest_run.max(current_run);
+  }
+  if longest_run <= 1 {
+    return physical_budget;
+  }
+  physical_budget
+    .min(tick_labels.len() / longest_run)
+    .clamp(2, 10)
 }
 
 fn maximum_tick_label_axis_pitch(
@@ -208,6 +255,7 @@ pub(crate) struct RadialChartStyle {
   pub point_colors: Vec<RgbColor>,
   pub point_styles: Vec<crate::common::ShapeStyle<'static>>,
   pub data_label_fill_colors: Vec<Option<RgbColor>>,
+  pub leader_line_style: crate::common::ShapeStyle<'static>,
   pub chart_area_style: crate::common::ShapeStyle<'static>,
   pub plot_area_style: crate::common::ShapeStyle<'static>,
 }
@@ -1695,8 +1743,10 @@ pub(crate) fn lower_clustered_column_chart(
     value_axis_is_horizontal,
     &mut metrics,
   );
-  let maximum_auto_increment_count =
-    maximum_auto_main_increment_count(available_value_axis_length, value_axis_label_extent);
+  let maximum_auto_increment_count = suppress_duplicate_formatted_tick_budget(
+    maximum_auto_main_increment_count(available_value_axis_length, value_axis_label_extent),
+    &tick_labels,
+  );
   // Polar radius labels and horizontal bar value labels do not use the same
   // Cartesian vertical-label capacity. LibreOffice gives the polar radius a
   // dedicated estimator; PowerPoint fixed output likewise retains five main
@@ -1730,9 +1780,18 @@ pub(crate) fn lower_clustered_column_chart(
       let text_properties =
         axis_set_horizontal_value_axis(chart, 0).and_then(|axis| axis.text_properties.as_deref());
       let rotation = category_axis_text_rotation_degrees(text_properties);
-      maximum_auto_main_increment_count(
-        plot_width,
-        maximum_tick_label_axis_pitch(&labels, &style.category_label, rotation, true, &mut metrics),
+      suppress_duplicate_formatted_tick_budget(
+        maximum_auto_main_increment_count(
+          plot_width,
+          maximum_tick_label_axis_pitch(
+            &labels,
+            &style.category_label,
+            rotation,
+            true,
+            &mut metrics,
+          ),
+        ),
+        &labels,
       )
     })
     .unwrap_or(maximum_auto_increment_count);
@@ -2187,6 +2246,20 @@ pub(crate) fn lower_clustered_column_chart(
     }
   }
 
+  lower_chart_group_decorations(
+    &mut items,
+    chart,
+    PlotRect {
+      left: plot_left,
+      top: plot_top,
+      width: plot_width,
+      height: plot_height,
+    },
+    &axis_scales,
+    projection_3d,
+    style,
+    category_count,
+  );
   lower_series_geometry(
     &mut items,
     chart,
@@ -2216,22 +2289,6 @@ pub(crate) fn lower_clustered_column_chart(
       &mut metrics,
     );
   }
-  if chart.has_high_low_lines || chart.has_up_down_bars {
-    lower_stock_overlays(
-      &mut items,
-      chart,
-      PlotRect {
-        left: plot_left,
-        top: plot_top,
-        width: plot_width,
-        height: plot_height,
-      },
-      scale,
-      style,
-      category_count,
-    );
-  }
-
   if category_axis_visible && !radar_only && !horizontal_bar_only && !powerpoint_2d_cartesian_axes {
     let (axis_start, axis_end) =
       projection_3d.map_or(((plot_left, zero_y), (plot_right, zero_y)), |projection| {
@@ -3221,7 +3278,7 @@ fn lower_cartesian_3d_walls(
     }));
   let (outline_color, outline_width) = chart_style_stroke_fallback(&style.plot_area_style)
     .unwrap_or((style.gridline_color, 0.75 * style.stroke_scale));
-  push_chart_polygon_with_optional_fill(
+  push_chart_styled_polygon(
     items,
     &[
       back_top_left,
@@ -3229,8 +3286,10 @@ fn lower_cartesian_3d_walls(
       back_bottom_right,
       back_bottom_left,
     ],
+    &style.back_wall_style,
     back_color,
     Some((outline_color, outline_width)),
+    style.stroke_scale,
   );
 
   let (depth_x, _) = projection.depth_vector();
@@ -3249,7 +3308,7 @@ fn lower_cartesian_3d_walls(
       back_bottom_right,
     )
   };
-  push_chart_polygon_with_optional_fill(
+  push_chart_styled_polygon(
     items,
     &[
       side_front_top,
@@ -3257,10 +3316,12 @@ fn lower_cartesian_3d_walls(
       side_back_bottom,
       side_front_bottom,
     ],
+    &style.side_wall_style,
     back_color.map(|color| shade_chart_color(color, 0.72)),
     Some((outline_color, outline_width)),
+    style.stroke_scale,
   );
-  push_chart_polygon_with_optional_fill(
+  push_chart_styled_polygon(
     items,
     &[
       front_bottom_left,
@@ -3268,56 +3329,66 @@ fn lower_cartesian_3d_walls(
       back_bottom_right,
       front_bottom_right,
     ],
+    &style.floor_style,
     back_color.map(|color| shade_chart_color(color, 0.88)),
     Some((outline_color, outline_width)),
+    style.stroke_scale,
   );
 }
 
-fn push_chart_polygon_with_optional_fill(
+fn push_chart_styled_polygon(
   items: &mut Vec<PageItem>,
   points: &[(f32, f32)],
-  color: Option<RgbColor>,
-  stroke: Option<(RgbColor, f32)>,
+  style: &crate::common::ShapeStyle<'static>,
+  fallback_fill_color: Option<RgbColor>,
+  fallback_stroke: Option<(RgbColor, f32)>,
+  stroke_width_scale: f32,
 ) {
   if points.len() < 3 {
     return;
   }
-  let minimum_x = points
-    .iter()
-    .map(|point| point.0)
-    .fold(f32::INFINITY, f32::min);
-  let maximum_x = points
-    .iter()
-    .map(|point| point.0)
-    .fold(f32::NEG_INFINITY, f32::max);
-  let minimum_y = points
-    .iter()
-    .map(|point| point.1)
-    .fold(f32::INFINITY, f32::min);
-  let maximum_y = points
-    .iter()
-    .map(|point| point.1)
-    .fold(f32::NEG_INFINITY, f32::max);
-  items.push(PageItem::Path(crate::common::PathItem {
-    bounds: common_rect(
-      minimum_x,
-      minimum_y,
-      maximum_x - minimum_x,
-      maximum_y - minimum_y,
+  let (left, top, right, bottom) = points.iter().fold(
+    (
+      f32::INFINITY,
+      f32::INFINITY,
+      f32::NEG_INFINITY,
+      f32::NEG_INFINITY,
     ),
+    |(left, top, right, bottom), (x, y)| (left.min(*x), top.min(*y), right.max(*x), bottom.max(*y)),
+  );
+  let bounds = common_rect(left, top, right - left, bottom - top);
+  let fill = match &style.fill {
+    crate::common::ShapeStyleValue::Paint(fill) => bind_chart_fill_to_bounds(fill, bounds),
+    crate::common::ShapeStyleValue::NoPaint => crate::common::Fill::None,
+    crate::common::ShapeStyleValue::Unspecified => fallback_fill_color
+      .map(|color| crate::common::Fill::Solid(common_rgb(color, 1.0)))
+      .unwrap_or(crate::common::Fill::None),
+  };
+  let stroke = match &style.stroke {
+    crate::common::ShapeStyleValue::Paint(stroke) => Some(bind_chart_stroke_to_bounds(
+      stroke,
+      bounds,
+      stroke_width_scale,
+    )),
+    crate::common::ShapeStyleValue::NoPaint => None,
+    crate::common::ShapeStyleValue::Unspecified => {
+      fallback_stroke.map(|(color, width_pt)| crate::common::Stroke {
+        width: crate::common::Pt(width_pt),
+        color: common_rgb(color, 1.0),
+        ..Default::default()
+      })
+    }
+  };
+  if fill == crate::common::Fill::None && stroke.is_none() {
+    return;
+  }
+  items.push(PageItem::Path(crate::common::PathItem {
+    bounds,
     points: points.iter().map(|(x, y)| common_point(*x, *y)).collect(),
     commands: Vec::new(),
     closed: true,
-    fill: color.map_or(crate::common::Fill::None, |color| {
-      crate::common::Fill::Solid(common_rgb(color, 1.0))
-    }),
-    stroke: stroke.map(|(color, width_pt)| crate::common::Stroke {
-      width: crate::common::Pt(width_pt),
-      color: common_rgb(color, 1.0),
-      dash: None,
-      source_style_id: None,
-      ..Default::default()
-    }),
+    fill,
+    stroke,
   }));
 }
 
@@ -4218,16 +4289,39 @@ pub(crate) fn lower_radial_chart(
       );
       (bounds.left, bounds.top)
     });
-    if (outside || best_fit_outside) && chart.show_leader_lines {
-      items.push(PageItem::Line(LineItem {
-        x1_pt: center_x + angle.sin() * radius_x * 0.94,
-        y1_pt: center_y - angle.cos() * radius_y * 0.94,
-        x2_pt: label_x + width * 0.5,
-        y2_pt: label_y + label_height * 0.5,
-        width_pt: 0.75,
-        color: style.data_label.color,
-        kind: LineItemKind::Stroke,
-      }));
+    let leader_start = (
+      center_x + angle.sin() * radius_x,
+      center_y - angle.cos() * radius_y,
+    );
+    let leader_end = (
+      leader_start.0.clamp(label_x, label_x + width),
+      leader_start.1.clamp(label_y, label_y + label_height),
+    );
+    let leader_edge_distance =
+      (leader_start.0 - center_x).powi(2) + (leader_start.1 - center_y).powi(2);
+    let leader_label_distance =
+      (leader_end.0 - center_x).powi(2) + (leader_end.1 - center_y).powi(2);
+    let leader_length = (leader_end.0 - leader_start.0).hypot(leader_end.1 - leader_start.1);
+    // LibreOffice PieChart::createTextLabelShape connects the sector edge to
+    // the closest point of a custom label rectangle.  It deliberately omits
+    // the line when a manual label has been moved inside the pie and when the
+    // remaining segment is less than one percent of the chart diagonal.
+    let label_is_outside_pie = leader_label_distance > leader_edge_distance + f32::EPSILON;
+    let leader_is_visible = leader_length >= frame.width_pt.hypot(frame.height_pt) * 0.01;
+    if chart.show_leader_lines
+      && label_is_outside_pie
+      && leader_is_visible
+      && (outside || best_fit_outside || label.layout.is_some())
+    {
+      push_chart_styled_line(
+        &mut items,
+        leader_start,
+        leader_end,
+        Some(&style.leader_line_style.stroke),
+        style.data_label.color,
+        0.75,
+        1.0,
+      );
     }
     if let Some(fill_color) = style
       .data_label_fill_colors
@@ -6468,7 +6562,109 @@ fn cartesian_scale_values(
       }
     }
   }
+  // Error-bar endpoints participate in automatic value-axis scaling.  Keep
+  // the authored axis bounds authoritative later in `linear_axis_scale`, but
+  // do not clip automatic fixed/percentage/statistical/custom extents to the
+  // raw data range.
+  for (series_index, series) in chart
+    .series
+    .iter()
+    .enumerate()
+    .filter(|(_, series)| series.axis_set_index == axis_set_index)
+  {
+    for error_bars in series
+      .error_bars
+      .iter()
+      .filter(|bars| bars.direction == c::ErrorBarDirectionValues::Y)
+    {
+      for (point_index, value) in series.values.iter().enumerate() {
+        let Some(value) = value.as_ref().copied().filter(|value| value.is_finite()) else {
+          continue;
+        };
+        let center = if matches!(
+          series.grouping,
+          ChartSeriesGrouping::Stacked | ChartSeriesGrouping::PercentStacked
+        ) {
+          stacked_value_bounds(chart, series_index, point_index, value).1
+        } else {
+          value
+        };
+        if error_bars.show_positive
+          && let Some(delta) = chart_error_bar_delta(error_bars, series, point_index, true)
+        {
+          values.push(center + delta);
+        }
+        if error_bars.show_negative
+          && let Some(delta) = chart_error_bar_delta(error_bars, series, point_index, false)
+        {
+          values.push(center - delta);
+        }
+      }
+    }
+  }
   values
+}
+
+fn chart_error_bar_delta(
+  error_bars: &crate::render::chart::ChartErrorBars<'_>,
+  series: &crate::render::chart::ClusteredColumnSeries<'_>,
+  point_index: usize,
+  positive: bool,
+) -> Option<f64> {
+  let data = match error_bars.direction {
+    c::ErrorBarDirectionValues::X => &series.x_values,
+    c::ErrorBarDirectionValues::Y => &series.values,
+  };
+  let delta = match &error_bars.values {
+    ChartErrorBarValues::Custom {
+      positive_values,
+      negative_values,
+      ..
+    } => if positive {
+      positive_values.get(point_index)
+    } else {
+      negative_values.get(point_index)
+    }
+    .copied()
+    .flatten()?,
+    ChartErrorBarValues::Fixed(value) => *value,
+    ChartErrorBarValues::Percentage(percent) => {
+      data.get(point_index).copied().flatten()?.abs() * percent / 100.0
+    }
+    ChartErrorBarValues::StandardDeviation(weight) => {
+      chart_population_standard_deviation(data)? * weight
+    }
+    ChartErrorBarValues::StandardError => {
+      let count = data
+        .iter()
+        .flatten()
+        .filter(|value| value.is_finite())
+        .count();
+      if count == 0 {
+        return None;
+      }
+      chart_population_standard_deviation(data)? / (count as f64).sqrt()
+    }
+  }
+  .abs();
+  (delta.is_finite()).then_some(delta)
+}
+
+fn chart_population_standard_deviation(values: &[Option<f64>]) -> Option<f64> {
+  let mut count = 0usize;
+  let mut sum = 0.0;
+  let mut square_sum = 0.0;
+  for value in values.iter().flatten().filter(|value| value.is_finite()) {
+    count += 1;
+    sum += *value;
+    square_sum += *value * *value;
+  }
+  if count == 0 {
+    return None;
+  }
+  let count = count as f64;
+  let variance = ((square_sum - sum * sum / count) / count).max(0.0);
+  Some(variance.sqrt())
 }
 
 fn visible_bubble_size(
@@ -6661,6 +6857,9 @@ fn lower_series_geometry(
         lower_radar_series(items, &context, series, series_index, color, style);
       }
     }
+    if !series.error_bars.is_empty() && !series.is_3d {
+      lower_series_error_bars(items, &context, style, series_index, color, axes.x);
+    }
     if !series.trendlines.is_empty() {
       lower_trendlines(
         items,
@@ -6678,6 +6877,321 @@ fn lower_series_geometry(
       );
     }
   }
+}
+
+fn lower_series_error_bars(
+  items: &mut Vec<PageItem>,
+  context: &SeriesGeometryContext<'_, '_>,
+  style: &ClusteredColumnStyle,
+  series_index: usize,
+  fallback_color: RgbColor,
+  x_scale: Option<crate::render::chart::LinearAxisScale>,
+) {
+  let series = &context.chart.series[series_index];
+  for (error_bar_index, error_bars) in series.error_bars.iter().enumerate() {
+    let stroke = style
+      .error_bar_styles
+      .get(series_index)
+      .and_then(|styles| styles.get(error_bar_index))
+      .map(|shape| &shape.stroke);
+    for point_index in 0..series.values.len().max(series.x_values.len()) {
+      let Some(points) =
+        chart_error_bar_points(context, series_index, point_index, error_bars, x_scale)
+      else {
+        continue;
+      };
+      let positive = error_bars
+        .show_positive
+        .then_some(points.positive)
+        .flatten();
+      let negative = error_bars
+        .show_negative
+        .then_some(points.negative)
+        .flatten();
+      let start = negative.unwrap_or(points.center);
+      let end = positive.unwrap_or(points.center);
+      if let Some((start, end)) = clip_chart_line_segment_to_plot(start, end, context.plot) {
+        push_chart_styled_line(
+          items,
+          start,
+          end,
+          stroke,
+          fallback_color,
+          0.75 * style.stroke_scale,
+          style.stroke_scale,
+        );
+      }
+      if error_bars.no_end_cap {
+        continue;
+      }
+      // LibreOffice's chart view uses a fixed 200 hundredths-of-a-millimetre
+      // cap in scene coordinates. Keep the same 2 mm physical size rather
+      // than scaling caps with the data interval or marker magnitude.
+      let cap_half = (2.0 * 72.0 / 25.4) * 0.5;
+      for endpoint in [negative, positive].into_iter().flatten() {
+        if !plot_contains_point(context.plot, endpoint) {
+          continue;
+        }
+        let (cap_start, cap_end) = if points.horizontal {
+          (
+            (endpoint.0, endpoint.1 - cap_half),
+            (endpoint.0, endpoint.1 + cap_half),
+          )
+        } else {
+          (
+            (endpoint.0 - cap_half, endpoint.1),
+            (endpoint.0 + cap_half, endpoint.1),
+          )
+        };
+        push_chart_styled_line(
+          items,
+          cap_start,
+          cap_end,
+          stroke,
+          fallback_color,
+          0.75 * style.stroke_scale,
+          style.stroke_scale,
+        );
+      }
+    }
+  }
+}
+
+#[derive(Clone, Copy)]
+struct ChartErrorBarPoints {
+  center: (f32, f32),
+  positive: Option<(f32, f32)>,
+  negative: Option<(f32, f32)>,
+  horizontal: bool,
+}
+
+fn chart_error_bar_points(
+  context: &SeriesGeometryContext<'_, '_>,
+  series_index: usize,
+  point_index: usize,
+  error_bars: &crate::render::chart::ChartErrorBars<'_>,
+  x_scale: Option<crate::render::chart::LinearAxisScale>,
+) -> Option<ChartErrorBarPoints> {
+  let chart = context.chart;
+  let series = chart.series.get(series_index)?;
+  let positive_delta = error_bars
+    .show_positive
+    .then(|| chart_error_bar_delta(error_bars, series, point_index, true))
+    .flatten();
+  let negative_delta = error_bars
+    .show_negative
+    .then(|| chart_error_bar_delta(error_bars, series, point_index, false))
+    .flatten();
+  if positive_delta.is_none() && negative_delta.is_none() {
+    return None;
+  }
+
+  match series.kind {
+    ChartSeriesKind::Scatter | ChartSeriesKind::Bubble => {
+      let y_value = series.values.get(point_index).copied().flatten()?;
+      let x_value = series
+        .x_values
+        .get(point_index)
+        .copied()
+        .flatten()
+        .unwrap_or(point_index as f64 + 1.0);
+      let center = (
+        x_scale.map_or(context.plot.left + context.plot.width * 0.5, |scale| {
+          value_x(x_value, scale, context.plot)
+        }),
+        value_y(
+          y_value,
+          context.scale,
+          context.plot.top,
+          context.plot.height,
+        ),
+      );
+      match error_bars.direction {
+        c::ErrorBarDirectionValues::X => {
+          let scale = x_scale?;
+          let positive =
+            positive_delta.map(|delta| (value_x(x_value + delta, scale, context.plot), center.1));
+          let negative =
+            negative_delta.map(|delta| (value_x(x_value - delta, scale, context.plot), center.1));
+          Some(ChartErrorBarPoints {
+            center,
+            positive,
+            negative,
+            horizontal: true,
+          })
+        }
+        c::ErrorBarDirectionValues::Y => {
+          let positive = positive_delta.map(|delta| {
+            (
+              center.0,
+              value_y(
+                y_value + delta,
+                context.scale,
+                context.plot.top,
+                context.plot.height,
+              ),
+            )
+          });
+          let negative = negative_delta.map(|delta| {
+            (
+              center.0,
+              value_y(
+                y_value - delta,
+                context.scale,
+                context.plot.top,
+                context.plot.height,
+              ),
+            )
+          });
+          Some(ChartErrorBarPoints {
+            center,
+            positive,
+            negative,
+            horizontal: false,
+          })
+        }
+      }
+    }
+    ChartSeriesKind::Bar if error_bars.direction == c::ErrorBarDirectionValues::Y => {
+      let value = series.values.get(point_index).copied().flatten()?;
+      let (_, center_value) = stacked_value_bounds(chart, series_index, point_index, value);
+      let center = (
+        value_x(center_value, context.scale, context.plot),
+        clustered_series_slot_center(context, series_index, point_index, true)?,
+      );
+      let positive = positive_delta.map(|delta| {
+        (
+          value_x(center_value + delta, context.scale, context.plot),
+          center.1,
+        )
+      });
+      let negative = negative_delta.map(|delta| {
+        (
+          value_x(center_value - delta, context.scale, context.plot),
+          center.1,
+        )
+      });
+      Some(ChartErrorBarPoints {
+        center,
+        positive,
+        negative,
+        horizontal: true,
+      })
+    }
+    ChartSeriesKind::Column
+    | ChartSeriesKind::Line
+    | ChartSeriesKind::Area
+    | ChartSeriesKind::Stock
+      if error_bars.direction == c::ErrorBarDirectionValues::Y =>
+    {
+      let value = series.values.get(point_index).copied().flatten()?;
+      let (_, center_value) = stacked_value_bounds(chart, series_index, point_index, value);
+      let center_x = if series.kind == ChartSeriesKind::Column {
+        clustered_series_slot_center(context, series_index, point_index, false)?
+      } else {
+        let display_index = category_display_index(chart, point_index, context.category_count);
+        category_point_x(chart, display_index, context.category_count, context.plot)
+      };
+      let center = (
+        center_x,
+        value_y(
+          center_value,
+          context.scale,
+          context.plot.top,
+          context.plot.height,
+        ),
+      );
+      let positive = positive_delta.map(|delta| {
+        (
+          center.0,
+          value_y(
+            center_value + delta,
+            context.scale,
+            context.plot.top,
+            context.plot.height,
+          ),
+        )
+      });
+      let negative = negative_delta.map(|delta| {
+        (
+          center.0,
+          value_y(
+            center_value - delta,
+            context.scale,
+            context.plot.top,
+            context.plot.height,
+          ),
+        )
+      });
+      Some(ChartErrorBarPoints {
+        center,
+        positive,
+        negative,
+        horizontal: false,
+      })
+    }
+    ChartSeriesKind::Column
+    | ChartSeriesKind::Bar
+    | ChartSeriesKind::Line
+    | ChartSeriesKind::Area
+    | ChartSeriesKind::Radar
+    | ChartSeriesKind::Stock
+    | ChartSeriesKind::Surface => None,
+  }
+}
+
+fn clustered_series_slot_center(
+  context: &SeriesGeometryContext<'_, '_>,
+  series_index: usize,
+  category_index: usize,
+  horizontal_bar: bool,
+) -> Option<f32> {
+  let series = context.chart.series.get(series_index)?;
+  let peer_count = context
+    .chart
+    .series
+    .iter()
+    .filter(|peer| {
+      peer.axis_set_index == series.axis_set_index
+        && peer.kind == series.kind
+        && peer.grouping == series.grouping
+    })
+    .count()
+    .max(1);
+  let peer_index = context.chart.series[..series_index]
+    .iter()
+    .filter(|peer| {
+      peer.axis_set_index == series.axis_set_index
+        && peer.kind == series.kind
+        && peer.grouping == series.grouping
+    })
+    .count();
+  let clustered = series.grouping == ChartSeriesGrouping::Clustered;
+  let slot = clustered_column_slot(
+    series_category_display_index(
+      context.chart.category_axis_reversed,
+      series.kind,
+      category_index,
+      context.category_count,
+    ),
+    if clustered { peer_index } else { 0 },
+    context.category_count,
+    if clustered { peer_count } else { 1 },
+    context.chart.gap_width_percent,
+    context.chart.overlap_percent,
+  )?;
+  Some(if horizontal_bar {
+    context.plot.top + slot.center as f32 * context.plot.height
+  } else {
+    context.plot.left + slot.center as f32 * context.plot.width
+  })
+}
+
+fn plot_contains_point(plot: PlotRect, point: (f32, f32)) -> bool {
+  point.0 >= plot.left
+    && point.0 <= plot.left + plot.width
+    && point.1 >= plot.top
+    && point.1 <= plot.top + plot.height
 }
 
 fn chart_3d_series_slot_context(
@@ -7750,64 +8264,242 @@ fn polynomial_value(coefficients: &[f64], x: f64) -> f64 {
     .fold(0.0, |value, coefficient| coefficient + x * value)
 }
 
-fn lower_stock_overlays(
+fn lower_chart_group_decorations(
   items: &mut Vec<PageItem>,
   chart: &ClusteredColumnChart<'_>,
   plot: PlotRect,
-  scale: crate::render::chart::LinearAxisScale,
+  axis_scales: &[CartesianAxisScales],
+  projection_3d: Option<Chart3DProjection>,
   style: &ClusteredColumnStyle,
   category_count: usize,
 ) {
-  for category_index in 0..category_count {
-    let values = chart
+  for (group_index, group) in chart.group_decorations.iter().enumerate() {
+    let Some(group_series) = chart
       .series
-      .iter()
-      .filter(|series| matches!(series.kind, ChartSeriesKind::Line | ChartSeriesKind::Stock))
-      .filter_map(|series| series.values.get(category_index).copied().flatten())
-      .collect::<Vec<_>>();
-    if values.len() < 2 {
+      .get(group.first_series_index..group.first_series_index.saturating_add(group.series_count))
+    else {
       continue;
+    };
+    let axes = axis_scales
+      .get(group.axis_set_index)
+      .unwrap_or(&axis_scales[0]);
+    let group_style = style.group_decoration_styles.get(group_index);
+
+    if group.drop_lines.is_some() {
+      let axis_value = 0.0_f64.clamp(axes.y.minimum, axes.y.maximum);
+      let axis_y = value_y(axis_value, axes.y, plot.top, plot.height);
+      for (relative_series_index, series) in group_series.iter().enumerate() {
+        let series_index = group.first_series_index + relative_series_index;
+        for (category_index, value) in series.values.iter().enumerate() {
+          let Some(value) = value.as_ref().copied().filter(|value| value.is_finite()) else {
+            continue;
+          };
+          let value = chart_group_series_end_value(
+            chart,
+            group.first_series_index,
+            group.series_count,
+            series_index,
+            category_index,
+            value,
+          );
+          let display_index = category_display_index(chart, category_index, category_count);
+          let x = category_point_x(chart, display_index, category_count, plot);
+          let data_y = value_y(value, axes.y, plot.top, plot.height);
+          let (start, end) = if series.is_3d {
+            let (front, back) = chart_3d_series_depth_slot(chart, series_index);
+            let depth = (front + back) * 0.5;
+            projection_3d.map_or(((x, data_y), (x, axis_y)), |projection| {
+              (
+                projection.project(x, data_y, depth),
+                projection.project(x, axis_y, depth),
+              )
+            })
+          } else {
+            ((x, data_y), (x, axis_y))
+          };
+          push_chart_styled_line(
+            items,
+            start,
+            end,
+            group_style.map(|style| &style.drop_lines.stroke),
+            style.gridline_color,
+            0.75 * style.stroke_scale,
+            style.stroke_scale,
+          );
+        }
+      }
     }
-    let display_index = category_display_index(chart, category_index, category_count);
-    let x = category_point_x(chart, display_index, category_count, plot);
-    if chart.has_high_low_lines {
-      let minimum = values.iter().copied().fold(f64::INFINITY, f64::min);
-      let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-      items.push(PageItem::Line(LineItem {
-        x1_pt: x,
-        y1_pt: value_y(minimum, scale, plot.top, plot.height),
-        x2_pt: x,
-        y2_pt: value_y(maximum, scale, plot.top, plot.height),
-        width_pt: style.stroke_scale,
-        color: style.gridline_color,
-        kind: LineItemKind::Stroke,
-      }));
-    }
-    if chart.has_up_down_bars {
-      let first = values[0];
-      let last = values[values.len() - 1];
-      let top = value_y(first.max(last), scale, plot.top, plot.height);
-      let bottom = value_y(first.min(last), scale, plot.top, plot.height);
-      items.push(PageItem::Rect(RectItem {
-        x_pt: x - plot.width / category_count.max(1) as f32 * 0.16,
-        y_pt: top,
-        width_pt: plot.width / category_count.max(1) as f32 * 0.32,
-        height_pt: (bottom - top).abs(),
-        fill_color: Some(if last >= first {
-          RgbColor {
-            r: 255,
-            g: 255,
-            b: 255,
-          }
-        } else {
-          RgbColor { r: 0, g: 0, b: 0 }
-        }),
-        fill_opacity: 1.0,
-        stroke: None,
-        stroke_opacity: 1.0,
-      }));
+
+    for category_index in 0..category_count {
+      let display_index = category_display_index(chart, category_index, category_count);
+      let x = category_point_x(chart, display_index, category_count, plot);
+      if group.high_low_lines.is_some() {
+        let values = group_series
+          .iter()
+          .enumerate()
+          .filter_map(|(relative_series_index, series)| {
+            let value = series.values.get(category_index).copied().flatten()?;
+            value.is_finite().then(|| {
+              chart_group_series_end_value(
+                chart,
+                group.first_series_index,
+                group.series_count,
+                group.first_series_index + relative_series_index,
+                category_index,
+                value,
+              )
+            })
+          })
+          .collect::<Vec<_>>();
+        if values.len() >= 2 {
+          let minimum = values.iter().copied().fold(f64::INFINITY, f64::min);
+          let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+          push_chart_styled_line(
+            items,
+            (x, value_y(minimum, axes.y, plot.top, plot.height)),
+            (x, value_y(maximum, axes.y, plot.top, plot.height)),
+            group_style.map(|style| &style.high_low_lines.stroke),
+            style.gridline_color,
+            0.75 * style.stroke_scale,
+            style.stroke_scale,
+          );
+        }
+      }
+
+      let Some(up_down_bars) = group.up_down_bars else {
+        continue;
+      };
+      let Some((first_series, last_series)) = group_series.first().zip(group_series.last()) else {
+        continue;
+      };
+      if group_series.len() < 2 {
+        continue;
+      }
+      let Some(first) = first_series
+        .values
+        .get(category_index)
+        .copied()
+        .flatten()
+        .filter(|value| value.is_finite())
+      else {
+        continue;
+      };
+      let Some(last) = last_series
+        .values
+        .get(category_index)
+        .copied()
+        .flatten()
+        .filter(|value| value.is_finite())
+      else {
+        continue;
+      };
+      let first = chart_group_series_end_value(
+        chart,
+        group.first_series_index,
+        group.series_count,
+        group.first_series_index,
+        category_index,
+        first,
+      );
+      let last_series_index = group.first_series_index + group.series_count - 1;
+      let last = chart_group_series_end_value(
+        chart,
+        group.first_series_index,
+        group.series_count,
+        last_series_index,
+        category_index,
+        last,
+      );
+      let top = value_y(first.max(last), axes.y, plot.top, plot.height);
+      let bottom = value_y(first.min(last), axes.y, plot.top, plot.height);
+      if (bottom - top).abs() <= f32::EPSILON {
+        continue;
+      }
+      let category_step = if chart.category_axis_shifted {
+        plot.width / category_count.max(1) as f32
+      } else if category_count > 1 {
+        plot.width / (category_count - 1) as f32
+      } else {
+        plot.width
+      };
+      let gap_width = up_down_bars
+        .gap_width
+        .as_ref()
+        .and_then(|gap| gap.val)
+        .map_or(150.0, f32::from)
+        .clamp(0.0, 500.0);
+      let bar_width = category_step / (1.0 + gap_width / 100.0);
+      let is_up = last > first;
+      let bar_style = if is_up {
+        group_style.map(|style| &style.up_bars)
+      } else {
+        group_style.map(|style| &style.down_bars)
+      };
+      let fallback_fill = if is_up {
+        RgbColor {
+          r: 255,
+          g: 255,
+          b: 255,
+        }
+      } else {
+        RgbColor { r: 0, g: 0, b: 0 }
+      };
+      let left = x - bar_width * 0.5;
+      let right = x + bar_width * 0.5;
+      let default_style = crate::common::ShapeStyle::default();
+      push_chart_styled_polygon(
+        items,
+        &[(left, top), (right, top), (right, bottom), (left, bottom)],
+        bar_style.unwrap_or(&default_style),
+        Some(fallback_fill),
+        Some((RgbColor { r: 0, g: 0, b: 0 }, 0.75 * style.stroke_scale)),
+        style.stroke_scale,
+      );
     }
   }
+}
+
+fn chart_group_series_end_value(
+  chart: &ClusteredColumnChart<'_>,
+  first_series_index: usize,
+  series_count: usize,
+  series_index: usize,
+  category_index: usize,
+  value: f64,
+) -> f64 {
+  let Some(series) = chart.series.get(series_index) else {
+    return value;
+  };
+  if !matches!(
+    series.grouping,
+    ChartSeriesGrouping::Stacked | ChartSeriesGrouping::PercentStacked
+  ) {
+    return value;
+  }
+  let Some(group_series) = chart
+    .series
+    .get(first_series_index..first_series_index.saturating_add(series_count))
+  else {
+    return value;
+  };
+  let total = if series.grouping == ChartSeriesGrouping::PercentStacked {
+    group_series
+      .iter()
+      .filter_map(|peer| peer.values.get(category_index).copied().flatten())
+      .filter(|value| value.is_finite())
+      .map(f64::abs)
+      .sum::<f64>()
+      .max(f64::EPSILON)
+  } else {
+    1.0
+  };
+  let start = chart.series[first_series_index..series_index]
+    .iter()
+    .filter_map(|peer| peer.values.get(category_index).copied().flatten())
+    .filter(|previous| previous.is_finite() && previous.signum() == value.signum())
+    .map(|previous| previous / total)
+    .sum::<f64>();
+  start + value / total
 }
 
 fn lower_column_series(
@@ -10163,7 +10855,7 @@ fn axis_set_scatter_uses_index_x_values(
 }
 
 fn scatter_x_axis_values(chart: &ClusteredColumnChart<'_>, axis_set_index: usize) -> Vec<f64> {
-  chart
+  let mut values = chart
     .series
     .iter()
     .filter(|series| {
@@ -10185,7 +10877,44 @@ fn scatter_x_axis_values(chart: &ClusteredColumnChart<'_>, axis_set_index: usize
       })
     })
     .filter(|value| value.is_finite())
-    .collect()
+    .collect::<Vec<_>>();
+  for series in chart.series.iter().filter(|series| {
+    series.axis_set_index == axis_set_index
+      && matches!(
+        series.kind,
+        ChartSeriesKind::Scatter | ChartSeriesKind::Bubble
+      )
+  }) {
+    for error_bars in series
+      .error_bars
+      .iter()
+      .filter(|bars| bars.direction == c::ErrorBarDirectionValues::X)
+    {
+      let point_count = series.x_values.len().max(series.values.len());
+      for point_index in 0..point_count {
+        let center = series
+          .x_values
+          .get(point_index)
+          .copied()
+          .flatten()
+          .unwrap_or(point_index as f64 + 1.0);
+        if !center.is_finite() {
+          continue;
+        }
+        if error_bars.show_positive
+          && let Some(delta) = chart_error_bar_delta(error_bars, series, point_index, true)
+        {
+          values.push(center + delta);
+        }
+        if error_bars.show_negative
+          && let Some(delta) = chart_error_bar_delta(error_bars, series, point_index, false)
+        {
+          values.push(center - delta);
+        }
+      }
+    }
+  }
+  values
 }
 
 fn stacked_value_bounds(
@@ -12623,11 +13352,11 @@ mod tests {
     );
     assert_eq!(
       maximum_auto_main_increment_count(90.0, generated_label_extent,),
-      7
+      6
     );
     assert_eq!(
       maximum_auto_main_increment_count(90.0, generated_label_extent,),
-      7
+      6
     );
   }
 

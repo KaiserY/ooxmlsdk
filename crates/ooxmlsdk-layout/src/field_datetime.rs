@@ -100,6 +100,82 @@ pub(crate) fn format_office_short_date(
   ))
 }
 
+/// Returns the locale-resolved numeric short-date picture in SpreadsheetML's
+/// number-format vocabulary.
+///
+/// Excel built-in format id 14 follows the application's format locale even
+/// though no custom `numFmt` is stored in the package. ICU owns the regional
+/// field order and separators; only the year width is promoted to four digits
+/// to match Office's built-in fixed-output form.
+pub(crate) fn spreadsheet_builtin_short_date_picture(language: Option<&str>) -> Option<String> {
+  let locale = field_locale(language)?;
+  let date = Date::try_new_gregorian(2006, 11, 23).ok()?;
+  let formatter = FixedCalendarDateTimeFormatter::<Gregorian, _>::try_new(
+    locale.into(),
+    YMD::short().with_year_style(YearStyle::Full),
+  )
+  .ok()?;
+  let formatted = formatter.format(&date);
+  spreadsheet_picture_from_icu_date_pattern(&formatted.pattern().to_string())
+}
+
+fn spreadsheet_picture_from_icu_date_pattern(pattern: &str) -> Option<String> {
+  let mut output = String::new();
+  let mut characters = pattern.chars().peekable();
+  let mut quoted = false;
+  while let Some(character) = characters.next() {
+    if character == '\'' {
+      if characters.peek() == Some(&'\'') {
+        characters.next();
+        if !quoted {
+          output.push('"');
+        }
+        output.push('\'');
+        if !quoted {
+          output.push('"');
+        }
+      } else {
+        quoted = !quoted;
+        output.push('"');
+      }
+      continue;
+    }
+    if quoted {
+      if character == '"' {
+        output.push_str("\"\"");
+      } else {
+        output.push(character);
+      }
+      continue;
+    }
+    let replacement = match character {
+      'y' | 'Y' | 'u' => Some('Y'),
+      'M' | 'L' => Some('M'),
+      'd' => Some('D'),
+      _ if character.is_ascii_alphabetic() => return None,
+      _ => None,
+    };
+    if let Some(replacement) = replacement {
+      let mut width = 1usize;
+      while characters.peek() == Some(&character) {
+        characters.next();
+        width += 1;
+      }
+      if replacement == 'Y' {
+        output.push_str("YYYY");
+      } else {
+        output.extend(std::iter::repeat_n(replacement, width));
+      }
+    } else {
+      output.push(character);
+    }
+  }
+  if quoted {
+    return None;
+  }
+  Some(output)
+}
+
 pub(crate) fn format_office_long_date(
   language: Option<&str>,
   value: FieldUpdateDateTime,
@@ -279,10 +355,25 @@ fn spreadsheet_date_picture_to_field_picture(picture: &str) -> Option<(String, O
   let mut embedded_language = None;
   let mut index = 0usize;
   let mut saw_date_token = false;
+  let mut previous_field = None;
+  let uses_day_period =
+    picture.to_ascii_lowercase().contains("am/pm") || picture.to_ascii_lowercase().contains("a/p");
   while index < chars.len() {
     let ch = chars[index];
     if ch == ';' {
       break;
+    }
+    if ascii_prefix_eq_ignore_case(&chars[index..], "am/pm") {
+      output.push_str("am/pm");
+      previous_field = Some('a');
+      index += "am/pm".len();
+      continue;
+    }
+    if ascii_prefix_eq_ignore_case(&chars[index..], "a/p") {
+      output.push_str("a/p");
+      previous_field = Some('a');
+      index += "a/p".len();
+      continue;
     }
     match ch {
       '[' => {
@@ -291,6 +382,14 @@ fn spreadsheet_date_picture_to_field_picture(picture: &str) -> Option<(String, O
           .position(|candidate| *candidate == ']')
           .map(|offset| index + 1 + offset)?;
         let marker = chars[index + 1..end].iter().collect::<String>();
+        if matches!(
+          marker.to_ascii_lowercase().as_str(),
+          "h" | "hh" | "m" | "mm" | "s" | "ss"
+        ) {
+          // Elapsed-time brackets are not calendar fields. The worksheet
+          // formatter handles them before entering this locale formatter.
+          return None;
+        }
         if let Some(lcid) = marker.strip_prefix("$-") {
           embedded_language = spreadsheet_lcid_language(lcid).map(ToOwned::to_owned);
         }
@@ -325,6 +424,7 @@ fn spreadsheet_date_picture_to_field_picture(picture: &str) -> Option<(String, O
           .count();
         output.push_str(if count <= 2 { "yy" } else { "yyyy" });
         saw_date_token = true;
+        previous_field = Some('y');
         index += count;
       }
       'm' | 'M' => {
@@ -333,8 +433,11 @@ fn spreadsheet_date_picture_to_field_picture(picture: &str) -> Option<(String, O
           .take_while(|candidate| candidate.eq_ignore_ascii_case(&ch))
           .count()
           .min(5);
-        output.extend(std::iter::repeat_n('M', count));
+        let minute = previous_field == Some('h')
+          || next_spreadsheet_date_time_field(&chars, index + count) == Some('s');
+        output.extend(std::iter::repeat_n(if minute { 'm' } else { 'M' }, count));
         saw_date_token = true;
+        previous_field = Some('m');
         index += count;
       }
       'd' | 'D' => {
@@ -345,6 +448,32 @@ fn spreadsheet_date_picture_to_field_picture(picture: &str) -> Option<(String, O
           .min(4);
         output.extend(std::iter::repeat_n('d', count));
         saw_date_token = true;
+        previous_field = Some('d');
+        index += count;
+      }
+      'h' | 'H' => {
+        let count = chars[index..]
+          .iter()
+          .take_while(|candidate| candidate.eq_ignore_ascii_case(&ch))
+          .count()
+          .min(2);
+        output.extend(std::iter::repeat_n(
+          if uses_day_period { 'h' } else { 'H' },
+          count,
+        ));
+        saw_date_token = true;
+        previous_field = Some('h');
+        index += count;
+      }
+      's' | 'S' => {
+        let count = chars[index..]
+          .iter()
+          .take_while(|candidate| candidate.eq_ignore_ascii_case(&ch))
+          .count()
+          .min(2);
+        output.extend(std::iter::repeat_n('s', count));
+        saw_date_token = true;
+        previous_field = Some('s');
         index += count;
       }
       '@' => index += 1,
@@ -358,8 +487,44 @@ fn spreadsheet_date_picture_to_field_picture(picture: &str) -> Option<(String, O
   saw_date_token.then_some((output, embedded_language))
 }
 
+fn next_spreadsheet_date_time_field(chars: &[char], mut index: usize) -> Option<char> {
+  while index < chars.len() {
+    match chars[index] {
+      ';' => return None,
+      '[' => {
+        index += 1;
+        while index < chars.len() && chars[index] != ']' {
+          index += 1;
+        }
+        index = (index + 1).min(chars.len());
+      }
+      '"' => {
+        index += 1;
+        while index < chars.len() && chars[index] != '"' {
+          index += 1;
+        }
+        index = (index + 1).min(chars.len());
+      }
+      '\\' | '_' | '*' => index = (index + 2).min(chars.len()),
+      field if matches!(field.to_ascii_lowercase(), 'y' | 'm' | 'd' | 'h' | 's') => {
+        return Some(field.to_ascii_lowercase());
+      }
+      field if field.is_ascii_alphabetic() => return Some(field.to_ascii_lowercase()),
+      _ => index += 1,
+    }
+  }
+  None
+}
+
 fn push_icu_quoted_literal(output: &mut String, literal: &str) {
-  output.push('\'');
+  // Keep adjacent SpreadsheetML escapes in one ICU literal. Emitting
+  // `'.'' '` for `\.\ ` makes the middle `''` an authored apostrophe;
+  // Excel instead renders the escaped dot and space as one literal run.
+  if output.ends_with('\'') {
+    output.pop();
+  } else {
+    output.push('\'');
+  }
   for ch in literal.chars() {
     output.push(ch);
     if ch == '\'' {
@@ -637,6 +802,14 @@ mod tests {
     assert_eq!(
       format_date_time_field(&tokens(&["CREATEDATE"]), Some("en-US"), VALUE),
       None
+    );
+  }
+
+  #[test]
+  fn adjacent_spreadsheet_escapes_remain_one_literal() {
+    assert_eq!(
+      super::format_spreadsheet_date_picture(r"yyyy/\ m/\ d\.\ h:mm", Some("zh-CN"), VALUE),
+      Some("2026/ 7/ 12. 20:19".to_string())
     );
   }
 }

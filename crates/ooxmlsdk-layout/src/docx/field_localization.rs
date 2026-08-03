@@ -60,6 +60,9 @@ pub(super) fn apply_generated_field_message_style(
   {
     return;
   }
+  let east_asia_language = ui_language
+    .and_then(crate::localization::canonical_locale)
+    .map(|language| Arc::<str>::from(language.to_string()));
 
   match message {
     FieldMessage::UndefinedBookmark
@@ -69,7 +72,7 @@ pub(super) fn apply_generated_field_message_style(
       // Asian slot. Keep the field's Latin face for punctuation while using
       // the legacy Office SimSun resource face for Han glyphs.
       style.east_asia_font_family = Some(Arc::<str>::from("SimSun"));
-      style.east_asia_language = Some(Arc::<str>::from("zh-CN"));
+      style.east_asia_language = east_asia_language.clone();
       // Direct effects and bold from a stale cached result do not carry
       // across Word's generated replacement. Fill color and Latin face do.
       style.outline_color = None;
@@ -107,7 +110,7 @@ pub(super) fn apply_generated_field_message_style(
       style.east_asia_font_family = Some(super::office_default_font_family_for_resource_locale(
         crate::localization::OfficeResourceLocale::SimplifiedChinese,
       ));
-      style.east_asia_language = Some(Arc::<str>::from("zh-CN"));
+      style.east_asia_language = east_asia_language;
       style.bold = true;
       style.complex_bold = Some(true);
       style.line_height_override_pt =

@@ -6,6 +6,7 @@ use super::page_settings::CalcPageSettings;
 use super::pivot::pivot_print_address;
 use super::styles::DefinedNameBuiltin;
 use super::worksheet::{CalcCell, CalcRow, CalcSheet, CellAddress, CellRange, SheetType};
+use crate::localization::OfficeStringCatalog;
 use crate::model::{RgbColor, TextStyle};
 use crate::text_metrics::TextMetrics;
 use crate::units;
@@ -346,8 +347,11 @@ fn print_scale_state(
     .drawings
     .iter()
     .any(|drawing| !drawing.charts.is_empty() || !drawing.extended_charts.is_empty());
-  if has_chart {
-    zoom = (zoom * sheet.page_settings.printer_default_paper_scale_percent() / 100).max(ZOOM_MIN);
+  let paper_scale = sheet
+    .page_settings
+    .fixed_output_paper_scale_percent(has_chart);
+  if paper_scale < 100 {
+    zoom = (zoom * paper_scale / 100).max(ZOOM_MIN);
   }
 
   CalcPrintScaleState {
@@ -1695,6 +1699,7 @@ fn print_cells_for_area<'a>(
   area: CellRange,
   conditional_eval_cache: &mut ConditionalFormatEvalCache,
 ) -> Vec<CalcPrintCell<'a>> {
+  let strings = OfficeStringCatalog::for_ui_language(Some(import.styles.output_ui_language()));
   let mut physical_cells = Vec::new();
   let mut occupied = HashSet::new();
   let mut visit_cell = |row_index: u32, row: &'a super::worksheet::CalcRow| {
@@ -1739,17 +1744,19 @@ fn print_cells_for_area<'a>(
         .or(pivot_header_number_format_code)
         .or(pivot_number_format_code)
         .or(number_format_code);
-      let (rendered_text, number_format_state) = rendered_number_text(
+      let (rendered_text, number_format_state) = rendered_number_text_for_locale(
         raw_text,
         effective_number_format_code,
         cell.data_type,
         import.globals.settings.date_1904,
+        import.styles.output_format_locale(),
       );
       let rendered_text = pivot_display_text(
         sheet,
         print_address,
         rendered_text,
         import.styles.has_explicit_ui_language(),
+        strings,
       );
       let icon_set = cell.display_text.parse::<f64>().ok().and_then(|value| {
         conditional_icon_set(import, sheet, address, value, conditional_eval_cache)
@@ -1782,7 +1789,7 @@ fn print_cells_for_area<'a>(
       visit_cell(row.row_index.unwrap_or(row_position as u32 + 1), row);
     }
   }
-  let mut virtual_cells = pivot_virtual_print_cells(sheet, area, &occupied);
+  let mut virtual_cells = pivot_virtual_print_cells(sheet, area, &occupied, strings);
   occupied.extend(virtual_cells.iter().map(|cell| cell.address));
   virtual_cells.extend(table_virtual_print_cells(sheet, area, &occupied));
   virtual_cells.sort_unstable_by_key(|cell| (cell.address.row, cell.address.col));
@@ -1818,6 +1825,7 @@ fn pivot_virtual_print_cells<'a>(
   sheet: &'a CalcSheet,
   area: CellRange,
   occupied: &HashSet<CellAddress>,
+  strings: &'static OfficeStringCatalog,
 ) -> Vec<CalcPrintCell<'a>> {
   let mut cells = Vec::new();
   for pivot in &sheet.resources.pivot_tables.tables {
@@ -1844,7 +1852,7 @@ fn pivot_virtual_print_cells<'a>(
           .data_field_names
           .first()
           .map(String::as_str)
-          .unwrap_or("(empty)");
+          .unwrap_or(strings.pivot_empty());
         cells.push(CalcPrintCell {
           address,
           text: Cow::Borrowed(text),
@@ -2479,6 +2487,7 @@ fn pivot_display_text(
   address: CellAddress,
   text: String,
   preserve_excel_cache: bool,
+  strings: &'static OfficeStringCatalog,
 ) -> String {
   if preserve_excel_cache {
     // The Office golden path opens workbooks read-only through Workbooks.Open.
@@ -2489,15 +2498,32 @@ fn pivot_display_text(
     // compatibility path used by mapped visible-output fixtures.
     return text;
   }
-  if let Some(text) = pivot_page_field_display_text(sheet, address) {
+  if let Some(text) = pivot_page_field_display_text(sheet, address, strings) {
     return text;
   }
   let Some(pivot) = pivot_table_for_cell(sheet, address) else {
-    if !sheet.resources.pivot_tables.tables.is_empty() && text == "(blank)" {
-      return "(empty)".to_string();
-    }
     return text;
   };
+  // A PivotTable without refreshOnLoad keeps the materialized worksheet
+  // report authoritative.  Its captions are persisted application strings,
+  // and opening the workbook for fixed output does not turn absence of an
+  // explicit UI locale into permission to regenerate or translate them.
+  // Reconstruct DataPilot captions only for the same refresh path that moves
+  // the cached cells into freshly calculated output geometry.
+  if !pivot.refresh_on_load {
+    return text;
+  }
+  if super::pivot::pivot_render_geometry(pivot)
+    .result_range
+    .contains(address)
+  {
+    if pivot.show_missing && text.is_empty() {
+      return pivot.missing_caption.clone().unwrap_or_default();
+    }
+    if pivot.show_error && is_spreadsheet_error_text(text.as_str()) {
+      return pivot.error_caption.clone().unwrap_or_default();
+    }
+  }
   // field/member result captions from the imported pivot source instead of
   // keeping Excel's persisted generic "Row Labels"/"(blank)" strings.
   if pivot.calculated_only_data_fields {
@@ -2508,13 +2534,18 @@ fn pivot_display_text(
       return label;
     }
     if address.row == table_start.row && address.col > table_start.col {
-      return "(empty)".to_string();
+      return strings.pivot_empty().to_string();
     }
   }
-  if is_pivot_row_labels_caption(text.as_str()) {
-    return pivot_row_caption_text(pivot, text.as_str());
+  if is_pivot_row_labels_caption(pivot, text.as_str()) {
+    return pivot_row_caption_text(pivot, text.as_str(), strings);
   }
-  if let Some(data_layout_caption) = pivot_data_layout_caption_text(pivot, address, text.as_str()) {
+  if is_pivot_column_labels_caption(pivot, text.as_str()) {
+    return pivot_column_label_text(pivot, strings).unwrap_or(text);
+  }
+  if let Some(data_layout_caption) =
+    pivot_data_layout_caption_text(pivot, address, text.as_str(), strings)
+  {
     return data_layout_caption;
   }
   if address.col == pivot.output_geometry.data_start.col
@@ -2527,27 +2558,34 @@ fn pivot_display_text(
     return name.clone();
   }
   match text.as_str() {
-    "Grand Total" => "Total Result".to_string(),
+    value
+      if pivot
+        .grand_total_caption
+        .as_deref()
+        .is_some_and(|caption| caption == value) =>
+    {
+      value.to_string()
+    }
+    "Grand Total" => pivot_grand_total_caption(pivot, strings),
     "Gesamtergebnis"
     | "Végösszeg"
     | "\u{041e}\u{0431}\u{0449}\u{0438}\u{0439} \u{0438}\u{0442}\u{043e}\u{0433}" => {
-      "Total Result".to_string()
+      pivot_grand_total_caption(pivot, strings)
     }
-    "Total general" => "Total Result".to_string(),
+    "Total general" => pivot_grand_total_caption(pivot, strings),
     "Total" => pivot.data_field_names.first().cloned().unwrap_or(text),
-    "Row Labels" => pivot_row_label_text(pivot).unwrap_or(text),
-    "Column Labels" => pivot_column_label_text(pivot).unwrap_or(text),
-    "(blank)" => "(empty)".to_string(),
+    "(blank)" => strings.pivot_empty().to_string(),
     "N.év1" => "Q1".to_string(),
     "N.év2" => "Q2".to_string(),
     "N.év3" => "Q3".to_string(),
     "N.év4" => "Q4".to_string(),
     _ => {
+      let total_suffix = format!(" {}", strings.pivot_total());
       if let Some(prefix) = text
-        .strip_suffix(" Total")
+        .strip_suffix(total_suffix.as_str())
         .filter(|prefix| !prefix.is_empty())
       {
-        format!("{prefix} Result")
+        format!("{prefix} {}", strings.pivot_result())
       } else {
         text
       }
@@ -2559,10 +2597,16 @@ fn pivot_data_layout_caption_text(
   pivot: &super::pivot::PivotTableModel,
   address: CellAddress,
   text: &str,
+  strings: &'static OfficeStringCatalog,
 ) -> Option<String> {
-  if text != "Values" {
+  if text != pivot.data_caption.as_str() {
     return None;
   }
+  let caption = if pivot.data_caption == "Values" || pivot.data_caption.is_empty() {
+    strings.pivot_data()
+  } else {
+    pivot.data_caption.as_str()
+  };
   if pivot
     .row_field_indexes
     .iter()
@@ -2576,7 +2620,7 @@ fn pivot_data_layout_caption_text(
         && address.col == pivot.output_geometry.table_start.col + position as u32
     })
   {
-    return Some("Data".to_string());
+    return Some(caption.to_string());
   }
   if pivot
     .column_field_indexes
@@ -2588,13 +2632,20 @@ fn pivot_data_layout_caption_text(
         && address.row == pivot.output_geometry.table_start.row
     })
   {
-    return Some("Data".to_string());
+    return Some(caption.to_string());
   }
   None
 }
 
-fn pivot_page_field_display_text(sheet: &CalcSheet, address: CellAddress) -> Option<String> {
+fn pivot_page_field_display_text(
+  sheet: &CalcSheet,
+  address: CellAddress,
+  strings: &'static OfficeStringCatalog,
+) -> Option<String> {
   for pivot in &sheet.resources.pivot_tables.tables {
+    if !pivot.refresh_on_load {
+      continue;
+    }
     let page_fields = &pivot.page_field_models;
     if page_fields.is_empty() {
       continue;
@@ -2616,22 +2667,34 @@ fn pivot_page_field_display_text(sheet: &CalcSheet, address: CellAddress) -> Opt
       return Some(page_field.field_name.clone());
     }
     if address.col == output_start.col + 1 {
-      return Some(pivot_page_field_value_text(&page_field.value));
+      return Some(pivot_page_field_value_text(&page_field.value, strings));
     }
   }
   None
 }
 
-fn pivot_page_field_value_text(value: &super::pivot::PivotPageFieldValue) -> String {
+fn pivot_page_field_value_text(
+  value: &super::pivot::PivotPageFieldValue,
+  strings: &'static OfficeStringCatalog,
+) -> String {
   match value {
-    super::pivot::PivotPageFieldValue::All => "- all -".to_string(),
-    super::pivot::PivotPageFieldValue::Multiple => "- multiple -".to_string(),
-    super::pivot::PivotPageFieldValue::Member(text) if text.is_empty() => "(empty)".to_string(),
+    super::pivot::PivotPageFieldValue::All => strings.pivot_all().to_string(),
+    super::pivot::PivotPageFieldValue::Multiple => strings.pivot_multiple().to_string(),
+    super::pivot::PivotPageFieldValue::Member(text) if text.is_empty() => {
+      strings.pivot_empty().to_string()
+    }
     super::pivot::PivotPageFieldValue::Member(text) => text.clone(),
   }
 }
 
-fn is_pivot_row_labels_caption(text: &str) -> bool {
+fn is_pivot_row_labels_caption(pivot: &super::pivot::PivotTableModel, text: &str) -> bool {
+  if pivot
+    .row_header_caption
+    .as_deref()
+    .is_some_and(|caption| caption == text)
+  {
+    return true;
+  }
   matches!(
     text,
     "Row Labels"
@@ -2641,16 +2704,40 @@ fn is_pivot_row_labels_caption(text: &str) -> bool {
   )
 }
 
+fn is_pivot_column_labels_caption(pivot: &super::pivot::PivotTableModel, text: &str) -> bool {
+  pivot
+    .column_header_caption
+    .as_deref()
+    .is_some_and(|caption| caption == text)
+    || matches!(
+      text,
+      "Column Labels" | "Spaltenbeschriftungen" | "Oszlopcímkék"
+    )
+}
+
+fn pivot_grand_total_caption(
+  pivot: &super::pivot::PivotTableModel,
+  strings: &'static OfficeStringCatalog,
+) -> String {
+  pivot
+    .grand_total_caption
+    .clone()
+    .unwrap_or_else(|| format!("{} {}", strings.pivot_total(), strings.pivot_result()))
+}
+
+fn is_spreadsheet_error_text(text: &str) -> bool {
+  text.starts_with('#') && (text.ends_with('!') || text.ends_with('?') || text == "#N/A")
+}
+
 fn pivot_table_for_cell(
   sheet: &CalcSheet,
   address: CellAddress,
 ) -> Option<&super::pivot::PivotTableModel> {
-  sheet
-    .resources
-    .pivot_tables
-    .tables
-    .iter()
-    .find(|pivot| pivot.output_geometry.table_range.contains(address))
+  sheet.resources.pivot_tables.tables.iter().find(|pivot| {
+    super::pivot::pivot_render_geometry(pivot)
+      .table_range
+      .contains(address)
+  })
 }
 
 fn pivot_row_label_text(pivot: &super::pivot::PivotTableModel) -> Option<String> {
@@ -2663,21 +2750,41 @@ fn pivot_row_label_text(pivot: &super::pivot::PivotTableModel) -> Option<String>
   Some(pivot.row_field_names.join(" "))
 }
 
-fn pivot_row_caption_text(pivot: &super::pivot::PivotTableModel, text: &str) -> String {
+fn pivot_row_caption_text(
+  pivot: &super::pivot::PivotTableModel,
+  text: &str,
+  strings: &'static OfficeStringCatalog,
+) -> String {
+  if let Some(caption) = pivot
+    .row_header_caption
+    .as_ref()
+    .filter(|caption| !caption.is_empty())
+  {
+    return caption.clone();
+  }
   pivot_row_label_text(pivot).unwrap_or_else(|| {
     // generic compact-layout row caption when multiple row fields share one
     // output column, while localized persisted captions are imported through
     // the DataPilot source as the generic "Row Labels" text.
     if pivot.compact && pivot.row_field_names.len() > 1 {
-      "Row Labels".to_string()
+      strings.pivot_row_labels().to_string()
     } else {
       text.to_string()
     }
   })
 }
 
-fn pivot_column_label_text(pivot: &super::pivot::PivotTableModel) -> Option<String> {
-  (!pivot.column_field_names.is_empty()).then(|| pivot.column_field_names.join(" "))
+fn pivot_column_label_text(
+  pivot: &super::pivot::PivotTableModel,
+  strings: &'static OfficeStringCatalog,
+) -> Option<String> {
+  pivot
+    .column_header_caption
+    .as_ref()
+    .filter(|caption| !caption.is_empty())
+    .cloned()
+    .or_else(|| (!pivot.column_field_names.is_empty()).then(|| pivot.column_field_names.join(" ")))
+    .or_else(|| Some(strings.pivot_column_labels().to_string()))
 }
 
 fn pivot_header_number_format_code<'a>(
@@ -2686,25 +2793,30 @@ fn pivot_header_number_format_code<'a>(
   address: CellAddress,
 ) -> Option<&'a str> {
   let pivot = pivot_table_for_cell(sheet, address)?;
-  if address.row >= pivot.output_geometry.data_start.row
-    && address.col >= pivot.output_geometry.table_start.col
-    && address.col < pivot.output_geometry.data_start.col
+  // Field number formats belong to the reconstructed DataPilot output.  For
+  // a non-refreshing PivotTable the persisted worksheet cell XF is the
+  // visible Office result and may intentionally differ from the cache field.
+  if !pivot.refresh_on_load {
+    return None;
+  }
+  let geometry = super::pivot::pivot_render_geometry(pivot);
+  if address.row >= geometry.data_start.row
+    && address.col >= geometry.table_range.start.col
+    && address.col < geometry.data_start.col
   {
-    let field_index = address
-      .col
-      .saturating_sub(pivot.output_geometry.table_start.col) as usize;
+    let field_index = address.col.saturating_sub(geometry.table_range.start.col) as usize;
     return pivot
       .row_field_number_format_ids
       .get(field_index)
       .and_then(|id| id.and_then(|id| import.styles.number_format_code(id)));
   }
-  if address.col >= pivot.output_geometry.data_start.col
-    && address.row >= pivot.output_geometry.table_start.row + pivot.output_geometry.header_rows
-    && address.row < pivot.output_geometry.data_start.row
+  if address.col >= geometry.data_start.col
+    && address.row >= geometry.table_range.start.row + pivot.output_geometry.header_rows
+    && address.row < geometry.data_start.row
   {
     let field_index = address
       .row
-      .saturating_sub(pivot.output_geometry.table_start.row + pivot.output_geometry.header_rows)
+      .saturating_sub(geometry.table_range.start.row + pivot.output_geometry.header_rows)
       as usize;
     return pivot
       .column_field_number_format_ids
@@ -2720,8 +2832,12 @@ fn pivot_data_number_format_code<'a>(
   address: CellAddress,
 ) -> Option<&'a str> {
   let pivot = pivot_table_for_cell(sheet, address)?;
-  let data_start_row = pivot.output_geometry.data_start.row;
-  let data_start_col = pivot.output_geometry.data_start.col;
+  if !pivot.refresh_on_load {
+    return None;
+  }
+  let geometry = super::pivot::pivot_render_geometry(pivot);
+  let data_start_row = geometry.data_start.row;
+  let data_start_col = geometry.data_start.col;
   if address.row < data_start_row || address.col < data_start_col {
     return None;
   }
@@ -2746,6 +2862,7 @@ fn pivot_data_cell_text_override(sheet: &CalcSheet, address: CellAddress) -> Opt
     .pivot_tables
     .tables
     .iter()
+    .filter(|pivot| pivot.refresh_on_load)
     .flat_map(|pivot| pivot.data_cell_text_overrides.iter())
     .find(|override_text| override_text.address == address)
     .map(|override_text| override_text.text.as_str())
@@ -2758,6 +2875,18 @@ pub(crate) fn rendered_number_text(
     ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues,
   >,
   date_1904: bool,
+) -> (String, NumberFormatRenderState) {
+  rendered_number_text_for_locale(raw, format_code, data_type, date_1904, None)
+}
+
+pub(crate) fn rendered_number_text_for_locale(
+  raw: &str,
+  format_code: Option<&str>,
+  data_type: Option<
+    ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues,
+  >,
+  date_1904: bool,
+  format_locale: Option<&str>,
 ) -> (String, NumberFormatRenderState) {
   match data_type {
     Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::Boolean) => {
@@ -2825,7 +2954,7 @@ pub(crate) fn rendered_number_text(
       return (text, NumberFormatRenderState::DateTime);
     }
     return (
-      format_serial_date_time(value, format_code, date_1904),
+      format_serial_date_time(value, format_code, date_1904, format_locale),
       NumberFormatRenderState::DateTime,
     );
   }
@@ -3479,7 +3608,12 @@ fn group_integer(value: &str) -> String {
   out.chars().rev().collect()
 }
 
-fn format_serial_date_time(value: f64, code: &str, date_1904: bool) -> String {
+fn format_serial_date_time(
+  value: f64,
+  code: &str,
+  date_1904: bool,
+  format_locale: Option<&str>,
+) -> String {
   let days = value.floor() as i64;
   let seconds = ((value - value.floor()) * 86_400.0).round() as i64;
   let days_since_unix = if date_1904 {
@@ -3493,16 +3627,29 @@ fn format_serial_date_time(value: f64, code: &str, date_1904: bool) -> String {
   let hour = seconds / 3_600;
   let minute = (seconds % 3_600) / 60;
   let second = seconds % 60;
+  let field_value = u16::try_from(year).ok().and_then(|year| {
+    Some(crate::options::FieldUpdateDateTime {
+      year,
+      month: u8::try_from(month).ok()?,
+      day: u8::try_from(day).ok()?,
+      hour: u8::try_from(hour).ok()?,
+      minute: u8::try_from(minute).ok()?,
+      second: u8::try_from(second).ok()?,
+    })
+  });
   if uses_system_long_date_format(code) {
-    // long date entry (NF_DATE_SYSTEM_LONG) to the current system locale.
-    // The corresponding Calc test fixes the locale to en-US.
-    return format!(
-      "{}, {} {}, {}",
-      weekday_name(year, month, day),
-      month_name(month),
-      day,
-      year
-    );
+    // NF_DATE_SYSTEM_LONG is resolved through the caller's format locale,
+    // independently of the UI and document languages.
+    if let Some(text) = field_value
+      .and_then(|value| crate::field_datetime::format_office_long_date(format_locale, value, true))
+    {
+      return text;
+    }
+  }
+  if let Some(text) = field_value.and_then(|value| {
+    crate::field_datetime::format_spreadsheet_date_picture(code, format_locale, value)
+  }) {
+    return text;
   }
   render_date_time_format(
     &strip_number_format_markers(code),
@@ -4252,6 +4399,19 @@ mod tests {
     assert_eq!(
       rendered_number_text("45657", Some("[$-809]dd/mm/yy"), None, false).0,
       "31/12/24"
+    );
+  }
+
+  #[test]
+  fn embedded_date_locale_overrides_the_host_format_locale() {
+    assert_eq!(
+      rendered_number_text_for_locale("43961", Some("[$-0409]d-mmm"), None, false, Some("zh-CN"),)
+        .0,
+      "10-May"
+    );
+    assert_eq!(
+      rendered_number_text_for_locale("43961", Some("d-mmm"), None, false, Some("zh-CN"),).0,
+      "10-5月"
     );
   }
 

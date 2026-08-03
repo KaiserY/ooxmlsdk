@@ -29,6 +29,7 @@ use crate::render::symbol as shared_symbol;
 use crate::text_layout::{StyledTextSpan, break_text_lines};
 use crate::text_metrics::TextMetrics;
 use crate::units;
+use icu_segmenter::GraphemeClusterSegmenter;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder};
 use kurbo::{Affine, Rect as KurboRect};
@@ -39,11 +40,12 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 use ooxmlsdk::units as sdk_units;
 use ooxmlsdk::units::DrawingmlPercentageValue;
+use unicode_bidi::{BidiClass, BidiInfo, Level, bidi_class};
 use unicode_script::{Script, UnicodeScript};
 
 use super::chart::{
-  ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, RadialChartStyle,
-  lower_clustered_column_chart, lower_radial_chart,
+  CartesianChartGroupDecorationStyle, ChartFrame, ChartLayoutProfile, ClusteredColumnStyle,
+  RadialChartStyle, lower_clustered_column_chart, lower_radial_chart,
 };
 use super::drawingml::color::{Color, SchemeColor};
 use super::drawingml::fill::{FillKind, FillProperties};
@@ -1329,6 +1331,12 @@ fn lower_chart(
               })
           })
           .collect(),
+        leader_line_style: pptx_chart_shape_style(
+          import,
+          slide,
+          chart_resource,
+          chart.leader_line_shape_properties,
+        ),
         chart_area_style: pptx_chart_area_shape_style(
           import,
           slide,
@@ -1487,6 +1495,59 @@ fn lower_chart(
             )
           })
           .collect()
+      })
+      .collect::<Vec<_>>();
+    let error_bar_styles = chart
+      .series
+      .iter()
+      .map(|series| {
+        series
+          .error_bars
+          .iter()
+          .map(|error_bars| {
+            pptx_chart_shape_style(import, slide, chart_resource, error_bars.shape_properties)
+          })
+          .collect()
+      })
+      .collect::<Vec<_>>();
+    let group_decoration_styles = chart
+      .group_decorations
+      .iter()
+      .map(|group| CartesianChartGroupDecorationStyle {
+        drop_lines: pptx_chart_shape_style(
+          import,
+          slide,
+          chart_resource,
+          group
+            .drop_lines
+            .and_then(|lines| lines.chart_shape_properties.as_deref()),
+        ),
+        high_low_lines: pptx_chart_shape_style(
+          import,
+          slide,
+          chart_resource,
+          group
+            .high_low_lines
+            .and_then(|lines| lines.chart_shape_properties.as_deref()),
+        ),
+        up_bars: pptx_chart_shape_style(
+          import,
+          slide,
+          chart_resource,
+          group
+            .up_down_bars
+            .and_then(|bars| bars.up_bars.as_deref())
+            .and_then(|bars| bars.chart_shape_properties.as_deref()),
+        ),
+        down_bars: pptx_chart_shape_style(
+          import,
+          slide,
+          chart_resource,
+          group
+            .up_down_bars
+            .and_then(|bars| bars.down_bars.as_deref())
+            .and_then(|bars| bars.chart_shape_properties.as_deref()),
+        ),
       })
       .collect::<Vec<_>>();
     let surface_band_colors = chart
@@ -1709,6 +1770,8 @@ fn lower_chart(
           series_point_colors,
           series_styles,
           trendline_styles,
+          error_bar_styles,
+          group_decoration_styles,
           series_point_styles,
           surface_band_colors,
           data_label_fill_colors: chart
@@ -1746,6 +1809,39 @@ fn lower_chart(
               .plot_area
               .shape_properties
               .as_deref(),
+          ),
+          floor_style: pptx_chart_area_shape_style(
+            import,
+            slide,
+            chart_resource,
+            chart_resource
+              .chart_space
+              .chart
+              .floor
+              .as_deref()
+              .and_then(|floor| floor.shape_properties.as_deref()),
+          ),
+          side_wall_style: pptx_chart_area_shape_style(
+            import,
+            slide,
+            chart_resource,
+            chart_resource
+              .chart_space
+              .chart
+              .side_wall
+              .as_deref()
+              .and_then(|wall| wall.shape_properties.as_deref()),
+          ),
+          back_wall_style: pptx_chart_area_shape_style(
+            import,
+            slide,
+            chart_resource,
+            chart_resource
+              .chart_space
+              .chart
+              .back_wall
+              .as_deref()
+              .and_then(|wall| wall.shape_properties.as_deref()),
           ),
         },
       );
@@ -2303,6 +2399,7 @@ fn lower_chart_texts(
         y_pt: text_y,
         line_height_pt: line_height(&style, 1.0),
         rotation_center_pt: None,
+        paragraph_bidi: false,
       },
       text,
       style.clone(),
@@ -3341,11 +3438,13 @@ fn lower_diagram_text_body_at_with_style_and_scale(
     &mut text_metrics,
   );
   let y_pt = match text_body.display_properties.anchor {
-    a::TextAnchoringTypeValues::Center => frame.y_pt + (frame.height_pt - estimated_height) / 2.0,
-    a::TextAnchoringTypeValues::Bottom => frame.y_pt + frame.height_pt - estimated_height,
-    a::TextAnchoringTypeValues::Top
+    a::TextAnchoringTypeValues::Center
     | a::TextAnchoringTypeValues::Justified
-    | a::TextAnchoringTypeValues::Distributed => frame.y_pt,
+    | a::TextAnchoringTypeValues::Distributed => {
+      frame.y_pt + (frame.height_pt - estimated_height) / 2.0
+    }
+    a::TextAnchoringTypeValues::Bottom => frame.y_pt + frame.height_pt - estimated_height,
+    a::TextAnchoringTypeValues::Top => frame.y_pt,
   };
 
   let mut cursor = TextCursor {
@@ -5476,14 +5575,26 @@ fn lower_table(
   let mut y = y0;
   let max_row = table.rows.len().saturating_sub(1);
   let max_column = table.grid.len().saturating_sub(1);
+  let row_heights = table
+    .rows
+    .iter()
+    .map(|row| {
+      table_row_display_height(row.height, row_height_sum, shape.size.cy, offset.scale_y())
+    })
+    .collect::<Vec<_>>();
   for (row_index, row) in table.rows.iter().enumerate() {
-    let row_height =
-      table_row_display_height(row.height, row_height_sum, shape.size.cy, offset.scale_y());
+    let row_height = row_heights[row_index];
     let mut x = x0;
     let mut grid_index = 0usize;
     for cell in &row.cells {
       let span = table_cell_grid_advance(cell);
-      let width_emu = if grid_index < table.grid.len() {
+      // PowerPoint serializes a horizontal merge as one gridSpan origin plus
+      // one hMerge continuation for every covered grid cell. The origin has
+      // already consumed those columns, so a continuation owns neither
+      // another grid column nor another physical width.
+      let width_emu = if cell.horizontal_merge {
+        0
+      } else if grid_index < table.grid.len() {
         table.grid[grid_index..table.grid.len().min(grid_index + span)]
           .iter()
           .copied()
@@ -5507,7 +5618,7 @@ fn lower_table(
             x_pt: x,
             y_pt: y,
             width_pt: cell_width,
-            height_pt: row_height,
+            height_pt: table_cell_display_height(cell, row_index, &row_heights),
           },
           items,
         );
@@ -6140,6 +6251,21 @@ fn table_cell_grid_span(cell: &TableCell) -> usize {
     .and_then(|span| usize::try_from(span).ok())
     .filter(|span| *span > 0)
     .unwrap_or(1)
+}
+
+fn table_cell_row_span(cell: &TableCell) -> usize {
+  cell
+    .row_span
+    .and_then(|span| usize::try_from(span).ok())
+    .filter(|span| *span > 0)
+    .unwrap_or(1)
+}
+
+fn table_cell_display_height(cell: &TableCell, row: usize, row_heights: &[f32]) -> f32 {
+  let end = row_heights
+    .len()
+    .min(row.saturating_add(table_cell_row_span(cell)));
+  row_heights.get(row..end).unwrap_or_default().iter().sum()
 }
 
 fn table_cell_grid_advance(cell: &TableCell) -> usize {
@@ -8179,6 +8305,7 @@ fn lower_text_body_at_with_table_style(
     text_body,
     TextStyleLoweringInputs {
       table_text_style,
+      table_cell: true,
       ..TextStyleLoweringInputs::default()
     },
     TextLoweringRuntime::default(),
@@ -8229,6 +8356,7 @@ struct TextBodyLoweringContext<'a> {
 struct TextStyleLoweringInputs<'a> {
   font_reference: Option<&'a FontStyleReference>,
   table_text_style: Option<&'a TableStyleTextProperties>,
+  table_cell: bool,
   shape_hyperlink_url: Option<&'a str>,
   base_font_size_pt: Option<f32>,
   auto_fit_font_scale: Option<f32>,
@@ -8304,8 +8432,16 @@ fn lower_text_body_at_with_style_and_scale(
     text_body,
     &mut text_metrics,
   );
+  // DrawingML shapes and table cells expose the same anchor tokens, but
+  // LibreOffice intentionally imports `just` and `dist` differently: regular
+  // shapes use centered vertical adjustment while table cells keep top.
   let y_pt = match text_body.display_properties.anchor {
     a::TextAnchoringTypeValues::Center => frame.y_pt + (frame.height_pt - estimated_height) / 2.0,
+    a::TextAnchoringTypeValues::Justified | a::TextAnchoringTypeValues::Distributed
+      if !style_inputs.table_cell =>
+    {
+      frame.y_pt + (frame.height_pt - estimated_height) / 2.0
+    }
     a::TextAnchoringTypeValues::Bottom => frame.y_pt + frame.height_pt - estimated_height,
     a::TextAnchoringTypeValues::Top
     | a::TextAnchoringTypeValues::Justified
@@ -9273,11 +9409,19 @@ struct TextCursor {
   column_index: usize,
 }
 
+#[derive(Clone)]
 struct TextLineRun<'a> {
   run: &'a TextRun,
   text: String,
   width_pt: f32,
   style: TextStyle,
+  kind: TextLineRunKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TextLineRunKind {
+  Text,
+  Tab,
 }
 
 #[derive(Default)]
@@ -9296,6 +9440,7 @@ struct TextLoweringOptions {
   rotation_center_pt: Option<(f32, f32)>,
   column_count: usize,
   column_spacing_pt: f32,
+  right_to_left_columns: bool,
   word_wrap: bool,
   clip_vertical_overflow: bool,
   clip_bottom_extension_pt: f32,
@@ -9322,6 +9467,7 @@ impl TextLoweringOptions {
       rotation_center_pt: None,
       column_count: text_body.display_properties.column_count.max(1),
       column_spacing_pt: units::emu_to_points(text_body.display_properties.column_spacing_emu),
+      right_to_left_columns: text_body.display_properties.right_to_left_columns,
       word_wrap: text_body.display_properties.word_wrap,
       // PowerPoint's fixed-output path clips a no-autofit text frame at the
       // shape edge even when bodyPr leaves vertOverflow at its schema default.
@@ -9518,8 +9664,16 @@ fn lower_paragraph(
     advance_text_column_if_needed(cursor, context.frame, *context.options);
   }
   let column_width = context.options.column_width(context.frame);
+  let logical_column_index = cursor
+    .column_index
+    .min(context.options.column_count.saturating_sub(1));
+  let visual_column_index = if context.options.right_to_left_columns {
+    context.options.column_count - logical_column_index - 1
+  } else {
+    logical_column_index
+  };
   let column_x = context.frame.x_pt
-    + cursor.column_index as f32 * (column_width + context.options.column_spacing_pt);
+    + visual_column_index as f32 * (column_width + context.options.column_spacing_pt);
   cursor.x_pt = column_x;
   if context.options.clip_vertical_overflow
     && cursor.y_pt
@@ -9549,13 +9703,18 @@ fn lower_paragraph(
     &bullet,
   );
   paragraph_style.apply_diagram_autofit_spacing_scale(paragraph, context.options);
-  let paragraph_left_offset = paragraph_style.left_offset(bullet.label.is_some());
-  let paragraph_x = cursor.x_pt + paragraph_left_offset;
+  let paragraph_leading_offset = paragraph_style.left_offset(bullet.label.is_some());
+  let paragraph_x = cursor.x_pt
+    + if paragraph_style.right_to_left {
+      paragraph_style.right_margin_pt
+    } else {
+      paragraph_leading_offset
+    };
   // ECMA-376 Part 1 §21.1.2.2.7 defines marL and marR in addition to the
   // text-body insets. They therefore reduce the paragraph's line box as well
   // as moving its origin; using the full column width lets indented text run
   // past the right edge before wrapping.
-  let paragraph_width = paragraph_style.available_width(column_width, paragraph_left_offset);
+  let paragraph_width = paragraph_style.available_width(column_width, paragraph_leading_offset);
   let mut segment_start = 0usize;
   let mut is_first_segment = true;
 
@@ -9565,7 +9724,7 @@ fn lower_paragraph(
       .position(|run| run.kind == TextRunKind::Break)
       .map(|offset| segment_start + offset)
       .unwrap_or(paragraph.runs.len());
-    let text_lines = layout_text_lines(
+    let mut text_lines = layout_text_lines(
       TextLineLayoutContext {
         import: context.import,
         slide: context.slide,
@@ -9573,10 +9732,18 @@ fn lower_paragraph(
         options: context.options,
         column_width: paragraph_width,
         slide_number: context.slide_number,
+        east_asian_line_break: paragraph_style.east_asian_line_break,
+        latin_line_break: paragraph_style.latin_line_break,
+        default_tab_size_pt: paragraph_style.default_tab_size_pt,
+        tab_stops: &paragraph_style.tab_stops,
+        hanging_punctuation: paragraph_style.hanging_punctuation,
       },
       &paragraph.runs[segment_start..segment_end],
       text_metrics,
     );
+    for text_line in &mut text_lines {
+      reorder_text_line_bidi(text_line, paragraph_style.right_to_left, text_metrics);
+    }
     let is_soft_break_empty_line =
       segment_start == segment_end && (segment_start > 0 || segment_end < paragraph.runs.len());
     let alignment = if context.options.anchor_center {
@@ -9588,6 +9755,16 @@ fn lower_paragraph(
     };
 
     for (line_index, text_line) in text_lines.iter().enumerate() {
+      let line_adjustment = paragraph_line_adjustment(
+        alignment,
+        line_index + 1 == text_lines.len(),
+        text_line,
+        paragraph_width,
+      );
+      let mut remaining_distributed_graphemes = match line_adjustment {
+        ParagraphLineAdjustment::Grapheme { count, .. } => count,
+        ParagraphLineAdjustment::None | ParagraphLineAdjustment::Word { .. } => 0,
+      };
       let mut run_x =
         aligned_paragraph_x(paragraph_x, paragraph_width, text_line.width_pt, alignment);
       let base_line_style = paragraph_base_style.clone();
@@ -9640,10 +9817,23 @@ fn lower_paragraph(
         // in the paragraph. `line_run.style` already includes inheritance and
         // auto-fit scaling, so it is also the correct base for explicit bullet
         // font/color/size overrides.
-        let mut bullet_style = text_line
-          .runs
-          .first()
-          .map(|run| run.style.clone())
+        let mut bullet_style = paragraph.runs[segment_start..segment_end]
+          .iter()
+          .find(|run| {
+            matches!(
+              run.kind,
+              TextRunKind::Run | TextRunKind::Field | TextRunKind::Math
+            ) && (!run.text.is_empty() || presentation_field_may_generate_text(context.import, run))
+          })
+          .map(|run| {
+            styled_text_run(
+              context.import,
+              context.slide,
+              &paragraph_base_style,
+              context.options,
+              run,
+            )
+          })
           .unwrap_or_else(|| paragraph_base_style.clone());
         if bullet.auto_number.is_none() && !bullet.font_follows_text {
           bullet_style.bold = false;
@@ -9676,7 +9866,15 @@ fn lower_paragraph(
         if let Some(mut graphic) = bullet_graphic_item(
           &bullet,
           context.image_resources,
-          run_x + paragraph_style.indent_pt,
+          paragraph_bullet_x(
+            run_x,
+            text_line.width_pt,
+            paragraph_style.indent_pt,
+            sdk_units::mm100_to_points100(i64::from(bullet.graphic_width_100mm.unwrap_or_default()))
+              as f32
+              / 100.0,
+            paragraph_style.right_to_left,
+          ),
           bullet_y_pt,
           bullet_line_height,
           bullet_text_height,
@@ -9690,13 +9888,24 @@ fn lower_paragraph(
           );
           items.push(PageItem::Image(graphic));
         } else {
+          let bullet_width_pt = text_metrics.measure_text(label.as_ref(), &bullet_style);
+          if paragraph_style.right_to_left {
+            bullet_style.resolved_bidi_level = Some(1);
+          }
           push_text_item(
             items,
             TextItemPlacement {
-              x_pt: run_x + paragraph_style.indent_pt,
+              x_pt: paragraph_bullet_x(
+                run_x,
+                text_line.width_pt,
+                paragraph_style.indent_pt,
+                bullet_width_pt,
+                paragraph_style.right_to_left,
+              ),
               y_pt: bullet_y_pt,
               line_height_pt: bullet_line_height,
               rotation_center_pt: context.options.rotation_center_pt,
+              paragraph_bidi: paragraph_style.right_to_left,
             },
             label.into_owned(),
             bullet_style,
@@ -9713,30 +9922,65 @@ fn lower_paragraph(
         let baseline_offset = common_baseline_offset
           .unwrap_or_else(|| paragraph_style.baseline_offset(style, run_line_height, text_metrics));
         let run_y_pt = cursor.y_pt + baseline_offset - raw_baseline_offset;
-        if !line_run.text.is_empty() && line_run.run.kind == TextRunKind::Math {
+        if line_run.kind == TextLineRunKind::Text
+          && !line_run.text.is_empty()
+          && line_run.run.kind == TextRunKind::Math
+        {
           push_math_ole_preview_item(items, run_x, run_y_pt, line_run.width_pt, run_line_height);
         }
-        if !line_run.text.is_empty() {
+        let adjusted_run_right = if line_run.kind == TextLineRunKind::Text
+          && !line_run.text.is_empty()
+        {
           let hyperlink_url = line_run
             .run
             .hyperlink_url
             .clone()
             .or_else(|| context.shape_hyperlink_url.map(ToString::to_string));
-          push_symbol_split_text_items(
-            items,
-            TextItemPlacement {
-              x_pt: run_x,
-              y_pt: run_y_pt,
-              line_height_pt: run_line_height,
-              rotation_center_pt: context.options.rotation_center_pt,
-            },
-            &line_run.text,
-            style,
-            hyperlink_url,
-            text_metrics,
-          );
-        }
-        run_x += line_run.width_pt;
+          let placement = TextItemPlacement {
+            x_pt: run_x,
+            y_pt: run_y_pt,
+            line_height_pt: run_line_height,
+            rotation_center_pt: context.options.rotation_center_pt,
+            paragraph_bidi: paragraph_style.right_to_left,
+          };
+          match line_adjustment {
+            ParagraphLineAdjustment::None => {
+              push_symbol_split_text_items(
+                items,
+                placement,
+                &line_run.text,
+                style,
+                hyperlink_url,
+                text_metrics,
+              );
+              None
+            }
+            ParagraphLineAdjustment::Word { extra_per_space } => Some(push_word_spaced_text_items(
+              items,
+              placement,
+              &line_run.text,
+              style,
+              hyperlink_url,
+              extra_per_space,
+              text_metrics,
+            )),
+            ParagraphLineAdjustment::Grapheme { extra_per_gap, .. } => {
+              Some(push_grapheme_distributed_text_items(
+                items,
+                placement,
+                &line_run.text,
+                style,
+                hyperlink_url,
+                extra_per_gap,
+                &mut remaining_distributed_graphemes,
+                text_metrics,
+              ))
+            }
+          }
+        } else {
+          None
+        };
+        run_x = adjusted_run_right.unwrap_or(run_x + line_run.width_pt);
       }
 
       cursor.y_pt += max_line_height;
@@ -9767,6 +10011,11 @@ struct TextLineLayoutContext<'a> {
   options: &'a TextLoweringOptions,
   column_width: f32,
   slide_number: i32,
+  east_asian_line_break: bool,
+  latin_line_break: bool,
+  default_tab_size_pt: f32,
+  tab_stops: &'a [ParagraphTabStop],
+  hanging_punctuation: bool,
 }
 
 fn layout_text_lines<'a>(
@@ -9789,6 +10038,12 @@ fn layout_text_lines<'a>(
 
   let legacy_lines = layout_text_lines_legacy(context, runs, text_metrics);
   if !context.options.word_wrap {
+    return legacy_lines;
+  }
+  // DrawingML tabs are positional controls, not glyph advances. Parley's
+  // Unicode line breaker does not carry paragraph tab-stop geometry, so keep
+  // tabbed paragraphs on the Office-aware path below.
+  if visible_runs.iter().any(|run| run.text.contains('\t')) {
     return legacy_lines;
   }
 
@@ -9834,8 +10089,21 @@ fn layout_text_lines<'a>(
   let legacy_overflows = legacy_lines
     .iter()
     .any(|line| line.width_pt > context.column_width + 0.01);
-  let needs_span_aware_breaking =
-    joins_word_across_run || (text.chars().any(parley_line_break_script) && legacy_overflows);
+  let has_dictionary_or_east_asian_text = text.chars().any(parley_line_break_script);
+  let has_east_asian_text = text.chars().any(east_asian_line_break_script);
+  // eaLnBrk=true permits the East Asian word to wrap without inserting a
+  // hyphen; false keeps that word intact. latinLnBrk has the corresponding
+  // emergency-break meaning for Latin words (ECMA-376 Part 1, 21.1.2.2.7).
+  // Do not invert the East Asian flag here: Parley's normal Unicode break
+  // opportunities are the enabled behavior, while the legacy whole-token
+  // path preserves a disabled East Asian word.
+  let needs_emergency_breaking = context.latin_line_break;
+  let needs_span_aware_breaking = (joins_word_across_run
+    && (context.east_asian_line_break || !has_east_asian_text))
+    || (has_dictionary_or_east_asian_text
+      && (context.east_asian_line_break || !has_east_asian_text)
+      && legacy_overflows)
+    || (needs_emergency_breaking && legacy_overflows);
   if !needs_span_aware_breaking {
     return legacy_lines;
   }
@@ -9850,37 +10118,124 @@ fn layout_text_lines<'a>(
     .options
     .word_wrap
     .then_some(context.column_width.max(0.0));
-  let Some(line_ranges) = break_text_lines(&text, &spans, max_advance, text_metrics) else {
+  let Some(mut line_ranges) = break_text_lines(&text, &spans, max_advance, text_metrics) else {
     return legacy_lines;
   };
   if line_ranges.is_empty() {
     return vec![TextLine::default()];
+  }
+  if needs_emergency_breaking {
+    line_ranges = emergency_break_text_ranges(
+      &text,
+      line_ranges,
+      &prepared_runs,
+      context.column_width,
+      text_metrics,
+    );
+  }
+  if context.hanging_punctuation {
+    apply_hanging_punctuation_to_ranges(&text, &mut line_ranges);
   }
 
   let parley_lines = line_ranges
     .into_iter()
     .map(|range| text_line_from_range(&text, range, &prepared_runs, text_metrics))
     .collect::<Vec<_>>();
-  if parley_lines
-    .iter()
-    .any(|line| line.width_pt > context.column_width + 0.01)
-  {
+  if parley_lines.iter().any(|line| {
+    text_line_fit_width(line, context.hanging_punctuation, text_metrics)
+      > context.column_width + 0.01
+  }) {
     legacy_lines
   } else {
     parley_lines
   }
 }
 
+fn apply_hanging_punctuation_to_ranges(text: &str, ranges: &mut Vec<Range<usize>>) {
+  let mut index = 0usize;
+  while index + 1 < ranges.len() {
+    if ranges[index].end != ranges[index + 1].start {
+      index += 1;
+      continue;
+    }
+    let next_start = ranges[index + 1].start;
+    let Some(next_text) = text.get(ranges[index + 1].clone()) else {
+      index += 1;
+      continue;
+    };
+    let Some(character) = next_text.chars().next() else {
+      ranges.remove(index + 1);
+      continue;
+    };
+    if !is_hanging_punctuation(character) {
+      index += 1;
+      continue;
+    }
+    let boundary = next_start + character.len_utf8();
+    ranges[index].end = boundary;
+    ranges[index + 1].start = boundary;
+    if ranges[index + 1].is_empty() {
+      ranges.remove(index + 1);
+    }
+  }
+}
+
+fn emergency_break_text_ranges(
+  text: &str,
+  ranges: Vec<Range<usize>>,
+  runs: &[PreparedTextRun<'_>],
+  max_width_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> Vec<Range<usize>> {
+  let mut output = Vec::new();
+  for range in ranges {
+    let measured = text_line_from_range(text, range.clone(), runs, text_metrics);
+    if measured.width_pt <= max_width_pt + 0.01 || range.is_empty() {
+      output.push(range);
+      continue;
+    }
+    let Some(line_text) = text.get(range.clone()) else {
+      output.push(range);
+      continue;
+    };
+    let mut line_start = range.start;
+    let mut previous_end = range.start;
+    for relative_end in GraphemeClusterSegmenter::new()
+      .segment_str(line_text)
+      .skip(1)
+    {
+      let end = range.start + relative_end;
+      let candidate = text_line_from_range(text, line_start..end, runs, text_metrics);
+      if candidate.width_pt > max_width_pt + 0.01 && previous_end > line_start {
+        output.push(line_start..previous_end);
+        line_start = previous_end;
+      }
+      previous_end = end;
+    }
+    if previous_end > line_start {
+      output.push(line_start..previous_end);
+    }
+  }
+  output
+}
+
 fn parley_line_break_script(ch: char) -> bool {
+  east_asian_line_break_script(ch)
+    || matches!(
+      ch.script(),
+      Script::Thai | Script::Lao | Script::Khmer | Script::Myanmar
+    )
+}
+
+fn east_asian_line_break_script(ch: char) -> bool {
   matches!(
     ch.script(),
     Script::Han
       | Script::Hiragana
       | Script::Katakana
-      | Script::Thai
-      | Script::Lao
-      | Script::Khmer
-      | Script::Myanmar
+      | Script::Hangul
+      | Script::Bopomofo
+      | Script::Yi
   )
 }
 
@@ -9925,6 +10280,204 @@ fn text_line_from_range<'a>(
   line
 }
 
+fn reorder_text_line_bidi(
+  line: &mut TextLine<'_>,
+  paragraph_right_to_left: bool,
+  text_metrics: &mut TextMetrics,
+) {
+  let mut logical_text = String::new();
+  let mut run_starts = Vec::with_capacity(line.runs.len());
+  let mut logical_run_by_byte = Vec::new();
+  for (run_index, run) in line.runs.iter().enumerate() {
+    run_starts.push(logical_text.len());
+    logical_text.push_str(&run.text);
+    logical_run_by_byte.extend(std::iter::repeat_n(run_index, run.text.len()));
+  }
+  if logical_text.is_empty() {
+    return;
+  }
+
+  // UAX #9 applies L1/L2 visual reordering after line breaking.
+  // `layout_text_lines` has already selected this physical line; resolve it
+  // with the paragraph's explicit base level so the resulting levels drive
+  // both run order and shaping direction on each uniform portion.
+  let base_level = if paragraph_right_to_left {
+    Level::rtl()
+  } else {
+    Level::ltr()
+  };
+  // DrawingML a:rtl is also a directional override for weak and neutral
+  // characters, not merely a complex-font selector (ECMA-376
+  // §21.1.2.2.8). Resolve that Office layer on an equal-character analysis
+  // string, then project UAX #9 levels back to the authored UTF-8 text.
+  let logical_chars = logical_text.char_indices().collect::<Vec<_>>();
+  let mut analysis_text = String::new();
+  let mut analysis_byte_starts = Vec::with_capacity(logical_chars.len());
+  for (char_index, &(logical_byte_start, _)) in logical_chars.iter().enumerate() {
+    let run = &line.runs[logical_run_by_byte[logical_byte_start]];
+    analysis_byte_starts.push(analysis_text.len());
+    analysis_text.push(drawingml_bidi_analysis_char(
+      &logical_chars,
+      char_index,
+      &run.style,
+    ));
+  }
+  let bidi = BidiInfo::new(&analysis_text, Some(base_level));
+  let mut logical_levels = vec![base_level; logical_text.len()];
+  for (char_index, &(logical_byte_start, character)) in logical_chars.iter().enumerate() {
+    let level = bidi.levels[analysis_byte_starts[char_index]];
+    logical_levels[logical_byte_start..logical_byte_start + character.len_utf8()].fill(level);
+  }
+  let mut logical_segments = Vec::new();
+  let mut segment_levels = Vec::new();
+  let mut empty_runs = Vec::new();
+
+  for (run_index, run) in line.runs.iter().enumerate() {
+    if run.text.is_empty() {
+      empty_runs.push(run.clone());
+      continue;
+    }
+    let global_start = run_starts[run_index];
+    let mut segment_start = 0usize;
+    let mut segment_level = logical_levels[global_start];
+    for (offset, _) in run.text.char_indices().skip(1) {
+      let level = logical_levels[global_start + offset];
+      if level == segment_level {
+        continue;
+      }
+      push_bidi_text_line_segment(
+        &mut logical_segments,
+        &mut segment_levels,
+        run,
+        segment_start..offset,
+        segment_level,
+        text_metrics,
+      );
+      segment_start = offset;
+      segment_level = level;
+    }
+    push_bidi_text_line_segment(
+      &mut logical_segments,
+      &mut segment_levels,
+      run,
+      segment_start..run.text.len(),
+      segment_level,
+      text_metrics,
+    );
+  }
+  if logical_segments.is_empty() {
+    return;
+  }
+
+  let visual_order = BidiInfo::reorder_visual(&segment_levels);
+  line.runs = visual_order
+    .into_iter()
+    .map(|index| logical_segments[index].clone())
+    .chain(empty_runs)
+    .collect();
+  line.width_pt = line.runs.iter().map(|run| run.width_pt).sum();
+}
+
+fn drawingml_bidi_analysis_char(
+  logical_chars: &[(usize, char)],
+  index: usize,
+  style: &TextStyle,
+) -> char {
+  let character = logical_chars[index].1;
+  let Some(right_to_left) = style.right_to_left else {
+    return character;
+  };
+  let class = bidi_class(character);
+  if drawingml_bidi_numeric_component(logical_chars, index, style, class) {
+    return character;
+  }
+  if !matches!(
+    class,
+    BidiClass::B
+      | BidiClass::BN
+      | BidiClass::CS
+      | BidiClass::ES
+      | BidiClass::ET
+      | BidiClass::NSM
+      | BidiClass::ON
+      | BidiClass::S
+      | BidiClass::WS
+  ) {
+    return character;
+  }
+  if right_to_left { '\u{05D0}' } else { 'A' }
+}
+
+fn drawingml_bidi_numeric_component(
+  logical_chars: &[(usize, char)],
+  index: usize,
+  style: &TextStyle,
+  class: BidiClass,
+) -> bool {
+  // ECMA-376 Part 1 §21.1.2.2.8 excludes these weak classes from the
+  // run-level directional override. ET and CS stay excluded even when the
+  // surrounding characters are not numeric; UAX #9 still decides their
+  // resolved level from the authored context.
+  if matches!(
+    class,
+    BidiClass::EN | BidiClass::AN | BidiClass::ET | BidiClass::CS
+  ) {
+    return true;
+  }
+  // Hebrew text additionally keeps an European Number Separator when it is
+  // part of an European-number sequence. Arabic and other RTL runs do not
+  // receive that exception.
+  if class != BidiClass::ES
+    || !style
+      .language
+      .as_deref()
+      .is_some_and(drawingml_is_hebrew_language_tag)
+  {
+    return false;
+  }
+  let previous = index
+    .checked_sub(1)
+    .map(|previous| bidi_class(logical_chars[previous].1));
+  let next = logical_chars
+    .get(index + 1)
+    .map(|&(_, next)| bidi_class(next));
+  previous == Some(BidiClass::EN) && next == Some(BidiClass::EN)
+}
+
+fn drawingml_is_hebrew_language_tag(value: &str) -> bool {
+  value.split(['-', '_']).next().is_some_and(|language| {
+    language.eq_ignore_ascii_case("he") || language.eq_ignore_ascii_case("iw")
+  })
+}
+
+fn push_bidi_text_line_segment<'a>(
+  segments: &mut Vec<TextLineRun<'a>>,
+  levels: &mut Vec<Level>,
+  run: &TextLineRun<'a>,
+  range: Range<usize>,
+  level: Level,
+  text_metrics: &mut TextMetrics,
+) {
+  let Some(text) = run.text.get(range) else {
+    return;
+  };
+  let mut style = run.style.clone();
+  style.resolved_bidi_level = Some(level.number());
+  let width_pt = if run.kind == TextLineRunKind::Tab {
+    run.width_pt
+  } else {
+    text_metrics.measure_text(text, &style)
+  };
+  segments.push(TextLineRun {
+    run: run.run,
+    text: text.to_string(),
+    width_pt,
+    style,
+    kind: run.kind,
+  });
+  levels.push(level);
+}
+
 fn layout_text_lines_legacy<'a>(
   context: TextLineLayoutContext<'_>,
   runs: &'a [TextRun],
@@ -9940,8 +10493,7 @@ fn layout_text_lines_legacy<'a>(
     })
     .collect::<Vec<_>>();
 
-  let mut lines = Vec::new();
-  let mut current = TextLine::default();
+  let mut tokens = Vec::new();
   for run in visible_runs {
     let style = styled_text_run(
       context.import,
@@ -9964,17 +10516,70 @@ fn layout_text_lines_legacy<'a>(
     } else {
       field_text.as_ref()
     };
-    for hard_line in text.split_inclusive('\n') {
-      let (line_text, has_hard_break) = hard_line
-        .strip_suffix('\n')
-        .map_or((hard_line, false), |text| (text, true));
+    for (line_text, has_hard_break) in drawingml_hard_lines(text) {
       for token in text_wrap_tokens(line_text) {
-        let width_pt = text_metrics.measure_text(token, &style);
+        tokens.push(LegacyTextToken {
+          run,
+          text: token.to_string(),
+          style: style.clone(),
+          kind: if token == "\t" {
+            LegacyTextTokenKind::Tab
+          } else {
+            LegacyTextTokenKind::Text
+          },
+        });
+      }
+      if has_hard_break {
+        tokens.push(LegacyTextToken {
+          run,
+          text: String::new(),
+          style: style.clone(),
+          kind: LegacyTextTokenKind::HardBreak,
+        });
+      }
+    }
+  }
+
+  let mut lines = Vec::new();
+  let mut current = TextLine::default();
+  for (index, token) in tokens.iter().enumerate() {
+    match token.kind {
+      LegacyTextTokenKind::HardBreak => {
+        trim_text_line_end(&mut current, text_metrics);
+        lines.push(current);
+        current = TextLine::default();
+      }
+      LegacyTextTokenKind::Tab => {
+        let mut tab_stop = paragraph_tab_stop(current.width_pt, context);
+        let mut aligned_width =
+          tab_aligned_text_width(&tokens[index + 1..], tab_stop.alignment, text_metrics);
+        let mut advance_pt = (tab_stop.position_pt - current.width_pt - aligned_width).max(0.0);
+        if context.options.word_wrap
+          && current.width_pt > f32::EPSILON
+          && current.width_pt + advance_pt > context.column_width
+        {
+          trim_text_line_end(&mut current, text_metrics);
+          lines.push(current);
+          current = TextLine::default();
+          tab_stop = paragraph_tab_stop(0.0, context);
+          aligned_width =
+            tab_aligned_text_width(&tokens[index + 1..], tab_stop.alignment, text_metrics);
+          advance_pt = (tab_stop.position_pt - aligned_width).max(0.0);
+        }
+        push_text_line_tab(&mut current, token.run, advance_pt, &token.style);
+      }
+      LegacyTextTokenKind::Text => {
+        let width_pt = text_metrics.measure_text(&token.text, &token.style);
         // The token's trailing whitespace is discarded if this becomes the
         // end of the line, so it must not force an otherwise fitting word to
         // the next line. Whitespace already accumulated after the previous
         // token remains part of current.width_pt and still separates words.
-        let fit_width_pt = text_metrics.measure_text(token.trim_end(), &style);
+        let fit_width_pt = hanging_punctuation_fit_width(
+          token.text.trim_end(),
+          &token.style,
+          context.hanging_punctuation,
+          text_metrics,
+        );
         if context.options.word_wrap
           && current.width_pt > f32::EPSILON
           && current.width_pt + fit_width_pt > context.column_width
@@ -9983,18 +10588,103 @@ fn layout_text_lines_legacy<'a>(
           lines.push(current);
           current = TextLine::default();
         }
-        push_text_line_token(&mut current, run, token, width_pt, &style);
-      }
-      if has_hard_break {
-        trim_text_line_end(&mut current, text_metrics);
-        lines.push(current);
-        current = TextLine::default();
+        push_text_line_token(&mut current, token.run, &token.text, width_pt, &token.style);
       }
     }
   }
   trim_text_line_end(&mut current, text_metrics);
   lines.push(current);
   lines
+}
+
+fn drawingml_hard_lines(text: &str) -> Vec<(&str, bool)> {
+  let mut lines = Vec::new();
+  let mut start = 0usize;
+  let mut characters = text.char_indices().peekable();
+  while let Some((index, character)) = characters.next() {
+    if !matches!(character, '\n' | '\r' | '\u{2028}' | '\u{2029}') {
+      continue;
+    }
+    let mut end = index + character.len_utf8();
+    if character == '\r'
+      && let Some(&(next_index, '\n')) = characters.peek()
+    {
+      characters.next();
+      end = next_index + '\n'.len_utf8();
+    }
+    lines.push((&text[start..index], true));
+    start = end;
+  }
+  if start < text.len() || lines.is_empty() {
+    lines.push((&text[start..], false));
+  }
+  lines
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LegacyTextTokenKind {
+  Text,
+  Tab,
+  HardBreak,
+}
+
+struct LegacyTextToken<'a> {
+  run: &'a TextRun,
+  text: String,
+  style: TextStyle,
+  kind: LegacyTextTokenKind,
+}
+
+fn paragraph_tab_stop(
+  current_width_pt: f32,
+  context: TextLineLayoutContext<'_>,
+) -> ParagraphTabStop {
+  if let Some(stop) = context
+    .tab_stops
+    .iter()
+    .find(|stop| stop.position_pt > current_width_pt + 0.01)
+  {
+    return *stop;
+  }
+  let interval = context.default_tab_size_pt.max(f32::EPSILON);
+  ParagraphTabStop {
+    position_pt: ((current_width_pt / interval).floor() + 1.0) * interval,
+    alignment: a::TextTabAlignmentValues::Left,
+  }
+}
+
+fn tab_aligned_text_width(
+  tokens: &[LegacyTextToken<'_>],
+  alignment: a::TextTabAlignmentValues,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  if alignment == a::TextTabAlignmentValues::Left {
+    return 0.0;
+  }
+  let mut width_pt = 0.0;
+  for token in tokens {
+    if token.kind != LegacyTextTokenKind::Text {
+      break;
+    }
+    let text = if alignment == a::TextTabAlignmentValues::Decimal {
+      token
+        .text
+        .char_indices()
+        .find_map(|(index, character)| matches!(character, '.' | ',').then_some(index))
+        .map_or(token.text.as_str(), |index| &token.text[..index])
+    } else {
+      token.text.as_str()
+    };
+    width_pt += text_metrics.measure_text(text, &token.style);
+    if alignment == a::TextTabAlignmentValues::Decimal && text.len() != token.text.len() {
+      break;
+    }
+  }
+  match alignment {
+    a::TextTabAlignmentValues::Center => width_pt / 2.0,
+    a::TextTabAlignmentValues::Right | a::TextTabAlignmentValues::Decimal => width_pt,
+    a::TextTabAlignmentValues::Left => 0.0,
+  }
 }
 
 fn push_text_line_token<'a>(
@@ -10007,6 +10697,7 @@ fn push_text_line_token<'a>(
   line.width_pt += width_pt;
   if let Some(last) = line.runs.last_mut()
     && std::ptr::eq(last.run, run)
+    && last.kind == TextLineRunKind::Text
   {
     last.text.push_str(token);
     last.width_pt += width_pt;
@@ -10017,6 +10708,23 @@ fn push_text_line_token<'a>(
     text: token.to_string(),
     width_pt,
     style: style.clone(),
+    kind: TextLineRunKind::Text,
+  });
+}
+
+fn push_text_line_tab<'a>(
+  line: &mut TextLine<'a>,
+  run: &'a TextRun,
+  width_pt: f32,
+  style: &TextStyle,
+) {
+  line.width_pt += width_pt;
+  line.runs.push(TextLineRun {
+    run,
+    text: "\t".to_string(),
+    width_pt,
+    style: style.clone(),
+    kind: TextLineRunKind::Tab,
   });
 }
 
@@ -10027,7 +10735,14 @@ fn text_wrap_tokens(text: &str) -> Vec<&str> {
   let mut tokens = Vec::new();
   let mut start = 0usize;
   for (index, ch) in text.char_indices() {
-    if ch.is_whitespace() {
+    if ch == '\t' {
+      if start < index {
+        tokens.push(&text[start..index]);
+      }
+      let end = index + ch.len_utf8();
+      tokens.push(&text[index..end]);
+      start = end;
+    } else if ch == '\u{200B}' || is_breakable_wrap_space(ch) {
       let end = index + ch.len_utf8();
       tokens.push(&text[start..end]);
       start = end;
@@ -10037,6 +10752,87 @@ fn text_wrap_tokens(text: &str) -> Vec<&str> {
     tokens.push(&text[start..]);
   }
   tokens
+}
+
+fn is_breakable_wrap_space(character: char) -> bool {
+  character.is_whitespace() && !matches!(character, '\u{00A0}' | '\u{202F}')
+}
+
+fn hanging_punctuation_fit_width(
+  text: &str,
+  style: &TextStyle,
+  hanging_punctuation: bool,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let width_pt = text_metrics.measure_text(text, style);
+  if !hanging_punctuation {
+    return width_pt;
+  }
+  let Some((index, character)) = text.char_indices().next_back() else {
+    return width_pt;
+  };
+  if !is_hanging_punctuation(character) {
+    return width_pt;
+  }
+  text_metrics.measure_text(&text[..index], style)
+}
+
+fn is_hanging_punctuation(character: char) -> bool {
+  matches!(
+    character,
+    ','
+      | '.'
+      | '!'
+      | '?'
+      | ':'
+      | ';'
+      | '\u{3001}'
+      | '\u{3002}'
+      | '\u{FF0C}'
+      | '\u{FF0E}'
+      | '\u{FF01}'
+      | '\u{FF1F}'
+      | '\u{FF1A}'
+      | '\u{FF1B}'
+      | '\u{3009}'
+      | '\u{300B}'
+      | '\u{300D}'
+      | '\u{300F}'
+      | '\u{3011}'
+      | '\u{3015}'
+      | '\u{3017}'
+      | '\u{3019}'
+      | '\u{301B}'
+      | '\u{2019}'
+      | '\u{201D}'
+      | ')'
+      | ']'
+      | '}'
+  )
+}
+
+fn text_line_fit_width(
+  line: &TextLine<'_>,
+  hanging_punctuation: bool,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  if !hanging_punctuation {
+    return line.width_pt;
+  }
+  let Some(run) = line.runs.iter().rev().find(|run| !run.text.is_empty()) else {
+    return line.width_pt;
+  };
+  if run.kind != TextLineRunKind::Text {
+    return line.width_pt;
+  }
+  let Some((index, character)) = run.text.char_indices().next_back() else {
+    return line.width_pt;
+  };
+  if !is_hanging_punctuation(character) {
+    return line.width_pt;
+  }
+  let prefix_width = text_metrics.measure_text(&run.text[..index], &run.style);
+  line.width_pt - (run.width_pt - prefix_width)
 }
 
 fn trim_text_line_end(line: &mut TextLine<'_>, text_metrics: &mut TextMetrics) {
@@ -10050,6 +10846,9 @@ fn trim_text_line_end(line: &mut TextLine<'_>, text_metrics: &mut TextMetrics) {
   while run_index > 0 {
     run_index -= 1;
     let run = &mut line.runs[run_index];
+    if run.kind == TextLineRunKind::Tab {
+      break;
+    }
     let trimmed_len = run.text.trim_end().len();
     if trimmed_len == run.text.len() {
       break;
@@ -10103,6 +10902,82 @@ fn scaled_text_font_size_pt(font_size_pt: f32, font_scale: f32, round_to_pt: boo
   units::quantize_points_to_office_print_grid(scaled).max(MINIMUM_TEXT_FONT_SIZE_PT)
 }
 
+#[derive(Clone, Copy, Debug)]
+enum ParagraphLineAdjustment {
+  None,
+  Word { extra_per_space: f32 },
+  Grapheme { extra_per_gap: f32, count: usize },
+}
+
+fn paragraph_line_adjustment(
+  alignment: a::TextAlignmentTypeValues,
+  is_last_line: bool,
+  line: &TextLine<'_>,
+  available_width_pt: f32,
+) -> ParagraphLineAdjustment {
+  let distributed = matches!(
+    alignment,
+    a::TextAlignmentTypeValues::Distributed | a::TextAlignmentTypeValues::ThaiDistributed
+  );
+  let justified = matches!(
+    alignment,
+    a::TextAlignmentTypeValues::Justified | a::TextAlignmentTypeValues::JustifiedLow
+  );
+  if (!distributed && !justified)
+    // PowerPoint keeps the final wrapped line of Thai-distributed text at
+    // its natural width. Ordinary `dist` remains distinct: unlike
+    // justification it can distribute a one-line paragraph.
+    || (is_last_line
+      && (justified || alignment == a::TextAlignmentTypeValues::ThaiDistributed))
+    || line.runs.iter().any(|run| {
+      run.kind == TextLineRunKind::Tab
+        || run
+          .style
+          .resolved_bidi_level
+          .is_some_and(|level| level % 2 == 1)
+    })
+  {
+    return ParagraphLineAdjustment::None;
+  }
+  let extra_pt = available_width_pt - line.width_pt;
+  if extra_pt <= 0.01 {
+    return ParagraphLineAdjustment::None;
+  }
+  let space_count = line
+    .runs
+    .iter()
+    .filter(|run| run.kind == TextLineRunKind::Text)
+    .map(|run| run.text.matches(' ').count())
+    .sum::<usize>();
+  if space_count > 0 {
+    return ParagraphLineAdjustment::Word {
+      extra_per_space: extra_pt / space_count as f32,
+    };
+  }
+  if !distributed {
+    return ParagraphLineAdjustment::None;
+  }
+  let grapheme_count = line
+    .runs
+    .iter()
+    .filter(|run| run.kind == TextLineRunKind::Text)
+    .map(|run| {
+      GraphemeClusterSegmenter::new()
+        .segment_str(&run.text)
+        .skip(1)
+        .count()
+    })
+    .sum::<usize>();
+  if grapheme_count < 2 {
+    ParagraphLineAdjustment::None
+  } else {
+    ParagraphLineAdjustment::Grapheme {
+      extra_per_gap: extra_pt / (grapheme_count - 1) as f32,
+      count: grapheme_count,
+    }
+  }
+}
+
 fn aligned_paragraph_x(
   paragraph_x: f32,
   column_width: f32,
@@ -10128,6 +11003,7 @@ struct TextItemPlacement {
   y_pt: f32,
   line_height_pt: f32,
   rotation_center_pt: Option<(f32, f32)>,
+  paragraph_bidi: bool,
 }
 
 fn push_text_item(
@@ -10153,7 +11029,7 @@ fn push_text_item(
     rotation_center_pt: placement.rotation_center_pt,
     hyperlink_url,
     form_widget_id: None,
-    paragraph_bidi: false,
+    paragraph_bidi: placement.paragraph_bidi,
     // DrawingML run boundaries are layout boundaries in PowerPoint's PDF
     // output, even when adjacent runs share formatting. Preserve them so the
     // PDF adapter does not reshape across rPr/field boundaries and introduce
@@ -10222,6 +11098,78 @@ fn push_symbol_split_text_items(
       text_metrics,
     );
   }
+}
+
+fn push_word_spaced_text_items(
+  items: &mut Vec<PageItem>,
+  placement: TextItemPlacement,
+  text: &str,
+  style: &TextStyle,
+  hyperlink_url: Option<String>,
+  extra_per_space: f32,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let mut x_pt = placement.x_pt;
+  let mut start = 0usize;
+  for (space, _) in text.match_indices(' ') {
+    let end = space + 1;
+    let segment = &text[start..end];
+    push_symbol_split_text_items(
+      items,
+      TextItemPlacement { x_pt, ..placement },
+      segment,
+      style,
+      hyperlink_url.clone(),
+      text_metrics,
+    );
+    x_pt += text_metrics.measure_text(segment, style) + extra_per_space;
+    start = end;
+  }
+  if start < text.len() {
+    let segment = &text[start..];
+    push_symbol_split_text_items(
+      items,
+      TextItemPlacement { x_pt, ..placement },
+      segment,
+      style,
+      hyperlink_url,
+      text_metrics,
+    );
+    x_pt += text_metrics.measure_text(segment, style);
+  }
+  x_pt
+}
+
+fn push_grapheme_distributed_text_items(
+  items: &mut Vec<PageItem>,
+  placement: TextItemPlacement,
+  text: &str,
+  style: &TextStyle,
+  hyperlink_url: Option<String>,
+  extra_per_gap: f32,
+  remaining_graphemes: &mut usize,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let mut x_pt = placement.x_pt;
+  let mut start = 0usize;
+  for end in GraphemeClusterSegmenter::new().segment_str(text).skip(1) {
+    let segment = &text[start..end];
+    push_symbol_split_text_items(
+      items,
+      TextItemPlacement { x_pt, ..placement },
+      segment,
+      style,
+      hyperlink_url.clone(),
+      text_metrics,
+    );
+    x_pt += text_metrics.measure_text(segment, style);
+    *remaining_graphemes = (*remaining_graphemes).saturating_sub(1);
+    if *remaining_graphemes > 0 {
+      x_pt += extra_per_gap;
+    }
+    start = end;
+  }
+  x_pt
 }
 
 #[derive(Clone, Copy)]
@@ -10329,6 +11277,23 @@ fn picture_bullet_x_pt(
   }
 }
 
+fn paragraph_bullet_x(
+  text_x_pt: f32,
+  text_width_pt: f32,
+  indent_pt: f32,
+  bullet_width_pt: f32,
+  right_to_left: bool,
+) -> f32 {
+  if right_to_left {
+    // DrawingML marL/indent form a logical leading margin in an RTL
+    // paragraph. A -36 pt hanging indent therefore reserves 36 pt to the
+    // right of the text; place the bullet against that outer edge.
+    text_x_pt + text_width_pt - indent_pt - bullet_width_pt
+  } else {
+    text_x_pt + indent_pt
+  }
+}
+
 fn line_height(style: &TextStyle, line_scale: f32) -> f32 {
   style.font_size_pt * DEFAULT_TEXT_LINE_HEIGHT_SCALE * line_scale
 }
@@ -10391,6 +11356,11 @@ fn estimate_wrapped_text_body_height(
           options: context.options,
           column_width,
           slide_number: context.slide_number,
+          east_asian_line_break: paragraph_style.east_asian_line_break,
+          latin_line_break: paragraph_style.latin_line_break,
+          default_tab_size_pt: paragraph_style.default_tab_size_pt,
+          tab_stops: &paragraph_style.tab_stops,
+          hanging_punctuation: paragraph_style.hanging_punctuation,
         },
         runs,
         text_metrics,
@@ -10582,6 +11552,12 @@ struct ParagraphDisplayStyle {
   right_margin_pt: f32,
   indent_pt: f32,
   alignment: a::TextAlignmentTypeValues,
+  right_to_left: bool,
+  east_asian_line_break: bool,
+  latin_line_break: bool,
+  default_tab_size_pt: f32,
+  tab_stops: Vec<ParagraphTabStop>,
+  hanging_punctuation: bool,
   font_alignment: a::TextFontAlignmentValues,
   line_spacing: ParagraphLineSpacing,
   space_before: ParagraphSpacing,
@@ -10590,6 +11566,12 @@ struct ParagraphDisplayStyle {
   master_default_run_properties: Option<Box<a::DefaultRunProperties>>,
   text_default_run_properties: Option<Box<a::DefaultRunProperties>>,
   direct_default_run_properties: Option<Box<a::DefaultRunProperties>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ParagraphTabStop {
+  position_pt: f32,
+  alignment: a::TextTabAlignmentValues,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -10827,6 +11809,16 @@ impl Default for ParagraphDisplayStyle {
       right_margin_pt: 0.0,
       indent_pt: 0.0,
       alignment: a::TextAlignmentTypeValues::Left,
+      right_to_left: false,
+      // MS-OI29500 §21.1.2.4.13 records the actual Office defaults: East
+      // Asian kinsoku is enabled and emergency Latin word breaking is not.
+      east_asian_line_break: true,
+      latin_line_break: false,
+      // MS-OI29500 §21.1.2.4.13: Office uses 914400 EMU (72 pt) when
+      // defTabSz is omitted.
+      default_tab_size_pt: 72.0,
+      tab_stops: Vec::new(),
+      hanging_punctuation: true,
       // ECMA-376 Part 1 §21.1.2.2.7: omitted fontAlgn implies base.
       font_alignment: a::TextFontAlignmentValues::Baseline,
       line_spacing: ParagraphLineSpacing::Default,
@@ -10838,6 +11830,21 @@ impl Default for ParagraphDisplayStyle {
       direct_default_run_properties: None,
     }
   }
+}
+
+fn paragraph_tab_stops(source: &a::TabStopList) -> Vec<ParagraphTabStop> {
+  let mut stops = source
+    .tab_stop
+    .iter()
+    .filter_map(|stop| {
+      stop.position.map(|position| ParagraphTabStop {
+        position_pt: units::emu_to_points(position.to_emu()),
+        alignment: stop.alignment.unwrap_or(a::TextTabAlignmentValues::Left),
+      })
+    })
+    .collect::<Vec<_>>();
+  stops.sort_by(|left, right| left.position_pt.total_cmp(&right.position_pt));
+  stops
 }
 
 fn text_list_default_run_properties(
@@ -10904,6 +11911,25 @@ impl ParagraphDisplayStyle {
       if let Some(alignment) = properties.alignment {
         style.alignment = alignment;
       }
+      if let Some(right_to_left) = properties.right_to_left.as_ref() {
+        style.right_to_left = right_to_left.as_bool();
+      }
+      if let Some(east_asian_line_break) = properties.east_asian_line_break.as_ref() {
+        style.east_asian_line_break = east_asian_line_break.as_bool();
+      }
+      if let Some(latin_line_break) = properties.latin_line_break.as_ref() {
+        style.latin_line_break = latin_line_break.as_bool();
+      }
+      if let Some(default_tab_size) = properties.default_tab_size {
+        style.default_tab_size_pt =
+          units::emu_to_points(default_tab_size.to_emu()).max(f32::EPSILON);
+      }
+      if let Some(tab_stop_list) = properties.tab_stop_list.as_ref() {
+        style.tab_stops = paragraph_tab_stops(tab_stop_list);
+      }
+      if let Some(hanging_punctuation) = properties.height.as_ref() {
+        style.hanging_punctuation = hanging_punctuation.as_bool();
+      }
       if let Some(font_alignment) = properties.font_alignment {
         style.font_alignment = font_alignment;
       }
@@ -10946,6 +11972,25 @@ impl ParagraphDisplayStyle {
           .map(|value| units::emu_to_points(i64::from(value)))
           .unwrap_or(self.indent_pt);
         self.alignment = properties.alignment.unwrap_or(self.alignment);
+        if let Some(right_to_left) = properties.right_to_left.as_ref() {
+          self.right_to_left = right_to_left.as_bool();
+        }
+        if let Some(east_asian_line_break) = properties.east_asian_line_break.as_ref() {
+          self.east_asian_line_break = east_asian_line_break.as_bool();
+        }
+        if let Some(latin_line_break) = properties.latin_line_break.as_ref() {
+          self.latin_line_break = latin_line_break.as_bool();
+        }
+        if let Some(default_tab_size) = properties.default_tab_size {
+          self.default_tab_size_pt =
+            units::emu_to_points(default_tab_size.to_emu()).max(f32::EPSILON);
+        }
+        if let Some(tab_stop_list) = properties.tab_stop_list.as_ref() {
+          self.tab_stops = paragraph_tab_stops(tab_stop_list);
+        }
+        if let Some(hanging_punctuation) = properties.height.as_ref() {
+          self.hanging_punctuation = hanging_punctuation.as_bool();
+        }
         self.font_alignment = properties.font_alignment.unwrap_or(self.font_alignment);
         if let Some(line_spacing) = properties.line_spacing.as_deref() {
           self.line_spacing = paragraph_line_spacing(line_spacing);
@@ -11004,6 +12049,25 @@ impl ParagraphDisplayStyle {
           .map(|value| units::emu_to_points(i64::from(value)))
           .unwrap_or(self.indent_pt);
         self.alignment = $properties.alignment.unwrap_or(self.alignment);
+        if let Some(right_to_left) = $properties.right_to_left.as_ref() {
+          self.right_to_left = right_to_left.as_bool();
+        }
+        if let Some(east_asian_line_break) = $properties.east_asian_line_break.as_ref() {
+          self.east_asian_line_break = east_asian_line_break.as_bool();
+        }
+        if let Some(latin_line_break) = $properties.latin_line_break.as_ref() {
+          self.latin_line_break = latin_line_break.as_bool();
+        }
+        if let Some(default_tab_size) = $properties.default_tab_size {
+          self.default_tab_size_pt =
+            units::emu_to_points(default_tab_size.to_emu()).max(f32::EPSILON);
+        }
+        if let Some(tab_stop_list) = $properties.tab_stop_list.as_ref() {
+          self.tab_stops = paragraph_tab_stops(tab_stop_list);
+        }
+        if let Some(hanging_punctuation) = $properties.height.as_ref() {
+          self.hanging_punctuation = hanging_punctuation.as_bool();
+        }
         self.font_alignment = $properties.font_alignment.unwrap_or(self.font_alignment);
         if let Some(line_spacing) = $properties.line_spacing.as_deref() {
           self.line_spacing = paragraph_line_spacing(line_spacing);
@@ -12014,6 +13078,14 @@ fn apply_drawingml_run_properties(
     },
     style,
   );
+  if let Some(right_to_left) = properties.right_to_left.as_ref() {
+    style.right_to_left = Some(
+      right_to_left
+        .val
+        .as_ref()
+        .is_none_or(|value| value.as_bool()),
+    );
+  }
   if let Some(fill) = properties.run_properties_choice1.as_ref() {
     apply_text_fill(import, slide, fill, style);
   }
@@ -12069,6 +13141,14 @@ fn apply_default_run_properties(
     },
     style,
   );
+  if let Some(right_to_left) = properties.right_to_left.as_ref() {
+    style.right_to_left = Some(
+      right_to_left
+        .val
+        .as_ref()
+        .is_none_or(|value| value.as_bool()),
+    );
+  }
   if let Some(fill) = properties.default_run_properties_choice1.as_ref() {
     apply_default_text_fill(import, slide, fill, style);
   }
@@ -12930,6 +14010,7 @@ mod tests {
           font_size_pt: 32.0,
           ..TextStyle::default()
         },
+        kind: TextLineRunKind::Text,
       }],
     };
 

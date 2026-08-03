@@ -5,6 +5,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use std::sync::Arc;
 
 use crate::error::Result;
+use crate::field_datetime;
 use crate::localization::{OfficeLocaleContext, OfficeResourceLocale};
 use crate::model::{BorderDashPattern, BorderStyle, RgbColor, TextStyle};
 use crate::pptx::drawingml::color::{ResolvedColor, apply_excel_tint};
@@ -31,7 +32,7 @@ pub(crate) struct StylesCatalog {
   theme_major_east_asian: Option<Arc<str>>,
   theme_minor_east_asian: Option<Arc<str>>,
   missing_theme_minor_from_document_language: bool,
-  builtin_number_format_locale: BuiltinNumberFormatLocale,
+  builtin_number_formats: BuiltinNumberFormatCodes,
   locales: OfficeLocaleContext,
 }
 
@@ -72,11 +73,19 @@ impl ThemeColorPalette {
   }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-enum BuiltinNumberFormatLocale {
-  #[default]
-  EnglishUs,
-  ChineseSimplified,
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct BuiltinNumberFormatCodes {
+  short_date: Arc<str>,
+  short_date_time: Arc<str>,
+}
+
+impl Default for BuiltinNumberFormatCodes {
+  fn default() -> Self {
+    Self {
+      short_date: Arc::from("M/D/YYYY"),
+      short_date_time: Arc::from("M/D/YYYY h:mm"),
+    }
+  }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -254,7 +263,7 @@ impl StylesCatalog {
         theme_colors,
         missing_theme_minor_from_document_language: missing_theme_minor.is_some(),
         theme_minor_east_asian: missing_theme_minor,
-        builtin_number_format_locale: builtin_number_format_locale(locales),
+        builtin_number_formats: builtin_number_format_codes(locales),
         locales: locales.clone(),
         ..Self::default()
       });
@@ -426,7 +435,7 @@ impl StylesCatalog {
       missing_theme_minor_from_document_language: false,
       theme_colors,
       indexed_colors,
-      builtin_number_format_locale: builtin_number_format_locale(locales),
+      builtin_number_formats: builtin_number_format_codes(locales),
       locales: locales.clone(),
     }
   }
@@ -451,24 +460,26 @@ impl StylesCatalog {
       11 => Some("0.00E+00"),
       12 => Some("# ?/?"),
       13 => Some("# ??/??"),
-      // Excel built-in date formats are locale-dependent. [MS-OSHARED]
-      // specifies yyyy/M/d for the Chinese short-date format, and Calc keeps
-      // per-locale built-in format tables instead of a single English table.
-      14 if self.builtin_number_format_locale == BuiltinNumberFormatLocale::ChineseSimplified => {
-        Some("YYYY/M/D")
-      }
-      14 => Some("M/D/YYYY"),
-      15 => Some("d-mmm-yy"),
-      16 => Some("d-mmm"),
-      17 => Some("mmm-yy"),
+      // Excel built-in date formats are locale-dependent. Calc maps id 14 to
+      // NF_DATE_SYS_DDMMYYYY and resolves it through the active locale-data
+      // table instead of treating the OOXML English table as universal.
+      14 => Some(self.builtin_number_formats.short_date.as_ref()),
+      // ECMA-376 Part 1 §18.8.30 lists ids 15–17 in the all-languages
+      // table. Unlike the system short-date ids 14 and 22, their English
+      // month-name vocabulary is package-stable. Carry that ownership as the
+      // standard SpreadsheetML LCID marker so the generic formatter can still
+      // honor a different locale embedded in a custom format. Office's zh-CN
+      // fixed output for tdf134118.xlsx (id 16) and
+      // 50755_workday_formula_example.xlsx (id 15) is the counterexample to
+      // applying the host format locale to every built-in date code.
+      15 => Some("[$-0409]d-mmm-yy"),
+      16 => Some("[$-0409]d-mmm"),
+      17 => Some("[$-0409]mmm-yy"),
       18 => Some("h:mm AM/PM"),
       19 => Some("h:mm:ss AM/PM"),
       20 => Some("h:mm"),
       21 => Some("h:mm:ss"),
-      22 if self.builtin_number_format_locale == BuiltinNumberFormatLocale::ChineseSimplified => {
-        Some("YYYY/M/D h:mm")
-      }
-      22 => Some("M/D/YYYY h:mm"),
+      22 => Some(self.builtin_number_formats.short_date_time.as_ref()),
       37 => Some("#,##0 ;(#,##0)"),
       38 => Some("#,##0 ;[Red](#,##0)"),
       39 => Some("#,##0.00;(#,##0.00)"),
@@ -871,6 +882,24 @@ impl StylesCatalog {
       && normal_font.scheme == x::FontSchemeValues::None
   }
 
+  pub(crate) fn fixed_output_alignment_indent_increment_pt(
+    &self,
+    measured_three_spaces_pt: f32,
+  ) -> f32 {
+    if self.normal_style_uses_explicit_arial_10() {
+      // ECMA-376 Part 1 §18.8.1 defines an indent increment as three
+      // Normal-font spaces. Calc's UnitConverter::finalizeImport obtains that
+      // space from the document ReferenceDevice through XFont::getCharWidth,
+      // rather than from the eventual PDF font. Excel's fixed-output Arial 10
+      // reference device resolves the three-space increment to 15 screen
+      // pixels; retaining that hinted device metric also matches the Arial 10
+      // digit-grid profile used for authored column widths.
+      15.0 * units::POINTS_PER_CSS_PIXEL
+    } else {
+      measured_three_spaces_pt
+    }
+  }
+
   pub(crate) fn normal_style_uses_explicit_verdana_10(&self) -> bool {
     let Some(normal_font) = self.font_records.first() else {
       return false;
@@ -917,11 +946,15 @@ impl StylesCatalog {
   }
 }
 
-fn builtin_number_format_locale(locales: &OfficeLocaleContext) -> BuiltinNumberFormatLocale {
-  if locales.format_locale_is_simplified_chinese() {
-    BuiltinNumberFormatLocale::ChineseSimplified
-  } else {
-    BuiltinNumberFormatLocale::EnglishUs
+fn builtin_number_format_codes(locales: &OfficeLocaleContext) -> BuiltinNumberFormatCodes {
+  let Some(short_date) =
+    field_datetime::spreadsheet_builtin_short_date_picture(locales.format_locale())
+  else {
+    return BuiltinNumberFormatCodes::default();
+  };
+  BuiltinNumberFormatCodes {
+    short_date_time: Arc::from(format!("{short_date} h:mm")),
+    short_date: Arc::from(short_date),
   }
 }
 
@@ -1574,9 +1607,17 @@ mod tests {
   #[test]
   fn builtin_short_date_format_follows_the_format_locale() {
     let simplified_chinese = StylesCatalog {
-      builtin_number_format_locale: builtin_number_format_locale(&OfficeLocaleContext::new(
+      builtin_number_formats: builtin_number_format_codes(&OfficeLocaleContext::new(
         None,
         Some("zh-CN"),
+        None,
+      )),
+      ..StylesCatalog::default()
+    };
+    let english_gb = StylesCatalog {
+      builtin_number_formats: builtin_number_format_codes(&OfficeLocaleContext::new(
+        None,
+        Some("en-GB"),
         None,
       )),
       ..StylesCatalog::default()
@@ -1588,7 +1629,20 @@ mod tests {
       simplified_chinese.number_format_code(22),
       Some("YYYY/M/D h:mm")
     );
+    assert_eq!(english_gb.number_format_code(14), Some("DD/MM/YYYY"));
     assert_eq!(english.number_format_code(14), Some("M/D/YYYY"));
+    assert_eq!(
+      simplified_chinese.number_format_code(15),
+      Some("[$-0409]d-mmm-yy")
+    );
+    assert_eq!(
+      simplified_chinese.number_format_code(16),
+      Some("[$-0409]d-mmm")
+    );
+    assert_eq!(
+      simplified_chinese.number_format_code(17),
+      Some("[$-0409]mmm-yy")
+    );
   }
 
   #[test]

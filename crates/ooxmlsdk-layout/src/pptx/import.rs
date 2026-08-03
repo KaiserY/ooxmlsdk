@@ -10,6 +10,7 @@ use super::drawingml::fill::FillProperties;
 use super::drawingml::line::LineProperties;
 use super::drawingml::shape_properties::EffectProperties;
 use super::drawingml::table::{TableStyle, TableStyleList};
+use super::drawingml::text_body::TextBody;
 use super::drawingml::theme::{ThemeColorScheme, ThemeFontScheme, ThemeFormatScheme};
 use super::presentation::PresentationFragmentHandler;
 use super::slide::{SlidePersist, SlideSize};
@@ -46,6 +47,7 @@ pub(crate) struct ThemeFragmentRecord {
   pub(crate) color_scheme: ThemeColorScheme,
   pub(crate) font_scheme: ThemeFontScheme,
   pub(crate) format_scheme: ThemeFormatScheme,
+  pub(crate) text_body_defaults: Option<TextBody>,
 }
 
 impl PowerPointImport {
@@ -110,6 +112,7 @@ impl PowerPointImport {
     color_scheme: ThemeColorScheme,
     font_scheme: ThemeFontScheme,
     format_scheme: ThemeFormatScheme,
+    text_body_defaults: Option<TextBody>,
   ) -> &ThemeFragmentRecord {
     if let Some(index) = self.themes.iter().position(|theme| theme.path == path) {
       return &self.themes[index];
@@ -121,6 +124,7 @@ impl PowerPointImport {
       color_scheme,
       font_scheme,
       format_scheme,
+      text_body_defaults,
     });
     self.themes.last().expect("theme inserted")
   }

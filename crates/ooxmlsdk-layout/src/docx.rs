@@ -218,6 +218,7 @@ pub(crate) fn extract(
   styles.math_font_family = document_math_settings.font_family;
   styles.literal_text_tabs_use_default_stops = explicit_default_tab_stop_pt.is_some();
   let mut numbering = NumberingCatalog::load(package, &main, import_settings, &styles)?;
+  styles.numbering_template = Some(numbering.fresh_for_story());
   let images = ImageCatalog::load(package, &main);
   let alt_chunks = AltChunkCatalog::load(package, &main);
   let hyperlinks = HyperlinkCatalog::load(package, &main);
@@ -308,7 +309,7 @@ pub(crate) fn extract(
     &mut form_widget_ids,
   );
   let (footnote_labels, endnote_labels, footnote_numbering, endnote_numbering) =
-    note_reference_labels(package, &main, &sections);
+    note_reference_labels(package, &main, &sections, styles.locales.format_locale());
   let footnote_positions = footnote_positions(package, &main, &sections);
   let footnotes = footnotes(
     package,
@@ -2337,7 +2338,10 @@ fn header_blocks(
   let images = ImageCatalog::load_from_header(package, &header_part);
   let hyperlinks = HyperlinkCatalog::load(package, &header_part);
   let header = header_part.root_element(package).ok()?;
-  let mut numbering = NumberingCatalog::default();
+  // Headers are separate WordprocessingML stories. They use the document's
+  // numbering definitions but keep their own sequence state; starting with
+  // an empty catalog silently discarded every w:numPr in a header.
+  let mut numbering = styles.numbering_for_story();
   let mut blocks = Vec::new();
   let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
   for choice in &header.header_choice {
@@ -2455,7 +2459,9 @@ fn footer_blocks(
   let images = ImageCatalog::load_from_footer(package, &footer_part);
   let hyperlinks = HyperlinkCatalog::load(package, &footer_part);
   let footer = footer_part.root_element(package).ok()?;
-  let mut numbering = NumberingCatalog::default();
+  // Footers share numbering definitions with the main document while their
+  // counters remain local to the footer story.
+  let mut numbering = styles.numbering_for_story();
   let mut blocks = Vec::new();
   let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
   for choice in &footer.footer_choice {
@@ -2564,13 +2570,13 @@ impl NoteNumberingSpec {
     }
   }
 
-  fn formatted(self, kind: NoteKind, value: i32) -> String {
+  fn formatted(self, kind: NoteKind, value: i32, language: Option<&str>) -> String {
     let format = if matches!(self.format, w::NumberFormatValues::None) {
       Self::default_for(kind).format
     } else {
       self.format
     };
-    format_numbering_value(value, format, false)
+    format_numbering_value_localized(value, format, false, language)
   }
 }
 
@@ -2585,6 +2591,7 @@ fn note_reference_labels(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   sections: &[ImportedSection],
+  language: Option<&str>,
 ) -> NoteReferenceLabels {
   let settings = main
     .document_settings_part(package)
@@ -2612,8 +2619,10 @@ fn note_reference_labels(
     .iter()
     .map(|section| section_note_numbering_spec(section, NoteKind::Endnote, endnote_default))
     .collect::<Vec<_>>();
-  let footnote_labels = note_labels_for_sections(sections, NoteKind::Footnote, &footnote_numbering);
-  let endnote_labels = note_labels_for_sections(sections, NoteKind::Endnote, &endnote_numbering);
+  let footnote_labels =
+    note_labels_for_sections(sections, NoteKind::Footnote, &footnote_numbering, language);
+  let endnote_labels =
+    note_labels_for_sections(sections, NoteKind::Endnote, &endnote_numbering, language);
 
   (
     footnote_labels,
@@ -2730,6 +2739,7 @@ fn note_labels_for_sections(
   sections: &[ImportedSection],
   kind: NoteKind,
   specs: &[NoteNumberingSpec],
+  language: Option<&str>,
 ) -> HashMap<i64, String> {
   let mut labels = HashMap::new();
   let mut value = specs
@@ -2751,7 +2761,7 @@ fn note_labels_for_sections(
       if labels.contains_key(&id) {
         continue;
       }
-      labels.insert(id, spec.formatted(kind, value));
+      labels.insert(id, spec.formatted(kind, value, language));
       value = value.saturating_add(1);
     }
   }
@@ -2893,7 +2903,7 @@ fn footnotes(
   let images = ImageCatalog::load_from_footnotes(package, &part);
   let hyperlinks = HyperlinkCatalog::load(package, &part);
   let footnotes = part.root_element(package)?;
-  let mut numbering = NumberingCatalog::default();
+  let mut numbering = styles.numbering_for_story();
   let mut context = NoteImportContext {
     styles,
     numbering: &mut numbering,
@@ -2957,7 +2967,7 @@ fn endnotes(
   let images = ImageCatalog::load_from_endnotes(package, &part);
   let hyperlinks = HyperlinkCatalog::load(package, &part);
   let endnotes = part.root_element(package)?;
-  let mut numbering = NumberingCatalog::default();
+  let mut numbering = styles.numbering_for_story();
   let mut context = NoteImportContext {
     styles,
     numbering: &mut numbering,
@@ -6185,6 +6195,7 @@ fn flush_complex_field(
         style_name,
         state.style,
         state.hyperlink_url.as_deref(),
+        styles.locales.ui_language(),
       );
     } else {
       // ECMA-376 Part 1 §17.16.4.3.3 makes \* MERGEFORMAT preserve the
@@ -6792,11 +6803,12 @@ fn push_localized_missing_style_ref(
   style_name: &str,
   mut style: TextStyle,
   hyperlink_url: Option<&str>,
+  ui_language: Option<&str>,
 ) {
   let message = FieldMessage::MissingStyle(style_name);
-  apply_generated_field_message_style(&mut style, message, Some("zh-CN"));
+  apply_generated_field_message_style(&mut style, message, ui_language);
   inlines.push(InlineItem::Text(TextRun {
-    text: localized_field_message(message, Some("zh-CN")),
+    text: localized_field_message(message, ui_language),
     style,
     hyperlink_url: hyperlink_url.map(ToString::to_string),
     dynamic_field: None,
@@ -7262,7 +7274,13 @@ fn push_simple_field(
           .styles
           .style_ref_name_requires_localized_error(style_name)
       {
-        push_localized_missing_style_ref(inlines, style_name, style, None);
+        push_localized_missing_style_ref(
+          inlines,
+          style_name,
+          style,
+          None,
+          context.styles.locales.ui_language(),
+        );
       } else if let Some(kind) = dynamic_kind {
         push_dynamic_field(inlines, kind, style, None, result_text);
       }
@@ -11859,6 +11877,61 @@ fn drawing_chart_shapes(
         .collect()
     })
     .collect::<Vec<_>>();
+  let error_bar_styles = series
+    .iter()
+    .map(|series| {
+      series
+        .error_bars
+        .into_iter()
+        .flatten()
+        .map(|error_bars| {
+          drawingml_chart_shape_common_style(
+            error_bars.chart_shape_properties.as_deref(),
+            &styles.theme_colors,
+          )
+        })
+        .collect()
+    })
+    .collect::<Vec<_>>();
+  let group_decoration_styles = cartesian
+    .as_ref()
+    .map(|chart| {
+      chart
+        .group_decorations
+        .iter()
+        .map(
+          |group| crate::pptx::chart::CartesianChartGroupDecorationStyle {
+            drop_lines: drawingml_chart_shape_common_style(
+              group
+                .drop_lines
+                .and_then(|lines| lines.chart_shape_properties.as_deref()),
+              &styles.theme_colors,
+            ),
+            high_low_lines: drawingml_chart_shape_common_style(
+              group
+                .high_low_lines
+                .and_then(|lines| lines.chart_shape_properties.as_deref()),
+              &styles.theme_colors,
+            ),
+            up_bars: drawingml_chart_shape_common_style(
+              group
+                .up_down_bars
+                .and_then(|bars| bars.up_bars.as_deref())
+                .and_then(|bars| bars.chart_shape_properties.as_deref()),
+              &styles.theme_colors,
+            ),
+            down_bars: drawingml_chart_shape_common_style(
+              group
+                .up_down_bars
+                .and_then(|bars| bars.down_bars.as_deref())
+                .and_then(|bars| bars.chart_shape_properties.as_deref()),
+              &styles.theme_colors,
+            ),
+          },
+        )
+        .collect()
+    })
+    .unwrap_or_default();
   let series_point_styles = series
     .iter()
     .enumerate()
@@ -12011,12 +12084,41 @@ fn drawing_chart_shapes(
         .collect()
     })
     .unwrap_or_default();
+  let leader_line_style = shared_chart::pie_chart_model(chart_space)
+    .map(|pie| {
+      drawingml_chart_shape_common_style(pie.leader_line_shape_properties, &styles.theme_colors)
+    })
+    .unwrap_or_default();
   let chart_area_style = drawingml_chart_area_common_style(
     chart_space.shape_properties.as_deref(),
     &styles.theme_colors,
   );
   let plot_area_style = drawingml_chart_area_common_style(
     chart_space.chart.plot_area.shape_properties.as_deref(),
+    &styles.theme_colors,
+  );
+  let floor_style = drawingml_chart_area_common_style(
+    chart_space
+      .chart
+      .floor
+      .as_deref()
+      .and_then(|floor| floor.shape_properties.as_deref()),
+    &styles.theme_colors,
+  );
+  let side_wall_style = drawingml_chart_area_common_style(
+    chart_space
+      .chart
+      .side_wall
+      .as_deref()
+      .and_then(|wall| wall.shape_properties.as_deref()),
+    &styles.theme_colors,
+  );
+  let back_wall_style = drawingml_chart_area_common_style(
+    chart_space
+      .chart
+      .back_wall
+      .as_deref()
+      .and_then(|wall| wall.shape_properties.as_deref()),
     &styles.theme_colors,
   );
   let title_fill_color = chart_space
@@ -12308,14 +12410,20 @@ fn drawing_chart_shapes(
     series_point_colors,
     series_styles,
     trendline_styles,
+    error_bar_styles,
+    group_decoration_styles,
     series_point_styles,
     surface_band_colors,
     data_label_fill_colors,
     pie_point_colors,
     pie_point_styles,
+    leader_line_style,
     title_fill_color,
     chart_area_style,
     plot_area_style,
+    floor_style,
+    side_wall_style,
+    back_wall_style,
   }));
   Some(vec![shape])
 }
@@ -12454,14 +12562,20 @@ fn drawing_extended_chart_shapes(
     series_point_colors: Vec::new(),
     series_styles: Vec::new(),
     trendline_styles: Vec::new(),
+    error_bar_styles: Vec::new(),
+    group_decoration_styles: Vec::new(),
     series_point_styles: Vec::new(),
     surface_band_colors: Vec::new(),
     data_label_fill_colors: Vec::new(),
     pie_point_colors: Vec::new(),
     pie_point_styles: Vec::new(),
+    leader_line_style: common::ShapeStyle::default(),
     title_fill_color: None,
     chart_area_style: common::ShapeStyle::default(),
     plot_area_style: common::ShapeStyle::default(),
+    floor_style: common::ShapeStyle::default(),
+    side_wall_style: common::ShapeStyle::default(),
+    back_wall_style: common::ShapeStyle::default(),
   }));
   Some(vec![shape])
 }
@@ -17104,7 +17218,9 @@ fn textbox_blocks_with_base(
   base_style.automatic_escapement_complex_font_size_pt = None;
 
   let mut blocks = Vec::new();
-  let mut numbering = NumberingCatalog::default();
+  // A text box is a separate story, not a package with a separate numbering
+  // part. Reuse the document definitions and reset only the sequence state.
+  let mut numbering = styles.numbering_for_story();
   let mut form_widget_ids = FormWidgetIdAllocator::default();
   let custom_xml_bindings = CustomXmlBindings::default();
   let paragraph_base = BlockContentParagraphBase {
@@ -18377,6 +18493,7 @@ struct StylesCatalog {
   theme_effects: ThemeEffectStyles,
   font_substitutions: HashMap<String, FontSubstitution>,
   styles: HashMap<String, StyleEntry>,
+  numbering_template: Option<NumberingCatalog>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -18669,6 +18786,14 @@ struct TableModelEnv<'a> {
 }
 
 impl StylesCatalog {
+  fn numbering_for_story(&self) -> NumberingCatalog {
+    self
+      .numbering_template
+      .as_ref()
+      .map(NumberingCatalog::fresh_for_story)
+      .unwrap_or_default()
+  }
+
   fn load(
     package: &mut WordprocessingDocument,
     main: &MainDocumentPart,
@@ -21060,6 +21185,14 @@ fn finalize_numbering_symbol_transport_style(
     return;
   }
 
+  if text.contains('\u{ad}') {
+    // A soft hyphen is a transport value rather than an optional line-break
+    // opportunity when it is the character of a bullet level. Word paints a
+    // normal hyphen for that value, and LibreOffice normalizes it for the
+    // same reason when importing tdf101626.docx.
+    *text = text.replace('\u{ad}', "-");
+  }
+
   let declared_symbol_font = symbol_run_properties
     .and_then(|properties| properties.run_fonts.first())
     .and_then(|fonts| {
@@ -21109,6 +21242,16 @@ fn finalize_numbering_symbol_transport_style(
 }
 
 impl NumberingCatalog {
+  fn fresh_for_story(&self) -> Self {
+    Self {
+      nums: self.nums.clone(),
+      abstract_nums: self.abstract_nums.clone(),
+      picture_bullets: self.picture_bullets.clone(),
+      counters: HashMap::new(),
+      initialized_start_overrides: HashSet::new(),
+    }
+  }
+
   fn counter_state(&self) -> NumberingCounterState {
     NumberingCounterState {
       counters: self.counters.clone(),
@@ -21258,14 +21401,32 @@ impl NumberingCatalog {
     format_context: NumberingFormatMergeContext,
   ) -> Option<NumberingLabel> {
     let num_id = reference.num_id();
-    let level_index = reference.level_index();
     let instance = self.nums.get(&num_id)?;
     let abstract_num_id = instance.abstract_num_id;
     let abstract_num = self.abstract_nums.get(&abstract_num_id)?;
+    let level_index = if format_context.style_numbering && reference.level_index.is_none() {
+      // ECMA-376 Part 1 §17.9.23: a style-level numPr can omit ilvl and
+      // let the abstract level's w:pStyle association select the level. A
+      // direct paragraph numPr still defaults an omitted ilvl to zero.
+      format
+        .style_id
+        .as_deref()
+        .and_then(|style_id| {
+          (0..=8).find(|level_index| {
+            effective_numbering_level(instance, abstract_num, *level_index)
+              .and_then(|level| level.paragraph_style_id.as_deref())
+              == Some(style_id)
+          })
+        })
+        .unwrap_or(0)
+    } else {
+      reference.level_index()
+    };
     let level_override = instance.overrides.get(&level_index);
+    let abstract_level = abstract_num.levels.get(&level_index);
     let level = level_override
       .and_then(|override_| override_.level.as_ref())
-      .or_else(|| abstract_num.levels.get(&level_index))?;
+      .or(abstract_level)?;
 
     let level_matches_paragraph_style =
       level.paragraph_style_id.as_deref() == format.style_id.as_deref();
@@ -21286,7 +21447,14 @@ impl NumberingCatalog {
     };
     merge_numbering_format_values(format, &level.format_properties, format_context);
     let start_override = level_override.and_then(|override_| override_.start);
-    let start = start_override.unwrap_or(level.start);
+    // [MS-OI29500] §2.1.292: Word ignores w:start when it is inside the
+    // w:lvl child of a numbering-instance override. Only w:startOverride can
+    // replace the abstract level's starting value.
+    let start = start_override.unwrap_or_else(|| {
+      abstract_level
+        .map(|level| level.start)
+        .unwrap_or(level.start)
+    });
 
     // A list can begin at a deeper level before any paragraph at its parent
     // levels. Word still counts the implicit parent nodes: a first level-1
@@ -21295,14 +21463,25 @@ impl NumberingCatalog {
     // these missing parents as counted phantom nodes in SwNumberTree.
     for parent_level_index in 0..level_index {
       let parent_override = instance.overrides.get(&parent_level_index);
+      let parent_abstract_level = abstract_num.levels.get(&parent_level_index);
       let Some(parent_level) = parent_override
         .and_then(|override_| override_.level.as_ref())
-        .or_else(|| abstract_num.levels.get(&parent_level_index))
+        .or(parent_abstract_level)
       else {
         continue;
       };
       let parent_start_override = parent_override.and_then(|override_| override_.start);
-      let parent_start = parent_start_override.unwrap_or(parent_level.start);
+      let parent_start = parent_start_override.unwrap_or_else(|| {
+        parent_abstract_level
+          .map(|level| level.start)
+          .unwrap_or(parent_level.start)
+      });
+      // LibreOffice maps every concrete w:num derived from one abstractNum to
+      // the same Writer ListId (AbstractListDef::MapListId). A startOverride
+      // carried by a later concrete instance therefore restarts that shared
+      // sequence instead of creating an unrelated counter stream. Track the
+      // sequence by the resolved abstract definition, while the one-shot
+      // override marker below remains owned by the concrete numId.
       let parent_key = (abstract_num_id, parent_level_index);
       let initializes_start_override = parent_start_override.is_some()
         && self
@@ -21340,24 +21519,6 @@ impl NumberingCatalog {
       level_index,
     );
 
-    let mut text = format_numbering_label(
-      level,
-      abstract_num_id,
-      level_index,
-      counter,
-      abstract_num,
-      &instance.overrides,
-      &self.counters,
-    );
-    let suppressed_non_numerical_text = format_numbering_label_suppressing_non_numerical(
-      level,
-      abstract_num_id,
-      level_index,
-      counter,
-      abstract_num,
-      &instance.overrides,
-      &self.counters,
-    );
     let mut style = base_style;
     let inherited_bullet_style = style.clone();
     // LibreOffice's NewNumberPortion starts ordinary numbering from the
@@ -21403,6 +21564,33 @@ impl NumberingCatalog {
         &styles.theme_colors,
       );
     }
+    let numbering_language = style
+      .language
+      .clone()
+      .or_else(|| style.east_asia_language.clone())
+      .or_else(|| style.bidi_language.clone())
+      .or_else(|| styles.locales.format_locale().map(Arc::from));
+    let mut text = format_numbering_label_with_language(
+      level,
+      abstract_num_id,
+      level_index,
+      counter,
+      abstract_num,
+      &instance.overrides,
+      &self.counters,
+      numbering_language.as_deref(),
+    );
+    let suppressed_non_numerical_text =
+      format_numbering_label_suppressing_non_numerical_with_language(
+        level,
+        abstract_num_id,
+        level_index,
+        counter,
+        abstract_num,
+        &instance.overrides,
+        &self.counters,
+        numbering_language.as_deref(),
+      );
     finalize_numbering_symbol_transport_style(
       &mut style,
       &inherited_bullet_style,
@@ -21510,6 +21698,45 @@ fn numbering_level_model_with_theme(
     format_properties,
     symbol_run_properties: level.numbering_symbol_run_properties.as_deref().cloned(),
   }
+}
+
+fn effective_numbering_level<'a>(
+  instance: &'a NumberingInstance,
+  abstract_num: &'a AbstractNumbering,
+  level_index: i32,
+) -> Option<&'a NumberingLevel> {
+  instance
+    .overrides
+    .get(&level_index)
+    .and_then(|override_| override_.level.as_ref())
+    .or_else(|| abstract_num.levels.get(&level_index))
+}
+
+fn effective_numbering_start(
+  abstract_num: &AbstractNumbering,
+  overrides: &HashMap<i32, LevelOverride>,
+  level_index: i32,
+) -> i32 {
+  if let Some(start) = overrides
+    .get(&level_index)
+    .and_then(|override_| override_.start)
+  {
+    return start;
+  }
+  if let Some(start) = abstract_num
+    .levels
+    .get(&level_index)
+    .map(|level| level.start)
+  {
+    return start;
+  }
+  // Keep malformed packages usable when they provide only an override level,
+  // while retaining Word's abstract-level start ownership for valid input.
+  overrides
+    .get(&level_index)
+    .and_then(|override_| override_.level.as_ref())
+    .map(|level| level.start)
+    .unwrap_or(0)
 }
 
 fn numbering_level_restarts_after(
@@ -21671,6 +21898,7 @@ fn normalize_picture_bullet_image_size(mut image: InlineImage) -> InlineImage {
   image
 }
 
+#[cfg(test)]
 fn format_numbering_label(
   level: &NumberingLevel,
   counter_id: i32,
@@ -21680,45 +21908,49 @@ fn format_numbering_label(
   overrides: &HashMap<i32, LevelOverride>,
   counters: &HashMap<(i32, i32), i32>,
 ) -> String {
+  format_numbering_label_with_language(
+    level,
+    counter_id,
+    level_index,
+    value,
+    abstract_num,
+    overrides,
+    counters,
+    None,
+  )
+}
+
+fn format_numbering_label_with_language(
+  level: &NumberingLevel,
+  counter_id: i32,
+  level_index: i32,
+  value: i32,
+  abstract_num: &AbstractNumbering,
+  overrides: &HashMap<i32, LevelOverride>,
+  counters: &HashMap<(i32, i32), i32>,
+  language: Option<&str>,
+) -> String {
   if matches!(level.format, w::NumberFormatValues::Bullet) {
     return format!("{}{}", level.text, numbering_suffix_text(level.suffix));
   }
 
-  let mut text = level.text.clone();
-  for index in 0..=8 {
-    let placeholder = format!("%{}", index + 1);
-    if !text.contains(&placeholder) {
-      continue;
-    }
-    let referenced_level = overrides
-      .get(&index)
-      .and_then(|override_| override_.level.as_ref())
-      .or_else(|| abstract_num.levels.get(&index));
-    let value = if index == level_index {
-      value
-    } else {
-      counters
-        .get(&(counter_id, index))
-        .copied()
-        .unwrap_or_else(|| referenced_level.map(|level| level.start).unwrap_or(1))
-    };
-    text = text.replace(
-      &placeholder,
-      &referenced_level.map_or_else(
-        || value.to_string(),
-        |referenced_level| {
-          format_numbering_level_value(
-            value,
-            referenced_level,
-            level.is_legal && legal_numbering_requires_decimal_override(referenced_level.format),
-          )
-        },
-      ),
-    );
-  }
+  let text = format_numbering_level_text(
+    level,
+    NumberingLabelFormatContext {
+      counter_id,
+      level_index,
+      current_value: value,
+      abstract_num,
+      overrides,
+      counters,
+      language,
+    },
+    true,
+  );
   format!("{text}{}", numbering_suffix_text(level.suffix))
 }
 
+#[cfg(test)]
 fn format_numbering_label_suppressing_non_numerical(
   level: &NumberingLevel,
   counter_id: i32,
@@ -21728,6 +21960,28 @@ fn format_numbering_label_suppressing_non_numerical(
   overrides: &HashMap<i32, LevelOverride>,
   counters: &HashMap<(i32, i32), i32>,
 ) -> String {
+  format_numbering_label_suppressing_non_numerical_with_language(
+    level,
+    counter_id,
+    level_index,
+    value,
+    abstract_num,
+    overrides,
+    counters,
+    None,
+  )
+}
+
+fn format_numbering_label_suppressing_non_numerical_with_language(
+  level: &NumberingLevel,
+  counter_id: i32,
+  level_index: i32,
+  value: i32,
+  abstract_num: &AbstractNumbering,
+  overrides: &HashMap<i32, LevelOverride>,
+  counters: &HashMap<(i32, i32), i32>,
+  language: Option<&str>,
+) -> String {
   if matches!(level.format, w::NumberFormatValues::Bullet) {
     return level
       .text
@@ -21736,6 +21990,37 @@ fn format_numbering_label_suppressing_non_numerical(
       .collect();
   }
 
+  format_numbering_level_text(
+    level,
+    NumberingLabelFormatContext {
+      counter_id,
+      level_index,
+      current_value: value,
+      abstract_num,
+      overrides,
+      counters,
+      language,
+    },
+    false,
+  )
+}
+
+#[derive(Clone, Copy)]
+struct NumberingLabelFormatContext<'a> {
+  counter_id: i32,
+  level_index: i32,
+  current_value: i32,
+  abstract_num: &'a AbstractNumbering,
+  overrides: &'a HashMap<i32, LevelOverride>,
+  counters: &'a HashMap<(i32, i32), i32>,
+  language: Option<&'a str>,
+}
+
+fn format_numbering_level_text(
+  level: &NumberingLevel,
+  context: NumberingLabelFormatContext<'_>,
+  preserve_non_numerical: bool,
+) -> String {
   let mut output = String::new();
   let mut chars = level.text.chars().peekable();
   while let Some(ch) = chars.next() {
@@ -21745,43 +22030,42 @@ fn format_numbering_label_suppressing_non_numerical(
     {
       chars.next();
       let referenced_index = i32::try_from(index - 1).unwrap_or_default();
-      let referenced_level = overrides
+      let referenced_level = context
+        .overrides
         .get(&referenced_index)
         .and_then(|override_| override_.level.as_ref())
-        .or_else(|| abstract_num.levels.get(&referenced_index));
-      let referenced_value = if referenced_index == level_index {
-        value
+        .or_else(|| context.abstract_num.levels.get(&referenced_index));
+      let referenced_value = if referenced_index == context.level_index {
+        context.current_value
       } else {
-        counters
-          .get(&(counter_id, referenced_index))
+        context
+          .counters
+          .get(&(context.counter_id, referenced_index))
           .copied()
-          .unwrap_or_else(|| referenced_level.map(|level| level.start).unwrap_or(1))
+          .unwrap_or_else(|| {
+            effective_numbering_start(context.abstract_num, context.overrides, referenced_index)
+          })
       };
       output.push_str(&referenced_level.map_or_else(
         || referenced_value.to_string(),
         |referenced_level| {
-          format_numbering_level_value(
+          format_numbering_level_value_localized(
             referenced_value,
             referenced_level,
-            level.is_legal && legal_numbering_requires_decimal_override(referenced_level.format),
+            // ECMA-376 §17.9.4 applies legal Arabic numbering to every level
+            // referenced by lvlText, including the current level. Preserve
+            // decimalZero's authored Arabic leading-zero presentation while
+            // converting non-Arabic formats such as Roman numerals.
+            level.is_legal,
+            context.language,
           )
         },
       ));
-    } else if is_word_numbering_delimiter(ch) {
+    } else if preserve_non_numerical || is_word_numbering_delimiter(ch) {
       output.push(ch);
     }
   }
   output
-}
-
-fn legal_numbering_requires_decimal_override(format: w::NumberFormatValues) -> bool {
-  !matches!(
-    format,
-    w::NumberFormatValues::None
-      | w::NumberFormatValues::Decimal
-      | w::NumberFormatValues::DecimalZero
-      | w::NumberFormatValues::DecimalHalfWidth
-  )
 }
 
 fn is_word_numbering_delimiter(ch: char) -> bool {
@@ -21791,7 +22075,17 @@ fn is_word_numbering_delimiter(ch: char) -> bool {
   )
 }
 
+#[cfg(test)]
 fn format_numbering_level_value(value: i32, level: &NumberingLevel, force_decimal: bool) -> String {
+  format_numbering_level_value_localized(value, level, force_decimal, None)
+}
+
+fn format_numbering_level_value_localized(
+  value: i32,
+  level: &NumberingLevel,
+  force_decimal: bool,
+  language: Option<&str>,
+) -> String {
   if !force_decimal && level.format == w::NumberFormatValues::Custom {
     match level.custom_format.as_deref() {
       Some("001, 002, 003, ...") => return format!("{value:03}"),
@@ -21809,7 +22103,7 @@ fn format_numbering_level_value(value: i32, level: &NumberingLevel, force_decima
       _ => {}
     }
   }
-  format_numbering_value(value, level.format, force_decimal)
+  format_numbering_value_localized(value, level.format, force_decimal, language)
 }
 
 fn numbering_suffix_text(suffix: NumberingSuffix) -> &'static str {
@@ -21825,45 +22119,108 @@ fn format_numbering_value(
   format: w::NumberFormatValues,
   force_decimal: bool,
 ) -> String {
-  if force_decimal {
+  format_numbering_value_localized(value, format, force_decimal, Some("en-US"))
+}
+
+fn format_numbering_value_localized(
+  value: i32,
+  format: w::NumberFormatValues,
+  force_decimal: bool,
+  language: Option<&str>,
+) -> String {
+  if force_decimal && !matches!(format, w::NumberFormatValues::DecimalZero) {
     return value.to_string();
   }
   match format {
+    w::NumberFormatValues::Decimal
+    | w::NumberFormatValues::Bullet
+    | w::NumberFormatValues::Custom => value.to_string(),
     w::NumberFormatValues::LowerLetter => alpha_number(value, false),
     w::NumberFormatValues::UpperLetter => alpha_number(value, true),
     w::NumberFormatValues::LowerRoman => roman_number(value).to_lowercase(),
     w::NumberFormatValues::UpperRoman => roman_number(value),
-    w::NumberFormatValues::Ordinal => english_ordinal_number(value),
-    w::NumberFormatValues::CardinalText => english_cardinal_number(value),
-    w::NumberFormatValues::OrdinalText => english_ordinal_text(value),
+    w::NumberFormatValues::Ordinal => localized_ordinal_number(value, language),
+    w::NumberFormatValues::CardinalText => localized_cardinal_number(value, language),
+    w::NumberFormatValues::OrdinalText => localized_ordinal_text(value, language),
+    w::NumberFormatValues::Hex => positive_radix_number(value, 16),
+    w::NumberFormatValues::Chicago => repeating_sequence_number(value, &['*', '†', '‡', '§']),
     w::NumberFormatValues::DecimalZero => format!("{value:02}"),
     w::NumberFormatValues::DecimalEnclosedCircle
-    | w::NumberFormatValues::DecimalEnclosedCircleChinese => enclosed_decimal_number(value, 0x2460),
+    | w::NumberFormatValues::DecimalEnclosedCircleChinese => circled_decimal_number(value),
     w::NumberFormatValues::DecimalEnclosedFullstop => enclosed_decimal_number(value, 0x2488),
     w::NumberFormatValues::DecimalEnclosedParen => enclosed_decimal_number(value, 0x2474),
+    w::NumberFormatValues::IdeographEnclosedCircle => bounded_sequence_number(
+      value,
+      &['㈠', '㈡', '㈢', '㈣', '㈤', '㈥', '㈦', '㈧', '㈨', '㈩'],
+    ),
     w::NumberFormatValues::DecimalFullWidth | w::NumberFormatValues::DecimalFullWidth2 => {
       full_width_decimal_number(value)
     }
+    w::NumberFormatValues::Aiueo => alphabetic_sequence_number(
+      value,
+      &[
+        'ｱ', 'ｲ', 'ｳ', 'ｴ', 'ｵ', 'ｶ', 'ｷ', 'ｸ', 'ｹ', 'ｺ', 'ｻ', 'ｼ', 'ｽ', 'ｾ', 'ｿ', 'ﾀ', 'ﾁ', 'ﾂ',
+        'ﾃ', 'ﾄ', 'ﾅ', 'ﾆ', 'ﾇ', 'ﾈ', 'ﾉ', 'ﾊ', 'ﾋ', 'ﾌ', 'ﾍ', 'ﾎ', 'ﾏ', 'ﾐ', 'ﾑ', 'ﾒ', 'ﾓ', 'ﾔ',
+        'ﾕ', 'ﾖ', 'ﾗ', 'ﾘ', 'ﾙ', 'ﾚ', 'ﾛ', 'ﾜ', 'ｦ', 'ﾝ',
+      ],
+    ),
+    w::NumberFormatValues::AiueoFullWidth => alphabetic_sequence_number(
+      value,
+      &[
+        'ア', 'イ', 'ウ', 'エ', 'オ', 'カ', 'キ', 'ク', 'ケ', 'コ', 'サ', 'シ', 'ス', 'セ', 'ソ',
+        'タ', 'チ', 'ツ', 'テ', 'ト', 'ナ', 'ニ', 'ヌ', 'ネ', 'ノ', 'ハ', 'ヒ', 'フ', 'ヘ', 'ホ',
+        'マ', 'ミ', 'ム', 'メ', 'モ', 'ヤ', 'ユ', 'ヨ', 'ラ', 'リ', 'ル', 'レ', 'ロ', 'ワ', 'ヲ',
+        'ン',
+      ],
+    ),
+    w::NumberFormatValues::Iroha => alphabetic_sequence_number(
+      value,
+      &[
+        'ｲ', 'ﾛ', 'ﾊ', 'ﾆ', 'ﾎ', 'ﾍ', 'ﾄ', 'ﾁ', 'ﾘ', 'ﾇ', 'ﾙ', 'ｦ', 'ﾜ', 'ｶ', 'ﾖ', 'ﾀ', 'ﾚ', 'ｿ',
+        'ﾂ', 'ﾈ', 'ﾅ', 'ﾗ', 'ﾑ', 'ｳ', 'ヰ', 'ﾉ', 'ｵ', 'ｸ', 'ﾔ', 'ﾏ', 'ｹ', 'ﾌ', 'ｺ', 'ｴ', 'ﾃ', 'ｱ',
+        'ｻ', 'ｷ', 'ﾕ', 'ﾒ', 'ﾐ', 'ｼ', 'ヱ', 'ﾋ', 'ﾓ', 'ｾ', 'ｽ', 'ﾝ',
+      ],
+    ),
+    w::NumberFormatValues::IrohaFullWidth => alphabetic_sequence_number(
+      value,
+      &[
+        'イ', 'ロ', 'ハ', 'ニ', 'ホ', 'ヘ', 'ト', 'チ', 'リ', 'ヌ', 'ル', 'ヲ', 'ワ', 'カ', 'ヨ',
+        'タ', 'レ', 'ソ', 'ツ', 'ネ', 'ナ', 'ラ', 'ム', 'ウ', 'ヰ', 'ノ', 'オ', 'ク', 'ヤ', 'マ',
+        'ケ', 'フ', 'コ', 'エ', 'テ', 'ア', 'サ', 'キ', 'ユ', 'メ', 'ミ', 'シ', 'ヱ', 'ヒ', 'モ',
+        'セ', 'ス', 'ン',
+      ],
+    ),
     w::NumberFormatValues::IdeographTraditional => bounded_sequence_number(
       value,
       &['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'],
     ),
-    w::NumberFormatValues::IdeographZodiac | w::NumberFormatValues::IdeographZodiacTraditional => {
-      bounded_sequence_number(
-        value,
-        &[
-          '子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戍', '亥',
-        ],
-      )
-    }
+    w::NumberFormatValues::IdeographZodiac => bounded_sequence_number(
+      value,
+      &[
+        // Word's legacy ideographZodiac formatter uses U+620D at position
+        // eleven, although the conventional earthly branch is U+620C. The
+        // distinction is visible in the Office fixed-output golden for
+        // LibreOffice cjklist31.docx, so retain the application mapping.
+        '子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戍', '亥',
+      ],
+    ),
+    w::NumberFormatValues::IdeographZodiacTraditional => sexagenary_cycle_number(value),
     w::NumberFormatValues::ChineseCounting
     | w::NumberFormatValues::ChineseCountingThousand
-    | w::NumberFormatValues::JapaneseCounting => cjk_counting_number(
+    | w::NumberFormatValues::JapaneseCounting
+    | w::NumberFormatValues::JapaneseDigitalTenThousand => cjk_counting_number(
       value,
       &['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'],
       &['十', '百', '千'],
       &['万', '亿'],
       true,
+    ),
+    w::NumberFormatValues::JapaneseLegal => cjk_counting_number(
+      value,
+      &['零', '壱', '弐', '参', '四', '伍', '六', '七', '八', '九'],
+      &['拾', '百', '千'],
+      &['万', '億'],
+      false,
     ),
     w::NumberFormatValues::TaiwaneseCounting | w::NumberFormatValues::TaiwaneseCountingThousand => {
       cjk_counting_number(
@@ -21891,16 +22248,122 @@ fn format_numbering_value(
     w::NumberFormatValues::IdeographDigital | w::NumberFormatValues::TaiwaneseDigital => {
       cjk_digit_number(
         value,
-        &['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'],
+        &[
+          if matches!(format, w::NumberFormatValues::TaiwaneseDigital) {
+            '○'
+          } else {
+            '〇'
+          },
+          '一',
+          '二',
+          '三',
+          '四',
+          '五',
+          '六',
+          '七',
+          '八',
+          '九',
+        ],
       )
     }
+    w::NumberFormatValues::Ganada => alphabetic_sequence_number(
+      value,
+      &[
+        '가', '나', '다', '라', '마', '바', '사', '아', '자', '차', '카', '타', '파', '하',
+      ],
+    ),
+    w::NumberFormatValues::Chosung => alphabetic_sequence_number(
+      value,
+      &[
+        'ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
+      ],
+    ),
+    w::NumberFormatValues::KoreanDigital => digit_substitution_number(
+      value,
+      &['영', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'],
+    ),
+    w::NumberFormatValues::KoreanCounting => cjk_counting_number(
+      value,
+      &['영', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'],
+      &['십', '백', '천'],
+      &['만', '억'],
+      true,
+    ),
+    w::NumberFormatValues::KoreanLegal => korean_native_number(value),
     w::NumberFormatValues::KoreanDigital2 => cjk_digit_number(
       value,
       &['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'],
     ),
+    w::NumberFormatValues::RussianLower => alphabetic_sequence_number(
+      value,
+      &[
+        'а', 'б', 'в', 'г', 'д', 'е', 'ж', 'з', 'и', 'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т',
+        'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 'ы', 'э', 'ю', 'я',
+      ],
+    ),
+    w::NumberFormatValues::RussianUpper => alphabetic_sequence_number(
+      value,
+      &[
+        'А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т',
+        'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ы', 'Э', 'Ю', 'Я',
+      ],
+    ),
+    w::NumberFormatValues::NumberInDash => format!("- {value} -"),
+    w::NumberFormatValues::Hebrew1 => hebrew_numeral(value),
+    w::NumberFormatValues::Hebrew2 => alphabetic_sequence_number(
+      value,
+      &[
+        'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ',
+        'ק', 'ר', 'ש', 'ת',
+      ],
+    ),
+    w::NumberFormatValues::ArabicAlpha => alphabetic_sequence_number(
+      value,
+      &[
+        'أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع',
+        'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ى',
+      ],
+    ),
+    w::NumberFormatValues::ArabicAbjad => alphabetic_sequence_number(
+      value,
+      &[
+        'أ', 'ب', 'ج', 'د', 'ه', 'و', 'ز', 'ح', 'ط', 'ي', 'ك', 'ل', 'م', 'ن', 'س', 'ع', 'ف', 'ص',
+        'ق', 'ر', 'ش', 'ت', 'ث', 'خ', 'ذ', 'ض', 'ظ', 'غ',
+      ],
+    ),
+    // The historical OOXML names are counter-intuitive: MS-DOCX assigns
+    // U+0915... (Devanagari consonants) to hindiVowels and U+0905... to
+    // hindiConsonants. Preserve the serialized-format semantics.
+    w::NumberFormatValues::HindiVowels => alphabetic_sequence_number(
+      value,
+      &[
+        'क', 'ख', 'ग', 'घ', 'ङ', 'च', 'छ', 'ज', 'झ', 'ञ', 'ट', 'ठ', 'ड', 'ढ', 'ण', 'त', 'थ', 'द',
+        'ध', 'न', 'प', 'फ', 'ब', 'भ', 'म', 'य', 'र', 'ल', 'व', 'श', 'ष', 'स', 'ह',
+      ],
+    ),
+    w::NumberFormatValues::HindiConsonants => alphabetic_sequence_number(
+      value,
+      &['अ', 'आ', 'इ', 'ई', 'उ', 'ऊ', 'ऋ', 'ए', 'ऐ', 'ओ', 'औ'],
+    ),
+    w::NumberFormatValues::HindiNumbers => decimal_digit_substitution(value, '०'),
+    w::NumberFormatValues::HindiCounting => hindi_cardinal_number(value),
+    w::NumberFormatValues::ThaiLetters => alphabetic_sequence_number(
+      value,
+      &[
+        'ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ', 'ฌ', 'ญ', 'ฎ', 'ฏ', 'ฐ', 'ฑ', 'ฒ', 'ณ', 'ด', 'ต',
+        'ถ', 'ท', 'ธ', 'น', 'บ', 'ป', 'ผ', 'ฝ', 'พ', 'ฟ', 'ภ', 'ม', 'ย', 'ร', 'ฤ', 'ล', 'ฦ', 'ว',
+        'ศ', 'ษ', 'ส', 'ห', 'ฬ', 'อ', 'ฮ',
+      ],
+    ),
+    w::NumberFormatValues::ThaiNumbers => decimal_digit_substitution(value, '๐'),
+    w::NumberFormatValues::ThaiCounting => thai_cardinal_number(value),
+    w::NumberFormatValues::VietnameseCounting => vietnamese_cardinal_number(value),
+    w::NumberFormatValues::BahtText => format!("{}บาทถ้วน", thai_cardinal_number(value)),
+    w::NumberFormatValues::DollarText => {
+      format!("{} Dollars", localized_cardinal_number(value, language))
+    }
     w::NumberFormatValues::DecimalHalfWidth => value.to_string(),
     w::NumberFormatValues::None => String::new(),
-    _ => value.to_string(),
   }
 }
 
@@ -21923,6 +22386,421 @@ fn alphabetic_sequence_number(mut value: i32, sequence: &[char]) -> String {
     value /= radix;
   }
   output.iter().rev().collect()
+}
+
+fn repeating_sequence_number(value: i32, sequence: &[char]) -> String {
+  if value <= 0 || sequence.is_empty() {
+    return value.to_string();
+  }
+  let zero_based = usize::try_from(value - 1).expect("positive numbering value fits usize");
+  let symbol = sequence[zero_based % sequence.len()];
+  std::iter::repeat_n(symbol, zero_based / sequence.len() + 1).collect()
+}
+
+fn positive_radix_number(value: i32, radix: u32) -> String {
+  if value <= 0 {
+    return value.to_string();
+  }
+  debug_assert_eq!(radix, 16);
+  format!("{value:X}")
+}
+
+fn decimal_digit_substitution(value: i32, zero: char) -> String {
+  value
+    .to_string()
+    .chars()
+    .map(|character| {
+      character.to_digit(10).map_or(character, |digit| {
+        char::from_u32(zero as u32 + digit).expect("decimal numbering digits are contiguous")
+      })
+    })
+    .collect()
+}
+
+fn digit_substitution_number(value: i32, digits: &[char; 10]) -> String {
+  value
+    .to_string()
+    .chars()
+    .map(|character| {
+      character
+        .to_digit(10)
+        .map_or(character, |digit| digits[digit as usize])
+    })
+    .collect()
+}
+
+fn sexagenary_cycle_number(value: i32) -> String {
+  if value <= 0 {
+    return value.to_string();
+  }
+  const STEMS: [char; 10] = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+  const BRANCHES: [char; 12] = [
+    '子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥',
+  ];
+  let index = usize::try_from((value - 1) % 60).expect("positive sexagenary index fits usize");
+  [STEMS[index % STEMS.len()], BRANCHES[index % BRANCHES.len()]]
+    .into_iter()
+    .collect()
+}
+
+fn hebrew_numeral(value: i32) -> String {
+  if value <= 0 || value > 999_999 {
+    return value.to_string();
+  }
+
+  fn below_thousand(mut value: i32) -> String {
+    const HUNDREDS: [(i32, char); 4] = [(400, 'ת'), (300, 'ש'), (200, 'ר'), (100, 'ק')];
+    const TENS: [(i32, char); 9] = [
+      (90, 'צ'),
+      (80, 'פ'),
+      (70, 'ע'),
+      (60, 'ס'),
+      (50, 'נ'),
+      (40, 'מ'),
+      (30, 'ל'),
+      (20, 'כ'),
+      (10, 'י'),
+    ];
+    const ONES: [(i32, char); 9] = [
+      (9, 'ט'),
+      (8, 'ח'),
+      (7, 'ז'),
+      (6, 'ו'),
+      (5, 'ה'),
+      (4, 'ד'),
+      (3, 'ג'),
+      (2, 'ב'),
+      (1, 'א'),
+    ];
+
+    let mut output = String::new();
+    for (amount, symbol) in HUNDREDS {
+      while value >= amount {
+        output.push(symbol);
+        value -= amount;
+      }
+    }
+    // Hebrew numerals avoid the divine-name spellings יה and יו.
+    if value == 15 {
+      output.push_str("טו");
+      return output;
+    }
+    if value == 16 {
+      output.push_str("טז");
+      return output;
+    }
+    for (amount, symbol) in TENS.into_iter().chain(ONES) {
+      if value >= amount {
+        output.push(symbol);
+        value -= amount;
+      }
+    }
+    output
+  }
+
+  if value < 1_000 {
+    return below_thousand(value);
+  }
+  let thousands = below_thousand(value / 1_000);
+  let remainder = value % 1_000;
+  if remainder == 0 {
+    thousands
+  } else {
+    format!("{thousands}{}", below_thousand(remainder))
+  }
+}
+
+fn korean_native_number(value: i32) -> String {
+  if value <= 0 {
+    return value.to_string();
+  }
+  const ONES: [&str; 10] = [
+    "", "하나", "둘", "셋", "넷", "다섯", "여섯", "일곱", "여덟", "아홉",
+  ];
+  const TENS: [&str; 10] = [
+    "", "열", "스물", "서른", "마흔", "쉰", "예순", "일흔", "여든", "아흔",
+  ];
+  if value < 100 {
+    return format!(
+      "{}{}",
+      TENS[(value / 10) as usize],
+      ONES[(value % 10) as usize]
+    );
+  }
+  cjk_counting_number(
+    value,
+    &['영', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'],
+    &['십', '백', '천'],
+    &['만', '억'],
+    true,
+  )
+}
+
+fn hindi_cardinal_number(value: i32) -> String {
+  const BELOW_HUNDRED: [&str; 100] = [
+    "शून्य",
+    "एक",
+    "दो",
+    "तीन",
+    "चार",
+    "पाँच",
+    "छह",
+    "सात",
+    "आठ",
+    "नौ",
+    "दस",
+    "ग्यारह",
+    "बारह",
+    "तेरह",
+    "चौदह",
+    "पन्द्रह",
+    "सोलह",
+    "सत्रह",
+    "अठारह",
+    "उन्नीस",
+    "बीस",
+    "इक्कीस",
+    "बाईस",
+    "तेईस",
+    "चौबीस",
+    "पच्चीस",
+    "छब्बीस",
+    "सत्ताईस",
+    "अट्ठाईस",
+    "उनतीस",
+    "तीस",
+    "इकतीस",
+    "बत्तीस",
+    "तैंतीस",
+    "चौंतीस",
+    "पैंतीस",
+    "छत्तीस",
+    "सैंतीस",
+    "अड़तीस",
+    "उनतालीस",
+    "चालीस",
+    "इकतालीस",
+    "बयालीस",
+    "तैंतालीस",
+    "चौवालीस",
+    "पैंतालीस",
+    "छियालीस",
+    "सैंतालीस",
+    "अड़तालीस",
+    "उनचास",
+    "पचास",
+    "इक्यावन",
+    "बावन",
+    "तिरेपन",
+    "चौवन",
+    "पचपन",
+    "छप्पन",
+    "सत्तावन",
+    "अट्ठावन",
+    "उनसठ",
+    "साठ",
+    "इकसठ",
+    "बासठ",
+    "तिरेसठ",
+    "चौंसठ",
+    "पैंसठ",
+    "छियासठ",
+    "सड़सठ",
+    "अड़सठ",
+    "उनहत्तर",
+    "सत्तर",
+    "इकहत्तर",
+    "बहत्तर",
+    "तिहत्तर",
+    "चौहत्तर",
+    "पचहत्तर",
+    "छिहत्तर",
+    "सतहत्तर",
+    "अठहत्तर",
+    "उनासी",
+    "अस्सी",
+    "इक्यासी",
+    "बयासी",
+    "तिरासी",
+    "चौरासी",
+    "पचासी",
+    "छियासी",
+    "सत्तासी",
+    "अट्ठासी",
+    "नवासी",
+    "नब्बे",
+    "इक्यानबे",
+    "बानबे",
+    "तिरानबे",
+    "चौरानबे",
+    "पंचानबे",
+    "छियानबे",
+    "सत्तानबे",
+    "अट्ठानबे",
+    "निन्यानबे",
+  ];
+
+  if value < 0 {
+    return format!("ऋण {}", hindi_cardinal_number(value.saturating_abs()));
+  }
+  if value < 100 {
+    return BELOW_HUNDRED[value as usize].to_string();
+  }
+  for (scale, name) in [
+    (1_000_000_000, "अरब"),
+    (10_000_000, "करोड़"),
+    (100_000, "लाख"),
+    (1_000, "हज़ार"),
+    (100, "सौ"),
+  ] {
+    if value >= scale {
+      let quotient = value / scale;
+      let remainder = value % scale;
+      let mut output = format!("{} {name}", hindi_cardinal_number(quotient));
+      if remainder > 0 {
+        output.push(' ');
+        output.push_str(&hindi_cardinal_number(remainder));
+      }
+      return output;
+    }
+  }
+  value.to_string()
+}
+
+fn thai_cardinal_number(value: i32) -> String {
+  const DIGITS: [&str; 10] = [
+    "ศูนย์",
+    "หนึ่ง",
+    "สอง",
+    "สาม",
+    "สี่",
+    "ห้า",
+    "หก",
+    "เจ็ด",
+    "แปด",
+    "เก้า",
+  ];
+  if value < 0 {
+    return format!("ลบ{}", thai_cardinal_number(value.saturating_abs()));
+  }
+  if value < 10 {
+    return DIGITS[value as usize].to_string();
+  }
+  if value < 100 {
+    let tens = value / 10;
+    let ones = value % 10;
+    let mut output = match tens {
+      1 => "สิบ".to_string(),
+      2 => "ยี่สิบ".to_string(),
+      _ => format!("{}สิบ", DIGITS[tens as usize]),
+    };
+    if ones == 1 {
+      output.push_str("เอ็ด");
+    } else if ones > 1 {
+      output.push_str(DIGITS[ones as usize]);
+    }
+    return output;
+  }
+  for (scale, name) in [
+    (1_000_000, "ล้าน"),
+    (100_000, "แสน"),
+    (10_000, "หมื่น"),
+    (1_000, "พัน"),
+    (100, "ร้อย"),
+  ] {
+    if value >= scale {
+      let quotient = value / scale;
+      let remainder = value % scale;
+      let mut output = format!("{}{name}", thai_cardinal_number(quotient));
+      if remainder > 0 {
+        output.push_str(&thai_cardinal_number(remainder));
+      }
+      return output;
+    }
+  }
+  value.to_string()
+}
+
+fn vietnamese_cardinal_number(value: i32) -> String {
+  const DIGITS: [&str; 10] = [
+    "không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín",
+  ];
+  if value < 0 {
+    return format!("âm {}", vietnamese_cardinal_number(value.saturating_abs()));
+  }
+  if value < 10 {
+    return DIGITS[value as usize].to_string();
+  }
+  if value < 20 {
+    let ones = value % 10;
+    return if ones == 0 {
+      "mười".to_string()
+    } else {
+      format!(
+        "mười {}",
+        if ones == 5 {
+          "lăm"
+        } else {
+          DIGITS[ones as usize]
+        }
+      )
+    };
+  }
+  if value < 100 {
+    let tens = value / 10;
+    let ones = value % 10;
+    let mut output = format!("{} mươi", DIGITS[tens as usize]);
+    if ones > 0 {
+      output.push(' ');
+      output.push_str(match ones {
+        1 => "mốt",
+        4 => "tư",
+        5 => "lăm",
+        _ => DIGITS[ones as usize],
+      });
+    }
+    return output;
+  }
+  if value < 1_000 {
+    let hundreds = value / 100;
+    let remainder = value % 100;
+    let mut output = format!("{} trăm", DIGITS[hundreds as usize]);
+    if remainder > 0 {
+      if remainder < 10 {
+        output.push_str(" lẻ ");
+        output.push_str(DIGITS[remainder as usize]);
+      } else {
+        output.push(' ');
+        output.push_str(&vietnamese_cardinal_number(remainder));
+      }
+    }
+    return output;
+  }
+  for (scale, name) in [
+    (1_000_000_000, "tỷ"),
+    (1_000_000, "triệu"),
+    (1_000, "nghìn"),
+  ] {
+    if value >= scale {
+      let quotient = value / scale;
+      let remainder = value % scale;
+      let mut output = format!("{} {name}", vietnamese_cardinal_number(quotient));
+      if remainder > 0 {
+        output.push(' ');
+        if scale == 1_000 && remainder < 100 {
+          output.push_str("không trăm ");
+          if remainder < 10 {
+            output.push_str("lẻ ");
+          }
+        } else if remainder < 10 {
+          output.push_str("lẻ ");
+        }
+        output.push_str(&vietnamese_cardinal_number(remainder));
+      }
+      return output;
+    }
+  }
+  value.to_string()
 }
 
 fn cjk_digit_number(value: i32, digits: &[char; 10]) -> String {
@@ -22036,6 +22914,79 @@ fn english_cardinal_number(value: i32) -> String {
 
 fn english_ordinal_text(value: i32) -> String {
   capitalize_ascii_initial(&english_ordinal_lower(value))
+}
+
+fn numbering_language_primary(language: Option<&str>) -> &str {
+  language
+    .unwrap_or("en")
+    .split(['-', '_'])
+    .next()
+    .unwrap_or("en")
+}
+
+fn localized_cardinal_number(value: i32, language: Option<&str>) -> String {
+  match numbering_language_primary(language) {
+    "en" => english_cardinal_number(value),
+    "hi" => hindi_cardinal_number(value),
+    "th" => thai_cardinal_number(value),
+    "vi" => vietnamese_cardinal_number(value),
+    "zh" | "ja" => cjk_counting_number(
+      value,
+      &['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'],
+      &['十', '百', '千'],
+      &['万', '亿'],
+      true,
+    ),
+    "ko" => cjk_counting_number(
+      value,
+      &['영', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'],
+      &['십', '백', '천'],
+      &['만', '억'],
+      true,
+    ),
+    // Do not leak English application resources into an authored language
+    // for which this renderer has no spellout rules. A decimal fallback is
+    // stable and keeps locale expansion additive.
+    _ => value.to_string(),
+  }
+}
+
+fn localized_ordinal_number(value: i32, language: Option<&str>) -> String {
+  match numbering_language_primary(language) {
+    "en" => english_ordinal_number(value),
+    "zh" | "ja" => format!("第{value}"),
+    "ko" => format!("제{value}"),
+    "th" => format!("ที่{value}"),
+    "vi" => format!("thứ {value}"),
+    "hi" => format!("{value}वाँ"),
+    _ => value.to_string(),
+  }
+}
+
+fn localized_ordinal_text(value: i32, language: Option<&str>) -> String {
+  match numbering_language_primary(language) {
+    "en" => english_ordinal_text(value),
+    "hi" => match value {
+      0 => "शून्यवाँ".to_string(),
+      1 => "पहला".to_string(),
+      2 => "दूसरा".to_string(),
+      3 => "तीसरा".to_string(),
+      4 => "चौथा".to_string(),
+      5 => "पाँचवाँ".to_string(),
+      6 => "छठा".to_string(),
+      _ => format!("{}वाँ", hindi_cardinal_number(value)),
+    },
+    "th" => format!("ที่{}", thai_cardinal_number(value)),
+    "vi" => match value {
+      1 => "thứ nhất".to_string(),
+      2 => "thứ nhì".to_string(),
+      4 => "thứ tư".to_string(),
+      _ => format!("thứ {}", vietnamese_cardinal_number(value)),
+    },
+    "zh" | "ja" => format!("第{}", localized_cardinal_number(value, language)),
+    "ko" => format!("제{}", localized_cardinal_number(value, language)),
+    _ => value.to_string(),
+  }
 }
 
 fn english_cardinal_lower(value: i32) -> String {
@@ -22204,6 +23155,18 @@ fn enclosed_decimal_number(value: i32, first_codepoint: u32) -> String {
   }
   char::from_u32(first_codepoint + value as u32 - 1)
     .expect("ECMA-376 enclosed decimal ranges are valid Unicode")
+    .to_string()
+}
+
+fn circled_decimal_number(value: i32) -> String {
+  let codepoint = match value {
+    1..=20 => 0x2460 + value as u32 - 1,
+    21..=35 => 0x3251 + value as u32 - 21,
+    36..=50 => 0x32B1 + value as u32 - 36,
+    _ => return value.to_string(),
+  };
+  char::from_u32(codepoint)
+    .expect("ECMA-376 circled decimal ranges are valid Unicode")
     .to_string()
 }
 

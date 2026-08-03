@@ -911,14 +911,20 @@ pub(crate) struct InlineChart {
   pub series_point_colors: Vec<Vec<Option<RgbColor>>>,
   pub series_styles: Vec<common::ShapeStyle<'static>>,
   pub trendline_styles: Vec<Vec<common::ShapeStyle<'static>>>,
+  pub error_bar_styles: Vec<Vec<common::ShapeStyle<'static>>>,
+  pub group_decoration_styles: Vec<crate::pptx::chart::CartesianChartGroupDecorationStyle>,
   pub series_point_styles: Vec<Vec<Option<common::ShapeStyle<'static>>>>,
   pub surface_band_colors: Vec<Vec<(u32, RgbColor)>>,
   pub data_label_fill_colors: Vec<Vec<Option<RgbColor>>>,
   pub pie_point_colors: Vec<RgbColor>,
   pub pie_point_styles: Vec<common::ShapeStyle<'static>>,
+  pub leader_line_style: common::ShapeStyle<'static>,
   pub title_fill_color: Option<RgbColor>,
   pub chart_area_style: common::ShapeStyle<'static>,
   pub plot_area_style: common::ShapeStyle<'static>,
+  pub floor_style: common::ShapeStyle<'static>,
+  pub side_wall_style: common::ShapeStyle<'static>,
+  pub back_wall_style: common::ShapeStyle<'static>,
 }
 
 #[derive(Clone, Debug)]

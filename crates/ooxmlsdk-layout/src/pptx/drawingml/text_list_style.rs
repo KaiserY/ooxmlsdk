@@ -278,20 +278,18 @@ impl TextListStyle {
     &self,
     paragraph_level: Option<u8>,
   ) -> Option<TextListParagraphStyleRef<'_>> {
-    if self.levels.is_empty() {
-      return self
-        .default_paragraph_properties
-        .as_deref()
-        .map(TextListParagraphStyleRef::Default);
-    }
-
     let requested_level = paragraph_level.unwrap_or(0).saturating_add(1);
     self
       .levels
       .iter()
       .find(|style| style.level == requested_level)
-      .or_else(|| self.levels.first())
       .map(TextListParagraphStyleRef::Level)
+      .or_else(|| {
+        self
+          .default_paragraph_properties
+          .as_deref()
+          .map(TextListParagraphStyleRef::Default)
+      })
   }
 }
 
@@ -578,5 +576,25 @@ mod tests {
         .and_then(|font| font.typeface.as_deref()),
       Some("+mj-lt")
     );
+  }
+
+  #[test]
+  fn a_later_list_level_does_not_style_an_unleveled_paragraph() {
+    let style = TextListStyle {
+      levels: vec![TextListLevelStyle::new(
+        2,
+        TextListLevelParagraphProperties::Level2(Box::new(a::Level2ParagraphProperties {
+          alignment: Some(a::TextAlignmentTypeValues::ThaiDistributed),
+          ..Default::default()
+        })),
+      )],
+      ..Default::default()
+    };
+
+    assert!(style.paragraph_style_for_level(None).is_none());
+    assert!(matches!(
+      style.paragraph_style_for_level(Some(1)),
+      Some(TextListParagraphStyleRef::Level(level)) if level.level == 2
+    ));
   }
 }

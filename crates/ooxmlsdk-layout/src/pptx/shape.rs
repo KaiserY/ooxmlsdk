@@ -141,6 +141,13 @@ impl PptShape {
     // PPTShape::addShape merges master text list style, placeholder text body
     // style, and the current shape text body style before shape creation.
     let mut style = TextListStyle::default();
+    if let Some(theme_style) = slide_persist
+      .theme_text_body_defaults
+      .as_ref()
+      .and_then(|text_body| text_body.list_style.as_ref())
+    {
+      style.merge_from(theme_style);
+    }
     if let Some(master_style) = self.get_sub_type_text_list_style(slide_persist) {
       style.merge_from(master_style);
     }

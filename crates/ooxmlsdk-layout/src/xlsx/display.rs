@@ -32,8 +32,8 @@ use super::import::ExcelImport;
 use super::print::{CalcPrintDocument, CalcPrintPage};
 use super::worksheet::{CalcSheet, CellAddress, CellRange, CellRect};
 use crate::pptx::chart::{
-  ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, RadialChartStyle,
-  lower_clustered_column_chart, lower_radial_chart, solid_chart_shape_style,
+  CartesianChartGroupDecorationStyle, ChartFrame, ChartLayoutProfile, ClusteredColumnStyle,
+  RadialChartStyle, lower_clustered_column_chart, lower_radial_chart, solid_chart_shape_style,
 };
 use crate::pptx::drawingml::color::{Color, RgbHexColor};
 use crate::pptx::drawingml::fill::FillKind;
@@ -409,11 +409,9 @@ fn print_page_items(
     heading_height + repeat_height + area_size.1,
   );
   let body_origin_x = setup.margin_left_pt + horizontal_centering + heading_width;
-  let paper_fallback_scale = if page.chart_count > 0 {
-    page.page_settings.printer_default_paper_scale_percent()
-  } else {
-    100
-  };
+  let paper_fallback_scale = page
+    .page_settings
+    .fixed_output_paper_scale_percent(page.chart_count > 0);
   let body_margin_top =
     if paper_fallback_scale < 100 && page.page_settings.header_footer.has_print_content() {
       setup.margin_top_pt * zoom_scale
@@ -2056,6 +2054,41 @@ fn render_cell_area(
     {
       alignment = Some(pivot_alignment);
     }
+    let alignment_indent = alignment.map_or(0i64, |alignment| {
+      i64::from(alignment.indent.unwrap_or(0)) + i64::from(alignment.relative_indent.unwrap_or(0))
+    });
+    let alignment_indent_pt = if alignment_indent > 0 {
+      let normal_style = import.styles.default_font_text_style();
+      // ECMA-376 §18.8.1 defines one alignment-indent increment as three
+      // space widths in the Normal style font. relativeIndent is the signed
+      // differential-format adjustment to the same count.
+      import
+        .styles
+        .fixed_output_alignment_indent_increment_pt(text_metrics.measure_text("   ", &normal_style))
+        * layout.zoom_scale
+        * alignment_indent as f32
+    } else {
+      0.0
+    };
+    let text_indent_pt =
+      pivot_builtin_style.text_indent_pt() * layout.zoom_scale + alignment_indent_pt;
+    let text_cell_rect = if text_indent_pt > 0.0 {
+      let inset = text_indent_pt.min(cell_rect.width_pt);
+      if calc_cell_horizontal_alignment(cell, alignment) == x::HorizontalAlignmentValues::Right {
+        CellRect {
+          width_pt: cell_rect.width_pt - inset,
+          ..cell_rect
+        }
+      } else {
+        CellRect {
+          x_pt: cell_rect.x_pt + inset,
+          width_pt: cell_rect.width_pt - inset,
+          ..cell_rect
+        }
+      }
+    } else {
+      cell_rect
+    };
     let output_area = calc_cell_output_area(
       CalcCellOutputContext {
         sheet: page.sheet,
@@ -2063,7 +2096,7 @@ fn render_cell_area(
         text_metrics,
       },
       cell,
-      cell_rect,
+      text_cell_rect,
       &measurement_style,
       alignment,
       layout.zoom_scale,
@@ -5437,6 +5470,11 @@ fn lower_drawing_chart(
         point_colors,
         point_styles,
         data_label_fill_colors,
+        leader_line_style: xlsx_chart_shape_style(
+          chart.leader_line_shape_properties,
+          import,
+          common::ShapeStyle::default(),
+        ),
         chart_area_style: xlsx_shape_style(
           chart_space.shape_properties.as_deref(),
           import,
@@ -5908,6 +5946,59 @@ fn lower_drawing_chart(
         .collect()
     })
     .collect();
+  let error_bar_styles = chart
+    .series
+    .iter()
+    .map(|series| {
+      series
+        .error_bars
+        .iter()
+        .map(|error_bars| {
+          xlsx_chart_shape_style(
+            error_bars.shape_properties,
+            import,
+            common::ShapeStyle::default(),
+          )
+        })
+        .collect()
+    })
+    .collect();
+  let group_decoration_styles = chart
+    .group_decorations
+    .iter()
+    .map(|group| CartesianChartGroupDecorationStyle {
+      drop_lines: xlsx_chart_shape_style(
+        group
+          .drop_lines
+          .and_then(|lines| lines.chart_shape_properties.as_deref()),
+        import,
+        common::ShapeStyle::default(),
+      ),
+      high_low_lines: xlsx_chart_shape_style(
+        group
+          .high_low_lines
+          .and_then(|lines| lines.chart_shape_properties.as_deref()),
+        import,
+        common::ShapeStyle::default(),
+      ),
+      up_bars: xlsx_chart_shape_style(
+        group
+          .up_down_bars
+          .and_then(|bars| bars.up_bars.as_deref())
+          .and_then(|bars| bars.chart_shape_properties.as_deref()),
+        import,
+        common::ShapeStyle::default(),
+      ),
+      down_bars: xlsx_chart_shape_style(
+        group
+          .up_down_bars
+          .and_then(|bars| bars.down_bars.as_deref())
+          .and_then(|bars| bars.chart_shape_properties.as_deref()),
+        import,
+        common::ShapeStyle::default(),
+      ),
+    })
+    .collect();
   let chart_area_style = xlsx_shape_style(
     chart_space.shape_properties.as_deref(),
     import,
@@ -6015,6 +6106,8 @@ fn lower_drawing_chart(
       series_point_colors,
       series_styles,
       trendline_styles,
+      error_bar_styles,
+      group_decoration_styles,
       series_point_styles,
       surface_band_colors,
       data_label_fill_colors: chart
@@ -6035,6 +6128,33 @@ fn lower_drawing_chart(
         .collect(),
       chart_area_style,
       plot_area_style,
+      floor_style: xlsx_shape_style(
+        chart_space
+          .chart
+          .floor
+          .as_deref()
+          .and_then(|floor| floor.shape_properties.as_deref()),
+        import,
+        solid_chart_shape_style(None, None),
+      ),
+      side_wall_style: xlsx_shape_style(
+        chart_space
+          .chart
+          .side_wall
+          .as_deref()
+          .and_then(|wall| wall.shape_properties.as_deref()),
+        import,
+        solid_chart_shape_style(None, None),
+      ),
+      back_wall_style: xlsx_shape_style(
+        chart_space
+          .chart
+          .back_wall
+          .as_deref()
+          .and_then(|wall| wall.shape_properties.as_deref()),
+        import,
+        solid_chart_shape_style(None, None),
+      ),
     },
   );
   let indexed_scatter_text = chart.series.iter().all(|series| {
@@ -6297,6 +6417,36 @@ fn resolve_hidden_chart_values(
     {
       series.bubble_sizes = values;
       resolved_any = true;
+    }
+
+    for error_bars in &mut series.error_bars {
+      let shared_chart::ChartErrorBarValues::Custom {
+        positive_formula,
+        positive_values,
+        negative_formula,
+        negative_values,
+      } = &mut error_bars.values
+      else {
+        continue;
+      };
+      let positive_missing =
+        positive_values.is_empty() || positive_values.iter().all(Option::is_none);
+      if (include_hidden_cells || positive_missing)
+        && let Some(formula) = *positive_formula
+        && let Some(values) = chart_reference_numeric_values(import, formula)
+      {
+        *positive_values = values;
+        resolved_any = true;
+      }
+      let negative_missing =
+        negative_values.is_empty() || negative_values.iter().all(Option::is_none);
+      if (include_hidden_cells || negative_missing)
+        && let Some(formula) = *negative_formula
+        && let Some(values) = chart_reference_numeric_values(import, formula)
+      {
+        *negative_values = values;
+        resolved_any = true;
+      }
     }
   }
 

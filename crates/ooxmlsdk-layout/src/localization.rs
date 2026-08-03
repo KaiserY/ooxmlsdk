@@ -55,17 +55,6 @@ impl OfficeLocaleContext {
     resolve_resource_locale(self.default_document_language())
   }
 
-  pub(crate) fn format_locale_is_simplified_chinese(&self) -> bool {
-    let Some(locale) = self.format_locale().and_then(maximized_locale) else {
-      return false;
-    };
-    locale.id.language.as_str() == "zh"
-      && locale
-        .id
-        .script
-        .is_some_and(|script| script.as_str() == "Hans")
-  }
-
   pub(crate) fn resource_locale(&self) -> OfficeResourceLocale {
     self.resource_locale
   }
@@ -177,6 +166,17 @@ pub(crate) struct OfficeStringCatalog {
   waterfall_decrease: &'static str,
   waterfall_total: &'static str,
   chart_display_units: [&'static str; 9],
+  // LibreOffice Calc's DataPilot resources are the owner for the explicit
+  // compatibility refresh path. Keep these separate from cached OOXML text;
+  // the latter is never translated by this catalog.
+  pivot_total: &'static str,
+  pivot_result: &'static str,
+  pivot_data: &'static str,
+  pivot_row_labels: &'static str,
+  pivot_column_labels: &'static str,
+  pivot_empty: &'static str,
+  pivot_all: &'static str,
+  pivot_multiple: &'static str,
   field_undefined_bookmark: &'static str,
   field_reference_source_not_found: &'static str,
   field_bookmark_name_not_specified: &'static str,
@@ -248,6 +248,38 @@ impl OfficeStringCatalog {
 
   pub(crate) fn chart_display_unit(self, unit: ChartDisplayUnit) -> &'static str {
     self.chart_display_units[unit as usize]
+  }
+
+  pub(crate) fn pivot_total(self) -> &'static str {
+    self.pivot_total
+  }
+
+  pub(crate) fn pivot_result(self) -> &'static str {
+    self.pivot_result
+  }
+
+  pub(crate) fn pivot_data(self) -> &'static str {
+    self.pivot_data
+  }
+
+  pub(crate) fn pivot_row_labels(self) -> &'static str {
+    self.pivot_row_labels
+  }
+
+  pub(crate) fn pivot_column_labels(self) -> &'static str {
+    self.pivot_column_labels
+  }
+
+  pub(crate) fn pivot_empty(self) -> &'static str {
+    self.pivot_empty
+  }
+
+  pub(crate) fn pivot_all(self) -> &'static str {
+    self.pivot_all
+  }
+
+  pub(crate) fn pivot_multiple(self) -> &'static str {
+    self.pivot_multiple
   }
 
   pub(crate) fn field_undefined_bookmark(self) -> &'static str {
@@ -326,6 +358,14 @@ const OFFICE_STRINGS_EN: OfficeStringCatalog = OfficeStringCatalog {
     "Billions",
     "Trillions",
   ],
+  pivot_total: "Total",
+  pivot_result: "Result",
+  pivot_data: "Data",
+  pivot_row_labels: "Row Labels",
+  pivot_column_labels: "Column Labels",
+  pivot_empty: "(empty)",
+  pivot_all: "- all -",
+  pivot_multiple: "- multiple -",
   field_undefined_bookmark: "Error! Bookmark not defined.",
   field_reference_source_not_found: "Error! Reference source not found.",
   field_bookmark_name_not_specified: "Error! No bookmark name given.",
@@ -350,6 +390,14 @@ const OFFICE_STRINGS_ZH_HANS: OfficeStringCatalog = OfficeStringCatalog {
   chart_display_units: [
     "百", "千", "万", "十万", "百万", "千万", "亿", "十亿", "万亿",
   ],
+  pivot_total: "合计",
+  pivot_result: "结果",
+  pivot_data: "数据",
+  pivot_row_labels: "行标签",
+  pivot_column_labels: "列标签",
+  pivot_empty: "(空白)",
+  pivot_all: "- 全部 -",
+  pivot_multiple: "- 多选 -",
   field_undefined_bookmark: "错误!未定义书签。",
   field_reference_source_not_found: "错误!未找到引用源。",
   field_bookmark_name_not_specified: "错误!未指定书签。",
@@ -375,6 +423,14 @@ const OFFICE_STRINGS_ZH_HANT: OfficeStringCatalog = OfficeStringCatalog {
   // display-unit spellings. Keep those exact resources until a Traditional
   // Chinese Office sample establishes a distinct pack.
   chart_display_units: OFFICE_STRINGS_ZH_HANS.chart_display_units,
+  pivot_total: "總計",
+  pivot_result: "結果",
+  pivot_data: "資料",
+  pivot_row_labels: "列標籤",
+  pivot_column_labels: "欄標籤",
+  pivot_empty: "(空缺)",
+  pivot_all: "- 全部 -",
+  pivot_multiple: "- 多項 -",
   field_undefined_bookmark: "錯誤！ 書籤未定義。",
   field_reference_source_not_found: "錯誤! 找不到參照來源。",
   field_bookmark_name_not_specified: "錯誤! 未提供書籤名稱。",

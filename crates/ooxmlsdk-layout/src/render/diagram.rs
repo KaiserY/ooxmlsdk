@@ -21,6 +21,9 @@ const SMARTART_TX_BULLET_INDENT_EMU: i32 = 285_750;
 // Microsoft's SmartArt layout documentation defines the default secondary
 // font size used by bulleted lines as 78 percent of the primary font size.
 const SMARTART_DEFAULT_SECONDARY_FONT_SCALE: f32 = 0.78;
+// DrawingML text layout uses a 120 percent line box when the paragraph does
+// not provide an explicit line-spacing value.
+const SMARTART_DEFAULT_LINE_HEIGHT_SCALE: f32 = 1.2;
 // ECMA-376 preset shape adjustments use 100000 as the full guide scale,
 // while diagram layout shape adjustments are stored as normalized doubles.
 const DRAWINGML_ADJUST_FULL_SCALE: f64 = 100_000.0;
@@ -49,6 +52,9 @@ pub struct DiagramShape {
   pub connector_end_arrow: bool,
   pub connector_begin_points: Option<String>,
   pub connector_end_points: Option<String>,
+  pub connector_beginning_padding: f32,
+  pub connector_end_padding: f32,
+  pub connector_bending_distance: f32,
   pub connector_start_override: Option<(f32, f32)>,
   pub connector_end_override: Option<(f32, f32)>,
   pub is_blip_placeholder: bool,
@@ -65,6 +71,7 @@ pub enum DiagramConnectorRoute {
   Straight,
   Bend,
   Curve,
+  LongCurve,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -73,9 +80,14 @@ enum ConnectorPointSet {
   Auto,
   TopCenter,
   BottomCenter,
+  Center,
   MiddleLeft,
   MiddleRight,
   MiddleLeftOrRight,
+  BottomLeft,
+  BottomRight,
+  TopLeft,
+  TopRight,
   Radial,
 }
 
@@ -138,6 +150,12 @@ impl DiagramShape {
         delta.0 < 0.0,
       )
     });
+    let (start, end) = padded_connector_segment(
+      start,
+      end,
+      self.connector_beginning_padding,
+      self.connector_end_padding,
+    );
     let mut commands = vec![crate::common::PathCommand::MoveTo(common_point(
       start.0, start.1,
     ))];
@@ -148,14 +166,31 @@ impl DiagramShape {
         )));
       }
       DiagramConnectorRoute::Bend => {
-        let bend = if self.connector_bend_at_end {
-          (start.0, end.1)
+        let dx = end.0 - start.0;
+        let dy = end.1 - start.1;
+        let authored_distance = self.connector_bending_distance.min(dx.abs().max(dy.abs()));
+        let (bend1, bend2) = if authored_distance > f32::EPSILON && dy.abs() >= dx.abs() {
+          // ECMA-376 defines bendDist from the connector's beginning,
+          // independent of whether the routing algorithm chooses the
+          // beginning or ending side as its preferred bend point.
+          let bend_y = start.1 + dy.signum() * authored_distance;
+          ((start.0, bend_y), (end.0, bend_y))
+        } else if authored_distance > f32::EPSILON {
+          let bend_x = start.0 + dx.signum() * authored_distance;
+          ((bend_x, start.1), (bend_x, end.1))
+        } else if self.connector_bend_at_end {
+          ((start.0, end.1), (start.0, end.1))
         } else {
-          (end.0, start.1)
+          ((end.0, start.1), (end.0, start.1))
         };
-        if (bend.0 - start.0).abs() > f32::EPSILON || (bend.1 - start.1).abs() > f32::EPSILON {
+        if (bend1.0 - start.0).abs() > f32::EPSILON || (bend1.1 - start.1).abs() > f32::EPSILON {
           commands.push(crate::common::PathCommand::LineTo(common_point(
-            bend.0, bend.1,
+            bend1.0, bend1.1,
+          )));
+        }
+        if (bend2.0 - bend1.0).abs() > f32::EPSILON || (bend2.1 - bend1.1).abs() > f32::EPSILON {
+          commands.push(crate::common::PathCommand::LineTo(common_point(
+            bend2.0, bend2.1,
           )));
         }
         commands.push(crate::common::PathCommand::LineTo(common_point(
@@ -179,6 +214,27 @@ impl DiagramShape {
           end: common_point(end.0, end.1),
         });
       }
+      DiagramConnectorRoute::LongCurve => {
+        let dx = end.0 - start.0;
+        let dy = end.1 - start.1;
+        let distance = dx.hypot(dy).max(1.0);
+        let authored_sweep = self.connector_bending_distance.abs();
+        let sweep = authored_sweep.max(distance / 2.0);
+        let side = if self.connector_bend_at_end {
+          1.0
+        } else {
+          -1.0
+        };
+        let normal = (-dy / distance * sweep * side, dx / distance * sweep * side);
+        commands.push(crate::common::PathCommand::CubicTo {
+          control1: common_point(start.0 + dx / 3.0 + normal.0, start.1 + dy / 3.0 + normal.1),
+          control2: common_point(
+            start.0 + dx * 2.0 / 3.0 + normal.0,
+            start.1 + dy * 2.0 / 3.0 + normal.1,
+          ),
+          end: common_point(end.0, end.1),
+        });
+      }
     }
     commands
   }
@@ -198,6 +254,30 @@ impl DiagramShape {
   }
 }
 
+fn padded_connector_segment(
+  start: (f32, f32),
+  end: (f32, f32),
+  beginning_padding: f32,
+  end_padding: f32,
+) -> ((f32, f32), (f32, f32)) {
+  let dx = end.0 - start.0;
+  let dy = end.1 - start.1;
+  let length = dx.hypot(dy);
+  if length <= f32::EPSILON {
+    return (start, end);
+  }
+  let beginning_padding = beginning_padding.max(0.0).min(length);
+  let end_padding = end_padding.max(0.0).min(length - beginning_padding);
+  let unit = (dx / length, dy / length);
+  (
+    (
+      start.0 + unit.0 * beginning_padding,
+      start.1 + unit.1 * beginning_padding,
+    ),
+    (end.0 - unit.0 * end_padding, end.1 - unit.1 * end_padding),
+  )
+}
+
 fn diagram_connector_point(
   authored: Option<&str>,
   shape: &DiagramShape,
@@ -207,10 +287,15 @@ fn diagram_connector_point(
   match authored {
     Some("tCtr") => (shape.x + shape.width / 2.0, shape.y),
     Some("bCtr") => (shape.x + shape.width / 2.0, shape.y + shape.height),
+    Some("ctr") => (shape.x + shape.width / 2.0, shape.y + shape.height / 2.0),
     Some("midL") => (shape.x, shape.y + shape.height / 2.0),
     Some("midR") => (shape.x + shape.width, shape.y + shape.height / 2.0),
     Some("midL midR") if prefer_left => (shape.x, shape.y + shape.height / 2.0),
     Some("midL midR") => (shape.x + shape.width, shape.y + shape.height / 2.0),
+    Some("bL") => (shape.x, shape.y + shape.height),
+    Some("bR") => (shape.x + shape.width, shape.y + shape.height),
+    Some("tL") => (shape.x, shape.y),
+    Some("tR") => (shape.x + shape.width, shape.y),
     Some("radial") | None => automatic,
     Some(_) => automatic,
   }
@@ -368,10 +453,14 @@ impl DiagramTextBody {
     shape_width_pt: f32,
     shape_height_pt: f32,
     primary_font_size_pt: Option<f32>,
+    data_node_type: Option<dgm::ElementValues>,
     constraints: &[DiagramConstraint],
   ) {
     for constraint in constraints {
       if !constraint.for_name.is_empty()
+        || constraint
+          .point_type
+          .is_some_and(|point_type| !diagram_element_type_matches(data_node_type, point_type))
         || !matches!(
           constraint.target,
           dgm::ConstraintValues::LeftMargin
@@ -388,7 +477,7 @@ impl DiagramTextBody {
         dgm::ConstraintValues::PrimaryFontSize | dgm::ConstraintValues::SecondaryFontSize => {
           primary_font_size_pt
         }
-        dgm::ConstraintValues::None if constraint.value != 0.0 => {
+        dgm::ConstraintValues::None if constraint.has_value => {
           Some(constraint_value_points(constraint))
         }
         _ => None,
@@ -742,6 +831,9 @@ struct DiagramShapeNode {
   connector_end_arrow: bool,
   connector_begin_points: Option<String>,
   connector_end_points: Option<String>,
+  connector_beginning_padding: f32,
+  connector_end_padding: f32,
+  connector_bending_distance: f32,
   connector_source_node: Option<String>,
   connector_destination_node: Option<String>,
   connector_route_shortest_distance: bool,
@@ -764,6 +856,7 @@ struct DiagramShapeNode {
   constraints: Vec<DiagramConstraint>,
   direct_constraints: Vec<DiagramConstraint>,
   rules: Vec<DiagramRule>,
+  placeholder_line_count: usize,
   children: Vec<DiagramShapeNode>,
 }
 
@@ -780,11 +873,14 @@ struct DiagramConstraint {
   ref_for_name: String,
   factor: f32,
   value: f32,
+  has_value: bool,
   target: dgm::ConstraintValues,
   reference: dgm::ConstraintValues,
   relationship: Option<dgm::ConstraintRelationshipValues>,
+  reference_relationship: Option<dgm::ConstraintRelationshipValues>,
   operator: Option<dgm::BoolOperatorValues>,
   point_type: Option<dgm::ElementValues>,
+  reference_point_type: Option<dgm::ElementValues>,
 }
 
 #[derive(Clone, Debug)]
@@ -958,6 +1054,45 @@ fn diagram_points(data: &dgm::DataModelRoot) -> Vec<&dgm::Point> {
     .collect()
 }
 
+fn diagram_sample_preferred_child_count(layout: &dgm::LayoutDefinition) -> usize {
+  let Some(model) = layout
+    .sample_data
+    .as_deref()
+    .and_then(|sample| sample.data_model.as_deref())
+  else {
+    return 0;
+  };
+  let points: HashMap<&str, dgm::PointValues> = model
+    .point_list
+    .xml_children
+    .iter()
+    .filter_map(|child| match child {
+      dgm::PointListChoice::Point(point) => {
+        Some((point.model_id.as_str(), point.r#type.unwrap_or_default()))
+      }
+      dgm::PointListChoice::AlternateContent(_) => None,
+    })
+    .collect();
+  let Some(connections) = model.connection_list.as_ref() else {
+    return 0;
+  };
+  let mut child_counts = HashMap::<&str, usize>::new();
+  for connection in &connections.connection {
+    if connection.r#type.unwrap_or_default() != dgm::ConnectionValues::ParentOf
+      || points.get(connection.source_id.as_str()) == Some(&dgm::PointValues::Document)
+      || points
+        .get(connection.destination_id.as_str())
+        .is_none_or(|point_type| *point_type != dgm::PointValues::Node)
+    {
+      continue;
+    }
+    *child_counts
+      .entry(connection.source_id.as_str())
+      .or_default() += 1;
+  }
+  child_counts.into_values().max().unwrap_or_default()
+}
+
 fn build_diagram_shape_tree(
   data: &dgm::DataModelRoot,
   layout: &dgm::LayoutDefinition,
@@ -969,6 +1104,7 @@ fn build_diagram_shape_tree(
   let connections = data.connection_list.as_ref()?;
   let points = diagram_points(data);
   let metrics = layout_node_metrics(Some(layout));
+  let placeholder_line_count = diagram_sample_preferred_child_count(layout);
   let point_by_id: HashMap<&str, &dgm::Point> = points
     .iter()
     .copied()
@@ -1042,6 +1178,7 @@ fn build_diagram_shape_tree(
     for_each_by_name: &for_each_by_name,
     connections,
     metrics: &metrics,
+    placeholder_line_count,
     styles,
     colors,
     fallback_fill,
@@ -1071,6 +1208,9 @@ fn build_diagram_shape_tree(
       connector_end_arrow: false,
       connector_begin_points: None,
       connector_end_points: None,
+      connector_beginning_padding: 0.0,
+      connector_end_padding: 0.0,
+      connector_bending_distance: 0.0,
       connector_source_node: None,
       connector_destination_node: None,
       connector_route_shortest_distance: false,
@@ -1093,6 +1233,7 @@ fn build_diagram_shape_tree(
       constraints: Vec::new(),
       direct_constraints: Vec::new(),
       rules: Vec::new(),
+      placeholder_line_count,
       children: Vec::new(),
     }),
     parent_path: Vec::new(),
@@ -1197,16 +1338,24 @@ fn iterator_indices(available: usize, start: i32, count: usize, step: i32) -> Ve
 
 fn point_matches_element_type(point: &dgm::Point, point_type: dgm::ElementValues) -> bool {
   let kind = point.r#type.unwrap_or(dgm::PointValues::Node);
-  match point_type {
+  diagram_element_type_matches(point_type_to_element_type(kind), point_type)
+}
+
+fn diagram_element_type_matches(
+  actual: Option<dgm::ElementValues>,
+  requested: dgm::ElementValues,
+) -> bool {
+  let actual = actual.unwrap_or(dgm::ElementValues::Node);
+  match requested {
     dgm::ElementValues::All => true,
-    dgm::ElementValues::Document => kind == dgm::PointValues::Document,
-    dgm::ElementValues::Node | dgm::ElementValues::Normal => kind == dgm::PointValues::Node,
-    dgm::ElementValues::NonNormal => kind == dgm::PointValues::Assistant,
-    dgm::ElementValues::Assistant => kind == dgm::PointValues::Assistant,
-    dgm::ElementValues::NonAssistant => kind != dgm::PointValues::Assistant,
-    dgm::ElementValues::ParentTransition => kind == dgm::PointValues::ParentTransition,
-    dgm::ElementValues::Presentation => kind == dgm::PointValues::Presentation,
-    dgm::ElementValues::SiblingTransition => kind == dgm::PointValues::SiblingTransition,
+    dgm::ElementValues::Node | dgm::ElementValues::Normal => actual == dgm::ElementValues::Node,
+    dgm::ElementValues::NonNormal => actual == dgm::ElementValues::Assistant,
+    dgm::ElementValues::NonAssistant => actual != dgm::ElementValues::Assistant,
+    dgm::ElementValues::Document
+    | dgm::ElementValues::Assistant
+    | dgm::ElementValues::ParentTransition
+    | dgm::ElementValues::Presentation
+    | dgm::ElementValues::SiblingTransition => actual == requested,
   }
 }
 
@@ -1218,6 +1367,7 @@ struct DiagramShapeCreationVisitor<'a> {
   for_each_by_name: &'a HashMap<&'a str, &'a dgm::ForEach>,
   connections: &'a dgm::ConnectionList,
   metrics: &'a LayoutNodeMetrics,
+  placeholder_line_count: usize,
   styles: Option<&'a DiagramStyles>,
   colors: Option<&'a DiagramStyleColors>,
   fallback_fill: RgbColor,
@@ -2321,6 +2471,9 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       connector_end_arrow: false,
       connector_begin_points: None,
       connector_end_points: None,
+      connector_beginning_padding: 0.0,
+      connector_end_padding: 0.0,
+      connector_bending_distance: 0.0,
       connector_source_node: None,
       connector_destination_node: None,
       connector_route_shortest_distance: false,
@@ -2352,6 +2505,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       constraints: self.active_constraints(layout_node),
       direct_constraints: self.active_constraints_unfiltered(layout_node),
       rules: self.active_rules(layout_node),
+      placeholder_line_count: self.placeholder_line_count,
       children: Vec::new(),
     };
     if self.parent_path.is_empty() && !self.tree_root_mapped {
@@ -2869,7 +3023,12 @@ fn parse_constraint(
       require_for_name = false;
     }
   }
+  // ECMA-376 §21.4.2.8 permits a constraint target to be selected by
+  // `forName`, by `ptType`, or by both.  Requiring a name here discarded the
+  // common cycle/linear form `for="ch" ptType="node"` before any layout
+  // algorithm could see it.
   if require_for_name
+    && constraint.point_type.is_none()
     && constraint
       .for_name
       .as_deref()
@@ -2886,11 +3045,14 @@ fn parse_constraint(
     ref_for_name: constraint.reference_for_name.clone().unwrap_or_default(),
     factor: constraint.fact.unwrap_or(1.0) as f32,
     value: constraint.val.unwrap_or_default() as f32,
+    has_value: constraint.val.is_some(),
     target: constraint.r#type,
     reference: constraint.reference_type.unwrap_or_default(),
     relationship: constraint.r#for,
+    reference_relationship: constraint.reference_for,
     operator: constraint.operator,
     point_type: constraint.point_type,
+    reference_point_type: constraint.reference_point_type,
   })
 }
 
@@ -2900,11 +3062,14 @@ fn parse_constraint_unfiltered(constraint: &dgm::Constraint) -> Option<DiagramCo
     ref_for_name: constraint.reference_for_name.clone().unwrap_or_default(),
     factor: constraint.fact.unwrap_or(1.0) as f32,
     value: constraint.val.unwrap_or_default() as f32,
+    has_value: constraint.val.is_some(),
     target: constraint.r#type,
     reference: constraint.reference_type.unwrap_or_default(),
     relationship: constraint.r#for,
+    reference_relationship: constraint.reference_for,
     operator: constraint.operator,
     point_type: constraint.point_type,
+    reference_point_type: constraint.reference_point_type,
   })
 }
 
@@ -3304,6 +3469,7 @@ fn layout_algorithm(algorithm: &dgm::Algorithm) -> LayoutAlgorithm {
     ) {
       Some("bend") => DiagramConnectorRoute::Bend,
       Some("curve") => DiagramConnectorRoute::Curve,
+      Some("longCurve") => DiagramConnectorRoute::LongCurve,
       _ => DiagramConnectorRoute::Straight,
     },
     connector_dimension: match algorithm_parameter_value(
@@ -3433,9 +3599,14 @@ fn connector_point_set_from_value(value: &str) -> ConnectorPointSet {
   match value {
     "tCtr" => ConnectorPointSet::TopCenter,
     "bCtr" => ConnectorPointSet::BottomCenter,
+    "ctr" => ConnectorPointSet::Center,
     "midL" => ConnectorPointSet::MiddleLeft,
     "midR" => ConnectorPointSet::MiddleRight,
     "midL midR" | "midR midL" => ConnectorPointSet::MiddleLeftOrRight,
+    "bL" => ConnectorPointSet::BottomLeft,
+    "bR" => ConnectorPointSet::BottomRight,
+    "tL" => ConnectorPointSet::TopLeft,
+    "tR" => ConnectorPointSet::TopRight,
     "radial" => ConnectorPointSet::Radial,
     _ => ConnectorPointSet::Auto,
   }
@@ -3447,9 +3618,14 @@ fn connector_point_set_name(value: ConnectorPointSet) -> Option<String> {
       ConnectorPointSet::Auto => return None,
       ConnectorPointSet::TopCenter => "tCtr",
       ConnectorPointSet::BottomCenter => "bCtr",
+      ConnectorPointSet::Center => "ctr",
       ConnectorPointSet::MiddleLeft => "midL",
       ConnectorPointSet::MiddleRight => "midR",
       ConnectorPointSet::MiddleLeftOrRight => "midL midR",
+      ConnectorPointSet::BottomLeft => "bL",
+      ConnectorPointSet::BottomRight => "bR",
+      ConnectorPointSet::TopLeft => "tL",
+      ConnectorPointSet::TopRight => "tR",
       ConnectorPointSet::Radial => "radial",
     }
     .to_string(),
@@ -3632,7 +3808,7 @@ fn assign_diagram_font_sync_groups(
       (group.for_name.is_empty() || group.for_name == node.internal_name)
         && group
           .point_type
-          .is_none_or(|point_type| Some(point_type) == node.data_node_type)
+          .is_none_or(|point_type| diagram_element_type_matches(node.data_node_type, point_type))
     })
     .map(|group| group.key.clone());
 
@@ -3669,9 +3845,9 @@ fn apply_direct_node_size_constraints(node: &mut DiagramShapeNode) {
       .is_none_or(|relationship| relationship == dgm::ConstraintRelationshipValues::_Self)
       || (!constraint.for_name.is_empty() && constraint.for_name != node.internal_name)
       || (!constraint.ref_for_name.is_empty() && constraint.ref_for_name != node.internal_name)
-      || constraint.point_type.is_some_and(|point_type| {
-        point_type != dgm::ElementValues::All && Some(point_type) != node.data_node_type
-      })
+      || constraint
+        .point_type
+        .is_some_and(|point_type| !diagram_element_type_matches(node.data_node_type, point_type))
     {
       continue;
     }
@@ -3679,7 +3855,7 @@ fn apply_direct_node_size_constraints(node: &mut DiagramShapeNode) {
     let reference = match constraint.reference {
       dgm::ConstraintValues::Width => width,
       dgm::ConstraintValues::Height => height,
-      dgm::ConstraintValues::None if constraint.value != 0.0 => constraint_value_points(constraint),
+      dgm::ConstraintValues::None if constraint.has_value => constraint_value_points(constraint),
       _ => continue,
     };
     let desired = if constraint.reference == dgm::ConstraintValues::None {
@@ -3755,9 +3931,9 @@ fn layout_shape_children(
   match algorithm.kind {
     dgm::AlgorithmValues::Composite => composite_layout_tree(node, algorithm.clone(), constraints),
     dgm::AlgorithmValues::Linear => linear_layout_tree(node, algorithm.clone(), constraints, rules),
-    dgm::AlgorithmValues::Cycle => cycle_layout_tree(node, algorithm.clone()),
+    dgm::AlgorithmValues::Cycle => cycle_layout_tree(node, algorithm.clone(), constraints),
     dgm::AlgorithmValues::HierarchyRoot | dgm::AlgorithmValues::HierarchyChild => {
-      hierarchy_layout_tree(node, algorithm.clone())
+      hierarchy_layout_tree(node, algorithm.clone(), constraints)
     }
     dgm::AlgorithmValues::Snake => snake_layout_tree(node, algorithm.clone(), constraints),
     dgm::AlgorithmValues::Text => apply_text_algorithm(
@@ -3773,7 +3949,7 @@ fn layout_shape_children(
       // likewise clears the `sp` shape text before the `tx` atom lays it out.
       node.text_body = DiagramTextBody::default();
     }
-    dgm::AlgorithmValues::Connector => connector_layout_tree(node, algorithm.clone()),
+    dgm::AlgorithmValues::Connector => connector_layout_tree(node, algorithm.clone(), constraints),
     dgm::AlgorithmValues::Pyramid => pyramid_layout_tree(node, algorithm.clone()),
   }
   align_children_in_parent(
@@ -3809,6 +3985,9 @@ fn apply_text_algorithm(
     .find(|constraint| {
       constraint.target == dgm::ConstraintValues::PrimaryFontSize
         && (constraint.for_name.is_empty() || constraint.for_name == node.internal_name)
+        && constraint
+          .point_type
+          .is_none_or(|point_type| diagram_element_type_matches(node.data_node_type, point_type))
     })
     .map(|constraint| constraint.value)
     .filter(|value| *value > 0.0);
@@ -3825,7 +4004,7 @@ fn apply_text_algorithm(
         && (rule.for_name.is_empty() || rule.for_name == node.internal_name)
         && rule
           .point_type
-          .is_none_or(|point_type| Some(point_type) == node.data_node_type)
+          .is_none_or(|point_type| diagram_element_type_matches(node.data_node_type, point_type))
     })
     .map(|rule| rule.value)
     .filter(|value| *value > 0.0);
@@ -3837,6 +4016,7 @@ fn apply_text_algorithm(
       .flatten()
       .or(font_size)
       .or(node.font_size_pt),
+    node.data_node_type,
     constraints,
   );
   node
@@ -3912,6 +4092,9 @@ fn apply_text_algorithm(
       .find(|constraint| {
         constraint.target == dgm::ConstraintValues::SecondaryFontSize
           && (constraint.for_name.is_empty() || constraint.for_name == node.internal_name)
+          && constraint
+            .point_type
+            .is_none_or(|point_type| diagram_element_type_matches(node.data_node_type, point_type))
       })
       .map(|constraint| {
         if constraint.value > 0.0 {
@@ -4008,11 +4191,215 @@ impl DiagramShapeNode {
   }
 }
 
+fn collect_matching_diagram_descendant_names(
+  node: &DiagramShapeNode,
+  point_type: Option<dgm::ElementValues>,
+  names: &mut Vec<String>,
+) {
+  for child in &node.children {
+    if point_type
+      .is_none_or(|point_type| diagram_element_type_matches(child.data_node_type, point_type))
+    {
+      names.push(child.internal_name.clone());
+    }
+    collect_matching_diagram_descendant_names(child, point_type, names);
+  }
+}
+
+fn diagram_descendant_by_name<'a>(
+  node: &'a DiagramShapeNode,
+  name: &str,
+) -> Option<&'a DiagramShapeNode> {
+  node.children.iter().find_map(|child| {
+    (child.internal_name == name)
+      .then_some(child)
+      .or_else(|| diagram_descendant_by_name(child, name))
+  })
+}
+
+fn constraint_reference_name(
+  node: &DiagramShapeNode,
+  constraint: &DiagramConstraint,
+  target_name: Option<&str>,
+) -> Option<String> {
+  if !constraint.ref_for_name.is_empty() {
+    return Some(constraint.ref_for_name.clone());
+  }
+  let reference_matches = |candidate: &DiagramShapeNode| {
+    constraint
+      .reference_point_type
+      .is_none_or(|point_type| diagram_element_type_matches(candidate.data_node_type, point_type))
+  };
+  match constraint
+    .reference_relationship
+    .unwrap_or(dgm::ConstraintRelationshipValues::_Self)
+  {
+    dgm::ConstraintRelationshipValues::_Self => constraint
+      .reference_point_type
+      .is_none_or(|point_type| diagram_element_type_matches(node.data_node_type, point_type))
+      .then(String::new),
+    dgm::ConstraintRelationshipValues::Child => target_name
+      .and_then(|target_name| {
+        node
+          .children
+          .iter()
+          .find(|child| child.internal_name == target_name && reference_matches(child))
+      })
+      .or_else(|| node.children.iter().find(|child| reference_matches(child)))
+      .map(|child| child.internal_name.clone()),
+    dgm::ConstraintRelationshipValues::Descendant => target_name
+      .and_then(|target_name| diagram_descendant_by_name(node, target_name))
+      .filter(|child| reference_matches(child))
+      .or_else(|| {
+        let mut stack: Vec<_> = node.children.iter().collect();
+        let mut found = None;
+        while let Some(candidate) = stack.pop() {
+          if reference_matches(candidate) {
+            found = Some(candidate);
+            break;
+          }
+          stack.extend(candidate.children.iter());
+        }
+        found
+      })
+      .map(|child| child.internal_name.clone()),
+  }
+}
+
+fn expand_constraints_for_children(
+  node: &DiagramShapeNode,
+  constraints: &[DiagramConstraint],
+) -> Vec<DiagramConstraint> {
+  let mut expanded = Vec::new();
+  for constraint in constraints {
+    let relationship = constraint
+      .relationship
+      .unwrap_or(dgm::ConstraintRelationshipValues::_Self);
+    let mut target_names = if !constraint.for_name.is_empty() {
+      vec![constraint.for_name.clone()]
+    } else {
+      match relationship {
+        dgm::ConstraintRelationshipValues::_Self => Vec::new(),
+        dgm::ConstraintRelationshipValues::Child => node
+          .children
+          .iter()
+          .filter(|child| {
+            constraint.point_type.is_none_or(|point_type| {
+              diagram_element_type_matches(child.data_node_type, point_type)
+            })
+          })
+          .map(|child| child.internal_name.clone())
+          .collect(),
+        dgm::ConstraintRelationshipValues::Descendant => {
+          let mut names = Vec::new();
+          collect_matching_diagram_descendant_names(node, constraint.point_type, &mut names);
+          names
+        }
+      }
+    };
+    target_names.sort();
+    target_names.dedup();
+    if target_names.is_empty() {
+      // A child/descendant selector that has no match in this layout scope is
+      // inapplicable.  Keeping its empty `forName` would retarget it to the
+      // current canvas: a `sibTrans` width of 0.1, for example, would then
+      // shrink the parent on every solver pass.
+      if relationship != dgm::ConstraintRelationshipValues::_Self {
+        continue;
+      }
+      let mut constraint = constraint.clone();
+      if let Some(reference_name) = constraint_reference_name(node, &constraint, None) {
+        constraint.ref_for_name = reference_name;
+      }
+      expanded.push(constraint);
+      continue;
+    }
+    for target_name in target_names {
+      let mut constraint = constraint.clone();
+      constraint.for_name = target_name.clone();
+      if let Some(reference_name) =
+        constraint_reference_name(node, &constraint, Some(target_name.as_str()))
+      {
+        constraint.ref_for_name = reference_name;
+      }
+      expanded.push(constraint);
+    }
+  }
+  expanded
+}
+
+fn direct_constraint_applies_to_node(
+  constraint: &DiagramConstraint,
+  node: &DiagramShapeNode,
+) -> bool {
+  constraint
+    .relationship
+    .is_none_or(|relationship| relationship == dgm::ConstraintRelationshipValues::_Self)
+    && (constraint.for_name.is_empty() || constraint.for_name == node.internal_name)
+    && constraint
+      .point_type
+      .is_none_or(|point_type| diagram_element_type_matches(node.data_node_type, point_type))
+}
+
+fn has_unbounded_height_rule(rules: &[DiagramRule], for_name: &str) -> bool {
+  rules.iter().any(|rule| {
+    rule.target == dgm::ConstraintValues::Height
+      && rule.value.is_infinite()
+      && (rule.for_name.is_empty() || rule.for_name == for_name)
+  })
+}
+
+fn diagram_placeholder_text_height(
+  node: &DiagramShapeNode,
+  properties: &HashMap<dgm::ConstraintValues, f32>,
+) -> Option<f32> {
+  if node.placeholder_line_count == 0 {
+    return None;
+  }
+  let primary_font_size =
+    layout_property_value(properties, dgm::ConstraintValues::PrimaryFontSize).or(node.font_size_pt);
+  let secondary_font_size =
+    layout_property_value(properties, dgm::ConstraintValues::SecondaryFontSize)
+      .or(primary_font_size.map(|value| value * SMARTART_DEFAULT_SECONDARY_FONT_SCALE));
+  let line_font_size = secondary_font_size.or(primary_font_size)?;
+  let mut vertical_margins = 0.0;
+  for constraint in &node.direct_constraints {
+    if !matches!(
+      constraint.target,
+      dgm::ConstraintValues::TopMargin | dgm::ConstraintValues::BottomMargin
+    ) {
+      continue;
+    }
+    let value = match constraint.reference {
+      dgm::ConstraintValues::PrimaryFontSize => primary_font_size,
+      dgm::ConstraintValues::SecondaryFontSize => secondary_font_size,
+      dgm::ConstraintValues::Width => Some(node.width),
+      dgm::ConstraintValues::Height => Some(node.height),
+      dgm::ConstraintValues::None if constraint.has_value => {
+        Some(constraint_value_points(constraint))
+      }
+      _ => None,
+    };
+    if let Some(value) = value {
+      vertical_margins += if constraint.reference == dgm::ConstraintValues::None {
+        value
+      } else {
+        value * constraint.factor
+      };
+    }
+  }
+  Some(
+    line_font_size * SMARTART_DEFAULT_LINE_HEIGHT_SCALE * node.placeholder_line_count as f32
+      + vertical_margins,
+  )
+}
+
 fn composite_layout_tree(
   node: &mut DiagramShapeNode,
   algorithm: LayoutAlgorithm,
   constraints: &[DiagramConstraint],
 ) {
+  let mut constraints = expand_constraints_for_children(node, constraints);
   let mut properties: HashMap<String, HashMap<dgm::ConstraintValues, f32>> = HashMap::new();
   let parent_width = if algorithm.aspect_ratio.unwrap_or_default() == 1.0 {
     node.width.min(node.height)
@@ -4029,83 +4416,184 @@ fn composite_layout_tree(
     HashMap::from([
       (dgm::ConstraintValues::Width, parent_width),
       (dgm::ConstraintValues::Height, node.height),
-      (dgm::ConstraintValues::Left, parent_x_offset),
+      (dgm::ConstraintValues::Left, 0.0),
       (dgm::ConstraintValues::Top, 0.0),
-      (dgm::ConstraintValues::Right, node.width - parent_x_offset),
+      (dgm::ConstraintValues::Right, parent_width),
       (dgm::ConstraintValues::Bottom, node.height),
+      (dgm::ConstraintValues::CenterHeight, parent_width / 2.0),
+      (dgm::ConstraintValues::CenterWidth, node.height / 2.0),
+      (
+        dgm::ConstraintValues::Diameter,
+        parent_width.min(node.height),
+      ),
     ]),
   );
-  for constraint in constraints {
-    apply_constraint_to_layout(constraint, &mut properties);
+  for child in &node.children {
+    let width = if child.width > 0.0 {
+      child.width
+    } else {
+      parent_width
+    };
+    let height = if child.height > 0.0 {
+      child.height
+    } else {
+      node.height
+    };
+    properties.insert(
+      child.internal_name.clone(),
+      HashMap::from([
+        (dgm::ConstraintValues::Width, width),
+        (dgm::ConstraintValues::Height, height),
+      ]),
+    );
+    for direct in &child.direct_constraints {
+      if !direct_constraint_applies_to_node(direct, child) {
+        continue;
+      }
+      let mut direct = direct.clone();
+      if direct.for_name.is_empty() {
+        direct.for_name.clone_from(&child.internal_name);
+      }
+      if direct.ref_for_name.is_empty() && direct.reference != dgm::ConstraintValues::None {
+        direct.ref_for_name.clone_from(&child.internal_name);
+      }
+      constraints.push(direct);
+    }
   }
+  solve_layout_constraints(&constraints, &mut properties);
   let mut vertical_min = f32::MAX;
   let mut vertical_max = 0.0_f32;
+  let child_count = node.children.len();
   for child in &mut node.children {
+    // Composite constraints are order-sensitive. Re-apply the constraints for
+    // the current child after earlier children have accepted their local
+    // limits, so a stacked child's `t=previous.h` observes that final height.
+    // Microsoft documents this ordering requirement for composite layouts,
+    // and LibreOffice applies the parent constraints once per child for the
+    // same reason.
     for constraint in constraints
       .iter()
       .filter(|constraint| constraint.for_name == child.internal_name)
     {
       apply_constraint_to_layout(constraint, &mut properties);
     }
-    for constraint in &child.direct_constraints {
-      if !constraint.for_name.is_empty() || !constraint.ref_for_name.is_empty() {
+    // Constraints declared on the child layout node refine the slot selected
+    // by this composite algorithm.  In particular, an `lte` size constraint
+    // together with an unbounded growth rule selects the boundary value; it
+    // is not a request to keep an earlier, smaller inherited size.  Apply
+    // these local constraints last, as CompositeAlg does in LibreOffice.
+    for direct in &child.direct_constraints {
+      if !direct_constraint_applies_to_node(direct, child) || !direct.ref_for_name.is_empty() {
         continue;
       }
-      if constraint.value == 0.0 && constraint.reference == dgm::ConstraintValues::None {
+      if direct.reference == dgm::ConstraintValues::None && !direct.has_value {
         continue;
       }
-      let mut constraint = constraint.clone();
-      constraint.for_name = child.internal_name.clone();
-      constraint.ref_for_name = child.internal_name.clone();
-      apply_constraint_to_layout(&constraint, &mut properties);
+      let mut direct = direct.clone();
+      direct.for_name.clone_from(&child.internal_name);
+      if direct.reference != dgm::ConstraintValues::None {
+        direct.ref_for_name.clone_from(&child.internal_name);
+      }
+      // A local boundary supersedes the inherited approximation.  The
+      // constraint itself remains authoritative; rules decide which
+      // constraints may move when the containing algorithm later scales.
+      direct.operator = Some(dgm::BoolOperatorValues::Equal);
+      apply_constraint_to_layout(&direct, &mut properties);
     }
     let properties_for_child = properties.get(child.internal_name.as_str());
-    let mut width = node.width;
+    let mut width = parent_width;
     let mut height = node.height;
     let mut x = 0.0;
     let mut y = 0.0;
     if let Some(properties_for_child) = properties_for_child {
-      if let Some(value) = properties_for_child.get(&dgm::ConstraintValues::Width) {
-        width = (*value).min(node.width);
+      let left = layout_property_value(properties_for_child, dgm::ConstraintValues::Left);
+      let right = layout_property_value(properties_for_child, dgm::ConstraintValues::Right);
+      let top = layout_property_value(properties_for_child, dgm::ConstraintValues::Top);
+      let bottom = layout_property_value(properties_for_child, dgm::ConstraintValues::Bottom);
+      if let Some(value) = layout_property_value(properties_for_child, dgm::ConstraintValues::Width)
+      {
+        width = value;
       }
-      if let Some(value) = properties_for_child.get(&dgm::ConstraintValues::Height) {
-        height = (*value).min(node.height);
+      if let Some(value) =
+        layout_property_value(properties_for_child, dgm::ConstraintValues::Height)
+      {
+        height = value;
       }
-      if let Some(value) = properties_for_child.get(&dgm::ConstraintValues::Left) {
-        x = *value;
-      } else if let Some(value) = properties_for_child.get(&dgm::ConstraintValues::CenterHeight) {
-        x = *value - width / 2.0;
-      } else if let Some(value) = properties_for_child.get(&dgm::ConstraintValues::Right) {
-        x = *value - width;
-      }
-      if let Some(value) = properties_for_child.get(&dgm::ConstraintValues::Top) {
-        y = *value;
-      } else if let Some(value) = properties_for_child.get(&dgm::ConstraintValues::CenterWidth) {
-        y = *value - height / 2.0;
-      } else if let Some(value) = properties_for_child.get(&dgm::ConstraintValues::Bottom) {
-        y = *value - height;
-      }
-      if let (Some(left), Some(right)) = (
-        properties_for_child.get(&dgm::ConstraintValues::Left),
-        properties_for_child.get(&dgm::ConstraintValues::Right),
-      ) {
+      if let (Some(left), Some(right)) = (left, right) {
         width = right - left;
       }
-      if let (Some(top), Some(bottom)) = (
-        properties_for_child.get(&dgm::ConstraintValues::Top),
-        properties_for_child.get(&dgm::ConstraintValues::Bottom),
-      ) {
+      if let (Some(top), Some(bottom)) = (top, bottom) {
         height = bottom - top;
       }
+      x = left
+        .or_else(|| {
+          layout_property_value(properties_for_child, dgm::ConstraintValues::CenterHeight)
+            .map(|center| center - width / 2.0)
+        })
+        .or_else(|| right.map(|right| right - width))
+        .unwrap_or_default();
+      y = top
+        .or_else(|| {
+          layout_property_value(properties_for_child, dgm::ConstraintValues::CenterWidth)
+            .map(|center| center - height / 2.0)
+        })
+        .or_else(|| bottom.map(|bottom| bottom - height))
+        .unwrap_or_default();
     }
     x += parent_x_offset;
-    child.x = x.max(0.0);
-    child.y = y.max(0.0);
-    child.width = width.min((node.width - child.x).max(0.0));
-    child.height = height.min((node.height - child.y).max(0.0));
+    child.x = if x.is_finite() { x } else { 0.0 };
+    child.y = if y.is_finite() { y } else { 0.0 };
+    child.width = if width.is_finite() {
+      width.max(0.0).min((node.width - child.x.max(0.0)).max(0.0))
+    } else {
+      parent_width
+    };
+    child.height = if height.is_finite() {
+      height
+        .max(0.0)
+        .min((node.height - child.y.max(0.0)).max(0.0))
+    } else {
+      node.height
+    };
+    let has_stacked_top = constraints.iter().any(|constraint| {
+      constraint.for_name == child.internal_name
+        && constraint.target == dgm::ConstraintValues::Top
+        && constraint.reference == dgm::ConstraintValues::Height
+        && !constraint.ref_for_name.is_empty()
+        && constraint.ref_for_name != child.internal_name
+    });
+    let has_explicit_bottom = constraints.iter().any(|constraint| {
+      constraint.for_name == child.internal_name
+        && constraint.target == dgm::ConstraintValues::Bottom
+    });
+    if child_count > 1
+      && node
+        .rules
+        .iter()
+        .any(|rule| rule.target == dgm::ConstraintValues::Height && rule.value.is_infinite())
+      && has_unbounded_height_rule(&child.rules, child.internal_name.as_str())
+      && child.text_body.is_empty()
+      && has_stacked_top
+      && !has_explicit_bottom
+      && let Some(preferred_height) = properties_for_child
+        .and_then(|properties| diagram_placeholder_text_height(child, properties))
+    {
+      // An empty descendant-text panel still reserves the line capacity shown
+      // by the layout definition's sample data. The rule may grow the initial
+      // constraint to that preferred size, but never beyond the remaining
+      // composite canvas.
+      child.height = preferred_height
+        .max(child.height)
+        .min((node.height - child.y.max(0.0)).max(0.0));
+    }
     vertical_min = vertical_min.min(child.y);
     vertical_max = vertical_max.max(child.y + child.height);
   }
+  // Composite coordinates describe the relative arrangement of the child
+  // extent.  Office and LibreOffice center that complete extent whenever it
+  // fits, including layouts whose children use explicit `t`/`b` constraints
+  // internally (hList1 is the common counterexample to treating those as a
+  // canvas-level anchor).
   if vertical_min >= 0.0 && vertical_min <= vertical_max && vertical_max <= node.height {
     let diff = node.height - (vertical_max - vertical_min);
     if diff > 0.0 {
@@ -4122,27 +4610,36 @@ fn composite_layout_tree(
 fn apply_constraint_to_layout(
   constraint: &DiagramConstraint,
   properties: &mut HashMap<String, HashMap<dgm::ConstraintValues, f32>>,
-) {
-  if constraint.for_name.is_empty() {
-    return;
-  }
+) -> bool {
   let reference = properties.get(constraint.ref_for_name.as_str());
-  let value = reference
-    .and_then(|properties| properties.get(&constraint.reference).copied())
-    .or_else(|| {
-      reference.and_then(|properties| {
-        if constraint.reference == dgm::ConstraintValues::Right {
-          Some(
-            properties.get(&dgm::ConstraintValues::Left).copied()?
-              + properties.get(&dgm::ConstraintValues::Width).copied()?,
-          )
-        } else {
-          None
-        }
-      })
-    })
-    .map(|value| value * constraint.factor)
-    .unwrap_or_else(|| constraint_value_points(constraint));
+  let value = if constraint.reference == dgm::ConstraintValues::None {
+    // A constraint without either `refType` or `val` does not prescribe the
+    // literal value zero.  DrawingML layout definitions use this form with
+    // `op="equ"` to keep a relationship set uniform after its members have
+    // been measured (for example, equal-height SmartArt siblings).  Until we
+    // have a measured group value, retain the existing property.
+    if !constraint.has_value {
+      return false;
+    }
+    constraint_value_points(constraint)
+  } else {
+    let value = reference
+      .and_then(|properties| layout_property_value(properties, constraint.reference))
+      .map(|value| value * constraint.factor);
+    match value {
+      Some(value) => value,
+      None if constraint.has_value => constraint_value_points(constraint),
+      None => {
+        // Layout definitions routinely reference a sibling declared later in
+        // the constraint list. Leave it unresolved for the next solver pass;
+        // substituting the default literal zero collapses the target shape.
+        return false;
+      }
+    }
+  };
+  if !value.is_finite() {
+    return false;
+  }
   let properties = properties.entry(constraint.for_name.clone()).or_default();
   let value = match (
     constraint.operator.unwrap_or_default(),
@@ -4152,11 +4649,155 @@ fn apply_constraint_to_layout(
     (dgm::BoolOperatorValues::LessThanOrEqualTo, Some(current)) => current.min(value),
     _ => value,
   };
+  let changed = properties
+    .get(&constraint.target)
+    .is_none_or(|current| (*current - value).abs() > f32::EPSILON);
   properties.insert(constraint.target, value);
+  changed
+}
+
+fn solve_layout_constraints(
+  constraints: &[DiagramConstraint],
+  properties: &mut HashMap<String, HashMap<dgm::ConstraintValues, f32>>,
+) {
+  // A complete pass can unlock at least one forward reference. The extra
+  // pass propagates offset-derived geometry (for example r + rOff -> l).
+  for _ in 0..=constraints.len().min(256) {
+    let mut changed = false;
+    for constraint in constraints {
+      changed |= apply_constraint_to_layout(constraint, properties);
+    }
+    if !changed {
+      break;
+    }
+  }
+}
+
+fn layout_property_value(
+  properties: &HashMap<dgm::ConstraintValues, f32>,
+  property: dgm::ConstraintValues,
+) -> Option<f32> {
+  let offset_for = |property| match property {
+    dgm::ConstraintValues::Left => Some(dgm::ConstraintValues::LeftOffset),
+    dgm::ConstraintValues::Right => Some(dgm::ConstraintValues::RightOffset),
+    dgm::ConstraintValues::Top => Some(dgm::ConstraintValues::TopOffset),
+    dgm::ConstraintValues::Bottom => Some(dgm::ConstraintValues::BottomOffset),
+    dgm::ConstraintValues::CenterHeight => Some(dgm::ConstraintValues::CenterXOffset),
+    dgm::ConstraintValues::CenterWidth => Some(dgm::ConstraintValues::CenterYOffset),
+    dgm::ConstraintValues::Width => Some(dgm::ConstraintValues::WidthOffset),
+    dgm::ConstraintValues::Height => Some(dgm::ConstraintValues::HeightOffset),
+    _ => None,
+  };
+  let get = |property| {
+    properties.get(&property).copied().map(|value| {
+      value
+        + offset_for(property)
+          .and_then(|offset| properties.get(&offset))
+          .copied()
+          .unwrap_or_default()
+    })
+  };
+  if let Some(value) = get(property) {
+    return Some(value);
+  }
+  match property {
+    dgm::ConstraintValues::Left => get(dgm::ConstraintValues::Right)
+      .zip(get(dgm::ConstraintValues::Width))
+      .map(|(right, width)| right - width)
+      .or_else(|| {
+        get(dgm::ConstraintValues::CenterHeight)
+          .zip(get(dgm::ConstraintValues::Width))
+          .map(|(center, width)| center - width / 2.0)
+      }),
+    dgm::ConstraintValues::Right => get(dgm::ConstraintValues::Left)
+      .zip(get(dgm::ConstraintValues::Width))
+      .map(|(left, width)| left + width)
+      .or_else(|| {
+        get(dgm::ConstraintValues::CenterHeight)
+          .zip(get(dgm::ConstraintValues::Width))
+          .map(|(center, width)| center + width / 2.0)
+      }),
+    // The generated enum names follow the schema documentation's historical
+    // labels: CenterHeight is `ctrX`, and CenterWidth is `ctrY`.
+    dgm::ConstraintValues::CenterHeight => get(dgm::ConstraintValues::Left)
+      .zip(get(dgm::ConstraintValues::Width))
+      .map(|(left, width)| left + width / 2.0)
+      .or_else(|| {
+        get(dgm::ConstraintValues::Right)
+          .zip(get(dgm::ConstraintValues::Width))
+          .map(|(right, width)| right - width / 2.0)
+      }),
+    dgm::ConstraintValues::Top => get(dgm::ConstraintValues::Bottom)
+      .zip(get(dgm::ConstraintValues::Height))
+      .map(|(bottom, height)| bottom - height)
+      .or_else(|| {
+        get(dgm::ConstraintValues::CenterWidth)
+          .zip(get(dgm::ConstraintValues::Height))
+          .map(|(center, height)| center - height / 2.0)
+      }),
+    dgm::ConstraintValues::Bottom => get(dgm::ConstraintValues::Top)
+      .zip(get(dgm::ConstraintValues::Height))
+      .map(|(top, height)| top + height)
+      .or_else(|| {
+        get(dgm::ConstraintValues::CenterWidth)
+          .zip(get(dgm::ConstraintValues::Height))
+          .map(|(center, height)| center + height / 2.0)
+      }),
+    dgm::ConstraintValues::CenterWidth => get(dgm::ConstraintValues::Top)
+      .zip(get(dgm::ConstraintValues::Height))
+      .map(|(top, height)| top + height / 2.0)
+      .or_else(|| {
+        get(dgm::ConstraintValues::Bottom)
+          .zip(get(dgm::ConstraintValues::Height))
+          .map(|(bottom, height)| bottom - height / 2.0)
+      }),
+    dgm::ConstraintValues::Width => get(dgm::ConstraintValues::Left)
+      .zip(get(dgm::ConstraintValues::Right))
+      .map(|(left, right)| right - left),
+    dgm::ConstraintValues::Height => get(dgm::ConstraintValues::Top)
+      .zip(get(dgm::ConstraintValues::Bottom))
+      .map(|(top, bottom)| bottom - top),
+    dgm::ConstraintValues::Diameter => get(dgm::ConstraintValues::Width)
+      .zip(get(dgm::ConstraintValues::Height))
+      .map(|(width, height)| width.min(height)),
+    _ => None,
+  }
 }
 
 fn constraint_value_points(constraint: &DiagramConstraint) -> f32 {
   if matches!(
+    constraint.target,
+    dgm::ConstraintValues::PrimaryFontSize
+      | dgm::ConstraintValues::SecondaryFontSize
+      | dgm::ConstraintValues::PyramidAccentRatio
+      | dgm::ConstraintValues::AlignmentOffset
+      | dgm::ConstraintValues::UserDefinedA
+      | dgm::ConstraintValues::UserDefinedB
+      | dgm::ConstraintValues::UserDefinedC
+      | dgm::ConstraintValues::UserDefinedD
+      | dgm::ConstraintValues::UserDefinedE
+      | dgm::ConstraintValues::UserDefinedF
+      | dgm::ConstraintValues::UserDefinedG
+      | dgm::ConstraintValues::UserDefinedH
+      | dgm::ConstraintValues::UserDefinedI
+      | dgm::ConstraintValues::UserDefinedJ
+      | dgm::ConstraintValues::UserDefinedK
+      | dgm::ConstraintValues::UserDefinedL
+      | dgm::ConstraintValues::UserDefinedM
+      | dgm::ConstraintValues::UserDefinedN
+      | dgm::ConstraintValues::UserDefinedO
+      | dgm::ConstraintValues::UserDefinedP
+      | dgm::ConstraintValues::UserDefinedQ
+      | dgm::ConstraintValues::UserDefinedR
+      | dgm::ConstraintValues::UserDefinedS
+      | dgm::ConstraintValues::UserDefinedT
+      | dgm::ConstraintValues::UserDefinedU
+      | dgm::ConstraintValues::UserDefinedV
+      | dgm::ConstraintValues::UserDefinedW
+      | dgm::ConstraintValues::UserDefinedX
+      | dgm::ConstraintValues::UserDefinedY
+      | dgm::ConstraintValues::UserDefinedZ
+  ) || matches!(
     constraint.reference,
     dgm::ConstraintValues::PrimaryFontSize | dgm::ConstraintValues::SecondaryFontSize
   ) {
@@ -4194,44 +4835,69 @@ fn linear_layout_tree(
     LinearDirection::Top => 270.0,
     LinearDirection::Bottom => 90.0,
   };
-  let mut properties: HashMap<String, HashMap<dgm::ConstraintValues, f32>> = HashMap::new();
-  for constraint in constraints {
-    let target_names = if !constraint.for_name.is_empty() {
-      vec![constraint.for_name.as_str()]
-    } else if let Some(point_type) = constraint.point_type {
-      node
-        .children
-        .iter()
-        .filter(|child| child.data_node_type == Some(point_type))
-        .map(|child| child.internal_name.as_str())
-        .collect()
-    } else {
-      Vec::new()
-    };
-    for target_name in target_names {
-      if constraint.target == dgm::ConstraintValues::Width {
-        properties
-          .entry(target_name.to_string())
-          .or_default()
-          .insert(
-            dgm::ConstraintValues::Width,
-            (node.width * constraint.factor).min(node.width),
-          );
+  let mut properties: HashMap<String, HashMap<dgm::ConstraintValues, f32>> = HashMap::from([(
+    String::new(),
+    HashMap::from([
+      (dgm::ConstraintValues::Width, node.width),
+      (dgm::ConstraintValues::Height, node.height),
+      (dgm::ConstraintValues::Left, 0.0),
+      (dgm::ConstraintValues::Top, 0.0),
+      (dgm::ConstraintValues::Right, node.width),
+      (dgm::ConstraintValues::Bottom, node.height),
+    ]),
+  )]);
+  let mut constraints = expand_constraints_for_children(node, constraints);
+  for child in &node.children {
+    properties.entry(child.internal_name.clone()).or_default();
+    for direct in &child.direct_constraints {
+      if !direct_constraint_applies_to_node(direct, child) {
+        continue;
       }
-      if constraint.target == dgm::ConstraintValues::Height {
-        properties
-          .entry(target_name.to_string())
-          .or_default()
-          .insert(
-            dgm::ConstraintValues::Height,
-            (node.height * constraint.factor).min(node.height),
-          );
+      let mut direct = direct.clone();
+      if direct.for_name.is_empty() {
+        direct.for_name.clone_from(&child.internal_name);
       }
+      if direct.ref_for_name.is_empty() && direct.reference != dgm::ConstraintValues::None {
+        direct.ref_for_name.clone_from(&child.internal_name);
+      }
+      constraints.push(direct);
     }
+  }
+  solve_layout_constraints(&constraints, &mut properties);
+  // Linear layout constraints are normalized against the current algorithm
+  // canvas before overflow scaling.  Keeping this explicit slot pass is
+  // important for repeated layout names: every `compNode` instance receives
+  // the same pre-scale width instead of inheriting a partially solved value
+  // from another instance with that name.  This mirrors LinearLayout's first
+  // approximation in LibreOffice and leaves the general solver available for
+  // offsets and cross-name references.
+  for constraint in &constraints {
+    if !matches!(
+      constraint.target,
+      dgm::ConstraintValues::Width | dgm::ConstraintValues::Height
+    ) || !node
+      .children
+      .iter()
+      .any(|child| child.internal_name == constraint.for_name)
+    {
+      continue;
+    }
+    let canvas_extent = if constraint.target == dgm::ConstraintValues::Width {
+      node.width
+    } else {
+      node.height
+    };
+    let value = (canvas_extent * constraint.factor)
+      .max(0.0)
+      .min(canvas_extent);
+    properties
+      .entry(constraint.for_name.clone())
+      .or_default()
+      .insert(constraint.target, value);
   }
   let mut space_width = 0.0;
   let mut space_height = 0.0;
-  for constraint in constraints {
+  for constraint in &constraints {
     if matches!(constraint.for_name.as_str(), "sp" | "space" | "sibTrans") {
       // A materialized spacing/transition layout node already consumes its
       // constrained width or height in the linear child sequence. Adding the
@@ -4244,10 +4910,38 @@ fn linear_layout_tree(
         continue;
       }
       if constraint.target == dgm::ConstraintValues::Width {
-        space_width = node.width * constraint.factor;
+        space_width = properties
+          .get(constraint.for_name.as_str())
+          .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Width))
+          .unwrap_or(node.width * constraint.factor);
       }
       if constraint.target == dgm::ConstraintValues::Height {
-        space_height = node.height * constraint.factor;
+        space_height = properties
+          .get(constraint.for_name.as_str())
+          .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Height))
+          .unwrap_or(node.height * constraint.factor);
+      }
+    }
+    if constraint.for_name.is_empty()
+      && matches!(
+        constraint.target,
+        dgm::ConstraintValues::Spacing | dgm::ConstraintValues::SiblingSpacing
+      )
+    {
+      let value = properties
+        .get("")
+        .and_then(|properties| layout_property_value(properties, constraint.target))
+        .unwrap_or_else(|| {
+          if horizontal {
+            node.width * constraint.factor
+          } else {
+            node.height * constraint.factor
+          }
+        });
+      if horizontal {
+        space_width = value;
+      } else {
+        space_height = value;
       }
     }
   }
@@ -4332,12 +5026,10 @@ fn linear_layout_tree(
   for child in &node.children {
     let child_properties = properties.get(child.internal_name.as_str());
     let width = child_properties
-      .and_then(|properties| properties.get(&dgm::ConstraintValues::Width))
-      .copied()
+      .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Width))
       .unwrap_or(base_width);
     let height = child_properties
-      .and_then(|properties| properties.get(&dgm::ConstraintValues::Height))
-      .copied()
+      .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Height))
       .unwrap_or(base_height);
     total_primary += if horizontal { width } else { height };
   }
@@ -4373,12 +5065,10 @@ fn linear_layout_tree(
   for child in &mut node.children {
     let child_properties = properties.get(child.internal_name.as_str());
     let mut width = child_properties
-      .and_then(|properties| properties.get(&dgm::ConstraintValues::Width))
-      .copied()
+      .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Width))
       .unwrap_or(base_width);
     let mut height = child_properties
-      .and_then(|properties| properties.get(&dgm::ConstraintValues::Height))
-      .copied()
+      .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Height))
       .unwrap_or(base_height);
     if shrink_names.is_empty() || shrink_names.contains(child.internal_name.as_str()) {
       width *= width_scale;
@@ -4394,7 +5084,7 @@ fn linear_layout_tree(
         x
       };
       child.x = x.max(0.0);
-      child.y = child_cross_axis_offset(
+      let default_y = child_cross_axis_offset(
         node.height,
         height,
         algorithm
@@ -4403,8 +5093,21 @@ fn linear_layout_tree(
         algorithm.node_vertical_alignment,
         true,
       );
-      child.width = width;
-      child.height = height;
+      child.y = child_properties
+        .map(|properties| {
+          constrained_axis_position(
+            properties,
+            dgm::ConstraintValues::Top,
+            dgm::ConstraintValues::Bottom,
+            dgm::ConstraintValues::CenterWidth,
+            dgm::ConstraintValues::TopOffset,
+            height,
+            default_y,
+          )
+        })
+        .unwrap_or(default_y);
+      child.width = width.max(0.0);
+      child.height = height.max(0.0);
       if child.is_connector {
         child.connector_angle_deg = connector_angle;
       }
@@ -4422,7 +5125,7 @@ fn linear_layout_tree(
         cursor += height;
         y
       };
-      child.x = child_cross_axis_offset(
+      let default_x = child_cross_axis_offset(
         node.width,
         width,
         algorithm
@@ -4431,9 +5134,22 @@ fn linear_layout_tree(
         algorithm.node_horizontal_alignment,
         false,
       );
+      child.x = child_properties
+        .map(|properties| {
+          constrained_axis_position(
+            properties,
+            dgm::ConstraintValues::Left,
+            dgm::ConstraintValues::Right,
+            dgm::ConstraintValues::CenterHeight,
+            dgm::ConstraintValues::LeftOffset,
+            width,
+            default_x,
+          )
+        })
+        .unwrap_or(default_x);
       child.y = y.max(0.0);
-      child.width = width;
-      child.height = height;
+      child.width = width.max(0.0);
+      child.height = height.max(0.0);
       if child.is_connector {
         child.connector_angle_deg = connector_angle;
       }
@@ -4447,6 +5163,21 @@ fn linear_layout_tree(
   if node.child_order == dgm::ChildOrderValues::Top {
     node.children.reverse();
   }
+}
+
+fn constrained_axis_position(
+  properties: &HashMap<dgm::ConstraintValues, f32>,
+  start: dgm::ConstraintValues,
+  end: dgm::ConstraintValues,
+  center: dgm::ConstraintValues,
+  offset: dgm::ConstraintValues,
+  extent: f32,
+  default: f32,
+) -> f32 {
+  layout_property_value(properties, start)
+    .or_else(|| layout_property_value(properties, center).map(|center| center - extent / 2.0))
+    .or_else(|| layout_property_value(properties, end).map(|end| end - extent))
+    .unwrap_or_else(|| default + properties.get(&offset).copied().unwrap_or_default())
 }
 
 fn child_cross_axis_offset(
@@ -4481,6 +5212,15 @@ fn align_children_in_parent(
   horizontal: Option<AxisAlignment>,
   vertical: Option<AxisAlignment>,
 ) {
+  align_children_in_parent_with_offset(node, horizontal, vertical, None);
+}
+
+fn align_children_in_parent_with_offset(
+  node: &mut DiagramShapeNode,
+  horizontal: Option<AxisAlignment>,
+  vertical: Option<AxisAlignment>,
+  alignment_offset: Option<f32>,
+) {
   if node.children.is_empty() {
     return;
   }
@@ -4506,11 +5246,27 @@ fn align_children_in_parent(
     .fold(f32::NEG_INFINITY, f32::max);
   let dx = horizontal
     .filter(|alignment| *alignment != AxisAlignment::None)
-    .map(|alignment| axis_alignment_offset(node.width, right - left, alignment) - left)
+    .map(|alignment| {
+      let slack = (node.width - (right - left)).max(0.0);
+      let aligned = match (alignment, alignment_offset) {
+        (AxisAlignment::Start, Some(offset)) => slack * (1.0 - offset),
+        (AxisAlignment::End, Some(offset)) => slack * offset,
+        _ => axis_alignment_offset(node.width, right - left, alignment),
+      };
+      aligned - left
+    })
     .unwrap_or(0.0);
   let dy = vertical
     .filter(|alignment| *alignment != AxisAlignment::None)
-    .map(|alignment| axis_alignment_offset(node.height, bottom - top, alignment) - top)
+    .map(|alignment| {
+      let slack = (node.height - (bottom - top)).max(0.0);
+      let aligned = match (alignment, alignment_offset) {
+        (AxisAlignment::Start, Some(offset)) => slack * (1.0 - offset),
+        (AxisAlignment::End, Some(offset)) => slack * offset,
+        _ => axis_alignment_offset(node.height, bottom - top, alignment),
+      };
+      aligned - top
+    })
     .unwrap_or(0.0);
   if dx == 0.0 && dy == 0.0 {
     return;
@@ -4521,7 +5277,11 @@ fn align_children_in_parent(
   }
 }
 
-fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
+fn cycle_layout_tree(
+  node: &mut DiagramShapeNode,
+  algorithm: LayoutAlgorithm,
+  constraints: &[DiagramConstraint],
+) {
   if node.children.is_empty() {
     return;
   }
@@ -4535,21 +5295,163 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
   {
     node.children.rotate_left(index);
   }
-  let center_x = lo_i32(node.width / 2.0);
-  let center_y = lo_i32(node.height / 2.0);
-  let child_width = lo_i32(node.width / 4.0);
-  let child_height = lo_i32(node.height / 4.0);
-  let connector_width = lo_i32(node.width / 12.0);
-  let connector_height = lo_i32(node.height / 12.0);
-  let radius = lo_i32(((node.width - child_width) / 2.0).min((node.height - child_height) / 2.0));
+  let mut cycle_constraints = expand_constraints_for_children(node, constraints);
+  let mut properties = HashMap::from([(
+    String::new(),
+    HashMap::from([
+      (dgm::ConstraintValues::Width, node.width),
+      (dgm::ConstraintValues::Height, node.height),
+      (dgm::ConstraintValues::Left, 0.0),
+      (dgm::ConstraintValues::Top, 0.0),
+      (dgm::ConstraintValues::Right, node.width),
+      (dgm::ConstraintValues::Bottom, node.height),
+      (dgm::ConstraintValues::CenterHeight, node.width / 2.0),
+      (dgm::ConstraintValues::CenterWidth, node.height / 2.0),
+      (dgm::ConstraintValues::Diameter, node.width.min(node.height)),
+    ]),
+  )]);
+  for child in &node.children {
+    properties.insert(
+      child.internal_name.clone(),
+      HashMap::from([
+        (
+          dgm::ConstraintValues::Width,
+          if child.width > 0.0 {
+            child.width
+          } else {
+            node.width
+          },
+        ),
+        (
+          dgm::ConstraintValues::Height,
+          if child.height > 0.0 {
+            child.height
+          } else {
+            node.height
+          },
+        ),
+      ]),
+    );
+    for direct in &child.direct_constraints {
+      let mut direct = direct.clone();
+      if direct.for_name.is_empty() {
+        direct.for_name.clone_from(&child.internal_name);
+      }
+      if direct.ref_for_name.is_empty() && direct.reference != dgm::ConstraintValues::None {
+        direct.ref_for_name.clone_from(&child.internal_name);
+      }
+      cycle_constraints.push(direct);
+    }
+  }
+  solve_layout_constraints(&cycle_constraints, &mut properties);
+
+  let parent_properties = properties.get("");
+  let diameter = parent_properties
+    .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Diameter))
+    .unwrap_or_else(|| node.width.min(node.height))
+    .max(0.0);
+  let center_x = parent_properties
+    .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::CenterHeight))
+    .unwrap_or(node.width / 2.0);
+  let center_y = parent_properties
+    .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::CenterWidth))
+    .unwrap_or(node.height / 2.0);
+  let default_child_width = node.width / 4.0;
+  let default_child_height = node.height / 4.0;
+  let default_connector_width = node.width / 12.0;
+  let default_connector_height = node.height / 12.0;
+  let raw_child_size = |child: &DiagramShapeNode| {
+    let child_properties = properties.get(child.internal_name.as_str());
+    let width = child_properties
+      .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Width))
+      .unwrap_or(if child.is_connector {
+        default_connector_width
+      } else {
+        default_child_width
+      });
+    let height = child_properties
+      .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Height))
+      .unwrap_or(if child.is_connector {
+        default_connector_height
+      } else {
+        default_child_height
+      });
+    (width.max(0.0), height.max(0.0))
+  };
+  let max_raw_width = node
+    .children
+    .iter()
+    .filter(|child| !child.is_connector)
+    .map(|child| raw_child_size(child).0)
+    .fold(0.0_f32, f32::max);
+  let max_raw_height = node
+    .children
+    .iter()
+    .filter(|child| !child.is_connector)
+    .map(|child| raw_child_size(child).1)
+    .fold(0.0_f32, f32::max);
+  let normalized_fraction = if algorithm.center_shape_mapping_first_node {
+    0.5
+  } else {
+    0.25
+  };
+  let width_scale =
+    if max_raw_width > node.width * normalized_fraction && max_raw_width > f32::EPSILON {
+      node.width * normalized_fraction / max_raw_width
+    } else {
+      1.0
+    };
+  let height_scale =
+    if max_raw_height > node.height * normalized_fraction && max_raw_height > f32::EPSILON {
+      node.height * normalized_fraction / max_raw_height
+    } else {
+      1.0
+    };
+  let uniform_scale = width_scale.min(height_scale);
+  let scaled_child_size = |child: &DiagramShapeNode| {
+    let (width, height) = raw_child_size(child);
+    (
+      lo_i32(width * uniform_scale),
+      lo_i32(height * uniform_scale),
+    )
+  };
+  let sibling_spacing = parent_properties
+    .and_then(|properties| {
+      layout_property_value(properties, dgm::ConstraintValues::SiblingSpacing)
+        .or_else(|| layout_property_value(properties, dgm::ConstraintValues::Spacing))
+    })
+    .unwrap_or_default()
+    * uniform_scale;
+  let max_orbit_width = node
+    .children
+    .iter()
+    .skip(usize::from(algorithm.center_shape_mapping_first_node))
+    .filter(|child| !child.is_connector)
+    .map(|child| scaled_child_size(child).0)
+    .fold(0.0_f32, f32::max)
+    .max(default_child_width * uniform_scale);
+  let max_orbit_height = node
+    .children
+    .iter()
+    .skip(usize::from(algorithm.center_shape_mapping_first_node))
+    .filter(|child| !child.is_connector)
+    .map(|child| scaled_child_size(child).1)
+    .fold(0.0_f32, f32::max)
+    .max(default_child_height * uniform_scale);
+  let radius = lo_i32(
+    ((diameter - max_orbit_width - sibling_spacing) / 2.0)
+      .min((diameter - max_orbit_height - sibling_spacing) / 2.0)
+      .max(0.0),
+  );
   let mut start = 0usize;
   if algorithm.center_shape_mapping_first_node
     && let Some(center) = node.children.first_mut()
   {
-    center.x = center_x - lo_i32(child_width / 2.0);
-    center.y = center_y - lo_i32(child_height / 2.0);
-    center.width = child_width;
-    center.height = child_height;
+    let (width, height) = scaled_child_size(center);
+    center.x = lo_i32(center_x - width / 2.0);
+    center.y = lo_i32(center_y - height / 2.0);
+    center.width = width;
+    center.height = height;
     start = 1;
   }
   let count = node.children.len().saturating_sub(start);
@@ -4558,7 +5460,7 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
   }
   let connector_radius = lo_i32(
     radius
-      * ((algorithm.span_angle as i32 / count as i32) as f32)
+      * (algorithm.span_angle / count as f32 / 2.0)
         .to_radians()
         .cos(),
   );
@@ -4570,13 +5472,25 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
   for (index, child) in node.children.iter_mut().skip(start).enumerate() {
     let angle = (index as f32) * algorithm.span_angle / count as f32 + algorithm.start_angle;
     let radians = angle.to_radians();
-    let (width, height, current_radius) = if child.is_connector {
-      (connector_width, connector_height, connector_radius)
+    let (width, height) = scaled_child_size(child);
+    let connection_distance = properties
+      .get(child.internal_name.as_str())
+      .and_then(|properties| {
+        layout_property_value(properties, dgm::ConstraintValues::ConnectionDistance)
+      })
+      .unwrap_or_default()
+      * uniform_scale;
+    let current_radius = if child.is_connector {
+      connector_radius + connection_distance
     } else {
-      (child_width, child_height, radius)
+      radius + connection_distance
     };
     child.x = lo_i32(center_x + current_radius * radians.sin() - lo_i32(width / 2.0));
-    child.y = lo_i32(center_y + current_radius * radians.cos() - lo_i32(height / 2.0));
+    // DrawingML cycle angles start at the top of the canvas and advance
+    // clockwise in the slide coordinate system.  Y grows downwards, so the
+    // cosine component is subtracted (LibreOffice's SmartArt cycle importer
+    // uses the same centerY - radius * cos(angle) mapping).
+    child.y = lo_i32(center_y - current_radius * radians.cos() - lo_i32(height / 2.0));
     child.width = width;
     child.height = height;
     if algorithm.rotation_path_along_path {
@@ -4589,7 +5503,11 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
   }
 }
 
-fn connector_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
+fn connector_layout_tree(
+  node: &mut DiagramShapeNode,
+  algorithm: LayoutAlgorithm,
+  constraints: &[DiagramConstraint],
+) {
   if !node.is_connector {
     return;
   }
@@ -4603,44 +5521,65 @@ fn connector_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
   node.connector_source_node = algorithm.connector_source_node;
   node.connector_destination_node = algorithm.connector_destination_node;
   node.connector_route_shortest_distance = algorithm.connector_route_shortest_distance;
-  let mut properties = HashMap::from([(
-    String::new(),
-    HashMap::from([
-      (dgm::ConstraintValues::Width, node.width),
-      (dgm::ConstraintValues::Height, node.height),
-      (dgm::ConstraintValues::Left, 0.0),
-      (dgm::ConstraintValues::Top, 0.0),
-      (dgm::ConstraintValues::Right, node.width),
-      (dgm::ConstraintValues::Bottom, node.height),
-    ]),
-  )]);
-  for constraint in &node.direct_constraints {
-    let Some(reference_properties) = properties.get(constraint.ref_for_name.as_str()) else {
-      continue;
-    };
-    let Some(reference) = reference_properties.get(&constraint.reference).copied() else {
-      continue;
-    };
-    properties
-      .entry(constraint.for_name.clone())
-      .or_default()
-      .insert(constraint.target, reference * constraint.factor);
-  }
-  let Some(parent_properties) = properties.get("") else {
-    return;
+  let node_name = node.internal_name.clone();
+  let base_properties = HashMap::from([
+    (dgm::ConstraintValues::Width, node.width),
+    (dgm::ConstraintValues::Height, node.height),
+    (dgm::ConstraintValues::Left, 0.0),
+    (dgm::ConstraintValues::Top, 0.0),
+    (dgm::ConstraintValues::Right, node.width),
+    (dgm::ConstraintValues::Bottom, node.height),
+  ]);
+  let mut properties = HashMap::from([
+    (String::new(), base_properties.clone()),
+    (node_name.clone(), base_properties),
+  ]);
+  let mut applicable_constraints: Vec<_> = constraints
+    .iter()
+    .filter(|constraint| {
+      (constraint.for_name.is_empty() || constraint.for_name == node_name)
+        && constraint
+          .point_type
+          .is_none_or(|point_type| diagram_element_type_matches(node.data_node_type, point_type))
+        && constraint
+          .relationship
+          .is_none_or(|relationship| relationship != dgm::ConstraintRelationshipValues::Child)
+    })
+    .cloned()
+    .collect();
+  applicable_constraints.extend(node.direct_constraints.clone());
+  solve_layout_constraints(&applicable_constraints, &mut properties);
+  let resolved = |target| {
+    let named_target = applicable_constraints
+      .iter()
+      .any(|constraint| constraint.for_name == node_name && constraint.target == target);
+    let named = properties
+      .get(node_name.as_str())
+      .and_then(|properties| layout_property_value(properties, target));
+    let parent = properties
+      .get("")
+      .and_then(|properties| layout_property_value(properties, target));
+    if named_target {
+      named.or(parent)
+    } else {
+      parent.or(named)
+    }
   };
-  let width = parent_properties
-    .get(&dgm::ConstraintValues::Width)
-    .copied()
-    .unwrap_or(node.width);
-  let height = parent_properties
-    .get(&dgm::ConstraintValues::Height)
-    .copied()
-    .unwrap_or(node.height);
+  let width = resolved(dgm::ConstraintValues::Width).unwrap_or(node.width);
+  let height = resolved(dgm::ConstraintValues::Height).unwrap_or(node.height);
   node.x += (node.width - width) / 2.0;
   node.y += (node.height - height) / 2.0;
-  node.width = width;
-  node.height = height;
+  node.width = width.max(0.0);
+  node.height = height.max(0.0);
+  node.connector_beginning_padding = resolved(dgm::ConstraintValues::BeginningPadding)
+    .unwrap_or_default()
+    .max(0.0);
+  node.connector_end_padding = resolved(dgm::ConstraintValues::EndPadding)
+    .unwrap_or_default()
+    .max(0.0);
+  node.connector_bending_distance = resolved(dgm::ConstraintValues::BendingDistance)
+    .unwrap_or_default()
+    .abs();
 }
 
 fn pyramid_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
@@ -4661,7 +5600,11 @@ fn pyramid_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) 
   }
 }
 
-fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
+fn hierarchy_layout_tree(
+  node: &mut DiagramShapeNode,
+  algorithm: LayoutAlgorithm,
+  constraints: &[DiagramConstraint],
+) {
   if node.children.is_empty() || node.width == 0.0 || node.height == 0.0 {
     return;
   }
@@ -4692,8 +5635,63 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
     return;
   }
 
-  let space_width = 0.1;
-  let space_height = 0.3;
+  let node_name = node.internal_name.clone();
+  let mut constraint_properties = HashMap::from([(
+    String::new(),
+    HashMap::from([
+      (dgm::ConstraintValues::Width, node.width),
+      (dgm::ConstraintValues::Height, node.height),
+    ]),
+  )]);
+  solve_layout_constraints(constraints, &mut constraint_properties);
+  let resolved_constraint = |target| {
+    constraint_properties
+      .get(node_name.as_str())
+      .and_then(|properties| layout_property_value(properties, target))
+      .or_else(|| {
+        constraint_properties
+          .get("")
+          .and_then(|properties| layout_property_value(properties, target))
+      })
+  };
+  let reference_extent = constraint_properties
+    .values()
+    .flat_map(|properties| {
+      [
+        layout_property_value(properties, dgm::ConstraintValues::Width),
+        layout_property_value(properties, dgm::ConstraintValues::Height),
+      ]
+    })
+    .flatten()
+    .filter(|value| value.is_finite() && *value > f32::EPSILON)
+    .fold(node.width.max(node.height), f32::max);
+  let spacing_ratio = |target, fallback: f32| {
+    resolved_constraint(target)
+      .or_else(|| resolved_constraint(dgm::ConstraintValues::Spacing))
+      .map(|spacing| spacing / reference_extent)
+      .or_else(|| {
+        constraints.iter().rev().find_map(|constraint| {
+          (constraint.target == target
+            && (constraint.for_name.is_empty() || constraint.for_name == node_name)
+            && matches!(
+              constraint.reference,
+              dgm::ConstraintValues::Width | dgm::ConstraintValues::Height
+            )
+            && constraint.factor.is_finite())
+          .then_some(constraint.factor)
+        })
+      })
+      .unwrap_or(fallback)
+      .clamp(-0.9, 4.0)
+  };
+  let primary_spacing = spacing_ratio(dgm::ConstraintValues::SiblingSpacing, 0.1);
+  let secondary_spacing = spacing_ratio(dgm::ConstraintValues::SecondarySiblingSpacing, 0.3);
+  let (space_width, space_height) =
+    if matches!(direction, LinearDirection::Left | LinearDirection::Right) {
+      (primary_spacing, secondary_spacing)
+    } else {
+      (secondary_spacing, primary_spacing)
+    };
   if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot && count == 3 {
     let assistant_index = node
       .children
@@ -4750,6 +5748,28 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
     child.height = height;
 
     if matches!(direction, LinearDirection::Top | LinearDirection::Bottom) {
+      child.x = child_cross_axis_offset(
+        node.width,
+        child.width,
+        algorithm
+          .child_alignment
+          .or(algorithm.secondary_child_alignment),
+        algorithm.node_horizontal_alignment,
+        false,
+      );
+    } else {
+      child.y = child_cross_axis_offset(
+        node.height,
+        child.height,
+        algorithm
+          .child_alignment
+          .or(algorithm.secondary_child_alignment),
+        algorithm.node_vertical_alignment,
+        true,
+      );
+    }
+
+    if matches!(direction, LinearDirection::Top | LinearDirection::Bottom) {
       y += lo_i32(height + child_height * space_height);
     } else {
       x += lo_i32(child_width + child_width * space_width);
@@ -4763,10 +5783,24 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
     }
     index += 1;
   }
-  align_children_in_parent(
+  if direction == LinearDirection::Right {
+    for child in &mut node.children {
+      child.x = node.width - child.x - child.width;
+    }
+  }
+  if direction == LinearDirection::Bottom {
+    for child in &mut node.children {
+      child.y = node.height - child.y - child.height;
+    }
+  }
+  let alignment_offset = resolved_constraint(dgm::ConstraintValues::AlignmentOffset)
+    .filter(|offset| offset.is_finite())
+    .map(|offset| offset.clamp(0.0, 1.0));
+  align_children_in_parent_with_offset(
     node,
     algorithm.hierarchy_horizontal_alignment,
     algorithm.hierarchy_vertical_alignment,
+    alignment_offset,
   );
 }
 
@@ -4846,10 +5880,8 @@ fn snake_layout_tree(
     shape_width = shape_height * child_aspect_ratio;
   }
 
-  let mut space_from_constraint = 1.0;
+  let mut snake_constraints = expand_constraints_for_children(node, constraints);
   let mut properties_by_name: HashMap<String, HashMap<dgm::ConstraintValues, f32>> = HashMap::new();
-  let mut properties_by_type: HashMap<dgm::ElementValues, HashMap<dgm::ConstraintValues, f32>> =
-    HashMap::new();
   properties_by_name.insert(
     String::new(),
     HashMap::from([
@@ -4857,53 +5889,56 @@ fn snake_layout_tree(
       (dgm::ConstraintValues::Height, shape_height),
     ]),
   );
-  for constraint in constraints {
-    if matches!(
-      constraint.reference,
-      dgm::ConstraintValues::Width | dgm::ConstraintValues::Height
-    ) && constraint.target == dgm::ConstraintValues::Spacing
-      && constraint.for_name.is_empty()
-    {
-      space_from_constraint = constraint.factor;
-    }
-    let Some(reference_properties) = properties_by_name.get(constraint.ref_for_name.as_str())
-    else {
-      continue;
-    };
-    let Some(reference) = reference_properties.get(&constraint.reference) else {
-      continue;
-    };
-    if constraint.value != 0.0 {
-      continue;
-    }
-    let value = lo_i32(reference * constraint.factor);
-    if let Some(point_type) = constraint.point_type {
-      properties_by_type
-        .entry(point_type)
-        .or_default()
-        .insert(constraint.target, value);
-    } else {
-      properties_by_name
-        .entry(constraint.for_name.clone())
-        .or_default()
-        .insert(constraint.target, value);
+  for child in &node.children {
+    properties_by_name
+      .entry(child.internal_name.clone())
+      .or_insert_with(|| {
+        HashMap::from([
+          (dgm::ConstraintValues::Width, shape_width),
+          (dgm::ConstraintValues::Height, shape_height),
+        ])
+      });
+    for direct in &child.direct_constraints {
+      let mut direct = direct.clone();
+      if direct.for_name.is_empty() {
+        direct.for_name.clone_from(&child.internal_name);
+      }
+      if direct.ref_for_name.is_empty() && direct.reference != dgm::ConstraintValues::None {
+        direct.ref_for_name.clone_from(&child.internal_name);
+      }
+      snake_constraints.push(direct);
     }
   }
+  solve_layout_constraints(&snake_constraints, &mut properties_by_name);
 
-  let shape_widths: Vec<f32> = node
+  let shape_sizes: Vec<(f32, f32)> = node
     .children
     .iter()
     .map(|child| {
-      child
-        .data_node_type
-        .and_then(|data_node_type| properties_by_type.get(&data_node_type))
-        .and_then(|properties| properties.get(&dgm::ConstraintValues::Width))
-        .copied()
-        .unwrap_or(shape_width)
+      let properties = properties_by_name.get(child.internal_name.as_str());
+      (
+        properties
+          .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Width))
+          .unwrap_or(shape_width)
+          .max(0.0),
+        properties
+          .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Height))
+          .unwrap_or(shape_height)
+          .max(0.0),
+      )
     })
     .collect();
+  let shape_widths: Vec<f32> = shape_sizes.iter().map(|size| size.0).collect();
 
-  let space_from_constraints = space_from_constraint != 1.0;
+  let spacing_value = properties_by_name
+    .get("")
+    .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Spacing));
+  let normalized_spacing = spacing_value
+    .map(|spacing| spacing / shape_width.max(f32::EPSILON))
+    .filter(|spacing| spacing.is_finite())
+    .map(|spacing| spacing.clamp(-0.9, 4.0));
+  let space_from_constraints = normalized_spacing.is_some();
+  let space_from_constraint = normalized_spacing.unwrap_or(1.0);
   let (increment_x, increment_y) = match algorithm.grow_direction {
     GrowDirection::TopLeft => (1.0, 1.0),
     GrowDirection::TopRight => (-1.0, 1.0),
@@ -4920,7 +5955,6 @@ fn snake_layout_tree(
   let grid_aspect_ratio = 0.54;
   let mut columns = 1usize;
   let mut rows = 1usize;
-  let mut max_row_width = 0.0_f32;
   if child_aspect_ratio != 0.0 && count as f32 <= child_aspect_ratio {
     rows = count;
   } else {
@@ -4930,7 +5964,6 @@ fn snake_layout_tree(
       columns = candidate_columns;
       let row_width: f32 = shape_widths.iter().take(candidate_columns).sum();
       if row_width != 0.0 && shape_height * candidate_rows as f32 / row_width >= grid_aspect_ratio {
-        max_row_width = row_width;
         break;
       }
     }
@@ -4947,6 +5980,10 @@ fn snake_layout_tree(
     }
     dgm::BreakpointValues::EndCanvas => {}
   }
+  let max_row_width = shape_widths
+    .chunks(columns.max(1))
+    .map(|row| row.iter().sum())
+    .fold(0.0_f32, f32::max);
 
   let mut child_width = lo_i32(node.width / (columns as f32 + (columns - 1) as f32 * space));
   let mut child_height = lo_i32(child_width * grid_aspect_ratio);
@@ -4976,16 +6013,29 @@ fn snake_layout_tree(
   let start_x = x;
   let mut column_index = 0usize;
   let mut row_height = 0.0_f32;
-  let widths_from_constraints = count >= 2
-    && node.children.get(1).and_then(|child| child.data_node_type)
-      == Some(dgm::ElementValues::SiblingTransition);
+  let widths_from_constraints = shape_widths
+    .windows(2)
+    .any(|widths| (widths[0] - widths[1]).abs() > f32::EPSILON);
+  let row_width_sums: Vec<f32> = shape_widths
+    .chunks(columns.max(1))
+    .map(|row| row.iter().sum())
+    .collect();
   for (index, child) in node.children.iter_mut().enumerate() {
     child.x = x;
     child.y = y;
     let mut current_width = child_width;
     let mut current_height = child_height;
     if widths_from_constraints && max_row_width != 0.0 {
-      current_width = lo_i32(node.width * shape_widths[index] / max_row_width);
+      let row = index / columns.max(1);
+      let row_length = count.saturating_sub(row * columns).min(columns);
+      let gap = child_width * space;
+      let available_width = (node.width - gap * row_length.saturating_sub(1) as f32).max(0.0);
+      let row_width = row_width_sums.get(row).copied().unwrap_or(max_row_width);
+      current_width = lo_i32(available_width * shape_widths[index] / row_width.max(f32::EPSILON));
+      let raw_size = shape_sizes[index];
+      if raw_size.0 > f32::EPSILON && raw_size.1 > f32::EPSILON {
+        current_height = lo_i32(current_width * raw_size.1 / raw_size.0);
+      }
     }
     if child_aspect_ratio != 0.0 {
       current_height = lo_i32(current_width / child_aspect_ratio).min(lo_i32(
@@ -5250,11 +6300,20 @@ fn diagram_bounds_attachment(
   let bottom = (center.0, bounds.y + bounds.height);
   let left = (bounds.x, center.1);
   let right = (bounds.x + bounds.width, center.1);
+  let top_left = (bounds.x, bounds.y);
+  let top_right = (bounds.x + bounds.width, bounds.y);
+  let bottom_left = (bounds.x, bounds.y + bounds.height);
+  let bottom_right = (bounds.x + bounds.width, bounds.y + bounds.height);
   match authored {
     Some("tCtr") => top,
     Some("bCtr") => bottom,
+    Some("ctr") => center,
     Some("midL") => left,
     Some("midR") => right,
+    Some("tL") => top_left,
+    Some("tR") => top_right,
+    Some("bL") => bottom_left,
+    Some("bR") => bottom_right,
     Some("midL midR") => {
       if (left.0 - toward.0).abs() <= (right.0 - toward.0).abs() {
         left
@@ -5281,14 +6340,23 @@ fn diagram_bounds_attachment(
       let scale = tx.min(ty);
       (center.0 + dx * scale, center.1 + dy * scale)
     }
-    Some("radial") | None | Some(_) => [top, bottom, left, right]
-      .into_iter()
-      .min_by(|left, right| {
-        let distance =
-          |point: (f32, f32)| (point.0 - toward.0).powi(2) + (point.1 - toward.1).powi(2);
-        distance(*left).total_cmp(&distance(*right))
-      })
-      .unwrap_or(center),
+    Some("radial") | None | Some(_) => [
+      top,
+      bottom,
+      left,
+      right,
+      top_left,
+      top_right,
+      bottom_left,
+      bottom_right,
+    ]
+    .into_iter()
+    .min_by(|left, right| {
+      let distance =
+        |point: (f32, f32)| (point.0 - toward.0).powi(2) + (point.1 - toward.1).powi(2);
+      distance(*left).total_cmp(&distance(*right))
+    })
+    .unwrap_or(center),
   }
 }
 
@@ -5353,6 +6421,9 @@ fn flatten_diagram_shape_tree(
       connector_end_arrow: node.connector_end_arrow,
       connector_begin_points: node.connector_begin_points.clone(),
       connector_end_points: node.connector_end_points.clone(),
+      connector_beginning_padding: node.connector_beginning_padding,
+      connector_end_padding: node.connector_end_padding,
+      connector_bending_distance: node.connector_bending_distance,
       connector_start_override: node
         .connector_start_override
         .map(|point| (x + point.0, y + point.1)),

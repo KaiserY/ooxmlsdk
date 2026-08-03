@@ -203,8 +203,16 @@ impl PPTShapeGroupContext {
     }
     if let Some(text_body) = &source.text_body {
       let mut text_body = TextBody::from_pml(text_body);
+      // PPTShapeContext clones the matched layout/master placeholder before
+      // parsing the local p:txBody. Preserve that presentation-specific
+      // ancestor before consulting generic DrawingML object defaults;
+      // otherwise a theme spDef such as anchor="t" masks a title
+      // placeholder's anchor="ctr" and moves every inherited title.
       if let Some(inherited) = shape.shape.text_body.as_ref() {
         text_body.inherit_placeholder_body_properties(inherited);
+      }
+      if let Some(theme_defaults) = slide_persist.theme_text_body_defaults.as_ref() {
+        text_body.inherit_theme_body_properties(theme_defaults);
       }
       resolve_text_body_hyperlinks(slide_persist, &mut text_body);
       shape.shape.set_text_body(text_body);

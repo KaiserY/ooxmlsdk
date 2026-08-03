@@ -101,6 +101,7 @@ fn spreadsheet_producer_profile(
   SpreadsheetProducerProfile {
     mso_document: application.is_some_and(|value| value.contains("Microsoft")),
     macintosh_excel: application.is_some_and(|value| value == "Microsoft Macintosh Excel"),
+    excel_online: application.is_some_and(|value| value == "Microsoft Excel Online"),
     libreoffice_document: application.is_some_and(|value| value.contains("LibreOffice")),
     excel_major_version,
     lowest_edited_version,

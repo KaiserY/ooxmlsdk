@@ -28,6 +28,7 @@ pub(crate) struct TextBodyDisplayProperties {
   pub(crate) clip_vertical_overflow: bool,
   pub(crate) column_count: usize,
   pub(crate) column_spacing_emu: i64,
+  pub(crate) right_to_left_columns: bool,
   pub(crate) text_area_rotation: Option<i32>,
   pub(crate) text_camera_z_rotation: Option<i32>,
   pub(crate) vertical: Option<a::TextVerticalValues>,
@@ -116,6 +117,47 @@ impl TextBody {
     )
   }
 
+  pub(crate) fn from_theme_object_defaults(source: Option<&a::ObjectDefaults>) -> Option<Self> {
+    let source = source?;
+    // MS-OE376 2.1.1300 resolves missing bodyPr attributes through txDef,
+    // then lnDef, then spDef. Build that same precedence from low to high;
+    // lstStyle uses the parallel DrawingML paragraph-property cascade.
+    let definitions = [
+      source.shape_default.as_deref().map(|definition| {
+        (
+          definition.body_properties.as_ref(),
+          definition.list_style.as_ref(),
+        )
+      }),
+      source.line_default.as_deref().map(|definition| {
+        (
+          definition.body_properties.as_ref(),
+          definition.list_style.as_ref(),
+        )
+      }),
+      source.text_default.as_deref().map(|definition| {
+        (
+          definition.body_properties.as_ref(),
+          definition.list_style.as_ref(),
+        )
+      }),
+    ];
+    let mut merged: Option<Self> = None;
+    for (body_properties, list_style) in definitions.into_iter().flatten() {
+      let mut overlay = Self::from_parts(body_properties, Some(list_style), &[]);
+      if let Some(inherited) = merged.as_ref() {
+        overlay.inherit_body_properties(inherited);
+        if let Some(source_style) = overlay.list_style.take() {
+          let mut merged_style = inherited.list_style.clone().unwrap_or_default();
+          merged_style.merge_from(&source_style);
+          overlay.list_style = Some(merged_style);
+        }
+      }
+      merged = Some(overlay);
+    }
+    merged
+  }
+
   fn from_parts(
     body_properties: &a::BodyProperties,
     list_style: Option<&a::ListStyle>,
@@ -144,24 +186,76 @@ impl TextBody {
     // this by cloning the placeholder TextBody before parsing the local
     // p:txBody; its TextBodyPropertiesContext replaces insets only when the
     // corresponding a:bodyPr attribute is present.
+    self.inherit_body_properties(inherited);
+    if !self.has_list_style {
+      self.list_style.clone_from(&inherited.list_style);
+    }
+  }
+
+  pub(crate) fn inherit_theme_body_properties(&mut self, inherited: &Self) {
+    // Theme lstStyle is merged below the presentation/master/placeholder
+    // styles by PptShape. Only missing bodyPr attributes participate in this
+    // second fallback (MS-OE376, 2.1.1300).
+    self.inherit_body_properties(inherited);
+  }
+
+  fn inherit_body_properties(&mut self, inherited: &Self) {
+    let has_direct_anchor = self
+      .body_properties
+      .as_deref()
+      .is_some_and(|properties| properties.anchor.is_some());
     if let (Some(properties), Some(inherited_properties)) = (
       self.body_properties.as_deref_mut(),
       inherited.body_properties.as_deref(),
     ) {
+      properties.rotation = properties.rotation.or(inherited_properties.rotation);
+      properties.use_paragraph_spacing = properties
+        .use_paragraph_spacing
+        .or(inherited_properties.use_paragraph_spacing);
+      properties.vertical_overflow = properties
+        .vertical_overflow
+        .or(inherited_properties.vertical_overflow);
+      properties.horizontal_overflow = properties
+        .horizontal_overflow
+        .or(inherited_properties.horizontal_overflow);
+      properties.vertical = properties.vertical.or(inherited_properties.vertical);
+      properties.wrap = properties.wrap.or(inherited_properties.wrap);
       properties.left_inset = properties.left_inset.or(inherited_properties.left_inset);
       properties.top_inset = properties.top_inset.or(inherited_properties.top_inset);
       properties.right_inset = properties.right_inset.or(inherited_properties.right_inset);
       properties.bottom_inset = properties
         .bottom_inset
         .or(inherited_properties.bottom_inset);
+      properties.column_count = properties
+        .column_count
+        .or(inherited_properties.column_count);
+      properties.column_spacing = properties
+        .column_spacing
+        .or(inherited_properties.column_spacing);
+      properties.right_to_left_columns = properties
+        .right_to_left_columns
+        .or(inherited_properties.right_to_left_columns);
+      properties.from_word_art = properties
+        .from_word_art
+        .or(inherited_properties.from_word_art);
+      properties.anchor = properties.anchor.or(inherited_properties.anchor);
+      properties.anchor_center = properties
+        .anchor_center
+        .or(inherited_properties.anchor_center);
+      properties.force_anti_alias = properties
+        .force_anti_alias
+        .or(inherited_properties.force_anti_alias);
+      properties.up_right = properties.up_right.or(inherited_properties.up_right);
+      properties.compatible_line_spacing = properties
+        .compatible_line_spacing
+        .or(inherited_properties.compatible_line_spacing);
     }
-
-    // TextBodyPropertiesContext likewise replaces the vertical anchor only
-    // when the current a:bodyPr has an anchor attribute.
-    let has_direct_anchor = self
-      .body_properties
-      .as_deref()
-      .is_some_and(|properties| properties.anchor.is_some());
+    if let Some(properties) = self.body_properties.as_deref() {
+      self.display_properties = TextBodyDisplayProperties::from_body_properties(properties);
+    }
+    // A synthesized placeholder/theme body can carry its already-resolved
+    // display anchor without retaining the source bodyPr. Preserve that
+    // cascade value whenever the local bodyPr did not author an anchor.
     if !has_direct_anchor {
       self.display_properties.anchor = inherited.display_properties.anchor;
     }
@@ -178,6 +272,7 @@ impl Default for TextBodyDisplayProperties {
       clip_vertical_overflow: false,
       column_count: 1,
       column_spacing_emu: 0,
+      right_to_left_columns: false,
       text_area_rotation: None,
       text_camera_z_rotation: None,
       vertical: None,
@@ -219,6 +314,9 @@ impl TextBodyDisplayProperties {
         .column_spacing
         .map(|spacing| spacing.to_emu())
         .unwrap_or_default(),
+      right_to_left_columns: properties
+        .right_to_left_columns
+        .is_some_and(|value| value.as_bool()),
       text_area_rotation: properties.rotation,
       text_camera_z_rotation: properties
         .scene3_d_type
